@@ -1,0 +1,23 @@
+import { betterAuth } from "better-auth";
+import { prismaAdapter } from "better-auth/adapters/prisma";
+import { bearer, organization } from "better-auth/plugins";
+
+export function createAuth(prisma: Parameters<typeof prismaAdapter>[0]) {
+  const trustedOrigins = [
+    process.env.WEB_ORIGIN ?? "http://localhost:5173",
+    "http://localhost:5173",
+    "http://localhost:3000",
+    "http://tauri.localhost",
+    "tauri://localhost",
+  ];
+
+  return betterAuth({
+    database: prismaAdapter(prisma, { provider: "postgresql" }),
+    emailAndPassword: { enabled: true },
+    trustedOrigins,
+    plugins: [
+      organization(), // each school = one organization
+      bearer(), // token auth for mobile and desktop
+    ],
+  });
+}

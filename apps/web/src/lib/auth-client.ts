@@ -1,0 +1,23 @@
+import { createAuthClient } from "better-auth/react";
+
+/**
+ * Better Auth client for the web app.
+ *
+ * Requests use the current web origin and `/api/auth` path. Vite proxies
+ * that path to the API during development; production can route it likewise.
+ *
+ * The `organizationClient` plugin gives us:
+ *   - authClient.useActiveOrganization()
+ *   - authClient.organization.setActive(id)
+ *   - authClient.organization.listMembers()  …etc.
+ */
+import { organizationClient } from "better-auth/client/plugins";
+
+export const authClient = createAuthClient({
+  baseURL: window.location.origin,
+  basePath: "/api/auth",
+  plugins: [organizationClient()],
+});
+
+// Re-export the hooks so components don't need to import from better-auth directly
+export const { useSession, signIn, signOut, signUp } = authClient;

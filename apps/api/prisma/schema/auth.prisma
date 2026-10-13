@@ -1,0 +1,191 @@
+// ============================================================================
+// BETTER AUTH CORE MODELS
+// Required by Better Auth with Organization and Dynamic Access Control plugins
+// ============================================================================
+
+model user {
+  id            String    @id
+  name          String
+  email         String    @unique
+  emailVerified Boolean   @default(false)
+  image         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  // Global role field — superAdmin to manage all orgs. Member roles handle school access.
+  role          String    @default("user")
+  banned        Boolean   @default(false)
+  banReason     String?
+  banExpires    DateTime?
+
+  // Relations
+  accounts             account[]
+  sessions             session[]
+  invitations          invitation[]
+  members              member[]
+  attendancesMarked    Attendance[]           @relation("AttendanceMarkedBy")
+  auditLogs            AuditLog[]
+  componentScores      ComponentScore[]
+  documents            Document[]
+  gradingSystems       GradingSystem[]
+  paymentsRecorded     Payment[]              @relation("PaymentRecordedBy")
+  transcriptRequests   TranscriptRequest[]
+  notifications        Notification[]
+  announcementsSent    Announcement[]         @relation("AnnouncementsSent")
+  feeReminderSchedules FeeReminderSchedule[]  @relation("FeeReminderSchedules")
+  expensesRecorded     Expense[]              @relation("ExpenseRecordedBy")
+  inventoryPerformed   InventoryTransaction[] @relation("InventoryPerformedBy")
+  inventoryReceived    InventoryTransaction[] @relation("InventoryRecipient")
+  userProfile          UserProfile?
+  submittedTickets     SupportTicket[]        @relation("SubmittedTickets")
+  assignedTickets      SupportTicket[]        @relation("AssignedTickets")
+  ticketReplies        TicketReply[]
+  payrollProcessed     PayrollRecord[]        @relation("PayrollProcessedBy")
+  promotionsApproved   PromotionRecord[]      @relation("PromotedBy")
+
+  @@index([banned])
+  @@index([email])
+  @@index([role])
+  @@map("users")
+}
+
+model session {
+  id                   String   @id
+  expiresAt            DateTime
+  token                String   @unique
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  ipAddress            String?
+  userAgent            String?
+  userId               String
+  // Required by organization plugin — tracks which org the user is viewing
+  activeOrganizationId String?
+  // Required by impersonation (admin plugin)
+  impersonatedBy       String?
+
+  user user @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([token])
+  @@index([userId])
+  @@index([activeOrganizationId])
+  @@index([impersonatedBy])
+  @@map("sessions")
+}
+
+model account {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                String
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  user user @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([providerId, accountId])
+  @@index([userId])
+  @@map("accounts")
+}
+
+model verification {
+  id         String   @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([identifier, value])
+  @@index([identifier])
+  @@index([expiresAt])
+  @@map("verifications")
+}
+
+// ============================================================
+// BETTER AUTH ORGANIZATION PLUGIN MODELS
+// ============================================================
+
+model organization {
+  id        String   @id
+  name      String
+  slug      String   @unique
+  logo      String?
+  metadata  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  members     member[]
+  invitations invitation[]
+  school      School?
+  roles       organizationRole[]
+
+  // Subscription State
+  subscriptionStatus String    @default("TRIALING")
+  expiresAt          DateTime?
+
+  @@index([slug])
+  @@index([subscriptionStatus])
+  @@map("organizations")
+}
+
+model organizationRole {
+  id             String   @id
+  organizationId String
+  role           String
+  permissions    String // JSON string of permission map e.g. {"student":["view","create"]}
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, role])
+  @@index([organizationId])
+  @@map("organization_roles")
+}
+
+model member {
+  id             String   @id
+  organizationId String
+  userId         String
+  role           String
+  banned         Boolean  @default(false)
+  banReason      String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         user         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, userId])
+  @@index([organizationId])
+  @@index([userId])
+  @@index([role])
+  @@map("members")
+}
+
+model invitation {
+  id             String   @id
+  organizationId String
+  email          String
+  role           String?
+  status         String   @default("pending")
+  expiresAt      DateTime
+  createdAt      DateTime @default(now())
+  inviterId      String
+
+  organization organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  inviter      user         @relation(fields: [inviterId], references: [id], onDelete: Cascade)
+
+  @@index([email])
+  @@index([inviterId])
+  @@index([organizationId])
+  @@index([status])
+  @@map("invitations")
+}

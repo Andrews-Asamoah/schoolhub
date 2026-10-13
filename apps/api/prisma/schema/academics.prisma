@@ -1,0 +1,370 @@
+// ============================================================================
+// ACADEMIC STRUCTURE & TIMETABLE
+// ============================================================================
+
+model House {
+  id             String   @id @default(cuid())
+  schoolId       String
+  name           String
+  code           String
+  description    String?
+  color          String?
+  motto          String?
+  houseTeacherId String?
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  school          School    @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  houseTeacher    Teacher?  @relation("HouseTeacher", fields: [houseTeacherId], references: [id])
+  students        Student[]
+  teachersInHouse Teacher[] @relation("TeacherHouse")
+
+  @@unique([code, schoolId])
+  @@index([houseTeacherId])
+  @@index([schoolId, isActive])
+  @@map("houses")
+}
+
+model AcademicYear {
+  id        String   @id @default(cuid())
+  schoolId  String
+  name      String
+  startDate DateTime @db.Date
+  endDate   DateTime @db.Date
+  isCurrent Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  school           School           @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  classes          Class[]
+  enrollments      Enrollment[]
+  terms            Term[]
+  reportCardSets   ReportCardSet[]
+  timetableEntries TimetableEntry[]
+
+  teacherAssignments    TeacherAssignment[]
+  staffAssignments      StaffAssignment[]
+  bills                 Bill[]                 @relation("AcademicYearBills")
+  notifications         Notification[]
+  announcements         Announcement[]
+  expenses              Expense[]
+  inventoryTransactions InventoryTransaction[]
+  payrollRecords        PayrollRecord[]
+  feeReminderSchedules  FeeReminderSchedule[]
+
+  @@unique([name, schoolId])
+  @@index([schoolId, isCurrent])
+  @@index([startDate, endDate])
+  @@map("academic_years")
+}
+
+model Term {
+  id             String   @id @default(cuid())
+  academicYearId String
+  name           String
+  termNumber     Int
+  startDate      DateTime @db.Date
+  endDate        DateTime @db.Date
+  isCurrent      Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  academicYear          AcademicYear           @relation(fields: [academicYearId], references: [id], onDelete: Cascade)
+  assessmentScores      AssessmentScore[]
+  bills                 Bill[]
+  enrollments           Enrollment[]
+  remarks               Remark[]
+  reportCardSets        ReportCardSet[]
+  notifications         Notification[]
+  announcements         Announcement[]
+  expenses              Expense[]
+  inventoryTransactions InventoryTransaction[]
+  payrollRecords        PayrollRecord[]
+  feeReminderSchedules  FeeReminderSchedule[]
+
+  @@unique([academicYearId, termNumber])
+  @@index([academicYearId])
+  @@index([isCurrent])
+  @@index([startDate, endDate])
+  @@map("terms")
+}
+
+model Department {
+  id                String   @id @default(cuid())
+  schoolId          String
+  name              String
+  code              String
+  description       String?
+  headOfDeptId      String?
+  promotionPassMark Decimal? @db.Decimal(5, 2)
+  isActive          Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  school               School               @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  headOfDept           Teacher?             @relation("DepartmentHead", fields: [headOfDeptId], references: [id])
+  students             Student[]
+  subjects             Subject[]            @relation("DepartmentSubjects")
+  teachersInDepartment Teacher[]            @relation("TeacherDepartment")
+  staff                Staff[]              @relation("StaffDepartment")
+  classes              Class[]
+  timetableEntries     TimetableEntry[]
+  assessmentTemplates  AssessmentTemplate[]
+  reportCardTemplates  ReportCardTemplate[]
+  periodTemplates      PeriodTemplate[]     @relation("DeptPeriodTemplates")
+  timeSlots            TimeSlot[]           @relation("DeptTimeSlots")
+
+  @@unique([code, schoolId])
+  @@index([headOfDeptId])
+  @@index([schoolId, isActive])
+  @@map("departments")
+}
+
+model Class {
+  id             String    @id @default(cuid())
+  schoolId       String
+  academicYearId String
+  name           String
+  slug           String?
+  level          String
+  capacity       Int?
+  classTeacherId String?
+  isActive       Boolean   @default(true)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  deletedAt      DateTime?
+
+  school                    School                    @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  academicYear              AcademicYear              @relation(fields: [academicYearId], references: [id], onDelete: Cascade)
+  classTeacher              Teacher?                  @relation(fields: [classTeacherId], references: [id])
+  subjects                  ClassSubject[]
+  enrollments               Enrollment[]
+  students                  Student[]
+  departmentId              String?
+  department                Department?               @relation(fields: [departmentId], references: [id])
+  assessmentTemplates       AssessmentTemplate[]
+  assessmentTemplateClasses AssessmentTemplateClass[]
+  reportCardSets            ReportCardSet[]
+  reportCardSetClasses      ReportCardSetClass[]
+  assessmentExtensions      AssessmentExtension[]
+  timetableEntries          TimetableEntry[]
+
+  feeStructures FeeStructureClass[]
+
+  nextPromotionClassId String?
+  nextPromotionClass   Class?  @relation("ClassPromotion", fields: [nextPromotionClassId], references: [id])
+  prevPromotionClasses Class[] @relation("ClassPromotion")
+
+  isGraduatingClass Boolean @default(false)
+  order             Int?
+
+  bills         Bill[]
+  promotionsSrc PromotionRecord[] @relation("PromotionFrom")
+  promotionsDst PromotionRecord[] @relation("PromotionTo")
+
+  @@unique([name, academicYearId, schoolId])
+  @@unique([slug, academicYearId, schoolId])
+  @@index([schoolId, isActive])
+  @@index([academicYearId])
+  @@index([classTeacherId])
+  @@index([schoolId, deletedAt])
+  @@map("classes")
+}
+
+model TeacherAssignment {
+  id             String   @id @default(cuid())
+  schoolId       String
+  teacherId      String
+  academicYearId String
+  createdAt      DateTime @default(now())
+
+  school       School       @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  teacher      Teacher      @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  academicYear AcademicYear @relation(fields: [academicYearId], references: [id], onDelete: Cascade)
+
+  @@unique([teacherId, academicYearId, schoolId])
+  @@map("teacher_assignments")
+}
+
+model StaffAssignment {
+  id             String   @id @default(cuid())
+  schoolId       String
+  staffId        String
+  academicYearId String
+  createdAt      DateTime @default(now())
+
+  school       School       @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  staff        Staff        @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  academicYear AcademicYear @relation(fields: [academicYearId], references: [id], onDelete: Cascade)
+
+  @@unique([staffId, academicYearId, schoolId])
+  @@map("staff_assignments")
+}
+
+model Subject {
+  id             String    @id @default(cuid())
+  schoolId       String
+  name           String
+  code           String
+  description    String?
+  periodsPerWeek Int       @default(4)
+  isActive       Boolean   @default(true)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  deletedAt      DateTime?
+
+  school           School            @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  departments      Department[]      @relation("DepartmentSubjects")
+  assessmentScores AssessmentScore[]
+  classSubjects    ClassSubject[]
+  teachers         SubjectTeacher[]
+  timetableEntries TimetableEntry[]
+
+  @@unique([code, schoolId])
+  @@index([schoolId, isActive])
+  @@index([schoolId, deletedAt])
+  @@map("subjects")
+}
+
+model ClassSubject {
+  id           String   @id @default(cuid())
+  classId      String
+  subjectId    String
+  isCompulsory Boolean  @default(true)
+  teacherId    String?
+  createdAt    DateTime @default(now())
+
+  class   Class    @relation(fields: [classId], references: [id], onDelete: Cascade)
+  subject Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  teacher Teacher? @relation(fields: [teacherId], references: [id])
+
+  @@unique([classId, subjectId])
+  @@index([classId])
+  @@index([subjectId])
+  @@index([teacherId])
+  @@map("class_subjects")
+}
+
+model SubjectTeacher {
+  id        String   @id @default(cuid())
+  subjectId String
+  teacherId String
+  createdAt DateTime @default(now())
+
+  subject Subject @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  teacher Teacher @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+
+  @@unique([subjectId, teacherId])
+  @@index([subjectId])
+  @@index([teacherId])
+  @@map("subject_teachers")
+}
+
+model Enrollment {
+  id             String           @id @default(cuid())
+  studentId      String
+  classId        String
+  academicYearId String
+  termId         String
+  status         EnrollmentStatus @default(ACTIVE)
+  enrolledAt     DateTime         @default(now())
+  completedAt    DateTime?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  student      Student      @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  class        Class        @relation(fields: [classId], references: [id], onDelete: Cascade)
+  academicYear AcademicYear @relation(fields: [academicYearId], references: [id], onDelete: Cascade)
+  term         Term         @relation(fields: [termId], references: [id])
+
+  @@unique([studentId, classId, academicYearId, termId])
+  @@index([studentId])
+  @@index([classId, academicYearId, status])
+  @@index([academicYearId])
+  @@index([termId])
+  @@map("enrollments")
+}
+
+model Classroom {
+  id        String   @id @default(cuid())
+  schoolId  String
+  name      String
+  capacity  Int?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  school           School           @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  timetableEntries TimetableEntry[]
+
+  @@unique([name, schoolId])
+  @@map("classrooms")
+}
+
+model PeriodTemplate {
+  id           String  @id @default(cuid())
+  schoolId     String
+  departmentId String?
+  name         String
+  startTime    String
+  endTime      String
+  sortOrder    Int     @default(0)
+
+  school     School      @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  department Department? @relation("DeptPeriodTemplates", fields: [departmentId], references: [id], onDelete: Cascade)
+
+  @@unique([schoolId, departmentId, startTime, endTime])
+  @@index([schoolId, departmentId])
+  @@map("period_templates")
+}
+
+model TimeSlot {
+  id           String    @id @default(cuid())
+  schoolId     String
+  departmentId String?
+  dayOfWeek    DayOfWeek
+  startTime    String
+  endTime      String
+  label        String?
+
+  school           School           @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  department       Department?      @relation("DeptTimeSlots", fields: [departmentId], references: [id], onDelete: Cascade)
+  timetableEntries TimetableEntry[]
+
+  @@unique([schoolId, departmentId, dayOfWeek, startTime, endTime])
+  @@index([schoolId, departmentId])
+  @@map("time_slots")
+}
+
+model TimetableEntry {
+  id             String             @id @default(cuid())
+  schoolId       String
+  classId        String?
+  departmentId   String?
+  type           TimetableEntryType @default(LESSON)
+  label          String?
+  subjectId      String?
+  teacherId      String?
+  timeSlotId     String
+  classroomId    String?
+  academicYearId String
+  termId         String?
+
+  school       School       @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  class        Class?       @relation(fields: [classId], references: [id], onDelete: Cascade)
+  department   Department?  @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  subject      Subject?     @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  teacher      Teacher?     @relation(fields: [teacherId], references: [id], onDelete: SetNull)
+  timeSlot     TimeSlot     @relation(fields: [timeSlotId], references: [id], onDelete: Cascade)
+  classroom    Classroom?   @relation(fields: [classroomId], references: [id], onDelete: SetNull)
+  academicYear AcademicYear @relation(fields: [academicYearId], references: [id], onDelete: Cascade)
+
+  @@unique([classroomId, timeSlotId, academicYearId])
+  @@unique([classId, timeSlotId, academicYearId])
+  @@unique([departmentId, timeSlotId, academicYearId])
+  @@index([classId])
+  @@index([departmentId])
+  @@index([teacherId])
+  @@index([timeSlotId])
+  @@map("timetable_entries")
+}

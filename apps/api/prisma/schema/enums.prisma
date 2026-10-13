@@ -1,0 +1,374 @@
+// ============================================================================
+// ENUMS - School Management System
+// ============================================================================
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+}
+
+enum GuardianType {
+  FATHER
+  MOTHER
+  GUARDIAN
+  SIBLING
+  RELATIVE
+  OTHER
+}
+
+enum StaffType {
+  ACCOUNTANT
+  HEADTEACHER
+  ADMIN
+  LIBRARIAN
+  DRIVER
+  SECURITY
+  NURSE
+  COUNSELOR
+  IT_SUPPORT
+  RECEPTIONIST
+  COOK
+  CLEANER
+  OTHER
+}
+
+enum EmploymentType {
+  FULL_TIME
+  PART_TIME
+  CONTRACT
+  TEMPORARY
+  INTERN
+}
+
+enum StudentStatus {
+  ACTIVE
+  GRADUATED
+  WITHDRAWN
+  SUSPENDED
+  TRANSFERRED
+  EXPELLED
+  DECEASED
+}
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  LATE
+  EXCUSED
+  SICK
+  PERMISSION
+}
+
+enum EnrollmentStatus {
+  ACTIVE
+  COMPLETED
+  WITHDRAWN
+  TRANSFERRED
+  SUSPENDED
+}
+
+enum AssessmentType {
+  FINAL_EXAM
+  MID_TERM_EXAM
+  CLASS_TEST
+  QUIZ
+  ASSIGNMENT
+  PROJECT
+  PRACTICAL
+  HOMEWORK
+  PRESENTATION
+  MOCK_EXAM
+}
+
+enum RequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  PROCESSING
+  COMPLETED
+  CANCELLED
+}
+
+enum RemarkType {
+  ACADEMIC
+  BEHAVIORAL
+  ATTENDANCE
+  GENERAL
+  ACHIEVEMENT
+  CONCERN
+  HEADTEACHER
+}
+
+enum AccountType {
+  ASSET
+  LIABILITY
+  EQUITY
+  REVENUE
+  EXPENSE
+}
+
+enum AccountCategory {
+  CASH
+  BANK
+  ACCOUNTS_RECEIVABLE
+  FIXED_ASSETS
+  INVENTORY
+  PREPAID_EXPENSES
+  ACCOUNTS_PAYABLE
+  ACCRUED_EXPENSES
+  LONG_TERM_DEBT
+  EQUITY_CAPITAL
+  RETAINED_EARNINGS
+  SCHOOL_FEES
+  OTHER_INCOME
+  SALARY_WAGES
+  UTILITIES
+  RENT
+  SUPPLIES
+  MAINTENANCE
+  TRANSPORT
+  INSURANCE
+  TAXES
+  OTHER_EXPENSE
+}
+
+enum FeeCategory {
+  TUITION
+  ADMISSION
+  REGISTRATION
+  EXAM
+  LIBRARY
+  LABORATORY
+  SPORTS
+  TRANSPORT
+  MEAL
+  UNIFORM
+  BOOKS
+  TECHNOLOGY
+  HOSTEL
+  INSURANCE
+  DEVELOPMENT
+  OTHER
+}
+
+enum BillStatus {
+  PENDING
+  PARTIALLY_PAID
+  PAID
+  OVERDUE
+  WAIVED
+  CANCELLED
+}
+
+enum BillType {
+  PROFORMA
+  INVOICE
+}
+
+enum BillItemStatus {
+  UNPAID
+  PARTIALLY_PAID
+  FULLY_PAID
+}
+
+enum PaymentMethod {
+  CASH
+  BANK_TRANSFER
+  CHEQUE
+  MOBILE_MONEY
+  CARD
+  ONLINE
+  OTHER
+}
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REFUNDED
+  CANCELLED
+}
+
+enum TransactionType {
+  INCOME
+  EXPENSE
+  TRANSFER
+  ADJUSTMENT
+}
+
+enum TransactionCategory {
+  SCHOOL_FEES
+  SALARY
+  UTILITIES
+  SUPPLIES
+  MAINTENANCE
+  TRANSPORT
+  RENT
+  INSURANCE
+  TAXES
+  DONATION
+  GRANT
+  OTHER
+}
+
+enum TranscriptRequestType {
+  OFFICIAL
+  UNOFFICIAL
+  BECE_TRANSCRIPT
+  WASSCE_TRANSCRIPT
+  TRANSFER_CERTIFICATE
+  PROGRESS_REPORT
+  FINAL_TRANSCRIPT
+  OTHER
+}
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+  LOGIN
+  LOGOUT
+  PAYMENT_RECORDED
+  BILL_GENERATED
+  GRADE_ENTERED
+  ATTENDANCE_MARKED
+}
+
+enum PlanType {
+  FREE
+  BASIC
+  STANDARD
+  PREMIUM
+  ENTERPRISE
+}
+
+enum BillingCycle {
+  MONTHLY
+  YEARLY
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  TRIALING
+  PAST_DUE
+  CANCELED
+  INCOMPLETE
+  INCOMPLETE_EXPIRED
+  UNPAID
+  EXPIRED
+  SUSPENDED
+}
+
+enum InvoiceStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+  VOID
+}
+
+enum EntityType {
+  STUDENT
+  TEACHER
+  STAFF
+  SCHOOL
+  BILL
+  PAYMENT
+  OTHER
+}
+
+enum ReportCardStatus {
+  DRAFT
+  GENERATING
+  GENERATED
+  PUBLISHED
+  ARCHIVED
+}
+
+enum NotificationType {
+  RESULT_PUBLISHED
+  FEE_REMINDER
+  ATTENDANCE_ALERT
+  GENERAL
+  ANNOUNCEMENT
+  ONLINE_PAYMENT
+  FINANCIAL_MESSAGE
+}
+
+enum MessageChannel {
+  SMS
+  EMAIL
+  IN_APP
+}
+
+enum ReminderStatus {
+  PENDING
+  SENT
+  FAILED
+  SKIPPED
+}
+
+enum TicketStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+enum TicketPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum PayrollStatus {
+  DRAFT
+  APPROVED
+  PAID
+  CANCELLED
+}
+
+enum DayOfWeek {
+  MONDAY
+  TUESDAY
+  WEDNESDAY
+  THURSDAY
+  FRIDAY
+  SATURDAY
+  SUNDAY
+}
+
+enum TimetableEntryType {
+  LESSON
+  BREAK
+  ACTIVITY
+}
+
+enum AssessmentScoreStatus {
+  DRAFT
+  SUBMITTED
+  REVIEWED
+  FINAL
+}
+
+enum PromotionType {
+  PROMOTED
+  REPEATED
+  GRADUATED
+  SKIPPED
+}
+
+enum BehavioralPillar {
+  PUNCTUALITY
+  CONDUCT
+  ATTITUDE
+  OTHER
+}
+
+enum InventoryTransactionType {
+  IN
+  OUT
+  ADJUSTMENT
+}

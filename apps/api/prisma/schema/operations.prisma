@@ -1,0 +1,347 @@
+// ============================================================================
+// OPERATIONS, INVENTORY, TICKETS, LOGS & AUDIT
+// ============================================================================
+
+model InventoryItem {
+  id          String   @id @default(cuid())
+  schoolId    String
+  name        String
+  description String?
+  category    String?
+  quantity    Int      @default(0)
+  unit        String?  @default("pcs")
+  minQuantity Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  school       School                 @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  transactions InventoryTransaction[]
+
+  @@unique([name, schoolId])
+  @@index([schoolId])
+  @@map("inventory_items")
+}
+
+model InventoryCategory {
+  id          String   @id @default(cuid())
+  schoolId    String
+  name        String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  school School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@unique([name, schoolId])
+  @@index([schoolId])
+  @@map("inventory_categories")
+}
+
+model InventoryTransaction {
+  id             String                   @id @default(cuid())
+  schoolId       String
+  itemId         String
+  type           InventoryTransactionType
+  quantity       Int
+  date           DateTime                 @default(now())
+  description    String?
+  performedById  String?
+  recipientName  String?
+  recipientId    String?
+  academicYearId String?
+  termId         String?
+  createdAt      DateTime                 @default(now())
+
+  school       School        @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  item         InventoryItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  performedBy  user?         @relation("InventoryPerformedBy", fields: [performedById], references: [id], onDelete: SetNull)
+  academicYear AcademicYear? @relation(fields: [academicYearId], references: [id])
+  term         Term?         @relation(fields: [termId], references: [id])
+  recipient    user?         @relation("InventoryRecipient", fields: [recipientId], references: [id], onDelete: SetNull)
+
+  @@index([itemId])
+  @@index([schoolId])
+  @@index([academicYearId])
+  @@index([termId])
+  @@index([recipientId])
+  @@map("inventory_transactions")
+}
+
+model Document {
+  id           String     @id @default(cuid())
+  schoolId     String
+  title        String
+  description  String?
+  fileUrl      String
+  fileType     String
+  fileSize     Int
+  entityType   EntityType
+  entityId     String
+  studentId    String?
+  teacherId    String?
+  staffId      String?
+  uploadedById String?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  school     School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  student    Student? @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  teacher    Teacher? @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  staff      Staff?   @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  uploadedBy user?    @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
+
+  @@index([uploadedById])
+  @@index([schoolId])
+  @@index([entityType, entityId])
+  @@index([studentId])
+  @@index([teacherId])
+  @@index([staffId])
+  @@map("documents")
+}
+
+model AuditLog {
+  id        String      @id @default(cuid())
+  userId    String
+  schoolId  String?
+  action    AuditAction
+  entityType String
+  entityId  String
+  oldValues Json?
+  newValues Json?
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime    @default(now())
+
+  user   user    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  school School? @relation(fields: [schoolId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([schoolId])
+  @@index([entityType, entityId])
+  @@index([action])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+model SupportTicket {
+  id            String         @id @default(cuid())
+  subject       String
+  description   String
+  status        TicketStatus   @default(OPEN)
+  priority      TicketPriority @default(MEDIUM)
+  category      String?
+  attachmentUrl String?
+  isInternal    Boolean        @default(false)
+  submittedById String
+  schoolId      String?
+  assignedToId  String?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  submittedBy user          @relation("SubmittedTickets", fields: [submittedById], references: [id])
+  school      School?       @relation(fields: [schoolId], references: [id])
+  assignedTo  user?         @relation("AssignedTickets", fields: [assignedToId], references: [id])
+  replies     TicketReply[]
+
+  @@index([submittedById])
+  @@index([schoolId])
+  @@index([status])
+  @@map("support_tickets")
+}
+
+model TicketReply {
+  id            String   @id @default(cuid())
+  ticketId      String
+  authorId      String
+  message       String
+  attachmentUrl String?
+  createdAt     DateTime @default(now())
+
+  ticket SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  author user          @relation(fields: [authorId], references: [id])
+
+  @@index([ticketId])
+  @@map("ticket_replies")
+}
+
+model Club {
+  id                String   @id @default(cuid())
+  schoolId          String
+  name              String
+  description       String?
+  teacherInChargeId String?
+  isActive          Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  school          School       @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  teacherInCharge Teacher?     @relation(fields: [teacherInChargeId], references: [id], onDelete: SetNull)
+  members         ClubMember[]
+
+  @@unique([name, schoolId])
+  @@index([schoolId])
+  @@index([teacherInChargeId])
+  @@map("clubs")
+}
+
+model ClubMember {
+  id        String   @id @default(cuid())
+  clubId    String
+  studentId String
+  joinedAt  DateTime @default(now())
+  role      String?
+
+  club    Club    @relation(fields: [clubId], references: [id], onDelete: Cascade)
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([clubId, studentId])
+  @@index([clubId])
+  @@index([studentId])
+  @@map("club_members")
+}
+
+model PromotionRecord {
+  id            String        @id @default(cuid())
+  schoolId      String
+  studentId     String
+  fromClassId   String
+  toClassId     String?
+  fromYearId    String
+  toYearId      String?
+  promotionType PromotionType
+  promotedById  String
+  promotedAt    DateTime      @default(now())
+  notes         String?
+  reason        String?
+
+  school     School  @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  student    Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  fromClass  Class   @relation("PromotionFrom", fields: [fromClassId], references: [id])
+  toClass    Class?  @relation("PromotionTo", fields: [toClassId], references: [id])
+  promotedBy user    @relation("PromotedBy", fields: [promotedById], references: [id])
+
+  @@index([schoolId])
+  @@index([studentId])
+  @@index([fromClassId])
+  @@index([toClassId])
+  @@index([fromYearId])
+  @@index([toYearId])
+  @@index([promotionType])
+  @@map("promotion_records")
+}
+
+model Notification {
+  id             String           @id @default(cuid())
+  schoolId       String
+  userId         String
+  type           NotificationType
+  title          String
+  message        String
+  isRead         Boolean          @default(false)
+  link           String?
+  academicYearId String?
+  termId         String?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  school       School        @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  user         user          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  academicYear AcademicYear? @relation(fields: [academicYearId], references: [id])
+  term         Term?         @relation(fields: [termId], references: [id])
+
+  @@index([schoolId])
+  @@index([userId])
+  @@index([type])
+  @@index([academicYearId])
+  @@index([termId])
+  @@map("notifications")
+}
+
+model Announcement {
+  id             String    @id @default(cuid())
+  schoolId       String
+  authorId       String
+  title          String
+  content        String
+  contentHtml    String?
+  target         String    @default("ALL")
+  messageType    String    @default("ANNOUNCEMENT")
+  sendSms        Boolean   @default(false)
+  sendEmail      Boolean   @default(false)
+  smsCount       Int       @default(0)
+  emailCount     Int       @default(0)
+  expiresAt      DateTime?
+  academicYearId String?
+  termId         String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  school       School        @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  author       user          @relation("AnnouncementsSent", fields: [authorId], references: [id], onDelete: Cascade)
+  academicYear AcademicYear? @relation(fields: [academicYearId], references: [id])
+  term         Term?         @relation(fields: [termId], references: [id])
+
+  @@index([schoolId])
+  @@index([authorId])
+  @@index([messageType])
+  @@index([academicYearId])
+  @@index([termId])
+  @@map("announcements")
+}
+
+model SMSLog {
+  id             String   @id @default(cuid())
+  schoolId       String
+  sentBy         String
+  audienceType   String
+  recipientCount Int      @default(0)
+  message        String
+  senderId       String
+  batchId        String?
+  status         String   @default("SENT")
+  failedCount    Int      @default(0)
+  createdAt      DateTime @default(now())
+
+  school School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@index([schoolId])
+  @@index([createdAt])
+  @@index([audienceType])
+  @@map("sms_logs")
+}
+
+model SystemSMSLog {
+  id             String   @id @default(cuid())
+  sentBy         String
+  message        String
+  targetFilter   String   @default("all")
+  recipientCount Int      @default(0)
+  batchId        String?
+  status         String   @default("SENT")
+  failedCount    Int      @default(0)
+  createdAt      DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([sentBy])
+  @@map("system_sms_logs")
+}
+
+model EmailLog {
+  id             String   @id @default(cuid())
+  schoolId       String
+  sentBy         String?
+  recipientEmail String
+  recipientName  String?
+  subject        String
+  category       String   @default("GENERAL")
+  status         String   @default("SENT")
+  errorMessage   String?
+  createdAt      DateTime @default(now())
+
+  school School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@index([schoolId])
+  @@index([createdAt])
+  @@index([category])
+  @@map("email_logs")
+}

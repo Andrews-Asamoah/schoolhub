@@ -1,0 +1,20 @@
+{
+  "name": "schoolhub",
+  "private": true,
+  "engines": {
+    "node": ">=22"
+  },
+  "packageManager": "pnpm@12.4.1",
+  "scripts": {
+    "dev": "turbo run dev",
+    "typecheck": "turbo run typecheck",
+    "db:migrate": "pnpm --filter @schoolhub/api migrate",
+    "db:studio": "pnpm --filter @schoolhub/api studio"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.5",
+    "prettier": "^3.9.10",
+    "turbo": "^2.11.7",
+    "typescript": "^7.0.2"
+  }
+}

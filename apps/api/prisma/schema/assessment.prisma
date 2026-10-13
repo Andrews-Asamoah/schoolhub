@@ -1,0 +1,345 @@
+// ============================================================================
+// ATTENDANCE, ASSESSMENTS & REPORT CARDS
+// ============================================================================
+
+model Attendance {
+  id         String           @id @default(cuid())
+  studentId  String
+  date       DateTime         @db.Date
+  status     AttendanceStatus
+  remarks    String?
+  markedById String?
+  markedAt   DateTime         @default(now())
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
+
+  student  Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  markedBy user?   @relation("AttendanceMarkedBy", fields: [markedById], references: [id], onDelete: SetNull)
+
+  @@unique([studentId, date])
+  @@index([studentId])
+  @@index([date, status])
+  @@index([markedById])
+  @@map("attendances")
+}
+
+model GradingSystem {
+  id              String   @id @default(cuid())
+  schoolId        String?
+  name            String
+  code            String
+  description     String?
+  isSystemDefault Boolean  @default(false)
+  isSchoolDefault Boolean  @default(false)
+  isActive        Boolean  @default(true)
+  createdById     String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  school              School?              @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  createdBy           user?                @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  assessmentTemplates AssessmentTemplate[]
+  gradeScales         GradeScale[]
+
+  @@unique([code, schoolId])
+  @@index([createdById])
+  @@index([schoolId, isActive])
+  @@index([isSystemDefault])
+  @@index([isSchoolDefault])
+  @@map("grading_systems")
+}
+
+model GradeScale {
+  id              String   @id @default(cuid())
+  gradingSystemId String
+  grade           String
+  description     String
+  minScore        Decimal  @db.Decimal(5, 2)
+  maxScore        Decimal  @db.Decimal(5, 2)
+  gradePoint      Decimal  @db.Decimal(3, 2)
+  displayOrder    Int
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  gradingSystem GradingSystem @relation(fields: [gradingSystemId], references: [id], onDelete: Cascade)
+
+  @@unique([gradingSystemId, grade])
+  @@index([gradingSystemId])
+  @@index([minScore, maxScore])
+  @@map("grade_scales")
+}
+
+model AssessmentTemplate {
+  id              String    @id @default(cuid())
+  schoolId        String
+  gradingSystemId String
+  name            String
+  description     String?
+  termNumber      Int?
+  isActive        Boolean   @default(true)
+  deadline        DateTime?
+  isLocked        Boolean   @default(false)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  school           School                    @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  gradingSystem    GradingSystem             @relation(fields: [gradingSystemId], references: [id])
+  classId          String?
+  classLevel       String?
+  subjectCode      String?
+  class            Class?                    @relation(fields: [classId], references: [id])
+  departmentId     String?
+  department       Department?               @relation(fields: [departmentId], references: [id])
+  classes          AssessmentTemplateClass[]
+  components       AssessmentComponent[]
+  assessmentScores AssessmentScore[]
+  extensions       AssessmentExtension[]
+
+  @@index([schoolId, isActive])
+  @@index([gradingSystemId])
+  @@map("assessment_templates")
+}
+
+model AssessmentComponent {
+  id            String         @id @default(cuid())
+  templateId    String
+  name          String
+  componentType AssessmentType
+  maxMarks      Decimal        @db.Decimal(6, 2)
+  weight        Decimal        @db.Decimal(5, 2)
+  displayOrder  Int
+  isRequired    Boolean        @default(true)
+  isRepeatable  Boolean        @default(false)
+  expectedCount Int            @default(1)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  template AssessmentTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  scores   ComponentScore[]
+
+  @@index([templateId])
+  @@index([componentType])
+  @@map("assessment_components")
+}
+
+model AssessmentScore {
+  id         String                @id @default(cuid())
+  studentId  String
+  subjectId  String
+  termId     String
+  templateId String
+  totalScore Decimal               @db.Decimal(6, 2)
+  percentage Decimal               @db.Decimal(5, 2)
+  status     AssessmentScoreStatus @default(DRAFT)
+  isLocked   Boolean               @default(false)
+  grade      String?
+  gradePoint Decimal?              @db.Decimal(3, 2)
+  position   Int?
+  remarks    String?
+  createdAt  DateTime              @default(now())
+  updatedAt  DateTime              @updatedAt
+
+  student         Student            @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  subject         Subject            @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  term            Term               @relation(fields: [termId], references: [id], onDelete: Cascade)
+  template        AssessmentTemplate @relation(fields: [templateId], references: [id])
+  componentScores ComponentScore[]
+
+  @@unique([studentId, subjectId, termId, templateId])
+  @@index([studentId, termId])
+  @@index([subjectId, termId])
+  @@index([templateId])
+  @@map("assessment_scores")
+}
+
+model ComponentScore {
+  id                String   @id @default(cuid())
+  assessmentScoreId String
+  componentId       String
+  occurrenceIndex   Int      @default(0)
+  marksObtained     Decimal  @db.Decimal(6, 2)
+  maxMarks          Decimal  @db.Decimal(6, 2)
+  percentage        Decimal  @db.Decimal(5, 2)
+  weightedScore     Decimal  @db.Decimal(6, 2)
+  rawScores         Json?
+  recordedById      String?
+  recordedAt        DateTime @default(now())
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  assessmentScore AssessmentScore     @relation(fields: [assessmentScoreId], references: [id], onDelete: Cascade)
+  component       AssessmentComponent @relation(fields: [componentId], references: [id])
+  recordedBy      user?               @relation(fields: [recordedById], references: [id], onDelete: SetNull)
+
+  @@unique([assessmentScoreId, componentId, occurrenceIndex])
+  @@index([assessmentScoreId])
+  @@index([componentId])
+  @@index([recordedById])
+  @@map("component_scores")
+}
+
+model AssessmentTemplateClass {
+  id         String @id @default(cuid())
+  templateId String
+  classId    String
+
+  template AssessmentTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  class    Class              @relation(fields: [classId], references: [id], onDelete: Cascade)
+
+  @@unique([templateId, classId])
+}
+
+model AssessmentExtension {
+  id         String   @id @default(cuid())
+  templateId String
+  classId    String
+  teacherId  String?
+  deadline   DateTime
+  reason     String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  template AssessmentTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  class    Class              @relation(fields: [classId], references: [id], onDelete: Cascade)
+  teacher  Teacher?           @relation(fields: [teacherId], references: [id], onDelete: SetNull)
+
+  @@unique([templateId, classId, teacherId])
+}
+
+model Remark {
+  id         String     @id @default(cuid())
+  studentId  String
+  teacherId  String
+  termId     String
+  remarkType RemarkType
+  content    String
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  teacher Teacher @relation(fields: [teacherId], references: [id])
+  term    Term    @relation(fields: [termId], references: [id], onDelete: Cascade)
+
+  @@index([studentId, termId])
+  @@index([teacherId])
+  @@index([remarkType])
+  @@map("remarks")
+}
+
+model TranscriptRequest {
+  id            String                @id @default(cuid())
+  studentId     String
+  requestType   TranscriptRequestType
+  purpose       String?
+  status        RequestStatus         @default(PENDING)
+  requestedAt   DateTime              @default(now())
+  processedAt   DateTime?
+  processedById String?
+  createdAt     DateTime              @default(now())
+  updatedAt     DateTime              @updatedAt
+
+  student     Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  processedBy user?   @relation(fields: [processedById], references: [id], onDelete: SetNull)
+
+  @@index([studentId])
+  @@index([status])
+  @@index([requestedAt])
+  @@index([processedById])
+  @@map("transcript_requests")
+}
+
+model ReportCardTemplate {
+  id                  String   @id @default(cuid())
+  schoolId            String
+  name                String
+  description         String?
+  layout              Json
+  isActive            Boolean  @default(true)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  departmentId        String?
+  developmentalConfig Json?
+  selConfig           Json?
+  disciplineConfig    Json?
+
+  school     School          @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  department Department?     @relation(fields: [departmentId], references: [id])
+  sets       ReportCardSet[]
+
+  @@index([schoolId])
+  @@index([departmentId])
+  @@map("report_card_templates")
+}
+
+model ReportCardSet {
+  id             String               @id @default(cuid())
+  schoolId       String
+  templateId     String
+  academicYearId String
+  termId         String
+  classId        String?
+  name           String
+  status         ReportCardStatus     @default(DRAFT)
+  targetClasses  ReportCardSetClass[]
+  publishAt      DateTime?
+  publishedAt    DateTime?
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+
+  school       School             @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  template     ReportCardTemplate @relation(fields: [templateId], references: [id])
+  academicYear AcademicYear       @relation(fields: [academicYearId], references: [id])
+  term         Term               @relation(fields: [termId], references: [id])
+  class        Class?             @relation(fields: [classId], references: [id])
+  reportCards  ReportCard[]
+
+  @@index([schoolId])
+  @@index([academicYearId])
+  @@index([termId])
+  @@index([classId])
+  @@map("report_card_sets")
+}
+
+model ReportCardSetClass {
+  id      String @id @default(cuid())
+  setId   String
+  classId String
+
+  set   ReportCardSet @relation(fields: [setId], references: [id], onDelete: Cascade)
+  class Class         @relation(fields: [classId], references: [id], onDelete: Cascade)
+
+  @@unique([setId, classId])
+}
+
+model ReportCard {
+  id          String    @id @default(cuid())
+  setId       String
+  studentId   String
+  data        Json
+  publishedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  set               ReportCardSet      @relation(fields: [setId], references: [id], onDelete: Cascade)
+  student           Student            @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  behavioralRemarks BehavioralRemark[]
+
+  @@unique([setId, studentId])
+  @@index([setId])
+  @@index([studentId])
+  @@map("report_cards")
+}
+
+model BehavioralRemark {
+  id           String           @id @default(cuid())
+  reportCardId String
+  pillar       BehavioralPillar
+  value        String
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  reportCard ReportCard @relation(fields: [reportCardId], references: [id], onDelete: Cascade)
+
+  @@index([reportCardId])
+  @@map("behavioral_remarks")
+}

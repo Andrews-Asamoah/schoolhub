@@ -1,0 +1,330 @@
+// ============================================================================
+// SCHOOL & USER PROFILES
+// ============================================================================
+
+model School {
+  id             String   @id @default(cuid())
+  organizationId String   @unique
+  name           String
+  code           String   @unique
+  email          String?
+  phone          String?
+  address        String?
+  logo           String?
+  motto          String?
+  website        String?
+  subdomain      String   @unique
+  currency       String   @default("GHS")
+  timezone       String   @default("Africa/Accra")
+  locale         String   @default("en-GH")
+  primaryColor   String   @default("#3B82F6")
+  secondaryColor String   @default("#10B981")
+  settings       Json?
+  features       Json?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization                organization                @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  academicYears               AcademicYear[]
+  assessmentTemplates         AssessmentTemplate[]
+  bills                       Bill[]
+  chartAccounts               ChartAccount[]
+  classes                     Class[]
+  customExpenseCategories     CustomExpenseCategory[]
+  customFeeCategories         CustomFeeCategory[]
+  customTransactionCategories CustomTransactionCategory[]
+  departments                 Department[]
+  documents                   Document[]
+  feeStructures               FeeStructure[]
+  gradingSystems              GradingSystem[]
+  guardians                   Guardian[]
+  houses                      House[]
+  payments                    Payment[]
+  staff                       Staff[]
+  students                    Student[]
+  subjects                    Subject[]
+  subscription                Subscription?
+  teachers                    Teacher[]
+  transactions                Transaction[]
+  reportCardTemplates         ReportCardTemplate[]
+  reportCardSets              ReportCardSet[]
+  notifications               Notification[]
+  announcements               Announcement[]
+  feeReminderSchedules        FeeReminderSchedule[]
+  expenses                    Expense[]
+  inventoryItems              InventoryItem[]
+  inventoryTransactions       InventoryTransaction[]
+  supportTickets              SupportTicket[]
+  clubs                       Club[]
+  payrollRecords              PayrollRecord[]
+  payslips                    Payslip[]
+  classrooms                  Classroom[]
+  timeSlots                   TimeSlot[]
+  periodTemplates             PeriodTemplate[]
+  timetableEntries            TimetableEntry[]
+
+  // Advanced Accounting Registries
+  feeItemRegistry     FeeItemRegistry[]
+  expenditureRegistry ExpenditureCategoryRegistry[]
+  teacherAssignments  TeacherAssignment[]
+  staffAssignments    StaffAssignment[]
+  promotionRecords    PromotionRecord[]
+  auditLogs           AuditLog[]
+  inventoryCategories InventoryCategory[]
+  smsLogs             SMSLog[]
+  emailLogs           EmailLog[]
+
+  @@index([code])
+  @@index([subdomain])
+  @@index([organizationId])
+  @@map("schools")
+}
+
+model UserProfile {
+  id     String @id @default(cuid())
+  userId String @unique
+
+  // Personal Information
+  firstName      String
+  lastName       String
+  otherNames     String?
+  phone          String?
+  alternatePhone String?
+  gender         Gender
+  dateOfBirth    DateTime @db.Date
+
+  // Address Information
+  nationality        String? @default("Ghanaian")
+  residentialAddress String?
+  postalAddress      String?
+  city               String?
+  region             String?
+  country            String? @default("Ghana")
+
+  // Emergency Contact
+  emergencyContactName  String?
+  emergencyContactPhone String?
+  emergencyRelationship String?
+  signatureUrl          String?
+  isActive              Boolean   @default(true)
+  lastLoginAt           DateTime?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  user      user       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  guardians Guardian[]
+  staff     Staff?
+  student   Student?
+  teacher   Teacher?
+
+  @@index([userId])
+  @@index([isActive])
+  @@map("user_profiles")
+}
+
+model Student {
+  id                 String        @id @default(cuid())
+  profileId          String        @unique
+  schoolId           String
+  studentId          String
+  admissionNumber    String?
+  admissionDate      DateTime      @default(now()) @db.Date
+  classId            String?
+  departmentId       String?
+  houseId            String?
+  previousSchool     String?
+  previousClass      String?
+  bloodGroup         String?
+  allergies          String?
+  medicalConditions  String?
+  outstandingBalance Decimal       @default(0) @db.Decimal(10, 2)
+  status             StudentStatus @default(ACTIVE)
+  plainTextPassword  String?
+  graduationDate     DateTime?     @db.Date
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+  deletedAt          DateTime?
+
+  profile          UserProfile         @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  school           School              @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  class            Class?              @relation(fields: [classId], references: [id])
+  department       Department?         @relation(fields: [departmentId], references: [id])
+  house            House?              @relation(fields: [houseId], references: [id])
+  assessmentScores AssessmentScore[]
+  attendances      Attendance[]
+  bills            Bill[]
+  documents        Document[]
+  enrollments      Enrollment[]
+  guardians        GuardianStudent[]
+  payments         Payment[]
+  remarks          Remark[]
+  transcripts      TranscriptRequest[]
+  reportCards      ReportCard[]
+  clubMembers      ClubMember[]
+  promotionRecords PromotionRecord[]
+
+  @@unique([studentId, schoolId])
+  @@unique([admissionNumber, schoolId])
+  @@index([schoolId, status])
+  @@index([classId, schoolId])
+  @@index([departmentId])
+  @@index([houseId])
+  @@index([profileId])
+  @@index([schoolId, deletedAt])
+  @@map("students")
+}
+
+model Teacher {
+  id              String         @id @default(cuid())
+  profileId       String?        @unique
+  schoolId        String
+  teacherId       String
+  staffNumber     String?
+  invitationEmail String?
+  firstName       String?
+  lastName        String?
+  departmentId    String
+  houseId         String?
+  qualification   String?
+  specialization  String?
+  experience      Int?
+  employmentType  EmploymentType @default(FULL_TIME)
+  hireDate        DateTime       @default(now()) @db.Date
+  contractEndDate DateTime?      @db.Date
+  monthlySalary   Decimal?       @db.Decimal(10, 2)
+  isActive        Boolean        @default(true)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  deletedAt       DateTime?
+
+  profile               UserProfile?     @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  school                School           @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  department            Department       @relation("TeacherDepartment", fields: [departmentId], references: [id])
+  house                 House?           @relation("TeacherHouse", fields: [houseId], references: [id])
+  classesAsClassTeacher Class[]
+  departmentsAsHead     Department[]     @relation("DepartmentHead")
+  documents             Document[]
+  housesAsHouseTeacher  House[]          @relation("HouseTeacher")
+  remarks               Remark[]
+  subjects              SubjectTeacher[]
+  classSubjects         ClassSubject[]
+  clubs                 Club[]
+  payslips              Payslip[]
+  timetableEntries      TimetableEntry[]
+
+  // Scoped to Academic Year
+  assignments          TeacherAssignment[]
+  assessmentExtensions AssessmentExtension[]
+
+  @@unique([teacherId, schoolId])
+  @@unique([staffNumber, schoolId])
+  @@index([schoolId, isActive])
+  @@index([departmentId])
+  @@index([houseId])
+  @@index([profileId])
+  @@index([invitationEmail])
+  @@index([schoolId, deletedAt])
+  @@map("teachers")
+}
+
+model Staff {
+  id        String @id @default(cuid())
+  profileId String @unique
+  schoolId  String
+
+  // Staff Identifiers
+  staffId     String
+  staffNumber String?
+
+  // Job Information
+  staffType    StaffType
+  departmentId String?
+  jobTitle     String?
+
+  // Employment Details
+  employmentType  EmploymentType @default(FULL_TIME)
+  hireDate        DateTime       @default(now()) @db.Date
+  contractEndDate DateTime?      @db.Date
+  monthlySalary   Decimal?       @db.Decimal(10, 2)
+  isActive        Boolean        @default(true)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  deletedAt       DateTime?
+
+  profile    UserProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  school     School      @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  department Department? @relation("StaffDepartment", fields: [departmentId], references: [id])
+  documents  Document[]
+  payslips   Payslip[]
+
+  // Scoped to Academic Year
+  assignments StaffAssignment[]
+
+  @@unique([staffId, schoolId])
+  @@unique([staffNumber, schoolId])
+  @@index([schoolId, isActive])
+  @@index([staffType])
+  @@index([profileId])
+  @@index([schoolId, deletedAt])
+  @@map("staff")
+}
+
+model Guardian {
+  id                 String       @id @default(cuid())
+  profileId          String?
+  schoolId           String
+  guardianId         String
+  firstName          String
+  lastName           String
+  otherNames         String?
+  phone              String
+  alternatePhone     String?
+  email              String?
+  gender             Gender?
+  relationshipType   GuardianType
+  occupation         String?
+  employer           String?
+  workAddress        String?
+  workPhone          String?
+  residentialAddress String?
+  city               String?
+  region             String?
+  canLogin           Boolean      @default(false)
+  isActive           Boolean      @default(true)
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+  deletedAt          DateTime?
+
+  profile  UserProfile?      @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  school   School            @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  students GuardianStudent[]
+
+  @@unique([guardianId, schoolId])
+  @@index([schoolId, isActive])
+  @@index([profileId])
+  @@index([email])
+  @@index([canLogin])
+  @@index([schoolId, deletedAt])
+  @@map("guardians")
+}
+
+model GuardianStudent {
+  id             String   @id @default(cuid())
+  guardianId     String
+  studentId      String
+  isPrimary      Boolean  @default(false)
+  canPickup      Boolean  @default(true)
+  receiveReports Boolean  @default(true)
+  receiveAlerts  Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  guardian Guardian @relation(fields: [guardianId], references: [id], onDelete: Cascade)
+  student  Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([guardianId, studentId])
+  @@index([guardianId])
+  @@index([studentId])
+  @@index([isPrimary])
+  @@map("guardian_students")
+}

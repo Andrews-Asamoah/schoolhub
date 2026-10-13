@@ -1,0 +1,15 @@
+import { createRootRoute, Outlet } from "@tanstack/react-router";
+import { ThemeProvider } from "@/components/theme-provider";
+
+/** Root route outlet; feature routes own their page layouts. */
+export const Route = createRootRoute({
+  component: RootLayout,
+});
+
+function RootLayout() {
+  return (
+    <ThemeProvider>
+      <Outlet />
+    </ThemeProvider>
+  );
+}

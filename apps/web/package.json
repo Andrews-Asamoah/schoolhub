@@ -1,0 +1,37 @@
+{
+  "name": "@schoolhub/web",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@radix-ui/react-slot": "^1.4.0",
+    "@schoolhub/shared": "workspace:*",
+    "@tanstack/react-query": "^5.81.5",
+    "@tanstack/react-query-devtools": "^5.81.5",
+    "@tanstack/react-router": "^1.121.12",
+    "better-auth": "^1.2.8",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "lucide-react": "^1.55.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "tailwind-merge": "^3.7.0"
+  },
+  "devDependencies": {
+    "@schoolhub/config": "workspace:*",
+    "@tailwindcss/vite": "^4.1.11",
+    "@tanstack/router-plugin": "^1.168.43",
+    "@types/react": "^19.1.8",
+    "@types/react-dom": "^19.1.6",
+    "@vitejs/plugin-react": "^6.1.2",
+    "tailwindcss": "^4.1.11",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.4"
+  }
+}

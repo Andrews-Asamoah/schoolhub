@@ -1,0 +1,564 @@
+// ============================================================================
+// FINANCE, ACCOUNTING & BILLING
+// ============================================================================
+
+model ChartAccount {
+  id          String          @id @default(cuid())
+  schoolId    String
+  code        String
+  name        String
+  description String?
+  accountType AccountType
+  category    AccountCategory
+  parentId    String?
+  balance     Decimal         @default(0) @db.Decimal(15, 2)
+  isActive    Boolean         @default(true)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  school             School         @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  parent             ChartAccount?  @relation("AccountHierarchy", fields: [parentId], references: [id])
+  children           ChartAccount[] @relation("AccountHierarchy")
+  creditTransactions Transaction[]  @relation("CreditAccount")
+  debitTransactions  Transaction[]  @relation("DebitAccount")
+
+  @@unique([code, schoolId])
+  @@index([schoolId, accountType])
+  @@index([category])
+  @@index([parentId])
+  @@index([isActive])
+  @@map("chart_accounts")
+}
+
+model FeeStructure {
+  id          String   @id @default(cuid())
+  schoolId    String
+  name        String
+  description String?
+  classLevel  String?
+  termBased   Boolean  @default(true)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  school        School              @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  bills         Bill[]
+  items         FeeItem[]
+  targetClasses FeeStructureClass[]
+
+  @@index([schoolId, isActive])
+  @@map("fee_structures")
+}
+
+model FeeStructureClass {
+  id             String @id @default(cuid())
+  feeStructureId String
+  classId        String
+
+  feeStructure FeeStructure @relation(fields: [feeStructureId], references: [id], onDelete: Cascade)
+  class        Class        @relation(fields: [classId], references: [id], onDelete: Cascade)
+
+  @@unique([feeStructureId, classId])
+  @@map("fee_structure_classes")
+}
+
+model FeeItemRegistry {
+  id          String   @id @default(cuid())
+  schoolId    String
+  name        String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  school   School    @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  feeItems FeeItem[]
+
+  @@unique([name, schoolId])
+  @@map("fee_item_registry")
+}
+
+model FeeItem {
+  id               String       @id @default(cuid())
+  feeStructureId   String
+  name             String
+  description      String?
+  amount           Decimal      @db.Decimal(10, 2)
+  category         FeeCategory?
+  customCategoryId String?
+  isOptional       Boolean      @default(false)
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  feeStructure   FeeStructure       @relation(fields: [feeStructureId], references: [id], onDelete: Cascade)
+  customCategory CustomFeeCategory? @relation(fields: [customCategoryId], references: [id])
+  billItems      BillItem[]
+
+  registryItemId String?
+  registryItem   FeeItemRegistry? @relation(fields: [registryItemId], references: [id])
+
+  @@index([feeStructureId])
+  @@index([category])
+  @@index([customCategoryId])
+  @@map("fee_items")
+}
+
+model Bill {
+  id             String     @id @default(cuid())
+  schoolId       String
+  studentId      String
+  academicYearId String
+  termId         String?
+  feeStructureId String?
+  billNumber     String
+  billCode       String?
+  totalAmount    Decimal    @db.Decimal(10, 2)
+  paidAmount     Decimal    @default(0) @db.Decimal(10, 2)
+  balanceAmount  Decimal    @db.Decimal(10, 2)
+  status         BillStatus @default(PENDING)
+  dueDate        DateTime?  @db.Date
+  issuedAt       DateTime   @default(now())
+  notes          String?
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  school       School        @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  student      Student       @relation(fields: [studentId], references: [id])
+  academicYear AcademicYear  @relation("AcademicYearBills", fields: [academicYearId], references: [id])
+  term         Term?         @relation(fields: [termId], references: [id])
+  feeStructure FeeStructure? @relation(fields: [feeStructureId], references: [id])
+  class        Class?        @relation(fields: [classId], references: [id])
+  items        BillItem[]
+  payments     Payment[]
+
+  classId  String?
+  billType BillType @default(INVOICE)
+
+  @@unique([billNumber, schoolId])
+  @@unique([billCode, schoolId])
+  @@index([schoolId, status])
+  @@index([studentId, academicYearId, status])
+  @@index([billNumber])
+  @@index([billCode])
+  @@index([dueDate])
+  @@index([academicYearId])
+  @@index([termId])
+  @@index([feeStructureId])
+  @@index([classId])
+  @@index([billType])
+  @@map("bills")
+}
+
+model BillItem {
+  id            String         @id @default(cuid())
+  billId        String
+  feeItemId     String?
+  description   String
+  amount        Decimal        @db.Decimal(10, 2)
+  quantity      Int            @default(1)
+  totalAmount   Decimal        @db.Decimal(10, 2)
+  paidAmount    Decimal        @default(0) @db.Decimal(10, 2)
+  balanceAmount Decimal        @db.Decimal(10, 2)
+  status        BillItemStatus @default(UNPAID)
+  createdAt     DateTime       @default(now())
+
+  bill         Bill          @relation(fields: [billId], references: [id], onDelete: Cascade)
+  feeItem      FeeItem?      @relation(fields: [feeItemId], references: [id])
+  paymentItems PaymentItem[]
+
+  @@index([billId])
+  @@index([feeItemId])
+  @@map("bill_items")
+}
+
+model Payment {
+  id              String        @id @default(cuid())
+  schoolId        String
+  studentId       String
+  billId          String?
+  paymentNumber   String
+  amount          Decimal       @db.Decimal(10, 2)
+  paymentMethod   PaymentMethod
+  paymentDate     DateTime      @db.Date
+  referenceNumber String?
+  transactionId   String?
+  status          PaymentStatus @default(COMPLETED)
+  notes           String?
+  recordedById    String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  school       School        @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  student      Student       @relation(fields: [studentId], references: [id])
+  bill         Bill?         @relation(fields: [billId], references: [id])
+  transaction  Transaction?  @relation(fields: [transactionId], references: [id])
+  recordedBy   user?         @relation("PaymentRecordedBy", fields: [recordedById], references: [id], onDelete: SetNull)
+  paymentItems PaymentItem[]
+
+  @@unique([paymentNumber, schoolId])
+  @@index([schoolId, paymentDate])
+  @@index([studentId])
+  @@index([billId])
+  @@index([paymentNumber])
+  @@index([status])
+  @@index([transactionId])
+  @@index([recordedById])
+  @@map("payments")
+}
+
+model PaymentItem {
+  id         String   @id @default(cuid())
+  paymentId  String
+  billItemId String
+  amount     Decimal  @db.Decimal(10, 2)
+  createdAt  DateTime @default(now())
+
+  payment  Payment  @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  billItem BillItem @relation(fields: [billItemId], references: [id], onDelete: Cascade)
+
+  @@index([paymentId])
+  @@index([billItemId])
+  @@map("payment_items")
+}
+
+model Transaction {
+  id                String               @id @default(cuid())
+  schoolId          String
+  transactionNumber String
+  transactionDate   DateTime             @db.Date
+  description       String
+  amount            Decimal              @db.Decimal(15, 2)
+  debitAccountId    String
+  creditAccountId   String
+  transactionType   TransactionType
+  category          TransactionCategory?
+  customCategoryId  String?
+  referenceType     String?
+  referenceId       String?
+  referenceNumber   String?
+  notes             String?
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+
+  school         School                     @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  debitAccount   ChartAccount               @relation("DebitAccount", fields: [debitAccountId], references: [id])
+  creditAccount  ChartAccount               @relation("CreditAccount", fields: [creditAccountId], references: [id])
+  customCategory CustomTransactionCategory? @relation(fields: [customCategoryId], references: [id])
+  payments       Payment[]
+
+  @@unique([transactionNumber, schoolId])
+  @@index([schoolId, transactionDate])
+  @@index([schoolId, transactionType])
+  @@index([transactionNumber])
+  @@index([debitAccountId])
+  @@index([creditAccountId])
+  @@index([category])
+  @@index([customCategoryId])
+  @@map("transactions")
+}
+
+model CustomFeeCategory {
+  id          String   @id @default(cuid())
+  schoolId    String
+  name        String
+  code        String
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  school   School    @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  feeItems FeeItem[]
+
+  @@unique([code, schoolId])
+  @@index([schoolId, isActive])
+  @@map("custom_fee_categories")
+}
+
+model CustomExpenseCategory {
+  id          String      @id @default(cuid())
+  schoolId    String
+  name        String
+  code        String
+  description String?
+  accountType AccountType
+  isActive    Boolean     @default(true)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  school School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@unique([code, schoolId])
+  @@index([schoolId, isActive])
+  @@index([accountType])
+  @@map("custom_expense_categories")
+}
+
+model CustomTransactionCategory {
+  id           String          @id @default(cuid())
+  schoolId     String
+  name         String
+  code         String
+  description  String?
+  categoryType TransactionType
+  isActive     Boolean         @default(true)
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+
+  school       School        @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  transactions Transaction[]
+  expenses     Expense[]
+
+  @@unique([code, schoolId])
+  @@index([schoolId, isActive])
+  @@index([categoryType])
+  @@map("custom_transaction_categories")
+}
+
+model Expense {
+  id                 String                       @id @default(cuid())
+  schoolId           String
+  date               DateTime                     @db.Date
+  amount             Decimal                      @db.Decimal(15, 2)
+  category           TransactionCategory?
+  customCategoryId   String?
+  description        String
+  payee              String?
+  paymentMethod      PaymentMethod                @default(CASH)
+  checkNumber        String?
+  voucherNumber      String?
+  referenceNumber    String?
+  recordedById       String?
+  academicYearId     String?
+  termId             String?
+  registryCategoryId String?
+  createdAt          DateTime                     @default(now())
+  updatedAt          DateTime                     @updatedAt
+
+  school           School                       @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  customCategory   CustomTransactionCategory?   @relation(fields: [customCategoryId], references: [id])
+  recordedBy       user?                        @relation("ExpenseRecordedBy", fields: [recordedById], references: [id], onDelete: SetNull)
+  academicYear     AcademicYear?                @relation(fields: [academicYearId], references: [id])
+  term             Term?                        @relation(fields: [termId], references: [id])
+  registryCategory ExpenditureCategoryRegistry? @relation(fields: [registryCategoryId], references: [id])
+
+  @@index([schoolId, date])
+  @@index([category])
+  @@index([recordedById])
+  @@index([academicYearId])
+  @@index([termId])
+  @@map("expenses")
+}
+
+model ExpenditureCategoryRegistry {
+  id          String    @id @default(cuid())
+  schoolId    String
+  name        String
+  description String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  school   School    @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  expenses Expense[]
+
+  @@unique([name, schoolId])
+  @@map("expenditure_category_registry")
+}
+
+model PayrollRecord {
+  id            String        @id @default(cuid())
+  schoolId      String
+  month         Int
+  year          Int
+  status        PayrollStatus @default(DRAFT)
+  totalGross    Decimal       @db.Decimal(15, 2)
+  totalNet      Decimal       @db.Decimal(15, 2)
+  totalTax      Decimal       @db.Decimal(15, 2)
+  totalSSNIT    Decimal       @db.Decimal(15, 2)
+  processedById String?
+  academicYearId String?
+  termId        String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  school       School        @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  academicYear AcademicYear? @relation(fields: [academicYearId], references: [id])
+  term         Term?         @relation(fields: [termId], references: [id])
+  processedBy  user?         @relation("PayrollProcessedBy", fields: [processedById], references: [id], onDelete: SetNull)
+  payslips     Payslip[]
+
+  @@unique([schoolId, month, year])
+  @@index([academicYearId])
+  @@index([termId])
+  @@map("payroll_records")
+}
+
+model Payslip {
+  id              String        @id @default(cuid())
+  payrollRecordId String
+  schoolId        String
+  staffId         String?
+  teacherId       String?
+  basicSalary     Decimal       @db.Decimal(15, 2)
+  allowances      Decimal       @default(0) @db.Decimal(15, 2)
+  grossSalary     Decimal       @db.Decimal(15, 2)
+  ssnitEmployee   Decimal       @db.Decimal(15, 2)
+  ssnitEmployer   Decimal       @db.Decimal(15, 2)
+  incomeTax       Decimal       @db.Decimal(15, 2)
+  otherDeductions Decimal       @default(0) @db.Decimal(15, 2)
+  netSalary       Decimal       @db.Decimal(15, 2)
+  paymentMethod   PaymentMethod @default(BANK_TRANSFER)
+  paymentStatus   PaymentStatus @default(PENDING)
+  paidAt          DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  payrollRecord PayrollRecord @relation(fields: [payrollRecordId], references: [id], onDelete: Cascade)
+  school        School        @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  staff         Staff?        @relation(fields: [staffId], references: [id], onDelete: SetNull)
+  teacher       Teacher?      @relation(fields: [teacherId], references: [id], onDelete: SetNull)
+
+  @@index([payrollRecordId])
+  @@index([staffId])
+  @@index([teacherId])
+  @@map("payslips")
+}
+
+model Subscription {
+  id                       String             @id @default(cuid())
+  schoolId                 String             @unique
+  planType                 PlanType           @default(FREE)
+  planName                 String             @default("Free Plan")
+  billingCycle             BillingCycle?
+  status                   SubscriptionStatus @default(ACTIVE)
+  amount                   Decimal?           @db.Decimal(10, 2)
+  currency                 String             @default("USD")
+  trialStartsAt            DateTime?
+  trialEndsAt              DateTime?
+  isOnTrial                Boolean            @default(false)
+  currentPeriodStart       DateTime?
+  currentPeriodEnd         DateTime?
+  stripeCustomerId         String?            @unique
+  stripeSubscriptionId     String?            @unique
+  stripePaymentMethodId    String?
+  paystackEmail            String?
+  paystackCustomerCode     String?
+  paystackSubscriptionCode String?
+  paystackTransactionId    String?
+  cancelAtPeriodEnd        Boolean            @default(false)
+  canceledAt               DateTime?
+  maxStudents              Int?
+  maxTeachers              Int?
+  maxStaff                 Int?
+  settings                 Json?
+  createdAt                DateTime           @default(now())
+  updatedAt                DateTime           @updatedAt
+
+  school   School          @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  invoices InvoiceRecord[]
+
+  @@index([schoolId])
+  @@index([status])
+  @@index([planType])
+  @@index([stripeCustomerId])
+  @@index([stripeSubscriptionId])
+  @@map("subscriptions")
+}
+
+model InvoiceRecord {
+  id              String        @id @default(cuid())
+  subscriptionId  String
+  invoiceNumber   String        @unique
+  amount          Decimal       @db.Decimal(10, 2)
+  currency        String        @default("USD")
+  status          InvoiceStatus @default(PENDING)
+  periodStart     DateTime
+  periodEnd       DateTime
+  paidAt          DateTime?
+  paymentMethod   String?
+  stripeInvoiceId String?       @unique
+  invoiceUrl      String?
+  pdfUrl          String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  subscription Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  @@index([subscriptionId])
+  @@index([status])
+  @@index([invoiceNumber])
+  @@map("invoice_records")
+}
+
+model FeeReminderSchedule {
+  id                    String   @id @default(cuid())
+  schoolId              String
+  name                  String
+  description           String?
+  isActive              Boolean  @default(true)
+  sendSms               Boolean  @default(true)
+  sendEmail             Boolean  @default(true)
+  sendInApp             Boolean  @default(true)
+  messageTemplate       String
+  smsTemplate           String?
+  targetOutstandingOnly Boolean  @default(true)
+  minimumOutstanding    Decimal  @default(0) @db.Decimal(10, 2)
+  academicYearId        String?
+  termId                String?
+  createdById           String
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  school       School                   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  academicYear AcademicYear?            @relation(fields: [academicYearId], references: [id])
+  term         Term?                    @relation(fields: [termId], references: [id])
+  createdBy    user                     @relation("FeeReminderSchedules", fields: [createdById], references: [id])
+  installments FeeReminderInstallment[]
+  logs         FeeReminderLog[]
+
+  @@index([schoolId, isActive])
+  @@index([academicYearId])
+  @@index([termId])
+  @@map("fee_reminder_schedules")
+}
+
+model FeeReminderInstallment {
+  id         String    @id @default(cuid())
+  scheduleId String
+  label      String
+  dueDate    DateTime  @db.Date
+  sendDate   DateTime  @db.Date
+  sent       Boolean   @default(false)
+  sentAt     DateTime?
+  createdAt  DateTime  @default(now())
+
+  schedule FeeReminderSchedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+  logs     FeeReminderLog[]
+
+  @@index([scheduleId])
+  @@index([sendDate, sent])
+  @@map("fee_reminder_installments")
+}
+
+model FeeReminderLog {
+  id                 String         @id @default(cuid())
+  scheduleId         String
+  installmentId      String?
+  guardianPhone      String?
+  guardianEmail      String?
+  guardianName       String
+  studentName        String
+  studentId          String
+  outstandingBalance Decimal        @db.Decimal(10, 2)
+  channel            MessageChannel
+  status             ReminderStatus @default(PENDING)
+  error              String?
+  sentAt             DateTime       @default(now())
+
+  schedule    FeeReminderSchedule     @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+  installment FeeReminderInstallment? @relation(fields: [installmentId], references: [id], onDelete: SetNull)
+
+  @@index([scheduleId])
+  @@index([installmentId])
+  @@index([channel, status])
+  @@map("fee_reminder_logs")
+}

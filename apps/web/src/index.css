@@ -1,0 +1,155 @@
+@import "tailwindcss";
+
+/*
+  Global CSS — Tailwind v4 uses @import instead of @tailwind directives.
+  Add your CSS custom properties (design tokens) here.
+*/
+
+:root {
+  --font-sans: "Inter", system-ui, sans-serif;
+  font-family: var(--font-sans);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+@keyframes wave {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  20%,
+  60% {
+    transform: rotate(14deg);
+  }
+  40%,
+  80% {
+    transform: rotate(-8deg);
+  }
+}
+
+@media (min-width: 768px) {
+  aside[data-collapsed="true"] .sidebar-expanded {
+    display: none;
+  }
+}
+
+.dark body {
+  background-color: #0b1220;
+  color: #e2e8f0;
+}
+
+.dark [class~="bg-white"] {
+  background-color: #111827;
+}
+
+.dark [class~="bg-white/90"] {
+  background-color: rgb(17 24 39 / 92%);
+}
+
+.dark [class~="bg-slate-50"],
+.dark [class~="bg-slate-50/70"],
+.dark [class~="bg-slate-50/80"] {
+  background-color: #111827;
+}
+
+.dark [class~="bg-slate-100"] {
+  background-color: #1e293b;
+}
+
+.dark [class~="bg-slate-200"] {
+  background-color: #334155;
+}
+
+.dark [class~="bg-blue-50"],
+.dark [class~="bg-blue-50/80"] {
+  background-color: #172554;
+}
+
+.dark [class~="bg-emerald-50"] {
+  background-color: #052e2b;
+}
+
+.dark [class~="bg-violet-50"] {
+  background-color: #2e1065;
+}
+
+.dark [class~="bg-rose-50"] {
+  background-color: #4c0519;
+}
+
+.dark [class~="bg-red-50"] {
+  background-color: #450a0a;
+}
+
+.dark [class~="bg-amber-50"] {
+  background-color: #422006;
+}
+
+.dark [class~="bg-amber-100"] {
+  background-color: #713f12;
+}
+
+.dark [class~="border-slate-100"],
+.dark [class~="border-slate-100/80"] {
+  border-color: #263447;
+}
+
+.dark [class~="border-slate-200"],
+.dark [class~="border-slate-200/80"] {
+  border-color: #334155;
+}
+
+.dark [class~="border-amber-200"] {
+  border-color: #854d0e;
+}
+
+.dark [class~="divide-slate-100"] > :not([hidden]) ~ :not([hidden]) {
+  border-color: #263447;
+}
+
+.dark [class~="text-slate-900"] {
+  color: #f1f5f9;
+}
+
+.dark [class~="text-slate-800"] {
+  color: #e2e8f0;
+}
+
+.dark [class~="text-slate-700"],
+.dark [class~="text-slate-600"] {
+  color: #cbd5e1;
+}
+
+.dark [class~="text-slate-500"],
+.dark [class~="text-slate-400"] {
+  color: #94a3b8;
+}
+
+.dark [class~="text-blue-700"] {
+  color: #93c5fd;
+}
+
+.dark [class~="text-amber-900"] {
+  color: #fef3c7;
+}
+
+.dark [class~="text-amber-800"],
+.dark [class~="text-amber-700"] {
+  color: #fcd34d;
+}
+
+.dark [class~="hover:bg-slate-50"]:hover,
+.dark [class~="hover:bg-slate-50/70"]:hover,
+.dark [class~="hover:bg-slate-100"]:hover {
+  background-color: #1e293b;
+}
+
+.dark [class~="hover:text-slate-900"]:hover {
+  color: #f1f5f9;
+}
+
+.dark .ring-white {
+  --tw-ring-color: #111827;
+}
