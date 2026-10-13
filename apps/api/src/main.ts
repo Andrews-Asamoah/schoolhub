@@ -6,6 +6,7 @@ import { env } from "./env.js";
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { bodyParser: false });
+  app.setGlobalPrefix("api");
 
   // Swagger OpenAPI Documentation
   const swaggerConfig = new DocumentBuilder()

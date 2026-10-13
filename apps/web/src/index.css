@@ -67,8 +67,20 @@
   background-color: #172554;
 }
 
+.dark [class~="bg-indigo-50"] {
+  background-color: #1e1b4b;
+}
+
 .dark [class~="bg-emerald-50"] {
   background-color: #052e2b;
+}
+
+.dark [class~="bg-amber-50"] {
+  background-color: #422006;
+}
+
+.dark [class~="bg-rose-50"] {
+  background-color: #4c0519;
 }
 
 .dark [class~="bg-violet-50"] {
@@ -131,6 +143,14 @@
   color: #93c5fd;
 }
 
+.dark [class~="text-indigo-600"] {
+  color: #a5b4fc;
+}
+
+.dark [class~="text-indigo-800"] {
+  color: #c7d2fe;
+}
+
 .dark [class~="text-amber-900"] {
   color: #fef3c7;
 }
@@ -144,6 +164,10 @@
 .dark [class~="hover:bg-slate-50/70"]:hover,
 .dark [class~="hover:bg-slate-100"]:hover {
   background-color: #1e293b;
+}
+
+.dark [class~="hover:bg-indigo-50"]:hover {
+  background-color: #312e81;
 }
 
 .dark [class~="hover:text-slate-900"]:hover {

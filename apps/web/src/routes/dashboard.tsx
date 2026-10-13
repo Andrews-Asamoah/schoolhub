@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
-import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
 import { SchoolSidebar } from "@/components/school/school-sidebar";
 import { DashboardContent } from "@/components/school/dashboard/dashboard-content";
 import { DashboardHeader } from "@/components/school/dashboard/dashboard-header";
@@ -21,6 +21,7 @@ interface School {
 
 function DashboardPage() {
   const { data: session, isPending: sessionLoading } = useSession();
+  const navigate = useNavigate();
   const { data: school } = useQuery({
     queryKey: ["school", "current"],
     queryFn: () => apiFetch<School>("/schools/current"),
@@ -36,12 +37,18 @@ function DashboardPage() {
   }).format(new Date());
   const greetingName = session?.user?.name?.split(" ")[0] ?? "there";
 
-  if (sessionLoading) {
+  useEffect(() => {
+    if (!sessionLoading && !session?.user) {
+      void navigate({ to: "/login", replace: true });
+    }
+  }, [session, sessionLoading, navigate]);
+
+  if (sessionLoading || !session?.user) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-50">
         <div className="flex items-center gap-3 text-sm text-slate-500">
           <span className="size-2 animate-pulse rounded-full bg-blue-600" />
-          Loading your workspace…
+          {sessionLoading ? "Loading your workspace…" : "Redirecting to sign in…"}
         </div>
       </div>
     );

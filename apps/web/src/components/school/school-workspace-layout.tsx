@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { Bell, Search } from "lucide-react";
-import type { ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 import { apiFetch } from "@/lib/api";
 import { useSession } from "@/lib/auth-client";
 import { SchoolSidebar } from "@/components/school/school-sidebar";
@@ -32,6 +32,7 @@ export function SchoolWorkspaceLayout({
   children,
 }: SchoolWorkspaceLayoutProps) {
   const { data: session, isPending: sessionLoading } = useSession();
+  const navigate = useNavigate();
   const { data: school, error: schoolError } = useQuery({
     queryKey: ["school", "current"],
     queryFn: () => apiFetch<School>("/schools/current"),
@@ -39,12 +40,18 @@ export function SchoolWorkspaceLayout({
     retry: false,
   });
 
-  if (sessionLoading) {
+  useEffect(() => {
+    if (!sessionLoading && !session?.user) {
+      void navigate({ to: "/login", replace: true });
+    }
+  }, [session, sessionLoading, navigate]);
+
+  if (sessionLoading || !session?.user) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#f7f8fc]">
         <div className="flex items-center gap-3 text-sm text-slate-500">
           <span className="size-2 animate-pulse rounded-full bg-blue-600" />
-          Loading your workspace…
+          {sessionLoading ? "Loading your workspace…" : "Redirecting to sign in…"}
         </div>
       </div>
     );

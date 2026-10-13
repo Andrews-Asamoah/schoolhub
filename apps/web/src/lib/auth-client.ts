@@ -10,13 +10,15 @@ import { createAuthClient } from "better-auth/react";
  *   - authClient.useActiveOrganization()
  *   - authClient.organization.setActive(id)
  *   - authClient.organization.listMembers()  …etc.
+ *
+ * The `adminClient` plugin adds `role` to the user type in session data.
  */
-import { organizationClient } from "better-auth/client/plugins";
+import { organizationClient, adminClient } from "better-auth/client/plugins";
 
 export const authClient = createAuthClient({
   baseURL: window.location.origin,
   basePath: "/api/auth",
-  plugins: [organizationClient()],
+  plugins: [organizationClient(), adminClient()],
 });
 
 // Re-export the hooks so components don't need to import from better-auth directly

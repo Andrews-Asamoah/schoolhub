@@ -1,7 +1,6 @@
 import { Link } from "@tanstack/react-router";
-import { GraduationCap, LogOut, Sparkles } from "lucide-react";
-import { useState } from "react";
-import { signOut } from "@/lib/auth-client";
+import { GraduationCap, LogOut, Sparkles, LoaderCircle } from "lucide-react";
+import { useLogout } from "@/hooks/use-logout";
 import { schoolNavGroups } from "@/lib/school-navigation";
 import {
   Sidebar,
@@ -26,15 +25,7 @@ export function SchoolSidebar({
   userName,
   userEmail,
 }: SchoolSidebarProps) {
-  const [signOutError, setSignOutError] = useState<string | null>(null);
-
-  async function handleSignOut() {
-    setSignOutError(null);
-    const result = await signOut();
-    if (result.error) {
-      setSignOutError(result.error.message ?? "Could not sign out.");
-    }
-  }
+  const { error: signOutError, isSigningOut, logout } = useLogout();
 
   return (
     <Sidebar>
@@ -107,16 +98,7 @@ export function SchoolSidebar({
             Your school&apos;s daily operations, together in one place.
           </p>
         </div>
-        {signOutError && (
-          <p role="alert" className="mb-2 px-2 text-xs text-red-600">
-            {signOutError}
-          </p>
-        )}
-        <button
-          type="button"
-          onClick={() => void handleSignOut()}
-          className="flex h-11 w-full items-center gap-3 rounded-xl px-2 text-left transition hover:bg-slate-50"
-        >
+        <div className="flex min-w-0 items-center gap-2">
           <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-slate-200 text-xs font-semibold text-slate-700">
             {userName?.charAt(0)?.toUpperCase() ?? "S"}
           </span>
@@ -128,8 +110,26 @@ export function SchoolSidebar({
               {userEmail ?? "Administrator"}
             </span>
           </span>
-          <LogOut className="sidebar-expanded size-4 shrink-0 text-slate-400" />
-        </button>
+          <button
+            type="button"
+            onClick={() => void logout()}
+            disabled={isSigningOut}
+            aria-label={isSigningOut ? "Signing out" : "Sign out"}
+            title={isSigningOut ? "Signing out…" : "Sign out"}
+            className="flex size-9 shrink-0 items-center justify-center rounded-lg text-slate-500 transition hover:bg-red-50 hover:text-red-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 disabled:cursor-wait disabled:opacity-60"
+          >
+            {isSigningOut ? (
+              <LoaderCircle className="size-4 animate-spin" />
+            ) : (
+              <LogOut className="size-4" />
+            )}
+          </button>
+        </div>
+        {signOutError && (
+          <p role="alert" className="mt-2 px-2 text-xs text-red-600">
+            {signOutError}
+          </p>
+        )}
       </SidebarFooter>
     </Sidebar>
   );

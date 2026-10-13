@@ -142,3 +142,38 @@ export const generateBillSchema = z.object({
   notes: z.string().optional(),
 });
 export type GenerateBillInput = z.infer<typeof generateBillSchema>;
+
+// ============================================================================
+// SUPER ADMIN SCHEMAS
+// ============================================================================
+
+export const enrollSchoolSchema = z.object({
+  // School details
+  schoolName: z.string().min(2),
+  schoolCode: z
+    .string()
+    .min(3)
+    .max(20)
+    .regex(/^[A-Z0-9-]+$/, "Uppercase letters, numbers, hyphens only"),
+  schoolEmail: z.string().email().optional(),
+  schoolPhone: z.string().optional(),
+  schoolAddress: z.string().optional(),
+  subdomain: z
+    .string()
+    .min(3)
+    .max(30)
+    .regex(/^[a-z0-9-]+$/, "Lowercase letters, numbers, hyphens only"),
+  region: z.string().optional(),
+
+  // Admin account
+  adminName: z.string().min(2),
+  adminEmail: z.string().email(),
+  adminPassword: z.string().min(8),
+});
+export type EnrollSchoolInput = z.infer<typeof enrollSchoolSchema>;
+
+export const updateSubscriptionSchema = z.object({
+  status: z.enum(["TRIALING", "ACTIVE", "PAST_DUE", "CANCELLED", "SUSPENDED"]),
+  expiresAt: z.string().optional(),
+});
+export type UpdateSubscriptionInput = z.infer<typeof updateSubscriptionSchema>;

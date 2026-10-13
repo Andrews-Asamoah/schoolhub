@@ -14,6 +14,16 @@ export function createAuth(prisma: Parameters<typeof prismaAdapter>[0]) {
   return betterAuth({
     database: prismaAdapter(prisma, { provider: "postgresql" }),
     emailAndPassword: { enabled: true },
+    user: {
+      additionalFields: {
+        role: {
+          type: "string",
+          required: false,
+          defaultValue: "user",
+          input: false,
+        },
+      },
+    },
     trustedOrigins,
     plugins: [
       organization(), // each school = one organization
