@@ -4,6 +4,7 @@ import {
   Post,
   Param,
   Query,
+  Headers,
   Body,
   UseGuards,
 } from "@nestjs/common";
@@ -12,6 +13,7 @@ import { SchoolTenantGuard } from "../../common/guards/school-tenant.guard.js";
 import { RolesGuard } from "../../common/guards/roles.guard.js";
 import { Roles } from "../../common/decorators/roles.decorator.js";
 import { CurrentSchool } from "../../common/decorators/current-school.decorator.js";
+import { CurrentSchoolRole } from "../../common/decorators/current-school-role.decorator.js";
 import { CurrentUser, type AuthenticatedUser } from "../../common/decorators/current-user.decorator.js";
 import { ZodValidationPipe } from "../../common/pipes/zod-validation.pipe.js";
 import {
@@ -30,6 +32,7 @@ export class AttendanceController {
   batchRecordAttendance(
     @CurrentSchool() school: School,
     @CurrentUser() user: AuthenticatedUser,
+    @CurrentSchoolRole() role: string | undefined,
     @Body(new ZodValidationPipe(batchAttendanceSchema))
     body: BatchAttendanceInput,
   ) {
@@ -37,31 +40,45 @@ export class AttendanceController {
       school.id,
       user.id,
       body,
+      role,
     );
   }
 
   @Get("class/:classId")
+  @Roles("owner", "admin", "teacher", "staff", "accountant")
   getClassAttendance(
     @CurrentSchool() school: School,
     @Param("classId") classId: string,
-    @Query("date") date: string,
+    @Query("date") date: string | undefined,
+    @CurrentSchoolRole() role: string | undefined,
+    @Headers("x-academic-year-id") academicYearId?: string,
+    @Headers("x-academic-term-id") termId?: string,
   ) {
-    const targetDate = date || new Date().toISOString().slice(0, 10);
     return this.attendanceService.getClassAttendance(
       school.id,
       classId,
-      targetDate,
+      date,
+      role,
+      academicYearId,
+      termId,
     );
   }
 
   @Get("student/:studentId")
+  @Roles("owner", "admin", "teacher", "staff", "accountant")
   getStudentAttendance(
     @CurrentSchool() school: School,
     @Param("studentId") studentId: string,
+    @CurrentSchoolRole() role: string | undefined,
+    @Headers("x-academic-year-id") academicYearId?: string,
+    @Headers("x-academic-term-id") termId?: string,
   ) {
     return this.attendanceService.getStudentAttendanceSummary(
       school.id,
       studentId,
+      role,
+      academicYearId,
+      termId,
     );
   }
 }

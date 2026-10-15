@@ -31,13 +31,44 @@ export async function apiFetch<T>(
   path: string,
   init?: RequestInit,
 ): Promise<T> {
+  const headers = new Headers(init?.headers);
+  headers.set("Content-Type", "application/json");
+  if (
+    typeof window !== "undefined" &&
+    path !== "/schools/roles"
+  ) {
+    const activeRole = window.localStorage.getItem("schoolhub-active-role");
+    if (activeRole) headers.set("x-school-role", activeRole);
+    if (activeRole === "accountant") {
+      const period = window.sessionStorage.getItem(
+        "schoolhub-accountant-academic-view",
+      );
+      if (period) {
+        try {
+          const parsed = JSON.parse(period) as {
+            academicYearId?: unknown;
+            termId?: unknown;
+          };
+          if (
+            typeof parsed.academicYearId === "string" &&
+            typeof parsed.termId === "string"
+          ) {
+            headers.set("x-academic-year-id", parsed.academicYearId);
+            headers.set("x-academic-term-id", parsed.termId);
+          }
+        } catch {
+          window.sessionStorage.removeItem(
+            "schoolhub-accountant-academic-view",
+          );
+        }
+      }
+    }
+  }
+
   const res = await fetch(`${API_BASE}${path}`, {
     ...init,
     credentials: "include", // send session cookie
-    headers: {
-      "Content-Type": "application/json",
-      ...init?.headers,
-    },
+    headers,
   });
 
   if (!res.ok) {

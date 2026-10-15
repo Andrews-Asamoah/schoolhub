@@ -30,6 +30,7 @@ model School {
   bills                       Bill[]
   chartAccounts               ChartAccount[]
   classes                     Class[]
+  classTeacherAssignments     ClassTeacherAssignment[]
   customExpenseCategories     CustomExpenseCategory[]
   customFeeCategories         CustomFeeCategory[]
   customTransactionCategories CustomTransactionCategory[]
@@ -201,7 +202,7 @@ model Teacher {
   school                School           @relation(fields: [schoolId], references: [id], onDelete: Cascade)
   department            Department       @relation("TeacherDepartment", fields: [departmentId], references: [id])
   house                 House?           @relation("TeacherHouse", fields: [houseId], references: [id])
-  classesAsClassTeacher Class[]
+  classTeacherAssignments ClassTeacherAssignment[] @relation("ClassTeacherAssignments")
   departmentsAsHead     Department[]     @relation("DepartmentHead")
   documents             Document[]
   housesAsHouseTeacher  House[]          @relation("HouseTeacher")

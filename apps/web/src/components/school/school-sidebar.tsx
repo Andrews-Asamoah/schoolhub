@@ -1,7 +1,8 @@
 import { Link } from "@tanstack/react-router";
 import { GraduationCap, LogOut, Sparkles, LoaderCircle } from "lucide-react";
 import { useLogout } from "@/hooks/use-logout";
-import { schoolNavGroups } from "@/lib/school-navigation";
+import { getSchoolNavGroupsForRole } from "@/lib/school-navigation";
+import { useSchoolRole } from "@/components/school/school-role-switcher";
 import {
   Sidebar,
   SidebarContent,
@@ -26,16 +27,18 @@ export function SchoolSidebar({
   userEmail,
 }: SchoolSidebarProps) {
   const { error: signOutError, isSigningOut, logout } = useLogout();
+  const { activeRole } = useSchoolRole();
+  const navGroups = getSchoolNavGroupsForRole(activeRole ?? undefined);
 
   return (
-    <Sidebar>
+    <Sidebar className="school-sidebar-shell">
       <SidebarHeader>
         <Link to="/dashboard" className="flex min-w-0 items-center gap-3">
           <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-white shadow-sm shadow-blue-600/20">
             <GraduationCap className="size-5" strokeWidth={2.2} />
           </span>
           <span className="sidebar-expanded min-w-0">
-            <span className="block text-[15px] font-bold tracking-tight text-slate-900">
+            <span className="school-brand-title block text-[15px] font-bold tracking-tight">
               SchoolHub
             </span>
             <span className="block text-[10px] font-medium tracking-wide text-slate-400">
@@ -61,7 +64,11 @@ export function SchoolSidebar({
 
         <SidebarGroup>
           <SidebarGroupLabel>Workspace</SidebarGroupLabel>
-          <SidebarMenuButton asChild active={activePage === "dashboard"}>
+          <SidebarMenuButton
+            asChild
+            active={activePage === "dashboard"}
+            className="school-sidebar-nav-item"
+          >
             <Link to="/dashboard">
               <span className="flex size-[18px] shrink-0 items-center justify-center rounded-sm bg-blue-600 text-white">
                 <GraduationCap className="size-3.5" />
@@ -71,12 +78,17 @@ export function SchoolSidebar({
           </SidebarMenuButton>
         </SidebarGroup>
 
-        {schoolNavGroups.map((group) => (
+        {navGroups.map((group) => (
           <SidebarGroup key={group.label}>
             <SidebarGroupLabel>{group.label}</SidebarGroupLabel>
             <div className="space-y-1">
               {group.items.map(({ id, label, icon: Icon }) => (
-                <SidebarMenuButton key={id} asChild active={activePage === id}>
+                <SidebarMenuButton
+                  key={id}
+                  asChild
+                  active={activePage === id}
+                  className="school-sidebar-nav-item"
+                >
                   <Link to="/$page" params={{ page: id }}>
                     <Icon className="size-[18px] shrink-0" />
                     <span className="sidebar-expanded flex-1">{label}</span>
@@ -103,10 +115,10 @@ export function SchoolSidebar({
             {userName?.charAt(0)?.toUpperCase() ?? "S"}
           </span>
           <span className="sidebar-expanded min-w-0 flex-1">
-            <span className="block truncate text-xs font-semibold text-slate-800">
+            <span className="school-sidebar-user-name block truncate text-xs font-semibold text-slate-800">
               {userName ?? "School admin"}
             </span>
-            <span className="block truncate text-[10px] text-slate-500">
+            <span className="school-sidebar-user-email block truncate text-[10px] text-slate-500">
               {userEmail ?? "Administrator"}
             </span>
           </span>

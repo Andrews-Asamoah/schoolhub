@@ -3,6 +3,7 @@ import {
   Get,
   Post,
   Param,
+  Headers,
   Body,
   UseGuards,
 } from "@nestjs/common";
@@ -11,6 +12,7 @@ import { SchoolTenantGuard } from "../../common/guards/school-tenant.guard.js";
 import { RolesGuard } from "../../common/guards/roles.guard.js";
 import { Roles } from "../../common/decorators/roles.decorator.js";
 import { CurrentSchool } from "../../common/decorators/current-school.decorator.js";
+import { CurrentSchoolRole } from "../../common/decorators/current-school-role.decorator.js";
 import { CurrentUser, type AuthenticatedUser } from "../../common/decorators/current-user.decorator.js";
 import { ZodValidationPipe } from "../../common/pipes/zod-validation.pipe.js";
 import {
@@ -27,6 +29,7 @@ export class FinanceController {
   constructor(private readonly financeService: FinanceService) {}
 
   @Get("fee-structures")
+  @Roles("owner", "admin", "accountant")
   listFeeStructures(@CurrentSchool() school: School) {
     return this.financeService.listFeeStructures(school.id);
   }
@@ -51,10 +54,20 @@ export class FinanceController {
   }
 
   @Get("students/:studentId/ledger")
+  @Roles("owner", "admin", "accountant")
   getStudentLedger(
     @CurrentSchool() school: School,
     @Param("studentId") studentId: string,
+    @CurrentSchoolRole() role: string | undefined,
+    @Headers("x-academic-year-id") academicYearId?: string,
+    @Headers("x-academic-term-id") termId?: string,
   ) {
-    return this.financeService.getStudentLedger(school.id, studentId);
+    return this.financeService.getStudentLedger(
+      school.id,
+      studentId,
+      role,
+      academicYearId,
+      termId,
+    );
   }
 }

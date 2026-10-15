@@ -38,10 +38,13 @@ export class RolesGuard implements CanActivate {
       throw new ForbiddenException("Access denied: No active school membership");
     }
 
-    const hasRole = requiredRoles.includes(membership.role);
+    const activeRole = request.schoolRole ?? membership.role;
+    const effectiveRoles =
+      activeRole === "headmistress" ? [activeRole, "admin"] : [activeRole];
+    const hasRole = requiredRoles.some((role) => effectiveRoles.includes(role));
     if (!hasRole) {
       throw new ForbiddenException(
-        `Insufficient permissions. Required roles: [${requiredRoles.join(", ")}]. Current role: ${membership.role}`,
+        `Insufficient permissions. Required roles: [${requiredRoles.join(", ")}]. Current role: ${activeRole}`,
       );
     }
 

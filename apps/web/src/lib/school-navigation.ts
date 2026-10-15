@@ -43,7 +43,17 @@ export const schoolNavGroups: SchoolNavGroup[] = [
         id: "students",
         label: "Students",
         icon: UsersRound,
-        description: "Admissions, student profiles, class placement, and family details.",
+        description:
+          "Student identity, admissions, profile status, and current class context.",
+        section: "People",
+        apiStatus: "available",
+      },
+      {
+        id: "enrollments",
+        label: "Enrollments",
+        icon: GraduationCap,
+        description:
+          "Place students into classes by academic year and term, and review historical rosters.",
         section: "People",
         apiStatus: "available",
       },
@@ -51,25 +61,27 @@ export const schoolNavGroups: SchoolNavGroup[] = [
         id: "teachers",
         label: "Teachers",
         icon: GraduationCap,
-        description: "Teacher profiles, teaching assignments, and class responsibilities.",
+        description:
+          "Teaching personnel, qualifications, departments, and teacher records.",
         section: "People",
-        apiStatus: "planned",
+        apiStatus: "available",
       },
       {
         id: "staff",
         label: "Staff",
         icon: UsersRound,
-        description: "Manage non-teaching staff and school operations personnel.",
+        description: "Non-teaching employees and school operations personnel.",
         section: "People",
-        apiStatus: "planned",
+        apiStatus: "available",
       },
       {
         id: "guardians",
         label: "Guardians",
         icon: HeartHandshake,
-        description: "Family contacts and their linked student records.",
+        description:
+          "Family contacts, relationship details, and linked student records.",
         section: "People",
-        apiStatus: "planned",
+        apiStatus: "available",
       },
     ],
   },
@@ -233,7 +245,8 @@ export const schoolNavGroups: SchoolNavGroup[] = [
         id: "teacher-portal",
         label: "Teacher portal",
         icon: GraduationCap,
-        description: "A teacher-focused view of classes, attendance, and assessments.",
+        description:
+          "A teacher-focused view of classes, attendance, and assessments.",
         section: "Portals",
         apiStatus: "planned",
       },
@@ -241,7 +254,8 @@ export const schoolNavGroups: SchoolNavGroup[] = [
         id: "student-portal",
         label: "Student portal",
         icon: School,
-        description: "A student view of timetable, attendance, and academic progress.",
+        description:
+          "A student view of timetable, attendance, and academic progress.",
         section: "Portals",
         apiStatus: "planned",
       },
@@ -249,7 +263,8 @@ export const schoolNavGroups: SchoolNavGroup[] = [
         id: "guardian-portal",
         label: "Guardian portal",
         icon: HeartHandshake,
-        description: "A family view of linked students, notices, and school updates.",
+        description:
+          "A family view of linked students, notices, and school updates.",
         section: "Portals",
         apiStatus: "planned",
       },
@@ -258,6 +273,15 @@ export const schoolNavGroups: SchoolNavGroup[] = [
   {
     label: "Administration",
     items: [
+      {
+        id: "team",
+        label: "Team & roles",
+        icon: UsersRound,
+        description:
+          "Manage school accounts and the roles each person can use.",
+        section: "Administration",
+        apiStatus: "available",
+      },
       {
         id: "settings",
         label: "School settings",
@@ -279,6 +303,54 @@ export const schoolNavGroups: SchoolNavGroup[] = [
 ];
 
 export const schoolNavItems = schoolNavGroups.flatMap((group) => group.items);
+
+const rolePages: Record<string, string[]> = {
+  teacher: [
+    "students",
+    "enrollments",
+    "teachers",
+    "classes",
+    "subjects",
+    "academic-years",
+    "timetable",
+    "assessments",
+    "attendance",
+    "reports",
+  ],
+  accountant: [
+    "students",
+    "enrollments",
+    "fees",
+    "payments",
+    "payroll",
+    "reports",
+  ],
+  staff: [
+    "students",
+    "enrollments",
+    "teachers",
+    "staff",
+    "guardians",
+    "attendance",
+    "inventory",
+    "clubs",
+    "documents",
+  ],
+  student: ["student-portal"],
+  guardian: ["guardian-portal"],
+};
+
+export function getSchoolNavGroupsForRole(role?: string) {
+  const allowedPages = rolePages[role ?? ""];
+  if (!allowedPages) return schoolNavGroups;
+
+  return schoolNavGroups
+    .map((group) => ({
+      ...group,
+      items: group.items.filter((item) => allowedPages.includes(item.id)),
+    }))
+    .filter((group) => group.items.length > 0);
+}
 
 export function getSchoolNavItem(id: string) {
   return schoolNavItems.find((item) => item.id === id);

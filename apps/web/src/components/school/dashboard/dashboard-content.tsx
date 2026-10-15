@@ -10,8 +10,8 @@ import {
   Plus,
   UsersRound,
 } from "lucide-react";
-import { Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
+import { Link } from "@tanstack/react-router";
 import { dashboardMetrics } from "@/components/school/dashboard/dashboard-data";
 import {
   RecentActivityCard,
@@ -23,6 +23,11 @@ import {
   MetricCard,
 } from "@/components/school/dashboard/dashboard-metrics";
 import { apiFetch } from "@/lib/api";
+import {
+  schoolRoleLabel,
+  useSchoolRole,
+} from "@/components/school/school-role-switcher";
+import { getSchoolNavGroupsForRole } from "@/lib/school-navigation";
 
 interface SetupYear {
   id: string;
@@ -59,19 +64,26 @@ export function DashboardContent({
   greetingName,
   search,
 }: DashboardContentProps) {
+  const { activeRole } = useSchoolRole();
+  const isManagementRole = ["owner", "admin", "headmistress"].includes(
+    activeRole ?? "",
+  );
   const schoolQuery = useQuery({
     queryKey: ["school", "current"],
     queryFn: () => apiFetch<SetupSchool>("/schools/current"),
+    enabled: isManagementRole,
     retry: false,
   });
   const classesQuery = useQuery({
     queryKey: ["academics", "classes"],
     queryFn: () => apiFetch<unknown[]>("/academics/classes"),
+    enabled: isManagementRole,
     retry: false,
   });
   const subjectsQuery = useQuery({
     queryKey: ["academics", "subjects"],
     queryFn: () => apiFetch<unknown[]>("/academics/subjects"),
+    enabled: isManagementRole,
     retry: false,
   });
   const years = schoolQuery.data?.academicYears ?? [];
@@ -112,6 +124,49 @@ export function DashboardContent({
   const completedSteps = setupItems.filter((item) => item.complete).length;
   const setupHasError =
     schoolQuery.isError || classesQuery.isError || subjectsQuery.isError;
+
+  if (!isManagementRole) {
+    const roleLinks = getSchoolNavGroupsForRole(activeRole ?? undefined)
+      .flatMap((group) => group.items)
+      .slice(0, 6);
+    return (
+      <main className="mx-auto max-w-[1440px] px-4 py-7 sm:px-6 lg:px-9 lg:py-9">
+        <div className="rounded-3xl border border-indigo-100 bg-gradient-to-br from-white via-indigo-50/60 to-sky-50/70 p-6 shadow-sm sm:p-9">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-indigo-700">
+            {schoolRoleLabel(activeRole)}
+          </p>
+          <h1 className="mt-2 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
+            Welcome, {greetingName}
+          </h1>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
+            You are viewing your {schoolRoleLabel(activeRole).toLowerCase()} workspace. Choose an area to continue.
+          </p>
+        </div>
+        <section className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {roleLinks.map((item) => (
+            <Link
+              key={item.id}
+              to="/$page"
+              params={{ page: item.id }}
+              className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-indigo-200 hover:bg-indigo-50/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+            >
+              <span className="flex size-10 items-center justify-center rounded-xl bg-indigo-50 text-indigo-700">
+                <item.icon className="size-5" />
+              </span>
+              <span>
+                <span className="block text-sm font-semibold text-slate-900">
+                  {item.label}
+                </span>
+                <span className="mt-0.5 block text-xs text-slate-500">
+                  {item.description}
+                </span>
+              </span>
+            </Link>
+          ))}
+        </section>
+      </main>
+    );
+  }
 
   return (
     <main className="mx-auto max-w-[1440px] px-4 py-7 sm:px-6 lg:px-9 lg:py-9">

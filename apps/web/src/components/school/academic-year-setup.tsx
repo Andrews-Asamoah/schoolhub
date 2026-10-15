@@ -186,7 +186,18 @@ export function AcademicYearSetup({ years }: AcademicYearSetupProps) {
                     type="checkbox"
                     checked={field.state.value}
                     onBlur={field.handleBlur}
-                    onChange={(event) => field.handleChange(event.target.checked)}
+                    onChange={(event) => {
+                      const isCurrent = event.target.checked;
+                      field.handleChange(isCurrent);
+                      if (!isCurrent) {
+                        form.setFieldValue("terms", (terms) =>
+                          (terms ?? []).map((term) => ({
+                            ...term,
+                            isCurrent: false,
+                          })),
+                        );
+                      }
+                    }}
                     className="size-4 rounded border-slate-300 accent-indigo-600"
                   />
                   Set as current year
@@ -207,12 +218,12 @@ export function AcademicYearSetup({ years }: AcademicYearSetupProps) {
                 {(field) => (
                   <button
                     type="button"
-                    disabled={(field.state.value ?? []).length >= 4}
+                    disabled={(field.state.value ?? []).length >= 3}
                     onClick={() => {
                       const usedNumbers = new Set(
                         (field.state.value ?? []).map((term) => term.termNumber),
                       );
-                      const nextNumber = [1, 2, 3, 4].find(
+                      const nextNumber = [1, 2, 3].find(
                         (number) => !usedNumbers.has(number),
                       );
                       if (nextNumber) field.pushValue(blankTerm(nextNumber));
@@ -288,6 +299,9 @@ export function AcademicYearSetup({ years }: AcademicYearSetupProps) {
                           checked={term.isCurrent}
                           onChange={(event) => {
                             const isCurrent = event.target.checked;
+                            if (isCurrent) {
+                              form.setFieldValue("isCurrent", true);
+                            }
                             termsField.handleChange((current) =>
                               (current ?? []).map((item, itemIndex) => ({
                                 ...item,
@@ -336,7 +350,7 @@ export function AcademicYearSetup({ years }: AcademicYearSetupProps) {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400">
               <Clock3 className="size-3.5" />
-              You can add up to four terms per year.
+              Each academic year can contain up to three terms.
             </p>
             <FormSubmitButton isSubmitting={mutation.isPending}>
               <Check className="size-4" />

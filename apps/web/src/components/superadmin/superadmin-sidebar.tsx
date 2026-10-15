@@ -66,7 +66,7 @@ export function SuperAdminSidebar({
             <Shield className="size-5" strokeWidth={2} />
           </span>
           <span className="sidebar-expanded min-w-0">
-            <span className="block text-[15px] font-bold tracking-tight text-slate-900 dark:text-white">
+            <span className="superadmin-brand-title block text-[15px] font-bold tracking-tight">
               SchoolHub
             </span>
             <span className="block text-[10px] font-bold tracking-[0.14em] text-indigo-700 dark:text-indigo-300">
@@ -116,10 +116,10 @@ export function SuperAdminSidebar({
             {userName?.charAt(0)?.toUpperCase() ?? "A"}
           </span>
           <span className="sidebar-expanded min-w-0 flex-1">
-            <span className="block truncate text-xs font-semibold text-slate-800 dark:text-slate-100">
+            <span className="superadmin-user-name block truncate text-xs font-semibold text-slate-800 dark:text-slate-100">
               {userName ?? "Super Admin"}
             </span>
-            <span className="block truncate text-[10px] text-slate-500 dark:text-slate-400">
+            <span className="superadmin-user-email block truncate text-[10px] text-slate-500 dark:text-slate-400">
               {userEmail ?? "admin@schoolhub.gh"}
             </span>
           </span>

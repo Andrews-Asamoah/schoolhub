@@ -153,8 +153,9 @@ model organizationRole {
 model member {
   id             String   @id
   organizationId String
-  userId         String
+  userId         String   @unique
   role           String
+  roles          String[] @default([])
   banned         Boolean  @default(false)
   banReason      String?
   createdAt      DateTime @default(now())

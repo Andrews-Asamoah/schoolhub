@@ -1,17 +1,38 @@
-import { Injectable } from "@nestjs/common";
+import { BadRequestException, ForbiddenException, Injectable } from "@nestjs/common";
 import { PrismaService } from "../../prisma/prisma.service.js";
 import type { BatchAttendanceInput } from "@schoolhub/shared";
+import { canManageAcademicContext } from "../../common/academic-context.js";
 
 @Injectable()
 export class AttendanceService {
   constructor(private readonly prisma: PrismaService) {}
 
   async batchRecordAttendance(
-    _schoolId: string,
+    schoolId: string,
     markedById: string,
     input: BatchAttendanceInput,
+    _role?: string,
   ) {
     const attendanceDate = new Date(input.date);
+    const { academicYear, term } =
+      await this.resolveAcademicContext(schoolId);
+    this.assertCurrentTermDate(input.date, term.startDate, term.endDate);
+    const studentIds = input.records.map((record) => record.studentId);
+    const placements = await this.prisma.client.enrollment.findMany({
+      where: {
+        studentId: { in: studentIds },
+        academicYearId: academicYear.id,
+        termId: term.id,
+        status: "ACTIVE",
+        student: { schoolId, deletedAt: null },
+      },
+      select: { studentId: true },
+    });
+    if (placements.length !== studentIds.length) {
+      throw new ForbiddenException(
+        "Attendance can only be recorded for students enrolled in the current term.",
+      );
+    }
 
     const operations = input.records.map((record) =>
       this.prisma.client.attendance.upsert({
@@ -47,11 +68,44 @@ export class AttendanceService {
     };
   }
 
-  async getClassAttendance(schoolId: string, classId: string, date: string) {
-    const attendanceDate = new Date(date);
+  async getClassAttendance(
+    schoolId: string,
+    classId: string,
+    requestedDate?: string,
+    role?: string,
+    academicYearId?: string,
+    termId?: string,
+  ) {
+    const { academicYear, term } = await this.resolveAcademicContext(
+      schoolId,
+      academicYearId,
+      termId,
+      role,
+    );
+    const today = new Date().toISOString().slice(0, 10);
+    const date =
+      requestedDate ??
+      (academicYear.isCurrent && term.isCurrent
+        ? today
+        : term.startDate.toISOString().slice(0, 10));
+    const attendanceDate = new Date(`${date}T00:00:00.000Z`);
+    if (requestedDate) {
+      this.assertCurrentTermDate(requestedDate, term.startDate, term.endDate);
+    }
 
     const students = await this.prisma.client.student.findMany({
-      where: { classId, schoolId, deletedAt: null },
+      where: {
+        schoolId,
+        deletedAt: null,
+        enrollments: {
+          some: {
+            classId,
+            academicYearId: academicYear.id,
+            termId: term.id,
+            status: "ACTIVE",
+          },
+        },
+      },
       orderBy: { profile: { lastName: "asc" } },
       include: {
         profile: { select: { firstName: true, lastName: true, otherNames: true } },
@@ -70,12 +124,34 @@ export class AttendanceService {
     }));
   }
 
-  async getStudentAttendanceSummary(schoolId: string, studentId: string) {
+  async getStudentAttendanceSummary(
+    schoolId: string,
+    studentId: string,
+    role?: string,
+    academicYearId?: string,
+    termId?: string,
+  ) {
+    const { academicYear, term } = await this.resolveAcademicContext(
+      schoolId,
+      academicYearId,
+      termId,
+      role,
+    );
     const records = await this.prisma.client.attendance.groupBy({
       by: ["status"],
       where: {
         studentId,
-        student: { schoolId },
+        student: {
+          schoolId,
+          enrollments: {
+            some: {
+              academicYearId: academicYear.id,
+              termId: term.id,
+              status: "ACTIVE",
+            },
+          },
+        },
+        date: { gte: term.startDate, lte: term.endDate },
       },
       _count: true,
     });
@@ -104,5 +180,71 @@ export class AttendanceService {
       totalDays,
       attendanceRate,
     };
+  }
+
+  private async resolveAcademicContext(
+    schoolId: string,
+    academicYearId?: string,
+    termId?: string,
+    role?: string,
+  ) {
+    if (Boolean(academicYearId) !== Boolean(termId)) {
+      throw new BadRequestException(
+        "Academic year and term must be supplied together.",
+      );
+    }
+    const academicYear = await this.prisma.client.academicYear.findFirst({
+      where: { schoolId, isCurrent: true },
+      include: { terms: { where: { isCurrent: true }, take: 1 } },
+    });
+    const term = academicYear?.terms[0];
+    if (!academicYear || !term) {
+      throw new BadRequestException(
+        "This school has not selected a current academic year and term.",
+      );
+    }
+    if (!academicYearId || !termId) return { academicYear, term };
+
+    const selectedTerm = await this.prisma.client.term.findFirst({
+      where: {
+        id: termId,
+        academicYearId,
+        academicYear: { schoolId },
+      },
+      include: { academicYear: true },
+    });
+    if (!selectedTerm) {
+      throw new BadRequestException(
+        "Choose a term belonging to an academic year in this school.",
+      );
+    }
+    if (
+      !canManageAcademicContext(role) &&
+      (selectedTerm.academicYearId !== academicYear.id ||
+        selectedTerm.id !== term.id)
+    ) {
+      throw new ForbiddenException(
+        "Only the current academic year and term are available for your role.",
+      );
+    }
+    return { academicYear: selectedTerm.academicYear, term: selectedTerm };
+  }
+
+  private assertCurrentTermDate(
+    value: string,
+    startDate: Date,
+    endDate: Date,
+  ) {
+    const date = new Date(`${value}T00:00:00.000Z`);
+    if (
+      !/^\d{4}-\d{2}-\d{2}$/.test(value) ||
+      Number.isNaN(date.getTime()) ||
+      date < startDate ||
+      date > endDate
+    ) {
+      throw new BadRequestException(
+        "Attendance date must fall within the currently selected term.",
+      );
+    }
   }
 }

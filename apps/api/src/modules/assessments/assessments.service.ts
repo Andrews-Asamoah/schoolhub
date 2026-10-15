@@ -1,7 +1,15 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common";
 import { PrismaService } from "../../prisma/prisma.service.js";
 import type { RecordScoreInput } from "@schoolhub/shared";
 import { Prisma } from "@prisma/client";
+import {
+  canManageAcademicContext,
+} from "../../common/academic-context.js";
 
 @Injectable()
 export class AssessmentsService {
@@ -21,8 +29,51 @@ export class AssessmentsService {
     _schoolId: string,
     recordedById: string,
     input: RecordScoreInput,
+    _role?: string,
   ) {
     return this.prisma.client.$transaction(async (tx) => {
+      const term = await tx.term.findFirst({
+        where: {
+          id: input.termId,
+          isCurrent: true,
+          academicYear: { schoolId: _schoolId, isCurrent: true },
+        },
+        select: { id: true, academicYearId: true },
+      });
+      if (!term) {
+        throw new ForbiddenException(
+          "Scores can only be recorded for the currently selected academic term.",
+        );
+      }
+      const [student, subject, template, enrollment] = await Promise.all([
+        tx.student.findFirst({
+          where: { id: input.studentId, schoolId: _schoolId, deletedAt: null },
+          select: { id: true },
+        }),
+        tx.subject.findFirst({
+          where: { id: input.subjectId, schoolId: _schoolId, isActive: true },
+          select: { id: true },
+        }),
+        tx.assessmentTemplate.findFirst({
+          where: { id: input.templateId, schoolId: _schoolId, isActive: true },
+          select: { id: true },
+        }),
+        tx.enrollment.findFirst({
+          where: {
+            studentId: input.studentId,
+            academicYearId: term.academicYearId,
+            termId: term.id,
+            status: "ACTIVE",
+            student: { schoolId: _schoolId },
+          },
+          select: { id: true },
+        }),
+      ]);
+      if (!student || !subject || !template || !enrollment) {
+        throw new BadRequestException(
+          "Scores require an active student enrolled at this school for the current term, a school subject, and a school assessment template.",
+        );
+      }
       // 1. Find or create the parent AssessmentScore
       const assessmentScore = await tx.assessmentScore.upsert({
         where: {
@@ -110,7 +161,26 @@ export class AssessmentsService {
     schoolId: string,
     studentId: string,
     termId: string,
+    role?: string,
   ) {
+    const term = await this.prisma.client.term.findFirst({
+      where: {
+        id: termId,
+        academicYear: { schoolId },
+      },
+      include: { academicYear: { select: { id: true, name: true, isCurrent: true } } },
+    });
+    if (!term) {
+      throw new BadRequestException("Choose a term belonging to this school.");
+    }
+    if (
+      !canManageAcademicContext(role) &&
+      (!term.isCurrent || !term.academicYear.isCurrent)
+    ) {
+      throw new ForbiddenException(
+        "Only the current academic year and term are available for your role.",
+      );
+    }
     const student = await this.prisma.client.student.findFirst({
       where: { id: studentId, schoolId, deletedAt: null },
       include: {
@@ -121,6 +191,21 @@ export class AssessmentsService {
 
     if (!student) {
       throw new NotFoundException("Student not found");
+    }
+    const enrollment = await this.prisma.client.enrollment.findFirst({
+      where: {
+        studentId,
+        academicYearId: term.academicYearId,
+        termId,
+        status: { in: ["ACTIVE", "COMPLETED"] },
+        student: { schoolId },
+      },
+      include: { class: { select: { id: true, name: true, level: true } } },
+    });
+    if (!enrollment) {
+      throw new NotFoundException(
+        "Student has no enrollment in the selected academic term.",
+      );
     }
 
     const scores = await this.prisma.client.assessmentScore.findMany({
@@ -139,8 +224,10 @@ export class AssessmentsService {
     });
 
     return {
-      student,
+      student: { ...student, currentClass: student.class, class: enrollment.class },
       termId,
+      academicYear: term.academicYear,
+      class: enrollment.class,
       scores,
       remarks,
     };

@@ -2,16 +2,134 @@
 
 /*
   Global CSS — Tailwind v4 uses @import instead of @tailwind directives.
-  Add your CSS custom properties (design tokens) here.
+  Semantic tokens follow shadcn/ui conventions so the application palette can
+  be adjusted centrally without changing component-level utility classes.
 */
 
 :root {
   --font-sans: "Inter", system-ui, sans-serif;
+  --background: oklch(0.985 0.003 250);
+  --foreground: oklch(0.19 0.025 260);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.19 0.025 260);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.19 0.025 260);
+  --primary: oklch(0.48 0.22 276);
+  --primary-foreground: oklch(0.99 0.002 250);
+  --secondary: oklch(0.95 0.012 255);
+  --secondary-foreground: oklch(0.29 0.04 265);
+  --muted: oklch(0.96 0.008 255);
+  --muted-foreground: oklch(0.49 0.025 258);
+  --accent: oklch(0.94 0.035 278);
+  --accent-foreground: oklch(0.32 0.12 277);
+  --destructive: oklch(0.58 0.23 27);
+  --destructive-foreground: oklch(0.99 0.002 250);
+  --border: oklch(0.89 0.015 255);
+  --input: oklch(0.89 0.015 255);
+  --ring: oklch(0.62 0.18 276);
+  --chart-1: oklch(0.62 0.19 276);
+  --chart-2: oklch(0.67 0.14 183);
+  --chart-3: oklch(0.72 0.16 75);
+  --chart-4: oklch(0.63 0.2 325);
+  --chart-5: oklch(0.65 0.21 25);
+  --sidebar: oklch(0.975 0.006 255);
+  --sidebar-foreground: oklch(0.25 0.03 260);
+  --sidebar-primary: oklch(0.48 0.22 276);
+  --sidebar-primary-foreground: oklch(0.99 0.002 250);
+  --sidebar-accent: oklch(0.93 0.025 276);
+  --sidebar-accent-foreground: oklch(0.32 0.12 277);
+  --sidebar-border: oklch(0.89 0.015 255);
+  --sidebar-ring: oklch(0.62 0.18 276);
+  --support-success: oklch(0.43 0.13 160);
+  --support-warning: oklch(0.48 0.13 75);
+  --support-danger: oklch(0.5 0.2 25);
+  --support-info: oklch(0.45 0.15 230);
+  --support-high: oklch(0.49 0.16 52);
+  --radius: 0.75rem;
   font-family: var(--font-sans);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+.dark {
+  --background: oklch(0.15 0.022 260);
+  --foreground: oklch(0.94 0.012 255);
+  --card: oklch(0.2 0.025 260);
+  --card-foreground: oklch(0.94 0.012 255);
+  --popover: oklch(0.2 0.025 260);
+  --popover-foreground: oklch(0.94 0.012 255);
+  --primary: oklch(0.72 0.15 276);
+  --primary-foreground: oklch(0.18 0.04 265);
+  --secondary: oklch(0.26 0.025 260);
+  --secondary-foreground: oklch(0.9 0.015 255);
+  --muted: oklch(0.25 0.022 260);
+  --muted-foreground: oklch(0.72 0.025 255);
+  --accent: oklch(0.3 0.07 276);
+  --accent-foreground: oklch(0.91 0.04 278);
+  --destructive: oklch(0.65 0.2 25);
+  --destructive-foreground: oklch(0.98 0.01 25);
+  --border: oklch(0.32 0.025 260);
+  --input: oklch(0.32 0.025 260);
+  --ring: oklch(0.65 0.15 276);
+  --chart-1: oklch(0.72 0.15 276);
+  --chart-2: oklch(0.72 0.14 183);
+  --chart-3: oklch(0.78 0.16 75);
+  --chart-4: oklch(0.7 0.18 325);
+  --chart-5: oklch(0.7 0.2 25);
+  --sidebar: oklch(0.18 0.024 260);
+  --sidebar-foreground: oklch(0.9 0.015 255);
+  --sidebar-primary: oklch(0.72 0.15 276);
+  --sidebar-primary-foreground: oklch(0.18 0.04 265);
+  --sidebar-accent: oklch(0.29 0.06 276);
+  --sidebar-accent-foreground: oklch(0.91 0.04 278);
+  --sidebar-border: oklch(0.32 0.025 260);
+  --sidebar-ring: oklch(0.65 0.15 276);
+  --support-success: oklch(0.79 0.14 160);
+  --support-warning: oklch(0.82 0.14 75);
+  --support-danger: oklch(0.75 0.16 25);
+  --support-info: oklch(0.78 0.13 230);
+  --support-high: oklch(0.8 0.15 52);
 }
 
 @keyframes wave {
@@ -50,6 +168,18 @@
   min-height: calc(100vh - 4rem);
 }
 
+.superadmin-breadcrumb-root {
+  color: var(--muted-foreground);
+}
+
+.superadmin-breadcrumb-separator {
+  color: var(--border);
+}
+
+.superadmin-breadcrumb-current {
+  color: var(--foreground);
+}
+
 .superadmin-sidebar-panel {
   background-color: transparent;
 }
@@ -67,16 +197,16 @@
 }
 
 .superadmin-app-shell .superadmin-button-primary {
-  border: 1px solid #3730a3;
-  background: #4338ca;
-  color: #ffffff;
+  border: 1px solid var(--primary);
+  background: var(--primary);
+  color: var(--primary-foreground);
   box-shadow: 0 4px 10px rgb(49 46 129 / 18%);
 }
 
 .superadmin-app-shell .superadmin-button-primary:hover:not(:disabled) {
-  border-color: #312e81;
-  background: #3730a3;
-  color: #ffffff;
+  border-color: color-mix(in oklab, var(--primary) 84%, black);
+  background: color-mix(in oklab, var(--primary) 84%, black);
+  color: var(--primary-foreground);
   box-shadow: 0 6px 16px rgb(49 46 129 / 24%);
 }
 
@@ -147,6 +277,51 @@
   color: #ffffff;
 }
 
+.superadmin-app-shell .superadmin-nav-item:not([aria-current="page"]):hover {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+
+.superadmin-sidebar-shell .superadmin-user-name {
+  color: #1e293b;
+}
+
+.superadmin-sidebar-shell .superadmin-user-email {
+  color: #64748b;
+}
+
+.superadmin-sidebar-shell .superadmin-brand-title {
+  color: #0f172a;
+}
+
+.school-sidebar-shell .school-brand-title {
+  color: #0f172a;
+}
+
+.school-sidebar-shell .school-sidebar-nav-item {
+  color: #475569;
+}
+
+.school-sidebar-shell .school-sidebar-nav-item:hover {
+  color: #0f172a;
+}
+
+.school-sidebar-shell .school-sidebar-nav-item[aria-current="page"] {
+  color: #1d4ed8;
+}
+
+.school-sidebar-shell .school-sidebar-nav-item[aria-current="page"]:hover {
+  color: #1e40af;
+}
+
+.school-sidebar-shell .school-sidebar-user-name {
+  color: #1e293b;
+}
+
+.school-sidebar-shell .school-sidebar-user-email {
+  color: #64748b;
+}
+
 .superadmin-app-shell .superadmin-tab[aria-pressed="true"] {
   background: #4338ca;
   color: #ffffff;
@@ -168,142 +343,136 @@
   outline-offset: 2px;
 }
 
-.dark [class~="bg-white"] {
+@layer utilities {
+:where(.dark) [class~="bg-white"]:where(:not([class*="dark:bg-"])) {
   background-color: #111827;
 }
 
-.dark [class~="bg-white/90"] {
+:where(.dark) [class~="bg-white/90"]:where(:not([class*="dark:bg-"])) {
   background-color: rgb(17 24 39 / 92%);
 }
 
-.dark [class~="bg-slate-50"],
-.dark [class~="bg-slate-50/70"],
-.dark [class~="bg-slate-50/80"] {
+:where(.dark) [class~="bg-slate-50"]:where(:not([class*="dark:bg-"])),
+:where(.dark) [class~="bg-slate-50/70"]:where(:not([class*="dark:bg-"])),
+:where(.dark) [class~="bg-slate-50/80"]:where(:not([class*="dark:bg-"])) {
   background-color: #111827;
 }
 
-.dark [class~="bg-slate-100"] {
+:where(.dark) [class~="bg-slate-100"]:where(:not([class*="dark:bg-"])) {
   background-color: #1e293b;
 }
 
-.dark [class~="bg-slate-200"] {
+:where(.dark) [class~="bg-slate-200"]:where(:not([class*="dark:bg-"])) {
   background-color: #334155;
 }
 
-.dark [class~="bg-blue-50"],
-.dark [class~="bg-blue-50/80"] {
+:where(.dark) [class~="bg-blue-50"]:where(:not([class*="dark:bg-"])),
+:where(.dark) [class~="bg-blue-50/80"]:where(:not([class*="dark:bg-"])) {
   background-color: #172554;
 }
 
-.dark [class~="bg-indigo-50"] {
+:where(.dark) [class~="bg-indigo-50"]:where(:not([class*="dark:bg-"])) {
   background-color: #1e1b4b;
 }
 
-.dark [class~="bg-emerald-50"] {
+:where(.dark) [class~="bg-emerald-50"]:where(:not([class*="dark:bg-"])) {
   background-color: #052e2b;
 }
 
-.dark [class~="bg-amber-50"] {
+:where(.dark) [class~="bg-amber-50"]:where(:not([class*="dark:bg-"])) {
   background-color: #422006;
 }
 
-.dark [class~="bg-rose-50"] {
+:where(.dark) [class~="bg-rose-50"]:where(:not([class*="dark:bg-"])) {
   background-color: #4c0519;
 }
 
-.dark [class~="bg-violet-50"] {
+:where(.dark) [class~="bg-violet-50"]:where(:not([class*="dark:bg-"])) {
   background-color: #2e1065;
 }
 
-.dark [class~="bg-rose-50"] {
-  background-color: #4c0519;
-}
-
-.dark [class~="bg-red-50"] {
+:where(.dark) [class~="bg-red-50"]:where(:not([class*="dark:bg-"])) {
   background-color: #450a0a;
 }
 
-.dark [class~="bg-amber-50"] {
-  background-color: #422006;
-}
-
-.dark [class~="bg-amber-100"] {
+:where(.dark) [class~="bg-amber-100"]:where(:not([class*="dark:bg-"])) {
   background-color: #713f12;
 }
 
-.dark [class~="border-slate-100"],
-.dark [class~="border-slate-100/80"] {
+:where(.dark) [class~="border-slate-100"]:where(:not([class*="dark:border-"])),
+:where(.dark) [class~="border-slate-100/80"]:where(:not([class*="dark:border-"])) {
   border-color: #263447;
 }
 
-.dark [class~="border-slate-200"],
-.dark [class~="border-slate-200/80"] {
+:where(.dark) [class~="border-slate-200"]:where(:not([class*="dark:border-"])),
+:where(.dark) [class~="border-slate-200/80"]:where(:not([class*="dark:border-"])) {
   border-color: #334155;
 }
 
-.dark [class~="border-amber-200"] {
+:where(.dark) [class~="border-amber-200"]:where(:not([class*="dark:border-"])) {
   border-color: #854d0e;
 }
 
-.dark [class~="divide-slate-100"] > :not([hidden]) ~ :not([hidden]) {
+:where(.dark) [class~="divide-slate-100"]:where(:not([class*="dark:divide-"])) > :not([hidden]) ~ :not([hidden]) {
   border-color: #263447;
 }
 
-.dark [class~="text-slate-900"] {
+:where(.dark) [class~="text-slate-900"]:where(:not([class*="dark:text-"])) {
   color: #f1f5f9;
 }
 
-.dark [class~="text-slate-800"] {
+:where(.dark) [class~="text-slate-800"]:where(:not([class*="dark:text-"])) {
   color: #e2e8f0;
 }
 
-.dark [class~="text-slate-700"],
-.dark [class~="text-slate-600"] {
+:where(.dark) [class~="text-slate-700"]:where(:not([class*="dark:text-"])),
+:where(.dark) [class~="text-slate-600"]:where(:not([class*="dark:text-"])) {
   color: #cbd5e1;
 }
 
-.dark [class~="text-slate-500"],
-.dark [class~="text-slate-400"] {
+:where(.dark) [class~="text-slate-500"]:where(:not([class*="dark:text-"])),
+:where(.dark) [class~="text-slate-400"]:where(:not([class*="dark:text-"])) {
   color: #94a3b8;
 }
 
-.dark [class~="text-blue-700"] {
+:where(.dark) [class~="text-blue-700"]:where(:not([class*="dark:text-"])) {
   color: #93c5fd;
 }
 
-.dark [class~="text-indigo-600"] {
+:where(.dark) [class~="text-indigo-600"]:where(:not([class*="dark:text-"])) {
   color: #a5b4fc;
 }
 
-.dark [class~="text-indigo-800"] {
+:where(.dark) [class~="text-indigo-800"]:where(:not([class*="dark:text-"])) {
   color: #c7d2fe;
 }
 
-.dark [class~="text-amber-900"] {
+:where(.dark) [class~="text-amber-900"]:where(:not([class*="dark:text-"])) {
   color: #fef3c7;
 }
 
-.dark [class~="text-amber-800"],
-.dark [class~="text-amber-700"] {
+:where(.dark) [class~="text-amber-800"]:where(:not([class*="dark:text-"])),
+:where(.dark) [class~="text-amber-700"]:where(:not([class*="dark:text-"])) {
   color: #fcd34d;
 }
 
-.dark [class~="hover:bg-slate-50"]:hover,
-.dark [class~="hover:bg-slate-50/70"]:hover,
-.dark [class~="hover:bg-slate-100"]:hover {
+:where(.dark) [class~="hover:bg-slate-50"]:where(:not([class*="dark:hover:bg-"])):hover,
+:where(.dark) [class~="hover:bg-slate-50/70"]:where(:not([class*="dark:hover:bg-"])):hover,
+:where(.dark) [class~="hover:bg-slate-100"]:where(:not([class*="dark:hover:bg-"])):hover {
   background-color: #1e293b;
 }
 
-.dark [class~="hover:bg-indigo-50"]:hover {
+:where(.dark) [class~="hover:bg-indigo-50"]:where(:not([class*="dark:hover:bg-"])):hover {
   background-color: #312e81;
 }
 
-.dark [class~="hover:text-slate-900"]:hover {
+:where(.dark) [class~="hover:text-slate-900"]:where(:not([class*="dark:hover:text-"])):hover {
   color: #f1f5f9;
 }
 
 .dark .ring-white {
   --tw-ring-color: #111827;
+}
 }
 
 .superadmin-sidebar-shell {
@@ -366,15 +535,15 @@
 }
 
 .dark .superadmin-app-shell .superadmin-button-primary {
-  border-color: #818cf8;
-  background: #6366f1;
-  color: #ffffff;
+  border-color: var(--primary);
+  background: var(--primary);
+  color: var(--primary-foreground);
 }
 
 .dark .superadmin-app-shell .superadmin-button-primary:hover:not(:disabled) {
-  border-color: #a5b4fc;
-  background: #4f46e5;
-  color: #ffffff;
+  border-color: color-mix(in oklab, var(--primary) 84%, white);
+  background: color-mix(in oklab, var(--primary) 84%, white);
+  color: var(--primary-foreground);
 }
 
 .dark .superadmin-app-shell .superadmin-button-secondary,
@@ -432,6 +601,51 @@
   color: #ffffff;
 }
 
+.dark .superadmin-app-shell .superadmin-nav-item:not([aria-current="page"]):hover {
+  background: rgb(255 255 255 / 6%);
+  color: #f8fafc;
+}
+
+.dark .superadmin-sidebar-shell .superadmin-user-name {
+  color: #f1f5f9;
+}
+
+.dark .superadmin-sidebar-shell .superadmin-user-email {
+  color: #94a3b8;
+}
+
+.dark .superadmin-sidebar-shell .superadmin-brand-title {
+  color: #f8fafc;
+}
+
+.dark .school-sidebar-shell .school-brand-title {
+  color: #f8fafc;
+}
+
+.dark .school-sidebar-shell .school-sidebar-nav-item {
+  color: #cbd5e1;
+}
+
+.dark .school-sidebar-shell .school-sidebar-nav-item:hover {
+  color: #f8fafc;
+}
+
+.dark .school-sidebar-shell .school-sidebar-nav-item[aria-current="page"] {
+  color: #bfdbfe;
+}
+
+.dark .school-sidebar-shell .school-sidebar-nav-item[aria-current="page"]:hover {
+  color: #dbeafe;
+}
+
+.dark .school-sidebar-shell .school-sidebar-user-name {
+  color: #e2e8f0;
+}
+
+.dark .school-sidebar-shell .school-sidebar-user-email {
+  color: #94a3b8;
+}
+
 .dark .superadmin-app-shell .superadmin-tab[aria-pressed="true"] {
   background: #6366f1;
   color: #ffffff;
@@ -466,17 +680,154 @@
   color: #7f8da5;
 }
 
-.dark [class~="text-emerald-700"] {
+.support-workspace {
+  color: var(--foreground);
+}
+
+.support-workspace .support-text-primary {
+  color: var(--foreground);
+}
+
+.support-workspace .support-text-secondary,
+.support-workspace .support-text-body {
+  color: var(--secondary-foreground);
+}
+
+.support-workspace .support-text-muted {
+  color: var(--muted-foreground);
+}
+
+.support-workspace .support-text-soft {
+  color: color-mix(in oklab, var(--muted-foreground) 76%, var(--background));
+}
+
+.support-workspace .support-text-accent,
+.support-workspace .support-refresh-button:hover {
+  color: var(--primary);
+}
+
+.support-workspace .support-text-success,
+.support-workspace .support-status-resolved {
+  color: var(--support-success);
+}
+
+.support-workspace .support-text-warning,
+.support-workspace .support-status-progress {
+  color: var(--support-warning);
+}
+
+.support-workspace .support-text-danger {
+  color: var(--support-danger);
+}
+
+.support-workspace .support-status-open,
+.support-workspace .support-priority-medium {
+  color: var(--support-info);
+}
+
+.support-workspace .support-status-closed,
+.support-workspace .support-priority-low {
+  color: var(--muted-foreground);
+}
+
+.support-workspace .support-priority-high {
+  color: var(--support-high);
+}
+
+.support-workspace .support-priority-urgent {
+  color: var(--support-danger);
+}
+
+.support-workspace .support-inbox-shell,
+.support-workspace .support-inbox,
+.support-workspace .support-conversation,
+.support-workspace .support-inbox-header,
+.support-workspace .support-conversation-header,
+.support-workspace .support-reply-form {
+  border-color: var(--border);
+  background-color: var(--card);
+}
+
+.support-workspace .support-timeline {
+  background-color: var(--background);
+}
+
+.support-workspace .support-request-card,
+.support-workspace .support-message-school {
+  border-color: var(--border);
+  background-color: var(--card);
+}
+
+.support-workspace .support-message-platform {
+  border-color: color-mix(in oklab, var(--primary) 25%, var(--border));
+  background-color: color-mix(in oklab, var(--primary) 8%, var(--card));
+}
+
+.support-workspace .support-message-activity {
+  border-color: var(--border);
+  background-color: var(--muted);
+}
+
+.support-workspace .support-ticket-row:not(.support-ticket-selected):hover {
+  border-color: var(--border);
+  background-color: var(--muted);
+}
+
+.support-workspace .support-ticket-selected {
+  border-color: color-mix(in oklab, var(--primary) 25%, var(--border));
+  background-color: var(--accent);
+}
+
+.support-workspace .support-summary-card {
+  border-color: var(--border);
+  background-color: var(--card);
+}
+
+.support-workspace .support-create-form {
+  border-color: color-mix(in oklab, var(--primary) 25%, var(--border));
+  background-color: color-mix(in oklab, var(--primary) 4%, var(--card));
+}
+
+.support-workspace .support-control,
+.support-workspace .support-select,
+.support-workspace .support-reply-textarea {
+  color-scheme: light dark;
+  border-color: var(--input);
+  background-color: var(--background);
+  color: var(--foreground);
+}
+
+.support-workspace .support-select option {
+  background-color: var(--popover);
+  color: var(--popover-foreground);
+}
+
+.support-workspace .support-control:focus,
+.support-workspace .support-reply-textarea:focus {
+  border-color: var(--ring);
+  background-color: var(--background);
+  color: var(--foreground);
+  box-shadow: 0 0 0 2px color-mix(in oklab, var(--ring) 18%, transparent);
+}
+
+.support-workspace .support-control::placeholder,
+.support-workspace .support-reply-textarea::placeholder {
+  color: var(--muted-foreground);
+}
+
+@layer utilities {
+:where(.dark) [class~="text-emerald-700"]:where(:not([class*="dark:text-"])) {
   color: #6ee7b7;
 }
 
-.dark [class~="text-rose-700"],
-.dark [class~="text-red-700"] {
+:where(.dark) [class~="text-rose-700"]:where(:not([class*="dark:text-"])),
+:where(.dark) [class~="text-red-700"]:where(:not([class*="dark:text-"])) {
   color: #fda4af;
 }
 
-.dark [class~="text-violet-700"] {
+:where(.dark) [class~="text-violet-700"]:where(:not([class*="dark:text-"])) {
   color: #c4b5fd;
+}
 }
 
 .superadmin-dialog-backdrop {

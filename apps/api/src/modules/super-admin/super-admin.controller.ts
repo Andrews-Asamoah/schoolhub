@@ -46,6 +46,11 @@ export class SuperAdminController {
     );
   }
 
+  @Get("schools/options")
+  listSchoolOptions() {
+    return this.superAdminService.listSchoolOptions();
+  }
+
   @Get("users")
   listUsers(
     @Query("page") page = "1",

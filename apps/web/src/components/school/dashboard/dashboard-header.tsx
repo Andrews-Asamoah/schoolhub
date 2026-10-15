@@ -1,6 +1,11 @@
 import { Bell, Search } from "lucide-react";
+import { AcademicContextSwitcher } from "@/components/school/academic-context-switcher";
 import { ThemeToggle } from "@/components/school/theme-toggle";
-import { SchoolOrganizationPicker } from "@/components/school/school-organization";
+import {
+  SchoolRoleSwitcher,
+  schoolRoleLabel,
+  useSchoolRole,
+} from "@/components/school/school-role-switcher";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 
 interface DashboardHeaderProps {
@@ -14,6 +19,8 @@ export function DashboardHeader({
   search,
   onSearchChange,
 }: DashboardHeaderProps) {
+  const { activeRole } = useSchoolRole();
+
   return (
     <header className="sticky top-0 z-10 flex h-[4.5rem] items-center justify-between border-b border-slate-200/80 bg-white/90 px-4 backdrop-blur md:px-8">
       <div className="flex min-w-0 items-center gap-3">
@@ -26,7 +33,8 @@ export function DashboardHeader({
         </div>
       </div>
       <div className="flex items-center gap-2 sm:gap-3">
-        <SchoolOrganizationPicker compact />
+        <AcademicContextSwitcher />
+        <SchoolRoleSwitcher />
         <label className="relative hidden md:block">
           <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
           <input
@@ -51,7 +59,7 @@ export function DashboardHeader({
           <p className="text-xs font-semibold text-slate-800">
             {userName ?? "School admin"}
           </p>
-          <p className="text-[10px] text-slate-500">Administrator</p>
+          <p className="text-[10px] text-slate-500">{schoolRoleLabel(activeRole)}</p>
         </div>
       </div>
     </header>

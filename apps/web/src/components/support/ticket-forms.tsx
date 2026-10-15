@@ -84,7 +84,7 @@ export function CreateTicketForm({
         event.stopPropagation();
         void form.handleSubmit().catch(() => undefined);
       }}
-      className="rounded-2xl border border-indigo-200 bg-indigo-50/50 p-5 shadow-sm dark:border-indigo-300/15 dark:bg-indigo-400/[0.05]"
+      className="support-create-form rounded-2xl border border-indigo-200 bg-indigo-50/50 p-5 shadow-sm dark:border-indigo-300/15 dark:bg-indigo-400/[0.05]"
     >
       <div className="mb-4 flex items-center gap-2">
         <span className="flex size-9 items-center justify-center rounded-xl bg-indigo-100 text-indigo-700 dark:bg-indigo-400/15 dark:text-indigo-200">
@@ -113,6 +113,7 @@ export function CreateTicketForm({
                 value={field.state.value}
                 onBlur={field.handleBlur}
                 onChange={(event) => field.handleChange(event.target.value)}
+                className="support-control"
                 maxLength={160}
                 placeholder="A short summary of the issue"
                 aria-invalid={field.state.meta.errors.length > 0}
@@ -130,6 +131,7 @@ export function CreateTicketForm({
                 value={field.state.value}
                 onBlur={field.handleBlur}
                 onChange={(event) => field.handleChange(event.target.value)}
+                className="support-select"
               >
                 {categories.map((category) => (
                   <option key={category} value={category}>{category}</option>
@@ -152,6 +154,7 @@ export function CreateTicketForm({
                 value={field.state.value}
                 onBlur={field.handleBlur}
                 onChange={(event) => field.handleChange(event.target.value)}
+                className="support-control"
                 rows={4}
                 maxLength={10000}
                 placeholder="Include what you were doing and what you expected to happen."
@@ -170,6 +173,7 @@ export function CreateTicketForm({
                 value={field.state.value}
                 onBlur={field.handleBlur}
                 onChange={(event) => field.handleChange(event.target.value as TicketPriority)}
+                className="support-select"
               >
                 {Object.entries(priorityLabels).map(([value, label]) => (
                   <option key={value} value={value}>{label}</option>
@@ -222,7 +226,7 @@ export function ReplyForm({
         event.stopPropagation();
         void form.handleSubmit().catch(() => undefined);
       }}
-      className="border-t border-slate-100 bg-white p-3 sm:p-4 dark:border-white/10 dark:bg-slate-900"
+      className="support-reply-form border-t border-slate-100 bg-white p-3 sm:p-4 dark:border-white/10 dark:bg-slate-900"
     >
       <div className="flex items-end gap-2">
         <form.Field name="message">
@@ -242,7 +246,7 @@ export function ReplyForm({
                 maxLength={10000}
                 rows={2}
                 placeholder={placeholder}
-                className="min-h-11 resize-y bg-slate-50 focus:bg-white dark:bg-slate-950"
+                className="support-reply-textarea min-h-11 resize-y"
                 aria-invalid={field.state.meta.errors.length > 0}
                 aria-describedby={field.state.meta.errors.length > 0 ? "ticket-reply-error" : undefined}
               />
@@ -317,7 +321,7 @@ export function PlatformTicketUpdateForm({
               value={field.state.value}
               onBlur={field.handleBlur}
               onChange={(event) => field.handleChange(event.target.value as TicketStatus)}
-              className="min-w-36 py-2 text-xs"
+              className="support-select min-w-36 py-2 text-xs"
             >
               {Object.entries(statusLabels).map(([value, label]) => (
                 <option key={value} value={value}>{label}</option>
@@ -335,7 +339,7 @@ export function PlatformTicketUpdateForm({
               value={field.state.value}
               onBlur={field.handleBlur}
               onChange={(event) => field.handleChange(event.target.value as TicketPriority)}
-              className="min-w-28 py-2 text-xs"
+              className="support-select min-w-28 py-2 text-xs"
             >
               {Object.entries(priorityLabels).map(([value, label]) => (
                 <option key={value} value={value}>{label}</option>

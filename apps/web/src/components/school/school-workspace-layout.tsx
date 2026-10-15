@@ -5,10 +5,15 @@ import { useEffect, type ReactNode } from "react";
 import { apiFetch } from "@/lib/api";
 import { useSession } from "@/lib/auth-client";
 import { SchoolSidebar } from "@/components/school/school-sidebar";
+import { AcademicContextSwitcher } from "@/components/school/academic-context-switcher";
 import {
-  SchoolOrganizationPicker,
   useSchoolOrganization,
 } from "@/components/school/school-organization";
+import {
+  SchoolRoleSwitcher,
+  schoolRoleLabel,
+  useSchoolRole,
+} from "@/components/school/school-role-switcher";
 import { ThemeToggle } from "@/components/school/theme-toggle";
 import {
   SidebarProvider,
@@ -40,12 +45,17 @@ export function SchoolWorkspaceLayout({
     activeOrganization,
     organizations,
     isPending: organizationLoading,
+    selectionError,
   } = useSchoolOrganization();
+  const { activeRole } = useSchoolRole();
   const navigate = useNavigate();
   const { data: school, error: schoolError } = useQuery({
     queryKey: ["school", "current"],
     queryFn: () => apiFetch<School>("/schools/current"),
-    enabled: !!session?.user && !!activeOrganization,
+    enabled:
+      !!session?.user &&
+      !!activeOrganization &&
+      organizations.length === 1,
     retry: false,
   });
 
@@ -92,7 +102,8 @@ export function SchoolWorkspaceLayout({
               </div>
             </div>
             <div className="flex items-center gap-2 sm:gap-3">
-              <SchoolOrganizationPicker compact />
+              <AcademicContextSwitcher />
+              <SchoolRoleSwitcher />
               <label className="relative hidden md:block">
                 <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
                 <input
@@ -115,7 +126,7 @@ export function SchoolWorkspaceLayout({
                 <p className="text-xs font-semibold text-slate-800">
                   {session?.user?.name ?? "School admin"}
                 </p>
-                <p className="text-[10px] text-slate-500">{section}</p>
+                <p className="text-[10px] text-slate-500">{schoolRoleLabel(activeRole)} · {section}</p>
               </div>
             </div>
           </header>
@@ -126,28 +137,32 @@ export function SchoolWorkspaceLayout({
                 Loading your school workspace…
               </div>
             )}
-            {!organizationLoading && session?.user && !activeOrganization && (
-              <div
-                role={organizations.length ? "status" : "alert"}
-                className="mb-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-900 shadow-sm"
-              >
-                {organizations.length ? (
-                  <>
-                    <p className="font-semibold">Choose the school workspace to continue.</p>
-                    <div className="mt-3 max-w-sm">
-                      <SchoolOrganizationPicker />
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <p className="font-semibold">No school workspace is linked to this account.</p>
-                    <p className="mt-1 text-xs">
-                      Ask a platform administrator to enroll your school and add this account as an administrator.
-                    </p>
-                  </>
-                )}
+            {selectionError && (
+              <div role="alert" className="mb-5 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs text-rose-800">
+                {selectionError}
               </div>
             )}
+            {!organizationLoading && organizations.length > 1 && (
+              <div
+                role="alert"
+                className="mb-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-900 shadow-sm"
+              >
+                <p className="font-semibold">This account is linked to multiple schools.</p>
+                <p className="mt-1 text-xs">
+                  School accounts cannot be shared across schools. Contact support to correct the memberships, then use separate credentials for each school.
+                </p>
+              </div>
+            )}
+            {!organizationLoading &&
+              organizations.length === 0 &&
+              session?.user && (
+                <div role="alert" className="mb-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-900 shadow-sm">
+                  <p className="font-semibold">No school workspace is linked to this account.</p>
+                  <p className="mt-1 text-xs">
+                    Ask a platform administrator to enroll your school and add this account as a member.
+                  </p>
+                </div>
+              )}
             {schoolError && activeOrganization && (
               <div
                 role="alert"
@@ -156,7 +171,10 @@ export function SchoolWorkspaceLayout({
                 School details could not be loaded: {schoolError.message}
               </div>
             )}
-            {!organizationLoading && activeOrganization && children}
+            {!organizationLoading &&
+              organizations.length === 1 &&
+              activeOrganization &&
+              children}
           </main>
         </div>
       </div>

@@ -12,7 +12,7 @@ import {
 import { useEffect, useState, type FormEvent } from "react";
 import { ThemeToggle } from "@/components/school/theme-toggle";
 import { consumeLogoutNotice } from "@/hooks/use-logout";
-import { signIn } from "@/lib/auth-client";
+import { signIn, useSession } from "@/lib/auth-client";
 
 export const Route = createFileRoute("/login")({
   component: LoginPage,
@@ -22,6 +22,7 @@ const chartBars = [42, 58, 49, 75, 63, 88, 70, 96, 77, 100, 84, 91];
 
 function LoginPage() {
   const navigate = useNavigate();
+  const { data: session, isPending: sessionPending } = useSession();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -30,9 +31,31 @@ function LoginPage() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
+    if (sessionPending || !session?.user) return;
+
+    if (session.user.role === "superAdmin") {
+      void navigate({ to: "/admin/dashboard", replace: true });
+    } else {
+      void navigate({ to: "/dashboard", replace: true });
+    }
+  }, [navigate, session, sessionPending]);
+
+  useEffect(() => {
+    if (sessionPending || session?.user) return;
     const notice = consumeLogoutNotice();
     if (notice) setLogoutNotice(notice);
-  }, []);
+  }, [session, sessionPending]);
+
+  if (sessionPending || session?.user) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-slate-50 dark:bg-slate-950">
+        <div role="status" className="flex items-center gap-3 text-sm text-slate-500 dark:text-slate-400">
+          <span className="size-2 animate-pulse rounded-full bg-indigo-500" />
+          {sessionPending ? "Checking your session…" : "Redirecting to your dashboard…"}
+        </div>
+      </main>
+    );
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -47,9 +70,9 @@ function LoginPage() {
       }
 
       if (result.data?.user?.role === "superAdmin") {
-        await navigate({ to: "/admin/dashboard" });
+        await navigate({ to: "/admin/dashboard", replace: true });
       } else {
-        await navigate({ to: "/dashboard" });
+        await navigate({ to: "/dashboard", replace: true });
       }
     } catch {
       setError("We couldn’t connect. Check your internet connection and try again.");

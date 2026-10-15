@@ -17,6 +17,7 @@ interface PlatformUser {
   createdAt: string;
   members: {
     role: string;
+    roles: string[];
     banned: boolean;
     organization: {
       name: string;
@@ -129,7 +130,9 @@ function SystemUsersPage() {
                               >
                                 <Building2 className="size-3.5" />
                                 {school.name}
-                                <span className="text-slate-400">· {member.role}</span>
+                                <span className="text-slate-400">
+                                  · {[member.role, ...member.roles].filter((role, index, all) => all.indexOf(role) === index).join(", ")}
+                                </span>
                               </Link>
                             ) : (
                               <span key={member.organization.name} className="text-xs text-slate-500">

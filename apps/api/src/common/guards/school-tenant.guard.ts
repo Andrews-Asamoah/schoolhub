@@ -53,6 +53,29 @@ export class SchoolTenantGuard implements CanActivate {
         "Your membership in this school has been suspended.",
       );
     }
+    if (!isSuperAdmin && member) {
+      const schoolMembershipCount = await this.prisma.client.member.count({
+        where: { userId: user.id },
+      });
+      if (schoolMembershipCount > 1) {
+        throw new ForbiddenException(
+          "This account is linked to more than one school. Use separate credentials for each school.",
+        );
+      }
+
+      const availableRoles = new Set([member.role, ...member.roles]);
+      const requestedRole = request.headers["x-school-role"];
+      const activeRole =
+        typeof requestedRole === "string" && requestedRole.length > 0
+          ? requestedRole
+          : member.role;
+      if (!availableRoles.has(activeRole)) {
+        throw new ForbiddenException(
+          "The selected role is not assigned to your school account.",
+        );
+      }
+      request.schoolRole = activeRole;
+    }
 
     // Load school details
     const school = await this.prisma.client.school.findUnique({

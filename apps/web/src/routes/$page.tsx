@@ -5,13 +5,7 @@ import {
   type UseQueryResult,
 } from "@tanstack/react-query";
 import { createFileRoute, Link, useParams } from "@tanstack/react-router";
-import {
-  ArrowRight,
-  Check,
-  CircleAlert,
-  LoaderCircle,
-  Plus,
-} from "lucide-react";
+import { ArrowRight, Check, CircleAlert, LoaderCircle } from "lucide-react";
 import { useState } from "react";
 import {
   recordPaymentSchema,
@@ -31,39 +25,36 @@ import { useSession } from "@/lib/auth-client";
 import { getSchoolNavItem } from "@/lib/school-navigation";
 import { TicketWorkspace } from "@/components/support/ticket-workspace";
 import { AcademicYearSetup } from "@/components/school/academic-year-setup";
+import { TeamRoleWorkspace } from "@/components/school/team-role-workspace";
+import { ClassesWorkspace } from "@/components/school/classes-workspace";
+import { useSchoolRole } from "@/components/school/school-role-switcher";
+import { EnrollmentWorkspace } from "@/components/school/enrollment-workspace";
+import { StudentDirectoryWorkspace } from "@/components/school/student-directory-workspace";
+import { PeopleWorkspace } from "@/components/school/people-workspace";
 
 export const Route = createFileRoute("/$page")({
   component: WorkspaceRoute,
 });
-
-interface Student {
-  id: string;
-  studentId: string;
-  admissionNumber: string;
-  status: string;
-  profile: {
-    firstName: string;
-    lastName: string;
-    otherNames?: string | null;
-  };
-  class?: { name: string; level: string } | null;
-}
-
-interface StudentPage {
-  data: Student[];
-  meta: { total: number; page: number; totalPages: number };
-}
 
 interface SchoolClass {
   id: string;
   name: string;
   level: string;
   capacity?: number | null;
-  academicYear?: { name: string; isCurrent: boolean } | null;
+  department?: { id: string; name: string; code: string } | null;
+  isActive: boolean;
+  isGraduatingClass: boolean;
   classTeacher?: {
     profile?: { firstName: string; lastName: string } | null;
   } | null;
   _count: { students: number };
+}
+
+interface ClassTeacher {
+  id: string;
+  firstName: string;
+  lastName: string;
+  isActive: boolean;
 }
 
 interface Subject {
@@ -161,19 +152,35 @@ function WorkspaceRoute() {
 function WorkspaceContent({ pageId }: { pageId: string }) {
   const { data: session } = useSession();
   const isSignedIn = !!session?.user;
+  const { activeRole } = useSchoolRole();
+  const canManageClasses = activeRole === "owner" || activeRole === "admin";
 
-  const studentsQuery = useQuery({
-    queryKey: ["students", "list", { page: 1, limit: 50 }],
-    queryFn: () => apiFetch<StudentPage>("/students?page=1&limit=50"),
-    enabled: isSignedIn && pageId === "students",
-    retry: false,
-  });
   const classesQuery = useQuery({
     queryKey: ["academics", "classes"],
     queryFn: () => apiFetch<SchoolClass[]>("/academics/classes"),
     enabled:
-      isSignedIn &&
-      ["classes", "attendance"].includes(pageId),
+      isSignedIn && ["classes", "attendance", "enrollments"].includes(pageId),
+    retry: false,
+  });
+  const departmentsQuery = useQuery({
+    queryKey: ["academics", "departments"],
+    queryFn: () =>
+      apiFetch<
+        {
+          id: string;
+          name: string;
+          code: string;
+          description?: string | null;
+          _count: { classes: number };
+        }[]
+      >("/academics/departments"),
+    enabled: isSignedIn && pageId === "classes",
+    retry: false,
+  });
+  const classTeachersQuery = useQuery({
+    queryKey: ["academics", "class-teachers"],
+    queryFn: () => apiFetch<ClassTeacher[]>("/academics/teachers"),
+    enabled: isSignedIn && pageId === "classes" && canManageClasses,
     retry: false,
   });
   const subjectsQuery = useQuery({
@@ -185,7 +192,7 @@ function WorkspaceContent({ pageId }: { pageId: string }) {
   const yearsQuery = useQuery({
     queryKey: ["schools", "academic-years"],
     queryFn: () => apiFetch<AcademicYear[]>("/schools/academic-years"),
-    enabled: isSignedIn && pageId === "academic-years",
+    enabled: isSignedIn && ["academic-years", "enrollments"].includes(pageId),
     retry: false,
   });
   const assessmentsQuery = useQuery({
@@ -208,28 +215,18 @@ function WorkspaceContent({ pageId }: { pageId: string }) {
   });
 
   const page = getSchoolNavItem(pageId)!;
-  const titleAction =
-    pageId === "students" || pageId === "classes" ? (
-      <button
-        type="button"
-        disabled
-        title="Creation form is not part of this release yet"
-        className="inline-flex h-10 items-center gap-2 rounded-lg bg-blue-600 px-4 text-xs font-semibold text-white opacity-60"
-      >
-        <Plus className="size-4" />
-        Add {pageId === "students" ? "student" : "class"}
-      </button>
-    ) : undefined;
-
   return (
     <>
-      <WorkspacePageHeading
-        section={page.section}
-        title={page.label}
-        description={page.description}
-        icon={page.icon}
-        action={titleAction}
-      />
+      {!["classes", "students", "teachers", "staff", "guardians"].includes(
+        pageId,
+      ) && (
+        <WorkspacePageHeading
+          section={page.section}
+          title={page.label}
+          description={page.description}
+          icon={page.icon}
+        />
+      )}
 
       {!isSignedIn ? (
         <WorkspaceEmptyState
@@ -238,18 +235,25 @@ function WorkspaceContent({ pageId }: { pageId: string }) {
         />
       ) : (
         <>
-          {pageId === "students" && (
-            <StudentList query={studentsQuery} />
-          )}
+          {pageId === "students" && <StudentDirectoryWorkspace />}
+          {pageId === "teachers" && <PeopleWorkspace kind="teachers" />}
+          {pageId === "staff" && <PeopleWorkspace kind="staff" />}
+          {pageId === "guardians" && <PeopleWorkspace kind="guardians" />}
           {pageId === "classes" && (
-            <ClassList query={classesQuery} />
+            <ClassesWorkspace
+              classesQuery={classesQuery}
+              departmentsQuery={departmentsQuery}
+              teachersQuery={classTeachersQuery}
+            />
           )}
-          {pageId === "subjects" && (
-            <SubjectList query={subjectsQuery} />
+          {pageId === "enrollments" && (
+            <EnrollmentWorkspace
+              yearsQuery={yearsQuery}
+              classesQuery={classesQuery}
+            />
           )}
-          {pageId === "academic-years" && (
-            <AcademicYears query={yearsQuery} />
-          )}
+          {pageId === "subjects" && <SubjectList query={subjectsQuery} />}
+          {pageId === "academic-years" && <AcademicYears query={yearsQuery} />}
           {pageId === "assessments" && (
             <AssessmentList query={assessmentsQuery} />
           )}
@@ -259,6 +263,7 @@ function WorkspaceContent({ pageId }: { pageId: string }) {
           {pageId === "fees" && <FeeStructureList query={feesQuery} />}
           {pageId === "payments" && <PaymentEntry />}
           {pageId === "settings" && <SchoolSettings query={schoolQuery} />}
+          {pageId === "team" && <TeamRoleWorkspace />}
           {pageId === "support" && <TicketWorkspace mode="school" />}
           {page.apiStatus === "planned" && (
             <PlannedWorkspace title={page.label} />
@@ -269,128 +274,7 @@ function WorkspaceContent({ pageId }: { pageId: string }) {
   );
 }
 
-function StudentList({
-  query,
-}: {
-  query: UseQueryResult<StudentPage, Error>;
-}) {
-  if (query.isPending) return <LoadingState label="Loading students" />;
-  if (query.error) return <QueryError error={query.error} />;
-  const rows = query.data?.data ?? [];
-  const columns: WorkspaceColumn<Student>[] = [
-    {
-      id: "student",
-      header: "Student",
-      cell: (student) => (
-        <span className="font-semibold text-slate-800">
-          {student.profile.firstName} {student.profile.lastName}
-        </span>
-      ),
-    },
-    {
-      id: "admission",
-      header: "Admission no.",
-      cell: (student) => student.admissionNumber,
-    },
-    {
-      id: "class",
-      header: "Class",
-      cell: (student) => student.class?.name ?? "Not assigned",
-    },
-    {
-      id: "status",
-      header: "Status",
-      cell: (student) => <StatusBadge value={student.status} />,
-    },
-  ];
-
-  return (
-    <>
-      <div className="mb-4 grid gap-4 sm:grid-cols-3">
-        <WorkspaceStat
-          label="Students in directory"
-          value={String(query.data?.meta.total ?? 0)}
-          detail="all records"
-        />
-        <WorkspaceStat
-          label="On this page"
-          value={String(rows.length)}
-          detail="student profiles"
-        />
-        <WorkspaceStat
-          label="Directory page"
-          value={`${query.data?.meta.page ?? 1} / ${query.data?.meta.totalPages ?? 1}`}
-          detail="pagination"
-        />
-      </div>
-      <WorkspaceDataTable
-        rows={rows}
-        columns={columns}
-        getRowId={(student) => student.id}
-        emptyTitle="No students yet"
-        emptyDescription="Students added to this school will appear here."
-      />
-      {rows.length > 0 && (
-        <p className="mt-3 text-right text-[11px] text-slate-400">
-          Showing {rows.length} of {query.data?.meta.total ?? rows.length} students
-        </p>
-      )}
-    </>
-  );
-}
-
-function ClassList({
-  query,
-}: {
-  query: UseQueryResult<SchoolClass[], Error>;
-}) {
-  if (query.isPending) return <LoadingState label="Loading classes" />;
-  if (query.error) return <QueryError error={query.error} />;
-  const rows = query.data ?? [];
-  const columns: WorkspaceColumn<SchoolClass>[] = [
-    {
-      id: "class",
-      header: "Class",
-      cell: (row) => (
-        <span className="font-semibold text-slate-800">{row.name}</span>
-      ),
-    },
-    { id: "level", header: "Level", cell: (row) => row.level },
-    {
-      id: "year",
-      header: "Academic year",
-      cell: (row) => row.academicYear?.name ?? "Not assigned",
-    },
-    {
-      id: "students",
-      header: "Students",
-      cell: (row) => `${row._count.students}${row.capacity ? ` / ${row.capacity}` : ""}`,
-    },
-    {
-      id: "teacher",
-      header: "Class teacher",
-      cell: (row) =>
-        row.classTeacher?.profile
-          ? `${row.classTeacher.profile.firstName} ${row.classTeacher.profile.lastName}`
-          : "Not assigned",
-    },
-  ];
-  return (
-    <WorkspaceDataTable
-      rows={rows}
-      columns={columns}
-      getRowId={(row) => row.id}
-      emptyTitle="No classes set up"
-      emptyDescription="Create school classes to organize students and lessons."
-    />
-  );
-}
-
-function SubjectList({
-  query,
-}: {
-  query: UseQueryResult<Subject[], Error>;
-}) {
+function SubjectList({ query }: { query: UseQueryResult<Subject[], Error> }) {
   if (query.isPending) return <LoadingState label="Loading subjects" />;
   if (query.error) return <QueryError error={query.error} />;
   const columns: WorkspaceColumn<Subject>[] = [
@@ -496,8 +380,10 @@ function FeeStructureList({
       header: "Applies to",
       cell: (fee) =>
         fee.targetClasses.length > 0
-          ? fee.targetClasses.map(({ class: schoolClass }) => schoolClass.name).join(", ")
-          : fee.classLevel ?? "All classes",
+          ? fee.targetClasses
+              .map(({ class: schoolClass }) => schoolClass.name)
+              .join(", ")
+          : (fee.classLevel ?? "All classes"),
     },
     { id: "items", header: "Fee items", cell: (fee) => fee.items.length },
     {
@@ -562,7 +448,11 @@ function AttendanceWorkspace({
         <span className="font-semibold text-slate-800">{row.name}</span>
       ),
     },
-    { id: "admission", header: "Admission no.", cell: (row) => row.admissionNumber },
+    {
+      id: "admission",
+      header: "Admission no.",
+      cell: (row) => row.admissionNumber,
+    },
     {
       id: "attendance",
       header: "Attendance",
@@ -652,7 +542,9 @@ function PaymentEntry() {
       paymentDate,
     });
     if (!result.success) {
-      setMessage(result.error.issues[0]?.message ?? "Check the payment details.");
+      setMessage(
+        result.error.issues[0]?.message ?? "Check the payment details.",
+      );
       return;
     }
     mutation.mutate(result.data);
@@ -768,11 +660,7 @@ function PaymentEntry() {
   );
 }
 
-function SchoolSettings({
-  query,
-}: {
-  query: UseQueryResult<School, Error>;
-}) {
+function SchoolSettings({ query }: { query: UseQueryResult<School, Error> }) {
   if (query.isPending) return <LoadingState label="Loading school profile" />;
   if (query.error) return <QueryError error={query.error} />;
   const school = query.data;
@@ -819,8 +707,8 @@ function PlannedWorkspace({ title }: { title: string }) {
   return (
     <>
       <PreviewDataNotice>
-        This section is part of the school workspace roadmap. Its menu entry
-        and page are ready, but the API does not yet provide these records.
+        This section is part of the school workspace roadmap. Its menu entry and
+        page are ready, but the API does not yet provide these records.
       </PreviewDataNotice>
       <div className="grid gap-4 sm:grid-cols-2">
         <WorkspaceStat label="Workspace area" value={title} detail="planned" />

@@ -46,6 +46,13 @@ export class SuperAdminService {
     };
   }
 
+  async listSchoolOptions() {
+    return this.prisma.client.school.findMany({
+      select: { id: true, name: true, code: true },
+      orderBy: { name: "asc" },
+    });
+  }
+
   async listUsers(page: number, limit: number) {
     const where = {
       role: { not: "superAdmin" },
@@ -64,6 +71,7 @@ export class SuperAdminService {
           members: {
             select: {
               role: true,
+              roles: true,
               banned: true,
               organization: {
                 select: {
@@ -205,6 +213,15 @@ export class SuperAdminService {
       });
       if (existingMember) {
         throw new ConflictException("This user is already a member of the school");
+      }
+      const otherSchoolMembership = await this.prisma.client.member.findFirst({
+        where: { userId: existingUser.id },
+        select: { organization: { select: { name: true } } },
+      });
+      if (otherSchoolMembership) {
+        throw new ConflictException(
+          "This account already belongs to another school. Use different credentials for each school.",
+        );
       }
     }
 

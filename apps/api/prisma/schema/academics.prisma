@@ -124,21 +124,20 @@ model Department {
 model Class {
   id             String    @id @default(cuid())
   schoolId       String
-  academicYearId String
+  academicYearId String?
   name           String
   slug           String?
   level          String
   capacity       Int?
-  classTeacherId String?
   isActive       Boolean   @default(true)
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
   deletedAt      DateTime?
 
   school                    School                    @relation(fields: [schoolId], references: [id], onDelete: Cascade)
-  academicYear              AcademicYear              @relation(fields: [academicYearId], references: [id], onDelete: Cascade)
-  classTeacher              Teacher?                  @relation(fields: [classTeacherId], references: [id])
+  academicYear              AcademicYear?             @relation(fields: [academicYearId], references: [id], onDelete: SetNull)
   subjects                  ClassSubject[]
+  classTeacherAssignments   ClassTeacherAssignment[]
   enrollments               Enrollment[]
   students                  Student[]
   departmentId              String?
@@ -167,9 +166,27 @@ model Class {
   @@unique([slug, academicYearId, schoolId])
   @@index([schoolId, isActive])
   @@index([academicYearId])
-  @@index([classTeacherId])
   @@index([schoolId, deletedAt])
   @@map("classes")
+}
+
+model ClassTeacherAssignment {
+  id            String   @id @default(cuid())
+  schoolId      String
+  classId       String
+  teacherId     String
+  effectiveFrom DateTime @db.Date
+  effectiveTo   DateTime? @db.Date
+  createdAt    DateTime @default(now())
+
+  school  School  @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  class   Class   @relation(fields: [classId], references: [id], onDelete: Cascade)
+  teacher Teacher @relation("ClassTeacherAssignments", fields: [teacherId], references: [id], onDelete: Restrict)
+
+  @@index([schoolId, classId, effectiveFrom, effectiveTo])
+  @@index([teacherId, effectiveFrom])
+  @@unique([classId, effectiveFrom])
+  @@map("class_teacher_assignments")
 }
 
 model TeacherAssignment {
@@ -278,7 +295,7 @@ model Enrollment {
   academicYear AcademicYear @relation(fields: [academicYearId], references: [id], onDelete: Cascade)
   term         Term         @relation(fields: [termId], references: [id])
 
-  @@unique([studentId, classId, academicYearId, termId])
+  @@unique([studentId, academicYearId, termId])
   @@index([studentId])
   @@index([classId, academicYearId, status])
   @@index([academicYearId])
