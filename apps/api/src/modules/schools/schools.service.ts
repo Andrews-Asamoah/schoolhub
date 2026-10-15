@@ -53,14 +53,41 @@ export class SchoolsService {
   }
 
   async createAcademicYear(schoolId: string, input: CreateAcademicYearInput) {
-    return this.prisma.client.academicYear.create({
-      data: {
-        schoolId,
-        name: input.name,
-        startDate: new Date(input.startDate),
-        endDate: new Date(input.endDate),
-        isCurrent: input.isCurrent,
-      },
+    return this.prisma.client.$transaction(async (transaction) => {
+      if (input.isCurrent) {
+        await transaction.academicYear.updateMany({
+          where: { schoolId, isCurrent: true },
+          data: { isCurrent: false },
+        });
+      }
+      if (input.terms?.some((term) => term.isCurrent)) {
+        await transaction.term.updateMany({
+          where: { academicYear: { schoolId }, isCurrent: true },
+          data: { isCurrent: false },
+        });
+      }
+
+      return transaction.academicYear.create({
+        data: {
+          schoolId,
+          name: input.name,
+          startDate: new Date(input.startDate),
+          endDate: new Date(input.endDate),
+          isCurrent: input.isCurrent,
+          terms: input.terms
+            ? {
+                create: input.terms.map((term) => ({
+                  name: term.name,
+                  termNumber: term.termNumber,
+                  startDate: new Date(term.startDate),
+                  endDate: new Date(term.endDate),
+                  isCurrent: term.isCurrent,
+                })),
+              }
+            : undefined,
+        },
+        include: { terms: { orderBy: { termNumber: "asc" } } },
+      });
     });
   }
 }

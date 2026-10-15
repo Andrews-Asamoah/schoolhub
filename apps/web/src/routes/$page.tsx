@@ -29,6 +29,8 @@ import {
 import { apiFetch, ApiError } from "@/lib/api";
 import { useSession } from "@/lib/auth-client";
 import { getSchoolNavItem } from "@/lib/school-navigation";
+import { TicketWorkspace } from "@/components/support/ticket-workspace";
+import { AcademicYearSetup } from "@/components/school/academic-year-setup";
 
 export const Route = createFileRoute("/$page")({
   component: WorkspaceRoute,
@@ -78,7 +80,14 @@ interface AcademicYear {
   startDate: string;
   endDate: string;
   isCurrent: boolean;
-  terms: { id: string; name: string; termNumber: number }[];
+  terms: {
+    id: string;
+    name: string;
+    termNumber: number;
+    startDate: string;
+    endDate: string;
+    isCurrent: boolean;
+  }[];
 }
 
 interface AssessmentTemplate {
@@ -250,6 +259,7 @@ function WorkspaceContent({ pageId }: { pageId: string }) {
           {pageId === "fees" && <FeeStructureList query={feesQuery} />}
           {pageId === "payments" && <PaymentEntry />}
           {pageId === "settings" && <SchoolSettings query={schoolQuery} />}
+          {pageId === "support" && <TicketWorkspace mode="school" />}
           {page.apiStatus === "planned" && (
             <PlannedWorkspace title={page.label} />
           )}
@@ -421,42 +431,7 @@ function AcademicYears({
 }) {
   if (query.isPending) return <LoadingState label="Loading academic years" />;
   if (query.error) return <QueryError error={query.error} />;
-  const columns: WorkspaceColumn<AcademicYear>[] = [
-    {
-      id: "year",
-      header: "Academic year",
-      cell: (year) => (
-        <span className="font-semibold text-slate-800">{year.name}</span>
-      ),
-    },
-    {
-      id: "dates",
-      header: "School year",
-      cell: (year) =>
-        `${new Date(year.startDate).toLocaleDateString()} – ${new Date(year.endDate).toLocaleDateString()}`,
-    },
-    {
-      id: "terms",
-      header: "Terms",
-      cell: (year) => year.terms.length,
-    },
-    {
-      id: "current",
-      header: "Status",
-      cell: (year) => (
-        <StatusBadge value={year.isCurrent ? "CURRENT" : "UPCOMING"} />
-      ),
-    },
-  ];
-  return (
-    <WorkspaceDataTable
-      rows={query.data ?? []}
-      columns={columns}
-      getRowId={(year) => year.id}
-      emptyTitle="No academic years configured"
-      emptyDescription="Create an academic year to organize terms, classes, and student records."
-    />
-  );
+  return <AcademicYearSetup years={query.data ?? []} />;
 }
 
 function AssessmentList({

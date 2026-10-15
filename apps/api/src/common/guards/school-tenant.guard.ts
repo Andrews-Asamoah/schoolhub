@@ -48,6 +48,11 @@ export class SchoolTenantGuard implements CanActivate {
         "You are not a registered member of this school.",
       );
     }
+    if (member?.banned && !isSuperAdmin) {
+      throw new ForbiddenException(
+        "Your membership in this school has been suspended.",
+      );
+    }
 
     // Load school details
     const school = await this.prisma.client.school.findUnique({

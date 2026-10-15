@@ -88,7 +88,7 @@ function AdminDashboard() {
           <button
             type="button"
             onClick={() => void navigate({ to: "/admin/schools/new" })}
-            className="inline-flex h-11 items-center gap-2 rounded-xl bg-white px-4 text-xs font-semibold text-indigo-800 shadow-lg shadow-blue-950/15 transition hover:-translate-y-0.5 hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-indigo-800"
+            className="superadmin-button-secondary inline-flex h-11 items-center gap-2 rounded-xl border border-white/70 bg-white px-4 text-xs font-bold text-indigo-900 shadow-lg shadow-blue-950/15 transition hover:-translate-y-0.5 hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-indigo-800"
           >
             <Plus className="size-4" />
             Enroll a school
@@ -148,7 +148,7 @@ function AdminDashboard() {
           </div>
           <Link
             to="/admin/schools"
-            className="group inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold text-indigo-600 transition hover:bg-indigo-50 hover:text-indigo-800"
+            className="superadmin-button-secondary group inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold text-indigo-700 transition hover:bg-indigo-50 hover:text-indigo-900"
           >
             View all schools
             <ArrowUpRight className="size-3.5 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
@@ -177,7 +177,7 @@ function AdminDashboard() {
             </p>
             <Link
               to="/admin/schools/new"
-              className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-xs font-semibold text-white shadow-sm transition hover:bg-indigo-700"
+              className="superadmin-button-primary inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-xs font-semibold text-white shadow-sm transition hover:bg-indigo-700"
             >
               <Plus className="size-3.5" />
               Enroll a school
@@ -252,7 +252,7 @@ function AdminDashboard() {
                         <Link
                           to="/admin/schools/$schoolId"
                           params={{ schoolId: school.id }}
-                          className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold text-indigo-600 transition hover:bg-indigo-50 hover:text-indigo-800"
+                          className="superadmin-button-secondary inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold text-indigo-700 transition hover:bg-indigo-50 hover:text-indigo-900"
                         >
                           View <ArrowRight className="size-3.5" />
                         </Link>

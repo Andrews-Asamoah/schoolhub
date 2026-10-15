@@ -57,7 +57,7 @@ function SchoolsListPage() {
         </div>
         <Link
           to="/admin/schools/new"
-          className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700"
+          className="superadmin-button-primary inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700"
         >
           <Plus className="size-4" />
           Enroll School
@@ -98,7 +98,7 @@ function SchoolsListPage() {
                 </p>
                 <Link
                   to="/admin/schools/new"
-                  className="rounded-lg bg-indigo-600 px-4 py-2 text-xs font-semibold text-white hover:bg-indigo-700"
+                  className="superadmin-button-primary rounded-lg bg-indigo-600 px-4 py-2 text-xs font-semibold text-white hover:bg-indigo-700"
                 >
                   Enroll a School
                 </Link>
@@ -148,7 +148,7 @@ function SchoolsListPage() {
                     type="button"
                     disabled={page === 1}
                     onClick={() => setPage((p) => p - 1)}
-                    className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 transition hover:bg-slate-50 disabled:opacity-40"
+                    className="superadmin-button-page rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 transition disabled:opacity-40"
                   >
                     Previous
                   </button>
@@ -156,7 +156,7 @@ function SchoolsListPage() {
                     type="button"
                     disabled={page >= data.meta.totalPages}
                     onClick={() => setPage((p) => p + 1)}
-                    className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 transition hover:bg-slate-50 disabled:opacity-40"
+                    className="superadmin-button-page rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 transition disabled:opacity-40"
                   >
                     Next
                   </button>

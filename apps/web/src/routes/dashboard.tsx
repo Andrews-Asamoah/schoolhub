@@ -7,6 +7,10 @@ import { DashboardHeader } from "@/components/school/dashboard/dashboard-header"
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { apiFetch } from "@/lib/api";
 import { useSession } from "@/lib/auth-client";
+import {
+  SchoolOrganizationPicker,
+  useSchoolOrganization,
+} from "@/components/school/school-organization";
 
 export const Route = createFileRoute("/dashboard")({
   component: DashboardPage,
@@ -21,11 +25,16 @@ interface School {
 
 function DashboardPage() {
   const { data: session, isPending: sessionLoading } = useSession();
+  const {
+    activeOrganization,
+    organizations,
+    isPending: organizationLoading,
+  } = useSchoolOrganization();
   const navigate = useNavigate();
   const { data: school } = useQuery({
     queryKey: ["school", "current"],
     queryFn: () => apiFetch<School>("/schools/current"),
-    enabled: !!session?.user,
+    enabled: !!session?.user && !!activeOrganization,
     retry: false,
   });
   const [search, setSearch] = useState("");
@@ -69,11 +78,39 @@ function DashboardPage() {
             search={search}
             onSearchChange={setSearch}
           />
-          <DashboardContent
-            today={today}
-            greetingName={greetingName}
-            search={search}
-          />
+          {organizationLoading ? (
+            <div className="mx-auto mt-8 flex max-w-3xl items-center gap-2 rounded-2xl border border-slate-200 bg-white p-6 text-sm text-slate-600 shadow-sm">
+              <span className="size-2 animate-pulse rounded-full bg-indigo-600" />
+              Loading your school workspace…
+            </div>
+          ) : !activeOrganization ? (
+            <div className="mx-auto mt-8 max-w-3xl rounded-2xl border border-amber-200 bg-amber-50 p-6 text-amber-950 shadow-sm">
+              {organizations.length ? (
+                <>
+                  <h1 className="text-lg font-bold">Choose your school</h1>
+                  <p className="mt-1 text-sm text-amber-800">
+                    Select the school workspace you want to manage.
+                  </p>
+                  <div className="mt-4 max-w-sm">
+                    <SchoolOrganizationPicker />
+                  </div>
+                </>
+              ) : (
+                <>
+                  <h1 className="text-lg font-bold">No school workspace linked</h1>
+                  <p className="mt-1 text-sm text-amber-800">
+                    Ask a platform administrator to enroll your school and add your account as an administrator.
+                  </p>
+                </>
+              )}
+            </div>
+          ) : (
+            <DashboardContent
+              today={today}
+              greetingName={greetingName}
+              search={search}
+            />
+          )}
         </div>
       </div>
     </SidebarProvider>

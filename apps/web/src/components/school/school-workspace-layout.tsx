@@ -5,6 +5,10 @@ import { useEffect, type ReactNode } from "react";
 import { apiFetch } from "@/lib/api";
 import { useSession } from "@/lib/auth-client";
 import { SchoolSidebar } from "@/components/school/school-sidebar";
+import {
+  SchoolOrganizationPicker,
+  useSchoolOrganization,
+} from "@/components/school/school-organization";
 import { ThemeToggle } from "@/components/school/theme-toggle";
 import {
   SidebarProvider,
@@ -32,11 +36,16 @@ export function SchoolWorkspaceLayout({
   children,
 }: SchoolWorkspaceLayoutProps) {
   const { data: session, isPending: sessionLoading } = useSession();
+  const {
+    activeOrganization,
+    organizations,
+    isPending: organizationLoading,
+  } = useSchoolOrganization();
   const navigate = useNavigate();
   const { data: school, error: schoolError } = useQuery({
     queryKey: ["school", "current"],
     queryFn: () => apiFetch<School>("/schools/current"),
-    enabled: !!session?.user,
+    enabled: !!session?.user && !!activeOrganization,
     retry: false,
   });
 
@@ -83,6 +92,7 @@ export function SchoolWorkspaceLayout({
               </div>
             </div>
             <div className="flex items-center gap-2 sm:gap-3">
+              <SchoolOrganizationPicker compact />
               <label className="relative hidden md:block">
                 <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
                 <input
@@ -110,16 +120,43 @@ export function SchoolWorkspaceLayout({
             </div>
           </header>
           <main className="mx-auto max-w-[1440px] px-4 py-7 sm:px-6 lg:px-9 lg:py-9">
-            {schoolError && session?.user && (
-              <div
-                role="status"
-                className="mb-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800"
-              >
-                School details are temporarily unavailable. Start the API and
-                select an active school to load tenant data.
+            {organizationLoading && (
+              <div className="mb-5 flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-xs text-slate-600 shadow-sm">
+                <span className="size-2 animate-pulse rounded-full bg-indigo-600" />
+                Loading your school workspace…
               </div>
             )}
-            {children}
+            {!organizationLoading && session?.user && !activeOrganization && (
+              <div
+                role={organizations.length ? "status" : "alert"}
+                className="mb-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-900 shadow-sm"
+              >
+                {organizations.length ? (
+                  <>
+                    <p className="font-semibold">Choose the school workspace to continue.</p>
+                    <div className="mt-3 max-w-sm">
+                      <SchoolOrganizationPicker />
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <p className="font-semibold">No school workspace is linked to this account.</p>
+                    <p className="mt-1 text-xs">
+                      Ask a platform administrator to enroll your school and add this account as an administrator.
+                    </p>
+                  </>
+                )}
+              </div>
+            )}
+            {schoolError && activeOrganization && (
+              <div
+                role="alert"
+                className="mb-5 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs text-rose-800"
+              >
+                School details could not be loaded: {schoolError.message}
+              </div>
+            )}
+            {!organizationLoading && activeOrganization && children}
           </main>
         </div>
       </div>

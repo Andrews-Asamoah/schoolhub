@@ -2,7 +2,6 @@ import {
   ArrowRight,
   CalendarDays,
   Check,
-  Clock3,
   MoreHorizontal,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -158,36 +157,58 @@ export function RecentActivityCard() {
   );
 }
 
-export function SchoolYearCard() {
+export function SchoolYearCard({
+  academicYear,
+}: {
+  academicYear?: {
+    name: string;
+    startDate: string;
+    endDate: string;
+    terms: { id: string; name: string; startDate: string; endDate: string; isCurrent: boolean }[];
+  };
+}) {
   return (
-    <div className="overflow-hidden rounded-2xl bg-slate-900 p-5 text-white shadow-[0_8px_24px_rgba(15,23,42,0.12)] sm:p-6">
+    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_2px_12px_rgba(15,23,42,0.035)] sm:p-6 dark:border-white/10 dark:bg-slate-900/70">
       <div className="flex items-start justify-between">
         <div>
-          <p className="text-xs font-medium text-slate-400">School year</p>
-          <h2 className="mt-1 text-lg font-semibold tracking-tight">
-            2026 / 2027
+          <p className="text-xs font-medium text-slate-500 dark:text-slate-400">Academic calendar</p>
+          <h2 className="mt-1 text-lg font-semibold tracking-tight text-slate-900 dark:text-white">
+            {academicYear?.name ?? "Not configured"}
           </h2>
         </div>
-        <span className="flex size-9 items-center justify-center rounded-xl bg-white/10 text-blue-300">
+        <span className="flex size-9 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 dark:bg-indigo-400/10 dark:text-indigo-300">
           <CalendarDays className="size-[18px]" />
         </span>
       </div>
-      <div className="mt-7">
-        <div className="mb-2 flex items-center justify-between text-[11px]">
-          <span className="text-slate-300">First term progress</span>
-          <span className="font-semibold text-white">38%</span>
-        </div>
-        <div className="h-2 overflow-hidden rounded-full bg-white/10">
-          <div className="h-full w-[38%] rounded-full bg-blue-400" />
-        </div>
-        <div className="mt-2 flex justify-between text-[10px] text-slate-500">
-          <span>Sep 8, 2026</span>
-          <span>Dec 18, 2026</span>
-        </div>
+      <div className="mt-4 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-slate-500 dark:text-slate-400">
+        <span>{academicYear ? new Date(academicYear.startDate).toLocaleDateString() : "Set a start date"}</span>
+        <span aria-hidden="true">→</span>
+        <span>{academicYear ? new Date(academicYear.endDate).toLocaleDateString() : "Set an end date"}</span>
       </div>
-      <div className="mt-6 flex items-center gap-2 border-t border-white/10 pt-4 text-[11px] text-slate-300">
-        <Clock3 className="size-3.5 text-blue-300" />
-        <span>9 weeks left in this term</span>
+      <div className="mt-5 border-t border-slate-100 pt-4 dark:border-white/10">
+        <p className="mb-2 text-[11px] font-semibold text-slate-700 dark:text-slate-300">
+          {academicYear?.terms.length ?? 0} terms configured
+        </p>
+        {academicYear?.terms.length ? (
+          <div className="flex flex-wrap gap-1.5">
+            {academicYear.terms.map((term) => (
+              <span
+                key={term.id}
+                className={`rounded-md border px-2 py-1 text-[10px] ${
+                  term.isCurrent
+                    ? "border-indigo-200 bg-indigo-50 font-semibold text-indigo-700 dark:border-indigo-300/20 dark:bg-indigo-400/10 dark:text-indigo-200"
+                    : "border-slate-200 bg-slate-50 text-slate-600 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-400"
+                }`}
+              >
+                {term.name}{term.isCurrent ? " · Current" : ""}
+              </span>
+            ))}
+          </div>
+        ) : (
+          <p className="text-[11px] leading-5 text-slate-500 dark:text-slate-400">
+            Create an academic year and its terms to prepare classes, billing, and assessments.
+          </p>
+        )}
       </div>
     </div>
   );

@@ -43,7 +43,7 @@ The API is intended to be the common backend for web, mobile, and desktop client
 NestJS application exposing authentication, health checks, and school-management endpoints. Its source is organized as follows:
 
 - `src/main.ts` — loads environment configuration first, bootstraps Nest, configures OpenAPI and CORS, and listens on the configured port.
-- `src/app.module.ts` — root composition point. Imports Prisma, Better Auth, and the school, student, academics, attendance, assessments, and finance modules; installs the global exception filter.
+- `src/app.module.ts` — root composition point. Imports Prisma, Better Auth, and the school, student, academics, attendance, assessments, finance, super-admin, and support modules; installs the global exception filter.
 - `src/auth/` — Better Auth configuration and a Prisma adapter. The auth plugins include organizations (used as school tenants) and bearer tokens (intended for native clients).
 - `src/common/` — cross-cutting HTTP support:
   - `decorators/` extracts the authenticated user and resolved school from a request, and declares allowed roles.
@@ -58,6 +58,7 @@ NestJS application exposing authentication, health checks, and school-management
   - `attendance/` — batch attendance recording and class/student attendance queries.
   - `assessments/` — assessment templates, component score recording, and student reports.
   - `finance/` — fee structures, bill generation, payments, and student ledgers.
+  - `support/` — school-scoped support tickets, platform-wide super-admin inbox, replies, status/priority management, and activity history.
 - `src/env.ts` — validates required environment variables and the optional API port with Zod.
 - `src/load-env.ts` — loads the repository-root `.env` for local development; deployment environments can supply variables directly.
 - `prisma/schema/` — modular Prisma schema files described in [Data model and persistence](#5-data-model-and-persistence).
@@ -69,9 +70,11 @@ NestJS application exposing authentication, health checks, and school-management
 React 19 single-page application built with Vite:
 
 - `src/main.tsx` — creates the TanStack Router and React Query providers.
-- `src/routes/` — file-based routes: root layout, `/`, `/login`, `/dashboard`, and `/$page` for school workspaces. The router plugin generates `src/routeTree.gen.ts`; that generated file should not be edited manually.
+- `src/routes/` — file-based routes: root layout, `/`, `/login`, `/dashboard`, and `/$page` for school workspaces. The super-admin console lives under `/admin` and includes the platform dashboard, school directory/enrollment/details, subscriptions, tenant users, support desk, and the current administrator profile. The router plugin generates `src/routeTree.gen.ts`; that generated file should not be edited manually.
 - `src/lib/school-navigation.ts` — grouped school-admin navigation catalogue and the status of each feature's API support.
 - `src/components/school/` — reusable school sidebar/workspace shell and page UI (headings, data tables, empty/loading/error states, and stat cards). Workspaces with API support load real tenant data; unfinished areas are explicitly marked planned.
+- `src/components/support/` — shared ticket inbox and conversation UI used by school administrators and platform super administrators. It polls the relevant ticket queue and open conversation every three seconds; ticket replies and status/priority changes are stored in the conversation timeline.
+- `src/components/forms/` — shared form controls for labels, inputs, selects, textareas, validation messages, and submit/cancel actions. Feature forms use `@tanstack/react-form` with shared Zod contracts from `@schoolhub/shared`, keeping field styling and validation behavior consistent.
 - `src/components/school/dashboard/` — dashboard header, overview composition, metric/attendance cards, activity/schedule cards, and the sample dashboard data; the `/dashboard` route coordinates session, school, and search state.
 - `src/lib/auth-client.ts` — Better Auth browser client using the `/api/auth` path and organization client plugin.
 - `src/lib/api.ts` — typed `fetch` wrapper for JSON API calls. It includes browser credentials for cookie-based sessions and throws `ApiError` for non-success responses.
@@ -81,7 +84,7 @@ React 19 single-page application built with Vite:
 - `vite.config.ts` — configures the router generator, React, Tailwind, TypeScript path aliases, and the development `/api` proxy to `localhost:3001`.
 - `index.html` — browser document shell mounting the React application.
 
-The current UI is an initial slice, not a complete feature interface: it has a sign-in page, a polished dashboard, and school-workspace pages for the current API-backed features. Students, classes, subjects, academic years, assessment templates, attendance, fee structures, payments, and school settings are wired to available API operations. Other sidebar destinations, including the teacher, student, and guardian portal areas, have explicit planned-feature pages rather than fabricated records. The dashboard reads the current school when a session exists, but its displayed summary metrics, schedule, and activity feed are explicitly marked as preview data. Sidebar visibility is not yet filtered by tenant role; backend authorization remains authoritative.
+The current UI is an initial slice, not a complete feature interface: it has a sign-in page, a polished dashboard, and school-workspace pages for the current API-backed features. Students, classes, subjects, academic years, assessment templates, attendance, fee structures, payments, school settings, and support tickets are wired to available API operations. School support conversations are restricted to the active school and school owner/admin roles; the platform support desk is restricted to super admins. Ticket lists and conversations refresh every three seconds while open, and replies plus status/priority changes are kept in the timeline. Other sidebar destinations, including the teacher, student, and guardian portal areas, have explicit planned-feature pages rather than fabricated records. The dashboard reads the current school when a session exists, but its displayed summary metrics, schedule, and activity feed are explicitly marked as preview data. Sidebar visibility is not yet filtered by tenant role; backend authorization remains authoritative.
 
 ### `apps/desktop/` and `apps/mobile/`
 
@@ -89,7 +92,17 @@ These directories currently have no checked-in source files. The API authenticat
 
 ### `packages/shared/` — shared contracts
 
-`src/index.ts` exports Zod schemas and inferred TypeScript types for common request payloads and roles, including students, classes, subjects, academic years, attendance, assessment scores, bills, and payments. The API applies these schemas through its Zod validation pipe; the web package can import the same contracts to keep request shapes aligned. The package builds distributable ESM and CommonJS outputs into `dist/`.
+`src/index.ts` exports Zod schemas and inferred TypeScript types for common request payloads and roles, including students, classes, subjects, academic years, attendance, assessment scores, bills, payments, and support tickets/replies. The API applies these schemas through its Zod validation pipe; the web package can import the same contracts to keep request shapes aligned. The package builds distributable ESM and CommonJS outputs into `dist/`.
+
+### Support ticket API
+
+The support feature uses the existing `SupportTicket` and `TicketReply` models in `apps/api/prisma/schema/operations.prisma`; no extra database tables or migration are needed.
+
+- `GET /api/support/tickets` and `POST /api/support/tickets` — list/create requests for the active school. School owner/admin membership is required.
+- `GET /api/support/tickets/:ticketId`, `POST /api/support/tickets/:ticketId/replies`, and `PATCH /api/support/tickets/:ticketId/status` — read and update a request within that active school. School users may confirm-close a ticket after support has marked it resolved; closed tickets cannot receive replies.
+- `GET /api/support/platform/tickets`, `GET /api/support/platform/tickets/:ticketId`, `POST /api/support/platform/tickets/:ticketId/replies`, and `PATCH /api/support/platform/tickets/:ticketId/status` — platform-wide inbox and ticket handling for super admins.
+
+School list/detail queries are scoped to the active school and exclude internal tickets. Status/priority changes add durable timeline replies so both sides can see what changed and who changed it. The web client polls for new ticket activity every three seconds rather than using a persistent socket connection.
 
 ### `packages/config/` — shared TypeScript configuration
 
@@ -128,8 +141,13 @@ All feature routes are tenant-guarded. Routes with write permissions also declar
 | Attendance | `POST /attendance/batch`, `GET /attendance/class/:classId`, `GET /attendance/student/:studentId` |
 | Assessments | `GET /assessments/templates`, `POST /assessments/scores`, `GET /assessments/student/:studentId/report` |
 | Finance | `GET /finance/fee-structures`, `POST /finance/bills/generate`, `POST /finance/payments`, `GET /finance/students/:studentId/ledger` |
+| Super-admin | `GET /super-admin/stats`, `GET /super-admin/schools`, `GET /super-admin/schools/:id`, `POST /super-admin/schools`, `PATCH /super-admin/schools/:id`, `POST /super-admin/schools/:id/admins`, `PATCH /super-admin/schools/:id/admins/:userId`, `DELETE /super-admin/schools/:id/admins/:userId`, `PATCH /super-admin/schools/:id/subscription`, `GET /super-admin/users` |
 
 OpenAPI documentation is mounted at `/api/docs`.
+
+School administrators created through the super-admin school-enrollment endpoint receive an initial password of `Admin@123`; the API hashes it before storing the credential. The enrollment form does not accept or transmit a password. Credential delivery is not automated yet, so the super admin must share the login details securely. This shared default is for the current enrollment flow only and should be replaced with unique, expiring setup credentials before production rollout.
+
+Super admins can update a school's name, code, subdomain, contact email, phone, and address from its detail page. They can add an administrator either by granting an existing account membership or creating a new account with the same initial password described above. Ban and removal actions apply to the school membership only; removing a membership does not delete the user's platform account. The tenant guard rejects banned memberships, and the API prevents banning/removing a school’s last active administrator.
 
 ## 5. Data model and persistence
 

@@ -74,6 +74,72 @@ export const createAcademicYearSchema = z.object({
   startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Format: YYYY-MM-DD"),
   endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Format: YYYY-MM-DD"),
   isCurrent: z.boolean().default(false),
+  terms: z.array(
+    z.object({
+      name: z.string().trim().min(2).max(60),
+      termNumber: z.number().int().min(1).max(4),
+      startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Format: YYYY-MM-DD"),
+      endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Format: YYYY-MM-DD"),
+      isCurrent: z.boolean().default(false),
+    }),
+  ).max(4).optional(),
+}).superRefine((year, context) => {
+  if (year.endDate <= year.startDate) {
+    context.addIssue({
+      code: "custom",
+      path: ["endDate"],
+      message: "The academic year must end after it starts.",
+    });
+  }
+
+  const termNumbers = new Set<number>();
+  const orderedTerms = (year.terms ?? [])
+    .map((term, index) => ({ term, index }))
+    .sort((first, second) =>
+      first.term.startDate.localeCompare(second.term.startDate),
+    );
+
+  orderedTerms.forEach(({ term, index }, orderedIndex) => {
+    if (term.endDate <= term.startDate) {
+      context.addIssue({
+        code: "custom",
+        path: ["terms", index, "endDate"],
+        message: "The term must end after it starts.",
+      });
+    }
+    if (term.startDate < year.startDate || term.endDate > year.endDate) {
+      context.addIssue({
+        code: "custom",
+        path: ["terms", index, "startDate"],
+        message: "Term dates must fall within the academic year.",
+      });
+    }
+    if (termNumbers.has(term.termNumber)) {
+      context.addIssue({
+        code: "custom",
+        path: ["terms", index, "termNumber"],
+        message: "Each term must have a unique number.",
+      });
+    }
+    termNumbers.add(term.termNumber);
+
+    const previousTerm = orderedTerms[orderedIndex - 1]?.term;
+    if (previousTerm && term.startDate <= previousTerm.endDate) {
+      context.addIssue({
+        code: "custom",
+        path: ["terms", index, "startDate"],
+        message: "Terms cannot overlap.",
+      });
+    }
+  });
+
+  if ((year.terms ?? []).filter((term) => term.isCurrent).length > 1) {
+    context.addIssue({
+      code: "custom",
+      path: ["terms"],
+      message: "Only one term can be current.",
+    });
+  }
 });
 export type CreateAcademicYearInput = z.infer<typeof createAcademicYearSchema>;
 
@@ -168,9 +234,64 @@ export const enrollSchoolSchema = z.object({
   // Admin account
   adminName: z.string().min(2),
   adminEmail: z.string().email(),
-  adminPassword: z.string().min(8),
 });
 export type EnrollSchoolInput = z.infer<typeof enrollSchoolSchema>;
+
+export const updateSchoolSchema = z.object({
+  schoolName: z.string().min(2),
+  schoolCode: z
+    .string()
+    .min(3)
+    .max(20)
+    .regex(/^[A-Z0-9-]+$/, "Uppercase letters, numbers, hyphens only"),
+  subdomain: z
+    .string()
+    .min(3)
+    .max(30)
+    .regex(/^[a-z0-9-]+$/, "Lowercase letters, numbers, hyphens only"),
+  schoolEmail: z.union([z.string().email(), z.literal("")]).optional(),
+  schoolPhone: z.string().optional(),
+  schoolAddress: z.string().optional(),
+});
+export type UpdateSchoolInput = z.infer<typeof updateSchoolSchema>;
+
+export const addSchoolAdminSchema = z.object({
+  name: z.string().min(2),
+  email: z.string().email(),
+});
+export type AddSchoolAdminInput = z.infer<typeof addSchoolAdminSchema>;
+
+export const setSchoolAdminBannedSchema = z.object({
+  banned: z.boolean(),
+});
+export type SetSchoolAdminBannedInput = z.infer<
+  typeof setSchoolAdminBannedSchema
+>;
+
+export const createSupportTicketSchema = z.object({
+  subject: z.string().trim().min(5).max(160),
+  description: z.string().trim().min(10).max(10000),
+  category: z.string().trim().min(2).max(60),
+  priority: z.enum(["LOW", "MEDIUM", "HIGH", "URGENT"]).default("MEDIUM"),
+});
+export type CreateSupportTicketInput = z.infer<
+  typeof createSupportTicketSchema
+>;
+
+export const supportTicketReplySchema = z.object({
+  message: z.string().trim().min(2).max(10000),
+});
+export type SupportTicketReplyInput = z.infer<
+  typeof supportTicketReplySchema
+>;
+
+export const updateSupportTicketSchema = z.object({
+  status: z.enum(["OPEN", "IN_PROGRESS", "RESOLVED", "CLOSED"]),
+  priority: z.enum(["LOW", "MEDIUM", "HIGH", "URGENT"]).optional(),
+});
+export type UpdateSupportTicketInput = z.infer<
+  typeof updateSupportTicketSchema
+>;
 
 export const updateSubscriptionSchema = z.object({
   status: z.enum(["TRIALING", "ACTIVE", "PAST_DUE", "CANCELLED", "SUSPENDED"]),

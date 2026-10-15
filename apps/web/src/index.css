@@ -36,8 +36,136 @@
 }
 
 .dark body {
-  background-color: #0b1220;
-  color: #e2e8f0;
+  background-color: #080d18;
+  color: #e7ecf5;
+}
+
+.superadmin-app-shell {
+  position: relative;
+  isolation: isolate;
+  background: #f1f5f9;
+}
+
+.superadmin-main {
+  min-height: calc(100vh - 4rem);
+}
+
+.superadmin-sidebar-panel {
+  background-color: transparent;
+}
+
+.superadmin-surface {
+  border-color: #dbe3ee;
+  background: #ffffff;
+  box-shadow: 0 8px 24px rgb(15 23 42 / 5%);
+  backdrop-filter: none;
+}
+
+.superadmin-input {
+  border-color: #cbd5e1;
+  background: #ffffff;
+}
+
+.superadmin-app-shell .superadmin-button-primary {
+  border: 1px solid #3730a3;
+  background: #4338ca;
+  color: #ffffff;
+  box-shadow: 0 4px 10px rgb(49 46 129 / 18%);
+}
+
+.superadmin-app-shell .superadmin-button-primary:hover:not(:disabled) {
+  border-color: #312e81;
+  background: #3730a3;
+  color: #ffffff;
+  box-shadow: 0 6px 16px rgb(49 46 129 / 24%);
+}
+
+.superadmin-app-shell .superadmin-button-secondary {
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #334155;
+  box-shadow: 0 1px 2px rgb(15 23 42 / 5%);
+}
+
+.superadmin-app-shell .superadmin-button-secondary:hover:not(:disabled) {
+  border-color: #a5b4fc;
+  background: #eef2ff;
+  color: #312e81;
+}
+
+.superadmin-app-shell .superadmin-button-danger {
+  border: 1px solid #fecaca;
+  background: #fff7f7;
+  color: #b91c1c;
+}
+
+.superadmin-app-shell .superadmin-button-danger:hover:not(:disabled) {
+  border-color: #fca5a5;
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.superadmin-app-shell .superadmin-button-warning {
+  border: 1px solid #fcd34d;
+  background: #fffbeb;
+  color: #92400e;
+}
+
+.superadmin-app-shell .superadmin-button-warning:hover:not(:disabled) {
+  border-color: #fbbf24;
+  background: #fef3c7;
+  color: #78350f;
+}
+
+.superadmin-app-shell .superadmin-button-page {
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #334155;
+}
+
+.superadmin-app-shell .superadmin-button-page:hover:not(:disabled) {
+  border-color: #818cf8;
+  background: #eef2ff;
+  color: #312e81;
+}
+
+.superadmin-app-shell .superadmin-button-page:disabled {
+  border-color: #e2e8f0;
+  background: #f8fafc;
+  color: #94a3b8;
+  opacity: 1;
+}
+
+.superadmin-app-shell .superadmin-nav-item[aria-current="page"] {
+  background: #4338ca;
+  color: #ffffff;
+  box-shadow: 0 4px 10px rgb(49 46 129 / 18%);
+}
+
+.superadmin-app-shell .superadmin-nav-item[aria-current="page"]:hover {
+  background: #3730a3;
+  color: #ffffff;
+}
+
+.superadmin-app-shell .superadmin-tab[aria-pressed="true"] {
+  background: #4338ca;
+  color: #ffffff;
+  box-shadow: 0 2px 6px rgb(49 46 129 / 20%);
+}
+
+.superadmin-app-shell .superadmin-tab[aria-pressed="false"] {
+  color: #475569;
+}
+
+.superadmin-app-shell .superadmin-tab[aria-pressed="false"]:hover {
+  background: #eef2ff;
+  color: #312e81;
+}
+
+.superadmin-app-shell button:focus-visible,
+.superadmin-app-shell a:focus-visible {
+  outline: 3px solid #818cf8;
+  outline-offset: 2px;
 }
 
 .dark [class~="bg-white"] {
@@ -176,4 +304,231 @@
 
 .dark .ring-white {
   --tw-ring-color: #111827;
+}
+
+.superadmin-sidebar-shell {
+  background-color: #f8fafc;
+  background-image: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+  backdrop-filter: none;
+}
+
+.superadmin-topbar {
+  background-color: #ffffff;
+  background-image: none;
+  box-shadow: 0 1px 3px rgb(15 23 42 / 5%);
+  backdrop-filter: none;
+}
+
+.dark .superadmin-topbar {
+  background-color: rgb(15 23 42 / 78%);
+}
+
+.dark .superadmin-app-shell {
+  background:
+    radial-gradient(ellipse at 86% 0%, rgb(99 102 241 / 19%), transparent 34rem),
+    radial-gradient(ellipse at 34% 12%, rgb(14 165 233 / 8%), transparent 29rem),
+    linear-gradient(135deg, #080d18 0%, #0b1220 48%, #0b1020 100%);
+}
+
+.dark .superadmin-sidebar-shell {
+  background-color: #0b1220;
+  background-image:
+    radial-gradient(ellipse at 0% 0%, rgb(129 140 248 / 20%), transparent 24rem),
+    radial-gradient(ellipse at 100% 60%, rgb(56 189 248 / 7%), transparent 22rem),
+    linear-gradient(180deg, rgb(15 23 42 / 88%), rgb(9 14 26 / 93%));
+  box-shadow: inset -1px 0 rgb(255 255 255 / 6%);
+}
+
+.dark .superadmin-topbar {
+  background-image: linear-gradient(90deg, rgb(15 23 42 / 78%), rgb(15 23 42 / 48%));
+}
+
+.dark .superadmin-surface {
+  border-color: rgb(148 163 184 / 16%);
+  background:
+    linear-gradient(145deg, rgb(30 41 59 / 74%), rgb(15 23 42 / 83%)),
+    rgb(15 23 42 / 82%);
+  box-shadow:
+    0 22px 58px rgb(0 0 0 / 23%),
+    inset 0 1px rgb(255 255 255 / 5%);
+  backdrop-filter: blur(22px);
+}
+
+.dark .superadmin-sidebar-panel {
+  background-color: transparent;
+}
+
+.dark .superadmin-input {
+  border-color: rgb(148 163 184 / 22%);
+  background: rgb(8 15 28 / 62%);
+  color: #e7ecf5;
+  box-shadow: inset 0 1px rgb(255 255 255 / 3%);
+}
+
+.dark .superadmin-app-shell .superadmin-button-primary {
+  border-color: #818cf8;
+  background: #6366f1;
+  color: #ffffff;
+}
+
+.dark .superadmin-app-shell .superadmin-button-primary:hover:not(:disabled) {
+  border-color: #a5b4fc;
+  background: #4f46e5;
+  color: #ffffff;
+}
+
+.dark .superadmin-app-shell .superadmin-button-secondary,
+.dark .superadmin-app-shell .superadmin-button-page {
+  border-color: rgb(148 163 184 / 28%);
+  background: rgb(30 41 59 / 90%);
+  color: #e2e8f0;
+}
+
+.dark .superadmin-app-shell .superadmin-button-secondary:hover:not(:disabled),
+.dark .superadmin-app-shell .superadmin-button-page:hover:not(:disabled) {
+  border-color: rgb(129 140 248 / 55%);
+  background: rgb(79 70 229 / 22%);
+  color: #ffffff;
+}
+
+.dark .superadmin-app-shell .superadmin-button-page:disabled {
+  border-color: rgb(71 85 105 / 35%);
+  background: rgb(15 23 42 / 55%);
+  color: #64748b;
+}
+
+.dark .superadmin-app-shell .superadmin-button-danger {
+  border-color: rgb(248 113 113 / 35%);
+  background: rgb(127 29 29 / 20%);
+  color: #fca5a5;
+}
+
+.dark .superadmin-app-shell .superadmin-button-danger:hover:not(:disabled) {
+  border-color: rgb(248 113 113 / 60%);
+  background: rgb(127 29 29 / 38%);
+  color: #fecaca;
+}
+
+.dark .superadmin-app-shell .superadmin-button-warning {
+  border-color: rgb(251 191 36 / 35%);
+  background: rgb(120 53 15 / 20%);
+  color: #fcd34d;
+}
+
+.dark .superadmin-app-shell .superadmin-button-warning:hover:not(:disabled) {
+  border-color: rgb(251 191 36 / 60%);
+  background: rgb(120 53 15 / 38%);
+  color: #fde68a;
+}
+
+.dark .superadmin-app-shell .superadmin-nav-item[aria-current="page"] {
+  background: rgb(99 102 241 / 24%);
+  color: #e0e7ff;
+  box-shadow: inset 3px 0 #a5b4fc, 0 4px 12px rgb(0 0 0 / 14%);
+}
+
+.dark .superadmin-app-shell .superadmin-nav-item[aria-current="page"]:hover {
+  background: rgb(99 102 241 / 32%);
+  color: #ffffff;
+}
+
+.dark .superadmin-app-shell .superadmin-tab[aria-pressed="true"] {
+  background: #6366f1;
+  color: #ffffff;
+  box-shadow: 0 3px 10px rgb(0 0 0 / 28%);
+}
+
+.dark .superadmin-app-shell .superadmin-tab[aria-pressed="false"] {
+  color: #cbd5e1;
+}
+
+.dark .superadmin-app-shell .superadmin-tab[aria-pressed="false"]:hover {
+  background: rgb(99 102 241 / 15%);
+  color: #ffffff;
+}
+
+.dark .superadmin-app-shell button:focus-visible,
+.dark .superadmin-app-shell a:focus-visible {
+  outline-color: #a5b4fc;
+}
+
+.superadmin-confirm-dialog {
+  background: #ffffff;
+}
+
+.dark .superadmin-confirm-dialog {
+  background:
+    radial-gradient(ellipse at 100% 0%, rgb(99 102 241 / 18%), transparent 19rem),
+    linear-gradient(145deg, rgb(30 41 59 / 96%), rgb(11 17 31 / 97%));
+}
+
+.dark .superadmin-input::placeholder {
+  color: #7f8da5;
+}
+
+.dark [class~="text-emerald-700"] {
+  color: #6ee7b7;
+}
+
+.dark [class~="text-rose-700"],
+.dark [class~="text-red-700"] {
+  color: #fda4af;
+}
+
+.dark [class~="text-violet-700"] {
+  color: #c4b5fd;
+}
+
+.superadmin-dialog-backdrop {
+  background: rgb(15 23 42 / 42%);
+  backdrop-filter: blur(9px);
+  animation: superadmin-fade-in 160ms ease-out both;
+}
+
+.superadmin-confirm-dialog {
+  border-color: rgb(203 213 225 / 70%);
+  background:
+    radial-gradient(ellipse at 100% 0%, rgb(99 102 241 / 8%), transparent 18rem),
+    rgb(255 255 255 / 96%);
+  color: #0f172a;
+  backdrop-filter: blur(24px);
+  animation: superadmin-dialog-in 180ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.dark .superadmin-dialog-backdrop {
+  background: rgb(2 6 23 / 68%);
+}
+
+.dark .superadmin-confirm-dialog {
+  border-color: rgb(148 163 184 / 18%);
+  background:
+    radial-gradient(ellipse at 100% 0%, rgb(99 102 241 / 18%), transparent 19rem),
+    linear-gradient(145deg, rgb(30 41 59 / 96%), rgb(11 17 31 / 97%));
+  box-shadow:
+    0 36px 100px rgb(0 0 0 / 58%),
+    inset 0 1px rgb(255 255 255 / 8%);
+  color: #e7ecf5;
+}
+
+@keyframes superadmin-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes superadmin-dialog-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .superadmin-dialog-backdrop,
+  .superadmin-confirm-dialog {
+    animation-duration: 1ms;
+  }
 }

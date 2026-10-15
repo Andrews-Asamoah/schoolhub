@@ -46,12 +46,25 @@ function AdminLayout() {
   const pathname = routerState.location.pathname;
   let activePage = "dashboard";
   if (pathname.includes("/admin/schools")) activePage = "schools";
+  else if (pathname.startsWith("/admin/users")) activePage = "users";
+  else if (pathname.startsWith("/admin/subscriptions")) activePage = "subscriptions";
+  else if (pathname.startsWith("/admin/support")) activePage = "support";
+  else if (pathname.startsWith("/admin/profile")) activePage = "profile";
+  const breadcrumb = {
+    dashboard: "Dashboard",
+    schools: "Schools",
+    users: "System users",
+    subscriptions: "Subscriptions",
+    support: "Support desk",
+    profile: "My profile",
+  }[activePage];
 
   return (
     <SuperAdminLayout
       activePage={activePage}
       userName={session.user.name}
       userEmail={session.user.email}
+      breadcrumb={breadcrumb}
     >
       <Outlet />
     </SuperAdminLayout>

@@ -1,5 +1,6 @@
 import { Bell, Search } from "lucide-react";
 import { ThemeToggle } from "@/components/school/theme-toggle";
+import { SchoolOrganizationPicker } from "@/components/school/school-organization";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 
 interface DashboardHeaderProps {
@@ -25,6 +26,7 @@ export function DashboardHeader({
         </div>
       </div>
       <div className="flex items-center gap-2 sm:gap-3">
+        <SchoolOrganizationPicker compact />
         <label className="relative hidden md:block">
           <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
           <input

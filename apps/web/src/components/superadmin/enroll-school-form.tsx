@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { useMutation } from "@tanstack/react-query";
-import { Eye, EyeOff, Building2, User } from "lucide-react";
+import { Building2, User } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import type { EnrollSchoolInput } from "@schoolhub/shared";
 
@@ -26,7 +26,6 @@ function toSchoolCode(value: string) {
 
 export function EnrollSchoolForm() {
   const navigate = useNavigate();
-  const [showPassword, setShowPassword] = useState(false);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [errors, setErrors] = useState<FormErrors>({});
 
@@ -40,7 +39,6 @@ export function EnrollSchoolForm() {
     region: "",
     adminName: "",
     adminEmail: "",
-    adminPassword: "",
   });
 
   const mutation = useMutation({
@@ -85,7 +83,6 @@ export function EnrollSchoolForm() {
     if (form.schoolEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.schoolEmail)) errs.schoolEmail = "Invalid email";
     if (!form.adminName || form.adminName.length < 2) errs.adminName = "Admin name must be at least 2 characters";
     if (!form.adminEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.adminEmail)) errs.adminEmail = "Valid email required";
-    if (!form.adminPassword || form.adminPassword.length < 8) errs.adminPassword = "Password must be at least 8 characters";
     setErrors(errs);
     return Object.keys(errs).length === 0;
   }
@@ -210,7 +207,7 @@ export function EnrollSchoolForm() {
           </span>
           <div>
             <h2 className="text-base font-semibold text-slate-900">Administrator Account</h2>
-            <p className="text-xs text-slate-500">Login credentials for the school owner</p>
+            <p className="text-xs text-slate-500">Login details for the school owner</p>
           </div>
         </div>
 
@@ -234,28 +231,11 @@ export function EnrollSchoolForm() {
               className={inputClass(!!errors.adminEmail)}
             />
           </FieldGroup>
-
-          <div className="sm:col-span-2">
-            <FieldGroup label="Password *" error={errors.adminPassword} hint="Minimum 8 characters">
-              <div className="relative">
-                <input
-                  type={showPassword ? "text" : "password"}
-                  placeholder="••••••••"
-                  value={form.adminPassword}
-                  onChange={(e) => set("adminPassword", e.target.value)}
-                  className={inputClass(!!errors.adminPassword) + " pr-10"}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword((s) => !s)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                >
-                  {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-                </button>
-              </div>
-            </FieldGroup>
-          </div>
         </div>
+        <p className="mt-5 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          An initial password of <strong>Admin@123</strong> will be assigned automatically.
+          Share it securely with the administrator.
+        </p>
       </section>
 
       {/* Actions */}
@@ -263,14 +243,14 @@ export function EnrollSchoolForm() {
         <button
           type="button"
           onClick={() => void navigate({ to: "/admin/schools" })}
-          className="rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+          className="superadmin-button-secondary rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-800 transition hover:bg-slate-50"
         >
           Cancel
         </button>
         <button
           type="submit"
           disabled={mutation.isPending}
-          className="rounded-xl bg-indigo-600 px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700 disabled:opacity-60"
+          className="superadmin-button-primary rounded-xl bg-indigo-600 px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700 disabled:opacity-60"
         >
           {mutation.isPending ? "Enrolling school…" : "Enroll School"}
         </button>

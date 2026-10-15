@@ -14,6 +14,7 @@ import { AttendanceModule } from "./modules/attendance/attendance.module.js";
 import { AssessmentsModule } from "./modules/assessments/assessments.module.js";
 import { FinanceModule } from "./modules/finance/finance.module.js";
 import { SuperAdminModule } from "./modules/super-admin/super-admin.module.js";
+import { SupportModule } from "./modules/support/support.module.js";
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { SuperAdminModule } from "./modules/super-admin/super-admin.module.js";
     AssessmentsModule,
     FinanceModule,
     SuperAdminModule,
+    SupportModule,
   ],
   controllers: [HealthController],
   providers: [

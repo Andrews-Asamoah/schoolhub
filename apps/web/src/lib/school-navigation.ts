@@ -272,7 +272,7 @@ export const schoolNavGroups: SchoolNavGroup[] = [
         icon: ShieldQuestion,
         description: "Get help and follow up on school support requests.",
         section: "Administration",
-        apiStatus: "planned",
+        apiStatus: "available",
       },
     ],
   },

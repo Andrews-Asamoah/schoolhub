@@ -56,7 +56,7 @@ export function SchoolRow({ school }: SchoolRowProps) {
         <Link
           to="/admin/schools/$schoolId"
           params={{ schoolId: school.id }}
-          className="rounded-lg bg-indigo-50 px-3 py-1.5 text-xs font-medium text-indigo-600 transition hover:bg-indigo-100"
+          className="superadmin-button-secondary rounded-lg bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-800 transition hover:bg-indigo-100"
         >
           View →
         </Link>
