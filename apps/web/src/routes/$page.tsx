@@ -31,6 +31,7 @@ import { useSchoolRole } from "@/components/school/school-role-switcher";
 import { EnrollmentWorkspace } from "@/components/school/enrollment-workspace";
 import { StudentDirectoryWorkspace } from "@/components/school/student-directory-workspace";
 import { PeopleWorkspace } from "@/components/school/people-workspace";
+import { SchoolLogoUploader } from "@/components/school/school-logo-uploader";
 import { HousesWorkspace } from "@/components/school/houses-workspace";
 import { TeacherPortalWorkspace } from "@/components/portal/teacher-portal-workspace";
 import { AccountantPortalWorkspace } from "@/components/portal/accountant-portal-workspace";
@@ -122,6 +123,7 @@ interface School {
   address?: string | null;
   motto?: string | null;
   website?: string | null;
+  logo?: string | null;
 }
 
 function WorkspaceRoute() {
@@ -696,6 +698,7 @@ function SchoolSettings({ query }: { query: UseQueryResult<School, Error> }) {
 
   return (
     <div className="rounded-2xl border border-slate-200/80 bg-white p-5 sm:p-6">
+      <SchoolLogoUploader logo={school.logo} />
       <h2 className="text-sm font-semibold text-slate-900">School profile</h2>
       <p className="mt-1 text-xs text-slate-500">
         Current details for your active school.

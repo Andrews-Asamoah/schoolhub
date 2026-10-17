@@ -7,6 +7,7 @@ import { PrismaModule } from "./prisma/prisma.module.js";
 import { GlobalExceptionFilter } from "./common/filters/global-exception.filter.js";
 
 // Domain Modules
+import { StorageModule } from "./modules/storage/storage.module.js";
 import { SchoolsModule } from "./modules/schools/schools.module.js";
 import { StudentsModule } from "./modules/students/students.module.js";
 import { AcademicsModule } from "./modules/academics/academics.module.js";
@@ -20,6 +21,7 @@ import { PeopleModule } from "./modules/people/people.module.js";
 @Module({
   imports: [
     PrismaModule,
+    StorageModule,
     AuthModule.forRoot({ auth }),
     SchoolsModule,
     StudentsModule,

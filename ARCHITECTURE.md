@@ -129,6 +129,10 @@ Contains the common TypeScript compiler options in `tsconfig.base.json`. Individ
 
 The API enables credentialed CORS for the configured web origin plus local web and Tauri origins, and permits requests without an `Origin` header for native clients. New client origins must be deliberately added to the API's trusted-origin/CORS configuration.
 
+### File storage (Cloudflare R2)
+
+`apps/api/src/modules/storage/` stores uploads in an R2 bucket through the S3-compatible API. Objects are keyed `schools/<schoolId>/…` (immutable id, not the subdomain) with a random name per upload so URLs can be cached forever. Uploads accept JPEG/PNG/WebP up to 2 MB and are identified from file bytes, not the client's filename or content type. Endpoints (tenant-guarded): `PUT|DELETE /api/schools/current/logo` (owner/admin) and `PUT|DELETE /api/schools/current/me/avatar`. Configure with the `R2_*` variables in `.env.example`; uploads return 503 until they are set.
+
 ## 4. Main API surface
 
 All feature routes are tenant-guarded. Routes with write permissions also declare role requirements; request payloads with shared schemas are validated at the controller boundary.

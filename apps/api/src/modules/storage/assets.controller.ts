@@ -1,0 +1,61 @@
+import {
+  Controller,
+  Delete,
+  Put,
+  UploadedFile,
+  UseGuards,
+  UseInterceptors,
+} from "@nestjs/common";
+import { FileInterceptor } from "@nestjs/platform-express";
+import type { School } from "@prisma/client";
+import { CurrentSchool } from "../../common/decorators/current-school.decorator.js";
+import { CurrentUser } from "../../common/decorators/current-user.decorator.js";
+import { Roles } from "../../common/decorators/roles.decorator.js";
+import { RolesGuard } from "../../common/guards/roles.guard.js";
+import { SchoolTenantGuard } from "../../common/guards/school-tenant.guard.js";
+import { AssetsService } from "./assets.service.js";
+import { MAX_IMAGE_BYTES } from "./image-validation.js";
+
+const imageUpload = (field: string) =>
+  FileInterceptor(field, { limits: { fileSize: MAX_IMAGE_BYTES, files: 1 } });
+
+/** Uploads for the *current* school (resolved from the request's address). */
+@Controller("schools/current")
+@UseGuards(SchoolTenantGuard, RolesGuard)
+export class AssetsController {
+  constructor(private readonly assets: AssetsService) {}
+
+  @Put("logo")
+  @Roles("owner", "admin")
+  @UseInterceptors(imageUpload("logo"))
+  uploadLogo(
+    @CurrentSchool() school: School,
+    @UploadedFile() file: Express.Multer.File | undefined,
+  ) {
+    return this.assets.setSchoolLogo(school, file);
+  }
+
+  @Delete("logo")
+  @Roles("owner", "admin")
+  removeLogo(@CurrentSchool() school: School) {
+    return this.assets.removeSchoolLogo(school);
+  }
+
+  @Put("me/avatar")
+  @UseInterceptors(imageUpload("avatar"))
+  uploadAvatar(
+    @CurrentSchool() school: School,
+    @CurrentUser() user: { id: string },
+    @UploadedFile() file: Express.Multer.File | undefined,
+  ) {
+    return this.assets.setAvatar(school, user.id, file);
+  }
+
+  @Delete("me/avatar")
+  removeAvatar(
+    @CurrentSchool() school: School,
+    @CurrentUser() user: { id: string },
+  ) {
+    return this.assets.removeAvatar(school, user.id);
+  }
+}
