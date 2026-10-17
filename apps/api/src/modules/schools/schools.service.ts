@@ -44,6 +44,33 @@ export class SchoolsService {
     return school;
   }
 
+  async getPublicSchoolBySubdomain(subdomain: string) {
+    const school = await this.prisma.client.school.findUnique({
+      where: { subdomain: subdomain.toLowerCase().trim() },
+      select: {
+        id: true,
+        organizationId: true,
+        name: true,
+        code: true,
+        subdomain: true,
+        logo: true,
+        motto: true,
+        primaryColor: true,
+        secondaryColor: true,
+        currency: true,
+        email: true,
+        phone: true,
+        address: true,
+      },
+    });
+
+    if (!school) {
+      throw new NotFoundException(`School with subdomain "${subdomain}" not found`);
+    }
+
+    return school;
+  }
+
   async updateSchool(
     schoolId: string,
     data: {

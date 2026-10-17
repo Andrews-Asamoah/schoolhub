@@ -82,6 +82,13 @@ interface SchoolClass {
   isActive: boolean;
 }
 
+interface HouseOption {
+  id: string;
+  name: string;
+  color: string | null;
+  isActive: boolean;
+}
+
 const emptyStudent: CreateStudentInput = {
   firstName: "",
   lastName: "",
@@ -135,6 +142,12 @@ export function StudentDirectoryWorkspace() {
   const classesQuery = useQuery({
     queryKey: ["academics", "classes"],
     queryFn: () => apiFetch<SchoolClass[]>("/academics/classes"),
+    retry: false,
+  });
+  const housesQuery = useQuery({
+    queryKey: ["academics", "houses"],
+    queryFn: () => apiFetch<HouseOption[]>("/academics/houses"),
+    enabled: canManage,
     retry: false,
   });
   const studentsQuery = useQuery({
@@ -234,7 +247,11 @@ export function StudentDirectoryWorkspace() {
       : []),
   ];
 
-  if (studentsQuery.isPending || classesQuery.isPending) {
+  if (
+    studentsQuery.isPending ||
+    classesQuery.isPending ||
+    (canManage && housesQuery.isPending)
+  ) {
     return (
       <div className="flex items-center gap-2 rounded-xl border border-border bg-card p-5 text-sm text-muted-foreground">
         <LoaderCircle className="size-4 animate-spin" />
@@ -249,6 +266,13 @@ export function StudentDirectoryWorkspace() {
     return (
       <PeopleError
         message={`Class filters could not be loaded: ${classesQuery.error.message}`}
+      />
+    );
+  }
+  if (canManage && housesQuery.error) {
+    return (
+      <PeopleError
+        message={`Houses could not be loaded: ${housesQuery.error.message}`}
       />
     );
   }
@@ -300,6 +324,7 @@ export function StudentDirectoryWorkspace() {
           key={editing?.id ?? "new"}
           student={editing}
           classes={classesQuery.data ?? []}
+          houses={housesQuery.data ?? []}
           onCancel={() => {
             setShowForm(false);
             setEditing(null);
@@ -424,11 +449,13 @@ export function StudentDirectoryWorkspace() {
 function StudentEditor({
   student,
   classes,
+  houses,
   onCancel,
   onSaved,
 }: {
   student: Student | null;
   classes: SchoolClass[];
+  houses: HouseOption[];
   onCancel: () => void;
   onSaved: () => Promise<void>;
 }) {
@@ -675,12 +702,23 @@ function StudentEditor({
             {(field) => (
               <label className="text-xs font-semibold text-foreground">
                 House (optional)
-                <input
+                <select
                   className={inputClasses}
                   value={field.state.value ?? ""}
                   onChange={(event) => field.handleChange(event.target.value)}
-                  placeholder="House ID"
-                />
+                >
+                  <option value="">No house assigned</option>
+                  {houses
+                    .filter(
+                      (house) =>
+                        house.isActive || house.id === student?.house?.id,
+                    )
+                    .map((house) => (
+                      <option key={house.id} value={house.id}>
+                        {house.name}
+                      </option>
+                    ))}
+                </select>
               </label>
             )}
           </form.Field>

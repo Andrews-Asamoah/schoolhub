@@ -97,7 +97,6 @@ export type UpdateStudentInput = z.infer<typeof updateStudentRecordSchema>;
 export const createTeacherSchema = z.object({
   firstName: z.string().trim().min(1).max(100),
   lastName: z.string().trim().min(1).max(100),
-  teacherId: z.string().trim().max(40).optional(),
   staffNumber: z.string().trim().max(40).optional(),
   invitationEmail: z.string().email().optional().or(z.literal("")),
   departmentId: z.string().min(1),
@@ -217,6 +216,28 @@ export const createDepartmentSchema = z.object({
   description: z.string().trim().max(500).optional(),
 });
 export type CreateDepartmentInput = z.infer<typeof createDepartmentSchema>;
+
+export const createHouseSchema = z.object({
+  name: z.string().trim().min(2, "Enter a house name").max(100),
+  code: z
+    .string()
+    .trim()
+    .min(2, "Enter a house code")
+    .max(20)
+    .regex(/^[A-Za-z0-9-]+$/, "Use only letters, numbers, and hyphens")
+    .transform((value) => value.toUpperCase()),
+  description: z.string().trim().max(500).optional(),
+  color: z
+    .string()
+    .regex(/^#[0-9A-Fa-f]{6}$/, "Choose a valid hex color")
+    .optional(),
+  motto: z.string().trim().max(200).optional(),
+  houseTeacherId: z.string().optional(),
+  isActive: z.boolean().default(true),
+});
+export type CreateHouseInput = z.infer<typeof createHouseSchema>;
+export const updateHouseSchema = createHouseSchema.partial();
+export type UpdateHouseInput = z.infer<typeof updateHouseSchema>;
 
 export const createSubjectSchema = z.object({
   name: z.string().min(1, "Subject name is required"),

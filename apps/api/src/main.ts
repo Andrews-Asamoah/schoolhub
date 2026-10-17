@@ -38,13 +38,20 @@ async function bootstrap() {
     "tauri://localhost",
   ];
 
+  const subdomainPattern =
+    /^https?:\/\/([a-z0-9-]+\.)*(localhost|schoolhub\.(gh|app|com))(:\d+)?$/i;
+
   app.enableCors({
     origin: (
       origin: string | undefined,
       callback: (err: Error | null, allow?: boolean) => void,
     ) => {
-      // Allow requests with no origin (mobile native apps, desktop requests) or allowed origins
-      if (!origin || allowedOrigins.includes(origin)) {
+      // Allow requests with no origin (mobile native apps, desktop requests) or allowed origins/subdomains
+      if (
+        !origin ||
+        allowedOrigins.includes(origin) ||
+        subdomainPattern.test(origin)
+      ) {
         return callback(null, true);
       }
       return callback(new Error(`CORS blocked for origin: ${origin}`));

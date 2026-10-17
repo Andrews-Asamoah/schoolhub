@@ -27,12 +27,38 @@ export class ApiError extends Error {
   }
 }
 
+function getClientSubdomain(): string | null {
+  if (typeof window === "undefined") return null;
+  const params = new URLSearchParams(window.location.search);
+  const override = params.get("school") || params.get("subdomain");
+  if (override && override.trim().length > 0) return override.trim().toLowerCase();
+
+  const hostname = window.location.hostname.toLowerCase();
+  if (hostname.endsWith(".localhost")) {
+    const parts = hostname.split(".");
+    if (parts.length >= 2 && parts[0] && !["www", "app", "api", "admin"].includes(parts[0])) {
+      return parts[0];
+    }
+  }
+  const parts = hostname.split(".");
+  if (parts.length >= 3 && parts[0] && !["www", "app", "api", "admin"].includes(parts[0])) {
+    return parts[0];
+  }
+  return null;
+}
+
 export async function apiFetch<T>(
   path: string,
   init?: RequestInit,
 ): Promise<T> {
   const headers = new Headers(init?.headers);
   headers.set("Content-Type", "application/json");
+
+  const subdomain = getClientSubdomain();
+  if (subdomain) {
+    headers.set("x-school-subdomain", subdomain);
+  }
+
   if (
     typeof window !== "undefined" &&
     path !== "/schools/roles"

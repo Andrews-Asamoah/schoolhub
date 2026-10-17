@@ -31,6 +31,11 @@ import { useSchoolRole } from "@/components/school/school-role-switcher";
 import { EnrollmentWorkspace } from "@/components/school/enrollment-workspace";
 import { StudentDirectoryWorkspace } from "@/components/school/student-directory-workspace";
 import { PeopleWorkspace } from "@/components/school/people-workspace";
+import { HousesWorkspace } from "@/components/school/houses-workspace";
+import { TeacherPortalWorkspace } from "@/components/portal/teacher-portal-workspace";
+import { AccountantPortalWorkspace } from "@/components/portal/accountant-portal-workspace";
+import { GuardianPortalWorkspace } from "@/components/portal/guardian-portal-workspace";
+import { StudentPortalWorkspace } from "@/components/portal/student-portal-workspace";
 
 export const Route = createFileRoute("/$page")({
   component: WorkspaceRoute,
@@ -217,7 +222,7 @@ function WorkspaceContent({ pageId }: { pageId: string }) {
   const page = getSchoolNavItem(pageId)!;
   return (
     <>
-      {!["classes", "students", "teachers", "staff", "guardians"].includes(
+      {!["classes", "students", "teachers", "staff", "guardians", "teacher-portal", "accountant-portal", "guardian-portal", "student-portal"].includes(
         pageId,
       ) && (
         <WorkspacePageHeading
@@ -235,10 +240,22 @@ function WorkspaceContent({ pageId }: { pageId: string }) {
         />
       ) : (
         <>
+          {pageId === "teacher-portal" && <TeacherPortalWorkspace />}
+          {pageId === "accountant-portal" && <AccountantPortalWorkspace />}
+          {pageId === "guardian-portal" && <GuardianPortalWorkspace />}
+          {pageId === "student-portal" && <StudentPortalWorkspace />}
+          {pageId === "invoices" && <AccountantPortalWorkspace defaultTab="invoices" />}
+          {pageId === "expenses" && <AccountantPortalWorkspace defaultTab="expenses" />}
+          {pageId === "payroll" && <AccountantPortalWorkspace defaultTab="payroll" />}
+          {pageId === "inventory" && <AccountantPortalWorkspace defaultTab="inventory" />}
+          {pageId === "timetable" && (
+            activeRole === "student" ? <StudentPortalWorkspace defaultTab="timetable" /> : <TeacherPortalWorkspace defaultTab="timetable" />
+          )}
           {pageId === "students" && <StudentDirectoryWorkspace />}
           {pageId === "teachers" && <PeopleWorkspace kind="teachers" />}
           {pageId === "staff" && <PeopleWorkspace kind="staff" />}
           {pageId === "guardians" && <PeopleWorkspace kind="guardians" />}
+          {pageId === "houses" && <HousesWorkspace />}
           {pageId === "classes" && (
             <ClassesWorkspace
               classesQuery={classesQuery}

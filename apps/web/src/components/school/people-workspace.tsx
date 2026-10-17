@@ -31,7 +31,6 @@ type Values = {
   firstName: string;
   lastName: string;
   otherNames: string;
-  teacherId: string;
   staffId: string;
   staffNumber: string;
   invitationEmail: string;
@@ -177,7 +176,6 @@ function initialValues(): Values {
     firstName: "",
     lastName: "",
     otherNames: "",
-    teacherId: "",
     staffId: "",
     staffNumber: "",
     invitationEmail: "",
@@ -476,15 +474,6 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
               )}
               {kind === "teachers" && (
                 <>
-                  <form.Field name="teacherId">
-                    {(field) => (
-                      <TextField
-                        label="Teacher ID (optional)"
-                        value={field.state.value}
-                        onChange={(value) => field.handleChange(value)}
-                      />
-                    )}
-                  </form.Field>
                   <form.Field name="staffNumber">
                     {(field) => (
                       <TextField
@@ -1063,8 +1052,7 @@ function StudentSearchPicker({
       return apiFetch<DirectoryPage<StudentOption>>(`/students?${params}`);
     },
     enabled:
-      deferredSearch.length >= 2 ||
-      (deferredSearch.length === 0 && !!classId),
+      deferredSearch.length >= 2 || (deferredSearch.length === 0 && !!classId),
     retry: false,
   });
   const selectedIds = new Set(value);

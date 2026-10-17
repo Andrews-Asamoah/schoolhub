@@ -8,42 +8,46 @@ import {
   Body,
   Headers,
   UseGuards,
-} from "@nestjs/common";
-import { AcademicsService } from "./academics.service.js";
-import { SchoolTenantGuard } from "../../common/guards/school-tenant.guard.js";
-import { RolesGuard } from "../../common/guards/roles.guard.js";
-import { Roles } from "../../common/decorators/roles.decorator.js";
-import { CurrentSchool } from "../../common/decorators/current-school.decorator.js";
-import { CurrentSchoolRole } from "../../common/decorators/current-school-role.decorator.js";
-import { ZodValidationPipe } from "../../common/pipes/zod-validation.pipe.js";
+} from '@nestjs/common';
+import { AcademicsService } from './academics.service.js';
+import { SchoolTenantGuard } from '../../common/guards/school-tenant.guard.js';
+import { RolesGuard } from '../../common/guards/roles.guard.js';
+import { Roles } from '../../common/decorators/roles.decorator.js';
+import { CurrentSchool } from '../../common/decorators/current-school.decorator.js';
+import { CurrentSchoolRole } from '../../common/decorators/current-school-role.decorator.js';
+import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe.js';
 import {
   createClassSchema,
   createClassTeacherAssignmentSchema,
   createDepartmentSchema,
   createEnrollmentSchema,
+  createHouseSchema,
   createSubjectSchema,
   updateClassSchema,
+  updateHouseSchema,
   type CreateClassInput,
   type CreateClassTeacherAssignmentInput,
   type CreateDepartmentInput,
   type CreateEnrollmentInput,
+  type CreateHouseInput,
   type CreateSubjectInput,
   type UpdateClassInput,
-} from "@schoolhub/shared";
-import type { School } from "@prisma/client";
+  type UpdateHouseInput,
+} from '@schoolhub/shared';
+import type { School } from '@prisma/client';
 
-@Controller("academics")
+@Controller('academics')
 @UseGuards(SchoolTenantGuard, RolesGuard)
 export class AcademicsController {
   constructor(private readonly academicsService: AcademicsService) {}
 
-  @Get("classes")
-  @Roles("owner", "admin", "teacher", "staff", "accountant")
+  @Get('classes')
+  @Roles('owner', 'admin', 'teacher', 'staff', 'accountant')
   listClasses(
     @CurrentSchool() school: School,
     @CurrentSchoolRole() role: string | undefined,
-    @Headers("x-academic-year-id") academicYearId?: string,
-    @Headers("x-academic-term-id") termId?: string,
+    @Headers('x-academic-year-id') academicYearId?: string,
+    @Headers('x-academic-term-id') termId?: string,
   ) {
     return this.academicsService.listClasses(
       school.id,
@@ -53,16 +57,16 @@ export class AcademicsController {
     );
   }
 
-  @Get("enrollments")
-  @Roles("owner", "admin", "teacher", "staff", "accountant")
+  @Get('enrollments')
+  @Roles('owner', 'admin', 'teacher', 'staff', 'accountant')
   listEnrollments(
     @CurrentSchool() school: School,
-    @Query("academicYearId") queryAcademicYearId: string | undefined,
-    @Query("termId") termId?: string,
-    @Query("classId") classId?: string,
+    @Query('academicYearId') queryAcademicYearId: string | undefined,
+    @Query('termId') termId?: string,
+    @Query('classId') classId?: string,
     @CurrentSchoolRole() role?: string,
-    @Headers("x-academic-year-id") viewAcademicYearId?: string,
-    @Headers("x-academic-term-id") viewTermId?: string,
+    @Headers('x-academic-year-id') viewAcademicYearId?: string,
+    @Headers('x-academic-term-id') viewTermId?: string,
   ) {
     return this.academicsService.listEnrollments(
       school.id,
@@ -73,13 +77,13 @@ export class AcademicsController {
     );
   }
 
-  @Get("eligible-students")
-  @Roles("owner", "admin", "staff")
+  @Get('eligible-students')
+  @Roles('owner', 'admin', 'staff')
   listEligibleStudents(
     @CurrentSchool() school: School,
-    @Query("academicYearId") academicYearId: string,
-    @Query("termId") termId: string,
-    @Query("search") search?: string,
+    @Query('academicYearId') academicYearId: string,
+    @Query('termId') termId: string,
+    @Query('search') search?: string,
     @CurrentSchoolRole() role?: string,
   ) {
     return this.academicsService.listEligibleStudents(
@@ -91,8 +95,8 @@ export class AcademicsController {
     );
   }
 
-  @Post("enrollments")
-  @Roles("owner", "admin", "staff")
+  @Post('enrollments')
+  @Roles('owner', 'admin', 'staff')
   createEnrollments(
     @CurrentSchool() school: School,
     @CurrentSchoolRole() role: string | undefined,
@@ -102,14 +106,14 @@ export class AcademicsController {
     return this.academicsService.createEnrollments(school.id, body, role);
   }
 
-  @Get("teachers")
-  @Roles("owner", "admin")
+  @Get('teachers')
+  @Roles('owner', 'admin')
   listClassTeachers(@CurrentSchool() school: School) {
     return this.academicsService.listClassTeachers(school.id);
   }
 
-  @Post("classes")
-  @Roles("owner", "admin")
+  @Post('classes')
+  @Roles('owner', 'admin')
   createClass(
     @CurrentSchool() school: School,
     @Body(new ZodValidationPipe(createClassSchema)) body: CreateClassInput,
@@ -117,44 +121,44 @@ export class AcademicsController {
     return this.academicsService.createClass(school.id, body);
   }
 
-  @Patch("classes/:id")
-  @Roles("owner", "admin")
+  @Patch('classes/:id')
+  @Roles('owner', 'admin')
   updateClass(
     @CurrentSchool() school: School,
-    @Param("id") id: string,
+    @Param('id') id: string,
     @Body(new ZodValidationPipe(updateClassSchema)) body: UpdateClassInput,
   ) {
     return this.academicsService.updateClass(school.id, id, body);
   }
 
-  @Get("classes/:id/teacher-assignments")
-  @Roles("owner", "admin", "teacher", "staff")
+  @Get('classes/:id/teacher-assignments')
+  @Roles('owner', 'admin', 'teacher', 'staff')
   listClassTeacherAssignments(
     @CurrentSchool() school: School,
-    @Param("id") id: string,
+    @Param('id') id: string,
   ) {
     return this.academicsService.listClassTeacherAssignments(school.id, id);
   }
 
-  @Post("classes/:id/teacher-assignments")
-  @Roles("owner", "admin")
+  @Post('classes/:id/teacher-assignments')
+  @Roles('owner', 'admin')
   assignClassTeacher(
     @CurrentSchool() school: School,
-    @Param("id") id: string,
+    @Param('id') id: string,
     @Body(new ZodValidationPipe(createClassTeacherAssignmentSchema))
     body: CreateClassTeacherAssignmentInput,
   ) {
     return this.academicsService.assignClassTeacher(school.id, id, body);
   }
 
-  @Get("departments")
-  @Roles("owner", "admin", "teacher", "staff")
+  @Get('departments')
+  @Roles('owner', 'admin', 'teacher', 'staff')
   listDepartments(@CurrentSchool() school: School) {
     return this.academicsService.listDepartments(school.id);
   }
 
-  @Post("departments")
-  @Roles("owner", "admin")
+  @Post('departments')
+  @Roles('owner', 'admin')
   createDepartment(
     @CurrentSchool() school: School,
     @Body(new ZodValidationPipe(createDepartmentSchema))
@@ -163,16 +167,41 @@ export class AcademicsController {
     return this.academicsService.createDepartment(school.id, body);
   }
 
-  @Get("classes/:id/students")
-  @Roles("owner", "admin", "teacher", "staff", "accountant")
+  @Get('houses')
+  @Roles('owner', 'admin', 'staff')
+  listHouses(@CurrentSchool() school: School) {
+    return this.academicsService.listHouses(school.id);
+  }
+
+  @Post('houses')
+  @Roles('owner', 'admin')
+  createHouse(
+    @CurrentSchool() school: School,
+    @Body(new ZodValidationPipe(createHouseSchema)) body: CreateHouseInput,
+  ) {
+    return this.academicsService.createHouse(school.id, body);
+  }
+
+  @Patch('houses/:id')
+  @Roles('owner', 'admin')
+  updateHouse(
+    @CurrentSchool() school: School,
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(updateHouseSchema)) body: UpdateHouseInput,
+  ) {
+    return this.academicsService.updateHouse(school.id, id, body);
+  }
+
+  @Get('classes/:id/students')
+  @Roles('owner', 'admin', 'teacher', 'staff', 'accountant')
   getClassStudents(
     @CurrentSchool() school: School,
-    @Param("id") id: string,
-    @Query("academicYearId") queryAcademicYearId: string | undefined,
-    @Query("termId") termId?: string,
+    @Param('id') id: string,
+    @Query('academicYearId') queryAcademicYearId: string | undefined,
+    @Query('termId') termId?: string,
     @CurrentSchoolRole() role?: string,
-    @Headers("x-academic-year-id") viewAcademicYearId?: string,
-    @Headers("x-academic-term-id") viewTermId?: string,
+    @Headers('x-academic-year-id') viewAcademicYearId?: string,
+    @Headers('x-academic-term-id') viewTermId?: string,
   ) {
     return this.academicsService.getClassStudents(
       school.id,
@@ -183,14 +212,14 @@ export class AcademicsController {
     );
   }
 
-  @Get("subjects")
-  @Roles("owner", "admin", "teacher")
+  @Get('subjects')
+  @Roles('owner', 'admin', 'teacher')
   listSubjects(@CurrentSchool() school: School) {
     return this.academicsService.listSubjects(school.id);
   }
 
-  @Post("subjects")
-  @Roles("owner", "admin")
+  @Post('subjects')
+  @Roles('owner', 'admin')
   createSubject(
     @CurrentSchool() school: School,
     @Body(new ZodValidationPipe(createSubjectSchema)) body: CreateSubjectInput,

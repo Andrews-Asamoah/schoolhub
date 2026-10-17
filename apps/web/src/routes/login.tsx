@@ -1,8 +1,10 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import {
   ArrowRight,
+  Building2,
   Eye,
   EyeOff,
+  Globe,
   GraduationCap,
   LockKeyhole,
   Mail,
@@ -12,7 +14,8 @@ import {
 import { useEffect, useState, type FormEvent } from "react";
 import { ThemeToggle } from "@/components/school/theme-toggle";
 import { consumeLogoutNotice } from "@/hooks/use-logout";
-import { signIn, useSession } from "@/lib/auth-client";
+import { authClient, signIn, useSession } from "@/lib/auth-client";
+import { useTenantSchool } from "@/lib/tenant";
 
 export const Route = createFileRoute("/login")({
   component: LoginPage,

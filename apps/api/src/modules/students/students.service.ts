@@ -4,12 +4,12 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
-} from "@nestjs/common";
-import { randomUUID } from "node:crypto";
-import { PrismaService } from "../../prisma/prisma.service.js";
-import type { CreateStudentInput, UpdateStudentInput } from "@schoolhub/shared";
-import type { StudentStatus } from "@prisma/client";
-import { canManageAcademicContext } from "../../common/academic-context.js";
+} from '@nestjs/common';
+import { randomUUID } from 'node:crypto';
+import { PrismaService } from '../../prisma/prisma.service.js';
+import type { CreateStudentInput, UpdateStudentInput } from '@schoolhub/shared';
+import type { StudentStatus } from '@prisma/client';
+import { canManageAcademicContext } from '../../common/academic-context.js';
 
 @Injectable()
 export class StudentsService {
@@ -37,7 +37,7 @@ export class StudentsService {
     const hasRequestedPeriod = Boolean(academicYearId && termId);
     if (Boolean(academicYearId) !== Boolean(termId)) {
       throw new BadRequestException(
-        "Academic year and term must both be supplied for historical class filtering",
+        'Academic year and term must both be supplied for historical class filtering',
       );
     }
     const currentYear = await this.prisma.client.academicYear.findFirst({
@@ -54,7 +54,7 @@ export class StudentsService {
         (academicYearId !== currentYear?.id || termId !== currentTerm?.id)
       ) {
         throw new ForbiddenException(
-          "Only the current academic year and term are available for your role.",
+          'Only the current academic year and term are available for your role.',
         );
       }
       const term = await this.prisma.client.term.findFirst({
@@ -67,7 +67,7 @@ export class StudentsService {
       });
       if (!term) {
         throw new BadRequestException(
-          "Choose a term belonging to an academic year in this school.",
+          'Choose a term belonging to an academic year in this school.',
         );
       }
     }
@@ -80,14 +80,14 @@ export class StudentsService {
     if (params.classId) {
       if (!academicYearId || !termId) {
         throw new BadRequestException(
-          "Select a current academic year and term before filtering by class.",
+          'Select a current academic year and term before filtering by class.',
         );
       }
       where.enrollments = {
         some: {
           academicYearId,
           termId,
-          status: { in: ["ACTIVE", "COMPLETED"] },
+          status: { in: ['ACTIVE', 'COMPLETED'] },
           ...(params.classId ? { classId: params.classId } : {}),
         },
       };
@@ -99,14 +99,14 @@ export class StudentsService {
 
     if (params.search) {
       where.OR = [
-        { admissionNumber: { contains: params.search, mode: "insensitive" } },
-        { studentId: { contains: params.search, mode: "insensitive" } },
+        { admissionNumber: { contains: params.search, mode: 'insensitive' } },
+        { studentId: { contains: params.search, mode: 'insensitive' } },
         {
           profile: {
             OR: [
-              { firstName: { contains: params.search, mode: "insensitive" } },
-              { lastName: { contains: params.search, mode: "insensitive" } },
-              { otherNames: { contains: params.search, mode: "insensitive" } },
+              { firstName: { contains: params.search, mode: 'insensitive' } },
+              { lastName: { contains: params.search, mode: 'insensitive' } },
+              { otherNames: { contains: params.search, mode: 'insensitive' } },
             ],
           },
         },
@@ -118,7 +118,7 @@ export class StudentsService {
         where,
         skip,
         take: limit,
-        orderBy: { createdAt: "desc" },
+        orderBy: { createdAt: 'desc' },
         include: {
           profile: true,
           class: { select: { id: true, name: true, level: true } },
@@ -149,12 +149,12 @@ export class StudentsService {
           studentId: { in: students.map((student) => student.id) },
           academicYearId,
           termId,
-          status: { in: ["ACTIVE", "COMPLETED"] },
+          status: { in: ['ACTIVE', 'COMPLETED'] },
           ...(params.classId ? { classId: params.classId } : {}),
           student: { schoolId, deletedAt: null },
           class: { schoolId },
         },
-        orderBy: { enrolledAt: "desc" },
+        orderBy: { enrolledAt: 'desc' },
         include: { class: { select: { id: true, name: true, level: true } } },
       });
       const enrollmentByStudent = new Map(
@@ -199,7 +199,7 @@ export class StudentsService {
     const currentOnly = !canManageAcademicContext(role);
     if (Boolean(requestedAcademicYearId) !== Boolean(requestedTermId)) {
       throw new BadRequestException(
-        "Academic year and term must be supplied together.",
+        'Academic year and term must be supplied together.',
       );
     }
     let academicYearId = requestedAcademicYearId;
@@ -215,7 +215,7 @@ export class StudentsService {
       });
       if (!selectedTerm) {
         throw new BadRequestException(
-          "Choose a term belonging to an academic year in this school.",
+          'Choose a term belonging to an academic year in this school.',
         );
       }
     } else {
@@ -251,7 +251,7 @@ export class StudentsService {
                   },
                 }
               : {}),
-          orderBy: { enrolledAt: "desc" },
+          orderBy: { enrolledAt: 'desc' },
           take: 5,
           include: { class: true, academicYear: true, term: true },
         },
@@ -259,13 +259,13 @@ export class StudentsService {
     });
 
     if (!student) {
-      throw new NotFoundException("Student not found");
+      throw new NotFoundException('Student not found');
     }
 
     const viewedEnrollment = await this.prisma.client.enrollment.findFirst({
       where: {
         studentId: student.id,
-        status: { in: ["ACTIVE", "COMPLETED"] },
+        status: { in: ['ACTIVE', 'COMPLETED'] },
         ...(academicYearId && termId
           ? { academicYearId, termId }
           : {
@@ -275,7 +275,7 @@ export class StudentsService {
               },
             }),
       },
-      orderBy: { enrolledAt: "desc" },
+      orderBy: { enrolledAt: 'desc' },
       include: {
         class: { select: { id: true, name: true, level: true } },
         academicYear: { select: { id: true, name: true } },
@@ -298,7 +298,19 @@ export class StudentsService {
         select: { code: true },
       });
       if (!school) {
-        throw new NotFoundException("School not found.");
+        throw new NotFoundException('School not found.');
+      }
+
+      if (input.houseId) {
+        const house = await tx.house.findFirst({
+          where: { id: input.houseId, schoolId, isActive: true },
+          select: { id: true },
+        });
+        if (!house) {
+          throw new BadRequestException(
+            'Choose an active house belonging to this school.',
+          );
+        }
       }
 
       const admissionYear = new Date().getUTCFullYear();
@@ -311,9 +323,9 @@ export class StudentsService {
 
       const schoolPrefix =
         school.code
-          .replace(/[^a-zA-Z0-9]/g, "")
+          .replace(/[^a-zA-Z0-9]/g, '')
           .toUpperCase()
-          .slice(0, 8) || "SCH";
+          .slice(0, 8) || 'SCH';
       const admissionPrefix = `${schoolPrefix}${String(admissionYear).slice(-2)}`;
       const existingNumbers = await tx.student.findMany({
         where: {
@@ -331,18 +343,18 @@ export class StudentsService {
       }, 0);
       if (lastSequence >= 9999) {
         throw new ConflictException(
-          "This school has reached the 9,999 admission numbers available for the current two-digit year code.",
+          'This school has reached the 9,999 admission numbers available for the current two-digit year code.',
         );
       }
-      const admissionNumber = `${admissionPrefix}${String(lastSequence + 1).padStart(4, "0")}`;
-      const studentId = `ID-${randomUUID().replaceAll("-", "").slice(0, 10).toUpperCase()}`;
+      const admissionNumber = `${admissionPrefix}${String(lastSequence + 1).padStart(4, '0')}`;
+      const studentId = `ID-${randomUUID().replaceAll('-', '').slice(0, 10).toUpperCase()}`;
 
       const user = await tx.user.create({
         data: {
           id: `usr_${randomUUID()}`,
           name: `${input.firstName} ${input.lastName}`,
           email: `${studentId.toLowerCase()}@student.schoolhub`,
-          role: "student",
+          role: 'student',
         },
       });
 
@@ -371,7 +383,7 @@ export class StudentsService {
           studentId,
           admissionNumber,
           departmentId: input.departmentId,
-          houseId: input.houseId,
+          houseId: input.houseId || null,
           bloodGroup: input.bloodGroup,
           allergies: input.allergies,
           medicalConditions: input.medicalConditions,
@@ -382,7 +394,7 @@ export class StudentsService {
                   guardian: {
                     create: {
                       schoolId,
-                      guardianId: `GUA-${randomUUID().replaceAll("-", "").slice(0, 12).toUpperCase()}`,
+                      guardianId: `GUA-${randomUUID().replaceAll('-', '').slice(0, 12).toUpperCase()}`,
                       firstName: guardian.firstName,
                       lastName: guardian.lastName,
                       otherNames: guardian.otherNames,
@@ -422,10 +434,22 @@ export class StudentsService {
     });
 
     if (!existing) {
-      throw new NotFoundException("Student not found");
+      throw new NotFoundException('Student not found');
     }
 
     return this.prisma.client.$transaction(async (tx) => {
+      if (input.houseId) {
+        const house = await tx.house.findFirst({
+          where: { id: input.houseId, schoolId },
+          select: { id: true, isActive: true },
+        });
+        if (!house || (!house.isActive && input.houseId !== existing.houseId)) {
+          throw new BadRequestException(
+            'Choose an active house belonging to this school.',
+          );
+        }
+      }
+
       if (existing.profileId) {
         await tx.userProfile.update({
           where: { id: existing.profileId },
@@ -451,7 +475,7 @@ export class StudentsService {
         where: { id },
         data: {
           departmentId: input.departmentId,
-          houseId: input.houseId,
+          houseId: input.houseId || null,
           bloodGroup: input.bloodGroup,
           allergies: input.allergies,
           medicalConditions: input.medicalConditions,
@@ -473,17 +497,17 @@ export class StudentsService {
     });
 
     if (!student) {
-      throw new NotFoundException("Student not found");
+      throw new NotFoundException('Student not found');
     }
 
     await this.prisma.client.student.update({
       where: { id },
       data: {
         deletedAt: new Date(),
-        status: "WITHDRAWN",
+        status: 'WITHDRAWN',
       },
     });
 
-    return { success: true, message: "Student deleted successfully" };
+    return { success: true, message: 'Student deleted successfully' };
   }
 }

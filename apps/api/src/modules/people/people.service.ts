@@ -1,16 +1,16 @@
-import { randomUUID } from "node:crypto";
+import { randomUUID } from 'node:crypto';
 import {
   BadRequestException,
   ConflictException,
   Injectable,
   NotFoundException,
-} from "@nestjs/common";
-import { PrismaService } from "../../prisma/prisma.service.js";
+} from '@nestjs/common';
+import { PrismaService } from '../../prisma/prisma.service.js';
 import type {
   CreateGuardianInput,
   CreateStaffInput,
   CreateTeacherInput,
-} from "@schoolhub/shared";
+} from '@schoolhub/shared';
 
 interface ListPeopleParams {
   page?: number;
@@ -27,12 +27,12 @@ function pagination(params: ListPeopleParams) {
 
 function searchText(value?: string) {
   const text = value?.trim();
-  return text ? { contains: text, mode: "insensitive" as const } : undefined;
+  return text ? { contains: text, mode: 'insensitive' as const } : undefined;
 }
 
 function newPublicId(prefix: string) {
   return `${prefix}-${new Date().getFullYear()}-${randomUUID()
-    .replaceAll("-", "")
+    .replaceAll('-', '')
     .slice(0, 8)
     .toUpperCase()}`;
 }
@@ -72,7 +72,7 @@ export class PeopleService {
         where,
         skip,
         take: limit,
-        orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
+        orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
         include: {
           department: { select: { id: true, name: true } },
           profile: {
@@ -99,7 +99,7 @@ export class PeopleService {
     return this.prisma.client.teacher.create({
       data: {
         schoolId,
-        teacherId: input.teacherId?.trim() || newPublicId("TCH"),
+        teacherId: newPublicId('TCH'),
         staffNumber: input.staffNumber?.trim() || null,
         invitationEmail: input.invitationEmail?.trim() || null,
         firstName: input.firstName,
@@ -120,7 +120,7 @@ export class PeopleService {
       where: { id, schoolId, deletedAt: null },
       data: { isActive },
     });
-    if (!result.count) throw new NotFoundException("Teacher not found.");
+    if (!result.count) throw new NotFoundException('Teacher not found.');
     return this.prisma.client.teacher.findFirstOrThrow({
       where: { id, schoolId },
       select: { id: true, isActive: true },
@@ -162,8 +162,8 @@ export class PeopleService {
         skip,
         take: limit,
         orderBy: [
-          { profile: { lastName: "asc" } },
-          { profile: { firstName: "asc" } },
+          { profile: { lastName: 'asc' } },
+          { profile: { firstName: 'asc' } },
         ],
         include: {
           department: { select: { id: true, name: true } },
@@ -188,7 +188,7 @@ export class PeopleService {
     });
     if (existingUser) {
       throw new ConflictException(
-        "This email already belongs to a SchoolHub account. Linking an existing account to a staff record is not available here.",
+        'This email already belongs to a SchoolHub account. Linking an existing account to a staff record is not available here.',
       );
     }
     if (input.departmentId) {
@@ -201,7 +201,7 @@ export class PeopleService {
           id: randomUUID(),
           name: `${input.firstName} ${input.lastName}`.trim(),
           email,
-          role: "user",
+          role: 'user',
         },
       });
       const profile = await tx.userProfile.create({
@@ -218,7 +218,7 @@ export class PeopleService {
         data: {
           schoolId,
           profileId: profile.id,
-          staffId: input.staffId?.trim() || newPublicId("STF"),
+          staffId: input.staffId?.trim() || newPublicId('STF'),
           staffNumber: input.staffNumber?.trim() || null,
           staffType: input.staffType,
           departmentId: input.departmentId || null,
@@ -239,7 +239,7 @@ export class PeopleService {
       where: { id, schoolId, deletedAt: null },
       data: { isActive },
     });
-    if (!result.count) throw new NotFoundException("Staff member not found.");
+    if (!result.count) throw new NotFoundException('Staff member not found.');
     return this.prisma.client.staff.findFirstOrThrow({
       where: { id, schoolId },
       select: { id: true, isActive: true },
@@ -271,7 +271,7 @@ export class PeopleService {
         where,
         skip,
         take: limit,
-        orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
+        orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
         include: {
           students: {
             where: { student: { schoolId, deletedAt: null } },
@@ -298,7 +298,7 @@ export class PeopleService {
   async createGuardian(schoolId: string, input: CreateGuardianInput) {
     const uniqueStudentIds = [...new Set(input.studentIds)];
     if (uniqueStudentIds.length !== input.studentIds.length) {
-      throw new BadRequestException("Each student can only be linked once.");
+      throw new BadRequestException('Each student can only be linked once.');
     }
     return this.prisma.client.$transaction(async (tx) => {
       const existingPrimaryStudentIds = new Set<string>();
@@ -313,7 +313,7 @@ export class PeopleService {
         });
         if (students.length !== uniqueStudentIds.length) {
           throw new BadRequestException(
-            "One or more selected students are not active records in this school.",
+            'One or more selected students are not active records in this school.',
           );
         }
         const existingPrimaryLinks = await tx.guardianStudent.findMany({
@@ -331,7 +331,7 @@ export class PeopleService {
       return tx.guardian.create({
         data: {
           schoolId,
-          guardianId: newPublicId("GUA"),
+          guardianId: newPublicId('GUA'),
           firstName: input.firstName,
           lastName: input.lastName,
           otherNames: input.otherNames || null,
@@ -376,7 +376,7 @@ export class PeopleService {
       where: { id, schoolId, deletedAt: null },
       data: { isActive },
     });
-    if (!result.count) throw new NotFoundException("Guardian not found.");
+    if (!result.count) throw new NotFoundException('Guardian not found.');
     return this.prisma.client.guardian.findFirstOrThrow({
       where: { id, schoolId },
       select: { id: true, isActive: true },
@@ -390,7 +390,7 @@ export class PeopleService {
     });
     if (!department) {
       throw new BadRequestException(
-        "Choose an active department belonging to this school.",
+        'Choose an active department belonging to this school.',
       );
     }
   }
