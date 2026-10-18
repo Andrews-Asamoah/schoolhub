@@ -8,9 +8,18 @@ import { PrismaService } from "../../prisma/prisma.service.js";
 import {
   ROLES,
   type CreateAcademicYearInput,
+  type CreateTermInput,
+  type UpdateAcademicYearInput,
+  type UpdateTermInput,
   type SetAcademicContextInput,
   type UpdateSchoolMemberRolesInput,
 } from "@schoolhub/shared";
+import {
+  findOverlappingTerm,
+  termProblemWithinYear,
+  termsOutsideYear,
+  toIsoDate,
+} from "./academic-calendar.js";
 import { canManageAcademicContext } from "../../common/academic-context.js";
 
 @Injectable()
@@ -363,6 +372,178 @@ export class SchoolsService {
             : undefined,
         },
         include: { terms: { orderBy: { termNumber: "asc" } } },
+      });
+    });
+  }
+
+  // --------------------------------------------------------------------------
+  // Editing existing academic years and adding / editing their terms
+  // --------------------------------------------------------------------------
+
+  private asRange(row: { startDate: Date; endDate: Date }) {
+    return { startDate: toIsoDate(row.startDate), endDate: toIsoDate(row.endDate) };
+  }
+
+  private async requireYear(schoolId: string, id: string) {
+    const year = await this.prisma.client.academicYear.findFirst({
+      where: { id, schoolId },
+      include: { terms: { orderBy: { termNumber: "asc" } } },
+    });
+    if (!year) throw new NotFoundException("Academic year not found.");
+    return year;
+  }
+
+  async updateAcademicYear(schoolId: string, id: string, input: UpdateAcademicYearInput) {
+    const year = await this.requireYear(schoolId, id);
+    const range = {
+      startDate: input.startDate ?? toIsoDate(year.startDate),
+      endDate: input.endDate ?? toIsoDate(year.endDate),
+    };
+    if (range.endDate <= range.startDate) {
+      throw new BadRequestException("The academic year must end after it starts.");
+    }
+    const outside = termsOutsideYear(
+      year.terms.map((term) => ({ ...this.asRange(term), name: term.name })),
+      range,
+    );
+    if (outside.length) {
+      throw new BadRequestException(
+        `These terms would fall outside the new dates: ${outside
+          .map((term) => term.name)
+          .join(", ")}. Edit the terms first.`,
+      );
+    }
+    if (input.isCurrent === true && year.terms.length === 0) {
+      throw new BadRequestException("Add at least one term before making this the current year.");
+    }
+
+    try {
+      return await this.prisma.client.$transaction(async (tx) => {
+        if (input.isCurrent === true) {
+          await tx.academicYear.updateMany({
+            where: { schoolId, isCurrent: true, NOT: { id } },
+            data: { isCurrent: false },
+          });
+          await tx.term.updateMany({
+            where: { academicYear: { schoolId }, isCurrent: true, NOT: { academicYearId: id } },
+            data: { isCurrent: false },
+          });
+          // A current year always has a current term.
+          if (!year.terms.some((term) => term.isCurrent)) {
+            await tx.term.update({
+              where: { id: year.terms[0]!.id },
+              data: { isCurrent: true },
+            });
+          }
+        }
+        if (input.isCurrent === false) {
+          await tx.term.updateMany({ where: { academicYearId: id }, data: { isCurrent: false } });
+        }
+        return tx.academicYear.update({
+          where: { id },
+          data: {
+            name: input.name,
+            startDate: input.startDate ? new Date(input.startDate) : undefined,
+            endDate: input.endDate ? new Date(input.endDate) : undefined,
+            isCurrent: input.isCurrent,
+          },
+          include: { terms: { orderBy: { termNumber: "asc" } } },
+        });
+      });
+    } catch (error) {
+      if ((error as { code?: string })?.code === "P2002") {
+        throw new BadRequestException("Another academic year already uses that name.");
+      }
+      throw error;
+    }
+  }
+
+  async createTerm(schoolId: string, yearId: string, input: CreateTermInput) {
+    const year = await this.requireYear(schoolId, yearId);
+    if (year.terms.length >= 3) {
+      throw new BadRequestException("An academic year can have at most three terms.");
+    }
+    if (year.terms.some((term) => term.termNumber === input.termNumber)) {
+      throw new BadRequestException(`Term ${input.termNumber} already exists in this academic year.`);
+    }
+    const problem = termProblemWithinYear(this.asRange(year), input);
+    if (problem) throw new BadRequestException(problem);
+    const overlap = findOverlappingTerm(
+      year.terms.map((term) => ({ ...this.asRange(term), name: term.name })),
+      input,
+    );
+    if (overlap) {
+      throw new BadRequestException(`These dates overlap ${overlap.name}.`);
+    }
+
+    return this.prisma.client.$transaction(async (tx) => {
+      const makeCurrent = input.isCurrent && year.isCurrent;
+      if (input.isCurrent && !year.isCurrent) {
+        throw new BadRequestException("Make the academic year current before choosing a current term.");
+      }
+      if (makeCurrent) {
+        await tx.term.updateMany({
+          where: { academicYear: { schoolId }, isCurrent: true },
+          data: { isCurrent: false },
+        });
+      }
+      return tx.term.create({
+        data: {
+          academicYearId: yearId,
+          name: input.name,
+          termNumber: input.termNumber,
+          startDate: new Date(input.startDate),
+          endDate: new Date(input.endDate),
+          // The first term added to the current year becomes its current term.
+          isCurrent: makeCurrent || (year.isCurrent && year.terms.length === 0),
+        },
+      });
+    });
+  }
+
+  async updateTerm(schoolId: string, termId: string, input: UpdateTermInput) {
+    const term = await this.prisma.client.term.findFirst({
+      where: { id: termId, academicYear: { schoolId } },
+      include: { academicYear: { include: { terms: true } } },
+    });
+    if (!term) throw new NotFoundException("Term not found.");
+    const range = {
+      startDate: input.startDate ?? toIsoDate(term.startDate),
+      endDate: input.endDate ?? toIsoDate(term.endDate),
+    };
+    const problem = termProblemWithinYear(this.asRange(term.academicYear), range);
+    if (problem) throw new BadRequestException(problem);
+    const overlap = findOverlappingTerm(
+      term.academicYear.terms.map((other) => ({
+        id: other.id,
+        name: other.name,
+        ...this.asRange(other),
+      })),
+      { id: term.id, ...range },
+    );
+    if (overlap) throw new BadRequestException(`These dates overlap ${overlap.name}.`);
+    if (input.isCurrent === true && !term.academicYear.isCurrent) {
+      throw new BadRequestException("Make the academic year current before choosing a current term.");
+    }
+    if (input.isCurrent === false && term.isCurrent && term.academicYear.isCurrent) {
+      throw new BadRequestException("The current year needs a current term. Choose another term instead.");
+    }
+
+    return this.prisma.client.$transaction(async (tx) => {
+      if (input.isCurrent === true) {
+        await tx.term.updateMany({
+          where: { academicYear: { schoolId }, isCurrent: true, NOT: { id: termId } },
+          data: { isCurrent: false },
+        });
+      }
+      return tx.term.update({
+        where: { id: termId },
+        data: {
+          name: input.name,
+          startDate: input.startDate ? new Date(input.startDate) : undefined,
+          endDate: input.endDate ? new Date(input.endDate) : undefined,
+          isCurrent: input.isCurrent,
+        },
       });
     });
   }

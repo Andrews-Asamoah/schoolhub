@@ -378,16 +378,36 @@ const rolePages: Record<string, string[]> = {
   guardian: ["guardian-portal"],
 };
 
+/** The one portal page that is each role's own home screen. */
+const ownPortalByRole: Record<string, string> = {
+  teacher: "teacher-portal",
+  accountant: "accountant-portal",
+  guardian: "guardian-portal",
+  student: "student-portal",
+};
+
+/**
+ * The "Portals" directory is not shown in anyone's sidebar. Administrators
+ * and general staff do not need it, and portal users reach their own portal
+ * through {@link getOwnPortalItem} instead of a list of every portal.
+ */
 export function getSchoolNavGroupsForRole(role?: string) {
   const allowedPages = rolePages[role ?? ""];
-  if (!allowedPages) return schoolNavGroups;
+  const groups = schoolNavGroups.filter((group) => group.label !== "Portals");
+  if (!allowedPages) return groups;
 
-  return schoolNavGroups
+  return groups
     .map((group) => ({
       ...group,
       items: group.items.filter((item) => allowedPages.includes(item.id)),
     }))
     .filter((group) => group.items.length > 0);
+}
+
+/** A portal user's own portal link (undefined for admins and general staff). */
+export function getOwnPortalItem(role?: string) {
+  const id = ownPortalByRole[role ?? ""];
+  return id ? schoolNavItems.find((item) => item.id === id) : undefined;
 }
 
 export function getSchoolNavItem(id: string) {

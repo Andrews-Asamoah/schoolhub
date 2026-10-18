@@ -16,6 +16,9 @@ import { AssessmentsModule } from "./modules/assessments/assessments.module.js";
 import { FinanceModule } from "./modules/finance/finance.module.js";
 import { SuperAdminModule } from "./modules/super-admin/super-admin.module.js";
 import { SupportModule } from "./modules/support/support.module.js";
+import { TeacherScopeModule } from "./common/scope/teacher-scope.service.js";
+import { SubjectsModule } from "./modules/subjects/subjects.module.js";
+import { TimetableModule } from "./modules/timetable/timetable.module.js";
 import { AccountsModule } from "./modules/accounts/accounts.module.js";
 import { PeopleModule } from "./modules/people/people.module.js";
 
@@ -34,6 +37,9 @@ import { PeopleModule } from "./modules/people/people.module.js";
     SupportModule,
     PeopleModule,
     AccountsModule,
+    TeacherScopeModule,
+    SubjectsModule,
+    TimetableModule,
   ],
   controllers: [HealthController],
   providers: [

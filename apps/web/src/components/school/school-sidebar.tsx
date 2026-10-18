@@ -1,7 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { GraduationCap, LogOut, Sparkles, LoaderCircle } from "lucide-react";
 import { useLogout } from "@/hooks/use-logout";
-import { getSchoolNavGroupsForRole } from "@/lib/school-navigation";
+import { getOwnPortalItem, getSchoolNavGroupsForRole } from "@/lib/school-navigation";
 import { useSchoolRole } from "@/components/school/school-role-switcher";
 import {
   Sidebar,
@@ -29,6 +29,7 @@ export function SchoolSidebar({
   const { error: signOutError, isSigningOut, logout } = useLogout();
   const { activeRole } = useSchoolRole();
   const navGroups = getSchoolNavGroupsForRole(activeRole ?? undefined);
+  const ownPortal = getOwnPortalItem(activeRole ?? undefined);
 
   return (
     <Sidebar className="school-sidebar-shell">
@@ -76,6 +77,18 @@ export function SchoolSidebar({
               <span className="sidebar-expanded flex-1">Overview</span>
             </Link>
           </SidebarMenuButton>
+          {ownPortal && (
+            <SidebarMenuButton
+              asChild
+              active={activePage === ownPortal.id}
+              className="school-sidebar-nav-item"
+            >
+              <Link to="/$page" params={{ page: ownPortal.id }}>
+                <ownPortal.icon className="size-[18px] shrink-0" />
+                <span className="sidebar-expanded flex-1">{ownPortal.label}</span>
+              </Link>
+            </SidebarMenuButton>
+          )}
         </SidebarGroup>
 
         {navGroups.map((group) => (

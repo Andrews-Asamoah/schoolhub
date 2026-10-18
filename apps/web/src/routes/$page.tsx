@@ -21,6 +21,8 @@ import {
   type WorkspaceColumn,
 } from "@/components/school/workspace-ui";
 import { apiFetch, ApiError } from "@/lib/api";
+import { SubjectsWorkspace } from "@/components/school/subjects-workspace";
+import { TimetableWorkspace } from "@/components/school/timetable-workspace";
 import { useSession } from "@/lib/auth-client";
 import { getSchoolNavItem } from "@/lib/school-navigation";
 import { TicketWorkspace } from "@/components/support/ticket-workspace";
@@ -61,14 +63,6 @@ interface ClassTeacher {
   firstName: string;
   lastName: string;
   isActive: boolean;
-}
-
-interface Subject {
-  id: string;
-  name: string;
-  code: string;
-  periodsPerWeek: number;
-  description?: string | null;
 }
 
 interface AcademicYear {
@@ -190,12 +184,6 @@ function WorkspaceContent({ pageId }: { pageId: string }) {
     enabled: isSignedIn && pageId === "classes" && canManageClasses,
     retry: false,
   });
-  const subjectsQuery = useQuery({
-    queryKey: ["academics", "subjects"],
-    queryFn: () => apiFetch<Subject[]>("/academics/subjects"),
-    enabled: isSignedIn && pageId === "subjects",
-    retry: false,
-  });
   const yearsQuery = useQuery({
     queryKey: ["schools", "academic-years"],
     queryFn: () => apiFetch<AcademicYear[]>("/schools/academic-years"),
@@ -251,7 +239,7 @@ function WorkspaceContent({ pageId }: { pageId: string }) {
           {pageId === "payroll" && <AccountantPortalWorkspace defaultTab="payroll" />}
           {pageId === "inventory" && <AccountantPortalWorkspace defaultTab="inventory" />}
           {pageId === "timetable" && (
-            activeRole === "student" ? <StudentPortalWorkspace defaultTab="timetable" /> : <TeacherPortalWorkspace defaultTab="timetable" />
+            activeRole === "student" ? <StudentPortalWorkspace defaultTab="timetable" /> : <TimetableWorkspace />
           )}
           {pageId === "students" && <StudentDirectoryWorkspace />}
           {pageId === "teachers" && <PeopleWorkspace kind="teachers" />}
@@ -271,7 +259,7 @@ function WorkspaceContent({ pageId }: { pageId: string }) {
               classesQuery={classesQuery}
             />
           )}
-          {pageId === "subjects" && <SubjectList query={subjectsQuery} />}
+          {pageId === "subjects" && <SubjectsWorkspace />}
           {pageId === "academic-years" && <AcademicYears query={yearsQuery} />}
           {pageId === "assessments" && (
             <AssessmentList query={assessmentsQuery} />
@@ -290,40 +278,6 @@ function WorkspaceContent({ pageId }: { pageId: string }) {
         </>
       )}
     </>
-  );
-}
-
-function SubjectList({ query }: { query: UseQueryResult<Subject[], Error> }) {
-  if (query.isPending) return <LoadingState label="Loading subjects" />;
-  if (query.error) return <QueryError error={query.error} />;
-  const columns: WorkspaceColumn<Subject>[] = [
-    {
-      id: "subject",
-      header: "Subject",
-      cell: (subject) => (
-        <span className="font-semibold text-slate-800">{subject.name}</span>
-      ),
-    },
-    { id: "code", header: "Code", cell: (subject) => subject.code },
-    {
-      id: "periods",
-      header: "Periods per week",
-      cell: (subject) => subject.periodsPerWeek,
-    },
-    {
-      id: "description",
-      header: "Description",
-      cell: (subject) => subject.description ?? "—",
-    },
-  ];
-  return (
-    <WorkspaceDataTable
-      rows={query.data ?? []}
-      columns={columns}
-      getRowId={(subject) => subject.id}
-      emptyTitle="No subjects in the catalogue"
-      emptyDescription="Add subjects to make them available for classes and assessments."
-    />
   );
 }
 

@@ -19,6 +19,9 @@ import {
   createGuardianSchema,
   createStaffSchema,
   createTeacherSchema,
+  updateGuardianSchema,
+  updateStaffSchema,
+  updateTeacherSchema,
   type CreateGuardianInput,
   type CreateStaffInput,
   type CreateTeacherInput,
@@ -90,11 +93,19 @@ interface Teacher {
   lastName: string | null;
   invitationEmail: string | null;
   isActive: boolean;
+  staffNumber?: string | null;
+  qualification?: string | null;
+  specialization?: string | null;
+  experience?: number | null;
+  employmentType?: string;
+  hireDate?: string;
   department: Department;
   profile: {
     firstName: string;
     lastName: string;
     phone: string | null;
+    gender?: string | null;
+    dateOfBirth?: string | null;
     user: { email: string } | null;
   } | null;
 }
@@ -105,11 +116,16 @@ interface Staff {
   staffType: string;
   jobTitle: string | null;
   isActive: boolean;
+  staffNumber?: string | null;
+  employmentType?: string;
+  hireDate?: string;
   department: Department | null;
   profile: {
     firstName: string;
     lastName: string;
     phone: string | null;
+    gender?: string | null;
+    dateOfBirth?: string | null;
     user: { email: string };
   };
 }
@@ -123,6 +139,11 @@ interface Guardian {
   email: string | null;
   relationshipType: string;
   isActive: boolean;
+  otherNames?: string | null;
+  alternatePhone?: string | null;
+  gender?: string | null;
+  occupation?: string | null;
+  employer?: string | null;
   students: {
     student: {
       id: string;
@@ -213,6 +234,7 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
   const [activeFilter, setActiveFilter] = useState("");
   const [page, setPage] = useState(1);
   const [showForm, setShowForm] = useState(false);
+  const [editing, setEditing] = useState<{ id: string; name: string } | null>(null);
   const [issued, setIssued] = useState<CredentialEntry[]>([]);
   const deferredSearch = useDeferredValue(search.trim());
   const isGuardianPage = kind === "guardians";
@@ -279,6 +301,15 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
   });
   const createMutation = useMutation({
     mutationFn: (values: Values) => {
+      if (editing) {
+        return apiFetch<{ credentials?: IssuedCredentials | null }>(
+          `/people/${kind}/${editing.id}`,
+          {
+            method: "PATCH",
+            body: JSON.stringify(makeUpdatePayload(kind, values)),
+          },
+        );
+      }
       const body = makePayload(kind, values);
       return apiFetch<{ credentials?: IssuedCredentials | null }>(`/people/${kind}`, {
         method: "POST",
@@ -286,7 +317,7 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
       });
     },
     onSuccess: async (created, values) => {
-      if (created.credentials) {
+      if (!editing && created.credentials) {
         setIssued([
           {
             label: `${values.firstName} ${values.lastName}`.trim(),
@@ -295,6 +326,7 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
         ]);
       }
       setShowForm(false);
+      setEditing(null);
       await queryClient.invalidateQueries({ queryKey: ["people", kind] });
       if (isGuardianPage) {
         await queryClient.invalidateQueries({ queryKey: ["students"] });
@@ -318,6 +350,7 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
   }
   const people = directoryQuery.data?.data ?? [];
   const rows: Row[] = people.map((person) => toRow(person));
+  const peopleById = new Map(people.map((person) => [person.id, person]));
   const total = directoryQuery.data?.meta.total ?? 0;
   const activeCount = rows.filter((row) => row.isActive).length;
   const columns: WorkspaceColumn<Row>[] = [
@@ -388,9 +421,24 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
           {
             id: "action",
             header: "",
-            className: "w-56 text-right",
+            className: "w-72 text-right",
             cell: (row: Row) => (
               <span className="inline-flex gap-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const person = peopleById.get(row.id);
+                    if (!person) return;
+                    createMutation.reset();
+                    form.reset(valuesFromPerson(person));
+                    setEditing({ id: row.id, name: row.name });
+                    setShowForm(true);
+                    window.scrollTo({ top: 0, behavior: "smooth" });
+                  }}
+                  className="rounded-md px-2 py-1.5 text-xs font-semibold text-primary hover:bg-primary/10"
+                >
+                  Edit
+                </button>
                 <button
                   type="button"
                   disabled={resetLoginMutation.isPending}
@@ -451,6 +499,7 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
               onClick={() => {
                 createMutation.reset();
                 form.reset(initialValues());
+                setEditing(null);
                 setShowForm((value) => !value);
               }}
               className="inline-flex h-10 items-center gap-2 rounded-lg bg-primary px-4 text-xs font-semibold text-primary-foreground shadow-sm hover:opacity-90"
@@ -466,7 +515,7 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
         <section className="rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-6">
           <div className="mb-5">
             <h3 className="text-sm font-bold text-foreground">
-              Add {resourceName}
+              {editing ? `Edit ${editing.name}` : `Add ${resourceName}`}
             </h3>
             <p className="mt-1 text-xs text-muted-foreground">
               {kind === "staff"
@@ -764,7 +813,7 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
                     )}
                   </form.Field>
                   <form.Field name="createLogin">
-                    {(field) => (
+                    {(field) => editing ? null : (
                       <label className="flex items-start gap-2 text-xs text-foreground sm:col-span-2">
                         <input
                           type="checkbox"
@@ -816,6 +865,7 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
                       />
                     )}
                   </form.Field>
+                  {!editing && (
                   <form.Field name="studentIds">
                     {(field) => (
                       <StudentSearchPicker
@@ -825,6 +875,7 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
                       />
                     )}
                   </form.Field>
+                  )}
                 </>
               )}
             </div>
@@ -848,7 +899,10 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
             <div className="flex justify-end gap-2 border-t border-border pt-4">
               <button
                 type="button"
-                onClick={() => setShowForm(false)}
+                onClick={() => {
+                  setShowForm(false);
+                  setEditing(null);
+                }}
                 className="h-9 rounded-lg border border-border px-4 text-xs font-semibold text-foreground hover:bg-muted"
               >
                 Cancel
@@ -861,7 +915,7 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
                 {createMutation.isPending && (
                   <LoaderCircle className="size-3.5 animate-spin" />
                 )}
-                Save {resourceName}
+                {editing ? "Save changes" : `Save ${resourceName}`}
               </button>
             </div>
           </form>
@@ -958,6 +1012,112 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
       )}
     </div>
   );
+}
+
+function isoDay(value?: string | null) {
+  return value ? value.slice(0, 10) : "";
+}
+
+function valuesFromPerson(person: Teacher | Staff | Guardian): Values {
+  const base = initialValues();
+  if ("teacherId" in person) {
+    return {
+      ...base,
+      firstName: person.firstName || person.profile?.firstName || "",
+      lastName: person.lastName || person.profile?.lastName || "",
+      staffNumber: person.staffNumber ?? "",
+      email: person.profile?.user?.email ?? person.invitationEmail ?? "",
+      phone: person.profile?.phone ?? "",
+      gender: person.profile?.gender ?? "",
+      dateOfBirth: isoDay(person.profile?.dateOfBirth),
+      departmentId: person.department.id,
+      qualification: person.qualification ?? "",
+      specialization: person.specialization ?? "",
+      experience: person.experience != null ? String(person.experience) : "",
+      employmentType: person.employmentType ?? "FULL_TIME",
+      hireDate: isoDay(person.hireDate) || base.hireDate,
+    };
+  }
+  if ("staffId" in person) {
+    return {
+      ...base,
+      firstName: person.profile.firstName,
+      lastName: person.profile.lastName,
+      email: person.profile.user.email,
+      phone: person.profile.phone ?? "",
+      gender: person.profile.gender ?? "MALE",
+      dateOfBirth: isoDay(person.profile.dateOfBirth),
+      staffId: person.staffId,
+      staffNumber: person.staffNumber ?? "",
+      staffType: person.staffType,
+      departmentId: person.department?.id ?? "",
+      jobTitle: person.jobTitle ?? "",
+      employmentType: person.employmentType ?? "FULL_TIME",
+      hireDate: isoDay(person.hireDate) || base.hireDate,
+    };
+  }
+  return {
+    ...base,
+    firstName: person.firstName,
+    lastName: person.lastName,
+    otherNames: person.otherNames ?? "",
+    email: person.email ?? "",
+    phone: person.phone,
+    alternatePhone: person.alternatePhone ?? "",
+    gender: person.gender ?? "",
+    relationshipType: person.relationshipType,
+    occupation: person.occupation ?? "",
+    employer: person.employer ?? "",
+  };
+}
+
+/** Edit payloads are validated with the update schemas (no create-only fields). */
+function makeUpdatePayload(kind: PeopleKind, values: Values) {
+  if (kind === "teachers") {
+    return updateTeacherSchema.parse({
+      firstName: values.firstName,
+      lastName: values.lastName,
+      staffNumber: values.staffNumber,
+      email: values.email,
+      phone: values.phone,
+      gender: values.gender || undefined,
+      dateOfBirth: values.dateOfBirth,
+      departmentId: values.departmentId,
+      qualification: values.qualification,
+      specialization: values.specialization,
+      experience: values.experience ? Number(values.experience) : undefined,
+      employmentType: values.employmentType,
+      hireDate: values.hireDate,
+    });
+  }
+  if (kind === "staff") {
+    return updateStaffSchema.parse({
+      firstName: values.firstName,
+      lastName: values.lastName,
+      email: values.email,
+      phone: values.phone,
+      gender: values.gender,
+      dateOfBirth: values.dateOfBirth,
+      staffNumber: values.staffNumber,
+      staffType: values.staffType,
+      departmentId: values.departmentId,
+      jobTitle: values.jobTitle,
+      employmentType: values.employmentType,
+      hireDate: values.hireDate,
+    });
+  }
+  return updateGuardianSchema.parse({
+    firstName: values.firstName,
+    lastName: values.lastName,
+    otherNames: values.otherNames,
+    phone: values.phone,
+    alternatePhone: values.alternatePhone,
+    email: values.email,
+    gender: values.gender || undefined,
+    relationshipType: values.relationshipType,
+    occupation: values.occupation,
+    employer: values.employer,
+  });
 }
 
 function makePayload(kind: PeopleKind, values: Values) {

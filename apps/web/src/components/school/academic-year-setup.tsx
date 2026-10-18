@@ -18,6 +18,7 @@ import {
   FormSubmitButton,
 } from "@/components/forms/form-controls";
 import { apiFetch } from "@/lib/api";
+import { AcademicYearCard } from "@/components/school/academic-year-card";
 
 type YearValues = Omit<CreateAcademicYearInput, "isCurrent" | "terms"> & {
   isCurrent?: boolean;
@@ -360,41 +361,9 @@ export function AcademicYearSetup({ years }: AcademicYearSetupProps) {
         </form>
       </section>
 
-      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+      <section className="grid gap-3 lg:grid-cols-2">
         {years.map((year) => (
-          <article
-            key={year.id}
-            className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-slate-900/70"
-          >
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <h3 className="text-sm font-bold text-slate-900 dark:text-white">{year.name}</h3>
-                <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
-                  {new Date(year.startDate).toLocaleDateString()} – {new Date(year.endDate).toLocaleDateString()}
-                </p>
-              </div>
-              {year.isCurrent && (
-                <span className="rounded-full bg-emerald-50 px-2 py-1 text-[10px] font-semibold text-emerald-700 dark:bg-emerald-400/10 dark:text-emerald-200">
-                  Current
-                </span>
-              )}
-            </div>
-            <div className="mt-3 flex flex-wrap gap-1.5">
-              {year.terms.map((term) => (
-                <span
-                  key={term.id}
-                  className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-[10px] text-slate-600 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-300"
-                >
-                  {term.name}{term.isCurrent ? " · Current" : ""}
-                </span>
-              ))}
-              {!year.terms.length && (
-                <span className="text-[10px] text-amber-700 dark:text-amber-300">
-                  No terms added yet
-                </span>
-              )}
-            </div>
-          </article>
+          <AcademicYearCard key={year.id} year={year} />
         ))}
       </section>
       {!years.length && (

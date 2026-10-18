@@ -28,6 +28,7 @@ export class AcademicsService {
     academicYearId?: string,
     termId?: string,
     role?: string,
+    scopeClassIds?: string[],
   ) {
     const today = new Date(
       `${new Date().toISOString().slice(0, 10)}T00:00:00.000Z`,
@@ -45,7 +46,11 @@ export class AcademicsService {
               term: year?.terms[0] ?? null,
             }));
     const classes = await this.prisma.client.class.findMany({
-      where: { schoolId, deletedAt: null },
+      where: {
+        schoolId,
+        deletedAt: null,
+        ...(scopeClassIds ? { id: { in: scopeClassIds } } : {}),
+      },
       orderBy: [{ order: 'asc' }, { name: 'asc' }],
       include: {
         department: { select: { id: true, name: true, code: true } },
@@ -337,6 +342,7 @@ export class AcademicsService {
     termId?: string,
     classId?: string,
     role?: string,
+    scopeClassIds?: string[],
   ) {
     const { academicYear, term } = await this.resolveAcademicTerm(
       schoolId,
@@ -345,12 +351,20 @@ export class AcademicsService {
       role,
     );
     if (classId) await this.requireClass(schoolId, classId);
+    // Teachers only see rosters of classes they teach.
+    if (scopeClassIds && classId && !scopeClassIds.includes(classId)) {
+      throw new ForbiddenException('You do not teach this class.');
+    }
 
     return this.prisma.client.enrollment.findMany({
       where: {
         academicYearId: academicYear.id,
         termId: term.id,
-        ...(classId ? { classId } : {}),
+        ...(classId
+          ? { classId }
+          : scopeClassIds
+            ? { classId: { in: scopeClassIds } }
+            : {}),
         status: { in: ['ACTIVE', 'COMPLETED'] },
         student: { schoolId, deletedAt: null },
         class: { schoolId },
@@ -780,6 +794,7 @@ export class AcademicsService {
     academicYearId: string | undefined,
     termId?: string,
     role?: string,
+    scopeClassIds?: string[],
   ) {
     const enrollments = await this.listEnrollments(
       schoolId,
@@ -787,6 +802,7 @@ export class AcademicsService {
       termId,
       classId,
       role,
+      scopeClassIds,
     );
     const latestPlacementByStudent = new Map<
       string,

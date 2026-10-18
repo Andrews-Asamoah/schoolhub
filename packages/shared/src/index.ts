@@ -585,3 +585,169 @@ export const updateSubscriptionSchema = z.object({
   expiresAt: z.string().optional(),
 });
 export type UpdateSubscriptionInput = z.infer<typeof updateSubscriptionSchema>;
+
+// ============================================================================
+// EDITING PEOPLE RECORDS
+// ============================================================================
+// Update schemas list their fields explicitly (instead of `.partial()`) so
+// that Zod defaults, such as employmentType = FULL_TIME, can never silently
+// overwrite stored values when a field is simply left out of an edit.
+
+const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD");
+const genderEnum = z.enum(["MALE", "FEMALE", "OTHER"]);
+const employmentTypeEnum = z.enum(["FULL_TIME", "PART_TIME", "CONTRACT", "TEMPORARY", "INTERN"]);
+
+export const updateTeacherSchema = z.object({
+  firstName: z.string().trim().min(1).max(100).optional(),
+  lastName: z.string().trim().min(1).max(100).optional(),
+  staffNumber: z.string().trim().max(40).optional(),
+  email: emailSchema.optional(),
+  phone: z.string().trim().max(30).optional(),
+  gender: genderEnum.optional(),
+  dateOfBirth: isoDate.optional().or(z.literal("")),
+  departmentId: z.string().min(1).optional(),
+  qualification: z.string().trim().max(150).optional(),
+  specialization: z.string().trim().max(150).optional(),
+  experience: z.number().int().min(0).max(70).optional(),
+  employmentType: employmentTypeEnum.optional(),
+  hireDate: isoDate.optional(),
+});
+export type UpdateTeacherInput = z.infer<typeof updateTeacherSchema>;
+
+export const updateStaffSchema = z.object({
+  firstName: z.string().trim().min(1).max(100).optional(),
+  lastName: z.string().trim().min(1).max(100).optional(),
+  email: emailSchema.optional(),
+  phone: z.string().trim().min(5).max(30).optional(),
+  gender: genderEnum.optional(),
+  dateOfBirth: isoDate.optional(),
+  staffNumber: z.string().trim().max(40).optional(),
+  staffType: createStaffSchema.shape.staffType.optional(),
+  departmentId: z.string().optional(),
+  jobTitle: z.string().trim().max(100).optional(),
+  employmentType: employmentTypeEnum.optional(),
+  hireDate: isoDate.optional(),
+});
+export type UpdateStaffInput = z.infer<typeof updateStaffSchema>;
+
+export const updateGuardianSchema = studentGuardianSchema
+  .omit({ isPrimary: true, createLogin: true })
+  .partial();
+export type UpdateGuardianInput = z.infer<typeof updateGuardianSchema>;
+
+// ============================================================================
+// ACADEMIC YEARS & TERMS (editing)
+// ============================================================================
+
+export const updateAcademicYearSchema = z.object({
+  name: z.string().trim().min(1).max(40).optional(),
+  startDate: isoDate.optional(),
+  endDate: isoDate.optional(),
+  isCurrent: z.boolean().optional(),
+});
+export type UpdateAcademicYearInput = z.infer<typeof updateAcademicYearSchema>;
+
+export const createTermSchema = z.object({
+  name: z.string().trim().min(2).max(60),
+  termNumber: z.number().int().min(1).max(3),
+  startDate: isoDate,
+  endDate: isoDate,
+  isCurrent: z.boolean().default(false),
+});
+export type CreateTermInput = z.infer<typeof createTermSchema>;
+
+export const updateTermSchema = z.object({
+  name: z.string().trim().min(2).max(60).optional(),
+  startDate: isoDate.optional(),
+  endDate: isoDate.optional(),
+  isCurrent: z.boolean().optional(),
+});
+export type UpdateTermInput = z.infer<typeof updateTermSchema>;
+
+// ============================================================================
+// SUBJECTS (management)
+// ============================================================================
+
+export const subjectCodeSchema = z
+  .string()
+  .trim()
+  .min(2, "Subject code is required")
+  .max(20)
+  .regex(/^[A-Za-z0-9_-]+$/, "Use letters, numbers, - or _")
+  .transform((value) => value.toUpperCase());
+
+export const saveSubjectSchema = z.object({
+  name: z.string().trim().min(2, "Subject name is required").max(100),
+  code: subjectCodeSchema,
+  description: z.string().trim().max(500).optional(),
+  periodsPerWeek: z.number().int().min(1).max(20),
+  isActive: z.boolean().optional(),
+});
+export type SaveSubjectInput = z.infer<typeof saveSubjectSchema>;
+
+export const setSubjectClassesSchema = z.object({
+  assignments: z
+    .array(
+      z.object({
+        classId: z.string().min(1),
+        teacherId: z.string().min(1).nullable().optional(),
+        isCompulsory: z.boolean().default(true),
+      }),
+    )
+    .max(200),
+});
+export type SetSubjectClassesInput = z.infer<typeof setSubjectClassesSchema>;
+
+export const setSubjectTeachersSchema = z.object({
+  teacherIds: z.array(z.string().min(1)).max(200),
+});
+export type SetSubjectTeachersInput = z.infer<typeof setSubjectTeachersSchema>;
+
+// ============================================================================
+// TIMETABLE
+// ============================================================================
+
+export const TIMETABLE_DAYS = ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"] as const;
+export type TimetableDay = (typeof TIMETABLE_DAYS)[number];
+
+const clockTime = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Use 24-hour HH:MM");
+
+export const savePeriodSchema = z
+  .object({
+    name: z.string().trim().min(1).max(40),
+    startTime: clockTime,
+    endTime: clockTime,
+    sortOrder: z.number().int().min(0).max(100).optional(),
+  })
+  .refine((period) => period.endTime > period.startTime, {
+    path: ["endTime"],
+    message: "A period must end after it starts.",
+  });
+export type SavePeriodInput = z.infer<typeof savePeriodSchema>;
+
+export const saveClassroomSchema = z.object({
+  name: z.string().trim().min(1).max(60),
+  capacity: z.number().int().positive().max(1000).optional(),
+});
+export type SaveClassroomInput = z.infer<typeof saveClassroomSchema>;
+
+export const saveTimetableEntrySchema = z
+  .object({
+    classId: z.string().min(1, "Choose a class"),
+    dayOfWeek: z.enum(TIMETABLE_DAYS),
+    periodId: z.string().min(1, "Choose a period"),
+    type: z.enum(["LESSON", "BREAK", "ACTIVITY"]).default("LESSON"),
+    subjectId: z.string().min(1).optional(),
+    teacherId: z.string().min(1).optional(),
+    classroomId: z.string().min(1).optional(),
+    label: z.string().trim().max(60).optional(),
+  })
+  .superRefine((entry, context) => {
+    if (entry.type === "LESSON" && !entry.subjectId) {
+      context.addIssue({ code: "custom", path: ["subjectId"], message: "Choose a subject for a lesson." });
+    }
+    if (entry.type !== "LESSON" && !entry.label) {
+      context.addIssue({ code: "custom", path: ["label"], message: "Give this slot a label, e.g. Lunch." });
+    }
+  });
+export type SaveTimetableEntryInput = z.infer<typeof saveTimetableEntrySchema>;

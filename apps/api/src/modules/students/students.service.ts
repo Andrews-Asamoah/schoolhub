@@ -39,6 +39,8 @@ export class StudentsService {
       search?: string;
       status?: StudentStatus;
       role?: string;
+      /** When set (teachers), only students enrolled in these classes are returned. */
+      scopeClassIds?: string[];
     },
   ) {
     const page = Math.max(1, params.page ?? 1);
@@ -90,8 +92,28 @@ export class StudentsService {
       deletedAt: null,
     };
 
-    if (params.classId) {
+    // Teachers are limited to the classes they teach; others may filter freely.
+    if (
+      params.scopeClassIds &&
+      params.classId &&
+      !params.scopeClassIds.includes(params.classId)
+    ) {
+      return {
+        data: [],
+        meta: { page, limit, total: 0, totalPages: 0 },
+      };
+    }
+    const classFilter: string | { in: string[] } | undefined =
+      params.classId ??
+      (params.scopeClassIds ? { in: params.scopeClassIds } : undefined);
+    if (classFilter) {
       if (!academicYearId || !termId) {
+        if (params.scopeClassIds && !params.classId) {
+          return {
+            data: [],
+            meta: { page, limit, total: 0, totalPages: 0 },
+          };
+        }
         throw new BadRequestException(
           'Select a current academic year and term before filtering by class.',
         );
@@ -101,7 +123,7 @@ export class StudentsService {
           academicYearId,
           termId,
           status: { in: ['ACTIVE', 'COMPLETED'] },
-          ...(params.classId ? { classId: params.classId } : {}),
+          classId: classFilter,
         },
       };
     }
@@ -163,7 +185,7 @@ export class StudentsService {
           academicYearId,
           termId,
           status: { in: ['ACTIVE', 'COMPLETED'] },
-          ...(params.classId ? { classId: params.classId } : {}),
+          ...(classFilter ? { classId: classFilter } : {}),
           student: { schoolId, deletedAt: null },
           class: { schoolId },
         },
@@ -208,6 +230,7 @@ export class StudentsService {
     role?: string,
     requestedAcademicYearId?: string,
     requestedTermId?: string,
+    scopeClassIds?: string[],
   ) {
     const currentOnly = !canManageAcademicContext(role);
     if (Boolean(requestedAcademicYearId) !== Boolean(requestedTermId)) {
@@ -240,7 +263,25 @@ export class StudentsService {
       termId ??= currentYear?.terms[0]?.id;
     }
     const student = await this.prisma.client.student.findFirst({
-      where: { id, schoolId, deletedAt: null },
+      where: {
+        id,
+        schoolId,
+        deletedAt: null,
+        // A teacher can only open students in classes they teach; anyone else
+        // gets the same "not found" so the record's existence is not leaked.
+        ...(scopeClassIds
+          ? {
+              enrollments: {
+                some: {
+                  academicYearId,
+                  termId,
+                  status: { in: ['ACTIVE', 'COMPLETED'] },
+                  classId: { in: scopeClassIds },
+                },
+              },
+            }
+          : {}),
+      },
       include: {
         profile: true,
         class: true,

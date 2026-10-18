@@ -35,31 +35,48 @@ import {
   type UpdateHouseInput,
 } from '@schoolhub/shared';
 import type { School } from '@prisma/client';
+import { TeacherScopeService } from '../../common/scope/teacher-scope.service.js';
+import {
+  CurrentUser,
+  type AuthenticatedUser,
+} from '../../common/decorators/current-user.decorator.js';
 
 @Controller('academics')
 @UseGuards(SchoolTenantGuard, RolesGuard)
 export class AcademicsController {
-  constructor(private readonly academicsService: AcademicsService) {}
+  constructor(
+    private readonly academicsService: AcademicsService,
+    private readonly teacherScope: TeacherScopeService,
+  ) {}
+
+  /** Class ids a teacher may see; undefined (no limit) for every other role. */
+  private scopeFor(school: School, role?: string, user?: AuthenticatedUser) {
+    return role === 'teacher' && user
+      ? this.teacherScope.getTaughtClassIds(school.id, user.id)
+      : Promise.resolve(undefined);
+  }
 
   @Get('classes')
   @Roles('owner', 'admin', 'teacher', 'staff', 'accountant')
-  listClasses(
+  async listClasses(
     @CurrentSchool() school: School,
     @CurrentSchoolRole() role: string | undefined,
     @Headers('x-academic-year-id') academicYearId?: string,
     @Headers('x-academic-term-id') termId?: string,
+    @CurrentUser() user?: AuthenticatedUser,
   ) {
     return this.academicsService.listClasses(
       school.id,
       academicYearId,
       termId,
       role,
+      await this.scopeFor(school, role, user),
     );
   }
 
   @Get('enrollments')
   @Roles('owner', 'admin', 'teacher', 'staff', 'accountant')
-  listEnrollments(
+  async listEnrollments(
     @CurrentSchool() school: School,
     @Query('academicYearId') queryAcademicYearId: string | undefined,
     @Query('termId') termId?: string,
@@ -67,6 +84,7 @@ export class AcademicsController {
     @CurrentSchoolRole() role?: string,
     @Headers('x-academic-year-id') viewAcademicYearId?: string,
     @Headers('x-academic-term-id') viewTermId?: string,
+    @CurrentUser() user?: AuthenticatedUser,
   ) {
     return this.academicsService.listEnrollments(
       school.id,
@@ -74,6 +92,7 @@ export class AcademicsController {
       termId ?? viewTermId,
       classId,
       role,
+      await this.scopeFor(school, role, user),
     );
   }
 
@@ -194,7 +213,7 @@ export class AcademicsController {
 
   @Get('classes/:id/students')
   @Roles('owner', 'admin', 'teacher', 'staff', 'accountant')
-  getClassStudents(
+  async getClassStudents(
     @CurrentSchool() school: School,
     @Param('id') id: string,
     @Query('academicYearId') queryAcademicYearId: string | undefined,
@@ -202,6 +221,7 @@ export class AcademicsController {
     @CurrentSchoolRole() role?: string,
     @Headers('x-academic-year-id') viewAcademicYearId?: string,
     @Headers('x-academic-term-id') viewTermId?: string,
+    @CurrentUser() user?: AuthenticatedUser,
   ) {
     return this.academicsService.getClassStudents(
       school.id,
@@ -209,6 +229,7 @@ export class AcademicsController {
       queryAcademicYearId ?? viewAcademicYearId,
       termId ?? viewTermId,
       role,
+      await this.scopeFor(school, role, user),
     );
   }
 

@@ -14,7 +14,13 @@ import {
   createGuardianSchema,
   createStaffSchema,
   createTeacherSchema,
+  updateGuardianSchema,
   updatePeopleStatusSchema,
+  updateStaffSchema,
+  updateTeacherSchema,
+  type UpdateGuardianInput,
+  type UpdateStaffInput,
+  type UpdateTeacherInput,
   type CreateGuardianInput,
   type CreateStaffInput,
   type CreateTeacherInput,
@@ -87,6 +93,17 @@ export class PeopleController {
     return this.peopleService.createTeacher(school, actor!.id, body);
   }
 
+  @Patch("teachers/:id")
+  @Roles("owner", "admin", "headmistress")
+  updateTeacher(
+    @CurrentSchool() school: School,
+    @CurrentUser() actor: AuthenticatedUser | undefined,
+    @Param("id") id: string,
+    @Body(new ZodValidationPipe(updateTeacherSchema)) body: UpdateTeacherInput,
+  ) {
+    return this.peopleService.updateTeacher(school, actor!.id, id, body);
+  }
+
   @Patch("teachers/:id/status")
   @Roles("owner", "admin", "headmistress")
   setTeacherStatus(
@@ -132,6 +149,23 @@ export class PeopleController {
     );
   }
 
+  @Patch("staff/:id")
+  @Roles("owner", "admin", "headmistress")
+  updateStaff(
+    @CurrentSchool() school: School,
+    @CurrentSchoolRole() schoolRole: string | undefined,
+    @CurrentUser() actor: AuthenticatedUser | undefined,
+    @Param("id") id: string,
+    @Body(new ZodValidationPipe(updateStaffSchema)) body: UpdateStaffInput,
+  ) {
+    return this.peopleService.updateStaff(
+      school,
+      { id: actor!.id, schoolRole },
+      id,
+      body,
+    );
+  }
+
   @Patch("staff/:id/status")
   @Roles("owner", "admin", "headmistress")
   setStaffStatus(
@@ -170,6 +204,17 @@ export class PeopleController {
     body: CreateGuardianInput,
   ) {
     return this.peopleService.createGuardian(school, actor!.id, body);
+  }
+
+  @Patch("guardians/:id")
+  @Roles("owner", "admin", "headmistress")
+  updateGuardian(
+    @CurrentSchool() school: School,
+    @CurrentUser() actor: AuthenticatedUser | undefined,
+    @Param("id") id: string,
+    @Body(new ZodValidationPipe(updateGuardianSchema)) body: UpdateGuardianInput,
+  ) {
+    return this.peopleService.updateGuardian(school, actor!.id, id, body);
   }
 
   @Patch("guardians/:id/status")

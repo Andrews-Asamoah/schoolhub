@@ -16,6 +16,7 @@ import { SchoolTenantGuard } from "../../common/guards/school-tenant.guard.js";
 import { RolesGuard } from "../../common/guards/roles.guard.js";
 import { Roles } from "../../common/decorators/roles.decorator.js";
 import { CurrentSchool } from "../../common/decorators/current-school.decorator.js";
+import { TeacherScopeService } from "../../common/scope/teacher-scope.service.js";
 import { CurrentUser, type AuthenticatedUser } from "../../common/decorators/current-user.decorator.js";
 import { CurrentSchoolRole } from "../../common/decorators/current-school-role.decorator.js";
 import { ZodValidationPipe } from "../../common/pipes/zod-validation.pipe.js";
@@ -30,11 +31,14 @@ import type { School, StudentStatus } from "@prisma/client";
 @Controller("students")
 @UseGuards(SchoolTenantGuard, RolesGuard)
 export class StudentsController {
-  constructor(private readonly studentsService: StudentsService) {}
+  constructor(
+    private readonly studentsService: StudentsService,
+    private readonly teacherScope: TeacherScopeService,
+  ) {}
 
   @Get()
   @Roles("owner", "admin", "teacher", "staff", "accountant")
-  listStudents(
+  async listStudents(
     @CurrentSchool() school: School,
     @CurrentSchoolRole() role: string | undefined,
     @Query("page") page?: string,
@@ -46,8 +50,14 @@ export class StudentsController {
     @Headers("x-academic-term-id") viewTermId?: string,
     @Query("search") search?: string,
     @Query("status") status?: StudentStatus,
+    @CurrentUser() user?: AuthenticatedUser,
   ) {
+    const scopeClassIds =
+      role === "teacher" && user
+        ? await this.teacherScope.getTaughtClassIds(school.id, user.id)
+        : undefined;
     return this.studentsService.listStudents(school.id, {
+      scopeClassIds,
       page: page ? Number(page) : undefined,
       limit: limit ? Number(limit) : undefined,
       classId,
@@ -61,19 +71,25 @@ export class StudentsController {
 
   @Get(":id")
   @Roles("owner", "admin", "teacher", "staff", "accountant")
-  getStudentById(
+  async getStudentById(
     @CurrentSchool() school: School,
     @CurrentSchoolRole() role: string | undefined,
     @Param("id") id: string,
     @Headers("x-academic-year-id") academicYearId?: string,
     @Headers("x-academic-term-id") termId?: string,
+    @CurrentUser() user?: AuthenticatedUser,
   ) {
+    const scopeClassIds =
+      role === "teacher" && user
+        ? await this.teacherScope.getTaughtClassIds(school.id, user.id)
+        : undefined;
     return this.studentsService.getStudentById(
       school.id,
       id,
       role,
       academicYearId,
       termId,
+      scopeClassIds,
     );
   }
 

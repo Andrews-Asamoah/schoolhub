@@ -17,9 +17,15 @@ import { CurrentUser } from "../../common/decorators/current-user.decorator.js";
 import { ZodValidationPipe } from "../../common/pipes/zod-validation.pipe.js";
 import {
   createAcademicYearSchema,
+  createTermSchema,
+  updateAcademicYearSchema,
   updateSchoolMemberRolesSchema,
+  updateTermSchema,
   setAcademicContextSchema,
   type CreateAcademicYearInput,
+  type CreateTermInput,
+  type UpdateAcademicYearInput,
+  type UpdateTermInput,
   type SetAcademicContextInput,
   type UpdateSchoolMemberRolesInput,
 } from "@schoolhub/shared";
@@ -114,6 +120,37 @@ export class SchoolsController {
       user.id,
       body,
     );
+  }
+
+  @Patch("academic-years/:id")
+  @Roles("owner", "admin")
+  updateAcademicYear(
+    @CurrentSchool() school: School,
+    @Param("id") id: string,
+    @Body(new ZodValidationPipe(updateAcademicYearSchema))
+    body: UpdateAcademicYearInput,
+  ) {
+    return this.schoolsService.updateAcademicYear(school.id, id, body);
+  }
+
+  @Post("academic-years/:id/terms")
+  @Roles("owner", "admin")
+  createTerm(
+    @CurrentSchool() school: School,
+    @Param("id") id: string,
+    @Body(new ZodValidationPipe(createTermSchema)) body: CreateTermInput,
+  ) {
+    return this.schoolsService.createTerm(school.id, id, body);
+  }
+
+  @Patch("terms/:id")
+  @Roles("owner", "admin")
+  updateTerm(
+    @CurrentSchool() school: School,
+    @Param("id") id: string,
+    @Body(new ZodValidationPipe(updateTermSchema)) body: UpdateTermInput,
+  ) {
+    return this.schoolsService.updateTerm(school.id, id, body);
   }
 
   @Post("academic-years")

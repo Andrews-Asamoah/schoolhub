@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -11,7 +12,11 @@ import {
   toIssuedCredentials,
 } from '../accounts/credentials.service.js';
 import { roleForStaffType } from '../accounts/staff-roles.js';
+import type { Prisma } from '@prisma/client';
 import type {
+  UpdateGuardianInput,
+  UpdateStaffInput,
+  UpdateTeacherInput,
   CreateGuardianInput,
   CreateStaffInput,
   CreateTeacherInput,
@@ -88,6 +93,8 @@ export class PeopleService {
               firstName: true,
               lastName: true,
               phone: true,
+              gender: true,
+              dateOfBirth: true,
               user: { select: { email: true } },
             },
           },
@@ -487,6 +494,318 @@ export class PeopleService {
     return this.prisma.client.guardian.findFirstOrThrow({
       where: { id, schoolId },
       select: { id: true, isActive: true },
+    });
+  }
+
+  // --------------------------------------------------------------------------
+  // Editing existing records
+  // --------------------------------------------------------------------------
+
+  private toDate(value: string | undefined) {
+    if (value === undefined) return undefined;
+    return value === '' ? null : new Date(`${value}T00:00:00.000Z`);
+  }
+
+  /** "" clears an optional text field, undefined leaves it untouched. */
+  private blankToNull(value: string | undefined) {
+    return value === undefined ? undefined : value.trim() === '' ? null : value.trim();
+  }
+
+  private async changeLoginEmail(
+    tx: Prisma.TransactionClient,
+    userId: string,
+    email: string,
+  ) {
+    const taken = await tx.user.findFirst({
+      where: { email, NOT: { id: userId } },
+      select: { id: true },
+    });
+    if (taken) {
+      throw new ConflictException(
+        `The email ${email} already belongs to another SchoolHub account.`,
+      );
+    }
+    await tx.user.update({
+      where: { id: userId },
+      data: { email, updatedAt: new Date() },
+    });
+  }
+
+  private rethrowUnique(error: unknown, message: string): never {
+    if ((error as { code?: string })?.code === 'P2002') {
+      throw new ConflictException(message);
+    }
+    throw error;
+  }
+
+  async updateTeacher(
+    school: { id: string },
+    actorId: string,
+    id: string,
+    input: UpdateTeacherInput,
+  ) {
+    if (input.departmentId) await this.requireDepartment(school.id, input.departmentId);
+    const existing = await this.prisma.client.teacher.findFirst({
+      where: { id, schoolId: school.id, deletedAt: null },
+      include: { profile: { include: { user: { select: { id: true, email: true } } } } },
+    });
+    if (!existing) throw new NotFoundException('Teacher not found.');
+
+    try {
+      return await this.prisma.client.$transaction(async (tx) => {
+        const names = {
+          firstName: input.firstName ?? existing.firstName ?? '',
+          lastName: input.lastName ?? existing.lastName ?? '',
+        };
+        if (existing.profile) {
+          if (input.email && input.email !== existing.profile.user.email) {
+            await this.changeLoginEmail(tx, existing.profile.userId, input.email);
+          }
+          if (input.firstName || input.lastName) {
+            await tx.user.update({
+              where: { id: existing.profile.userId },
+              data: { name: `${names.firstName} ${names.lastName}`.trim() },
+            });
+          }
+          await tx.userProfile.update({
+            where: { id: existing.profile.id },
+            data: {
+              firstName: input.firstName,
+              lastName: input.lastName,
+              phone: this.blankToNull(input.phone),
+              gender: input.gender,
+              dateOfBirth: this.toDate(input.dateOfBirth),
+            },
+          });
+        }
+        const updated = await tx.teacher.update({
+          where: { id },
+          data: {
+            firstName: input.firstName,
+            lastName: input.lastName,
+            staffNumber: this.blankToNull(input.staffNumber),
+            invitationEmail: input.email,
+            departmentId: input.departmentId,
+            qualification: this.blankToNull(input.qualification),
+            specialization: this.blankToNull(input.specialization),
+            experience: input.experience,
+            employmentType: input.employmentType,
+            hireDate: input.hireDate
+              ? new Date(`${input.hireDate}T00:00:00.000Z`)
+              : undefined,
+          },
+          include: {
+            department: { select: { id: true, name: true } },
+            profile: {
+              select: {
+                firstName: true,
+                lastName: true,
+                phone: true,
+                user: { select: { email: true } },
+              },
+            },
+          },
+        });
+        await this.credentials.audit(tx, {
+          actorId,
+          schoolId: school.id,
+          action: 'UPDATE',
+          entityType: 'TEACHER',
+          entityId: id,
+          details: { fields: Object.keys(input) },
+        });
+        return updated;
+      });
+    } catch (error) {
+      this.rethrowUnique(error, 'That staff number is already used by another teacher.');
+    }
+  }
+
+  async updateStaff(
+    school: { id: string },
+    actor: { id: string; schoolRole?: string },
+    id: string,
+    input: UpdateStaffInput,
+  ) {
+    if (input.departmentId) await this.requireDepartment(school.id, input.departmentId);
+    const existing = await this.prisma.client.staff.findFirst({
+      where: { id, schoolId: school.id, deletedAt: null },
+      include: { profile: { include: { user: { select: { id: true, email: true } } } } },
+    });
+    if (!existing) throw new NotFoundException('Staff member not found.');
+
+    const currentRole = roleForStaffType(existing.staffType);
+    const nextRole = input.staffType ? roleForStaffType(input.staffType) : currentRole;
+    const roleChanges = nextRole !== currentRole;
+    // Administrator accounts are managed by owners and administrators only,
+    // and nobody may change their own access level.
+    if (
+      (nextRole === 'admin' || currentRole === 'admin') &&
+      actor.schoolRole === 'headmistress'
+    ) {
+      throw new ForbiddenException(
+        'Only a school owner or administrator can change administrator accounts.',
+      );
+    }
+    if (roleChanges && existing.profile.userId === actor.id) {
+      throw new ForbiddenException('You cannot change your own access level.');
+    }
+
+    try {
+      return await this.prisma.client.$transaction(async (tx) => {
+        const userId = existing.profile.userId;
+        if (input.email && input.email !== existing.profile.user.email) {
+          await this.changeLoginEmail(tx, userId, input.email);
+        }
+        if (input.firstName || input.lastName) {
+          await tx.user.update({
+            where: { id: userId },
+            data: {
+              name: `${input.firstName ?? existing.profile.firstName} ${
+                input.lastName ?? existing.profile.lastName
+              }`.trim(),
+            },
+          });
+        }
+        await tx.userProfile.update({
+          where: { id: existing.profileId },
+          data: {
+            firstName: input.firstName,
+            lastName: input.lastName,
+            phone: input.phone,
+            gender: input.gender,
+            dateOfBirth: input.dateOfBirth
+              ? new Date(`${input.dateOfBirth}T00:00:00.000Z`)
+              : undefined,
+          },
+        });
+        if (roleChanges) {
+          const member = await tx.member.findUnique({
+            where: { userId },
+            select: { role: true },
+          });
+          if (member && member.role !== 'owner') {
+            await tx.member.update({ where: { userId }, data: { role: nextRole } });
+          }
+        }
+        const updated = await tx.staff.update({
+          where: { id },
+          data: {
+            staffNumber: this.blankToNull(input.staffNumber),
+            staffType: input.staffType,
+            departmentId: input.departmentId === '' ? null : input.departmentId,
+            jobTitle: this.blankToNull(input.jobTitle),
+            employmentType: input.employmentType,
+            hireDate: input.hireDate
+              ? new Date(`${input.hireDate}T00:00:00.000Z`)
+              : undefined,
+          },
+          include: {
+            department: { select: { id: true, name: true } },
+            profile: { include: { user: { select: { email: true } } } },
+          },
+        });
+        await this.credentials.audit(tx, {
+          actorId: actor.id,
+          schoolId: school.id,
+          action: 'UPDATE',
+          entityType: 'STAFF',
+          entityId: id,
+          details: { fields: Object.keys(input), ...(roleChanges ? { role: nextRole } : {}) },
+        });
+        return updated;
+      });
+    } catch (error) {
+      this.rethrowUnique(error, 'That staff number is already used by another staff member.');
+    }
+  }
+
+  async updateGuardian(
+    school: { id: string },
+    actorId: string,
+    id: string,
+    input: UpdateGuardianInput,
+  ) {
+    const existing = await this.prisma.client.guardian.findFirst({
+      where: { id, schoolId: school.id, deletedAt: null },
+      include: { profile: { include: { user: { select: { id: true, email: true } } } } },
+    });
+    if (!existing) throw new NotFoundException('Guardian not found.');
+    const email =
+      input.email === undefined ? undefined : input.email.trim().toLowerCase() || null;
+    if (email === null && existing.profile) {
+      throw new BadRequestException(
+        'This guardian has a portal login, so an email address is required.',
+      );
+    }
+
+    return this.prisma.client.$transaction(async (tx) => {
+      if (existing.profile) {
+        if (email && email !== existing.profile.user.email) {
+          await this.changeLoginEmail(tx, existing.profile.userId, email);
+        }
+        if (input.firstName || input.lastName) {
+          await tx.user.update({
+            where: { id: existing.profile.userId },
+            data: {
+              name: `${input.firstName ?? existing.firstName} ${
+                input.lastName ?? existing.lastName
+              }`.trim(),
+            },
+          });
+        }
+        await tx.userProfile.update({
+          where: { id: existing.profile.id },
+          data: {
+            firstName: input.firstName,
+            lastName: input.lastName,
+            otherNames: this.blankToNull(input.otherNames),
+            phone: input.phone,
+            gender: input.gender,
+          },
+        });
+      }
+      const updated = await tx.guardian.update({
+        where: { id },
+        data: {
+          firstName: input.firstName,
+          lastName: input.lastName,
+          otherNames: this.blankToNull(input.otherNames),
+          phone: input.phone,
+          alternatePhone: this.blankToNull(input.alternatePhone),
+          email,
+          gender: input.gender,
+          relationshipType: input.relationshipType,
+          occupation: this.blankToNull(input.occupation),
+          employer: this.blankToNull(input.employer),
+          residentialAddress: this.blankToNull(input.residentialAddress),
+          city: this.blankToNull(input.city),
+          region: this.blankToNull(input.region),
+        },
+        include: {
+          students: {
+            where: { student: { schoolId: school.id, deletedAt: null } },
+            include: {
+              student: {
+                select: {
+                  id: true,
+                  admissionNumber: true,
+                  profile: { select: { firstName: true, lastName: true } },
+                },
+              },
+            },
+          },
+        },
+      });
+      await this.credentials.audit(tx, {
+        actorId,
+        schoolId: school.id,
+        action: 'UPDATE',
+        entityType: 'GUARDIAN',
+        entityId: id,
+        details: { fields: Object.keys(input) },
+      });
+      return updated;
     });
   }
 
