@@ -27,7 +27,7 @@ export class ApiError extends Error {
   }
 }
 
-function getClientSubdomain(): string | null {
+export function getClientSubdomain(): string | null {
   if (typeof window === "undefined") return null;
   const params = new URLSearchParams(window.location.search);
   const override = params.get("school") || params.get("subdomain");
@@ -102,6 +102,16 @@ export async function apiFetch<T>(
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
+    // An administrator-issued password is still in force: every business
+    // endpoint refuses until it is replaced, so send the user to do that.
+    if (
+      res.status === 403 &&
+      (body as { error?: string }).error === "PASSWORD_CHANGE_REQUIRED" &&
+      typeof window !== "undefined" &&
+      window.location.pathname !== "/change-password"
+    ) {
+      window.location.assign("/change-password");
+    }
     throw new ApiError(
       res.status,
       (body as { message?: string }).message ?? res.statusText,

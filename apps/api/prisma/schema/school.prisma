@@ -91,8 +91,9 @@ model UserProfile {
   otherNames     String?
   phone          String?
   alternatePhone String?
-  gender         Gender
-  dateOfBirth    DateTime @db.Date
+  // Optional: guardians and other portal-only users are not asked for these.
+  gender         Gender?
+  dateOfBirth    DateTime? @db.Date
 
   // Address Information
   nationality        String? @default("Ghanaian")
@@ -140,7 +141,6 @@ model Student {
   medicalConditions  String?
   outstandingBalance Decimal       @default(0) @db.Decimal(10, 2)
   status             StudentStatus @default(ACTIVE)
-  plainTextPassword  String?
   graduationDate     DateTime?     @db.Date
   createdAt          DateTime      @default(now())
   updatedAt          DateTime      @updatedAt

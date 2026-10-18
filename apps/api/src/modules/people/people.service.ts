@@ -1,11 +1,16 @@
 import { randomUUID } from 'node:crypto';
 import {
   BadRequestException,
-  ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service.js';
+import {
+  CredentialsService,
+  toIssuedCredentials,
+} from '../accounts/credentials.service.js';
+import { roleForStaffType } from '../accounts/staff-roles.js';
 import type {
   CreateGuardianInput,
   CreateStaffInput,
@@ -39,7 +44,10 @@ function newPublicId(prefix: string) {
 
 @Injectable()
 export class PeopleService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly credentials: CredentialsService,
+  ) {}
 
   async listTeachers(schoolId: string, params: ListPeopleParams) {
     const { page, limit, skip } = pagination(params);
@@ -94,25 +102,64 @@ export class PeopleService {
     };
   }
 
-  async createTeacher(schoolId: string, input: CreateTeacherInput) {
-    await this.requireDepartment(schoolId, input.departmentId);
-    return this.prisma.client.teacher.create({
-      data: {
-        schoolId,
-        teacherId: newPublicId('TCH'),
-        staffNumber: input.staffNumber?.trim() || null,
-        invitationEmail: input.invitationEmail?.trim() || null,
-        firstName: input.firstName,
-        lastName: input.lastName,
-        departmentId: input.departmentId,
-        qualification: input.qualification || null,
-        specialization: input.specialization || null,
-        experience: input.experience,
-        employmentType: input.employmentType,
-        hireDate: new Date(`${input.hireDate}T00:00:00.000Z`),
-      },
-      include: { department: { select: { id: true, name: true } } },
+  async createTeacher(
+    school: { id: string; organizationId: string },
+    actorId: string,
+    input: CreateTeacherInput,
+  ) {
+    await this.requireDepartment(school.id, input.departmentId);
+    const credential = await this.credentials.prepare('teacher');
+    const teacherId = newPublicId('TCH');
+
+    const teacher = await this.prisma.client.$transaction(async (tx) => {
+      const login = await this.credentials.createLogin(tx, {
+        name: `${input.firstName} ${input.lastName}`.trim(),
+        email: input.email,
+        role: 'teacher',
+        organizationId: school.organizationId,
+        credential,
+        profile: {
+          firstName: input.firstName,
+          lastName: input.lastName,
+          phone: input.phone || null,
+          gender: input.gender ?? null,
+          dateOfBirth: input.dateOfBirth
+            ? new Date(`${input.dateOfBirth}T00:00:00.000Z`)
+            : null,
+        },
+      });
+      const created = await tx.teacher.create({
+        data: {
+          schoolId: school.id,
+          profileId: login.profileId,
+          teacherId,
+          staffNumber: input.staffNumber?.trim() || null,
+          invitationEmail: login.email,
+          firstName: input.firstName,
+          lastName: input.lastName,
+          departmentId: input.departmentId,
+          qualification: input.qualification || null,
+          specialization: input.specialization || null,
+          experience: input.experience,
+          employmentType: input.employmentType,
+          hireDate: new Date(`${input.hireDate}T00:00:00.000Z`),
+        },
+        include: { department: { select: { id: true, name: true } } },
+      });
+      await this.credentials.audit(tx, {
+        actorId,
+        schoolId: school.id,
+        action: 'CREDENTIALS_ISSUED',
+        entityType: 'TEACHER',
+        entityId: created.id,
+      });
+      return { record: created, loginEmail: login.email };
     });
+
+    return {
+      ...teacher.record,
+      credentials: toIssuedCredentials(teacher.loginEmail, credential, 'teacher'),
+    };
   }
 
   async setTeacherStatus(schoolId: string, id: string, isActive: boolean) {
@@ -180,33 +227,32 @@ export class PeopleService {
     };
   }
 
-  async createStaff(schoolId: string, input: CreateStaffInput) {
-    const email = input.email.trim().toLowerCase();
-    const existingUser = await this.prisma.client.user.findUnique({
-      where: { email },
-      select: { id: true },
-    });
-    if (existingUser) {
-      throw new ConflictException(
-        'This email already belongs to a SchoolHub account. Linking an existing account to a staff record is not available here.',
+  async createStaff(
+    school: { id: string; organizationId: string },
+    actor: { id: string; schoolRole?: string },
+    input: CreateStaffInput,
+  ) {
+    const role = roleForStaffType(input.staffType);
+    // Administrator accounts can manage every other login, so a headmistress
+    // (who is an administrator for most routes) may not mint new ones.
+    if (role === 'admin' && actor.schoolRole === 'headmistress') {
+      throw new ForbiddenException(
+        'Only a school owner or administrator can create an administrator account.',
       );
     }
     if (input.departmentId) {
-      await this.requireDepartment(schoolId, input.departmentId);
+      await this.requireDepartment(school.id, input.departmentId);
     }
+    const credential = await this.credentials.prepare(role);
 
-    return this.prisma.client.$transaction(async (tx) => {
-      const user = await tx.user.create({
-        data: {
-          id: randomUUID(),
-          name: `${input.firstName} ${input.lastName}`.trim(),
-          email,
-          role: 'user',
-        },
-      });
-      const profile = await tx.userProfile.create({
-        data: {
-          userId: user.id,
+    const result = await this.prisma.client.$transaction(async (tx) => {
+      const login = await this.credentials.createLogin(tx, {
+        name: `${input.firstName} ${input.lastName}`.trim(),
+        email: input.email,
+        role,
+        organizationId: school.organizationId,
+        credential,
+        profile: {
           firstName: input.firstName,
           lastName: input.lastName,
           gender: input.gender,
@@ -214,10 +260,10 @@ export class PeopleService {
           phone: input.phone,
         },
       });
-      return tx.staff.create({
+      const staff = await tx.staff.create({
         data: {
-          schoolId,
-          profileId: profile.id,
+          schoolId: school.id,
+          profileId: login.profileId!,
           staffId: input.staffId?.trim() || newPublicId('STF'),
           staffNumber: input.staffNumber?.trim() || null,
           staffType: input.staffType,
@@ -231,7 +277,21 @@ export class PeopleService {
           profile: { include: { user: { select: { email: true } } } },
         },
       });
+      await this.credentials.audit(tx, {
+        actorId: actor.id,
+        schoolId: school.id,
+        action: 'CREDENTIALS_ISSUED',
+        entityType: 'STAFF',
+        entityId: staff.id,
+        details: { role },
+      });
+      return { staff, loginEmail: login.email };
     });
+
+    return {
+      ...result.staff,
+      credentials: toIssuedCredentials(result.loginEmail, credential, role),
+    };
   }
 
   async setStaffStatus(schoolId: string, id: string, isActive: boolean) {
@@ -295,7 +355,19 @@ export class PeopleService {
     };
   }
 
-  async createGuardian(schoolId: string, input: CreateGuardianInput) {
+  async createGuardian(
+    school: { id: string; organizationId: string },
+    actorId: string,
+    input: CreateGuardianInput,
+  ) {
+    const schoolId = school.id;
+    const email = input.email?.trim().toLowerCase() || null;
+    if (input.createLogin && !email) {
+      throw new BadRequestException(
+        'An email address is required to create a parent-portal login.',
+      );
+    }
+    const credential = input.createLogin ? await this.credentials.prepare('guardian') : null;
     const uniqueStudentIds = [...new Set(input.studentIds)];
     if (uniqueStudentIds.length !== input.studentIds.length) {
       throw new BadRequestException('Each student can only be linked once.');
@@ -328,8 +400,27 @@ export class PeopleService {
           existingPrimaryStudentIds.add(relation.studentId);
         }
       }
-      return tx.guardian.create({
+      const login =
+        credential && email
+          ? await this.credentials.createLogin(tx, {
+              name: `${input.firstName} ${input.lastName}`.trim(),
+              email,
+              role: 'guardian',
+              organizationId: school.organizationId,
+              credential,
+              profile: {
+                firstName: input.firstName,
+                lastName: input.lastName,
+                otherNames: input.otherNames || null,
+                phone: input.phone,
+                gender: input.gender ?? null,
+              },
+            })
+          : null;
+      const guardian = await tx.guardian.create({
         data: {
+          profileId: login?.profileId ?? null,
+          canLogin: Boolean(login),
           schoolId,
           guardianId: newPublicId('GUA'),
           firstName: input.firstName,
@@ -337,7 +428,7 @@ export class PeopleService {
           otherNames: input.otherNames || null,
           phone: input.phone,
           alternatePhone: input.alternatePhone || null,
-          email: input.email?.trim().toLowerCase() || null,
+          email,
           gender: input.gender,
           relationshipType: input.relationshipType,
           occupation: input.occupation || null,
@@ -368,6 +459,22 @@ export class PeopleService {
           },
         },
       });
+      if (login) {
+        await this.credentials.audit(tx, {
+          actorId,
+          schoolId,
+          action: 'CREDENTIALS_ISSUED',
+          entityType: 'GUARDIAN',
+          entityId: guardian.id,
+        });
+      }
+      return {
+        ...guardian,
+        credentials:
+          login && credential
+            ? toIssuedCredentials(login.email, credential, 'guardian')
+            : null,
+      };
     });
   }
 

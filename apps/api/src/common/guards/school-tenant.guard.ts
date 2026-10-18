@@ -7,6 +7,7 @@ import {
   UnauthorizedException,
 } from "@nestjs/common";
 import { PrismaService } from "../../prisma/prisma.service.js";
+import { assertPasswordChangeNotPending } from "./password-change.js";
 
 function extractSubdomain(req: any): string | null {
   const customHeader = req.headers["x-school-subdomain"];
@@ -52,6 +53,7 @@ export class SchoolTenantGuard implements CanActivate {
     }
 
     const user = session.user;
+    assertPasswordChangeNotPending(user);
     const isSuperAdmin = user.role === "superAdmin";
 
     // Determine active organization / school ID

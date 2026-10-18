@@ -10,6 +10,11 @@ import {
   X,
 } from "lucide-react";
 import { useDeferredValue, useState } from "react";
+import type { IssuedCredentials } from "@schoolhub/shared";
+import {
+  CredentialsDialog,
+  type CredentialEntry,
+} from "@/components/credentials/credentials-dialog";
 import {
   createGuardianSchema,
   createStaffSchema,
@@ -33,7 +38,7 @@ type Values = {
   otherNames: string;
   staffId: string;
   staffNumber: string;
-  invitationEmail: string;
+  createLogin: boolean;
   email: string;
   phone: string;
   gender: string;
@@ -165,6 +170,8 @@ const employmentTypes = [
 const relationships = [
   "FATHER",
   "MOTHER",
+  "GRANDFATHER",
+  "GRANDMOTHER",
   "GUARDIAN",
   "SIBLING",
   "RELATIVE",
@@ -178,7 +185,7 @@ function initialValues(): Values {
     otherNames: "",
     staffId: "",
     staffNumber: "",
-    invitationEmail: "",
+    createLogin: false,
     email: "",
     phone: "",
     gender: "MALE",
@@ -206,6 +213,7 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
   const [activeFilter, setActiveFilter] = useState("");
   const [page, setPage] = useState(1);
   const [showForm, setShowForm] = useState(false);
+  const [issued, setIssued] = useState<CredentialEntry[]>([]);
   const deferredSearch = useDeferredValue(search.trim());
   const isGuardianPage = kind === "guardians";
   const canManage =
@@ -258,15 +266,34 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
       await queryClient.invalidateQueries({ queryKey: ["people", kind] });
     },
   });
+  const resetLoginMutation = useMutation({
+    mutationFn: ({ id }: { id: string; name: string }) =>
+      apiFetch<IssuedCredentials>(
+        `/accounts/people/${kind === "teachers" ? "teacher" : kind === "staff" ? "staff" : "guardian"}/${id}/credentials`,
+        { method: "POST" },
+      ),
+    onSuccess: (credentials, variables) => {
+      // Held in component state only, never in the query cache.
+      setIssued([{ label: variables.name, credentials }]);
+    },
+  });
   const createMutation = useMutation({
     mutationFn: (values: Values) => {
       const body = makePayload(kind, values);
-      return apiFetch(`/people/${kind}`, {
+      return apiFetch<{ credentials?: IssuedCredentials | null }>(`/people/${kind}`, {
         method: "POST",
         body: JSON.stringify(body),
       });
     },
-    onSuccess: async () => {
+    onSuccess: async (created, values) => {
+      if (created.credentials) {
+        setIssued([
+          {
+            label: `${values.firstName} ${values.lastName}`.trim(),
+            credentials: created.credentials,
+          },
+        ]);
+      }
       setShowForm(false);
       await queryClient.invalidateQueries({ queryKey: ["people", kind] });
       if (isGuardianPage) {
@@ -361,18 +388,36 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
           {
             id: "action",
             header: "",
-            className: "w-28 text-right",
+            className: "w-56 text-right",
             cell: (row: Row) => (
-              <button
-                type="button"
-                disabled={statusMutation.isPending}
-                onClick={() =>
-                  statusMutation.mutate({ id: row.id, isActive: !row.isActive })
-                }
-                className="rounded-md px-2 py-1.5 text-xs font-semibold text-primary hover:bg-primary/10 disabled:opacity-50"
-              >
-                {row.isActive ? "Deactivate" : "Reactivate"}
-              </button>
+              <span className="inline-flex gap-1">
+                <button
+                  type="button"
+                  disabled={resetLoginMutation.isPending}
+                  onClick={() => {
+                    if (
+                      window.confirm(
+                        `Issue a new temporary password for ${row.name}? Their current password will stop working and they will be signed out.`,
+                      )
+                    ) {
+                      resetLoginMutation.mutate({ id: row.id, name: row.name });
+                    }
+                  }}
+                  className="rounded-md px-2 py-1.5 text-xs font-semibold text-primary hover:bg-primary/10 disabled:opacity-50"
+                >
+                  Reset login
+                </button>
+                <button
+                  type="button"
+                  disabled={statusMutation.isPending}
+                  onClick={() =>
+                    statusMutation.mutate({ id: row.id, isActive: !row.isActive })
+                  }
+                  className="rounded-md px-2 py-1.5 text-xs font-semibold text-primary hover:bg-primary/10 disabled:opacity-50"
+                >
+                  {row.isActive ? "Deactivate" : "Reactivate"}
+                </button>
+              </span>
             ),
           } satisfies WorkspaceColumn<Row>,
         ]
@@ -395,7 +440,7 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
                 {kind === "teachers"
                   ? "Manage teaching personnel and their school department. Teachers are not duplicated in the non-teaching Staff directory."
                   : isGuardianPage
-                    ? "Maintain family contacts and their links to student records. Guardian records do not create sign-in accounts."
+                    ? "Maintain family contacts and their links to student records. Tick “Create parent-portal login” to give a guardian access."
                     : "Manage non-teaching employees, departments, and operational roles. Teaching personnel are managed separately under Teachers."}
               </p>
             </div>
@@ -483,10 +528,11 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
                       />
                     )}
                   </form.Field>
-                  <form.Field name="invitationEmail">
+                  <form.Field name="email">
                     {(field) => (
                       <TextField
-                        label="Work email (optional)"
+                        label="Sign-in email"
+                        required
                         type="email"
                         value={field.state.value}
                         onChange={(value) => field.handleChange(value)}
@@ -717,6 +763,25 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
                       />
                     )}
                   </form.Field>
+                  <form.Field name="createLogin">
+                    {(field) => (
+                      <label className="flex items-start gap-2 text-xs text-foreground sm:col-span-2">
+                        <input
+                          type="checkbox"
+                          checked={field.state.value}
+                          onChange={(event) => field.handleChange(event.target.checked)}
+                          className="mt-0.5 size-4 rounded border-border"
+                        />
+                        <span>
+                          <span className="font-semibold">Create parent-portal login</span>
+                          <span className="block text-muted-foreground">
+                            Requires an email. A temporary password is shown once; the
+                            guardian must change it at first sign-in.
+                          </span>
+                        </span>
+                      </label>
+                    )}
+                  </form.Field>
                   <form.Field name="relationshipType">
                     {(field) => (
                       <SelectField
@@ -852,9 +917,12 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
         </label>
       </section>
 
-      {statusMutation.error && !showForm && (
-        <ErrorPanel message={statusMutation.error.message} />
+      {(statusMutation.error || resetLoginMutation.error) && !showForm && (
+        <ErrorPanel
+          message={(statusMutation.error ?? resetLoginMutation.error)!.message}
+        />
       )}
+      <CredentialsDialog entries={issued} onClose={() => setIssued([])} />
       <WorkspaceDataTable
         rows={rows}
         columns={columns}

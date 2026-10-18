@@ -8,6 +8,7 @@ import {
   Body,
   Query,
   UseGuards,
+  Header,
 } from "@nestjs/common";
 import { SuperAdminService } from "./super-admin.service.js";
 import { SuperAdminGuard } from "../../common/guards/super-admin.guard.js";
@@ -76,6 +77,7 @@ export class SuperAdminController {
   }
 
   @Post("schools/:id/admins")
+  @Header("Cache-Control", "no-store") // response carries a one-time password
   addSchoolAdmin(
     @Param("id") id: string,
     @Body(new ZodValidationPipe(addSchoolAdminSchema)) body: AddSchoolAdminInput,
@@ -106,6 +108,7 @@ export class SuperAdminController {
   }
 
   @Post("schools")
+  @Header("Cache-Control", "no-store") // response carries a one-time password
   enrollSchool(
     @Body(new ZodValidationPipe(enrollSchoolSchema)) body: EnrollSchoolInput,
   ) {

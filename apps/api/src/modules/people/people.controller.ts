@@ -3,6 +3,7 @@ import {
   Body,
   Controller,
   Get,
+  Header,
   Param,
   Patch,
   Post,
@@ -20,6 +21,11 @@ import {
   type UpdatePeopleStatusInput,
 } from "@schoolhub/shared";
 import { CurrentSchool } from "../../common/decorators/current-school.decorator.js";
+import { CurrentSchoolRole } from "../../common/decorators/current-school-role.decorator.js";
+import {
+  CurrentUser,
+  type AuthenticatedUser,
+} from "../../common/decorators/current-user.decorator.js";
 import { Roles } from "../../common/decorators/roles.decorator.js";
 import { RolesGuard } from "../../common/guards/roles.guard.js";
 import { SchoolTenantGuard } from "../../common/guards/school-tenant.guard.js";
@@ -71,12 +77,14 @@ export class PeopleController {
 
   @Post("teachers")
   @Roles("owner", "admin", "headmistress")
+  @Header("Cache-Control", "no-store") // response carries a one-time password
   createTeacher(
     @CurrentSchool() school: School,
+    @CurrentUser() actor: AuthenticatedUser | undefined,
     @Body(new ZodValidationPipe(createTeacherSchema))
     body: CreateTeacherInput,
   ) {
-    return this.peopleService.createTeacher(school.id, body);
+    return this.peopleService.createTeacher(school, actor!.id, body);
   }
 
   @Patch("teachers/:id/status")
@@ -109,12 +117,19 @@ export class PeopleController {
 
   @Post("staff")
   @Roles("owner", "admin", "headmistress")
+  @Header("Cache-Control", "no-store")
   createStaff(
     @CurrentSchool() school: School,
+    @CurrentSchoolRole() schoolRole: string | undefined,
+    @CurrentUser() actor: AuthenticatedUser | undefined,
     @Body(new ZodValidationPipe(createStaffSchema))
     body: CreateStaffInput,
   ) {
-    return this.peopleService.createStaff(school.id, body);
+    return this.peopleService.createStaff(
+      school,
+      { id: actor!.id, schoolRole },
+      body,
+    );
   }
 
   @Patch("staff/:id/status")
@@ -147,12 +162,14 @@ export class PeopleController {
 
   @Post("guardians")
   @Roles("owner", "admin", "headmistress", "staff")
+  @Header("Cache-Control", "no-store")
   createGuardian(
     @CurrentSchool() school: School,
+    @CurrentUser() actor: AuthenticatedUser | undefined,
     @Body(new ZodValidationPipe(createGuardianSchema))
     body: CreateGuardianInput,
   ) {
-    return this.peopleService.createGuardian(school.id, body);
+    return this.peopleService.createGuardian(school, actor!.id, body);
   }
 
   @Patch("guardians/:id/status")

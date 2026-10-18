@@ -17,6 +17,71 @@ export const ROLES = [
 export type Role = (typeof ROLES)[number];
 
 // ============================================================================
+// PASSWORD POLICY & CREDENTIALS
+// ============================================================================
+
+export const PASSWORD_MIN_LENGTH = 10;
+export const PASSWORD_MAX_LENGTH = 128;
+
+/**
+ * Password rules shared by the API (authoritative) and the web client
+ * (instant feedback). Length matters most; the character-class rules keep
+ * trivially weak choices such as "password12" out.
+ */
+export const passwordSchema = z
+  .string()
+  .min(PASSWORD_MIN_LENGTH, `Use at least ${PASSWORD_MIN_LENGTH} characters`)
+  .max(PASSWORD_MAX_LENGTH, `Use at most ${PASSWORD_MAX_LENGTH} characters`)
+  .regex(/[a-z]/, "Include a lowercase letter")
+  .regex(/[A-Z]/, "Include an uppercase letter")
+  .regex(/[0-9]/, "Include a number");
+
+/** Trimmed, lower-cased, validated email (uses the Zod 4 top-level `z.email()`). */
+export const emailSchema = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .pipe(z.email("Enter a valid email address"));
+
+export const changePasswordSchema = z
+  .object({
+    currentPassword: z.string().min(1, "Enter your current password").max(PASSWORD_MAX_LENGTH),
+    newPassword: passwordSchema,
+  })
+  .refine((value) => value.newPassword !== value.currentPassword, {
+    path: ["newPassword"],
+    message: "Choose a password different from your current one",
+  });
+export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;
+
+/**
+ * Returned exactly once by every endpoint that provisions or resets a login.
+ * The temporary password is never stored in readable form and cannot be
+ * retrieved again - only reset.
+ */
+export interface IssuedCredentials {
+  /** Value to type into the "Email" box on the sign-in page. */
+  loginEmail: string;
+  /** Short ID a student may type instead of the full login email. */
+  loginId?: string;
+  temporaryPassword: string;
+  role: Role;
+  mustChangePassword: true;
+}
+
+export const STUDENT_LOGIN_EMAIL_DOMAIN = "schoolhub.gh";
+
+/** Deterministic, globally unique login email for a student account. */
+export function studentLoginEmail(admissionNumber: string, schoolSubdomain: string) {
+  return `${admissionNumber.trim().toLowerCase()}@students.${schoolSubdomain
+    .trim()
+    .toLowerCase()}.${STUDENT_LOGIN_EMAIL_DOMAIN}`;
+}
+
+export const CREDENTIAL_SUBJECT_KINDS = ["student", "teacher", "staff", "guardian"] as const;
+export type CredentialSubjectKind = (typeof CREDENTIAL_SUBJECT_KINDS)[number];
+
+// ============================================================================
 // STUDENT SCHEMAS
 // ============================================================================
 
@@ -26,13 +91,15 @@ export const studentGuardianSchema = z.object({
   otherNames: z.string().trim().max(100).optional(),
   phone: z.string().trim().min(5).max(30),
   alternatePhone: z.string().trim().max(30).optional(),
-  email: z.string().email().optional().or(z.literal("")),
+  email: z.email().optional().or(z.literal("")),
   gender: z.enum(["MALE", "FEMALE", "OTHER"]).optional(),
   relationshipType: z.enum([
     "FATHER",
     "MOTHER",
     "GUARDIAN",
     "SIBLING",
+    "GRANDFATHER",
+    "GRANDMOTHER",
     "RELATIVE",
     "OTHER",
   ]),
@@ -42,6 +109,8 @@ export const studentGuardianSchema = z.object({
   city: z.string().trim().max(100).optional(),
   region: z.string().trim().max(100).optional(),
   isPrimary: z.boolean(),
+  /** Create a parent-portal login. Requires an email address. */
+  createLogin: z.boolean().default(false),
 });
 export type StudentGuardianInput = z.infer<typeof studentGuardianSchema>;
 
@@ -98,7 +167,15 @@ export const createTeacherSchema = z.object({
   firstName: z.string().trim().min(1).max(100),
   lastName: z.string().trim().min(1).max(100),
   staffNumber: z.string().trim().max(40).optional(),
-  invitationEmail: z.string().email().optional().or(z.literal("")),
+  /** Sign-in email. A login is always created for new teachers. */
+  email: emailSchema,
+  phone: z.string().trim().max(30).optional(),
+  gender: z.enum(["MALE", "FEMALE", "OTHER"]).optional(),
+  dateOfBirth: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .optional()
+    .or(z.literal("")),
   departmentId: z.string().min(1),
   qualification: z.string().trim().max(150).optional(),
   specialization: z.string().trim().max(150).optional(),
@@ -113,7 +190,7 @@ export type CreateTeacherInput = z.infer<typeof createTeacherSchema>;
 export const createStaffSchema = z.object({
   firstName: z.string().trim().min(1).max(100),
   lastName: z.string().trim().min(1).max(100),
-  email: z.string().email(),
+  email: emailSchema,
   phone: z.string().trim().min(5).max(30),
   gender: z.enum(["MALE", "FEMALE", "OTHER"]),
   dateOfBirth: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
@@ -433,7 +510,7 @@ export const enrollSchoolSchema = z.object({
     .min(3)
     .max(20)
     .regex(/^[A-Z0-9-]+$/, "Uppercase letters, numbers, hyphens only"),
-  schoolEmail: z.string().email().optional(),
+  schoolEmail: z.email().optional(),
   schoolPhone: z.string().optional(),
   schoolAddress: z.string().optional(),
   subdomain: z
@@ -445,7 +522,7 @@ export const enrollSchoolSchema = z.object({
 
   // Admin account
   adminName: z.string().min(2),
-  adminEmail: z.string().email(),
+  adminEmail: emailSchema,
 });
 export type EnrollSchoolInput = z.infer<typeof enrollSchoolSchema>;
 
@@ -461,7 +538,7 @@ export const updateSchoolSchema = z.object({
     .min(3)
     .max(30)
     .regex(/^[a-z0-9-]+$/, "Lowercase letters, numbers, hyphens only"),
-  schoolEmail: z.union([z.string().email(), z.literal("")]).optional(),
+  schoolEmail: z.union([z.email(), z.literal("")]).optional(),
   schoolPhone: z.string().optional(),
   schoolAddress: z.string().optional(),
 });
@@ -469,7 +546,7 @@ export type UpdateSchoolInput = z.infer<typeof updateSchoolSchema>;
 
 export const addSchoolAdminSchema = z.object({
   name: z.string().min(2),
-  email: z.string().email(),
+  email: emailSchema,
 });
 export type AddSchoolAdminInput = z.infer<typeof addSchoolAdminSchema>;
 

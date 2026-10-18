@@ -13,12 +13,23 @@ import { createAuthClient } from "better-auth/react";
  *
  * The `adminClient` plugin adds `role` to the user type in session data.
  */
-import { organizationClient, adminClient } from "better-auth/client/plugins";
+import {
+  adminClient,
+  inferAdditionalFields,
+  organizationClient,
+} from "better-auth/client/plugins";
 
 export const authClient = createAuthClient({
   baseURL: window.location.origin,
   basePath: "/api/auth",
-  plugins: [organizationClient(), adminClient()],
+  plugins: [
+    organizationClient(),
+    adminClient(),
+    // Server-set flag: true while the password is an admin-issued temporary one.
+    inferAdditionalFields({
+      user: { mustChangePassword: { type: "boolean", required: false } },
+    }),
+  ],
 });
 
 // Re-export the hooks so components don't need to import from better-auth directly

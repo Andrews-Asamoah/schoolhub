@@ -16,6 +16,7 @@ import {
   createStudentSchema,
   updateStudentRecordSchema,
   type CreateStudentInput,
+  type IssuedCredentials,
   type StudentGuardianInput,
   type UpdateStudentInput,
 } from "@schoolhub/shared";
@@ -27,6 +28,10 @@ import {
 } from "@/components/school/workspace-ui";
 import { useSchoolRole } from "@/components/school/school-role-switcher";
 import { apiFetch } from "@/lib/api";
+import {
+  CredentialsDialog,
+  type CredentialEntry,
+} from "@/components/credentials/credentials-dialog";
 
 interface Student {
   id: string;
@@ -134,6 +139,16 @@ export function StudentDirectoryWorkspace() {
   const [page, setPage] = useState(1);
   const [editing, setEditing] = useState<Student | null>(null);
   const [showForm, setShowForm] = useState(false);
+  const [issued, setIssued] = useState<CredentialEntry[]>([]);
+  const resetLoginMutation = useMutation({
+    mutationFn: ({ id }: { id: string; name: string }) =>
+      apiFetch<IssuedCredentials>(`/accounts/people/student/${id}/credentials`, {
+        method: "POST",
+      }),
+    // Held in component state only, never in the query cache.
+    onSuccess: (credentials, variables) =>
+      setIssued([{ label: `${variables.name} (student)`, credentials }]),
+  });
   const periodKey =
     typeof window === "undefined"
       ? ""
@@ -230,17 +245,38 @@ export function StudentDirectoryWorkspace() {
           {
             id: "actions",
             header: "",
-            className: "w-20 text-right",
+            className: "w-44 text-right",
             cell: (student: Student) => (
-              <button
-                type="button"
-                onClick={() => openEdit(student)}
-                className="inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-xs font-semibold text-primary hover:bg-primary/10"
-                aria-label={`Edit ${student.profile.firstName} ${student.profile.lastName}`}
-              >
-                <SquarePen className="size-3.5" />
-                Edit
-              </button>
+              <span className="inline-flex gap-1">
+                {["owner", "admin", "headmistress"].includes(activeRole ?? "") && (
+                  <button
+                    type="button"
+                    disabled={resetLoginMutation.isPending}
+                    onClick={() => {
+                      const name = `${student.profile.firstName} ${student.profile.lastName}`;
+                      if (
+                        window.confirm(
+                          `Issue a new temporary password for ${name}? Their current password will stop working and they will be signed out.`,
+                        )
+                      ) {
+                        resetLoginMutation.mutate({ id: student.id, name });
+                      }
+                    }}
+                    className="rounded-md px-2 py-1.5 text-xs font-semibold text-primary hover:bg-primary/10 disabled:opacity-50"
+                  >
+                    Reset login
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => openEdit(student)}
+                  className="inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-xs font-semibold text-primary hover:bg-primary/10"
+                  aria-label={`Edit ${student.profile.firstName} ${student.profile.lastName}`}
+                >
+                  <SquarePen className="size-3.5" />
+                  Edit
+                </button>
+              </span>
             ),
           } satisfies WorkspaceColumn<Student>,
         ]
@@ -325,6 +361,7 @@ export function StudentDirectoryWorkspace() {
           student={editing}
           classes={classesQuery.data ?? []}
           houses={housesQuery.data ?? []}
+          onIssued={setIssued}
           onCancel={() => {
             setShowForm(false);
             setEditing(null);
@@ -409,6 +446,12 @@ export function StudentDirectoryWorkspace() {
         </div>
       </section>
 
+      <CredentialsDialog entries={issued} onClose={() => setIssued([])} />
+      {resetLoginMutation.error && (
+        <p role="alert" className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+          {resetLoginMutation.error.message}
+        </p>
+      )}
       <WorkspaceDataTable
         rows={rows}
         columns={columns}
@@ -452,10 +495,12 @@ function StudentEditor({
   houses,
   onCancel,
   onSaved,
+  onIssued,
 }: {
   student: Student | null;
   classes: SchoolClass[];
   houses: HouseOption[];
+  onIssued: (entries: CredentialEntry[]) => void;
   onCancel: () => void;
   onSaved: () => Promise<void>;
 }) {
@@ -466,7 +511,15 @@ function StudentEditor({
       const payload = student
         ? updateStudentRecordSchema.parse(values)
         : createStudentSchema.parse(values);
-      return apiFetch<Student>(
+      return apiFetch<
+        Student & {
+          credentials?: IssuedCredentials;
+          guardianCredentials?: {
+            name: string;
+            credentials: IssuedCredentials | null;
+          }[];
+        }
+      >(
         student ? `/students/${student.id}` : "/students",
         {
           method: student ? "PATCH" : "POST",
@@ -474,7 +527,19 @@ function StudentEditor({
         },
       );
     },
-    onSuccess: async () => {
+    onSuccess: async (saved) => {
+      if (saved.credentials) {
+        const name = `${saved.profile.firstName} ${saved.profile.lastName}`;
+        onIssued([
+          { label: `${name} (student)`, credentials: saved.credentials },
+          ...(saved.guardianCredentials ?? [])
+            .filter((g) => g.credentials)
+            .map((g) => ({
+              label: `${g.name} (guardian of ${name})`,
+              credentials: g.credentials!,
+            })),
+        ]);
+      }
       await onSaved();
       await queryClient.invalidateQueries({ queryKey: ["dashboard"] });
     },
@@ -915,6 +980,7 @@ function createGuardianDraft(isPrimary: boolean): GuardianDraft {
     city: "",
     region: "",
     isPrimary,
+    createLogin: false,
   };
 }
 
@@ -1002,6 +1068,8 @@ function GuardianDraftEditor({
             <option value="FATHER">Father</option>
             <option value="MOTHER">Mother</option>
             <option value="GUARDIAN">Guardian</option>
+            <option value="GRANDFATHER">Grandfather</option>
+            <option value="GRANDMOTHER">Grandmother</option>
             <option value="SIBLING">Sibling</option>
             <option value="RELATIVE">Relative</option>
             <option value="OTHER">Other</option>
@@ -1026,6 +1094,23 @@ function GuardianDraftEditor({
           value={guardian.email ?? ""}
           onChange={(value) => update("email", value)}
         />
+        <label className="flex items-start gap-2 text-xs text-foreground sm:col-span-2 lg:col-span-3">
+          <input
+            type="checkbox"
+            checked={guardian.createLogin}
+            disabled={!guardian.email}
+            onChange={(event) => update("createLogin", event.target.checked)}
+            className="mt-0.5 size-4 rounded border-border"
+          />
+          <span>
+            <span className="font-semibold">Create parent-portal login</span>
+            <span className="block text-muted-foreground">
+              {guardian.email
+                ? "A temporary password is shown once after saving; the guardian must change it at first sign-in."
+                : "Enter an email address to enable this."}
+            </span>
+          </span>
+        </label>
         <StudentTextField
           label="Occupation"
           value={guardian.occupation ?? ""}

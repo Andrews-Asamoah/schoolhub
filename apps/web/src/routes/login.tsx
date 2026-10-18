@@ -12,6 +12,8 @@ import {
   Sparkles,
 } from "lucide-react";
 import { useEffect, useState, type FormEvent } from "react";
+import { studentLoginEmail } from "@schoolhub/shared";
+import { getClientSubdomain } from "@/lib/api";
 import { ThemeToggle } from "@/components/school/theme-toggle";
 import { consumeLogoutNotice } from "@/hooks/use-logout";
 import { authClient, signIn, useSession } from "@/lib/auth-client";
@@ -36,7 +38,9 @@ function LoginPage() {
   useEffect(() => {
     if (sessionPending || !session?.user) return;
 
-    if (session.user.role === "superAdmin") {
+    if (session.user.mustChangePassword) {
+      void navigate({ to: "/change-password", replace: true });
+    } else if (session.user.role === "superAdmin") {
       void navigate({ to: "/admin/dashboard", replace: true });
     } else {
       void navigate({ to: "/dashboard", replace: true });
@@ -66,13 +70,26 @@ function LoginPage() {
     setLoading(true);
 
     try {
-      const result = await signIn.email({ email, password });
+      // Students may type just their admission number; build the full login
+      // address from the school they are visiting (<school>.schoolhub.gh).
+      let loginEmail = email.trim();
+      if (!loginEmail.includes("@")) {
+        const school = getClientSubdomain();
+        if (!school) {
+          setError("Open your school’s SchoolHub address to sign in with a student ID, or use your email.");
+          return;
+        }
+        loginEmail = studentLoginEmail(loginEmail, school);
+      }
+      const result = await signIn.email({ email: loginEmail, password });
       if (result.error) {
         setError(result.error.message ?? "Sign-in failed. Check your details and try again.");
         return;
       }
 
-      if (result.data?.user?.role === "superAdmin") {
+      if (result.data?.user?.mustChangePassword) {
+        await navigate({ to: "/change-password", replace: true });
+      } else if (result.data?.user?.role === "superAdmin") {
         await navigate({ to: "/admin/dashboard", replace: true });
       } else {
         await navigate({ to: "/dashboard", replace: true });
@@ -238,20 +255,22 @@ function LoginPage() {
                 htmlFor="email"
                 className="mb-2 block text-xs font-semibold text-slate-700 dark:text-slate-200"
               >
-                Email address
+                Email or student ID
               </label>
               <div className="group relative">
                 <Mail className="pointer-events-none absolute left-3.5 top-1/2 size-[17px] -translate-y-1/2 text-slate-400 transition group-focus-within:text-blue-600" />
                 <input
                   id="email"
                   name="email"
-                  type="email"
+                  type="text"
                   autoComplete="username"
-                  inputMode="email"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
                   required
                   value={email}
                   onChange={(event) => setEmail(event.target.value)}
-                  placeholder="you@school.edu"
+                  placeholder="you@school.edu or ABC260001"
                   className="h-12 w-full rounded-xl border border-slate-200 bg-white pl-11 pr-4 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 hover:border-slate-300 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:hover:border-slate-600"
                 />
               </div>

@@ -20,6 +20,11 @@ import {
   X,
 } from "lucide-react";
 import { apiFetch } from "@/lib/api";
+import type { IssuedCredentials } from "@schoolhub/shared";
+import {
+  CredentialsDialog,
+  type CredentialEntry,
+} from "@/components/credentials/credentials-dialog";
 import { SubscriptionBadge } from "@/components/superadmin/subscription-badge";
 
 export const Route = createFileRoute("/admin/schools/$schoolId")({
@@ -97,6 +102,7 @@ function SchoolDetailPage() {
   const [adminName, setAdminName] = useState("");
   const [adminEmail, setAdminEmail] = useState("");
   const [adminMessage, setAdminMessage] = useState("");
+  const [issued, setIssued] = useState<CredentialEntry[]>([]);
   const [adminConfirmation, setAdminConfirmation] =
     useState<AdminConfirmation | null>(null);
   const cancelConfirmationRef = useRef<HTMLButtonElement>(null);
@@ -160,15 +166,27 @@ function SchoolDetailPage() {
 
   const addAdminMutation = useMutation({
     mutationFn: (body: { name: string; email: string }) =>
-      apiFetch<{ admin: { name: string; email: string }; createdAccount: boolean }>(
+      apiFetch<{
+        admin: { name: string; email: string };
+        createdAccount: boolean;
+        credentials: IssuedCredentials | null;
+      }>(
         `/super-admin/schools/${schoolId}/admins`,
         { method: "POST", body: JSON.stringify(body) },
       ),
     onSuccess: (result) => {
       refreshSchoolData();
+      if (result.credentials) {
+        setIssued([
+          {
+            label: `${result.admin.name} (school admin)`,
+            credentials: result.credentials,
+          },
+        ]);
+      }
       setAdminMessage(
         result.createdAccount
-          ? `${result.admin.name} was added. Their initial password is Admin@123; share it securely.`
+          ? `${result.admin.name} was added. Their default password was shown; they must change it at first sign-in.`
           : `${result.admin.name} was added using their existing account.`,
       );
       setAdminName("");
@@ -470,6 +488,7 @@ function SchoolDetailPage() {
                 {addAdminMutation.error?.message ?? adminActionMutation.error?.message}
               </p>
             )}
+            <CredentialsDialog entries={issued} onClose={() => setIssued([])} />
             {adminMessage && <p role="status" className="mt-3 text-xs font-medium text-emerald-700">{adminMessage}</p>}
           </form>
 

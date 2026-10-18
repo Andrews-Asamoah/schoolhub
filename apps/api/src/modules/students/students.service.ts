@@ -7,13 +7,26 @@ import {
 } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { PrismaService } from '../../prisma/prisma.service.js';
-import type { CreateStudentInput, UpdateStudentInput } from '@schoolhub/shared';
-import type { StudentStatus } from '@prisma/client';
+import {
+  studentLoginEmail,
+  type CreateStudentInput,
+  type IssuedCredentials,
+  type UpdateStudentInput,
+} from '@schoolhub/shared';
+import type { Prisma, School, StudentStatus } from '@prisma/client';
 import { canManageAcademicContext } from '../../common/academic-context.js';
+import {
+  CredentialsService,
+  toIssuedCredentials,
+  type PreparedCredential,
+} from '../accounts/credentials.service.js';
 
 @Injectable()
 export class StudentsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly credentials: CredentialsService,
+  ) {}
 
   async listStudents(
     schoolId: string,
@@ -291,13 +304,38 @@ export class StudentsService {
     };
   }
 
-  async createStudent(schoolId: string, input: CreateStudentInput) {
-    return this.prisma.client.$transaction(async (tx) => {
-      const school = await tx.school.findUnique({
+  async createStudent(
+    school: Pick<School, 'id' | 'organizationId' | 'subdomain'>,
+    actorId: string,
+    input: CreateStudentInput,
+  ) {
+    const schoolId = school.id;
+
+    // Validate guardian login requests and hash every temporary password
+    // BEFORE opening the transaction (hashing is deliberately slow).
+    const guardianPlans = await Promise.all(
+      input.guardians.map(async (guardian) => {
+        const email = guardian.email?.trim().toLowerCase() || null;
+        if (guardian.createLogin && !email) {
+          throw new BadRequestException(
+            `An email address is required to create a login for ${guardian.firstName} ${guardian.lastName}.`,
+          );
+        }
+        return {
+          guardian,
+          email,
+          credential: guardian.createLogin ? await this.credentials.prepare('guardian') : null,
+        };
+      }),
+    );
+    const studentCredential = await this.credentials.prepare('student');
+
+    const created = await this.prisma.client.$transaction(async (tx) => {
+      const schoolRow = await tx.school.findUnique({
         where: { id: schoolId },
         select: { code: true },
       });
-      if (!school) {
+      if (!schoolRow) {
         throw new NotFoundException('School not found.');
       }
 
@@ -322,7 +360,7 @@ export class StudentsService {
       `;
 
       const schoolPrefix =
-        school.code
+        schoolRow.code
           .replace(/[^a-zA-Z0-9]/g, '')
           .toUpperCase()
           .slice(0, 8) || 'SCH';
@@ -349,18 +387,16 @@ export class StudentsService {
       const admissionNumber = `${admissionPrefix}${String(lastSequence + 1).padStart(4, '0')}`;
       const studentId = `ID-${randomUUID().replaceAll('-', '').slice(0, 10).toUpperCase()}`;
 
-      const user = await tx.user.create({
-        data: {
-          id: `usr_${randomUUID()}`,
-          name: `${input.firstName} ${input.lastName}`,
-          email: `${studentId.toLowerCase()}@student.schoolhub`,
-          role: 'student',
-        },
-      });
-
-      const profile = await tx.userProfile.create({
-        data: {
-          userId: user.id,
+      // Student login: <admission number>@students.<school>.schoolhub.gh.
+      // The sign-in page also accepts just the admission number.
+      const loginEmail = studentLoginEmail(admissionNumber, school.subdomain);
+      const studentLogin = await this.credentials.createLogin(tx, {
+        name: `${input.firstName} ${input.lastName}`,
+        email: loginEmail,
+        role: 'student',
+        organizationId: school.organizationId,
+        credential: studentCredential,
+        profile: {
           firstName: input.firstName,
           lastName: input.lastName,
           otherNames: input.otherNames,
@@ -379,7 +415,7 @@ export class StudentsService {
       const student = await tx.student.create({
         data: {
           schoolId,
-          profileId: profile.id,
+          profileId: studentLogin.profileId!,
           studentId,
           admissionNumber,
           departmentId: input.departmentId,
@@ -387,44 +423,159 @@ export class StudentsService {
           bloodGroup: input.bloodGroup,
           allergies: input.allergies,
           medicalConditions: input.medicalConditions,
-          guardians: input.guardians.length
-            ? {
-                create: input.guardians.map((guardian) => ({
-                  isPrimary: guardian.isPrimary,
-                  guardian: {
-                    create: {
-                      schoolId,
-                      guardianId: `GUA-${randomUUID().replaceAll('-', '').slice(0, 12).toUpperCase()}`,
-                      firstName: guardian.firstName,
-                      lastName: guardian.lastName,
-                      otherNames: guardian.otherNames,
-                      phone: guardian.phone,
-                      alternatePhone: guardian.alternatePhone,
-                      email: guardian.email?.trim().toLowerCase() || null,
-                      gender: guardian.gender,
-                      relationshipType: guardian.relationshipType,
-                      occupation: guardian.occupation,
-                      employer: guardian.employer,
-                      residentialAddress: guardian.residentialAddress,
-                      city: guardian.city,
-                      region: guardian.region,
-                    },
-                  },
-                })),
-              }
-            : undefined,
-        },
-        include: {
-          profile: true,
-          class: true,
-          guardians: {
-            include: { guardian: true },
-          },
         },
       });
 
-      return student;
+      const guardianCredentials: Array<{
+        guardianId: string;
+        name: string;
+        credentials: IssuedCredentials | null;
+        linkedExisting: boolean;
+      }> = [];
+
+      for (const plan of guardianPlans) {
+        const { guardian, email, credential } = plan;
+        const name = `${guardian.firstName} ${guardian.lastName}`.trim();
+
+        // A parent with several children is ONE guardian record (matched by
+        // email within the school) so they get one login, not one per child.
+        const existing = email
+          ? await tx.guardian.findFirst({
+              where: { schoolId, email, deletedAt: null },
+            })
+          : null;
+
+        let guardianRecordId: string;
+        let issued: IssuedCredentials | null = null;
+        let linkedExisting = false;
+
+        if (existing) {
+          guardianRecordId = existing.id;
+          linkedExisting = true;
+          if (credential && !existing.profileId) {
+            issued = await this.provisionGuardianLogin(
+              tx,
+              school,
+              existing.id,
+              { ...guardian, email: email! },
+              credential,
+            );
+          }
+        } else {
+          const record = await tx.guardian.create({
+            data: {
+              schoolId,
+              guardianId: `GUA-${randomUUID().replaceAll('-', '').slice(0, 12).toUpperCase()}`,
+              firstName: guardian.firstName,
+              lastName: guardian.lastName,
+              otherNames: guardian.otherNames,
+              phone: guardian.phone,
+              alternatePhone: guardian.alternatePhone,
+              email,
+              gender: guardian.gender,
+              relationshipType: guardian.relationshipType,
+              occupation: guardian.occupation,
+              employer: guardian.employer,
+              residentialAddress: guardian.residentialAddress,
+              city: guardian.city,
+              region: guardian.region,
+            },
+          });
+          guardianRecordId = record.id;
+          if (credential) {
+            issued = await this.provisionGuardianLogin(
+              tx,
+              school,
+              record.id,
+              { ...guardian, email: email! },
+              credential,
+            );
+          }
+        }
+
+        await tx.guardianStudent.create({
+          data: {
+            guardianId: guardianRecordId,
+            studentId: student.id,
+            isPrimary: guardian.isPrimary,
+          },
+        });
+        guardianCredentials.push({
+          guardianId: guardianRecordId,
+          name,
+          credentials: issued,
+          linkedExisting,
+        });
+      }
+
+      await this.credentials.audit(tx, {
+        actorId,
+        schoolId,
+        action: 'CREDENTIALS_ISSUED',
+        entityType: 'STUDENT',
+        entityId: student.id,
+        details: {
+          guardianLoginsIssued: guardianCredentials.filter((g) => g.credentials)
+            .length,
+        },
+      });
+
+      const full = await tx.student.findUniqueOrThrow({
+        where: { id: student.id },
+        include: {
+          profile: true,
+          class: true,
+          guardians: { include: { guardian: true } },
+        },
+      });
+      return { student: full, guardianCredentials };
     });
+
+    return {
+      ...created.student,
+      credentials: toIssuedCredentials(
+        studentLoginEmail(created.student.admissionNumber!, school.subdomain),
+        studentCredential,
+        'student',
+        created.student.admissionNumber ?? undefined,
+      ),
+      guardianCredentials: created.guardianCredentials,
+    };
+  }
+
+  private async provisionGuardianLogin(
+    tx: Prisma.TransactionClient,
+    school: Pick<School, 'id' | 'organizationId'>,
+    guardianRecordId: string,
+    guardian: {
+      firstName: string;
+      lastName: string;
+      otherNames?: string;
+      phone: string;
+      gender?: 'MALE' | 'FEMALE' | 'OTHER';
+      email: string;
+    },
+    credential: PreparedCredential,
+  ): Promise<IssuedCredentials> {
+    const login = await this.credentials.createLogin(tx, {
+      name: `${guardian.firstName} ${guardian.lastName}`.trim(),
+      email: guardian.email,
+      role: 'guardian',
+      organizationId: school.organizationId,
+      credential,
+      profile: {
+        firstName: guardian.firstName,
+        lastName: guardian.lastName,
+        otherNames: guardian.otherNames,
+        phone: guardian.phone,
+        gender: guardian.gender,
+      },
+    });
+    await tx.guardian.update({
+      where: { id: guardianRecordId },
+      data: { profileId: login.profileId, canLogin: true },
+    });
+    return toIssuedCredentials(login.email, credential, 'guardian');
   }
 
   async updateStudent(schoolId: string, id: string, input: UpdateStudentInput) {

@@ -16,6 +16,7 @@ import { AssessmentsModule } from "./modules/assessments/assessments.module.js";
 import { FinanceModule } from "./modules/finance/finance.module.js";
 import { SuperAdminModule } from "./modules/super-admin/super-admin.module.js";
 import { SupportModule } from "./modules/support/support.module.js";
+import { AccountsModule } from "./modules/accounts/accounts.module.js";
 import { PeopleModule } from "./modules/people/people.module.js";
 
 @Module({
@@ -32,6 +33,7 @@ import { PeopleModule } from "./modules/people/people.module.js";
     SuperAdminModule,
     SupportModule,
     PeopleModule,
+    AccountsModule,
   ],
   controllers: [HealthController],
   providers: [

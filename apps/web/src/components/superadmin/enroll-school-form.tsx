@@ -3,6 +3,11 @@ import { useNavigate } from "@tanstack/react-router";
 import { useMutation } from "@tanstack/react-query";
 import { Building2, User } from "lucide-react";
 import { apiFetch } from "@/lib/api";
+import type { IssuedCredentials } from "@schoolhub/shared";
+import {
+  CredentialsDialog,
+  type CredentialEntry,
+} from "@/components/credentials/credentials-dialog";
 import type { EnrollSchoolInput } from "@schoolhub/shared";
 
 type FormErrors = Partial<Record<keyof EnrollSchoolInput, string>>;
@@ -41,17 +46,22 @@ export function EnrollSchoolForm() {
     adminEmail: "",
   });
 
+  const [issued, setIssued] = useState<CredentialEntry[]>([]);
   const mutation = useMutation({
     mutationFn: (data: EnrollSchoolInput) =>
-      apiFetch<{ school: { id: string } }>("/super-admin/schools", {
+      apiFetch<{ school: { id: string }; credentials: IssuedCredentials }>("/super-admin/schools", {
         method: "POST",
         body: JSON.stringify(data),
       }),
-    onSuccess: () => {
+    onSuccess: (result) => {
       setSuccessMsg("School enrolled successfully!");
-      setTimeout(() => {
-        void navigate({ to: "/admin/schools" });
-      }, 1200);
+      // Navigation waits until the one-time credentials have been saved.
+      setIssued([
+        {
+          label: `${form.adminName} (school owner)`,
+          credentials: result.credentials,
+        },
+      ]);
     },
     onError: (err: Error) => {
       setErrors({ schoolName: err.message });
@@ -103,6 +113,13 @@ export function EnrollSchoolForm() {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-8">
+      <CredentialsDialog
+        entries={issued}
+        onClose={() => {
+          setIssued([]);
+          void navigate({ to: "/admin/schools" });
+        }}
+      />
       {successMsg && (
         <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-medium text-emerald-700">
           {successMsg}
@@ -233,7 +250,7 @@ export function EnrollSchoolForm() {
           </FieldGroup>
         </div>
         <p className="mt-5 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-          An initial password of <strong>Admin@123</strong> will be assigned automatically.
+          The default owner password (Owner@123) is assigned and the owner must change it at first sign-in.
           Share it securely with the administrator.
         </p>
       </section>

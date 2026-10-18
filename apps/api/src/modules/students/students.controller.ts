@@ -7,6 +7,7 @@ import {
   Param,
   Query,
   Headers,
+  Header,
   Body,
   UseGuards,
 } from "@nestjs/common";
@@ -15,6 +16,7 @@ import { SchoolTenantGuard } from "../../common/guards/school-tenant.guard.js";
 import { RolesGuard } from "../../common/guards/roles.guard.js";
 import { Roles } from "../../common/decorators/roles.decorator.js";
 import { CurrentSchool } from "../../common/decorators/current-school.decorator.js";
+import { CurrentUser, type AuthenticatedUser } from "../../common/decorators/current-user.decorator.js";
 import { CurrentSchoolRole } from "../../common/decorators/current-school-role.decorator.js";
 import { ZodValidationPipe } from "../../common/pipes/zod-validation.pipe.js";
 import {
@@ -77,11 +79,13 @@ export class StudentsController {
 
   @Post()
   @Roles("owner", "admin", "staff")
+  @Header("Cache-Control", "no-store") // response carries one-time passwords
   createStudent(
     @CurrentSchool() school: School,
+    @CurrentUser() actor: AuthenticatedUser | undefined,
     @Body(new ZodValidationPipe(createStudentSchema)) body: CreateStudentInput,
   ) {
-    return this.studentsService.createStudent(school.id, body);
+    return this.studentsService.createStudent(school, actor!.id, body);
   }
 
   @Patch(":id")

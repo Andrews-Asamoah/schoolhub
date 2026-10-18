@@ -14,7 +14,7 @@
   "devDependencies": {
     "@types/node": "^26.6.5",
     "prettier": "^3.9.10",
-    "turbo": "^2.11.7",
+    "turbo": "^2.11.9",
     "typescript": "^7.0.2"
   }
 }

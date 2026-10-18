@@ -16,6 +16,11 @@ model user {
   banned        Boolean   @default(false)
   banReason     String?
   banExpires    DateTime?
+  // Credential lifecycle. mustChangePassword is true whenever an administrator
+  // issued or reset the password; the API refuses every tenant request until
+  // the owner of the account picks a new one.
+  mustChangePassword Boolean   @default(false)
+  passwordChangedAt  DateTime?
 
   // Relations
   accounts             account[]

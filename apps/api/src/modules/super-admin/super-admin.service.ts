@@ -6,7 +6,7 @@ import {
 } from "@nestjs/common";
 import { PrismaService } from "../../prisma/prisma.service.js";
 import { generateId } from "better-auth";
-import { hashPassword } from "better-auth/crypto";
+import { CredentialsService, toIssuedCredentials } from "../accounts/credentials.service.js";
 import type {
   AddSchoolAdminInput,
   EnrollSchoolInput,
@@ -15,11 +15,12 @@ import type {
   UpdateSubscriptionInput,
 } from "@schoolhub/shared";
 
-const SCHOOL_ADMIN_DEFAULT_PASSWORD = "Admin@123";
-
 @Injectable()
 export class SuperAdminService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly credentials: CredentialsService,
+  ) {}
 
   async listSchools(page: number, limit: number) {
     const [schools, total] = await Promise.all([
@@ -228,22 +229,22 @@ export class SuperAdminService {
     const userId = existingUser?.id ?? generateId();
     const memberId = generateId();
     const now = new Date();
-    const hashedPassword = existingUser
-      ? null
-      : await hashPassword(SCHOOL_ADMIN_DEFAULT_PASSWORD);
+    // Role default password (Admin@123); the admin is forced to change it at first sign-in.
+    const credential = existingUser ? null : await this.credentials.prepare("admin");
 
     const admin = await this.prisma.client.$transaction(async (transaction) => {
       if (!existingUser) {
-        if (!hashedPassword) {
-          throw new Error("Expected a hashed password when creating a new admin account");
+        if (!credential) {
+          throw new Error("Expected a prepared credential when creating a new admin account");
         }
         await transaction.user.create({
           data: {
             id: userId,
             name: input.name,
             email: input.email,
-            emailVerified: true,
+            emailVerified: false,
             role: "user",
+            mustChangePassword: true,
             createdAt: now,
             updatedAt: now,
           },
@@ -254,7 +255,7 @@ export class SuperAdminService {
             accountId: userId,
             providerId: "credential",
             userId,
-            password: hashedPassword,
+            password: credential.passwordHash,
             createdAt: now,
             updatedAt: now,
           },
@@ -279,6 +280,10 @@ export class SuperAdminService {
     return {
       admin: { ...admin, role: "admin" },
       createdAccount: !existingUser,
+      // Shown once to the super admin to hand over; the admin must change it at first sign-in.
+      credentials: credential
+        ? toIssuedCredentials(input.email, credential, "admin")
+        : null,
     };
   }
 
@@ -397,7 +402,7 @@ export class SuperAdminService {
     const memberId = generateId();
     const now = new Date();
 
-    const hashedPassword = await hashPassword(SCHOOL_ADMIN_DEFAULT_PASSWORD);
+    const credential = await this.credentials.prepare("owner");
 
     const [, adminUser, , , school] = await this.prisma.client.$transaction([
       // 1. Create organization
@@ -420,8 +425,9 @@ export class SuperAdminService {
           id: userId,
           name: input.adminName,
           email: input.adminEmail,
-          emailVerified: true,
+          emailVerified: false,
           role: "owner",
+          mustChangePassword: true,
           createdAt: now,
           updatedAt: now,
         },
@@ -433,7 +439,7 @@ export class SuperAdminService {
           accountId: userId,
           providerId: "credential",
           userId,
-          password: hashedPassword,
+          password: credential.passwordHash,
           createdAt: now,
           updatedAt: now,
         },
@@ -471,6 +477,7 @@ export class SuperAdminService {
         email: adminUser.email,
         role: adminUser.role,
       },
+      credentials: toIssuedCredentials(adminUser.email, credential, "owner"),
     };
   }
 

@@ -5,6 +5,7 @@ import {
   ForbiddenException,
   UnauthorizedException,
 } from "@nestjs/common";
+import { assertPasswordChangeNotPending } from "./password-change.js";
 
 /**
  * SuperAdminGuard — allows only users with role === "superAdmin" to proceed.
@@ -19,6 +20,8 @@ export class SuperAdminGuard implements CanActivate {
     if (!user) {
       throw new UnauthorizedException("Authentication required");
     }
+
+    assertPasswordChangeNotPending(user);
 
     if (user.role !== "superAdmin") {
       throw new ForbiddenException(
