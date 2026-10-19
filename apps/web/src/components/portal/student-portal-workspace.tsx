@@ -30,6 +30,7 @@ import {
 import { PortalStatCard } from "./portal-stat-card";
 import { PortalModal } from "./portal-modal";
 import { cn } from "@/lib/utils";
+import { MyProfilePanel } from "@/components/school/student-profile-panel";
 import { DataTable } from "@/components/ui/data-table";
 import { useCanExportTables } from "@/lib/table-export-policy";
 
@@ -172,6 +173,8 @@ export function StudentPortalWorkspace({ defaultTab = "dashboard" }: StudentPort
           </div>
         </div>
       </div>
+
+      <MyProfilePanel />
 
       {/* KPI Stats */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

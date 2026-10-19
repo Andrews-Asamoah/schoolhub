@@ -87,6 +87,10 @@ model UserProfile {
   id     String @id @default(cuid())
   userId String @unique
 
+  /// Contact / login email shown on the profile. For students this is the
+  /// generated username@st.<school domain> address.
+  email  String?
+
   // Personal Information
   firstName      String
   lastName       String
@@ -132,6 +136,8 @@ model Student {
   schoolId           String
   studentId          String
   admissionNumber    String?
+  /// Generated sign-in name, e.g. "a.asamoah" (unique within the school).
+  username           String?
   admissionDate      DateTime      @default(now()) @db.Date
   classId            String?
   departmentId       String?
@@ -169,6 +175,7 @@ model Student {
 
   @@unique([studentId, schoolId])
   @@unique([admissionNumber, schoolId])
+  @@unique([schoolId, username])
   @@index([schoolId, status])
   @@index([classId, schoolId])
   @@index([departmentId])

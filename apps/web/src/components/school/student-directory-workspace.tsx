@@ -1,3 +1,4 @@
+import { StudentProfileModal } from "@/components/school/student-profile-panel";
 import { useForm } from "@tanstack/react-form";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -150,6 +151,7 @@ export function StudentDirectoryWorkspace() {
   const [page, setPage] = useState(1);
   const [editing, setEditing] = useState<Student | null>(null);
   const [showForm, setShowForm] = useState(false);
+  const [viewingId, setViewingId] = useState<string | null>(null);
   const [issued, setIssued] = useState<CredentialEntry[]>([]);
   const resetLoginMutation = useMutation({
     mutationFn: ({ id }: { id: string; name: string }) =>
@@ -209,6 +211,21 @@ export function StudentDirectoryWorkspace() {
   }
 
   const columns: WorkspaceColumn<Student>[] = [
+    {
+      id: "view",
+      header: "",
+      className: "w-20 text-right",
+      cell: (student: Student) => (
+        <button
+          type="button"
+          onClick={() => setViewingId(student.id)}
+          className="rounded-md px-2 py-1.5 text-xs font-semibold text-primary hover:bg-primary/10"
+          aria-label={`View profile of ${student.profile.firstName} ${student.profile.lastName}`}
+        >
+          View
+        </button>
+      ),
+    } satisfies WorkspaceColumn<Student>,
     {
       id: "name",
       header: "Student",
@@ -374,6 +391,8 @@ export function StudentDirectoryWorkspace() {
           )}
         </div>
       </section>
+
+      {viewingId && <StudentProfileModal studentId={viewingId} onClose={() => setViewingId(null)} />}
 
       {showForm && canManage && (
         <StudentEditor

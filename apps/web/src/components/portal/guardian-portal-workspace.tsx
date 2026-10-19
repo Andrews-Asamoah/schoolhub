@@ -35,6 +35,7 @@ import {
 import { PortalStatCard } from "./portal-stat-card";
 import { PortalModal } from "./portal-modal";
 import { cn } from "@/lib/utils";
+import { MyWardsPanel } from "@/components/school/student-profile-panel";
 import { DataTable } from "@/components/ui/data-table";
 import { useCanExportTables } from "@/lib/table-export-policy";
 
@@ -192,6 +193,8 @@ export function GuardianPortalWorkspace({ defaultTab = "overview" }: GuardianPor
           </div>
         </div>
       </div>
+
+      <MyWardsPanel />
 
       {/* Children Selector Pills */}
       <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-slate-200/80 bg-white p-3 shadow-xs dark:border-slate-800 dark:bg-slate-900">

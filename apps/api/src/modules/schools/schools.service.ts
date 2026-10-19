@@ -1,5 +1,7 @@
 import {
   BadRequestException,
+  HttpException,
+  HttpStatus,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -7,6 +9,7 @@ import {
 import type { School } from "@prisma/client";
 import { PrismaService } from "../../prisma/prisma.service.js";
 import {
+  studentEmailDomain,
   type CreateAcademicYearInput,
   type CreateTermInput,
   type UpdateAcademicYearInput,
@@ -27,6 +30,48 @@ import { canManageAcademicContext } from "../../common/academic-context.js";
 @Injectable()
 export class SchoolsService {
   constructor(private readonly prisma: PrismaService) {}
+
+  private readonly resolveHits = new Map<string, number[]>();
+
+  /**
+   * Turns what a person typed in the sign-in box into the email to sign in
+   * with. A student types their username (a.asamoah) or, for older records,
+   * their admission number; anything containing "@" is used as given.
+   * Unknown names get a plausible address back, so the response never reveals
+   * whether a username exists - the sign-in itself then simply fails.
+   */
+  async resolveLoginIdentifier(subdomain: string, identifier: string, ip: string) {
+    const now = Date.now();
+    const recent = (this.resolveHits.get(ip) ?? []).filter((t) => now - t < 10 * 60 * 1000);
+    if (recent.length >= 60) {
+      throw new HttpException("Too many attempts. Please wait a few minutes.", HttpStatus.TOO_MANY_REQUESTS);
+    }
+    recent.push(now);
+    this.resolveHits.set(ip, recent);
+
+    const id = identifier.trim().toLowerCase();
+    if (!id || id.length > 120) throw new BadRequestException("Enter your username or email.");
+    if (id.includes("@")) return { email: id };
+
+    const school = await this.prisma.client.school.findUnique({
+      where: { subdomain: subdomain.toLowerCase().trim() },
+      select: { id: true, email: true, subdomain: true },
+    });
+    if (!school) throw new NotFoundException("School not found.");
+    const student = await this.prisma.client.student.findFirst({
+      where: {
+        schoolId: school.id,
+        deletedAt: null,
+        OR: [{ username: id }, { admissionNumber: { equals: id, mode: "insensitive" } }],
+      },
+      select: { profile: { select: { user: { select: { email: true } } } } },
+    });
+    return {
+      email:
+        student?.profile.user.email ??
+        `${id}@${studentEmailDomain(school.email, school.subdomain)}`,
+    };
+  }
 
   async getCurrentSchool(schoolId: string, role?: string) {
     const school = await this.prisma.client.school.findUnique({

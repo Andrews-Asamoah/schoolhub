@@ -56,7 +56,7 @@ export class StudentsController {
       role === "teacher" && user
         ? await this.teacherScope.getTaughtClassIds(school.id, user.id)
         : undefined;
-    return this.studentsService.listStudents(school.id, {
+    const result = await this.studentsService.listStudents(school.id, {
       scopeClassIds,
       page: page ? Number(page) : undefined,
       limit: limit ? Number(limit) : undefined,
@@ -67,6 +67,39 @@ export class StudentsController {
       status,
       role,
     });
+    return role === "teacher"
+      ? { ...result, data: result.data.map((row) => this.studentsService.withoutFinancials(row)) }
+      : result;
+  }
+
+  /** The signed-in student's own profile. */
+  @Get("me")
+  @Roles("student")
+  myProfile(
+    @CurrentSchool() school: School,
+    @CurrentUser() user: AuthenticatedUser | undefined,
+  ) {
+    return this.studentsService.getMyProfile(school.id, user!.id);
+  }
+
+  /** Children linked to the signed-in parent / guardian. */
+  @Get("my-wards")
+  @Roles("guardian")
+  myWards(
+    @CurrentSchool() school: School,
+    @CurrentUser() user: AuthenticatedUser | undefined,
+  ) {
+    return this.studentsService.getMyWards(school.id, user!.id);
+  }
+
+  @Get("my-wards/:id")
+  @Roles("guardian")
+  myWard(
+    @CurrentSchool() school: School,
+    @CurrentUser() user: AuthenticatedUser | undefined,
+    @Param("id") id: string,
+  ) {
+    return this.studentsService.getMyWard(school.id, user!.id, id);
   }
 
   /** The signed-in student's own subjects (inherited from their class). */
@@ -77,6 +110,22 @@ export class StudentsController {
     @CurrentUser() user: AuthenticatedUser | undefined,
   ) {
     return this.studentsService.getMySubjects(school.id, user!.id);
+  }
+
+  /** Profile details (sign-in name and email, class, guardians, subjects). */
+  @Get(":id/profile")
+  @Roles("owner", "admin", "teacher", "staff", "accountant")
+  async getStudentProfile(
+    @CurrentSchool() school: School,
+    @CurrentSchoolRole() role: string | undefined,
+    @Param("id") id: string,
+    @CurrentUser() user?: AuthenticatedUser,
+  ) {
+    const scopeClassIds =
+      role === "teacher" && user
+        ? await this.teacherScope.getTaughtClassIds(school.id, user.id)
+        : undefined;
+    return this.studentsService.getProfileView(school.id, id, scopeClassIds);
   }
 
   @Get(":id/subjects")
@@ -114,7 +163,7 @@ export class StudentsController {
       role === "teacher" && user
         ? await this.teacherScope.getTaughtClassIds(school.id, user.id)
         : undefined;
-    return this.studentsService.getStudentById(
+    const student = await this.studentsService.getStudentById(
       school.id,
       id,
       role,
@@ -122,6 +171,7 @@ export class StudentsController {
       termId,
       scopeClassIds,
     );
+    return role === "teacher" ? this.studentsService.withoutFinancials(student) : student;
   }
 
   @Post()

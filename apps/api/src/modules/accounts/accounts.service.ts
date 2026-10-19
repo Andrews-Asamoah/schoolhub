@@ -127,13 +127,16 @@ export class AccountsService {
         userId = student.profile.userId;
         role = "student";
         credential = await this.credentials.prepare(role);
-        const studentLoginId = student.admissionNumber ?? student.studentId;
+        // Students created with the username scheme sign in with it; older
+        // records keep using their admission number.
+        const studentLoginId = student.username ?? student.admissionNumber ?? student.studentId;
         loginId = studentLoginId;
         email = student.profile.user.email;
         if (email.endsWith("@student.schoolhub")) {
           // Legacy placeholder that is not a valid sign-in address.
           email = studentLoginEmail(studentLoginId, school.subdomain);
           await tx.user.update({ where: { id: userId }, data: { email } });
+          await tx.userProfile.update({ where: { id: student.profileId }, data: { email } });
         }
       } else if (kind === "teacher") {
         const teacher = await tx.teacher.findFirst({

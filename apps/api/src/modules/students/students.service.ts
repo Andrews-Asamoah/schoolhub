@@ -8,7 +8,9 @@ import {
 import { randomUUID } from 'node:crypto';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import {
-  studentLoginEmail,
+  studentEmailDomain,
+  studentUsernameBase,
+  studentUsernameCandidate,
   type CreateStudentInput,
   type IssuedCredentials,
   type UpdateStudentInput,
@@ -382,7 +384,7 @@ export class StudentsService {
     const created = await this.prisma.client.$transaction(async (tx) => {
       const schoolRow = await tx.school.findUnique({
         where: { id: schoolId },
-        select: { code: true },
+        select: { code: true, email: true },
       });
       if (!schoolRow) {
         throw new NotFoundException('School not found.');
@@ -467,9 +469,48 @@ export class StudentsService {
       const admissionNumber = `${admissionPrefix}${String(lastSequence + 1).padStart(4, '0')}`;
       const studentId = `ID-${randomUUID().replaceAll('-', '').slice(0, 10).toUpperCase()}`;
 
-      // Student login: <admission number>@students.<school>.schoolhub.gh.
-      // The sign-in page also accepts just the admission number.
-      const loginEmail = studentLoginEmail(admissionNumber, school.subdomain);
+      // Student login: username = first initial + "." + surname
+      // (Andrews Asamoah -> a.asamoah); email = username@st.<school domain>.
+      // A taken name gets 1, 2, 3 ... appended. Still inside the advisory lock
+      // taken above, so two simultaneous registrations cannot pick the same name.
+      const usernameBase = studentUsernameBase(input.firstName, input.lastName);
+      if (!usernameBase) {
+        throw new BadRequestException(
+          'The first name and surname must contain letters so a username can be generated.',
+        );
+      }
+      const emailDomain = studentEmailDomain(schoolRow.email, school.subdomain);
+      const [takenUsernames, takenEmails] = await Promise.all([
+        tx.student.findMany({
+          where: { schoolId, username: { startsWith: usernameBase } },
+          select: { username: true },
+        }),
+        // Emails are unique across the whole platform, not just this school.
+        tx.user.findMany({
+          where: { email: { startsWith: usernameBase, endsWith: `@${emailDomain}` } },
+          select: { email: true },
+        }),
+      ]);
+      const usedUsernames = new Set(
+        takenUsernames.map((row) => row.username?.toLowerCase()),
+      );
+      const usedEmails = new Set(takenEmails.map((row) => row.email.toLowerCase()));
+      let attempt = 0;
+      let username = studentUsernameCandidate(usernameBase, attempt);
+      while (
+        usedUsernames.has(username) ||
+        usedEmails.has(`${username}@${emailDomain}`)
+      ) {
+        attempt += 1;
+        if (attempt > 9999) {
+          throw new ConflictException(
+            'Too many students share this name; ask an administrator to create this login manually.',
+          );
+        }
+        username = studentUsernameCandidate(usernameBase, attempt);
+      }
+      const loginEmail = `${username}@${emailDomain}`;
+
       const studentLogin = await this.credentials.createLogin(tx, {
         name: `${input.firstName} ${input.lastName}`,
         email: loginEmail,
@@ -477,6 +518,8 @@ export class StudentsService {
         organizationId: school.organizationId,
         credential: studentCredential,
         profile: {
+          // The generated login email is kept on the student's profile.
+          email: loginEmail,
           firstName: input.firstName,
           lastName: input.lastName,
           otherNames: input.otherNames,
@@ -498,6 +541,7 @@ export class StudentsService {
           profileId: studentLogin.profileId!,
           studentId,
           admissionNumber,
+          username,
           departmentId: departmentId ?? null,
           classId: placement?.isCurrentPeriod ? placement.class.id : null,
           houseId: input.houseId || null,
@@ -629,6 +673,8 @@ export class StudentsService {
       });
       return {
         student: full,
+        loginEmail,
+        username,
         guardianCredentials,
         subjects: placement
           ? await this.subjectsForClass(tx, placement.class.id)
@@ -639,10 +685,10 @@ export class StudentsService {
     return {
       ...created.student,
       credentials: toIssuedCredentials(
-        studentLoginEmail(created.student.admissionNumber!, school.subdomain),
+        created.loginEmail,
         studentCredential,
         'student',
-        created.student.admissionNumber ?? undefined,
+        created.username,
       ),
       guardianCredentials: created.guardianCredentials,
       // Subjects are inherited from the class (see subjectsForClass).
@@ -760,6 +806,172 @@ export class StudentsService {
           null
         : null,
     }));
+  }
+
+  /**
+   * Teachers need to know who a student is, not what the family owes: the
+   * fee balance is removed from anything a teacher receives.
+   */
+  withoutFinancials<T extends { outstandingBalance?: unknown }>(row: T) {
+    const { outstandingBalance: _omitted, ...rest } = row;
+    return rest;
+  }
+
+  /** Curated profile used by the parent and student portals (no internal fields). */
+  private async profileView(
+    schoolId: string,
+    studentId: string,
+    options: { viewerGuardianId?: string } = {},
+  ) {
+    const db = this.prisma.client;
+    const student = await db.student.findFirst({
+      where: { id: studentId, schoolId, deletedAt: null },
+      include: {
+        profile: true,
+        house: { select: { id: true, name: true } },
+        department: { select: { id: true, name: true } },
+        guardians: {
+          include: {
+            guardian: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                relationshipType: true,
+                phone: true,
+                email: true,
+              },
+            },
+          },
+        },
+      },
+    });
+    if (!student) throw new NotFoundException('Student not found');
+
+    const enrollment = await db.enrollment.findFirst({
+      where: {
+        studentId: student.id,
+        status: { in: ['ACTIVE', 'COMPLETED'] },
+        term: { isCurrent: true, academicYear: { isCurrent: true, schoolId } },
+      },
+      orderBy: { enrolledAt: 'desc' },
+      include: { class: { select: { id: true, name: true, level: true } } },
+    });
+    const subjects = enrollment
+      ? await this.subjectsForClass(db, enrollment.classId)
+      : [];
+
+    const p = student.profile;
+    return {
+      id: student.id,
+      studentId: student.studentId,
+      admissionNumber: student.admissionNumber,
+      username: student.username,
+      loginEmail: p.email,
+      status: student.status,
+      admissionDate: student.admissionDate,
+      profile: {
+        firstName: p.firstName,
+        lastName: p.lastName,
+        otherNames: p.otherNames,
+        gender: p.gender,
+        dateOfBirth: p.dateOfBirth,
+        nationality: p.nationality,
+        residentialAddress: p.residentialAddress,
+        city: p.city,
+        region: p.region,
+        email: p.email,
+        emergencyContactName: p.emergencyContactName,
+        emergencyContactPhone: p.emergencyContactPhone,
+        emergencyRelationship: p.emergencyRelationship,
+      },
+      class: enrollment?.class ?? null,
+      department: student.department,
+      house: student.house,
+      previousSchool: student.previousSchool,
+      previousClass: student.previousClass,
+      health: {
+        bloodGroup: student.bloodGroup,
+        allergies: student.allergies,
+        medicalConditions: student.medicalConditions,
+      },
+      // A parent sees who else is linked to the child, but contact details
+      // only for themselves.
+      guardians: student.guardians.map((link) => ({
+        id: link.guardian.id,
+        name: `${link.guardian.firstName} ${link.guardian.lastName}`.trim(),
+        relationshipType: link.guardian.relationshipType,
+        isPrimary: link.isPrimary,
+        ...(!options.viewerGuardianId || link.guardian.id === options.viewerGuardianId
+          ? { phone: link.guardian.phone, email: link.guardian.email }
+          : {}),
+      })),
+      subjects,
+    };
+  }
+
+  /**
+   * Profile view for staff and teachers. A teacher only gets students in
+   * classes they teach (same rule as the student list); no fee balance.
+   */
+  async getProfileView(schoolId: string, studentId: string, scopeClassIds?: string[]) {
+    if (scopeClassIds) {
+      const visible = await this.prisma.client.student.findFirst({
+        where: {
+          id: studentId,
+          schoolId,
+          deletedAt: null,
+          enrollments: { some: { classId: { in: scopeClassIds } } },
+        },
+        select: { id: true },
+      });
+      if (!visible) throw new NotFoundException('Student not found');
+    }
+    return this.profileView(schoolId, studentId);
+  }
+
+  private async requireGuardian(schoolId: string, userId: string) {
+    const guardian = await this.prisma.client.guardian.findFirst({
+      where: { schoolId, deletedAt: null, isActive: true, profile: { userId } },
+      select: { id: true },
+    });
+    if (!guardian) throw new NotFoundException('Guardian record not found');
+    return guardian;
+  }
+
+  /** Children linked to the signed-in parent. */
+  async getMyWards(schoolId: string, userId: string) {
+    const guardian = await this.requireGuardian(schoolId, userId);
+    const links = await this.prisma.client.guardianStudent.findMany({
+      where: { guardianId: guardian.id, student: { schoolId, deletedAt: null } },
+      select: { studentId: true },
+    });
+    return Promise.all(
+      links.map((link) =>
+        this.profileView(schoolId, link.studentId, { viewerGuardianId: guardian.id }),
+      ),
+    );
+  }
+
+  /** One linked child. Anyone else's child looks like "not found". */
+  async getMyWard(schoolId: string, userId: string, studentId: string) {
+    const guardian = await this.requireGuardian(schoolId, userId);
+    const link = await this.prisma.client.guardianStudent.findFirst({
+      where: { guardianId: guardian.id, studentId, student: { schoolId, deletedAt: null } },
+      select: { id: true },
+    });
+    if (!link) throw new NotFoundException('Student not found');
+    return this.profileView(schoolId, studentId, { viewerGuardianId: guardian.id });
+  }
+
+  /** The signed-in student's own profile (shows their username and login email). */
+  async getMyProfile(schoolId: string, userId: string) {
+    const student = await this.prisma.client.student.findFirst({
+      where: { schoolId, deletedAt: null, profile: { userId } },
+      select: { id: true },
+    });
+    if (!student) throw new NotFoundException('Student record not found');
+    return this.profileView(schoolId, student.id);
   }
 
   /** The signed-in student's own subjects (student portal). */

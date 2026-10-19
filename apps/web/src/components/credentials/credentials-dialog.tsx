@@ -60,18 +60,18 @@ export function CredentialsDialog({
           {entries.map((entry, index) => {
             const { credentials } = entry;
             const signIn = credentials.loginId ?? credentials.loginEmail;
-            const block = `Sign-in: ${signIn}\nDefault password: ${credentials.temporaryPassword}`;
+            const block = `Username: ${signIn}\nLogin email: ${credentials.loginEmail}\nDefault password: ${credentials.temporaryPassword}`;
             return (
               <section key={`${credentials.loginEmail}-${index}`} className="rounded-xl border border-slate-200 p-4 dark:border-white/10">
                 <h3 className="text-sm font-semibold text-slate-900 dark:text-white">{entry.label}</h3>
                 <dl className="mt-2 space-y-1.5 text-sm">
                   <div className="flex justify-between gap-3">
-                    <dt className="text-slate-500">Sign in with</dt>
+                    <dt className="text-slate-500">{credentials.loginId ? "Username" : "Sign in with"}</dt>
                     <dd className="break-all text-right font-mono text-slate-900 dark:text-white">{signIn}</dd>
                   </div>
                   {credentials.loginId && (
                     <div className="flex justify-between gap-3">
-                      <dt className="text-slate-500">Or full email</dt>
+                      <dt className="text-slate-500">Login email</dt>
                       <dd className="break-all text-right font-mono text-xs text-slate-600 dark:text-slate-300">{credentials.loginEmail}</dd>
                     </div>
                   )}

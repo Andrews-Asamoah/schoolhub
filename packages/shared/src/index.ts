@@ -62,7 +62,7 @@ export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;
 export interface IssuedCredentials {
   /** Value to type into the "Email" box on the sign-in page. */
   loginEmail: string;
-  /** Short ID a student may type instead of the full login email. */
+  /** Short ID a student may type instead of the full login email (their username). */
   loginId?: string;
   temporaryPassword: string;
   role: Role;
@@ -76,6 +76,69 @@ export function studentLoginEmail(admissionNumber: string, schoolSubdomain: stri
   return `${admissionNumber.trim().toLowerCase()}@students.${schoolSubdomain
     .trim()
     .toLowerCase()}.${STUDENT_LOGIN_EMAIL_DOMAIN}`;
+}
+
+/**
+ * Free mail providers. A school that registered with one of these (e.g.
+ * info@gmail.com) has no domain of its own, and many schools would share it,
+ * so its students get an address under the platform domain instead.
+ */
+const PUBLIC_EMAIL_DOMAINS = new Set([
+  "gmail.com",
+  "googlemail.com",
+  "yahoo.com",
+  "yahoo.co.uk",
+  "outlook.com",
+  "hotmail.com",
+  "live.com",
+  "msn.com",
+  "icloud.com",
+  "aol.com",
+  "proton.me",
+  "protonmail.com",
+  "mail.com",
+]);
+
+/**
+ * Domain part of a student's login email: "st." + the school's own email
+ * domain. info@manaint.edu.gh  ->  st.manaint.edu.gh
+ */
+export function studentEmailDomain(
+  schoolEmail: string | null | undefined,
+  schoolSubdomain: string,
+): string {
+  const domain = schoolEmail?.split("@")[1]?.trim().toLowerCase();
+  if (
+    domain &&
+    /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/.test(domain) &&
+    !PUBLIC_EMAIL_DOMAINS.has(domain)
+  ) {
+    return `st.${domain}`;
+  }
+  return `st.${schoolSubdomain.trim().toLowerCase()}.${STUDENT_LOGIN_EMAIL_DOMAIN}`;
+}
+
+const toLetters = (value: string) =>
+  value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "") // strip accents (e.g. é -> e)
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "");
+
+/**
+ * Base username: first letter of the first name + "." + surname.
+ * Andrews Asamoah -> a.asamoah. Returns null when a name has no usable letters.
+ */
+export function studentUsernameBase(firstName: string, surname: string): string | null {
+  const initial = toLetters(firstName).replace(/[0-9]/g, "").charAt(0);
+  const last = toLetters(surname);
+  if (!initial || !last) return null;
+  return `${initial}.${last}`;
+}
+
+/** Candidate usernames in order: a.asamoah, a.asamoah1, a.asamoah2, ... */
+export function studentUsernameCandidate(base: string, attempt: number): string {
+  return attempt === 0 ? base : `${base}${attempt}`;
 }
 
 export const CREDENTIAL_SUBJECT_KINDS = ["student", "teacher", "staff", "guardian"] as const;

@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import { useEffect, useState, type FormEvent } from "react";
 import { studentLoginEmail } from "@schoolhub/shared";
-import { getClientSubdomain } from "@/lib/api";
+import { apiFetch, getClientSubdomain } from "@/lib/api";
 import { ThemeToggle } from "@/components/school/theme-toggle";
 import { consumeLogoutNotice } from "@/hooks/use-logout";
 import { authClient, signIn, useSession } from "@/lib/auth-client";
@@ -70,16 +70,20 @@ function LoginPage() {
     setLoading(true);
 
     try {
-      // Students may type just their admission number; build the full login
-      // address from the school they are visiting (<school>.schoolhub.gh).
+      // Students type their username (e.g. a.asamoah) rather than a long
+      // email. The school's server turns it into the real login address.
       let loginEmail = email.trim();
       if (!loginEmail.includes("@")) {
         const school = getClientSubdomain();
         if (!school) {
-          setError("Open your school’s SchoolHub address to sign in with a student ID, or use your email.");
+          setError("Open your school’s SchoolHub address to sign in with a username, or use your email.");
           return;
         }
-        loginEmail = studentLoginEmail(loginEmail, school);
+        const resolved = await apiFetch<{ email: string }>(
+          `/schools/public/${school}/resolve-login`,
+          { method: "POST", body: JSON.stringify({ identifier: loginEmail }) },
+        ).catch(() => null);
+        loginEmail = resolved?.email ?? studentLoginEmail(loginEmail, school);
       }
       const result = await signIn.email({ email: loginEmail, password });
       if (result.error) {
@@ -255,7 +259,7 @@ function LoginPage() {
                 htmlFor="email"
                 className="mb-2 block text-xs font-semibold text-slate-700 dark:text-slate-200"
               >
-                Email or student ID
+                Email or username
               </label>
               <div className="group relative">
                 <Mail className="pointer-events-none absolute left-3.5 top-1/2 size-[17px] -translate-y-1/2 text-slate-400 transition group-focus-within:text-blue-600" />
@@ -270,7 +274,7 @@ function LoginPage() {
                   required
                   value={email}
                   onChange={(event) => setEmail(event.target.value)}
-                  placeholder="you@school.edu or ABC260001"
+                  placeholder="you@school.edu or a.asamoah"
                   className="h-12 w-full rounded-xl border border-slate-200 bg-white pl-11 pr-4 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 hover:border-slate-300 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:hover:border-slate-600"
                 />
               </div>
