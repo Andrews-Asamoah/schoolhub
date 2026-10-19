@@ -7,7 +7,6 @@ import {
 import type { School } from "@prisma/client";
 import { PrismaService } from "../../prisma/prisma.service.js";
 import {
-  ROLES,
   type CreateAcademicYearInput,
   type CreateTermInput,
   type UpdateAcademicYearInput,
@@ -16,6 +15,7 @@ import {
   type UpdateSchoolMemberRolesInput,
   type UpdateSchoolSettingsInput,
 } from "@schoolhub/shared";
+import { checkRoleChange } from "./member-roles.js";
 import {
   findOverlappingTerm,
   termProblemWithinYear,
@@ -277,31 +277,17 @@ export class SchoolsService {
       throw new NotFoundException("School membership not found.");
     }
 
-    if (!input.roles.includes(target.role as (typeof ROLES)[number])) {
-      throw new BadRequestException(
-        "The membership's primary role must remain assigned.",
-      );
+    const change = checkRoleChange({
+      actorRole: actor.role,
+      target: { role: target.role, roles: target.roles },
+      requested: input.roles,
+    });
+    if (!change.ok) {
+      throw change.kind === "forbidden"
+        ? new ForbiddenException(change.message)
+        : new BadRequestException(change.message);
     }
-    if (input.roles.includes("owner") && target.role !== "owner") {
-      throw new BadRequestException(
-        "Owner access cannot be granted as an additional role.",
-      );
-    }
-    const existingRoles = new Set([target.role, ...target.roles]);
-    const addsAdministratorAccess = input.roles.some(
-      (role) =>
-        (role === "admin" || role === "headmistress") &&
-        !existingRoles.has(role),
-    );
-    if (addsAdministratorAccess && actor.role !== "owner") {
-      throw new ForbiddenException(
-        "Only the school owner can grant administrator or headmistress access.",
-      );
-    }
-
-    const roles = [...new Set(input.roles)].filter(
-      (role) => role !== target.role,
-    );
+    const roles = change.roles;
     const updated = await this.prisma.client.member.update({
       where: { id: target.id },
       data: { roles },

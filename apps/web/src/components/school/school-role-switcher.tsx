@@ -77,6 +77,8 @@ export function useSchoolRole() {
 
   return {
     activeRole,
+    /** The role on the membership itself (never changes with the role switcher). */
+    primaryRole: query.data?.primaryRole ?? null,
     roles: query.data?.roles ?? [],
     isPending: query.isPending,
     error: query.error,
