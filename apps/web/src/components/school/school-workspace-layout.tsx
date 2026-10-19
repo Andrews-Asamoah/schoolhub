@@ -5,6 +5,7 @@ import { useEffect, type ReactNode } from "react";
 import { apiFetch } from "@/lib/api";
 import { useSession } from "@/lib/auth-client";
 import { SchoolSidebar } from "@/components/school/school-sidebar";
+import { ProfilePhotoMenu } from "@/components/school/profile-photo-menu";
 import { AcademicContextSwitcher } from "@/components/school/academic-context-switcher";
 import {
   useSchoolOrganization,
@@ -84,6 +85,7 @@ export function SchoolWorkspaceLayout({
           schoolName={school?.name}
           userName={session?.user?.name}
           userEmail={session?.user?.email}
+          userImage={session?.user?.image}
         />
         <div className="min-w-0 flex-1">
           <header className="sticky top-0 z-10 flex h-[4.5rem] items-center justify-between border-b border-slate-200/80 bg-white/90 px-4 backdrop-blur md:px-8">
@@ -122,12 +124,7 @@ export function SchoolWorkspaceLayout({
                 <span className="absolute right-2 top-2 size-1.5 rounded-full bg-rose-500 ring-2 ring-white" />
               </button>
               <span className="hidden h-6 w-px bg-slate-200 sm:block" />
-              <div className="hidden text-right sm:block">
-                <p className="text-xs font-semibold text-slate-800">
-                  {session?.user?.name ?? "School admin"}
-                </p>
-                <p className="text-[10px] text-slate-500">{schoolRoleLabel(activeRole)} · {section}</p>
-              </div>
+              <ProfilePhotoMenu subtitle={`${schoolRoleLabel(activeRole)} · ${section}`} />
             </div>
           </header>
           <main className="mx-auto max-w-[1440px] px-4 py-7 sm:px-6 lg:px-9 lg:py-9">

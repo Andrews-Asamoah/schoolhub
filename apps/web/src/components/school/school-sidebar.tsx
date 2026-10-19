@@ -1,6 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { GraduationCap, LogOut, Sparkles, LoaderCircle } from "lucide-react";
 import { useLogout } from "@/hooks/use-logout";
+import { UserAvatar } from "@/components/ui/user-avatar";
 import { getOwnPortalItem, getSchoolNavGroupsForRole } from "@/lib/school-navigation";
 import { useSchoolRole } from "@/components/school/school-role-switcher";
 import {
@@ -18,6 +19,7 @@ interface SchoolSidebarProps {
   schoolName?: string;
   userName?: string;
   userEmail?: string;
+  userImage?: string | null;
 }
 
 export function SchoolSidebar({
@@ -25,6 +27,7 @@ export function SchoolSidebar({
   schoolName,
   userName,
   userEmail,
+  userImage,
 }: SchoolSidebarProps) {
   const { error: signOutError, isSigningOut, logout } = useLogout();
   const { activeRole } = useSchoolRole();
@@ -124,9 +127,7 @@ export function SchoolSidebar({
           </p>
         </div>
         <div className="flex min-w-0 items-center gap-2">
-          <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-slate-200 text-xs font-semibold text-slate-700">
-            {userName?.charAt(0)?.toUpperCase() ?? "S"}
-          </span>
+          <UserAvatar name={userName} image={userImage} />
           <span className="sidebar-expanded min-w-0 flex-1">
             <span className="school-sidebar-user-name block truncate text-xs font-semibold text-slate-800">
               {userName ?? "School admin"}
