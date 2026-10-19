@@ -40,6 +40,7 @@ model AcademicYear {
   classes          Class[]
   enrollments      Enrollment[]
   terms            Term[]
+  admissionCycles  AdmissionCycle[]
   reportCardSets   ReportCardSet[]
   timetableEntries TimetableEntry[]
 
@@ -75,6 +76,7 @@ model Term {
   bills                 Bill[]
   enrollments           Enrollment[]
   remarks               Remark[]
+  admissionCycles       AdmissionCycle[]
   reportCardSets        ReportCardSet[]
   notifications         Notification[]
   announcements         Announcement[]
@@ -140,6 +142,8 @@ model Class {
   classTeacherAssignments   ClassTeacherAssignment[]
   enrollments               Enrollment[]
   students                  Student[]
+  admissionCycleClasses     AdmissionCycleClass[]
+  applications              Application[]
   departmentId              String?
   department                Department?               @relation(fields: [departmentId], references: [id])
   assessmentTemplates       AssessmentTemplate[]

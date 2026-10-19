@@ -1,0 +1,150 @@
+// ============================================================================
+// ADMISSIONS: enrollment windows -> applications -> entrance exam -> decision
+// -> admission (student record + portal login are created on "admit").
+// ============================================================================
+
+enum AdmissionCycleStatus {
+  DRAFT
+  OPEN
+  CLOSED
+}
+
+/// Entrance-exam / admission fee, paid in cash on exam day. It is income for
+/// the school and is NOT refundable whatever the admission outcome.
+enum AdmissionFeeStatus {
+  NOT_REQUIRED
+  PENDING
+  PAID
+  EXEMPTED
+}
+
+enum ApplicationStatus {
+  SUBMITTED
+  UNDER_REVIEW
+  EXAM_SCHEDULED
+  EXAM_COMPLETED
+  ACCEPTED
+  WAITLISTED
+  REJECTED
+  ADMITTED
+  WITHDRAWN
+}
+
+/// One enrollment window (e.g. "2027/2028 Term 1 Intake"). Each school opens
+/// one per academic year / term it admits new students.
+model AdmissionCycle {
+  id             String               @id @default(cuid())
+  schoolId       String
+  name           String
+  academicYearId String
+  termId         String?
+  opensAt        DateTime
+  closesAt       DateTime
+  status         AdmissionCycleStatus @default(DRAFT)
+  examMaxScore   Decimal              @default(100) @db.Decimal(6, 2)
+  passMark       Decimal              @default(50) @db.Decimal(6, 2)
+  /// Fee each applicant pays in cash when coming to write the entrance exam (0 = free).
+  admissionFee   Decimal              @default(0) @db.Decimal(10, 2)
+  instructions   String?
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+
+  school       School                @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  academicYear AcademicYear          @relation(fields: [academicYearId], references: [id], onDelete: Cascade)
+  term         Term?                 @relation(fields: [termId], references: [id], onDelete: SetNull)
+  classes      AdmissionCycleClass[]
+  applications Application[]
+
+  @@unique([schoolId, name])
+  @@index([schoolId, status])
+  @@map("admission_cycles")
+}
+
+/// Classes open for applications in a cycle, with an optional seat limit.
+model AdmissionCycleClass {
+  id        String   @id @default(cuid())
+  cycleId   String
+  classId   String
+  seats     Int?
+  createdAt DateTime @default(now())
+
+  cycle        AdmissionCycle @relation(fields: [cycleId], references: [id], onDelete: Cascade)
+  class        Class          @relation(fields: [classId], references: [id], onDelete: Cascade)
+  applications Application[]
+
+  @@unique([cycleId, classId])
+  @@index([classId])
+  @@map("admission_cycle_classes")
+}
+
+model Application {
+  id                 String            @id @default(cuid())
+  schoolId           String
+  cycleId            String
+  cycleClassId       String
+  classId            String
+  applicationNumber  String
+  status             ApplicationStatus @default(SUBMITTED)
+
+  firstName          String
+  lastName           String
+  otherNames         String?
+  gender             Gender
+  dateOfBirth        DateTime          @db.Date
+  nationality        String            @default("Ghanaian")
+  previousSchool     String?
+  previousClass      String?
+  residentialAddress String?
+  city               String?
+  region             String?
+
+  guardianFirstName    String
+  guardianLastName     String
+  guardianPhone        String
+  guardianEmail        String?
+  guardianRelationship String
+
+  examDate           DateTime?
+  examVenue          String?
+  examScore          Decimal?          @db.Decimal(6, 2)
+  decisionNote       String?
+  decidedAt          DateTime?
+  decidedById        String?
+  studentId          String?           @unique
+  admittedAt         DateTime?
+
+  // Admission fee. feeDue is a snapshot of the intake's fee; feeStatus moves
+  // PENDING -> PAID (cash received, posted to the income ledger) or
+  // PENDING -> EXEMPTED (waived, with a mandatory reason). Never refunded.
+  feeStatus          AdmissionFeeStatus @default(NOT_REQUIRED)
+  feeDue             Decimal           @default(0) @db.Decimal(10, 2)
+  feePaidAmount      Decimal?          @db.Decimal(10, 2)
+  feePaidAt          DateTime?         @db.Date
+  feeReceiptNumber   String?
+  feeNotes           String?
+  feeReceivedById    String?
+  feeTransactionId   String?           @unique
+  feeExemptionReason String?
+  feeExemptedById    String?
+  feeExemptedAt      DateTime?
+
+  submittedAt        DateTime          @default(now())
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+
+  school     School              @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  cycle      AdmissionCycle      @relation(fields: [cycleId], references: [id], onDelete: Cascade)
+  cycleClass AdmissionCycleClass @relation(fields: [cycleClassId], references: [id], onDelete: Restrict)
+  class      Class               @relation(fields: [classId], references: [id], onDelete: Restrict)
+  student    Student?            @relation(fields: [studentId], references: [id], onDelete: SetNull)
+  feeTransaction Transaction?    @relation(fields: [feeTransactionId], references: [id], onDelete: SetNull)
+
+  @@unique([schoolId, applicationNumber])
+  @@unique([schoolId, feeReceiptNumber])
+  @@index([cycleId, status])
+  @@index([cycleId, feeStatus])
+  @@index([schoolId, status])
+  @@index([cycleClassId])
+  @@index([classId])
+  @@map("applications")
+}

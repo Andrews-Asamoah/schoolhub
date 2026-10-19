@@ -52,6 +52,15 @@ export const schoolNavGroups: SchoolNavGroup[] = [
         apiStatus: "available",
       },
       {
+        id: "admissions",
+        label: "Admissions",
+        icon: ClipboardCheck,
+        description:
+          "Open an intake, review applications, run entrance exams, and admit successful applicants with portal logins.",
+        section: "People",
+        apiStatus: "available",
+      },
+      {
         id: "enrollments",
         label: "Enrollments",
         icon: GraduationCap,
@@ -354,6 +363,7 @@ const rolePages: Record<string, string[]> = {
   ],
   accountant: [
     "accountant-portal",
+    "admissions",
     "fees",
     "payments",
     "invoices",
@@ -365,6 +375,7 @@ const rolePages: Record<string, string[]> = {
   ],
   staff: [
     "students",
+    "admissions",
     "enrollments",
     "teachers",
     "staff",

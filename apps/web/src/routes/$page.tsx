@@ -30,6 +30,7 @@ import { AcademicYearSetup } from "@/components/school/academic-year-setup";
 import { TeamRoleWorkspace } from "@/components/school/team-role-workspace";
 import { ClassesWorkspace } from "@/components/school/classes-workspace";
 import { useSchoolRole } from "@/components/school/school-role-switcher";
+import { AdmissionsWorkspace } from "@/components/school/admissions-workspace";
 import { EnrollmentWorkspace } from "@/components/school/enrollment-workspace";
 import { StudentDirectoryWorkspace } from "@/components/school/student-directory-workspace";
 import { PeopleWorkspace } from "@/components/school/people-workspace";
@@ -242,6 +243,7 @@ function WorkspaceContent({ pageId }: { pageId: string }) {
             activeRole === "student" ? <StudentPortalWorkspace defaultTab="timetable" /> : <TimetableWorkspace />
           )}
           {pageId === "students" && <StudentDirectoryWorkspace />}
+          {pageId === "admissions" && <AdmissionsWorkspace />}
           {pageId === "teachers" && <PeopleWorkspace kind="teachers" />}
           {pageId === "staff" && <PeopleWorkspace kind="staff" />}
           {pageId === "guardians" && <PeopleWorkspace kind="guardians" />}

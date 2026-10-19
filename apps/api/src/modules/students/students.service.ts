@@ -349,6 +349,14 @@ export class StudentsService {
     school: Pick<School, 'id' | 'organizationId' | 'subdomain'>,
     actorId: string,
     input: CreateStudentInput,
+    options: {
+      role?: string;
+      /** Runs inside the same transaction (used by admissions to link the application). */
+      afterCreate?: (
+        tx: Prisma.TransactionClient,
+        student: { id: string; admissionNumber: string | null },
+      ) => Promise<void>;
+    } = {},
   ) {
     const schoolId = school.id;
 
@@ -392,8 +400,39 @@ export class StudentsService {
         }
       }
 
+      let departmentId = input.departmentId;
+      if (departmentId) {
+        const department = await tx.department.findFirst({
+          where: { id: departmentId, schoolId, isActive: true },
+          select: { id: true },
+        });
+        if (!department) {
+          throw new BadRequestException(
+            'Choose an active department belonging to this school.',
+          );
+        }
+      }
+
+      // Class placement (optional): validated BEFORE any account is created.
+      const placement = input.classId
+        ? await this.resolvePlacement(tx, schoolId, input, options.role)
+        : null;
+      if (placement) {
+        const classDepartmentId = placement.class.departmentId;
+        if (departmentId && classDepartmentId && classDepartmentId !== departmentId) {
+          throw new BadRequestException(
+            'The selected class belongs to a different department.',
+          );
+        }
+        // A class that sits in a department puts its students there too.
+        departmentId ??= classDepartmentId ?? undefined;
+      }
+
       const admissionYear = new Date().getUTCFullYear();
-      await tx.$queryRaw`
+      // pg_advisory_xact_lock() returns Postgres `void`, which Prisma cannot
+      // deserialize through $queryRaw (it failed every student creation with
+      // P2010). $executeRaw never reads result columns, so it is safe.
+      await tx.$executeRaw`
         SELECT pg_advisory_xact_lock(
           hashtext(${schoolId}),
           hashtext(${String(admissionYear)})
@@ -459,13 +498,26 @@ export class StudentsService {
           profileId: studentLogin.profileId!,
           studentId,
           admissionNumber,
-          departmentId: input.departmentId,
+          departmentId: departmentId ?? null,
+          classId: placement?.isCurrentPeriod ? placement.class.id : null,
           houseId: input.houseId || null,
           bloodGroup: input.bloodGroup,
           allergies: input.allergies,
           medicalConditions: input.medicalConditions,
         },
       });
+
+      if (placement) {
+        await tx.enrollment.create({
+          data: {
+            studentId: student.id,
+            classId: placement.class.id,
+            academicYearId: placement.academicYearId,
+            termId: placement.termId,
+            status: 'ACTIVE',
+          },
+        });
+      }
 
       const guardianCredentials: Array<{
         guardianId: string;
@@ -561,15 +613,27 @@ export class StudentsService {
         },
       });
 
+      await options.afterCreate?.(tx, {
+        id: student.id,
+        admissionNumber: student.admissionNumber,
+      });
+
       const full = await tx.student.findUniqueOrThrow({
         where: { id: student.id },
         include: {
           profile: true,
           class: true,
+          department: true,
           guardians: { include: { guardian: true } },
         },
       });
-      return { student: full, guardianCredentials };
+      return {
+        student: full,
+        guardianCredentials,
+        subjects: placement
+          ? await this.subjectsForClass(tx, placement.class.id)
+          : [],
+      };
     });
 
     return {
@@ -581,6 +645,175 @@ export class StudentsService {
         created.student.admissionNumber ?? undefined,
       ),
       guardianCredentials: created.guardianCredentials,
+      // Subjects are inherited from the class (see subjectsForClass).
+      subjects: created.subjects,
+    };
+  }
+
+  /**
+   * Validate the class (and the academic term) a new student is placed in.
+   * Mirrors AcademicsService.createEnrollments so both paths follow the
+   * same rules: active class of this school, current-term-only for roles that
+   * cannot manage the academic context, and the class capacity limit.
+   */
+  private async resolvePlacement(
+    tx: Prisma.TransactionClient,
+    schoolId: string,
+    input: Pick<CreateStudentInput, 'classId' | 'academicYearId' | 'termId'>,
+    role?: string,
+  ) {
+    if (Boolean(input.academicYearId) !== Boolean(input.termId)) {
+      throw new BadRequestException(
+        'Academic year and term must be supplied together.',
+      );
+    }
+    const klass = await tx.class.findFirst({
+      where: { id: input.classId, schoolId, isActive: true, deletedAt: null },
+      select: { id: true, name: true, capacity: true, departmentId: true },
+    });
+    if (!klass) {
+      throw new BadRequestException(
+        'Choose an active class belonging to this school.',
+      );
+    }
+
+    const currentYear = await tx.academicYear.findFirst({
+      where: { schoolId, isCurrent: true },
+      include: { terms: { where: { isCurrent: true }, take: 1 } },
+    });
+    const currentTerm = currentYear?.terms[0];
+    if (!currentYear || !currentTerm) {
+      throw new BadRequestException(
+        'Set a current academic year and term (Academic years) before placing a student in a class.',
+      );
+    }
+    const academicYearId = input.academicYearId ?? currentYear.id;
+    const termId = input.termId ?? currentTerm.id;
+    const term = await tx.term.findFirst({
+      where: { id: termId, academicYearId, academicYear: { schoolId } },
+      select: { id: true },
+    });
+    if (!term) {
+      throw new BadRequestException(
+        'Choose a term belonging to an academic year in this school.',
+      );
+    }
+    const isCurrentPeriod =
+      academicYearId === currentYear.id && termId === currentTerm.id;
+    if (!isCurrentPeriod && !canManageAcademicContext(role)) {
+      throw new ForbiddenException(
+        'Only the current academic year and term are available for your role.',
+      );
+    }
+
+    if (klass.capacity !== null) {
+      const taken = await tx.enrollment.count({
+        where: { classId: klass.id, academicYearId, termId, status: 'ACTIVE' },
+      });
+      if (taken + 1 > klass.capacity) {
+        throw new ConflictException(
+          `${klass.name} is full (capacity ${klass.capacity}).`,
+        );
+      }
+    }
+    return { class: klass, academicYearId, termId, isCurrentPeriod };
+  }
+
+  /**
+   * Subjects a student inherits: everything linked to their class
+   * (ClassSubject). The same subject can be linked to many classes, each with
+   * its own teacher, so the teacher shown is the one for THIS class.
+   */
+  async subjectsForClass(
+    client: Prisma.TransactionClient | PrismaService['client'],
+    classId: string,
+  ) {
+    const rows = await client.classSubject.findMany({
+      where: {
+        classId,
+        subject: { deletedAt: null, isActive: true },
+      },
+      orderBy: { subject: { name: 'asc' } },
+      include: {
+        subject: {
+          select: { id: true, name: true, code: true, periodsPerWeek: true },
+        },
+        teacher: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            profile: { select: { firstName: true, lastName: true } },
+          },
+        },
+      },
+    });
+    return rows.map((row) => ({
+      subjectId: row.subject.id,
+      name: row.subject.name,
+      code: row.subject.code,
+      periodsPerWeek: row.subject.periodsPerWeek,
+      isCompulsory: row.isCompulsory,
+      teacherId: row.teacherId,
+      teacherName: row.teacher
+        ? `${row.teacher.firstName ?? row.teacher.profile?.firstName ?? ''} ${row.teacher.lastName ?? row.teacher.profile?.lastName ?? ''}`.trim() ||
+          null
+        : null,
+    }));
+  }
+
+  /** The signed-in student's own subjects (student portal). */
+  async getMySubjects(schoolId: string, userId: string) {
+    const student = await this.prisma.client.student.findFirst({
+      where: { schoolId, deletedAt: null, profile: { userId } },
+      select: { id: true },
+    });
+    if (!student) throw new NotFoundException('Student record not found');
+    return this.getStudentSubjects(schoolId, student.id);
+  }
+
+  /** Subjects for a student in the viewed (default: current) academic term. */
+  async getStudentSubjects(
+    schoolId: string,
+    studentId: string,
+    options: {
+      academicYearId?: string;
+      termId?: string;
+      scopeClassIds?: string[];
+    } = {},
+  ) {
+    let { academicYearId, termId } = options;
+    if (!academicYearId || !termId) {
+      const year = await this.prisma.client.academicYear.findFirst({
+        where: { schoolId, isCurrent: true },
+        include: { terms: { where: { isCurrent: true }, take: 1 } },
+      });
+      academicYearId = year?.id;
+      termId = year?.terms[0]?.id;
+    }
+    const enrollment = await this.prisma.client.enrollment.findFirst({
+      where: {
+        studentId,
+        academicYearId,
+        termId,
+        status: { in: ['ACTIVE', 'COMPLETED'] },
+        student: { schoolId, deletedAt: null },
+        class: { schoolId },
+        ...(options.scopeClassIds
+          ? { classId: { in: options.scopeClassIds } }
+          : {}),
+      },
+      include: { class: { select: { id: true, name: true, level: true } } },
+    });
+    if (!enrollment) {
+      return { class: null, subjects: [] };
+    }
+    return {
+      class: enrollment.class,
+      subjects: await this.subjectsForClass(
+        this.prisma.client,
+        enrollment.classId,
+      ),
     };
   }
 
@@ -638,6 +871,21 @@ export class StudentsService {
         if (!house || (!house.isActive && input.houseId !== existing.houseId)) {
           throw new BadRequestException(
             'Choose an active house belonging to this school.',
+          );
+        }
+      }
+
+      if (input.departmentId) {
+        const department = await tx.department.findFirst({
+          where: { id: input.departmentId, schoolId },
+          select: { id: true, isActive: true },
+        });
+        if (
+          !department ||
+          (!department.isActive && input.departmentId !== existing.departmentId)
+        ) {
+          throw new BadRequestException(
+            'Choose an active department belonging to this school.',
           );
         }
       }

@@ -6,7 +6,7 @@ import {
 } from "@nestjs/common";
 import { PrismaService } from "../../prisma/prisma.service.js";
 import type { GenerateBillInput, RecordPaymentInput } from "@schoolhub/shared";
-import { Prisma } from "@prisma/client";
+import { Prisma, type TransactionCategory } from "@prisma/client";
 import { canManageAcademicContext } from "../../common/academic-context.js";
 
 @Injectable()
@@ -154,6 +154,116 @@ export class FinanceService {
       count: createdBills.length,
       totalBilled: totalAmount * createdBills.length,
     };
+  }
+
+  /**
+   * Find (or lazily create) a ledger account. Schools start with an empty
+   * chart of accounts, so system postings provision what they need.
+   */
+  private async ensureAccount(
+    tx: Prisma.TransactionClient,
+    schoolId: string,
+    spec: {
+      accountType: "ASSET" | "REVENUE";
+      category: "CASH" | "OTHER_INCOME";
+      name: string;
+      code: string;
+    },
+  ) {
+    const existing = await tx.chartAccount.findFirst({
+      where:
+        spec.category === "CASH"
+          ? { schoolId, accountType: spec.accountType, category: spec.category, isActive: true }
+          : { schoolId, accountType: spec.accountType, category: spec.category, name: spec.name },
+      orderBy: { code: "asc" },
+    });
+    if (existing) return existing;
+    // The school may already use our preferred code for something else.
+    for (const code of [spec.code, `${spec.code}-1`, `${spec.code}-2`, `${spec.code}-3`]) {
+      const taken = await tx.chartAccount.findUnique({
+        where: { code_schoolId: { code, schoolId } },
+        select: { id: true },
+      });
+      if (!taken) {
+        return tx.chartAccount.create({
+          data: {
+            schoolId,
+            code,
+            name: spec.name,
+            accountType: spec.accountType,
+            category: spec.category,
+          },
+        });
+      }
+    }
+    throw new BadRequestException(
+      `Could not create the “${spec.name}” account: its code is already in use. Create it manually in the chart of accounts.`,
+    );
+  }
+
+  /**
+   * Post cash received as school income (double entry: debit cash on hand,
+   * credit a revenue account) and raise both account balances. Runs inside the
+   * caller's transaction so the income and the business record it relates to
+   * (e.g. an admission-fee receipt) are saved - or rolled back - together.
+   */
+  async postIncome(
+    tx: Prisma.TransactionClient,
+    input: {
+      schoolId: string;
+      amount: Prisma.Decimal;
+      date: Date;
+      description: string;
+      category: TransactionCategory;
+      revenueAccount: { name: string; code: string };
+      referenceType: string;
+      referenceId: string;
+      referenceNumber?: string;
+      notes?: string;
+    },
+  ) {
+    const cash = await this.ensureAccount(tx, input.schoolId, {
+      accountType: "ASSET",
+      category: "CASH",
+      name: "Cash on Hand",
+      code: "1000",
+    });
+    const revenue = await this.ensureAccount(tx, input.schoolId, {
+      accountType: "REVENUE",
+      category: "OTHER_INCOME",
+      name: input.revenueAccount.name,
+      code: input.revenueAccount.code,
+    });
+
+    const prefix = `TXN-${input.date.getUTCFullYear()}-`;
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${input.schoolId}), hashtext(${prefix}))`;
+    const last = await tx.transaction.findFirst({
+      where: { schoolId: input.schoolId, transactionNumber: { startsWith: prefix } },
+      orderBy: { transactionNumber: "desc" },
+      select: { transactionNumber: true },
+    });
+    const seq = last ? Number(last.transactionNumber.slice(prefix.length)) + 1 : 1;
+
+    const transaction = await tx.transaction.create({
+      data: {
+        schoolId: input.schoolId,
+        transactionNumber: `${prefix}${String(seq).padStart(5, "0")}`,
+        transactionDate: input.date,
+        description: input.description,
+        amount: input.amount,
+        debitAccountId: cash.id,
+        creditAccountId: revenue.id,
+        transactionType: "INCOME",
+        category: input.category,
+        referenceType: input.referenceType,
+        referenceId: input.referenceId,
+        referenceNumber: input.referenceNumber,
+        notes: input.notes,
+      },
+    });
+    await tx.chartAccount.update({ where: { id: cash.id }, data: { balance: { increment: input.amount } } });
+    await tx.chartAccount.update({ where: { id: revenue.id }, data: { balance: { increment: input.amount } } });
+    return transaction;
   }
 
   async recordPayment(

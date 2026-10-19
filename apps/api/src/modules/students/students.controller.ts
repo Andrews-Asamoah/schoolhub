@@ -69,6 +69,37 @@ export class StudentsController {
     });
   }
 
+  /** The signed-in student's own subjects (inherited from their class). */
+  @Get("me/subjects")
+  @Roles("student")
+  mySubjects(
+    @CurrentSchool() school: School,
+    @CurrentUser() user: AuthenticatedUser | undefined,
+  ) {
+    return this.studentsService.getMySubjects(school.id, user!.id);
+  }
+
+  @Get(":id/subjects")
+  @Roles("owner", "admin", "teacher", "staff", "accountant")
+  async getStudentSubjects(
+    @CurrentSchool() school: School,
+    @CurrentSchoolRole() role: string | undefined,
+    @Param("id") id: string,
+    @Headers("x-academic-year-id") academicYearId?: string,
+    @Headers("x-academic-term-id") termId?: string,
+    @CurrentUser() user?: AuthenticatedUser,
+  ) {
+    const scopeClassIds =
+      role === "teacher" && user
+        ? await this.teacherScope.getTaughtClassIds(school.id, user.id)
+        : undefined;
+    return this.studentsService.getStudentSubjects(school.id, id, {
+      academicYearId,
+      termId,
+      scopeClassIds,
+    });
+  }
+
   @Get(":id")
   @Roles("owner", "admin", "teacher", "staff", "accountant")
   async getStudentById(
@@ -98,10 +129,11 @@ export class StudentsController {
   @Header("Cache-Control", "no-store") // response carries one-time passwords
   createStudent(
     @CurrentSchool() school: School,
+    @CurrentSchoolRole() role: string | undefined,
     @CurrentUser() actor: AuthenticatedUser | undefined,
     @Body(new ZodValidationPipe(createStudentSchema)) body: CreateStudentInput,
   ) {
-    return this.studentsService.createStudent(school, actor!.id, body);
+    return this.studentsService.createStudent(school, actor!.id, body, { role });
   }
 
   @Patch(":id")

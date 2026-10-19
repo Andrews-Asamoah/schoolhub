@@ -114,14 +114,29 @@ export const studentGuardianSchema = z.object({
 });
 export type StudentGuardianInput = z.infer<typeof studentGuardianSchema>;
 
+/**
+ * A <select> that has nothing chosen posts "". Treat that (and whitespace) as
+ * "not provided" so it never reaches the database as an invalid foreign key.
+ */
+export const optionalId = z.preprocess(
+  (value) => (typeof value === "string" && value.trim() === "" ? undefined : value),
+  z.string().trim().min(1).optional(),
+);
+
 export const createStudentSchema = z.object({
   firstName: z.string().min(1, "First name is required"),
   lastName: z.string().min(1, "Last name is required"),
   otherNames: z.string().optional(),
   gender: z.enum(["MALE", "FEMALE", "OTHER"]).default("MALE"),
   dateOfBirth: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Format: YYYY-MM-DD"),
-  departmentId: z.string().optional(),
-  houseId: z.string().optional(),
+  /** Department the student belongs to (must exist in this school). */
+  departmentId: optionalId,
+  /** Class to place the student in for the current (or given) term. */
+  classId: optionalId,
+  /** Optional: defaults to the school's current academic year / term. */
+  academicYearId: optionalId,
+  termId: optionalId,
+  houseId: optionalId,
   nationality: z.string().default("Ghanaian"),
   residentialAddress: z.string().optional(),
   city: z.string().optional(),
@@ -145,8 +160,9 @@ export const createStudentSchema = z.object({
 });
 export type CreateStudentInput = z.infer<typeof createStudentSchema>;
 
+// Class placement is changed through enrollments (it is per term), not here.
 export const updateStudentSchema = createStudentSchema
-  .omit({ guardians: true })
+  .omit({ guardians: true, classId: true, academicYearId: true, termId: true })
   .partial();
 export const updateStudentRecordSchema = updateStudentSchema.extend({
   status: z
@@ -751,3 +767,164 @@ export const saveTimetableEntrySchema = z
     }
   });
 export type SaveTimetableEntryInput = z.infer<typeof saveTimetableEntrySchema>;
+
+// ============================================================================
+// ADMISSIONS (enrollment windows, applications, entrance exam, admission)
+// ============================================================================
+
+export const ADMISSION_CYCLE_STATUSES = ["DRAFT", "OPEN", "CLOSED"] as const;
+export type AdmissionCycleStatus = (typeof ADMISSION_CYCLE_STATUSES)[number];
+
+export const APPLICATION_STATUSES = [
+  "SUBMITTED",
+  "UNDER_REVIEW",
+  "EXAM_SCHEDULED",
+  "EXAM_COMPLETED",
+  "ACCEPTED",
+  "WAITLISTED",
+  "REJECTED",
+  "ADMITTED",
+  "WITHDRAWN",
+] as const;
+export type ApplicationStatus = (typeof APPLICATION_STATUSES)[number];
+
+export const GUARDIAN_RELATIONSHIPS = [
+  "FATHER",
+  "MOTHER",
+  "GUARDIAN",
+  "GRANDFATHER",
+  "GRANDMOTHER",
+  "SIBLING",
+  "RELATIVE",
+  "OTHER",
+] as const;
+
+/** Admin: create / edit an enrollment window. */
+export const saveAdmissionCycleSchema = z
+  .object({
+    name: z.string().trim().min(3, "Give the intake a name").max(120),
+    academicYearId: z.string().min(1, "Choose an academic year"),
+    termId: optionalId,
+    opensAt: isoDate,
+    closesAt: isoDate,
+    status: z.enum(ADMISSION_CYCLE_STATUSES).optional(),
+    examMaxScore: z.number().positive().max(1000).default(100),
+    passMark: z.number().min(0).max(1000).default(50),
+    /** Cash fee each applicant pays on exam day (0 = no fee). Non-refundable. */
+    admissionFee: z
+      .number()
+      .min(0, "The fee cannot be negative")
+      .max(1_000_000)
+      .refine((v) => Math.abs(v * 100 - Math.round(v * 100)) < 1e-6, {
+        message: "Use at most two decimal places.",
+      })
+      .default(0),
+    instructions: z.string().trim().max(2000).optional(),
+    classes: z
+      .array(
+        z.object({
+          classId: z.string().min(1),
+          /** Maximum number of applicants that can be accepted. Empty = no limit. */
+          seats: z.number().int().positive().max(5000).nullable().optional(),
+        }),
+      )
+      .min(1, "Open at least one class for applications")
+      .max(100),
+  })
+  .refine((v) => v.closesAt >= v.opensAt, {
+    path: ["closesAt"],
+    message: "Applications must close on or after the opening date.",
+  })
+  .refine((v) => v.passMark <= v.examMaxScore, {
+    path: ["passMark"],
+    message: "The pass mark cannot be higher than the exam's maximum score.",
+  })
+  .refine((v) => new Set(v.classes.map((c) => c.classId)).size === v.classes.length, {
+    path: ["classes"],
+    message: "A class can only be listed once.",
+  });
+export type SaveAdmissionCycleInput = z.infer<typeof saveAdmissionCycleSchema>;
+
+/** Public: the enrollment form a prospective student's guardian fills in. */
+export const submitApplicationSchema = z.object({
+  classId: z.string().min(1, "Choose the class applied for"),
+  firstName: z.string().trim().min(1, "First name is required").max(100),
+  lastName: z.string().trim().min(1, "Last name is required").max(100),
+  otherNames: z.string().trim().max(100).optional(),
+  gender: z.enum(["MALE", "FEMALE", "OTHER"]),
+  dateOfBirth: isoDate,
+  nationality: z.string().trim().min(2).max(60).default("Ghanaian"),
+  previousSchool: z.string().trim().max(150).optional(),
+  previousClass: z.string().trim().max(60).optional(),
+  residentialAddress: z.string().trim().max(250).optional(),
+  city: z.string().trim().max(100).optional(),
+  region: z.string().trim().max(100).optional(),
+  guardianFirstName: z.string().trim().min(1, "Guardian first name is required").max(100),
+  guardianLastName: z.string().trim().min(1, "Guardian last name is required").max(100),
+  guardianPhone: z.string().trim().min(7, "Enter a valid phone number").max(30),
+  guardianEmail: z.email("Enter a valid email address").optional().or(z.literal("")),
+  guardianRelationship: z.enum(GUARDIAN_RELATIONSHIPS),
+  /** Must be ticked: the guardian confirms the details are correct. */
+  declaration: z.literal(true, { error: "Please confirm the declaration." }),
+  /** Honeypot - real users never see or fill this; bots do. */
+  website: z.string().max(200).optional(),
+});
+export type SubmitApplicationInput = z.infer<typeof submitApplicationSchema>;
+
+/** Public: look up an application's progress (reference + the contact used to apply). */
+export const trackApplicationSchema = z.object({
+  applicationNumber: z.string().trim().min(5).max(40),
+  contact: z.string().trim().min(5).max(120),
+});
+export type TrackApplicationInput = z.infer<typeof trackApplicationSchema>;
+
+export const scheduleExamSchema = z.object({
+  applicationIds: z.array(z.string().min(1)).min(1).max(500),
+  examDate: z.string().regex(/^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2})?/, "Use a valid date and time"),
+  venue: z.string().trim().min(2, "Enter the exam venue").max(150),
+});
+export type ScheduleExamInput = z.infer<typeof scheduleExamSchema>;
+
+export const recordExamScoreSchema = z.object({
+  score: z.number().min(0, "Score cannot be negative").max(1000),
+});
+export type RecordExamScoreInput = z.infer<typeof recordExamScoreSchema>;
+
+export const decideApplicationSchema = z
+  .object({
+    decision: z.enum(["ACCEPTED", "WAITLISTED", "REJECTED"]),
+    note: z.string().trim().max(500).optional(),
+    /** Accept an applicant who is below the pass mark (needs a written reason). */
+    overridePassMark: z.boolean().default(false),
+  })
+  .refine((v) => !v.overridePassMark || (v.note && v.note.length >= 5), {
+    path: ["note"],
+    message: "Explain why the pass mark is being overridden.",
+  });
+export type DecideApplicationInput = z.infer<typeof decideApplicationSchema>;
+
+export const admitApplicationSchema = z.object({
+  houseId: optionalId,
+});
+export type AdmitApplicationInput = z.infer<typeof admitApplicationSchema>;
+
+export const ADMISSION_FEE_STATUSES = ["NOT_REQUIRED", "PENDING", "PAID", "EXEMPTED"] as const;
+export type AdmissionFeeStatus = (typeof ADMISSION_FEE_STATUSES)[number];
+
+/** Cash received from an applicant for the entrance exam. The amount is the fee due. */
+export const receiveAdmissionFeeSchema = z.object({
+  /** Defaults to today. */
+  paymentDate: isoDate.optional(),
+  notes: z.string().trim().max(300).optional(),
+});
+export type ReceiveAdmissionFeeInput = z.infer<typeof receiveAdmissionFeeSchema>;
+
+/** Waive the fee for an applicant. A reason is mandatory and is kept on record. */
+export const exemptAdmissionFeeSchema = z.object({
+  reason: z
+    .string()
+    .trim()
+    .min(5, "Give a reason for the exemption (at least 5 characters).")
+    .max(300),
+});
+export type ExemptAdmissionFeeInput = z.infer<typeof exemptAdmissionFeeSchema>;

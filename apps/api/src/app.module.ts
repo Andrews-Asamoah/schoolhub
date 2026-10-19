@@ -21,6 +21,7 @@ import { SubjectsModule } from "./modules/subjects/subjects.module.js";
 import { TimetableModule } from "./modules/timetable/timetable.module.js";
 import { AccountsModule } from "./modules/accounts/accounts.module.js";
 import { PeopleModule } from "./modules/people/people.module.js";
+import { AdmissionsModule } from "./modules/admissions/admissions.module.js";
 
 @Module({
   imports: [
@@ -40,6 +41,7 @@ import { PeopleModule } from "./modules/people/people.module.js";
     TeacherScopeModule,
     SubjectsModule,
     TimetableModule,
+    AdmissionsModule,
   ],
   controllers: [HealthController],
   providers: [

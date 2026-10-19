@@ -201,6 +201,7 @@ enum TransactionType {
 
 enum TransactionCategory {
   SCHOOL_FEES
+  ADMISSION_FEE
   SALARY
   UTILITIES
   SUPPLIES

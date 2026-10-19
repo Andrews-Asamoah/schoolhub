@@ -84,7 +84,17 @@ interface StudentPage {
 interface SchoolClass {
   id: string;
   name: string;
+  level?: string;
   isActive: boolean;
+  departmentId?: string | null;
+  capacity?: number | null;
+  _count?: { students: number };
+}
+
+interface DepartmentOption {
+  id: string;
+  name: string;
+  code: string;
 }
 
 interface HouseOption {
@@ -101,6 +111,7 @@ const emptyStudent: CreateStudentInput = {
   gender: "MALE",
   dateOfBirth: "",
   departmentId: "",
+  classId: "",
   houseId: "",
   nationality: "Ghanaian",
   residentialAddress: "",
@@ -157,6 +168,12 @@ export function StudentDirectoryWorkspace() {
   const classesQuery = useQuery({
     queryKey: ["academics", "classes"],
     queryFn: () => apiFetch<SchoolClass[]>("/academics/classes"),
+    retry: false,
+  });
+  const departmentsQuery = useQuery({
+    queryKey: ["academics", "departments"],
+    queryFn: () => apiFetch<DepartmentOption[]>("/academics/departments"),
+    enabled: canManage,
     retry: false,
   });
   const housesQuery = useQuery({
@@ -360,6 +377,7 @@ export function StudentDirectoryWorkspace() {
           key={editing?.id ?? "new"}
           student={editing}
           classes={classesQuery.data ?? []}
+          departments={departmentsQuery.data ?? []}
           houses={housesQuery.data ?? []}
           onIssued={setIssued}
           onCancel={() => {
@@ -492,6 +510,7 @@ export function StudentDirectoryWorkspace() {
 function StudentEditor({
   student,
   classes,
+  departments,
   houses,
   onCancel,
   onSaved,
@@ -499,6 +518,7 @@ function StudentEditor({
 }: {
   student: Student | null;
   classes: SchoolClass[];
+  departments: DepartmentOption[];
   houses: HouseOption[];
   onIssued: (entries: CredentialEntry[]) => void;
   onCancel: () => void;
@@ -541,6 +561,7 @@ function StudentEditor({
         ]);
       }
       await onSaved();
+      await queryClient.invalidateQueries({ queryKey: ["academics"] });
       await queryClient.invalidateQueries({ queryKey: ["dashboard"] });
     },
   });
@@ -576,8 +597,9 @@ function StudentEditor({
             {student ? "Edit student record" : "Add a student"}
           </h3>
           <p className="mt-1 text-xs text-muted-foreground">
-            Student identity is separate from class placement. Enroll the
-            student in the Enrollments workspace.
+            {student
+              ? "Class placement is per term: change a student's class in the Enrollments workspace."
+              : "Choose a department and class to place the student now. The student automatically inherits the subjects linked to that class."}
             {!student &&
               " Admission numbers are generated as SCHOOLCODE + two-digit year + four-digit sequence (for example, ABC260001)."}
           </p>
@@ -753,16 +775,89 @@ function StudentEditor({
           <form.Field name="departmentId">
             {(field) => (
               <label className="text-xs font-semibold text-foreground">
-                Department (optional)
-                <input
+                Department
+                <select
                   className={inputClasses}
                   value={field.state.value ?? ""}
-                  onChange={(event) => field.handleChange(event.target.value)}
-                  placeholder="Department ID"
-                />
+                  onChange={(event) => {
+                    field.handleChange(event.target.value);
+                    // A class that sits in another department no longer applies.
+                    const chosen = classes.find(
+                      (c) => c.id === form.getFieldValue("classId"),
+                    );
+                    if (
+                      chosen?.departmentId &&
+                      event.target.value &&
+                      chosen.departmentId !== event.target.value
+                    ) {
+                      form.setFieldValue("classId", "");
+                    }
+                  }}
+                >
+                  <option value="">No department</option>
+                  {departments.map((department) => (
+                    <option key={department.id} value={department.id}>
+                      {department.name}
+                    </option>
+                  ))}
+                </select>
               </label>
             )}
           </form.Field>
+          {!student && (
+            <form.Subscribe selector={(state) => state.values.departmentId}>
+              {(departmentId) => (
+                <form.Field name="classId">
+                  {(field) => {
+                    const options = classes.filter(
+                      (c) =>
+                        c.isActive &&
+                        (!departmentId ||
+                          !c.departmentId ||
+                          c.departmentId === departmentId),
+                    );
+                    return (
+                      <label className="text-xs font-semibold text-foreground">
+                        Class (current term)
+                        <select
+                          className={inputClasses}
+                          value={field.state.value ?? ""}
+                          onChange={(event) => {
+                            field.handleChange(event.target.value);
+                            const picked = classes.find(
+                              (c) => c.id === event.target.value,
+                            );
+                            // Picking a class fills in its department.
+                            if (picked?.departmentId && !departmentId) {
+                              form.setFieldValue(
+                                "departmentId",
+                                picked.departmentId,
+                              );
+                            }
+                          }}
+                        >
+                          <option value="">Place in a class later</option>
+                          {options.map((c) => {
+                            const full =
+                              c.capacity != null &&
+                              (c._count?.students ?? 0) >= c.capacity;
+                            return (
+                              <option key={c.id} value={c.id} disabled={full}>
+                                {c.name}
+                                {c.capacity != null
+                                  ? ` (${c._count?.students ?? 0}/${c.capacity}${full ? ", full" : ""})`
+                                  : ""}
+                              </option>
+                            );
+                          })}
+                        </select>
+                      </label>
+                    );
+                  }}
+                </form.Field>
+              )}
+            </form.Subscribe>
+          )}
           <form.Field name="houseId">
             {(field) => (
               <label className="text-xs font-semibold text-foreground">

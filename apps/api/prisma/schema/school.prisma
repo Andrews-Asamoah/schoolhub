@@ -43,6 +43,8 @@ model School {
   payments                    Payment[]
   staff                       Staff[]
   students                    Student[]
+  admissionCycles             AdmissionCycle[]
+  applications                Application[]
   subjects                    Subject[]
   subscription                Subscription?
   teachers                    Teacher[]
@@ -163,6 +165,7 @@ model Student {
   reportCards      ReportCard[]
   clubMembers      ClubMember[]
   promotionRecords PromotionRecord[]
+  application      Application?
 
   @@unique([studentId, schoolId])
   @@unique([admissionNumber, schoolId])
