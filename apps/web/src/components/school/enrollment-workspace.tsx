@@ -10,6 +10,8 @@ import {
 import { useEffect, useMemo, useState } from "react";
 import type { CreateEnrollmentInput } from "@schoolhub/shared";
 import { useSchoolRole } from "@/components/school/school-role-switcher";
+import { DataTable, type DataTableColumn } from "@/components/ui/data-table";
+import { canExportTables } from "@/lib/table-export-policy";
 import { apiFetch } from "@/lib/api";
 
 interface EnrollmentClass {
@@ -144,6 +146,44 @@ export function EnrollmentWorkspace({
 
   const eligibleStudents = eligibleQuery.data ?? [];
   const roster = rosterQuery.data ?? [];
+
+  const rosterColumns: DataTableColumn<(typeof roster)[number]>[] = [
+    {
+      id: "student",
+      header: "Student",
+      value: (enrollment) =>
+        `${enrollment.student.profile.firstName} ${enrollment.student.profile.lastName} (${enrollment.student.studentId})`,
+      cell: (enrollment) => (
+        <>
+          <p className="text-sm font-semibold text-foreground">
+            {enrollment.student.profile.firstName} {enrollment.student.profile.lastName}
+          </p>
+          <p className="text-xs text-muted-foreground">{enrollment.student.studentId}</p>
+        </>
+      ),
+    },
+    {
+      id: "admission",
+      header: "Admission number",
+      cell: (enrollment) => enrollment.student.admissionNumber || "—",
+    },
+    {
+      id: "class",
+      header: "Class",
+      cell: (enrollment) => (
+        <span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary">
+          {enrollment.class.name}
+        </span>
+      ),
+    },
+    {
+      id: "enrolled",
+      header: "Enrolled",
+      value: (enrollment) => enrollment.enrolledAt.slice(0, 10),
+      cell: (enrollment) => new Date(enrollment.enrolledAt).toLocaleDateString(),
+    },
+  ];
+
   const selectedClass = classes.find((schoolClass) => schoolClass.id === classId);
   const currentClassCount = roster.length;
   const atCapacity = Boolean(
@@ -413,43 +453,17 @@ export function EnrollmentWorkspace({
         ) : rosterQuery.error ? (
           <InlineError message={`Roster could not be loaded: ${rosterQuery.error.message}`} />
         ) : roster.length ? (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[620px] text-left">
-              <thead className="bg-muted/50">
-                <tr className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                  <th className="px-5 py-3.5">Student</th>
-                  <th className="px-5 py-3.5">Admission number</th>
-                  <th className="px-5 py-3.5">Class</th>
-                  <th className="px-5 py-3.5">Enrolled</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {roster.map((enrollment) => (
-                  <tr key={enrollment.id} className="hover:bg-muted/20">
-                    <td className="px-5 py-3.5">
-                      <p className="text-sm font-semibold text-foreground">
-                        {enrollment.student.profile.firstName} {enrollment.student.profile.lastName}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {enrollment.student.studentId}
-                      </p>
-                    </td>
-                    <td className="px-5 py-3.5 text-sm text-secondary-foreground">
-                      {enrollment.student.admissionNumber || "—"}
-                    </td>
-                    <td className="px-5 py-3.5">
-                      <span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary">
-                        {enrollment.class.name}
-                      </span>
-                    </td>
-                    <td className="px-5 py-3.5 text-xs text-muted-foreground">
-                      {new Date(enrollment.enrolledAt).toLocaleDateString()}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <DataTable
+            embedded
+            rows={roster}
+            columns={rosterColumns}
+            getRowId={(enrollment) => enrollment.id}
+            exportTitle="Term roster"
+            canExport={canExportTables(activeRole)}
+            searchPlaceholder="Search roster…"
+            emptyTitle="No placements"
+            emptyDescription="No placements to show."
+          />
         ) : (
           <div className="px-5 py-10 text-center">
             <CalendarDays className="mx-auto size-7 text-muted-foreground" />

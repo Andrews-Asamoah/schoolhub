@@ -35,6 +35,8 @@ import {
 import { PortalStatCard } from "./portal-stat-card";
 import { PortalModal } from "./portal-modal";
 import { cn } from "@/lib/utils";
+import { DataTable } from "@/components/ui/data-table";
+import { useCanExportTables } from "@/lib/table-export-policy";
 
 interface GuardianPortalWorkspaceProps {
   defaultTab?: "overview" | "academics" | "attendance" | "fees" | "timetable" | "notices";
@@ -113,6 +115,7 @@ const mockKofiGrades: ChildGrade[] = [
 ];
 
 export function GuardianPortalWorkspace({ defaultTab = "overview" }: GuardianPortalWorkspaceProps) {
+  const canExport = useCanExportTables();
   const [activeTab, setActiveTab] = useState(defaultTab);
   const [selectedChildId, setSelectedChildId] = useState<string>("child-1");
   const [showPaymentModal, setShowPaymentModal] = useState(false);
@@ -455,41 +458,39 @@ export function GuardianPortalWorkspace({ defaultTab = "overview" }: GuardianPor
             </button>
           </div>
 
-          <div className="overflow-x-auto rounded-2xl border border-slate-200/80 bg-white shadow-xs dark:border-slate-800 dark:bg-slate-900">
-            <table className="w-full min-w-[700px] border-collapse text-left text-xs">
-              <thead>
-                <tr className="border-b border-slate-100 bg-slate-50/70 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:border-slate-800 dark:bg-slate-800/50">
-                  <th className="p-3.5 pl-5">Subject</th>
-                  <th className="p-3.5 text-center">Class Score (30)</th>
-                  <th className="p-3.5 text-center">Exam Score (70)</th>
-                  <th className="p-3.5 text-center">Total (100)</th>
-                  <th className="p-3.5 text-center">Grade</th>
-                  <th className="p-3.5 text-center">Rank</th>
-                  <th className="p-3.5">Teacher Remark</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                {mockKofiGrades.map((g) => (
-                  <tr key={g.code} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/40">
-                    <td className="p-3.5 pl-5">
-                      <p className="font-bold text-slate-900 dark:text-white">{g.subject}</p>
-                      <p className="text-[10px] text-slate-400 font-mono">{g.code}</p>
-                    </td>
-                    <td className="p-3.5 text-center font-medium">{g.classScore}</td>
-                    <td className="p-3.5 text-center font-medium">{g.examScore}</td>
-                    <td className="p-3.5 text-center font-black text-slate-900 dark:text-white">{g.total}%</td>
-                    <td className="p-3.5 text-center">
-                      <span className="rounded-md bg-emerald-50 px-2 py-0.5 text-xs font-black text-emerald-700">
-                        {g.grade}
-                      </span>
-                    </td>
-                    <td className="p-3.5 text-center font-semibold text-slate-600 dark:text-slate-400">{g.position}</td>
-                    <td className="p-3.5 text-slate-600 dark:text-slate-300">{g.teacherRemark}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <DataTable
+            rows={mockKofiGrades}
+            canExport={canExport}
+            exportTitle="Academic results"
+            getRowId={(g) => g.code}
+            emptyTitle="No results yet"
+            emptyDescription="Published assessment results will appear here."
+            columns={[
+              {
+                id: "subject",
+                header: "Subject",
+                value: (g) => `${g.subject} (${g.code})`,
+                cell: (g) => (
+                  <>
+                    <p className="font-bold text-foreground">{g.subject}</p>
+                    <p className="font-mono text-[10px] text-muted-foreground">{g.code}</p>
+                  </>
+                ),
+              },
+              { id: "classScore", header: "Class Score (30)", className: "text-center", value: (g) => g.classScore, cell: (g) => <span className="font-medium">{g.classScore}</span> },
+              { id: "examScore", header: "Exam Score (70)", className: "text-center", value: (g) => g.examScore, cell: (g) => <span className="font-medium">{g.examScore}</span> },
+              { id: "total", header: "Total (100)", className: "text-center", value: (g) => g.total, cell: (g) => <span className="font-black text-foreground">{g.total}%</span> },
+              {
+                id: "grade",
+                header: "Grade",
+                className: "text-center",
+                value: (g) => g.grade,
+                cell: (g) => <span className="rounded-md bg-emerald-50 px-2 py-0.5 text-xs font-black text-emerald-700 dark:bg-emerald-400/10 dark:text-emerald-300">{g.grade}</span>,
+              },
+              { id: "position", header: "Rank", className: "text-center", value: (g) => String(g.position), cell: (g) => <span className="font-semibold text-muted-foreground">{g.position}</span> },
+              { id: "remark", header: "Teacher Remark", cell: (g) => g.teacherRemark },
+            ]}
+          />
         </div>
       )}
 

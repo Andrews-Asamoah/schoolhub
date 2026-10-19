@@ -5,12 +5,13 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import type {
+  CopyPeriodsInput,
   SaveClassroomInput,
   SavePeriodInput,
   SaveTimetableEntryInput,
 } from '@schoolhub/shared';
 import { PrismaService } from '../../prisma/prisma.service.js';
-import { findPlacementClash, periodsOverlap } from './timetable-rules.js';
+import { findPlacementClash, periodsOverlap, planPeriodCopy } from './timetable-rules.js';
 
 const entryInclude = {
   class: { select: { id: true, name: true } },
@@ -50,7 +51,7 @@ export class TimetableService {
   /** Everything the timetable screen needs in one round trip. */
   async getSetup(schoolId: string, academicYearId?: string) {
     const db = this.prisma.client;
-    const [years, periods, classrooms, classes, subjects, teachers, classSubjects] =
+    const [years, periods, classrooms, classes, subjects, teachers, classSubjects, departments] =
       await Promise.all([
         db.academicYear.findMany({
           where: { schoolId },
@@ -62,7 +63,7 @@ export class TimetableService {
         db.class.findMany({
           where: { schoolId, deletedAt: null, isActive: true },
           orderBy: [{ order: 'asc' }, { name: 'asc' }],
-          select: { id: true, name: true, level: true, academicYearId: true },
+          select: { id: true, name: true, level: true, academicYearId: true, departmentId: true },
         }),
         db.subject.findMany({
           where: { schoolId, deletedAt: null, isActive: true },
@@ -82,6 +83,11 @@ export class TimetableService {
           where: { class: { schoolId, deletedAt: null }, subject: { deletedAt: null } },
           select: { classId: true, subjectId: true, teacherId: true },
         }),
+        db.department.findMany({
+          where: { schoolId, isActive: true },
+          orderBy: { name: 'asc' },
+          select: { id: true, name: true, code: true },
+        }),
       ]);
     const year =
       years.find((row) => row.id === academicYearId) ??
@@ -98,27 +104,35 @@ export class TimetableService {
         .map((teacher) => ({ id: teacher.id, name: personName(teacher) }))
         .sort((a, b) => a.name.localeCompare(b.name)),
       classSubjects,
+      departments,
     };
   }
 
   // -------------------------------------------------------------- periods ---
 
-  listPeriods(schoolId: string) {
+  /**
+   * Periods are defined per department (lower primary, upper primary, JHS …).
+   * `departmentId: null` is the default set used by classes with no department.
+   * Omit `departmentId` to list every period in the school.
+   */
+  listPeriods(schoolId: string, departmentId?: string | null) {
     return this.prisma.client.periodTemplate.findMany({
-      where: { schoolId, departmentId: null },
+      where: { schoolId, ...(departmentId === undefined ? {} : { departmentId }) },
       orderBy: [{ sortOrder: 'asc' }, { startTime: 'asc' }],
     });
   }
 
   async createPeriod(schoolId: string, input: SavePeriodInput) {
-    await this.assertNoPeriodOverlap(schoolId, input);
+    const departmentId = input.departmentId ?? null;
+    await this.requireDepartment(schoolId, departmentId);
+    await this.assertNoPeriodOverlap(schoolId, departmentId, input);
     const count = await this.prisma.client.periodTemplate.count({
-      where: { schoolId, departmentId: null },
+      where: { schoolId, departmentId },
     });
     return this.prisma.client.periodTemplate.create({
       data: {
         schoolId,
-        departmentId: null,
+        departmentId,
         name: input.name,
         startTime: input.startTime,
         endTime: input.endTime,
@@ -129,7 +143,7 @@ export class TimetableService {
 
   async updatePeriod(schoolId: string, id: string, input: SavePeriodInput) {
     const period = await this.requirePeriod(schoolId, id);
-    await this.assertNoPeriodOverlap(schoolId, input, id);
+    await this.assertNoPeriodOverlap(schoolId, period.departmentId, input, id);
     const timesChanged =
       period.startTime !== input.startTime || period.endTime !== input.endTime;
     if (timesChanged && (await this.countEntriesInPeriod(schoolId, period)) > 0) {
@@ -157,6 +171,63 @@ export class TimetableService {
     }
     await this.prisma.client.periodTemplate.delete({ where: { id } });
     return { success: true };
+  }
+
+  /**
+   * Copies one department's periods into other departments. Existing periods in
+   * a target are never changed or removed; identical or overlapping times are
+   * skipped and reported back so the caller can show what happened.
+   */
+  async copyPeriods(schoolId: string, input: CopyPeriodsInput) {
+    const db = this.prisma.client;
+    await this.requireDepartment(schoolId, input.fromDepartmentId);
+    const targets = [...new Set(input.toDepartmentIds)];
+    const targetDepartments = await db.department.findMany({
+      where: { schoolId, id: { in: targets } },
+      select: { id: true, name: true },
+    });
+    if (targetDepartments.length !== targets.length) {
+      throw new BadRequestException('Choose departments that belong to this school.');
+    }
+    const source = await this.listPeriods(schoolId, input.fromDepartmentId);
+    if (source.length === 0) {
+      throw new BadRequestException('The department you are copying from has no periods yet.');
+    }
+
+    const results = await db.$transaction(async (tx) => {
+      const out: {
+        departmentId: string;
+        departmentName: string;
+        created: number;
+        skipped: ReturnType<typeof planPeriodCopy>['skipped'];
+      }[] = [];
+      for (const department of targetDepartments) {
+        const existing = await tx.periodTemplate.findMany({
+          where: { schoolId, departmentId: department.id },
+        });
+        const plan = planPeriodCopy(source, existing);
+        if (plan.create.length) {
+          await tx.periodTemplate.createMany({
+            data: plan.create.map((period) => ({
+              schoolId,
+              departmentId: department.id,
+              name: period.name,
+              startTime: period.startTime,
+              endTime: period.endTime,
+              sortOrder: period.sortOrder,
+            })),
+          });
+        }
+        out.push({
+          departmentId: department.id,
+          departmentName: department.name,
+          created: plan.create.length,
+          skipped: plan.skipped,
+        });
+      }
+      return out;
+    });
+    return { results };
   }
 
   // ----------------------------------------------------------- classrooms ---
@@ -247,11 +318,14 @@ export class TimetableService {
     const [klass, period] = await Promise.all([
       db.class.findFirst({
         where: { id: input.classId, schoolId, deletedAt: null },
-        select: { id: true, name: true },
+        select: { id: true, name: true, departmentId: true },
       }),
       this.requirePeriod(schoolId, input.periodId),
     ]);
     if (!klass) throw new BadRequestException('Choose a class that belongs to this school.');
+    if ((period.departmentId ?? null) !== (klass.departmentId ?? null)) {
+      throw new BadRequestException("This period belongs to a different department than the class.");
+    }
 
     let subjectId: string | null = null;
     let teacherId: string | null = null;
@@ -278,10 +352,16 @@ export class TimetableService {
     }
 
     const slot = await this.ensureTimeSlot(schoolId, input.dayOfWeek, period);
-    const sameSlot = await db.timetableEntry.findMany({
-      where: { schoolId, academicYearId: yearId, timeSlotId: slot.id },
-      include: { class: { select: { name: true } } },
+    // Departments have their own periods, so the same teacher or room can be
+    // double-booked by slots that overlap in clock time without sharing a slot id.
+    const dayEntries = await db.timetableEntry.findMany({
+      where: { schoolId, academicYearId: yearId, timeSlot: { dayOfWeek: input.dayOfWeek } },
+      include: {
+        class: { select: { name: true } },
+        timeSlot: { select: { startTime: true, endTime: true } },
+      },
     });
+    const sameSlot = dayEntries.filter((row) => periodsOverlap(row.timeSlot, period));
     const clash = findPlacementClash(
       sameSlot.map((row) => ({
         id: row.id,
@@ -372,13 +452,13 @@ export class TimetableService {
   private async ensureTimeSlot(
     schoolId: string,
     dayOfWeek: SaveTimetableEntryInput['dayOfWeek'],
-    period: { name: string; startTime: string; endTime: string },
+    period: { name: string; startTime: string; endTime: string; departmentId: string | null },
   ) {
     const db = this.prisma.client;
     const found = await db.timeSlot.findFirst({
       where: {
         schoolId,
-        departmentId: null,
+        departmentId: period.departmentId,
         dayOfWeek,
         startTime: period.startTime,
         endTime: period.endTime,
@@ -389,7 +469,7 @@ export class TimetableService {
       db.timeSlot.create({
         data: {
           schoolId,
-          departmentId: null,
+          departmentId: period.departmentId,
           dayOfWeek,
           startTime: period.startTime,
           endTime: period.endTime,
@@ -432,6 +512,15 @@ export class TimetableService {
     return period;
   }
 
+  private async requireDepartment(schoolId: string, id: string | null) {
+    if (id === null) return;
+    const department = await this.prisma.client.department.findFirst({
+      where: { id, schoolId },
+      select: { id: true },
+    });
+    if (!department) throw new BadRequestException('Choose a department that belongs to this school.');
+  }
+
   private async requireClassroom(schoolId: string, id: string) {
     const room = await this.prisma.client.classroom.findFirst({ where: { id, schoolId } });
     if (!room) throw new NotFoundException('Room not found.');
@@ -440,23 +529,28 @@ export class TimetableService {
 
   private countEntriesInPeriod(
     schoolId: string,
-    period: { startTime: string; endTime: string },
+    period: { startTime: string; endTime: string; departmentId: string | null },
   ) {
     return this.prisma.client.timetableEntry.count({
       where: {
         schoolId,
-        timeSlot: { startTime: period.startTime, endTime: period.endTime },
+        timeSlot: {
+          departmentId: period.departmentId,
+          startTime: period.startTime,
+          endTime: period.endTime,
+        },
       },
     });
   }
 
   private async assertNoPeriodOverlap(
     schoolId: string,
+    departmentId: string | null,
     input: { startTime: string; endTime: string },
     exceptId?: string,
   ) {
     const others = await this.prisma.client.periodTemplate.findMany({
-      where: { schoolId, departmentId: null, ...(exceptId ? { NOT: { id: exceptId } } : {}) },
+      where: { schoolId, departmentId, ...(exceptId ? { NOT: { id: exceptId } } : {}) },
     });
     const clash = others.find((other) => periodsOverlap(other, input));
     if (clash) {

@@ -981,6 +981,7 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
         rows={rows}
         columns={columns}
         getRowId={(row) => row.id}
+        exportTitle={title}
         emptyTitle={`No ${title.toLowerCase()} match these filters`}
         emptyDescription={`Clear a filter or add a ${resourceName} to build the directory.`}
       />

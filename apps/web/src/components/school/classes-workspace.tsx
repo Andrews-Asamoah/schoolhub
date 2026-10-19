@@ -31,6 +31,8 @@ import {
   FormSubmitButton,
 } from "@/components/forms/form-controls";
 import { useSchoolRole } from "@/components/school/school-role-switcher";
+import { DataTable, type DataTableColumn } from "@/components/ui/data-table";
+import { canExportTables } from "@/lib/table-export-policy";
 import { apiFetch } from "@/lib/api";
 
 interface DepartmentOption {
@@ -186,6 +188,122 @@ export function ClassesWorkspace({
     setEditingClass(null);
     setShowClassForm(true);
   }
+
+  const classColumns: DataTableColumn<ClassRecord>[] = [
+    {
+      id: "class",
+      header: "Class",
+      value: (schoolClass) => `${schoolClass.name} (${schoolClass.level})`,
+      cell: (schoolClass) => (
+        <div className="flex items-center gap-3">
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+            <GraduationCap className="size-[18px]" />
+          </span>
+          <div>
+            <p className="text-sm font-semibold text-foreground">{schoolClass.name}</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">{schoolClass.level}</p>
+          </div>
+        </div>
+      ),
+    },
+    {
+      id: "department",
+      header: "Department",
+      value: (schoolClass) => schoolClass.department?.name ?? "Not assigned",
+      cell: (schoolClass) =>
+        schoolClass.department ? (
+          <span className="inline-flex items-center gap-2 rounded-full bg-primary/8 px-2.5 py-1 text-xs font-medium text-primary">
+            <Building2 className="size-3.5" /> {schoolClass.department.name}
+          </span>
+        ) : (
+          <span className="text-xs font-medium text-destructive">Not assigned</span>
+        ),
+    },
+    {
+      id: "learners",
+      header: "Learners",
+      value: (schoolClass) => schoolClass._count.students,
+      cell: (schoolClass) => {
+        const occupancy =
+          schoolClass.capacity && schoolClass.capacity > 0
+            ? Math.min((schoolClass._count.students / schoolClass.capacity) * 100, 100)
+            : null;
+        return (
+          <div className="min-w-24">
+            <p className="text-xs font-semibold text-foreground">
+              {schoolClass._count.students}
+              {schoolClass.capacity ? <span className="font-normal text-muted-foreground"> / {schoolClass.capacity}</span> : null}
+            </p>
+            {occupancy !== null && (
+              <div
+                className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-muted"
+                role="progressbar"
+                aria-label={`${schoolClass.name} capacity`}
+                aria-valuenow={Math.round(occupancy)}
+                aria-valuemin={0}
+                aria-valuemax={100}
+              >
+                <span className={`block h-full rounded-full ${occupancy >= 90 ? "bg-amber-500" : "bg-primary"}`} style={{ width: `${occupancy}%` }} />
+              </div>
+            )}
+          </div>
+        );
+      },
+    },
+    {
+      id: "teacher",
+      header: "Class teacher",
+      cell: (schoolClass) => {
+        const teacher = schoolClass.classTeacher?.profile ?? schoolClass.classTeacher;
+        return teacher ? `${teacher.firstName} ${teacher.lastName}` : "Not assigned";
+      },
+    },
+    {
+      id: "status",
+      header: "Status",
+      value: (schoolClass) => (schoolClass.isActive ? "Active" : "Inactive"),
+      cell: (schoolClass) => (
+        <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold ${schoolClass.isActive ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300" : "bg-muted text-muted-foreground"}`}>
+          <span className={`size-1.5 rounded-full ${schoolClass.isActive ? "bg-emerald-500" : "bg-muted-foreground"}`} />
+          {schoolClass.isActive ? "Active" : "Inactive"}
+        </span>
+      ),
+    },
+    ...(canManage
+      ? [
+          {
+            id: "actions",
+            header: "",
+            className: "text-right",
+            cell: (schoolClass: ClassRecord) => (
+              <div className="inline-flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    classMutation.reset();
+                    updateClassMutation.reset();
+                    setShowClassForm(false);
+                    setEditingClass(schoolClass);
+                  }}
+                  aria-label={`Edit ${schoolClass.name}`}
+                  className="inline-flex size-9 items-center justify-center rounded-lg border border-border text-muted-foreground transition hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <Pencil className="size-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setManagingTeacherClass(schoolClass)}
+                  aria-label={`Manage class teacher for ${schoolClass.name}`}
+                  className="inline-flex size-9 items-center justify-center rounded-lg border border-border text-muted-foreground transition hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <CalendarClock className="size-4" />
+                </button>
+              </div>
+            ),
+          },
+        ]
+      : []),
+  ];
 
   return (
     <div className="space-y-7">
@@ -472,109 +590,17 @@ export function ClassesWorkspace({
         ) : classesQuery.error ? (
           <InlineError message={`Classes could not be loaded: ${classesQuery.error.message}`} />
         ) : filteredClasses.length ? (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[850px] text-left">
-              <thead className="bg-muted/60">
-                <tr className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                  <th scope="col" className="px-5 py-3.5">Class</th>
-                  <th scope="col" className="px-5 py-3.5">Department</th>
-                  <th scope="col" className="px-5 py-3.5">Learners</th>
-                  <th scope="col" className="px-5 py-3.5">Class teacher</th>
-                  <th scope="col" className="px-5 py-3.5">Status</th>
-                  {canManage && <th scope="col" className="px-5 py-3.5"><span className="sr-only">Actions</span></th>}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {filteredClasses.map((schoolClass) => {
-                  const teacher = schoolClass.classTeacher?.profile ?? schoolClass.classTeacher;
-                  const occupancy =
-                    schoolClass.capacity && schoolClass.capacity > 0
-                      ? Math.min((schoolClass._count.students / schoolClass.capacity) * 100, 100)
-                      : null;
-                  return (
-                    <tr key={schoolClass.id} className="transition-colors hover:bg-muted/30">
-                      <td className="px-5 py-4">
-                        <div className="flex items-center gap-3">
-                          <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                            <GraduationCap className="size-[18px]" />
-                          </span>
-                          <div>
-                            <p className="text-sm font-semibold text-foreground">{schoolClass.name}</p>
-                            <p className="mt-0.5 text-xs text-muted-foreground">{schoolClass.level}</p>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-5 py-4">
-                        {schoolClass.department ? (
-                          <span className="inline-flex items-center gap-2 rounded-full bg-primary/8 px-2.5 py-1 text-xs font-medium text-primary">
-                            <Building2 className="size-3.5" /> {schoolClass.department.name}
-                          </span>
-                        ) : (
-                          <span className="text-xs font-medium text-destructive">Not assigned</span>
-                        )}
-                      </td>
-                      <td className="px-5 py-4">
-                        <div className="min-w-24">
-                          <p className="text-xs font-semibold text-foreground">
-                            {schoolClass._count.students}
-                            {schoolClass.capacity ? <span className="font-normal text-muted-foreground"> / {schoolClass.capacity}</span> : null}
-                          </p>
-                          {occupancy !== null && (
-                            <div
-                              className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-muted"
-                              role="progressbar"
-                              aria-label={`${schoolClass.name} capacity`}
-                              aria-valuenow={Math.round(occupancy)}
-                              aria-valuemin={0}
-                              aria-valuemax={100}
-                            >
-                              <span className={`block h-full rounded-full ${occupancy >= 90 ? "bg-amber-500" : "bg-primary"}`} style={{ width: `${occupancy}%` }} />
-                            </div>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-5 py-4 text-xs text-secondary-foreground">
-                        {teacher ? `${teacher.firstName} ${teacher.lastName}` : "Not assigned"}
-                      </td>
-                      <td className="px-5 py-4">
-                        <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold ${schoolClass.isActive ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300" : "bg-muted text-muted-foreground"}`}>
-                          <span className={`size-1.5 rounded-full ${schoolClass.isActive ? "bg-emerald-500" : "bg-muted-foreground"}`} />
-                          {schoolClass.isActive ? "Active" : "Inactive"}
-                        </span>
-                      </td>
-                      {canManage && (
-                        <td className="px-5 py-4 text-right">
-                          <div className="inline-flex items-center gap-2">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                classMutation.reset();
-                                updateClassMutation.reset();
-                                setShowClassForm(false);
-                                setEditingClass(schoolClass);
-                              }}
-                              aria-label={`Edit ${schoolClass.name}`}
-                              className="inline-flex size-9 items-center justify-center rounded-lg border border-border text-muted-foreground transition hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                            >
-                              <Pencil className="size-4" />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setManagingTeacherClass(schoolClass)}
-                              aria-label={`Manage class teacher for ${schoolClass.name}`}
-                              className="inline-flex size-9 items-center justify-center rounded-lg border border-border text-muted-foreground transition hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                            >
-                              <CalendarClock className="size-4" />
-                            </button>
-                          </div>
-                        </td>
-                      )}
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+          <DataTable
+            embedded
+            searchable={false}
+            rows={filteredClasses}
+            columns={classColumns}
+            getRowId={(schoolClass) => schoolClass.id}
+            exportTitle="Classes"
+            canExport={canExportTables(activeRole)}
+            emptyTitle="No classes"
+            emptyDescription="No classes to show."
+          />
         ) : (
           <div className="px-5 py-12 text-center">
             <GraduationCap className="mx-auto size-8 text-muted-foreground" />

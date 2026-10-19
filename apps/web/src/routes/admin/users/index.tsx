@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { Building2, ChevronLeft, ChevronRight, CircleAlert, Search, Users } from "lucide-react";
 import { apiFetch } from "@/lib/api";
+import { DataTable, type DataTableColumn } from "@/components/ui/data-table";
 
 export const Route = createFileRoute("/admin/users/")({
   component: SystemUsersPage,
@@ -52,6 +53,75 @@ function SystemUsersPage() {
     );
   });
 
+  const columns: DataTableColumn<PlatformUser>[] = [
+    {
+      id: "user",
+      header: "User",
+      value: (user) => `${user.name} (${user.email})`,
+      cell: (user) => (
+        <>
+          <p className="text-sm font-semibold text-foreground">{user.name}</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">{user.email}</p>
+        </>
+      ),
+    },
+    { id: "role", header: "Platform role", value: (user) => user.role, cell: (user) => <span className="capitalize">{user.role}</span> },
+    {
+      id: "memberships",
+      header: "School memberships",
+      className: "max-w-sm",
+      value: (user) =>
+        user.members
+          .map((member) => {
+            const roles = [member.role, ...member.roles].filter((role, index, all) => all.indexOf(role) === index).join("/");
+            return `${member.organization.school?.name ?? member.organization.name} (${roles})`;
+          })
+          .join("; "),
+      cell: (user) => (
+        <div className="flex flex-wrap gap-2">
+          {user.members.map((member) => {
+            const school = member.organization.school;
+            return school ? (
+              <Link
+                key={school.id}
+                to="/admin/schools/$schoolId"
+                params={{ schoolId: school.id }}
+                className="superadmin-button-secondary inline-flex items-center gap-1.5 rounded-lg bg-muted px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-indigo-50 hover:text-indigo-900"
+                title={`${member.role}${member.banned ? " (membership suspended)" : ""}`}
+              >
+                <Building2 className="size-3.5" />
+                {school.name}
+                <span className="text-muted-foreground">
+                  · {[member.role, ...member.roles].filter((role, index, all) => all.indexOf(role) === index).join(", ")}
+                </span>
+              </Link>
+            ) : (
+              <span key={member.organization.name} className="text-xs text-muted-foreground">
+                {member.organization.name}
+              </span>
+            );
+          })}
+        </div>
+      ),
+    },
+    {
+      id: "status",
+      header: "Status",
+      value: (user) => (user.banned ? "Suspended" : "Active"),
+      cell: (user) => (
+        <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${user.banned ? "bg-rose-500/10 text-rose-700 dark:text-rose-300" : "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"}`}>
+          {user.banned ? "Suspended" : "Active"}
+        </span>
+      ),
+    },
+    {
+      id: "joined",
+      header: "Joined",
+      value: (user) => user.createdAt.slice(0, 10),
+      cell: (user) => <span className="whitespace-nowrap">{new Date(user.createdAt).toLocaleDateString()}</span>,
+    },
+  ];
+
   return (
     <div className="space-y-6">
       <header className="flex flex-wrap items-end justify-between gap-4">
@@ -97,64 +167,18 @@ function SystemUsersPage() {
           </div>
         ) : (
           <>
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[720px] text-left">
-                <thead className="bg-slate-50">
-                  <tr className="border-b border-slate-100">
-                    {["User", "Platform role", "School memberships", "Status", "Joined"].map((heading) => (
-                      <th key={heading} className="px-5 py-3 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-                        {heading}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {users.map((user) => (
-                    <tr key={user.id} className="border-b border-slate-100 last:border-0">
-                      <td className="px-5 py-4">
-                        <p className="text-sm font-semibold text-slate-800">{user.name}</p>
-                        <p className="mt-0.5 text-xs text-slate-500">{user.email}</p>
-                      </td>
-                      <td className="px-5 py-4 text-sm capitalize text-slate-600">{user.role}</td>
-                      <td className="max-w-sm px-5 py-4">
-                        <div className="flex flex-wrap gap-2">
-                          {user.members.map((member) => {
-                            const school = member.organization.school;
-                            return school ? (
-                              <Link
-                                key={school.id}
-                                to="/admin/schools/$schoolId"
-                                params={{ schoolId: school.id }}
-                                className="superadmin-button-secondary inline-flex items-center gap-1.5 rounded-lg bg-slate-100 px-2.5 py-1.5 text-xs font-medium text-slate-800 hover:bg-indigo-50 hover:text-indigo-900"
-                                title={`${member.role}${member.banned ? " (membership suspended)" : ""}`}
-                              >
-                                <Building2 className="size-3.5" />
-                                {school.name}
-                                <span className="text-slate-400">
-                                  · {[member.role, ...member.roles].filter((role, index, all) => all.indexOf(role) === index).join(", ")}
-                                </span>
-                              </Link>
-                            ) : (
-                              <span key={member.organization.name} className="text-xs text-slate-500">
-                                {member.organization.name}
-                              </span>
-                            );
-                          })}
-                        </div>
-                      </td>
-                      <td className="px-5 py-4">
-                        <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${user.banned ? "bg-rose-50 text-rose-700" : "bg-emerald-50 text-emerald-700"}`}>
-                          {user.banned ? "Suspended" : "Active"}
-                        </span>
-                      </td>
-                      <td className="whitespace-nowrap px-5 py-4 text-xs text-slate-500">
-                        {new Date(user.createdAt).toLocaleDateString()}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <DataTable
+              embedded
+              searchable={false}
+              paginate={false}
+              canExport
+              rows={users}
+              columns={columns}
+              getRowId={(user) => user.id}
+              exportTitle="Platform users"
+              emptyTitle="No users"
+              emptyDescription="No users to show."
+            />
             {data && data.meta.totalPages > 1 && (
               <div className="flex items-center justify-between border-t border-slate-100 px-5 py-3">
                 <span className="text-xs text-slate-500">Page {data.meta.page} of {data.meta.totalPages}</span>

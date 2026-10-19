@@ -734,12 +734,26 @@ export const savePeriodSchema = z
     startTime: clockTime,
     endTime: clockTime,
     sortOrder: z.number().int().min(0).max(100).optional(),
+    /** Department the period belongs to. null/omitted = default periods for classes with no department. */
+    departmentId: z.string().min(1).nullable().optional(),
   })
   .refine((period) => period.endTime > period.startTime, {
     path: ["endTime"],
     message: "A period must end after it starts.",
   });
 export type SavePeriodInput = z.infer<typeof savePeriodSchema>;
+
+/** Copy one department's periods to others. null from = the default (no-department) periods. */
+export const copyPeriodsSchema = z
+  .object({
+    fromDepartmentId: z.string().min(1).nullable(),
+    toDepartmentIds: z.array(z.string().min(1)).min(1, "Choose a department to copy to").max(30),
+  })
+  .refine((input) => !input.toDepartmentIds.includes(input.fromDepartmentId ?? ""), {
+    path: ["toDepartmentIds"],
+    message: "Choose departments other than the one you are copying from.",
+  });
+export type CopyPeriodsInput = z.infer<typeof copyPeriodsSchema>;
 
 export const saveClassroomSchema = z.object({
   name: z.string().trim().min(1).max(60),

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { ArrowUpRight, ChevronLeft, ChevronRight, CircleAlert, CreditCard } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { SubscriptionBadge } from "@/components/superadmin/subscription-badge";
+import { DataTable, type DataTableColumn } from "@/components/ui/data-table";
 
 export const Route = createFileRoute("/admin/subscriptions/")({
   component: SubscriptionsPage,
@@ -31,6 +32,52 @@ function SubscriptionsPage() {
       apiFetch<SchoolsResponse>(`/super-admin/schools?page=${page}&limit=20`),
     retry: false,
   });
+
+  const columns: DataTableColumn<SchoolSubscription>[] = [
+    {
+      id: "school",
+      header: "School",
+      value: (school) => `${school.name} (${school.code} · ${school.subdomain})`,
+      cell: (school) => (
+        <>
+          <p className="text-sm font-semibold text-foreground">{school.name}</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">{school.code} · {school.subdomain}</p>
+        </>
+      ),
+    },
+    {
+      id: "status",
+      header: "Status",
+      value: (school) => school.organization.subscriptionStatus,
+      cell: (school) => <SubscriptionBadge status={school.organization.subscriptionStatus} />,
+    },
+    {
+      id: "expires",
+      header: "Expires",
+      value: (school) => school.organization.expiresAt?.slice(0, 10) ?? "No expiry set",
+      cell: (school) => (school.organization.expiresAt ? new Date(school.organization.expiresAt).toLocaleDateString() : "No expiry set"),
+    },
+    {
+      id: "enrolled",
+      header: "Enrolled",
+      value: (school) => school.createdAt.slice(0, 10),
+      cell: (school) => <span className="whitespace-nowrap">{new Date(school.createdAt).toLocaleDateString()}</span>,
+    },
+    {
+      id: "actions",
+      header: "",
+      className: "text-right",
+      cell: (school) => (
+        <Link
+          to="/admin/schools/$schoolId"
+          params={{ schoolId: school.id }}
+          className="superadmin-button-secondary inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-indigo-800 hover:bg-indigo-50"
+        >
+          Manage <ArrowUpRight className="size-3.5" />
+        </Link>
+      ),
+    },
+  ];
 
   return (
     <div className="space-y-6">
@@ -62,49 +109,17 @@ function SubscriptionsPage() {
           </div>
         ) : (
           <>
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[650px] text-left">
-                <thead className="bg-slate-50">
-                  <tr className="border-b border-slate-100">
-                    {["School", "Status", "Expires", "Enrolled", ""].map((heading) => (
-                      <th key={heading} className="px-5 py-3 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-                        {heading}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.data.map((school) => (
-                    <tr key={school.id} className="border-b border-slate-100 last:border-0">
-                      <td className="px-5 py-4">
-                        <p className="text-sm font-semibold text-slate-800">{school.name}</p>
-                        <p className="mt-0.5 text-xs text-slate-500">{school.code} · {school.subdomain}</p>
-                      </td>
-                      <td className="px-5 py-4">
-                        <SubscriptionBadge status={school.organization.subscriptionStatus} />
-                      </td>
-                      <td className="px-5 py-4 text-sm text-slate-600">
-                        {school.organization.expiresAt
-                          ? new Date(school.organization.expiresAt).toLocaleDateString()
-                          : "No expiry set"}
-                      </td>
-                      <td className="whitespace-nowrap px-5 py-4 text-xs text-slate-500">
-                        {new Date(school.createdAt).toLocaleDateString()}
-                      </td>
-                      <td className="px-5 py-4 text-right">
-                        <Link
-                          to="/admin/schools/$schoolId"
-                          params={{ schoolId: school.id }}
-                          className="superadmin-button-secondary inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-indigo-800 hover:bg-indigo-50"
-                        >
-                          Manage <ArrowUpRight className="size-3.5" />
-                        </Link>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <DataTable
+              embedded
+              paginate={false}
+              canExport
+              rows={data.data}
+              columns={columns}
+              getRowId={(school) => school.id}
+              exportTitle="Subscriptions"
+              emptyTitle="No subscriptions"
+              emptyDescription="No subscriptions to show."
+            />
             {data.meta.totalPages > 1 && (
               <div className="flex items-center justify-between border-t border-slate-100 px-5 py-3">
                 <span className="text-xs text-slate-500">Page {data.meta.page} of {data.meta.totalPages}</span>

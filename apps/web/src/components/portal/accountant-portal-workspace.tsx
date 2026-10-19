@@ -34,6 +34,8 @@ import {
 import { PortalStatCard } from "./portal-stat-card";
 import { PortalModal } from "./portal-modal";
 import { cn } from "@/lib/utils";
+import { DataTable } from "@/components/ui/data-table";
+import { useCanExportTables } from "@/lib/table-export-policy";
 
 interface AccountantPortalWorkspaceProps {
   defaultTab?: "overview" | "invoices" | "payments" | "debtors" | "payroll" | "expenses" | "inventory";
@@ -142,6 +144,7 @@ const mockInventory: InventoryRecord[] = [
 ];
 
 export function AccountantPortalWorkspace({ defaultTab = "overview" }: AccountantPortalWorkspaceProps) {
+  const canExport = useCanExportTables();
   const [activeTab, setActiveTab] = useState(defaultTab);
   const [invoices, setInvoices] = useState<InvoiceRecord[]>(mockInvoices);
   const [payments, setPayments] = useState<PaymentRecord[]>(mockPayments);
@@ -591,57 +594,63 @@ export function AccountantPortalWorkspace({ defaultTab = "overview" }: Accountan
           </div>
 
           {/* Table */}
-          <div className="overflow-x-auto rounded-2xl border border-slate-200/80 bg-white shadow-xs dark:border-slate-800 dark:bg-slate-900">
-            <table className="w-full min-w-[800px] border-collapse text-left text-xs">
-              <thead>
-                <tr className="border-b border-slate-100 bg-slate-50/70 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:border-slate-800 dark:bg-slate-800/50">
-                  <th className="p-3.5 pl-5">Invoice #</th>
-                  <th className="p-3.5">Student</th>
-                  <th className="p-3.5">Fee Structure</th>
-                  <th className="p-3.5 text-right">Total (GH₵)</th>
-                  <th className="p-3.5 text-right">Paid (GH₵)</th>
-                  <th className="p-3.5 text-right">Balance (GH₵)</th>
-                  <th className="p-3.5 text-center">Status</th>
-                  <th className="p-3.5">Due Date</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                {filteredInvoices.map((inv) => (
-                  <tr key={inv.id} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/40">
-                    <td className="p-3.5 pl-5 font-mono font-bold text-slate-700 dark:text-slate-300">
-                      {inv.billNumber}
-                    </td>
-                    <td className="p-3.5">
-                      <p className="font-bold text-slate-900 dark:text-white">{inv.studentName}</p>
-                      <p className="text-[10px] text-slate-400">{inv.className}</p>
-                    </td>
-                    <td className="p-3.5 text-slate-600 dark:text-slate-300">{inv.feeStructureName}</td>
-                    <td className="p-3.5 text-right font-semibold">{inv.totalAmount.toLocaleString()}</td>
-                    <td className="p-3.5 text-right font-semibold text-emerald-600">{inv.paidAmount.toLocaleString()}</td>
-                    <td className="p-3.5 text-right font-black">
-                      <span className={inv.balanceAmount > 0 ? "text-rose-600" : "text-emerald-600"}>
-                        {inv.balanceAmount.toLocaleString()}
-                      </span>
-                    </td>
-                    <td className="p-3.5 text-center">
-                      <span
-                        className={cn(
-                          "rounded-full px-2.5 py-0.5 text-[10px] font-black uppercase",
-                          inv.status === "PAID" && "bg-emerald-50 text-emerald-700 border border-emerald-200",
-                          inv.status === "PARTIALLY_PAID" && "bg-blue-50 text-blue-700 border border-blue-200",
-                          inv.status === "PENDING" && "bg-amber-50 text-amber-700 border border-amber-200",
-                          inv.status === "OVERDUE" && "bg-rose-50 text-rose-700 border border-rose-200",
-                        )}
-                      >
-                        {inv.status.replaceAll("_", " ")}
-                      </span>
-                    </td>
-                    <td className="p-3.5 text-slate-500 font-mono text-[11px]">{inv.dueDate}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <DataTable
+            rows={filteredInvoices}
+            searchable={false}
+            canExport={canExport}
+            exportTitle="Fee invoices"
+            getRowId={(inv) => inv.id}
+            emptyTitle="No invoices found"
+            emptyDescription="No invoices match the current search and status filter."
+            columns={[
+              { id: "bill", header: "Invoice #", cell: (inv) => <span className="font-mono font-bold text-foreground">{inv.billNumber}</span> },
+              {
+                id: "student",
+                header: "Student",
+                value: (inv) => `${inv.studentName} (${inv.className})`,
+                cell: (inv) => (
+                  <>
+                    <p className="font-bold text-foreground">{inv.studentName}</p>
+                    <p className="text-[10px] text-muted-foreground">{inv.className}</p>
+                  </>
+                ),
+              },
+              { id: "fee", header: "Fee Structure", cell: (inv) => inv.feeStructureName },
+              { id: "total", header: "Total (GH₵)", className: "text-right", value: (inv) => inv.totalAmount, cell: (inv) => <span className="font-semibold">{inv.totalAmount.toLocaleString()}</span> },
+              { id: "paid", header: "Paid (GH₵)", className: "text-right", value: (inv) => inv.paidAmount, cell: (inv) => <span className="font-semibold text-emerald-600">{inv.paidAmount.toLocaleString()}</span> },
+              {
+                id: "balance",
+                header: "Balance (GH₵)",
+                className: "text-right",
+                value: (inv) => inv.balanceAmount,
+                cell: (inv) => (
+                  <span className={cn("font-black", inv.balanceAmount > 0 ? "text-rose-600" : "text-emerald-600")}>
+                    {inv.balanceAmount.toLocaleString()}
+                  </span>
+                ),
+              },
+              {
+                id: "status",
+                header: "Status",
+                className: "text-center",
+                value: (inv) => inv.status.replaceAll("_", " "),
+                cell: (inv) => (
+                  <span
+                    className={cn(
+                      "rounded-full border px-2.5 py-0.5 text-[10px] font-black uppercase",
+                      inv.status === "PAID" && "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-400/20 dark:bg-emerald-400/10 dark:text-emerald-300",
+                      inv.status === "PARTIALLY_PAID" && "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-400/20 dark:bg-blue-400/10 dark:text-blue-300",
+                      inv.status === "PENDING" && "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-400/20 dark:bg-amber-400/10 dark:text-amber-300",
+                      inv.status === "OVERDUE" && "border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-400/20 dark:bg-rose-400/10 dark:text-rose-300",
+                    )}
+                  >
+                    {inv.status.replaceAll("_", " ")}
+                  </span>
+                ),
+              },
+              { id: "due", header: "Due Date", cell: (inv) => <span className="font-mono text-[11px] text-muted-foreground">{inv.dueDate}</span> },
+            ]}
+          />
         </div>
       )}
 
@@ -662,50 +671,55 @@ export function AccountantPortalWorkspace({ defaultTab = "overview" }: Accountan
             </button>
           </div>
 
-          <div className="overflow-x-auto rounded-2xl border border-slate-200/80 bg-white shadow-xs dark:border-slate-800 dark:bg-slate-900">
-            <table className="w-full min-w-[750px] border-collapse text-left text-xs">
-              <thead>
-                <tr className="border-b border-slate-100 bg-slate-50/70 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:border-slate-800 dark:bg-slate-800/50">
-                  <th className="p-3.5 pl-5">Receipt #</th>
-                  <th className="p-3.5">Student</th>
-                  <th className="p-3.5">Method & Reference</th>
-                  <th className="p-3.5 text-right">Amount Paid</th>
-                  <th className="p-3.5">Payment Date</th>
-                  <th className="p-3.5 text-center">Receipt</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                {payments.map((p) => (
-                  <tr key={p.id} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/40">
-                    <td className="p-3.5 pl-5 font-mono font-bold text-emerald-700 dark:text-emerald-400">
-                      {p.receiptNumber}
-                    </td>
-                    <td className="p-3.5">
-                      <p className="font-bold text-slate-900 dark:text-white">{p.studentName}</p>
-                      <p className="text-[10px] text-slate-400">{p.className}</p>
-                    </td>
-                    <td className="p-3.5">
-                      <span className="font-semibold text-slate-800 dark:text-slate-200 block">{p.paymentMethod.replaceAll("_", " ")}</span>
-                      <span className="text-[10px] text-slate-400 font-mono">Ref: {p.referenceNumber}</span>
-                    </td>
-                    <td className="p-3.5 text-right font-black text-slate-900 dark:text-white">
-                      GH₵ {p.amount.toLocaleString()}
-                    </td>
-                    <td className="p-3.5 text-slate-500 font-mono text-[11px]">{p.paymentDate}</td>
-                    <td className="p-3.5 text-center">
-                      <button
-                        onClick={() => setSelectedReceipt(p)}
-                        className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
-                      >
-                        <Printer className="size-3.5" />
-                        Print
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <DataTable
+            rows={payments}
+            canExport={canExport}
+            exportTitle="Fee payments"
+            getRowId={(p) => p.id}
+            emptyTitle="No payments recorded"
+            emptyDescription="Recorded fee payments will appear here."
+            columns={[
+              { id: "receipt", header: "Receipt #", cell: (p) => <span className="font-mono font-bold text-emerald-700 dark:text-emerald-400">{p.receiptNumber}</span> },
+              {
+                id: "student",
+                header: "Student",
+                value: (p) => `${p.studentName} (${p.className})`,
+                cell: (p) => (
+                  <>
+                    <p className="font-bold text-foreground">{p.studentName}</p>
+                    <p className="text-[10px] text-muted-foreground">{p.className}</p>
+                  </>
+                ),
+              },
+              {
+                id: "method",
+                header: "Method & Reference",
+                value: (p) => `${p.paymentMethod.replaceAll("_", " ")} (Ref: ${p.referenceNumber})`,
+                cell: (p) => (
+                  <>
+                    <span className="block font-semibold text-foreground">{p.paymentMethod.replaceAll("_", " ")}</span>
+                    <span className="font-mono text-[10px] text-muted-foreground">Ref: {p.referenceNumber}</span>
+                  </>
+                ),
+              },
+              { id: "amount", header: "Amount Paid (GH₵)", className: "text-right", value: (p) => p.amount, cell: (p) => <span className="font-black text-foreground">GH₵ {p.amount.toLocaleString()}</span> },
+              { id: "date", header: "Payment Date", cell: (p) => <span className="font-mono text-[11px] text-muted-foreground">{p.paymentDate}</span> },
+              {
+                id: "receiptAction",
+                header: "",
+                className: "text-center",
+                cell: (p) => (
+                  <button
+                    onClick={() => setSelectedReceipt(p)}
+                    className="inline-flex items-center gap-1 rounded-lg border border-border bg-card px-2.5 py-1 text-[11px] font-semibold text-foreground hover:bg-muted"
+                  >
+                    <Printer className="size-3.5" />
+                    Print receipt
+                  </button>
+                ),
+              },
+            ]}
+          />
         </div>
       )}
 
@@ -726,51 +740,55 @@ export function AccountantPortalWorkspace({ defaultTab = "overview" }: Accountan
             </button>
           </div>
 
-          <div className="overflow-x-auto rounded-2xl border border-slate-200/80 bg-white shadow-xs dark:border-slate-800 dark:bg-slate-900">
-            <table className="w-full min-w-[750px] border-collapse text-left text-xs">
-              <thead>
-                <tr className="border-b border-slate-100 bg-slate-50/70 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:border-slate-800 dark:bg-slate-800/50">
-                  <th className="p-3.5 pl-5">Student</th>
-                  <th className="p-3.5">Class</th>
-                  <th className="p-3.5 text-right">Total Billed</th>
-                  <th className="p-3.5 text-right">Amount Paid</th>
-                  <th className="p-3.5 text-right">Outstanding Arrears</th>
-                  <th className="p-3.5">Due Status</th>
-                  <th className="p-3.5 text-center">Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                {invoices.filter((i) => i.balanceAmount > 0).map((debtor) => (
-                  <tr key={debtor.id} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/40">
-                    <td className="p-3.5 pl-5">
-                      <p className="font-bold text-slate-900 dark:text-white">{debtor.studentName}</p>
-                      <p className="text-[10px] text-slate-400 font-mono">{debtor.studentId}</p>
-                    </td>
-                    <td className="p-3.5 text-slate-600 dark:text-slate-300">{debtor.className}</td>
-                    <td className="p-3.5 text-right font-semibold">GH₵ {debtor.totalAmount.toLocaleString()}</td>
-                    <td className="p-3.5 text-right font-semibold text-emerald-600">GH₵ {debtor.paidAmount.toLocaleString()}</td>
-                    <td className="p-3.5 text-right font-black text-rose-600">
-                      GH₵ {debtor.balanceAmount.toLocaleString()}
-                    </td>
-                    <td className="p-3.5">
-                      <span className="rounded-full bg-rose-50 px-2.5 py-0.5 text-[10px] font-black text-rose-700">
-                        {debtor.status === "OVERDUE" ? "Overdue" : "Pending Due"}
-                      </span>
-                    </td>
-                    <td className="p-3.5 text-center">
-                      <button
-                        onClick={() => setSelectedDebtor(debtor)}
-                        className="inline-flex items-center gap-1 rounded-lg bg-slate-100 px-2.5 py-1 text-[11px] font-bold text-slate-700 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-200"
-                      >
-                        <Bell className="size-3" />
-                        Remind
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <DataTable
+            rows={invoices.filter((i) => i.balanceAmount > 0)}
+            canExport={canExport}
+            exportTitle="Debtors and overdue balances"
+            getRowId={(debtor) => debtor.id}
+            emptyTitle="No outstanding balances"
+            emptyDescription="Students with unpaid fee balances will appear here."
+            columns={[
+              {
+                id: "student",
+                header: "Student",
+                value: (debtor) => `${debtor.studentName} (${debtor.studentId})`,
+                cell: (debtor) => (
+                  <>
+                    <p className="font-bold text-foreground">{debtor.studentName}</p>
+                    <p className="font-mono text-[10px] text-muted-foreground">{debtor.studentId}</p>
+                  </>
+                ),
+              },
+              { id: "class", header: "Class", cell: (debtor) => debtor.className },
+              { id: "billed", header: "Total Billed (GH₵)", className: "text-right", value: (debtor) => debtor.totalAmount, cell: (debtor) => <span className="font-semibold">GH₵ {debtor.totalAmount.toLocaleString()}</span> },
+              { id: "paid", header: "Amount Paid (GH₵)", className: "text-right", value: (debtor) => debtor.paidAmount, cell: (debtor) => <span className="font-semibold text-emerald-600">GH₵ {debtor.paidAmount.toLocaleString()}</span> },
+              { id: "arrears", header: "Outstanding Arrears (GH₵)", className: "text-right", value: (debtor) => debtor.balanceAmount, cell: (debtor) => <span className="font-black text-rose-600">GH₵ {debtor.balanceAmount.toLocaleString()}</span> },
+              {
+                id: "due",
+                header: "Due Status",
+                value: (debtor) => (debtor.status === "OVERDUE" ? "Overdue" : "Pending Due"),
+                cell: (debtor) => (
+                  <span className="rounded-full bg-rose-50 px-2.5 py-0.5 text-[10px] font-black text-rose-700 dark:bg-rose-400/10 dark:text-rose-300">
+                    {debtor.status === "OVERDUE" ? "Overdue" : "Pending Due"}
+                  </span>
+                ),
+              },
+              {
+                id: "remind",
+                header: "",
+                className: "text-center",
+                cell: (debtor) => (
+                  <button
+                    onClick={() => setSelectedDebtor(debtor)}
+                    className="inline-flex items-center gap-1 rounded-lg bg-muted px-2.5 py-1 text-[11px] font-bold text-foreground hover:bg-muted/70"
+                  >
+                    <Bell className="size-3" />
+                    Remind
+                  </button>
+                ),
+              },
+            ]}
+          />
         </div>
       )}
 
@@ -791,43 +809,39 @@ export function AccountantPortalWorkspace({ defaultTab = "overview" }: Accountan
             </button>
           </div>
 
-          <div className="overflow-x-auto rounded-2xl border border-slate-200/80 bg-white shadow-xs dark:border-slate-800 dark:bg-slate-900">
-            <table className="w-full min-w-[750px] border-collapse text-left text-xs">
-              <thead>
-                <tr className="border-b border-slate-100 bg-slate-50/70 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:border-slate-800 dark:bg-slate-800/50">
-                  <th className="p-3.5 pl-5">Staff Name</th>
-                  <th className="p-3.5">Role / Dept</th>
-                  <th className="p-3.5 text-right">Basic (GH₵)</th>
-                  <th className="p-3.5 text-right">Allowances</th>
-                  <th className="p-3.5 text-right">Tax & SSNIT</th>
-                  <th className="p-3.5 text-right">Net Salary</th>
-                  <th className="p-3.5 text-center">Status</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                {mockStaffSalaries.map((s) => (
-                  <tr key={s.id} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/40">
-                    <td className="p-3.5 pl-5 font-bold text-slate-900 dark:text-white">{s.staffName}</td>
-                    <td className="p-3.5">
-                      <span className="block text-slate-800 dark:text-slate-200 font-medium">{s.role}</span>
-                      <span className="text-[10px] text-slate-400">{s.department}</span>
-                    </td>
-                    <td className="p-3.5 text-right font-medium">{s.basicSalary.toLocaleString()}</td>
-                    <td className="p-3.5 text-right font-medium text-emerald-600">+{s.allowances.toLocaleString()}</td>
-                    <td className="p-3.5 text-right font-medium text-rose-600">-{s.taxDeductions.toLocaleString()}</td>
-                    <td className="p-3.5 text-right font-black text-slate-900 dark:text-white">
-                      GH₵ {s.netPay.toLocaleString()}
-                    </td>
-                    <td className="p-3.5 text-center">
-                      <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-[10px] font-bold text-emerald-700">
-                        {s.status}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <DataTable
+            rows={mockStaffSalaries}
+            canExport={canExport}
+            exportTitle="Staff payroll"
+            getRowId={(s) => s.id}
+            emptyTitle="No payroll records"
+            emptyDescription="Staff salary records will appear here."
+            columns={[
+              { id: "name", header: "Staff Name", cell: (s) => <span className="font-bold text-foreground">{s.staffName}</span> },
+              {
+                id: "role",
+                header: "Role / Dept",
+                value: (s) => `${s.role} (${s.department})`,
+                cell: (s) => (
+                  <>
+                    <span className="block font-medium text-foreground">{s.role}</span>
+                    <span className="text-[10px] text-muted-foreground">{s.department}</span>
+                  </>
+                ),
+              },
+              { id: "basic", header: "Basic (GH₵)", className: "text-right", value: (s) => s.basicSalary, cell: (s) => <span className="font-medium">{s.basicSalary.toLocaleString()}</span> },
+              { id: "allowances", header: "Allowances (GH₵)", className: "text-right", value: (s) => s.allowances, cell: (s) => <span className="font-medium text-emerald-600">+{s.allowances.toLocaleString()}</span> },
+              { id: "tax", header: "Tax & SSNIT (GH₵)", className: "text-right", value: (s) => s.taxDeductions, cell: (s) => <span className="font-medium text-rose-600">-{s.taxDeductions.toLocaleString()}</span> },
+              { id: "net", header: "Net Salary (GH₵)", className: "text-right", value: (s) => s.netPay, cell: (s) => <span className="font-black text-foreground">GH₵ {s.netPay.toLocaleString()}</span> },
+              {
+                id: "status",
+                header: "Status",
+                className: "text-center",
+                value: (s) => s.status,
+                cell: (s) => <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-[10px] font-bold text-emerald-700 dark:bg-emerald-400/10 dark:text-emerald-300">{s.status}</span>,
+              },
+            ]}
+          />
         </div>
       )}
 
@@ -848,46 +862,48 @@ export function AccountantPortalWorkspace({ defaultTab = "overview" }: Accountan
             </button>
           </div>
 
-          <div className="overflow-x-auto rounded-2xl border border-slate-200/80 bg-white shadow-xs dark:border-slate-800 dark:bg-slate-900">
-            <table className="w-full min-w-[750px] border-collapse text-left text-xs">
-              <thead>
-                <tr className="border-b border-slate-100 bg-slate-50/70 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:border-slate-800 dark:bg-slate-800/50">
-                  <th className="p-3.5 pl-5">Date & POV #</th>
-                  <th className="p-3.5">Payee & Category</th>
-                  <th className="p-3.5">Description</th>
-                  <th className="p-3.5 text-right">Amount (GH₵)</th>
-                  <th className="p-3.5">Payment Method</th>
-                  <th className="p-3.5 text-center">Status</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                {expenses.map((exp) => (
-                  <tr key={exp.id} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/40">
-                    <td className="p-3.5 pl-5">
-                      <p className="font-mono font-bold text-slate-900 dark:text-white">{exp.voucherNumber}</p>
-                      <p className="text-[10px] text-slate-400 font-mono">{exp.date}</p>
-                    </td>
-                    <td className="p-3.5">
-                      <p className="font-bold text-slate-900 dark:text-white">{exp.payee}</p>
-                      <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-                        {exp.category}
-                      </span>
-                    </td>
-                    <td className="p-3.5 text-slate-600 dark:text-slate-300 max-w-xs truncate">{exp.description}</td>
-                    <td className="p-3.5 text-right font-black text-rose-600">
-                      -GH₵ {exp.amount.toLocaleString()}
-                    </td>
-                    <td className="p-3.5 text-slate-600 dark:text-slate-400 font-medium">{exp.paymentMethod}</td>
-                    <td className="p-3.5 text-center">
-                      <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700">
-                        {exp.status}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <DataTable
+            rows={expenses}
+            canExport={canExport}
+            exportTitle="Operational expenses"
+            getRowId={(exp) => exp.id}
+            emptyTitle="No expenses recorded"
+            emptyDescription="Expense vouchers will appear here."
+            columns={[
+              {
+                id: "voucher",
+                header: "Date & POV #",
+                value: (exp) => `${exp.voucherNumber} (${exp.date})`,
+                cell: (exp) => (
+                  <>
+                    <p className="font-mono font-bold text-foreground">{exp.voucherNumber}</p>
+                    <p className="font-mono text-[10px] text-muted-foreground">{exp.date}</p>
+                  </>
+                ),
+              },
+              {
+                id: "payee",
+                header: "Payee & Category",
+                value: (exp) => `${exp.payee} (${exp.category})`,
+                cell: (exp) => (
+                  <>
+                    <p className="font-bold text-foreground">{exp.payee}</p>
+                    <span className="rounded-md bg-muted px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">{exp.category}</span>
+                  </>
+                ),
+              },
+              { id: "description", header: "Description", className: "max-w-xs", cell: (exp) => <span className="block truncate">{exp.description}</span>, value: (exp) => exp.description },
+              { id: "amount", header: "Amount (GH₵)", className: "text-right", value: (exp) => exp.amount, cell: (exp) => <span className="font-black text-rose-600">-GH₵ {exp.amount.toLocaleString()}</span> },
+              { id: "method", header: "Payment Method", cell: (exp) => <span className="font-medium">{exp.paymentMethod}</span> },
+              {
+                id: "status",
+                header: "Status",
+                className: "text-center",
+                value: (exp) => exp.status,
+                cell: (exp) => <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700 dark:bg-emerald-400/10 dark:text-emerald-300">{exp.status}</span>,
+              },
+            ]}
+          />
         </div>
       )}
 
@@ -908,48 +924,41 @@ export function AccountantPortalWorkspace({ defaultTab = "overview" }: Accountan
             </button>
           </div>
 
-          <div className="overflow-x-auto rounded-2xl border border-slate-200/80 bg-white shadow-xs dark:border-slate-800 dark:bg-slate-900">
-            <table className="w-full min-w-[700px] border-collapse text-left text-xs">
-              <thead>
-                <tr className="border-b border-slate-100 bg-slate-50/70 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:border-slate-800 dark:bg-slate-800/50">
-                  <th className="p-3.5 pl-5">Item Code</th>
-                  <th className="p-3.5">Item Name</th>
-                  <th className="p-3.5">Category</th>
-                  <th className="p-3.5 text-center">Stock Level</th>
-                  <th className="p-3.5 text-right">Unit Cost</th>
-                  <th className="p-3.5 text-right">Valuation</th>
-                  <th className="p-3.5">Location</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                {inventoryList.map((item) => {
+          <DataTable
+            rows={inventoryList}
+            canExport={canExport}
+            exportTitle="School inventory"
+            getRowId={(item) => item.id}
+            emptyTitle="No inventory items"
+            emptyDescription="Inventory items will appear here."
+            columns={[
+              { id: "code", header: "Item Code", cell: (item) => <span className="font-mono text-muted-foreground">{item.code}</span>, value: (item) => item.code },
+              { id: "name", header: "Item Name", cell: (item) => <span className="font-bold text-foreground">{item.name}</span> },
+              { id: "category", header: "Category", cell: (item) => item.category },
+              {
+                id: "stock",
+                header: "Stock Level",
+                className: "text-center",
+                value: (item) => `${item.stockQty}${item.stockQty <= item.minThreshold ? " (LOW)" : ""}`,
+                cell: (item) => {
                   const isLow = item.stockQty <= item.minThreshold;
                   return (
-                    <tr key={item.id} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/40">
-                      <td className="p-3.5 pl-5 font-mono text-slate-500">{item.code}</td>
-                      <td className="p-3.5 font-bold text-slate-900 dark:text-white">{item.name}</td>
-                      <td className="p-3.5 text-slate-600 dark:text-slate-300">{item.category}</td>
-                      <td className="p-3.5 text-center">
-                        <span
-                          className={cn(
-                            "rounded-full px-2.5 py-0.5 text-[10px] font-black",
-                            isLow ? "bg-rose-50 text-rose-700" : "bg-emerald-50 text-emerald-700",
-                          )}
-                        >
-                          {item.stockQty} {isLow ? "(LOW)" : "In Stock"}
-                        </span>
-                      </td>
-                      <td className="p-3.5 text-right font-medium">GH₵ {item.unitCost}</td>
-                      <td className="p-3.5 text-right font-black text-slate-900 dark:text-white">
-                        GH₵ {(item.stockQty * item.unitCost).toLocaleString()}
-                      </td>
-                      <td className="p-3.5 text-slate-500">{item.location}</td>
-                    </tr>
+                    <span
+                      className={cn(
+                        "rounded-full px-2.5 py-0.5 text-[10px] font-black",
+                        isLow ? "bg-rose-50 text-rose-700 dark:bg-rose-400/10 dark:text-rose-300" : "bg-emerald-50 text-emerald-700 dark:bg-emerald-400/10 dark:text-emerald-300",
+                      )}
+                    >
+                      {item.stockQty} {isLow ? "(LOW)" : "In Stock"}
+                    </span>
                   );
-                })}
-              </tbody>
-            </table>
-          </div>
+                },
+              },
+              { id: "unit", header: "Unit Cost (GH₵)", className: "text-right", value: (item) => item.unitCost, cell: (item) => <span className="font-medium">GH₵ {item.unitCost}</span> },
+              { id: "valuation", header: "Valuation (GH₵)", className: "text-right", value: (item) => item.stockQty * item.unitCost, cell: (item) => <span className="font-black text-foreground">GH₵ {(item.stockQty * item.unitCost).toLocaleString()}</span> },
+              { id: "location", header: "Location", cell: (item) => item.location },
+            ]}
+          />
         </div>
       )}
 

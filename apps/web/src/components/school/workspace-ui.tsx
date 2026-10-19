@@ -1,7 +1,8 @@
 import type { LucideIcon } from "lucide-react";
 import { ArrowUpRight, Inbox } from "lucide-react";
 import type { ReactNode } from "react";
-import { cn } from "@/lib/utils";
+import { DataTable, type DataTableColumn } from "@/components/ui/data-table";
+import { useCanExportTables } from "@/lib/table-export-policy";
 
 export function WorkspacePageHeading({
   section,
@@ -46,75 +47,39 @@ export function PreviewDataNotice({ children }: { children: ReactNode }) {
   );
 }
 
-export interface WorkspaceColumn<T> {
-  id: string;
-  header: string;
-  cell: (row: T) => ReactNode;
-  className?: string;
-}
+export type WorkspaceColumn<T> = DataTableColumn<T>;
 
+/**
+ * School-workspace data table (shadcn data-table pattern): sorting, search,
+ * pagination, column visibility, and Print / CSV / Excel / PDF export for the
+ * roles allowed to export. Follows light and dark mode through theme tokens.
+ */
 export function WorkspaceDataTable<T>({
   rows,
   columns,
   getRowId,
   emptyTitle,
   emptyDescription,
+  exportTitle,
 }: {
   rows: T[];
   columns: WorkspaceColumn<T>[];
   getRowId: (row: T) => string;
   emptyTitle: string;
   emptyDescription: string;
+  exportTitle?: string;
 }) {
-  if (rows.length === 0) {
-    return (
-      <WorkspaceEmptyState
-        title={emptyTitle}
-        description={emptyDescription}
-      />
-    );
-  }
-
+  const canExport = useCanExportTables();
   return (
-    <div className="overflow-x-auto rounded-2xl border border-slate-200/80 bg-white shadow-[0_2px_12px_rgba(15,23,42,0.025)]">
-      <table className="w-full min-w-[600px] border-collapse text-left">
-        <thead>
-          <tr className="border-b border-slate-100 bg-slate-50/70">
-            {columns.map((column) => (
-              <th
-                key={column.id}
-                className={cn(
-                  "px-5 py-3 text-[10px] font-semibold uppercase tracking-wider text-slate-400",
-                  column.className,
-                )}
-              >
-                {column.header}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-slate-100">
-          {rows.map((row) => (
-            <tr
-              key={getRowId(row)}
-              className="transition-colors hover:bg-slate-50/70"
-            >
-              {columns.map((column) => (
-                <td
-                  key={column.id}
-                  className={cn(
-                    "px-5 py-3.5 text-xs text-slate-600",
-                    column.className,
-                  )}
-                >
-                  {column.cell(row)}
-                </td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <DataTable
+      rows={rows}
+      columns={columns}
+      getRowId={getRowId}
+      emptyTitle={emptyTitle}
+      emptyDescription={emptyDescription}
+      exportTitle={exportTitle ?? emptyTitle}
+      canExport={canExport}
+    />
   );
 }
 

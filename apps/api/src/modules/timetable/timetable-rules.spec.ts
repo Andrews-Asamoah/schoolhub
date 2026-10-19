@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { findPlacementClash, periodsOverlap, type SlotUsage } from "./timetable-rules.js";
+import { findPlacementClash, periodsOverlap, planPeriodCopy, type SlotUsage } from "./timetable-rules.js";
 
 const lesson = (over: Partial<SlotUsage>): SlotUsage => ({
   id: "e1",
@@ -38,5 +38,23 @@ describe("findPlacementClash", () => {
   });
   it("ignores teachers and rooms for breaks", () => {
     expect(findPlacementClash([lesson({})], { ...next, teacherId: "t1", classroomId: "r1", type: "BREAK" })).toBeNull();
+  });
+});
+
+describe("planPeriodCopy", () => {
+  const p = (name: string, startTime: string, endTime: string, sortOrder = 0) => ({ name, startTime, endTime, sortOrder });
+
+  it("copies everything into an empty department", () => {
+    const plan = planPeriodCopy([p("P1", "08:00", "08:40"), p("P2", "08:40", "09:20", 1)], []);
+    expect(plan.create).toHaveLength(2);
+    expect(plan.skipped).toHaveLength(0);
+  });
+  it("skips identical times and reports overlaps separately", () => {
+    const plan = planPeriodCopy(
+      [p("P1", "08:00", "08:40"), p("P2", "08:40", "09:20", 1), p("P3", "09:20", "10:00", 2)],
+      [{ startTime: "08:00", endTime: "08:40" }, { startTime: "09:00", endTime: "09:30" }],
+    );
+    expect(plan.create.map((x) => x.name)).toEqual([]);
+    expect(plan.skipped.map((x) => x.reason)).toEqual(["exists", "overlap", "overlap"]);
   });
 });

@@ -15,6 +15,7 @@ import {
 import { apiFetch } from "@/lib/api";
 import { StatCard } from "@/components/superadmin/stat-card";
 import { SubscriptionBadge } from "@/components/superadmin/subscription-badge";
+import { DataTable, type DataTableColumn } from "@/components/ui/data-table";
 import { Link, useNavigate } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/admin/dashboard")({
@@ -65,6 +66,60 @@ function AdminDashboard() {
     queryFn: () => apiFetch<SchoolsListResponse>("/super-admin/schools?page=1&limit=5"),
     retry: false,
   });
+
+  const regionOf = (metadata: string | null | undefined) => {
+    try {
+      return (metadata ? (JSON.parse(metadata) as { region?: string }) : null)?.region ?? "";
+    } catch {
+      return "";
+    }
+  };
+  const schoolColumns: DataTableColumn<NonNullable<typeof schools>["data"][number]>[] = [
+    {
+      id: "school",
+      header: "School",
+      value: (school) => `${school.name} (${school.subdomain}.schoolhub)`,
+      cell: (school) => (
+        <div className="flex items-center gap-3">
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-indigo-50 text-xs font-bold text-indigo-600">
+            {school.name.slice(0, 1).toUpperCase()}
+          </span>
+          <div className="min-w-0">
+            <p className="truncate text-sm font-semibold text-foreground">{school.name}</p>
+            <p className="mt-0.5 truncate text-xs text-muted-foreground">{school.subdomain}.schoolhub</p>
+          </div>
+        </div>
+      ),
+    },
+    { id: "region", header: "Region", value: (school) => regionOf(school.organization.metadata), cell: (school) => regionOf(school.organization.metadata) || "—" },
+    { id: "students", header: "Students", value: (school) => school.students.length, cell: (school) => <span className="font-semibold tabular-nums">{school.students.length}</span> },
+    {
+      id: "subscription",
+      header: "Subscription",
+      value: (school) => school.organization.subscriptionStatus,
+      cell: (school) => <SubscriptionBadge status={school.organization.subscriptionStatus} />,
+    },
+    {
+      id: "enrolled",
+      header: "Enrolled",
+      value: (school) => String(school.createdAt).slice(0, 10),
+      cell: (school) => new Date(school.createdAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }),
+    },
+    {
+      id: "actions",
+      header: "",
+      className: "text-right",
+      cell: (school) => (
+        <Link
+          to="/admin/schools/$schoolId"
+          params={{ schoolId: school.id }}
+          className="superadmin-button-secondary inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold text-indigo-700 transition hover:bg-indigo-50 hover:text-indigo-900"
+        >
+          View <ArrowRight className="size-3.5" />
+        </Link>
+      ),
+    },
+  ];
 
   return (
     <div className="space-y-7">
@@ -184,85 +239,16 @@ function AdminDashboard() {
             </Link>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[680px] text-left">
-              <thead className="bg-slate-50/70">
-                <tr className="border-b border-slate-100">
-                  {["School", "Region", "Students", "Subscription", "Enrolled", ""].map(
-                    (h) => (
-                      <th
-                        key={h}
-                        className="px-5 py-3.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400"
-                      >
-                        {h}
-                      </th>
-                    ),
-                  )}
-                </tr>
-              </thead>
-              <tbody>
-                {schools.data.map((school) => {
-                  let region = "";
-                  try {
-                    const meta = school.organization.metadata
-                      ? (JSON.parse(school.organization.metadata) as { region?: string })
-                      : null;
-                    region = meta?.region ?? "";
-                  } catch {
-                    /* ignore */
-                  }
-
-                  return (
-                    <tr
-                      key={school.id}
-                      className="border-b border-slate-100 last:border-b-0 transition hover:bg-slate-50/70"
-                    >
-                      <td className="px-5 py-4">
-                        <div className="flex items-center gap-3">
-                          <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-indigo-50 text-xs font-bold text-indigo-600">
-                            {school.name.slice(0, 1).toUpperCase()}
-                          </span>
-                          <div className="min-w-0">
-                            <p className="truncate text-sm font-semibold text-slate-900">
-                              {school.name}
-                            </p>
-                            <p className="mt-0.5 truncate text-xs text-slate-400">{school.subdomain}.schoolhub</p>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-5 py-4 text-sm text-slate-500">
-                        {region || "—"}
-                      </td>
-                      <td className="px-5 py-4 text-sm font-semibold tabular-nums text-slate-700">
-                        {school.students.length}
-                      </td>
-                      <td className="px-5 py-4">
-                        <SubscriptionBadge
-                          status={school.organization.subscriptionStatus}
-                        />
-                      </td>
-                      <td className="px-5 py-4 text-xs text-slate-500">
-                        {new Date(school.createdAt).toLocaleDateString("en-GB", {
-                          day: "numeric",
-                          month: "short",
-                          year: "numeric",
-                        })}
-                      </td>
-                      <td className="px-5 py-4 text-right">
-                        <Link
-                          to="/admin/schools/$schoolId"
-                          params={{ schoolId: school.id }}
-                          className="superadmin-button-secondary inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold text-indigo-700 transition hover:bg-indigo-50 hover:text-indigo-900"
-                        >
-                          View <ArrowRight className="size-3.5" />
-                        </Link>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+          <DataTable
+            embedded
+            compact
+            paginate={false}
+            rows={schools.data}
+            columns={schoolColumns}
+            getRowId={(school) => school.id}
+            emptyTitle="No schools"
+            emptyDescription="No schools to show."
+          />
         )}
       </section>
     </div>

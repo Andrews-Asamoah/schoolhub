@@ -48,3 +48,36 @@ export function findPlacementClash(existing: SlotUsage[], next: Placement): stri
   }
   return null;
 }
+
+export interface CopiablePeriod extends ClockRange {
+  name: string;
+  sortOrder: number;
+}
+
+export interface PeriodCopyPlan {
+  create: CopiablePeriod[];
+  skipped: { name: string; startTime: string; endTime: string; reason: 'exists' | 'overlap' }[];
+}
+
+/**
+ * Decides which source periods can be copied into a department that already
+ * has `existing` periods. Identical times are skipped as already present, and
+ * anything overlapping an existing (or just-planned) period is skipped so the
+ * target's "periods cannot overlap" rule still holds.
+ */
+export function planPeriodCopy(source: CopiablePeriod[], existing: ClockRange[]): PeriodCopyPlan {
+  const occupied: ClockRange[] = [...existing];
+  const plan: PeriodCopyPlan = { create: [], skipped: [] };
+  for (const period of source) {
+    const base = { name: period.name, startTime: period.startTime, endTime: period.endTime };
+    if (occupied.some((o) => o.startTime === period.startTime && o.endTime === period.endTime)) {
+      plan.skipped.push({ ...base, reason: 'exists' });
+    } else if (occupied.some((o) => periodsOverlap(o, period))) {
+      plan.skipped.push({ ...base, reason: 'overlap' });
+    } else {
+      plan.create.push(period);
+      occupied.push(period);
+    }
+  }
+  return plan;
+}

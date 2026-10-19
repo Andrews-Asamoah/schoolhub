@@ -212,6 +212,8 @@ export function StudentDirectoryWorkspace() {
     {
       id: "name",
       header: "Student",
+      value: (student) =>
+        `${student.profile.firstName} ${student.profile.lastName}${student.profile.otherNames ? ` ${student.profile.otherNames}` : ""} (${student.studentId})`,
       cell: (student) => (
         <div className="flex items-center gap-3">
           <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
@@ -255,6 +257,7 @@ export function StudentDirectoryWorkspace() {
     {
       id: "status",
       header: "Status",
+      value: (student) => student.status,
       cell: (student) => <StudentStatusBadge status={student.status} />,
     },
     ...(canManage
@@ -474,6 +477,7 @@ export function StudentDirectoryWorkspace() {
         rows={rows}
         columns={columns}
         getRowId={(student) => student.id}
+        exportTitle="Student directory"
         emptyTitle="No students match these filters"
         emptyDescription="Clear a filter or add a student record to start building your school directory."
       />

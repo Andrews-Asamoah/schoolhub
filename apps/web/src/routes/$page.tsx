@@ -305,7 +305,7 @@ function AssessmentList({
       id: "template",
       header: "Template",
       cell: (template) => (
-        <span className="font-semibold text-slate-800">{template.name}</span>
+        <span className="font-semibold text-foreground">{template.name}</span>
       ),
     },
     {
@@ -321,6 +321,7 @@ function AssessmentList({
     {
       id: "components",
       header: "Components",
+      value: (template) => template.components.length,
       cell: (template) => template.components.length,
     },
   ];
@@ -329,6 +330,7 @@ function AssessmentList({
       rows={query.data ?? []}
       columns={columns}
       getRowId={(template) => template.id}
+      exportTitle="Assessment templates"
       emptyTitle="No assessment templates yet"
       emptyDescription="Active templates configured for your school will appear here."
     />
@@ -347,7 +349,7 @@ function FeeStructureList({
       id: "name",
       header: "Fee structure",
       cell: (fee) => (
-        <span className="font-semibold text-slate-800">{fee.name}</span>
+        <span className="font-semibold text-foreground">{fee.name}</span>
       ),
     },
     {
@@ -360,10 +362,11 @@ function FeeStructureList({
               .join(", ")
           : (fee.classLevel ?? "All classes"),
     },
-    { id: "items", header: "Fee items", cell: (fee) => fee.items.length },
+    { id: "items", header: "Fee items", value: (fee) => fee.items.length, cell: (fee) => fee.items.length },
     {
       id: "total",
-      header: "Structure total",
+      header: "Structure total (GHS)",
+      value: (fee) => fee.items.reduce((total, item) => total + Number(item.amount), 0),
       cell: (fee) =>
         new Intl.NumberFormat("en-GH", {
           style: "currency",
@@ -378,6 +381,7 @@ function FeeStructureList({
       rows={query.data ?? []}
       columns={columns}
       getRowId={(fee) => fee.id}
+      exportTitle="Fee structures"
       emptyTitle="No active fee structures"
       emptyDescription="Add an active fee structure before generating student bills."
     />
@@ -420,7 +424,7 @@ function AttendanceWorkspace({
       id: "student",
       header: "Student",
       cell: (row) => (
-        <span className="font-semibold text-slate-800">{row.name}</span>
+        <span className="font-semibold text-foreground">{row.name}</span>
       ),
     },
     {
@@ -431,6 +435,7 @@ function AttendanceWorkspace({
     {
       id: "attendance",
       header: "Attendance",
+      value: (row) => row.attendance?.status ?? "Not recorded",
       cell: (row) =>
         row.attendance ? (
           <StatusBadge value={row.attendance.status} />
@@ -476,6 +481,7 @@ function AttendanceWorkspace({
           rows={attendanceQuery.data ?? []}
           columns={columns}
           getRowId={(row) => row.studentId}
+          exportTitle="Class attendance"
           emptyTitle="No students in this class"
           emptyDescription="Add students to this class to record attendance."
         />

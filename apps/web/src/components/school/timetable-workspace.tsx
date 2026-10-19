@@ -1,8 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CalendarClock, CircleAlert, LoaderCircle, Pencil, Plus, Trash2, X } from "lucide-react";
+import { CalendarClock, CircleAlert, Copy, LoaderCircle, Pencil, Plus, Trash2, X } from "lucide-react";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import {
   TIMETABLE_DAYS,
+  copyPeriodsSchema,
   saveClassroomSchema,
   savePeriodSchema,
   saveTimetableEntrySchema,
@@ -10,17 +11,22 @@ import {
   type TimetableDay,
 } from "@schoolhub/shared";
 import { FormField, FormInput } from "@/components/forms/form-controls";
+import { TableExportMenu } from "@/components/ui/data-table";
+import { useCanExportTables } from "@/lib/table-export-policy";
+import type { ExportTable } from "@/lib/table-export";
 import { useSchoolRole } from "@/components/school/school-role-switcher";
 import { apiFetch } from "@/lib/api";
 
-interface Period { id: string; name: string; startTime: string; endTime: string; sortOrder: number }
+interface Period { id: string; name: string; startTime: string; endTime: string; sortOrder: number; departmentId: string | null }
+interface Department { id: string; name: string; code: string }
 interface Room { id: string; name: string; capacity: number | null }
 interface Setup {
   academicYear: { id: string; name: string; isCurrent: boolean } | null;
   academicYears: { id: string; name: string; isCurrent: boolean }[];
   periods: Period[];
   classrooms: Room[];
-  classes: { id: string; name: string; level: string }[];
+  classes: { id: string; name: string; level: string; departmentId: string | null }[];
+  departments: Department[];
   subjects: { id: string; name: string; code: string; periodsPerWeek: number }[];
   teachers: { id: string; name: string }[];
   classSubjects: { classId: string; subjectId: string; teacherId: string | null }[];
@@ -57,6 +63,7 @@ export function TimetableWorkspace() {
   const { activeRole } = useSchoolRole();
   const canEdit = ["owner", "admin", "headmistress"].includes(activeRole ?? "");
   const isTeacher = activeRole === "teacher";
+  const canExport = useCanExportTables();
 
   const [view, setView] = useState<View>(isTeacher ? "teacher" : "class");
   const [targetId, setTargetId] = useState("");
@@ -121,12 +128,47 @@ export function TimetableWorkspace() {
     return map;
   }, [entries]);
 
+  // Periods belong to a department. A class shows its own department's periods;
+  // teacher and room views merge every department's periods by clock time.
+  const classDeptId = view === "class" ? setup?.classes.find((c) => c.id === targetId)?.departmentId ?? null : null;
+  const visiblePeriods = useMemo(() => {
+    if (!setup) return [];
+    if (view === "class") return setup.periods.filter((p) => (p.departmentId ?? null) === classDeptId);
+    const merged = new Map<string, Period>();
+    for (const period of setup.periods) {
+      const key = `${period.startTime}|${period.endTime}`;
+      if (!merged.has(key)) merged.set(key, period);
+    }
+    return [...merged.values()].sort((a, b) => a.startTime.localeCompare(b.startTime));
+  }, [setup, view, classDeptId]);
+
   if (setupQuery.isPending) return <Status>Loading timetable…</Status>;
   if (setupQuery.error) return <Status tone="error">{setupQuery.error.message}</Status>;
   if (!setup?.academicYear) {
     return <Status tone="error">Set up a current academic year before building the timetable.</Status>;
   }
   const editableHere = canEdit && view === "class";
+  const departmentName = classDeptId
+    ? setup.departments.find((d) => d.id === classDeptId)?.name ?? "this department"
+    : "the default (no department) schedule";
+  const targetLabel = options.find((option) => option.id === targetId)?.label ?? "";
+
+  function buildGridExport(): ExportTable {
+    const text = (entry: Entry) =>
+      [
+        entry.type === "LESSON" ? entry.subject?.name ?? "Lesson" : entry.label ?? entry.type,
+        view === "class" ? entry.teacher?.name : entry.class?.name,
+        entry.classroom?.name,
+      ].filter(Boolean).join(" · ");
+    return {
+      title: `Timetable - ${targetLabel}`,
+      headers: ["Period", ...days.map((day) => DAY_LABEL[day])],
+      rows: visiblePeriods.map((period) => [
+        `${period.name} (${period.startTime}-${period.endTime})`,
+        ...days.map((day) => (cellMap.get(`${day}|${period.startTime}|${period.endTime}`) ?? []).map(text).join("; ")),
+      ]),
+    };
+  }
 
   return (
     <div className="space-y-5">
@@ -163,14 +205,17 @@ export function TimetableWorkspace() {
               </select>
             </div>
           )}
-          {canEdit && (
+          {(canEdit || canExport) && (
             <div className="ml-auto flex gap-2">
+              {canExport && visiblePeriods.length > 0 && targetId && <TableExportMenu build={buildGridExport} />}
+              {canEdit && (<>
               <button type="button" className={outline} onClick={() => setManage(manage === "periods" ? null : "periods")}>
                 <CalendarClock className="size-4" /> Periods
               </button>
               <button type="button" className={outline} onClick={() => setManage(manage === "rooms" ? null : "rooms")}>
                 Rooms
               </button>
+              </>)}
             </div>
           )}
         </div>
@@ -180,22 +225,36 @@ export function TimetableWorkspace() {
       </section>
 
       {canEdit && manage === "periods" && (
-        <PeriodManager periods={setup.periods} onClose={() => setManage(null)} onChanged={refresh} />
+        <PeriodManager
+          periods={setup.periods}
+          departments={setup.departments}
+          hasUnassignedClasses={setup.classes.some((c) => !c.departmentId)}
+          initialDepartmentId={view === "class" ? classDeptId : undefined}
+          onClose={() => setManage(null)}
+          onChanged={refresh}
+        />
       )}
       {canEdit && manage === "rooms" && (
         <RoomManager rooms={setup.classrooms} onClose={() => setManage(null)} onChanged={refresh} />
       )}
 
-      {setup.periods.length === 0 ? (
+      {visiblePeriods.length === 0 ? (
         <Status>
-          {canEdit
-            ? "Define the school day first: open “Periods” and add the lesson and break times."
-            : "The school day has not been set up yet."}
+          {view !== "class"
+            ? "No periods have been set up yet."
+            : canEdit
+              ? `Define the school day for ${departmentName}: open “Periods” and add the lesson and break times, or copy them from another department.`
+              : "The school day has not been set up for this class's department yet."}
         </Status>
       ) : entriesQuery.error ? (
         <Status tone="error">{entriesQuery.error.message}</Status>
       ) : (
         <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-white/10 dark:bg-slate-900/70">
+          {view === "class" && (
+            <p className="border-b border-slate-100 px-4 py-2 text-[11px] text-slate-500 dark:border-white/10">
+              Periods for <span className="font-semibold text-slate-700 dark:text-slate-200">{classDeptId ? departmentName : "classes without a department"}</span>
+            </p>
+          )}
           <table className="w-full min-w-[720px] border-collapse text-left">
             <thead>
               <tr className="border-b border-slate-100 bg-slate-50/70 dark:border-white/10 dark:bg-white/[0.03]">
@@ -206,7 +265,7 @@ export function TimetableWorkspace() {
               </tr>
             </thead>
             <tbody>
-              {setup.periods.map((period) => (
+              {visiblePeriods.map((period) => (
                 <tr key={period.id} className="border-b border-slate-100 last:border-0 dark:border-white/10">
                   <th scope="row" className="px-3 py-2 align-top text-left">
                     <span className="block text-xs font-semibold text-slate-800 dark:text-slate-100">{period.name}</span>
@@ -451,15 +510,51 @@ function ManagerShell({ title, description, onClose, children }: { title: string
   );
 }
 
-function PeriodManager({ periods, onClose, onChanged }: { periods: Period[]; onClose: () => void; onChanged: () => Promise<void> }) {
+interface CopyResult {
+  results: {
+    departmentId: string;
+    departmentName: string;
+    created: number;
+    skipped: { name: string; startTime: string; endTime: string; reason: "exists" | "overlap" }[];
+  }[];
+}
+
+function PeriodManager({
+  periods: allPeriods,
+  departments,
+  hasUnassignedClasses,
+  initialDepartmentId,
+  onClose,
+  onChanged,
+}: {
+  periods: Period[];
+  departments: Department[];
+  hasUnassignedClasses: boolean;
+  initialDepartmentId?: string | null;
+  onClose: () => void;
+  onChanged: () => Promise<void>;
+}) {
+  const showDefault = hasUnassignedClasses || allPeriods.some((p) => !p.departmentId) || departments.length === 0;
+  // "" stands for the default (no department) schedule.
+  const [departmentId, setDepartmentId] = useState<string>(
+    initialDepartmentId !== undefined ? initialDepartmentId ?? "" : departments[0]?.id ?? "",
+  );
+  const periods = useMemo(
+    () => allPeriods.filter((p) => (p.departmentId ?? "") === departmentId),
+    [allPeriods, departmentId],
+  );
   const [editingId, setEditingId] = useState<string | "new" | null>(null);
   const [name, setName] = useState("");
   const [start, setStart] = useState("08:00");
   const [end, setEnd] = useState("08:40");
   const [problem, setProblem] = useState<string | null>(null);
+  const [copying, setCopying] = useState(false);
+  const [targets, setTargets] = useState<string[]>([]);
+  const [copyProblem, setCopyProblem] = useState<string | null>(null);
+  const [copyResult, setCopyResult] = useState<CopyResult | null>(null);
 
   const save = useMutation({
-    mutationFn: (input: { name: string; startTime: string; endTime: string }) =>
+    mutationFn: (input: { name: string; startTime: string; endTime: string; departmentId: string | null }) =>
       apiFetch(editingId && editingId !== "new" ? `/timetable/periods/${editingId}` : "/timetable/periods", {
         method: editingId && editingId !== "new" ? "PATCH" : "POST",
         body: JSON.stringify(input),
@@ -470,7 +565,21 @@ function PeriodManager({ periods, onClose, onChanged }: { periods: Period[]; onC
     mutationFn: (id: string) => apiFetch(`/timetable/periods/${id}`, { method: "DELETE" }),
     onSuccess: onChanged,
   });
+  const copy = useMutation({
+    mutationFn: (input: { fromDepartmentId: string | null; toDepartmentIds: string[] }) =>
+      apiFetch<CopyResult>("/timetable/periods/copy", { method: "POST", body: JSON.stringify(input) }),
+    onSuccess: async (result) => { setCopyResult(result); setTargets([]); await onChanged(); },
+  });
 
+  function chooseDepartment(id: string) {
+    setDepartmentId(id);
+    setEditingId(null);
+    setCopying(false);
+    setCopyResult(null);
+    setTargets([]);
+    save.reset();
+    remove.reset();
+  }
   function open(period?: Period) {
     save.reset();
     setProblem(null);
@@ -481,24 +590,44 @@ function PeriodManager({ periods, onClose, onChanged }: { periods: Period[]; onC
   }
   function submit(event: FormEvent) {
     event.preventDefault();
-    const parsed = savePeriodSchema.safeParse({ name, startTime: start, endTime: end });
+    const parsed = savePeriodSchema.safeParse({ name, startTime: start, endTime: end, departmentId: departmentId || null });
     if (!parsed.success) return setProblem(parsed.error.issues[0]?.message ?? "Check the times.");
     setProblem(null);
-    save.mutate(parsed.data);
+    save.mutate({ ...parsed.data, departmentId: parsed.data.departmentId ?? null });
+  }
+  function submitCopy() {
+    const parsed = copyPeriodsSchema.safeParse({ fromDepartmentId: departmentId || null, toDepartmentIds: targets });
+    if (!parsed.success) return setCopyProblem(parsed.error.issues[0]?.message ?? "Choose where to copy.");
+    setCopyProblem(null);
+    setCopyResult(null);
+    copy.mutate(parsed.data);
   }
   const error = problem ?? save.error?.message ?? remove.error?.message;
+  const currentName = departmentId ? departments.find((d) => d.id === departmentId)?.name ?? "Department" : "Default (no department)";
+  const copyTargets = departments.filter((d) => d.id !== departmentId);
 
   return (
-    <ManagerShell title="School day periods" description="Lessons and breaks share these times every day. Periods cannot overlap." onClose={onClose}>
+    <ManagerShell
+      title="School day periods"
+      description="Each department has its own periods; every class in a department shares them. Periods in a department cannot overlap."
+      onClose={onClose}
+    >
+      <div className="mb-4 max-w-xs">
+        <label htmlFor="period-department" className="mb-1 block text-[11px] font-medium text-slate-500">Department</label>
+        <select id="period-department" className={selectClass} value={departmentId} onChange={(e) => chooseDepartment(e.target.value)}>
+          {showDefault && <option value="">Default (no department)</option>}
+          {departments.map((department) => <option key={department.id} value={department.id}>{department.name}</option>)}
+        </select>
+      </div>
       <ul className="mb-4 divide-y divide-slate-100 rounded-xl border border-slate-200 dark:divide-white/10 dark:border-white/10">
         {periods.map((period) => (
           <li key={period.id} className="flex items-center justify-between gap-3 px-3 py-2 text-xs">
             <span><span className="font-semibold text-slate-800 dark:text-slate-100">{period.name}</span> <span className="text-slate-500">{period.startTime}–{period.endTime}</span></span>
             <span className="flex gap-1">
-              <button type="button" className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100" aria-label={`Edit ${period.name}`} onClick={() => open(period)}><Pencil className="size-3.5" /></button>
+              <button type="button" className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 dark:hover:bg-white/10" aria-label={`Edit ${period.name}`} onClick={() => open(period)}><Pencil className="size-3.5" /></button>
               <button
                 type="button"
-                className="rounded-md p-1.5 text-rose-600 hover:bg-rose-50"
+                className="rounded-md p-1.5 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-400/10"
                 aria-label={`Delete ${period.name}`}
                 disabled={remove.isPending}
                 onClick={() => { if (window.confirm(`Delete ${period.name}?`)) remove.mutate(period.id); }}
@@ -506,7 +635,7 @@ function PeriodManager({ periods, onClose, onChanged }: { periods: Period[]; onC
             </span>
           </li>
         ))}
-        {periods.length === 0 && <li className="px-3 py-3 text-xs text-slate-500">No periods yet.</li>}
+        {periods.length === 0 && <li className="px-3 py-3 text-xs text-slate-500">No periods for {currentName} yet.{copyTargets.length > 0 || departmentId ? " Add one below, or copy another department's periods from that department." : ""}</li>}
       </ul>
       {editingId ? (
         <form onSubmit={submit} className="space-y-3" noValidate>
@@ -523,8 +652,65 @@ function PeriodManager({ periods, onClose, onChanged }: { periods: Period[]; onC
         </form>
       ) : (
         <>
-          <button type="button" className={outline} onClick={() => open()}><Plus className="size-4" /> Add period</button>
+          <div className="flex flex-wrap gap-2">
+            <button type="button" className={outline} onClick={() => open()}><Plus className="size-4" /> Add period</button>
+            {periods.length > 0 && departments.length > (departmentId ? 1 : 0) && (
+              <button type="button" className={outline} aria-expanded={copying} onClick={() => { setCopying(!copying); setCopyResult(null); setCopyProblem(null); }}>
+                <Copy className="size-4" /> Copy to other departments
+              </button>
+            )}
+          </div>
           {error && <div className="mt-3"><Status tone="error">{error}</Status></div>}
+          {copying && (
+            <div className="mt-4 space-y-3 rounded-xl border border-slate-200 p-4 dark:border-white/10">
+              <div>
+                <p className="text-xs font-semibold text-slate-800 dark:text-slate-100">Copy {periods.length} period{periods.length === 1 ? "" : "s"} from {currentName} to:</p>
+                <p className="mt-0.5 text-[11px] text-slate-500">Existing periods in the target are kept. Periods with the same times are skipped, and ones that would overlap are skipped and reported. Lessons are not copied because teachers differ.</p>
+              </div>
+              <ul className="grid gap-1.5 sm:grid-cols-2">
+                {copyTargets.map((department) => {
+                  const existing = allPeriods.filter((p) => p.departmentId === department.id).length;
+                  return (
+                    <li key={department.id}>
+                      <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs hover:bg-slate-50 dark:border-white/10 dark:hover:bg-white/5">
+                        <input
+                          type="checkbox"
+                          className="size-3.5 accent-indigo-600"
+                          checked={targets.includes(department.id)}
+                          onChange={(e) => setTargets((current) => e.target.checked ? [...current, department.id] : current.filter((id) => id !== department.id))}
+                        />
+                        <span className="font-medium text-slate-800 dark:text-slate-100">{department.name}</span>
+                        <span className="ml-auto text-[10px] text-slate-500">{existing} existing</span>
+                      </label>
+                    </li>
+                  );
+                })}
+              </ul>
+              {(copyProblem ?? copy.error?.message) && <Status tone="error">{copyProblem ?? copy.error?.message}</Status>}
+              {copyResult && (
+                <ul className="space-y-1 text-xs" role="status">
+                  {copyResult.results.map((result) => (
+                    <li key={result.departmentId} className="rounded-lg bg-slate-50 px-3 py-2 dark:bg-white/5">
+                      <span className="font-semibold text-slate-800 dark:text-slate-100">{result.departmentName}:</span>{" "}
+                      copied {result.created}
+                      {result.skipped.length > 0 && (
+                        <span className="text-slate-500">
+                          , skipped {result.skipped.length} ({result.skipped.map((p) => `${p.name} ${p.startTime}–${p.endTime} ${p.reason === "exists" ? "already exists" : "overlaps"}`).join("; ")})
+                        </span>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <div className="flex gap-2">
+                <button type="button" className={primary} disabled={copy.isPending || targets.length === 0} onClick={submitCopy}>
+                  {copy.isPending && <LoaderCircle className="size-3.5 animate-spin" />}
+                  Copy periods
+                </button>
+                <button type="button" className={outline} onClick={() => setCopying(false)}>Close</button>
+              </div>
+            </div>
+          )}
         </>
       )}
     </ManagerShell>

@@ -287,6 +287,7 @@ export function SubjectsWorkspace() {
         rows={subjects}
         columns={columns}
         getRowId={(subject) => subject.id}
+        exportTitle="Subjects"
         emptyTitle={search ? "No matching subjects" : "No subjects in the catalogue"}
         emptyDescription={
           canManage

@@ -30,6 +30,8 @@ import {
 import { PortalStatCard } from "./portal-stat-card";
 import { PortalModal } from "./portal-modal";
 import { cn } from "@/lib/utils";
+import { DataTable } from "@/components/ui/data-table";
+import { useCanExportTables } from "@/lib/table-export-policy";
 
 interface StudentPortalWorkspaceProps {
   defaultTab?: "dashboard" | "timetable" | "grades" | "assignments" | "classmates" | "house" | "fees";
@@ -96,6 +98,7 @@ const mockClassmates: Classmate[] = [
 ];
 
 export function StudentPortalWorkspace({ defaultTab = "dashboard" }: StudentPortalWorkspaceProps) {
+  const canExport = useCanExportTables();
   const [activeTab, setActiveTab] = useState(defaultTab);
   const [assignments, setAssignments] = useState<StudentAssignment[]>(mockAssignments);
   const [activeAssignmentToSubmit, setActiveAssignmentToSubmit] = useState<StudentAssignment | null>(null);
@@ -123,6 +126,15 @@ export function StudentPortalWorkspace({ defaultTab = "dashboard" }: StudentPort
     setActiveAssignmentToSubmit(null);
     setSubmissionText("");
   };
+
+  const studentResults = [
+    { name: "Integrated Science", code: "SCI-09", cw: 28, ex: 61, tot: 89, gr: "A1", rk: "#1", rm: "Outstanding mastery of concepts." },
+    { name: "Core Mathematics", code: "MTH-09", cw: 26, ex: 59, tot: 85, gr: "A1", rk: "#2", rm: "Excellent analytical clarity." },
+    { name: "English Language", code: "ENG-09", cw: 25, ex: 56, tot: 81, gr: "A1", rk: "#4", rm: "Great essay structure and vocabulary." },
+    { name: "Social Studies", code: "SOC-09", cw: 24, ex: 54, tot: 78, gr: "B2", rk: "#5", rm: "Good historical insights." },
+    { name: "Information Technology", code: "ICT-09", cw: 29, ex: 64, tot: 93, gr: "A1", rk: "#1", rm: "Brilliant practical skill." },
+    { name: "French Language", code: "FRN-09", cw: 21, ex: 48, tot: 69, gr: "C4", rk: "#8", rm: "More verbal practice recommended." }
+  ];
 
   return (
     <div className="space-y-6">
@@ -445,45 +457,29 @@ export function StudentPortalWorkspace({ defaultTab = "dashboard" }: StudentPort
             </span>
           </div>
 
-          <div className="overflow-x-auto rounded-2xl border border-slate-200/80 bg-white shadow-xs dark:border-slate-800 dark:bg-slate-900">
-            <table className="w-full min-w-[650px] border-collapse text-left text-xs">
-              <thead>
-                <tr className="border-b border-slate-100 bg-slate-50/70 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:border-slate-800 dark:bg-slate-800/50">
-                  <th className="p-3.5 pl-5">Subject</th>
-                  <th className="p-3.5 text-center">Classwork (30)</th>
-                  <th className="p-3.5 text-center">Exam (70)</th>
-                  <th className="p-3.5 text-center">Total (100)</th>
-                  <th className="p-3.5 text-center">Grade</th>
-                  <th className="p-3.5 text-center">Class Rank</th>
-                  <th className="p-3.5">Teacher Remark</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                {[
-                  { name: "Integrated Science", code: "SCI-09", cw: 28, ex: 61, tot: 89, gr: "A1", rk: "#1", rm: "Outstanding mastery of concepts." },
-                  { name: "Core Mathematics", code: "MTH-09", cw: 26, ex: 59, tot: 85, gr: "A1", rk: "#2", rm: "Excellent analytical clarity." },
-                  { name: "English Language", code: "ENG-09", cw: 25, ex: 56, tot: 81, gr: "A1", rk: "#4", rm: "Great essay structure and vocabulary." },
-                  { name: "Social Studies", code: "SOC-09", cw: 24, ex: 54, tot: 78, gr: "B2", rk: "#5", rm: "Good historical insights." },
-                  { name: "Information Technology", code: "ICT-09", cw: 29, ex: 64, tot: 93, gr: "A1", rk: "#1", rm: "Brilliant practical skill." },
-                  { name: "French Language", code: "FRN-09", cw: 21, ex: 48, tot: 69, gr: "C4", rk: "#8", rm: "More verbal practice recommended." },
-                ].map((row) => (
-                  <tr key={row.code} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/40">
-                    <td className="p-3.5 pl-5 font-bold text-slate-900 dark:text-white">{row.name}</td>
-                    <td className="p-3.5 text-center font-medium">{row.cw}</td>
-                    <td className="p-3.5 text-center font-medium">{row.ex}</td>
-                    <td className="p-3.5 text-center font-black text-slate-900 dark:text-white">{row.tot}%</td>
-                    <td className="p-3.5 text-center">
-                      <span className="rounded-md bg-emerald-50 px-2 py-0.5 text-xs font-black text-emerald-700">
-                        {row.gr}
-                      </span>
-                    </td>
-                    <td className="p-3.5 text-center font-semibold text-slate-600 dark:text-slate-400">{row.rk}</td>
-                    <td className="p-3.5 text-slate-600 dark:text-slate-300">{row.rm}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <DataTable
+            rows={studentResults}
+            canExport={canExport}
+            exportTitle="Academic record"
+            getRowId={(row) => row.code}
+            emptyTitle="No results yet"
+            emptyDescription="Published assessment results will appear here."
+            columns={[
+              { id: "subject", header: "Subject", cell: (row) => <span className="font-bold text-foreground">{row.name}</span> },
+              { id: "cw", header: "Classwork (30)", className: "text-center", value: (row) => row.cw, cell: (row) => <span className="font-medium">{row.cw}</span> },
+              { id: "ex", header: "Exam (70)", className: "text-center", value: (row) => row.ex, cell: (row) => <span className="font-medium">{row.ex}</span> },
+              { id: "tot", header: "Total (100)", className: "text-center", value: (row) => row.tot, cell: (row) => <span className="font-black text-foreground">{row.tot}%</span> },
+              {
+                id: "gr",
+                header: "Grade",
+                className: "text-center",
+                value: (row) => row.gr,
+                cell: (row) => <span className="rounded-md bg-emerald-50 px-2 py-0.5 text-xs font-black text-emerald-700 dark:bg-emerald-400/10 dark:text-emerald-300">{row.gr}</span>,
+              },
+              { id: "rk", header: "Class Rank", className: "text-center", value: (row) => Number(row.rk.replace("#", "")), cell: (row) => <span className="font-semibold text-muted-foreground">{row.rk}</span> },
+              { id: "rm", header: "Teacher Remark", cell: (row) => row.rm },
+            ]}
+          />
         </div>
       )}
 

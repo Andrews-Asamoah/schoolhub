@@ -13,9 +13,11 @@ import {
 } from '@nestjs/common';
 import type { School } from '@prisma/client';
 import {
+  copyPeriodsSchema,
   saveClassroomSchema,
   savePeriodSchema,
   saveTimetableEntrySchema,
+  type CopyPeriodsInput,
   type SaveClassroomInput,
   type SavePeriodInput,
   type SaveTimetableEntryInput,
@@ -81,6 +83,15 @@ export class TimetableController {
     @Body(new ZodValidationPipe(savePeriodSchema)) body: SavePeriodInput,
   ) {
     return this.timetable.createPeriod(school.id, body);
+  }
+
+  @Post('periods/copy')
+  @Roles('owner', 'admin')
+  copyPeriods(
+    @CurrentSchool() school: School,
+    @Body(new ZodValidationPipe(copyPeriodsSchema)) body: CopyPeriodsInput,
+  ) {
+    return this.timetable.copyPeriods(school.id, body);
   }
 
   @Patch('periods/:id')

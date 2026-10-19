@@ -3,7 +3,8 @@ import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { Plus, School, Search } from "lucide-react";
 import { apiFetch } from "@/lib/api";
-import { SchoolRow } from "@/components/superadmin/school-row";
+import { SubscriptionBadge } from "@/components/superadmin/subscription-badge";
+import { DataTable, type DataTableColumn } from "@/components/ui/data-table";
 
 export const Route = createFileRoute("/admin/schools/")({
   component: SchoolsListPage,
@@ -44,6 +45,54 @@ function SchoolsListPage() {
       s.name.toLowerCase().includes(search.toLowerCase()) ||
       s.code.toLowerCase().includes(search.toLowerCase()),
   );
+
+  const columns: DataTableColumn<SchoolSummary>[] = [
+    {
+      id: "name",
+      header: "School Name",
+      value: (school) => `${school.name} (${school.subdomain})`,
+      cell: (school) => (
+        <div>
+          <p className="text-sm font-semibold text-foreground">{school.name}</p>
+          <p className="text-xs text-muted-foreground">{school.subdomain}</p>
+        </div>
+      ),
+    },
+    {
+      id: "code",
+      header: "Code",
+      value: (school) => school.code,
+      cell: (school) => <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs text-foreground">{school.code}</code>,
+    },
+    { id: "students", header: "Students", value: (school) => school.students.length, cell: (school) => <span className="text-sm font-medium text-foreground">{school.students.length}</span> },
+    { id: "teachers", header: "Teachers", value: (school) => school.teachers.length, cell: (school) => <span className="text-sm font-medium text-foreground">{school.teachers.length}</span> },
+    {
+      id: "subscription",
+      header: "Subscription",
+      value: (school) => school.organization.subscriptionStatus,
+      cell: (school) => <SubscriptionBadge status={school.organization.subscriptionStatus} />,
+    },
+    {
+      id: "enrolled",
+      header: "Enrolled",
+      value: (school) => school.createdAt.slice(0, 10),
+      cell: (school) => new Date(school.createdAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }),
+    },
+    {
+      id: "actions",
+      header: "",
+      className: "text-right",
+      cell: (school) => (
+        <Link
+          to="/admin/schools/$schoolId"
+          params={{ schoolId: school.id }}
+          className="superadmin-button-secondary rounded-lg bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-800 transition hover:bg-indigo-100"
+        >
+          View →
+        </Link>
+      ),
+    },
+  ];
 
   return (
     <div className="space-y-6">
@@ -107,35 +156,18 @@ function SchoolsListPage() {
           </div>
         ) : (
           <>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left">
-                <thead>
-                  <tr className="border-b border-slate-100">
-                    {[
-                      "School Name",
-                      "Code",
-                      "Students",
-                      "Teachers",
-                      "Subscription",
-                      "Enrolled",
-                      "",
-                    ].map((h) => (
-                      <th
-                        key={h}
-                        className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-400"
-                      >
-                        {h}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {filtered.map((school) => (
-                    <SchoolRow key={school.id} school={school} />
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <DataTable
+              embedded
+              searchable={false}
+              paginate={false}
+              canExport
+              rows={filtered ?? []}
+              columns={columns}
+              getRowId={(school) => school.id}
+              exportTitle="Schools"
+              emptyTitle="No schools"
+              emptyDescription="No schools match your search."
+            />
 
             {/* Pagination */}
             {data && data.meta.totalPages > 1 && (
