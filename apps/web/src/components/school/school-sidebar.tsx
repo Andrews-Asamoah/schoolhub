@@ -1,9 +1,8 @@
 import { Link } from "@tanstack/react-router";
-import { GraduationCap, LogOut, Sparkles, LoaderCircle } from "lucide-react";
-import { useLogout } from "@/hooks/use-logout";
-import { UserAvatar } from "@/components/ui/user-avatar";
+import { GraduationCap, Sparkles } from "lucide-react";
+import { SidebarUserMenu } from "@/components/ui/sidebar-user-menu";
 import { getOwnPortalItem, getSchoolNavGroupsForRole } from "@/lib/school-navigation";
-import { useSchoolRole } from "@/components/school/school-role-switcher";
+import { schoolRoleLabel, useSchoolRole } from "@/components/school/school-role-switcher";
 import {
   Sidebar,
   SidebarContent,
@@ -29,7 +28,6 @@ export function SchoolSidebar({
   userEmail,
   userImage,
 }: SchoolSidebarProps) {
-  const { error: signOutError, isSigningOut, logout } = useLogout();
   const { activeRole } = useSchoolRole();
   const navGroups = getSchoolNavGroupsForRole(activeRole ?? undefined);
   const ownPortal = getOwnPortalItem(activeRole ?? undefined);
@@ -126,36 +124,23 @@ export function SchoolSidebar({
             Your school&apos;s daily operations, together in one place.
           </p>
         </div>
-        <div className="flex min-w-0 items-center gap-2">
-          <UserAvatar name={userName} image={userImage} />
-          <span className="sidebar-expanded min-w-0 flex-1">
-            <span className="school-sidebar-user-name block truncate text-xs font-semibold text-slate-800">
-              {userName ?? "School admin"}
-            </span>
-            <span className="school-sidebar-user-email block truncate text-[10px] text-slate-500">
-              {userEmail ?? "Administrator"}
-            </span>
-          </span>
-          <button
-            type="button"
-            onClick={() => void logout()}
-            disabled={isSigningOut}
-            aria-label={isSigningOut ? "Signing out" : "Sign out"}
-            title={isSigningOut ? "Signing out…" : "Sign out"}
-            className="flex size-9 shrink-0 items-center justify-center rounded-lg text-slate-500 transition hover:bg-red-50 hover:text-red-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 disabled:cursor-wait disabled:opacity-60"
-          >
-            {isSigningOut ? (
-              <LoaderCircle className="size-4 animate-spin" />
-            ) : (
-              <LogOut className="size-4" />
-            )}
-          </button>
-        </div>
-        {signOutError && (
-          <p role="alert" className="mt-2 px-2 text-xs text-red-600">
-            {signOutError}
-          </p>
-        )}
+        <SidebarUserMenu
+          name={userName ?? "School admin"}
+          email={userEmail}
+          image={userImage}
+          roleLabel={schoolRoleLabel(activeRole)}
+          profileLink={({ className, onClick, children }) => (
+            <Link
+              to="/$page"
+              params={{ page: "profile" }}
+              role="menuitem"
+              className={className}
+              onClick={onClick}
+            >
+              {children}
+            </Link>
+          )}
+        />
       </SidebarFooter>
     </Sidebar>
   );

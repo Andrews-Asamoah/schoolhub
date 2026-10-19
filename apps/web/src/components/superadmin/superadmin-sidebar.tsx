@@ -1,8 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import {
-  LogOut,
   LayoutDashboard,
-  LoaderCircle,
   School,
   Shield,
   Users,
@@ -10,7 +8,7 @@ import {
   UserCircle,
   LifeBuoy,
 } from "lucide-react";
-import { useLogout } from "@/hooks/use-logout";
+import { SidebarUserMenu } from "@/components/ui/sidebar-user-menu";
 import {
   Sidebar,
   SidebarContent,
@@ -56,8 +54,6 @@ export function SuperAdminSidebar({
   userName,
   userEmail,
 }: SuperAdminSidebarProps) {
-  const { error: signOutError, isSigningOut, logout } = useLogout();
-
   return (
     <Sidebar className="superadmin-sidebar-shell border-r border-slate-200 shadow-md shadow-slate-900/5 dark:border-white/10 dark:shadow-black/20">
       <SidebarHeader className="superadmin-sidebar-panel border-b border-slate-200/80 dark:border-white/10">
@@ -106,43 +102,16 @@ export function SuperAdminSidebar({
       </SidebarContent>
 
       <SidebarFooter className="superadmin-sidebar-panel border-slate-200/80 dark:border-white/10">
-        {signOutError && (
-          <p role="alert" className="mb-2 px-2 text-xs text-red-600 dark:text-red-300">
-            {signOutError}
-          </p>
-        )}
-        <div className="flex min-w-0 items-center gap-2">
-          <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-xs font-bold text-indigo-700 ring-1 ring-indigo-200/70 dark:bg-indigo-400/15 dark:text-indigo-200 dark:ring-indigo-200/10">
-            {userName?.charAt(0)?.toUpperCase() ?? "A"}
-          </span>
-          <span className="sidebar-expanded min-w-0 flex-1">
-            <span className="superadmin-user-name block truncate text-xs font-semibold text-slate-800 dark:text-slate-100">
-              {userName ?? "Super Admin"}
-            </span>
-            <span className="superadmin-user-email block truncate text-[10px] text-slate-500 dark:text-slate-400">
-              {userEmail ?? "admin@schoolhub.gh"}
-            </span>
-          </span>
-          <button
-            type="button"
-            onClick={() => void logout()}
-            disabled={isSigningOut}
-            aria-label={isSigningOut ? "Signing out" : "Sign out"}
-            title={isSigningOut ? "Signing out…" : "Sign out"}
-            className="superadmin-button-danger flex size-9 shrink-0 items-center justify-center rounded-lg text-slate-500 transition hover:bg-rose-50 hover:text-rose-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400 disabled:cursor-wait disabled:opacity-60 dark:text-slate-400 dark:hover:bg-rose-400/10 dark:hover:text-rose-200"
-          >
-            {isSigningOut ? (
-              <LoaderCircle className="size-4 animate-spin" />
-            ) : (
-              <LogOut className="size-4" />
-            )}
-          </button>
-        </div>
-        {signOutError && (
-          <p role="alert" className="mt-2 px-2 text-xs text-red-600 dark:text-red-300">
-            {signOutError}
-          </p>
-        )}
+        <SidebarUserMenu
+          name={userName ?? "Super Admin"}
+          email={userEmail ?? "admin@schoolhub.gh"}
+          roleLabel="Platform admin"
+          profileLink={({ className, onClick, children }) => (
+            <Link to="/admin/profile" role="menuitem" className={className} onClick={onClick}>
+              {children}
+            </Link>
+          )}
+        />
       </SidebarFooter>
     </Sidebar>
   );
