@@ -4,6 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
+import type { School } from "@prisma/client";
 import { PrismaService } from "../../prisma/prisma.service.js";
 import {
   ROLES,
@@ -13,6 +14,7 @@ import {
   type UpdateTermInput,
   type SetAcademicContextInput,
   type UpdateSchoolMemberRolesInput,
+  type UpdateSchoolSettingsInput,
 } from "@schoolhub/shared";
 import {
   findOverlappingTerm,
@@ -80,23 +82,16 @@ export class SchoolsService {
     return school;
   }
 
-  async updateSchool(
-    schoolId: string,
-    data: {
-      name?: string;
-      email?: string;
-      phone?: string;
-      address?: string;
-      motto?: string;
-      website?: string;
-      primaryColor?: string;
-      secondaryColor?: string;
-    },
-  ) {
-    return this.prisma.client.school.update({
-      where: { id: schoolId },
-      data,
-    });
+  async updateSchool(school: School, data: UpdateSchoolSettingsInput) {
+    const client = this.prisma.client;
+    // The organization mirrors the school's display name (as it does the logo).
+    const [updated] = await client.$transaction([
+      client.school.update({ where: { id: school.id }, data }),
+      ...(data.name && data.name !== school.name
+        ? [client.organization.update({ where: { id: school.organizationId }, data: { name: data.name } })]
+        : []),
+    ]);
+    return updated;
   }
 
   async getAcademicYears(schoolId: string, role?: string) {

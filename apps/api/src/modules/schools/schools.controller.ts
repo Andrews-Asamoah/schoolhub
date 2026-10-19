@@ -20,6 +20,7 @@ import {
   createTermSchema,
   updateAcademicYearSchema,
   updateSchoolMemberRolesSchema,
+  updateSchoolSettingsSchema,
   updateTermSchema,
   setAcademicContextSchema,
   type CreateAcademicYearInput,
@@ -28,6 +29,7 @@ import {
   type UpdateTermInput,
   type SetAcademicContextInput,
   type UpdateSchoolMemberRolesInput,
+  type UpdateSchoolSettingsInput,
 } from "@schoolhub/shared";
 import type { School } from "@prisma/client";
 
@@ -79,19 +81,10 @@ export class SchoolsController {
   @Roles("owner", "admin")
   updateSchool(
     @CurrentSchool() school: School,
-    @Body()
-    body: {
-      name?: string;
-      email?: string;
-      phone?: string;
-      address?: string;
-      motto?: string;
-      website?: string;
-      primaryColor?: string;
-      secondaryColor?: string;
-    },
+    @Body(new ZodValidationPipe(updateSchoolSettingsSchema))
+    body: UpdateSchoolSettingsInput,
   ) {
-    return this.schoolsService.updateSchool(school.id, body);
+    return this.schoolsService.updateSchool(school, body);
   }
 
   @Get("academic-years")

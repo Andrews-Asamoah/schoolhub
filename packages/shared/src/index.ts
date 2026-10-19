@@ -942,3 +942,60 @@ export const exemptAdmissionFeeSchema = z.object({
     .max(300),
 });
 export type ExemptAdmissionFeeInput = z.infer<typeof exemptAdmissionFeeSchema>;
+
+// ============================================================================
+// SCHOOL SETTINGS + SELF-SERVICE PROFILE
+// ============================================================================
+
+/** Blank text becomes null so a field can be cleared; missing stays "unchanged". */
+const clearable = <T extends z.ZodType>(schema: T) =>
+  z.preprocess(
+    (value) => (typeof value === "string" && value.trim() === "" ? null : value),
+    schema.nullable().optional(),
+  );
+
+const phoneText = z.string().trim().min(5, "Enter a valid phone number").max(30);
+const HEX_COLOR = /^#[0-9a-fA-F]{6}$/;
+
+/** Details an owner or admin may change. Code and subdomain are identifiers and are not editable. */
+export const updateSchoolSettingsSchema = z.object({
+  name: z.string().trim().min(2, "School name is required").max(120).optional(),
+  email: clearable(z.email("Enter a valid email address").max(160)),
+  phone: clearable(phoneText),
+  address: clearable(z.string().trim().max(250)),
+  motto: clearable(z.string().trim().max(150)),
+  website: clearable(
+    z.preprocess(
+      (value) =>
+        typeof value === "string" && value.trim() && !/^https?:\/\//i.test(value.trim())
+          ? `https://${value.trim()}`
+          : value,
+      z
+        .url("Enter a valid website address")
+        .max(200)
+        .refine((value) => /^https?:\/\//i.test(value), "Use an http or https address"),
+    ),
+  ),
+  primaryColor: z.string().regex(HEX_COLOR, "Use a colour like #3B82F6").optional(),
+  secondaryColor: z.string().regex(HEX_COLOR, "Use a colour like #10B981").optional(),
+});
+export type UpdateSchoolSettingsInput = z.infer<typeof updateSchoolSettingsSchema>;
+
+/** Roles whose name is part of an official school record, so only the school can change it. */
+export const NAME_LOCKED_ROLES = ["student", "guardian"] as const;
+
+/** Basic details any signed-in user may change about themselves. Email and role are not included. */
+export const updateMyProfileSchema = z.object({
+  firstName: z.string().trim().min(1, "First name is required").max(100).optional(),
+  lastName: z.string().trim().min(1, "Last name is required").max(100).optional(),
+  otherNames: clearable(z.string().trim().max(100)),
+  phone: clearable(phoneText),
+  alternatePhone: clearable(phoneText),
+  residentialAddress: clearable(z.string().trim().max(250)),
+  city: clearable(z.string().trim().max(100)),
+  region: clearable(z.string().trim().max(100)),
+  emergencyContactName: clearable(z.string().trim().max(150)),
+  emergencyContactPhone: clearable(phoneText),
+  emergencyRelationship: clearable(z.string().trim().max(100)),
+});
+export type UpdateMyProfileInput = z.infer<typeof updateMyProfileSchema>;

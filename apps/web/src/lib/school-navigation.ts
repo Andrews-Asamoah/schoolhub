@@ -19,6 +19,7 @@ import {
   Settings2,
   ShieldQuestion,
   TrendingDown,
+  UserRound,
   UsersRound,
   WalletCards,
   type LucideIcon,
@@ -348,6 +349,21 @@ export const schoolNavGroups: SchoolNavGroup[] = [
   },
 ];
 
+// Not listed in any sidebar (see getSchoolNavGroupsForRole): reached from the header account menu.
+schoolNavGroups.push({
+  label: "Account",
+  items: [
+    {
+      id: "profile",
+      label: "My profile",
+      icon: UserRound,
+      description: "Your photo and basic contact details.",
+      section: "Account",
+      apiStatus: "available",
+    },
+  ],
+});
+
 export const schoolNavItems = schoolNavGroups.flatMap((group) => group.items);
 
 const rolePages: Record<string, string[]> = {
@@ -404,7 +420,7 @@ const ownPortalByRole: Record<string, string> = {
  */
 export function getSchoolNavGroupsForRole(role?: string) {
   const allowedPages = rolePages[role ?? ""];
-  const groups = schoolNavGroups.filter((group) => group.label !== "Portals");
+  const groups = schoolNavGroups.filter((group) => group.label !== "Portals" && group.label !== "Account");
   if (!allowedPages) return groups;
 
   return groups

@@ -35,6 +35,8 @@ import { EnrollmentWorkspace } from "@/components/school/enrollment-workspace";
 import { StudentDirectoryWorkspace } from "@/components/school/student-directory-workspace";
 import { PeopleWorkspace } from "@/components/school/people-workspace";
 import { SchoolLogoUploader } from "@/components/school/school-logo-uploader";
+import { SchoolSettingsForm } from "@/components/school/school-settings-form";
+import { ProfileWorkspace } from "@/components/school/profile-workspace";
 import { HousesWorkspace } from "@/components/school/houses-workspace";
 import { TeacherPortalWorkspace } from "@/components/portal/teacher-portal-workspace";
 import { AccountantPortalWorkspace } from "@/components/portal/accountant-portal-workspace";
@@ -272,6 +274,7 @@ function WorkspaceContent({ pageId }: { pageId: string }) {
           {pageId === "fees" && <FeeStructureList query={feesQuery} />}
           {pageId === "payments" && <PaymentEntry />}
           {pageId === "settings" && <SchoolSettings query={schoolQuery} />}
+          {pageId === "profile" && <ProfileWorkspace />}
           {pageId === "team" && <TeamRoleWorkspace />}
           {pageId === "support" && <TicketWorkspace mode="school" />}
           {page.apiStatus === "planned" && (
@@ -647,40 +650,10 @@ function SchoolSettings({ query }: { query: UseQueryResult<School, Error> }) {
   const school = query.data;
   if (!school) return null;
 
-  const details = [
-    ["School name", school.name],
-    ["School code", school.code],
-    ["Subdomain", school.subdomain],
-    ["Email", school.email ?? "Not set"],
-    ["Phone", school.phone ?? "Not set"],
-    ["Address", school.address ?? "Not set"],
-    ["Motto", school.motto ?? "Not set"],
-    ["Website", school.website ?? "Not set"],
-  ];
-
   return (
-    <div className="rounded-2xl border border-slate-200/80 bg-white p-5 sm:p-6">
+    <div className="rounded-2xl border border-slate-200/80 bg-white p-5 sm:p-6 dark:border-white/10 dark:bg-slate-900/70">
       <SchoolLogoUploader logo={school.logo} />
-      <h2 className="text-sm font-semibold text-slate-900">School profile</h2>
-      <p className="mt-1 text-xs text-slate-500">
-        Current details for your active school.
-      </p>
-      <dl className="mt-5 grid gap-x-8 sm:grid-cols-2">
-        {details.map(([label, value]) => (
-          <div
-            key={label}
-            className="border-b border-slate-100 py-3 first:pt-0"
-          >
-            <dt className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
-              {label}
-            </dt>
-            <dd className="mt-1 text-xs font-medium text-slate-700">{value}</dd>
-          </div>
-        ))}
-      </dl>
-      <p className="mt-5 text-[11px] text-slate-400">
-        Editing school details will be available in a future update.
-      </p>
+      <SchoolSettingsForm school={school} />
     </div>
   );
 }
