@@ -32,14 +32,19 @@ export class MeService {
 
   async getProfile(userId: string, role: string | undefined) {
     const db = this.prisma.client;
-    const [user, profile] = await Promise.all([
+    const [user, profile, student] = await Promise.all([
       db.user.findUnique({ where: { id: userId }, select: { name: true, email: true, image: true } }),
       db.userProfile.findUnique({ where: { userId }, select: PROFILE_FIELDS }),
+      // Students sign in with a username; their email is a generated internal address.
+      role === "student"
+        ? db.student.findFirst({ where: { deletedAt: null, profile: { userId } }, select: { username: true } })
+        : Promise.resolve(null),
     ]);
     if (!user) throw new NotFoundException("Account not found");
     const fallback = splitName(user.name);
     return {
       user,
+      username: student?.username ?? null,
       profile: profile ?? {
         firstName: fallback.first,
         lastName: fallback.last,

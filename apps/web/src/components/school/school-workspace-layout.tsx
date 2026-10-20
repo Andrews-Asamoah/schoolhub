@@ -5,7 +5,7 @@ import { useEffect, type ReactNode } from "react";
 import { apiFetch } from "@/lib/api";
 import { useSession } from "@/lib/auth-client";
 import { SchoolSidebar } from "@/components/school/school-sidebar";
-import { ProfilePhotoMenu } from "@/components/school/profile-photo-menu";
+import { HeaderAccountLink } from "@/components/school/header-account-link";
 import { AcademicContextSwitcher } from "@/components/school/academic-context-switcher";
 import {
   useSchoolOrganization,
@@ -124,7 +124,7 @@ export function SchoolWorkspaceLayout({
                 <span className="absolute right-2 top-2 size-1.5 rounded-full bg-rose-500 ring-2 ring-white" />
               </button>
               <span className="hidden h-6 w-px bg-slate-200 sm:block" />
-              <ProfilePhotoMenu subtitle={`${schoolRoleLabel(activeRole)} · ${section}`} />
+              <HeaderAccountLink subtitle={`${schoolRoleLabel(activeRole)} · ${section}`} />
             </div>
           </header>
           <main className="mx-auto max-w-[1440px] px-4 py-7 sm:px-6 lg:px-9 lg:py-9">

@@ -24,6 +24,8 @@ interface ProfileDetails {
 
 interface ProfileResponse {
   user: { name: string; email: string; image: string | null };
+  /** Students sign in with this instead of an email. */
+  username: string | null;
   profile: ProfileDetails;
   canEditName: boolean;
 }
@@ -126,12 +128,21 @@ function ProfileForm({ data }: { data: ProfileResponse }) {
             <FormField label="Other names" htmlFor="me-other" error={errors.otherNames}>
               <FormInput id="me-other" value={values.otherNames} onChange={set("otherNames")} disabled={!data.canEditName} />
             </FormField>
-            <FormField label="Email" htmlFor="me-email" hint="Your sign-in email. Ask your school administrator to change it.">
-              <div className="relative">
-                <FormInput id="me-email" value={data.user.email} readOnly disabled className="pr-9" />
-                <Lock className="pointer-events-none absolute right-3 top-1/2 size-3.5 -translate-y-1/2 text-slate-400" />
-              </div>
-            </FormField>
+            {data.username ? (
+              <FormField label="Username" htmlFor="me-username" hint="You sign in with this username. Ask the school office to change it.">
+                <div className="relative">
+                  <FormInput id="me-username" value={data.username} readOnly disabled className="pr-9" />
+                  <Lock className="pointer-events-none absolute right-3 top-1/2 size-3.5 -translate-y-1/2 text-slate-400" />
+                </div>
+              </FormField>
+            ) : (
+              <FormField label="Email" htmlFor="me-email" hint="Your sign-in email. Ask your school administrator to change it.">
+                <div className="relative">
+                  <FormInput id="me-email" value={data.user.email} readOnly disabled className="pr-9" />
+                  <Lock className="pointer-events-none absolute right-3 top-1/2 size-3.5 -translate-y-1/2 text-slate-400" />
+                </div>
+              </FormField>
+            )}
             <FormField label="Phone" htmlFor="me-phone" error={errors.phone}>
               <FormInput id="me-phone" type="tel" value={values.phone} onChange={set("phone")} />
             </FormField>
@@ -153,13 +164,13 @@ function ProfileForm({ data }: { data: ProfileResponse }) {
         <section className={card} aria-labelledby="profile-emergency-heading">
           <h2 id="profile-emergency-heading" className="text-sm font-semibold text-slate-900 dark:text-slate-100">Emergency contact</h2>
           <div className="mt-4 grid gap-4 sm:grid-cols-3">
-            <FormField label="Name" htmlFor="me-ec-name" error={errors.emergencyContactName}>
+            <FormField label="Emergency contact name" htmlFor="me-ec-name" error={errors.emergencyContactName}>
               <FormInput id="me-ec-name" value={values.emergencyContactName} onChange={set("emergencyContactName")} />
             </FormField>
-            <FormField label="Phone" htmlFor="me-ec-phone" error={errors.emergencyContactPhone}>
+            <FormField label="Emergency contact phone" htmlFor="me-ec-phone" error={errors.emergencyContactPhone}>
               <FormInput id="me-ec-phone" type="tel" value={values.emergencyContactPhone} onChange={set("emergencyContactPhone")} />
             </FormField>
-            <FormField label="Relationship" htmlFor="me-ec-rel" error={errors.emergencyRelationship}>
+            <FormField label="Relationship to you" htmlFor="me-ec-rel" error={errors.emergencyRelationship}>
               <FormInput id="me-ec-rel" value={values.emergencyRelationship} onChange={set("emergencyRelationship")} />
             </FormField>
           </div>
