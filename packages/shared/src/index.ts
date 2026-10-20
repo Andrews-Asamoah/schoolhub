@@ -510,6 +510,12 @@ export type SetAcademicContextInput = z.infer<typeof setAcademicContextSchema>;
 
 export const updateSchoolMemberRolesSchema = z.object({
   roles: z.array(z.enum(ROLES)).min(1).max(ROLES.length),
+  /**
+   * Needed the first time someone is given the teacher role: a teacher record
+   * (which carries a department) is created so they appear in class, subject
+   * and timetable pickers.
+   */
+  teacherDepartmentId: z.string().min(1).optional(),
 });
 export type UpdateSchoolMemberRolesInput = z.infer<
   typeof updateSchoolMemberRolesSchema

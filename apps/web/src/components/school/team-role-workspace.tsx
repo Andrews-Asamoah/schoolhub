@@ -23,7 +23,7 @@ const ROLE_HELP: Record<Role, string> = {
   owner: "Owns the school workspace.",
   admin: "Manages school settings, classes, people and roles.",
   headmistress: "Same management access as an administrator.",
-  teacher: "Teacher portal, classes, assessments and attendance.",
+  teacher: "Their students and classes, subjects, timetable, assessments and attendance.",
   accountant: "Fees, payments, expenses and payroll.",
   staff: "General records, attendance and inventory.",
   student: "Student portal and timetable.",
@@ -206,9 +206,15 @@ export function TeamRoleWorkspace() {
           onSaved={async (updated) => {
             setEditing(null);
             setNotice(`Roles updated for ${updated.name}.`);
+            // A new teacher role also creates a teacher record, so refresh everything
+            // that lists teachers (people, class teachers, subjects, timetable).
             await Promise.all([
               queryClient.invalidateQueries({ queryKey: ["school", "members"] }),
               queryClient.invalidateQueries({ queryKey: ["schools", "roles"] }),
+              queryClient.invalidateQueries({ queryKey: ["people"] }),
+              queryClient.invalidateQueries({ queryKey: ["academics"] }),
+              queryClient.invalidateQueries({ queryKey: ["subjects"] }),
+              queryClient.invalidateQueries({ queryKey: ["timetable"] }),
             ]);
           }}
         />
@@ -230,6 +236,15 @@ function RoleDialog({
 }) {
   const [selected, setSelected] = useState<Role[]>(member.roles);
   const [problem, setProblem] = useState<string | null>(null);
+  const [teacherDepartmentId, setTeacherDepartmentId] = useState("");
+  // A teacher record (with a department) is created the first time the role is granted.
+  const newTeacher = selected.includes("teacher") && !member.roles.includes("teacher");
+  const departments = useQuery({
+    queryKey: ["academics", "departments"],
+    queryFn: () => apiFetch<{ id: string; name: string; isActive: boolean }[]>("/academics/departments"),
+    enabled: newTeacher,
+    retry: false,
+  });
   const panelRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef(onClose);
   closeRef.current = onClose;
@@ -249,10 +264,10 @@ function RoleDialog({
   }, []);
 
   const save = useMutation({
-    mutationFn: (roles: Role[]) =>
+    mutationFn: (body: { roles: Role[]; teacherDepartmentId?: string }) =>
       apiFetch<SchoolMember>(`/schools/members/${member.userId}/roles`, {
         method: "PATCH",
-        body: JSON.stringify({ roles }),
+        body: JSON.stringify(body),
       }),
     onSuccess: onSaved,
   });
@@ -269,8 +284,14 @@ function RoleDialog({
     event.preventDefault();
     const parsed = updateSchoolMemberRolesSchema.safeParse({ roles: selected });
     if (!parsed.success) return setProblem("Choose at least one role.");
+    if (newTeacher && !teacherDepartmentId) {
+      return setProblem("Choose the department this teacher belongs to.");
+    }
     setProblem(null);
-    save.mutate(parsed.data.roles);
+    save.mutate({
+      roles: parsed.data.roles,
+      teacherDepartmentId: newTeacher ? teacherDepartmentId : undefined,
+    });
   }
 
   return (
@@ -331,6 +352,40 @@ function RoleDialog({
               );
             })}
           </fieldset>
+
+          {newTeacher && (
+            <div className="mt-4 rounded-xl border border-indigo-100 bg-indigo-50/50 p-3 dark:border-indigo-400/20 dark:bg-indigo-400/5">
+              <label className="block text-xs font-semibold text-slate-800 dark:text-slate-100">
+                Teacher&apos;s department
+                <select
+                  value={teacherDepartmentId}
+                  onChange={(event) => {
+                    setProblem(null);
+                    setTeacherDepartmentId(event.target.value);
+                  }}
+                  className={`${inputClass} mt-1.5 w-full`}
+                >
+                  <option value="">
+                    {departments.isPending
+                      ? "Loading departments…"
+                      : (departments.data ?? []).length
+                        ? "Select a department"
+                        : "No departments yet"}
+                  </option>
+                  {(departments.data ?? [])
+                    .filter((department) => department.isActive)
+                    .map((department) => (
+                      <option key={department.id} value={department.id}>
+                        {department.name}
+                      </option>
+                    ))}
+                </select>
+              </label>
+              <p className="mt-1.5 text-[11px] text-slate-500 dark:text-slate-400">
+                A teacher record is created so this person can be assigned to classes, subjects and the timetable.
+              </p>
+            </div>
+          )}
 
           {(problem || save.error) && (
             <p role="alert" className="mt-4 flex items-start gap-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-800">

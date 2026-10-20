@@ -4,9 +4,9 @@ import {
   useQueryClient,
   type UseQueryResult,
 } from "@tanstack/react-query";
-import { createFileRoute, Link, useParams } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate, useParams } from "@tanstack/react-router";
 import { ArrowRight, Check, CircleAlert, LoaderCircle } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   recordPaymentSchema,
   type RecordPaymentInput,
@@ -24,7 +24,7 @@ import { apiFetch, ApiError } from "@/lib/api";
 import { SubjectsWorkspace } from "@/components/school/subjects-workspace";
 import { TimetableWorkspace } from "@/components/school/timetable-workspace";
 import { useSession } from "@/lib/auth-client";
-import { getSchoolNavItem } from "@/lib/school-navigation";
+import { canRoleAccessPage, getSchoolNavItem } from "@/lib/school-navigation";
 import { TicketWorkspace } from "@/components/support/ticket-workspace";
 import { AcademicYearSetup } from "@/components/school/academic-year-setup";
 import { TeamRoleWorkspace } from "@/components/school/team-role-workspace";
@@ -134,6 +134,16 @@ interface School {
 function WorkspaceRoute() {
   const { page } = useParams({ from: "/$page" });
   const navItem = getSchoolNavItem(page);
+  const { activeRole } = useSchoolRole();
+  const navigate = useNavigate();
+  const blocked = Boolean(navItem && activeRole && !canRoleAccessPage(activeRole, navItem.id));
+
+  // Switching to a role that cannot open this page (for example Administrator
+  // -> Teacher while on Team roles) must not leave the old page showing.
+  useEffect(() => {
+    if (blocked) void navigate({ to: "/dashboard", replace: true });
+  }, [blocked, navigate]);
+  if (blocked) return null;
 
   if (!navItem) {
     return (

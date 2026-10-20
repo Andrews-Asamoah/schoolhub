@@ -6,7 +6,8 @@ import {
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
-import type { School } from "@prisma/client";
+import { randomUUID } from "node:crypto";
+import type { Prisma, School } from "@prisma/client";
 import { PrismaService } from "../../prisma/prisma.service.js";
 import {
   studentEmailDomain,
@@ -333,15 +334,30 @@ export class SchoolsService {
         : new BadRequestException(change.message);
     }
     const roles = change.roles;
-    const updated = await this.prisma.client.member.update({
-      where: { id: target.id },
-      data: { roles },
-      select: {
-        userId: true,
-        role: true,
-        roles: true,
-        user: { select: { name: true, email: true } },
-      },
+    const hadTeacher = target.role === "teacher" || target.roles.includes("teacher");
+    const wantsTeacher = target.role === "teacher" || roles.includes("teacher");
+    const updated = await this.prisma.client.$transaction(async (tx) => {
+      // The teacher role is only useful once there is a teacher record to
+      // assign to classes and subjects, so keep the two in step.
+      if (wantsTeacher && target.role !== "teacher") {
+        await this.ensureTeacherRecord(tx, schoolId, target.userId, input.teacherDepartmentId);
+      } else if (hadTeacher && !wantsTeacher) {
+        // Keep history (past classes, subjects) but stop offering them as a teacher.
+        await tx.teacher.updateMany({
+          where: { schoolId, profile: { userId: target.userId } },
+          data: { isActive: false },
+        });
+      }
+      return tx.member.update({
+        where: { id: target.id },
+        data: { roles },
+        select: {
+          userId: true,
+          role: true,
+          roles: true,
+          user: { select: { name: true, email: true } },
+        },
+      });
     });
 
     return {
@@ -351,6 +367,58 @@ export class SchoolsService {
       primaryRole: updated.role,
       roles: [...new Set([updated.role, ...updated.roles])],
     };
+  }
+
+  /** Creates (or reactivates) the teacher record for an existing school account. */
+  private async ensureTeacherRecord(
+    tx: Prisma.TransactionClient,
+    schoolId: string,
+    userId: string,
+    departmentId?: string,
+  ) {
+    const user = await tx.user.findUniqueOrThrow({
+      where: { id: userId },
+      select: { name: true, email: true },
+    });
+    const [firstName = user.name, ...rest] = user.name.trim().split(/\s+/);
+    const lastName = rest.join(" ") || "-";
+    const profile =
+      (await tx.userProfile.findUnique({ where: { userId } })) ??
+      (await tx.userProfile.create({ data: { userId, firstName, lastName } }));
+
+    const existing = await tx.teacher.findFirst({
+      where: { schoolId, profileId: profile.id },
+      select: { id: true },
+    });
+    if (existing) {
+      await tx.teacher.update({
+        where: { id: existing.id },
+        data: { isActive: true, deletedAt: null },
+      });
+      return;
+    }
+
+    if (!departmentId) {
+      throw new BadRequestException("Choose a department for this teacher.");
+    }
+    const department = await tx.department.findFirst({
+      where: { id: departmentId, schoolId, isActive: true },
+      select: { id: true },
+    });
+    if (!department) {
+      throw new BadRequestException("Choose an active department belonging to this school.");
+    }
+    await tx.teacher.create({
+      data: {
+        schoolId,
+        profileId: profile.id,
+        teacherId: `TCH-${new Date().getFullYear()}-${randomUUID().replaceAll("-", "").slice(0, 8).toUpperCase()}`,
+        invitationEmail: user.email,
+        firstName,
+        lastName,
+        departmentId: department.id,
+      },
+    });
   }
 
   async createAcademicYear(schoolId: string, input: CreateAcademicYearInput) {

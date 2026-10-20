@@ -384,7 +384,6 @@ export const schoolNavItems = schoolNavGroups.flatMap((group) => group.items);
 
 const rolePages: Record<string, string[]> = {
   teacher: [
-    "teacher-portal",
     "students",
     "classes",
     "subjects",
@@ -433,9 +432,11 @@ const rolePages: Record<string, string[]> = {
   guardian: ["guardian-portal"],
 };
 
-/** The one portal page that is each role's own home screen. */
+/**
+ * The portal page that is a role's own home screen. Teachers have none: their
+ * Overview and the Students, Classes, Subjects and Timetable pages are their workspace.
+ */
 const ownPortalByRole: Record<string, string> = {
-  teacher: "teacher-portal",
   accountant: "accountant-portal",
   guardian: "guardian-portal",
 };
@@ -462,6 +463,17 @@ export function getSchoolNavGroupsForRole(role?: string) {
 export function getOwnPortalItem(role?: string) {
   const id = ownPortalByRole[role ?? ""];
   return id ? schoolNavItems.find((item) => item.id === id) : undefined;
+}
+
+/**
+ * Whether a role may open a page. Management roles (no entry in rolePages) may
+ * open every page, and account pages such as "My profile" are open to everyone.
+ */
+export function canRoleAccessPage(role: string | null | undefined, pageId: string) {
+  const item = schoolNavItems.find((entry) => entry.id === pageId);
+  if (item?.section === "Account") return true;
+  const allowed = rolePages[role ?? ""];
+  return !allowed || allowed.includes(pageId);
 }
 
 export function getSchoolNavItem(id: string) {
