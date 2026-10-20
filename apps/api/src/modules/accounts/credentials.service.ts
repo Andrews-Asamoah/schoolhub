@@ -125,6 +125,51 @@ export class CredentialsService {
   }
 
   /**
+   * Like {@link createLogin}, but when the email already belongs to someone in
+   * THIS school (for example an administrator registering their own child, or
+   * a parent who is later hired as staff) the existing account is reused: the
+   * new role is added to it and its profile is filled in. Their password is
+   * never touched and no credentials are issued.
+   */
+  async createOrLinkLogin(tx: Prisma.TransactionClient, input: CreateLoginInput) {
+    const email = input.email.trim().toLowerCase();
+    const user = await tx.user.findUnique({ where: { email }, select: { id: true } });
+    if (!user) {
+      return { ...(await this.createLogin(tx, input)), linked: false as const };
+    }
+
+    const member = await tx.member.findUnique({
+      where: { userId: user.id },
+      select: { id: true, organizationId: true, role: true, roles: true },
+    });
+    if (!member || member.organizationId !== input.organizationId) {
+      throw new ConflictException(
+        `The email ${email} already belongs to a SchoolHub account outside this school, so it cannot be reused here. Use a different email.`,
+      );
+    }
+    if (member.role !== input.role && !member.roles.includes(input.role)) {
+      await tx.member.update({
+        where: { id: member.id },
+        data: { roles: [...member.roles, input.role], updatedAt: new Date() },
+      });
+    }
+
+    const profile = await tx.userProfile.findUnique({ where: { userId: user.id } });
+    let profileId = profile?.id ?? null;
+    if (!profile && input.profile) {
+      profileId = (await tx.userProfile.create({ data: { ...input.profile, userId: user.id } })).id;
+    } else if (profile && input.profile) {
+      // Only fill gaps; never overwrite details the person already has.
+      const fill: Prisma.UserProfileUncheckedUpdateInput = {};
+      if (!profile.phone && input.profile.phone) fill.phone = input.profile.phone;
+      if (!profile.gender && input.profile.gender) fill.gender = input.profile.gender;
+      if (!profile.dateOfBirth && input.profile.dateOfBirth) fill.dateOfBirth = input.profile.dateOfBirth;
+      if (Object.keys(fill).length) await tx.userProfile.update({ where: { id: profile.id }, data: fill });
+    }
+    return { userId: user.id, email, profileId, linked: true as const };
+  }
+
+  /**
    * Issue a fresh temporary password for an existing user: creates the
    * credential account / membership if they are missing (legacy records),
    * flags the account for a forced change, and signs the user out everywhere.

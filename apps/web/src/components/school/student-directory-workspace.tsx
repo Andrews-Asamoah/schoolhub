@@ -153,6 +153,7 @@ export function StudentDirectoryWorkspace() {
   const [showForm, setShowForm] = useState(false);
   const [viewingId, setViewingId] = useState<string | null>(null);
   const [issued, setIssued] = useState<CredentialEntry[]>([]);
+  const [notice, setNotice] = useState<string | null>(null);
   const resetLoginMutation = useMutation({
     mutationFn: ({ id }: { id: string; name: string }) =>
       apiFetch<IssuedCredentials>(`/accounts/people/student/${id}/credentials`, {
@@ -402,6 +403,7 @@ export function StudentDirectoryWorkspace() {
           departments={departmentsQuery.data ?? []}
           houses={housesQuery.data ?? []}
           onIssued={setIssued}
+          onNotice={setNotice}
           onCancel={() => {
             setShowForm(false);
             setEditing(null);
@@ -487,6 +489,12 @@ export function StudentDirectoryWorkspace() {
       </section>
 
       <CredentialsDialog entries={issued} onClose={() => setIssued([])} />
+      {notice && (
+        <p role="status" className="flex items-start justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs text-emerald-900 dark:border-emerald-400/20 dark:bg-emerald-400/10 dark:text-emerald-200">
+          <span>{notice}</span>
+          <button type="button" onClick={() => setNotice(null)} className="font-semibold underline-offset-2 hover:underline">Dismiss</button>
+        </p>
+      )}
       {resetLoginMutation.error && (
         <p role="alert" className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
           {resetLoginMutation.error.message}
@@ -538,12 +546,14 @@ function StudentEditor({
   onCancel,
   onSaved,
   onIssued,
+  onNotice,
 }: {
   student: Student | null;
   classes: SchoolClass[];
   departments: DepartmentOption[];
   houses: HouseOption[];
   onIssued: (entries: CredentialEntry[]) => void;
+  onNotice: (text: string | null) => void;
   onCancel: () => void;
   onSaved: () => Promise<void>;
 }) {
@@ -560,6 +570,7 @@ function StudentEditor({
           guardianCredentials?: {
             name: string;
             credentials: IssuedCredentials | null;
+            accountLinked?: boolean;
           }[];
         }
       >(
@@ -571,6 +582,13 @@ function StudentEditor({
       );
     },
     onSuccess: async (saved) => {
+      // Staff or administrators registered as a parent keep their own login.
+      const linked = (saved.guardianCredentials ?? []).filter((g) => g.accountLinked);
+      onNotice(
+        linked.length
+          ? `${linked.map((g) => g.name).join(", ")} already ${linked.length === 1 ? "has" : "have"} an account at this school. ${linked.length === 1 ? "It now also has" : "They now also have"} the parent role and sign in with the existing password, so no new parent password was created.`
+          : null,
+      );
       if (saved.credentials) {
         const name = `${saved.profile.firstName} ${saved.profile.lastName}`;
         onIssued([

@@ -27,7 +27,7 @@ const ROLE_HELP: Record<Role, string> = {
   accountant: "Fees, payments, expenses and payroll.",
   staff: "General records, attendance and inventory.",
   student: "Student portal and timetable.",
-  guardian: "Parent / guardian portal.",
+  guardian: "Parent portal for their own children. Can be combined with any other role.",
 };
 
 const assignable = ROLES.filter((role) => role !== "owner");
@@ -237,6 +237,9 @@ function RoleDialog({
   const [selected, setSelected] = useState<Role[]>(member.roles);
   const [problem, setProblem] = useState<string | null>(null);
   const [teacherDepartmentId, setTeacherDepartmentId] = useState("");
+  const [guardianPhone, setGuardianPhone] = useState("");
+  // A guardian (parent) record is created the first time that role is granted.
+  const newGuardian = selected.includes("guardian") && !member.roles.includes("guardian");
   // A teacher record (with a department) is created the first time the role is granted.
   const newTeacher = selected.includes("teacher") && !member.roles.includes("teacher");
   const departments = useQuery({
@@ -264,7 +267,7 @@ function RoleDialog({
   }, []);
 
   const save = useMutation({
-    mutationFn: (body: { roles: Role[]; teacherDepartmentId?: string }) =>
+    mutationFn: (body: { roles: Role[]; teacherDepartmentId?: string; guardianPhone?: string }) =>
       apiFetch<SchoolMember>(`/schools/members/${member.userId}/roles`, {
         method: "PATCH",
         body: JSON.stringify(body),
@@ -287,10 +290,14 @@ function RoleDialog({
     if (newTeacher && !teacherDepartmentId) {
       return setProblem("Choose the department this teacher belongs to.");
     }
+    if (newGuardian && guardianPhone.trim().length < 7) {
+      return setProblem("Enter a phone number for this parent.");
+    }
     setProblem(null);
     save.mutate({
       roles: parsed.data.roles,
       teacherDepartmentId: newTeacher ? teacherDepartmentId : undefined,
+      guardianPhone: newGuardian ? guardianPhone.trim() : undefined,
     });
   }
 
@@ -383,6 +390,29 @@ function RoleDialog({
               </label>
               <p className="mt-1.5 text-[11px] text-slate-500 dark:text-slate-400">
                 A teacher record is created so this person can be assigned to classes, subjects and the timetable.
+              </p>
+            </div>
+          )}
+
+          {newGuardian && (
+            <div className="mt-4 rounded-xl border border-indigo-100 bg-indigo-50/50 p-3 dark:border-indigo-400/20 dark:bg-indigo-400/5">
+              <label className="block text-xs font-semibold text-slate-800 dark:text-slate-100">
+                Parent&apos;s phone number
+                <input
+                  type="tel"
+                  value={guardianPhone}
+                  onChange={(event) => {
+                    setProblem(null);
+                    setGuardianPhone(event.target.value);
+                  }}
+                  autoComplete="tel"
+                  className={`${inputClass} mt-1.5 w-full`}
+                />
+              </label>
+              <p className="mt-1.5 text-[11px] text-slate-500 dark:text-slate-400">
+                A parent record is created so this person can be linked to their children and see them
+                in the parent portal. Link children from the Guardians page. They keep their current
+                password and sign in as usual.
               </p>
             </div>
           )}

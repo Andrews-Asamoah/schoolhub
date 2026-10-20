@@ -516,6 +516,12 @@ export const updateSchoolMemberRolesSchema = z.object({
    * and timetable pickers.
    */
   teacherDepartmentId: z.string().min(1).optional(),
+  /**
+   * Needed the first time someone is given the guardian (parent) role and no
+   * phone number is on file: a guardian record is created so they can be linked
+   * to their children and use the parent portal.
+   */
+  guardianPhone: z.string().trim().min(7).max(30).optional(),
 });
 export type UpdateSchoolMemberRolesInput = z.infer<
   typeof updateSchoolMemberRolesSchema
@@ -733,7 +739,11 @@ export type UpdateStaffInput = z.infer<typeof updateStaffSchema>;
 
 export const updateGuardianSchema = studentGuardianSchema
   .omit({ isPrimary: true, createLogin: true })
-  .partial();
+  .partial()
+  .extend({
+    /** Link this guardian to more students (existing links are kept). */
+    addStudentIds: z.array(z.string().min(1)).max(50).optional(),
+  });
 export type UpdateGuardianInput = z.infer<typeof updateGuardianSchema>;
 
 // ============================================================================

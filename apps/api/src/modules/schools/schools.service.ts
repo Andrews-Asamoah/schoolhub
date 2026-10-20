@@ -336,6 +336,8 @@ export class SchoolsService {
     const roles = change.roles;
     const hadTeacher = target.role === "teacher" || target.roles.includes("teacher");
     const wantsTeacher = target.role === "teacher" || roles.includes("teacher");
+    const hadGuardian = target.role === "guardian" || target.roles.includes("guardian");
+    const wantsGuardian = target.role === "guardian" || roles.includes("guardian");
     const updated = await this.prisma.client.$transaction(async (tx) => {
       // The teacher role is only useful once there is a teacher record to
       // assign to classes and subjects, so keep the two in step.
@@ -344,6 +346,15 @@ export class SchoolsService {
       } else if (hadTeacher && !wantsTeacher) {
         // Keep history (past classes, subjects) but stop offering them as a teacher.
         await tx.teacher.updateMany({
+          where: { schoolId, profile: { userId: target.userId } },
+          data: { isActive: false },
+        });
+      }
+      // Same for parents: an administrator or staff member can also be a guardian.
+      if (wantsGuardian && target.role !== "guardian") {
+        await this.ensureGuardianRecord(tx, schoolId, target.userId, input.guardianPhone);
+      } else if (hadGuardian && !wantsGuardian) {
+        await tx.guardian.updateMany({
           where: { schoolId, profile: { userId: target.userId } },
           data: { isActive: false },
         });
@@ -417,6 +428,70 @@ export class SchoolsService {
         firstName,
         lastName,
         departmentId: department.id,
+      },
+    });
+  }
+
+  /** Creates (or reactivates) the guardian record for an existing school account. */
+  private async ensureGuardianRecord(
+    tx: Prisma.TransactionClient,
+    schoolId: string,
+    userId: string,
+    phone?: string,
+  ) {
+    const user = await tx.user.findUniqueOrThrow({
+      where: { id: userId },
+      select: { name: true, email: true },
+    });
+    const [firstName = user.name, ...rest] = user.name.trim().split(/\s+/);
+    const lastName = rest.join(" ") || "-";
+    let profile = await tx.userProfile.findUnique({ where: { userId } });
+    if (!profile) {
+      profile = await tx.userProfile.create({ data: { userId, firstName, lastName, phone } });
+    } else if (!profile.phone && phone) {
+      profile = await tx.userProfile.update({ where: { id: profile.id }, data: { phone } });
+    }
+
+    const own = await tx.guardian.findFirst({
+      where: { schoolId, profileId: profile.id },
+      select: { id: true },
+    });
+    if (own) {
+      await tx.guardian.update({
+        where: { id: own.id },
+        data: { isActive: true, deletedAt: null, canLogin: true },
+      });
+      return;
+    }
+    // A guardian record may already exist for this email (added by the office
+    // before the person had an account): connect it instead of duplicating it.
+    const byEmail = await tx.guardian.findFirst({
+      where: { schoolId, email: user.email.toLowerCase(), deletedAt: null, profileId: null },
+      select: { id: true },
+    });
+    if (byEmail) {
+      await tx.guardian.update({
+        where: { id: byEmail.id },
+        data: { profileId: profile.id, canLogin: true, isActive: true },
+      });
+      return;
+    }
+
+    const contactPhone = profile.phone ?? phone;
+    if (!contactPhone) {
+      throw new BadRequestException("Enter a phone number for this parent.");
+    }
+    await tx.guardian.create({
+      data: {
+        schoolId,
+        profileId: profile.id,
+        canLogin: true,
+        guardianId: `GUA-${randomUUID().replaceAll("-", "").slice(0, 12).toUpperCase()}`,
+        firstName,
+        lastName,
+        phone: contactPhone,
+        email: user.email.toLowerCase(),
+        relationshipType: "GUARDIAN",
       },
     });
   }

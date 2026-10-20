@@ -239,6 +239,7 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
   const [editing, setEditing] = useState<{ id: string; name: string } | null>(null);
   const [viewing, setViewing] = useState<{ id: string; name: string } | null>(null);
   const [issued, setIssued] = useState<CredentialEntry[]>([]);
+  const [notice, setNotice] = useState<string | null>(null);
   const deferredSearch = useDeferredValue(search.trim());
   const isGuardianPage = kind === "guardians";
   const canManage =
@@ -305,7 +306,7 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
   const createMutation = useMutation({
     mutationFn: (values: Values) => {
       if (editing) {
-        return apiFetch<{ credentials?: IssuedCredentials | null }>(
+        return apiFetch<{ credentials?: IssuedCredentials | null; linkedExistingAccount?: boolean }>(
           `/people/${kind}/${editing.id}`,
           {
             method: "PATCH",
@@ -314,12 +315,17 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
         );
       }
       const body = makePayload(kind, values);
-      return apiFetch<{ credentials?: IssuedCredentials | null }>(`/people/${kind}`, {
+      return apiFetch<{ credentials?: IssuedCredentials | null; linkedExistingAccount?: boolean }>(`/people/${kind}`, {
         method: "POST",
         body: JSON.stringify(body),
       });
     },
     onSuccess: async (created, values) => {
+      setNotice(
+        !editing && created.linkedExistingAccount
+          ? `${values.firstName} ${values.lastName} already has an account at this school. It now also has this role, and they keep signing in with their own password. No new password was created.`
+          : null,
+      );
       if (!editing && created.credentials) {
         setIssued([
           {
@@ -891,7 +897,11 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
                       />
                     )}
                   </form.Field>
-                  {!editing && (
+                  {editing && (
+                    <p className="text-[11px] text-muted-foreground sm:col-span-2">
+                      Search below to link more children to this parent. Existing links are kept.
+                    </p>
+                  )}
                   <form.Field name="studentIds">
                     {(field) => (
                       <StudentSearchPicker
@@ -901,7 +911,6 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
                       />
                     )}
                   </form.Field>
-                  )}
                 </>
               )}
             </div>
@@ -1003,6 +1012,12 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
         />
       )}
       <CredentialsDialog entries={issued} onClose={() => setIssued([])} />
+      {notice && (
+        <p role="status" className="flex items-start justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs text-emerald-900 dark:border-emerald-400/20 dark:bg-emerald-400/10 dark:text-emerald-200">
+          <span>{notice}</span>
+          <button type="button" onClick={() => setNotice(null)} className="font-semibold underline-offset-2 hover:underline">Dismiss</button>
+        </p>
+      )}
       <WorkspaceDataTable
         rows={rows}
         columns={columns}
@@ -1144,6 +1159,7 @@ function makeUpdatePayload(kind: PeopleKind, values: Values) {
     relationshipType: values.relationshipType,
     occupation: values.occupation,
     employer: values.employer,
+    addStudentIds: values.studentIds.length ? values.studentIds : undefined,
   });
 }
 

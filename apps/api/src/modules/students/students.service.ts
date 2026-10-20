@@ -568,6 +568,8 @@ export class StudentsService {
         name: string;
         credentials: IssuedCredentials | null;
         linkedExisting: boolean;
+        /** The guardian's email already had an account here, which now also has the guardian role. */
+        accountLinked: boolean;
       }> = [];
 
       for (const plan of guardianPlans) {
@@ -584,19 +586,22 @@ export class StudentsService {
 
         let guardianRecordId: string;
         let issued: IssuedCredentials | null = null;
+        let accountLinked = false;
         let linkedExisting = false;
 
         if (existing) {
           guardianRecordId = existing.id;
           linkedExisting = true;
           if (credential && !existing.profileId) {
-            issued = await this.provisionGuardianLogin(
+            const login = await this.provisionGuardianLogin(
               tx,
               school,
               existing.id,
               { ...guardian, email: email! },
               credential,
             );
+            issued = login.credentials;
+            accountLinked = login.linked;
           }
         } else {
           const record = await tx.guardian.create({
@@ -620,13 +625,15 @@ export class StudentsService {
           });
           guardianRecordId = record.id;
           if (credential) {
-            issued = await this.provisionGuardianLogin(
+            const login = await this.provisionGuardianLogin(
               tx,
               school,
               record.id,
               { ...guardian, email: email! },
               credential,
             );
+            issued = login.credentials;
+            accountLinked = login.linked;
           }
         }
 
@@ -642,6 +649,7 @@ export class StudentsService {
           name,
           credentials: issued,
           linkedExisting,
+          accountLinked,
         });
       }
 
@@ -1216,6 +1224,11 @@ export class StudentsService {
     };
   }
 
+  /**
+   * Gives a guardian record a portal login. When the email already belongs to
+   * someone in this school (staff, an administrator, ...) that account is
+   * reused and simply gains the guardian role, so no new password is issued.
+   */
   private async provisionGuardianLogin(
     tx: Prisma.TransactionClient,
     school: Pick<School, 'id' | 'organizationId'>,
@@ -1229,8 +1242,8 @@ export class StudentsService {
       email: string;
     },
     credential: PreparedCredential,
-  ): Promise<IssuedCredentials> {
-    const login = await this.credentials.createLogin(tx, {
+  ): Promise<{ credentials: IssuedCredentials | null; linked: boolean }> {
+    const login = await this.credentials.createOrLinkLogin(tx, {
       name: `${guardian.firstName} ${guardian.lastName}`.trim(),
       email: guardian.email,
       role: 'guardian',
@@ -1248,7 +1261,12 @@ export class StudentsService {
       where: { id: guardianRecordId },
       data: { profileId: login.profileId, canLogin: true },
     });
-    return toIssuedCredentials(login.email, credential, 'guardian');
+    return {
+      credentials: login.linked
+        ? null
+        : toIssuedCredentials(login.email, credential, 'guardian'),
+      linked: login.linked,
+    };
   }
 
   async updateStudent(schoolId: string, id: string, input: UpdateStudentInput) {

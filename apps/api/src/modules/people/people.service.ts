@@ -120,7 +120,7 @@ export class PeopleService {
     const teacherId = newPublicId('TCH');
 
     const teacher = await this.prisma.client.$transaction(async (tx) => {
-      const login = await this.credentials.createLogin(tx, {
+      const login = await this.credentials.createOrLinkLogin(tx, {
         name: `${input.firstName} ${input.lastName}`.trim(),
         email: input.email,
         role: 'teacher',
@@ -161,12 +161,16 @@ export class PeopleService {
         entityType: 'TEACHER',
         entityId: created.id,
       });
-      return { record: created, loginEmail: login.email };
+      return { record: created, loginEmail: login.email, linked: login.linked };
     });
 
     return {
       ...teacher.record,
-      credentials: toIssuedCredentials(teacher.loginEmail, credential, 'teacher'),
+      // No password is issued when an existing account was reused (it keeps its own).
+      credentials: teacher.linked
+        ? null
+        : toIssuedCredentials(teacher.loginEmail, credential, 'teacher'),
+      linkedExistingAccount: teacher.linked,
     };
   }
 
@@ -301,7 +305,7 @@ export class PeopleService {
     const credential = await this.credentials.prepare(role);
 
     const result = await this.prisma.client.$transaction(async (tx) => {
-      const login = await this.credentials.createLogin(tx, {
+      const login = await this.credentials.createOrLinkLogin(tx, {
         name: `${input.firstName} ${input.lastName}`.trim(),
         email: input.email,
         role,
@@ -340,12 +344,15 @@ export class PeopleService {
         entityId: staff.id,
         details: { role },
       });
-      return { staff, loginEmail: login.email };
+      return { staff, loginEmail: login.email, linked: login.linked };
     });
 
     return {
       ...result.staff,
-      credentials: toIssuedCredentials(result.loginEmail, credential, role),
+      credentials: result.linked
+        ? null
+        : toIssuedCredentials(result.loginEmail, credential, role),
+      linkedExistingAccount: result.linked,
     };
   }
 
@@ -457,7 +464,7 @@ export class PeopleService {
       }
       const login =
         credential && email
-          ? await this.credentials.createLogin(tx, {
+          ? await this.credentials.createOrLinkLogin(tx, {
               name: `${input.firstName} ${input.lastName}`.trim(),
               email,
               role: 'guardian',
@@ -527,8 +534,11 @@ export class PeopleService {
         ...guardian,
         credentials:
           login && credential
-            ? toIssuedCredentials(login.email, credential, 'guardian')
+            ? login.linked
+              ? null
+              : toIssuedCredentials(login.email, credential, 'guardian')
             : null,
+        linkedExistingAccount: Boolean(login?.linked),
       };
     });
   }
@@ -787,6 +797,16 @@ export class PeopleService {
       );
     }
 
+    const addStudentIds = [...new Set(input.addStudentIds ?? [])];
+    if (addStudentIds.length) {
+      const found = await this.prisma.client.student.count({
+        where: { id: { in: addStudentIds }, schoolId: school.id, deletedAt: null },
+      });
+      if (found !== addStudentIds.length) {
+        throw new BadRequestException('Choose students that belong to this school.');
+      }
+    }
+
     return this.prisma.client.$transaction(async (tx) => {
       if (existing.profile) {
         if (email && email !== existing.profile.user.email) {
@@ -812,6 +832,29 @@ export class PeopleService {
             gender: input.gender,
           },
         });
+      }
+      if (addStudentIds.length) {
+        const already = await tx.guardianStudent.findMany({
+          where: { guardianId: id, studentId: { in: addStudentIds } },
+          select: { studentId: true },
+        });
+        const alreadyLinked = new Set(already.map((link) => link.studentId));
+        const fresh = addStudentIds.filter((studentId) => !alreadyLinked.has(studentId));
+        // A student's first guardian becomes primary; later ones are secondary.
+        const withPrimary = await tx.guardianStudent.findMany({
+          where: { studentId: { in: fresh }, isPrimary: true, guardian: { schoolId: school.id, deletedAt: null } },
+          select: { studentId: true },
+        });
+        const hasPrimary = new Set(withPrimary.map((link) => link.studentId));
+        if (fresh.length) {
+          await tx.guardianStudent.createMany({
+            data: fresh.map((studentId) => ({
+              guardianId: id,
+              studentId,
+              isPrimary: !hasPrimary.has(studentId),
+            })),
+          });
+        }
       }
       const updated = await tx.guardian.update({
         where: { id },
