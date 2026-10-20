@@ -1,4 +1,4 @@
-import { BadRequestException, ForbiddenException, Injectable } from "@nestjs/common";
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "../../prisma/prisma.service.js";
 import type { BatchAttendanceInput } from "@schoolhub/shared";
 import { canManageAcademicContext } from "../../common/academic-context.js";
@@ -179,6 +179,52 @@ export class AttendanceService {
       summary,
       totalDays,
       attendanceRate,
+    };
+  }
+
+  async getMyAttendanceSummary(
+    schoolId: string,
+    userId: string,
+    academicYearId?: string,
+    termId?: string,
+  ) {
+    const student = await this.prisma.client.student.findFirst({
+      where: { schoolId, deletedAt: null, profile: { userId } },
+      select: { id: true },
+    });
+    if (!student) throw new NotFoundException('Student record not found');
+    const { academicYear, term } = await this.resolveAcademicContext(
+      schoolId,
+      academicYearId,
+      termId,
+      'student',
+    );
+    const summaryData = await this.getStudentAttendanceSummary(
+      schoolId,
+      student.id,
+      'student',
+      academicYear.id,
+      term.id,
+    );
+    const recentRecords = await this.prisma.client.attendance.findMany({
+      where: {
+        studentId: student.id,
+        date: { gte: term.startDate, lte: term.endDate },
+      },
+      orderBy: { date: 'desc' },
+      take: 30,
+      select: {
+        id: true,
+        date: true,
+        status: true,
+        remarks: true,
+      },
+    });
+    return {
+      ...summaryData,
+      academicYear: { id: academicYear.id, name: academicYear.name },
+      term: { id: term.id, name: term.name },
+      recentRecords,
     };
   }
 

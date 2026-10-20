@@ -28,6 +28,7 @@ import {
   useSchoolRole,
 } from "@/components/school/school-role-switcher";
 import { getSchoolNavGroupsForRole } from "@/lib/school-navigation";
+import { StudentOverview } from "@/components/portal/student-overview";
 
 interface SetupYear {
   id: string;
@@ -124,6 +125,14 @@ export function DashboardContent({
   const completedSteps = setupItems.filter((item) => item.complete).length;
   const setupHasError =
     schoolQuery.isError || classesQuery.isError || subjectsQuery.isError;
+
+  if (activeRole === "student") {
+    return (
+      <main className="mx-auto max-w-[1440px] px-4 py-7 sm:px-6 lg:px-9 lg:py-9">
+        <StudentOverview />
+      </main>
+    );
+  }
 
   if (!isManagementRole) {
     const roleLinks = getSchoolNavGroupsForRole(activeRole ?? undefined)

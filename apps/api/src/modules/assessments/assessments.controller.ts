@@ -45,6 +45,16 @@ export class AssessmentsController {
     );
   }
 
+  @Get("me/report")
+  @Roles("student")
+  getMyReport(
+    @CurrentSchool() school: School,
+    @CurrentUser() user: AuthenticatedUser,
+    @Query("termId") termId?: string,
+  ) {
+    return this.assessmentsService.getMyReportCard(school.id, user.id, termId);
+  }
+
   @Get("student/:studentId/report")
   @Roles("owner", "admin", "teacher")
   getStudentReport(

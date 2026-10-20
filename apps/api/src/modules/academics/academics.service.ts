@@ -9,11 +9,14 @@ import { PrismaService } from '../../prisma/prisma.service.js';
 import type {
   CreateClassInput,
   CreateClassTeacherAssignmentInput,
+  CreateClubInput,
   CreateDepartmentInput,
   CreateEnrollmentInput,
   CreateHouseInput,
   CreateSubjectInput,
+  AddClubMemberInput,
   UpdateClassInput,
+  UpdateClubInput,
   UpdateHouseInput,
 } from '@schoolhub/shared';
 import type { Prisma } from '@prisma/client';
@@ -838,5 +841,228 @@ export class AcademicsService {
         periodsPerWeek: input.periodsPerWeek,
       },
     });
+  }
+
+  async listClubs(schoolId: string) {
+    return this.prisma.client.club.findMany({
+      where: { schoolId },
+      orderBy: [{ isActive: 'desc' }, { name: 'asc' }],
+      include: {
+        teacherInCharge: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            profile: { select: { firstName: true, lastName: true } },
+          },
+        },
+        _count: {
+          select: { members: true },
+        },
+        members: {
+          include: {
+            student: {
+              select: {
+                id: true,
+                studentId: true,
+                admissionNumber: true,
+                profile: {
+                  select: { firstName: true, lastName: true, gender: true },
+                },
+                house: {
+                  select: { id: true, name: true, color: true },
+                },
+              },
+            },
+          },
+          orderBy: { joinedAt: 'asc' },
+        },
+      },
+    });
+  }
+
+  async getClub(schoolId: string, clubId: string) {
+    const club = await this.prisma.client.club.findFirst({
+      where: { id: clubId, schoolId },
+      include: {
+        teacherInCharge: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            profile: { select: { firstName: true, lastName: true } },
+          },
+        },
+        _count: { select: { members: true } },
+        members: {
+          include: {
+            student: {
+              select: {
+                id: true,
+                studentId: true,
+                admissionNumber: true,
+                profile: {
+                  select: { firstName: true, lastName: true, gender: true },
+                },
+                house: {
+                  select: { id: true, name: true, color: true },
+                },
+              },
+            },
+          },
+          orderBy: { joinedAt: 'asc' },
+        },
+      },
+    });
+    if (!club) throw new NotFoundException('Club not found');
+    return club;
+  }
+
+  async createClub(schoolId: string, input: CreateClubInput) {
+    const existing = await this.prisma.client.club.findFirst({
+      where: { name: { equals: input.name, mode: 'insensitive' }, schoolId },
+    });
+    if (existing) {
+      throw new ConflictException('A club with this name already exists.');
+    }
+    if (input.teacherInChargeId) {
+      const teacher = await this.prisma.client.teacher.findFirst({
+        where: { id: input.teacherInChargeId, schoolId, isActive: true },
+      });
+      if (!teacher) {
+        throw new BadRequestException('Choose an active teacher in this school.');
+      }
+    }
+    return this.prisma.client.club.create({
+      data: {
+        schoolId,
+        name: input.name,
+        description: input.description || null,
+        teacherInChargeId: input.teacherInChargeId || null,
+        isActive: input.isActive ?? true,
+      },
+      include: {
+        teacherInCharge: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            profile: { select: { firstName: true, lastName: true } },
+          },
+        },
+        _count: { select: { members: true } },
+      },
+    });
+  }
+
+  async updateClub(schoolId: string, clubId: string, input: UpdateClubInput) {
+    const existing = await this.prisma.client.club.findFirst({
+      where: { id: clubId, schoolId },
+    });
+    if (!existing) throw new NotFoundException('Club not found');
+
+    if (input.name && input.name.toLowerCase() !== existing.name.toLowerCase()) {
+      const duplicate = await this.prisma.client.club.findFirst({
+        where: {
+          name: { equals: input.name, mode: 'insensitive' },
+          schoolId,
+          id: { not: clubId },
+        },
+      });
+      if (duplicate) {
+        throw new ConflictException('A club with this name already exists.');
+      }
+    }
+
+    if (input.teacherInChargeId) {
+      const teacher = await this.prisma.client.teacher.findFirst({
+        where: { id: input.teacherInChargeId, schoolId, isActive: true },
+      });
+      if (!teacher) {
+        throw new BadRequestException('Choose an active teacher in this school.');
+      }
+    }
+
+    return this.prisma.client.club.update({
+      where: { id: clubId },
+      data: {
+        ...(input.name !== undefined ? { name: input.name } : {}),
+        ...(input.description !== undefined ? { description: input.description || null } : {}),
+        ...(input.teacherInChargeId !== undefined ? { teacherInChargeId: input.teacherInChargeId || null } : {}),
+        ...(input.isActive !== undefined ? { isActive: input.isActive } : {}),
+      },
+      include: {
+        teacherInCharge: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            profile: { select: { firstName: true, lastName: true } },
+          },
+        },
+        _count: { select: { members: true } },
+      },
+    });
+  }
+
+  async deleteClub(schoolId: string, clubId: string) {
+    const existing = await this.prisma.client.club.findFirst({
+      where: { id: clubId, schoolId },
+    });
+    if (!existing) throw new NotFoundException('Club not found');
+    await this.prisma.client.club.delete({ where: { id: clubId } });
+    return { success: true };
+  }
+
+  async addClubMember(schoolId: string, clubId: string, input: AddClubMemberInput) {
+    const club = await this.prisma.client.club.findFirst({
+      where: { id: clubId, schoolId },
+    });
+    if (!club) throw new NotFoundException('Club not found');
+
+    const student = await this.prisma.client.student.findFirst({
+      where: { id: input.studentId, schoolId, deletedAt: null },
+    });
+    if (!student) throw new NotFoundException('Student not found');
+
+    const existingMember = await this.prisma.client.clubMember.findUnique({
+      where: { clubId_studentId: { clubId, studentId: input.studentId } },
+    });
+    if (existingMember) {
+      throw new ConflictException('This student is already a member of this club.');
+    }
+
+    return this.prisma.client.clubMember.create({
+      data: {
+        clubId,
+        studentId: input.studentId,
+        role: input.role || 'Member',
+      },
+      include: {
+        student: {
+          select: {
+            id: true,
+            studentId: true,
+            admissionNumber: true,
+            profile: { select: { firstName: true, lastName: true } },
+            house: { select: { id: true, name: true } },
+          },
+        },
+      },
+    });
+  }
+
+  async removeClubMember(schoolId: string, clubId: string, studentId: string) {
+    const member = await this.prisma.client.clubMember.findUnique({
+      where: { clubId_studentId: { clubId, studentId } },
+      include: { club: { select: { schoolId: true } } },
+    });
+    if (!member || member.club.schoolId !== schoolId) {
+      throw new NotFoundException('Club membership not found');
+    }
+    await this.prisma.client.clubMember.delete({
+      where: { clubId_studentId: { clubId, studentId } },
+    });
+    return { success: true };
   }
 }

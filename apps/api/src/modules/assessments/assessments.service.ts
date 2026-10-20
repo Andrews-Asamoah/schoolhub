@@ -232,4 +232,26 @@ export class AssessmentsService {
       remarks,
     };
   }
+
+  async getMyReportCard(schoolId: string, userId: string, termId?: string) {
+    const student = await this.prisma.client.student.findFirst({
+      where: { schoolId, deletedAt: null, profile: { userId } },
+      select: { id: true },
+    });
+    if (!student) throw new NotFoundException('Student record not found');
+
+    let resolvedTermId = termId;
+    if (!resolvedTermId) {
+      const currentYear = await this.prisma.client.academicYear.findFirst({
+        where: { schoolId, isCurrent: true },
+        include: { terms: { where: { isCurrent: true }, take: 1 } },
+      });
+      resolvedTermId = currentYear?.terms[0]?.id;
+    }
+    if (!resolvedTermId) {
+      throw new BadRequestException('No current academic term set for this school.');
+    }
+
+    return this.getStudentReportCard(schoolId, student.id, resolvedTermId, 'student');
+  }
 }

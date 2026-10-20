@@ -395,6 +395,22 @@ export type CreateHouseInput = z.infer<typeof createHouseSchema>;
 export const updateHouseSchema = createHouseSchema.partial();
 export type UpdateHouseInput = z.infer<typeof updateHouseSchema>;
 
+export const createClubSchema = z.object({
+  name: z.string().trim().min(2, "Enter a club name").max(100),
+  description: z.string().trim().max(500).optional(),
+  teacherInChargeId: z.string().optional().nullable(),
+  isActive: z.boolean().default(true),
+});
+export type CreateClubInput = z.infer<typeof createClubSchema>;
+export const updateClubSchema = createClubSchema.partial();
+export type UpdateClubInput = z.infer<typeof updateClubSchema>;
+
+export const addClubMemberSchema = z.object({
+  studentId: z.string().min(1, "Select a student"),
+  role: z.string().trim().max(50).optional().nullable(),
+});
+export type AddClubMemberInput = z.infer<typeof addClubMemberSchema>;
+
 export const createSubjectSchema = z.object({
   name: z.string().min(1, "Subject name is required"),
   code: z.string().min(1, "Subject code is required"),

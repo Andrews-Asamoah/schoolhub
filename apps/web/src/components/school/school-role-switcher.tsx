@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { CircleAlert, UserRoundCog } from "lucide-react";
+import { CircleAlert, UserRoundCog, ChevronDown } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { useSchoolOrganization } from "@/components/school/school-organization";
 
@@ -99,16 +99,27 @@ export function SchoolRoleSwitcher() {
   }
   if (!activeRole) return null;
 
+  // If there is only one role, show a simple static badge with no dropdown arrow or select
+  if (roles.length <= 1) {
+    return (
+      <div className="flex min-w-0 items-center gap-2 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 shadow-sm dark:border-white/10 dark:bg-slate-900 dark:text-slate-200">
+        <UserRoundCog className="size-4 shrink-0 text-indigo-600 dark:text-indigo-300" />
+        <span className="truncate max-w-36 sm:max-w-44">
+          {roleLabels[activeRole] ?? activeRole}
+        </span>
+      </div>
+    );
+  }
+
   return (
-    <label className="flex min-w-0 items-center gap-2 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 shadow-sm dark:border-white/10 dark:bg-slate-900 dark:text-slate-200">
+    <label className="relative flex min-w-0 items-center gap-2 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 shadow-sm dark:border-white/10 dark:bg-slate-900 dark:text-slate-200">
       <UserRoundCog className="size-4 shrink-0 text-indigo-600 dark:text-indigo-300" />
       <span className="sr-only">Active role</span>
       <select
         aria-label="Switch role"
         value={activeRole}
-        disabled={roles.length < 2}
         onChange={(event) => void selectRole(event.target.value)}
-        className="max-w-36 cursor-pointer bg-transparent outline-none disabled:cursor-default sm:max-w-44"
+        className="max-w-36 appearance-none cursor-pointer bg-transparent pr-5 outline-none sm:max-w-44"
       >
         {roles.map((role) => (
           <option key={role} value={role}>
@@ -116,6 +127,7 @@ export function SchoolRoleSwitcher() {
           </option>
         ))}
       </select>
+      <ChevronDown className="pointer-events-none absolute right-2 size-3.5 text-slate-400" />
     </label>
   );
 }

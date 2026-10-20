@@ -64,6 +64,22 @@ export class AttendanceController {
     );
   }
 
+  @Get("me")
+  @Roles("student")
+  getMyAttendance(
+    @CurrentSchool() school: School,
+    @CurrentUser() user: AuthenticatedUser,
+    @Headers("x-academic-year-id") academicYearId?: string,
+    @Headers("x-academic-term-id") termId?: string,
+  ) {
+    return this.attendanceService.getMyAttendanceSummary(
+      school.id,
+      user.id,
+      academicYearId,
+      termId,
+    );
+  }
+
   @Get("student/:studentId")
   @Roles("owner", "admin", "teacher", "staff", "accountant")
   getStudentAttendance(

@@ -141,6 +141,14 @@ export const schoolNavGroups: SchoolNavGroup[] = [
         section: "Academics",
         apiStatus: "available",
       },
+      {
+        id: "assignments",
+        label: "Assignments",
+        icon: FileText,
+        description: "Homework, coursework, and task submissions.",
+        section: "Academics",
+        apiStatus: "available",
+      },
     ],
   },
   {
@@ -177,7 +185,15 @@ export const schoolNavGroups: SchoolNavGroup[] = [
         icon: Home,
         description: "Student clubs, memberships, and activities.",
         section: "School operations",
-        apiStatus: "planned",
+        apiStatus: "available",
+      },
+      {
+        id: "classmates",
+        label: "Classmates",
+        icon: UsersRound,
+        description: "Class roster, peer learners, and student leaders.",
+        section: "School operations",
+        apiStatus: "available",
       },
       {
         id: "documents",
@@ -243,7 +259,7 @@ export const schoolNavGroups: SchoolNavGroup[] = [
         icon: FileBarChart,
         description: "School performance, enrollment, and attendance insights.",
         section: "Insights",
-        apiStatus: "planned",
+        apiStatus: "available",
       },
     ],
   },
@@ -256,7 +272,7 @@ export const schoolNavGroups: SchoolNavGroup[] = [
         icon: Megaphone,
         description: "School-wide notices and targeted updates.",
         section: "Communication",
-        apiStatus: "planned",
+        apiStatus: "available",
       },
       {
         id: "messages",
@@ -376,6 +392,7 @@ const rolePages: Record<string, string[]> = {
     "assessments",
     "attendance",
     "reports",
+    "clubs",
   ],
   accountant: [
     "accountant-portal",
@@ -398,10 +415,21 @@ const rolePages: Record<string, string[]> = {
     "guardians",
     "attendance",
     "inventory",
+    "houses",
     "clubs",
     "documents",
   ],
-  student: ["student-portal", "timetable"],
+  student: [
+    "subjects",
+    "timetable",
+    "assessments",
+    "assignments",
+    "attendance",
+    "classmates",
+    "houses",
+    "clubs",
+    "announcements",
+  ],
   guardian: ["guardian-portal"],
 };
 
@@ -410,7 +438,6 @@ const ownPortalByRole: Record<string, string> = {
   teacher: "teacher-portal",
   accountant: "accountant-portal",
   guardian: "guardian-portal",
-  student: "student-portal",
 };
 
 /**

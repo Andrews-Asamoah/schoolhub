@@ -38,10 +38,18 @@ import { SchoolLogoUploader } from "@/components/school/school-logo-uploader";
 import { SchoolSettingsForm } from "@/components/school/school-settings-form";
 import { ProfileWorkspace } from "@/components/school/profile-workspace";
 import { HousesWorkspace } from "@/components/school/houses-workspace";
+import { ClubsWorkspace } from "@/components/school/clubs-workspace";
 import { TeacherPortalWorkspace } from "@/components/portal/teacher-portal-workspace";
 import { AccountantPortalWorkspace } from "@/components/portal/accountant-portal-workspace";
 import { GuardianPortalWorkspace } from "@/components/portal/guardian-portal-workspace";
 import { StudentPortalWorkspace } from "@/components/portal/student-portal-workspace";
+import { StudentSubjectsView } from "@/components/portal/student-subjects-view";
+import { StudentAttendanceView } from "@/components/portal/student-attendance-view";
+import { StudentReportView } from "@/components/portal/student-report-view";
+import { StudentClassmatesView } from "@/components/portal/student-classmates-view";
+import { StudentHouseClubsView } from "@/components/portal/student-house-clubs-view";
+import { StudentAssignmentsView } from "@/components/portal/student-assignments-view";
+import { StudentAnnouncementsView } from "@/components/portal/student-announcements-view";
 
 export const Route = createFileRoute("/$page")({
   component: WorkspaceRoute,
@@ -215,9 +223,10 @@ function WorkspaceContent({ pageId }: { pageId: string }) {
   const page = getSchoolNavItem(pageId)!;
   return (
     <>
-      {!["classes", "students", "teachers", "staff", "guardians", "teacher-portal", "accountant-portal", "guardian-portal", "student-portal"].includes(
-        pageId,
-      ) && (
+      {activeRole !== "student" &&
+        !["classes", "students", "teachers", "staff", "guardians", "teacher-portal", "accountant-portal", "guardian-portal", "student-portal", "clubs", "houses", "assignments", "classmates"].includes(
+          pageId,
+        ) && (
         <WorkspacePageHeading
           section={page.section}
           title={page.label}
@@ -249,7 +258,17 @@ function WorkspaceContent({ pageId }: { pageId: string }) {
           {pageId === "teachers" && <PeopleWorkspace kind="teachers" />}
           {pageId === "staff" && <PeopleWorkspace kind="staff" />}
           {pageId === "guardians" && <PeopleWorkspace kind="guardians" />}
-          {pageId === "houses" && <HousesWorkspace />}
+          {pageId === "houses" && (
+            activeRole === "student" ? <StudentHouseClubsView /> : <HousesWorkspace />
+          )}
+          {pageId === "clubs" && (
+            activeRole === "student" ? <StudentHouseClubsView /> : <ClubsWorkspace />
+          )}
+          {pageId === "classmates" && <StudentClassmatesView />}
+          {pageId === "assignments" && <StudentAssignmentsView />}
+          {pageId === "announcements" && (
+            activeRole === "student" ? <StudentAnnouncementsView /> : <PlannedWorkspace title={page.label} />
+          )}
           {pageId === "classes" && (
             <ClassesWorkspace
               classesQuery={classesQuery}
@@ -263,15 +282,29 @@ function WorkspaceContent({ pageId }: { pageId: string }) {
               classesQuery={classesQuery}
             />
           )}
-          {pageId === "subjects" && <SubjectsWorkspace />}
+          {pageId === "subjects" && (
+            activeRole === "student" ? <StudentSubjectsView /> : <SubjectsWorkspace />
+          )}
           {pageId === "academic-years" && <AcademicYears query={yearsQuery} />}
           {pageId === "assessments" && (
-            <AssessmentList query={assessmentsQuery} />
+            activeRole === "student" ? <StudentReportView /> : <AssessmentList query={assessmentsQuery} />
+          )}
+          {pageId === "reports" && (
+            activeRole === "student" ? <StudentReportView /> : <PlannedWorkspace title={page.label} />
           )}
           {pageId === "attendance" && (
-            <AttendanceWorkspace query={classesQuery} />
+            activeRole === "student" ? <StudentAttendanceView /> : <AttendanceWorkspace query={classesQuery} />
           )}
-          {pageId === "fees" && <FeeStructureList query={feesQuery} />}
+          {pageId === "fees" && (
+            activeRole === "student" ? (
+              <WorkspaceEmptyState
+                title="Fees are managed by parents / guardians"
+                description="Detailed billing schedules and payment invoices are accessible to your parent or guardian on their guardian portal."
+              />
+            ) : (
+              <FeeStructureList query={feesQuery} />
+            )
+          )}
           {pageId === "payments" && <PaymentEntry />}
           {pageId === "settings" && <SchoolSettings query={schoolQuery} />}
           {pageId === "profile" && <ProfileWorkspace />}

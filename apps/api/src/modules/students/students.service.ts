@@ -1029,6 +1029,193 @@ export class StudentsService {
     };
   }
 
+  /** Classmates for the signed-in student (in the current academic term). */
+  async getMyClassmates(schoolId: string, userId: string) {
+    const student = await this.prisma.client.student.findFirst({
+      where: { schoolId, deletedAt: null, profile: { userId } },
+      select: { id: true },
+    });
+    if (!student) throw new NotFoundException('Student record not found');
+
+    const enrollment = await this.prisma.client.enrollment.findFirst({
+      where: {
+        studentId: student.id,
+        status: { in: ['ACTIVE', 'COMPLETED'] },
+        term: { isCurrent: true, academicYear: { isCurrent: true, schoolId } },
+      },
+      orderBy: { enrolledAt: 'desc' },
+      select: {
+        classId: true,
+        class: {
+          select: {
+            id: true,
+            name: true,
+            level: true,
+            classTeacher: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                profile: { select: { firstName: true, lastName: true } },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!enrollment) {
+      return { class: null, classmates: [] };
+    }
+
+    const enrollments = await this.prisma.client.enrollment.findMany({
+      where: {
+        classId: enrollment.classId,
+        status: { in: ['ACTIVE', 'COMPLETED'] },
+        student: { schoolId, deletedAt: null },
+      },
+      include: {
+        student: {
+          select: {
+            id: true,
+            studentId: true,
+            admissionNumber: true,
+            gender: true,
+            profile: { select: { firstName: true, lastName: true, gender: true } },
+            house: { select: { id: true, name: true, color: true } },
+          },
+        },
+      },
+      orderBy: [{ student: { profile: { lastName: 'asc' } } }],
+    });
+
+    return {
+      class: enrollment.class,
+      classmates: enrollments.map((e) => ({
+        id: e.student.id,
+        isSelf: e.student.id === student.id,
+        studentId: e.student.studentId,
+        admissionNumber: e.student.admissionNumber,
+        name: `${e.student.profile.firstName} ${e.student.profile.lastName}`.trim(),
+        firstName: e.student.profile.firstName,
+        lastName: e.student.profile.lastName,
+        house: e.student.house?.name ?? 'No House',
+        houseColor: e.student.house?.color ?? '#2563EB',
+        gender: e.student.profile.gender ?? e.student.gender,
+      })),
+    };
+  }
+
+  /** Joined clubs for the signed-in student. */
+  async getMyClubs(schoolId: string, userId: string) {
+    const student = await this.prisma.client.student.findFirst({
+      where: { schoolId, deletedAt: null, profile: { userId } },
+      select: { id: true },
+    });
+    if (!student) throw new NotFoundException('Student record not found');
+
+    const clubMemberships = await this.prisma.client.clubMember.findMany({
+      where: { studentId: student.id, club: { schoolId } },
+      include: {
+        club: {
+          include: {
+            teacherInCharge: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                profile: { select: { firstName: true, lastName: true } },
+              },
+            },
+            _count: { select: { members: true } },
+          },
+        },
+      },
+      orderBy: { joinedAt: 'desc' },
+    });
+
+    return clubMemberships.map((cm) => ({
+      membershipId: cm.id,
+      role: cm.role ?? 'Member',
+      joinedAt: cm.joinedAt,
+      club: cm.club,
+    }));
+  }
+
+  /**
+   * Fee payment status badge for the student.
+   * Full fee breakdown and balances are strictly hidden from students and only
+   * visible to guardians/accountants. Students only see a status badge:
+   * FULLY_PAID, PARTIALLY_PAID, or YET_TO_PAY.
+   */
+  async getMyFeeStatus(schoolId: string, userId: string) {
+    const student = await this.prisma.client.student.findFirst({
+      where: { schoolId, deletedAt: null, profile: { userId } },
+      select: { id: true, outstandingBalance: true },
+    });
+    if (!student) throw new NotFoundException('Student record not found');
+
+    const currentYear = await this.prisma.client.academicYear.findFirst({
+      where: { schoolId, isCurrent: true },
+      include: { terms: { where: { isCurrent: true }, take: 1 } },
+    });
+    const currentTerm = currentYear?.terms[0];
+
+    const [bills, payments] = await Promise.all([
+      this.prisma.client.bill.findMany({
+        where: {
+          studentId: student.id,
+          schoolId,
+          ...(currentYear && currentTerm
+            ? { academicYearId: currentYear.id, termId: currentTerm.id }
+            : {}),
+        },
+        select: { id: true, totalAmount: true, balanceAmount: true },
+      }),
+      this.prisma.client.payment.findMany({
+        where: {
+          studentId: student.id,
+          schoolId,
+        },
+        select: { id: true, amount: true },
+      }),
+    ]);
+
+    const totalBilled = bills.reduce((sum, b) => sum + Number(b.totalAmount), 0);
+    const totalRemaining = bills.reduce((sum, b) => sum + Number(b.balanceAmount), 0);
+    const totalPaid = payments.reduce((sum, p) => sum + Number(p.amount), 0);
+
+    let status: 'FULLY_PAID' | 'PARTIALLY_PAID' | 'YET_TO_PAY';
+    let label: string;
+    let description: string;
+
+    if (totalBilled > 0 && totalRemaining <= 0) {
+      status = 'FULLY_PAID';
+      label = 'Fully Paid';
+      description = 'All required school fees have been cleared. Examination hall pass is approved.';
+    } else if (totalPaid > 0 && totalRemaining > 0) {
+      status = 'PARTIALLY_PAID';
+      label = 'Partially Paid';
+      description = 'A partial payment has been recorded. Please have your parent or guardian complete the remaining balance on their portal.';
+    } else if (totalBilled > 0) {
+      status = 'YET_TO_PAY';
+      label = 'Yet to Make Payment';
+      description = 'Term fees are currently pending payment. Please remind your parent or guardian to make payment via the parent portal.';
+    } else {
+      status = 'FULLY_PAID';
+      label = 'Fully Paid';
+      description = 'Your student account is in good standing with no pending fee obligations.';
+    }
+
+    return {
+      status,
+      label,
+      description,
+      academicYear: currentYear?.name ?? null,
+      term: currentTerm?.name ?? null,
+    };
+  }
+
   private async provisionGuardianLogin(
     tx: Prisma.TransactionClient,
     school: Pick<School, 'id' | 'organizationId'>,

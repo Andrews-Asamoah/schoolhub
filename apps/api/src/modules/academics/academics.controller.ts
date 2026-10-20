@@ -3,6 +3,7 @@ import {
   Get,
   Post,
   Patch,
+  Delete,
   Param,
   Query,
   Body,
@@ -19,19 +20,25 @@ import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe.js';
 import {
   createClassSchema,
   createClassTeacherAssignmentSchema,
+  createClubSchema,
   createDepartmentSchema,
   createEnrollmentSchema,
   createHouseSchema,
   createSubjectSchema,
+  addClubMemberSchema,
   updateClassSchema,
+  updateClubSchema,
   updateHouseSchema,
   type CreateClassInput,
   type CreateClassTeacherAssignmentInput,
+  type CreateClubInput,
   type CreateDepartmentInput,
   type CreateEnrollmentInput,
   type CreateHouseInput,
   type CreateSubjectInput,
+  type AddClubMemberInput,
   type UpdateClassInput,
+  type UpdateClubInput,
   type UpdateHouseInput,
 } from '@schoolhub/shared';
 import type { School } from '@prisma/client';
@@ -187,7 +194,7 @@ export class AcademicsController {
   }
 
   @Get('houses')
-  @Roles('owner', 'admin', 'staff')
+  @Roles('owner', 'admin', 'staff', 'teacher', 'student', 'guardian')
   listHouses(@CurrentSchool() school: School) {
     return this.academicsService.listHouses(school.id);
   }
@@ -209,6 +216,63 @@ export class AcademicsController {
     @Body(new ZodValidationPipe(updateHouseSchema)) body: UpdateHouseInput,
   ) {
     return this.academicsService.updateHouse(school.id, id, body);
+  }
+
+  @Get('clubs')
+  @Roles('owner', 'admin', 'staff', 'teacher', 'student', 'guardian')
+  listClubs(@CurrentSchool() school: School) {
+    return this.academicsService.listClubs(school.id);
+  }
+
+  @Get('clubs/:id')
+  @Roles('owner', 'admin', 'staff', 'teacher', 'student', 'guardian')
+  getClub(@CurrentSchool() school: School, @Param('id') id: string) {
+    return this.academicsService.getClub(school.id, id);
+  }
+
+  @Post('clubs')
+  @Roles('owner', 'admin', 'staff')
+  createClub(
+    @CurrentSchool() school: School,
+    @Body(new ZodValidationPipe(createClubSchema)) body: CreateClubInput,
+  ) {
+    return this.academicsService.createClub(school.id, body);
+  }
+
+  @Patch('clubs/:id')
+  @Roles('owner', 'admin', 'staff')
+  updateClub(
+    @CurrentSchool() school: School,
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(updateClubSchema)) body: UpdateClubInput,
+  ) {
+    return this.academicsService.updateClub(school.id, id, body);
+  }
+
+  @Delete('clubs/:id')
+  @Roles('owner', 'admin', 'staff')
+  deleteClub(@CurrentSchool() school: School, @Param('id') id: string) {
+    return this.academicsService.deleteClub(school.id, id);
+  }
+
+  @Post('clubs/:id/members')
+  @Roles('owner', 'admin', 'staff', 'teacher')
+  addClubMember(
+    @CurrentSchool() school: School,
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(addClubMemberSchema)) body: AddClubMemberInput,
+  ) {
+    return this.academicsService.addClubMember(school.id, id, body);
+  }
+
+  @Delete('clubs/:id/members/:studentId')
+  @Roles('owner', 'admin', 'staff', 'teacher')
+  removeClubMember(
+    @CurrentSchool() school: School,
+    @Param('id') id: string,
+    @Param('studentId') studentId: string,
+  ) {
+    return this.academicsService.removeClubMember(school.id, id, studentId);
   }
 
   @Get('classes/:id/students')

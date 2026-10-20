@@ -112,6 +112,36 @@ export class StudentsController {
     return this.studentsService.getMySubjects(school.id, user!.id);
   }
 
+  /** The signed-in student's classmates. */
+  @Get("me/classmates")
+  @Roles("student")
+  myClassmates(
+    @CurrentSchool() school: School,
+    @CurrentUser() user: AuthenticatedUser | undefined,
+  ) {
+    return this.studentsService.getMyClassmates(school.id, user!.id);
+  }
+
+  /** The signed-in student's joined clubs. */
+  @Get("me/clubs")
+  @Roles("student")
+  myClubs(
+    @CurrentSchool() school: School,
+    @CurrentUser() user: AuthenticatedUser | undefined,
+  ) {
+    return this.studentsService.getMyClubs(school.id, user!.id);
+  }
+
+  /** The signed-in student's fee status badge (no fee numbers/amounts exposed). */
+  @Get("me/fee-status")
+  @Roles("student")
+  myFeeStatus(
+    @CurrentSchool() school: School,
+    @CurrentUser() user: AuthenticatedUser | undefined,
+  ) {
+    return this.studentsService.getMyFeeStatus(school.id, user!.id);
+  }
+
   /** Profile details (sign-in name and email, class, guardians, subjects). */
   @Get(":id/profile")
   @Roles("owner", "admin", "teacher", "staff", "accountant")
