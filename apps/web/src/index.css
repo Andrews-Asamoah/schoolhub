@@ -1,37 +1,85 @@
 @import "tailwindcss";
 
 /*
-  Global CSS — Tailwind v4 uses @import instead of @tailwind directives.
-  Semantic tokens follow shadcn/ui conventions so the application palette can
-  be adjusted centrally without changing component-level utility classes.
+  ============================================================================
+  THEME  (single source of truth for every colour in the app)
+  ============================================================================
+
+  How it works
+  - Colours are semantic CSS variables (shadcn/ui convention): --background,
+    --card, --primary, --success ... Light values live in :root, dark values in
+    .dark. Components never use raw palette colours (slate-500, bg-white,
+    #fff); they use the token utilities (bg-card, text-muted-foreground ...).
+  - A token already changes with the theme, so components do NOT need dark:
+    variants for colour. dark: is only for deliberate structural differences.
+  - To re-brand the app, edit the values below. Nothing else changes.
+  - `pnpm --filter @schoolhub/web lint:theme` fails the build if a raw colour
+    sneaks into a component. See apps/web/THEMING.md.
+
+  The `dark` variant below ties Tailwind's dark: to the app's .dark class.
+  Without it, Tailwind v4 follows the operating system setting instead, which
+  is why dark colours used to appear in light mode on dark-mode computers.
 */
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
+  color-scheme: light;
   --font-sans: "Inter", system-ui, sans-serif;
+
+  /* Surfaces */
   --background: oklch(0.985 0.003 250);
   --foreground: oklch(0.19 0.025 260);
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.19 0.025 260);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.19 0.025 260);
+
+  /* Brand */
   --primary: oklch(0.48 0.22 276);
   --primary-foreground: oklch(0.99 0.002 250);
   --secondary: oklch(0.95 0.012 255);
   --secondary-foreground: oklch(0.29 0.04 265);
-  --muted: oklch(0.96 0.008 255);
-  --muted-foreground: oklch(0.49 0.025 258);
   --accent: oklch(0.94 0.035 278);
   --accent-foreground: oklch(0.32 0.12 277);
-  --destructive: oklch(0.58 0.23 27);
-  --destructive-foreground: oklch(0.99 0.002 250);
+
+  /* Neutral UI */
+  --muted: oklch(0.96 0.008 255);
+  --muted-foreground: oklch(0.46 0.025 258);
   --border: oklch(0.89 0.015 255);
-  --input: oklch(0.89 0.015 255);
+  --input: oklch(0.86 0.016 255);
   --ring: oklch(0.62 0.18 276);
+  --overlay: oklch(0.15 0.03 260 / 0.5);
+
+  /* Status: use as text/solid (bg-success), tint (bg-success/10), border (border-success/20) */
+  --destructive: oklch(0.52 0.21 27);
+  --destructive-foreground: oklch(0.99 0.002 25);
+  --success: oklch(0.45 0.13 160);
+  --success-foreground: oklch(0.99 0.01 160);
+  --warning: oklch(0.5 0.13 70);
+  --warning-foreground: oklch(0.99 0.01 80);
+  --info: oklch(0.47 0.14 235);
+  --info-foreground: oklch(0.99 0.01 235);
+  --highlight: oklch(0.48 0.2 295);
+  --highlight-foreground: oklch(0.99 0.01 295);
+
+  /* Brand surfaces: fixed-dark banners (login, platform dashboard). Identical in
+     light and dark mode, so text on them uses --brand-foreground, never --foreground. */
+  --brand: oklch(0.27 0.085 268);
+  --brand-mid: oklch(0.37 0.115 266);
+  --brand-soft: oklch(0.5 0.14 262);
+  --brand-accent: oklch(0.86 0.07 240);
+  --brand-glow: oklch(0.65 0.15 235);
+  --brand-foreground: oklch(0.99 0 0);
+
+  /* Data visualisation */
   --chart-1: oklch(0.62 0.19 276);
   --chart-2: oklch(0.67 0.14 183);
   --chart-3: oklch(0.72 0.16 75);
   --chart-4: oklch(0.63 0.2 325);
   --chart-5: oklch(0.65 0.21 25);
+
+  /* Sidebar */
   --sidebar: oklch(0.975 0.006 255);
   --sidebar-foreground: oklch(0.25 0.03 260);
   --sidebar-primary: oklch(0.48 0.22 276);
@@ -40,11 +88,14 @@
   --sidebar-accent-foreground: oklch(0.32 0.12 277);
   --sidebar-border: oklch(0.89 0.015 255);
   --sidebar-ring: oklch(0.62 0.18 276);
-  --support-success: oklch(0.43 0.13 160);
-  --support-warning: oklch(0.48 0.13 75);
-  --support-danger: oklch(0.5 0.2 25);
-  --support-info: oklch(0.45 0.15 230);
+
+  /* Aliases kept for the support workspace styles */
+  --support-success: var(--success);
+  --support-warning: var(--warning);
+  --support-danger: var(--destructive);
+  --support-info: var(--info);
   --support-high: oklch(0.49 0.16 52);
+
   --radius: 0.75rem;
   font-family: var(--font-sans);
   font-synthesis: none;
@@ -53,6 +104,59 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
+.dark {
+  color-scheme: dark;
+  --background: oklch(0.15 0.022 260);
+  --foreground: oklch(0.94 0.012 255);
+  --card: oklch(0.2 0.025 260);
+  --card-foreground: oklch(0.94 0.012 255);
+  --popover: oklch(0.2 0.025 260);
+  --popover-foreground: oklch(0.94 0.012 255);
+
+  --primary: oklch(0.72 0.15 276);
+  --primary-foreground: oklch(0.18 0.04 265);
+  --secondary: oklch(0.26 0.025 260);
+  --secondary-foreground: oklch(0.9 0.015 255);
+  --accent: oklch(0.3 0.07 276);
+  --accent-foreground: oklch(0.91 0.04 278);
+
+  --muted: oklch(0.25 0.022 260);
+  --muted-foreground: oklch(0.72 0.025 255);
+  --border: oklch(0.32 0.025 260);
+  --input: oklch(0.36 0.025 260);
+  --ring: oklch(0.65 0.15 276);
+  --overlay: oklch(0.05 0.02 260 / 0.65);
+
+  --destructive: oklch(0.7 0.19 25);
+  --destructive-foreground: oklch(0.18 0.04 25);
+  --success: oklch(0.78 0.15 160);
+  --success-foreground: oklch(0.2 0.05 160);
+  --warning: oklch(0.82 0.14 80);
+  --warning-foreground: oklch(0.2 0.05 80);
+  --info: oklch(0.78 0.12 230);
+  --info-foreground: oklch(0.2 0.04 230);
+  --highlight: oklch(0.76 0.14 295);
+  --highlight-foreground: oklch(0.2 0.05 295);
+
+  --chart-1: oklch(0.72 0.15 276);
+  --chart-2: oklch(0.72 0.14 183);
+  --chart-3: oklch(0.78 0.16 75);
+  --chart-4: oklch(0.7 0.18 325);
+  --chart-5: oklch(0.7 0.2 25);
+
+  --sidebar: oklch(0.18 0.024 260);
+  --sidebar-foreground: oklch(0.9 0.015 255);
+  --sidebar-primary: oklch(0.72 0.15 276);
+  --sidebar-primary-foreground: oklch(0.18 0.04 265);
+  --sidebar-accent: oklch(0.29 0.06 276);
+  --sidebar-accent-foreground: oklch(0.91 0.04 278);
+  --sidebar-border: oklch(0.32 0.025 260);
+  --sidebar-ring: oklch(0.65 0.15 276);
+
+  --support-high: oklch(0.8 0.15 52);
+}
+
+/* Registers the tokens as Tailwind colours: bg-card, text-success, border-border ... */
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -70,9 +174,24 @@
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
+  --color-highlight: var(--highlight);
+  --color-highlight-foreground: var(--highlight-foreground);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+  --color-overlay: var(--overlay);
+  --color-brand: var(--brand);
+  --color-brand-mid: var(--brand-mid);
+  --color-brand-soft: var(--brand-soft);
+  --color-brand-accent: var(--brand-accent);
+  --color-brand-glow: var(--brand-glow);
+  --color-brand-foreground: var(--brand-foreground);
   --color-chart-1: var(--chart-1);
   --color-chart-2: var(--chart-2);
   --color-chart-3: var(--chart-3);
@@ -92,44 +211,21 @@
   --radius-xl: calc(var(--radius) + 4px);
 }
 
-.dark {
-  --background: oklch(0.15 0.022 260);
-  --foreground: oklch(0.94 0.012 255);
-  --card: oklch(0.2 0.025 260);
-  --card-foreground: oklch(0.94 0.012 255);
-  --popover: oklch(0.2 0.025 260);
-  --popover-foreground: oklch(0.94 0.012 255);
-  --primary: oklch(0.72 0.15 276);
-  --primary-foreground: oklch(0.18 0.04 265);
-  --secondary: oklch(0.26 0.025 260);
-  --secondary-foreground: oklch(0.9 0.015 255);
-  --muted: oklch(0.25 0.022 260);
-  --muted-foreground: oklch(0.72 0.025 255);
-  --accent: oklch(0.3 0.07 276);
-  --accent-foreground: oklch(0.91 0.04 278);
-  --destructive: oklch(0.65 0.2 25);
-  --destructive-foreground: oklch(0.98 0.01 25);
-  --border: oklch(0.32 0.025 260);
-  --input: oklch(0.32 0.025 260);
-  --ring: oklch(0.65 0.15 276);
-  --chart-1: oklch(0.72 0.15 276);
-  --chart-2: oklch(0.72 0.14 183);
-  --chart-3: oklch(0.78 0.16 75);
-  --chart-4: oklch(0.7 0.18 325);
-  --chart-5: oklch(0.7 0.2 25);
-  --sidebar: oklch(0.18 0.024 260);
-  --sidebar-foreground: oklch(0.9 0.015 255);
-  --sidebar-primary: oklch(0.72 0.15 276);
-  --sidebar-primary-foreground: oklch(0.18 0.04 265);
-  --sidebar-accent: oklch(0.29 0.06 276);
-  --sidebar-accent-foreground: oklch(0.91 0.04 278);
-  --sidebar-border: oklch(0.32 0.025 260);
-  --sidebar-ring: oklch(0.65 0.15 276);
-  --support-success: oklch(0.79 0.14 160);
-  --support-warning: oklch(0.82 0.14 75);
-  --support-danger: oklch(0.75 0.16 25);
-  --support-info: oklch(0.78 0.13 230);
-  --support-high: oklch(0.8 0.15 52);
+/* Defaults every element inherits, so new components look right unstyled. */
+@layer base {
+  * {
+    border-color: var(--border);
+    outline-color: color-mix(in oklab, var(--ring) 50%, transparent);
+  }
+
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+  }
+
+  ::selection {
+    background-color: color-mix(in oklab, var(--primary) 25%, transparent);
+  }
 }
 
 @keyframes wave {
@@ -153,15 +249,14 @@
   }
 }
 
-.dark body {
-  background-color: #080d18;
-  color: #e7ecf5;
-}
-
+/*
+  Shell components used by the school and platform-admin layouts. Every colour
+  is a token, so light and dark come from the theme, not from per-mode rules.
+*/
 .superadmin-app-shell {
   position: relative;
   isolation: isolate;
-  background: #f1f5f9;
+  background: var(--background);
 }
 
 .superadmin-main {
@@ -180,506 +275,217 @@
   color: var(--foreground);
 }
 
+.superadmin-sidebar-shell {
+  background-color: var(--sidebar);
+}
+
 .superadmin-sidebar-panel {
   background-color: transparent;
 }
 
+.superadmin-topbar {
+  background-color: var(--card);
+  box-shadow: 0 1px 3px color-mix(in oklab, var(--foreground) 6%, transparent);
+}
+
 .superadmin-surface {
-  border-color: #dbe3ee;
-  background: #ffffff;
-  box-shadow: 0 8px 24px rgb(15 23 42 / 5%);
-  backdrop-filter: none;
+  border-color: var(--border);
+  background: var(--card);
+  box-shadow: 0 8px 24px color-mix(in oklab, var(--foreground) 6%, transparent);
 }
 
 .superadmin-input {
-  border-color: #cbd5e1;
-  background: #ffffff;
+  border-color: var(--input);
+  background: var(--card);
 }
 
 .superadmin-app-shell .superadmin-button-primary {
   border: 1px solid var(--primary);
   background: var(--primary);
   color: var(--primary-foreground);
-  box-shadow: 0 4px 10px rgb(49 46 129 / 18%);
+  box-shadow: 0 4px 10px color-mix(in oklab, var(--primary) 22%, transparent);
 }
 
 .superadmin-app-shell .superadmin-button-primary:hover:not(:disabled) {
-  border-color: color-mix(in oklab, var(--primary) 84%, black);
-  background: color-mix(in oklab, var(--primary) 84%, black);
-  color: var(--primary-foreground);
-  box-shadow: 0 6px 16px rgb(49 46 129 / 24%);
+  background: color-mix(in oklab, var(--primary) 88%, transparent);
+  box-shadow: 0 6px 16px color-mix(in oklab, var(--primary) 28%, transparent);
 }
 
-.superadmin-app-shell .superadmin-button-secondary {
-  border: 1px solid #cbd5e1;
-  background: #ffffff;
-  color: #334155;
-  box-shadow: 0 1px 2px rgb(15 23 42 / 5%);
-}
-
-.superadmin-app-shell .superadmin-button-secondary:hover:not(:disabled) {
-  border-color: #a5b4fc;
-  background: #eef2ff;
-  color: #312e81;
-}
-
-.superadmin-app-shell .superadmin-button-danger {
-  border: 1px solid #fecaca;
-  background: #fff7f7;
-  color: #b91c1c;
-}
-
-.superadmin-app-shell .superadmin-button-danger:hover:not(:disabled) {
-  border-color: #fca5a5;
-  background: #fee2e2;
-  color: #991b1b;
-}
-
-.superadmin-app-shell .superadmin-button-warning {
-  border: 1px solid #fcd34d;
-  background: #fffbeb;
-  color: #92400e;
-}
-
-.superadmin-app-shell .superadmin-button-warning:hover:not(:disabled) {
-  border-color: #fbbf24;
-  background: #fef3c7;
-  color: #78350f;
-}
-
+.superadmin-app-shell .superadmin-button-secondary,
 .superadmin-app-shell .superadmin-button-page {
-  border: 1px solid #cbd5e1;
-  background: #ffffff;
-  color: #334155;
+  border: 1px solid var(--input);
+  background: var(--card);
+  color: var(--secondary-foreground);
+  box-shadow: 0 1px 2px color-mix(in oklab, var(--foreground) 6%, transparent);
 }
 
+.superadmin-app-shell .superadmin-button-secondary:hover:not(:disabled),
 .superadmin-app-shell .superadmin-button-page:hover:not(:disabled) {
-  border-color: #818cf8;
-  background: #eef2ff;
-  color: #312e81;
+  border-color: color-mix(in oklab, var(--primary) 45%, var(--border));
+  background: var(--accent);
+  color: var(--accent-foreground);
 }
 
 .superadmin-app-shell .superadmin-button-page:disabled {
-  border-color: #e2e8f0;
-  background: #f8fafc;
-  color: #94a3b8;
+  border-color: var(--border);
+  background: var(--muted);
+  color: var(--muted-foreground);
   opacity: 1;
 }
 
+.superadmin-app-shell .superadmin-button-danger {
+  border: 1px solid color-mix(in oklab, var(--destructive) 30%, transparent);
+  background: color-mix(in oklab, var(--destructive) 10%, transparent);
+  color: var(--destructive);
+}
+
+.superadmin-app-shell .superadmin-button-danger:hover:not(:disabled) {
+  border-color: color-mix(in oklab, var(--destructive) 45%, transparent);
+  background: color-mix(in oklab, var(--destructive) 18%, transparent);
+}
+
+.superadmin-app-shell .superadmin-button-warning {
+  border: 1px solid color-mix(in oklab, var(--warning) 30%, transparent);
+  background: color-mix(in oklab, var(--warning) 10%, transparent);
+  color: var(--warning);
+}
+
+.superadmin-app-shell .superadmin-button-warning:hover:not(:disabled) {
+  border-color: color-mix(in oklab, var(--warning) 45%, transparent);
+  background: color-mix(in oklab, var(--warning) 18%, transparent);
+}
+
 .superadmin-app-shell .superadmin-nav-item[aria-current="page"] {
-  background: #4338ca;
-  color: #ffffff;
-  box-shadow: 0 4px 10px rgb(49 46 129 / 18%);
+  background: var(--primary);
+  color: var(--primary-foreground);
+  box-shadow: 0 4px 10px color-mix(in oklab, var(--primary) 22%, transparent);
 }
 
 .superadmin-app-shell .superadmin-nav-item[aria-current="page"]:hover {
-  background: #3730a3;
-  color: #ffffff;
+  background: color-mix(in oklab, var(--primary) 90%, transparent);
+  color: var(--primary-foreground);
 }
 
 .superadmin-app-shell .superadmin-nav-item:not([aria-current="page"]):hover {
-  background: #e2e8f0;
-  color: #0f172a;
+  background: var(--muted);
+  color: var(--foreground);
 }
 
 .superadmin-sidebar-shell .superadmin-user-name {
-  color: #1e293b;
+  color: var(--foreground);
 }
 
 .superadmin-sidebar-shell .superadmin-user-email {
-  color: #64748b;
+  color: var(--muted-foreground);
 }
 
-.superadmin-sidebar-shell .superadmin-brand-title {
-  color: #0f172a;
-}
-
+.superadmin-sidebar-shell .superadmin-brand-title,
 .school-sidebar-shell .school-brand-title {
-  color: #0f172a;
+  color: var(--foreground);
 }
 
 .school-sidebar-shell .school-sidebar-nav-item {
-  color: #475569;
+  color: var(--muted-foreground);
 }
 
 .school-sidebar-shell .school-sidebar-nav-item:hover {
-  color: #0f172a;
+  color: var(--foreground);
 }
 
 .school-sidebar-shell .school-sidebar-nav-item[aria-current="page"] {
-  color: #1d4ed8;
+  color: var(--primary);
 }
 
 .school-sidebar-shell .school-sidebar-nav-item[aria-current="page"]:hover {
-  color: #1e40af;
-}
-
-.school-sidebar-shell .school-sidebar-user-name {
-  color: #1e293b;
-}
-
-.school-sidebar-shell .school-sidebar-user-email {
-  color: #64748b;
+  color: color-mix(in oklab, var(--primary) 85%, transparent);
 }
 
 .superadmin-app-shell .superadmin-tab[aria-pressed="true"] {
-  background: #4338ca;
-  color: #ffffff;
-  box-shadow: 0 2px 6px rgb(49 46 129 / 20%);
+  background: var(--primary);
+  color: var(--primary-foreground);
+  box-shadow: 0 2px 6px color-mix(in oklab, var(--primary) 24%, transparent);
 }
 
 .superadmin-app-shell .superadmin-tab[aria-pressed="false"] {
-  color: #475569;
+  color: var(--muted-foreground);
 }
 
 .superadmin-app-shell .superadmin-tab[aria-pressed="false"]:hover {
-  background: #eef2ff;
-  color: #312e81;
+  background: var(--accent);
+  color: var(--accent-foreground);
 }
 
 .superadmin-app-shell button:focus-visible,
 .superadmin-app-shell a:focus-visible {
-  outline: 3px solid #818cf8;
+  outline: 3px solid var(--ring);
   outline-offset: 2px;
 }
 
-@layer utilities {
-:where(.dark) [class~="bg-white"]:where(:not([class*="dark:bg-"])) {
-  background-color: #111827;
-}
-
-:where(.dark) [class~="bg-white/90"]:where(:not([class*="dark:bg-"])) {
-  background-color: rgb(17 24 39 / 92%);
-}
-
-:where(.dark) [class~="bg-slate-50"]:where(:not([class*="dark:bg-"])),
-:where(.dark) [class~="bg-slate-50/70"]:where(:not([class*="dark:bg-"])),
-:where(.dark) [class~="bg-slate-50/80"]:where(:not([class*="dark:bg-"])) {
-  background-color: #111827;
-}
-
-:where(.dark) [class~="bg-slate-100"]:where(:not([class*="dark:bg-"])) {
-  background-color: #1e293b;
-}
-
-:where(.dark) [class~="bg-slate-200"]:where(:not([class*="dark:bg-"])) {
-  background-color: #334155;
-}
-
-:where(.dark) [class~="bg-blue-50"]:where(:not([class*="dark:bg-"])),
-:where(.dark) [class~="bg-blue-50/80"]:where(:not([class*="dark:bg-"])) {
-  background-color: #172554;
-}
-
-:where(.dark) [class~="bg-indigo-50"]:where(:not([class*="dark:bg-"])) {
-  background-color: #1e1b4b;
-}
-
-:where(.dark) [class~="bg-emerald-50"]:where(:not([class*="dark:bg-"])) {
-  background-color: #052e2b;
-}
-
-:where(.dark) [class~="bg-amber-50"]:where(:not([class*="dark:bg-"])) {
-  background-color: #422006;
-}
-
-:where(.dark) [class~="bg-rose-50"]:where(:not([class*="dark:bg-"])) {
-  background-color: #4c0519;
-}
-
-:where(.dark) [class~="bg-violet-50"]:where(:not([class*="dark:bg-"])) {
-  background-color: #2e1065;
-}
-
-:where(.dark) [class~="bg-red-50"]:where(:not([class*="dark:bg-"])) {
-  background-color: #450a0a;
-}
-
-:where(.dark) [class~="bg-amber-100"]:where(:not([class*="dark:bg-"])) {
-  background-color: #713f12;
-}
-
-:where(.dark) [class~="border-slate-100"]:where(:not([class*="dark:border-"])),
-:where(.dark) [class~="border-slate-100/80"]:where(:not([class*="dark:border-"])) {
-  border-color: #263447;
-}
-
-:where(.dark) [class~="border-slate-200"]:where(:not([class*="dark:border-"])),
-:where(.dark) [class~="border-slate-200/80"]:where(:not([class*="dark:border-"])) {
-  border-color: #334155;
-}
-
-:where(.dark) [class~="border-amber-200"]:where(:not([class*="dark:border-"])) {
-  border-color: #854d0e;
-}
-
-:where(.dark) [class~="divide-slate-100"]:where(:not([class*="dark:divide-"])) > :not([hidden]) ~ :not([hidden]) {
-  border-color: #263447;
-}
-
-:where(.dark) [class~="text-slate-900"]:where(:not([class*="dark:text-"])) {
-  color: #f1f5f9;
-}
-
-:where(.dark) [class~="text-slate-800"]:where(:not([class*="dark:text-"])) {
-  color: #e2e8f0;
-}
-
-:where(.dark) [class~="text-slate-700"]:where(:not([class*="dark:text-"])),
-:where(.dark) [class~="text-slate-600"]:where(:not([class*="dark:text-"])) {
-  color: #cbd5e1;
-}
-
-:where(.dark) [class~="text-slate-500"]:where(:not([class*="dark:text-"])),
-:where(.dark) [class~="text-slate-400"]:where(:not([class*="dark:text-"])) {
-  color: #94a3b8;
-}
-
-:where(.dark) [class~="text-blue-700"]:where(:not([class*="dark:text-"])) {
-  color: #93c5fd;
-}
-
-:where(.dark) [class~="text-indigo-600"]:where(:not([class*="dark:text-"])) {
-  color: #a5b4fc;
-}
-
-:where(.dark) [class~="text-indigo-800"]:where(:not([class*="dark:text-"])) {
-  color: #c7d2fe;
-}
-
-:where(.dark) [class~="text-amber-900"]:where(:not([class*="dark:text-"])) {
-  color: #fef3c7;
-}
-
-:where(.dark) [class~="text-amber-800"]:where(:not([class*="dark:text-"])),
-:where(.dark) [class~="text-amber-700"]:where(:not([class*="dark:text-"])) {
-  color: #fcd34d;
-}
-
-:where(.dark) [class~="hover:bg-slate-50"]:where(:not([class*="dark:hover:bg-"])):hover,
-:where(.dark) [class~="hover:bg-slate-50/70"]:where(:not([class*="dark:hover:bg-"])):hover,
-:where(.dark) [class~="hover:bg-slate-100"]:where(:not([class*="dark:hover:bg-"])):hover {
-  background-color: #1e293b;
-}
-
-:where(.dark) [class~="hover:bg-indigo-50"]:where(:not([class*="dark:hover:bg-"])):hover {
-  background-color: #312e81;
-}
-
-:where(.dark) [class~="hover:text-slate-900"]:where(:not([class*="dark:hover:text-"])):hover {
-  color: #f1f5f9;
-}
-
-.dark .ring-white {
-  --tw-ring-color: #111827;
-}
-}
-
-.superadmin-sidebar-shell {
-  background-color: #f8fafc;
-  background-image: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
-  backdrop-filter: none;
-}
-
-.superadmin-topbar {
-  background-color: #ffffff;
-  background-image: none;
-  box-shadow: 0 1px 3px rgb(15 23 42 / 5%);
-  backdrop-filter: none;
-}
-
-.dark .superadmin-topbar {
-  background-color: rgb(15 23 42 / 78%);
-}
-
-.dark .superadmin-app-shell {
-  background:
-    radial-gradient(ellipse at 86% 0%, rgb(99 102 241 / 19%), transparent 34rem),
-    radial-gradient(ellipse at 34% 12%, rgb(14 165 233 / 8%), transparent 29rem),
-    linear-gradient(135deg, #080d18 0%, #0b1220 48%, #0b1020 100%);
-}
-
-.dark .superadmin-sidebar-shell {
-  background-color: #0b1220;
-  background-image:
-    radial-gradient(ellipse at 0% 0%, rgb(129 140 248 / 20%), transparent 24rem),
-    radial-gradient(ellipse at 100% 60%, rgb(56 189 248 / 7%), transparent 22rem),
-    linear-gradient(180deg, rgb(15 23 42 / 88%), rgb(9 14 26 / 93%));
-  box-shadow: inset -1px 0 rgb(255 255 255 / 6%);
-}
-
-.dark .superadmin-topbar {
-  background-image: linear-gradient(90deg, rgb(15 23 42 / 78%), rgb(15 23 42 / 48%));
-}
-
-.dark .superadmin-surface {
-  border-color: rgb(148 163 184 / 16%);
-  background:
-    linear-gradient(145deg, rgb(30 41 59 / 74%), rgb(15 23 42 / 83%)),
-    rgb(15 23 42 / 82%);
-  box-shadow:
-    0 22px 58px rgb(0 0 0 / 23%),
-    inset 0 1px rgb(255 255 255 / 5%);
-  backdrop-filter: blur(22px);
-}
-
-.dark .superadmin-sidebar-panel {
-  background-color: transparent;
-}
-
-.dark .superadmin-input {
-  border-color: rgb(148 163 184 / 22%);
-  background: rgb(8 15 28 / 62%);
-  color: #e7ecf5;
-  box-shadow: inset 0 1px rgb(255 255 255 / 3%);
-}
-
-.dark .superadmin-app-shell .superadmin-button-primary {
-  border-color: var(--primary);
-  background: var(--primary);
-  color: var(--primary-foreground);
-}
-
-.dark .superadmin-app-shell .superadmin-button-primary:hover:not(:disabled) {
-  border-color: color-mix(in oklab, var(--primary) 84%, white);
-  background: color-mix(in oklab, var(--primary) 84%, white);
-  color: var(--primary-foreground);
-}
-
-.dark .superadmin-app-shell .superadmin-button-secondary,
-.dark .superadmin-app-shell .superadmin-button-page {
-  border-color: rgb(148 163 184 / 28%);
-  background: rgb(30 41 59 / 90%);
-  color: #e2e8f0;
-}
-
-.dark .superadmin-app-shell .superadmin-button-secondary:hover:not(:disabled),
-.dark .superadmin-app-shell .superadmin-button-page:hover:not(:disabled) {
-  border-color: rgb(129 140 248 / 55%);
-  background: rgb(79 70 229 / 22%);
-  color: #ffffff;
-}
-
-.dark .superadmin-app-shell .superadmin-button-page:disabled {
-  border-color: rgb(71 85 105 / 35%);
-  background: rgb(15 23 42 / 55%);
-  color: #64748b;
-}
-
-.dark .superadmin-app-shell .superadmin-button-danger {
-  border-color: rgb(248 113 113 / 35%);
-  background: rgb(127 29 29 / 20%);
-  color: #fca5a5;
-}
-
-.dark .superadmin-app-shell .superadmin-button-danger:hover:not(:disabled) {
-  border-color: rgb(248 113 113 / 60%);
-  background: rgb(127 29 29 / 38%);
-  color: #fecaca;
-}
-
-.dark .superadmin-app-shell .superadmin-button-warning {
-  border-color: rgb(251 191 36 / 35%);
-  background: rgb(120 53 15 / 20%);
-  color: #fcd34d;
-}
-
-.dark .superadmin-app-shell .superadmin-button-warning:hover:not(:disabled) {
-  border-color: rgb(251 191 36 / 60%);
-  background: rgb(120 53 15 / 38%);
-  color: #fde68a;
-}
-
-.dark .superadmin-app-shell .superadmin-nav-item[aria-current="page"] {
-  background: rgb(99 102 241 / 24%);
-  color: #e0e7ff;
-  box-shadow: inset 3px 0 #a5b4fc, 0 4px 12px rgb(0 0 0 / 14%);
-}
-
-.dark .superadmin-app-shell .superadmin-nav-item[aria-current="page"]:hover {
-  background: rgb(99 102 241 / 32%);
-  color: #ffffff;
-}
-
-.dark .superadmin-app-shell .superadmin-nav-item:not([aria-current="page"]):hover {
-  background: rgb(255 255 255 / 6%);
-  color: #f8fafc;
-}
-
-.dark .superadmin-sidebar-shell .superadmin-user-name {
-  color: #f1f5f9;
-}
-
-.dark .superadmin-sidebar-shell .superadmin-user-email {
-  color: #94a3b8;
-}
-
-.dark .superadmin-sidebar-shell .superadmin-brand-title {
-  color: #f8fafc;
-}
-
-.dark .school-sidebar-shell .school-brand-title {
-  color: #f8fafc;
-}
-
-.dark .school-sidebar-shell .school-sidebar-nav-item {
-  color: #cbd5e1;
-}
-
-.dark .school-sidebar-shell .school-sidebar-nav-item:hover {
-  color: #f8fafc;
-}
-
-.dark .school-sidebar-shell .school-sidebar-nav-item[aria-current="page"] {
-  color: #bfdbfe;
-}
-
-.dark .school-sidebar-shell .school-sidebar-nav-item[aria-current="page"]:hover {
-  color: #dbeafe;
-}
-
-.dark .school-sidebar-shell .school-sidebar-user-name {
-  color: #e2e8f0;
-}
-
-.dark .school-sidebar-shell .school-sidebar-user-email {
-  color: #94a3b8;
-}
-
-.dark .superadmin-app-shell .superadmin-tab[aria-pressed="true"] {
-  background: #6366f1;
-  color: #ffffff;
-  box-shadow: 0 3px 10px rgb(0 0 0 / 28%);
-}
-
-.dark .superadmin-app-shell .superadmin-tab[aria-pressed="false"] {
-  color: #cbd5e1;
-}
-
-.dark .superadmin-app-shell .superadmin-tab[aria-pressed="false"]:hover {
-  background: rgb(99 102 241 / 15%);
-  color: #ffffff;
-}
-
-.dark .superadmin-app-shell button:focus-visible,
-.dark .superadmin-app-shell a:focus-visible {
-  outline-color: #a5b4fc;
+.superadmin-dialog-backdrop {
+  background: var(--overlay);
+  backdrop-filter: blur(9px);
+  animation: superadmin-fade-in 160ms ease-out both;
 }
 
 .superadmin-confirm-dialog {
-  background: #ffffff;
-}
-
-.dark .superadmin-confirm-dialog {
+  border-color: color-mix(in oklab, var(--border) 70%, transparent);
   background:
-    radial-gradient(ellipse at 100% 0%, rgb(99 102 241 / 18%), transparent 19rem),
-    linear-gradient(145deg, rgb(30 41 59 / 96%), rgb(11 17 31 / 97%));
+    radial-gradient(ellipse at 100% 0%, color-mix(in oklab, var(--primary) 9%, transparent), transparent 18rem),
+    color-mix(in oklab, var(--card) 96%, transparent);
+  color: var(--card-foreground);
+  backdrop-filter: blur(24px);
+  animation: superadmin-dialog-in 180ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
 
-.dark .superadmin-input::placeholder {
-  color: #7f8da5;
+@keyframes superadmin-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
+@keyframes superadmin-dialog-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Sidebar account menu: soft pop-in from the trigger. */
+@keyframes user-menu-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.user-menu-panel {
+  transform-origin: bottom left;
+  animation: user-menu-in 160ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .superadmin-dialog-backdrop,
+  .superadmin-confirm-dialog {
+    animation-duration: 1ms;
+  }
+
+  .user-menu-panel {
+    animation: none;
+  }
+}
+
+/* Support workspace (already token based) */
 .support-workspace {
   color: var(--foreground);
 }
@@ -791,7 +597,6 @@
 .support-workspace .support-control,
 .support-workspace .support-select,
 .support-workspace .support-reply-textarea {
-  color-scheme: light dark;
   border-color: var(--input);
   background-color: var(--background);
   color: var(--foreground);
@@ -815,95 +620,3 @@
   color: var(--muted-foreground);
 }
 
-@layer utilities {
-:where(.dark) [class~="text-emerald-700"]:where(:not([class*="dark:text-"])) {
-  color: #6ee7b7;
-}
-
-:where(.dark) [class~="text-rose-700"]:where(:not([class*="dark:text-"])),
-:where(.dark) [class~="text-red-700"]:where(:not([class*="dark:text-"])) {
-  color: #fda4af;
-}
-
-:where(.dark) [class~="text-violet-700"]:where(:not([class*="dark:text-"])) {
-  color: #c4b5fd;
-}
-}
-
-.superadmin-dialog-backdrop {
-  background: rgb(15 23 42 / 42%);
-  backdrop-filter: blur(9px);
-  animation: superadmin-fade-in 160ms ease-out both;
-}
-
-.superadmin-confirm-dialog {
-  border-color: rgb(203 213 225 / 70%);
-  background:
-    radial-gradient(ellipse at 100% 0%, rgb(99 102 241 / 8%), transparent 18rem),
-    rgb(255 255 255 / 96%);
-  color: #0f172a;
-  backdrop-filter: blur(24px);
-  animation: superadmin-dialog-in 180ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
-}
-
-.dark .superadmin-dialog-backdrop {
-  background: rgb(2 6 23 / 68%);
-}
-
-.dark .superadmin-confirm-dialog {
-  border-color: rgb(148 163 184 / 18%);
-  background:
-    radial-gradient(ellipse at 100% 0%, rgb(99 102 241 / 18%), transparent 19rem),
-    linear-gradient(145deg, rgb(30 41 59 / 96%), rgb(11 17 31 / 97%));
-  box-shadow:
-    0 36px 100px rgb(0 0 0 / 58%),
-    inset 0 1px rgb(255 255 255 / 8%);
-  color: #e7ecf5;
-}
-
-@keyframes superadmin-fade-in {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-@keyframes superadmin-dialog-in {
-  from {
-    opacity: 0;
-    transform: translateY(10px) scale(0.985);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .superadmin-dialog-backdrop,
-  .superadmin-confirm-dialog {
-    animation-duration: 1ms;
-  }
-}
-
-
-/* Sidebar account menu: soft pop-in from the trigger. */
-@keyframes user-menu-in {
-  from {
-    opacity: 0;
-    transform: translateY(8px) scale(0.97);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-
-.user-menu-panel {
-  transform-origin: bottom left;
-  animation: user-menu-in 160ms cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .user-menu-panel {
-    animation: none;
-  }
-}

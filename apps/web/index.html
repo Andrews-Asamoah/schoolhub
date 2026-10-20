@@ -4,6 +4,20 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>SchoolHub</title>
+    <!--
+      Apply the saved theme before first paint so the page never flashes the
+      wrong colours. Keep the storage key in sync with theme-provider.tsx.
+    -->
+    <script>
+      (function () {
+        try {
+          var dark = localStorage.getItem("schoolhub-theme") === "dark";
+          var root = document.documentElement;
+          root.classList.toggle("dark", dark);
+          root.style.colorScheme = dark ? "dark" : "light";
+        } catch (e) {}
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
