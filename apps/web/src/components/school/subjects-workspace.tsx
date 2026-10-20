@@ -268,6 +268,7 @@ export function SubjectsWorkspace() {
           teachers={(teachersQuery.data ?? []).filter((teacher) => teacher.isActive)}
           loading={classesQuery.isPending || teachersQuery.isPending}
           pending={classesMutation.isPending}
+          onManageTeachers={() => setPanel({ type: "teachers", subject: panel.subject })}
           onCancel={() => setPanel(null)}
           onSave={(input) => classesMutation.mutate({ id: panel.subject.id, input })}
         />
@@ -416,6 +417,7 @@ function ClassAssignmentPanel({
   loading,
   pending,
   onSave,
+  onManageTeachers,
   onCancel,
 }: {
   subject: SubjectRow;
@@ -424,8 +426,12 @@ function ClassAssignmentPanel({
   loading: boolean;
   pending: boolean;
   onSave: (input: SetSubjectClassesInput) => void;
+  onManageTeachers: () => void;
   onCancel: () => void;
 }) {
+  // Only teachers assigned to this subject can be put in charge of it.
+  const assignedIds = new Set(subject.teachers.map((teacher) => teacher.id));
+  const subjectTeachers = teachers.filter((teacher) => assignedIds.has(teacher.id));
   const [selected, setSelected] = useState(
     () =>
       new Map(
@@ -455,9 +461,17 @@ function ClassAssignmentPanel({
   return (
     <PanelShell
       title={`Classes studying ${subject.name}`}
-      description="Tick the classes that take this subject and optionally choose who teaches it in each."
+      description="Tick the classes that take this subject and optionally choose who teaches it in each. Only teachers assigned to this subject are listed."
       onCancel={onCancel}
     >
+      {!loading && subjectTeachers.length === 0 && (
+        <p className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-400/20 dark:bg-amber-400/10 dark:text-amber-200">
+          No teachers are assigned to {subject.name} yet.
+          <button type="button" className="font-semibold underline" onClick={onManageTeachers}>
+            Assign teachers to this subject
+          </button>
+        </p>
+      )}
       {loading ? (
         <p className="text-xs text-slate-500">Loading classes and teachers…</p>
       ) : classes.length === 0 ? (
@@ -481,9 +495,15 @@ function ClassAssignmentPanel({
                       className="h-8 rounded-lg border border-slate-200 bg-white px-2 text-xs dark:border-white/10 dark:bg-slate-950"
                     >
                       <option value="">No teacher yet</option>
-                      {teachers.map((teacher) => (
+                      {subjectTeachers.map((teacher) => (
                         <option key={teacher.id} value={teacher.id}>{teacher.firstName} {teacher.lastName}</option>
                       ))}
+                      {/* Keep an older assignment visible so it is not silently dropped. */}
+                      {row.teacherId && !assignedIds.has(row.teacherId) && (
+                        <option value={row.teacherId}>
+                          {subject.classes.find((item) => item.classId === schoolClass.id)?.teacherName ?? "Current teacher"} (not assigned to this subject)
+                        </option>
+                      )}
                     </select>
                     <label className="flex items-center gap-1.5 text-slate-600 dark:text-slate-300">
                       <input type="checkbox" className="size-3.5 accent-indigo-600" checked={row.isCompulsory} onChange={(e) => patch(schoolClass.id, { isCompulsory: e.target.checked })} />

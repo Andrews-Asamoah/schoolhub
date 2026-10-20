@@ -9,6 +9,7 @@ import type {
   SetSubjectClassesInput,
   SetSubjectTeachersInput,
 } from "@schoolhub/shared";
+import { findUnqualifiedTeachers } from "./subject-assignments.js";
 import { PrismaService } from "../../prisma/prisma.service.js";
 
 const teacherSelect = {
@@ -147,6 +148,22 @@ export class SubjectsService {
     }
     if (teacherCount.expected !== teacherCount.found) {
       throw new BadRequestException("Choose active teachers that belong to this school.");
+    }
+
+    // Only teachers assigned to this subject can be put in charge of it in a class.
+    const [qualified, current] = await Promise.all([
+      this.prisma.client.subjectTeacher.findMany({ where: { subjectId: id }, select: { teacherId: true } }),
+      this.prisma.client.classSubject.findMany({ where: { subjectId: id }, select: { classId: true, teacherId: true } }),
+    ]);
+    const unqualified = findUnqualifiedTeachers(
+      input.assignments,
+      new Set(qualified.map((row) => row.teacherId)),
+      new Map(current.map((row) => [row.classId, row.teacherId])),
+    );
+    if (unqualified.length) {
+      throw new BadRequestException(
+        "Only teachers assigned to this subject can teach it in a class. Assign them to the subject first.",
+      );
     }
 
     const removed = await this.prisma.client.classSubject.findMany({
