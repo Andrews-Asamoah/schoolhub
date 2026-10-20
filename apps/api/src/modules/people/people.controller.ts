@@ -26,6 +26,7 @@ import {
   type CreateTeacherInput,
   type UpdatePeopleStatusInput,
 } from "@schoolhub/shared";
+import { canSeePrivateBiodata } from "./teacher-biodata.js";
 import { CurrentSchool } from "../../common/decorators/current-school.decorator.js";
 import { CurrentSchoolRole } from "../../common/decorators/current-school-role.decorator.js";
 import {
@@ -79,6 +80,16 @@ export class PeopleController {
       search,
       isActive: parseActiveParam(active),
     });
+  }
+
+  @Get("teachers/:id")
+  @Roles("owner", "admin", "headmistress", "teacher", "staff")
+  getTeacher(
+    @CurrentSchool() school: School,
+    @CurrentSchoolRole() role: string | undefined,
+    @Param("id") id: string,
+  ) {
+    return this.peopleService.getTeacherBiodata(school.id, id, canSeePrivateBiodata(role));
   }
 
   @Post("teachers")

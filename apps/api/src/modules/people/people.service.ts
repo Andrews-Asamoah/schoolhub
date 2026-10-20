@@ -12,6 +12,7 @@ import {
   toIssuedCredentials,
 } from '../accounts/credentials.service.js';
 import { roleForStaffType } from '../accounts/staff-roles.js';
+import { toTeacherBiodata } from './teacher-biodata.js';
 import type { Prisma } from '@prisma/client';
 import type {
   UpdateGuardianInput,
@@ -167,6 +168,53 @@ export class PeopleService {
       ...teacher.record,
       credentials: toIssuedCredentials(teacher.loginEmail, credential, 'teacher'),
     };
+  }
+
+  /** One teacher's biodata. Selects fields explicitly so pay is never loaded. */
+  async getTeacherBiodata(schoolId: string, id: string, canSeePrivate: boolean) {
+    const teacher = await this.prisma.client.teacher.findFirst({
+      where: { id, schoolId, deletedAt: null },
+      select: {
+        id: true,
+        teacherId: true,
+        staffNumber: true,
+        invitationEmail: true,
+        firstName: true,
+        lastName: true,
+        qualification: true,
+        specialization: true,
+        experience: true,
+        employmentType: true,
+        hireDate: true,
+        contractEndDate: true,
+        isActive: true,
+        department: { select: { id: true, name: true } },
+        subjects: { select: { subject: { select: { id: true, name: true } } } },
+        profile: {
+          select: {
+            firstName: true,
+            lastName: true,
+            otherNames: true,
+            phone: true,
+            alternatePhone: true,
+            gender: true,
+            dateOfBirth: true,
+            nationality: true,
+            residentialAddress: true,
+            postalAddress: true,
+            city: true,
+            region: true,
+            country: true,
+            emergencyContactName: true,
+            emergencyContactPhone: true,
+            emergencyRelationship: true,
+            user: { select: { email: true, image: true } },
+          },
+        },
+      },
+    });
+    if (!teacher) throw new NotFoundException('Teacher not found');
+    return toTeacherBiodata(teacher, canSeePrivate);
   }
 
   async setTeacherStatus(schoolId: string, id: string, isActive: boolean) {

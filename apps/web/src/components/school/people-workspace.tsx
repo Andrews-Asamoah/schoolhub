@@ -2,6 +2,7 @@ import { useForm } from "@tanstack/react-form";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Check,
+  Eye,
   LoaderCircle,
   Plus,
   Search,
@@ -32,6 +33,7 @@ import {
   type WorkspaceColumn,
 } from "@/components/school/workspace-ui";
 import { useSchoolRole } from "@/components/school/school-role-switcher";
+import { TeacherBiodataDialog } from "@/components/school/teacher-biodata-dialog";
 import { apiFetch } from "@/lib/api";
 
 type PeopleKind = "teachers" | "staff" | "guardians";
@@ -235,6 +237,7 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
   const [page, setPage] = useState(1);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<{ id: string; name: string } | null>(null);
+  const [viewing, setViewing] = useState<{ id: string; name: string } | null>(null);
   const [issued, setIssued] = useState<CredentialEntry[]>([]);
   const deferredSearch = useDeferredValue(search.trim());
   const isGuardianPage = kind === "guardians";
@@ -416,12 +419,32 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
         </span>
       ),
     },
+    ...(kind === "teachers"
+      ? [
+          {
+            id: "view",
+            header: "",
+            className: "w-24 text-right",
+            cell: (row: Row) => (
+              <button
+                type="button"
+                onClick={() => setViewing({ id: row.id, name: row.name })}
+                aria-label={`View biodata for ${row.name}`}
+                className="inline-flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-semibold text-primary hover:bg-primary/10"
+              >
+                <Eye className="size-3.5" />
+                View
+              </button>
+            ),
+          } satisfies WorkspaceColumn<Row>,
+        ]
+      : []),
     ...(canManage
       ? [
           {
             id: "action",
             header: "",
-            className: "w-72 text-right",
+            className: "w-64 text-right",
             cell: (row: Row) => (
               <span className="inline-flex gap-1">
                 <button
@@ -474,6 +497,9 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
 
   return (
     <div className="space-y-5">
+      {viewing && kind === "teachers" && (
+        <TeacherBiodataDialog teacherId={viewing.id} fallbackName={viewing.name} onClose={() => setViewing(null)} />
+      )}
       <section className="rounded-2xl border border-border bg-gradient-to-br from-primary/10 via-card to-sky-500/5 p-5 sm:p-6">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="flex items-start gap-3">

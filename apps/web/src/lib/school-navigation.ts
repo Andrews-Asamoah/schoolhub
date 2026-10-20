@@ -446,10 +446,21 @@ const ownPortalByRole: Record<string, string> = {
  * and general staff do not need it, and portal users reach their own portal
  * through {@link getOwnPortalItem} instead of a list of every portal.
  */
+/**
+ * Pages made for students only. Roles with no page list of their own (owner,
+ * administrator, headmistress) see everything else, so these are left out of
+ * their sidebar.
+ */
+const studentOnlyPages = ["classmates"];
+
 export function getSchoolNavGroupsForRole(role?: string) {
   const allowedPages = rolePages[role ?? ""];
   const groups = schoolNavGroups.filter((group) => group.label !== "Portals" && group.label !== "Account");
-  if (!allowedPages) return groups;
+  if (!allowedPages) {
+    return groups
+      .map((group) => ({ ...group, items: group.items.filter((item) => !studentOnlyPages.includes(item.id)) }))
+      .filter((group) => group.items.length > 0);
+  }
 
   return groups
     .map((group) => ({
