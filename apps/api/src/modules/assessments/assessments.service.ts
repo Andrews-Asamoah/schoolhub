@@ -10,10 +10,15 @@ import { Prisma } from "@prisma/client";
 import {
   canManageAcademicContext,
 } from "../../common/academic-context.js";
+import { canEnterMarks } from "../../common/scope/teacher-access.js";
+import { TeacherScopeService } from "../../common/scope/teacher-scope.service.js";
 
 @Injectable()
 export class AssessmentsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly teacherScope: TeacherScopeService,
+  ) {}
 
   async listAssessmentTemplates(schoolId: string) {
     return this.prisma.client.assessmentTemplate.findMany({
@@ -31,6 +36,8 @@ export class AssessmentsService {
     input: RecordScoreInput,
     _role?: string,
   ) {
+    // Looked up before the transaction so it does not hold a second connection open.
+    const assignments = await this.teacherScope.getAssignments(_schoolId, recordedById);
     return this.prisma.client.$transaction(async (tx) => {
       const term = await tx.term.findFirst({
         where: {
@@ -66,12 +73,18 @@ export class AssessmentsService {
             status: "ACTIVE",
             student: { schoolId: _schoolId },
           },
-          select: { id: true },
+          select: { id: true, classId: true },
         }),
       ]);
       if (!student || !subject || !template || !enrollment) {
         throw new BadRequestException(
           "Scores require an active student enrolled at this school for the current term, a school subject, and a school assessment template.",
+        );
+      }
+      // A teacher may only record marks for the subject they are assigned to in the pupil's class.
+      if (!canEnterMarks(_role, assignments, enrollment.classId, input.subjectId)) {
+        throw new ForbiddenException(
+          "Only the teacher assigned to this subject in the pupil's class can record marks.",
         );
       }
       // 1. Find or create the parent AssessmentScore

@@ -2,17 +2,25 @@ import { BadRequestException, ForbiddenException, Injectable, NotFoundException 
 import { PrismaService } from "../../prisma/prisma.service.js";
 import type { BatchAttendanceInput } from "@schoolhub/shared";
 import { canManageAcademicContext } from "../../common/academic-context.js";
+import { canMarkRegister } from "../../common/scope/teacher-access.js";
+import { TeacherScopeService } from "../../common/scope/teacher-scope.service.js";
 
 @Injectable()
 export class AttendanceService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly teacherScope: TeacherScopeService,
+  ) {}
 
   async batchRecordAttendance(
     schoolId: string,
     markedById: string,
     input: BatchAttendanceInput,
-    _role?: string,
+    role?: string,
   ) {
+    if (input.date > new Date().toISOString().slice(0, 10)) {
+      throw new BadRequestException("The register cannot be marked for a future date.");
+    }
     const attendanceDate = new Date(input.date);
     const { academicYear, term } =
       await this.resolveAcademicContext(schoolId);
@@ -26,12 +34,17 @@ export class AttendanceService {
         status: "ACTIVE",
         student: { schoolId, deletedAt: null },
       },
-      select: { studentId: true },
+      select: { studentId: true, classId: true },
     });
     if (placements.length !== studentIds.length) {
       throw new ForbiddenException(
         "Attendance can only be recorded for students enrolled in the current term.",
       );
+    }
+    // Only a class teacher (or a school manager) may mark that class's register.
+    const assignments = await this.teacherScope.getAssignments(schoolId, markedById);
+    if (!canMarkRegister(role, assignments, [...new Set(placements.map((placement) => placement.classId))])) {
+      throw new ForbiddenException("Only the class teacher can mark this class's register.");
     }
 
     const operations = input.records.map((record) =>
@@ -75,7 +88,13 @@ export class AttendanceService {
     role?: string,
     academicYearId?: string,
     termId?: string,
+    userId?: string,
   ) {
+    // A teacher can open the register of classes they teach, not every class.
+    if (role === "teacher") {
+      const taught = userId ? await this.teacherScope.getTaughtClassIds(schoolId, userId) : [];
+      if (!taught.includes(classId)) throw new ForbiddenException("You do not teach this class.");
+    }
     const { academicYear, term } = await this.resolveAcademicContext(
       schoolId,
       academicYearId,

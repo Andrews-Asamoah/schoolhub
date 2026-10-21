@@ -30,11 +30,14 @@ import { AcademicYearSetup } from "@/components/school/academic-year-setup";
 import { TeamRoleWorkspace } from "@/components/school/team-role-workspace";
 import { ClassesWorkspace } from "@/components/school/classes-workspace";
 import { useSchoolRole } from "@/components/school/school-role-switcher";
+import { useTeachingOverview } from "@/lib/teaching";
 import { AdmissionsWorkspace } from "@/components/school/admissions-workspace";
 import { EnrollmentWorkspace } from "@/components/school/enrollment-workspace";
 import { StudentDirectoryWorkspace } from "@/components/school/student-directory-workspace";
 import { PeopleWorkspace } from "@/components/school/people-workspace";
 import { SchoolLogoUploader } from "@/components/school/school-logo-uploader";
+import { AssessmentEntryWorkspace } from "@/components/school/assessment-entry-workspace";
+import { ClassRegister } from "@/components/school/class-register";
 import { SchoolSettingsForm } from "@/components/school/school-settings-form";
 import { ProfileWorkspace } from "@/components/school/profile-workspace";
 import { HousesWorkspace } from "@/components/school/houses-workspace";
@@ -297,7 +300,19 @@ function WorkspaceContent({ pageId }: { pageId: string }) {
           )}
           {pageId === "academic-years" && <AcademicYears query={yearsQuery} />}
           {pageId === "assessments" && (
-            activeRole === "student" ? <StudentReportView /> : <AssessmentList query={assessmentsQuery} />
+            activeRole === "student" ? (
+              <StudentReportView />
+            ) : activeRole === "teacher" ? (
+              <AssessmentEntryWorkspace mode="teacher" />
+            ) : (
+              <div className="space-y-8">
+                <AssessmentEntryWorkspace mode="manager" />
+                <section aria-labelledby="assessment-templates-heading" className="space-y-3">
+                  <h2 id="assessment-templates-heading" className="text-sm font-bold text-slate-900 dark:text-white">Assessment templates</h2>
+                  <AssessmentList query={assessmentsQuery} />
+                </section>
+              </div>
+            )
           )}
           {pageId === "reports" && (
             activeRole === "student" ? <StudentReportView /> : <PlannedWorkspace title={page.label} />
@@ -443,6 +458,8 @@ function AttendanceWorkspace({
   const [selectedDate, setSelectedDate] = useState(
     new Date().toISOString().slice(0, 10),
   );
+  const { activeRole: attendanceRole } = useSchoolRole();
+  const teaching = useTeachingOverview(attendanceRole === "teacher");
   const classId = selectedClassId || query.data?.[0]?.id || "";
   const attendanceQuery = useQuery({
     queryKey: ["attendance", "class", classId, selectedDate],
@@ -490,6 +507,37 @@ function AttendanceWorkspace({
         ),
     },
   ];
+
+  // Managers can mark any class; a teacher only the classes they are class teacher of.
+  const canMark =
+    ["owner", "admin", "headmistress"].includes(attendanceRole ?? "") ||
+    (attendanceRole === "teacher" && !!teaching.data?.classes.find((item) => item.id === classId)?.isClassTeacher);
+  if (canMark) {
+    return (
+      <div className="space-y-4">
+        <div className="flex flex-wrap items-end gap-3 rounded-2xl border border-slate-200/80 bg-white p-4">
+          <label className="grid gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+            Class
+            <select
+              value={classId}
+              onChange={(event) => setSelectedClassId(event.target.value)}
+              className="h-9 min-w-48 rounded-lg border border-slate-200 bg-white px-3 text-xs font-medium normal-case tracking-normal text-slate-700 outline-none focus:border-blue-400"
+            >
+              {query.data.map((schoolClass) => (
+                <option key={schoolClass.id} value={schoolClass.id}>{schoolClass.name}</option>
+              ))}
+            </select>
+          </label>
+        </div>
+        <ClassRegister
+          key={classId}
+          classId={classId}
+          className={query.data.find((schoolClass) => schoolClass.id === classId)?.name ?? "Class"}
+          canMark
+        />
+      </div>
+    );
+  }
 
   return (
     <>

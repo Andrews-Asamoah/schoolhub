@@ -568,6 +568,25 @@ export const recordScoreSchema = z.object({
 });
 export type RecordScoreInput = z.infer<typeof recordScoreSchema>;
 
+/** Save a batch of marks for one class and subject. `marks: null` clears a mark. */
+export const saveAssessmentEntrySchema = z.object({
+  classId: z.string().min(1),
+  subjectId: z.string().min(1),
+  templateId: z.string().min(1),
+  entries: z
+    .array(
+      z.object({
+        studentId: z.string().min(1),
+        componentId: z.string().min(1),
+        occurrenceIndex: z.number().int().min(0).max(50).default(0),
+        marks: z.number().min(0).max(10000).nullable(),
+      }),
+    )
+    .min(1, "There are no marks to save")
+    .max(5000),
+});
+export type SaveAssessmentEntryInput = z.infer<typeof saveAssessmentEntrySchema>;
+
 // ============================================================================
 // FINANCE & BILLING SCHEMAS
 // ============================================================================

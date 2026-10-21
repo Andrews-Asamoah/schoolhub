@@ -48,6 +48,7 @@ export class AttendanceController {
   @Roles("owner", "admin", "teacher", "staff", "accountant")
   getClassAttendance(
     @CurrentSchool() school: School,
+    @CurrentUser() user: AuthenticatedUser,
     @Param("classId") classId: string,
     @Query("date") date: string | undefined,
     @CurrentSchoolRole() role: string | undefined,
@@ -61,6 +62,7 @@ export class AttendanceController {
       role,
       academicYearId,
       termId,
+      user.id,
     );
   }
 

@@ -1,7 +1,9 @@
 import {
+  BadRequestException,
   Controller,
   Get,
   Post,
+  Put,
   Param,
   Query,
   Body,
@@ -15,13 +17,48 @@ import { CurrentSchool } from "../../common/decorators/current-school.decorator.
 import { CurrentSchoolRole } from "../../common/decorators/current-school-role.decorator.js";
 import { CurrentUser, type AuthenticatedUser } from "../../common/decorators/current-user.decorator.js";
 import { ZodValidationPipe } from "../../common/pipes/zod-validation.pipe.js";
-import { recordScoreSchema, type RecordScoreInput } from "@schoolhub/shared";
+import {
+  recordScoreSchema,
+  saveAssessmentEntrySchema,
+  type RecordScoreInput,
+  type SaveAssessmentEntryInput,
+} from "@schoolhub/shared";
+import { AssessmentEntryService } from "./assessment-entry.service.js";
 import type { School } from "@prisma/client";
 
 @Controller("assessments")
 @UseGuards(SchoolTenantGuard, RolesGuard)
 export class AssessmentsController {
-  constructor(private readonly assessmentsService: AssessmentsService) {}
+  constructor(
+    private readonly assessmentsService: AssessmentsService,
+    private readonly entry: AssessmentEntryService,
+  ) {}
+
+  /** The marks screen for one class and subject: roster, applicable assessments, marks and totals. */
+  @Get("entry")
+  @Roles("owner", "admin", "teacher")
+  getEntry(
+    @CurrentSchool() school: School,
+    @CurrentUser() user: AuthenticatedUser,
+    @CurrentSchoolRole() role: string | undefined,
+    @Query("classId") classId: string,
+    @Query("subjectId") subjectId: string,
+    @Query("templateId") templateId?: string,
+  ) {
+    if (!classId || !subjectId) throw new BadRequestException("Choose a class and a subject.");
+    return this.entry.getSheet(school.id, user.id, role, { classId, subjectId, templateId });
+  }
+
+  @Put("entry")
+  @Roles("owner", "admin", "teacher")
+  saveEntry(
+    @CurrentSchool() school: School,
+    @CurrentUser() user: AuthenticatedUser,
+    @CurrentSchoolRole() role: string | undefined,
+    @Body(new ZodValidationPipe(saveAssessmentEntrySchema)) body: SaveAssessmentEntryInput,
+  ) {
+    return this.entry.saveEntries(school.id, user.id, role, body);
+  }
 
   @Get("templates")
   @Roles("owner", "admin", "teacher")

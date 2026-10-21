@@ -12,6 +12,7 @@ import { SchoolsModule } from "./modules/schools/schools.module.js";
 import { StudentsModule } from "./modules/students/students.module.js";
 import { AcademicsModule } from "./modules/academics/academics.module.js";
 import { AttendanceModule } from "./modules/attendance/attendance.module.js";
+import { TeachingModule } from "./modules/teaching/teaching.module.js";
 import { AssessmentsModule } from "./modules/assessments/assessments.module.js";
 import { FinanceModule } from "./modules/finance/finance.module.js";
 import { SuperAdminModule } from "./modules/super-admin/super-admin.module.js";
@@ -32,6 +33,7 @@ import { AdmissionsModule } from "./modules/admissions/admissions.module.js";
     StudentsModule,
     AcademicsModule,
     AttendanceModule,
+    TeachingModule,
     AssessmentsModule,
     FinanceModule,
     SuperAdminModule,
