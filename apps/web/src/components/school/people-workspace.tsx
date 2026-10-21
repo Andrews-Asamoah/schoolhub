@@ -343,8 +343,13 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
     },
   });
 
+  // The form library re-applies `defaultValues` on every render while the form is
+  // untouched. They must therefore follow whatever the form was last reset to
+  // (blank for "Add", the person's details for "Edit"); passing a fresh blank
+  // object each render would wipe the prefilled edit values.
+  const [formDefaults, setFormDefaults] = useState<Values>(initialValues);
   const form = useForm({
-    defaultValues: initialValues(),
+    defaultValues: formDefaults,
     onSubmit: async ({ value }) => {
       createMutation.reset();
       createMutation.mutate(value);
@@ -459,7 +464,9 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
                     const person = peopleById.get(row.id);
                     if (!person) return;
                     createMutation.reset();
-                    form.reset(valuesFromPerson(person));
+                    const personValues = valuesFromPerson(person);
+                    setFormDefaults(personValues);
+                    form.reset(personValues);
                     setEditing({ id: row.id, name: row.name });
                     setShowForm(true);
                     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -530,7 +537,9 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
               type="button"
               onClick={() => {
                 createMutation.reset();
-                form.reset(initialValues());
+                const blank = initialValues();
+                setFormDefaults(blank);
+                form.reset(blank);
                 setEditing(null);
                 setShowForm((value) => !value);
               }}
