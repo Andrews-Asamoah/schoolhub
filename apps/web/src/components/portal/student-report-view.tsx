@@ -1,212 +1,88 @@
 import { useQuery } from "@tanstack/react-query";
-import { Award, CheckCircle2, Download, FileText, Printer, School, Sparkles, TrendingUp } from "lucide-react";
+import { CheckCircle2, FileText, LoaderCircle, Printer, Sparkles } from "lucide-react";
 import { useState } from "react";
 import { apiFetch } from "@/lib/api";
-import { DataTable } from "@/components/ui/data-table";
-import { useCanExportTables } from "@/lib/table-export-policy";
 
-interface SubjectScoreRow {
-  code: string;
-  name: string;
-  cw: number;
-  ex: number;
-  tot: number;
-  gr: string;
-  rk: string;
-  rm: string;
+interface ReportSubject {
+  subject: { id: string; name: string; code: string };
+  totalScore: number;
+  percentage: number;
+  grade: string | null;
+  position: number | null;
+  remarks: string | null;
+  components: { name: string; marksObtained: number; maxMarks: number; percentage: number; weight: number }[];
+}
+interface TemplateLayout {
+  type?: string;
+  accentColor?: string;
+  showPosition?: boolean;
+  showAssessmentBreakdown?: boolean;
+}
+interface PublishedReport {
+  id: string;
+  data: { student?: { class?: { name?: string; level?: string } | null }; subjects?: ReportSubject[]; remarks?: { type: string; content: string; teacher: string }[] };
+  student: { admissionNumber: string | null; profile: { firstName: string; lastName: string } };
+  publishedAt: string | null;
+  set: { name: string; academicYear: { name: string }; term: { name: string; termNumber: number }; template: { name: string; layout: TemplateLayout | null } };
 }
 
-const mockReportScores: SubjectScoreRow[] = [
-  { code: "SCI-09", name: "Integrated Science", cw: 28, ex: 61, tot: 89, gr: "A1", rk: "#1", rm: "Outstanding grasp of scientific methods and concepts." },
-  { code: "MTH-09", name: "Core Mathematics", cw: 26, ex: 59, tot: 85, gr: "A1", rk: "#2", rm: "Excellent computational and logical problem solving." },
-  { code: "ENG-09", name: "English Language", cw: 25, ex: 56, tot: 81, gr: "A1", rk: "#4", rm: "Strong vocabulary, eloquence, and essay construction." },
-  { code: "SOC-09", name: "Social Studies", cw: 24, ex: 54, tot: 78, gr: "B2", rk: "#5", rm: "Commendable historical analysis and engagement." },
-  { code: "ICT-09", name: "Information Technology", cw: 29, ex: 64, tot: 93, gr: "A1", rk: "#1", rm: "Exceptional computing agility and practical performance." },
-  { code: "FRN-09", name: "French Language", cw: 21, ex: 48, tot: 69, gr: "C4", rk: "#8", rm: "Good effort; more conversational drills recommended." },
-  { code: "RME-09", name: "Religious & Moral Education", cw: 27, ex: 58, tot: 85, gr: "A1", rk: "#3", rm: "High moral reasoning and thoughtful participation." },
-  { code: "PHE-09", name: "Physical & Health Education", cw: 28, ex: 62, tot: 90, gr: "A1", rk: "#2", rm: "Great sportsmanship and physical endurance." },
-];
-
 export function StudentReportView() {
-  const canExport = useCanExportTables();
-  const [selectedTerm, setSelectedTerm] = useState("Term 1 (Current)");
-
-  const { data, isLoading } = useQuery({
-    queryKey: ["assessments", "me", "report"],
-    queryFn: () => apiFetch<any>("/assessments/me/report"),
+  const [selectedId, setSelectedId] = useState("");
+  const reports = useQuery({
+    queryKey: ["assessments", "report-cards", "me"],
+    queryFn: () => apiFetch<PublishedReport[]>("/assessments/report-cards/me"),
     retry: false,
   });
+  const rows = reports.data ?? [];
+  const active = rows.find((report) => report.id === selectedId) ?? rows[0];
+  const subjects = active?.data.subjects ?? [];
+  const layout = active?.set.template.layout;
+  const accent = layout?.accentColor ?? "#4f46e5";
+  const showPosition = layout?.showPosition !== false;
+  const showBreakdown = layout?.showAssessmentBreakdown !== false;
+  const average = subjects.length ? subjects.reduce((sum, row) => sum + row.percentage, 0) / subjects.length : null;
+  const positionRows = subjects.filter((row) => row.position !== null);
+  const averagePosition = positionRows.length ? positionRows.reduce((sum, row) => sum + (row.position ?? 0), 0) / positionRows.length : null;
+  const positiveGrades = subjects.filter((row) => row.grade && !["F", "U", "9"].includes(row.grade.toUpperCase())).length;
 
-  const scores: SubjectScoreRow[] = mockReportScores;
-  const gpa = "3.92 / 4.00";
-  const classRank = "#1 of 38";
-  const attendanceRate = "97.4%";
+  if (reports.isPending) return <div className="flex items-center gap-2 rounded-2xl border border-border bg-card p-6 text-sm text-muted-foreground"><LoaderCircle className="size-4 animate-spin" />Loading published reports…</div>;
+  if (reports.isError) return <div role="alert" className="rounded-2xl border border-rose-200 bg-rose-50 p-5 text-sm text-rose-800 dark:border-rose-400/20 dark:bg-rose-950/30 dark:text-rose-200">Unable to load published reports: {reports.error.message}</div>;
 
-  return (
-    <div className="space-y-6">
-      {/* Header & Print Actions */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h2 className="text-xl font-black text-slate-900 dark:text-white">Academic Report Card</h2>
-          <p className="text-xs text-slate-500">
-            Official terminal assessment scores, subject grades, and teacher remarks
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <select
-            value={selectedTerm}
-            onChange={(e) => setSelectedTerm(e.target.value)}
-            className="h-9 rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200"
-          >
-            <option value="Term 1 (Current)">2025/2026 • Term 1 (Current)</option>
-            <option value="Term 3 (2024/2025)">2024/2025 • Term 3</option>
-            <option value="Term 2 (2024/2025)">2024/2025 • Term 2</option>
-          </select>
-
-          <button
-            onClick={() => window.print()}
-            className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 text-xs font-bold text-slate-700 shadow-2xs hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200"
-          >
-            <Printer className="size-3.5" />
-            Print Report
-          </button>
-        </div>
-      </div>
-
-      {/* Summary KPI Cards */}
-      <div className="grid gap-4 sm:grid-cols-3">
-        <div className="rounded-2xl border border-indigo-100 bg-gradient-to-br from-indigo-50/80 to-white p-5 shadow-xs dark:border-indigo-900/30 dark:bg-slate-900">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-indigo-900 dark:text-indigo-300">Grade Point Average</span>
-            <Award className="size-5 text-indigo-600" />
-          </div>
-          <p className="mt-2 text-2xl font-black text-slate-900 dark:text-white">{gpa}</p>
-          <p className="mt-0.5 text-xs font-semibold text-emerald-600">Grade A1 • Distinction</p>
-        </div>
-
-        <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs dark:border-slate-800 dark:bg-slate-900">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500">Class Position</span>
-            <TrendingUp className="size-5 text-amber-500" />
-          </div>
-          <p className="mt-2 text-2xl font-black text-slate-900 dark:text-white">{classRank}</p>
-          <p className="mt-0.5 text-xs text-slate-400">JHS 3 Emerald Class Roster</p>
-        </div>
-
-        <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs dark:border-slate-800 dark:bg-slate-900">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500">Term Attendance</span>
-            <CheckCircle2 className="size-5 text-emerald-500" />
-          </div>
-          <p className="mt-2 text-2xl font-black text-slate-900 dark:text-white">{attendanceRate}</p>
-          <p className="mt-0.5 text-xs text-slate-400">Regular & Punctual</p>
-        </div>
-      </div>
-
-      {/* Subject Scores Table */}
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-            <FileText className="size-4 text-indigo-600" />
-            Subject Breakdown & Marks
-          </h3>
-        </div>
-
-        <DataTable
-          rows={scores}
-          canExport={canExport}
-          exportTitle="Term 1 Academic Report"
-          getRowId={(row) => row.code}
-          emptyTitle="No results published yet"
-          emptyDescription="Scores will appear once grading is finalized."
-          columns={[
-            {
-              id: "subject",
-              header: "Subject",
-              cell: (row) => (
-                <div>
-                  <p className="font-bold text-foreground">{row.name}</p>
-                  <p className="text-[10px] text-muted-foreground">{row.code}</p>
-                </div>
-              ),
-            },
-            {
-              id: "cw",
-              header: "Classwork (30)",
-              className: "text-center",
-              value: (row) => row.cw,
-              cell: (row) => <span className="font-medium">{row.cw}</span>,
-            },
-            {
-              id: "ex",
-              header: "Exams (70)",
-              className: "text-center",
-              value: (row) => row.ex,
-              cell: (row) => <span className="font-medium">{row.ex}</span>,
-            },
-            {
-              id: "tot",
-              header: "Total Score (100)",
-              className: "text-center",
-              value: (row) => row.tot,
-              cell: (row) => <span className="font-black text-foreground">{row.tot}%</span>,
-            },
-            {
-              id: "gr",
-              header: "Grade",
-              className: "text-center",
-              value: (row) => row.gr,
-              cell: (row) => (
-                <span className="rounded-md bg-emerald-50 px-2.5 py-0.5 text-xs font-black text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
-                  {row.gr}
-                </span>
-              ),
-            },
-            {
-              id: "rk",
-              header: "Rank",
-              className: "text-center",
-              value: (row) => Number(row.rk.replace("#", "")),
-              cell: (row) => <span className="font-bold text-slate-600 dark:text-slate-300">{row.rk}</span>,
-            },
-            {
-              id: "rm",
-              header: "Teacher's Remark",
-              cell: (row) => <span className="text-xs leading-relaxed">{row.rm}</span>,
-            },
-          ]}
-        />
-      </div>
-
-      {/* Conduct & Teacher Remarks */}
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs dark:border-slate-800 dark:bg-slate-900">
-          <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">
-            Class Teacher&apos;s Appraisal
-          </h4>
-          <p className="mt-2 text-xs text-slate-700 dark:text-slate-300 leading-relaxed font-medium">
-            &ldquo;Kwame continues to exhibit stellar intellectual curiosity and model leadership as class prefect. He collaborates warmly with his peers and approaches every project with thorough preparation.&rdquo;
-          </p>
-          <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-2 text-[11px] text-slate-400 dark:border-slate-800">
-            <span>Mrs. Grace Appiah</span>
-            <span className="font-semibold text-indigo-600">Class Teacher</span>
-          </div>
-        </div>
-
-        <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs dark:border-slate-800 dark:bg-slate-900">
-          <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">
-            Headmistress&apos;s Endorsement
-          </h4>
-          <p className="mt-2 text-xs text-slate-700 dark:text-slate-300 leading-relaxed font-medium">
-            &ldquo;An exemplary scholar whose consistency is an inspiration to the entire student body. Recommended for honors distinction in science and mathematics.&rdquo;
-          </p>
-          <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-2 text-[11px] text-slate-400 dark:border-slate-800">
-            <span>Dr. Elizabeth Ansah</span>
-            <span className="font-semibold text-emerald-600">Headmistress</span>
-          </div>
-        </div>
-      </div>
+  return <div className="space-y-5">
+    <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between print:hidden">
+      <div><div className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.16em] text-primary"><Sparkles className="size-4" /> Academic records</div><h2 className="text-2xl font-black tracking-tight text-foreground">Your reports</h2><p className="mt-1 text-sm text-muted-foreground">Official reports released by your school appear here.</p></div>
+      {rows.length > 0 && <div className="flex flex-wrap gap-2"><select aria-label="Select report" value={active?.id ?? ""} onChange={(event) => setSelectedId(event.target.value)} className="h-10 rounded-xl border border-input bg-background px-3 text-sm">{rows.map((report) => <option key={report.id} value={report.id}>{report.set.academicYear.name} · {report.set.term.name}</option>)}</select><button type="button" onClick={() => window.print()} className="inline-flex h-10 items-center gap-2 rounded-xl px-4 text-sm font-bold text-white shadow-sm transition hover:opacity-90" style={{ backgroundColor: accent }}><Printer className="size-4" />Print report</button></div>}
     </div>
-  );
+    {!active ? <div className="rounded-3xl border border-dashed border-border bg-card p-10 text-center"><span className="mx-auto flex size-14 items-center justify-center rounded-2xl bg-primary/10 text-primary"><FileText className="size-7" /></span><h3 className="mt-4 font-bold">No published reports yet</h3><p className="mx-auto mt-1 max-w-md text-sm leading-6 text-muted-foreground">Your school has not released a report for your account yet. Check again after the school announces publication.</p></div> :
+    <article className="report-print-area overflow-hidden rounded-3xl border border-border bg-card shadow-sm print:rounded-none print:border-0 print:shadow-none">
+      <div className="h-2 w-full" style={{ backgroundColor: accent }} />
+      <header className="relative overflow-hidden border-b border-border p-5 sm:p-8" style={{ backgroundColor: `${accent}0D` }}>
+        <div className="absolute -right-8 -top-14 size-48 rounded-full opacity-[0.07]" style={{ backgroundColor: accent }} />
+        <div className="relative flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0"><p className="text-[10px] font-extrabold uppercase tracking-[0.2em]" style={{ color: accent }}>Student academic report</p><h1 className="mt-2 text-2xl font-black tracking-tight sm:text-3xl">{active.set.name}</h1><p className="mt-2 text-sm text-muted-foreground">{active.set.academicYear.name} <span className="px-1">·</span> {active.set.term.name}</p><div className="mt-4 flex flex-wrap gap-2"><span className="rounded-full border border-border bg-background/80 px-3 py-1.5 text-xs font-semibold">{active.data.student?.class?.name ?? "Class not specified"}</span>{active.student.admissionNumber && <span className="rounded-full border border-border bg-background/80 px-3 py-1.5 text-xs text-muted-foreground">Admission no. {active.student.admissionNumber}</span>}</div></div>
+          <div className="rounded-2xl border border-border/70 bg-background/80 p-4 sm:min-w-48"><p className="text-xs font-semibold text-muted-foreground">Prepared for</p><p className="mt-1 font-bold">{active.student.profile.firstName} {active.student.profile.lastName}</p><div className="mt-3 flex items-center gap-1.5 text-[11px] font-semibold" style={{ color: accent }}><CheckCircle2 className="size-3.5" />Official published copy</div><p className="mt-2 text-[11px] text-muted-foreground">Design: {active.set.template.name}</p>{active.publishedAt && <p className="mt-1 text-[11px] text-muted-foreground">Published {new Date(active.publishedAt).toLocaleDateString()}</p>}</div>
+        </div>
+      </header>
+
+      <div className="space-y-6 p-5 sm:p-8">
+        <section className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+          <div className="rounded-2xl border border-border p-4"><p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Subjects graded</p><p className="mt-2 text-2xl font-black tabular-nums">{subjects.length}</p></div>
+          <div className="rounded-2xl border border-border p-4"><p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Average score</p><p className="mt-2 text-2xl font-black tabular-nums">{average === null ? "—" : `${average.toFixed(1)}%`}</p></div>
+          <div className="col-span-2 rounded-2xl border border-border p-4 sm:col-span-1"><p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Subject positions</p><p className="mt-2 text-2xl font-black tabular-nums">{showPosition && averagePosition !== null ? averagePosition.toFixed(1) : "—"}</p><p className="mt-1 text-[11px] text-muted-foreground">{showPosition && averagePosition !== null ? "Average position across graded subjects" : "Position not included in this design"}</p></div>
+        </section>
+
+        <section>
+          <div className="mb-3 flex flex-wrap items-end justify-between gap-2"><div><p className="text-[10px] font-bold uppercase tracking-[0.18em]" style={{ color: accent }}>01 · Academic results</p><h2 className="mt-1 text-lg font-black">Subject performance</h2></div><p className="text-xs text-muted-foreground">{positiveGrades} of {subjects.length} subject(s) have a recorded grade</p></div>
+          {subjects.length ? <div className="overflow-x-auto rounded-xl border border-border"><table className="w-full min-w-[620px] border-collapse text-left text-sm"><thead><tr style={{ backgroundColor: accent }} className="text-white"><th className="p-3 font-semibold">Subject</th><th className="p-3 text-right font-semibold">Score</th><th className="p-3 text-right font-semibold">Percentage</th><th className="p-3 text-center font-semibold">Grade</th>{showPosition && <th className="p-3 text-center font-semibold">Position</th>}</tr></thead><tbody>{subjects.map((row, index) => <tr key={row.subject.id} className={index % 2 ? "border-t border-border bg-muted/20" : "border-t border-border"}><td className="p-3"><span className="font-semibold">{row.subject.name}</span><span className="mt-0.5 block text-[11px] text-muted-foreground">{row.subject.code}</span></td><td className="p-3 text-right font-medium tabular-nums">{row.totalScore.toFixed(1)}</td><td className="p-3 text-right tabular-nums">{row.percentage.toFixed(1)}%</td><td className="p-3 text-center"><span className="inline-flex min-w-9 justify-center rounded-lg px-2 py-1 text-xs font-black" style={{ color: accent, backgroundColor: `${accent}14` }}>{row.grade ?? "—"}</span></td>{showPosition && <td className="p-3 text-center tabular-nums">{row.position ?? "—"}</td>}</tr>)}</tbody></table></div> : <div className="rounded-xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">No finalized subject results were included in this report.</div>}
+        </section>
+
+        {showBreakdown && subjects.some((row) => row.components.length > 0) && <section><p className="text-[10px] font-bold uppercase tracking-[0.18em]" style={{ color: accent }}>02 · How the marks add up</p><h2 className="mt-1 text-lg font-black">Assessment breakdown</h2><div className="mt-3 grid gap-3 sm:grid-cols-2">{subjects.filter((row) => row.components.length > 0).map((row) => <div key={row.subject.id} className="rounded-2xl border border-border p-4"><h3 className="text-sm font-bold">{row.subject.name}</h3><div className="mt-3 space-y-2">{row.components.map((component, index) => <div key={component.name + index}><div className="flex items-center justify-between gap-3 text-xs"><span className="text-muted-foreground">{component.name}</span><span className="font-semibold tabular-nums">{component.marksObtained} / {component.maxMarks}</span></div><div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full" style={{ width: `${Math.max(0, Math.min(100, component.percentage))}%`, backgroundColor: accent }} /></div></div>)}</div></div>)}</div></section>}
+
+        {(active.data.remarks ?? []).length > 0 && <section><p className="text-[10px] font-bold uppercase tracking-[0.18em]" style={{ color: accent }}>03 · Teacher feedback</p><h2 className="mt-1 text-lg font-black">Remarks</h2><div className="mt-3 grid gap-3 sm:grid-cols-2">{active.data.remarks?.map((remark, index) => <div key={remark.type + index} className="rounded-2xl border border-border p-4" style={{ borderLeftWidth: 3, borderLeftColor: accent }}><p className="text-[10px] font-extrabold uppercase tracking-wide text-muted-foreground">{remark.type.replaceAll("_", " ")}</p><p className="mt-2 text-sm leading-6">{remark.content}</p>{remark.teacher && <p className="mt-3 text-xs font-semibold text-muted-foreground">{remark.teacher}</p>}</div>)}</div></section>}
+
+        <footer className="flex flex-col gap-2 border-t border-border pt-4 text-[11px] leading-5 text-muted-foreground sm:flex-row sm:items-center sm:justify-between"><p>This report was made available securely through SchoolHub.</p><p>{active.set.template.name} · {active.set.term.name}</p></footer>
+      </div>
+    </article>}
+    <style>{`@media print { body * { visibility: hidden; } .report-print-area, .report-print-area * { visibility: visible; } .report-print-area { position: absolute; inset: 0; width: 100%; border: 0; box-shadow: none; padding: 0; background: white !important; color: black !important; } .report-print-area section { break-inside: avoid; } .report-print-area button, .report-print-area select { display: none !important; } @page { size: A4; margin: 12mm; } }`}</style>
+  </div>;
 }
