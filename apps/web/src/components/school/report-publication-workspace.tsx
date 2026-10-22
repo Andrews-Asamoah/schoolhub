@@ -41,7 +41,7 @@ type ReportSet = {
   updatedAt: string;
 };
 type Workspace = { years: Year[]; templates: Template[]; sets: ReportSet[] };
-type SchoolClass = { id: string; name: string; level: string };
+type SchoolClass = { id: string; name: string; level: string; isActive: boolean };
 type PreviewSubject = { subject: { id: string; name: string; code: string }; totalScore: number; percentage: number; grade: string | null; position: number | null };
 type ReportPreview = {
   id: string;
@@ -77,7 +77,7 @@ export function ReportPublicationWorkspace({ onOpenSetup }: { onOpenSetup?: () =
   const years = workspace.data?.years ?? [];
   const templates = workspace.data?.templates ?? [];
   const activeTemplates = templates.filter((template) => template.isActive);
-  const classes = classesQuery.data ?? [];
+  const classes = (classesQuery.data ?? []).filter((schoolClass) => schoolClass.isActive);
   const chosenYear = years.find((year) => year.id === yearId) ?? years.find((year) => year.isCurrent) ?? years[0];
   const terms = chosenYear?.terms ?? [];
   const effectiveYearId = chosenYear?.id ?? "";
