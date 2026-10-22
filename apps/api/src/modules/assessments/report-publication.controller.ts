@@ -68,6 +68,12 @@ export class ReportPublicationController {
     return this.reports.generate(school.id, user.id, id);
   }
 
+  @Patch("sets/:id/review")
+  @Roles("owner", "admin", "headmistress")
+  markReviewed(@CurrentSchool() school: School, @CurrentUser() user: AuthenticatedUser, @Param("id") id: string) {
+    return this.reports.markReviewed(school.id, user.id, id);
+  }
+
   @Patch("sets/:id/publish")
   @Roles("owner", "admin", "headmistress")
   publish(@CurrentSchool() school: School, @CurrentUser() user: AuthenticatedUser, @Param("id") id: string) {
