@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { CheckCircle2, FileText, LoaderCircle, Printer, Sparkles } from "lucide-react";
+import { CheckCircle2, FileText, GraduationCap, LoaderCircle, Printer, Sparkles } from "lucide-react";
 import { useState } from "react";
 import { apiFetch } from "@/lib/api";
 
@@ -23,7 +23,7 @@ interface PublishedReport {
   data: { student?: { class?: { name?: string; level?: string } | null }; subjects?: ReportSubject[]; remarks?: { type: string; content: string; teacher: string }[] };
   student: { admissionNumber: string | null; profile: { firstName: string; lastName: string } };
   publishedAt: string | null;
-  set: { name: string; academicYear: { name: string }; term: { name: string; termNumber: number }; template: { name: string; layout: TemplateLayout | null } };
+  set: { name: string; academicYear: { name: string }; term: { name: string; termNumber: number }; template: { name: string; layout: TemplateLayout | null }; school: { name: string; code: string; email: string | null; phone: string | null; address: string | null; logo: string | null; motto: string | null; website: string | null; primaryColor: string; secondaryColor: string } };
 }
 
 export function StudentReportView() {
@@ -37,7 +37,7 @@ export function StudentReportView() {
   const active = rows.find((report) => report.id === selectedId) ?? rows[0];
   const subjects = active?.data.subjects ?? [];
   const layout = active?.set.template.layout;
-  const accent = layout?.accentColor ?? "#4f46e5";
+  const accent = layout?.accentColor ?? active?.set.school.primaryColor ?? "#4f46e5";
   const templateType = layout?.type ?? "modern";
   const reportLabel = templateType === "primary" ? "Primary terminal report" : templateType === "jhs" ? "JHS performance report" : templateType === "classic" ? "Classic academic report" : "Student academic report";
   const showPosition = layout?.showPosition !== false;
@@ -61,7 +61,7 @@ export function StudentReportView() {
       <header className="relative overflow-hidden border-b border-border p-5 sm:p-8" style={{ backgroundColor: `${accent}0D` }}>
         <div className="absolute -right-8 -top-14 size-48 rounded-full opacity-[0.07]" style={{ backgroundColor: accent }} />
         <div className="relative flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
-          <div className="min-w-0"><p className="text-[10px] font-extrabold uppercase tracking-[0.2em]" style={{ color: accent }}>{reportLabel}</p><h1 className="mt-2 text-2xl font-black tracking-tight sm:text-3xl">{active.set.name}</h1><p className="mt-2 text-sm text-muted-foreground">{active.set.academicYear.name} <span className="px-1">·</span> {active.set.term.name}</p><div className="mt-4 flex flex-wrap gap-2"><span className="rounded-full border border-border bg-background/80 px-3 py-1.5 text-xs font-semibold">{active.data.student?.class?.name ?? "Class not specified"}</span>{active.student.admissionNumber && <span className="rounded-full border border-border bg-background/80 px-3 py-1.5 text-xs text-muted-foreground">Admission no. {active.student.admissionNumber}</span>}</div></div>
+          <div className="min-w-0 flex-1"><div className="flex items-start gap-3">{active.set.school.logo ? <img src={active.set.school.logo} alt={`${active.set.school.name} logo`} className="size-14 shrink-0 rounded-xl border border-border bg-white object-contain p-1" /> : <span className="flex size-14 shrink-0 items-center justify-center rounded-xl border border-border bg-background" style={{ color: accent }}><GraduationCap className="size-7" /></span>}<div className="min-w-0"><p className="text-[10px] font-extrabold uppercase tracking-[0.2em]" style={{ color: accent }}>{active.set.school.code}</p><h1 className="mt-1 text-xl font-black tracking-tight sm:text-2xl">{active.set.school.name}</h1>{active.set.school.motto && <p className="mt-1 text-xs italic text-muted-foreground">{active.set.school.motto}</p>}{active.set.school.address && <p className="mt-2 text-xs text-muted-foreground">{active.set.school.address}</p>}<p className="mt-1 text-xs text-muted-foreground">{[active.set.school.phone, active.set.school.email, active.set.school.website].filter(Boolean).join(" · ")}</p></div></div><div className="mt-5 border-t border-border/70 pt-4"><p className="text-[10px] font-extrabold uppercase tracking-[0.2em]" style={{ color: accent }}>{reportLabel}</p><h2 className="mt-1 text-lg font-black sm:text-xl">{active.set.name}</h2><p className="mt-1 text-sm text-muted-foreground">{active.set.academicYear.name} <span className="px-1">·</span> {active.set.term.name}</p><div className="mt-3 flex flex-wrap gap-2"><span className="rounded-full border border-border bg-background/80 px-3 py-1.5 text-xs font-semibold">{active.data.student?.class?.name ?? "Class not specified"}</span>{active.student.admissionNumber && <span className="rounded-full border border-border bg-background/80 px-3 py-1.5 text-xs text-muted-foreground">Admission no. {active.student.admissionNumber}</span>}</div></div></div>
           <div className="rounded-2xl border border-border/70 bg-background/80 p-4 sm:min-w-48"><p className="text-xs font-semibold text-muted-foreground">Prepared for</p><p className="mt-1 font-bold">{active.student.profile.firstName} {active.student.profile.lastName}</p><div className="mt-3 flex items-center gap-1.5 text-[11px] font-semibold" style={{ color: accent }}><CheckCircle2 className="size-3.5" />Official published copy</div><p className="mt-2 text-[11px] text-muted-foreground">Design: {active.set.template.name}</p>{active.publishedAt && <p className="mt-1 text-[11px] text-muted-foreground">Published {new Date(active.publishedAt).toLocaleDateString()}</p>}</div>
         </div>
       </header>
