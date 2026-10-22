@@ -6,15 +6,34 @@ import { Roles } from "../../common/decorators/roles.decorator.js";
 import { RolesGuard } from "../../common/guards/roles.guard.js";
 import { SchoolTenantGuard } from "../../common/guards/school-tenant.guard.js";
 import { ReportPublicationService } from "./report-publication.service.js";
+import { ReportTemplatePresetsService } from "./report-template-presets.service.js";
 
 @Controller("assessments/report-cards")
 @UseGuards(SchoolTenantGuard, RolesGuard)
 export class ReportPublicationController {
-  constructor(private readonly reports: ReportPublicationService) {}
+  constructor(private readonly reports: ReportPublicationService, private readonly templatePresets: ReportTemplatePresetsService) {}
 
   @Get("workspace")
   @Roles("owner", "admin", "headmistress")
   getWorkspace(@CurrentSchool() school: School) { return this.reports.getWorkspace(school.id); }
+
+  @Get("sets/:id/reports")
+  @Roles("owner", "admin", "headmistress")
+  getSetReports(@CurrentSchool() school: School, @Param("id") id: string) {
+    return this.reports.getSetReports(school.id, id);
+  }
+
+  @Post("templates/initialize-defaults")
+  @Roles("owner", "admin", "headmistress")
+  initializeTemplates(@CurrentSchool() school: School, @CurrentUser() user: AuthenticatedUser) {
+    return this.templatePresets.initializeDefaultTemplates(school.id, user.id);
+  }
+
+  @Patch("templates/:id/activate")
+  @Roles("owner", "admin", "headmistress")
+  activateTemplate(@CurrentSchool() school: School, @CurrentUser() user: AuthenticatedUser, @Param("id") id: string) {
+    return this.templatePresets.activateTemplate(school.id, user.id, id);
+  }
 
   @Get("me")
   @Roles("student")
