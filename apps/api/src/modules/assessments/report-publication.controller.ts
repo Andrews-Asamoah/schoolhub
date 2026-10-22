@@ -23,6 +23,18 @@ export class ReportPublicationController {
     return this.templatePresets.initializeDefaultTemplates(school.id, user.id);
   }
 
+  @Get("sets/:id/reports")
+  @Roles("owner", "admin", "headmistress")
+  getSetReports(@CurrentSchool() school: School, @Param("id") id: string) {
+    return this.reports.getSetReports(school.id, id);
+  }
+
+  @Patch("templates/:id/activate")
+  @Roles("owner", "admin", "headmistress")
+  activateTemplate(@CurrentSchool() school: School, @CurrentUser() user: AuthenticatedUser, @Param("id") id: string) {
+    return this.templatePresets.activateTemplate(school.id, user.id, id);
+  }
+
   @Get("me")
   @Roles("student")
   getMyReports(@CurrentSchool() school: School, @CurrentUser() user: AuthenticatedUser) {
