@@ -3,13 +3,14 @@ import { FileText, LoaderCircle, Printer } from "lucide-react";
 import { useState } from "react";
 import { apiFetch } from "@/lib/api";
 
+type TemplateLayout = { type?: string; accentColor?: string; showPosition?: boolean; showAssessmentBreakdown?: boolean };
 type Report = {
   id: string;
   studentId: string;
-  data: { student?: { class?: { name?: string } | null }; subjects?: { subject: { id: string; name: string; code: string }; totalScore: number; percentage: number; grade: string | null; position: number | null }[]; remarks?: { type: string; content: string; teacher: string }[] };
+  data: { student?: { class?: { name?: string } | null }; subjects?: { subject: { id: string; name: string; code: string }; totalScore: number; percentage: number; grade: string | null; position: number | null; components?: { name: string; marksObtained: number; maxMarks: number; percentage: number }[] }[]; remarks?: { type: string; content: string; teacher: string }[] };
   publishedAt: string | null;
-  student: { admissionNumber: string; profile: { firstName: string; lastName: string } };
-  set: { name: string; academicYear: { name: string }; term: { name: string } };
+  student: { admissionNumber: string | null; profile: { firstName: string; lastName: string } };
+  set: { name: string; academicYear: { name: string }; term: { name: string }; template: { name: string; layout: TemplateLayout | null } };
 };
 
 export function GuardianPublishedReports() {
@@ -17,6 +18,12 @@ export function GuardianPublishedReports() {
   const reports = useQuery({ queryKey: ["assessments", "report-cards", "guardian"], queryFn: () => apiFetch<Report[]>("/assessments/report-cards/guardian"), retry: false });
   const rows = reports.data ?? [];
   const selected = rows.find((r) => r.id === selectedId) ?? rows[0];
+  const subjects = selected?.data.subjects ?? [];
+  const layout = selected?.set.template.layout;
+  const accent = layout?.accentColor ?? "#4f46e5";
+  const showPosition = layout?.showPosition !== false;
+  const showBreakdown = layout?.showAssessmentBreakdown !== false;
+  const average = subjects.length ? subjects.reduce((sum, subject) => sum + subject.percentage, 0) / subjects.length : null;
   if (reports.isPending) return <div className="flex items-center gap-2 rounded-xl border border-border bg-card p-4 text-sm text-muted-foreground"><LoaderCircle className="size-4 animate-spin" />Loading published ward reports…</div>;
   if (reports.isError) return <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">Unable to load published reports: {reports.error.message}</div>;
   return <section className="space-y-4 rounded-2xl border border-border bg-card p-5">
