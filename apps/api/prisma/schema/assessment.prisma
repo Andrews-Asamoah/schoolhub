@@ -283,6 +283,8 @@ model ReportCardSet {
   targetClasses  ReportCardSetClass[]
   publishAt      DateTime?
   publishedAt    DateTime?
+  isReviewed     Boolean              @default(false)
+  reviewedAt     DateTime?
   createdAt      DateTime             @default(now())
   updatedAt      DateTime             @updatedAt
 

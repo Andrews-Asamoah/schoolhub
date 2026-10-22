@@ -17,16 +17,16 @@ export class ReportPublicationController {
   @Roles("owner", "admin", "headmistress")
   getWorkspace(@CurrentSchool() school: School) { return this.reports.getWorkspace(school.id); }
 
-  @Post("templates/initialize-defaults")
-  @Roles("owner", "admin", "headmistress")
-  initializeTemplates(@CurrentSchool() school: School, @CurrentUser() user: AuthenticatedUser) {
-    return this.templatePresets.initializeDefaultTemplates(school.id, user.id);
-  }
-
   @Get("sets/:id/reports")
   @Roles("owner", "admin", "headmistress")
   getSetReports(@CurrentSchool() school: School, @Param("id") id: string) {
     return this.reports.getSetReports(school.id, id);
+  }
+
+  @Post("templates/initialize-defaults")
+  @Roles("owner", "admin", "headmistress")
+  initializeTemplates(@CurrentSchool() school: School, @CurrentUser() user: AuthenticatedUser) {
+    return this.templatePresets.initializeDefaultTemplates(school.id, user.id);
   }
 
   @Patch("templates/:id/activate")
@@ -66,6 +66,12 @@ export class ReportPublicationController {
   @Roles("owner", "admin", "headmistress")
   generate(@CurrentSchool() school: School, @CurrentUser() user: AuthenticatedUser, @Param("id") id: string) {
     return this.reports.generate(school.id, user.id, id);
+  }
+
+  @Patch("sets/:id/review")
+  @Roles("owner", "admin", "headmistress")
+  markReviewed(@CurrentSchool() school: School, @CurrentUser() user: AuthenticatedUser, @Param("id") id: string) {
+    return this.reports.markReviewed(school.id, user.id, id);
   }
 
   @Patch("sets/:id/publish")
