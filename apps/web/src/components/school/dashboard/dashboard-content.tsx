@@ -140,14 +140,14 @@ export function DashboardContent({
       .slice(0, 6);
     return (
       <main className="mx-auto max-w-[1440px] px-4 py-7 sm:px-6 lg:px-9 lg:py-9">
-        <div className="rounded-3xl border border-indigo-100 bg-gradient-to-br from-white via-indigo-50/60 to-sky-50/70 p-6 shadow-sm sm:p-9">
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-indigo-700">
+        <div className="rounded-3xl border border-indigo-100 bg-gradient-to-br from-white via-indigo-50/60 to-sky-50/70 p-6 shadow-sm sm:p-9 dark:border-indigo-900/30 dark:from-slate-900 dark:via-indigo-950/40 dark:to-sky-950/30">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-indigo-700 dark:text-indigo-300">
             {schoolRoleLabel(activeRole)}
           </p>
-          <h1 className="mt-2 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
+          <h1 className="mt-2 text-2xl font-bold tracking-tight text-slate-900 dark:text-white sm:text-3xl">
             Welcome, {greetingName}
           </h1>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-300">
             You are viewing your {schoolRoleLabel(activeRole).toLowerCase()} workspace. Choose an area to continue.
           </p>
         </div>
@@ -157,16 +157,16 @@ export function DashboardContent({
               key={item.id}
               to="/$page"
               params={{ page: item.id }}
-              className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-indigo-200 hover:bg-indigo-50/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+              className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-indigo-200 hover:bg-indigo-50/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:border-slate-800 dark:bg-slate-900 dark:hover:border-indigo-800 dark:hover:bg-indigo-950/30"
             >
-              <span className="flex size-10 items-center justify-center rounded-xl bg-indigo-50 text-indigo-700">
+              <span className="flex size-10 items-center justify-center rounded-xl bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300">
                 <item.icon className="size-5" />
               </span>
               <span>
-                <span className="block text-sm font-semibold text-slate-900">
+                <span className="block text-sm font-semibold text-slate-900 dark:text-white">
                   {item.label}
                 </span>
-                <span className="mt-0.5 block text-xs text-slate-500">
+                <span className="mt-0.5 block text-xs text-slate-500 dark:text-slate-400">
                   {item.description}
                 </span>
               </span>
@@ -182,18 +182,18 @@ export function DashboardContent({
       <div className="mb-7 flex flex-wrap items-end justify-between gap-4">
         <div>
           <div className="mb-2 flex items-center gap-2">
-            <p className="text-xs font-medium text-slate-500">{today}</p>
+            <p className="text-xs font-medium text-slate-500 dark:text-slate-400">{today}</p>
             <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-amber-700">
               Preview data
             </span>
           </div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-[30px]">
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white sm:text-[30px]">
             Good morning, {greetingName}
             <span className="ml-2 inline-block origin-bottom-right animate-[wave_1.8s_ease-in-out_infinite]">
               👋
             </span>
           </h1>
-          <p className="mt-1.5 text-sm text-slate-500">
+          <p className="mt-1.5 text-sm text-slate-500 dark:text-slate-400">
             Here&apos;s what&apos;s happening at your school today.
           </p>
         </div>

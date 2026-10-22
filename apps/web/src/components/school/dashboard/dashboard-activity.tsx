@@ -27,25 +27,25 @@ function ScheduleItem({
       <div className="w-11 shrink-0 pt-0.5 text-[10px] font-medium text-slate-400">
         {time}
       </div>
-      <div className="relative flex min-w-0 flex-1 gap-3 border-l border-slate-100 pb-1 pl-4">
+      <div className="relative flex min-w-0 flex-1 gap-3 border-l border-slate-100 pb-1 pl-4 dark:border-slate-700">
         <span
           className={cn(
-            "absolute -left-[5px] top-1 size-2.5 rounded-full ring-4 ring-white",
+            "absolute -left-[5px] top-1 size-2.5 rounded-full ring-4 ring-white dark:ring-slate-900",
             color,
           )}
         />
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <p className="truncate text-xs font-semibold text-slate-800">
+            <p className="truncate text-xs font-semibold text-slate-800 dark:text-white">
               {title}
             </p>
             {status === "done" && (
-              <span className="flex size-4 shrink-0 items-center justify-center rounded-full bg-emerald-50 text-emerald-600">
+              <span className="flex size-4 shrink-0 items-center justify-center rounded-full bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400">
                 <Check className="size-2.5" />
               </span>
             )}
             {status === "current" && (
-              <span className="shrink-0 rounded-full bg-blue-50 px-1.5 py-0.5 text-[9px] font-semibold text-blue-600">
+              <span className="shrink-0 rounded-full bg-blue-50 px-1.5 py-0.5 text-[9px] font-semibold text-blue-600 dark:bg-blue-950/40 dark:text-blue-400">
                 NOW
               </span>
             )}
@@ -59,10 +59,10 @@ function ScheduleItem({
 
 export function ScheduleCard() {
   return (
-    <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_2px_12px_rgba(15,23,42,0.025)] sm:p-6">
+    <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_2px_12px_rgba(15,23,42,0.025)] sm:p-6 dark:border-slate-800 dark:bg-slate-900">
       <div className="mb-5 flex items-start justify-between">
         <div>
-          <h2 className="text-sm font-semibold text-slate-900">
+          <h2 className="text-sm font-semibold text-slate-900 dark:text-white">
             Today&apos;s schedule
           </h2>
           <p className="mt-1 text-xs text-slate-500">Tuesday · October 13</p>
@@ -100,7 +100,7 @@ export function ScheduleCard() {
       </div>
       <button
         type="button"
-        className="mt-5 flex w-full items-center justify-center gap-2 rounded-lg border border-slate-200 py-2.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-50"
+        className="mt-5 flex w-full items-center justify-center gap-2 rounded-lg border border-slate-200 py-2.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
       >
         View full calendar <ArrowRight className="size-3.5" />
       </button>
@@ -110,10 +110,10 @@ export function ScheduleCard() {
 
 export function RecentActivityCard() {
   return (
-    <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_2px_12px_rgba(15,23,42,0.025)] sm:p-6">
+    <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_2px_12px_rgba(15,23,42,0.025)] sm:p-6 dark:border-slate-800 dark:bg-slate-900">
       <div className="mb-5 flex items-center justify-between">
         <div>
-          <h2 className="text-sm font-semibold text-slate-900">
+          <h2 className="text-sm font-semibold text-slate-900 dark:text-white">
             Recent activity
           </h2>
           <p className="mt-1 text-xs text-slate-500">
@@ -127,7 +127,7 @@ export function RecentActivityCard() {
           View all
         </button>
       </div>
-      <div className="divide-y divide-slate-100">
+      <div className="divide-y divide-slate-100 dark:divide-slate-800">
         {recentActivities.map(({ icon: Icon, color, title, detail, time }) => (
           <div
             key={title}
@@ -142,7 +142,7 @@ export function RecentActivityCard() {
               <Icon className="size-4" />
             </span>
             <div className="min-w-0 flex-1">
-              <p className="truncate text-xs font-semibold text-slate-800">
+              <p className="truncate text-xs font-semibold text-slate-800 dark:text-white">
                 {title}
               </p>
               <p className="mt-0.5 truncate text-[11px] text-slate-500">

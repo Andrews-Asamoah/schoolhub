@@ -1013,6 +1013,22 @@ export const scheduleExamSchema = z.object({
 });
 export type ScheduleExamInput = z.infer<typeof scheduleExamSchema>;
 
+/**
+ * Edit an applicant's exam in one go: date/time, venue and/or score. Only the
+ * fields sent are changed. `score: null` clears a recorded score.
+ */
+export const updateApplicationExamSchema = z
+  .object({
+    /** ISO timestamp (preferred) or "YYYY-MM-DD[THH:mm]". */
+    examDate: z.string().regex(/^\d{4}-\d{2}-\d{2}/, "Use a valid date and time").optional(),
+    venue: z.string().trim().min(2, "Enter the exam venue").max(150).optional(),
+    score: z.number().min(0, "Score cannot be negative").max(1000).nullable().optional(),
+  })
+  .refine((v) => v.examDate !== undefined || v.venue !== undefined || v.score !== undefined, {
+    message: "Nothing to update.",
+  });
+export type UpdateApplicationExamInput = z.infer<typeof updateApplicationExamSchema>;
+
 export const recordExamScoreSchema = z.object({
   score: z.number().min(0, "Score cannot be negative").max(1000),
 });
@@ -1113,3 +1129,162 @@ export const updateMyProfileSchema = z.object({
   emergencyRelationship: clearable(z.string().trim().max(100)),
 });
 export type UpdateMyProfileInput = z.infer<typeof updateMyProfileSchema>;
+
+// ============================================================================
+// ASSESSMENT SETUP (templates and grading scales)
+// ============================================================================
+
+export const ASSESSMENT_TYPES = [
+  "CLASS_TEST",
+  "QUIZ",
+  "ASSIGNMENT",
+  "PROJECT",
+  "PRACTICAL",
+  "HOMEWORK",
+  "PRESENTATION",
+  "MID_TERM_EXAM",
+  "MOCK_EXAM",
+  "FINAL_EXAM",
+] as const;
+export type AssessmentTypeName = (typeof ASSESSMENT_TYPES)[number];
+
+export const ASSESSMENT_TYPE_LABELS: Record<AssessmentTypeName, string> = {
+  CLASS_TEST: "Class test",
+  QUIZ: "Quiz",
+  ASSIGNMENT: "Assignment",
+  PROJECT: "Project",
+  PRACTICAL: "Practical",
+  HOMEWORK: "Homework",
+  PRESENTATION: "Presentation",
+  MID_TERM_EXAM: "Mid-term exam",
+  MOCK_EXAM: "Mock exam",
+  FINAL_EXAM: "End-of-term exam",
+};
+
+export interface GradeBandLike {
+  grade: string;
+  minScore: number;
+  maxScore: number;
+}
+
+/**
+ * Problems with a set of grade bands, in plain words. Bands may leave small gaps
+ * between them (80-100 then 70-79), but they must not overlap, must not repeat a
+ * grade, and must cover 0 to 100 so every pupil gets a grade.
+ */
+export function gradeScaleProblems(bands: GradeBandLike[]): string[] {
+  const problems: string[] = [];
+  if (bands.length === 0) return problems;
+
+  const seen = new Set<string>();
+  for (const band of bands) {
+    if (band.minScore > band.maxScore) problems.push(`${band.grade || "A grade"}: the lowest score is above the highest score.`);
+    const key = band.grade.trim().toLowerCase();
+    if (seen.has(key)) problems.push(`The grade "${band.grade}" is used more than once.`);
+    seen.add(key);
+  }
+
+  const sorted = [...bands].sort((a, b) => a.minScore - b.minScore);
+  for (let index = 1; index < sorted.length; index++) {
+    const previous = sorted[index - 1]!;
+    const current = sorted[index]!;
+    if (current.minScore <= previous.maxScore) {
+      problems.push(`${previous.grade} (${previous.minScore}-${previous.maxScore}) overlaps ${current.grade} (${current.minScore}-${current.maxScore}).`);
+    }
+  }
+  if (sorted[0]!.minScore !== 0) problems.push("The lowest grade must start at 0 so every score gets a grade.");
+  if (Math.max(...bands.map((band) => band.maxScore)) !== 100) problems.push("The highest grade must reach 100.");
+  return problems;
+}
+
+export const gradeBandInputSchema = z.object({
+  grade: z.string().trim().min(1, "Every grade needs a name").max(4, "Keep grade names short, like A or B+"),
+  description: z.string().trim().min(1, "Describe each grade, for example Excellent").max(40),
+  minScore: z.number("Enter a lowest score").min(0).max(100),
+  maxScore: z.number("Enter a highest score").min(0).max(100),
+  gradePoint: z.number("Enter a grade point").min(0).max(10),
+});
+
+export const saveGradingSystemSchema = z
+  .object({
+    name: z.string().trim().min(2, "Give the grading scale a name").max(80),
+    description: clearable(z.string().trim().max(300)),
+    scales: z.array(gradeBandInputSchema).min(2, "Add at least two grades").max(15),
+  })
+  .superRefine((value, ctx) => {
+    for (const message of gradeScaleProblems(value.scales)) ctx.addIssue({ code: "custom", path: ["scales"], message });
+  });
+export type SaveGradingSystemInput = z.infer<typeof saveGradingSystemSchema>;
+
+export const assessmentComponentInputSchema = z.object({
+  id: z.string().min(1).optional(),
+  name: z.string().trim().min(1, "Give every component a name").max(60),
+  componentType: z.enum(ASSESSMENT_TYPES),
+  maxMarks: z.number("Enter the maximum marks").positive("Maximum marks must be more than 0").max(1000),
+  weight: z.number("Enter the weight").min(0, "Weight cannot be negative").max(100, "Weight cannot be more than 100"),
+  isRequired: z.boolean().default(true),
+  isRepeatable: z.boolean().default(false),
+  expectedCount: z.number().int().min(1).max(10).default(1),
+});
+export type AssessmentComponentInput = z.infer<typeof assessmentComponentInputSchema>;
+
+export const saveAssessmentTemplateSchema = z
+  .object({
+    name: z.string().trim().min(2, "Give the assessment a name").max(120),
+    description: clearable(z.string().trim().max(500)),
+    gradingSystemId: z.string().min(1, "Choose a grading scale"),
+    /** Empty means every class. */
+    classIds: z.array(z.string().min(1)).max(300).default([]),
+    /** null means every subject. */
+    subjectCode: clearable(z.string().trim().max(20)),
+    /** null means every term. */
+    termNumber: z.number().int().min(1).max(6).nullable().optional(),
+    /** A date, YYYY-MM-DD. Marks can be entered up to the end of that day. */
+    deadline: clearable(z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use a date like 2026-12-18")),
+    isActive: z.boolean().default(true),
+    isLocked: z.boolean().default(false),
+    components: z.array(assessmentComponentInputSchema).min(1, "Add at least one component").max(12),
+  })
+  .superRefine((value, ctx) => {
+    const total = value.components.reduce((sum, component) => sum + component.weight, 0);
+    if (Math.abs(total - 100) > 0.01) {
+      ctx.addIssue({ code: "custom", path: ["components"], message: `Component weights must add up to 100%. They add up to ${Math.round(total * 100) / 100}%.` });
+    }
+    const names = new Set<string>();
+    for (const component of value.components) {
+      const key = component.name.trim().toLowerCase();
+      if (names.has(key)) ctx.addIssue({ code: "custom", path: ["components"], message: `"${component.name}" is used twice. Give each component its own name.` });
+      names.add(key);
+    }
+  });
+export type SaveAssessmentTemplateInput = z.infer<typeof saveAssessmentTemplateSchema>;
+
+/**
+ * Whether new component settings are allowed once marks exist. Names may always
+ * change; marks, weights and which components exist may not, because totals and
+ * grades already recorded depend on them. Returns a reason, or null if fine.
+ */
+export function lockedStructureProblem(
+  existing: { id: string; maxMarks: number; weight: number; componentType: string; isRequired: boolean; isRepeatable: boolean; expectedCount: number }[],
+  incoming: { id?: string; maxMarks: number; weight: number; componentType: string; isRequired: boolean; isRepeatable: boolean; expectedCount: number }[],
+): string | null {
+  const message =
+    "Marks have already been recorded, so the components, their maximum marks and weights can't change. You can rename components, or duplicate this assessment to start a new one.";
+  if (existing.length !== incoming.length) return message;
+  const byId = new Map(existing.map((component) => [component.id, component]));
+  for (const component of incoming) {
+    const before = component.id ? byId.get(component.id) : undefined;
+    if (!before) return message;
+    if (
+      before.maxMarks !== component.maxMarks ||
+      before.weight !== component.weight ||
+      before.componentType !== component.componentType ||
+      before.isRequired !== component.isRequired ||
+      before.isRepeatable !== component.isRepeatable ||
+      before.expectedCount !== component.expectedCount
+    ) {
+      return message;
+    }
+  }
+  return null;
+}

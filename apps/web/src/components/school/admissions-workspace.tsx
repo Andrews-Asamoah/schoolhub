@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Pencil } from "lucide-react";
 import { useState } from "react";
 import {
   saveAdmissionCycleSchema,
@@ -411,6 +412,7 @@ function ApplicationsPanel({ cycles, canDecide }: { cycles: Cycle[]; canDecide: 
   const { activeRole } = useSchoolRole();
   const money = useMoney();
   const canCollect = ["owner", "admin", "staff", "accountant"].includes(activeRole ?? "");
+  const canEditExam = ["owner", "admin", "staff"].includes(activeRole ?? "");
   const summaryQuery = useQuery({
     queryKey: ["admissions", "fees", cycleId],
     queryFn: () => apiFetch<FeeSummary>(`/admissions/fees/summary${cycleId ? `?cycleId=${cycleId}` : ""}`),
@@ -603,13 +605,8 @@ function ApplicationsPanel({ cycles, canDecide }: { cycles: Cycle[]; canDecide: 
                       onWithdraw={() => withdraw.mutate(app.id)}
                     />
                   </td>
-                  <td className="p-3 text-xs text-muted-foreground">
-                    {app.examDate ? `${new Date(app.examDate).toLocaleString()} · ${app.examVenue ?? ""}` : "—"}
-                    {app.examScore !== null && (
-                      <p className="font-semibold text-foreground">
-                        Score {Number(app.examScore)}/{Number(app.cycle.examMaxScore)} (pass {Number(app.cycle.passMark)})
-                      </p>
-                    )}
+                  <td className="min-w-[250px] p-3 align-top text-xs">
+                    <ExamCell app={app} canEdit={canEditExam} onSaved={() => void refresh()} />
                   </td>
                   <td className="p-3">
                     <RowActions app={app} canDecide={canDecide} busy={act.isPending} onAct={act.mutate} onDecide={(decision) => setDeciding({ app, decision })} onAdmit={() => admit(app)} />
@@ -678,7 +675,6 @@ function RowActions({
   onDecide: (d: "ACCEPTED" | "WAITLISTED" | "REJECTED") => void;
   onAdmit: () => void;
 }) {
-  const [score, setScore] = useState("");
   const closed = ["ADMITTED", "WITHDRAWN"].includes(app.status);
   return (
     <div className="flex flex-col gap-1.5">
@@ -686,29 +682,6 @@ function RowActions({
         <button type="button" className={ghost} disabled={busy} onClick={() => onAct({ path: `/admissions/applications/${app.id}/review` })}>
           Start review
         </button>
-      )}
-      {["EXAM_SCHEDULED", "EXAM_COMPLETED"].includes(app.status) && (
-        <div className="flex gap-1.5">
-          <input
-            type="number"
-            min={0}
-            max={Number(app.cycle.examMaxScore)}
-            placeholder="Score"
-            value={score}
-            onChange={(e) => setScore(e.target.value)}
-            className="h-9 w-20 rounded-lg border border-border bg-background px-2 text-xs"
-            aria-label="Exam score"
-          />
-          <button
-            type="button"
-            className={ghost}
-            disabled={busy || score === "" || app.feeStatus === "PENDING"}
-            title={app.feeStatus === "PENDING" ? "Receive the admission fee or record an exemption first" : undefined}
-            onClick={() => onAct({ path: `/admissions/applications/${app.id}/score`, body: { score: Number(score) } })}
-          >
-            Save score
-          </button>
-        </div>
       )}
       {canDecide && !closed && app.status !== "ACCEPTED" && (
         <div className="flex flex-wrap gap-1.5">
@@ -919,6 +892,171 @@ function ExemptFeeDialog({ app, onClose, onDone }: { app: Application; onClose: 
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+// -------------------------------------------------------------- exam editor
+
+const EDITABLE_EXAM_STATUSES = ["SUBMITTED", "UNDER_REVIEW", "EXAM_SCHEDULED", "EXAM_COMPLETED"];
+
+/** ISO timestamp -> value for <input type="datetime-local"> in the viewer's timezone. */
+function toLocalInput(iso: string | null): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+const scoreText = (value: string | null) => (value === null ? "" : String(Number(value)));
+
+/**
+ * The applicant's exam: date and time, venue and score, editable in place.
+ * Staff can schedule, reschedule, enter a score and correct it until a
+ * decision is made. Saving sends only what changed.
+ */
+function ExamCell({ app, canEdit, onSaved }: { app: Application; canEdit: boolean; onSaved: () => void }) {
+  const [editing, setEditing] = useState(false);
+  const [date, setDate] = useState("");
+  const [venue, setVenue] = useState("");
+  const [score, setScore] = useState("");
+  const [formError, setFormError] = useState<string | null>(null);
+
+  const max = Number(app.cycle.examMaxScore);
+  const pass = Number(app.cycle.passMark);
+  const editable = canEdit && EDITABLE_EXAM_STATUSES.includes(app.status);
+  const feePending = app.feeStatus === "PENDING";
+
+  const save = useMutation({
+    mutationFn: (body: Record<string, unknown>) =>
+      apiFetch(`/admissions/applications/${app.id}/exam`, { method: "PATCH", body: JSON.stringify(body) }),
+    onSuccess: () => {
+      setEditing(false);
+      onSaved();
+    },
+  });
+
+  function open() {
+    setDate(toLocalInput(app.examDate));
+    setVenue(app.examVenue ?? "");
+    setScore(scoreText(app.examScore));
+    setFormError(null);
+    save.reset();
+    setEditing(true);
+  }
+
+  function submit(event: React.FormEvent) {
+    event.preventDefault();
+    setFormError(null);
+    const body: Record<string, unknown> = {};
+    const venueChanged = venue.trim() !== (app.examVenue ?? "");
+    const dateChanged = date !== toLocalInput(app.examDate);
+    if (dateChanged || venueChanged) {
+      if (!date) return setFormError("Choose the exam date and time.");
+      if (venue.trim().length < 2) return setFormError("Enter the exam venue.");
+      if (Number.isNaN(new Date(date).getTime())) return setFormError("Enter a valid exam date and time.");
+      if (dateChanged) body.examDate = new Date(date).toISOString();
+      if (venueChanged) body.venue = venue.trim();
+    }
+    if (score !== scoreText(app.examScore)) {
+      if (score.trim() === "") {
+        body.score = null;
+      } else {
+        const n = Number(score);
+        if (Number.isNaN(n) || n < 0) return setFormError("Enter a valid score.");
+        if (n > max) return setFormError(`The score cannot be above ${max}.`);
+        body.score = n;
+      }
+    }
+    if (Object.keys(body).length === 0) {
+      setEditing(false);
+      return;
+    }
+    save.mutate(body);
+  }
+
+  if (editing) {
+    return (
+      <form onSubmit={submit} noValidate className="space-y-2.5" aria-label={`Edit exam for ${app.firstName} ${app.lastName}`}>
+        <label className="block text-[11px] font-semibold text-foreground">
+          Date and time
+          <input type="datetime-local" className={`${input} !mt-1 !h-9 text-xs`} value={date} onChange={(e) => setDate(e.target.value)} />
+        </label>
+        <label className="block text-[11px] font-semibold text-foreground">
+          Venue
+          <input className={`${input} !mt-1 !h-9 text-xs`} value={venue} onChange={(e) => setVenue(e.target.value)} placeholder="Main Hall" />
+        </label>
+        <label className="block text-[11px] font-semibold text-foreground">
+          Score <span className="font-normal text-muted-foreground">(out of {max}, pass mark {pass})</span>
+          <input
+            type="number"
+            min={0}
+            max={max}
+            step="any"
+            inputMode="decimal"
+            className={`${input} !mt-1 !h-9 text-xs disabled:cursor-not-allowed disabled:opacity-60`}
+            value={score}
+            onChange={(e) => setScore(e.target.value)}
+            disabled={feePending && app.examScore === null}
+            placeholder="Not yet marked"
+          />
+        </label>
+        {feePending && (
+          <p className="rounded-lg bg-warning/10 px-2.5 py-1.5 text-[11px] text-warning">
+            The score can be entered once the admission fee is received or waived.
+          </p>
+        )}
+        {(formError || save.error) && (
+          <p role="alert" className="text-[11px] text-destructive">
+            {formError ?? errorText(save.error)}
+          </p>
+        )}
+        <div className="flex gap-1.5">
+          <button type="submit" className={primary} disabled={save.isPending}>
+            {save.isPending ? "Saving…" : "Save"}
+          </button>
+          <button type="button" className={ghost} onClick={() => setEditing(false)} disabled={save.isPending}>
+            Cancel
+          </button>
+        </div>
+      </form>
+    );
+  }
+
+  const score_ = app.examScore === null ? null : Number(app.examScore);
+  return (
+    <div className="space-y-1">
+      {app.examDate ? (
+        <p className="text-muted-foreground">
+          {new Date(app.examDate).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })}
+          {app.examVenue ? ` · ${app.examVenue}` : ""}
+        </p>
+      ) : (
+        <p className="text-muted-foreground">Not scheduled</p>
+      )}
+      {score_ !== null ? (
+        <p className="flex flex-wrap items-center gap-1.5 font-semibold text-foreground">
+          Score {score_}/{max}
+          <span
+            className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${score_ >= pass ? "bg-success/10 text-success" : "bg-warning/10 text-warning"}`}
+          >
+            {score_ >= pass ? "Passed" : "Below pass mark"}
+          </span>
+        </p>
+      ) : (
+        app.examDate && <p className="text-muted-foreground">No score yet</p>
+      )}
+      {editable && (
+        <button
+          type="button"
+          onClick={open}
+          aria-label={`Edit exam for ${app.firstName} ${app.lastName}`}
+          className="mt-0.5 inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-[11px] font-semibold text-primary hover:bg-primary/10"
+        >
+          <Pencil className="size-3" />
+          {app.examDate ? "Edit exam" : "Schedule exam"}
+        </button>
+      )}
     </div>
   );
 }

@@ -79,7 +79,7 @@ export function SchoolWorkspaceLayout({
 
   return (
     <SidebarProvider>
-      <div className="min-h-screen bg-slate-50 md:flex">
+      <div className="min-h-screen bg-slate-50 dark:bg-background md:flex">
         <SchoolSidebar
           activePage={activePage}
           schoolName={school?.name}
@@ -88,10 +88,10 @@ export function SchoolWorkspaceLayout({
           userImage={session?.user?.image}
         />
         <div className="min-w-0 flex-1">
-          <header className="sticky top-0 z-10 flex h-[4.5rem] items-center justify-between border-b border-slate-200/80 bg-white/90 px-4 backdrop-blur md:px-8">
+          <header className="sticky top-0 z-10 flex h-[4.5rem] items-center justify-between border-b border-slate-200/80 bg-white/90 px-4 backdrop-blur dark:border-slate-800 dark:bg-slate-950/80 md:px-8">
             <div className="flex min-w-0 items-center gap-3">
               <SidebarTrigger />
-              <span className="hidden h-5 w-px bg-slate-200 sm:block" />
+              <span className="hidden h-5 w-px bg-slate-200 dark:bg-slate-700 sm:block" />
               <div className="hidden items-center gap-2 text-xs text-slate-400 sm:flex">
                 <Link
                   to="/dashboard"
@@ -111,19 +111,19 @@ export function SchoolWorkspaceLayout({
                 <input
                   placeholder={`Search ${title.toLowerCase()}`}
                   aria-label={`Search ${title.toLowerCase()}`}
-                  className="h-9 w-48 rounded-lg border border-slate-200 bg-slate-50 pl-9 pr-3 text-xs text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-blue-300 focus:bg-white focus:ring-2 focus:ring-blue-100"
+                  className="h-9 w-48 rounded-lg border border-slate-200 bg-slate-50 pl-9 pr-3 text-xs text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-blue-300 focus:bg-white focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:placeholder:text-slate-500"
                 />
               </label>
               <ThemeToggle />
               <button
                 type="button"
                 aria-label="Notifications"
-                className="relative flex size-9 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-slate-900"
+                className="relative flex size-9 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-slate-800 dark:hover:text-white"
               >
                 <Bell className="size-[18px]" />
-                <span className="absolute right-2 top-2 size-1.5 rounded-full bg-rose-500 ring-2 ring-white" />
+                <span className="absolute right-2 top-2 size-1.5 rounded-full bg-rose-500 ring-2 ring-white dark:ring-slate-950" />
               </button>
-              <span className="hidden h-6 w-px bg-slate-200 sm:block" />
+              <span className="hidden h-6 w-px bg-slate-200 dark:bg-slate-700 sm:block" />
               <HeaderAccountLink subtitle={`${schoolRoleLabel(activeRole)} · ${section}`} />
             </div>
           </header>

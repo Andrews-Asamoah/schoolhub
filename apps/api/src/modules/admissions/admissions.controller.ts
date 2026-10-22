@@ -23,6 +23,7 @@ import {
   scheduleExamSchema,
   submitApplicationSchema,
   trackApplicationSchema,
+  updateApplicationExamSchema,
   type AdmitApplicationInput,
   type DecideApplicationInput,
   type ExemptAdmissionFeeInput,
@@ -31,6 +32,7 @@ import {
   type SaveAdmissionCycleInput,
   type ScheduleExamInput,
   type SubmitApplicationInput,
+  type UpdateApplicationExamInput,
   type TrackApplicationInput,
 } from "@schoolhub/shared";
 import { CurrentSchool } from "../../common/decorators/current-school.decorator.js";
@@ -184,6 +186,18 @@ export class AdmissionsController {
   @Roles("owner", "admin", "staff")
   review(@CurrentSchool() school: School, @Param("id") id: string) {
     return this.admissions.markUnderReview(school.id, id);
+  }
+
+  /** Edit exam date, venue and/or score for one applicant (inline editor). */
+  @Patch("applications/:id/exam")
+  @Roles("owner", "admin", "staff")
+  updateExam(
+    @CurrentSchool() school: School,
+    @CurrentUser() actor: AuthenticatedUser | undefined,
+    @Param("id") id: string,
+    @Body(new ZodValidationPipe(updateApplicationExamSchema)) body: UpdateApplicationExamInput,
+  ) {
+    return this.admissions.updateExam(school.id, actor!.id, id, body);
   }
 
   @Post("applications/:id/score")

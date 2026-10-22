@@ -20,6 +20,23 @@ export interface TargetClass {
 }
 
 /**
+ * How specifically a template is aimed at this class, or null if it is aimed at
+ * other classes. No class limits at all means every class, scoring 0.
+ */
+export function classScopeScore(
+  template: Pick<TemplateScope, "classId" | "classIds" | "classLevel" | "departmentId">,
+  target: TargetClass,
+): number | null {
+  const limitsClass =
+    template.classId != null || template.classIds.length > 0 || template.classLevel != null || template.departmentId != null;
+  if (!limitsClass) return 0;
+  if (template.classId === target.id || template.classIds.includes(target.id)) return 8;
+  if (template.classLevel != null && template.classLevel === target.level) return 4;
+  if (template.departmentId != null && template.departmentId === target.departmentId) return 2;
+  return null;
+}
+
+/**
  * How specifically a template is meant for this class, subject and term, or
  * null if it does not apply. A template with no class/subject/term limits
  * applies to everything but is the least specific.
@@ -34,15 +51,9 @@ export function templateSpecificity(
   if (template.termNumber != null && template.termNumber !== termNumber) return null;
   if (template.subjectCode && template.subjectCode.toLowerCase() !== subjectCode.toLowerCase()) return null;
 
-  const limitsClass =
-    template.classId != null || template.classIds.length > 0 || template.classLevel != null || template.departmentId != null;
-  let score = 0;
-  if (limitsClass) {
-    if (template.classId === target.id || template.classIds.includes(target.id)) score += 8;
-    else if (template.classLevel != null && template.classLevel === target.level) score += 4;
-    else if (template.departmentId != null && template.departmentId === target.departmentId) score += 2;
-    else return null;
-  }
+  const classScore = classScopeScore(template, target);
+  if (classScore === null) return null;
+  let score = classScore;
   if (template.subjectCode) score += 16;
   if (template.termNumber != null) score += 1;
   return score;

@@ -52,9 +52,12 @@ const field =
 export function AssessmentEntryWorkspace({
   mode,
   initial,
+  onOpenSetup,
 }: {
   mode: "teacher" | "manager";
   initial?: { classId: string; subjectId: string } | null;
+  /** For managers: jump to where assessments are set up. */
+  onOpenSetup?: () => void;
 }) {
   const queryClient = useQueryClient();
   const teaching = useTeachingOverview(mode === "teacher");
@@ -228,6 +231,11 @@ export function AssessmentEntryWorkspace({
       {sheet && !sheet.template && (
         <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900 dark:border-amber-400/20 dark:bg-amber-400/10 dark:text-amber-200">
           {sheet.readOnlyReason}
+          {onOpenSetup && (
+            <button type="button" onClick={onOpenSetup} className="ml-2 font-semibold underline">
+              Set up an assessment
+            </button>
+          )}
         </p>
       )}
 

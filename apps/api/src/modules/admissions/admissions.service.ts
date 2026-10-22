@@ -18,6 +18,7 @@ import {
   type ScheduleExamInput,
   type SubmitApplicationInput,
   type TrackApplicationInput,
+  type UpdateApplicationExamInput,
 } from "@schoolhub/shared";
 import { PrismaService } from "../../prisma/prisma.service.js";
 import { CredentialsService } from "../accounts/credentials.service.js";
@@ -28,6 +29,16 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 const startOfDay = (iso: string) => new Date(`${iso}T00:00:00.000Z`);
 const endOfDay = (iso: string) => new Date(`${iso}T23:59:59.999Z`);
 const digits = (value: string) => value.replace(/\D/g, "");
+
+/**
+ * Exam date/time from the browser: a full ISO timestamp (with Z or an offset)
+ * is used as is; "YYYY-MM-DD" means 09:00 and "YYYY-MM-DDTHH:mm" is taken as UTC.
+ */
+function parseExamDate(value: string): Date {
+  if (/(Z|[+-]\d{2}:\d{2})$/.test(value)) return new Date(value);
+  if (value.length === 10) return new Date(`${value}T09:00:00.000Z`);
+  return new Date(`${value.length === 16 ? `${value}:00` : value}.000Z`.replace(/\.000Z\.000Z$/, ".000Z"));
+}
 
 /**
  * Tiny in-memory sliding-window limiter for the anonymous endpoints. Good for
@@ -491,13 +502,78 @@ export class AdmissionsService {
         "Every selected application must belong to this school and be awaiting an exam.",
       );
     }
-    const when = new Date(input.examDate.length === 10 ? `${input.examDate}T09:00:00.000Z` : `${input.examDate}:00.000Z`);
+    const when = parseExamDate(input.examDate);
     if (Number.isNaN(when.getTime())) throw new BadRequestException("Enter a valid exam date.");
     await this.prisma.client.application.updateMany({
       where: { id: { in: apps.map((a) => a.id) }, schoolId },
       data: { status: "EXAM_SCHEDULED", examDate: when, examVenue: input.venue },
     });
     return { scheduled: apps.length };
+  }
+
+  /**
+   * Edit one applicant's exam: date/time, venue and score. The status follows
+   * the data: a score means EXAM_COMPLETED, a date without a score means
+   * EXAM_SCHEDULED, and clearing a score steps back to EXAM_SCHEDULED. Once a
+   * decision is made the exam is locked; change the decision first.
+   */
+  async updateExam(schoolId: string, actorId: string, id: string, input: UpdateApplicationExamInput) {
+    const app = await this.requireApplication(schoolId, id);
+    const editable = ["SUBMITTED", "UNDER_REVIEW", "EXAM_SCHEDULED", "EXAM_COMPLETED"];
+    if (!editable.includes(app.status)) {
+      throw new ConflictException("Exam details cannot be changed after a decision has been made.");
+    }
+
+    let examDate = app.examDate;
+    let venue = app.examVenue;
+    if (input.examDate !== undefined) {
+      examDate = parseExamDate(input.examDate);
+      if (Number.isNaN(examDate.getTime())) throw new BadRequestException("Enter a valid exam date and time.");
+    }
+    if (input.venue !== undefined) venue = input.venue;
+    if ((input.examDate !== undefined || input.venue !== undefined) && (!examDate || !venue)) {
+      throw new BadRequestException("Enter both the exam date and the venue.");
+    }
+
+    let examScore: Prisma.Decimal | number | null = app.examScore;
+    if (input.score !== undefined) {
+      if (input.score === null) {
+        examScore = null;
+      } else {
+        if (!examDate) {
+          throw new BadRequestException("Set the exam date and venue before recording a score.");
+        }
+        this.assertFeeSettled(app, "recording the exam score");
+        if (input.score > Number(app.cycle.examMaxScore)) {
+          throw new BadRequestException(`The score cannot be above ${app.cycle.examMaxScore}.`);
+        }
+        examScore = input.score;
+      }
+    }
+
+    const status =
+      examScore !== null ? "EXAM_COMPLETED" : examDate ? "EXAM_SCHEDULED" : app.status;
+    const updated = await this.prisma.client.$transaction(async (tx) => {
+      const row = await tx.application.update({
+        where: { id },
+        data: { examDate, examVenue: venue, examScore, status },
+      });
+      await this.credentials.audit(tx, {
+        actorId,
+        schoolId,
+        action: "UPDATE",
+        entityType: "APPLICATION_EXAM",
+        entityId: id,
+        details: {
+          examDate: examDate?.toISOString() ?? null,
+          venue,
+          score: examScore === null ? null : Number(examScore),
+          status,
+        },
+      });
+      return row;
+    });
+    return updated;
   }
 
   /** Fee is settled when it was paid in cash, waived, or never applied. */

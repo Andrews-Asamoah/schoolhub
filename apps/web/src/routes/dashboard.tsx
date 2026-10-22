@@ -57,7 +57,7 @@ function DashboardPage() {
 
   if (sessionLoading || !session?.user) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-50">
+      <div className="flex min-h-screen items-center justify-center bg-slate-50 dark:bg-background">
         <div className="flex items-center gap-3 text-sm text-slate-500">
           <span className="size-2 animate-pulse rounded-full bg-blue-600" />
           {sessionLoading ? "Loading your workspace…" : "Redirecting to sign in…"}
@@ -68,7 +68,7 @@ function DashboardPage() {
 
   return (
     <SidebarProvider>
-      <div className="min-h-screen bg-slate-50 md:flex">
+      <div className="min-h-screen bg-slate-50 dark:bg-background md:flex">
         <SchoolSidebar
           activePage="dashboard"
           schoolName={school?.name}
@@ -82,7 +82,7 @@ function DashboardPage() {
             onSearchChange={setSearch}
           />
           {organizationLoading ? (
-            <div className="mx-auto mt-8 flex max-w-3xl items-center gap-2 rounded-2xl border border-slate-200 bg-white p-6 text-sm text-slate-600 shadow-sm">
+            <div className="mx-auto mt-8 flex max-w-3xl items-center gap-2 rounded-2xl border border-slate-200 bg-white p-6 text-sm text-slate-600 shadow-sm dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300">
               <span className="size-2 animate-pulse rounded-full bg-indigo-600" />
               Loading your school workspace…
             </div>

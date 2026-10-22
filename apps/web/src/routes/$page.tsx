@@ -37,6 +37,7 @@ import { StudentDirectoryWorkspace } from "@/components/school/student-directory
 import { PeopleWorkspace } from "@/components/school/people-workspace";
 import { SchoolLogoUploader } from "@/components/school/school-logo-uploader";
 import { AssessmentEntryWorkspace } from "@/components/school/assessment-entry-workspace";
+import { AssessmentsAdmin } from "@/components/school/assessments-admin";
 import { ClassRegister } from "@/components/school/class-register";
 import { SchoolSettingsForm } from "@/components/school/school-settings-form";
 import { ProfileWorkspace } from "@/components/school/profile-workspace";
@@ -53,6 +54,7 @@ import { StudentClassmatesView } from "@/components/portal/student-classmates-vi
 import { StudentHouseClubsView } from "@/components/portal/student-house-clubs-view";
 import { StudentAssignmentsView } from "@/components/portal/student-assignments-view";
 import { StudentAnnouncementsView } from "@/components/portal/student-announcements-view";
+import { AdminAnnouncementsWorkspace } from "@/components/portal/admin-announcements-workspace";
 
 export const Route = createFileRoute("/$page")({
   component: WorkspaceRoute,
@@ -93,15 +95,6 @@ interface AcademicYear {
     endDate: string;
     isCurrent: boolean;
   }[];
-}
-
-interface AssessmentTemplate {
-  id: string;
-  name: string;
-  description?: string | null;
-  termNumber?: number | null;
-  components: { id: string; name: string; maxMarks: number | string }[];
-  gradingSystem: { name: string };
 }
 
 interface FeeStructure {
@@ -214,12 +207,6 @@ function WorkspaceContent({ pageId }: { pageId: string }) {
     enabled: isSignedIn && ["academic-years", "enrollments"].includes(pageId),
     retry: false,
   });
-  const assessmentsQuery = useQuery({
-    queryKey: ["assessments", "templates"],
-    queryFn: () => apiFetch<AssessmentTemplate[]>("/assessments/templates"),
-    enabled: isSignedIn && pageId === "assessments",
-    retry: false,
-  });
   const feesQuery = useQuery({
     queryKey: ["finance", "fee-structures"],
     queryFn: () => apiFetch<FeeStructure[]>("/finance/fee-structures"),
@@ -237,7 +224,7 @@ function WorkspaceContent({ pageId }: { pageId: string }) {
   return (
     <>
       {activeRole !== "student" &&
-        !["classes", "students", "teachers", "staff", "guardians", "teacher-portal", "accountant-portal", "guardian-portal", "student-portal", "clubs", "houses", "assignments", "classmates"].includes(
+        !["classes", "students", "teachers", "staff", "guardians", "teacher-portal", "accountant-portal", "guardian-portal", "student-portal", "clubs", "houses", "assignments", "classmates", "announcements"].includes(
           pageId,
         ) && (
         <WorkspacePageHeading
@@ -280,7 +267,7 @@ function WorkspaceContent({ pageId }: { pageId: string }) {
           {pageId === "classmates" && <StudentClassmatesView />}
           {pageId === "assignments" && <StudentAssignmentsView />}
           {pageId === "announcements" && (
-            activeRole === "student" ? <StudentAnnouncementsView /> : <PlannedWorkspace title={page.label} />
+            activeRole === "student" ? <StudentAnnouncementsView /> : <AdminAnnouncementsWorkspace />
           )}
           {pageId === "classes" && (
             <ClassesWorkspace
@@ -305,13 +292,7 @@ function WorkspaceContent({ pageId }: { pageId: string }) {
             ) : activeRole === "teacher" ? (
               <AssessmentEntryWorkspace mode="teacher" />
             ) : (
-              <div className="space-y-8">
-                <AssessmentEntryWorkspace mode="manager" />
-                <section aria-labelledby="assessment-templates-heading" className="space-y-3">
-                  <h2 id="assessment-templates-heading" className="text-sm font-bold text-slate-900 dark:text-white">Assessment templates</h2>
-                  <AssessmentList query={assessmentsQuery} />
-                </section>
-              </div>
+              <AssessmentsAdmin />
             )
           )}
           {pageId === "reports" && (
@@ -352,50 +333,6 @@ function AcademicYears({
   if (query.isPending) return <LoadingState label="Loading academic years" />;
   if (query.error) return <QueryError error={query.error} />;
   return <AcademicYearSetup years={query.data ?? []} />;
-}
-
-function AssessmentList({
-  query,
-}: {
-  query: UseQueryResult<AssessmentTemplate[], Error>;
-}) {
-  if (query.isPending) return <LoadingState label="Loading assessments" />;
-  if (query.error) return <QueryError error={query.error} />;
-  const columns: WorkspaceColumn<AssessmentTemplate>[] = [
-    {
-      id: "template",
-      header: "Template",
-      cell: (template) => (
-        <span className="font-semibold text-foreground">{template.name}</span>
-      ),
-    },
-    {
-      id: "grading",
-      header: "Grading system",
-      cell: (template) => template.gradingSystem.name,
-    },
-    {
-      id: "term",
-      header: "Term",
-      cell: (template) => template.termNumber ?? "All terms",
-    },
-    {
-      id: "components",
-      header: "Components",
-      value: (template) => template.components.length,
-      cell: (template) => template.components.length,
-    },
-  ];
-  return (
-    <WorkspaceDataTable
-      rows={query.data ?? []}
-      columns={columns}
-      getRowId={(template) => template.id}
-      exportTitle="Assessment templates"
-      emptyTitle="No assessment templates yet"
-      emptyDescription="Active templates configured for your school will appear here."
-    />
-  );
 }
 
 function FeeStructureList({
