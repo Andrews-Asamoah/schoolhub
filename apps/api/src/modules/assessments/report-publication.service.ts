@@ -44,7 +44,7 @@ export class ReportPublicationService {
     return this.prisma.client.reportCard.findMany({
       where: { studentId: student.id, publishedAt: { not: null }, set: { schoolId, status: "PUBLISHED" } },
       orderBy: { publishedAt: "desc" },
-      select: { id: true, data: true, publishedAt: true, set: { select: { name: true, academicYear: { select: { name: true } }, term: { select: { name: true, termNumber: true } }, template: { select: { name: true, layout: true } } } } },
+      select: { id: true, data: true, publishedAt: true, student: { select: { admissionNumber: true, profile: { select: { firstName: true, lastName: true } } } }, set: { select: { name: true, academicYear: { select: { name: true } }, term: { select: { name: true, termNumber: true } }, template: { select: { name: true, layout: true } } } } },
     });
   }
 
