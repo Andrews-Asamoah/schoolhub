@@ -90,7 +90,7 @@ export class ReportPublicationService {
     if (set.status === "GENERATING") throw new ConflictException("This report batch is already being generated.");
     const classIds = set.targetClasses.map(({ classId }) => classId);
     if (!classIds.length) throw new BadRequestException("Choose at least one class.");
-    await db.reportCardSet.update({ where: { id: set.id }, data: { status: "GENERATING" } });
+    await db.reportCardSet.update({ where: { id: set.id }, data: { status: "GENERATING", isReviewed: false, reviewedAt: null } });
     try {
       const students = await db.student.findMany({
         where: { schoolId, deletedAt: null, enrollments: { some: { academicYearId: set.academicYearId, termId: set.termId, status: { in: ["ACTIVE", "COMPLETED"] }, classId: { in: classIds } } } },
@@ -116,14 +116,45 @@ export class ReportPublicationService {
           const data = { schemaVersion: 1, student: { id: student.id, class: student.enrollments[0]?.class ?? null }, academicYearId: set.academicYearId, termId: set.termId, subjects: student.assessmentScores.map((score) => ({ subject: score.subject, totalScore: Number(score.totalScore), percentage: Number(score.percentage), grade: score.grade, position: score.position, remarks: score.remarks, components: score.componentScores.map((c) => ({ name: c.component.name, marksObtained: Number(c.marksObtained), maxMarks: Number(c.maxMarks), percentage: Number(c.percentage), weight: Number(c.component.weight) })) })), remarks: student.remarks.map((r) => ({ type: r.remarkType, content: r.content, teacher: [r.teacher.profile?.firstName, r.teacher.profile?.lastName].filter(Boolean).join(" ") })), generatedAt: new Date().toISOString() };
           await tx.reportCard.upsert({ where: { setId_studentId: { setId: set.id, studentId: student.id } }, create: { setId: set.id, studentId: student.id, data: data as Prisma.InputJsonValue }, update: { data: data as Prisma.InputJsonValue, publishedAt: null } });
         }
-        await tx.reportCardSet.update({ where: { id: set.id }, data: { status: "GENERATED" } });
+        await tx.reportCardSet.update({ where: { id: set.id }, data: { status: "GENERATED", isReviewed: false, reviewedAt: null } });
         await tx.auditLog.create({ data: { schoolId, userId: actorId, action: "UPDATE", entityType: "REPORT_CARD_SET", entityId: set.id, newValues: { operation: "GENERATE", reportCount: reportableStudents.length } } });
       });
-      return { id: set.id, status: "GENERATED", reportCount: reportableStudents.length };
+      return { id: set.id, status: "GENERATED", reportCount: reportableStudents.length, isReviewed: false };
     } catch (error) {
       await db.reportCardSet.update({ where: { id: set.id }, data: { status: "DRAFT" } }).catch(() => undefined);
       throw error;
     }
+  }
+
+  async markReviewed(schoolId: string, actorId: string, setId: string) {
+    const db = this.prisma.client;
+    return db.$transaction(async (tx) => {
+      const set = await tx.reportCardSet.findFirst({
+        where: { id: setId, schoolId },
+        include: { _count: { select: { reportCards: true } } },
+      });
+      if (!set) throw new NotFoundException("Report batch not found.");
+      if (set.status !== "GENERATED") throw new ConflictException("Generate the report batch successfully before reviewing it.");
+      if (!set._count.reportCards) throw new BadRequestException("There are no reports to review.");
+
+      const reviewedAt = new Date();
+      const updated = await tx.reportCardSet.update({
+        where: { id: set.id },
+        data: { isReviewed: true, reviewedAt },
+        select: { id: true, status: true, isReviewed: true, reviewedAt: true },
+      });
+      await tx.auditLog.create({
+        data: {
+          schoolId,
+          userId: actorId,
+          action: "UPDATE",
+          entityType: "REPORT_CARD_SET",
+          entityId: set.id,
+          newValues: { operation: "REVIEW", reportCount: set._count.reportCards, reviewedAt: reviewedAt.toISOString() },
+        },
+      });
+      return updated;
+    });
   }
 
   async publish(schoolId: string, actorId: string, setId: string) {
@@ -131,6 +162,7 @@ export class ReportPublicationService {
       const set = await tx.reportCardSet.findFirst({ where: { id: setId, schoolId }, include: { _count: { select: { reportCards: true } } } });
       if (!set) throw new NotFoundException("Report batch not found.");
       if (set.status !== "GENERATED") throw new ConflictException("Generate reports successfully before publishing them.");
+      if (!set.isReviewed || !set.reviewedAt) throw new ConflictException("Review the generated reports and mark the batch reviewed before publishing.");
       if (!set._count.reportCards) throw new BadRequestException("There are no reports to publish.");
       const now = new Date();
       if (set.publishAt && set.publishAt > now) throw new ConflictException("This batch is scheduled for a future date. It cannot be published early.");
