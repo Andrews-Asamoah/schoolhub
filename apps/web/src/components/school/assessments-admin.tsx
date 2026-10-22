@@ -22,7 +22,7 @@ export function AssessmentsAdmin() {
           </button>
         ))}
       </div>
-      {tab === "marks" ? <AssessmentEntryWorkspace mode="manager" onOpenSetup={() => setTab("setup")} /> : tab === "setup" ? <AssessmentSetupWorkspace /> : <ReportPublicationWorkspace />}
+      {tab === "marks" ? <AssessmentEntryWorkspace mode="manager" onOpenSetup={() => setTab("setup")} /> : tab === "setup" ? <AssessmentSetupWorkspace /> : <ReportPublicationWorkspace onOpenSetup={() => setTab("setup")} />}
     </div>
   );
 }
