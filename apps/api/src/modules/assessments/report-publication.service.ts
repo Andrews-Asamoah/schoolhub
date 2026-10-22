@@ -29,7 +29,7 @@ export class ReportPublicationService {
   async getGuardianPublishedReports(schoolId: string, userId: string) {
     const guardian = await this.prisma.client.guardian.findFirst({
       where: { schoolId, deletedAt: null, isActive: true, profile: { userId } },
-      select: { students: { where: { receiveReports: true }, select: { student: { select: { id: true, firstName: true, lastName: true, admissionNumber: true } } } } },
+      select: { students: { where: { receiveReports: true }, select: { student: { select: { id: true, admissionNumber: true, profile: { select: { firstName: true, lastName: true } } } } } } },
     });
     if (!guardian) throw new NotFoundException("Guardian record not found.");
     const studentIds = guardian.students.map((row) => row.student.id);
@@ -37,7 +37,7 @@ export class ReportPublicationService {
     const reports = await this.prisma.client.reportCard.findMany({
       where: { studentId: { in: studentIds }, publishedAt: { not: null }, set: { schoolId, status: "PUBLISHED" } },
       orderBy: { publishedAt: "desc" },
-      select: { id: true, studentId: true, data: true, publishedAt: true, student: { select: { firstName: true, lastName: true, admissionNumber: true } }, set: { select: { name: true, academicYear: { select: { name: true } }, term: { select: { name: true, termNumber: true } } } } },
+      select: { id: true, studentId: true, data: true, publishedAt: true, student: { select: { admissionNumber: true, profile: { select: { firstName: true, lastName: true } } } }, set: { select: { name: true, academicYear: { select: { name: true } }, term: { select: { name: true, termNumber: true } } } } },
     });
     return reports;
   }
