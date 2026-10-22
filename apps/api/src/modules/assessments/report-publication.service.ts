@@ -16,6 +16,32 @@ export class ReportPublicationService {
     return { years, templates, sets: sets.map((s) => ({ id: s.id, name: s.name, status: s.status, template: s.template, academicYear: s.academicYear, term: s.term, classes: s.targetClasses.map((r) => r.class), reportCount: s._count.reportCards, publishAt: s.publishAt, publishedAt: s.publishedAt, updatedAt: s.updatedAt })) };
   }
 
+  async getMyPublishedReports(schoolId: string, userId: string) {
+    const student = await this.prisma.client.student.findFirst({ where: { schoolId, deletedAt: null, profile: { userId } }, select: { id: true } });
+    if (!student) throw new NotFoundException("Student record not found.");
+    return this.prisma.client.reportCard.findMany({
+      where: { studentId: student.id, publishedAt: { not: null }, set: { schoolId, status: "PUBLISHED" } },
+      orderBy: { publishedAt: "desc" },
+      select: { id: true, data: true, publishedAt: true, set: { select: { name: true, academicYear: { select: { name: true } }, term: { select: { name: true, termNumber: true } } } } },
+    });
+  }
+
+  async getGuardianPublishedReports(schoolId: string, userId: string) {
+    const guardian = await this.prisma.client.guardian.findFirst({
+      where: { schoolId, deletedAt: null, isActive: true, profile: { userId } },
+      select: { students: { where: { receiveReports: true }, select: { student: { select: { id: true, firstName: true, lastName: true, admissionNumber: true } } } } },
+    });
+    if (!guardian) throw new NotFoundException("Guardian record not found.");
+    const studentIds = guardian.students.map((row) => row.student.id);
+    if (!studentIds.length) return [];
+    const reports = await this.prisma.client.reportCard.findMany({
+      where: { studentId: { in: studentIds }, publishedAt: { not: null }, set: { schoolId, status: "PUBLISHED" } },
+      orderBy: { publishedAt: "desc" },
+      select: { id: true, studentId: true, data: true, publishedAt: true, student: { select: { firstName: true, lastName: true, admissionNumber: true } }, set: { select: { name: true, academicYear: { select: { name: true } }, term: { select: { name: true, termNumber: true } } } } },
+    });
+    return reports;
+  }
+
   async createSet(schoolId: string, actorId: string, input: { name: string; templateId: string; academicYearId: string; termId: string; classIds: string[]; publishAt: string | null }) {
     const [template, year, term, classes] = await Promise.all([
       this.prisma.client.reportCardTemplate.findFirst({ where: { id: input.templateId, schoolId, isActive: true }, select: { id: true } }),
@@ -55,13 +81,7 @@ export class ReportPublicationService {
       });
       await db.$transaction(async (tx) => {
         for (const student of students) {
-          const data = {
-            schemaVersion: 1, student: { id: student.id, class: student.enrollments[0]?.class ?? null },
-            academicYearId: set.academicYearId, termId: set.termId,
-            subjects: student.assessmentScores.map((score) => ({ subject: score.subject, totalScore: Number(score.totalScore), percentage: Number(score.percentage), grade: score.grade, position: score.position, remarks: score.remarks, components: score.componentScores.map((c) => ({ name: c.component.name, marksObtained: Number(c.marksObtained), maxMarks: Number(c.maxMarks), percentage: Number(c.percentage), weight: Number(c.component.weight) })) })),
-            remarks: student.remarks.map((r) => ({ type: r.remarkType, content: r.content, teacher: [r.teacher.profile?.firstName, r.teacher.profile?.lastName].filter(Boolean).join(" ") })),
-            generatedAt: new Date().toISOString(),
-          };
+          const data = { schemaVersion: 1, student: { id: student.id, class: student.enrollments[0]?.class ?? null }, academicYearId: set.academicYearId, termId: set.termId, subjects: student.assessmentScores.map((score) => ({ subject: score.subject, totalScore: Number(score.totalScore), percentage: Number(score.percentage), grade: score.grade, position: score.position, remarks: score.remarks, components: score.componentScores.map((c) => ({ name: c.component.name, marksObtained: Number(c.marksObtained), maxMarks: Number(c.maxMarks), percentage: Number(c.percentage), weight: Number(c.component.weight) })) })), remarks: student.remarks.map((r) => ({ type: r.remarkType, content: r.content, teacher: [r.teacher.profile?.firstName, r.teacher.profile?.lastName].filter(Boolean).join(" ") })), generatedAt: new Date().toISOString() };
           await tx.reportCard.upsert({ where: { setId_studentId: { setId: set.id, studentId: student.id } }, create: { setId: set.id, studentId: student.id, data: data as Prisma.InputJsonValue }, update: { data: data as Prisma.InputJsonValue, publishedAt: null } });
         }
         await tx.reportCardSet.update({ where: { id: set.id }, data: { status: "GENERATED" } });
