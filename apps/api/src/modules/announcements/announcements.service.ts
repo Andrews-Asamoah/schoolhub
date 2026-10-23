@@ -114,7 +114,7 @@ export class AnnouncementsService {
       return true;
     }
     if (["all_jhs_students", "jhs_students"].includes(normalized)) {
-      return role === "student" && /\b(jhs|junior\s+high|basic\s*[789])\b/i.test(studentClassLabel ?? "");
+      return role === "student" && /\b(jhs\s*\d*|junior\s+high|basic\s*[789])\b/i.test(studentClassLabel ?? "");
     }
     if (role === "student") {
       return [
