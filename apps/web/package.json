@@ -12,6 +12,7 @@
     "audit:theme": "node scripts/audit-theme-contrast.mjs"
   },
   "dependencies": {
+    "@radix-ui/react-select": "^2.4.1",
     "@radix-ui/react-slot": "^1.5.0",
     "@schoolhub/shared": "workspace:*",
     "@tanstack/react-form": "^1.33.5",

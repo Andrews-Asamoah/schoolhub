@@ -20,6 +20,8 @@ interface School {
   name: string;
   code: string;
   subdomain: string;
+  logo: string | null;
+  motto: string | null;
 }
 
 function DashboardPage() {
@@ -72,8 +74,11 @@ function DashboardPage() {
         <SchoolSidebar
           activePage="dashboard"
           schoolName={school?.name}
+          schoolLogo={school?.logo}     // <--- Passed logo here
+          schoolMotto={school?.motto}   // <--- Passed motto here
           userName={session?.user?.name}
           userEmail={session?.user?.email}
+          userImage={session?.user?.image}
         />
         <div className="min-w-0 flex-1">
           <DashboardHeader

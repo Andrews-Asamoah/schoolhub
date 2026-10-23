@@ -1,10 +1,8 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import {
   ArrowRight,
-  Building2,
   Eye,
   EyeOff,
-  Globe,
   GraduationCap,
   LockKeyhole,
   Mail,
@@ -148,7 +146,7 @@ function LoginPage() {
           </div>
           <h1 className="max-w-lg text-4xl font-semibold leading-[1.12] tracking-[-0.04em] xl:text-[54px]">
             A brighter way to{" "}
-            <span className="bg-gradient-to-r from-sky-200 via-blue-200 to-indigo-200 bg-clip-text text-transparent">
+            <span className="bg-linear-to-r from-sky-200 via-blue-200 to-indigo-200 bg-clip-text text-transparent">
               run your school.
             </span>
           </h1>
@@ -157,7 +155,7 @@ function LoginPage() {
             one calm, clear workspace.
           </p>
 
-          <div className="mt-12 max-w-md rounded-2xl border border-white/15 bg-white/[0.08] p-5 shadow-2xl shadow-blue-950/30 backdrop-blur-xl">
+          <div className="mt-12 max-w-md rounded-2xl border border-white/15 bg-white/8 p-5 shadow-2xl shadow-blue-950/30 backdrop-blur-xl">
             <div className="flex items-start justify-between">
               <div>
                 <p className="text-xs font-medium text-blue-100/65">
@@ -166,14 +164,14 @@ function LoginPage() {
                 <p className="mt-1 text-lg font-semibold">A clearer picture</p>
               </div>
               <span className="flex size-9 items-center justify-center rounded-xl bg-sky-300/15 text-sky-200">
-                <ShieldCheck className="size-[18px]" />
+                <ShieldCheck className="size-4.5" />
               </span>
             </div>
-            <div className="mt-6 flex h-[88px] items-end gap-2">
+            <div className="mt-6 flex h-22 items-end gap-2">
               {chartBars.map((height, index) => (
                 <span
                   key={index}
-                  className="flex-1 rounded-t-sm bg-gradient-to-t from-blue-400/30 to-sky-200/90"
+                  className="flex-1 rounded-t-sm bg-linear-to-t from-blue-400/30 to-sky-200/90"
                   style={{ height: `${height}%` }}
                 />
               ))}
@@ -193,11 +191,11 @@ function LoginPage() {
         </div>
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute -bottom-36 -right-28 size-[440px] rounded-full border border-white/[0.08]"
+          className="pointer-events-none absolute -bottom-36 -right-28 size-110 rounded-full border border-white/8"
         />
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute -bottom-24 -right-16 size-[320px] rounded-full border border-white/[0.08]"
+          className="pointer-events-none absolute -bottom-24 -right-16 size-80 rounded-full border border-white/8"
         />
       </section>
 
@@ -206,7 +204,7 @@ function LoginPage() {
           <ThemeToggle />
         </div>
 
-        <div className="w-full max-w-[420px]">
+        <div className="w-full max-w-105">
           <div className="mb-9 flex items-center gap-3 lg:hidden">
             <span className="flex size-10 items-center justify-center rounded-xl bg-blue-600 text-white shadow-lg shadow-blue-600/20">
               <GraduationCap className="size-5" />
@@ -262,7 +260,7 @@ function LoginPage() {
                 Email or username
               </label>
               <div className="group relative">
-                <Mail className="pointer-events-none absolute left-3.5 top-1/2 size-[17px] -translate-y-1/2 text-slate-400 transition group-focus-within:text-blue-600" />
+                <Mail className="pointer-events-none absolute left-3.5 top-1/2 size-4.25 -translate-y-1/2 text-slate-400 transition group-focus-within:text-blue-600" />
                 <input
                   id="email"
                   name="email"
@@ -290,7 +288,7 @@ function LoginPage() {
                 </label>
               </div>
               <div className="group relative">
-                <LockKeyhole className="pointer-events-none absolute left-3.5 top-1/2 size-[17px] -translate-y-1/2 text-slate-400 transition group-focus-within:text-blue-600" />
+                <LockKeyhole className="pointer-events-none absolute left-3.5 top-1/2 size-4.25 -translate-y-1/2 text-slate-400 transition group-focus-within:text-blue-600" />
                 <input
                   id="password"
                   name="password"
@@ -310,9 +308,9 @@ function LoginPage() {
                   className="absolute right-2 top-1/2 flex size-9 -translate-y-1/2 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:hover:bg-slate-800 dark:hover:text-slate-200"
                 >
                   {showPassword ? (
-                    <EyeOff className="size-[17px]" />
+                    <EyeOff className="size-4.25" />
                   ) : (
-                    <Eye className="size-[17px]" />
+                    <Eye className="size-4.25" />
                   )}
                 </button>
               </div>

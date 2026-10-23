@@ -1,13 +1,9 @@
 import { ChevronRight, ChevronsUpDown, LoaderCircle, LogOut, UserRound } from "lucide-react";
 import {
-  type KeyboardEvent as ReactKeyboardEvent,
-  type ReactNode,
-  useCallback,
   useEffect,
-  useId,
-  useLayoutEffect,
   useRef,
   useState,
+  type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
 import { UserAvatar } from "@/components/ui/user-avatar";
@@ -31,34 +27,25 @@ export interface SidebarUserMenuProps {
   }) => ReactNode;
 }
 
-const PANEL_WIDTH = 288;
-const GAP = 8;
+const PANEL_WIDTH = 290;
+const GAP = 10;
 
 const itemBase =
-  "group flex w-full items-center gap-3 rounded-xl px-2.5 py-2 text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-blue-500/70";
+  "group flex w-full items-center gap-3 rounded-xl px-2.5 py-2.5 text-left outline-none transition-all duration-150 focus-visible:ring-2 focus-visible:ring-blue-500/70";
 
-/**
- * Account card at the bottom of a sidebar. Clicking it opens a popover with
- * the signed-in person, a link to their profile and a sign-out action.
- *
- * The popover is portalled to <body> and positioned from the trigger, so it is
- * never clipped by the sidebar (collapsed rail, or the mobile slide-in drawer).
- */
 export function SidebarUserMenu({ name, email, image, roleLabel, profileLink }: SidebarUserMenuProps) {
   const { error: signOutError, isSigningOut, logout } = useLogout();
   const [open, setOpen] = useState(false);
   const [position, setPosition] = useState<{ left: number; bottom: number } | null>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
-  const menuId = useId();
 
   const displayName = name?.trim() || "Your account";
 
-  const place = useCallback(() => {
+  const place = () => {
     const trigger = triggerRef.current;
     if (!trigger) return;
     const rect = trigger.getBoundingClientRect();
-    // A collapsed sidebar rail is narrow: open beside it instead of above it.
     const beside = rect.width < 140;
     const width = Math.min(PANEL_WIDTH, window.innerWidth - GAP * 2);
     const left = beside ? rect.right + GAP : rect.left;
@@ -68,26 +55,25 @@ export function SidebarUserMenu({ name, email, image, roleLabel, profileLink }: 
         ? Math.max(GAP, window.innerHeight - rect.bottom)
         : window.innerHeight - rect.top + GAP,
     });
-  }, []);
+  };
 
-  const close = useCallback((returnFocus = false) => {
+  const close = (returnFocus = false) => {
     setOpen(false);
     if (returnFocus) triggerRef.current?.focus();
-  }, []);
+  };
 
-  // Keep the panel attached to the trigger.
-  useLayoutEffect(() => {
+  useEffect(() => {
     if (!open) return;
     place();
-    window.addEventListener("resize", place);
-    window.addEventListener("scroll", place, true);
+    const handleResizeOrScroll = () => place();
+    window.addEventListener("resize", handleResizeOrScroll);
+    window.addEventListener("scroll", handleResizeOrScroll, true);
     return () => {
-      window.removeEventListener("resize", place);
-      window.removeEventListener("scroll", place, true);
+      window.removeEventListener("resize", handleResizeOrScroll);
+      window.removeEventListener("scroll", handleResizeOrScroll, true);
     };
-  }, [open, place]);
+  }, [open]);
 
-  // Outside click, Escape, and moving focus into the menu.
   useEffect(() => {
     if (!open) return;
     const onPointer = (event: MouseEvent) => {
@@ -103,49 +89,27 @@ export function SidebarUserMenu({ name, email, image, roleLabel, profileLink }: 
     };
     document.addEventListener("mousedown", onPointer);
     document.addEventListener("keydown", onKey);
-    const frame = requestAnimationFrame(() =>
-      panelRef.current?.querySelector<HTMLElement>('[role="menuitem"]')?.focus(),
-    );
     return () => {
       document.removeEventListener("mousedown", onPointer);
       document.removeEventListener("keydown", onKey);
-      cancelAnimationFrame(frame);
     };
-  }, [open, close]);
-
-  function onMenuKeyDown(event: ReactKeyboardEvent<HTMLDivElement>) {
-    const items = Array.from(
-      panelRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"]:not([disabled])') ?? [],
-    );
-    if (items.length === 0) return;
-    const current = items.indexOf(document.activeElement as HTMLElement);
-    let next: number | null = null;
-    if (event.key === "ArrowDown") next = (current + 1) % items.length;
-    else if (event.key === "ArrowUp") next = (current - 1 + items.length) % items.length;
-    else if (event.key === "Home") next = 0;
-    else if (event.key === "End") next = items.length - 1;
-    else if (event.key === "Tab") close();
-    if (next !== null) {
-      event.preventDefault();
-      items[next]?.focus();
-    }
-  }
+  }, [open]);
 
   return (
     <>
+      {/* Trigger Card Button */}
       <button
         ref={triggerRef}
         type="button"
         aria-haspopup="menu"
         aria-expanded={open}
-        aria-controls={open ? menuId : undefined}
         title={displayName}
         onClick={() => setOpen((value) => !value)}
         className={cn(
-          "group flex w-full min-w-0 items-center gap-2.5 rounded-xl border border-transparent p-2 text-left transition",
-          "hover:border-slate-200 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/70",
-          "dark:hover:border-white/10 dark:hover:bg-white/5",
-          open && "border-slate-200 bg-slate-50 dark:border-white/10 dark:bg-white/5",
+          "group flex w-full min-w-0 items-center gap-2.5 rounded-xl border border-slate-200/60 bg-white/60 p-2 text-left transition-all duration-200 backdrop-blur-md",
+          "hover:border-slate-300 hover:bg-white/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/70",
+          "dark:border-slate-800/80 dark:bg-slate-900/50 dark:hover:border-slate-700 dark:hover:bg-slate-800/80",
+          open && "border-slate-300 bg-white/90 dark:border-slate-700 dark:bg-slate-800/90 shadow-sm",
         )}
       >
         <span className="relative shrink-0">
@@ -169,43 +133,46 @@ export function SidebarUserMenu({ name, email, image, roleLabel, profileLink }: 
         />
       </button>
 
+      {/* Glassmorphic Popover Card */}
       {open &&
         position &&
         createPortal(
           <div
             ref={panelRef}
-            id={menuId}
             role="menu"
             aria-label="Account menu"
-            onKeyDown={onMenuKeyDown}
             style={{
               left: position.left,
               bottom: position.bottom,
               width: Math.min(PANEL_WIDTH, window.innerWidth - GAP * 2),
-              maxHeight: `calc(100vh - ${GAP * 2}px)`,
             }}
-            className="user-menu-panel fixed z-[70] overflow-hidden rounded-2xl border border-slate-200/80 bg-white/95 text-left shadow-2xl shadow-slate-900/15 ring-1 ring-black/5 backdrop-blur-xl dark:border-white/10 dark:bg-slate-900/95 dark:shadow-black/50 dark:ring-white/5"
+            className="user-menu-panel fixed z-[70] overflow-hidden rounded-2xl border border-white/60 bg-white/80 text-left shadow-2xl shadow-slate-900/10 ring-1 ring-slate-950/5 backdrop-blur-xl animate-in fade-in-0 zoom-in-95 dark:border-slate-800/80 dark:bg-slate-900/80 dark:shadow-black/60 dark:ring-white/10"
           >
-            <div className="relative px-4 pt-4 pb-3">
+            {/* Header with Mesh Glass Glow */}
+            <div className="relative overflow-hidden px-4 pt-4.5 pb-3.5">
+              {/* Subtle ambient gradient mesh */}
               <div
                 aria-hidden="true"
-                className="absolute inset-x-0 top-0 h-16 bg-gradient-to-br from-blue-500/15 via-indigo-500/10 to-transparent dark:from-blue-400/15 dark:via-indigo-400/10"
+                className="pointer-events-none absolute -inset-x-4 -top-10 h-32 bg-gradient-to-br from-indigo-500/10 via-sky-500/5 to-transparent blur-xl dark:from-indigo-400/15 dark:via-purple-500/10"
               />
-              <div className="relative flex items-center gap-3">
+
+              <div className="relative flex items-center gap-3.5">
                 <UserAvatar
                   name={name}
                   image={image}
-                  className="size-12 text-base ring-2 ring-white shadow-sm dark:ring-slate-900"
+                  className="size-12 text-base ring-2 ring-white/90 shadow-sm dark:ring-slate-800"
                 />
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-slate-900 dark:text-white">
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-bold tracking-tight text-slate-900 dark:text-white">
                     {displayName}
                   </p>
                   {email && (
-                    <p className="truncate text-xs text-slate-500 dark:text-slate-400">{email}</p>
+                    <p className="truncate text-xs text-slate-500 dark:text-slate-400 font-normal">
+                      {email}
+                    </p>
                   )}
                   {roleLabel && (
-                    <span className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-blue-700 ring-1 ring-blue-100 dark:bg-blue-400/10 dark:text-blue-200 dark:ring-blue-300/10">
+                    <span className="mt-1.5 inline-flex items-center gap-1.5 rounded-full bg-indigo-500/10 px-2.5 py-0.5 text-[10px] font-semibold text-indigo-700 dark:bg-indigo-400/15 dark:text-indigo-300">
                       <span className="size-1.5 rounded-full bg-emerald-500" aria-hidden="true" />
                       {roleLabel}
                     </span>
@@ -214,28 +181,35 @@ export function SidebarUserMenu({ name, email, image, roleLabel, profileLink }: 
               </div>
             </div>
 
-            <div className="border-t border-slate-100 p-1.5 dark:border-white/10">
+            {/* Profile Action Link */}
+            <div className="border-t border-slate-200/50 p-1.5 dark:border-slate-800/60">
               {profileLink({
                 onClick: () => close(),
-                className: cn(itemBase, "hover:bg-slate-100 focus-visible:bg-slate-100 dark:hover:bg-white/10 dark:focus-visible:bg-white/10"),
+                className: cn(
+                  itemBase,
+                  "hover:bg-slate-100/70 focus-visible:bg-slate-100/70 dark:hover:bg-slate-800/60 dark:focus-visible:bg-slate-800/60",
+                ),
                 children: (
                   <>
-                    <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-600 dark:bg-blue-400/10 dark:text-blue-200">
+                    <span className="flex size-8 shrink-0 items-center justify-center rounded-xl bg-indigo-500/10 text-indigo-600 dark:bg-indigo-400/15 dark:text-indigo-300">
                       <UserRound className="size-4" />
                     </span>
                     <span className="min-w-0 flex-1">
-                      <span className="block text-sm font-medium text-slate-800 dark:text-slate-100">My profile</span>
+                      <span className="block text-xs font-semibold text-slate-800 dark:text-slate-100">
+                        My profile
+                      </span>
                       <span className="block truncate text-[11px] text-slate-500 dark:text-slate-400">
                         View and edit your details
                       </span>
                     </span>
-                    <ChevronRight className="size-4 shrink-0 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-slate-500" />
+                    <ChevronRight className="size-4 shrink-0 text-slate-400 transition group-hover:translate-x-0.5 group-hover:text-slate-600 dark:text-slate-500 dark:group-hover:text-slate-300" />
                   </>
                 ),
               })}
             </div>
 
-            <div className="border-t border-slate-100 p-1.5 dark:border-white/10">
+            {/* Logout Action Button */}
+            <div className="border-t border-slate-200/50 p-1.5 dark:border-slate-800/60">
               <button
                 type="button"
                 role="menuitem"
@@ -243,14 +217,14 @@ export function SidebarUserMenu({ name, email, image, roleLabel, profileLink }: 
                 onClick={() => void logout()}
                 className={cn(
                   itemBase,
-                  "hover:bg-red-50 focus-visible:bg-red-50 disabled:cursor-wait disabled:opacity-70 dark:hover:bg-red-400/10 dark:focus-visible:bg-red-400/10",
+                  "hover:bg-rose-500/10 focus-visible:bg-rose-500/10 disabled:cursor-wait disabled:opacity-70 dark:hover:bg-rose-500/15 dark:focus-visible:bg-rose-500/15",
                 )}
               >
-                <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-red-50 text-red-600 dark:bg-red-400/10 dark:text-red-300">
+                <span className="flex size-8 shrink-0 items-center justify-center rounded-xl bg-rose-500/10 text-rose-600 dark:bg-rose-400/15 dark:text-rose-300">
                   {isSigningOut ? <LoaderCircle className="size-4 animate-spin" /> : <LogOut className="size-4" />}
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className="block text-sm font-medium text-red-600 dark:text-red-300">
+                  <span className="block text-xs font-semibold text-rose-600 dark:text-rose-300">
                     {isSigningOut ? "Signing out…" : "Sign out"}
                   </span>
                   <span className="block truncate text-[11px] text-slate-500 dark:text-slate-400">
@@ -259,7 +233,7 @@ export function SidebarUserMenu({ name, email, image, roleLabel, profileLink }: 
                 </span>
               </button>
               {signOutError && (
-                <p role="alert" className="px-3 pt-1 pb-2 text-xs text-red-600 dark:text-red-300">
+                <p role="alert" className="px-3 pt-1 pb-2 text-xs text-rose-600 dark:text-rose-400">
                   {signOutError}
                 </p>
               )}

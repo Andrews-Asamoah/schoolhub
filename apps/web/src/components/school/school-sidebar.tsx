@@ -16,6 +16,8 @@ import {
 interface SchoolSidebarProps {
   activePage: string;
   schoolName?: string;
+  schoolLogo?: string | null;
+  schoolMotto?: string | null;
   userName?: string;
   userEmail?: string;
   userImage?: string | null;
@@ -24,6 +26,8 @@ interface SchoolSidebarProps {
 export function SchoolSidebar({
   activePage,
   schoolName,
+  schoolLogo,
+  schoolMotto,
   userName,
   userEmail,
   userImage,
@@ -36,39 +40,31 @@ export function SchoolSidebar({
     <Sidebar className="school-sidebar-shell">
       <SidebarHeader>
         <Link to="/dashboard" className="flex min-w-0 items-center gap-3">
-          <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-white shadow-sm shadow-blue-600/20">
-            <GraduationCap className="size-5" strokeWidth={2.2} />
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-white shadow-sm shadow-blue-600/20 overflow-hidden">
+            {schoolLogo ? (
+              <img src={schoolLogo} alt={schoolName ?? "School Logo"} className="size-full object-cover" />
+            ) : (
+              <GraduationCap className="size-5" strokeWidth={2.2} />
+            )}
           </span>
           <span className="sidebar-expanded min-w-0">
-            <span className="school-brand-title block text-[15px] font-bold tracking-tight">
-              SchoolHub
+            <span className="school-brand-title block text-[15px] font-bold tracking-tight text-slate-900 dark:text-white truncate">
+              {schoolName ?? "School Workspace"}
             </span>
-            <span className="block text-[10px] font-medium tracking-wide text-slate-400">
-              SCHOOL MANAGEMENT
+            <span className="block text-[10px] font-medium tracking-wide text-slate-400 dark:text-slate-500 truncate">
+              {schoolMotto ?? "SCHOOL MANAGEMENT"}
             </span>
           </span>
         </Link>
       </SidebarHeader>
 
       <SidebarContent>
-        <div className="sidebar-expanded mb-6 rounded-xl border border-slate-100 bg-slate-50 p-3">
-          <div className="flex items-center justify-between gap-2">
-            <div className="min-w-0">
-              <p className="truncate text-xs font-semibold text-slate-800">
-                {schoolName ?? "Your school"}
-              </p>
-              <p className="mt-0.5 text-[11px] text-slate-500">
-                Current workspace
-              </p>
-            </div>
-          </div>
-        </div>
-
         <SidebarGroup>
           <SidebarGroupLabel>Workspace</SidebarGroupLabel>
           <SidebarMenuButton
             asChild
             active={activePage === "dashboard"}
+            tooltip="Overview"
             className="school-sidebar-nav-item"
           >
             <Link to="/dashboard">
@@ -115,12 +111,12 @@ export function SchoolSidebar({
       </SidebarContent>
 
       <SidebarFooter>
-        <div className="sidebar-expanded mb-3 rounded-xl bg-blue-50/80 p-3">
-          <div className="mb-1.5 flex items-center gap-2 text-blue-700">
+        <div className="sidebar-expanded mb-3 rounded-xl bg-blue-50/80 p-3 dark:bg-blue-950/30">
+          <div className="mb-1.5 flex items-center gap-2 text-blue-700 dark:text-blue-300">
             <Sparkles className="size-3.5" />
             <span className="text-xs font-semibold">SchoolHub workspace</span>
           </div>
-          <p className="text-[11px] leading-relaxed text-slate-600">
+          <p className="text-[11px] leading-relaxed text-slate-600 dark:text-slate-400">
             Your school&apos;s daily operations, together in one place.
           </p>
         </div>

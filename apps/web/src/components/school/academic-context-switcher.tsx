@@ -1,7 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CalendarRange, CircleAlert } from "lucide-react";
+import { CalendarRange, CircleAlert, RotateCcw } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useSchoolRole } from "@/components/school/school-role-switcher";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { apiFetch } from "@/lib/api";
 
 interface AcademicTerm {
@@ -32,11 +39,13 @@ export function AcademicContextSwitcher() {
   const canManageSchoolContext = ["owner", "admin", "headmistress"].includes(
     activeRole ?? "",
   );
+
   const yearsQuery = useQuery({
     queryKey: ["schools", "academic-years"],
     queryFn: () => apiFetch<AcademicYear[]>("/schools/academic-years"),
     retry: false,
   });
+
   const contextQuery = useQuery({
     queryKey: ["schools", "academic-context"],
     queryFn: () => apiFetch<AcademicContext | null>("/schools/academic-context"),
@@ -44,6 +53,7 @@ export function AcademicContextSwitcher() {
     refetchOnWindowFocus: true,
     refetchInterval: 15_000,
   });
+
   const [academicYearId, setAcademicYearId] = useState("");
   const [termId, setTermId] = useState("");
   const [hasPersonalOverride, setHasPersonalOverride] = useState(false);
@@ -138,6 +148,7 @@ export function AcademicContextSwitcher() {
     (year) => year.id === academicYearId,
   );
   const selectedTerm = selectedYear?.terms.find((term) => term.id === termId);
+
   const mutation = useMutation({
     mutationFn: () =>
       apiFetch<AcademicContext>("/schools/academic-context", {
@@ -156,7 +167,7 @@ export function AcademicContextSwitcher() {
       <span
         role="alert"
         title={error?.message}
-        className="inline-flex items-center gap-1.5 text-xs text-destructive"
+        className="inline-flex items-center gap-1.5 rounded-md border border-rose-200 bg-rose-50 px-2.5 py-1 text-xs text-rose-700 dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-300"
       >
         <CircleAlert className="size-3.5 shrink-0" />
         Academic period unavailable
@@ -168,8 +179,8 @@ export function AcademicContextSwitcher() {
 
   if (!current) {
     return (
-      <span className="hidden items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 py-2 text-xs text-muted-foreground sm:inline-flex">
-        <CalendarRange className="size-3.5" />
+      <span className="hidden items-center gap-1.5 rounded-xl border border-slate-200/80 bg-white/90 px-3 py-1.5 text-xs font-medium text-slate-500 dark:border-slate-800 dark:bg-slate-900/90 dark:text-slate-400 sm:inline-flex">
+        <CalendarRange className="size-3.5 text-slate-400 dark:text-slate-500" />
         {isAccountant
           ? "Waiting for the school to set a current period"
           : "Set up the current academic period"}
@@ -181,30 +192,28 @@ export function AcademicContextSwitcher() {
     return (
       <span
         title="The active academic period is set by a school administrator"
-        className="hidden max-w-48 items-center gap-1.5 truncate rounded-lg border border-border bg-card px-2.5 py-2 text-xs font-medium text-foreground sm:inline-flex"
+        className="hidden items-center gap-2 rounded-xl border border-slate-200/80 bg-white/90 px-3.5 py-1.5 text-xs font-semibold text-slate-700 shadow-xs dark:border-slate-800 dark:bg-slate-900/90 dark:text-slate-200 sm:inline-flex"
       >
-        <CalendarRange className="size-3.5 shrink-0 text-primary" />
-        <span className="truncate">
+        <CalendarRange className="size-4 shrink-0 text-indigo-600 dark:text-indigo-400" />
+        <span>
           {current.academicYear.name} · {current.term.name}
         </span>
       </span>
     );
   }
 
+  const isCurrentSelection =
+    academicYearId === current.academicYear.id && termId === current.term.id;
+
   return (
-    <div className="flex flex-col items-end gap-1">
-      <div className="flex items-center gap-1.5 rounded-lg border border-border bg-card px-2 py-1.5 shadow-sm">
-        <CalendarRange className="hidden size-4 shrink-0 text-primary sm:block" />
-        <label className="sr-only" htmlFor="active-academic-year">
-          {isAccountant ? "Academic year to view" : "Active academic year"}
-        </label>
-        <select
-          id="active-academic-year"
-          aria-label={isAccountant ? "Academic year to view" : "Active academic year"}
+    <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1.5 rounded-xl border border-slate-200/80 bg-white/90 p-1 shadow-xs dark:border-slate-800 dark:bg-slate-900/90">
+        <CalendarRange className="size-4 shrink-0 text-indigo-600 dark:text-indigo-400 ml-2" />
+
+        {/* Academic Year Select */}
+        <Select
           value={academicYearId}
-          disabled={mutation.isPending}
-          onChange={(event) => {
-            const yearId = event.target.value;
+          onValueChange={(yearId) => {
             const year = yearsQuery.data?.find((item) => item.id === yearId);
             setAcademicYearId(yearId);
             setTermId(
@@ -214,36 +223,46 @@ export function AcademicContextSwitcher() {
             );
             mutation.reset();
           }}
-          className="max-w-28 bg-transparent text-xs font-semibold text-foreground outline-none sm:max-w-36"
+          disabled={mutation.isPending}
         >
-          {(yearsQuery.data ?? []).map((year) => (
-            <option key={year.id} value={year.id}>
-              {year.name}
-            </option>
-          ))}
-        </select>
-        <label className="sr-only" htmlFor="active-academic-term">
-          {isAccountant ? "Term to view" : "Active term"}
-        </label>
-        <select
-          id="active-academic-term"
-          aria-label={isAccountant ? "Term to view" : "Active term"}
+          <SelectTrigger className="h-7 border-none bg-transparent px-1.5 shadow-none focus:ring-0">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent align="start">
+            {(yearsQuery.data ?? []).map((year) => (
+              <SelectItem key={year.id} value={year.id}>
+                {year.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <span className="text-slate-300 dark:text-slate-700 font-bold">·</span>
+
+        {/* Term Select */}
+        <Select
           value={termId}
-          disabled={!selectedYear?.terms.length || mutation.isPending}
-          onChange={(event) => {
-            setTermId(event.target.value);
+          onValueChange={(val) => {
+            setTermId(val);
             mutation.reset();
           }}
-          className="max-w-24 border-l border-border bg-transparent pl-1.5 text-xs font-semibold text-foreground outline-none sm:max-w-32"
+          disabled={!selectedYear?.terms.length || mutation.isPending}
         >
-          {(selectedYear?.terms ?? []).map((term) => (
-            <option key={term.id} value={term.id}>
-              {term.name}
-            </option>
-          ))}
-        </select>
+          <SelectTrigger className="h-7 border-none bg-transparent px-1.5 shadow-none focus:ring-0">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent align="start">
+            {(selectedYear?.terms ?? []).map((term) => (
+              <SelectItem key={term.id} value={term.id}>
+                {term.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        {/* Action Button */}
         {isAccountant ? (
-          <>
+          <div className="flex items-center gap-1 pl-1">
             <button
               type="button"
               disabled={!selectedTerm}
@@ -253,9 +272,7 @@ export function AcademicContextSwitcher() {
                   selectedYear.id === current.academicYear.id &&
                   selectedTerm.id === current.term.id;
                 if (isSchoolCurrent) {
-                  window.sessionStorage.removeItem(
-                    ACCOUNTANT_VIEW_STORAGE_KEY,
-                  );
+                  window.sessionStorage.removeItem(ACCOUNTANT_VIEW_STORAGE_KEY);
                 } else {
                   window.sessionStorage.setItem(
                     ACCOUNTANT_VIEW_STORAGE_KEY,
@@ -268,57 +285,44 @@ export function AcademicContextSwitcher() {
                 setHasPersonalOverride(!isSchoolCurrent);
                 void queryClient.invalidateQueries();
               }}
-              className="rounded-md bg-primary px-2 py-1 text-[10px] font-semibold text-primary-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50 sm:px-2.5 sm:text-xs"
+              className="rounded-lg bg-indigo-600 px-2.5 py-1 text-xs font-semibold text-white transition-all hover:bg-indigo-500 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-indigo-500 dark:hover:bg-indigo-400"
             >
               View
             </button>
             {hasPersonalOverride && (
               <button
                 type="button"
-                title="Return to the school's current academic period"
+                title="Return to current school period"
                 onClick={() => {
-                  window.sessionStorage.removeItem(
-                    ACCOUNTANT_VIEW_STORAGE_KEY,
-                  );
+                  window.sessionStorage.removeItem(ACCOUNTANT_VIEW_STORAGE_KEY);
                   setHasPersonalOverride(false);
                   setAcademicYearId(current.academicYear.id);
                   setTermId(current.term.id);
                   void queryClient.invalidateQueries();
                 }}
-                className="border-l border-border pl-1.5 text-[10px] font-semibold text-muted-foreground hover:text-foreground"
+                className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100"
               >
+                <RotateCcw className="size-3" />
                 Current
               </button>
             )}
-          </>
+          </div>
         ) : (
           <button
             type="button"
-            disabled={
-              mutation.isPending ||
-              !academicYearId ||
-              !termId ||
-              (academicYearId === current.academicYear.id &&
-                termId === current.term.id)
-            }
+            disabled={mutation.isPending || !academicYearId || !termId || isCurrentSelection}
             onClick={() => mutation.mutate()}
-            className="rounded-md bg-primary px-2 py-1 text-[10px] font-semibold text-primary-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50 sm:px-2.5 sm:text-xs"
+            className="ml-1 rounded-lg bg-indigo-600 px-2.5 py-1 text-xs font-semibold text-white transition-all hover:bg-indigo-500 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-indigo-500 dark:hover:bg-indigo-400"
           >
             {mutation.isPending ? "Switching…" : "Apply"}
           </button>
         )}
       </div>
-      <span className="text-[10px] text-muted-foreground">
-        {isAccountant && hasPersonalOverride
-          ? `Personal view: ${selectedYear?.name ?? ""} · ${selectedTerm?.name ?? ""}`
-          : isAccountant
-            ? `School current: ${current.academicYear.name} · ${current.term.name}`
-            : null}
-      </span>
+
       {mutation.error && (
         <span
           role="alert"
-          className="max-w-48 text-right text-[10px] text-destructive"
+          className="text-right text-[10px] text-rose-600 dark:text-rose-400"
         >
           Could not switch academic period: {mutation.error.message}
         </span>
