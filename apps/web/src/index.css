@@ -218,9 +218,49 @@
     outline-color: color-mix(in oklab, var(--ring) 50%, transparent);
   }
 
+  html,
+  body,
+  #root {
+    min-height: 100%;
+  }
+
+  #root {
+    background-color: var(--background);
+    color: var(--foreground);
+  }
+
   body {
     background-color: var(--background);
     color: var(--foreground);
+  }
+
+  /* Native form controls inherit the selected app theme, not the OS theme.
+     Component utility classes can still override these base-layer defaults. */
+  input:where(:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="file"]):not([type="hidden"])),
+  select,
+  textarea {
+    border-color: var(--input);
+    background-color: var(--card);
+    color: var(--foreground);
+  }
+
+  input::placeholder,
+  textarea::placeholder {
+    color: var(--muted-foreground);
+    opacity: 1;
+  }
+
+  select option {
+    background-color: var(--popover);
+    color: var(--popover-foreground);
+  }
+
+  input:where(:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="file"]):not([type="hidden"])):disabled,
+  select:disabled,
+  textarea:disabled {
+    background-color: var(--muted);
+    color: var(--muted-foreground);
+    cursor: not-allowed;
   }
 
   ::selection {

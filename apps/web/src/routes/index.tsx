@@ -29,9 +29,9 @@ function IndexRedirect() {
   }, [session, isPending, navigate]);
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-50">
-      <div className="flex items-center gap-3 text-sm text-slate-400">
-        <span className="size-2 animate-pulse rounded-full bg-indigo-500" />
+    <div className="flex min-h-screen items-center justify-center bg-background">
+      <div className="flex items-center gap-3 text-sm text-muted-foreground">
+        <span className="size-2 animate-pulse rounded-full bg-primary" />
         Redirecting…
       </div>
     </div>
