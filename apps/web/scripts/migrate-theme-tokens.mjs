@@ -87,6 +87,7 @@ function mapColor({ util, color, shade, alpha, dark, interactive }, ctx) {
       return null;
     }
     if (fam === "from" || fam === "via" || fam === "to") return a >= 50 ? { v: `card${A}` } : null;
+    if (fam === "border") return a >= 50 ? { v: `border${A}` } : null; // a pale edge on a glass surface
     return null;
   }
   if (color === "black") return null;
@@ -208,16 +209,28 @@ function transformGroup(texts) {
   }));
   if (!toks.some((t) => t.m)) return texts;
 
-  // context from non-dark, non-interactive tokens
-  const plain = toks.filter((t) => !t.dark && t.variants.length === 0);
-  const ctx = { inverse: false, solid: null, screen: toks.some((t) => /^(min-h-screen|h-screen)$/.test(t.base)) };
-  for (const t of plain) {
-    if (!t.m) continue;
-    const isBgLike = ["bg", "from", "via", "to"].includes(t.fam);
-    if (!isBgLike) continue;
-    if (NEUTRAL.has(t.color) && Number(t.shade) >= 800 && !t.alpha) ctx.inverse = true;
-    if (HUE[t.color] && Number(t.shade) >= 500 && (!t.alpha || Number(t.alpha) >= 60)) ctx.solid = ctx.solid ?? HUE[t.color];
+  // Context (dark surface / solid hue behind the text).
+  // Judged PER STRING, because the two sides of
+  //   active ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-500"
+  // are alternatives and must not influence each other. A string that sets no
+  // background of its own (e.g. a shared base "text-white ...") falls back to the
+  // whole element, whose conditional parts supply the surface.
+  const newCtx = () => ({ inverse: false, solid: null, screen: false });
+  const lits = texts.map(() => ({ ctx: newCtx(), hasBg: false }));
+  const groupCtx = newCtx();
+  const feed = (c, t) => {
+    if (/^(min-h-screen|h-screen)$/.test(t.base)) c.screen = true;
+    if (!t.m || t.dark || t.variants.length !== 0) return;
+    if (!["bg", "from", "via", "to"].includes(t.fam)) return;
+    if (NEUTRAL.has(t.color) && Number(t.shade) >= 800 && !t.alpha) c.inverse = true;
+    if (HUE[t.color] && Number(t.shade) >= 500 && (!t.alpha || Number(t.alpha) >= 60)) c.solid = c.solid ?? HUE[t.color];
+  };
+  for (const t of toks) {
+    feed(lits[t.li].ctx, t);
+    feed(groupCtx, t);
+    if (t.variants.length === 0 && !t.dark && /^(bg|from|via|to)-/.test(t.base)) lits[t.li].hasBg = true;
   }
+  const ctxs = lits.map((l) => (l.hasBg ? l.ctx : groupCtx));
 
   // semantic counterparts that already adapt to the theme
   const adapt = new Set();
@@ -225,7 +238,7 @@ function transformGroup(texts) {
   for (const t of toks) {
     if (t.m && !t.dark) {
       const interactive = t.variants.some((v) => HOVERISH.has(v));
-      const r = mapColor({ util: t.util, color: t.color, shade: t.shade, alpha: t.alpha, dark: false, interactive }, ctx);
+      const r = mapColor({ util: t.util, color: t.color, shade: t.shade, alpha: t.alpha, dark: false, interactive }, ctxs[t.li]);
       results.set(t, r);
       if (r && r.v) adapt.add(`${t.vkey}|${t.fam}`);
     } else if (!t.m && t.sem && !t.dark) adapt.add(`${t.vkey}|${t.fam}`);
@@ -235,9 +248,9 @@ function transformGroup(texts) {
       if (adapt.has(`${t.vkey}|${t.fam}`)) { results.set(t, { drop: true }); continue; }
       const interactive = t.variants.some((v) => HOVERISH.has(v));
       if (t.color === "white") { // dark-only white overlay: express through foreground
-        results.set(t, mapColor({ util: t.util, color: "white", alpha: t.alpha, dark: true }, ctx) ? { v: `${(mapColor({ util: t.util, color: "white", alpha: t.alpha, dark: true }, ctx)).fg}${t.alpha ? "/" + t.alpha : ""}` } : null);
+        results.set(t, mapColor({ util: t.util, color: "white", alpha: t.alpha, dark: true }, ctxs[t.li]) ? { v: `${(mapColor({ util: t.util, color: "white", alpha: t.alpha, dark: true }, ctxs[t.li])).fg}${t.alpha ? "/" + t.alpha : ""}` } : null);
       } else {
-        results.set(t, mapColor({ util: t.util, color: t.color, shade: t.shade, alpha: t.alpha, dark: true, interactive }, ctx));
+        results.set(t, mapColor({ util: t.util, color: t.color, shade: t.shade, alpha: t.alpha, dark: true, interactive }, ctxs[t.li]));
       }
     }
   }
@@ -352,28 +365,70 @@ function fixBanners() {
       write("routes/admin/dashboard.tsx", lines.join("\n"));
     }
   }
-  // portal banners: white overlays become the banner's own foreground token
-  const HERO = { guardian: "primary-foreground", teacher: "primary-foreground", student: "highlight-foreground", accountant: "background" };
+  // Banners that use a hue (or the page foreground) as their surface: white
+  // overlays and accent text inside them become that banner's own -foreground
+  // token, so they stay readable in both themes. Anything inside a card-coloured
+  // element (a white button on the banner) keeps its normal tokens.
+  const BANNER = /rounded-3xl bg-gradient-to-br from-/;
   const ACC = /text-(success|warning|info|highlight|primary|destructive)(?![-\w/])/g;
-  for (const [name, fg] of Object.entries(HERO)) {
-    const file = `components/portal/${name}-portal-workspace.tsx`;
-    if (!exists(file)) continue;
-    const lines = read(file).split("\n");
-    const r = bannerRange(lines, /rounded-3xl bg-gradient-to-br from-/, (l) => l.trim().startsWith("</div>"));
-    if (r) {
-      for (let i = r[0]; i <= r[1]; i++) {
-        lines[i] = lines[i].replace(/(className|class)="[^"]*"/g, (c) => {
-          if (c.includes("bg-card")) return c;
-          return c
-            .replace(/\b(text|bg|border|ring)-white\b/g, `$1-${fg}`)
-            .replace(/\b(text|bg|border|ring)-white\//g, `$1-${fg}/`)
-            .replace(ACC, `text-${fg}`);
-        });
-        lines[i] = lines[i].replaceAll("hover:bg-white/20", `hover:bg-${fg}/20`);
+  const classSource = (open) => {
+    const attr = open.attributes.find((x) => x.type === "JSXAttribute" && x.name?.name === "className");
+    return attr ? { attr, text: attr.value ? attr.value.__src : "" } : null;
+  };
+  for (const f of walkDir(ROOT)) {
+    const rel = path.relative(ROOT, f).split(path.sep).join("/");
+    const src = fs.readFileSync(f, "utf8");
+    if (!BANNER.test(src)) continue;
+    let ast;
+    try { ast = parse(src, { sourceType: "module", plugins: ["typescript", "jsx"], errorRecovery: true }); } catch { continue; }
+    const edits = [];
+    const stringsIn = (node, out) => {
+      if (!node || typeof node !== "object") return;
+      if (Array.isArray(node)) { node.forEach((n) => stringsIn(n, out)); return; }
+      if (node.type === "StringLiteral") out.push({ start: node.start + 1, end: node.end - 1 });
+      else if (node.type === "TemplateElement") out.push({ start: node.start, end: node.end });
+      for (const k of Object.keys(node)) { if (k === "loc") continue; const v = node[k]; if (v && typeof v === "object") stringsIn(v, out); }
+    };
+    const visit = (node, ctx) => {
+      if (!node || typeof node !== "object") return;
+      if (Array.isArray(node)) { node.forEach((n) => visit(n, ctx)); return; }
+      if (node.type === "JSXElement") {
+        const open = node.openingElement;
+        const attr = open.attributes.find((x) => x.type === "JSXAttribute" && x.name?.name === "className");
+        const cls = attr && attr.value ? src.slice(attr.value.start, attr.value.end) : "";
+        let c = ctx;
+        if (cls && BANNER.test(cls)) {
+          const m = /text-(?:(primary|highlight|success|info|warning|destructive)-foreground|background)\b/.exec(cls);
+          if (m) c = { fg: m[1] ? `${m[1]}-foreground` : "background", inCard: false };
+        } else if (ctx.fg && /\bbg-(card|popover)\b/.test(cls)) {
+          c = { ...ctx, inCard: true };
+        }
+        if (c.fg && !c.inCard && attr && attr.value) {
+          const lits = []; stringsIn(attr.value, lits);
+          for (const l of lits) {
+            const t = src.slice(l.start, l.end);
+            if (/\bbg-(card|popover)\b/.test(t)) continue;
+            const next = t
+              .replace(/\b(text|bg|border|ring)-white\b/g, `$1-${c.fg}`)
+              .replace(/\b(text|bg|border|ring)-white\//g, `$1-${c.fg}/`)
+              .replace(ACC, `text-${c.fg}`)
+              .replaceAll("hover:bg-white/20", `hover:bg-${c.fg}/20`);
+            if (next !== t) edits.push({ ...l, text: next });
+          }
+        }
+        for (const child of node.children) visit(child, c);
+        return;
       }
-    }
-    const chip = fg === "background" ? "success-foreground" : "primary-foreground";
-    write(file, lines.join("\n").replaceAll('isActive ? "bg-white/20 text-white"', `isActive ? "bg-${chip}/20 text-${chip}"`));
+      for (const k of Object.keys(node)) { if (k === "loc") continue; const v = node[k]; if (v && typeof v === "object") visit(v, ctx); }
+    };
+    visit(ast.program, { fg: null, inCard: false });
+    edits.sort((x, y) => y.start - x.start);
+    let out = src;
+    for (const e of edits) out = out.slice(0, e.start) + e.text + out.slice(e.end);
+    // active tab count chips
+    const chip = /accountant/.test(rel) ? "success-foreground" : "primary-foreground";
+    out = out.replaceAll('isActive ? "bg-white/20 text-white"', `isActive ? "bg-${chip}/20 text-${chip}"`);
+    if (out !== src) write(rel, out);
   }
 }
 
@@ -385,6 +440,19 @@ function replaceIn(file, pairs) {
 }
 
 function fixSmall() {
+  // Count badges inside an active (coloured) tab: white overlay -> the tab's foreground token.
+  for (const f of walkDir(ROOT)) {
+    const rel = path.relative(ROOT, f).split(path.sep).join("/");
+    const text = fs.readFileSync(f, "utf8");
+    if (!/(?:isActive|active|selected)\s*\?\s*"bg-white\/\d+/.test(text)) continue;
+    const chip = /accountant/.test(rel) ? "success-foreground" : "primary-foreground";
+    write(rel, text.replace(/\b(isActive|active|selected)(\s*\?\s*)"bg-white\/(\d+)(?: text-white)?"/g, `$1$2"bg-${chip}/$3 text-${chip}"`));
+  }
+  for (const f of walkDir(ROOT)) {
+    const rel = path.relative(ROOT, f).split(path.sep).join("/");
+    const text = fs.readFileSync(f, "utf8");
+    if (text.includes("selection:text-white")) write(rel, text.replaceAll("selection:text-white", "selection:text-primary-foreground"));
+  }
   replaceIn("components/portal/portal-stat-card.tsx", [["text-white shadow-sm", "text-background shadow-sm"]]);
   replaceIn("components/ui/sidebar-user-menu.tsx", [["ring-black/5 backdrop-blur-xl dark:ring-foreground/5", "ring-foreground/5 backdrop-blur-xl"], ["ring-black/5", "ring-foreground/5"]]);
   for (const f of walkDir(ROOT)) {
@@ -392,6 +460,7 @@ function fixSmall() {
     const s = fs.readFileSync(f, "utf8");
     if (s.includes("bg-black/40")) write(rel, s.replaceAll("bg-black/40", "bg-overlay"));
   }
+  replaceIn("lib/utils.ts", [['isActive && "bg-blue-500"', 'isActive && "bg-primary"']]);
   replaceIn("routes/admin/profile.tsx", [["bg-white/10 ring-1 ring-white/20", "bg-primary-foreground/10 ring-1 ring-primary-foreground/20"]]);
   replaceIn("components/school/school-workspace-layout.tsx", [["bg-[#f7f8fc]", "bg-background"]]);
 }
@@ -424,7 +493,5 @@ for (const file of walkDir(ROOT)) {
 if (!DRY) { fixBanners(); fixSmall(); }
 
 console.log(`${DRY ? "[dry run] " : ""}class strings rewritten in ${changedFiles} file(s): ${stats.mapped} classes mapped to tokens, ${stats.droppedDark} redundant dark: overrides removed.`);
-const left = [...stats.leftover.entries()].sort((a, b) => b[1] - a[1]);
-if (left.length && !DRY) console.log("Left for manual review (translucent white/black overlays):", left.map(([k, v]) => `${k} x${v}`).join(", "));
 for (const n of notes) console.log("NOTE:", n);
 console.log(DRY ? "" : "Next: pnpm --filter @schoolhub/web lint:theme  (lists anything still using raw colours)");

@@ -49,6 +49,8 @@ const RULES = [
 const ALLOW = [
   // House colour swatches are chosen by the school (data), text on them must stay white.
   [/school\/houses-workspace\.tsx$/, "white-black", /text-white/],
+  // Report-card table headers sit on the template's accent colour (set with an inline style), so the white text is intentional.
+  [/portal\/(guardian-published-reports|student-report-view)\.tsx$/, "white-black", /text-white/],
   // The default for a school-chosen house colour (stored in the database, shown in a colour picker).
   [/school\/houses-workspace\.tsx$/, "inline-style-colour", /#[0-9a-fA-F]{6}/],
 ];
