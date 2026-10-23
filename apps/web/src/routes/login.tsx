@@ -10,12 +10,12 @@ import {
   Sparkles,
 } from "lucide-react";
 import { useEffect, useState, type FormEvent } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { studentLoginEmail } from "@schoolhub/shared";
 import { apiFetch, getClientSubdomain } from "@/lib/api";
 import { ThemeToggle } from "@/components/school/theme-toggle";
 import { consumeLogoutNotice } from "@/hooks/use-logout";
-import { authClient, signIn, useSession } from "@/lib/auth-client";
-import { useTenantSchool } from "@/lib/tenant";
+import { signIn, useSession } from "@/lib/auth-client";
 
 export const Route = createFileRoute("/login")({
   component: LoginPage,
@@ -23,15 +23,35 @@ export const Route = createFileRoute("/login")({
 
 const chartBars = [42, 58, 49, 75, 63, 88, 70, 96, 77, 100, 84, 91];
 
+interface PublicSchoolBranding {
+  school: {
+    name: string;
+    logo: string | null;
+    motto: string | null;
+  };
+}
+
 function LoginPage() {
   const navigate = useNavigate();
   const { data: session, isPending: sessionPending } = useSession();
+  const subdomain = getClientSubdomain();
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [logoutNotice, setLogoutNotice] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  // Fetch school branding dynamically if a tenant subdomain is active
+  const { data: tenantData } = useQuery({
+    queryKey: ["login-branding", subdomain],
+    queryFn: () => apiFetch<PublicSchoolBranding>(`/admissions/public/${subdomain}`),
+    enabled: Boolean(subdomain),
+    retry: false,
+  });
+
+  const school = tenantData?.school;
 
   useEffect(() => {
     if (sessionPending || !session?.user) return;
@@ -68,24 +88,24 @@ function LoginPage() {
     setLoading(true);
 
     try {
-      // Students type their username (e.g. a.asamoah) rather than a long
-      // email. The school's server turns it into the real login address.
       let loginEmail = email.trim();
       if (!loginEmail.includes("@")) {
-        const school = getClientSubdomain();
-        if (!school) {
+        const schoolSub = getClientSubdomain();
+        if (!schoolSub) {
           setError("Open your school’s SchoolHub address to sign in with a username, or use your email.");
+          setLoading(false);
           return;
         }
         const resolved = await apiFetch<{ email: string }>(
-          `/schools/public/${school}/resolve-login`,
+          `/schools/public/${schoolSub}/resolve-login`,
           { method: "POST", body: JSON.stringify({ identifier: loginEmail }) },
         ).catch(() => null);
-        loginEmail = resolved?.email ?? studentLoginEmail(loginEmail, school);
+        loginEmail = resolved?.email ?? studentLoginEmail(loginEmail, schoolSub);
       }
       const result = await signIn.email({ email: loginEmail, password });
       if (result.error) {
         setError(result.error.message ?? "Sign-in failed. Check your details and try again.");
+        setLoading(false);
         return;
       }
 
@@ -105,6 +125,8 @@ function LoginPage() {
 
   return (
     <main className="grid min-h-screen bg-slate-50 lg:grid-cols-[1.04fr_0.96fr] dark:bg-slate-950">
+      
+      {/* Left Hero Panel with dynamic school motto/branding adaptation */}
       <section className="relative hidden min-h-screen overflow-hidden bg-[#101d48] px-12 py-10 text-white lg:flex lg:flex-col xl:px-16">
         <div
           aria-hidden="true"
@@ -125,16 +147,21 @@ function LoginPage() {
           }}
         />
 
+        {/* Dynamic Header Brand (Subdomain logo + name) */}
         <div className="relative z-10 flex items-center gap-3">
-          <span className="flex size-11 items-center justify-center rounded-2xl bg-white/10 ring-1 ring-white/20 backdrop-blur">
-            <GraduationCap className="size-6 text-sky-200" strokeWidth={2.2} />
+          <span className="flex size-12 items-center justify-center overflow-hidden rounded-2xl bg-white/10 ring-1 ring-white/20 backdrop-blur">
+            {school?.logo ? (
+              <img src={school.logo} alt={school.name} className="size-full object-cover" />
+            ) : (
+              <GraduationCap className="size-6 text-sky-200" strokeWidth={2.2} />
+            )}
           </span>
           <span>
             <span className="block text-lg font-bold tracking-tight">
-              SchoolHub
+              {school?.name ?? "SchoolHub"}
             </span>
             <span className="block text-[10px] font-semibold uppercase tracking-[0.22em] text-blue-200/70">
-              School management
+              {school?.motto ?? "School management"}
             </span>
           </span>
         </div>
@@ -142,7 +169,7 @@ function LoginPage() {
         <div className="relative z-10 my-auto max-w-xl py-16">
           <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/[0.07] px-3 py-1.5 text-xs font-medium text-blue-100 shadow-lg shadow-blue-950/10 backdrop-blur">
             <Sparkles className="size-3.5 text-sky-300" />
-            One connected school community
+            {school?.name ? `Welcome to ${school.name} Portal` : "One connected school community"}
           </div>
           <h1 className="max-w-lg text-4xl font-semibold leading-[1.12] tracking-[-0.04em] xl:text-[54px]">
             A brighter way to{" "}
@@ -151,8 +178,9 @@ function LoginPage() {
             </span>
           </h1>
           <p className="mt-5 max-w-md text-[15px] leading-7 text-blue-100/70">
-            Bring your people, learning, and day-to-day operations together in
-            one calm, clear workspace.
+            {school?.motto 
+              ? `"${school.motto}" — Bringing your people, learning, and operations together in one clear workspace.` 
+              : "Bring your people, learning, and day-to-day operations together in one calm, clear workspace."}
           </p>
 
           <div className="mt-12 max-w-md rounded-2xl border border-white/15 bg-white/8 p-5 shadow-2xl shadow-blue-950/30 backdrop-blur-xl">
@@ -199,6 +227,7 @@ function LoginPage() {
         />
       </section>
 
+      {/* Right Login Form Section */}
       <section className="relative flex min-h-screen items-center justify-center px-5 py-10 sm:px-10">
         <div className="absolute right-5 top-5 sm:right-8 sm:top-8">
           <ThemeToggle />
@@ -206,15 +235,19 @@ function LoginPage() {
 
         <div className="w-full max-w-105">
           <div className="mb-9 flex items-center gap-3 lg:hidden">
-            <span className="flex size-10 items-center justify-center rounded-xl bg-blue-600 text-white shadow-lg shadow-blue-600/20">
-              <GraduationCap className="size-5" />
+            <span className="flex size-11 items-center justify-center overflow-hidden rounded-xl bg-blue-600 text-white shadow-lg shadow-blue-600/20">
+              {school?.logo ? (
+                <img src={school.logo} alt={school.name} className="size-full object-cover" />
+              ) : (
+                <GraduationCap className="size-5" />
+              )}
             </span>
             <span>
               <span className="block text-base font-bold tracking-tight text-slate-900 dark:text-white">
-                SchoolHub
+                {school?.name ?? "SchoolHub"}
               </span>
               <span className="block text-[9px] font-semibold uppercase tracking-[0.2em] text-slate-400">
-                School management
+                {school?.motto ?? "School management"}
               </span>
             </span>
           </div>
@@ -227,7 +260,7 @@ function LoginPage() {
               Sign in to your workspace
             </h2>
             <p className="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400">
-              Enter your account details to continue to SchoolHub.
+              Enter your account details to continue to {school?.name ?? "SchoolHub"}.
             </p>
           </div>
 
