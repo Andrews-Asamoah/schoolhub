@@ -1,279 +1,246 @@
-import { useState } from "react";
-import { Bell, Megaphone, Pin, Search, X } from "lucide-react";
-import { PortalModal } from "./portal-modal";
+import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { Bell, LoaderCircle, Megaphone, Pin, RefreshCw, Search, X } from "lucide-react";
+import { apiFetch } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { PortalModal } from "./portal-modal";
+import {
+  ANNOUNCEMENT_CATEGORY_STYLES,
+  announcementCategoryLabel,
+  announcementDate,
+  announcementQueryRoleKey,
+  announcementTargetLabel,
+  type AnnouncementItem,
+} from "./announcement-utils";
+import type { AnnouncementCategory } from "@schoolhub/shared";
 
-interface AnnouncementItem {
-  id: string;
-  title: string;
-  category: "ACADEMIC" | "EVENT" | "HOUSE" | "GENERAL";
-  date: string;
-  isPinned?: boolean;
-  content: string;
-  author: string;
-  target: string;
+type CategoryFilter = "ALL" | AnnouncementCategory;
+
+const READ_STORAGE_KEY = "schoolhub-read-announcements";
+
+const filterOptions: { value: CategoryFilter; label: string }[] = [
+  { value: "ALL", label: "All Notices" },
+  { value: "ACADEMIC", label: "Academic" },
+  { value: "EVENT", label: "Events" },
+  { value: "HOUSE", label: "House" },
+  { value: "GENERAL", label: "General" },
+];
+
+function loadReadIds() {
+  if (typeof window === "undefined") return new Set<string>();
+  try {
+    const parsed: unknown = JSON.parse(window.localStorage.getItem(READ_STORAGE_KEY) ?? "[]");
+    return new Set(
+      Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === "string") : [],
+    );
+  } catch {
+    return new Set<string>();
+  }
 }
 
-const mockAnnouncements: AnnouncementItem[] = [
-  {
-    id: "ann-1",
-    title: "Mid-Term Examination Timetable & Examination Rules Published",
-    category: "ACADEMIC",
-    date: "October 18, 2026",
-    isPinned: true,
-    content:
-      "The official schedule for the 2025/2026 First Term Examinations is now available. Students are reminded that only students in full school uniform with verified hall passes will be admitted into the examination halls. Check your timetable under Academics. The examination will run from November 3rd to November 14th, 2026. All students must be seated 15 minutes before the start of each paper. Mobile phones and electronic devices are strictly prohibited in all examination halls.",
-    author: "Academic Board",
-    target: "All JHS Students",
-  },
-  {
-    id: "ann-2",
-    title: "National Science & Maths Quiz (NSMQ) School Trials",
-    category: "EVENT",
-    date: "October 16, 2026",
-    isPinned: true,
-    content:
-      "Trial sessions for the Junior Science Olympiad & NSMQ prep squad will hold this Wednesday at 3:30 PM in the Science Auditorium. All interested students from Basic 7 to Basic 9 are invited to participate. Bring your scientific calculators and mathematical sets. The top 6 students will be selected to represent the school at the regional rounds. Refreshments will be provided after the session.",
-    author: "Science Department",
-    target: "Interested Students",
-  },
-  {
-    id: "ann-3",
-    title: "Inter-House Athletics & Cross Country Registration",
-    category: "HOUSE",
-    date: "October 14, 2026",
-    content:
-      "House captains and sports prefects are conducting trials for the 100m, 400m, 4x100m relay, and table tennis. Ensure you report to your House Master after school to register your events. Inter-house day is scheduled for Saturday, November 22nd. Students selected will receive a special permission slip signed by their form teachers. Practice sessions begin next Monday at 4:00 PM on the school field.",
-    author: "Sports Master",
-    target: "All School Houses",
-  },
-  {
-    id: "ann-4",
-    title: "Library Week & Extended ICT Lab Hours",
-    category: "GENERAL",
-    date: "October 10, 2026",
-    content:
-      "The central library and ICT lab will stay open until 5:00 PM on Mondays through Thursdays for assignment research and group study sessions. Internet access is restricted to academic educational resources. Library Week activities include a reading competition, a book fair, and a guest author talk. Students who borrow a minimum of 3 books will receive extra credit points.",
-    author: "School Librarian",
-    target: "Entire School Community",
-  },
-  {
-    id: "ann-5",
-    title: "Second Term School Fees Payment Deadline",
-    category: "ACADEMIC",
-    date: "October 8, 2026",
-    content:
-      "All parents and guardians are reminded that the deadline for second term school fees payment is October 31st, 2026. Students with outstanding balances after this date may not be allowed to write the mid-term examinations. Payment can be made via bank transfer, mobile money (MTN/Vodafone/AirtelTigo), or at the bursary office between 8:00 AM and 3:00 PM on school days.",
-    author: "Bursary Office",
-    target: "All Parents & Guardians",
-  },
-  {
-    id: "ann-6",
-    title: "Uniform Inspection & Updated Dress Code Policy",
-    category: "GENERAL",
-    date: "October 5, 2026",
-    content:
-      "Following the PTA meeting, the school has updated its uniform policy effective immediately. All students must wear black leather shoes (no sneakers), full school uniform including ties for JHS 3, and hair must be in the approved school style. Prefects and teachers will conduct random uniform inspections each Monday morning. Students in violation will be sent home to change and a letter will be issued to parents.",
-    author: "School Prefect Council",
-    target: "All Students",
-  },
-];
-
-type CategoryFilter = "ALL" | "ACADEMIC" | "EVENT" | "HOUSE" | "GENERAL";
-
-const categoryColors: Record<Exclude<CategoryFilter, "ALL">, { bg: string; text: string }> = {
-  ACADEMIC: { bg: "bg-blue-50 dark:bg-blue-950/40", text: "text-blue-700 dark:text-blue-300" },
-  EVENT: { bg: "bg-purple-50 dark:bg-purple-950/40", text: "text-purple-700 dark:text-purple-300" },
-  HOUSE: { bg: "bg-amber-50 dark:bg-amber-950/40", text: "text-amber-700 dark:text-amber-300" },
-  GENERAL: { bg: "bg-slate-100 dark:bg-slate-800", text: "text-slate-700 dark:text-slate-300" },
-};
-
-const filterOptions: { id: CategoryFilter; label: string }[] = [
-  { id: "ALL", label: "All Notices" },
-  { id: "ACADEMIC", label: "Academic" },
-  { id: "EVENT", label: "Events" },
-  { id: "HOUSE", label: "House" },
-  { id: "GENERAL", label: "General" },
-];
+function errorText(error: unknown) {
+  return error instanceof Error ? error.message : "The request failed. Please try again.";
+}
 
 export function StudentAnnouncementsView() {
   const [filter, setFilter] = useState<CategoryFilter>("ALL");
   const [search, setSearch] = useState("");
-  const [readIds, setReadIds] = useState<Set<string>>(new Set());
+  const [readIds, setReadIds] = useState<Set<string>>(loadReadIds);
   const [selected, setSelected] = useState<AnnouncementItem | null>(null);
 
-  function openAnnouncement(item: AnnouncementItem) {
-    setSelected(item);
-    setReadIds((prev) => new Set([...prev, item.id]));
-  }
+  const announcementsQuery = useQuery({
+    queryKey: ["announcements", announcementQueryRoleKey()],
+    queryFn: () => apiFetch<AnnouncementItem[]>("/announcements"),
+    retry: false,
+  });
 
-  const filtered = mockAnnouncements.filter((item) => {
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(READ_STORAGE_KEY, JSON.stringify([...readIds]));
+    } catch {
+      // Announcements remain usable when storage is unavailable or restricted.
+    }
+  }, [readIds]);
+
+  const announcements = announcementsQuery.data ?? [];
+  const normalizedSearch = search.trim().toLowerCase();
+  const filtered = announcements.filter((item) => {
     const matchesCategory = filter === "ALL" || item.category === filter;
-    const q = search.toLowerCase();
     const matchesSearch =
-      !search ||
-      item.title.toLowerCase().includes(q) ||
-      item.content.toLowerCase().includes(q) ||
-      item.author.toLowerCase().includes(q);
+      !normalizedSearch ||
+      item.title.toLowerCase().includes(normalizedSearch) ||
+      item.content.toLowerCase().includes(normalizedSearch) ||
+      item.author.name.toLowerCase().includes(normalizedSearch);
     return matchesCategory && matchesSearch;
   });
 
-  const pinnedCount = mockAnnouncements.filter((a) => a.isPinned).length;
-  const unreadCount = mockAnnouncements.filter((a) => !readIds.has(a.id)).length;
+  const unreadCount = announcements.filter((item) => !readIds.has(item.id)).length;
+  const pinnedCount = announcements.filter((item) => item.isPinned).length;
+
+  function openAnnouncement(item: AnnouncementItem) {
+    setSelected(item);
+    setReadIds((current) => {
+      if (current.has(item.id)) return current;
+      return new Set([...current, item.id]);
+    });
+  }
 
   return (
     <div className="space-y-6">
-      {/* Page Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-xl font-black text-slate-900 dark:text-white">
-            School Notices &amp; Announcements
-          </h2>
-          <p className="text-xs text-slate-500">
-            Official school bulletins, academic notices, and extracurricular event updates
+          <h2 className="text-xl font-black text-foreground">School Notices &amp; Announcements</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Official school bulletins, academic notices, and extracurricular updates.
           </p>
         </div>
-        {unreadCount > 0 && (
-          <span className="inline-flex items-center gap-1.5 self-start rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700 dark:border-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-300 sm:self-auto">
-            <Bell className="size-3.5" />
-            {unreadCount} unread
-          </span>
-        )}
+        <div className="flex items-center gap-2">
+          {unreadCount > 0 && (
+            <span className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary">
+              <Bell className="size-3.5" />
+              {unreadCount} unread
+            </span>
+          )}
+          <button
+            type="button"
+            onClick={() => void announcementsQuery.refetch()}
+            disabled={announcementsQuery.isFetching}
+            aria-label="Refresh announcements"
+            className="rounded-lg border border-border p-2 text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-50"
+          >
+            <RefreshCw className={cn("size-4", announcementsQuery.isFetching && "animate-spin")} />
+          </button>
+        </div>
       </div>
 
-      {/* Stats Strip */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         {[
-          { label: "Total Notices", value: mockAnnouncements.length, color: "text-slate-900 dark:text-white" },
-          { label: "Pinned", value: pinnedCount, color: "text-indigo-600 dark:text-indigo-400" },
-          { label: "Unread", value: unreadCount, color: "text-rose-600 dark:text-rose-400" },
+          { label: "Total Notices", value: announcements.length, color: "text-foreground" },
+          { label: "Pinned", value: pinnedCount, color: "text-primary" },
+          { label: "Unread", value: unreadCount, color: "text-destructive" },
         ].map((stat) => (
-          <div
-            key={stat.label}
-            className="rounded-2xl border border-slate-200/80 bg-white p-4 text-center shadow-xs dark:border-slate-800 dark:bg-slate-900"
-          >
-            <p className={cn("text-2xl font-black", stat.color)}>{stat.value}</p>
-            <p className="mt-0.5 text-[11px] text-slate-500">{stat.label}</p>
+          <div key={stat.label} className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+            <p className={cn("text-2xl font-black tabular-nums", stat.color)}>{stat.value}</p>
+            <p className="mt-1 text-xs text-muted-foreground">{stat.label}</p>
           </div>
         ))}
       </div>
 
-      {/* Search Bar */}
       <div className="relative">
-        <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+        <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
         <input
           type="search"
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={(event) => setSearch(event.target.value)}
           placeholder="Search notices by title, content, or author…"
-          className="h-10 w-full rounded-xl border border-slate-200 bg-white pl-10 pr-4 text-xs text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:placeholder:text-slate-500 dark:focus:border-indigo-600 dark:focus:ring-indigo-900/30"
+          className="h-11 w-full rounded-xl border border-input bg-background pl-10 pr-10 text-sm text-foreground outline-none placeholder:text-muted-foreground focus:ring-2 focus:ring-ring"
         />
         {search && (
           <button
             type="button"
             onClick={() => setSearch("")}
-            className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md p-0.5 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
+            aria-label="Clear search"
+            className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md p-1 text-muted-foreground hover:bg-muted"
           >
-            <X className="size-3.5" />
+            <X className="size-4" />
           </button>
         )}
       </div>
 
-      {/* Category Filter Tabs */}
-      <div className="flex items-center gap-1 overflow-x-auto rounded-2xl border border-slate-200/80 bg-white p-1.5 shadow-xs dark:border-slate-800 dark:bg-slate-900">
-        {filterOptions.map((opt) => (
+      <div className="flex items-center gap-1 overflow-x-auto rounded-2xl border border-border bg-card p-1.5">
+        {filterOptions.map((option) => (
           <button
-            key={opt.id}
+            key={option.value}
             type="button"
-            onClick={() => setFilter(opt.id)}
+            onClick={() => setFilter(option.value)}
+            aria-pressed={filter === option.value}
             className={cn(
-              "flex shrink-0 items-center rounded-xl px-3.5 py-2 text-xs font-bold transition-all",
-              filter === opt.id
-                ? "bg-indigo-600 text-white shadow-sm shadow-indigo-600/20"
-                : "text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white",
+              "shrink-0 rounded-xl px-4 py-2 text-sm font-semibold transition",
+              filter === option.value
+                ? "bg-primary text-primary-foreground"
+                : "text-muted-foreground hover:bg-muted hover:text-foreground",
             )}
           >
-            {opt.label}
+            {option.label}
           </button>
         ))}
       </div>
 
-      {/* Announcements List */}
-      {filtered.length === 0 ? (
-        <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-white py-14 text-center dark:border-slate-700 dark:bg-slate-900">
-          <Megaphone className="size-10 text-slate-300 dark:text-slate-600" />
-          <h3 className="mt-4 text-sm font-semibold text-slate-700 dark:text-slate-300">
-            No notices found
+      {announcementsQuery.isPending ? (
+        <div className="flex items-center justify-center gap-2 rounded-2xl border border-border bg-card p-12 text-sm text-muted-foreground">
+          <LoaderCircle className="size-5 animate-spin" />
+          Loading announcements…
+        </div>
+      ) : announcementsQuery.isError ? (
+        <div role="alert" className="rounded-2xl border border-destructive/30 bg-destructive/10 p-6">
+          <p className="font-semibold text-destructive">Announcements could not be loaded.</p>
+          <p className="mt-1 text-sm text-muted-foreground">{errorText(announcementsQuery.error)}</p>
+          <button
+            type="button"
+            onClick={() => void announcementsQuery.refetch()}
+            className="mt-4 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground"
+          >
+            Try again
+          </button>
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-card px-5 py-14 text-center">
+          <Megaphone className="size-10 text-muted-foreground" />
+          <h3 className="mt-4 text-sm font-bold text-foreground">
+            {announcements.length === 0 ? "No announcements yet" : "No notices found"}
           </h3>
-          <p className="mt-1 max-w-xs text-xs text-slate-400">
-            {search
-              ? `No announcements match "${search}". Try a different search term.`
-              : "There are no notices in this category yet."}
+          <p className="mt-1 max-w-sm text-sm text-muted-foreground">
+            {search || filter !== "ALL"
+              ? "Try a different search term or category."
+              : "New school notices will appear here when they are published."}
           </p>
           {(search || filter !== "ALL") && (
             <button
               type="button"
               onClick={() => { setSearch(""); setFilter("ALL"); }}
-              className="mt-4 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-bold text-white hover:bg-indigo-700"
+              className="mt-4 rounded-lg border border-border px-3 py-2 text-sm font-semibold hover:bg-muted"
             >
               Clear filters
             </button>
           )}
         </div>
       ) : (
-        <div className="space-y-4">
+        <div className="space-y-3">
           {filtered.map((item) => {
             const isRead = readIds.has(item.id);
-            const catColors = categoryColors[item.category];
+            const colors = ANNOUNCEMENT_CATEGORY_STYLES[item.category];
             return (
               <button
                 key={item.id}
                 type="button"
                 onClick={() => openAnnouncement(item)}
                 className={cn(
-                  "w-full rounded-2xl border p-5 text-left shadow-xs transition hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500",
-                  item.isPinned
-                    ? "border-indigo-200 bg-indigo-50/30 dark:border-indigo-900/40 dark:bg-slate-900"
-                    : "border-slate-200/80 bg-white dark:border-slate-800 dark:bg-slate-900",
-                  isRead && "opacity-70",
+                  "w-full rounded-2xl border bg-card p-5 text-left shadow-sm transition hover:border-primary/40 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                  item.isPinned ? "border-primary/40" : "border-border",
+                  isRead && "opacity-75",
                 )}
               >
-                <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="flex flex-wrap items-center gap-2">
-                    {!isRead && (
-                      <span className="size-2 shrink-0 rounded-full bg-indigo-600" aria-label="Unread" />
-                    )}
+                    {!isRead && <span className="size-2 rounded-full bg-primary" aria-label="Unread" />}
                     {item.isPinned && (
-                      <span className="flex items-center gap-1 rounded-md bg-indigo-600 px-2 py-0.5 text-[10px] font-bold text-white">
+                      <span className="inline-flex items-center gap-1 rounded-md bg-primary/10 px-2 py-1 text-xs font-semibold text-primary">
                         <Pin className="size-3" /> Pinned
                       </span>
                     )}
-                    <span className={cn("rounded-md px-2 py-0.5 text-[10px] font-bold", catColors.bg, catColors.text)}>
-                      {item.category}
-                    </span>
-                    <span className="text-[11px] font-medium text-slate-400">
-                      {item.target}
+                    <span className={cn("rounded-md px-2 py-1 text-xs font-semibold", colors.background, colors.foreground)}>
+                      {announcementCategoryLabel(item.category)}
                     </span>
                   </div>
-                  <span className="text-[11px] text-slate-400">{item.date}</span>
+                  <span className="text-xs text-muted-foreground">{announcementDate(item.createdAt)}</span>
                 </div>
-
-                <h3 className="mt-2 text-sm font-bold text-slate-900 dark:text-white">
-                  {item.title}
-                </h3>
-
-                <p className="mt-1.5 line-clamp-2 text-xs leading-relaxed text-slate-600 dark:text-slate-300">
+                <h3 className="mt-3 text-base font-bold text-foreground">{item.title}</h3>
+                <p className="mt-1.5 line-clamp-2 whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">
                   {item.content}
                 </p>
-
-                <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-2 text-[11px] text-slate-400 dark:border-slate-800">
-                  <span>
-                    Published by:{" "}
-                    <strong className="text-slate-700 dark:text-slate-200">{item.author}</strong>
-                  </span>
-                  <span className="font-semibold text-indigo-600 dark:text-indigo-400">
-                    Read more →
-                  </span>
+                <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-border pt-3 text-xs text-muted-foreground">
+                  <span>Published by <strong className="font-semibold text-foreground">{item.author.name}</strong></span>
+                  <span>{announcementTargetLabel(item.target)}</span>
                 </div>
               </button>
             );
@@ -281,45 +248,34 @@ export function StudentAnnouncementsView() {
         </div>
       )}
 
-      {/* Detail Modal */}
       <PortalModal
         isOpen={!!selected}
         onClose={() => setSelected(null)}
-        title={selected?.title ?? ""}
-        description={`${selected?.category} • ${selected?.date} • Published by ${selected?.author}`}
+        title={selected?.title ?? "Announcement"}
+        description={selected ? `${announcementCategoryLabel(selected.category)} · ${announcementDate(selected.createdAt)} · Published by ${selected.author.name}` : undefined}
         maxWidth="lg"
       >
         {selected && (
-          <div className="space-y-4 text-xs">
+          <div className="space-y-4">
             <div className="flex flex-wrap items-center gap-2">
               {selected.isPinned && (
-                <span className="flex items-center gap-1 rounded-md bg-indigo-600 px-2 py-0.5 text-[10px] font-bold text-white">
+                <span className="inline-flex items-center gap-1 rounded-md bg-primary/10 px-2 py-1 text-xs font-semibold text-primary">
                   <Pin className="size-3" /> Pinned
                 </span>
               )}
-              <span
-                className={cn(
-                  "rounded-md px-2 py-0.5 text-[10px] font-bold",
-                  categoryColors[selected.category].bg,
-                  categoryColors[selected.category].text,
-                )}
-              >
-                {selected.category}
+              <span className={cn("rounded-md px-2 py-1 text-xs font-semibold", ANNOUNCEMENT_CATEGORY_STYLES[selected.category].background, ANNOUNCEMENT_CATEGORY_STYLES[selected.category].foreground)}>
+                {announcementCategoryLabel(selected.category)}
               </span>
-              <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-                Target: {selected.target}
+              <span className="rounded-md bg-muted px-2 py-1 text-xs font-medium text-muted-foreground">
+                {announcementTargetLabel(selected.target)}
               </span>
             </div>
-
-            <p className="leading-relaxed text-slate-600 dark:text-slate-300">
-              {selected.content}
-            </p>
-
-            <div className="flex items-center justify-end border-t border-slate-100 pt-3 dark:border-slate-800">
+            <p className="whitespace-pre-wrap text-sm leading-7 text-foreground">{selected.content}</p>
+            <div className="flex justify-end border-t border-border pt-4">
               <button
                 type="button"
                 onClick={() => setSelected(null)}
-                className="rounded-xl bg-indigo-600 px-4 py-2 text-xs font-bold text-white hover:bg-indigo-700"
+                className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"
               >
                 Done
               </button>

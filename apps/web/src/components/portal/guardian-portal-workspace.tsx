@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
   AlertCircle,
   ArrowRight,
@@ -20,6 +21,9 @@ import {
   MapPin,
   Megaphone,
   MessageSquare,
+  LoaderCircle,
+  Pin,
+  RefreshCw,
   Phone,
   Printer,
   QrCode,
@@ -39,6 +43,15 @@ import { MyWardsPanel } from "@/components/school/student-profile-panel";
 import { DataTable } from "@/components/ui/data-table";
 import { useCanExportTables } from "@/lib/table-export-policy";
 import { GuardianPublishedReports } from "@/components/portal/guardian-published-reports";
+import { apiFetch } from "@/lib/api";
+import {
+  ANNOUNCEMENT_CATEGORY_STYLES,
+  announcementCategoryLabel,
+  announcementDate,
+  announcementTargetLabel,
+  announcementQueryRoleKey,
+  type AnnouncementItem,
+} from "./announcement-utils";
 
 interface GuardianPortalWorkspaceProps {
   defaultTab?: "overview" | "academics" | "attendance" | "fees" | "timetable" | "notices";
@@ -123,6 +136,14 @@ export function GuardianPortalWorkspace({ defaultTab = "overview" }: GuardianPor
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showReportCardModal, setShowReportCardModal] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const [selectedAnnouncement, setSelectedAnnouncement] = useState<AnnouncementItem | null>(null);
+
+  const announcementsQuery = useQuery({
+    queryKey: ["announcements", announcementQueryRoleKey()],
+    queryFn: () => apiFetch<AnnouncementItem[]>("/announcements"),
+    enabled: activeTab === "notices",
+    retry: false,
+  });
 
   // Payment form state
   const [payAmount, setPayAmount] = useState("650");
@@ -665,40 +686,118 @@ export function GuardianPortalWorkspace({ defaultTab = "overview" }: GuardianPor
       {/* TAB: NOTICES */}
       {activeTab === "notices" && (
         <div className="space-y-4">
-          <div>
-            <h2 className="text-lg font-bold text-slate-900 dark:text-white">School Circulars & PTA Announcements</h2>
-            <p className="text-xs text-slate-500">Official updates from the school administration</p>
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-bold text-foreground">School Circulars &amp; PTA Announcements</h2>
+              <p className="text-sm text-muted-foreground">Published updates intended for parents and guardians</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => void announcementsQuery.refetch()}
+              disabled={announcementsQuery.isFetching}
+              className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-semibold text-foreground hover:bg-muted disabled:opacity-50"
+            >
+              <RefreshCw className={cn("size-4", announcementsQuery.isFetching && "animate-spin")} />
+              Refresh
+            </button>
           </div>
 
-          <div className="space-y-3">
-            {[
-              {
-                title: "Mid-Term Academic Progress Exhibition & Open Day",
-                date: "October 24, 2026",
-                category: "Event",
-                body: "All parents and guardians are cordially invited to our Term 1 Open Day on Friday, Oct 24. Teachers will be available from 1:00 PM to discuss individual student learning targets.",
-              },
-              {
-                title: "Annual Inter-House Athletics Competition",
-                date: "November 5, 2026",
-                category: "Sports",
-                body: "Students in Aggrey, Gbewaa, and Osei Tutu houses will compete in track & field events at the El-Wak Stadium. Parent attendance is enthusiastically welcomed.",
-              },
-            ].map((n) => (
-              <div key={n.title} className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs dark:border-slate-800 dark:bg-slate-900">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="rounded-md bg-blue-50 px-2 py-0.5 text-[10px] font-bold text-blue-700">
-                    {n.category}
-                  </span>
-                  <span className="text-slate-400 font-medium">{n.date}</span>
-                </div>
-                <h3 className="mt-2 text-sm font-bold text-slate-900 dark:text-white">{n.title}</h3>
-                <p className="mt-1.5 text-xs text-slate-600 dark:text-slate-300 leading-relaxed">{n.body}</p>
-              </div>
-            ))}
-          </div>
+          {announcementsQuery.isPending ? (
+            <div className="flex items-center justify-center gap-2 rounded-2xl border border-border bg-card p-10 text-sm text-muted-foreground">
+              <LoaderCircle className="size-5 animate-spin" /> Loading announcements…
+            </div>
+          ) : announcementsQuery.isError ? (
+            <div role="alert" className="rounded-2xl border border-destructive/30 bg-destructive/10 p-5">
+              <p className="font-semibold text-destructive">Announcements could not be loaded.</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {announcementsQuery.error instanceof Error ? announcementsQuery.error.message : "Please try again."}
+              </p>
+              <button
+                type="button"
+                onClick={() => void announcementsQuery.refetch()}
+                className="mt-3 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground"
+              >
+                Try again
+              </button>
+            </div>
+          ) : announcementsQuery.data?.length ? (
+            <div className="space-y-3">
+              {announcementsQuery.data.map((announcement) => {
+                const categoryStyle = ANNOUNCEMENT_CATEGORY_STYLES[announcement.category];
+                return (
+                  <button
+                    key={announcement.id}
+                    type="button"
+                    onClick={() => setSelectedAnnouncement(announcement)}
+                    className="w-full rounded-2xl border border-border bg-card p-5 text-left shadow-sm transition hover:border-primary/40 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        {announcement.isPinned && (
+                          <span className="inline-flex items-center gap-1 rounded-md bg-primary/10 px-2 py-1 text-xs font-semibold text-primary">
+                            <Pin className="size-3" /> Pinned
+                          </span>
+                        )}
+                        <span className={cn("rounded-md px-2 py-1 text-xs font-semibold", categoryStyle.background, categoryStyle.foreground)}>
+                          {announcementCategoryLabel(announcement.category)}
+                        </span>
+                      </div>
+                      <span className="text-xs text-muted-foreground">{announcementDate(announcement.createdAt)}</span>
+                    </div>
+                    <h3 className="mt-3 text-sm font-bold text-foreground">{announcement.title}</h3>
+                    <p className="mt-1.5 line-clamp-3 whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">
+                      {announcement.content}
+                    </p>
+                    <div className="mt-3 flex flex-wrap justify-between gap-2 border-t border-border pt-3 text-xs text-muted-foreground">
+                      <span>Published by <strong className="text-foreground">{announcement.author.name}</strong></span>
+                      <span>{announcementTargetLabel(announcement.target)}</span>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="rounded-2xl border border-dashed border-border bg-card p-10 text-center">
+              <Megaphone className="mx-auto size-9 text-muted-foreground" />
+              <h3 className="mt-3 text-sm font-bold text-foreground">No announcements yet</h3>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Published notices for parents and guardians will appear here.
+              </p>
+            </div>
+          )}
         </div>
       )}
+
+      <PortalModal
+        isOpen={!!selectedAnnouncement}
+        onClose={() => setSelectedAnnouncement(null)}
+        title={selectedAnnouncement?.title ?? "Announcement"}
+        description={selectedAnnouncement ? `${announcementCategoryLabel(selectedAnnouncement.category)} · ${announcementDate(selectedAnnouncement.createdAt)} · Published by ${selectedAnnouncement.author.name}` : undefined}
+        maxWidth="lg"
+      >
+        {selectedAnnouncement && (
+          <div className="space-y-4">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className={cn("rounded-md px-2 py-1 text-xs font-semibold", ANNOUNCEMENT_CATEGORY_STYLES[selectedAnnouncement.category].background, ANNOUNCEMENT_CATEGORY_STYLES[selectedAnnouncement.category].foreground)}>
+                {announcementCategoryLabel(selectedAnnouncement.category)}
+              </span>
+              <span className="rounded-md bg-muted px-2 py-1 text-xs font-medium text-muted-foreground">
+                {announcementTargetLabel(selectedAnnouncement.target)}
+              </span>
+            </div>
+            <p className="whitespace-pre-wrap text-sm leading-7 text-foreground">{selectedAnnouncement.content}</p>
+            <div className="flex justify-end border-t border-border pt-4">
+              <button
+                type="button"
+                onClick={() => setSelectedAnnouncement(null)}
+                className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        )}
+      </PortalModal>
 
       {/* MODAL: Pay Fees Online */}
       <PortalModal
