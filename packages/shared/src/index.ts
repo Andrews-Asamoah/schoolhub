@@ -1288,3 +1288,44 @@ export function lockedStructureProblem(
   }
   return null;
 }
+
+
+// ============================================================================
+// ANNOUNCEMENTS
+// ============================================================================
+
+export const ANNOUNCEMENT_CATEGORIES = ["ACADEMIC", "EVENT", "HOUSE", "GENERAL"] as const;
+export type AnnouncementCategory = (typeof ANNOUNCEMENT_CATEGORIES)[number];
+
+export const ANNOUNCEMENT_TARGETS = [
+  "ALL_STUDENTS",
+  "JHS_STUDENTS",
+  "SCHOOL_HOUSES",
+  "SCHOOL_COMMUNITY",
+  "PARENTS_GUARDIANS",
+  "TEACHERS",
+] as const;
+export type AnnouncementTarget = (typeof ANNOUNCEMENT_TARGETS)[number];
+
+export const ANNOUNCEMENT_STATUSES = ["PUBLISHED", "DRAFT"] as const;
+export type AnnouncementStatus = (typeof ANNOUNCEMENT_STATUSES)[number];
+
+export const createAnnouncementSchema = z.object({
+  title: z.string().trim().min(3, "Title must contain at least 3 characters").max(180),
+  content: z.string().trim().min(1, "Announcement content is required").max(10000),
+  category: z.enum(ANNOUNCEMENT_CATEGORIES).default("GENERAL"),
+  target: z.enum(ANNOUNCEMENT_TARGETS).default("SCHOOL_COMMUNITY"),
+  isPinned: z.boolean().default(false),
+  status: z.enum(ANNOUNCEMENT_STATUSES).default("PUBLISHED"),
+});
+export type CreateAnnouncementInput = z.infer<typeof createAnnouncementSchema>;
+
+export const updateAnnouncementPinSchema = z.object({
+  isPinned: z.boolean(),
+});
+export type UpdateAnnouncementPinInput = z.infer<typeof updateAnnouncementPinSchema>;
+
+export const updateAnnouncementStatusSchema = z.object({
+  status: z.enum(ANNOUNCEMENT_STATUSES),
+});
+export type UpdateAnnouncementStatusInput = z.infer<typeof updateAnnouncementStatusSchema>;

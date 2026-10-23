@@ -265,6 +265,9 @@ model Announcement {
   content        String
   contentHtml    String?
   target         String    @default("ALL")
+  category       String    @default("GENERAL")
+  status         String    @default("PUBLISHED")
+  isPinned       Boolean   @default(false)
   messageType    String    @default("ANNOUNCEMENT")
   sendSms        Boolean   @default(false)
   sendEmail      Boolean   @default(false)
@@ -286,6 +289,8 @@ model Announcement {
   @@index([messageType])
   @@index([academicYearId])
   @@index([termId])
+  @@index([schoolId, status])
+  @@index([schoolId, isPinned, createdAt])
   @@map("announcements")
 }
 
