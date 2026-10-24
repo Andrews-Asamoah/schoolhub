@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  ConflictException,
   ForbiddenException,
 } from "@nestjs/common";
 import { PrismaService } from "../../prisma/prisma.service.js";
@@ -151,6 +152,91 @@ export class FinanceService {
         _count: { select: { bills: true } },
       },
     });
+  }
+
+  async updateFeeStructure(
+    schoolId: string,
+    feeStructureId: string,
+    input: {
+      name: string;
+      description?: string | null;
+      classLevel?: string | null;
+      termBased: boolean;
+      targetClassIds: string[];
+      items: { registryItemId?: string | null; name: string; amount: number; isOptional: boolean; description?: string | null }[];
+    },
+  ) {
+    const classIds = [...new Set(input.targetClassIds)];
+    const registryIds = [...new Set(input.items.map((item) => item.registryItemId).filter((id): id is string => Boolean(id)))];
+
+    return this.prisma.client.$transaction(async (tx) => {
+      // Share the same advisory lock with bill generation so an edit cannot
+      // race with a bill that is being created from this template.
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${schoolId}), hashtext(${feeStructureId}))`;
+      const existing = await tx.feeStructure.findFirst({
+        where: { id: feeStructureId, schoolId },
+        include: { _count: { select: { bills: true } } },
+      });
+      if (!existing) throw new NotFoundException("Fee structure not found.");
+      if (existing._count.bills > 0) {
+        throw new ConflictException(
+          "This fee structure has already been used to generate student bills and is locked. Duplicate it to create an editable version.",
+        );
+      }
+
+      const [classes, registryItems] = await Promise.all([
+        classIds.length
+          ? tx.class.findMany({
+              where: { id: { in: classIds }, schoolId, deletedAt: null },
+              select: { id: true },
+            })
+          : Promise.resolve([]),
+        registryIds.length
+          ? tx.feeItemRegistry.findMany({
+              where: { id: { in: registryIds }, schoolId },
+              select: { id: true, name: true },
+            })
+          : Promise.resolve([]),
+      ]);
+      if (classes.length !== classIds.length) {
+        throw new BadRequestException("One or more selected classes do not belong to this school.");
+      }
+      if (registryItems.length !== registryIds.length) {
+        throw new BadRequestException("One or more fee item categories are invalid for this school.");
+      }
+
+      // No bill has ever been generated from this structure, so replacing
+      // the template's item and class rows is safe. The operation is atomic.
+      await tx.feeStructureClass.deleteMany({ where: { feeStructureId } });
+      await tx.feeItem.deleteMany({ where: { feeStructureId } });
+      return tx.feeStructure.update({
+        where: { id: feeStructureId },
+        data: {
+          name: input.name.trim(),
+          description: input.description?.trim() || null,
+          classLevel: input.classLevel?.trim() || null,
+          termBased: input.termBased,
+          targetClasses: { create: classIds.map((classId) => ({ classId })) },
+          items: {
+            create: input.items.map((item) => {
+              const registryItem = registryItems.find((candidate) => candidate.id === item.registryItemId);
+              return {
+                name: item.name.trim() || registryItem?.name || "Fee item",
+                amount: new Prisma.Decimal(item.amount),
+                isOptional: item.isOptional,
+                description: item.description?.trim() || null,
+                registryItemId: item.registryItemId || null,
+              };
+            }),
+          },
+        },
+        include: {
+          items: true,
+          targetClasses: { include: { class: { select: { id: true, name: true } } } },
+          _count: { select: { bills: true } },
+        },
+      });
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
   }
 
   async setFeeStructureActive(schoolId: string, feeStructureId: string, isActive: boolean) {
