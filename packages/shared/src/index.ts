@@ -640,6 +640,26 @@ export const createExpenseSchema = z.object({
 });
 export type CreateExpenseInput = z.infer<typeof createExpenseSchema>;
 
+export const createInventoryItemSchema = z.object({
+  name: z.string().trim().min(2, "Item name must contain at least 2 characters").max(150),
+  description: z.string().trim().max(500).optional(),
+  category: z.string().trim().max(100).optional(),
+  unit: z.string().trim().min(1).max(20).default("pcs"),
+  minQuantity: z.number().int().min(0).default(0),
+  initialQuantity: z.number().int().min(0).default(0),
+});
+export type CreateInventoryItemInput = z.infer<typeof createInventoryItemSchema>;
+
+export const inventoryStockMovementSchema = z.object({
+  type: z.enum(["IN", "OUT"]),
+  quantity: z.number().int().positive("Quantity must be a positive whole number"),
+  date: z.string().regex(/^\\d{4}-\\d{2}-\\d{2}$/, "Format: YYYY-MM-DD"),
+  description: z.string().trim().max(500).optional(),
+  recipientName: z.string().trim().max(150).optional(),
+});
+export type InventoryStockMovementInput = z.infer<typeof inventoryStockMovementSchema>;
+
+
 
 // ============================================================================
 // SUPER ADMIN SCHEMAS
