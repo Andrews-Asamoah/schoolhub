@@ -441,7 +441,14 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
     {
       id: "details",
       header: isGuardianPage ? "Relationship" : "Role",
-      cell: (row) => row.detail,
+      cell: (row) =>
+        isGuardianPage ? (
+          <span className="inline-flex items-center rounded-lg border border-primary/15 bg-primary/5 px-2.5 py-1 text-xs font-medium text-foreground">
+            {row.detail}
+          </span>
+        ) : (
+          row.detail
+        ),
     },
     ...(!isGuardianPage
       ? [
