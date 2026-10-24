@@ -1,7 +1,6 @@
 import { useQuery, type UseQueryResult } from "@tanstack/react-query";
 import { useState } from "react";
-import { Printer } from "lucide-react";
-import { AlertCircle, CalendarDays, CheckCircle2, Clock3, LoaderCircle, RefreshCw, UserRound, XCircle } from "lucide-react";
+import { AlertCircle, CalendarDays, CheckCircle2, Clock3, LoaderCircle, Printer, RefreshCw, UserRound, XCircle } from "lucide-react";
 import type { StudentProfileData } from "@/components/school/student-profile-panel";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { apiFetch } from "@/lib/api";
