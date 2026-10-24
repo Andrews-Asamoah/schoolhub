@@ -583,23 +583,98 @@ export class FinanceService {
     });
   }
 
-  async listExpenses(schoolId: string) {
+  async listExpenses(schoolId: string, fromDate?: string, toDate?: string) {
+    const parseBoundary = (value: string | undefined, label: string) => {
+      if (!value) return undefined;
+      if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(value)) {
+        throw new BadRequestException(`Enter ${label} as YYYY-MM-DD.`);
+      }
+      const parsed = new Date(`${value}T00:00:00.000Z`);
+      if (Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== value) {
+        throw new BadRequestException(`Enter a valid ${label.toLowerCase()}.`);
+      }
+      return parsed;
+    };
+    const startDate = parseBoundary(fromDate, "start date");
+    const endDate = parseBoundary(toDate, "end date");
+    if (startDate && endDate && startDate > endDate) {
+      throw new BadRequestException("Start date must be before or equal to end date.");
+    }
     return this.prisma.client.expense.findMany({
-      where: { schoolId },
+      where: {
+        schoolId,
+        ...(startDate || endDate ? {
+          date: {
+            ...(startDate ? { gte: startDate } : {}),
+            ...(endDate ? { lte: endDate } : {}),
+          },
+        } : {}),
+      },
       orderBy: [{ date: "desc" }, { createdAt: "desc" }],
-      take: 500,
       include: {
         customCategory: { select: { name: true } },
-        registryCategory: { select: { name: true } },
+        registryCategory: { select: { id: true, name: true, description: true } },
+        recordedBy: { select: { name: true } },
       },
+    });
+  }
+
+  async listExpenditureCategories(schoolId: string) {
+    return this.prisma.client.expenditureCategoryRegistry.findMany({
+      where: { schoolId },
+      orderBy: { name: "asc" },
+    });
+  }
+
+  async createExpenditureCategory(schoolId: string, input: { name: string; description?: string | null }) {
+    const name = input.name.trim();
+    const duplicate = await this.prisma.client.expenditureCategoryRegistry.findFirst({
+      where: { schoolId, name: { equals: name, mode: "insensitive" } },
+      select: { id: true },
+    });
+    if (duplicate) throw new BadRequestException("An expenditure category with that name already exists.");
+    return this.prisma.client.expenditureCategoryRegistry.create({
+      data: { schoolId, name, description: input.description?.trim() || null },
+    });
+  }
+
+  async updateExpenditureCategory(schoolId: string, categoryId: string, input: { name: string; description?: string | null }) {
+    const existing = await this.prisma.client.expenditureCategoryRegistry.findFirst({
+      where: { id: categoryId, schoolId },
+      select: { id: true },
+    });
+    if (!existing) throw new NotFoundException("Expenditure category not found.");
+    const name = input.name.trim();
+    const duplicate = await this.prisma.client.expenditureCategoryRegistry.findFirst({
+      where: { schoolId, id: { not: categoryId }, name: { equals: name, mode: "insensitive" } },
+      select: { id: true },
+    });
+    if (duplicate) throw new BadRequestException("An expenditure category with that name already exists.");
+    return this.prisma.client.expenditureCategoryRegistry.update({
+      where: { id: categoryId },
+      data: { name, description: input.description?.trim() || null },
     });
   }
 
   async createExpense(schoolId: string, recordedById: string, input: CreateExpenseInput) {
     const date = new Date(`${input.date}T00:00:00.000Z`);
-    if (Number.isNaN(date.getTime())) {
+    if (Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== input.date) {
       throw new BadRequestException("Enter a valid expense date.");
     }
+    if (input.registryCategoryId) {
+      const category = await this.prisma.client.expenditureCategoryRegistry.findFirst({
+        where: { id: input.registryCategoryId, schoolId },
+        select: { id: true },
+      });
+      if (!category) throw new BadRequestException("The selected expenditure category does not belong to this school.");
+    }
+
+    const academicYear = await this.prisma.client.academicYear.findFirst({
+      where: { schoolId, isCurrent: true },
+      include: { terms: { where: { isCurrent: true }, take: 1 } },
+    });
+    const currentTerm = academicYear?.terms[0];
+
     return this.prisma.client.expense.create({
       data: {
         schoolId,
@@ -609,12 +684,18 @@ export class FinanceService {
         payee: input.payee || null,
         category: input.category,
         paymentMethod: input.paymentMethod,
+        registryCategoryId: input.registryCategoryId || null,
+        checkNumber: input.checkNumber || null,
+        voucherNumber: input.voucherNumber || null,
         referenceNumber: input.referenceNumber || null,
         recordedById,
+        academicYearId: academicYear?.id ?? null,
+        termId: currentTerm?.id ?? null,
       },
       include: {
         customCategory: { select: { name: true } },
-        registryCategory: { select: { name: true } },
+        registryCategory: { select: { id: true, name: true, description: true } },
+        recordedBy: { select: { name: true } },
       },
     });
   }
