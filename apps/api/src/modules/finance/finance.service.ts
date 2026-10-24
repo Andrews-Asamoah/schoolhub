@@ -383,7 +383,7 @@ export class FinanceService {
       });
 
       return payment;
-    });
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
   }
 
   async listBills(schoolId: string) {
