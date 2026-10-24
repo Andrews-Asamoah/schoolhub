@@ -938,7 +938,7 @@ export class FinanceService {
     const currentTerm = currentYear?.terms[0];
     const installment = input.installment;
     const parseDate = (value: string, field: string) => {
-      if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(value)) throw new BadRequestException(`Enter ${field} as YYYY-MM-DD.`);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) throw new BadRequestException(`Enter ${field} as YYYY-MM-DD.`);
       const date = new Date(`${value}T00:00:00.000Z`);
       if (Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== value) {
         throw new BadRequestException(`Enter a valid ${field.toLowerCase()}.`);
@@ -1068,11 +1068,11 @@ export class FinanceService {
       if (bill.dueDate && (!target.earliestDueDate || bill.dueDate < target.earliestDueDate)) target.earliestDueDate = bill.dueDate;
       for (const link of student.guardians) {
         const guardian = link.guardian;
-        if (!guardian.isActive || guardian.deletedAt || !guardian.canLogin) continue;
+        if (!guardian.isActive || guardian.deletedAt) continue;
         const guardianName = [guardian.firstName, guardian.otherNames, guardian.lastName].filter(Boolean).join(" ").trim() || "Parent/guardian";
         target.guardians.set(guardian.id, {
           id: guardian.id,
-          userId: guardian.profile?.userId ?? null,
+          userId: guardian.canLogin ? guardian.profile?.userId ?? null : null,
           name: guardianName,
           phone: guardian.phone ?? null,
           email: guardian.email ?? null,
@@ -1108,13 +1108,16 @@ export class FinanceService {
     const db = this.prisma.client;
     const schedule = await db.feeReminderSchedule.findFirst({
       where: { id: scheduleId, schoolId },
-      include: { installments: { where: { sent: false }, orderBy: { sendDate: "asc" }, take: 1 } },
+      include: { installments: { orderBy: { sendDate: "asc" } } },
     });
     if (!schedule) throw new NotFoundException("Fee reminder schedule not found.");
     if (!schedule.isActive) throw new BadRequestException("Activate this schedule before sending reminders.");
     if (!schedule.sendInApp) throw new BadRequestException("In-app reminders are not enabled for this schedule.");
 
-    const installment = schedule.installments[0];
+    const installment = schedule.installments.find((item) => !item.sent);
+    if (schedule.installments.length > 0 && !installment) {
+      throw new BadRequestException("All configured reminder dates have already been sent. Add a new reminder date before sending again.");
+    }
     const targets = await this.collectFeeReminderTargets(
       schoolId,
       Number(schedule.minimumOutstanding),
@@ -1125,12 +1128,10 @@ export class FinanceService {
       throw new BadRequestException("No students currently meet this schedule's outstanding-balance threshold.");
     }
 
-    const alreadySent = installment
-      ? await db.feeReminderLog.findMany({
-          where: { scheduleId, installmentId: installment.id, channel: "IN_APP", status: "SENT" },
-          select: { studentId: true, guardianPhone: true, guardianEmail: true, guardianName: true },
-        })
-      : [];
+    const alreadySent = await db.feeReminderLog.findMany({
+      where: { scheduleId, installmentId: installment?.id ?? null, channel: "IN_APP", status: "SENT" },
+      select: { studentId: true, guardianPhone: true, guardianEmail: true, guardianName: true },
+    });
     const sentKeys = new Set(alreadySent.map((log) => `${log.studentId}|${log.guardianPhone ?? ""}|${log.guardianEmail ?? ""}|${log.guardianName}`));
     let inAppSent = 0;
     let skippedNoLogin = 0;
