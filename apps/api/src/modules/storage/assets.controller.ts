@@ -2,6 +2,7 @@ import {
   Controller,
   Delete,
   Put,
+  Param,
   UploadedFile,
   UseGuards,
   UseInterceptors,
@@ -39,6 +40,29 @@ export class AssetsController {
   @Roles("owner", "admin")
   removeLogo(@CurrentSchool() school: School) {
     return this.assets.removeSchoolLogo(school);
+  }
+
+
+  @Put("signatures/:kind/:personId")
+  @Roles("owner", "admin", "headteacher")
+  @UseInterceptors(imageUpload("signature"))
+  uploadPersonSignature(
+    @CurrentSchool() school: School,
+    @Param("kind") kind: string,
+    @Param("personId") personId: string,
+    @UploadedFile() file: Express.Multer.File | undefined,
+  ) {
+    return this.assets.setPersonSignature(school, kind, personId, file);
+  }
+
+  @Delete("signatures/:kind/:personId")
+  @Roles("owner", "admin", "headteacher")
+  removePersonSignature(
+    @CurrentSchool() school: School,
+    @Param("kind") kind: string,
+    @Param("personId") personId: string,
+  ) {
+    return this.assets.removePersonSignature(school, kind, personId);
   }
 
   @Put("me/avatar")
