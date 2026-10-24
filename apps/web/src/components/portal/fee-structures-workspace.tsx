@@ -98,7 +98,7 @@ export function FeeStructuresWorkspace() {
   const [feedback, setFeedback] = useState<{ kind: "success" | "error"; text: string } | null>(null);
 
   const structuresQuery = useQuery({
-    queryKey: ["finance", "fee-structures"],
+    queryKey: ["finance", "fee-structures", "all"],
     queryFn: () => apiFetch<FeeStructure[]>("/finance/fee-structures?includeArchived=true"),
     retry: false,
   });
