@@ -180,9 +180,9 @@ export function AdminAnnouncementsWorkspace({ mode = "admin" }: { mode?: Announc
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-xl font-black text-foreground">School Announcements</h2>
+          <h2 className="text-xl font-black text-foreground">{mode === "teacher" ? "Class Announcements" : mode === "accountant" ? "Fee Announcements" : "School Announcements"}</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Create and manage school notices, event updates, and academic bulletins.
+            {mode === "teacher" ? "Share notices with students and guardians in the classes you teach." : mode === "accountant" ? "Send announcements to guardians of students with outstanding school fees." : "Create and manage school notices, event updates, and academic bulletins."}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -201,7 +201,7 @@ export function AdminAnnouncementsWorkspace({ mode = "admin" }: { mode?: Announc
             className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground transition hover:opacity-90"
           >
             <Plus className="size-4" />
-            New announcement
+            {mode === "accountant" ? "New fee announcement" : mode === "teacher" ? "New class announcement" : "New announcement"}
           </button>
         </div>
       </div>
@@ -408,8 +408,8 @@ export function AdminAnnouncementsWorkspace({ mode = "admin" }: { mode?: Announc
       <PortalModal
         isOpen={isCreateOpen}
         onClose={() => !createMutation.isPending && setIsCreateOpen(false)}
-        title="New announcement"
-        description="Write a notice and choose who should see it."
+        title={mode === "accountant" ? "New fee announcement" : mode === "teacher" ? "New class announcement" : "New announcement"}
+        description={mode === "teacher" ? "Send a message to students or guardians in your assigned classes." : mode === "accountant" ? "Notify parents and guardians whose wards have unpaid fees." : "Write a notice and choose who should see it."}
         maxWidth="lg"
       >
         <form onSubmit={handleCreate} className="space-y-4">
@@ -429,43 +429,82 @@ export function AdminAnnouncementsWorkspace({ mode = "admin" }: { mode?: Announc
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <label htmlFor="announcement-category" className="mb-1.5 block text-sm font-semibold text-foreground">Category</label>
-              <select
-                id="announcement-category"
-                value={form.category}
-                onChange={(event) => setForm((current) => ({ ...current, category: event.target.value as AnnouncementCategory }))}
-                className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-              >
-                {filterOptions.filter((option) => option.value !== "ALL").map((option) => (
-                  <option key={option.value} value={option.value}>{option.label}</option>
-                ))}
-              </select>
+              <Select value={form.category} onValueChange={(value) => setForm((current) => ({ ...current, category: value as AnnouncementCategory }))}>
+                <SelectTrigger id="announcement-category" className="h-10 w-full">
+                  <SelectValue placeholder="Choose a category" />
+                </SelectTrigger>
+                <SelectContent>
+                  {filterOptions.filter((option) => option.value !== "ALL").map((option) => (
+                    <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div>
               <label htmlFor="announcement-target" className="mb-1.5 block text-sm font-semibold text-foreground">Target audience</label>
-              <select
-                id="announcement-target"
-                value={form.target}
-                onChange={(event) => setForm((current) => ({ ...current, target: event.target.value as CreateAnnouncementInput["target"] }))}
-                className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-              >
-                {ANNOUNCEMENT_TARGET_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>{option.label}</option>
-                ))}
-              </select>
+              <Select value={form.target} onValueChange={(value) => setForm((current) => ({ ...current, target: value as CreateAnnouncementInput["target"], classIds: [] }))}>
+                <SelectTrigger id="announcement-target" className="h-10 w-full">
+                  <SelectValue placeholder="Choose an audience" />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableTargets.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
-          <div>
-            <label htmlFor="announcement-status" className="mb-1.5 block text-sm font-semibold text-foreground">Publication status</label>
-            <select
-              id="announcement-status"
-              value={form.status}
-              onChange={(event) => setForm((current) => ({ ...current, status: event.target.value as AnnouncementStatus }))}
-              className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-            >
-              <option value="PUBLISHED">Publish now</option>
-              <option value="DRAFT">Save as draft</option>
-            </select>
-          </div>
+          {requiresClassTargets && (
+            <div className="space-y-2 rounded-xl border border-border bg-muted/30 p-3">
+              <label htmlFor="announcement-class-selector" className="block text-sm font-semibold text-foreground">Target classes</label>
+              <p className="text-xs text-muted-foreground">Choose one or more classes. Teachers can only select classes assigned to them.</p>
+              <Select
+                value=""
+                onValueChange={(classId) => setForm((current) => ({
+                  ...current,
+                  classIds: current.classIds.includes(classId) ? current.classIds : [...current.classIds, classId],
+                }))}
+              >
+                <SelectTrigger id="announcement-class-selector" className="h-10 w-full bg-background">
+                  <SelectValue placeholder={classOptionsQuery.isPending ? "Loading classes…" : "Add a class"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {classOptions.filter((option) => !form.classIds.includes(option.id)).map((option) => (
+                    <SelectItem key={option.id} value={option.id}>{option.level} · {option.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {classOptionsQuery.isError && <p role="alert" className="text-xs text-destructive">Could not load classes. Close and retry this announcement later.</p>}
+              {selectedClasses.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {selectedClasses.map((klass) => (
+                    <span key={klass.id} className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-2.5 py-1 text-xs font-medium text-foreground">
+                      {klass.level} · {klass.name}
+                      <button type="button" onClick={() => setForm((current) => ({ ...current, classIds: current.classIds.filter((id) => id !== klass.id) }))} aria-label={"Remove " + klass.name} className="rounded-full p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground">
+                        <X className="size-3" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground">No classes selected yet.</p>
+              )}
+            </div>
+          )}
+          {mode === "admin" && (
+            <div>
+              <label htmlFor="announcement-status" className="mb-1.5 block text-sm font-semibold text-foreground">Publication status</label>
+              <Select value={form.status} onValueChange={(value) => setForm((current) => ({ ...current, status: value as AnnouncementStatus }))}>
+                <SelectTrigger id="announcement-status" className="h-10 w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="PUBLISHED">Publish now</SelectItem>
+                  <SelectItem value="DRAFT">Save as draft</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
           <div>
             <label htmlFor="announcement-content" className="mb-1.5 block text-sm font-semibold text-foreground">Announcement content</label>
             <textarea
@@ -479,6 +518,7 @@ export function AdminAnnouncementsWorkspace({ mode = "admin" }: { mode?: Announc
               className="w-full rounded-lg border border-input bg-background p-3 text-sm leading-relaxed text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
             />
           </div>
+          {mode === "admin" && (
           <label className="flex items-center gap-3 rounded-lg border border-border p-3 text-sm text-foreground">
             <input
               type="checkbox"
@@ -488,6 +528,7 @@ export function AdminAnnouncementsWorkspace({ mode = "admin" }: { mode?: Announc
             />
             Pin this announcement to the top
           </label>
+          )}
           {createMutation.isError && (
             <p role="alert" className="text-sm text-destructive">{errorText(createMutation.error)}</p>
           )}
@@ -506,7 +547,7 @@ export function AdminAnnouncementsWorkspace({ mode = "admin" }: { mode?: Announc
               className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-bold text-primary-foreground disabled:opacity-50"
             >
               {createMutation.isPending ? <LoaderCircle className="size-4 animate-spin" /> : <Send className="size-4" />}
-              {createMutation.isPending ? "Saving…" : form.status === "DRAFT" ? "Save draft" : "Publish"}
+              {createMutation.isPending ? "Saving…" : mode === "admin" && form.status === "DRAFT" ? "Save draft" : "Publish"}
             </button>
           </div>
         </form>
