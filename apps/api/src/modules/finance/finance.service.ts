@@ -337,6 +337,109 @@ export class FinanceService {
     });
   }
 
+  async listBills(schoolId: string) {
+    return this.prisma.client.bill.findMany({
+      where: { schoolId },
+      orderBy: { issuedAt: "desc" },
+      take: 500,
+      include: {
+        student: {
+          select: {
+            id: true,
+            admissionNumber: true,
+            profile: { select: { firstName: true, lastName: true } },
+          },
+        },
+        class: { select: { id: true, name: true } },
+        feeStructure: { select: { name: true } },
+        academicYear: { select: { name: true } },
+        term: { select: { name: true } },
+      },
+    });
+  }
+
+  async listPayments(schoolId: string) {
+    return this.prisma.client.payment.findMany({
+      where: { schoolId },
+      orderBy: [{ paymentDate: "desc" }, { createdAt: "desc" }],
+      take: 500,
+      include: {
+        student: {
+          select: {
+            id: true,
+            admissionNumber: true,
+            profile: { select: { firstName: true, lastName: true } },
+          },
+        },
+        bill: { select: { id: true, billNumber: true } },
+        recordedBy: { select: { name: true, email: true } },
+      },
+    });
+  }
+
+  async listExpenses(schoolId: string) {
+    return this.prisma.client.expense.findMany({
+      where: { schoolId },
+      orderBy: [{ date: "desc" }, { createdAt: "desc" }],
+      take: 500,
+      include: {
+        customCategory: { select: { name: true } },
+        registryCategory: { select: { name: true } },
+      },
+    });
+  }
+
+  async createExpense(schoolId: string, recordedById: string, input: CreateExpenseInput) {
+    const date = new Date(`${input.date}T00:00:00.000Z`);
+    if (Number.isNaN(date.getTime())) {
+      throw new BadRequestException("Enter a valid expense date.");
+    }
+    return this.prisma.client.expense.create({
+      data: {
+        schoolId,
+        date,
+        amount: new Prisma.Decimal(input.amount),
+        description: input.description,
+        payee: input.payee || null,
+        category: input.category,
+        paymentMethod: input.paymentMethod,
+        referenceNumber: input.referenceNumber || null,
+        recordedById,
+      },
+      include: {
+        customCategory: { select: { name: true } },
+        registryCategory: { select: { name: true } },
+      },
+    });
+  }
+
+  async listPayrollRecords(schoolId: string) {
+    return this.prisma.client.payrollRecord.findMany({
+      where: { schoolId },
+      orderBy: [{ year: "desc" }, { month: "desc" }],
+      take: 100,
+      include: {
+        payslips: {
+          select: {
+            id: true,
+            staffId: true,
+            teacherId: true,
+            basicSalary: true,
+            allowances: true,
+            grossSalary: true,
+            ssnitEmployee: true,
+            incomeTax: true,
+            otherDeductions: true,
+            netSalary: true,
+            paymentMethod: true,
+            paymentStatus: true,
+            paidAt: true,
+          },
+        },
+      },
+    });
+  }
+
   async getStudentLedger(
     schoolId: string,
     studentId: string,
