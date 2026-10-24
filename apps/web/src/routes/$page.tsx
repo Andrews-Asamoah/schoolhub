@@ -447,7 +447,7 @@ function AttendanceWorkspace({
 
   // Managers can mark any class; a teacher only the classes they are class teacher of.
   const canMark =
-    ["owner", "admin", "headmistress"].includes(attendanceRole ?? "") ||
+    ["owner", "admin", "headteacher"].includes(attendanceRole ?? "") ||
     (attendanceRole === "teacher" && !!teaching.data?.classes.find((item) => item.id === classId)?.isClassTeacher);
   if (canMark) {
     return (

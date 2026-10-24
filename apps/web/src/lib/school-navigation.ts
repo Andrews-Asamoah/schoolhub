@@ -448,7 +448,7 @@ const ownPortalByRole: Record<string, string> = {
  */
 /**
  * Pages made for students only. Roles with no page list of their own (owner,
- * administrator, headmistress) see everything else, so these are left out of
+ * administrator, headteacher) see everything else, so these are left out of
  * their sidebar.
  */
 const studentOnlyPages = ["classmates"];

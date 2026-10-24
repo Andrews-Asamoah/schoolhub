@@ -61,7 +61,7 @@ const selectClass = "h-10 w-full rounded-lg border border-slate-200 bg-white px-
 export function TimetableWorkspace() {
   const queryClient = useQueryClient();
   const { activeRole } = useSchoolRole();
-  const canEdit = ["owner", "admin", "headmistress"].includes(activeRole ?? "");
+  const canEdit = ["owner", "admin", "headteacher"].includes(activeRole ?? "");
   const isTeacher = activeRole === "teacher";
   const canExport = useCanExportTables();
 

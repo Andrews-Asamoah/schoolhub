@@ -17,12 +17,12 @@ interface SchoolMember {
 }
 
 /** Mirrors the API: only the owner may grant or remove these. */
-const OWNER_ONLY: readonly Role[] = ["admin", "headmistress"];
+const OWNER_ONLY: readonly Role[] = ["admin", "headteacher"];
 
 const ROLE_HELP: Record<Role, string> = {
   owner: "Owns the school workspace.",
   admin: "Manages school settings, classes, people and roles.",
-  headmistress: "Same management access as an administrator.",
+  headteacher: "Same management access as an administrator.",
   teacher: "Their students and classes, subjects, timetable, assessments and attendance.",
   accountant: "Fees, payments, expenses and payroll.",
   staff: "General records, attendance and inventory.",
@@ -156,7 +156,7 @@ export function TeamRoleWorkspace() {
           <div>
             <h2 className="text-base font-bold text-slate-900 dark:text-slate-100">Team roles</h2>
             <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600 dark:text-slate-300">
-              One account can hold several roles in this school, for example a teacher who is also an accountant. Each person keeps their primary role and can switch between the roles you give them. Only the school owner can grant or remove administrator and headmistress access.
+              One account can hold several roles in this school, for example a teacher who is also an accountant. Each person keeps their primary role and can switch between the roles you give them. Only the school owner can grant or remove administrator and headteacher access.
             </p>
           </div>
         </div>
