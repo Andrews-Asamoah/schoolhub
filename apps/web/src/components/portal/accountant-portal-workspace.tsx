@@ -128,7 +128,7 @@ const mockExpenses: ExpenseRecord[] = [
 ];
 
 const mockStaffSalaries: StaffSalaryRecord[] = [
-  { id: "sal-1", staffName: "Dr. Mensah Ofori", role: "Headmaster", department: "Administration", basicSalary: 7500, allowances: 1500, taxDeductions: 1350, netPay: 7650, status: "DISBURSED" },
+  { id: "sal-1", staffName: "Dr. Mensah Ofori", role: "Headteacher", department: "Administration", basicSalary: 7500, allowances: 1500, taxDeductions: 1350, netPay: 7650, status: "DISBURSED" },
   { id: "sal-2", staffName: "Mrs. Grace Appiah", role: "Senior Science Tutor", department: "Science", basicSalary: 3850, allowances: 1000, taxDeductions: 765, netPay: 4085, status: "DISBURSED" },
   { id: "sal-3", staffName: "Mr. Kwabena Darko", role: "Math Lead Tutor", department: "Mathematics", basicSalary: 3900, allowances: 950, taxDeductions: 780, netPay: 4070, status: "DISBURSED" },
   { id: "sal-4", staffName: "Ms. Veronica Kusi", role: "English Tutor", department: "Languages", basicSalary: 3500, allowances: 800, taxDeductions: 680, netPay: 3620, status: "DISBURSED" },

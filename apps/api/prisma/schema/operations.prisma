@@ -265,6 +265,7 @@ model Announcement {
   content        String
   contentHtml    String?
   target         String    @default("ALL")
+  targetClassIds String[]  @default([]) @map("target_class_ids")
   category       String    @default("GENERAL")
   status         String    @default("PUBLISHED")
   isPinned       Boolean   @default(false)
