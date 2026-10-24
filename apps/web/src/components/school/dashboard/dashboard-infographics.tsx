@@ -228,6 +228,9 @@ export function HorizontalBreakdown({
   data: BreakdownDatum[];
 }) {
   const total = data.reduce((sum, item) => sum + item.count, 0);
+  if (total <= 0) {
+    return <p className="text-xs text-muted-foreground">No distribution data available.</p>;
+  }
 
   return (
     <div className="space-y-4">
@@ -334,6 +337,8 @@ export function DashboardInfographics() {
           value={feeProgress}
           label="Fees collected"
           sublabel="Collected this term"
+          amount={collectedFees}
+          targetAmount={feeTarget}
         />
         <p className="mt-4 text-[11px] leading-5 text-muted-foreground">
           Remaining target:{" "}
