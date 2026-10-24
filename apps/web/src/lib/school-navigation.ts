@@ -298,6 +298,14 @@ export const schoolNavGroups: SchoolNavGroup[] = [
         apiStatus: "available",
       },
       {
+        id: "fee-reminders",
+        label: "Fee reminders",
+        icon: Bell,
+        description: "Schedule, preview and send fee reminders to guardian portal accounts.",
+        section: "Finance",
+        apiStatus: "available",
+      },
+      {
         id: "outstanding",
         label: "Outstanding fees",
         icon: AlertCircle,
@@ -468,6 +476,7 @@ const rolePages: Record<string, string[]> = {
     "invoices",
     "expenses",
     "payroll",
+    "fee-reminders",
     "inventory",
     "students",
     "reports",
