@@ -653,7 +653,7 @@ export type CreateInventoryItemInput = z.infer<typeof createInventoryItemSchema>
 export const inventoryStockMovementSchema = z.object({
   type: z.enum(["IN", "OUT"]),
   quantity: z.number().int().positive("Quantity must be a positive whole number"),
-  date: z.string().regex(/^\\d{4}-\\d{2}-\\d{2}$/, "Format: YYYY-MM-DD"),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Format: YYYY-MM-DD"),
   description: z.string().trim().max(500).optional(),
   recipientName: z.string().trim().max(150).optional(),
 });
