@@ -378,3 +378,14 @@ enum InventoryTransactionType {
   OUT
   ADJUSTMENT
 }
+
+
+enum ConcessionValueType {
+  PERCENTAGE
+  FIXED
+}
+
+enum ConcessionType {
+  SIBLING_DISCOUNT
+  SCHOLARSHIP
+}
