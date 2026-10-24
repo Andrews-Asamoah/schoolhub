@@ -30,9 +30,9 @@ export function SuperAdminLayout({
         />
         <div className="min-w-0 flex-1">
           {/* Top bar */}
-          <header className="superadmin-topbar sticky top-0 z-10 flex h-16 items-center gap-3 border-b border-slate-200/80 bg-white px-4 md:px-7 dark:border-white/[0.07] dark:bg-slate-950/45">
+          <header className="superadmin-topbar sticky top-0 z-10 flex h-16 items-center gap-3 border-b border-border bg-card px-4 md:px-7 ">
             <SidebarTrigger className="superadmin-button-secondary shrink-0" />
-            <div className="h-4 w-px bg-slate-200 dark:bg-white/10" />
+            <div className="h-4 w-px bg-border" />
             <div className="superadmin-breadcrumb flex min-w-0 items-center gap-2 text-sm">
               <span className="superadmin-breadcrumb-root hidden font-semibold sm:block">Platform</span>
               {breadcrumb && (
@@ -45,7 +45,7 @@ export function SuperAdminLayout({
             <div className="ml-auto flex items-center gap-2 sm:gap-3">
               {activePage === "dashboard" && <SchoolSwitcher />}
               <ThemeToggle className="superadmin-button-secondary" />
-              <span className="hidden h-6 w-px bg-slate-200 dark:bg-white/10 sm:block" />
+              <span className="hidden h-6 w-px bg-border sm:block" />
               <span className="inline-flex items-center gap-1.5 rounded-full border border-primary/25 bg-primary/10 px-2.5 py-1 text-[11px] font-semibold text-primary shadow-sm sm:text-xs">
                 <span className="size-1.5 rounded-full bg-primary" />
                 <span className="hidden sm:inline">Super Admin</span>
