@@ -21,12 +21,6 @@ interface ClassmatesResponse {
     id: string;
     name: string;
     level: string;
-    classTeacher?: {
-      id: string;
-      firstName: string;
-      lastName: string;
-      profile?: { firstName: string; lastName: string } | null;
-    } | null;
   } | null;
   classmates: ClassmateItem[];
 }
@@ -48,12 +42,6 @@ export function StudentClassmatesView() {
 
   const classmates = data?.classmates ?? [];
   const className = data?.class?.name;
-  const teacher = data?.class?.classTeacher;
-  const teacherName = teacher?.profile
-    ? `${teacher.profile.firstName} ${teacher.profile.lastName}`.trim()
-    : teacher
-      ? `${teacher.firstName} ${teacher.lastName}`.trim()
-      : null;
 
   const normalizedSearch = search.trim().toLocaleLowerCase();
   const filtered = classmates.filter((classmate) => {
@@ -86,11 +74,6 @@ export function StudentClassmatesView() {
               <p className="mt-1 text-sm text-muted-foreground">
                 Your classmates enrolled in the current academic term.
               </p>
-              {teacherName && (
-                <p className="mt-2 text-sm text-muted-foreground">
-                  Class teacher: <span className="font-medium text-foreground">{teacherName}</span>
-                </p>
-              )}
             </div>
           </div>
 
