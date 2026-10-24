@@ -39,24 +39,19 @@ interface StudentTimetableResponse {
   entries: TimetableEntry[];
 }
 
-type DayKey =
-  | "MONDAY"
-  | "TUESDAY"
-  | "WEDNESDAY"
-  | "THURSDAY"
-  | "FRIDAY"
-  | "SATURDAY"
-  | "SUNDAY";
+interface StudentTimetableSchool {
+  name?: string | null;
+  code?: string | null;
+  address?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  website?: string | null;
+  motto?: string | null;
+}
 
-const DAYS: DayKey[] = [
-  "MONDAY",
-  "TUESDAY",
-  "WEDNESDAY",
-  "THURSDAY",
-  "FRIDAY",
-  "SATURDAY",
-  "SUNDAY",
-];
+type DayKey = "MONDAY" | "TUESDAY" | "WEDNESDAY" | "THURSDAY" | "FRIDAY";
+
+const DAYS: DayKey[] = ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY"];
 
 const DAY_SHORT: Record<DayKey, string> = {
   MONDAY: "Mon",
@@ -64,12 +59,15 @@ const DAY_SHORT: Record<DayKey, string> = {
   WEDNESDAY: "Wed",
   THURSDAY: "Thu",
   FRIDAY: "Fri",
-  SATURDAY: "Sat",
-  SUNDAY: "Sun",
 };
 
+function isSchoolDay(date: Date): boolean {
+  return date.getDay() >= 1 && date.getDay() <= 5;
+}
+
 function getDayKey(date: Date): DayKey {
-  return DAYS[(date.getDay() + 6) % 7]!;
+  const dayIndex = date.getDay();
+  return dayIndex === 0 || dayIndex === 6 ? "MONDAY" : DAYS[dayIndex - 1]!;
 }
 
 function formatDay(value: string) {
@@ -202,14 +200,22 @@ export function StudentTimetableView() {
     queryFn: () => apiFetch<StudentTimetableResponse>("/timetable/me"),
     retry: false,
   });
+  const { data: school, isLoading: isSchoolLoading } = useQuery({
+    queryKey: ["school", "current"],
+    queryFn: () => apiFetch<StudentTimetableSchool>("/schools/current"),
+    retry: false,
+    staleTime: 1000 * 60 * 15,
+  });
 
   const entries = data?.entries ?? [];
+  const isSchoolDayToday = isSchoolDay(now);
   const todayKey = getDayKey(now);
+  const isSelectedDayToday = isSchoolDayToday && selectedDay === todayKey;
   const nowMinutes = now.getHours() * 60 + now.getMinutes() + now.getSeconds() / 60;
 
   useEffect(() => {
-    setSelectedDay(todayKey);
-  }, [todayKey]);
+    setSelectedDay(isSchoolDayToday ? todayKey : "MONDAY");
+  }, [todayKey, isSchoolDayToday]);
 
   const entriesByDay = useMemo(() => {
     const grouped = Object.fromEntries(DAYS.map((day) => [day, [] as TimetableEntry[]])) as Record<
@@ -234,13 +240,14 @@ export function StudentTimetableView() {
     return grouped;
   }, [entries]);
 
-  const todayEntries = entriesByDay[todayKey];
+  const todayEntries = isSchoolDayToday ? entriesByDay[todayKey] : [];
   const selectedEntries = entriesByDay[selectedDay];
 
   const printSlots = useMemo(() => {
     const slots = new Map<string, { key: string; startTime: string; endTime: string; startMinutes: number; endMinutes: number }>();
 
     for (const entry of entries) {
+      if (!DAYS.includes(entry.dayOfWeek as DayKey)) continue;
       const startMinutes = parseTime(entry.startTime);
       const endMinutes = parseTime(entry.endTime);
       if (startMinutes === null || endMinutes === null || endMinutes <= startMinutes) continue;
@@ -257,8 +264,9 @@ export function StudentTimetableView() {
   }, [entries]);
 
   useEffect(() => {
-    if (!isPrinting) return;
+    if (!isPrinting || isSchoolLoading) return;
 
+    document.documentElement.classList.add("printing-student-timetable");
     document.body.classList.add("printing-student-timetable");
     const finishPrinting = () => setIsPrinting(false);
     window.addEventListener("afterprint", finishPrinting);
@@ -268,8 +276,9 @@ export function StudentTimetableView() {
       window.clearTimeout(printTimeout);
       window.removeEventListener("afterprint", finishPrinting);
       document.body.classList.remove("printing-student-timetable");
+      document.documentElement.classList.remove("printing-student-timetable");
     };
-  }, [isPrinting]);
+  }, [isPrinting, isSchoolLoading]);
 
   const currentEntry =
     todayEntries.find((entry) => {
@@ -281,8 +290,8 @@ export function StudentTimetableView() {
   const nextEntry = useMemo(() => {
     if (entries.length === 0) return null;
 
-    const todayIndex = DAYS.indexOf(todayKey);
-    const currentWeekMinute = todayIndex * 24 * 60 + nowMinutes;
+    const currentDayIndex = (now.getDay() + 6) % 7;
+    const currentWeekMinute = currentDayIndex * 24 * 60 + nowMinutes;
     let best:
       | { entry: TimetableEntry; minutesAway: number; dayOffset: number }
       | null = null;
@@ -292,10 +301,10 @@ export function StudentTimetableView() {
       const start = parseTime(entry.startTime);
       if (dayIndex < 0 || start === null) continue;
 
-      const dayOffset = (dayIndex - todayIndex + DAYS.length) % DAYS.length;
-      const absoluteStart = (todayIndex + dayOffset) * 24 * 60 + start;
+      const dayOffset = (dayIndex - currentDayIndex + 7) % 7;
+      const absoluteStart = (currentDayIndex + dayOffset) * 24 * 60 + start;
       let minutesAway = absoluteStart - currentWeekMinute;
-      if (minutesAway <= 0) minutesAway += DAYS.length * 24 * 60;
+      if (minutesAway <= 0) minutesAway += 7 * 24 * 60;
       const occurrenceDayOffset = Math.floor((nowMinutes + minutesAway) / (24 * 60));
 
       if (!best || minutesAway < best.minutesAway) {
@@ -304,7 +313,7 @@ export function StudentTimetableView() {
     }
 
     return best;
-  }, [entries, nowMinutes, todayKey]);
+  }, [entries, nowMinutes, todayKey, now.getDay()]);
 
   const completedToday = todayEntries.filter((entry) => {
     const end = parseTime(entry.endTime);
@@ -321,7 +330,7 @@ export function StudentTimetableView() {
     currentEnd !== null ? Math.max(0, Math.ceil(currentEnd - nowMinutes)) : 0;
 
   const nextOnSelectedDay =
-    selectedDay === todayKey
+    isSelectedDayToday
       ? selectedEntries.find((entry) => {
           const start = parseTime(entry.startTime);
           return start !== null && start > nowMinutes;
@@ -624,7 +633,7 @@ export function StudentTimetableView() {
             <div className="rounded-2xl border border-border bg-card p-3 shadow-sm   sm:p-4">
               <div className="flex gap-2 overflow-x-auto pb-1">
                 {DAYS.map((day) => {
-                  const isToday = day === todayKey;
+                  const isToday = isSchoolDayToday && day === todayKey;
                   const selected = day === selectedDay;
                   const count = entriesByDay[day].length;
                   return (
@@ -679,12 +688,12 @@ export function StudentTimetableView() {
                 <div>
                   <h3 className="text-lg font-black text-foreground ">{formatDay(selectedDay)}</h3>
                   <p className="mt-0.5 text-xs text-muted-foreground ">
-                    {selectedDay === todayKey
+                    {isSelectedDayToday
                       ? `${completedToday} of ${todayEntries.length} periods completed today`
                       : `${selectedEntries.length} scheduled ${selectedEntries.length === 1 ? "period" : "periods"}`}
                   </p>
                 </div>
-                {selectedDay === todayKey && (
+                {isSelectedDayToday && (
                   <span className="inline-flex w-fit items-center gap-1.5 rounded-full bg-success/10 px-3 py-1.5 text-[10px] font-bold text-success  ">
                     <span className="size-1.5 animate-pulse rounded-full bg-success/20" /> Live day view
                   </span>
@@ -714,14 +723,14 @@ export function StudentTimetableView() {
                     const start = parseTime(entry.startTime);
                     const end = parseTime(entry.endTime);
                     const isCurrent =
-                      selectedDay === todayKey &&
+                      isSelectedDayToday &&
                       start !== null &&
                       end !== null &&
                       nowMinutes >= start &&
                       nowMinutes < end;
-                    const isCompleted = selectedDay === todayKey && end !== null && end <= nowMinutes;
+                    const isCompleted = isSelectedDayToday && end !== null && end <= nowMinutes;
                     const isNext = entry.id === nextOnSelectedDay && !isCurrent;
-                    const isFuture = selectedDay !== todayKey || (start !== null && start > nowMinutes);
+                    const isFuture = !isSelectedDayToday || (start !== null && start > nowMinutes);
                     const entryProgress =
                       isCurrent && start !== null && end !== null && end > start
                         ? Math.min(100, Math.max(0, ((nowMinutes - start) / (end - start)) * 100))
@@ -862,20 +871,26 @@ export function StudentTimetableView() {
       <section
         className="student-timetable-print"
         aria-hidden={!isPrinting}
-        data-density={printSlots.length > 14 ? "tight" : printSlots.length > 10 ? "compact" : "standard"}
+        data-density={printSlots.length > 12 ? "tight" : printSlots.length > 8 ? "compact" : "standard"}
       >
         <header className="student-timetable-print-header">
-          <div>
-            <p className="student-timetable-print-eyebrow">SchoolHub · Weekly schedule</p>
-            <h1>Class Timetable{data?.class?.name ? ` — ${data.class.name}` : ""}</h1>
-            <p className="student-timetable-print-subtitle">
-              {[data?.class?.level, data?.academicYear?.name, data?.term?.name].filter(Boolean).join(" · ") || "Current academic schedule"}
+          <div className="student-timetable-print-school">
+            <p className="student-timetable-print-eyebrow">
+              {school?.code ? `School code: ${school.code}` : "Weekly school timetable"}
             </p>
+            <h1>{school?.name || "School Timetable"}</h1>
+            {school?.motto && <p className="student-timetable-print-motto">{school.motto}</p>}
+            {(school?.address || school?.phone || school?.email || school?.website) && (
+              <p className="student-timetable-print-contact">
+                {[school?.address, school?.phone, school?.email, school?.website].filter(Boolean).join(" · ")}
+              </p>
+            )}
           </div>
           <div className="student-timetable-print-datestamp">
-            <span>Printed on</span>
-            <strong>{formatLongDate(now)}</strong>
-            <span>{formatClock(now)}</span>
+            <strong className="student-timetable-print-document-title">WEEKLY CLASS TIMETABLE</strong>
+            <strong>{data?.class?.name || "Class not assigned"}{data?.class?.level ? ` · ${data.class.level}` : ""}</strong>
+            <span>{[data?.academicYear?.name, data?.term?.name].filter(Boolean).join(" · ") || "Current academic schedule"}</span>
+            <span>Printed {formatLongDate(now)} · {formatClock(now)}</span>
           </div>
         </header>
 
@@ -893,7 +908,7 @@ export function StudentTimetableView() {
                 {DAYS.map((day) => (
                   <th key={day} scope="col">
                     {formatDay(day)}
-                    {day === todayKey && <span className="student-timetable-print-today">Today</span>}
+                    {isSchoolDayToday && day === todayKey && <span className="student-timetable-print-today">Today</span>}
                   </th>
                 ))}
               </tr>
@@ -915,14 +930,14 @@ export function StudentTimetableView() {
                         className={cn(
                           "student-timetable-print-cell",
                           slotEntries.some((entry) =>
-                            day === todayKey &&
+                            isSchoolDayToday && day === todayKey &&
                             nowMinutes >= slot.startMinutes &&
                             nowMinutes < slot.endMinutes,
                           ) && "student-timetable-print-current",
                         )}
                       >
                         {slotEntries.map((entry) => {
-                          const isCurrent = day === todayKey &&
+                          const isCurrent = isSchoolDayToday && day === todayKey &&
                             nowMinutes >= slot.startMinutes &&
                             nowMinutes < slot.endMinutes;
                           const details = [
@@ -958,7 +973,7 @@ export function StudentTimetableView() {
 
         <footer className="student-timetable-print-footer">
           <span>Times and allocations follow the school's published timetable.</span>
-          <span>{printSlots.length} time slots · Monday–Sunday</span>
+          <span>{printSlots.length} time slots · Monday–Friday</span>
         </footer>
       </section>,
       document.body,
