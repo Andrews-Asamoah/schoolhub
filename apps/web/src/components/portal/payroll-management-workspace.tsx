@@ -42,6 +42,13 @@ interface PayrollRecord {
   payslips: Payslip[];
   _count?: { payslips: number };
 }
+interface SalaryPerson {
+  id: string;
+  type: "TEACHER" | "STAFF";
+  identifier: string;
+  name: string;
+  monthlySalary: number | string | null;
+}
 interface GenerateResponse {
   payrollRecord: PayrollRecord;
   includedCount: number;
@@ -80,14 +87,31 @@ export function PayrollManagementWorkspace() {
   const [selectedDetail, setSelectedDetail] = useState<PayrollRecord | null>(null);
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [search, setSearch] = useState("");
+  const [salarySearch, setSalarySearch] = useState("");
+  const [salaryTarget, setSalaryTarget] = useState<SalaryPerson | null>(null);
+  const [salaryDraft, setSalaryDraft] = useState("");
   const [feedback, setFeedback] = useState<{ kind: "success" | "error"; text: string } | null>(null);
 
+  const salaryRegisterQuery = useQuery({
+    queryKey: ["finance", "payroll-salaries"],
+    queryFn: () => apiFetch<SalaryPerson[]>("/finance/payroll/salaries"),
+    retry: false,
+  });
   const payrollQuery = useQuery({
     queryKey: ["finance", "payroll"],
     queryFn: () => apiFetch<PayrollRecord[]>("/finance/payroll"),
     retry: false,
   });
   const payroll = payrollQuery.data ?? [];
+  const salaryRegister = salaryRegisterQuery.data ?? [];
+  const filteredSalaryRegister = useMemo(() => {
+    const term = salarySearch.trim().toLowerCase();
+    return salaryRegister.filter(person => !term ||
+      person.name.toLowerCase().includes(term) ||
+      person.identifier.toLowerCase().includes(term) ||
+      person.type.toLowerCase().includes(term));
+  }, [salaryRegister, salarySearch]);
+  const salaryMissingCount = salaryRegister.filter(person => !(Number(person.monthlySalary) > 0)).length;
   const visiblePayroll = useMemo(() => payroll.filter(record => {
     const term = search.trim().toLowerCase();
     const textMatch = !term || monthName(record.month, record.year).toLowerCase().includes(term) || String(record.year).includes(term);
@@ -108,6 +132,23 @@ export function PayrollManagementWorkspace() {
     },
     onError: (error: Error) => setFeedback({ kind: "error", text: error.message }),
   });
+  const updateSalary = useMutation({
+    mutationFn: ({ person, monthlySalary }: { person: SalaryPerson; monthlySalary: number }) =>
+      apiFetch<{ id: string; type: string; monthlySalary: number }>(
+        `/finance/payroll/salaries/${person.type}/${encodeURIComponent(person.id)}`,
+        { method: "PATCH", body: JSON.stringify({ monthlySalary }) },
+      ),
+    onSuccess: async (_result, variables) => {
+      setFeedback({ kind: "success", text: `Monthly salary updated for ${variables.person.name}. New payroll drafts will use this value.` });
+      setSalaryTarget(null);
+      setSalaryDraft("");
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["finance", "payroll-salaries"] }),
+        queryClient.invalidateQueries({ queryKey: ["finance", "payroll"] }),
+      ]);
+    },
+    onError: (error: Error) => setFeedback({ kind: "error", text: error.message }),
+  });
   const updatePayroll = useMutation({
     mutationFn: (input: TransitionTarget & { paymentMethod?: PaymentMethod }) =>
       apiFetch<PayrollRecord>(`/finance/payroll/${encodeURIComponent(input.payroll.id)}/status`, {
@@ -123,6 +164,24 @@ export function PayrollManagementWorkspace() {
     },
     onError: (error: Error) => setFeedback({ kind: "error", text: error.message }),
   });
+
+  function submitSalary(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!salaryTarget) return;
+    const amount = Number(salaryDraft);
+    if (salaryDraft.trim() === "" || !Number.isFinite(amount) || amount < 0 || amount > 10000000) {
+      setFeedback({ kind: "error", text: "Enter a valid non-negative monthly salary in GHS." });
+      return;
+    }
+    updateSalary.mutate({ person: salaryTarget, monthlySalary: Math.round((amount + Number.EPSILON) * 100) / 100 });
+  }
+  const exportSalaryRegister = () => downloadCsv([
+    ["SchoolHub Salary Register"],
+    ["Exported at", new Date().toLocaleString("en-GB")],
+    [],
+    ["Employee", "Employee reference", "Type", "Monthly salary (GHS)", "Payroll eligible"],
+    ...salaryRegister.map(person => [person.name, person.identifier, person.type, person.monthlySalary == null ? "" : Number(person.monthlySalary).toFixed(2), Number(person.monthlySalary) > 0 ? "Yes" : "No"]),
+  ], "schoolhub-salary-register.csv");
 
   function submitGenerate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -171,12 +230,32 @@ export function PayrollManagementWorkspace() {
 
     <section className="rounded-2xl border border-border bg-card p-4 shadow-sm sm:p-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div><h2 className="text-lg font-semibold text-foreground">Salary register</h2><p className="mt-1 text-sm text-muted-foreground">Manage the monthly base salary used when creating new payroll drafts. Updating a salary does not alter already saved payroll runs.</p></div>
+        <button type="button" className={secondaryButton} onClick={exportSalaryRegister} disabled={!salaryRegister.length}><Download className="size-4" /> Export salaries</button>
+      </div>
+      <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0 flex-1"><label className="mb-1.5 block text-xs font-semibold text-muted-foreground">Search employee</label><input className={fieldClass} value={salarySearch} onChange={event => setSalarySearch(event.target.value)} placeholder="Search by name, ID, or staff type…" /></div>
+        <div className="rounded-xl bg-muted/40 px-3 py-2 text-xs text-muted-foreground"><strong className="text-foreground">{salaryMissingCount}</strong> active employee(s) missing a positive salary</div>
+      </div>
+      {salaryRegisterQuery.isPending ? <LoadingState /> : salaryRegisterQuery.error ? <ErrorState message={salaryRegisterQuery.error.message} /> : filteredSalaryRegister.length ? <div className="mt-4 overflow-x-auto"><table className="w-full min-w-[620px] text-left text-sm"><thead><tr className="border-b border-border text-xs text-muted-foreground"><th className="p-3">Employee</th><th className="p-3">Type</th><th className="p-3 text-right">Monthly salary</th><th className="p-3">Payroll readiness</th><th className="p-3"></th></tr></thead><tbody>{filteredSalaryRegister.map(person => { const ready = Number(person.monthlySalary) > 0; return <tr key={person.type + person.id} className="border-b border-border/70 last:border-0"><td className="p-3"><p className="font-semibold text-foreground">{person.name}</p><p className="mt-1 text-xs text-muted-foreground">{person.identifier}</p></td><td className="p-3">{person.type === "TEACHER" ? "Teacher" : "Staff"}</td><td className="p-3 text-right font-semibold tabular-nums">{ready ? money(Number(person.monthlySalary)) : "Not configured"}</td><td className="p-3"><span className={cn("rounded-full px-2.5 py-1 text-[10px] font-bold", ready ? "bg-success/10 text-success" : "bg-warning/10 text-foreground")}>{ready ? "READY" : "NEEDS SALARY"}</span></td><td className="p-3 text-right"><button type="button" className="text-xs font-semibold text-primary hover:underline" onClick={() => { setFeedback(null); setSalaryTarget(person); setSalaryDraft(person.monthlySalary == null ? "" : String(person.monthlySalary)); }}>Edit salary</button></td></tr>; })}</tbody></table></div> : <div className="rounded-xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">{salarySearch ? "No employees match your search." : "No active teachers or staff records are available for payroll."}</div>}
+    </section>
+
+    <section className="rounded-2xl border border-border bg-card p-4 shadow-sm sm:p-5">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div className="min-w-0 flex-1"><label className="mb-1.5 block text-xs font-semibold text-muted-foreground">Search payroll periods</label><input className={fieldClass} value={search} onChange={event => setSearch(event.target.value)} placeholder="Search by month or year…" /></div>
         <div className="sm:w-48"><label className="mb-1.5 block text-xs font-semibold text-muted-foreground">Status</label><Select value={statusFilter} onValueChange={setStatusFilter}><SelectTrigger className="w-full"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ALL">All statuses</SelectItem>{(["DRAFT","APPROVED","PAID","CANCELLED"] as const).map(value => <SelectItem key={value} value={value}>{value}</SelectItem>)}</SelectContent></Select></div>
       </div>
       {payrollQuery.isPending ? <LoadingState /> : payrollQuery.error ? <ErrorState message={payrollQuery.error.message} /> : visiblePayroll.length ? <div className="mt-4 overflow-x-auto"><table className="w-full min-w-[860px] text-left text-sm"><thead><tr className="border-b border-border text-xs text-muted-foreground"><th className="p-3">Payroll period</th><th className="p-3">Status</th><th className="p-3 text-right">Employees</th><th className="p-3 text-right">Gross</th><th className="p-3 text-right">PAYE</th><th className="p-3 text-right">Net</th><th className="p-3">Actions</th></tr></thead><tbody>{visiblePayroll.map(run => <tr key={run.id} className="border-b border-border/70 last:border-0 hover:bg-muted/30"><td className="p-3"><p className="font-semibold text-foreground">{monthName(run.month, run.year)}</p><p className="mt-1 text-xs text-muted-foreground">SSNIT: {money(run.totalSSNIT)}</p></td><td className="p-3"><span className={cn("inline-flex rounded-full px-2.5 py-1 text-[10px] font-bold", statusTone(run.status))}>{run.status}</span></td><td className="p-3 text-right tabular-nums">{run._count?.payslips ?? run.payslips.length}</td><td className="p-3 text-right tabular-nums">{money(run.totalGross)}</td><td className="p-3 text-right tabular-nums">{money(run.totalTax)}</td><td className="p-3 text-right font-semibold tabular-nums">{money(run.totalNet)}</td><td className="p-3"><div className="flex flex-wrap gap-2"><button type="button" onClick={() => setSelectedDetail(run)} className="text-xs font-semibold text-primary hover:underline">Review slips</button>{run.status === "DRAFT" && <button type="button" onClick={() => setTransitionTarget({ payroll: run, nextStatus: "APPROVED" })} className="text-xs font-semibold text-foreground hover:underline">Approve</button>}{run.status === "APPROVED" && <button type="button" onClick={() => { setPaidConfirmation(false); setPaymentMethod("BANK_TRANSFER"); setTransitionTarget({ payroll: run, nextStatus: "PAID" }); }} className="text-xs font-semibold text-primary hover:underline">Confirm paid</button>}{run.status === "DRAFT" && <button type="button" onClick={() => setTransitionTarget({ payroll: run, nextStatus: "CANCELLED" })} className="text-xs font-semibold text-destructive hover:underline">Cancel</button>}</div></td></tr>)}</tbody></table></div> : <EmptyState title="No payroll runs yet" description="Generate a draft for a supported period after confirming employee salary and tax details." />}
     </section>
 
+    {salaryTarget && <Modal title="Update monthly salary" description={`${salaryTarget.name} · ${salaryTarget.type === "TEACHER" ? "Teacher" : "Staff"}`} onClose={() => !updateSalary.isPending && setSalaryTarget(null)}>
+      <form className="space-y-4" onSubmit={submitSalary}>
+        <div className="rounded-xl bg-muted/40 p-3 text-sm text-muted-foreground">This value is used for future payroll drafts only. Saved or approved payroll runs will not be recalculated.</div>
+        <Field label="Monthly base salary (GHS)"><input type="number" min="0" max="10000000" step="0.01" required className={fieldClass} value={salaryDraft} onChange={event => setSalaryDraft(event.target.value)} placeholder="0.00" /></Field>
+        {updateSalary.error && <ErrorState message={updateSalary.error.message} />}
+        <div className="flex justify-end gap-2 border-t border-border pt-4"><button type="button" className={secondaryButton} onClick={() => setSalaryTarget(null)} disabled={updateSalary.isPending}>Cancel</button><button type="submit" className={primaryButton} disabled={updateSalary.isPending}>{updateSalary.isPending && <LoaderCircle className="size-4 animate-spin" />}Save salary</button></div>
+      </form>
+    </Modal>}
     {showGenerate && <Modal title="Generate payroll draft" description="Build a draft payroll from the school's active staff and teacher monthly salary values." onClose={() => !generatePayroll.isPending && setShowGenerate(false)}>
       <form onSubmit={submitGenerate} className="space-y-4">
         <div className="grid gap-4 sm:grid-cols-2"><Field label="Payroll month"><Select value={month} onValueChange={setMonth}><SelectTrigger className="w-full"><SelectValue /></SelectTrigger><SelectContent>{[9,10,11,12].map(value => <SelectItem key={value} value={String(value)}>{new Date(Date.UTC(2026,value-1,1)).toLocaleDateString("en-GB",{month:"long",timeZone:"UTC"})}</SelectItem>)}</SelectContent></Select></Field><Field label="Year"><input disabled value="2026" className={cn(fieldClass,"opacity-70")} /></Field></div>
