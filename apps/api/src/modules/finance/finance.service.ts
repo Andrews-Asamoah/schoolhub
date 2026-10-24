@@ -178,7 +178,7 @@ export class FinanceService {
         results.push(bill);
       }
       return results;
-    });
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 
     return {
       success: true,
