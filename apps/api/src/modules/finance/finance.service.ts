@@ -976,9 +976,16 @@ export class FinanceService {
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
   }
 
-  async listBills(schoolId: string) {
+  async listBills(schoolId: string, studentId?: string) {
     return this.prisma.client.bill.findMany({
-      where: { schoolId },
+      where: {
+        schoolId,
+        ...(studentId ? {
+          studentId,
+          balanceAmount: { gt: 0 },
+          status: { notIn: ["CANCELLED", "WAIVED"] },
+        } : {}),
+      },
       orderBy: { issuedAt: "desc" },
       take: 500,
       include: {
@@ -1000,6 +1007,67 @@ export class FinanceService {
         concessions: { select: { id: true, type: true, label: true, amount: true }, orderBy: { createdAt: "asc" } },
       },
     });
+  }
+
+  async listOutstandingStudents(schoolId: string) {
+    const bills = await this.prisma.client.bill.findMany({
+      where: {
+        schoolId,
+        balanceAmount: { gt: 0 },
+        status: { notIn: ["CANCELLED", "WAIVED"] },
+      },
+      select: {
+        studentId: true,
+        balanceAmount: true,
+        student: {
+          select: {
+            id: true,
+            admissionNumber: true,
+            status: true,
+            deletedAt: true,
+            profile: { select: { firstName: true, lastName: true } },
+          },
+        },
+        class: { select: { id: true, name: true } },
+      },
+    });
+
+    const byStudent = new Map<string, {
+      id: string;
+      admissionNumber: string;
+      profile: { firstName: string; lastName: string } | null;
+      classes: Map<string, { id: string; name: string }>;
+      outstandingBalance: number;
+    }>();
+    for (const bill of bills) {
+      if (bill.student.deletedAt || bill.student.status !== "ACTIVE") continue;
+      const existing = byStudent.get(bill.studentId) ?? {
+        id: bill.student.id,
+        admissionNumber: bill.student.admissionNumber,
+        profile: bill.student.profile,
+        classes: new Map<string, { id: string; name: string }>(),
+        outstandingBalance: 0,
+      };
+      if (bill.class) existing.classes.set(bill.class.id, bill.class);
+      existing.outstandingBalance = roundMoney(
+        existing.outstandingBalance + Number(bill.balanceAmount),
+      );
+      byStudent.set(bill.studentId, existing);
+    }
+
+    return [...byStudent.values()]
+      .map((student) => ({
+        id: student.id,
+        admissionNumber: student.admissionNumber,
+        profile: student.profile,
+        classes: [...student.classes.values()].sort((a, b) => a.name.localeCompare(b.name)),
+        outstandingBalance: student.outstandingBalance,
+      }))
+      .sort((a, b) => {
+        const aName = [a.profile?.firstName, a.profile?.lastName].filter(Boolean).join(" ") || a.admissionNumber;
+        const bName = [b.profile?.firstName, b.profile?.lastName].filter(Boolean).join(" ") || b.admissionNumber;
+        return aName.localeCompare(bName);
+      });
   }
 
   async listPayments(schoolId: string) {
