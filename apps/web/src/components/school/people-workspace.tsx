@@ -283,14 +283,22 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
       const firstPage = await apiFetch<DirectoryPage<Guardian>>(
         `/people/guardians?${params.toString()}`,
       );
-      const allGuardians = [...firstPage.data];
-      for (let nextPage = 2; nextPage <= firstPage.meta.totalPages; nextPage += 1) {
-        params.set("page", String(nextPage));
-        const result = await apiFetch<DirectoryPage<Guardian>>(
-          `/people/guardians?${params.toString()}`,
-        );
-        allGuardians.push(...result.data);
-      }
+      const remainingPages = await Promise.all(
+        Array.from(
+          { length: Math.max(0, firstPage.meta.totalPages - 1) },
+          (_, index) => {
+            const pageParams = new URLSearchParams(params);
+            pageParams.set("page", String(index + 2));
+            return apiFetch<DirectoryPage<Guardian>>(
+              `/people/guardians?${pageParams.toString()}`,
+            );
+          },
+        ),
+      );
+      const allGuardians = [
+        ...firstPage.data,
+        ...remainingPages.flatMap((result) => result.data),
+      ];
       return {
         data: allGuardians,
         meta: { ...firstPage.meta, page: 1, limit: allGuardians.length, totalPages: 1 },
