@@ -27,6 +27,17 @@ type StudentListResponse = { data: StudentOption[]; meta?: { total: number } };
 const field = "h-10 w-full rounded-xl border border-border bg-background px-3 text-sm text-foreground outline-none focus:ring-2 focus:ring-ring/30";
 const primary = "inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50";
 const secondary = "inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-border bg-card px-3 py-2 text-sm font-semibold text-foreground transition hover:bg-muted disabled:opacity-50";
+const periodLabel = (award: Scholarship, years: SchoolYear[]) => {
+  if (award.termId) {
+    for (const year of years) {
+      const term = year.terms.find((item) => item.id === award.termId);
+      if (term) return year.name + " · " + term.name;
+    }
+    return "Selected term";
+  }
+  if (award.academicYearId) return years.find((year) => year.id === award.academicYearId)?.name ?? "Selected year";
+  return "All periods";
+};
 const personName = (student?: StudentOption) => [student?.profile?.firstName, student?.profile?.lastName].filter(Boolean).join(" ").trim() || student?.admissionNumber || "Student";
 const money = (value: number | string) => new Intl.NumberFormat("en-GH", { style: "currency", currency: "GHS", maximumFractionDigits: 2 }).format(Number(value) || 0);
 
@@ -162,7 +173,7 @@ export function ConcessionsWorkspace() {
 
       <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
         <div className="mb-4 flex items-center gap-2"><BadgeCheck className="size-5 text-primary" /><div><h2 className="font-semibold">Student scholarships</h2><p className="text-sm text-muted-foreground">Existing awards and their current status.</p></div></div>
-        {concessionsQuery.isPending ? <p className="text-sm text-muted-foreground">Loading scholarships…</p> : scholarships.length === 0 ? <p className="rounded-xl border border-dashed border-border p-4 text-sm text-muted-foreground">No student scholarships have been recorded.</p> : <div className="overflow-x-auto"><table className="w-full min-w-[720px] text-left text-sm"><thead><tr className="border-b border-border text-xs uppercase tracking-wide text-muted-foreground"><th className="p-3">Student</th><th className="p-3">Award</th><th className="p-3">Value</th><th className="p-3">Period</th><th className="p-3">Status</th><th className="p-3">Action</th></tr></thead><tbody>{scholarships.map((award) => <tr key={award.id} className="border-b border-border/70 last:border-0"><td className="p-3"><p className="font-medium">{personName(award.student)}</p><p className="text-xs text-muted-foreground">{award.student.admissionNumber || "No admission number"}</p></td><td className="p-3"><p>{award.name}</p><p className="max-w-xs truncate text-xs text-muted-foreground">{award.reason || "No note provided"}</p></td><td className="p-3 font-medium">{award.valueType === "PERCENTAGE" ? award.value + "%" : money(award.value)}</td><td className="p-3 text-muted-foreground">{award.termId ? (years.flatMap((year) => year.terms.map((term) => ({ ...term, yearName: year.name }))).find((term) => term.id === award.termId)?.yearName + " · " + (years.flatMap((year) => year.terms).find((term) => term.id === award.termId)?.name || "Term") : award.academicYearId ? years.find((year) => year.id === award.academicYearId)?.name || "Selected year" : "All periods"}</td><td className="p-3"><span className={cn("rounded-full px-2.5 py-1 text-xs font-semibold", award.isActive ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300" : "bg-muted text-muted-foreground")}>{award.isActive ? "Active" : "Inactive"}</span></td><td className="p-3"><button type="button" className={secondary} disabled={toggleScholarship.isPending} onClick={() => toggleScholarship.mutate({ id: award.id, isActive: !award.isActive })}>{award.isActive ? "Deactivate" : "Reactivate"}</button></td></tr>)}</tbody></table></div>}
+              <td className="p-3 text-muted-foreground">{periodLabel(award, years)}</td>
       </section>
       <p className="text-xs leading-5 text-muted-foreground">These concessions apply to newly generated bills only. Bills already issued retain their original balances and audit history. The system caps combined concessions at the bill amount and applies scholarships before the sibling discount rule.</p>
     </div>
