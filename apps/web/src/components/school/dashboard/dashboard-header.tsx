@@ -2,11 +2,7 @@ import { Search } from "lucide-react";
 import { DashboardNotificationsMenu } from "@/components/school/dashboard/dashboard-notifications-menu";
 import { AcademicContextSwitcher } from "@/components/school/academic-context-switcher";
 import { ThemeToggle } from "@/components/school/theme-toggle";
-import {
-  SchoolRoleSwitcher,
-  schoolRoleLabel,
-  useSchoolRole,
-} from "@/components/school/school-role-switcher";
+import { SchoolRoleSwitcher } from "@/components/school/school-role-switcher";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 
 interface DashboardHeaderProps {
@@ -19,8 +15,6 @@ export function DashboardHeader({
   search,
   onSearchChange,
 }: DashboardHeaderProps) {
-  const { activeRole } = useSchoolRole();
-
   return (
     <header className="sticky top-0 z-10 grid grid-cols-[auto_1fr_auto] items-center gap-2 border-b border-border bg-card/90 px-3 py-2.5 backdrop-blur  sm:px-6 md:px-8 min-h-[4.5rem]">
       
