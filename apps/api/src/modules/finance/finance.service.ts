@@ -13,9 +13,9 @@ import { canManageAcademicContext } from "../../common/academic-context.js";
 export class FinanceService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async listFeeStructures(schoolId: string) {
+  async listFeeStructures(schoolId: string, includeArchived = false) {
     return this.prisma.client.feeStructure.findMany({
-      where: { schoolId },
+      where: includeArchived ? { schoolId } : { schoolId, isActive: true },
       orderBy: [{ isActive: "desc" }, { createdAt: "desc" }],
       include: {
         items: true,
