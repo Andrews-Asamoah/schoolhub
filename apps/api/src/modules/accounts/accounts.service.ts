@@ -9,6 +9,7 @@ import {
 import { hashPassword, verifyPassword } from "better-auth/crypto";
 import type { School } from "@prisma/client";
 import {
+  guardianEmailDomain,
   studentLoginEmail,
   type ChangePasswordInput,
   type CredentialSubjectKind,
@@ -196,7 +197,18 @@ export class AccountsService {
           userId = guardian.profile.userId;
           email = guardian.profile.user.email;
         } else {
-          const loginEmail = guardian.email?.trim().toLowerCase() || newGuardianLoginEmail(displayName);
+          const schoolEmailInfo = await tx.school.findUnique({
+            where: { id: school.id },
+            select: { email: true, subdomain: true },
+          });
+          if (!schoolEmailInfo) throw new NotFoundException("School not found.");
+          const guardianDomain = guardianEmailDomain(
+            schoolEmailInfo.email,
+            schoolEmailInfo.subdomain,
+          );
+          const loginEmail =
+            guardian.email?.trim().toLowerCase() ||
+            newGuardianLoginEmail(displayName, guardianDomain);
           const created = await this.credentials.createLogin(tx, {
             name: displayName,
             email: loginEmail,
