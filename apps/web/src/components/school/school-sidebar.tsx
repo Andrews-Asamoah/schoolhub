@@ -40,7 +40,7 @@ export function SchoolSidebar({
     <Sidebar className="school-sidebar-shell">
       <SidebarHeader>
         <Link to="/dashboard" className="flex min-w-0 items-center gap-3">
-          <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-white shadow-sm shadow-blue-600/20 overflow-hidden">
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm overflow-hidden">
             {schoolLogo ? (
               <img src={schoolLogo} alt={schoolName ?? "School Logo"} className="size-full object-cover" />
             ) : (
@@ -48,10 +48,10 @@ export function SchoolSidebar({
             )}
           </span>
           <span className="sidebar-expanded min-w-0">
-            <span className="school-brand-title block text-[15px] font-bold tracking-tight text-slate-900 dark:text-white truncate">
+            <span className="school-brand-title block text-[15px] font-bold tracking-tight text-foreground truncate">
               {schoolName ?? "School Workspace"}
             </span>
-            <span className="block text-[10px] font-medium tracking-wide text-slate-400 dark:text-slate-500 truncate">
+            <span className="block text-[10px] font-medium tracking-wide text-muted-foreground truncate">
               {schoolMotto ?? "SCHOOL MANAGEMENT"}
             </span>
           </span>
@@ -68,7 +68,7 @@ export function SchoolSidebar({
             className="school-sidebar-nav-item"
           >
             <Link to="/dashboard">
-              <span className="flex size-[18px] shrink-0 items-center justify-center rounded-sm bg-blue-600 text-white">
+              <span className="flex size-[18px] shrink-0 items-center justify-center rounded-sm bg-primary text-primary-foreground">
                 <GraduationCap className="size-3.5" />
               </span>
               <span className="sidebar-expanded flex-1">Overview</span>
@@ -111,12 +111,12 @@ export function SchoolSidebar({
       </SidebarContent>
 
       <SidebarFooter>
-        <div className="sidebar-expanded mb-3 rounded-xl bg-blue-50/80 p-3 dark:bg-blue-950/30">
-          <div className="mb-1.5 flex items-center gap-2 text-blue-700 dark:text-blue-300">
+        <div className="sidebar-expanded mb-3 rounded-xl bg-primary/5 p-3">
+          <div className="mb-1.5 flex items-center gap-2 text-primary">
             <Sparkles className="size-3.5" />
             <span className="text-xs font-semibold">SchoolHub workspace</span>
           </div>
-          <p className="text-[11px] leading-relaxed text-slate-600 dark:text-slate-400">
+          <p className="text-[11px] leading-relaxed text-muted-foreground">
             Your school&apos;s daily operations, together in one place.
           </p>
         </div>

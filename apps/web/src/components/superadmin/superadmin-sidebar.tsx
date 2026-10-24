@@ -55,17 +55,17 @@ export function SuperAdminSidebar({
   userEmail,
 }: SuperAdminSidebarProps) {
   return (
-    <Sidebar className="superadmin-sidebar-shell border-r border-slate-200 shadow-md shadow-slate-900/5 dark:border-white/10 dark:shadow-black/20">
-      <SidebarHeader className="superadmin-sidebar-panel border-b border-slate-200/80 dark:border-white/10">
+    <Sidebar className="superadmin-sidebar-shell border-r border-r border-border shadow-sm">
+      <SidebarHeader className="superadmin-sidebar-panel border-b border-border">
         <Link to="/admin/dashboard" className="flex min-w-0 items-center gap-3">
-          <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 text-white shadow-lg shadow-indigo-600/25">
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm">
             <Shield className="size-5" strokeWidth={2} />
           </span>
           <span className="sidebar-expanded min-w-0">
             <span className="superadmin-brand-title block text-[15px] font-bold tracking-tight">
               SchoolHub
             </span>
-            <span className="block text-[10px] font-bold tracking-[0.14em] text-indigo-700 dark:text-indigo-300">
+            <span className="block text-[10px] font-bold tracking-[0.14em] text-primary">
               PLATFORM ADMIN
             </span>
           </span>
@@ -75,7 +75,7 @@ export function SuperAdminSidebar({
       <SidebarContent className="superadmin-sidebar-panel">
         {navSections.map((section) => (
           <SidebarGroup key={section.title}>
-            <SidebarGroupLabel className="text-slate-500 dark:text-slate-500">
+            <SidebarGroupLabel className="text-muted-foreground">
               {section.title}
             </SidebarGroupLabel>
             <div className="space-y-0.5">
@@ -86,8 +86,8 @@ export function SuperAdminSidebar({
                   active={activePage === id}
                   className={`superadmin-nav-item ${
                     activePage === id
-                      ? "bg-indigo-600 text-white shadow-md shadow-indigo-900/15 ring-1 ring-indigo-700 hover:bg-indigo-700 hover:text-white dark:bg-indigo-400/15 dark:text-indigo-100 dark:shadow-none dark:ring-indigo-300/20 dark:hover:bg-indigo-400/20 dark:hover:text-white"
-                      : "text-slate-700 hover:bg-slate-200/70 hover:text-slate-950 dark:text-slate-400 dark:hover:bg-white/[0.06] dark:hover:text-white"
+                      ? "bg-primary text-primary-foreground shadow-sm ring-1 ring-primary/20 hover:bg-primary/90"
+                      : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
                   }`}
                 >
                   <Link to={to}>
@@ -101,7 +101,7 @@ export function SuperAdminSidebar({
         ))}
       </SidebarContent>
 
-      <SidebarFooter className="superadmin-sidebar-panel border-slate-200/80 dark:border-white/10">
+      <SidebarFooter className="superadmin-sidebar-panel border-border">
         <SidebarUserMenu
           name={userName ?? "Super Admin"}
           email={userEmail ?? "admin@schoolhub.gh"}
