@@ -624,6 +624,23 @@ export const generateBillSchema = z.object({
 });
 export type GenerateBillInput = z.infer<typeof generateBillSchema>;
 
+export const createExpenseSchema = z.object({
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Format: YYYY-MM-DD"),
+  amount: z.number().positive("Amount must be greater than zero"),
+  description: z.string().trim().min(3, "Enter a meaningful expense description").max(500),
+  payee: z.string().trim().max(200).optional(),
+  category: z.enum([
+    "SALARY", "UTILITIES", "SUPPLIES", "MAINTENANCE", "TRANSPORT",
+    "RENT", "INSURANCE", "TAXES", "OTHER",
+  ]),
+  paymentMethod: z.enum([
+    "CASH", "BANK_TRANSFER", "CHEQUE", "MOBILE_MONEY", "CARD", "ONLINE", "OTHER",
+  ]),
+  referenceNumber: z.string().trim().max(120).optional(),
+});
+export type CreateExpenseInput = z.infer<typeof createExpenseSchema>;
+
+
 // ============================================================================
 // SUPER ADMIN SCHEMAS
 // ============================================================================
