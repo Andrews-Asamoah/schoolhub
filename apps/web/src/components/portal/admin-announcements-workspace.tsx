@@ -8,6 +8,7 @@ import type {
 } from "@schoolhub/shared";
 import { apiFetch } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PortalModal } from "./portal-modal";
 import {
   ANNOUNCEMENT_CATEGORY_STYLES,
@@ -21,6 +22,8 @@ import {
 
 type CategoryFilter = "ALL" | AnnouncementCategory;
 type Notice = { kind: "success" | "error"; message: string };
+type AnnouncementWorkspaceMode = "admin" | "teacher" | "accountant";
+type AnnouncementClassOption = { id: string; name: string; level: string };
 
 const filterOptions: { value: CategoryFilter; label: string }[] = [
   { value: "ALL", label: "All" },
@@ -30,11 +33,12 @@ const filterOptions: { value: CategoryFilter; label: string }[] = [
   { value: "GENERAL", label: "General" },
 ];
 
-const emptyForm = (): CreateAnnouncementInput => ({
+const emptyForm = (mode: AnnouncementWorkspaceMode = "admin"): CreateAnnouncementInput => ({
   title: "",
   content: "",
   category: "GENERAL",
-  target: "SCHOOL_COMMUNITY",
+  target: mode === "teacher" ? "SELECTED_CLASSES" : mode === "accountant" ? "OUTSTANDING_FEE_GUARDIANS" : "SCHOOL_COMMUNITY",
+  classIds: [],
   isPinned: false,
   status: "PUBLISHED",
 });
@@ -43,7 +47,7 @@ function errorText(error: unknown) {
   return error instanceof Error ? error.message : "The request failed. Please try again.";
 }
 
-export function AdminAnnouncementsWorkspace() {
+export function AdminAnnouncementsWorkspace({ mode = "admin" }: { mode?: AnnouncementWorkspaceMode }) {
   const queryClient = useQueryClient();
   const [filter, setFilter] = useState<CategoryFilter>("ALL");
   const [search, setSearch] = useState("");
@@ -51,13 +55,28 @@ export function AdminAnnouncementsWorkspace() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<AnnouncementItem | null>(null);
   const [notice, setNotice] = useState<Notice | null>(null);
-  const [form, setForm] = useState<CreateAnnouncementInput>(emptyForm);
+  const [form, setForm] = useState<CreateAnnouncementInput>(() => emptyForm(mode));
 
   const announcementsQuery = useQuery({
     queryKey: ["announcements", announcementQueryRoleKey()],
     queryFn: () => apiFetch<AnnouncementItem[]>("/announcements"),
     retry: false,
   });
+
+  const classOptionsQuery = useQuery({
+    queryKey: ["announcement-classes", announcementQueryRoleKey()],
+    queryFn: () => apiFetch<AnnouncementClassOption[]>("/announcements/classes"),
+    enabled: mode !== "accountant",
+    retry: false,
+  });
+  const classOptions = classOptionsQuery.data ?? [];
+  const availableTargets = mode === "teacher"
+    ? ANNOUNCEMENT_TARGET_OPTIONS.filter((option) => option.value === "SELECTED_CLASSES" || option.value === "SELECTED_CLASS_GUARDIANS")
+    : mode === "accountant"
+      ? ANNOUNCEMENT_TARGET_OPTIONS.filter((option) => option.value === "OUTSTANDING_FEE_GUARDIANS")
+      : ANNOUNCEMENT_TARGET_OPTIONS;
+  const requiresClassTargets = form.target === "SELECTED_CLASSES" || form.target === "SELECTED_CLASS_GUARDIANS";
+  const selectedClasses = classOptions.filter((option) => form.classIds.includes(option.id));
 
   const refreshAnnouncements = () =>
     queryClient.invalidateQueries({ queryKey: ["announcements"] });
@@ -71,7 +90,7 @@ export function AdminAnnouncementsWorkspace() {
     onSuccess: async (_, input) => {
       await refreshAnnouncements();
       setIsCreateOpen(false);
-      setForm(emptyForm());
+      setForm(emptyForm(mode));
       setNotice({
         kind: "success",
         message: input.status === "DRAFT" ? "Draft saved." : "Announcement published.",
@@ -152,6 +171,8 @@ export function AdminAnnouncementsWorkspace() {
       ...form,
       title: form.title.trim(),
       content: form.content.trim(),
+      status: mode === "admin" ? form.status : "PUBLISHED",
+      isPinned: mode === "admin" ? form.isPinned : false,
     });
   }
 
