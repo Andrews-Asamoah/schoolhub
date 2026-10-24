@@ -87,6 +87,7 @@ export function StudentHouseClubsView({ defaultTab = "CLUBS" }: { defaultTab?: T
 
   const joinedClubIds = new Set((myClubsQuery.data ?? []).map((membership) => membership.club.id));
   const myHouseId = profileQuery.data?.house?.id;
+  const myHouse = (housesQuery.data ?? []).find((house) => house.id === myHouseId);
   const activeHouses = (housesQuery.data ?? [])
     .filter((house) => house.isActive || house.id === myHouseId)
     .sort((a, b) => a.id === myHouseId ? -1 : b.id === myHouseId ? 1 : a.name.localeCompare(b.name));
@@ -220,10 +221,9 @@ export function StudentHouseClubsView({ defaultTab = "CLUBS" }: { defaultTab?: T
             <div className="rounded-2xl border border-indigo-200 bg-indigo-50/30 p-4 dark:border-indigo-900/40 dark:bg-indigo-950/10">
               <p className="text-[10px] font-bold uppercase tracking-wider text-indigo-700 dark:text-indigo-300">Your Assigned House</p>
               <h4 className="mt-1 text-lg font-black text-slate-900 dark:text-white">
-                {housesQuery.data?.find((house) => house.id === myHouseId)?.name ?? profileQuery.data.house.name}
+                {myHouse?.name ?? profileQuery.data.house.name}
               </h4>
-              {housesQuery.data?.find((house) => house.id === myHouseId)?.motto &&
-                <p className="mt-1 text-xs italic text-slate-600 dark:text-slate-300">{housesQuery.data.find((house) => house.id === myHouseId)?.motto}</p>}
+              {myHouse?.motto && <p className="mt-1 text-xs italic text-slate-600 dark:text-slate-300">{myHouse.motto}</p>}
             </div>
           )}
           {housesQuery.isLoading ? (
