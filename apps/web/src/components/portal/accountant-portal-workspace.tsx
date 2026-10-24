@@ -598,7 +598,7 @@ export function AccountantPortalWorkspace({
           {billsQuery.error ? <QueryError message={billsQuery.error.message} /> : <BillsTable bills={debtors.filter((bill) => {
             const term = search.trim().toLowerCase();
             return !term || bill.billNumber.toLowerCase().includes(term) || studentName(bill.student).toLowerCase().includes(term) || (bill.class?.name ?? "").toLowerCase().includes(term);
-          })} onRecordPayment={(bill) => { setSelectedBillId(bill.id); setShowPaymentForm(true); }} />
+          })} onRecordPayment={(bill) => { setSelectedBillId(bill.id); setShowPaymentForm(true); }} />}
         </section>
       )}
 
