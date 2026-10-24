@@ -109,6 +109,7 @@ export function ClassRegister({ classId, className, canMark }: { classId: string
       })),
   });
   const weekend = [0, 6].includes(new Date(`${date}T00:00:00`).getDay());
+  const marked = (rows?.length ?? 0) - counts.unmarked;
 
   return (
     <section aria-label={`Register for ${className}`} className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
@@ -153,13 +154,17 @@ export function ClassRegister({ classId, className, canMark }: { classId: string
               This date is a weekend.
             </p>
           )}
-          <div className="grid grid-cols-2 gap-2 px-4 pt-4 text-xs sm:grid-cols-4" aria-live="polite">
-            <Chip tone="emerald">{counts.PRESENT} present</Chip>
-            <Chip tone="rose">{counts.ABSENT} absent</Chip>
-            <Chip tone="amber">{counts.LATE} late</Chip>
-            {counts.other > 0 && <Chip tone="slate">{counts.other} excused / sick / permission</Chip>}
-            <Chip tone="slate">{counts.unmarked} not marked</Chip>
-            {canMark && (
+          <div className="grid grid-cols-2 gap-3 p-4 sm:grid-cols-4 sm:p-5" aria-live="polite">
+            <SummaryCard label="Present" value={counts.PRESENT} detail="Marked present" />
+            <SummaryCard label="Absent" value={counts.ABSENT} detail="Marked absent" />
+            <SummaryCard label="Late" value={counts.LATE} detail="Arrived late" />
+            <SummaryCard label="Register progress" value={marked} detail={`of ${rows.length} pupils marked`} />
+          </div>
+          {canMark && (
+            <div className="flex flex-wrap items-center justify-between gap-3 border-y border-border bg-muted/30 px-4 py-3 sm:px-5">
+              <p className="text-sm text-muted-foreground">
+                {counts.unmarked} pupil{counts.unmarked === 1 ? "" : "s"} still unmarked
+              </p>
               <button
                 type="button"
                 onClick={markAllPresent}
@@ -167,8 +172,8 @@ export function ClassRegister({ classId, className, canMark }: { classId: string
               >
                 Mark unmarked as present
               </button>
-            )}
-          </div>
+            </div>
+          )}
 
           <ul className="mt-3 divide-y divide-border">
             {rows.map((row) => {
@@ -207,9 +212,7 @@ export function ClassRegister({ classId, className, canMark }: { classId: string
                       )}
                     </>
                   ) : (
-                    <span className="text-sm text-foreground">
-                      {row.attendance ? LABEL[row.attendance.status] : "Not recorded"}
-                    </span>
+                    <StatusPill status={row.attendance?.status ?? null} />
                   )}
                 </li>
               );
@@ -246,12 +249,35 @@ export function ClassRegister({ classId, className, canMark }: { classId: string
   );
 }
 
-function Chip({ tone, children }: { tone: "emerald" | "rose" | "amber" | "slate"; children: React.ReactNode }) {
-  const tones = {
-    emerald: "border-primary/20 bg-primary/10 text-primary",
-    rose: "border-destructive/20 bg-destructive/10 text-destructive",
-    amber: "border-border bg-muted text-foreground",
-    slate: "border-border bg-muted text-muted-foreground",
-  };
-  return <span className={`inline-flex items-center rounded-full border px-3 py-1.5 text-xs font-semibold ${tones[tone]}`}>{children}</span>;
+function SummaryCard({
+  label,
+  value,
+  detail,
+}: {
+  label: string;
+  value: number;
+  detail: string;
+}) {
+  return (
+    <article className="rounded-xl border border-border bg-background p-3 sm:p-4">
+      <p className="text-xs font-medium text-muted-foreground">{label}</p>
+      <p className="mt-2 text-2xl font-semibold tracking-tight text-foreground tabular-nums">{value}</p>
+      <p className="mt-0.5 text-xs text-muted-foreground">{detail}</p>
+    </article>
+  );
+}
+
+function StatusPill({ status }: { status: Status | null }) {
+  if (!status) {
+    return (
+      <span className="inline-flex items-center rounded-full border border-border bg-muted px-3 py-1.5 text-xs font-medium text-muted-foreground">
+        Not recorded
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center rounded-full border border-primary/20 bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary">
+      {LABEL[status]}
+    </span>
+  );
 }
