@@ -150,12 +150,7 @@ export class AnnouncementsService {
       return;
     }
     if (!input.classIds.length) throw new BadRequestException("Select at least one class for this audience.");
-    const allowedIds = role === "teacher"
-      ? await this.teacherScope.getTaughtClassIds(schoolId, userId)
-      : (await this.prisma.client.class.findMany({
-          where: { schoolId, deletedAt: null, isActive: true },
-          select: { id: true },
-        })).map((item) => item.id);
+    const allowedIds = (await this.listClasses(schoolId, role, userId)).map((item) => item.id);
     const allowed = new Set(allowedIds);
     if ([...new Set(input.classIds)].some((id) => !allowed.has(id))) {
       throw new ForbiddenException("One or more selected classes are outside your school or teaching assignment.");
@@ -213,7 +208,7 @@ export class AnnouncementsService {
   private async guardianHasOutstandingWard(schoolId: string, userId: string) {
     const guardian = await this.prisma.client.guardian.findFirst({
       where: {
-        schoolId, deletedAt: null, profile: { userId },
+        schoolId, deletedAt: null, profile: { is: { userId } },
         students: { some: { student: { schoolId, deletedAt: null, bills: {
           some: { schoolId, balanceAmount: { gt: 0 }, status: { in: [...debtorBillStatuses] } },
         } } } },
@@ -262,7 +257,7 @@ export class AnnouncementsService {
     const recipientIds = [...new Set(await this.getRecipientUserIds(schoolId, target, targetClassIds))]
       .filter((id) => Boolean(id) && id !== authorId);
     if (!recipientIds.length) return;
-    const link = "/announcements/" + announcementId;
+    const link = "/announcements?announcementId=" + announcementId;
     const existing = await this.prisma.client.notification.findMany({
       where: { schoolId, type: "ANNOUNCEMENT", link },
       select: { userId: true },

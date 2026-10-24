@@ -131,8 +131,19 @@ export function DashboardNotificationsMenu() {
                     <button
                       type="button"
                       onClick={() => {
-                        if (!item.isRead) markRead.mutate(item.id);
-                        setOpen(false);
+                        void (async () => {
+                          if (!item.isRead) {
+                            try {
+                              await markRead.mutateAsync(item.id);
+                            } catch {
+                              // Navigation should still work if the read-state request fails.
+                            }
+                          }
+                          setOpen(false);
+                          if (item.link?.startsWith("/") && !item.link.startsWith("//")) {
+                            window.location.assign(item.link);
+                          }
+                        })();
                       }}
                       className={cn(
                         "flex w-full gap-3 px-4 py-3 text-left transition hover:bg-muted/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
