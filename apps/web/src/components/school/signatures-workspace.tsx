@@ -27,6 +27,8 @@ export function SignaturesWorkspace() {
   const client = useQueryClient();
   const [kind, setKind] = useState<PersonKind>("teacher");
   const [feedback, setFeedback] = useState<{ kind: "success" | "error"; text: string } | null>(null);
+  const [uploadingKeys, setUploadingKeys] = useState<Set<string>>(() => new Set());
+  const signatureKey = (personKind: PersonKind, personId: string) => personKind + ":" + personId;
   const teachersQuery = useQuery({
     queryKey: ["people", "teachers", "signatures"],
     queryFn: () => apiFetch<ListResponse>("/people/teachers?page=1&limit=100&active=true"),
@@ -38,10 +40,14 @@ export function SignaturesWorkspace() {
     retry: false,
   });
   const upload = useMutation({
-    mutationFn: async ({ person, file }: { person: Person; file: File }) => {
+    mutationFn: async ({ person, file, personKind }: { person: Person; file: File; personKind: PersonKind }) => {
       const form = new FormData();
       form.append("signature", file);
-      return apiFetch<{ signatureUrl: string }>("/schools/current/signatures/" + kind + "/" + person.id, { method: "PUT", body: form });
+      return apiFetch<{ signatureUrl: string }>("/schools/current/signatures/" + personKind + "/" + person.id, { method: "PUT", body: form });
+    },
+    onMutate: ({ person, personKind }) => {
+      const key = signatureKey(personKind, person.id);
+      setUploadingKeys((current) => new Set(current).add(key));
     },
     onSuccess: async () => {
       setFeedback({ kind: "success", text: "Signature uploaded to Cloudflare R2 and linked to the staff profile." });
@@ -53,6 +59,14 @@ export function SignaturesWorkspace() {
       ]);
     },
     onError: (error: Error) => setFeedback({ kind: "error", text: error.message }),
+    onSettled: (_data, _error, variables) => {
+      const key = signatureKey(variables.personKind, variables.person.id);
+      setUploadingKeys((current) => {
+        const next = new Set(current);
+        next.delete(key);
+        return next;
+      });
+    },
   });
   const remove = useMutation({
     mutationFn: (person: Person) => apiFetch<{ signatureUrl: null }>("/schools/current/signatures/" + kind + "/" + person.id, { method: "DELETE" }),
@@ -94,12 +108,13 @@ export function SignaturesWorkspace() {
       : <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{people.map((person) => {
         const signatureUrl = person.profile?.signatureUrl;
         const inputId = "signature-" + kind + "-" + person.id;
+        const isUploading = uploadingKeys.has(signatureKey(kind, person.id));
         return <article key={person.id} className="flex min-w-0 flex-col rounded-2xl border border-border bg-card p-4 shadow-sm">
           <div className="flex items-start gap-3"><div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground"><UserRoundPen className="size-5" /></div><div className="min-w-0 flex-1"><h3 className="truncate font-semibold">{personName(person)}</h3><p className="truncate text-xs text-muted-foreground">{person.profile?.user?.email || person.staffType || person.staffNumber || person.teacherId || (kind === "teacher" ? "Teacher" : "Staff member")}</p></div>{signatureUrl && <CheckCircle2 className="size-5 shrink-0 text-emerald-600" aria-label="Signature uploaded" />}</div>
           <div className="mt-4 flex h-32 items-center justify-center overflow-hidden rounded-xl border border-dashed border-border bg-muted/30 p-3">{signatureUrl ? <img src={signatureUrl} alt={"Signature of " + personName(person)} className="max-h-full max-w-full object-contain" /> : <div className="text-center text-muted-foreground"><ImagePlus className="mx-auto size-6" /><p className="mt-2 text-xs">No signature uploaded</p></div>}</div>
           <div className="mt-4 flex flex-wrap gap-2">
-            <label htmlFor={inputId} className={cn(button, "cursor-pointer")}>{upload.isPending ? <LoaderCircle className="size-4 animate-spin" /> : <UploadCloud className="size-4" />}{signatureUrl ? "Replace signature" : "Upload signature"}</label>
-            <input id={inputId} type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" disabled={upload.isPending} onChange={(event) => { const file = event.currentTarget.files?.[0]; event.currentTarget.value = ""; if (!file) return; if (file.size > 2 * 1024 * 1024) { setFeedback({ kind: "error", text: "Choose an image no larger than 2 MB." }); return; } setFeedback(null); upload.mutate({ person, file }); }} />
+            <label htmlFor={inputId} className={cn(button, "cursor-pointer")}>{isUploading ? <LoaderCircle className="size-4 animate-spin" /> : <UploadCloud className="size-4" />}{isUploading ? "Uploading…" : signatureUrl ? "Replace signature" : "Upload signature"}</label>
+            <input id={inputId} type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" disabled={isUploading} onChange={(event) => { const file = event.currentTarget.files?.[0]; event.currentTarget.value = ""; if (!file) return; if (file.size > 2 * 1024 * 1024) { setFeedback({ kind: "error", text: "Choose an image no larger than 2 MB." }); return; } setFeedback(null); upload.mutate({ person, file, personKind: kind }); }} />
             {signatureUrl && <button type="button" className={button} disabled={remove.isPending} onClick={() => { if (window.confirm("Remove the stored signature for " + personName(person) + "?")) remove.mutate(person); }}><Trash2 className="size-4" /> Remove</button>}
           </div>
           <p className="mt-3 text-xs leading-5 text-muted-foreground">PNG, JPEG or WebP · maximum 2 MB</p>
