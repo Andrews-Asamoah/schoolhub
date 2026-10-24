@@ -193,6 +193,7 @@ export function AccountantPortalWorkspace({
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [showPaymentForm, setShowPaymentForm] = useState(false);
   const [selectedBillId, setSelectedBillId] = useState("");
+  const [selectedFeeStructureId, setSelectedFeeStructureId] = useState("");
   const [showBillForm, setShowBillForm] = useState(false);
   const [showExpenseForm, setShowExpenseForm] = useState(false);
   const [message, setMessage] = useState<{ kind: "success" | "error"; text: string } | null>(null);
@@ -269,6 +270,10 @@ export function AccountantPortalWorkspace({
   const payrollNet = payroll.reduce((sum, run) => sum + Number(run.totalNet), 0);
   const currentYear = (yearsQuery.data ?? []).find((year) => year.isCurrent);
   const currentTerm = currentYear?.terms.find((term) => term.isCurrent);
+  const selectedFeeStructure = feeStructures.find((fee) => fee.id === selectedFeeStructureId);
+  const billTargetClasses = selectedFeeStructure?.targetClasses.length
+    ? classes.filter((schoolClass) => selectedFeeStructure.targetClasses.some((target) => target.class.id === schoolClass.id))
+    : classes;
 
   const recordPayment = useMutation({
     mutationFn: (input: RecordPaymentInput) =>
@@ -303,6 +308,7 @@ export function AccountantPortalWorkspace({
           : result.message ?? "No bills were generated.",
       });
       setShowBillForm(false);
+      setSelectedFeeStructureId("");
       await queryClient.invalidateQueries({ queryKey: ["finance", "bills"] });
     },
     onError: (error: Error) => setMessage({ kind: "error", text: error.message }),
@@ -564,7 +570,7 @@ export function AccountantPortalWorkspace({
           <form onSubmit={submitBill} className="space-y-4">
             {!currentYear || !currentTerm ? <div role="alert" className="rounded-xl border border-warning/30 bg-warning/5 p-3 text-sm text-foreground">A current academic year and term must be selected in School Settings before billing.</div> : <p className="rounded-xl bg-muted p-3 text-sm text-muted-foreground">Billing period: <span className="font-semibold text-foreground">{currentYear.name} · {currentTerm.name}</span></p>}
             <Field label="Fee structure">
-              <select name="feeStructureId" required className={inputClass} defaultValue="">
+              <select name="feeStructureId" required className={inputClass} value={selectedFeeStructureId} onChange={(event) => setSelectedFeeStructureId(event.target.value)}>
                 <option value="" disabled>Select a fee structure…</option>
                 {feeStructures.map((fee) => <option key={fee.id} value={fee.id}>{fee.name} · {currency(fee.items.reduce((sum, item) => sum + Number(item.amount), 0))}</option>)}
               </select>
@@ -572,7 +578,7 @@ export function AccountantPortalWorkspace({
             <Field label="Class">
               <select name="classId" required className={inputClass} defaultValue="">
                 <option value="" disabled>Select a class…</option>
-                {classes.map((schoolClass) => <option key={schoolClass.id} value={schoolClass.id}>{schoolClass.name}{typeof schoolClass._count?.students === "number" ? ` · ${schoolClass._count.students} students` : ""}</option>)}
+                {billTargetClasses.map((schoolClass) => <option key={schoolClass.id} value={schoolClass.id}>{schoolClass.name}{typeof schoolClass._count?.students === "number" ? ` · ${schoolClass._count.students} students` : ""}</option>)}
               </select>
             </Field>
             <Field label="Due date (optional)"><input name="dueDate" type="date" className={inputClass} /></Field>
