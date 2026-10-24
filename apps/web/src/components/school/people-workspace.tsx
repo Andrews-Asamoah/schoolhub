@@ -259,14 +259,42 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
         : "staff member";
 
   const directoryQuery = useQuery({
-    queryKey: ["people", kind, { page, search: deferredSearch, activeFilter }],
-    queryFn: () => {
-      const params = new URLSearchParams({ page: String(page), limit: "20" });
-      if (deferredSearch) params.set("search", deferredSearch);
+    queryKey: [
+      "people",
+      kind,
+      isGuardianPage ? { activeFilter } : { page, search: deferredSearch, activeFilter },
+    ],
+    queryFn: async () => {
+      const params = new URLSearchParams({
+        page: isGuardianPage ? "1" : String(page),
+        limit: isGuardianPage ? "100" : "20",
+      });
+      if (!isGuardianPage && deferredSearch) params.set("search", deferredSearch);
       if (activeFilter) params.set("active", activeFilter);
-      return apiFetch<DirectoryPage<Teacher | Staff | Guardian>>(
-        `/people/${kind}?${params.toString()}`,
+
+      if (!isGuardianPage) {
+        return apiFetch<DirectoryPage<Teacher | Staff | Guardian>>(
+          `/people/${kind}?${params.toString()}`,
+        );
+      }
+
+      // The API caps page size at 100. Fetch every guardian page so the
+      // directory table can search and paginate across the complete record set.
+      const firstPage = await apiFetch<DirectoryPage<Guardian>>(
+        `/people/guardians?${params.toString()}`,
       );
+      const allGuardians = [...firstPage.data];
+      for (let nextPage = 2; nextPage <= firstPage.meta.totalPages; nextPage += 1) {
+        params.set("page", String(nextPage));
+        const result = await apiFetch<DirectoryPage<Guardian>>(
+          `/people/guardians?${params.toString()}`,
+        );
+        allGuardians.push(...result.data);
+      }
+      return {
+        data: allGuardians,
+        meta: { ...firstPage.meta, page: 1, limit: allGuardians.length, totalPages: 1 },
+      } satisfies DirectoryPage<Teacher | Staff | Guardian>;
     },
     retry: false,
   });
@@ -984,20 +1012,22 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
         />
       </div>
 
-      <section className="grid gap-3 rounded-2xl border border-border bg-card p-4 md:grid-cols-[minmax(220px,1fr)_180px]">
-        <label className="relative">
-          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-          <input
-            value={search}
-            onChange={(event) => {
-              setSearch(event.target.value);
-              setPage(1);
-            }}
-            placeholder={`Search ${title.toLowerCase()} by name, ID or contact`}
-            aria-label={`Search ${title.toLowerCase()}`}
-            className={`${inputClasses} mt-0 pl-9`}
-          />
-        </label>
+      <section className={`grid gap-3 rounded-2xl border border-border bg-card p-4 ${isGuardianPage ? "md:grid-cols-1" : "md:grid-cols-[minmax(220px,1fr)_180px]"}`}>
+        {!isGuardianPage && (
+          <label className="relative">
+            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <input
+              value={search}
+              onChange={(event) => {
+                setSearch(event.target.value);
+                setPage(1);
+              }}
+              placeholder={`Search ${title.toLowerCase()} by name, ID or contact`}
+              aria-label={`Search ${title.toLowerCase()}`}
+              className={`${inputClasses} mt-0 pl-9`}
+            />
+          </label>
+        )}
         <label>
           <span className="sr-only">Filter by status</span>
           <select
@@ -1035,7 +1065,7 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
         emptyTitle={`No ${title.toLowerCase()} match these filters`}
         emptyDescription={`Clear a filter or add a ${resourceName} to build the directory.`}
       />
-      {(directoryQuery.data?.meta.totalPages ?? 0) > 1 && (
+      {!isGuardianPage && (directoryQuery.data?.meta.totalPages ?? 0) > 1 && (
         <div className="flex items-center justify-between rounded-xl border border-border bg-card px-4 py-3">
           <p className="text-xs text-muted-foreground">
             Page {directoryQuery.data?.meta.page} of{" "}
