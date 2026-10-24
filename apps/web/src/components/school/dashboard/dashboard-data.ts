@@ -21,5 +21,6 @@ export interface DashboardAnalytics {
   genderDistribution: { label: string; value: number }[];
   enrollmentGrowth: { month: string; population: number; newAdmissions: number }[];
   financialStatus: { month: string; revenue: number; expenditures: number }[];
+  hasFinancialRecords: boolean;
   recentActivities: DashboardActivity[];
 }
