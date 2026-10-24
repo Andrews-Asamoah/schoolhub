@@ -46,6 +46,12 @@ export function ClassRegister({ classId, className, canMark }: { classId: string
     queryFn: () => apiFetch<RegisterRow[]>(`/attendance/class/${classId}?date=${date}`),
     retry: false,
   });
+  const markedDatesQuery = useQuery({
+    queryKey: ["attendance", "class", classId, "marked-dates"],
+    queryFn: () => apiFetch<string[]>(`/attendance/class/${classId}/dates`),
+    enabled: Boolean(classId),
+    retry: false,
+  });
   const rows = query.data;
 
   // Start from what is already recorded whenever the class, date or data changes.
@@ -128,6 +134,7 @@ export function ClassRegister({ classId, className, canMark }: { classId: string
             maxDate={todayIso()}
             onChange={setDate}
             ariaLabel="Select attendance date"
+            markedDates={markedDatesQuery.data ?? []}
           />
         </div>
       </div>
