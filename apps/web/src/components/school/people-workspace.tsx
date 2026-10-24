@@ -340,9 +340,10 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
         `/accounts/people/${kind === "teachers" ? "teacher" : kind === "staff" ? "staff" : "guardian"}/${id}/credentials`,
         { method: "POST" },
       ),
-    onSuccess: (credentials, variables) => {
+    onSuccess: async (credentials, variables) => {
       // Held in component state only, never in the query cache.
       setIssued([{ label: variables.name, credentials }]);
+      await queryClient.invalidateQueries({ queryKey: ["people", kind] });
     },
   });
   const createMutation = useMutation({
@@ -523,7 +524,9 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
                   onClick={() => {
                     if (
                       window.confirm(
-                        `Issue a new temporary password for ${row.name}? Their current password will stop working and they will be signed out.`,
+                        isGuardianPage && !row.hasLogin
+                          ? `Create a parent-portal login for ${row.name}?`
+                          : `Issue a new temporary password for ${row.name}? Their current password will stop working and they will be signed out.`,
                       )
                     ) {
                       resetLoginMutation.mutate({ id: row.id, name: row.name });
