@@ -197,7 +197,7 @@ export function AdminAnnouncementsWorkspace({ mode = "admin" }: { mode?: Announc
           </button>
           <button
             type="button"
-            onClick={() => { setForm(emptyForm()); setNotice(null); setIsCreateOpen(true); }}
+            onClick={() => { setForm(emptyForm(mode)); setNotice(null); setIsCreateOpen(true); }}
             className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground transition hover:opacity-90"
           >
             <Plus className="size-4" />
@@ -485,7 +485,14 @@ export function AdminAnnouncementsWorkspace({ mode = "admin" }: { mode?: Announc
                   ))}
                 </SelectContent>
               </Select>
-              {classOptionsQuery.isError && <p role="alert" className="text-xs text-destructive">Could not load classes. Close and retry this announcement later.</p>}
+              {classOptionsQuery.isError && (
+                <div role="alert" className="space-y-2 text-xs text-destructive">
+                  <p>Could not load classes.</p>
+                  <button type="button" onClick={() => void classOptionsQuery.refetch()} className="rounded-lg border border-border px-2.5 py-1.5 font-semibold text-foreground hover:bg-muted">
+                    Retry loading classes
+                  </button>
+                </div>
+              )}
               {selectedClasses.length > 0 ? (
                 <div className="flex flex-wrap gap-2">
                   {selectedClasses.map((klass) => (
@@ -554,7 +561,7 @@ export function AdminAnnouncementsWorkspace({ mode = "admin" }: { mode?: Announc
             </button>
             <button
               type="submit"
-              disabled={createMutation.isPending}
+              disabled={createMutation.isPending || (requiresClassTargets && form.classIds.length === 0)}
               className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-bold text-primary-foreground disabled:opacity-50"
             >
               {createMutation.isPending ? <LoaderCircle className="size-4 animate-spin" /> : <Send className="size-4" />}
