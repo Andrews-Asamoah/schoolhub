@@ -849,7 +849,55 @@ export class FinanceService {
         );
       }
 
-      // 1. Create payment record only after all tenant/bill checks pass.
+      // Validate explicit fee-component allocations before writing anything.
+      // Older clients may omit allocations; those retain the historical FIFO behaviour.
+      const itemAllocations: { billItemId: string; amount: number }[] = [];
+      if (!bill && input.allocations?.length) {
+        throw new BadRequestException("Fee-component allocations require a bill.");
+      }
+      if (bill) {
+        if (input.allocations) {
+          const seenItemIds = new Set<string>();
+          let allocatedTotal = 0;
+          for (const allocation of input.allocations) {
+            if (seenItemIds.has(allocation.billItemId)) {
+              throw new BadRequestException("Each bill component can only be selected once.");
+            }
+            seenItemIds.add(allocation.billItemId);
+            const item = bill.items.find((candidate) => candidate.id === allocation.billItemId);
+            if (!item) {
+              throw new BadRequestException("One or more selected components do not belong to this bill.");
+            }
+            const amount = roundMoney(allocation.amount);
+            const itemBalance = Number(item.balanceAmount);
+            if (amount <= 0 || amount > itemBalance + 0.009) {
+              throw new BadRequestException(
+                `Allocation for "${item.description}" must be greater than zero and no more than ${itemBalance.toFixed(2)}.`,
+              );
+            }
+            itemAllocations.push({ billItemId: item.id, amount });
+            allocatedTotal = roundMoney(allocatedTotal + amount);
+          }
+          if (Math.abs(allocatedTotal - roundMoney(input.amount)) > 0.009) {
+            throw new BadRequestException("The payment amount must equal the sum of the selected fee-component allocations.");
+          }
+        } else {
+          let remaining = roundMoney(input.amount);
+          for (const item of bill.items) {
+            if (remaining <= 0) break;
+            const itemBalance = Number(item.balanceAmount);
+            if (itemBalance <= 0) continue;
+            const applied = roundMoney(Math.min(remaining, itemBalance));
+            if (applied > 0) itemAllocations.push({ billItemId: item.id, amount: applied });
+            remaining = roundMoney(remaining - applied);
+          }
+          if (remaining > 0.009) {
+            throw new BadRequestException("The payment could not be fully allocated to the bill components.");
+          }
+        }
+      }
+
+      // 1. Create payment record only after all tenant/bill/allocation checks pass.
       const payment = await tx.payment.create({
         data: {
           schoolId,
@@ -881,16 +929,15 @@ export class FinanceService {
         });
       }
 
-      // 3. Allocate the payment to bill items in order, preserving the item ledger.
+      // 3. Apply each explicit allocation to the matching bill component.
       if (bill) {
-        let remaining = input.amount;
-        for (const item of bill.items) {
-          if (remaining <= 0) break;
+        for (const allocation of itemAllocations) {
+          const item = bill.items.find((candidate) => candidate.id === allocation.billItemId);
+          if (!item) throw new BadRequestException("A selected bill component no longer exists.");
+          const applied = allocation.amount;
           const itemBalance = Number(item.balanceAmount);
-          if (itemBalance <= 0) continue;
-          const applied = Math.min(remaining, itemBalance);
-          const nextBalance = Math.max(0, itemBalance - applied);
-          const nextPaid = Number(item.paidAmount) + applied;
+          const nextBalance = Math.max(0, roundMoney(itemBalance - applied));
+          const nextPaid = roundMoney(Number(item.paidAmount) + applied);
           await tx.billItem.update({
             where: { id: item.id },
             data: {
@@ -906,7 +953,6 @@ export class FinanceService {
               amount: new Prisma.Decimal(applied),
             },
           });
-          remaining -= applied;
         }
       }
 
@@ -970,6 +1016,20 @@ export class FinanceService {
           },
         },
         bill: { select: { id: true, billNumber: true } },
+        paymentItems: {
+          include: {
+            billItem: {
+              include: {
+                feeItem: {
+                  include: {
+                    customCategory: { select: { name: true } },
+                    registryItem: { select: { name: true } },
+                  },
+                },
+              },
+            },
+          },
+        },
         recordedBy: { select: { name: true, email: true } },
       },
     });
