@@ -196,7 +196,7 @@ export class AccountsService {
           userId = guardian.profile.userId;
           email = guardian.profile.user.email;
         } else {
-          const loginEmail = guardian.email?.trim().toLowerCase() || newGuardianLoginEmail();
+          const loginEmail = guardian.email?.trim().toLowerCase() || newGuardianLoginEmail(displayName);
           const created = await this.credentials.createLogin(tx, {
             name: displayName,
             email: loginEmail,
