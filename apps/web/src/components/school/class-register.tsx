@@ -150,15 +150,16 @@ export function ClassRegister({ classId, className, canMark }: { classId: string
       {rows && rows.length > 0 && (
         <>
           {weekend && (
-            <p className="mx-4 mt-4 rounded-xl border border-border bg-muted px-3 py-2 text-sm text-muted-foreground">
-              This date is a weekend.
+            <p className="mx-4 mt-4 flex items-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2.5 text-sm font-medium text-amber-700 dark:text-amber-300">
+              <CircleAlert className="size-4 shrink-0" />
+              This date falls on a weekend. Attendance is usually recorded on school days.
             </p>
           )}
           <div className="grid grid-cols-2 gap-3 p-4 sm:grid-cols-4 sm:p-5" aria-live="polite">
-            <SummaryCard label="Present" value={counts.PRESENT} detail="Marked present" />
-            <SummaryCard label="Absent" value={counts.ABSENT} detail="Marked absent" />
-            <SummaryCard label="Late" value={counts.LATE} detail="Arrived late" />
-            <SummaryCard label="Register progress" value={marked} detail={`of ${rows.length} pupils marked`} />
+            <SummaryCard tone="present" label="Present" value={counts.PRESENT} detail="Marked present" />
+            <SummaryCard tone="absent" label="Absent" value={counts.ABSENT} detail="Marked absent" />
+            <SummaryCard tone="late" label="Late" value={counts.LATE} detail="Arrived late" />
+            <SummaryCard tone="progress" label="Register progress" value={marked} detail={`of ${rows.length} pupils marked`} />
           </div>
           {canMark && (
             <div className="flex flex-wrap items-center justify-between gap-3 border-y border-border bg-muted/30 px-4 py-3 sm:px-5">
@@ -250,19 +251,51 @@ export function ClassRegister({ classId, className, canMark }: { classId: string
 }
 
 function SummaryCard({
+  tone,
   label,
   value,
   detail,
 }: {
+  tone: "present" | "absent" | "late" | "progress";
   label: string;
   value: number;
   detail: string;
 }) {
+  const tones = {
+    present: {
+      border: "border-emerald-500/30",
+      icon: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400",
+      value: "text-emerald-700 dark:text-emerald-300",
+      dot: "bg-emerald-500",
+    },
+    absent: {
+      border: "border-rose-500/30",
+      icon: "bg-rose-500/15 text-rose-600 dark:text-rose-400",
+      value: "text-rose-700 dark:text-rose-300",
+      dot: "bg-rose-500",
+    },
+    late: {
+      border: "border-amber-500/30",
+      icon: "bg-amber-500/15 text-amber-600 dark:text-amber-400",
+      value: "text-amber-700 dark:text-amber-300",
+      dot: "bg-amber-500",
+    },
+    progress: {
+      border: "border-sky-500/30",
+      icon: "bg-sky-500/15 text-sky-600 dark:text-sky-400",
+      value: "text-sky-700 dark:text-sky-300",
+      dot: "bg-sky-500",
+    },
+  }[tone];
+
   return (
-    <article className="rounded-xl border border-border bg-background p-3 sm:p-4">
-      <p className="text-xs font-medium text-muted-foreground">{label}</p>
-      <p className="mt-2 text-2xl font-semibold tracking-tight text-foreground tabular-nums">{value}</p>
-      <p className="mt-0.5 text-xs text-muted-foreground">{detail}</p>
+    <article className={`rounded-xl border ${tones.border} bg-background p-3 shadow-sm transition-colors sm:p-4`}>
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-sm font-semibold text-foreground">{label}</p>
+        <span className={`size-2 rounded-full ${tones.dot}`} aria-hidden="true" />
+      </div>
+      <p className={`mt-2 text-3xl font-bold tracking-tight tabular-nums ${tones.value}`}>{value}</p>
+      <p className="mt-1 text-sm text-muted-foreground">{detail}</p>
     </article>
   );
 }
@@ -276,7 +309,12 @@ function StatusPill({ status }: { status: Status | null }) {
     );
   }
   return (
-    <span className="inline-flex items-center rounded-full border border-primary/20 bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary">
+    <span className={`inline-flex items-center rounded-full border px-3 py-1.5 text-xs font-semibold ${
+      status === "PRESENT" ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+        : status === "ABSENT" ? "border-rose-500/30 bg-rose-500/10 text-rose-700 dark:text-rose-300"
+          : status === "LATE" ? "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300"
+            : "border-sky-500/30 bg-sky-500/10 text-sky-700 dark:text-sky-300"
+    }`}>
       {LABEL[status]}
     </span>
   );
