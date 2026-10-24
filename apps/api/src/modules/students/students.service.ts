@@ -8,6 +8,7 @@ import {
 import { randomUUID } from 'node:crypto';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import {
+  guardianEmailDomain,
   studentEmailDomain,
   studentUsernameBase,
   studentUsernameCandidate,
@@ -367,12 +368,20 @@ export class StudentsService {
   ) {
     const schoolId = school.id;
 
+    // Resolve the school's own domain before preparing guardian credentials.
+    // Public email providers fall back to the school's SchoolHub subdomain.
+    const schoolEmailInfo = await this.prisma.client.school.findUnique({
+      where: { id: schoolId },
+      select: { email: true },
+    });
+    const guardianDomain = guardianEmailDomain(schoolEmailInfo?.email, school.subdomain);
+
     // Validate guardian login requests and hash every temporary password
     // BEFORE opening the transaction (hashing is deliberately slow).
     const guardianPlans = await Promise.all(
       input.guardians.map(async (guardian) => {
         const contactEmail = guardian.email?.trim().toLowerCase() || null;
-        const loginEmail = contactEmail || (guardian.createLogin ? newGuardianLoginEmail(`${guardian.firstName ?? ""} ${guardian.lastName ?? ""}`.trim()) : null);
+        const loginEmail = contactEmail || (guardian.createLogin ? newGuardianLoginEmail(`${guardian.firstName ?? ""} ${guardian.lastName ?? ""}`.trim(), guardianDomain) : null);
         return {
           guardian,
           contactEmail,
