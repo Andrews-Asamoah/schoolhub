@@ -661,6 +661,7 @@ export const createExpenseSchema = z.object({
   voucherNumber: z.string().trim().max(120).optional(),
   referenceNumber: z.string().trim().max(120).optional(),
 });
+
 export type CreateExpenseInput = z.infer<typeof createExpenseSchema>;
 
 export const createInventoryItemSchema = z.object({
