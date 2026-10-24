@@ -33,12 +33,14 @@ export class FinanceService {
   }
 
   async createFeeItemRegistry(schoolId: string, input: { name: string; description?: string | null }) {
+    const name = input.name.trim();
+    const duplicate = await this.prisma.client.feeItemRegistry.findFirst({
+      where: { schoolId, name: { equals: name, mode: "insensitive" } },
+      select: { id: true },
+    });
+    if (duplicate) throw new BadRequestException("A fee item category with that name already exists.");
     return this.prisma.client.feeItemRegistry.create({
-      data: {
-        schoolId,
-        name: input.name.trim(),
-        description: input.description?.trim() || null,
-      },
+      data: { schoolId, name, description: input.description?.trim() || null },
     });
   }
 
@@ -48,9 +50,15 @@ export class FinanceService {
       select: { id: true },
     });
     if (!existing) throw new NotFoundException("Fee item category not found.");
+    const name = input.name.trim();
+    const duplicate = await this.prisma.client.feeItemRegistry.findFirst({
+      where: { schoolId, id: { not: itemId }, name: { equals: name, mode: "insensitive" } },
+      select: { id: true },
+    });
+    if (duplicate) throw new BadRequestException("A fee item category with that name already exists.");
     return this.prisma.client.feeItemRegistry.update({
       where: { id: itemId },
-      data: { name: input.name.trim(), description: input.description?.trim() || null },
+      data: { name, description: input.description?.trim() || null },
     });
   }
 
