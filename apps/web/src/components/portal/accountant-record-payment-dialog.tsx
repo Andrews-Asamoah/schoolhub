@@ -1,4 +1,6 @@
 import { useMemo, useState, type FormEvent } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { apiFetch } from "@/lib/api";
 import { Check, ChevronsUpDown, LoaderCircle, School, X } from "lucide-react";
 import type { RecordPaymentInput } from "@schoolhub/shared";
 import { cn } from "@/lib/utils";
@@ -12,6 +14,10 @@ interface PaymentClass {
   id: string;
   name: string;
   isActive: boolean;
+}
+interface OutstandingStudent extends PaymentStudent {
+  classes: { id: string; name: string }[];
+  outstandingBalance: number | string;
 }
 interface PaymentBillItem {
   id: string;
@@ -121,36 +127,37 @@ export function AccountantRecordPaymentDialog({
   const [notes, setNotes] = useState("");
   const [validationError, setValidationError] = useState("");
 
+  const studentsQuery = useQuery({
+    queryKey: ["finance", "students", "outstanding"],
+    queryFn: () => apiFetch<OutstandingStudent[]>("/finance/students/outstanding"),
+    retry: false,
+  });
+  const studentBillsQuery = useQuery({
+    queryKey: ["finance", "bills", "student", studentId],
+    queryFn: () => apiFetch<PaymentBill[]>("/finance/bills?studentId=" + encodeURIComponent(studentId)),
+    enabled: Boolean(studentId),
+    retry: false,
+  });
   const eligibleBills = useMemo(() => bills.filter(outstanding), [bills]);
+  const allStudents = studentsQuery.data ?? [];
   const studentOptions = useMemo(() => {
-    const byId = new Map<string, { student: PaymentStudent; classIds: Set<string>; classNames: Set<string> }>();
-    for (const bill of eligibleBills) {
-      const existing = byId.get(bill.studentId) ?? {
-        student: bill.student,
-        classIds: new Set<string>(),
-        classNames: new Set<string>(),
-      };
-      if (bill.class?.id) existing.classIds.add(bill.class.id);
-      if (bill.class?.name) existing.classNames.add(bill.class.name);
-      byId.set(bill.studentId, existing);
-    }
     const term = studentSearch.trim().toLowerCase();
-    return [...byId.values()]
-      .filter(({ classIds }) => classId === "ALL" || classIds.has(classId))
-      .filter(({ student }) => {
+    return allStudents
+      .filter((student) => classId === "ALL" || student.classes.some((schoolClass) => schoolClass.id === classId))
+      .filter((student) => {
         const name = studentName(student).toLowerCase();
         const admission = student.admissionNumber.toLowerCase();
         return !term || name.includes(term) || admission.includes(term);
       })
-      .sort((a, b) => studentName(a.student).localeCompare(studentName(b.student)));
-  }, [eligibleBills, classId, studentSearch]);
+      .sort((a, b) => studentName(a).localeCompare(studentName(b)));
+  }, [allStudents, classId, studentSearch]);
 
-  const selectedStudent = eligibleBills.find((bill) => bill.studentId === studentId)?.student;
-  const selectedStudentBills = eligibleBills.filter(
-    (bill) =>
-      bill.studentId === studentId &&
-      (classId === "ALL" || bill.class?.id === classId),
-  );
+  const selectedStudent =
+    allStudents.find((student) => student.id === studentId) ??
+    eligibleBills.find((bill) => bill.studentId === studentId)?.student;
+  const selectedStudentBills = (studentBillsQuery.data ?? eligibleBills.filter((bill) => bill.studentId === studentId))
+    .filter(outstanding)
+    .filter((bill) => classId === "ALL" || bill.class?.id === classId);
   const selectedBill = selectedStudentBills.find((bill) => bill.id === billId);
   const allocationTotal = allocations.reduce(
     (sum, item) => sum + (item.selected ? Math.round((Number(item.amount) || 0) * 100) / 100 : 0),
@@ -350,7 +357,11 @@ export function AccountantRecordPaymentDialog({
                   role="listbox"
                   className="absolute left-0 right-0 top-[4.7rem] z-30 max-h-60 overflow-y-auto rounded-xl border border-border bg-popover p-1.5 text-popover-foreground shadow-xl"
                 >
-                  {studentOptions.length ? studentOptions.map(({ student, classNames }) => (
+                  {studentsQuery.isPending ? (
+                    <p className="px-3 py-6 text-center text-sm text-muted-foreground">Loading students with outstanding bills…</p>
+                  ) : studentsQuery.error ? (
+                    <p role="alert" className="px-3 py-6 text-center text-sm text-destructive">{studentsQuery.error.message}</p>
+                  ) : studentOptions.length ? studentOptions.map((student) => (
                     <button
                       key={student.id}
                       type="button"
@@ -363,14 +374,14 @@ export function AccountantRecordPaymentDialog({
                       <span className="min-w-0">
                         <span className="block truncate text-sm font-medium">{studentName(student)}</span>
                         <span className="mt-0.5 block text-xs text-muted-foreground">
-                          {student.admissionNumber} · {[...classNames].join(", ") || "No class"}
+                          {student.admissionNumber} · {student.classes.map((schoolClass) => schoolClass.name).join(", ") || "No class"} · Outstanding {money(amount(student.outstandingBalance))}
                         </span>
                       </span>
                       {studentId === student.id && <Check className="mt-1 size-4 shrink-0 text-primary" />}
                     </button>
                   )) : (
                     <p className="px-3 py-6 text-center text-sm text-muted-foreground">
-                      {eligibleBills.length ? "No students match this search and class." : "No students with outstanding bills were found."}
+                      {allStudents.length ? "No students match this search and class." : "No students with outstanding bills were found."}
                     </p>
                   )}
                   <button
@@ -391,11 +402,11 @@ export function AccountantRecordPaymentDialog({
             <select
               className={inputClass}
               value={billId}
-              disabled={!studentId || !selectedStudentBills.length}
+              disabled={!studentId || studentBillsQuery.isPending || !selectedStudentBills.length}
               onChange={(event) => chooseBill(event.target.value)}
               required
             >
-              <option value="" disabled>Select an outstanding bill…</option>
+              <option value="" disabled>{studentBillsQuery.isPending ? "Loading outstanding bills…" : "Select an outstanding bill…"}</option>
               {selectedStudentBills.map((bill) => (
                 <option key={bill.id} value={bill.id}>
                   {bill.feeStructure?.name || bill.billNumber} ({bill.billNumber}) · Balance {money(amount(bill.balanceAmount))}
