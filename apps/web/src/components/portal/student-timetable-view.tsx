@@ -173,16 +173,16 @@ function RetryMessage({
   isFetching: boolean;
 }) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white px-5 py-9 text-center shadow-sm dark:border-slate-800 dark:bg-slate-900">
-      <div className="mx-auto flex size-11 items-center justify-center rounded-2xl bg-rose-50 text-rose-600 dark:bg-rose-950/40 dark:text-rose-300">
+    <div className="rounded-2xl border border-border bg-white px-5 py-9 text-center shadow-sm  ">
+      <div className="mx-auto flex size-11 items-center justify-center rounded-2xl bg-destructive/10 text-destructive  ">
         <RefreshCw className={cn("size-5", isFetching && "animate-spin")} />
       </div>
-      <p className="mt-3 text-sm font-semibold text-slate-800 dark:text-slate-100">{message}</p>
+      <p className="mt-3 text-sm font-semibold text-foreground ">{message}</p>
       <button
         type="button"
         onClick={onRetry}
         disabled={isFetching}
-        className="mt-4 inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-xs font-bold text-white transition hover:bg-indigo-700 disabled:cursor-wait disabled:opacity-60"
+        className="mt-4 inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-xs font-bold text-primary-foreground transition hover:bg-primary disabled:cursor-wait disabled:opacity-60"
       >
         <RefreshCw className={cn("size-3.5", isFetching && "animate-spin")} />
         {isFetching ? "Refreshing…" : "Refresh timetable"}
@@ -260,9 +260,10 @@ export function StudentTimetableView() {
       const absoluteStart = (todayIndex + dayOffset) * 24 * 60 + start;
       let minutesAway = absoluteStart - currentWeekMinute;
       if (minutesAway <= 0) minutesAway += DAYS.length * 24 * 60;
+      const occurrenceDayOffset = Math.floor((nowMinutes + minutesAway) / (24 * 60));
 
       if (!best || minutesAway < best.minutesAway) {
-        best = { entry, minutesAway, dayOffset };
+        best = { entry, minutesAway, dayOffset: occurrenceDayOffset };
       }
     }
 
@@ -293,54 +294,54 @@ export function StudentTimetableView() {
 
   return (
     <div className="space-y-6">
-      <section className="relative isolate overflow-hidden rounded-[28px] bg-gradient-to-br from-indigo-700 via-violet-700 to-slate-950 p-5 text-white shadow-xl shadow-indigo-950/10 sm:p-7 lg:p-8">
-        <div aria-hidden="true" className="pointer-events-none absolute -right-12 -top-20 size-72 rounded-full bg-fuchsia-400/20 blur-3xl" />
-        <div aria-hidden="true" className="pointer-events-none absolute -bottom-28 left-1/3 size-72 rounded-full bg-cyan-400/15 blur-3xl" />
+      <section className="relative isolate overflow-hidden rounded-[28px] bg-gradient-to-br from-brand via-brand-mid to-brand p-5 text-brand-foreground shadow-xl shadow-foreground/10 sm:p-7 lg:p-8">
+        <div aria-hidden="true" className="pointer-events-none absolute -right-12 -top-20 size-72 rounded-full bg-brand-glow/20 blur-3xl" />
+        <div aria-hidden="true" className="pointer-events-none absolute -bottom-28 left-1/3 size-72 rounded-full bg-brand-accent/15 blur-3xl" />
         <div className="relative grid gap-7 lg:grid-cols-[minmax(0,1fr)_280px] lg:items-center">
           <div>
-            <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.16em] text-indigo-50">
+            <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.16em] text-brand-foreground/95">
               <span className="relative flex size-2">
-                <span className="absolute inline-flex size-full animate-ping rounded-full bg-emerald-300 opacity-70" />
-                <span className="relative inline-flex size-2 rounded-full bg-emerald-300" />
+                <span className="absolute inline-flex size-full animate-ping rounded-full bg-success/10 opacity-70" />
+                <span className="relative inline-flex size-2 rounded-full bg-success/10" />
               </span>
               Live timetable
             </div>
             <h1 className="mt-4 max-w-2xl text-3xl font-black tracking-tight sm:text-4xl">
               Your school day,
-              <span className="block text-indigo-200">in perfect rhythm.</span>
+              <span className="block text-brand-accent">in perfect rhythm.</span>
             </h1>
-            <p className="mt-3 max-w-xl text-sm leading-6 text-indigo-100/90 sm:text-base">
+            <p className="mt-3 max-w-xl text-sm leading-6 text-brand-foreground/85 sm:text-base">
               Know what’s happening now, where to go next, and how your day unfolds.
             </p>
             <div className="mt-5 flex flex-wrap gap-2">
               <span className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-xs font-semibold">
-                <GraduationCap className="size-4 text-cyan-200" />
+                <GraduationCap className="size-4 text-brand-accent" />
                 {data?.class
                   ? [data.class.name, data.class.level].filter(Boolean).join(" · ")
                   : "Your class timetable"}
               </span>
               {data?.academicYear?.name && (
                 <span className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-xs font-semibold">
-                  <CalendarDays className="size-4 text-violet-200" />
+                  <CalendarDays className="size-4 text-brand-accent" />
                   {data.academicYear.name}{data.term?.name ? ` · ${data.term.name}` : ""}
                 </span>
               )}
             </div>
           </div>
 
-          <div className="rounded-2xl border border-white/15 bg-white/10 p-5 shadow-lg shadow-slate-950/10 backdrop-blur-md sm:p-6">
+          <div className="rounded-2xl border border-white/15 bg-white/10 p-5 shadow-lg shadow-foreground/10 backdrop-blur-md sm:p-6">
             <div className="flex items-center justify-between gap-3">
-              <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-indigo-100">Local time</span>
-              <Clock3 className="size-4 text-cyan-200" />
+              <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-primary">Local time</span>
+              <Clock3 className="size-4 text-info" />
             </div>
             <time className="mt-2 block font-mono text-3xl font-black tracking-tight tabular-nums sm:text-4xl">
               {formatClock(now)}
             </time>
-            <p className="mt-2 text-sm font-semibold text-white">{formatLongDate(now)}</p>
+            <p className="mt-2 text-sm font-semibold text-primary-foreground">{formatLongDate(now)}</p>
             <div className="mt-5 flex items-center justify-between border-t border-white/15 pt-4 text-xs">
-              <span className="text-indigo-100/80">Schedule status</span>
-              <span className="inline-flex items-center gap-1.5 font-bold text-emerald-200">
-                <span className="size-1.5 rounded-full bg-emerald-300" />
+              <span className="text-brand-foreground/80">Schedule status</span>
+              <span className="inline-flex items-center gap-1.5 font-bold text-success">
+                <span className="size-1.5 rounded-full bg-success/10" />
                 Updating live
               </span>
             </div>
@@ -350,8 +351,8 @@ export function StudentTimetableView() {
 
       {isLoading ? (
         <div className="grid gap-4 lg:grid-cols-2">
-          <div className="h-48 animate-pulse rounded-2xl bg-slate-100 dark:bg-slate-800" />
-          <div className="h-48 animate-pulse rounded-2xl bg-slate-100 dark:bg-slate-800" />
+          <div className="h-48 animate-pulse rounded-2xl bg-muted " />
+          <div className="h-48 animate-pulse rounded-2xl bg-muted " />
         </div>
       ) : isError ? (
         <RetryMessage
@@ -360,21 +361,21 @@ export function StudentTimetableView() {
           isFetching={isFetching}
         />
       ) : entries.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-5 py-10 text-center dark:border-slate-700 dark:bg-slate-900">
-          <div className="mx-auto flex size-14 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-600 dark:bg-indigo-950/50 dark:text-indigo-300">
+        <div className="rounded-2xl border border-dashed border-border bg-white px-5 py-10 text-center  ">
+          <div className="mx-auto flex size-14 items-center justify-center rounded-2xl bg-primary/10 text-primary  ">
             <CalendarDays className="size-6" />
           </div>
-          <h2 className="mt-4 text-base font-bold text-slate-900 dark:text-white">
+          <h2 className="mt-4 text-base font-bold text-foreground dark:text-primary-foreground">
             Your timetable is getting ready
           </h2>
-          <p className="mx-auto mt-1 max-w-md text-sm leading-6 text-slate-500">
+          <p className="mx-auto mt-1 max-w-md text-sm leading-6 text-muted-foreground">
             There are no published periods for your current class yet. Check back later or contact your school office if you expect to see your schedule.
           </p>
           <button
             type="button"
             onClick={() => void refetch()}
             disabled={isFetching}
-            className="mt-4 inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-xs font-bold text-white transition hover:bg-indigo-700 disabled:opacity-50"
+            className="mt-4 inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-xs font-bold text-primary-foreground transition hover:bg-primary disabled:opacity-50"
           >
             <RefreshCw className={cn("size-3.5", isFetching && "animate-spin")} />
             Refresh timetable
@@ -386,19 +387,19 @@ export function StudentTimetableView() {
             <section
               aria-live="polite"
               className={cn(
-                "overflow-hidden rounded-2xl border bg-white shadow-sm dark:bg-slate-900",
+                "overflow-hidden rounded-2xl border bg-white shadow-sm ",
                 currentEntry
-                  ? "border-emerald-200 dark:border-emerald-900/60"
-                  : "border-slate-200/80 dark:border-slate-800",
+                  ? "border-success/25 "
+                  : "border-border ",
               )}
             >
-              <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-5 py-4 dark:border-slate-800">
-                <div className="flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-white">
+              <div className="flex items-center justify-between gap-3 border-b border-border px-5 py-4 ">
+                <div className="flex items-center gap-2 text-sm font-bold text-foreground dark:text-primary-foreground">
                   <span className={cn(
                     "flex size-8 items-center justify-center rounded-xl",
                     currentEntry
-                      ? "bg-emerald-50 text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-300"
-                      : "bg-indigo-50 text-indigo-600 dark:bg-indigo-950/50 dark:text-indigo-300",
+                      ? "bg-success/10 text-success  "
+                      : "bg-primary/10 text-primary  ",
                   )}>
                     <Zap className="size-4" />
                   </span>
@@ -407,8 +408,8 @@ export function StudentTimetableView() {
                 <span className={cn(
                   "rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide",
                   currentEntry
-                    ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300"
-                    : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300",
+                    ? "bg-success/10 text-success  "
+                    : "bg-muted text-muted-foreground  ",
                 )}>
                   {currentEntry ? "In session" : "Between periods"}
                 </span>
@@ -418,41 +419,41 @@ export function StudentTimetableView() {
                 <div className="p-5 sm:p-6">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-300">
+                      <p className="text-xs font-semibold text-success ">
                         {periodTypeLabel(currentEntry.type)} · {formatTime(currentEntry.startTime)} – {formatTime(currentEntry.endTime)}
                       </p>
-                      <h2 className="mt-2 text-2xl font-black tracking-tight text-slate-900 dark:text-white sm:text-3xl">
+                      <h2 className="mt-2 text-2xl font-black tracking-tight text-foreground dark:text-primary-foreground sm:text-3xl">
                         {periodTitle(currentEntry)}
                       </h2>
                       {currentEntry.subject?.code && (
-                        <p className="mt-1 text-xs font-medium text-slate-500">{currentEntry.subject.code}</p>
+                        <p className="mt-1 text-xs font-medium text-muted-foreground">{currentEntry.subject.code}</p>
                       )}
                     </div>
-                    <div className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-300">
+                    <div className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-success/10 text-success  ">
                       <Activity className="size-6" />
                     </div>
                   </div>
-                  <div className="mt-5 flex flex-wrap gap-x-5 gap-y-2 text-xs text-slate-600 dark:text-slate-300">
+                  <div className="mt-5 flex flex-wrap gap-x-5 gap-y-2 text-xs text-muted-foreground ">
                     {currentEntry.teacher?.name && (
                       <span className="inline-flex items-center gap-2">
-                        <UserRound className="size-4 text-indigo-500" />
+                        <UserRound className="size-4 text-primary" />
                         {currentEntry.teacher.name}
                       </span>
                     )}
                     {currentEntry.classroom?.name && (
                       <span className="inline-flex items-center gap-2">
-                        <MapPin className="size-4 text-indigo-500" />
+                        <MapPin className="size-4 text-primary" />
                         {currentEntry.classroom.name}
                       </span>
                     )}
                     {!currentEntry.teacher?.name && !currentEntry.classroom?.name && (
-                      <span className="text-slate-500">No teacher or room details have been assigned to this period.</span>
+                      <span className="text-muted-foreground">No teacher or room details have been assigned to this period.</span>
                     )}
                   </div>
                   <div className="mt-5">
                     <div className="mb-2 flex items-center justify-between gap-3 text-[11px]">
-                      <span className="font-semibold text-slate-600 dark:text-slate-300">Period progress</span>
-                      <span className="font-bold tabular-nums text-emerald-700 dark:text-emerald-300">
+                      <span className="font-semibold text-muted-foreground ">Period progress</span>
+                      <span className="font-bold tabular-nums text-success ">
                         {currentMinutesLeft} min remaining
                       </span>
                     </div>
@@ -462,10 +463,10 @@ export function StudentTimetableView() {
                       aria-valuemin={0}
                       aria-valuemax={100}
                       aria-valuenow={Math.round(currentProgress)}
-                      className="h-2 overflow-hidden rounded-full bg-emerald-100 dark:bg-emerald-950/70"
+                      className="h-2 overflow-hidden rounded-full bg-success/10 "
                     >
                       <div
-                        className="h-full rounded-full bg-gradient-to-r from-emerald-400 to-teal-500 transition-[width] duration-1000"
+                        className="h-full rounded-full bg-gradient-to-r from-success to-success transition-[width] duration-1000"
                         style={{ width: `${currentProgress}%` }}
                       />
                     </div>
@@ -473,17 +474,17 @@ export function StudentTimetableView() {
                 </div>
               ) : (
                 <div className="flex h-full min-h-40 flex-col justify-center p-5 sm:p-6">
-                  <h2 className="text-xl font-black tracking-tight text-slate-900 dark:text-white">
+                  <h2 className="text-xl font-black tracking-tight text-foreground dark:text-primary-foreground">
                     You’re between classes.
                   </h2>
-                  <p className="mt-2 max-w-lg text-sm leading-6 text-slate-500 dark:text-slate-400">
+                  <p className="mt-2 max-w-lg text-sm leading-6 text-muted-foreground ">
                     Take a breath, prepare your materials, and check the next period so you know where to be.
                   </p>
                   {nextEntry && (
                     <button
                       type="button"
                       onClick={() => setSelectedDay(nextEntry.entry.dayOfWeek as DayKey)}
-                      className="mt-4 inline-flex w-fit items-center gap-2 text-xs font-bold text-indigo-700 transition hover:text-indigo-900 dark:text-indigo-300 dark:hover:text-indigo-200"
+                      className="mt-4 inline-flex w-fit items-center gap-2 text-xs font-bold text-primary transition hover:text-primary  dark:hover:text-primary"
                     >
                       View next period <ArrowRight className="size-3.5" />
                     </button>
@@ -492,16 +493,16 @@ export function StudentTimetableView() {
               )}
             </section>
 
-            <section className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
-              <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-5 py-4 dark:border-slate-800">
-                <div className="flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-white">
-                  <span className="flex size-8 items-center justify-center rounded-xl bg-violet-50 text-violet-600 dark:bg-violet-950/50 dark:text-violet-300">
+            <section className="overflow-hidden rounded-2xl border border-border bg-white shadow-sm  ">
+              <div className="flex items-center justify-between gap-3 border-b border-border px-5 py-4 ">
+                <div className="flex items-center gap-2 text-sm font-bold text-foreground dark:text-primary-foreground">
+                  <span className="flex size-8 items-center justify-center rounded-xl bg-highlight/10 text-highlight  ">
                     <Timer className="size-4" />
                   </span>
                   Up next
                 </div>
                 {nextEntry && (
-                  <span className="rounded-full bg-violet-50 px-2.5 py-1 text-[10px] font-bold text-violet-700 dark:bg-violet-950/50 dark:text-violet-300">
+                  <span className="rounded-full bg-highlight/10 px-2.5 py-1 text-[10px] font-bold text-highlight  ">
                     {nextEntry.minutesAway < 60
                       ? `In ${Math.max(1, Math.ceil(nextEntry.minutesAway))} min`
                       : nextEntry.dayOffset === 0
@@ -514,37 +515,43 @@ export function StudentTimetableView() {
                 <button
                   type="button"
                   onClick={() => setSelectedDay(nextEntry.entry.dayOfWeek as DayKey)}
-                  className="group block w-full p-5 text-left transition hover:bg-slate-50/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-500 dark:hover:bg-slate-800/60 sm:p-6"
+                  className="group block w-full p-5 text-left transition hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/15 dark:hover:bg-muted sm:p-6"
                 >
-                  <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-                    {nextEntry.dayOffset === 0 ? "Today" : nextEntry.dayOffset === 1 ? "Tomorrow" : formatDay(nextEntry.entry.dayOfWeek)}
-                    {nextEntry.dayOffset === 0 || nextEntry.dayOffset === 1 ? "" : ` · ${formatTime(nextEntry.entry.startTime)}`}
+                  <p className="text-xs font-semibold text-muted-foreground ">
+                    {nextEntry.dayOffset === 0
+                      ? "Today"
+                      : nextEntry.dayOffset === 1
+                        ? "Tomorrow"
+                        : nextEntry.dayOffset === 7
+                          ? `Next ${formatDay(nextEntry.entry.dayOfWeek)}`
+                          : formatDay(nextEntry.entry.dayOfWeek)}
+                    {nextEntry.dayOffset <= 1 ? "" : ` · ${formatTime(nextEntry.entry.startTime)}`}
                   </p>
-                  <h2 className="mt-2 text-xl font-black tracking-tight text-slate-900 transition group-hover:text-indigo-700 dark:text-white dark:group-hover:text-indigo-300">
+                  <h2 className="mt-2 text-xl font-black tracking-tight text-foreground transition group-hover:text-primary dark:text-primary-foreground dark:group-hover:text-primary">
                     {periodTitle(nextEntry.entry)}
                   </h2>
-                  <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                  <p className="mt-1 text-sm text-muted-foreground ">
                     {formatTime(nextEntry.entry.startTime)} – {formatTime(nextEntry.entry.endTime)}
                   </p>
-                  <div className="mt-4 flex flex-wrap gap-3 text-xs text-slate-600 dark:text-slate-300">
+                  <div className="mt-4 flex flex-wrap gap-3 text-xs text-muted-foreground ">
                     {nextEntry.entry.teacher?.name && (
                       <span className="inline-flex items-center gap-1.5">
-                        <UserRound className="size-3.5 text-violet-500" /> {nextEntry.entry.teacher.name}
+                        <UserRound className="size-3.5 text-highlight" /> {nextEntry.entry.teacher.name}
                       </span>
                     )}
                     {nextEntry.entry.classroom?.name && (
                       <span className="inline-flex items-center gap-1.5">
-                        <MapPin className="size-3.5 text-violet-500" /> {nextEntry.entry.classroom.name}
+                        <MapPin className="size-3.5 text-highlight" /> {nextEntry.entry.classroom.name}
                       </span>
                     )}
                   </div>
-                  <span className="mt-5 inline-flex items-center gap-1.5 text-xs font-bold text-violet-700 dark:text-violet-300">
+                  <span className="mt-5 inline-flex items-center gap-1.5 text-xs font-bold text-highlight ">
                     Open {formatDay(nextEntry.entry.dayOfWeek)} schedule
                     <ArrowRight className="size-3.5 transition group-hover:translate-x-0.5" />
                   </span>
                 </button>
               ) : (
-                <div className="p-6 text-sm text-slate-500 dark:text-slate-400">
+                <div className="p-6 text-sm text-muted-foreground ">
                   Your school has not published any upcoming periods.
                 </div>
               )}
@@ -554,14 +561,14 @@ export function StudentTimetableView() {
           <section className="space-y-4">
             <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
               <div>
-                <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] text-indigo-600 dark:text-indigo-300">
+                <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] text-primary ">
                   <CalendarDays className="size-4" />
                   Your weekly plan
                 </div>
-                <h2 className="mt-1 text-xl font-black tracking-tight text-slate-900 dark:text-white sm:text-2xl">
+                <h2 className="mt-1 text-xl font-black tracking-tight text-foreground dark:text-primary-foreground sm:text-2xl">
                   Follow your day
                 </h2>
-                <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                <p className="mt-1 text-sm text-muted-foreground ">
                   Your current period updates automatically as the day moves on.
                 </p>
               </div>
@@ -569,13 +576,13 @@ export function StudentTimetableView() {
                 type="button"
                 onClick={() => window.print()}
                 disabled={entries.length === 0}
-                className="inline-flex w-fit items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs font-bold text-slate-700 shadow-sm transition hover:border-indigo-200 hover:bg-indigo-50/50 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+                className="inline-flex w-fit items-center gap-2 rounded-xl border border-border bg-white px-3.5 py-2.5 text-xs font-bold text-foreground shadow-sm transition hover:border-primary/20 hover:bg-primary/10 disabled:opacity-50    dark:hover:bg-muted"
               >
                 <Printer className="size-4" /> Print schedule
               </button>
             </div>
 
-            <div className="rounded-2xl border border-slate-200/80 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-4">
+            <div className="rounded-2xl border border-border bg-white p-3 shadow-sm   sm:p-4">
               <div className="flex gap-2 overflow-x-auto pb-1">
                 {DAYS.map((day) => {
                   const isToday = day === todayKey;
@@ -591,14 +598,14 @@ export function StudentTimetableView() {
                       className={cn(
                         "relative flex min-w-[74px] flex-1 flex-col items-center rounded-xl border px-3 py-3 text-center transition sm:min-w-0 sm:px-2",
                         selected
-                          ? "border-indigo-600 bg-indigo-600 text-white shadow-md shadow-indigo-600/20"
-                          : "border-transparent bg-slate-50 text-slate-600 hover:border-slate-200 hover:bg-slate-100 dark:bg-slate-800/70 dark:text-slate-300 dark:hover:border-slate-700",
+                          ? "border-primary/20 bg-primary text-primary-foreground shadow-md shadow-primary/10"
+                          : "border-transparent bg-muted/50 text-muted-foreground hover:border-border hover:bg-muted   dark:hover:border-border",
                       )}
                     >
                       {isToday && (
                         <span className={cn(
                           "mb-1 text-[9px] font-black uppercase tracking-wider",
-                          selected ? "text-indigo-100" : "text-emerald-600 dark:text-emerald-300",
+                          selected ? "text-primary" : "text-success ",
                         )}>
                           Today
                         </span>
@@ -606,7 +613,7 @@ export function StudentTimetableView() {
                       <span className="text-sm font-bold">{DAY_SHORT[day]}</span>
                       <span className={cn(
                         "mt-1 text-[10px] font-semibold",
-                        selected ? "text-indigo-100" : "text-slate-400",
+                        selected ? "text-primary" : "text-muted-foreground",
                       )}>
                         {count} {count === 1 ? "period" : "periods"}
                       </span>
@@ -616,53 +623,54 @@ export function StudentTimetableView() {
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-[11px] font-medium text-slate-500 dark:text-slate-400">
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-[11px] font-medium text-muted-foreground ">
               <span className="inline-flex items-center gap-2">
-                <span className="size-2.5 rounded-full bg-emerald-500" /> Live now
+                <span className="size-2.5 rounded-full bg-success/20" /> Live now
               </span>
               <span className="inline-flex items-center gap-2">
-                <span className="size-2.5 rounded-full bg-violet-500" /> Next period
+                <span className="size-2.5 rounded-full bg-highlight/20" /> Next period
               </span>
               <span className="inline-flex items-center gap-2">
-                <span className="size-2.5 rounded-full bg-slate-300 dark:bg-slate-600" /> Completed
+                <span className="size-2.5 rounded-full bg-muted " /> Completed
               </span>
             </div>
 
-            <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-6">
-              <div className="mb-5 flex flex-col justify-between gap-2 border-b border-slate-100 pb-4 dark:border-slate-800 sm:flex-row sm:items-center">
+            <div className="rounded-2xl border border-border bg-white p-4 shadow-sm   sm:p-6">
+              <div className="mb-5 flex flex-col justify-between gap-2 border-b border-border pb-4  sm:flex-row sm:items-center">
                 <div>
-                  <h3 className="text-lg font-black text-slate-900 dark:text-white">{formatDay(selectedDay)}</h3>
-                  <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                  <h3 className="text-lg font-black text-foreground dark:text-primary-foreground">{formatDay(selectedDay)}</h3>
+                  <p className="mt-0.5 text-xs text-muted-foreground ">
                     {selectedDay === todayKey
                       ? `${completedToday} of ${todayEntries.length} periods completed today`
                       : `${selectedEntries.length} scheduled ${selectedEntries.length === 1 ? "period" : "periods"}`}
                   </p>
                 </div>
                 {selectedDay === todayKey && (
-                  <span className="inline-flex w-fit items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1.5 text-[10px] font-bold text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
-                    <span className="size-1.5 animate-pulse rounded-full bg-emerald-500" /> Live day view
+                  <span className="inline-flex w-fit items-center gap-1.5 rounded-full bg-success/10 px-3 py-1.5 text-[10px] font-bold text-success  ">
+                    <span className="size-1.5 animate-pulse rounded-full bg-success/20" /> Live day view
                   </span>
                 )}
               </div>
 
               {selectedEntries.length === 0 ? (
-                <div className="rounded-xl border border-dashed border-slate-300 px-4 py-10 text-center dark:border-slate-700">
-                  <div className="mx-auto flex size-12 items-center justify-center rounded-2xl bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-300">
+                <div className="rounded-xl border border-dashed border-border px-4 py-10 text-center ">
+                  <div className="mx-auto flex size-12 items-center justify-center rounded-2xl bg-muted text-muted-foreground  ">
                     <CalendarDays className="size-5" />
                   </div>
-                  <p className="mt-3 text-sm font-bold text-slate-800 dark:text-slate-100">
+                  <p className="mt-3 text-sm font-bold text-foreground ">
                     No periods scheduled for {formatDay(selectedDay)}.
                   </p>
-                  <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                  <p className="mt-1 text-xs text-muted-foreground ">
                     Choose another day to view your classes.
                   </p>
                 </div>
               ) : (
-                <ol className="relative space-y-3" aria-label={`${formatDay(selectedDay)} periods`}>
+                <div className="relative">
                   <div
                     aria-hidden="true"
-                    className="absolute bottom-6 left-[7px] top-3 w-px bg-gradient-to-b from-slate-200 via-indigo-200 to-slate-200 dark:from-slate-700 dark:via-indigo-900 dark:to-slate-700"
+                    className="absolute bottom-6 left-[7px] top-3 w-px bg-gradient-to-b from-muted bg-primary/10 to-muted   "
                   />
+                  <ol className="relative space-y-3" aria-label={`${formatDay(selectedDay)} periods`}>
                   {selectedEntries.map((entry) => {
                     const start = parseTime(entry.startTime);
                     const end = parseTime(entry.endTime);
@@ -685,26 +693,26 @@ export function StudentTimetableView() {
                         <span
                           aria-hidden="true"
                           className={cn(
-                            "absolute left-0 top-5 z-10 size-4 rounded-full border-[3px] border-white shadow-sm dark:border-slate-900",
+                            "absolute left-0 top-5 z-10 size-4 rounded-full border-[3px] border-white shadow-sm ",
                             isCurrent
-                              ? "bg-emerald-500 ring-4 ring-emerald-100 dark:ring-emerald-950"
+                              ? "bg-success/20 ring-4 ring-success/20 "
                               : isNext
-                                ? "bg-violet-500 ring-4 ring-violet-100 dark:ring-violet-950"
+                                ? "bg-highlight/20 ring-4 ring-highlight/15 "
                                 : isCompleted
-                                  ? "bg-slate-300 dark:bg-slate-600"
-                                  : "bg-indigo-200 dark:bg-indigo-900",
+                                  ? "bg-muted "
+                                  : "bg-primary/10 ",
                           )}
                         />
                         <article
                           className={cn(
                             "rounded-2xl border p-4 transition-all duration-300 sm:p-5",
                             isCurrent
-                              ? "border-emerald-300 bg-gradient-to-br from-emerald-50 to-white shadow-lg shadow-emerald-950/5 ring-1 ring-emerald-100 dark:border-emerald-900 dark:from-emerald-950/40 dark:to-slate-900 dark:ring-emerald-950"
+                              ? "border-success/25 bg-gradient-to-br bg-success/10 to-white shadow-lg shadow-success/10 ring-1 ring-success/20    "
                               : isNext
-                                ? "border-violet-200 bg-violet-50/40 shadow-sm dark:border-violet-900/60 dark:bg-violet-950/20"
+                                ? "border-highlight/20 bg-highlight/10 shadow-sm  "
                                 : isCompleted
-                                  ? "border-slate-100 bg-slate-50/60 dark:border-slate-800 dark:bg-slate-800/30"
-                                  : "border-slate-200/80 bg-white hover:border-indigo-200 hover:shadow-sm dark:border-slate-800 dark:bg-slate-900 dark:hover:border-indigo-900",
+                                  ? "border-border bg-muted/50  "
+                                  : "border-border bg-white hover:border-primary/20 hover:shadow-sm   dark:hover:border-primary/20",
                           )}
                         >
                           <div className="flex flex-wrap items-start justify-between gap-3">
@@ -712,10 +720,10 @@ export function StudentTimetableView() {
                               <span className={cn(
                                 "mt-0.5 flex size-10 shrink-0 items-center justify-center rounded-xl",
                                 isCurrent
-                                  ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/60 dark:text-emerald-200"
+                                  ? "bg-success/10 text-success  "
                                   : isNext
-                                    ? "bg-violet-100 text-violet-700 dark:bg-violet-900/50 dark:text-violet-200"
-                                    : "bg-indigo-50 text-indigo-600 dark:bg-indigo-950/60 dark:text-indigo-300",
+                                    ? "bg-highlight/10 text-highlight  "
+                                    : "bg-primary/10 text-primary  ",
                               )}>
                                 {entry.type === "BREAK" ? <Clock3 className="size-5" /> : entry.type === "ACTIVITY" ? <Sparkles className="size-5" /> : <BookOpen className="size-5" />}
                               </span>
@@ -724,78 +732,78 @@ export function StudentTimetableView() {
                                   <h4 className={cn(
                                     "text-sm font-black sm:text-base",
                                     isCompleted
-                                      ? "text-slate-600 dark:text-slate-300"
-                                      : "text-slate-900 dark:text-white",
+                                      ? "text-muted-foreground "
+                                      : "text-foreground dark:text-primary-foreground",
                                   )}>
                                     {periodTitle(entry)}
                                   </h4>
                                   {isCurrent && (
-                                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-600 px-2 py-0.5 text-[9px] font-black uppercase tracking-wide text-white">
+                                    <span className="inline-flex items-center gap-1 rounded-full bg-success px-2 py-0.5 text-[9px] font-black uppercase tracking-wide text-primary-foreground">
                                       <span className="size-1.5 animate-pulse rounded-full bg-white" /> Live now
                                     </span>
                                   )}
                                   {isNext && (
-                                    <span className="rounded-full bg-violet-600 px-2 py-0.5 text-[9px] font-black uppercase tracking-wide text-white">
+                                    <span className="rounded-full bg-highlight px-2 py-0.5 text-[9px] font-black uppercase tracking-wide text-primary-foreground">
                                       Next up
                                     </span>
                                   )}
                                   {isCompleted && (
-                                    <span className="inline-flex items-center gap-1 rounded-full bg-slate-200 px-2 py-0.5 text-[9px] font-bold uppercase text-slate-600 dark:bg-slate-700 dark:text-slate-200">
+                                    <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[9px] font-bold uppercase text-muted-foreground  ">
                                       <Check className="size-3" /> Completed
                                     </span>
                                   )}
                                 </div>
-                                <p className="mt-1 text-xs font-semibold text-slate-500 dark:text-slate-400">
+                                <p className="mt-1 text-xs font-semibold text-muted-foreground ">
                                   {formatTime(entry.startTime)} – {formatTime(entry.endTime)}
-                                  <span className="mx-2 text-slate-300 dark:text-slate-600">•</span>
+                                  <span className="mx-2 text-muted-foreground ">•</span>
                                   {periodTypeLabel(entry.type)}
                                   {entry.subject?.code ? ` · ${entry.subject.code}` : ""}
                                 </p>
                               </div>
                             </div>
                             {isCurrent && (
-                              <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-white/70 px-2.5 py-1 text-[10px] font-bold text-emerald-800 dark:border-emerald-900 dark:bg-slate-900/70 dark:text-emerald-200">
+                              <span className="inline-flex items-center gap-1.5 rounded-full border border-success/25 bg-white/70 px-2.5 py-1 text-[10px] font-bold text-success   ">
                                 <Timer className="size-3.5" /> {currentMinutesLeft} min left
                               </span>
                             )}
                           </div>
 
                           {(entry.teacher?.name || entry.classroom?.name) && (
-                            <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 border-t border-slate-200/70 pt-3 text-xs text-slate-600 dark:border-slate-700 dark:text-slate-300">
+                            <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 border-t border-border pt-3 text-xs text-muted-foreground  ">
                               {entry.teacher?.name && (
                                 <span className="inline-flex items-center gap-2">
                                   <span className={cn(
                                     "flex size-7 items-center justify-center rounded-full text-[9px] font-black",
                                     isCurrent
-                                      ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/70 dark:text-emerald-100"
-                                      : "bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-200",
+                                      ? "bg-success/10 text-success  "
+                                      : "bg-primary/10 text-primary  ",
                                   )}>
                                     {teacherInitials(entry.teacher.name)}
                                   </span>
-                                  <span><span className="block text-[10px] text-slate-400">Teacher</span><span className="font-semibold">{entry.teacher.name}</span></span>
+                                  <span><span className="block text-[10px] text-muted-foreground">Teacher</span><span className="font-semibold">{entry.teacher.name}</span></span>
                                 </span>
                               )}
                               {entry.classroom?.name && (
                                 <span className="inline-flex items-center gap-2">
-                                  <span className="flex size-7 items-center justify-center rounded-full bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-200">
+                                  <span className="flex size-7 items-center justify-center rounded-full bg-muted text-muted-foreground  ">
                                     <MapPin className="size-3.5" />
                                   </span>
-                                  <span><span className="block text-[10px] text-slate-400">Room</span><span className="font-semibold">{entry.classroom.name}</span></span>
+                                  <span><span className="block text-[10px] text-muted-foreground">Room</span><span className="font-semibold">{entry.classroom.name}</span></span>
                                 </span>
                               )}
                             </div>
                           )}
 
                           {isCurrent && (
-                            <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-emerald-100 dark:bg-emerald-950/70">
+                            <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-success/10 ">
                               <div
-                                className="h-full rounded-full bg-gradient-to-r from-emerald-400 to-teal-500 transition-[width] duration-1000"
+                                className="h-full rounded-full bg-gradient-to-r from-success to-success transition-[width] duration-1000"
                                 style={{ width: `${entryProgress}%` }}
                               />
                             </div>
                           )}
                           {!isCurrent && !isCompleted && isFuture && entry.type !== "BREAK" && (
-                            <div className="mt-3 flex items-center gap-1.5 text-[10px] font-semibold text-slate-400">
+                            <div className="mt-3 flex items-center gap-1.5 text-[10px] font-semibold text-muted-foreground">
                               <Activity className="size-3.5" /> Get ready for this period
                             </div>
                           )}
@@ -803,7 +811,8 @@ export function StudentTimetableView() {
                       </li>
                     );
                   })}
-                </ol>
+                  </ol>
+                </div>
               )}
             </div>
           </section>
