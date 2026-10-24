@@ -4,6 +4,7 @@ import { CircleAlert, CircleCheck, LoaderCircle } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { apiFetch } from "@/lib/api";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { DatePicker } from "@/components/ui/date-picker";
 
 const STATUSES = [
   ["PRESENT", "Present"],
@@ -120,16 +121,15 @@ export function ClassRegister({ classId, className, canMark }: { classId: string
             {canMark ? "Mark each pupil, then save." : "Only the class teacher can mark this register."}
           </p>
         </div>
-        <label className="grid gap-1.5 text-xs font-medium text-muted-foreground">
-          Date
-          <input
-            type="date"
+        <div className="grid w-full gap-1.5 text-xs font-semibold text-foreground sm:w-56">
+          <label>Date</label>
+          <DatePicker
             value={date}
-            max={todayIso()}
-            onChange={(event) => event.target.value && setDate(event.target.value)}
-            className="h-10 rounded-xl border border-input bg-background px-3 text-sm text-foreground outline-none transition focus-visible:ring-2 focus-visible:ring-ring"
+            maxDate={todayIso()}
+            onChange={setDate}
+            ariaLabel="Select attendance date"
           />
-        </label>
+        </div>
       </div>
 
       {query.isPending && (
