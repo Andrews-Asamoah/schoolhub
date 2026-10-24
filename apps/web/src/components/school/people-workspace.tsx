@@ -942,8 +942,9 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
                         <span>
                           <span className="font-semibold">Create parent-portal login</span>
                           <span className="block text-muted-foreground">
-                            Requires an email. A temporary password is shown once; the
-                            guardian must change it at first sign-in.
+                            If no contact email is entered, a sign-in email is generated
+                            using the school's domain. A temporary password is shown once;
+                            the guardian must change it at first sign-in.
                           </span>
                         </span>
                       </label>
@@ -1191,7 +1192,7 @@ function valuesFromPerson(person: Teacher | Staff | Guardian): Values {
     firstName: person.firstName,
     lastName: person.lastName,
     otherNames: person.otherNames ?? "",
-    email: person.email ?? "",
+    email: person.email ?? person.profile?.user?.email ?? "",
     phone: person.phone,
     alternatePhone: person.alternatePhone ?? "",
     gender: person.gender ?? "",
