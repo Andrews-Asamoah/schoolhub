@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, Param, Post, Query, UseGuards } from "@nestjs/common";
 import {
   createInventoryItemSchema,
   inventoryStockMovementSchema,
@@ -23,6 +23,18 @@ export class InventoryController {
   @Roles("owner", "admin", "headteacher", "accountant")
   listItems(@CurrentSchool() school: School) {
     return this.inventoryService.listItems(school.id);
+  }
+
+  @Get("transactions")
+  @Roles("owner", "admin", "headteacher", "accountant")
+  listTransactions(
+    @CurrentSchool() school: School,
+    @Query("from") fromDate?: string,
+    @Query("to") toDate?: string,
+    @Query("itemId") itemId?: string,
+    @Query("type") transactionType?: string,
+  ) {
+    return this.inventoryService.listTransactions(school.id, fromDate, toDate, itemId, transactionType);
   }
 
   @Post("items")
