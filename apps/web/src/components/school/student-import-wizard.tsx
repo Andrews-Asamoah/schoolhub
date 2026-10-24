@@ -351,7 +351,7 @@ export function StudentImportWizard({
               <input type="checkbox" checked={createGuardianLogins} onChange={(event) => setCreateGuardianLogins(event.target.checked)} className="mt-0.5 size-4 accent-primary" />
               <span>
                 <span className="font-semibold text-foreground">Also create parent-portal logins</span>
-                <span className="block text-muted-foreground">For guardians who have an email address. Leave this off to add only the students and their contacts.</span>
+                <span className="block text-muted-foreground">Creates a sign-in for every linked guardian. If no contact email is provided, SchoolHub generates a non-deliverable login email; save the credentials report and share the login details securely with the guardian.</span>
               </span>
             </label>
 
