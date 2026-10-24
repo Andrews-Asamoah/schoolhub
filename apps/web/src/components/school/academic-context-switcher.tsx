@@ -36,7 +36,7 @@ export function AcademicContextSwitcher() {
   const queryClient = useQueryClient();
   const { activeRole } = useSchoolRole();
   const isAccountant = activeRole === "accountant";
-  const canManageSchoolContext = ["owner", "admin", "headmistress"].includes(
+  const canManageSchoolContext = ["owner", "admin", "headteacher"].includes(
     activeRole ?? "",
   );
 

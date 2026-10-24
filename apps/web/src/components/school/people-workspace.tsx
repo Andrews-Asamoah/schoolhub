@@ -243,7 +243,7 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
   const deferredSearch = useDeferredValue(search.trim());
   const isGuardianPage = kind === "guardians";
   const canManage =
-    ["owner", "admin", "headmistress"].includes(activeRole ?? "") ||
+    ["owner", "admin", "headteacher"].includes(activeRole ?? "") ||
     (isGuardianPage && activeRole === "staff");
   const title =
     kind === "teachers"

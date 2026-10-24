@@ -17,7 +17,7 @@ const ROLE_CHANGE_EVENT = "schoolhub-role-change";
 const roleLabels: Record<string, string> = {
   owner: "School owner",
   admin: "Administrator",
-  headmistress: "Headmistress",
+  headteacher: "Headteacher",
   teacher: "Teacher",
   accountant: "Accountant",
   staff: "Staff",

@@ -49,7 +49,7 @@ const outline =
 export function SubjectsWorkspace() {
   const queryClient = useQueryClient();
   const { activeRole } = useSchoolRole();
-  const canManage = ["owner", "admin", "headmistress"].includes(activeRole ?? "");
+  const canManage = ["owner", "admin", "headteacher"].includes(activeRole ?? "");
   const [search, setSearch] = useState("");
   const [showInactive, setShowInactive] = useState(false);
   const [panel, setPanel] = useState<Panel>(null);
