@@ -28,6 +28,61 @@ export class InventoryService {
     });
   }
 
+  async listTransactions(
+    schoolId: string,
+    fromDate?: string,
+    toDate?: string,
+    itemId?: string,
+    transactionType?: string,
+  ) {
+    const parseDate = (value: string | undefined, field: string) => {
+      if (!value) return undefined;
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+        throw new BadRequestException(`Enter ${field} as YYYY-MM-DD.`);
+      }
+      const date = new Date(`${value}T00:00:00.000Z`);
+      if (Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== value) {
+        throw new BadRequestException(`Enter a valid ${field.toLowerCase()}.`);
+      }
+      return date;
+    };
+    const startDate = parseDate(fromDate, "start date");
+    const endDate = parseDate(toDate, "end date");
+    if (startDate && endDate && startDate > endDate) {
+      throw new BadRequestException("Start date must be on or before the end date.");
+    }
+    if (transactionType && !["IN", "OUT", "ADJUSTMENT"].includes(transactionType)) {
+      throw new BadRequestException("Choose a valid stock movement type.");
+    }
+    if (itemId) {
+      const item = await this.prisma.client.inventoryItem.findFirst({
+        where: { id: itemId, schoolId },
+        select: { id: true },
+      });
+      if (!item) throw new NotFoundException("Inventory item not found.");
+    }
+    const endExclusive = endDate ? new Date(endDate.getTime() + 24 * 60 * 60 * 1000) : undefined;
+    return this.prisma.client.inventoryTransaction.findMany({
+      where: {
+        schoolId,
+        ...(itemId ? { itemId } : {}),
+        ...(transactionType ? { type: transactionType as "IN" | "OUT" | "ADJUSTMENT" } : {}),
+        ...(startDate || endExclusive ? {
+          date: {
+            ...(startDate ? { gte: startDate } : {}),
+            ...(endExclusive ? { lt: endExclusive } : {}),
+          },
+        } : {}),
+      },
+      orderBy: [{ date: "desc" }, { createdAt: "desc" }],
+      take: 1000,
+      include: {
+        item: { select: { id: true, name: true, category: true, unit: true } },
+        performedBy: { select: { name: true } },
+      },
+    });
+  }
+
   async createItem(schoolId: string, performedById: string, input: CreateInventoryItemInput) {
     return this.prisma.client.$transaction(async (tx) => {
       const item = await tx.inventoryItem.create({
