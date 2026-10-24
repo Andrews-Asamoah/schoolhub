@@ -20,7 +20,6 @@ import {
 import {
   createExpenseSchema,
   generateBillSchema,
-  recordPaymentSchema,
   createInventoryItemSchema,
   inventoryStockMovementSchema,
   type CreateInventoryItemInput,
