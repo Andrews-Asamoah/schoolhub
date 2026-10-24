@@ -1099,6 +1099,29 @@ export class FinanceService {
     });
   }
 
+  async addFeeReminderInstallment(
+    schoolId: string,
+    scheduleId: string,
+    input: { label: string; dueDate: string; sendDate: string },
+  ) {
+    const schedule = await this.prisma.client.feeReminderSchedule.findFirst({
+      where: { id: scheduleId, schoolId },
+      select: { id: true },
+    });
+    if (!schedule) throw new NotFoundException("Fee reminder schedule not found.");
+    const parseDate = (value: string, field: string) => {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) throw new BadRequestException(`Enter ${field} as YYYY-MM-DD.`);
+      const date = new Date(`${value}T00:00:00.000Z`);
+      if (Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== value) throw new BadRequestException(`Enter a valid ${field.toLowerCase()}.`);
+      return date;
+    };
+    const dueDate = parseDate(input.dueDate, "due date");
+    const sendDate = parseDate(input.sendDate, "send date");
+    if (sendDate > dueDate) throw new BadRequestException("The reminder send date must be on or before the due date.");
+    return this.prisma.client.feeReminderInstallment.create({
+      data: { scheduleId, label: input.label.trim(), dueDate, sendDate },
+    });
+  }
   private async collectFeeReminderTargets(
     schoolId: string,
     minimumOutstanding: number,
