@@ -73,6 +73,9 @@ export function StudentAnnouncementsView() {
     setReadIds((current) => current.has(matchingAnnouncement.id)
       ? current
       : new Set([...current, matchingAnnouncement.id]));
+    const url = new URL(window.location.href);
+    url.searchParams.delete("announcementId");
+    window.history.replaceState(window.history.state, "", url.pathname + url.search + url.hash);
   }, [announcements]);
 
   const normalizedSearch = search.trim().toLowerCase();

@@ -151,7 +151,11 @@ export function AdminAnnouncementsWorkspace({ mode = "admin" }: { mode?: Announc
     const announcementId = new URLSearchParams(window.location.search).get("announcementId");
     if (!announcementId) return;
     const matchingAnnouncement = announcements.find((item) => item.id === announcementId);
-    if (matchingAnnouncement) setSelected(matchingAnnouncement);
+    if (!matchingAnnouncement) return;
+    setSelected(matchingAnnouncement);
+    const url = new URL(window.location.href);
+    url.searchParams.delete("announcementId");
+    window.history.replaceState(window.history.state, "", url.pathname + url.search + url.hash);
   }, [announcements]);
 
   const normalizedSearch = search.trim().toLowerCase();

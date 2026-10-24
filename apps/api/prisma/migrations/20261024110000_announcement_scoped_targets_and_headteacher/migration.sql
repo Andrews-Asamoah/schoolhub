@@ -10,7 +10,7 @@ SET "roles" = ARRAY(
     WHEN role_name = 'headmistress' THEN 'headteacher'
     ELSE role_name
   END
-  FROM unnest("roles") AS role_name
+  FROM unnest("roles") AS roles(role_name)
 )
 WHERE array_position("roles", 'headmistress') IS NOT NULL;
 
