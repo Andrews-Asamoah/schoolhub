@@ -546,10 +546,12 @@ export class FinanceService {
           return {
             feeItemId: item.id,
             description: item.name,
-            amount: new Prisma.Decimal(netLine),
+            amount: new Prisma.Decimal(grossLine),
             quantity: 1,
-            totalAmount: new Prisma.Decimal(netLine),
+            totalAmount: new Prisma.Decimal(grossLine),
+            discountAmount: new Prisma.Decimal(lineDiscount),
             balanceAmount: new Prisma.Decimal(netLine),
+            status: netLine === 0 ? "FULLY_PAID" as const : "UNPAID" as const,
           };
         });
         const randomNum = Math.floor(10000 + Math.random() * 90000);
@@ -568,6 +570,7 @@ export class FinanceService {
             totalAmount: new Prisma.Decimal(netTotal),
             paidAmount: new Prisma.Decimal(0),
             balanceAmount: new Prisma.Decimal(netTotal),
+            status: netTotal === 0 ? "PAID" : "PENDING",
             dueDate: input.dueDate ? new Date(input.dueDate) : undefined,
             notes: input.notes,
             items: { create: billItems },
@@ -932,7 +935,7 @@ export class FinanceService {
         academicYear: { select: { name: true } },
         term: { select: { name: true } },
         items: {
-          select: { id: true, description: true, amount: true, quantity: true, totalAmount: true, paidAmount: true, balanceAmount: true },
+          select: { id: true, description: true, amount: true, quantity: true, totalAmount: true, discountAmount: true, paidAmount: true, balanceAmount: true },
           orderBy: { createdAt: "asc" },
         },
         concessions: { select: { id: true, type: true, label: true, amount: true }, orderBy: { createdAt: "asc" } },
