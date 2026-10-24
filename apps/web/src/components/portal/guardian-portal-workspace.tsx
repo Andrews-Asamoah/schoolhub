@@ -132,7 +132,7 @@ export function GuardianPortalWorkspace({ defaultTab = "overview" }: { defaultTa
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         <Metric label="Linked children" value={wardsQuery.isPending ? "—" : String(wards.length)} detail="Children currently linked to this guardian account" icon={UsersRound} />
         <Metric label="Published reports" value="View reports" detail="Official report cards released by the school" icon={GraduationCap} />
-        <Metric label="School updates" value={announcementsQuery.isPending ? "—" : String(announcements.length)} detail="Current notices available to your account" icon={BellRing} />
+        <Metric label="School updates" value={announcementsQuery.isPending || announcementsQuery.isError ? "—" : String(announcements.length)} detail={announcementsQuery.isError ? "School updates could not be loaded" : "Current notices available to your account"} icon={BellRing} />
       </div>
 
       <nav aria-label="Guardian portal sections" className="flex gap-1 overflow-x-auto rounded-2xl border border-border bg-card p-1.5 shadow-sm">
