@@ -1039,7 +1039,10 @@
     print-color-adjust: exact;
   }
 
-  #credentials-print-root button,
+  #credentials-print-root button {
+    display: none !important;
+  }
+
   #credentials-print-root section {
     break-inside: avoid;
     page-break-inside: avoid;
