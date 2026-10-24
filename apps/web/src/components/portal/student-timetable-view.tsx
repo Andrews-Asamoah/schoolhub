@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { useQuery } from "@tanstack/react-query";
 import {
   Activity,
@@ -194,6 +195,7 @@ function RetryMessage({
 export function StudentTimetableView() {
   const now = useLiveClock();
   const [selectedDay, setSelectedDay] = useState<DayKey>(() => getDayKey(new Date()));
+  const [isPrinting, setIsPrinting] = useState(false);
 
   const { data, isLoading, isError, refetch, isFetching } = useQuery({
     queryKey: ["timetable", "me"],
@@ -234,6 +236,40 @@ export function StudentTimetableView() {
 
   const todayEntries = entriesByDay[todayKey];
   const selectedEntries = entriesByDay[selectedDay];
+
+  const printSlots = useMemo(() => {
+    const slots = new Map<string, { key: string; startTime: string; endTime: string; startMinutes: number; endMinutes: number }>();
+
+    for (const entry of entries) {
+      const startMinutes = parseTime(entry.startTime);
+      const endMinutes = parseTime(entry.endTime);
+      if (startMinutes === null || endMinutes === null || endMinutes <= startMinutes) continue;
+
+      const key = `${startMinutes}|${endMinutes}`;
+      if (!slots.has(key)) {
+        slots.set(key, { key, startTime: entry.startTime, endTime: entry.endTime, startMinutes, endMinutes });
+      }
+    }
+
+    return [...slots.values()].sort((a, b) =>
+      a.startMinutes - b.startMinutes || a.endMinutes - b.endMinutes,
+    );
+  }, [entries]);
+
+  useEffect(() => {
+    if (!isPrinting) return;
+
+    document.body.classList.add("printing-student-timetable");
+    const finishPrinting = () => setIsPrinting(false);
+    window.addEventListener("afterprint", finishPrinting);
+    const printTimeout = window.setTimeout(() => window.print(), 100);
+
+    return () => {
+      window.clearTimeout(printTimeout);
+      window.removeEventListener("afterprint", finishPrinting);
+      document.body.classList.remove("printing-student-timetable");
+    };
+  }, [isPrinting]);
 
   const currentEntry =
     todayEntries.find((entry) => {
@@ -576,7 +612,7 @@ export function StudentTimetableView() {
               </div>
               <button
                 type="button"
-                onClick={() => window.print()}
+                onClick={() => setIsPrinting(true)}
                 disabled={entries.length === 0}
                 className="inline-flex w-fit items-center gap-2 rounded-xl border border-border bg-card px-3.5 py-2.5 text-xs font-bold text-foreground shadow-sm transition hover:border-primary/20 hover:bg-primary/10 disabled:opacity-50    "
               >
@@ -821,5 +857,110 @@ export function StudentTimetableView() {
         </>
       )}
     </div>
+    {createPortal(
+      <section
+        className="student-timetable-print"
+        aria-hidden={!isPrinting}
+        data-density={printSlots.length > 14 ? "tight" : printSlots.length > 10 ? "compact" : "standard"}
+      >
+        <header className="student-timetable-print-header">
+          <div>
+            <p className="student-timetable-print-eyebrow">SchoolHub · Weekly schedule</p>
+            <h1>Class Timetable{data?.class?.name ? ` — ${data.class.name}` : ""}</h1>
+            <p className="student-timetable-print-subtitle">
+              {[data?.class?.level, data?.academicYear?.name, data?.term?.name].filter(Boolean).join(" · ") || "Current academic schedule"}
+            </p>
+          </div>
+          <div className="student-timetable-print-datestamp">
+            <span>Printed on</span>
+            <strong>{formatLongDate(now)}</strong>
+            <span>{formatClock(now)}</span>
+          </div>
+        </header>
+
+        {printSlots.length === 0 ? (
+          <p className="student-timetable-print-empty">No valid timetable periods are available to print.</p>
+        ) : (
+          <table className="student-timetable-print-table">
+            <colgroup>
+              <col className="student-timetable-print-time-column" />
+              {DAYS.map((day) => <col key={day} />)}
+            </colgroup>
+            <thead>
+              <tr>
+                <th scope="col">Time</th>
+                {DAYS.map((day) => (
+                  <th key={day} scope="col">
+                    {formatDay(day)}
+                    {day === todayKey && <span className="student-timetable-print-today">Today</span>}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {printSlots.map((slot) => (
+                <tr key={slot.key}>
+                  <th scope="row">
+                    <span>{formatTime(slot.startTime)}</span>
+                    <span className="student-timetable-print-time-end">{formatTime(slot.endTime)}</span>
+                  </th>
+                  {DAYS.map((day) => {
+                    const slotEntries = entriesByDay[day].filter(
+                      (entry) => parseTime(entry.startTime) === slot.startMinutes && parseTime(entry.endTime) === slot.endMinutes,
+                    );
+                    return (
+                      <td
+                        key={day}
+                        className={cn(
+                          "student-timetable-print-cell",
+                          slotEntries.some((entry) =>
+                            day === todayKey &&
+                            nowMinutes >= slot.startMinutes &&
+                            nowMinutes < slot.endMinutes,
+                          ) && "student-timetable-print-current",
+                        )}
+                      >
+                        {slotEntries.map((entry) => {
+                          const isCurrent = day === todayKey &&
+                            nowMinutes >= slot.startMinutes &&
+                            nowMinutes < slot.endMinutes;
+                          const details = [
+                            entry.teacher?.name,
+                            entry.classroom?.name,
+                          ].filter(Boolean);
+
+                          return (
+                            <div className="student-timetable-print-period" key={entry.id}>
+                              <strong className="student-timetable-print-period-title">
+                                {periodTitle(entry)}
+                              </strong>
+                              {entry.subject?.code && (
+                                <span className="student-timetable-print-meta">{entry.subject.code}</span>
+                              )}
+                              {details.length > 0 && (
+                                <span className="student-timetable-print-meta">{details.join(" · ")}</span>
+                              )}
+                              {isCurrent && (
+                                <span className="student-timetable-print-current-label">NOW</span>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+
+        <footer className="student-timetable-print-footer">
+          <span>Times and allocations follow the school's published timetable.</span>
+          <span>{printSlots.length} time slots · Monday–Sunday</span>
+        </footer>
+      </section>,
+      document.body,
+    )}
   );
 }
