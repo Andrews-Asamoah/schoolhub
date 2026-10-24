@@ -418,7 +418,10 @@ export function AccountantPortalWorkspace({
       setShowBillForm(false);
       setSelectedFeeStructureId("");
       setSelectedClassId("");
-      await queryClient.invalidateQueries({ queryKey: ["finance", "bills"] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["finance", "bills"] }),
+        queryClient.invalidateQueries({ queryKey: ["finance", "fee-structures"] }),
+      ]);
     },
     onError: (error: Error) => setMessage({ kind: "error", text: error.message }),
   });
