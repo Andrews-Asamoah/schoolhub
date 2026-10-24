@@ -114,4 +114,20 @@ export class AttendanceController {
       termId,
     );
   }
+
+  /** Attendance for a child linked to the authenticated guardian. */
+  @Get("guardian/:studentId")
+  @Roles("guardian")
+  getGuardianWardAttendance(
+    @CurrentSchool() school: School,
+    @CurrentUser() user: AuthenticatedUser,
+    @Param("studentId") studentId: string,
+    @Headers("x-academic-year-id") academicYearId?: string,
+    @Headers("x-academic-term-id") termId?: string,
+  ) {
+    return this.attendanceService.getGuardianWardAttendance(
+      school.id, user.id, studentId, academicYearId, termId,
+    );
+  }
+
 }
