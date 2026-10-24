@@ -662,7 +662,8 @@ export function AccountantPortalWorkspace({
 
       {showPaymentForm && (
         <Modal title="Record a payment" description="Record a receipt against an outstanding bill. The server validates the bill and updates its balance." onClose={() => { setShowPaymentForm(false); setSelectedBillId(""); }}>
-          <form onSubmit={submitPayment} className="space-y-4">\n            {message?.kind === "error" && <QueryError message={message.text} />}
+          <form onSubmit={submitPayment} className="space-y-4">
+            {message?.kind === "error" && <QueryError message={message.text} />}
             <Field label="Outstanding bill">
               <select name="billId" required className={inputClass} value={selectedBillId} onChange={(event) => setSelectedBillId(event.target.value)}>
                 <option value="" disabled>Select a bill…</option>
@@ -685,7 +686,8 @@ export function AccountantPortalWorkspace({
 
       {showBillForm && (
         <Modal title="Generate student bills" description="Generate bills for every active student enrolled in one class for the current academic term." onClose={() => { setShowBillForm(false); setSelectedFeeStructureId(""); setSelectedClassId(""); }}>
-          <form onSubmit={submitBill} className="space-y-4">\n            {message?.kind === "error" && <QueryError message={message.text} />}
+          <form onSubmit={submitBill} className="space-y-4">
+            {message?.kind === "error" && <QueryError message={message.text} />}
             {yearsQuery.error && <QueryError message={yearsQuery.error.message} />}
             {feeStructuresQuery.error && <QueryError message={feeStructuresQuery.error.message} />}
             {classesQuery.error && <QueryError message={classesQuery.error.message} />}
@@ -730,7 +732,8 @@ export function AccountantPortalWorkspace({
 
       {showInventoryForm && (
         <Modal title="Add inventory item" description="Create a stock item with a minimum quantity threshold and optional opening stock." onClose={() => setShowInventoryForm(false)}>
-          <form onSubmit={submitInventoryItem} className="space-y-4">\n            {message?.kind === "error" && <QueryError message={message.text} />}
+          <form onSubmit={submitInventoryItem} className="space-y-4">
+            {message?.kind === "error" && <QueryError message={message.text} />}
             <Field label="Item name"><input name="name" required minLength={2} maxLength={150} className={inputClass} placeholder="e.g. Exercise books, lab glassware" /></Field>
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label="Category"><input name="category" className={inputClass} placeholder="Books, stationery, equipment…" /></Field>
@@ -746,7 +749,8 @@ export function AccountantPortalWorkspace({
 
       {stockItemId && (
         <Modal title="Record stock movement" description={`Update quantities for ${inventoryItems.find((item) => item.id === stockItemId)?.name ?? "this item"}. Stock cannot go below zero.`} onClose={() => setStockItemId("")}>
-          <form onSubmit={submitStockMovement} className="space-y-4">\n            {message?.kind === "error" && <QueryError message={message.text} />}
+          <form onSubmit={submitStockMovement} className="space-y-4">
+            {message?.kind === "error" && <QueryError message={message.text} />}
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label="Movement type"><select name="type" required className={inputClass} defaultValue="IN"><option value="IN">Stock in — received</option><option value="OUT">Stock out — issued</option></select></Field>
               <Field label="Quantity"><input name="quantity" type="number" required min="1" step="1" className={inputClass} /></Field>
@@ -761,7 +765,8 @@ export function AccountantPortalWorkspace({
 
       {showExpenseForm && (
         <Modal title="Record an expense" description="Save a school expense to the database. Enter the actual payment and reference details." onClose={() => setShowExpenseForm(false)}>
-          <form onSubmit={submitExpense} className="space-y-4">\n            {message?.kind === "error" && <QueryError message={message.text} />}
+          <form onSubmit={submitExpense} className="space-y-4">
+            {message?.kind === "error" && <QueryError message={message.text} />}
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label="Date"><input name="date" type="date" required defaultValue={new Date().toISOString().slice(0, 10)} className={inputClass} /></Field>
               <Field label="Amount (GHS)"><input name="amount" type="number" required min="0.01" step="0.01" className={inputClass} placeholder="0.00" /></Field>
