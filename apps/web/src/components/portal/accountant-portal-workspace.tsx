@@ -269,6 +269,7 @@ export function AccountantPortalWorkspace({
   const classes = (classesQuery.data ?? []).filter((schoolClass) => schoolClass.isActive);
   const payroll = payrollQuery.data ?? [];
   const selectedPayroll = payroll.find((run) => run.id === selectedPayrollId);
+  const selectedBillForPayment = bills.find((bill) => bill.id === selectedBillId);
   const inventoryItems = inventoryQuery.data ?? [];
 
   const filteredBills = useMemo(() => bills.filter((bill) => {
@@ -520,7 +521,7 @@ export function AccountantPortalWorkspace({
         </div>
       </section>
 
-      {message && (
+      {message && !showPaymentForm && !showBillForm && !showExpenseForm && !showInventoryForm && !stockItemId && (
         <div role={message.kind === "error" ? "alert" : "status"} className={cn(
           "flex items-start gap-3 rounded-2xl border p-4 text-sm",
           message.kind === "error" ? "border-destructive/30 bg-destructive/5 text-destructive" : "border-success/30 bg-success/5 text-foreground",
@@ -633,7 +634,7 @@ export function AccountantPortalWorkspace({
           <SectionHeader
             title="Supplies & inventory"
             description="Track stock quantities, minimum levels, and auditable stock-in / stock-out movements."
-            action={<button className={buttonPrimary} onClick={() => setShowInventoryForm(true)}><Plus className="size-4" /> Add item</button>}
+            action={<button className={buttonPrimary} onClick={() => { setMessage(null); setShowInventoryForm(true); }}><Plus className="size-4" /> Add item</button>}
           />
           {inventoryQuery.error ? <QueryError message={inventoryQuery.error.message} /> : inventoryItems.length ? (
             <div className="mt-4 overflow-x-auto">
@@ -648,7 +649,7 @@ export function AccountantPortalWorkspace({
                     <td className="p-3 text-right tabular-nums">{item.minQuantity}</td>
                     <td className="p-3"><StatusBadge value={low ? "LOW STOCK" : "IN STOCK"} /></td>
                     <td className="p-3">{dateLabel(item.updatedAt)}</td>
-                    <td className="p-3 text-right"><button className="text-xs font-semibold text-primary hover:underline" onClick={() => setStockItemId(item.id)}>Record movement</button></td>
+                    <td className="p-3 text-right"><button className="text-xs font-semibold text-primary hover:underline" onClick={() => { setMessage(null); setStockItemId(item.id); }}>Record movement</button></td>
                   </tr>;
                 })}</tbody>
               </table>
@@ -661,7 +662,7 @@ export function AccountantPortalWorkspace({
 
       {showPaymentForm && (
         <Modal title="Record a payment" description="Record a receipt against an outstanding bill. The server validates the bill and updates its balance." onClose={() => { setShowPaymentForm(false); setSelectedBillId(""); }}>
-          <form onSubmit={submitPayment} className="space-y-4">
+          <form onSubmit={submitPayment} className="space-y-4">\n            {message?.kind === "error" && <QueryError message={message.text} />}
             <Field label="Outstanding bill">
               <select name="billId" required className={inputClass} value={selectedBillId} onChange={(event) => setSelectedBillId(event.target.value)}>
                 <option value="" disabled>Select a bill…</option>
@@ -671,7 +672,7 @@ export function AccountantPortalWorkspace({
               </select>
             </Field>
             <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Amount (GHS)"><input name="amount" type="number" required min="0.01" step="0.01" className={inputClass} placeholder="0.00" /></Field>
+              <Field label="Amount (GHS)"><input name="amount" type="number" required min="0.01" max={selectedBillForPayment?.balanceAmount} step="0.01" className={inputClass} placeholder="0.00" /></Field>
               <Field label="Payment date"><input name="paymentDate" type="date" required defaultValue={new Date().toISOString().slice(0, 10)} className={inputClass} /></Field>
               <Field label="Payment method"><select name="paymentMethod" className={inputClass} defaultValue="CASH">{["CASH", "BANK_TRANSFER", "CHEQUE", "MOBILE_MONEY", "CARD", "ONLINE", "OTHER"].map((method) => <option key={method} value={method}>{method.replaceAll("_", " ")}</option>)}</select></Field>
               <Field label="Reference number (optional)"><input name="referenceNumber" className={inputClass} placeholder="Bank / MoMo transaction ID" /></Field>
@@ -684,7 +685,7 @@ export function AccountantPortalWorkspace({
 
       {showBillForm && (
         <Modal title="Generate student bills" description="Generate bills for every active student enrolled in one class for the current academic term." onClose={() => { setShowBillForm(false); setSelectedFeeStructureId(""); setSelectedClassId(""); }}>
-          <form onSubmit={submitBill} className="space-y-4">
+          <form onSubmit={submitBill} className="space-y-4">\n            {message?.kind === "error" && <QueryError message={message.text} />}
             {yearsQuery.error && <QueryError message={yearsQuery.error.message} />}
             {feeStructuresQuery.error && <QueryError message={feeStructuresQuery.error.message} />}
             {classesQuery.error && <QueryError message={classesQuery.error.message} />}
@@ -729,7 +730,7 @@ export function AccountantPortalWorkspace({
 
       {showInventoryForm && (
         <Modal title="Add inventory item" description="Create a stock item with a minimum quantity threshold and optional opening stock." onClose={() => setShowInventoryForm(false)}>
-          <form onSubmit={submitInventoryItem} className="space-y-4">
+          <form onSubmit={submitInventoryItem} className="space-y-4">\n            {message?.kind === "error" && <QueryError message={message.text} />}
             <Field label="Item name"><input name="name" required minLength={2} maxLength={150} className={inputClass} placeholder="e.g. Exercise books, lab glassware" /></Field>
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label="Category"><input name="category" className={inputClass} placeholder="Books, stationery, equipment…" /></Field>
@@ -745,7 +746,7 @@ export function AccountantPortalWorkspace({
 
       {stockItemId && (
         <Modal title="Record stock movement" description={`Update quantities for ${inventoryItems.find((item) => item.id === stockItemId)?.name ?? "this item"}. Stock cannot go below zero.`} onClose={() => setStockItemId("")}>
-          <form onSubmit={submitStockMovement} className="space-y-4">
+          <form onSubmit={submitStockMovement} className="space-y-4">\n            {message?.kind === "error" && <QueryError message={message.text} />}
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label="Movement type"><select name="type" required className={inputClass} defaultValue="IN"><option value="IN">Stock in — received</option><option value="OUT">Stock out — issued</option></select></Field>
               <Field label="Quantity"><input name="quantity" type="number" required min="1" step="1" className={inputClass} /></Field>
@@ -760,7 +761,7 @@ export function AccountantPortalWorkspace({
 
       {showExpenseForm && (
         <Modal title="Record an expense" description="Save a school expense to the database. Enter the actual payment and reference details." onClose={() => setShowExpenseForm(false)}>
-          <form onSubmit={submitExpense} className="space-y-4">
+          <form onSubmit={submitExpense} className="space-y-4">\n            {message?.kind === "error" && <QueryError message={message.text} />}
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label="Date"><input name="date" type="date" required defaultValue={new Date().toISOString().slice(0, 10)} className={inputClass} /></Field>
               <Field label="Amount (GHS)"><input name="amount" type="number" required min="0.01" step="0.01" className={inputClass} placeholder="0.00" /></Field>
