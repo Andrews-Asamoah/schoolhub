@@ -84,6 +84,59 @@ export class AssetsService {
     return { image: url };
   }
 
+
+  async setPersonSignature(
+    school: School,
+    kind: string,
+    personId: string,
+    file: Express.Multer.File | undefined,
+  ) {
+    if (kind !== "teacher" && kind !== "staff") {
+      throw new BadRequestException("Signature target must be a teacher or staff member.");
+    }
+    const image = this.readImage(file);
+    const person = kind === "teacher"
+      ? await this.prisma.client.teacher.findFirst({ where: { id: personId, schoolId: school.id, deletedAt: null }, select: { profileId: true } })
+      : await this.prisma.client.staff.findFirst({ where: { id: personId, schoolId: school.id, deletedAt: null }, select: { profileId: true } });
+    if (!person?.profileId) {
+      throw new BadRequestException("This person needs a linked user profile before a signature can be stored.");
+    }
+    const profile = await this.prisma.client.userProfile.findUnique({
+      where: { id: person.profileId },
+      select: { id: true, signatureUrl: true },
+    });
+    if (!profile) throw new BadRequestException("The person's user profile was not found.");
+    const url = await this.r2.upload(
+      this.r2.keys.signature(school.id, kind, personId, image.ext),
+      image.buffer,
+      image.mime,
+    );
+    await this.prisma.client.userProfile.update({
+      where: { id: profile.id },
+      data: { signatureUrl: url },
+    });
+    await this.removeOwned(school, profile.signatureUrl);
+    return { signatureUrl: url };
+  }
+
+  async removePersonSignature(school: School, kind: string, personId: string) {
+    if (kind !== "teacher" && kind !== "staff") {
+      throw new BadRequestException("Signature target must be a teacher or staff member.");
+    }
+    const person = kind === "teacher"
+      ? await this.prisma.client.teacher.findFirst({ where: { id: personId, schoolId: school.id, deletedAt: null }, select: { profileId: true } })
+      : await this.prisma.client.staff.findFirst({ where: { id: personId, schoolId: school.id, deletedAt: null }, select: { profileId: true } });
+    if (!person?.profileId) throw new BadRequestException("This person has no linked user profile.");
+    const profile = await this.prisma.client.userProfile.findUnique({
+      where: { id: person.profileId },
+      select: { id: true, signatureUrl: true },
+    });
+    if (!profile) throw new BadRequestException("The person's user profile was not found.");
+    await this.prisma.client.userProfile.update({ where: { id: profile.id }, data: { signatureUrl: null } });
+    await this.removeOwned(school, profile.signatureUrl);
+    return { signatureUrl: null };
+  }
+
   async removeAvatar(school: School, userId: string) {
     const previous = await this.prisma.client.user.findUnique({
       where: { id: userId },
