@@ -1080,14 +1080,6 @@ export class StudentsService {
             id: true,
             name: true,
             level: true,
-            classTeacher: {
-              select: {
-                id: true,
-                firstName: true,
-                lastName: true,
-                profile: { select: { firstName: true, lastName: true } },
-              },
-            },
           },
         },
       },
