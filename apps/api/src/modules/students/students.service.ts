@@ -1073,6 +1073,8 @@ export class StudentsService {
       orderBy: { enrolledAt: 'desc' },
       select: {
         classId: true,
+        academicYearId: true,
+        termId: true,
         class: {
           select: {
             id: true,
@@ -1098,6 +1100,8 @@ export class StudentsService {
     const enrollments = await this.prisma.client.enrollment.findMany({
       where: {
         classId: enrollment.classId,
+        academicYearId: enrollment.academicYearId,
+        termId: enrollment.termId,
         status: { in: ['ACTIVE', 'COMPLETED'] },
         student: { schoolId, deletedAt: null },
       },
