@@ -586,7 +586,7 @@ export class FinanceService {
   async listExpenses(schoolId: string, fromDate?: string, toDate?: string) {
     const parseBoundary = (value: string | undefined, label: string) => {
       if (!value) return undefined;
-      if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(value)) {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
         throw new BadRequestException(`Enter ${label} as YYYY-MM-DD.`);
       }
       const parsed = new Date(`${value}T00:00:00.000Z`);
