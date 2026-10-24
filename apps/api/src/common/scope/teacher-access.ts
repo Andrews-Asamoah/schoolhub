@@ -9,7 +9,7 @@ export function isSchoolManager(role: string | undefined) {
 
 /**
  * Who may do what with a class, in one place.
- *  - Marking the register: managers, or the class teacher of every class involved.
+ *  - Marking the register: only the class teacher of every class involved.
  *  - Entering marks: managers, or the teacher assigned to that subject in that class.
  *  - Viewing marks: the above, plus the class teacher (who compiles the class's reports).
  */
