@@ -200,7 +200,7 @@ export function StudentTimetableView() {
     queryFn: () => apiFetch<StudentTimetableResponse>("/timetable/me"),
     retry: false,
   });
-  const { data: school } = useQuery({
+  const { data: school, isLoading: isSchoolLoading } = useQuery({
     queryKey: ["school", "current"],
     queryFn: () => apiFetch<StudentTimetableSchool>("/schools/current"),
     retry: false,
@@ -264,7 +264,7 @@ export function StudentTimetableView() {
   }, [entries]);
 
   useEffect(() => {
-    if (!isPrinting) return;
+    if (!isPrinting || isSchoolLoading) return;
 
     document.documentElement.classList.add("printing-student-timetable");
     document.body.classList.add("printing-student-timetable");
@@ -278,7 +278,7 @@ export function StudentTimetableView() {
       document.body.classList.remove("printing-student-timetable");
       document.documentElement.classList.remove("printing-student-timetable");
     };
-  }, [isPrinting]);
+  }, [isPrinting, isSchoolLoading]);
 
   const currentEntry =
     todayEntries.find((entry) => {
