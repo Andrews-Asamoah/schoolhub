@@ -536,33 +536,35 @@ export function AccountantPortalWorkspace({
 
   return (
     <div className="space-y-6">
-      <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-emerald-800 via-teal-800 to-slate-950 p-6 text-white shadow-lg sm:p-8">
-        <div className="pointer-events-none absolute -right-12 -top-20 size-64 rounded-full bg-emerald-400/10 blur-3xl" />
-        <div className="relative flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-          <div className="max-w-2xl space-y-2">
-            <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-semibold">
-              <CircleDollarSign className="size-4" />
-              Finance & bursary
+      {activeTab === "overview" && (
+        <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-emerald-800 via-teal-800 to-slate-950 p-6 text-white shadow-lg sm:p-8">
+          <div className="pointer-events-none absolute -right-12 -top-20 size-64 rounded-full bg-emerald-400/10 blur-3xl" />
+          <div className="relative flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+            <div className="max-w-2xl space-y-2">
+              <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-semibold">
+                <CircleDollarSign className="size-4" />
+                Finance & bursary
+              </div>
+              <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Accountant workspace</h1>
+              <p className="text-sm leading-6 text-emerald-50/90">
+                Manage fee billing, record collections, track debtors, review expenses, and monitor payroll records.
+                Figures on this page are calculated from the school’s saved finance records.
+              </p>
             </div>
-            <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Accountant workspace</h1>
-            <p className="text-sm leading-6 text-emerald-50/90">
-              Manage fee billing, record collections, track debtors, review expenses, and monitor payroll records.
-              Figures on this page are calculated from the school’s saved finance records.
-            </p>
+            <div className="flex flex-wrap gap-2">
+              <button className={buttonPrimary} onClick={() => { setMessage(null); setSelectedBillId(""); setShowPaymentForm(true); }}>
+                <Plus className="size-4" /> Record payment
+              </button>
+              <button className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-white/30 bg-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/20" onClick={() => { setMessage(null); setSelectedFeeStructureId(""); setSelectedClassId(""); setShowBillForm(true); }}>
+                <Receipt className="size-4" /> Generate bills
+              </button>
+              <button className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-white/30 bg-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/20" onClick={() => { setMessage(null); setShowExpenseForm(true); }}>
+                <Plus className="size-4" /> Add expense
+              </button>
+            </div>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <button className={buttonPrimary} onClick={() => { setMessage(null); setSelectedBillId(""); setShowPaymentForm(true); }}>
-              <Plus className="size-4" /> Record payment
-            </button>
-            <button className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-white/30 bg-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/20" onClick={() => { setMessage(null); setSelectedFeeStructureId(""); setSelectedClassId(""); setShowBillForm(true); }}>
-              <Receipt className="size-4" /> Generate bills
-            </button>
-            <button className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-white/30 bg-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/20" onClick={() => { setMessage(null); setShowExpenseForm(true); }}>
-              <Plus className="size-4" /> Add expense
-            </button>
-          </div>
-        </div>
-      </section>
+        </section>
+      )}
 
       {message && !showPaymentForm && !showBillForm && !showExpenseForm && !showInventoryForm && !stockItemId && (
         <div role={message.kind === "error" ? "alert" : "status"} className={cn(
@@ -575,12 +577,14 @@ export function AccountantPortalWorkspace({
         </div>
       )}
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <MetricCard label="Payments collected" value={paymentsQuery.error ? "Unavailable" : currency(collected)} detail={paymentsQuery.error ? "Could not load payment records" : `${payments.length} recorded receipts`} icon={ArrowUpRight} />
-        <MetricCard label="Outstanding fees" value={billsQuery.error ? "Unavailable" : currency(outstanding)} detail={billsQuery.error ? "Could not load bill records" : `${debtors.length} bills with balances`} icon={AlertCircle} />
-        <MetricCard label="Recorded expenses" value={expensesQuery.error ? "Unavailable" : currency(expenseTotal)} detail={expensesQuery.error ? "Could not load expense records" : `${expenses.length} expense entries`} icon={ArrowDownRight} />
-        <MetricCard label="Payroll net total" value={payrollQuery.error ? "Unavailable" : currency(payrollNet)} detail={payrollQuery.error ? "Could not load payroll records" : `${payroll.length} saved payroll run(s)`} icon={Wallet} />
-      </div>
+      {activeTab === "overview" && (
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <MetricCard label="Payments collected" value={paymentsQuery.error ? "Unavailable" : currency(collected)} detail={paymentsQuery.error ? "Could not load payment records" : `${payments.length} recorded receipts`} icon={ArrowUpRight} />
+          <MetricCard label="Outstanding fees" value={billsQuery.error ? "Unavailable" : currency(outstanding)} detail={billsQuery.error ? "Could not load bill records" : `${debtors.length} bills with balances`} icon={AlertCircle} />
+          <MetricCard label="Recorded expenses" value={expensesQuery.error ? "Unavailable" : currency(expenseTotal)} detail={expensesQuery.error ? "Could not load expense records" : `${expenses.length} expense entries`} icon={ArrowDownRight} />
+          <MetricCard label="Payroll net total" value={payrollQuery.error ? "Unavailable" : currency(payrollNet)} detail={payrollQuery.error ? "Could not load payroll records" : `${payroll.length} saved payroll run(s)`} icon={Wallet} />
+        </div>
+      )}
 
       <nav aria-label="Accountant sections" className="flex gap-1 overflow-x-auto rounded-2xl border border-border bg-card p-1.5">
         {tabs.map((tab) => {
