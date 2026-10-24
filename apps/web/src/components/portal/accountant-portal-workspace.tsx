@@ -31,6 +31,7 @@ import {
 } from "@schoolhub/shared";
 import { AdminAnnouncementsWorkspace } from "./admin-announcements-workspace";
 import { AccountantFinanceCharts } from "./accountant-finance-charts";
+import { AccountantRecordPaymentDialog } from "./accountant-record-payment-dialog";
 import { apiFetch } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
@@ -76,6 +77,18 @@ interface ApiBill {
   items?: { id: string; description: string; amount: number | string; quantity: number; totalAmount: number | string; discountAmount?: number | string; paidAmount: number | string; balanceAmount: number | string }[];
 }
 
+interface ApiPaymentItem {
+  amount: number | string;
+  billItem: {
+    description: string;
+    feeItem?: {
+      category?: string | null;
+      customCategory?: { name: string } | null;
+      registryItem?: { name: string } | null;
+    } | null;
+  };
+}
+
 interface ApiPayment {
   id: string;
   paymentNumber: string;
@@ -87,6 +100,7 @@ interface ApiPayment {
   referenceNumber?: string | null;
   paymentDate: string;
   status: string;
+  paymentItems?: ApiPaymentItem[];
   recordedBy?: { name?: string | null; email?: string | null } | null;
 }
 
@@ -278,7 +292,6 @@ export function AccountantPortalWorkspace({
   const classes = (classesQuery.data ?? []).filter((schoolClass) => schoolClass.isActive);
   const payroll = payrollQuery.data ?? [];
   const selectedPayroll = payroll.find((run) => run.id === selectedPayrollId);
-  const selectedBillForPayment = bills.find((bill) => bill.id === selectedBillId);
   const inventoryItems = inventoryQuery.data ?? [];
 
   const filteredBills = useMemo(() => bills.filter((bill) => {
@@ -307,6 +320,20 @@ export function AccountantPortalWorkspace({
   // treated as cash received in dashboard totals or payment-method analysis.
   const settledPayments = payments.filter((payment) => payment.status === "COMPLETED");
   const collected = settledPayments.reduce((sum, payment) => sum + Number(payment.amount), 0);
+  const collectionsByFeeComponent = settledPayments.reduce<Record<string, number>>((totals, payment) => {
+    for (const allocation of payment.paymentItems ?? []) {
+      const feeItem = allocation.billItem.feeItem;
+      const category =
+        feeItem?.customCategory?.name ??
+        feeItem?.registryItem?.name ??
+        feeItem?.category?.replaceAll("_", " ") ??
+        allocation.billItem.description ??
+        "Uncategorised";
+      totals[category] = (totals[category] ?? 0) + Number(allocation.amount);
+    }
+    return totals;
+  }, {});
+  const feeComponentCollections = Object.entries(collectionsByFeeComponent).sort((a, b) => b[1] - a[1]);
   const outstanding = debtors.reduce((sum, bill) => sum + Number(bill.balanceAmount), 0);
   const expenseTotal = expenses.reduce((sum, expense) => sum + Number(expense.amount), 0);
   const paidPayroll = payroll.filter((run) => run.status === "PAID");
@@ -330,6 +357,10 @@ export function AccountantPortalWorkspace({
       ["Receipts"],
       ["Receipt number", "Student", "Date", "Method", "Reference", "Amount (GHS)", "Status"],
       ...payments.map(payment => [payment.paymentNumber, studentName(payment.student), dateLabel(payment.paymentDate), payment.paymentMethod, payment.referenceNumber ?? "", Number(payment.amount).toFixed(2), payment.status]),
+      [],
+      ["Collections by fee component"],
+      ["Fee component", "Collected (GHS)"],
+      ...feeComponentCollections.map(([category, total]) => [category, total.toFixed(2)]),
       [],
       ["Outstanding bills"],
       ["Bill number", "Student", "Class", "Due date", "Gross (GHS)", "Discount (GHS)", "Total (GHS)", "Paid (GHS)", "Balance (GHS)", "Status"],
@@ -479,27 +510,6 @@ export function AccountantPortalWorkspace({
     }
     setMessage(null);
     recordStockMovement.mutate({ itemId: stockItemId, input: result.data });
-  }
-
-  function submitPayment(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const form = new FormData(event.currentTarget);
-    const selectedBill = bills.find((bill) => bill.id === String(form.get("billId") ?? ""));
-    const result = recordPaymentSchema.safeParse({
-      studentId: selectedBill?.studentId,
-      billId: selectedBill?.id,
-      amount: Number(form.get("amount")),
-      paymentMethod: form.get("paymentMethod"),
-      paymentDate: form.get("paymentDate"),
-      referenceNumber: String(form.get("referenceNumber") ?? "").trim() || undefined,
-      notes: String(form.get("notes") ?? "").trim() || undefined,
-    });
-    if (!result.success) {
-      setMessage({ kind: "error", text: result.error.issues[0]?.message ?? "Check the payment details." });
-      return;
-    }
-    setMessage(null);
-    recordPayment.mutate(result.data);
   }
 
   function submitBill(event: FormEvent<HTMLFormElement>) {
@@ -682,6 +692,27 @@ export function AccountantPortalWorkspace({
             <div className="rounded-xl border border-border p-4"><h3 className="font-semibold text-foreground">Collection by payment method</h3><p className="mt-1 text-xs text-muted-foreground">Completed receipts only; unsettled and refunded payments are excluded.</p>{settledPayments.length ? <div className="mt-3 space-y-3">{Object.entries(settledPayments.reduce<Record<string, number>>((totals, payment) => { totals[payment.paymentMethod] = (totals[payment.paymentMethod] ?? 0) + Number(payment.amount); return totals; }, {})).sort((a,b) => b[1]-a[1]).map(([method,total]) => <div key={method}><div className="flex justify-between gap-3 text-sm"><span>{method.replaceAll("_", " ")}</span><span className="font-semibold tabular-nums">{currency(total)}</span></div><div className="mt-1 h-2 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-primary" style={{ width: (collected > 0 ? Math.min(100, total / collected * 100) : 0) + "%" }} /></div></div>)}</div> : <EmptyState icon={Receipt} title="No receipt data yet" description="Payment method analysis will appear when receipts have been recorded." />}</div>
             <div className="rounded-xl border border-border p-4"><h3 className="font-semibold text-foreground">Financial position</h3><p className="mt-1 text-xs text-muted-foreground">A high-level comparison of recorded money in and operating money out.</p><div className="mt-4 space-y-3"><div className="flex items-center justify-between gap-3"><span className="text-sm text-muted-foreground">Collections</span><span className="font-semibold text-foreground">{currency(collected)}</span></div><div className="flex items-center justify-between gap-3"><span className="text-sm text-muted-foreground">Expenses</span><span className="font-semibold text-foreground">{currency(expenseTotal)}</span></div><div className="flex items-center justify-between gap-3 border-t border-border pt-3"><span className="text-sm font-semibold text-foreground">Collections less expenses</span><span className="text-lg font-bold tabular-nums text-foreground">{currency(collected - expenseTotal)}</span></div><p className="text-xs leading-5 text-muted-foreground">This is a simple cash-flow indicator, not an audited profit figure; it excludes receivables, payroll timing and other accounting adjustments.</p></div></div>
           </div>
+          <div className="mt-5 rounded-xl border border-border p-4">
+            <h3 className="font-semibold text-foreground">Collections by fee component</h3>
+            <p className="mt-1 text-xs text-muted-foreground">Completed receipts allocated to the individual bill components. Categories come from the fee item setup; uncategorised items use the bill component description.</p>
+            {feeComponentCollections.length ? (
+              <div className="mt-4 space-y-3">
+                {feeComponentCollections.map(([category, total]) => (
+                  <div key={category}>
+                    <div className="flex flex-wrap justify-between gap-3 text-sm">
+                      <span className="font-medium text-foreground">{category}</span>
+                      <span className="font-semibold tabular-nums">{currency(total)}</span>
+                    </div>
+                    <div className="mt-1 h-2 overflow-hidden rounded-full bg-muted">
+                      <div className="h-full rounded-full bg-primary" style={{ width: (collected > 0 ? Math.min(100, total / collected * 100) : 0) + "%" }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="mt-4 text-sm text-muted-foreground">No allocated fee-component collections are available yet.</p>
+            )}
+          </div>
         </section>
       )}
 
@@ -785,27 +816,21 @@ export function AccountantPortalWorkspace({
       )}
 
       {showPaymentForm && (
-        <Modal title="Record a payment" description="Record a receipt against an outstanding bill. The server validates the bill and updates its balance." onClose={() => { setShowPaymentForm(false); setSelectedBillId(""); }}>
-          <form onSubmit={submitPayment} className="space-y-4">
-            {message?.kind === "error" && <QueryError message={message.text} />}
-            <Field label="Outstanding bill">
-              <select name="billId" required className={inputClass} value={selectedBillId} onChange={(event) => setSelectedBillId(event.target.value)}>
-                <option value="" disabled>Select a bill…</option>
-                {bills.filter((bill) => Number(bill.balanceAmount) > 0 && bill.status !== "CANCELLED" && bill.status !== "WAIVED").map((bill) => (
-                  <option key={bill.id} value={bill.id}>{bill.billNumber} — {studentName(bill.student)} · Balance {currency(bill.balanceAmount)}</option>
-                ))}
-              </select>
-            </Field>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Amount (GHS)"><input name="amount" type="number" required min="0.01" max={selectedBillForPayment?.balanceAmount} step="0.01" className={inputClass} placeholder="0.00" /></Field>
-              <Field label="Payment date"><input name="paymentDate" type="date" required defaultValue={new Date().toISOString().slice(0, 10)} className={inputClass} /></Field>
-              <Field label="Payment method"><select name="paymentMethod" className={inputClass} defaultValue="CASH">{["CASH", "BANK_TRANSFER", "CHEQUE", "MOBILE_MONEY", "CARD", "ONLINE", "OTHER"].map((method) => <option key={method} value={method}>{method.replaceAll("_", " ")}</option>)}</select></Field>
-              <Field label="Reference number (optional)"><input name="referenceNumber" className={inputClass} placeholder="Bank / MoMo transaction ID" /></Field>
-            </div>
-            <Field label="Notes (optional)"><textarea name="notes" className={cn(inputClass, "h-20 py-2")} placeholder="Additional payment notes" /></Field>
-            <ModalActions onCancel={() => { setShowPaymentForm(false); setSelectedBillId(""); }} busy={recordPayment.isPending} submitLabel="Save payment" />
-          </form>
-        </Modal>
+        <AccountantRecordPaymentDialog
+          bills={bills}
+          classes={classes}
+          initialBillId={selectedBillId}
+          isSubmitting={recordPayment.isPending}
+          errorMessage={message?.kind === "error" ? message.text : undefined}
+          onClose={() => {
+            setShowPaymentForm(false);
+            setSelectedBillId("");
+          }}
+          onSubmit={(input) => {
+            setMessage(null);
+            recordPayment.mutate(input);
+          }}
+        />
       )}
 
       {showBillForm && (
