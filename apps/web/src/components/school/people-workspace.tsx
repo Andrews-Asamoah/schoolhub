@@ -146,6 +146,11 @@ interface Guardian {
   gender?: string | null;
   occupation?: string | null;
   employer?: string | null;
+  residentialAddress?: string | null;
+  city?: string | null;
+  region?: string | null;
+  canLogin?: boolean;
+  profile?: { user: { email: string } } | null;
   students: {
     student: {
       id: string;
@@ -466,7 +471,7 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
         </span>
       ),
     },
-    ...(kind === "teachers"
+    ...(kind === "teachers" || isGuardianPage
       ? [
           {
             id: "view",
@@ -476,7 +481,7 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
               <button
                 type="button"
                 onClick={() => setViewing({ id: row.id, name: row.name })}
-                aria-label={`View biodata for ${row.name}`}
+                aria-label={`View details for ${row.name}`}
                 className="inline-flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-semibold text-primary hover:bg-primary/10"
               >
                 <Eye className="size-3.5" />
@@ -548,6 +553,12 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
     <div className="space-y-5">
       {viewing && kind === "teachers" && (
         <TeacherBiodataDialog teacherId={viewing.id} fallbackName={viewing.name} onClose={() => setViewing(null)} />
+      )}
+      {viewing && isGuardianPage && peopleById.get(viewing.id) && (
+        <GuardianDetailsDialog
+          guardian={peopleById.get(viewing.id) as Guardian}
+          onClose={() => setViewing(null)}
+        />
       )}
       <section className="rounded-2xl border border-border bg-gradient-to-br from-primary/10 via-card to-sky-500/5 p-5 sm:p-6">
         <div className="flex flex-wrap items-start justify-between gap-4">
@@ -1534,6 +1545,107 @@ function ErrorPanel({ message }: { message: string }) {
       className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive"
     >
       {message}
+    </div>
+  );
+}
+
+
+function GuardianDetailsDialog({
+  guardian,
+  onClose,
+}: {
+  guardian: Guardian;
+  onClose: () => void;
+}) {
+  const fullName = [guardian.firstName, guardian.otherNames, guardian.lastName]
+    .filter(Boolean)
+    .join(" ");
+  const loginEmail = guardian.profile?.user.email;
+  const students = guardian.students.map(({ student }) => ({
+    id: student.id,
+    name: [student.profile.firstName, student.profile.lastName].filter(Boolean).join(" "),
+    admissionNumber: student.admissionNumber,
+  }));
+
+  return (
+    <div
+      className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/50 p-4"
+      role="presentation"
+      onMouseDown={(event) => event.target === event.currentTarget && onClose()}
+    >
+      <section
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="guardian-details-title"
+        className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-border bg-card p-5 text-card-foreground shadow-2xl sm:p-6"
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Guardian record</p>
+            <h2 id="guardian-details-title" className="mt-1 text-lg font-bold">{fullName}</h2>
+            <p className="mt-1 text-xs text-muted-foreground">{guardian.guardianId}</p>
+          </div>
+          <button type="button" onClick={onClose} aria-label="Close guardian details" className="rounded-lg p-2 text-muted-foreground hover:bg-muted">
+            <X className="size-4" />
+          </button>
+        </div>
+
+        <div className="mt-5 grid gap-3 sm:grid-cols-2">
+          <GuardianDetail label="Relationship" value={guardian.relationshipType} />
+          <GuardianDetail label="Status" value={guardian.isActive ? "Active" : "Inactive"} />
+          <GuardianDetail label="Phone" value={guardian.phone} />
+          <GuardianDetail label="Alternate phone" value={guardian.alternatePhone} />
+          <GuardianDetail label="Contact email" value={guardian.email} />
+          <GuardianDetail label="Login email" value={loginEmail} />
+          <GuardianDetail label="Gender" value={guardian.gender} />
+          <GuardianDetail label="Occupation" value={guardian.occupation} />
+          <GuardianDetail label="Employer" value={guardian.employer} />
+          <GuardianDetail label="City" value={guardian.city} />
+          <GuardianDetail label="Region" value={guardian.region} />
+          <GuardianDetail label="Residential address" value={guardian.residentialAddress} />
+        </div>
+
+        <div className="mt-5 rounded-xl border border-border p-4">
+          <h3 className="text-sm font-semibold">Linked students ({students.length})</h3>
+          {students.length ? (
+            <ul className="mt-2 divide-y divide-border">
+              {students.map((student) => (
+                <li key={student.id} className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
+                  <span className="font-medium">{student.name}</span>
+                  <span className="text-xs text-muted-foreground">{student.admissionNumber || "No admission number"}</span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="mt-2 text-sm text-muted-foreground">No students are linked to this guardian.</p>
+          )}
+        </div>
+
+        {!guardian.canLogin && (
+          <p className="mt-4 rounded-lg bg-amber-500/10 px-3 py-2 text-xs text-amber-800 dark:text-amber-200">
+            This guardian does not currently have a parent-portal login. Use Reset login in the directory to create one.
+          </p>
+        )}
+        {loginEmail?.endsWith("@login.schoolhub.invalid") && (
+          <p className="mt-2 text-xs text-muted-foreground">
+            This is a generated sign-in email, not a deliverable contact email. The guardian must use it with their temporary password to sign in.
+          </p>
+        )}
+        <div className="mt-5 flex justify-end">
+          <button type="button" onClick={onClose} className="inline-flex h-9 items-center rounded-lg border border-border px-4 text-xs font-semibold hover:bg-muted">
+            Close
+          </button>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function GuardianDetail({ label, value }: { label: string; value?: string | null }) {
+  return (
+    <div className="min-w-0 rounded-lg bg-muted/40 px-3 py-2.5">
+      <p className="text-[11px] font-medium text-muted-foreground">{label}</p>
+      <p className="mt-1 break-words text-sm font-medium">{value || "—"}</p>
     </div>
   );
 }
