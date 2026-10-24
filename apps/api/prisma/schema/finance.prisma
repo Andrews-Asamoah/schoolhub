@@ -579,7 +579,7 @@ model SiblingDiscountPolicy {
   name                String
   minimumWardCount    Int
   valueType           ConcessionValueType @default(PERCENTAGE)
-  value               Decimal             @db.Decimal(7, 2)
+  value               Decimal             @db.Decimal(12, 2)
   isActive            Boolean             @default(true)
   createdById         String?
   createdAt           DateTime            @default(now())
@@ -599,7 +599,7 @@ model StudentScholarship {
   studentId      String
   name           String
   valueType      ConcessionValueType @default(PERCENTAGE)
-  value          Decimal             @db.Decimal(7, 2)
+  value          Decimal             @db.Decimal(12, 2)
   reason         String?
   academicYearId String?
   termId         String?
