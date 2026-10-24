@@ -43,6 +43,7 @@ import { ClubsWorkspace } from "@/components/school/clubs-workspace";
 import { TeacherPortalWorkspace } from "@/components/portal/teacher-portal-workspace";
 import { AccountantPortalWorkspace } from "@/components/portal/accountant-portal-workspace";
 import { ExpenseManagementWorkspace } from "@/components/portal/expense-management-workspace";
+import { PayrollManagementWorkspace } from "@/components/portal/payroll-management-workspace";
 import { FeeStructuresWorkspace } from "@/components/portal/fee-structures-workspace";
 import { GuardianPortalWorkspace } from "@/components/portal/guardian-portal-workspace";
 import { GuardianChildRecordsWorkspace } from "@/components/portal/guardian-child-records-workspace";
@@ -233,7 +234,7 @@ function WorkspaceContent({ pageId }: { pageId: string }) {
           {pageId === "outstanding" && <AccountantPortalWorkspace defaultTab="debtors" />}
           {pageId === "finance-reports" && <AccountantPortalWorkspace defaultTab="reports" />}
           {pageId === "expenses" && <ExpenseManagementWorkspace />}
-          {pageId === "payroll" && <AccountantPortalWorkspace defaultTab="payroll" />}
+          {pageId === "payroll" && <PayrollManagementWorkspace />}
           {pageId === "inventory" && <AccountantPortalWorkspace defaultTab="inventory" />}
           {pageId === "timetable" && (
             activeRole === "student" ? <StudentPortalWorkspace page="timetable" /> : <TimetableWorkspace />
