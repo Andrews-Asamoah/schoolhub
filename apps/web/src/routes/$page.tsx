@@ -241,7 +241,7 @@ function WorkspaceContent({ pageId }: { pageId: string }) {
           {pageId === "payroll" && <AccountantPortalWorkspace defaultTab="payroll" />}
           {pageId === "inventory" && <AccountantPortalWorkspace defaultTab="inventory" />}
           {pageId === "timetable" && (
-            activeRole === "student" ? <StudentPortalWorkspace defaultTab="timetable" /> : <TimetableWorkspace />
+            activeRole === "student" ? <StudentPortalWorkspace page="timetable" /> : <TimetableWorkspace />
           )}
           {pageId === "students" && <StudentDirectoryWorkspace />}
           {pageId === "admissions" && <AdmissionsWorkspace />}
