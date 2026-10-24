@@ -350,18 +350,25 @@ export function AdminAnnouncementsWorkspace({ mode = "admin" }: { mode?: Announc
                   <span>{item.author.name}</span>
                 </div>
                 <p className="mt-2 text-xs text-muted-foreground">Audience: {announcementTargetLabel(item.target)}</p>
+                {item.targetClassIds.length > 0 && (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Classes: {classOptions.filter((klass) => item.targetClassIds.includes(klass.id)).map((klass) => klass.name).join(", ") || item.targetClassIds.length + " selected"}
+                  </p>
+                )}
                 <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
                   <div className="flex gap-1">
-                    <button
-                      type="button"
-                      onClick={() => pinMutation.mutate({ id: item.id, isPinned: !item.isPinned })}
-                      disabled={isSaving}
-                      title={item.isPinned ? "Unpin announcement" : "Pin announcement"}
-                      aria-label={item.isPinned ? "Unpin announcement" : "Pin announcement"}
-                      className="rounded-lg p-2 text-muted-foreground hover:bg-muted hover:text-primary disabled:opacity-50"
-                    >
-                      <Pin className="size-4" />
-                    </button>
+                    {mode === "admin" && (
+                      <button
+                        type="button"
+                        onClick={() => pinMutation.mutate({ id: item.id, isPinned: !item.isPinned })}
+                        disabled={isSaving}
+                        title={item.isPinned ? "Unpin announcement" : "Pin announcement"}
+                        aria-label={item.isPinned ? "Unpin announcement" : "Pin announcement"}
+                        className="rounded-lg p-2 text-muted-foreground hover:bg-muted hover:text-primary disabled:opacity-50"
+                      >
+                        <Pin className="size-4" />
+                      </button>
+                    )}
                     <button
                       type="button"
                       onClick={() => setSelected(item)}
@@ -369,35 +376,39 @@ export function AdminAnnouncementsWorkspace({ mode = "admin" }: { mode?: Announc
                     >
                       View
                     </button>
-                    {item.status === "DRAFT" ? (
-                      <button
-                        type="button"
-                        onClick={() => statusMutation.mutate({ id: item.id, status: "PUBLISHED" })}
-                        disabled={isSaving}
-                        className="rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground disabled:opacity-50"
-                      >
-                        Publish
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => statusMutation.mutate({ id: item.id, status: "DRAFT" })}
-                        disabled={isSaving}
-                        className="rounded-lg border border-border px-3 py-2 text-xs font-semibold text-foreground hover:bg-muted disabled:opacity-50"
-                      >
-                        Move to draft
-                      </button>
+                    {mode === "admin" && (
+                      item.status === "DRAFT" ? (
+                        <button
+                          type="button"
+                          onClick={() => statusMutation.mutate({ id: item.id, status: "PUBLISHED" })}
+                          disabled={isSaving}
+                          className="rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground disabled:opacity-50"
+                        >
+                          Publish
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => statusMutation.mutate({ id: item.id, status: "DRAFT" })}
+                          disabled={isSaving}
+                          className="rounded-lg border border-border px-3 py-2 text-xs font-semibold text-foreground hover:bg-muted disabled:opacity-50"
+                        >
+                          Move to draft
+                        </button>
+                      )
                     )}
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setDeleteTarget(item)}
-                    disabled={isSaving}
-                    aria-label={`Delete ${item.title}`}
-                    className="rounded-lg p-2 text-destructive hover:bg-destructive/10 disabled:opacity-50"
-                  >
-                    <Trash2 className="size-4" />
-                  </button>
+                  {mode === "admin" && (
+                    <button
+                      type="button"
+                      onClick={() => setDeleteTarget(item)}
+                      disabled={isSaving}
+                      aria-label={"Delete " + item.title}
+                      className="rounded-lg p-2 text-destructive hover:bg-destructive/10 disabled:opacity-50"
+                    >
+                      <Trash2 className="size-4" />
+                    </button>
+                  )}
                 </div>
               </article>
             );
