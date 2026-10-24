@@ -325,6 +325,7 @@ export class FinanceService {
               schoolId,
               studentId: input.studentId,
             },
+            include: { items: true },
           })
         : null;
 
@@ -372,13 +373,48 @@ export class FinanceService {
         });
       }
 
-      // 3. Decrement student outstanding balance
+      // 3. Allocate the payment to bill items in order, preserving the item ledger.
+      if (bill) {
+        let remaining = input.amount;
+        for (const item of bill.items) {
+          if (remaining <= 0) break;
+          const itemBalance = Number(item.balanceAmount);
+          if (itemBalance <= 0) continue;
+          const applied = Math.min(remaining, itemBalance);
+          const nextBalance = Math.max(0, itemBalance - applied);
+          const nextPaid = Number(item.paidAmount) + applied;
+          await tx.billItem.update({
+            where: { id: item.id },
+            data: {
+              paidAmount: new Prisma.Decimal(nextPaid),
+              balanceAmount: new Prisma.Decimal(nextBalance),
+              status: nextBalance === 0 ? "FULLY_PAID" : "PARTIALLY_PAID",
+            },
+          });
+          await tx.paymentItem.create({
+            data: {
+              paymentId: payment.id,
+              billItemId: item.id,
+              amount: new Prisma.Decimal(applied),
+            },
+          });
+          remaining -= applied;
+        }
+      }
+
+      // Keep the aggregate student balance from dropping below zero if older
+      // records contain an out-of-sync aggregate balance.
+      const currentStudent = await tx.student.findFirst({
+        where: { id: input.studentId, schoolId, deletedAt: null },
+        select: { id: true, outstandingBalance: true },
+      });
+      if (!currentStudent) throw new NotFoundException("Student not found.");
       await tx.student.update({
-        where: { id: input.studentId },
+        where: { id: currentStudent.id },
         data: {
-          outstandingBalance: {
-            decrement: paymentAmount,
-          },
+          outstandingBalance: new Prisma.Decimal(
+            Math.max(0, Number(currentStudent.outstandingBalance) - input.amount),
+          ),
         },
       });
 
