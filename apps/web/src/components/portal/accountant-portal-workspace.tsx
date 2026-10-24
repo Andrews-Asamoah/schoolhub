@@ -6,6 +6,7 @@ import {
   ArrowUpRight,
   CheckCircle2,
   CircleDollarSign,
+  Download,
   FileText,
   LoaderCircle,
   Megaphone,
@@ -36,6 +37,7 @@ type AccountantTab =
   | "invoices"
   | "payments"
   | "debtors"
+  | "reports"
   | "payroll"
   | "expenses"
   | "inventory"
@@ -164,6 +166,7 @@ const tabs: { id: AccountantTab; label: string; icon: typeof Wallet }[] = [
   { id: "invoices", label: "Invoices & bills", icon: FileText },
   { id: "payments", label: "Payments & receipts", icon: Receipt },
   { id: "debtors", label: "Outstanding fees", icon: AlertCircle },
+  { id: "reports", label: "Finance reports", icon: FileText },
   { id: "payroll", label: "Payroll", icon: Wallet },
   { id: "expenses", label: "Expenses", icon: ArrowDownRight },
   { id: "inventory", label: "Inventory", icon: Package },
@@ -299,6 +302,46 @@ export function AccountantPortalWorkspace({
   const payrollNet = payroll.reduce((sum, run) => sum + Number(run.totalNet), 0);
   const currentYear = (yearsQuery.data ?? []).find((year) => year.isCurrent);
   const currentTerm = currentYear?.terms.find((term) => term.isCurrent);
+  const exportFinanceReport = () => {
+    const rows: unknown[][] = [
+      ["SchoolHub Finance Report"],
+      ["Generated at", new Date().toLocaleString("en-GH")],
+      ["Academic period", [currentYear?.name, currentTerm?.name].filter(Boolean).join(" - ") || "All available records"],
+      [],
+      ["Metric", "Amount (GHS)", "Record count"],
+      ["Payments collected", collected.toFixed(2), String(payments.length)],
+      ["Outstanding balances", outstanding.toFixed(2), String(debtors.length)],
+      ["Operating expenses", expenseTotal.toFixed(2), String(expenses.length)],
+      ["Payroll gross", payroll.reduce((sum, run) => sum + Number(run.totalGross), 0).toFixed(2), String(payroll.length)],
+      ["Payroll net", payrollNet.toFixed(2), String(payroll.length)],
+      [],
+      ["Receipts"],
+      ["Receipt number", "Student", "Date", "Method", "Reference", "Amount (GHS)", "Status"],
+      ...payments.map(payment => [payment.paymentNumber, studentName(payment.student), dateLabel(payment.paymentDate), payment.paymentMethod, payment.referenceNumber ?? "", Number(payment.amount).toFixed(2), payment.status]),
+      [],
+      ["Outstanding bills"],
+      ["Bill number", "Student", "Class", "Due date", "Total (GHS)", "Paid (GHS)", "Balance (GHS)", "Status"],
+      ...debtors.map(bill => [bill.billNumber, studentName(bill.student), bill.class?.name ?? "", dateLabel(bill.dueDate), Number(bill.totalAmount).toFixed(2), Number(bill.paidAmount).toFixed(2), Number(bill.balanceAmount).toFixed(2), bill.status]),
+      [],
+      ["Expenses"],
+      ["Date", "Voucher", "Payee", "Description", "Category", "Payment method", "Amount (GHS)"],
+      ...expenses.map(expense => [dateLabel(expense.date), expense.voucherNumber ?? expense.referenceNumber ?? "", expense.payee ?? "", expense.description, expense.customCategory?.name ?? expense.registryCategory?.name ?? expense.category ?? "OTHER", expense.paymentMethod, Number(expense.amount).toFixed(2)]),
+    ];
+    const csv = rows.map(row => row.map(value => {
+      const field = String(value ?? "");
+      return '"' + field.replaceAll('"', '""') + '"';
+    }).join(",")).join("\\r\\n");
+    const blob = new Blob(["\\uFEFF", csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "schoolhub-finance-report.csv";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  };
+
   const selectedFeeStructure = feeStructures.find((fee) => fee.id === selectedFeeStructureId);
   const billTargetClasses = selectedFeeStructure?.targetClasses.length
     ? classes.filter((schoolClass) => selectedFeeStructure.targetClasses.some((target) => target.class.id === schoolClass.id))
@@ -493,33 +536,35 @@ export function AccountantPortalWorkspace({
 
   return (
     <div className="space-y-6">
-      <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-emerald-800 via-teal-800 to-slate-950 p-6 text-white shadow-lg sm:p-8">
-        <div className="pointer-events-none absolute -right-12 -top-20 size-64 rounded-full bg-emerald-400/10 blur-3xl" />
-        <div className="relative flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-          <div className="max-w-2xl space-y-2">
-            <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-semibold">
-              <CircleDollarSign className="size-4" />
-              Finance & bursary
+      {activeTab === "overview" && (
+        <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-emerald-800 via-teal-800 to-slate-950 p-6 text-white shadow-lg sm:p-8">
+          <div className="pointer-events-none absolute -right-12 -top-20 size-64 rounded-full bg-emerald-400/10 blur-3xl" />
+          <div className="relative flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+            <div className="max-w-2xl space-y-2">
+              <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-semibold">
+                <CircleDollarSign className="size-4" />
+                Finance & bursary
+              </div>
+              <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Accountant workspace</h1>
+              <p className="text-sm leading-6 text-emerald-50/90">
+                Manage fee billing, record collections, track debtors, review expenses, and monitor payroll records.
+                Figures on this page are calculated from the school’s saved finance records.
+              </p>
             </div>
-            <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Accountant workspace</h1>
-            <p className="text-sm leading-6 text-emerald-50/90">
-              Manage fee billing, record collections, track debtors, review expenses, and monitor payroll records.
-              Figures on this page are calculated from the school’s saved finance records.
-            </p>
+            <div className="flex flex-wrap gap-2">
+              <button className={buttonPrimary} onClick={() => { setMessage(null); setSelectedBillId(""); setShowPaymentForm(true); }}>
+                <Plus className="size-4" /> Record payment
+              </button>
+              <button className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-white/30 bg-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/20" onClick={() => { setMessage(null); setSelectedFeeStructureId(""); setSelectedClassId(""); setShowBillForm(true); }}>
+                <Receipt className="size-4" /> Generate bills
+              </button>
+              <button className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-white/30 bg-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/20" onClick={() => { setMessage(null); setShowExpenseForm(true); }}>
+                <Plus className="size-4" /> Add expense
+              </button>
+            </div>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <button className={buttonPrimary} onClick={() => { setMessage(null); setSelectedBillId(""); setShowPaymentForm(true); }}>
-              <Plus className="size-4" /> Record payment
-            </button>
-            <button className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-white/30 bg-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/20" onClick={() => { setMessage(null); setSelectedFeeStructureId(""); setSelectedClassId(""); setShowBillForm(true); }}>
-              <Receipt className="size-4" /> Generate bills
-            </button>
-            <button className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-white/30 bg-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/20" onClick={() => { setMessage(null); setShowExpenseForm(true); }}>
-              <Plus className="size-4" /> Add expense
-            </button>
-          </div>
-        </div>
-      </section>
+        </section>
+      )}
 
       {message && !showPaymentForm && !showBillForm && !showExpenseForm && !showInventoryForm && !stockItemId && (
         <div role={message.kind === "error" ? "alert" : "status"} className={cn(
@@ -532,12 +577,14 @@ export function AccountantPortalWorkspace({
         </div>
       )}
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <MetricCard label="Payments collected" value={paymentsQuery.error ? "Unavailable" : currency(collected)} detail={paymentsQuery.error ? "Could not load payment records" : `${payments.length} recorded receipts`} icon={ArrowUpRight} />
-        <MetricCard label="Outstanding fees" value={billsQuery.error ? "Unavailable" : currency(outstanding)} detail={billsQuery.error ? "Could not load bill records" : `${debtors.length} bills with balances`} icon={AlertCircle} />
-        <MetricCard label="Recorded expenses" value={expensesQuery.error ? "Unavailable" : currency(expenseTotal)} detail={expensesQuery.error ? "Could not load expense records" : `${expenses.length} expense entries`} icon={ArrowDownRight} />
-        <MetricCard label="Payroll net total" value={payrollQuery.error ? "Unavailable" : currency(payrollNet)} detail={payrollQuery.error ? "Could not load payroll records" : `${payroll.length} saved payroll run(s)`} icon={Wallet} />
-      </div>
+      {activeTab === "overview" && (
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <MetricCard label="Payments collected" value={paymentsQuery.error ? "Unavailable" : currency(collected)} detail={paymentsQuery.error ? "Could not load payment records" : `${payments.length} recorded receipts`} icon={ArrowUpRight} />
+          <MetricCard label="Outstanding fees" value={billsQuery.error ? "Unavailable" : currency(outstanding)} detail={billsQuery.error ? "Could not load bill records" : `${debtors.length} bills with balances`} icon={AlertCircle} />
+          <MetricCard label="Recorded expenses" value={expensesQuery.error ? "Unavailable" : currency(expenseTotal)} detail={expensesQuery.error ? "Could not load expense records" : `${expenses.length} expense entries`} icon={ArrowDownRight} />
+          <MetricCard label="Payroll net total" value={payrollQuery.error ? "Unavailable" : currency(payrollNet)} detail={payrollQuery.error ? "Could not load payroll records" : `${payroll.length} saved payroll run(s)`} icon={Wallet} />
+        </div>
+      )}
 
       <nav aria-label="Accountant sections" className="flex gap-1 overflow-x-auto rounded-2xl border border-border bg-card p-1.5">
         {tabs.map((tab) => {
@@ -605,6 +652,27 @@ export function AccountantPortalWorkspace({
             const term = search.trim().toLowerCase();
             return !term || bill.billNumber.toLowerCase().includes(term) || studentName(bill.student).toLowerCase().includes(term) || (bill.class?.name ?? "").toLowerCase().includes(term);
           })} onRecordPayment={(bill) => { setSelectedBillId(bill.id); setShowPaymentForm(true); }} />}
+        </section>
+      )}
+
+
+      {!loading && activeTab === "reports" && (
+        <section className="rounded-2xl border border-border bg-card p-5">
+          <SectionHeader title="Finance reports" description="A live summary calculated from saved bills, receipts, expense entries and payroll runs." action={<button type="button" className={buttonPrimary} onClick={exportFinanceReport} disabled={billsQuery.isError || paymentsQuery.isError || expensesQuery.isError || payrollQuery.isError}><Download className="size-4" /> Export CSV</button>} />
+          <p className="mt-2 text-xs text-muted-foreground">Period: {[currentYear?.name, currentTerm?.name].filter(Boolean).join(" · ") || "All available records"}. Totals reflect the records returned by the finance API.</p>
+          {(billsQuery.error || paymentsQuery.error || expensesQuery.error || payrollQuery.error) && <QueryError message="Some finance data could not be loaded. Resolve the errors before exporting a complete report." />}
+          <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            <MetricCard label="Payments collected" value={paymentsQuery.error ? "Unavailable" : currency(collected)} detail={payments.length + " receipts"} icon={ArrowUpRight} />
+            <MetricCard label="Outstanding balances" value={billsQuery.error ? "Unavailable" : currency(outstanding)} detail={debtors.length + " bills with balances"} icon={AlertCircle} />
+            <MetricCard label="Operating expenses" value={expensesQuery.error ? "Unavailable" : currency(expenseTotal)} detail={expenses.length + " expense records"} icon={ArrowDownRight} />
+            <MetricCard label="Payroll gross" value={payrollQuery.error ? "Unavailable" : currency(payroll.reduce((sum, run) => sum + Number(run.totalGross), 0))} detail={payroll.length + " payroll runs"} icon={Wallet} />
+            <MetricCard label="Payroll net" value={payrollQuery.error ? "Unavailable" : currency(payrollNet)} detail="After recorded deductions" icon={Wallet} />
+            <MetricCard label="Receivables" value={billsQuery.error ? "Unavailable" : String(debtors.length)} detail={debtors.filter(bill => bill.status === "OVERDUE").length + " overdue bills"} icon={Receipt} />
+          </div>
+          <div className="mt-5 grid gap-5 xl:grid-cols-2">
+            <div className="rounded-xl border border-border p-4"><h3 className="font-semibold text-foreground">Collection by payment method</h3><p className="mt-1 text-xs text-muted-foreground">Based on recorded receipts.</p>{payments.length ? <div className="mt-3 space-y-3">{Object.entries(payments.reduce<Record<string, number>>((totals, payment) => { totals[payment.paymentMethod] = (totals[payment.paymentMethod] ?? 0) + Number(payment.amount); return totals; }, {})).sort((a,b) => b[1]-a[1]).map(([method,total]) => <div key={method}><div className="flex justify-between gap-3 text-sm"><span>{method.replaceAll("_", " ")}</span><span className="font-semibold tabular-nums">{currency(total)}</span></div><div className="mt-1 h-2 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-primary" style={{ width: (collected > 0 ? Math.min(100, total / collected * 100) : 0) + "%" }} /></div></div>)}</div> : <EmptyState icon={Receipt} title="No receipt data yet" description="Payment method analysis will appear when receipts have been recorded." />}</div>
+            <div className="rounded-xl border border-border p-4"><h3 className="font-semibold text-foreground">Financial position</h3><p className="mt-1 text-xs text-muted-foreground">A high-level comparison of recorded money in and operating money out.</p><div className="mt-4 space-y-3"><div className="flex items-center justify-between gap-3"><span className="text-sm text-muted-foreground">Collections</span><span className="font-semibold text-foreground">{currency(collected)}</span></div><div className="flex items-center justify-between gap-3"><span className="text-sm text-muted-foreground">Expenses</span><span className="font-semibold text-foreground">{currency(expenseTotal)}</span></div><div className="flex items-center justify-between gap-3 border-t border-border pt-3"><span className="text-sm font-semibold text-foreground">Collections less expenses</span><span className="text-lg font-bold tabular-nums text-foreground">{currency(collected - expenseTotal)}</span></div><p className="text-xs leading-5 text-muted-foreground">This is a simple cash-flow indicator, not an audited profit figure; it excludes receivables, payroll timing and other accounting adjustments.</p></div></div>
+          </div>
         </section>
       )}
 

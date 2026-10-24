@@ -244,6 +244,8 @@ function WorkspaceContent({ pageId }: { pageId: string }) {
           {pageId === "guardian-fees" && <GuardianFeesWorkspace />}
           {pageId === "student-portal" && <StudentPortalWorkspace />}
           {pageId === "invoices" && <AccountantPortalWorkspace defaultTab="invoices" />}
+          {pageId === "outstanding" && <AccountantPortalWorkspace defaultTab="debtors" />}
+          {pageId === "finance-reports" && <AccountantPortalWorkspace defaultTab="reports" />}
           {pageId === "expenses" && <AccountantPortalWorkspace defaultTab="expenses" />}
           {pageId === "payroll" && <AccountantPortalWorkspace defaultTab="payroll" />}
           {pageId === "inventory" && <AccountantPortalWorkspace defaultTab="inventory" />}
