@@ -72,7 +72,7 @@ function EmptyFeature({ title, description, icon: Icon }: { title: string; descr
   );
 }
 
-export function GuardianPortalWorkspace({ defaultTab = "overview" }: { defaultTab?: GuardianTab }) {
+export function GuardianPortalWorkspace({ defaultTab = "overview", showSectionNav = true }: { defaultTab?: GuardianTab; showSectionNav?: boolean }) {
   const [activeTab, setActiveTab] = useState<GuardianTab>(defaultTab);
   const [selectedAnnouncement, setSelectedAnnouncement] = useState<AnnouncementItem | null>(null);
   const { data: session } = useSession();
@@ -135,7 +135,7 @@ export function GuardianPortalWorkspace({ defaultTab = "overview" }: { defaultTa
         <Metric label="School updates" value={announcementsQuery.isPending || announcementsQuery.isError ? "—" : String(announcements.length)} detail={announcementsQuery.isError ? "School updates could not be loaded" : "Current notices available to your account"} icon={BellRing} />
       </div>
 
-      <nav aria-label="Guardian portal sections" className="flex gap-1 overflow-x-auto rounded-2xl border border-border bg-card p-1.5 shadow-sm">
+      {showSectionNav && <nav aria-label="Guardian portal sections" className="flex gap-1 overflow-x-auto rounded-2xl border border-border bg-card p-1.5 shadow-sm">
         {tabs.map(({ id, label, icon: Icon }) => (
           <button key={id} type="button" onClick={() => setActiveTab(id)} aria-current={activeTab === id ? "page" : undefined}
             className={cn("inline-flex shrink-0 items-center gap-2 rounded-xl px-3.5 py-2.5 text-xs font-semibold transition sm:text-sm", activeTab === id ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:bg-accent hover:text-foreground")}>
@@ -143,7 +143,7 @@ export function GuardianPortalWorkspace({ defaultTab = "overview" }: { defaultTa
             {id === "notices" && announcements.length > 0 && <span className={cn("rounded-full px-1.5 py-0.5 text-[10px]", activeTab === id ? "bg-primary-foreground/15 text-primary-foreground" : "bg-muted text-muted-foreground")}>{announcements.length}</span>}
           </button>
         ))}
-      </nav>
+      </nav>}
 
       {activeTab === "overview" && (
         <div className="grid gap-5 xl:grid-cols-[1.25fr_0.75fr]">
