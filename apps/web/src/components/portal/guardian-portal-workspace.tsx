@@ -74,7 +74,8 @@ function EmptyFeature({ title, description, icon: Icon }: { title: string; descr
 }
 
 export function GuardianPortalWorkspace({ defaultTab = "overview", showSectionNav = true }: { defaultTab?: GuardianTab; showSectionNav?: boolean }) {
-  const [activeTab, setActiveTab] = useState<GuardianTab>(defaultTab);\n  useEffect(() => { setActiveTab(defaultTab); }, [defaultTab]);
+  const [activeTab, setActiveTab] = useState<GuardianTab>(defaultTab);
+  useEffect(() => { setActiveTab(defaultTab); }, [defaultTab]);
   const [selectedAnnouncement, setSelectedAnnouncement] = useState<AnnouncementItem | null>(null);
   const { data: session } = useSession();
 
