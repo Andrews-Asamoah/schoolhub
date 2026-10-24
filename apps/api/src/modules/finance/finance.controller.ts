@@ -4,6 +4,7 @@ import {
   Post,
   Patch,
   Param,
+  Query,
   Headers,
   Body,
   UseGuards,
@@ -54,8 +55,11 @@ export class FinanceController {
 
   @Get("fee-structures")
   @Roles("owner", "admin", "accountant")
-  listFeeStructures(@CurrentSchool() school: School) {
-    return this.financeService.listFeeStructures(school.id);
+  listFeeStructures(
+    @CurrentSchool() school: School,
+    @Query("includeArchived") includeArchived?: string,
+  ) {
+    return this.financeService.listFeeStructures(school.id, includeArchived === "true");
   }
 
   @Post("fee-structures")
