@@ -56,6 +56,8 @@ export class R2Service {
       `schools/${schoolId}/images/logo/${randomUUID()}.${ext}`,
     avatar: (schoolId: string, userId: string, ext: string) =>
       `schools/${schoolId}/images/avatars/${userId}-${randomUUID()}.${ext}`,
+    signature: (schoolId: string, kind: string, personId: string, ext: string) =>
+      `schools/${schoolId}/images/signatures/${kind}/${personId}-${randomUUID()}.${ext}`,
     document: (schoolId: string, kind: string, ext: string) =>
       `schools/${schoolId}/files/${kind}/${randomUUID()}.${ext}`,
   };

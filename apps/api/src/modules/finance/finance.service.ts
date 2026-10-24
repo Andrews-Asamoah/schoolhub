@@ -256,6 +256,196 @@ export class FinanceService {
     });
   }
 
+
+  async listConcessions(schoolId: string) {
+    const [siblingPolicies, scholarships] = await Promise.all([
+      this.prisma.client.siblingDiscountPolicy.findMany({
+        where: { schoolId },
+        orderBy: [{ isActive: "desc" }, { minimumWardCount: "asc" }, { createdAt: "desc" }],
+      }),
+      this.prisma.client.studentScholarship.findMany({
+        where: { schoolId },
+        orderBy: [{ isActive: "desc" }, { createdAt: "desc" }],
+        include: {
+          student: {
+            select: {
+              id: true,
+              admissionNumber: true,
+              profile: { select: { firstName: true, lastName: true } },
+            },
+          },
+        },
+        take: 500,
+      }),
+    ]);
+    return { siblingPolicies, scholarships };
+  }
+
+  async createSiblingDiscountPolicy(
+    schoolId: string,
+    createdById: string,
+    input: { name: string; minimumWardCount: number; valueType: "PERCENTAGE" | "FIXED"; value: number },
+  ) {
+    const name = input.name.trim();
+    const existingThreshold = await this.prisma.client.siblingDiscountPolicy.findFirst({
+      where: { schoolId, minimumWardCount: input.minimumWardCount, isActive: true },
+      select: { id: true },
+    });
+    if (existingThreshold) throw new ConflictException("An active rule already exists for this number of linked wards. Deactivate it before replacing it.");
+    const existing = await this.prisma.client.siblingDiscountPolicy.findFirst({
+      where: { schoolId, name: { equals: name, mode: "insensitive" } },
+      select: { id: true },
+    });
+    if (existing) throw new ConflictException("A sibling discount policy with this name already exists.");
+    if (input.valueType === "PERCENTAGE" && input.value > 100) {
+      throw new BadRequestException("Percentage discounts cannot exceed 100%.");
+    }
+    if (input.value <= 0 || input.minimumWardCount < 2) {
+      throw new BadRequestException("Enter a positive discount and a minimum of at least two linked wards.");
+    }
+    return this.prisma.client.siblingDiscountPolicy.create({
+      data: {
+        schoolId, createdById, name, minimumWardCount: input.minimumWardCount,
+        valueType: input.valueType, value: new Prisma.Decimal(input.value),
+      },
+    });
+  }
+
+  async setSiblingDiscountPolicyActive(schoolId: string, policyId: string, isActive: boolean) {
+    const policy = await this.prisma.client.siblingDiscountPolicy.findFirst({
+      where: { id: policyId, schoolId }, select: { id: true, minimumWardCount: true },
+    });
+    if (!policy) throw new NotFoundException("Sibling discount policy not found.");
+    if (isActive) {
+      const duplicateThreshold = await this.prisma.client.siblingDiscountPolicy.findFirst({
+        where: { schoolId, minimumWardCount: policy.minimumWardCount, isActive: true, id: { not: policyId } },
+        select: { id: true },
+      });
+      if (duplicateThreshold) throw new ConflictException("Another active rule already exists for this number of linked wards.");
+    }
+    return this.prisma.client.siblingDiscountPolicy.update({ where: { id: policyId }, data: { isActive } });
+  }
+
+  async createStudentScholarship(
+    schoolId: string,
+    createdById: string,
+    input: {
+      studentId: string; name: string; valueType: "PERCENTAGE" | "FIXED"; value: number;
+      reason?: string; academicYearId?: string; termId?: string; startDate?: string; endDate?: string;
+    },
+  ) {
+    const [student, academicYear, term] = await Promise.all([
+      this.prisma.client.student.findFirst({
+        where: { id: input.studentId, schoolId, deletedAt: null, status: "ACTIVE" },
+        select: { id: true },
+      }),
+      input.academicYearId
+        ? this.prisma.client.academicYear.findFirst({ where: { id: input.academicYearId, schoolId }, select: { id: true } })
+        : Promise.resolve(null),
+      input.termId
+        ? this.prisma.client.term.findFirst({ where: { id: input.termId, academicYear: { schoolId } }, select: { id: true, academicYearId: true } })
+        : Promise.resolve(null),
+    ]);
+    if (!student) throw new NotFoundException("Active student not found in this school.");
+    if (input.academicYearId && !academicYear) throw new BadRequestException("The selected academic year does not belong to this school.");
+    if (input.termId && !term) throw new BadRequestException("The selected term does not belong to this school.");
+    if (term && input.academicYearId && term.academicYearId !== input.academicYearId) {
+      throw new BadRequestException("The selected term belongs to a different academic year.");
+    }
+    if (input.valueType === "PERCENTAGE" && input.value > 100) throw new BadRequestException("Scholarship percentage cannot exceed 100%.");
+    if (input.value <= 0) throw new BadRequestException("Scholarship value must be greater than zero.");
+    if (input.startDate && input.endDate && input.startDate > input.endDate) {
+      throw new BadRequestException("The scholarship end date must be on or after its start date.");
+    }
+    return this.prisma.client.studentScholarship.create({
+      data: {
+        schoolId, createdById, studentId: student.id, name: input.name.trim(),
+        valueType: input.valueType, value: new Prisma.Decimal(input.value),
+        reason: input.reason?.trim() || null, academicYearId: academicYear?.id ?? term?.academicYearId ?? null,
+        termId: term?.id ?? null,
+        startDate: input.startDate ? new Date(input.startDate) : null,
+        endDate: input.endDate ? new Date(input.endDate) : null,
+      },
+      include: {
+        student: { select: { id: true, admissionNumber: true, profile: { select: { firstName: true, lastName: true } } } },
+      },
+    });
+  }
+
+  async setStudentScholarshipActive(schoolId: string, scholarshipId: string, isActive: boolean) {
+    const scholarship = await this.prisma.client.studentScholarship.findFirst({
+      where: { id: scholarshipId, schoolId }, select: { id: true },
+    });
+    if (!scholarship) throw new NotFoundException("Student scholarship not found.");
+    return this.prisma.client.studentScholarship.update({ where: { id: scholarshipId }, data: { isActive } });
+  }
+
+  private async calculateStudentConcessions(
+    tx: Prisma.TransactionClient,
+    schoolId: string,
+    studentId: string,
+    academicYearId: string,
+    termId: string,
+    grossAmount: number,
+  ) {
+    const today = new Date();
+    today.setUTCHours(0, 0, 0, 0);
+    const scholarships = await tx.studentScholarship.findMany({
+      where: {
+        schoolId, studentId, isActive: true,
+        AND: [
+          { OR: [{ academicYearId: null }, { academicYearId }] },
+          { OR: [{ termId: null }, { termId }] },
+          { OR: [{ startDate: null }, { startDate: { lte: today } }] },
+          { OR: [{ endDate: null }, { endDate: { gte: today } }] },
+        ],
+      },
+      orderBy: { createdAt: "asc" },
+    });
+    const details: { type: "SCHOLARSHIP" | "SIBLING_DISCOUNT"; label: string; amount: number; scholarshipId?: string; policyId?: string }[] = [];
+    let remaining = grossAmount;
+    for (const scholarship of scholarships) {
+      if (remaining <= 0) break;
+      const requested = scholarship.valueType === "PERCENTAGE"
+        ? roundMoney(grossAmount * Number(scholarship.value) / 100)
+        : Number(scholarship.value);
+      const amount = roundMoney(Math.min(remaining, Math.max(0, requested)));
+      if (amount > 0) {
+        details.push({ type: "SCHOLARSHIP", label: scholarship.name, amount, scholarshipId: scholarship.id });
+        remaining = roundMoney(remaining - amount);
+      }
+    }
+
+    const guardianLinks = await tx.guardianStudent.findMany({
+      where: { studentId, guardian: { schoolId, isActive: true, deletedAt: null } },
+      select: { guardianId: true },
+    });
+    const guardianIds = [...new Set(guardianLinks.map((link) => link.guardianId))];
+    if (remaining > 0 && guardianIds.length) {
+      const linkedStudents = await tx.guardianStudent.findMany({
+        where: {
+          guardianId: { in: guardianIds },
+          student: { schoolId, status: "ACTIVE", deletedAt: null },
+          guardian: { schoolId, isActive: true, deletedAt: null },
+        },
+        select: { studentId: true },
+      });
+      const wardCount = new Set(linkedStudents.map((link) => link.studentId)).size;
+      const policy = await tx.siblingDiscountPolicy.findFirst({
+        where: { schoolId, isActive: true, minimumWardCount: { lte: wardCount } },
+        orderBy: [{ minimumWardCount: "desc" }, { createdAt: "desc" }],
+      });
+      if (policy) {
+        const requested = policy.valueType === "PERCENTAGE"
+          ? roundMoney(remaining * Number(policy.value) / 100)
+          : Number(policy.value);
+        const amount = roundMoney(Math.min(remaining, Math.max(0, requested)));
+        if (amount > 0) details.push({ type: "SIBLING_DISCOUNT", label: policy.name, amount, policyId: policy.id });
+      }
+    }
+    return { details, totalDiscount: roundMoney(details.reduce((sum, item) => sum + item.amount, 0)) };
+  }
+
   async generateBills(schoolId: string, input: GenerateBillInput) {
     const currentYear = await this.prisma.client.academicYear.findFirst({
       where: { schoolId, isCurrent: true },
@@ -354,6 +544,29 @@ export class FinanceService {
         });
         if (existingBill) continue;
 
+        const concessions = await this.calculateStudentConcessions(
+          tx, schoolId, studentId, currentYear.id, currentTerm.id, totalAmount,
+        );
+        const netTotal = roundMoney(Math.max(0, totalAmount - concessions.totalDiscount));
+        let allocatedDiscount = 0;
+        const billItems = feeStructure.items.map((item, index) => {
+          const grossLine = Number(item.amount);
+          const lineDiscount = index === feeStructure.items.length - 1
+            ? roundMoney(concessions.totalDiscount - allocatedDiscount)
+            : roundMoney(concessions.totalDiscount * grossLine / (totalAmount || 1));
+          allocatedDiscount = roundMoney(allocatedDiscount + lineDiscount);
+          const netLine = roundMoney(Math.max(0, grossLine - lineDiscount));
+          return {
+            feeItemId: item.id,
+            description: item.name,
+            amount: new Prisma.Decimal(grossLine),
+            quantity: 1,
+            totalAmount: new Prisma.Decimal(grossLine),
+            discountAmount: new Prisma.Decimal(lineDiscount),
+            balanceAmount: new Prisma.Decimal(netLine),
+            status: netLine === 0 ? "FULLY_PAID" as const : "UNPAID" as const,
+          };
+        });
         const randomNum = Math.floor(10000 + Math.random() * 90000);
         const billNumber = `INV-${year}-${randomNum}`;
         const bill = await tx.bill.create({
@@ -365,26 +578,29 @@ export class FinanceService {
             feeStructureId: input.feeStructureId,
             classId: input.classId,
             billNumber,
-            totalAmount: new Prisma.Decimal(totalAmount),
+            grossAmount: new Prisma.Decimal(totalAmount),
+            discountAmount: new Prisma.Decimal(concessions.totalDiscount),
+            totalAmount: new Prisma.Decimal(netTotal),
             paidAmount: new Prisma.Decimal(0),
-            balanceAmount: new Prisma.Decimal(totalAmount),
+            balanceAmount: new Prisma.Decimal(netTotal),
+            status: netTotal === 0 ? "PAID" : "PENDING",
             dueDate: input.dueDate ? new Date(input.dueDate) : undefined,
             notes: input.notes,
-            items: {
-              create: feeStructure.items.map((item) => ({
-                feeItemId: item.id,
-                description: item.name,
-                amount: item.amount,
-                quantity: 1,
-                totalAmount: item.amount,
-                balanceAmount: item.amount,
+            items: { create: billItems },
+            concessions: {
+              create: concessions.details.map((detail) => ({
+                type: detail.type,
+                label: detail.label,
+                amount: new Prisma.Decimal(detail.amount),
+                siblingDiscountPolicyId: detail.policyId,
+                studentScholarshipId: detail.scholarshipId,
               })),
             },
           },
         });
         await tx.student.update({
           where: { id: studentId },
-          data: { outstandingBalance: { increment: new Prisma.Decimal(totalAmount) } },
+          data: { outstandingBalance: { increment: new Prisma.Decimal(netTotal) } },
         });
         results.push(bill);
       }
@@ -394,7 +610,7 @@ export class FinanceService {
     return {
       success: true,
       count: billingResult.bills.length,
-      totalBilled: billingResult.totalAmount * billingResult.bills.length,
+      totalBilled: roundMoney(billingResult.bills.reduce((sum, bill) => sum + Number(bill.totalAmount), 0)),
     };
   }
 
@@ -732,9 +948,10 @@ export class FinanceService {
         academicYear: { select: { name: true } },
         term: { select: { name: true } },
         items: {
-          select: { id: true, description: true, amount: true, quantity: true, totalAmount: true, paidAmount: true, balanceAmount: true },
+          select: { id: true, description: true, amount: true, quantity: true, totalAmount: true, discountAmount: true, paidAmount: true, balanceAmount: true },
           orderBy: { createdAt: "asc" },
         },
+        concessions: { select: { id: true, type: true, label: true, amount: true }, orderBy: { createdAt: "asc" } },
       },
     });
   }

@@ -2,6 +2,7 @@ import {
   Activity,
   AlertCircle,
   BadgeDollarSign,
+  BadgeCheck,
   Bell,
   BookOpen,
   ChartNoAxesCombined,
@@ -266,6 +267,14 @@ export const schoolNavGroups: SchoolNavGroup[] = [
         apiStatus: "available",
       },
       {
+        id: "concessions",
+        label: "Scholarships & discounts",
+        icon: BadgeCheck,
+        description: "Manage sibling discount rules and student-specific scholarships applied automatically to new bills.",
+        section: "Finance",
+        apiStatus: "available",
+      },
+      {
         id: "payments",
         label: "Payments",
         icon: BadgeDollarSign,
@@ -419,6 +428,14 @@ export const schoolNavGroups: SchoolNavGroup[] = [
         apiStatus: "available",
       },
       {
+        id: "signatures",
+        label: "Staff signatures",
+        icon: BadgeCheck,
+        description: "Upload and manage authorised staff signatures for future school forms and printouts.",
+        section: "Administration",
+        apiStatus: "available",
+      },
+      {
         id: "settings",
         label: "School settings",
         icon: Settings2,
@@ -468,6 +485,7 @@ const rolePages: Record<string, string[]> = {
   ],
   accountant: [
     "accountant-portal",
+    "concessions",
     "finance-reports",
     "outstanding",
     "admissions",

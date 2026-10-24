@@ -47,6 +47,8 @@ import { PayrollManagementWorkspace } from "@/components/portal/payroll-manageme
 import { FeeReminderWorkspace } from "@/components/portal/fee-reminder-workspace";
 import { InventoryManagementWorkspace } from "@/components/portal/inventory-management-workspace";
 import { FeeStructuresWorkspace } from "@/components/portal/fee-structures-workspace";
+import { ConcessionsWorkspace } from "@/components/portal/concessions-workspace";
+import { SignaturesWorkspace } from "@/components/school/signatures-workspace";
 import { GuardianPortalWorkspace } from "@/components/portal/guardian-portal-workspace";
 import { GuardianChildRecordsWorkspace } from "@/components/portal/guardian-child-records-workspace";
 import { GuardianFeesWorkspace } from "@/components/portal/guardian-fees-workspace";
@@ -205,7 +207,7 @@ function WorkspaceContent({ pageId }: { pageId: string }) {
   return (
     <>
       {activeRole !== "student" &&
-        !["classes", "students", "teachers", "staff", "guardians", "teacher-portal", "accountant-portal", "fees", "payments", "invoices", "expenses", "payroll", "fee-reminders", "inventory", "outstanding", "finance-reports", "guardian-portal", "guardian-attendance", "guardian-timetable", "guardian-reports", "guardian-notices", "guardian-fees", "student-portal", "clubs", "houses", "assignments", "classmates", "announcements"].includes(
+        !["classes", "students", "teachers", "staff", "guardians", "teacher-portal", "accountant-portal", "fees", "concessions", "signatures", "payments", "invoices", "expenses", "payroll", "fee-reminders", "inventory", "outstanding", "finance-reports", "guardian-portal", "guardian-attendance", "guardian-timetable", "guardian-reports", "guardian-notices", "guardian-fees", "student-portal", "clubs", "houses", "assignments", "classmates", "announcements"].includes(
           pageId,
         ) && (
         <WorkspacePageHeading
@@ -295,6 +297,8 @@ function WorkspaceContent({ pageId }: { pageId: string }) {
           {pageId === "attendance" && (
             activeRole === "student" ? <StudentAttendanceView /> : <AttendanceWorkspace query={classesQuery} />
           )}
+          {pageId === "concessions" && <ConcessionsWorkspace />}
+          {pageId === "signatures" && <SignaturesWorkspace />}
           {pageId === "fees" && (
             activeRole === "student" ? (
               <WorkspaceEmptyState

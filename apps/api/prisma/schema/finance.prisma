@@ -112,6 +112,8 @@ model Bill {
   billNumber     String
   billCode       String?
   totalAmount    Decimal    @db.Decimal(10, 2)
+  grossAmount    Decimal    @default(0) @db.Decimal(10, 2)
+  discountAmount Decimal    @default(0) @db.Decimal(10, 2)
   paidAmount     Decimal    @default(0) @db.Decimal(10, 2)
   balanceAmount  Decimal    @db.Decimal(10, 2)
   status         BillStatus @default(PENDING)
@@ -129,6 +131,7 @@ model Bill {
   class        Class?        @relation(fields: [classId], references: [id])
   items        BillItem[]
   payments     Payment[]
+  concessions  BillConcession[]
 
   classId  String?
   billType BillType @default(INVOICE)
@@ -156,6 +159,7 @@ model BillItem {
   amount        Decimal        @db.Decimal(10, 2)
   quantity      Int            @default(1)
   totalAmount   Decimal        @db.Decimal(10, 2)
+  discountAmount Decimal       @default(0) @db.Decimal(10, 2)
   paidAmount    Decimal        @default(0) @db.Decimal(10, 2)
   balanceAmount Decimal        @db.Decimal(10, 2)
   status        BillItemStatus @default(UNPAID)
@@ -562,4 +566,76 @@ model FeeReminderLog {
   @@index([installmentId])
   @@index([channel, status])
   @@map("fee_reminder_logs")
+}
+
+
+// ============================================================================
+// STUDENT CONCESSIONS: sibling discounts and individually awarded scholarships
+// ============================================================================
+
+model SiblingDiscountPolicy {
+  id                  String              @id @default(cuid())
+  schoolId            String
+  name                String
+  minimumWardCount    Int
+  valueType           ConcessionValueType @default(PERCENTAGE)
+  value               Decimal             @db.Decimal(12, 2)
+  isActive            Boolean             @default(true)
+  createdById         String?
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+
+  school       School           @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  concessions  BillConcession[]
+
+  @@unique([schoolId, name])
+  @@index([schoolId, isActive, minimumWardCount])
+  @@map("sibling_discount_policies")
+}
+
+model StudentScholarship {
+  id             String              @id @default(cuid())
+  schoolId       String
+  studentId      String
+  name           String
+  valueType      ConcessionValueType @default(PERCENTAGE)
+  value          Decimal             @db.Decimal(12, 2)
+  reason         String?
+  academicYearId String?
+  termId         String?
+  startDate      DateTime?           @db.Date
+  endDate        DateTime?           @db.Date
+  isActive       Boolean             @default(true)
+  createdById    String?
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+
+  school       School           @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  student      Student          @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  concessions  BillConcession[]
+
+  @@index([schoolId, isActive])
+  @@index([studentId, isActive])
+  @@index([academicYearId, termId])
+  @@map("student_scholarships")
+}
+
+model BillConcession {
+  id                      String         @id @default(cuid())
+  billId                  String
+  type                    ConcessionType
+  label                   String
+  amount                  Decimal        @db.Decimal(10, 2)
+  siblingDiscountPolicyId String?
+  studentScholarshipId    String?
+  createdAt               DateTime       @default(now())
+
+  bill                  Bill                  @relation(fields: [billId], references: [id], onDelete: Cascade)
+  siblingDiscountPolicy SiblingDiscountPolicy? @relation(fields: [siblingDiscountPolicyId], references: [id], onDelete: SetNull)
+  studentScholarship    StudentScholarship?    @relation(fields: [studentScholarshipId], references: [id], onDelete: SetNull)
+
+  @@index([billId])
+  @@index([siblingDiscountPolicyId])
+  @@index([studentScholarshipId])
+  @@map("bill_concessions")
 }
