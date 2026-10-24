@@ -9,11 +9,22 @@ import type { IssuedCredentials, Role } from "@schoolhub/shared";
 export type ProvisionableRole = Exclude<Role, "owner">;
 
 /**
- * Creates a unique sign-in identifier for guardians without a contact email.
- * The reserved .invalid domain is deliberately non-deliverable.
+ * Creates a short, name-based sign-in identifier for guardians without a
+ * contact email. A random suffix prevents collisions; .invalid is reserved
+ * and deliberately non-deliverable.
  */
-export function newGuardianLoginEmail() {
-  return `guardian-${randomUUID()}@login.schoolhub.invalid`;
+export function newGuardianLoginEmail(name: string) {
+  const parts = name
+    .normalize("NFKD")
+    .replace(/[\\u0300-\\u036f]/g, "")
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter(Boolean);
+  const first = parts[0] ?? "guardian";
+  const last = parts.length > 1 ? parts[parts.length - 1] : "";
+  const namePart = (last ? `${first[0]}${last}` : first).slice(0, 18);
+  const suffix = randomUUID().replaceAll("-", "").slice(0, 6);
+  return `${namePart}-${suffix}@login.schoolhub.invalid`;
 }
 
 export interface PreparedCredential {
