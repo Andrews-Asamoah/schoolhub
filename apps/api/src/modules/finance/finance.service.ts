@@ -667,6 +667,10 @@ export class FinanceService {
         feeStructure: { select: { name: true } },
         academicYear: { select: { name: true } },
         term: { select: { name: true } },
+        items: {
+          select: { id: true, description: true, amount: true, quantity: true, totalAmount: true, paidAmount: true, balanceAmount: true },
+          orderBy: { createdAt: "asc" },
+        },
       },
     });
   }
