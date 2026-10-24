@@ -579,7 +579,6 @@ model SiblingDiscountPolicy {
   minimumWardCount    Int
   valueType           ConcessionValueType @default(PERCENTAGE)
   value               Decimal             @db.Decimal(7, 2)
-  appliesToAllWards   Boolean             @default(true)
   isActive            Boolean             @default(true)
   createdById         String?
   createdAt           DateTime            @default(now())
