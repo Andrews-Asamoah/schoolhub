@@ -4,12 +4,8 @@ import {
   AlertCircle,
   ArrowDownRight,
   ArrowUpRight,
-  Banknote,
-  CalendarDays,
   CheckCircle2,
   CircleDollarSign,
-  ClipboardList,
-  Download,
   FileText,
   LoaderCircle,
   Megaphone,
@@ -196,6 +192,7 @@ export function AccountantPortalWorkspace({
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [showPaymentForm, setShowPaymentForm] = useState(false);
+  const [selectedBillId, setSelectedBillId] = useState("");
   const [showBillForm, setShowBillForm] = useState(false);
   const [showExpenseForm, setShowExpenseForm] = useState(false);
   const [message, setMessage] = useState<{ kind: "success" | "error"; text: string } | null>(null);
@@ -282,6 +279,7 @@ export function AccountantPortalWorkspace({
     onSuccess: async (payment) => {
       setMessage({ kind: "success", text: `Payment recorded. Receipt ${payment.paymentNumber} is ready.` });
       setShowPaymentForm(false);
+      setSelectedBillId("");
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["finance", "payments"] }),
         queryClient.invalidateQueries({ queryKey: ["finance", "bills"] }),
@@ -487,7 +485,7 @@ export function AccountantPortalWorkspace({
         <section className="rounded-2xl border border-border bg-card p-5">
           <SectionHeader title="Invoices & bills" description="Search bills, review balances, and generate billing for an active class." action={<button className={buttonPrimary} onClick={() => setShowBillForm(true)}><Plus className="size-4" /> Generate bills</button>} />
           <SearchFilters search={search} setSearch={setSearch} statusFilter={statusFilter} setStatusFilter={setStatusFilter} statuses={["PENDING", "PARTIALLY_PAID", "PAID", "OVERDUE"]} />
-          <BillsTable bills={filteredBills} onRecordPayment={(bill) => { setSearch(bill.billNumber); setShowPaymentForm(true); }} />
+          <BillsTable bills={filteredBills} onRecordPayment={(bill) => { setSelectedBillId(bill.id); setShowPaymentForm(true); }} />
         </section>
       )}
 
@@ -505,7 +503,7 @@ export function AccountantPortalWorkspace({
           <BillsTable bills={debtors.filter((bill) => {
             const term = search.trim().toLowerCase();
             return !term || bill.billNumber.toLowerCase().includes(term) || studentName(bill.student).toLowerCase().includes(term) || (bill.class?.name ?? "").toLowerCase().includes(term);
-          })} onRecordPayment={() => setShowPaymentForm(true)} />
+          })} onRecordPayment={(bill) => { setSelectedBillId(bill.id); setShowPaymentForm(true); }} />
         </section>
       )}
 
@@ -542,7 +540,7 @@ export function AccountantPortalWorkspace({
         <Modal title="Record a payment" description="Record a receipt against an outstanding bill. The server validates the bill and updates its balance." onClose={() => setShowPaymentForm(false)}>
           <form onSubmit={submitPayment} className="space-y-4">
             <Field label="Outstanding bill">
-              <select name="billId" required className={inputClass} defaultValue="">
+              <select name="billId" required className={inputClass} value={selectedBillId} onChange={(event) => setSelectedBillId(event.target.value)}>
                 <option value="" disabled>Select a bill…</option>
                 {bills.filter((bill) => Number(bill.balanceAmount) > 0 && bill.status !== "CANCELLED" && bill.status !== "WAIVED").map((bill) => (
                   <option key={bill.id} value={bill.id}>{bill.billNumber} — {studentName(bill.student)} · Balance {currency(bill.balanceAmount)}</option>
