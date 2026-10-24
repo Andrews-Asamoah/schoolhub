@@ -594,7 +594,7 @@ export class StudentsService {
         const name = `${guardian.firstName} ${guardian.lastName}`.trim();
 
         // A parent with several children is ONE guardian record (matched by
-        // email within the school) so they get one login, not one per child.
+        // contact email or, when absent, matching name and phone.
         const existing = contactEmail
           ? await tx.guardian.findFirst({
               where: { schoolId, email: contactEmail, deletedAt: null },
@@ -657,7 +657,7 @@ export class StudentsService {
               tx,
               school,
               record.id,
-              { ...guardian, email: email! },
+              { ...guardian, email: loginEmail! },
               credential,
             );
             issued = login.credentials;
