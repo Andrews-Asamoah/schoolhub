@@ -21,6 +21,7 @@ import {
   CredentialsService,
   toIssuedCredentials,
   type PreparedCredential,
+  newGuardianLoginEmail,
 } from '../accounts/credentials.service.js';
 
 @Injectable()
@@ -370,7 +371,7 @@ export class StudentsService {
     // BEFORE opening the transaction (hashing is deliberately slow).
     const guardianPlans = await Promise.all(
       input.guardians.map(async (guardian) => {
-        const email = guardian.email?.trim().toLowerCase() || null;
+        const email = guardian.email?.trim().toLowerCase() || (guardian.createLogin ? newGuardianLoginEmail() : null);
         if (guardian.createLogin && !email) {
           throw new BadRequestException(
             `An email address is required to create a login for ${guardian.firstName} ${guardian.lastName}.`,
