@@ -198,6 +198,23 @@ export class FinanceController {
     return this.financeService.listPayrollRecords(school.id);
   }
 
+  @Get("payroll/salaries")
+  @Roles("owner", "admin", "accountant")
+  listPayrollSalaryRegister(@CurrentSchool() school: School) {
+    return this.financeService.listPayrollSalaryRegister(school.id);
+  }
+
+  @Patch("payroll/salaries/:kind/:personId")
+  @Roles("owner", "admin", "accountant")
+  updatePayrollSalary(
+    @CurrentSchool() school: School,
+    @Param("kind") kind: string,
+    @Param("personId") personId: string,
+    @Body(new ZodValidationPipe(updatePayrollSalarySchema)) body: UpdatePayrollSalaryInput,
+  ) {
+    return this.financeService.updatePayrollSalary(school.id, kind, personId, body.monthlySalary);
+  }
+
   @Post("payroll")
   @Roles("owner", "admin", "accountant")
   generatePayrollDraft(
