@@ -5,12 +5,8 @@ import {
   type UseQueryResult,
 } from "@tanstack/react-query";
 import { createFileRoute, Link, useNavigate, useParams } from "@tanstack/react-router";
-import { ArrowRight, Check, CircleAlert, LoaderCircle } from "lucide-react";
+import { CircleAlert, LoaderCircle } from "lucide-react";
 import { useEffect, useState } from "react";
-import {
-  recordPaymentSchema,
-  type RecordPaymentInput,
-} from "@schoolhub/shared";
 import { SchoolWorkspaceLayout } from "@/components/school/school-workspace-layout";
 import {
   PreviewDataNotice,
@@ -526,157 +522,6 @@ function AttendanceWorkspace({
   );
 }
 
-function PaymentEntry() {
-  const queryClient = useQueryClient();
-  const [studentId, setStudentId] = useState("");
-  const [amount, setAmount] = useState("");
-  const [paymentMethod, setPaymentMethod] =
-    useState<RecordPaymentInput["paymentMethod"]>("CASH");
-  const [paymentDate, setPaymentDate] = useState(
-    new Date().toISOString().slice(0, 10),
-  );
-  const [message, setMessage] = useState<string | null>(null);
-  const mutation = useMutation({
-    mutationFn: (input: RecordPaymentInput) =>
-      apiFetch("/finance/payments", {
-        method: "POST",
-        body: JSON.stringify(input),
-      }),
-    onSuccess: async () => {
-      setMessage("Payment recorded successfully.");
-      await queryClient.invalidateQueries({ queryKey: ["finance"] });
-    },
-    onError: (error: Error) => setMessage(error.message),
-  });
-
-  function submitPayment(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setMessage(null);
-    const result = recordPaymentSchema.safeParse({
-      studentId,
-      amount: Number(amount),
-      paymentMethod,
-      paymentDate,
-    });
-    if (!result.success) {
-      setMessage(
-        result.error.issues[0]?.message ?? "Check the payment details.",
-      );
-      return;
-    }
-    mutation.mutate(result.data);
-  }
-
-  return (
-    <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(280px,0.7fr)]">
-      <form
-        onSubmit={submitPayment}
-        className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_2px_12px_rgba(15,23,42,0.025)] sm:p-6"
-      >
-        <h2 className="text-sm font-semibold text-slate-900">
-          Record a payment
-        </h2>
-        <p className="mt-1 text-xs text-slate-500">
-          Record a payment against a student account.
-        </p>
-        <div className="mt-5 grid gap-4 sm:grid-cols-2">
-          <FormField label="Student ID">
-            <input
-              required
-              value={studentId}
-              onChange={(event) => setStudentId(event.target.value)}
-              placeholder="Paste the student record ID"
-              className={formInputClass}
-            />
-          </FormField>
-          <FormField label="Amount (GHS)">
-            <input
-              required
-              min="0.01"
-              step="0.01"
-              type="number"
-              value={amount}
-              onChange={(event) => setAmount(event.target.value)}
-              placeholder="0.00"
-              className={formInputClass}
-            />
-          </FormField>
-          <FormField label="Payment method">
-            <select
-              value={paymentMethod}
-              onChange={(event) =>
-                setPaymentMethod(
-                  event.target.value as RecordPaymentInput["paymentMethod"],
-                )
-              }
-              className={formInputClass}
-            >
-              {[
-                "CASH",
-                "BANK_TRANSFER",
-                "CHEQUE",
-                "MOBILE_MONEY",
-                "CARD",
-                "ONLINE",
-                "OTHER",
-              ].map((method) => (
-                <option key={method} value={method}>
-                  {method.replaceAll("_", " ")}
-                </option>
-              ))}
-            </select>
-          </FormField>
-          <FormField label="Payment date">
-            <input
-              required
-              type="date"
-              value={paymentDate}
-              onChange={(event) => setPaymentDate(event.target.value)}
-              className={formInputClass}
-            />
-          </FormField>
-        </div>
-        {message && (
-          <p
-            role={mutation.isError ? "alert" : "status"}
-            className={`mt-4 text-xs ${mutation.isError ? "text-red-600" : "text-emerald-700"}`}
-          >
-            {message}
-          </p>
-        )}
-        <button
-          type="submit"
-          disabled={mutation.isPending}
-          className="mt-5 inline-flex h-10 items-center gap-2 rounded-lg bg-blue-600 px-4 text-xs font-semibold text-white transition hover:bg-blue-700 disabled:opacity-60"
-        >
-          {mutation.isPending ? (
-            <LoaderCircle className="size-4 animate-spin" />
-          ) : (
-            <Check className="size-4" />
-          )}
-          {mutation.isPending ? "Recording…" : "Record payment"}
-        </button>
-      </form>
-      <div className="rounded-2xl border border-slate-200/80 bg-white p-5 sm:p-6">
-        <h2 className="text-sm font-semibold text-slate-900">
-          Payment history
-        </h2>
-        <p className="mt-1 text-xs leading-relaxed text-slate-500">
-          Payments can be recorded here. A school-wide payment history endpoint
-          is not yet available, so receipts are not listed in this view.
-        </p>
-        <Link
-          to="/$page"
-          params={{ page: "fees" }}
-          className="mt-5 inline-flex items-center gap-2 text-xs font-semibold text-blue-600 hover:text-blue-700"
-        >
-          Review fee structures <ArrowRight className="size-3.5" />
-        </Link>
-      </div>
-    </div>
-  );
-}
-
 function SchoolSettings({ query }: { query: UseQueryResult<School, Error> }) {
   if (query.isPending) return <LoadingState label="Loading school profile" />;
   if (query.error) return <QueryError error={query.error} />;
@@ -777,20 +622,3 @@ function StatusBadge({ value }: { value: string }) {
   );
 }
 
-function FormField({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <label className="grid gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
-      {label}
-      {children}
-    </label>
-  );
-}
-
-const formInputClass =
-  "h-10 rounded-lg border border-slate-200 bg-white px-3 text-xs font-medium normal-case tracking-normal text-slate-700 outline-none placeholder:font-normal placeholder:text-slate-400 focus:border-blue-400 focus:ring-2 focus:ring-blue-100";
