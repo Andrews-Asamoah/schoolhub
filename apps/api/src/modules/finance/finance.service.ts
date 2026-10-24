@@ -6,8 +6,34 @@ import {
 } from "@nestjs/common";
 import { PrismaService } from "../../prisma/prisma.service.js";
 import type { CreateExpenseInput, GenerateBillInput, RecordPaymentInput } from "@schoolhub/shared";
-import { Prisma, type TransactionCategory } from "@prisma/client";
+import { Prisma, type AccountCategory, type AccountType, type PaymentMethod, type TransactionCategory } from "@prisma/client";
 import { canManageAcademicContext } from "../../common/academic-context.js";
+
+const PAYE_MONTHLY_BANDS_2026 = [
+  { limit: 588, rate: 0 },
+  { limit: 80, rate: 0.05 },
+  { limit: 100, rate: 0.10 },
+  { limit: 2_900, rate: 0.175 },
+  { limit: 16_000, rate: 0.25 },
+  { limit: 30_332, rate: 0.30 },
+  { limit: Number.POSITIVE_INFINITY, rate: 0.35 },
+] as const;
+
+function roundMoney(value: number) {
+  return Math.round((value + Number.EPSILON) * 100) / 100;
+}
+
+function calculateResidentPaye2026(chargeableIncome: number) {
+  let remaining = Math.max(0, chargeableIncome);
+  let tax = 0;
+  for (const band of PAYE_MONTHLY_BANDS_2026) {
+    if (remaining <= 0) break;
+    const taxableInBand = Math.min(remaining, band.limit);
+    tax += taxableInBand * band.rate;
+    remaining -= taxableInBand;
+  }
+  return roundMoney(tax);
+}
 
 @Injectable()
 export class FinanceService {
@@ -316,8 +342,8 @@ export class FinanceService {
     tx: Prisma.TransactionClient,
     schoolId: string,
     spec: {
-      accountType: "ASSET" | "REVENUE";
-      category: "CASH" | "OTHER_INCOME";
+      accountType: AccountType;
+      category: AccountCategory;
       name: string;
       code: string;
     },
@@ -415,6 +441,87 @@ export class FinanceService {
     });
     await tx.chartAccount.update({ where: { id: cash.id }, data: { balance: { increment: input.amount } } });
     await tx.chartAccount.update({ where: { id: revenue.id }, data: { balance: { increment: input.amount } } });
+    return transaction;
+  }
+  /**
+   * Post an expense using double-entry bookkeeping: debit the matching
+   * expense account and credit cash. The source expense and ledger entry
+   * are written inside the same database transaction.
+   */
+  async postExpense(
+    tx: Prisma.TransactionClient,
+    input: {
+      schoolId: string;
+      amount: Prisma.Decimal;
+      date: Date;
+      description: string;
+      category: TransactionCategory;
+      paymentMethod: PaymentMethod;
+      referenceType: string;
+      referenceId: string;
+      referenceNumber?: string;
+      notes?: string;
+    },
+  ) {
+    const accountByCategory: Record<string, { name: string; code: string; category: AccountCategory }> = {
+      SALARY: { name: "Salaries & Wages", code: "6000", category: "SALARY_WAGES" },
+      UTILITIES: { name: "Utilities", code: "6100", category: "UTILITIES" },
+      SUPPLIES: { name: "School Supplies", code: "6200", category: "SUPPLIES" },
+      MAINTENANCE: { name: "Repairs & Maintenance", code: "6300", category: "MAINTENANCE" },
+      TRANSPORT: { name: "Transport", code: "6400", category: "TRANSPORT" },
+      RENT: { name: "Rent", code: "6500", category: "RENT" },
+      INSURANCE: { name: "Insurance", code: "6600", category: "INSURANCE" },
+      TAXES: { name: "Taxes", code: "6700", category: "TAXES" },
+    };
+    const accountSpec = accountByCategory[input.category] ?? {
+      name: "Other Operating Expenses",
+      code: "6900",
+      category: "OTHER_EXPENSE" as AccountCategory,
+    };
+    const paymentUsesBank = ["BANK_TRANSFER", "CHEQUE", "MOBILE_MONEY", "CARD", "ONLINE"].includes(input.paymentMethod);
+    const paymentAccount = await this.ensureAccount(tx, input.schoolId, paymentUsesBank
+      ? { accountType: "ASSET", category: "BANK", name: "Bank & Electronic Payments", code: "1010" }
+      : { accountType: "ASSET", category: "CASH", name: "Cash on Hand", code: "1000" });
+    const expenseAccount = await this.ensureAccount(tx, input.schoolId, {
+      accountType: "EXPENSE",
+      category: accountSpec.category,
+      name: accountSpec.name,
+      code: accountSpec.code,
+    });
+
+    const prefix = "TXN-" + input.date.getUTCFullYear() + "-";
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${input.schoolId}), hashtext(${prefix}))`;
+    const last = await tx.transaction.findFirst({
+      where: { schoolId: input.schoolId, transactionNumber: { startsWith: prefix } },
+      orderBy: { transactionNumber: "desc" },
+      select: { transactionNumber: true },
+    });
+    const seq = last ? Number(last.transactionNumber.slice(prefix.length)) + 1 : 1;
+    const transaction = await tx.transaction.create({
+      data: {
+        schoolId: input.schoolId,
+        transactionNumber: prefix + String(seq).padStart(5, "0"),
+        transactionDate: input.date,
+        description: input.description,
+        amount: input.amount,
+        debitAccountId: expenseAccount.id,
+        creditAccountId: paymentAccount.id,
+        transactionType: "EXPENSE",
+        category: input.category,
+        referenceType: input.referenceType,
+        referenceId: input.referenceId,
+        referenceNumber: input.referenceNumber,
+        notes: [input.notes, "Payment method: " + input.paymentMethod].filter(Boolean).join(" · "),
+      },
+    });
+    await tx.chartAccount.update({
+      where: { id: expenseAccount.id },
+      data: { balance: { increment: input.amount } },
+    });
+    await tx.chartAccount.update({
+      where: { id: paymentAccount.id },
+      data: { balance: { decrement: input.amount } },
+    });
     return transaction;
   }
 
@@ -560,6 +667,10 @@ export class FinanceService {
         feeStructure: { select: { name: true } },
         academicYear: { select: { name: true } },
         term: { select: { name: true } },
+        items: {
+          select: { id: true, description: true, amount: true, quantity: true, totalAmount: true, paidAmount: true, balanceAmount: true },
+          orderBy: { createdAt: "asc" },
+        },
       },
     });
   }
@@ -583,40 +694,298 @@ export class FinanceService {
     });
   }
 
-  async listExpenses(schoolId: string) {
+  async listExpenses(schoolId: string, fromDate?: string, toDate?: string) {
+    const parseBoundary = (value: string | undefined, label: string) => {
+      if (!value) return undefined;
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+        throw new BadRequestException(`Enter ${label} as YYYY-MM-DD.`);
+      }
+      const parsed = new Date(`${value}T00:00:00.000Z`);
+      if (Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== value) {
+        throw new BadRequestException(`Enter a valid ${label.toLowerCase()}.`);
+      }
+      return parsed;
+    };
+    const startDate = parseBoundary(fromDate, "start date");
+    const endDate = parseBoundary(toDate, "end date");
+    if (startDate && endDate && startDate > endDate) {
+      throw new BadRequestException("Start date must be before or equal to end date.");
+    }
     return this.prisma.client.expense.findMany({
-      where: { schoolId },
+      where: {
+        schoolId,
+        ...(startDate || endDate ? {
+          date: {
+            ...(startDate ? { gte: startDate } : {}),
+            ...(endDate ? { lte: endDate } : {}),
+          },
+        } : {}),
+      },
       orderBy: [{ date: "desc" }, { createdAt: "desc" }],
-      take: 500,
       include: {
         customCategory: { select: { name: true } },
-        registryCategory: { select: { name: true } },
+        registryCategory: { select: { id: true, name: true, description: true } },
+        recordedBy: { select: { name: true } },
       },
+    });
+  }
+
+  async listExpenditureCategories(schoolId: string) {
+    return this.prisma.client.expenditureCategoryRegistry.findMany({
+      where: { schoolId },
+      orderBy: { name: "asc" },
+    });
+  }
+
+  async createExpenditureCategory(schoolId: string, input: { name: string; description?: string | null }) {
+    const name = input.name.trim();
+    const duplicate = await this.prisma.client.expenditureCategoryRegistry.findFirst({
+      where: { schoolId, name: { equals: name, mode: "insensitive" } },
+      select: { id: true },
+    });
+    if (duplicate) throw new BadRequestException("An expenditure category with that name already exists.");
+    return this.prisma.client.expenditureCategoryRegistry.create({
+      data: { schoolId, name, description: input.description?.trim() || null },
+    });
+  }
+
+  async updateExpenditureCategory(schoolId: string, categoryId: string, input: { name: string; description?: string | null }) {
+    const existing = await this.prisma.client.expenditureCategoryRegistry.findFirst({
+      where: { id: categoryId, schoolId },
+      select: { id: true },
+    });
+    if (!existing) throw new NotFoundException("Expenditure category not found.");
+    const name = input.name.trim();
+    const duplicate = await this.prisma.client.expenditureCategoryRegistry.findFirst({
+      where: { schoolId, id: { not: categoryId }, name: { equals: name, mode: "insensitive" } },
+      select: { id: true },
+    });
+    if (duplicate) throw new BadRequestException("An expenditure category with that name already exists.");
+    return this.prisma.client.expenditureCategoryRegistry.update({
+      where: { id: categoryId },
+      data: { name, description: input.description?.trim() || null },
     });
   }
 
   async createExpense(schoolId: string, recordedById: string, input: CreateExpenseInput) {
     const date = new Date(`${input.date}T00:00:00.000Z`);
-    if (Number.isNaN(date.getTime())) {
+    if (Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== input.date) {
       throw new BadRequestException("Enter a valid expense date.");
     }
-    return this.prisma.client.expense.create({
-      data: {
+    if (input.registryCategoryId) {
+      const category = await this.prisma.client.expenditureCategoryRegistry.findFirst({
+        where: { id: input.registryCategoryId, schoolId },
+        select: { id: true },
+      });
+      if (!category) throw new BadRequestException("The selected expenditure category does not belong to this school.");
+    }
+
+    const academicYear = await this.prisma.client.academicYear.findFirst({
+      where: { schoolId, isCurrent: true },
+      include: { terms: { where: { isCurrent: true }, take: 1 } },
+    });
+    const currentTerm = academicYear?.terms[0];
+
+    return this.prisma.client.$transaction(async (tx) => {
+      const expense = await tx.expense.create({
+        data: {
+          schoolId,
+          date,
+          amount: new Prisma.Decimal(input.amount),
+          description: input.description,
+          payee: input.payee || null,
+          category: input.category,
+          paymentMethod: input.paymentMethod,
+          registryCategoryId: input.registryCategoryId || null,
+          checkNumber: input.checkNumber || null,
+          voucherNumber: input.voucherNumber || null,
+          referenceNumber: input.referenceNumber || null,
+          recordedById,
+          academicYearId: academicYear?.id ?? null,
+          termId: currentTerm?.id ?? null,
+        },
+        include: {
+          customCategory: { select: { name: true } },
+          registryCategory: { select: { id: true, name: true, description: true } },
+          recordedBy: { select: { name: true } },
+        },
+      });
+      await this.postExpense(tx, {
         schoolId,
-        date,
         amount: new Prisma.Decimal(input.amount),
+        date,
         description: input.description,
-        payee: input.payee || null,
         category: input.category,
         paymentMethod: input.paymentMethod,
-        referenceNumber: input.referenceNumber || null,
-        recordedById,
-      },
-      include: {
-        customCategory: { select: { name: true } },
-        registryCategory: { select: { name: true } },
-      },
+        referenceType: "EXPENSE",
+        referenceId: expense.id,
+        referenceNumber: input.voucherNumber || input.referenceNumber || undefined,
+        notes: input.registryCategoryId ? "Expenditure category: " + input.registryCategoryId : undefined,
+      });
+      return expense;
     });
+  }
+
+  async generatePayrollDraft(
+    schoolId: string,
+    processedById: string,
+    input: { month: number; year: number; confirmResidentTaxTreatment: true },
+  ) {
+    // GRA's 2026 monthly resident bands took effect on 1 September 2026.
+    // Refuse to silently apply these rules to historical periods.
+    if (input.year !== 2026 || input.month < 9) {
+      throw new BadRequestException(
+        "Automatic draft generation currently supports September–December 2026 only. Configure the applicable historical tax rules before generating an earlier period.",
+      );
+    }
+    const db = this.prisma.client;
+    const existing = await db.payrollRecord.findUnique({
+      where: { schoolId_month_year: { schoolId, month: input.month, year: input.year } },
+      select: { id: true },
+    });
+    if (existing) throw new BadRequestException("A payroll run already exists for this month and year.");
+
+    const [teachers, staff, currentYear] = await Promise.all([
+      db.teacher.findMany({
+        where: { schoolId, isActive: true, deletedAt: null },
+        select: { id: true, monthlySalary: true },
+      }),
+      db.staff.findMany({
+        where: { schoolId, isActive: true, deletedAt: null },
+        select: { id: true, monthlySalary: true },
+      }),
+      db.academicYear.findFirst({
+        where: { schoolId, isCurrent: true },
+        include: { terms: { where: { isCurrent: true }, take: 1 } },
+      }),
+    ]);
+    const eligible = [
+      ...teachers.filter((person) => Number(person.monthlySalary ?? 0) > 0).map((person) => ({
+        teacherId: person.id,
+        staffId: null as string | null,
+        basicSalary: Number(person.monthlySalary),
+      })),
+      ...staff.filter((person) => Number(person.monthlySalary ?? 0) > 0).map((person) => ({
+        teacherId: null as string | null,
+        staffId: person.id,
+        basicSalary: Number(person.monthlySalary),
+      })),
+    ];
+    if (!eligible.length) {
+      throw new BadRequestException("No active teachers or staff have a positive monthly salary. Add salary details before generating payroll.");
+    }
+
+    const payslips = eligible.map((person) => {
+      // SSNIT 2026 insurable earnings range: GHS 587.80–69,000.
+      const insurableSalary = Math.min(69_000, Math.max(587.80, person.basicSalary));
+      const ssnitEmployee = roundMoney(insurableSalary * 0.055);
+      const ssnitEmployer = roundMoney(insurableSalary * 0.13);
+      const grossSalary = roundMoney(person.basicSalary);
+      const incomeTax = calculateResidentPaye2026(Math.max(0, grossSalary - ssnitEmployee));
+      const netSalary = roundMoney(Math.max(0, grossSalary - ssnitEmployee - incomeTax));
+      return {
+        schoolId,
+        teacherId: person.teacherId,
+        staffId: person.staffId,
+        basicSalary: new Prisma.Decimal(roundMoney(person.basicSalary)),
+        allowances: new Prisma.Decimal(0),
+        grossSalary: new Prisma.Decimal(grossSalary),
+        ssnitEmployee: new Prisma.Decimal(ssnitEmployee),
+        ssnitEmployer: new Prisma.Decimal(ssnitEmployer),
+        incomeTax: new Prisma.Decimal(incomeTax),
+        otherDeductions: new Prisma.Decimal(0),
+        netSalary: new Prisma.Decimal(netSalary),
+        paymentMethod: "BANK_TRANSFER" as const,
+        paymentStatus: "PENDING" as const,
+      };
+    });
+    const sum = (key: "grossSalary" | "netSalary" | "incomeTax" | "ssnitEmployee" | "ssnitEmployer") =>
+      roundMoney(payslips.reduce((total, slip) => total + Number(slip[key]), 0));
+
+    const payrollRecord = await db.$transaction(async (tx) => {
+      const duplicate = await tx.payrollRecord.findUnique({
+        where: { schoolId_month_year: { schoolId, month: input.month, year: input.year } },
+        select: { id: true },
+      });
+      if (duplicate) throw new BadRequestException("A payroll run already exists for this month and year.");
+      return tx.payrollRecord.create({
+        data: {
+          schoolId,
+          month: input.month,
+          year: input.year,
+          status: "DRAFT",
+          totalGross: new Prisma.Decimal(sum("grossSalary")),
+          totalNet: new Prisma.Decimal(sum("netSalary")),
+          totalTax: new Prisma.Decimal(sum("incomeTax")),
+          totalSSNIT: new Prisma.Decimal(roundMoney(sum("ssnitEmployee") + sum("ssnitEmployer"))),
+          processedById,
+          academicYearId: currentYear?.id ?? null,
+          termId: currentYear?.terms[0]?.id ?? null,
+          payslips: { create: payslips },
+        },
+        include: {
+          _count: { select: { payslips: true } },
+        },
+      });
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+
+    return {
+      payrollRecord,
+      includedCount: eligible.length,
+      excludedCount: teachers.length + staff.length - eligible.length,
+    };
+  }
+
+  async transitionPayroll(
+    schoolId: string,
+    payrollRecordId: string,
+    input: { status: "APPROVED" | "PAID" | "CANCELLED"; paymentMethod?: string },
+  ) {
+    const db = this.prisma.client;
+    const payroll = await db.payrollRecord.findFirst({
+      where: { id: payrollRecordId, schoolId },
+      include: { _count: { select: { payslips: true } } },
+    });
+    if (!payroll) throw new NotFoundException("Payroll run not found.");
+    if (payroll.status === "DRAFT" && input.status === "APPROVED") {
+      if (!payroll._count.payslips) throw new BadRequestException("A payroll run without payslips cannot be approved.");
+      return db.payrollRecord.update({
+        where: { id: payroll.id },
+        data: { status: "APPROVED" },
+        include: {
+          payslips: { include: { staff: { select: { staffId: true, profile: { select: { firstName: true, lastName: true } } } }, teacher: { select: { teacherId: true, profile: { select: { firstName: true, lastName: true } } } } } },
+          _count: { select: { payslips: true } },
+        },
+      });
+    }
+    if (payroll.status === "DRAFT" && input.status === "CANCELLED") {
+      return db.payrollRecord.update({
+        where: { id: payroll.id },
+        data: { status: "CANCELLED" },
+        include: { payslips: true, _count: { select: { payslips: true } } },
+      });
+    }
+    if (payroll.status === "APPROVED" && input.status === "PAID") {
+      const paymentMethod = input.paymentMethod;
+      if (!paymentMethod || !["CASH", "BANK_TRANSFER", "CHEQUE", "MOBILE_MONEY", "CARD", "ONLINE", "OTHER"].includes(paymentMethod)) {
+        throw new BadRequestException("Choose a valid payment method before confirming payroll disbursement.");
+      }
+      return db.$transaction(async (tx) => {
+        await tx.payslip.updateMany({
+          where: { payrollRecordId: payroll.id, schoolId },
+          data: { paymentStatus: "COMPLETED", paymentMethod: paymentMethod as PaymentMethod, paidAt: new Date() },
+        });
+        return tx.payrollRecord.update({
+          where: { id: payroll.id },
+          data: { status: "PAID" },
+          include: {
+            payslips: { include: { staff: { select: { staffId: true, profile: { select: { firstName: true, lastName: true } } } }, teacher: { select: { teacherId: true, profile: { select: { firstName: true, lastName: true } } } } } },
+            _count: { select: { payslips: true } },
+          },
+        });
+      });
+    }
+    throw new BadRequestException(`Payroll cannot move from ${payroll.status} to ${input.status}.`);
   }
 
   async listPayrollRecords(schoolId: string) {
@@ -626,24 +995,367 @@ export class FinanceService {
       take: 100,
       include: {
         payslips: {
+          include: {
+            staff: { select: { staffId: true, profile: { select: { firstName: true, lastName: true } } } },
+            teacher: { select: { teacherId: true, profile: { select: { firstName: true, lastName: true } } } },
+          },
+        },
+        _count: { select: { payslips: true } },
+      },
+    });
+  }
+
+  async listFeeReminderSchedules(schoolId: string) {
+    return this.prisma.client.feeReminderSchedule.findMany({
+      where: { schoolId },
+      orderBy: { createdAt: "desc" },
+      include: {
+        installments: { orderBy: { dueDate: "asc" } },
+        createdBy: { select: { name: true } },
+        academicYear: { select: { name: true } },
+        term: { select: { name: true } },
+        _count: { select: { logs: true } },
+      },
+    });
+  }
+
+  async createFeeReminderSchedule(
+    schoolId: string,
+    createdById: string,
+    input: {
+      name: string;
+      description?: string;
+      messageTemplate: string;
+      minimumOutstanding: number;
+      installment?: { label: string; dueDate: string; sendDate: string };
+    },
+  ) {
+    const name = input.name.trim();
+    const currentYear = await this.prisma.client.academicYear.findFirst({
+      where: { schoolId, isCurrent: true },
+      include: { terms: { where: { isCurrent: true }, take: 1 } },
+    });
+    const currentTerm = currentYear?.terms[0];
+    const installment = input.installment;
+    const parseDate = (value: string, field: string) => {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) throw new BadRequestException(`Enter ${field} as YYYY-MM-DD.`);
+      const date = new Date(`${value}T00:00:00.000Z`);
+      if (Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== value) {
+        throw new BadRequestException(`Enter a valid ${field.toLowerCase()}.`);
+      }
+      return date;
+    };
+    const dueDate = installment ? parseDate(installment.dueDate, "due date") : undefined;
+    const sendDate = installment ? parseDate(installment.sendDate, "send date") : undefined;
+    if (dueDate && sendDate && sendDate > dueDate) {
+      throw new BadRequestException("The reminder send date must be on or before the due date.");
+    }
+
+    return this.prisma.client.feeReminderSchedule.create({
+      data: {
+        schoolId,
+        name,
+        description: input.description?.trim() || null,
+        isActive: true,
+        sendSms: false,
+        sendEmail: false,
+        sendInApp: true,
+        targetOutstandingOnly: true,
+        minimumOutstanding: new Prisma.Decimal(input.minimumOutstanding),
+        messageTemplate: input.messageTemplate.trim(),
+        academicYearId: currentYear?.id ?? null,
+        termId: currentTerm?.id ?? null,
+        createdById,
+        ...(installment && dueDate && sendDate ? {
+          installments: { create: { label: installment.label.trim(), dueDate, sendDate } },
+        } : {}),
+      },
+      include: {
+        installments: { orderBy: { dueDate: "asc" } },
+        createdBy: { select: { name: true } },
+        academicYear: { select: { name: true } },
+        term: { select: { name: true } },
+        _count: { select: { logs: true } },
+      },
+    });
+  }
+
+  async setFeeReminderScheduleActive(schoolId: string, scheduleId: string, isActive: boolean) {
+    const existing = await this.prisma.client.feeReminderSchedule.findFirst({
+      where: { id: scheduleId, schoolId },
+      select: { id: true },
+    });
+    if (!existing) throw new NotFoundException("Fee reminder schedule not found.");
+    return this.prisma.client.feeReminderSchedule.update({
+      where: { id: scheduleId },
+      data: { isActive },
+      include: {
+        installments: { orderBy: { dueDate: "asc" } },
+        createdBy: { select: { name: true } },
+        academicYear: { select: { name: true } },
+        term: { select: { name: true } },
+        _count: { select: { logs: true } },
+      },
+    });
+  }
+
+  async addFeeReminderInstallment(
+    schoolId: string,
+    scheduleId: string,
+    input: { label: string; dueDate: string; sendDate: string },
+  ) {
+    const schedule = await this.prisma.client.feeReminderSchedule.findFirst({
+      where: { id: scheduleId, schoolId },
+      select: { id: true },
+    });
+    if (!schedule) throw new NotFoundException("Fee reminder schedule not found.");
+    const parseDate = (value: string, field: string) => {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) throw new BadRequestException(`Enter ${field} as YYYY-MM-DD.`);
+      const date = new Date(`${value}T00:00:00.000Z`);
+      if (Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== value) throw new BadRequestException(`Enter a valid ${field.toLowerCase()}.`);
+      return date;
+    };
+    const dueDate = parseDate(input.dueDate, "due date");
+    const sendDate = parseDate(input.sendDate, "send date");
+    if (sendDate > dueDate) throw new BadRequestException("The reminder send date must be on or before the due date.");
+    return this.prisma.client.feeReminderInstallment.create({
+      data: { scheduleId, label: input.label.trim(), dueDate, sendDate },
+    });
+  }
+  private async collectFeeReminderTargets(
+    schoolId: string,
+    minimumOutstanding: number,
+    academicYearId?: string | null,
+    termId?: string | null,
+  ) {
+    const bills = await this.prisma.client.bill.findMany({
+      where: {
+        schoolId,
+        status: { notIn: ["PAID", "CANCELLED", "WAIVED"] },
+        balanceAmount: { gt: 0 },
+        ...(academicYearId ? { academicYearId } : {}),
+        ...(termId ? { termId } : {}),
+      },
+      include: {
+        student: {
           select: {
             id: true,
-            staffId: true,
-            teacherId: true,
-            basicSalary: true,
-            allowances: true,
-            grossSalary: true,
-            ssnitEmployee: true,
-            incomeTax: true,
-            otherDeductions: true,
-            netSalary: true,
-            paymentMethod: true,
-            paymentStatus: true,
-            paidAt: true,
+            profile: { select: { firstName: true, lastName: true, otherNames: true } },
+            guardians: {
+              where: { receiveAlerts: true },
+              include: {
+                guardian: {
+                  select: {
+                    id: true,
+                    firstName: true,
+                    lastName: true,
+                    otherNames: true,
+                    phone: true,
+                    email: true,
+                    canLogin: true,
+                    isActive: true,
+                    deletedAt: true,
+                    profile: { select: { userId: true } },
+                  },
+                },
+              },
+            },
           },
         },
       },
     });
+    type GuardianTarget = {
+      id: string;
+      userId: string | null;
+      name: string;
+      phone: string | null;
+      email: string | null;
+    };
+    type StudentTarget = {
+      studentId: string;
+      name: string;
+      balance: number;
+      earliestDueDate: Date | null;
+      guardians: Map<string, GuardianTarget>;
+    };
+    const targets = new Map<string, StudentTarget>();
+    for (const bill of bills) {
+      const student = bill.student;
+      const studentName = [student.profile.firstName, student.profile.otherNames, student.profile.lastName].filter(Boolean).join(" ").trim() || "Student";
+      let target = targets.get(student.id);
+      if (!target) {
+        target = { studentId: student.id, name: studentName, balance: 0, earliestDueDate: bill.dueDate, guardians: new Map() };
+        targets.set(student.id, target);
+      }
+      target.balance += Number(bill.balanceAmount);
+      if (bill.dueDate && (!target.earliestDueDate || bill.dueDate < target.earliestDueDate)) target.earliestDueDate = bill.dueDate;
+      for (const link of student.guardians) {
+        const guardian = link.guardian;
+        if (!guardian.isActive || guardian.deletedAt) continue;
+        const guardianName = [guardian.firstName, guardian.otherNames, guardian.lastName].filter(Boolean).join(" ").trim() || "Parent/guardian";
+        target.guardians.set(guardian.id, {
+          id: guardian.id,
+          userId: guardian.canLogin ? guardian.profile?.userId ?? null : null,
+          name: guardianName,
+          phone: guardian.phone ?? null,
+          email: guardian.email ?? null,
+        });
+      }
+    }
+    return [...targets.values()].filter((target) => target.balance > 0 && target.balance >= minimumOutstanding);
+  }
+
+  async previewFeeReminder(schoolId: string, scheduleId: string) {
+    const schedule = await this.prisma.client.feeReminderSchedule.findFirst({
+      where: { id: scheduleId, schoolId },
+      select: { id: true, minimumOutstanding: true, academicYearId: true, termId: true },
+    });
+    if (!schedule) throw new NotFoundException("Fee reminder schedule not found.");
+    const targets = await this.collectFeeReminderTargets(
+      schoolId,
+      Number(schedule.minimumOutstanding),
+      schedule.academicYearId,
+      schedule.termId,
+    );
+    const recipientTargets = targets.flatMap((target) => [...target.guardians.values()]);
+    return {
+      studentCount: targets.length,
+      guardianCount: recipientTargets.filter((guardian) => Boolean(guardian.userId)).length,
+      guardiansWithoutPortal: recipientTargets.filter((guardian) => !guardian.userId).length,
+      totalOutstanding: targets.reduce((sum, target) => sum + target.balance, 0),
+      sampleStudents: targets.slice(0, 5).map((target) => ({ name: target.name, balance: target.balance })),
+    };
+  }
+
+  async sendFeeReminderInApp(schoolId: string, scheduleId: string) {
+    const db = this.prisma.client;
+    const schedule = await db.feeReminderSchedule.findFirst({
+      where: { id: scheduleId, schoolId },
+      include: { installments: { orderBy: { sendDate: "asc" } } },
+    });
+    if (!schedule) throw new NotFoundException("Fee reminder schedule not found.");
+    if (!schedule.isActive) throw new BadRequestException("Activate this schedule before sending reminders.");
+    if (!schedule.sendInApp) throw new BadRequestException("In-app reminders are not enabled for this schedule.");
+
+    const installment = schedule.installments.find((item) => !item.sent);
+    if (schedule.installments.length > 0 && !installment) {
+      throw new BadRequestException("All configured reminder dates have already been sent. Add a new reminder date before sending again.");
+    }
+    const targets = await this.collectFeeReminderTargets(
+      schoolId,
+      Number(schedule.minimumOutstanding),
+      schedule.academicYearId,
+      schedule.termId,
+    );
+    if (!targets.length) {
+      throw new BadRequestException("No students currently meet this schedule's outstanding-balance threshold.");
+    }
+
+    const alreadySent = await db.feeReminderLog.findMany({
+      where: { scheduleId, installmentId: installment?.id ?? null, channel: "IN_APP", status: "SENT" },
+      select: { studentId: true, guardianPhone: true, guardianEmail: true, guardianName: true },
+    });
+    const sentKeys = new Set(alreadySent.map((log) => `${log.studentId}|${log.guardianPhone ?? ""}|${log.guardianEmail ?? ""}|${log.guardianName}`));
+    let inAppSent = 0;
+    let skippedNoLogin = 0;
+    let failed = 0;
+    let alreadySentCount = 0;
+    const today = new Date();
+
+    for (const target of targets) {
+      const balanceText = new Intl.NumberFormat("en-GH", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(target.balance);
+      const dueDateText = target.earliestDueDate
+        ? target.earliestDueDate.toISOString().slice(0, 10)
+        : "not specified";
+      for (const guardian of target.guardians.values()) {
+        const key = `${target.studentId}|${guardian.phone ?? ""}|${guardian.email ?? ""}|${guardian.name}`;
+        if (sentKeys.has(key)) {
+          alreadySentCount++;
+          continue;
+        }
+        const message = schedule.messageTemplate
+          .replaceAll("{{studentName}}", target.name)
+          .replaceAll("{{guardianName}}", guardian.name)
+          .replaceAll("{{outstandingBalance}}", `GHS ${balanceText}`)
+          .replaceAll("{{dueDate}}", dueDateText)
+          .replaceAll("{{installmentLabel}}", installment?.label ?? "school fees")
+          .slice(0, 2000);
+        if (!guardian.userId) {
+          skippedNoLogin++;
+          await db.feeReminderLog.create({
+            data: {
+              scheduleId,
+              installmentId: installment?.id ?? null,
+              guardianPhone: guardian.phone,
+              guardianEmail: guardian.email,
+              guardianName: guardian.name,
+              studentName: target.name,
+              studentId: target.studentId,
+              outstandingBalance: new Prisma.Decimal(target.balance),
+              channel: "IN_APP",
+              status: "SKIPPED",
+              error: "Guardian has no linked portal login.",
+            },
+          });
+          continue;
+        }
+        try {
+          await db.$transaction(async (tx) => {
+            await tx.notification.create({
+              data: {
+                schoolId,
+                userId: guardian.userId!,
+                type: "FEE_REMINDER",
+                title: `Fee reminder for ${target.name}`,
+                message,
+                link: "/guardian-fees",
+                academicYearId: schedule.academicYearId,
+                termId: schedule.termId,
+              },
+            });
+            await tx.feeReminderLog.create({
+              data: {
+                scheduleId,
+                installmentId: installment?.id ?? null,
+                guardianPhone: guardian.phone,
+                guardianEmail: guardian.email,
+                guardianName: guardian.name,
+                studentName: target.name,
+                studentId: target.studentId,
+                outstandingBalance: new Prisma.Decimal(target.balance),
+                channel: "IN_APP",
+                status: "SENT",
+              },
+            });
+          });
+          inAppSent++;
+        } catch (error) {
+          failed++;
+          await db.feeReminderLog.create({
+            data: {
+              scheduleId,
+              installmentId: installment?.id ?? null,
+              guardianPhone: guardian.phone,
+              guardianEmail: guardian.email,
+              guardianName: guardian.name,
+              studentName: target.name,
+              studentId: target.studentId,
+              outstandingBalance: new Prisma.Decimal(target.balance),
+              channel: "IN_APP",
+              status: "FAILED",
+              error: error instanceof Error ? error.message.slice(0, 500) : "Could not create notification.",
+            },
+          });
+        }
+      }
+    }
+    if (installment && failed === 0) {
+      await db.feeReminderInstallment.update({
+        where: { id: installment.id },
+        data: { sent: true, sentAt: new Date() },
+      });
+    }
+    return { studentCount: targets.length, inAppSent, skippedNoLogin, failed, alreadySent: alreadySentCount };
   }
 
   async getStudentLedger(

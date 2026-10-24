@@ -12,6 +12,7 @@ import {
   LoaderCircle,
   Package,
   Plus,
+  Printer,
   Receipt,
   Search,
   Wallet,
@@ -68,6 +69,7 @@ interface ApiBill {
   status: "PAID" | "PARTIALLY_PAID" | "PENDING" | "OVERDUE" | "WAIVED" | "CANCELLED";
   dueDate?: string | null;
   issuedAt: string;
+  items?: { id: string; description: string; amount: number | string; quantity: number; totalAmount: number | string; paidAmount: number | string; balanceAmount: number | string }[];
 }
 
 interface ApiPayment {
@@ -161,6 +163,18 @@ interface ApiPayroll {
   }[];
 }
 
+function downloadCsv(rows: unknown[][], filename: string) {
+  const csv = rows.map((row) => row.map((value) => '"' + String(value ?? "").replaceAll('"', '""') + '"').join(",")).join("\r\n");
+  const url = URL.createObjectURL(new Blob(["\uFEFF", csv], { type: "text/csv;charset=utf-8;" }));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
 const currency = (value: number | string) =>
   new Intl.NumberFormat("en-GH", {
     style: "currency",
@@ -200,6 +214,8 @@ export function AccountantPortalWorkspace({
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [showPaymentForm, setShowPaymentForm] = useState(false);
   const [selectedBillId, setSelectedBillId] = useState("");
+  const [selectedReceipt, setSelectedReceipt] = useState<ApiPayment | null>(null);
+  const [selectedInvoiceForPrint, setSelectedInvoiceForPrint] = useState<ApiBill | null>(null);
   const [selectedFeeStructureId, setSelectedFeeStructureId] = useState("");
   const [selectedClassId, setSelectedClassId] = useState("");
   const [showBillForm, setShowBillForm] = useState(false);
@@ -316,8 +332,8 @@ export function AccountantPortalWorkspace({
     const csv = rows.map(row => row.map(value => {
       const field = String(value ?? "");
       return '"' + field.replaceAll('"', '""') + '"';
-    }).join(",")).join("\\r\\n");
-    const blob = new Blob(["\\uFEFF", csv], { type: "text/csv;charset=utf-8;" });
+    }).join(",")).join("\r\n");
+    const blob = new Blob(["\uFEFF", csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
@@ -521,7 +537,14 @@ export function AccountantPortalWorkspace({
     feeStructuresQuery.isPending || classesQuery.isPending || yearsQuery.isPending || payrollQuery.isPending || (activeTab === "inventory" && inventoryQuery.isPending);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6"><style>{`@media print {
+        body * { visibility: hidden !important; }
+        .payment-receipt-print, .payment-receipt-print *, .invoice-print-area, .invoice-print-area * { visibility: visible !important; }
+        .payment-receipt-print, .invoice-print-area { position: absolute !important; inset: 0 auto auto 0 !important; width: 100% !important; max-width: none !important; margin: 0 !important; padding: 24px !important; border: 0 !important; box-shadow: none !important; background: white !important; color: black !important; }
+        .payment-receipt-actions, .invoice-print-actions { display: none !important; }
+        .payment-receipt-print p, .payment-receipt-print span, .payment-receipt-print h2, .payment-receipt-print h3, .invoice-print-area p, .invoice-print-area span, .invoice-print-area h2, .invoice-print-area h3 { color: black !important; }
+        @page { size: A4 portrait; margin: 12mm; }
+      }`}</style>
       {activeTab === "overview" && (
         <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-emerald-800 via-teal-800 to-slate-950 p-6 text-white shadow-lg sm:p-8">
           <div className="pointer-events-none absolute -right-12 -top-20 size-64 rounded-full bg-emerald-400/10 blur-3xl" />
@@ -588,7 +611,7 @@ export function AccountantPortalWorkspace({
               </div>
               <Link to="/$page" params={{ page: "payments" }} className={buttonSecondary}>View payments</Link>
             </div>
-            {paymentsQuery.error ? <QueryError message={paymentsQuery.error.message} /> : <PaymentsTable payments={payments.slice(0, 6)} />}
+            {paymentsQuery.error ? <QueryError message={paymentsQuery.error.message} /> : <PaymentsTable payments={payments.slice(0, 6)} onViewReceipt={setSelectedReceipt} />}
           </section>
           <section className="rounded-2xl border border-border bg-card p-5">
             <h2 className="font-semibold text-foreground">Attention required</h2>
@@ -604,17 +627,17 @@ export function AccountantPortalWorkspace({
 
       {!loading && activeTab === "invoices" && (
         <section className="rounded-2xl border border-border bg-card p-5">
-          <SectionHeader title="Invoices & bills" description="Search bills, review balances, and generate billing for an active class." action={<button className={buttonPrimary} onClick={() => { setMessage(null); setSelectedFeeStructureId(""); setSelectedClassId(""); setShowBillForm(true); }}><Plus className="size-4" /> Generate bills</button>} />
+          <SectionHeader title="Invoices & bills" description="Search bills, review balances, and generate billing for an active class." action={<div className="flex flex-wrap gap-2"><button type="button" className={buttonSecondary} onClick={() => downloadCsv([["Invoice","Student","Admission number","Class","Fee structure","Due date","Total (GHS)","Paid (GHS)","Balance (GHS)","Status"], ...filteredBills.map(bill => [bill.billNumber, studentName(bill.student), bill.student?.admissionNumber ?? "", bill.class?.name ?? "", bill.feeStructure?.name ?? "", dateLabel(bill.dueDate), Number(bill.totalAmount).toFixed(2), Number(bill.paidAmount).toFixed(2), Number(bill.balanceAmount).toFixed(2), bill.status])], "schoolhub-invoices.csv")} disabled={!filteredBills.length}><Download className="size-4" /> Export CSV</button><button className={buttonPrimary} onClick={() => { setMessage(null); setSelectedFeeStructureId(""); setSelectedClassId(""); setShowBillForm(true); }}><Plus className="size-4" /> Generate bills</button></div>} />
           <SearchFilters search={search} setSearch={setSearch} statusFilter={statusFilter} setStatusFilter={setStatusFilter} statuses={["PENDING", "PARTIALLY_PAID", "PAID", "OVERDUE"]} />
-          {billsQuery.error ? <QueryError message={billsQuery.error.message} /> : <BillsTable bills={filteredBills} onRecordPayment={(bill) => { setSelectedBillId(bill.id); setShowPaymentForm(true); }} />}
+          {billsQuery.error ? <QueryError message={billsQuery.error.message} /> : <BillsTable bills={filteredBills} onRecordPayment={(bill) => { setSelectedBillId(bill.id); setShowPaymentForm(true); }} onViewInvoice={setSelectedInvoiceForPrint} />}
         </section>
       )}
 
       {!loading && activeTab === "payments" && (
         <section className="rounded-2xl border border-border bg-card p-5">
-          <SectionHeader title="Payments & receipts" description="Saved payment transactions from the school finance ledger." action={<button className={buttonPrimary} onClick={() => { setMessage(null); setSelectedBillId(""); setShowPaymentForm(true); }}><Plus className="size-4" /> Record payment</button>} />
+          <SectionHeader title="Payments & receipts" description="Saved payment transactions from the school finance ledger." action={<div className="flex flex-wrap gap-2"><button type="button" className={buttonSecondary} onClick={() => downloadCsv([["Receipt","Student","Admission number","Bill","Date","Method","Reference","Amount (GHS)","Status"], ...filteredPayments.map(payment => [payment.paymentNumber, studentName(payment.student), payment.student?.admissionNumber ?? "", payment.bill?.billNumber ?? "", dateLabel(payment.paymentDate), payment.paymentMethod, payment.referenceNumber ?? "", Number(payment.amount).toFixed(2), payment.status])], "schoolhub-payment-register.csv")} disabled={!filteredPayments.length}><Download className="size-4" /> Export CSV</button><button className={buttonPrimary} onClick={() => { setMessage(null); setSelectedBillId(""); setShowPaymentForm(true); }}><Plus className="size-4" /> Record payment</button></div>} />
           <div className="relative my-4 max-w-md"><Search className="absolute left-3 top-3 size-4 text-muted-foreground" /><input className={cn(inputClass, "pl-9")} value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search receipt, student, or reference" /></div>
-          {paymentsQuery.error ? <QueryError message={paymentsQuery.error.message} /> : <PaymentsTable payments={filteredPayments} />}
+          {paymentsQuery.error ? <QueryError message={paymentsQuery.error.message} /> : <PaymentsTable payments={filteredPayments} onViewReceipt={setSelectedReceipt} />}
         </section>
       )}
 
@@ -624,7 +647,7 @@ export function AccountantPortalWorkspace({
           {billsQuery.error ? <QueryError message={billsQuery.error.message} /> : <BillsTable bills={debtors.filter((bill) => {
             const term = search.trim().toLowerCase();
             return !term || bill.billNumber.toLowerCase().includes(term) || studentName(bill.student).toLowerCase().includes(term) || (bill.class?.name ?? "").toLowerCase().includes(term);
-          })} onRecordPayment={(bill) => { setSelectedBillId(bill.id); setShowPaymentForm(true); }} />}
+          })} onRecordPayment={(bill) => { setSelectedBillId(bill.id); setShowPaymentForm(true); }} onViewInvoice={setSelectedInvoiceForPrint} />}
         </section>
       )}
 
@@ -700,6 +723,53 @@ export function AccountantPortalWorkspace({
       )}
 
       {activeTab === "announcements" && <AdminAnnouncementsWorkspace mode="accountant" />}
+
+      {selectedInvoiceForPrint && (
+        <Modal title="Invoice summary" description="Print-ready summary of the saved bill record." onClose={() => setSelectedInvoiceForPrint(null)}>
+          <section className="invoice-print-area rounded-xl border border-border p-5">
+            <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border pb-4">
+              <div><p className="text-xs font-bold uppercase tracking-[0.15em] text-primary">SchoolHub · Student invoice</p><h2 className="mt-1 text-xl font-bold text-foreground">{selectedInvoiceForPrint.billNumber}</h2><p className="mt-1 text-sm text-muted-foreground">Issued {dateLabel(selectedInvoiceForPrint.issuedAt)}</p></div>
+              <div className="text-right"><p className="text-xs text-muted-foreground">Invoice total</p><p className="mt-1 text-2xl font-bold tabular-nums text-foreground">{currency(selectedInvoiceForPrint.totalAmount)}</p><StatusBadge value={selectedInvoiceForPrint.status} /></div>
+            </div>
+            <div className="grid gap-x-6 gap-y-4 py-4 sm:grid-cols-2">
+              <div><p className="text-xs uppercase tracking-wide text-muted-foreground">Student</p><p className="mt-1 font-semibold text-foreground">{studentName(selectedInvoiceForPrint.student)}</p><p className="mt-1 text-xs text-muted-foreground">Admission no. {selectedInvoiceForPrint.student?.admissionNumber || "—"}</p></div>
+              <div><p className="text-xs uppercase tracking-wide text-muted-foreground">Class</p><p className="mt-1 font-semibold text-foreground">{selectedInvoiceForPrint.class?.name || "Class not recorded"}</p></div>
+              <div><p className="text-xs uppercase tracking-wide text-muted-foreground">Fee structure</p><p className="mt-1 font-semibold text-foreground">{selectedInvoiceForPrint.feeStructure?.name || "Fee bill"}</p></div>
+              <div><p className="text-xs uppercase tracking-wide text-muted-foreground">Academic period</p><p className="mt-1 font-semibold text-foreground">{[selectedInvoiceForPrint.academicYear?.name, selectedInvoiceForPrint.term?.name].filter(Boolean).join(" · ") || "Not specified"}</p></div>
+              <div><p className="text-xs uppercase tracking-wide text-muted-foreground">Due date</p><p className="mt-1 font-semibold text-foreground">{dateLabel(selectedInvoiceForPrint.dueDate)}</p></div>
+            </div>
+            {selectedInvoiceForPrint.items?.length ? <div className="py-4"><h3 className="mb-2 text-sm font-semibold text-foreground">Fee items</h3><div className="overflow-x-auto"><table className="w-full min-w-[430px] text-left text-sm"><thead><tr className="border-b border-border text-xs text-muted-foreground"><th className="py-2 pr-3">Description</th><th className="px-2 py-2 text-right">Qty</th><th className="px-2 py-2 text-right">Unit amount</th><th className="pl-2 py-2 text-right">Total</th></tr></thead><tbody>{selectedInvoiceForPrint.items.map(item => <tr key={item.id} className="border-b border-border/70 last:border-0"><td className="py-2 pr-3 text-foreground">{item.description}</td><td className="px-2 py-2 text-right tabular-nums">{item.quantity}</td><td className="px-2 py-2 text-right tabular-nums">{currency(item.amount)}</td><td className="pl-2 py-2 text-right font-medium tabular-nums">{currency(item.totalAmount)}</td></tr>)}</tbody></table></div></div> : null}
+            <div className="border-y border-border py-4"><div className="grid grid-cols-[1fr_auto] gap-3 py-2 text-sm"><span className="text-muted-foreground">Total billed</span><span className="font-semibold tabular-nums text-foreground">{currency(selectedInvoiceForPrint.totalAmount)}</span></div><div className="grid grid-cols-[1fr_auto] gap-3 py-2 text-sm"><span className="text-muted-foreground">Payments recorded</span><span className="font-semibold tabular-nums text-foreground">{currency(selectedInvoiceForPrint.paidAmount)}</span></div><div className="grid grid-cols-[1fr_auto] gap-3 border-t border-border pt-3 text-base"><span className="font-semibold text-foreground">Balance due</span><span className="font-bold tabular-nums text-foreground">{currency(selectedInvoiceForPrint.balanceAmount)}</span></div></div>
+            <p className="mt-4 text-xs leading-5 text-muted-foreground">This invoice summary reflects the saved SchoolHub bill and its recorded line items.</p>
+          </section>
+          <div className="invoice-print-actions mt-4 flex flex-wrap justify-end gap-2"><button type="button" className={buttonSecondary} onClick={() => downloadCsv([["Field","Value"],["Invoice",selectedInvoiceForPrint.billNumber],["Student",studentName(selectedInvoiceForPrint.student)],["Admission number",selectedInvoiceForPrint.student?.admissionNumber ?? ""],["Class",selectedInvoiceForPrint.class?.name ?? ""],["Fee structure",selectedInvoiceForPrint.feeStructure?.name ?? ""],["Academic year",selectedInvoiceForPrint.academicYear?.name ?? ""],["Term",selectedInvoiceForPrint.term?.name ?? ""],["Issued",dateLabel(selectedInvoiceForPrint.issuedAt)],["Due date",dateLabel(selectedInvoiceForPrint.dueDate)],["Total (GHS)",Number(selectedInvoiceForPrint.totalAmount).toFixed(2)],["Paid (GHS)",Number(selectedInvoiceForPrint.paidAmount).toFixed(2)],["Balance (GHS)",Number(selectedInvoiceForPrint.balanceAmount).toFixed(2)],["Status",selectedInvoiceForPrint.status]],"invoice-"+selectedInvoiceForPrint.billNumber+".csv")}><Download className="size-4" /> Export invoice</button><button type="button" className={buttonPrimary} onClick={() => window.print()}><Printer className="size-4" /> Print / Save PDF</button></div>
+        </Modal>
+      )}
+
+      {selectedReceipt && (
+        <Modal title="Payment receipt" description="Saved receipt details from the school payment ledger." onClose={() => setSelectedReceipt(null)}>
+          <section className="payment-receipt-print rounded-xl border border-border p-5">
+            <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border pb-4">
+              <div><p className="text-xs font-bold uppercase tracking-[0.15em] text-primary">SchoolHub · Official receipt record</p><h2 className="mt-1 text-xl font-bold text-foreground">{selectedReceipt.paymentNumber}</h2><p className="mt-1 text-sm text-muted-foreground">{dateLabel(selectedReceipt.paymentDate)}</p></div>
+              <div className="text-right"><p className="text-xs text-muted-foreground">Amount received</p><p className="mt-1 text-2xl font-bold tabular-nums text-foreground">{currency(selectedReceipt.amount)}</p><StatusBadge value={selectedReceipt.status} /></div>
+            </div>
+            <div className="grid gap-x-6 gap-y-4 py-4 sm:grid-cols-2">
+              <div><p className="text-xs uppercase tracking-wide text-muted-foreground">Student</p><p className="mt-1 font-semibold text-foreground">{studentName(selectedReceipt.student)}</p></div>
+              <div><p className="text-xs uppercase tracking-wide text-muted-foreground">Admission number</p><p className="mt-1 font-semibold text-foreground">{selectedReceipt.student?.admissionNumber || "—"}</p></div>
+              <div><p className="text-xs uppercase tracking-wide text-muted-foreground">Invoice</p><p className="mt-1 font-semibold text-foreground">{selectedReceipt.bill?.billNumber || "Unallocated payment"}</p></div>
+              <div><p className="text-xs uppercase tracking-wide text-muted-foreground">Payment method</p><p className="mt-1 font-semibold text-foreground">{selectedReceipt.paymentMethod.replaceAll("_", " ")}</p></div>
+              <div><p className="text-xs uppercase tracking-wide text-muted-foreground">Transaction reference</p><p className="mt-1 font-semibold text-foreground">{selectedReceipt.referenceNumber || "—"}</p></div>
+              <div><p className="text-xs uppercase tracking-wide text-muted-foreground">Recorded by</p><p className="mt-1 font-semibold text-foreground">{selectedReceipt.recordedBy?.name || selectedReceipt.recordedBy?.email || "School accounts"}</p></div>
+            </div>
+            {selectedReceipt.status !== "COMPLETED" && <p className="border-t border-border pt-3 text-xs leading-5 text-muted-foreground">This transaction is marked {selectedReceipt.status.replaceAll("_", " ")}. It should not be treated as a completed receipt until its status is confirmed.</p>}
+            <div className="border-t border-border pt-4"><p className="text-xs text-muted-foreground">This document reflects the saved SchoolHub payment record. It does not independently verify a bank or mobile-money transaction.</p><div className="mt-8 grid grid-cols-2 gap-8 text-xs text-muted-foreground"><div className="border-t border-border pt-2">Received by</div><div className="border-t border-border pt-2">Authorised by</div></div></div>
+          </section>
+          <div className="payment-receipt-actions mt-4 flex flex-wrap justify-end gap-2">
+            <button type="button" className={buttonSecondary} onClick={() => downloadCsv([["Field","Value"],["Receipt",selectedReceipt.paymentNumber],["Student",studentName(selectedReceipt.student)],["Admission number",selectedReceipt.student?.admissionNumber ?? ""],["Invoice",selectedReceipt.bill?.billNumber ?? ""],["Date",dateLabel(selectedReceipt.paymentDate)],["Payment method",selectedReceipt.paymentMethod],["Reference",selectedReceipt.referenceNumber ?? ""],["Amount (GHS)",Number(selectedReceipt.amount).toFixed(2)],["Status",selectedReceipt.status]], "receipt-"+selectedReceipt.paymentNumber+".csv")}><Download className="size-4" /> Export receipt</button>
+            <button type="button" className={buttonPrimary} onClick={() => window.print()}><Printer className="size-4" /> Print / Save PDF</button>
+          </div>
+        </Modal>
+      )}
 
       {showPaymentForm && (
         <Modal title="Record a payment" description="Record a receipt against an outstanding bill. The server validates the bill and updates its balance." onClose={() => { setShowPaymentForm(false); setSelectedBillId(""); }}>
@@ -837,14 +907,14 @@ function SearchFilters({ search, setSearch, statusFilter, setStatusFilter, statu
   return <div className="my-4 flex flex-wrap gap-3"><div className="relative min-w-56 flex-1"><Search className="absolute left-3 top-3 size-4 text-muted-foreground" /><input className={cn(inputClass, "pl-9")} value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search bill, student, or class" /></div><select className={cn(inputClass, "w-auto min-w-40")} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="ALL">All statuses</option>{statuses.map((status) => <option key={status} value={status}>{status.replaceAll("_", " ")}</option>)}</select></div>;
 }
 
-function BillsTable({ bills, onRecordPayment }: { bills: ApiBill[]; onRecordPayment: (bill: ApiBill) => void }) {
+function BillsTable({ bills, onRecordPayment, onViewInvoice }: { bills: ApiBill[]; onRecordPayment: (bill: ApiBill) => void; onViewInvoice: (bill: ApiBill) => void }) {
   if (!bills.length) return <EmptyState icon={FileText} title="No matching bills" description="Bills appear here after they are generated for an active class and term." />;
-  return <div className="mt-4 overflow-x-auto"><table className="w-full min-w-[820px] text-left text-sm"><thead><tr className="border-b border-border text-xs text-muted-foreground"><th className="p-3">Bill</th><th className="p-3">Student / class</th><th className="p-3">Due date</th><th className="p-3 text-right">Amount</th><th className="p-3 text-right">Paid</th><th className="p-3 text-right">Balance</th><th className="p-3">Status</th><th className="p-3"></th></tr></thead><tbody>{bills.map((bill) => <tr key={bill.id} className="border-b border-border/70 last:border-0 hover:bg-muted/40"><td className="p-3"><div className="font-semibold text-foreground">{bill.billNumber}</div><div className="text-xs text-muted-foreground">{bill.feeStructure?.name ?? "Fee bill"}</div></td><td className="p-3"><div className="font-medium text-foreground">{studentName(bill.student)}</div><div className="text-xs text-muted-foreground">{bill.student?.admissionNumber} · {bill.class?.name ?? "Class not recorded"}</div></td><td className="p-3">{dateLabel(bill.dueDate)}</td><td className="p-3 text-right tabular-nums">{currency(bill.totalAmount)}</td><td className="p-3 text-right tabular-nums">{currency(bill.paidAmount)}</td><td className="p-3 text-right font-semibold tabular-nums">{currency(bill.balanceAmount)}</td><td className="p-3"><StatusBadge value={bill.status} /></td><td className="p-3 text-right">{Number(bill.balanceAmount) > 0 && <button className="text-xs font-semibold text-primary hover:underline" onClick={() => onRecordPayment(bill)}>Record payment</button>}</td></tr>)}</tbody></table></div>;
+  return <div className="mt-4 overflow-x-auto"><table className="w-full min-w-[820px] text-left text-sm"><thead><tr className="border-b border-border text-xs text-muted-foreground"><th className="p-3">Bill</th><th className="p-3">Student / class</th><th className="p-3">Due date</th><th className="p-3 text-right">Amount</th><th className="p-3 text-right">Paid</th><th className="p-3 text-right">Balance</th><th className="p-3">Status</th><th className="p-3"></th></tr></thead><tbody>{bills.map((bill) => <tr key={bill.id} className="border-b border-border/70 last:border-0 hover:bg-muted/40"><td className="p-3"><div className="font-semibold text-foreground">{bill.billNumber}</div><div className="text-xs text-muted-foreground">{bill.feeStructure?.name ?? "Fee bill"}</div></td><td className="p-3"><div className="font-medium text-foreground">{studentName(bill.student)}</div><div className="text-xs text-muted-foreground">{bill.student?.admissionNumber} · {bill.class?.name ?? "Class not recorded"}</div></td><td className="p-3">{dateLabel(bill.dueDate)}</td><td className="p-3 text-right tabular-nums">{currency(bill.totalAmount)}</td><td className="p-3 text-right tabular-nums">{currency(bill.paidAmount)}</td><td className="p-3 text-right font-semibold tabular-nums">{currency(bill.balanceAmount)}</td><td className="p-3"><StatusBadge value={bill.status} /></td><td className="p-3 text-right"><div className="flex flex-col items-end gap-1"><button type="button" className="text-xs font-semibold text-primary hover:underline" onClick={() => onViewInvoice(bill)}>View invoice</button>{Number(bill.balanceAmount) > 0 && <button type="button" className="text-xs font-semibold text-foreground hover:underline" onClick={() => onRecordPayment(bill)}>Record payment</button>}</div></td></tr>)}</tbody></table></div>;
 }
 
-function PaymentsTable({ payments }: { payments: ApiPayment[] }) {
+function PaymentsTable({ payments, onViewReceipt }: { payments: ApiPayment[]; onViewReceipt: (payment: ApiPayment) => void }) {
   if (!payments.length) return <EmptyState icon={Receipt} title="No payments recorded" description="When an accountant records a payment, the saved receipt will appear here." />;
-  return <div className="mt-4 overflow-x-auto"><table className="w-full min-w-[680px] text-left text-sm"><thead><tr className="border-b border-border text-xs text-muted-foreground"><th className="p-3">Receipt</th><th className="p-3">Student</th><th className="p-3">Date</th><th className="p-3">Method / reference</th><th className="p-3 text-right">Amount</th><th className="p-3">Status</th></tr></thead><tbody>{payments.map((payment) => <tr key={payment.id} className="border-b border-border/70 last:border-0 hover:bg-muted/40"><td className="p-3 font-semibold text-foreground">{payment.paymentNumber}</td><td className="p-3"><div className="font-medium">{studentName(payment.student)}</div><div className="text-xs text-muted-foreground">{payment.student?.admissionNumber}</div></td><td className="p-3">{dateLabel(payment.paymentDate)}</td><td className="p-3"><div>{payment.paymentMethod.replaceAll("_", " ")}</div><div className="text-xs text-muted-foreground">{payment.referenceNumber || "No reference"}</div></td><td className="p-3 text-right font-semibold tabular-nums">{currency(payment.amount)}</td><td className="p-3"><StatusBadge value={payment.status} /></td></tr>)}</tbody></table></div>;
+  return <div className="mt-4 overflow-x-auto"><table className="w-full min-w-[760px] text-left text-sm"><thead><tr className="border-b border-border text-xs text-muted-foreground"><th className="p-3">Receipt</th><th className="p-3">Student</th><th className="p-3">Date</th><th className="p-3">Method / reference</th><th className="p-3 text-right">Amount</th><th className="p-3">Status</th><th className="p-3"></th></tr></thead><tbody>{payments.map((payment) => <tr key={payment.id} className="border-b border-border/70 last:border-0 hover:bg-muted/40"><td className="p-3 font-semibold text-foreground">{payment.paymentNumber}</td><td className="p-3"><div className="font-medium">{studentName(payment.student)}</div><div className="text-xs text-muted-foreground">{payment.student?.admissionNumber}</div></td><td className="p-3">{dateLabel(payment.paymentDate)}</td><td className="p-3"><div>{payment.paymentMethod.replaceAll("_", " ")}</div><div className="text-xs text-muted-foreground">{payment.referenceNumber || "No reference"}</div></td><td className="p-3 text-right font-semibold tabular-nums">{currency(payment.amount)}</td><td className="p-3"><StatusBadge value={payment.status} /></td><td className="p-3 text-right"><button type="button" className="text-xs font-semibold text-primary hover:underline" onClick={() => onViewReceipt(payment)}>View receipt</button></td></tr>)}</tbody></table></div>;
 }
 
 function ExpensesTable({ expenses }: { expenses: ApiExpense[] }) {

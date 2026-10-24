@@ -47,6 +47,35 @@ const feeItemRegistrySchema = z.object({
   description: z.string().trim().max(500).optional(),
 });
 const feeStructureStatusSchema = z.object({ isActive: z.boolean() });
+const expenditureCategorySchema = z.object({ name: z.string().trim().min(2, "Enter a category name").max(120), description: z.string().trim().max(500).optional() });
+const payrollDraftSchema = z.object({
+  month: z.number().int().min(1).max(12),
+  year: z.literal(2026),
+  confirmResidentTaxTreatment: z.literal(true),
+});
+const payrollTransitionSchema = z.object({
+  status: z.enum(["APPROVED", "PAID", "CANCELLED"]),
+  paymentMethod: z.enum(["CASH", "BANK_TRANSFER", "CHEQUE", "MOBILE_MONEY", "CARD", "ONLINE", "OTHER"]).optional(),
+});
+const feeReminderCreateSchema = z.object({
+  name: z.string().trim().min(2, "Enter a schedule name").max(120),
+  description: z.string().trim().max(500).optional(),
+  messageTemplate: z.string().trim().min(12, "Write a useful reminder message").max(1500),
+  minimumOutstanding: z.number().finite().min(0).max(100000000).default(0),
+  installment: z.object({
+    label: z.string().trim().min(1).max(100),
+    dueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Format: YYYY-MM-DD"),
+    sendDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Format: YYYY-MM-DD"),
+  }).optional(),
+});
+const reminderScheduleActiveSchema = z.object({ isActive: z.boolean() });
+const feeReminderInstallmentSchema = z.object({
+  label: z.string().trim().min(1, "Enter an installment label").max(100),
+  dueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Format: YYYY-MM-DD"),
+  sendDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Format: YYYY-MM-DD"),
+});
+
+
 
 @Controller("finance")
 @UseGuards(SchoolTenantGuard, RolesGuard)
@@ -120,8 +149,37 @@ export class FinanceController {
 
   @Get("expenses")
   @Roles("owner", "admin", "accountant")
-  listExpenses(@CurrentSchool() school: School) {
-    return this.financeService.listExpenses(school.id);
+  listExpenses(
+    @CurrentSchool() school: School,
+    @Query("from") fromDate?: string,
+    @Query("to") toDate?: string,
+  ) {
+    return this.financeService.listExpenses(school.id, fromDate, toDate);
+  }
+
+  @Get("expenditure-categories")
+  @Roles("owner", "admin", "accountant")
+  listExpenditureCategories(@CurrentSchool() school: School) {
+    return this.financeService.listExpenditureCategories(school.id);
+  }
+
+  @Post("expenditure-categories")
+  @Roles("owner", "admin", "accountant")
+  createExpenditureCategory(
+    @CurrentSchool() school: School,
+    @Body(new ZodValidationPipe(expenditureCategorySchema)) body: z.infer<typeof expenditureCategorySchema>,
+  ) {
+    return this.financeService.createExpenditureCategory(school.id, body);
+  }
+
+  @Patch("expenditure-categories/:categoryId")
+  @Roles("owner", "admin", "accountant")
+  updateExpenditureCategory(
+    @CurrentSchool() school: School,
+    @Param("categoryId") categoryId: string,
+    @Body(new ZodValidationPipe(expenditureCategorySchema)) body: z.infer<typeof expenditureCategorySchema>,
+  ) {
+    return this.financeService.updateExpenditureCategory(school.id, categoryId, body);
   }
 
   @Post("expenses")
@@ -138,6 +196,26 @@ export class FinanceController {
   @Roles("owner", "admin", "accountant")
   listPayrollRecords(@CurrentSchool() school: School) {
     return this.financeService.listPayrollRecords(school.id);
+  }
+
+  @Post("payroll")
+  @Roles("owner", "admin", "accountant")
+  generatePayrollDraft(
+    @CurrentSchool() school: School,
+    @CurrentUser() user: AuthenticatedUser,
+    @Body(new ZodValidationPipe(payrollDraftSchema)) body: z.infer<typeof payrollDraftSchema>,
+  ) {
+    return this.financeService.generatePayrollDraft(school.id, user.id, body);
+  }
+
+  @Patch("payroll/:recordId/status")
+  @Roles("owner", "admin", "accountant")
+  transitionPayroll(
+    @CurrentSchool() school: School,
+    @Param("recordId") recordId: string,
+    @Body(new ZodValidationPipe(payrollTransitionSchema)) body: z.infer<typeof payrollTransitionSchema>,
+  ) {
+    return this.financeService.transitionPayroll(school.id, recordId, body);
   }
 
   @Post("bills/generate")
@@ -157,6 +235,61 @@ export class FinanceController {
     @Body(new ZodValidationPipe(recordPaymentSchema)) body: RecordPaymentInput,
   ) {
     return this.financeService.recordPayment(school.id, user.id, body);
+  }
+
+
+  @Get("fee-reminders")
+  @Roles("owner", "admin", "accountant")
+  listFeeReminderSchedules(@CurrentSchool() school: School) {
+    return this.financeService.listFeeReminderSchedules(school.id);
+  }
+
+  @Post("fee-reminders")
+  @Roles("owner", "admin", "accountant")
+  createFeeReminderSchedule(
+    @CurrentSchool() school: School,
+    @CurrentUser() user: AuthenticatedUser,
+    @Body(new ZodValidationPipe(feeReminderCreateSchema)) body: z.infer<typeof feeReminderCreateSchema>,
+  ) {
+    return this.financeService.createFeeReminderSchedule(school.id, user.id, body);
+  }
+
+  @Patch("fee-reminders/:scheduleId")
+  @Roles("owner", "admin", "accountant")
+  setFeeReminderScheduleActive(
+    @CurrentSchool() school: School,
+    @Param("scheduleId") scheduleId: string,
+    @Body(new ZodValidationPipe(reminderScheduleActiveSchema)) body: z.infer<typeof reminderScheduleActiveSchema>,
+  ) {
+    return this.financeService.setFeeReminderScheduleActive(school.id, scheduleId, body.isActive);
+  }
+
+  @Post("fee-reminders/:scheduleId/installments")
+  @Roles("owner", "admin", "accountant")
+  addFeeReminderInstallment(
+    @CurrentSchool() school: School,
+    @Param("scheduleId") scheduleId: string,
+    @Body(new ZodValidationPipe(feeReminderInstallmentSchema)) body: z.infer<typeof feeReminderInstallmentSchema>,
+  ) {
+    return this.financeService.addFeeReminderInstallment(school.id, scheduleId, body);
+  }
+
+  @Get("fee-reminders/:scheduleId/preview")
+  @Roles("owner", "admin", "accountant")
+  previewFeeReminder(
+    @CurrentSchool() school: School,
+    @Param("scheduleId") scheduleId: string,
+  ) {
+    return this.financeService.previewFeeReminder(school.id, scheduleId);
+  }
+
+  @Post("fee-reminders/:scheduleId/send")
+  @Roles("owner", "admin", "accountant")
+  sendFeeReminderInApp(
+    @CurrentSchool() school: School,
+    @Param("scheduleId") scheduleId: string,
+  ) {
+    return this.financeService.sendFeeReminderInApp(school.id, scheduleId);
   }
 
   @Get("students/:studentId/ledger")
