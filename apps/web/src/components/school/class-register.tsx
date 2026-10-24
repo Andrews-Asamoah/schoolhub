@@ -317,10 +317,10 @@ function StatusPill({ status }: { status: Status | null }) {
   }
   return (
     <span className={`inline-flex items-center rounded-full border px-3 py-1.5 text-xs font-semibold ${
-      status === "PRESENT" ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
-        : status === "ABSENT" ? "border-rose-500/30 bg-rose-500/10 text-rose-700 dark:text-rose-300"
-          : status === "LATE" ? "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300"
-            : "border-sky-500/30 bg-sky-500/10 text-sky-700 dark:text-sky-300"
+      status === "PRESENT" ? "border-success/30 bg-success/10 text-success"
+        : status === "ABSENT" ? "border-destructive/30 bg-destructive/10 text-destructive"
+          : status === "LATE" ? "border-warning/30 bg-warning/10 text-warning"
+            : "border-info/30 bg-info/10 text-info"
     }`}>
       {LABEL[status]}
     </span>
