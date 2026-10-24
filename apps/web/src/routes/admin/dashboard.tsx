@@ -17,6 +17,18 @@ import { StatCard } from "@/components/superadmin/stat-card";
 import { SubscriptionBadge } from "@/components/superadmin/subscription-badge";
 import { DataTable, type DataTableColumn } from "@/components/ui/data-table";
 import { Link, useNavigate } from "@tanstack/react-router";
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 
 export const Route = createFileRoute("/admin/dashboard")({
   component: AdminDashboard,
@@ -184,6 +196,38 @@ function AdminDashboard() {
           icon={CreditCard}
           color="rose"
         />
+      </section>
+
+      <section aria-label="Platform analytics" className="grid gap-5 xl:grid-cols-[1.35fr_1fr]">
+        <article className="min-w-0 rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_4px_24px_rgba(15,23,42,0.035)] sm:p-6">
+          <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
+            <div><h2 className="text-sm font-semibold text-slate-900 sm:text-base">Platform footprint</h2><p className="mt-1 text-xs leading-5 text-slate-500">Current totals from platform statistics</p></div>
+            <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-semibold text-slate-500">Live data</span>
+          </div>
+          {statsLoading ? <div className="flex h-64 items-center justify-center text-sm text-slate-400">Loading platform metrics…</div> : statsError || !stats ? <div className="flex h-64 items-center justify-center rounded-xl border border-dashed border-slate-200 px-5 text-center text-sm text-slate-500">Platform statistics are unavailable. Chart data will appear when the API responds.</div> : (
+            <div role="img" aria-label={`Platform totals: ${stats.totalSchools} schools, ${stats.totalStudents} students, ${stats.totalTeachers} teachers, ${stats.activeSubscriptions} active subscriptions`} className="h-64 w-full min-w-0">
+              <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+                <BarChart data={[{ label: "Schools", value: stats.totalSchools, fill: "#6366f1" }, { label: "Students", value: stats.totalStudents, fill: "#0d9488" }, { label: "Teachers", value: stats.totalTeachers, fill: "#f59e0b" }, { label: "Active plans", value: stats.activeSubscriptions, fill: "#8b5cf6" }]} margin={{ top: 8, right: 8, left: -12, bottom: 0 }}>
+                  <CartesianGrid stroke="#e2e8f0" strokeDasharray="3 3" vertical={false} />
+                  <XAxis dataKey="label" tickLine={false} axisLine={false} tick={{ fill: "#64748b", fontSize: 11 }} />
+                  <YAxis allowDecimals={false} tickLine={false} axisLine={false} width={42} tick={{ fill: "#64748b", fontSize: 10 }} />
+                  <Tooltip contentStyle={{ borderRadius: 12, border: "1px solid #e2e8f0", fontSize: 12 }} formatter={(value) => [Number(value ?? 0).toLocaleString("en-GH"), "Total"]} />
+                  <Bar dataKey="value" radius={[7, 7, 0, 0]} maxBarSize={48}>{[{ fill: "#6366f1" }, { fill: "#0d9488" }, { fill: "#f59e0b" }, { fill: "#8b5cf6" }].map((item, index) => <Cell key={index} fill={item.fill} />)}</Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+          <p className="mt-3 text-[10px] leading-4 text-slate-400">Counts use different units; compare each category over time, not against one another.</p>
+        </article>
+        <article className="min-w-0 rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_4px_24px_rgba(15,23,42,0.035)] sm:p-6">
+          <div className="mb-4"><h2 className="text-sm font-semibold text-slate-900 sm:text-base">Subscription mix</h2><p className="mt-1 text-xs leading-5 text-slate-500">Status of the five most recently enrolled schools shown below</p></div>
+          {schoolsLoading ? <div className="flex h-48 items-center justify-center text-sm text-slate-400">Loading school records…</div> : schoolsError || !schools?.data.length ? <div className="flex h-48 items-center justify-center rounded-xl border border-dashed border-slate-200 px-5 text-center text-sm text-slate-500">No school subscription data available yet.</div> : (() => {
+            const groups = schools.data.reduce<Record<string, number>>((acc, school) => { const status = school.organization.subscriptionStatus || "UNKNOWN"; acc[status] = (acc[status] ?? 0) + 1; return acc; }, {});
+            const palette = ["#6366f1", "#0d9488", "#f59e0b", "#e11d48", "#8b5cf6"];
+            const data = Object.entries(groups).map(([name, value]) => ({ name: name.replaceAll("_", " "), value }));
+            return <><div role="img" aria-label={data.map((item) => `${item.name}: ${item.value} schools`).join(", ")} className="h-48 w-full min-w-0"><ResponsiveContainer width="100%" height="100%" minWidth={0}><PieChart><Pie data={data} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius="58%" outerRadius="82%" paddingAngle={3} stroke="none">{data.map((item, index) => <Cell key={item.name} fill={palette[index % palette.length]} />)}</Pie><Tooltip contentStyle={{ borderRadius: 12, border: "1px solid #e2e8f0", fontSize: 12 }} formatter={(value) => [`${value ?? 0} schools`, "Count"]} /></PieChart></ResponsiveContainer></div><div className="mt-3 space-y-2">{data.map((item, index) => <div key={item.name} className="flex items-center justify-between gap-3 text-xs"><span className="flex min-w-0 items-center gap-2 text-slate-600"><span className="size-2.5 shrink-0 rounded-sm" style={{ backgroundColor: palette[index % palette.length] }} />{item.name}</span><span className="font-semibold tabular-nums text-slate-900">{item.value}</span></div>)}</div></>;
+          })()}
+        </article>
       </section>
 
       <section className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_4px_24px_rgba(15,23,42,0.035)]">
