@@ -43,6 +43,7 @@ import { ClubsWorkspace } from "@/components/school/clubs-workspace";
 import { TeacherPortalWorkspace } from "@/components/portal/teacher-portal-workspace";
 import { AccountantPortalWorkspace } from "@/components/portal/accountant-portal-workspace";
 import { GuardianPortalWorkspace } from "@/components/portal/guardian-portal-workspace";
+import { GuardianChildRecordsWorkspace } from "@/components/portal/guardian-child-records-workspace";
 import { StudentPortalWorkspace } from "@/components/portal/student-portal-workspace";
 import { StudentSubjectsView } from "@/components/portal/student-subjects-view";
 import { StudentAttendanceView } from "@/components/portal/student-attendance-view";
@@ -214,7 +215,7 @@ function WorkspaceContent({ pageId }: { pageId: string }) {
   return (
     <>
       {activeRole !== "student" &&
-        !["classes", "students", "teachers", "staff", "guardians", "teacher-portal", "accountant-portal", "guardian-portal", "student-portal", "clubs", "houses", "assignments", "classmates", "announcements"].includes(
+        !["classes", "students", "teachers", "staff", "guardians", "teacher-portal", "accountant-portal", "guardian-portal", "guardian-attendance", "guardian-timetable", "guardian-reports", "guardian-notices", "student-portal", "clubs", "houses", "assignments", "classmates", "announcements"].includes(
           pageId,
         ) && (
         <WorkspacePageHeading
@@ -234,7 +235,11 @@ function WorkspaceContent({ pageId }: { pageId: string }) {
         <>
           {pageId === "teacher-portal" && <TeacherPortalWorkspace />}
           {pageId === "accountant-portal" && <AccountantPortalWorkspace />}
-          {pageId === "guardian-portal" && <GuardianPortalWorkspace />}
+          {pageId === "guardian-portal" && <GuardianPortalWorkspace showSectionNav={false} />}
+          {pageId === "guardian-attendance" && <GuardianChildRecordsWorkspace view="attendance" />}
+          {pageId === "guardian-timetable" && <GuardianChildRecordsWorkspace view="timetable" />}
+          {pageId === "guardian-reports" && <GuardianPortalWorkspace defaultTab="academics" showSectionNav={false} />}
+          {pageId === "guardian-notices" && <GuardianPortalWorkspace defaultTab="notices" showSectionNav={false} />}
           {pageId === "student-portal" && <StudentPortalWorkspace />}
           {pageId === "invoices" && <AccountantPortalWorkspace defaultTab="invoices" />}
           {pageId === "expenses" && <AccountantPortalWorkspace defaultTab="expenses" />}
