@@ -20,16 +20,16 @@ export function WorkspacePageHeading({
   return (
     <div className="mb-7 flex flex-wrap items-end justify-between gap-4">
       <div>
-        <p className="mb-2 text-xs font-medium text-slate-500">{section}</p>
+        <p className="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">{section}</p>
         <div className="flex items-center gap-3">
-          <span className="flex size-10 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
+          <span className="flex size-11 items-center justify-center rounded-xl border border-primary/20 bg-primary/10 text-primary shadow-sm">
             <Icon className="size-5" />
           </span>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-[30px]">
+          <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-[30px]">
             {title}
           </h1>
         </div>
-        <p className="mt-2 max-w-2xl text-sm text-slate-500">{description}</p>
+        <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">{description}</p>
       </div>
       {action}
     </div>
