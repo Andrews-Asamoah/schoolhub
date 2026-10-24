@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
-import type { CreateInventoryItemInput, InventoryStockMovementInput } from "@schoolhub/shared";
+import type { CreateInventoryItemInput, InventoryStockMovementInput, UpdateInventoryItemInput } from "@schoolhub/shared";
 import { PrismaService } from "../../prisma/prisma.service.js";
 
 @Injectable()
@@ -111,6 +111,30 @@ export class InventoryService {
         });
       }
       return item;
+    });
+  }
+
+  async updateItem(schoolId: string, itemId: string, input: UpdateInventoryItemInput) {
+    const updated = await this.prisma.client.inventoryItem.updateMany({
+      where: { id: itemId, schoolId },
+      data: {
+        name: input.name.trim(),
+        description: input.description?.trim() || null,
+        category: input.category?.trim() || null,
+        unit: input.unit.trim(),
+        minQuantity: input.minQuantity,
+      },
+    });
+    if (updated.count !== 1) throw new NotFoundException("Inventory item not found.");
+    return this.prisma.client.inventoryItem.findFirst({
+      where: { id: itemId, schoolId },
+      include: {
+        transactions: {
+          orderBy: { createdAt: "desc" },
+          take: 5,
+          select: { id: true, type: true, quantity: true, date: true, description: true, recipientName: true, createdAt: true },
+        },
+      },
     });
   }
 
