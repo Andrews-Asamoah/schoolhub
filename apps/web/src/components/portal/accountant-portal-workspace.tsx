@@ -298,10 +298,16 @@ export function AccountantPortalWorkspace({
   }), [payments, search]);
 
   const debtors = bills.filter((bill) => Number(bill.balanceAmount) > 0 && bill.status !== "CANCELLED" && bill.status !== "WAIVED");
-  const collected = payments.reduce((sum, payment) => sum + Number(payment.amount), 0);
+  // Only settled receipts are counted as collections. Failed, pending,
+  // cancelled and refunded transactions remain visible in history but are not
+  // treated as cash received in dashboard totals or payment-method analysis.
+  const settledPayments = payments.filter((payment) => payment.status === "COMPLETED");
+  const collected = settledPayments.reduce((sum, payment) => sum + Number(payment.amount), 0);
   const outstanding = debtors.reduce((sum, bill) => sum + Number(bill.balanceAmount), 0);
   const expenseTotal = expenses.reduce((sum, expense) => sum + Number(expense.amount), 0);
-  const payrollNet = payroll.reduce((sum, run) => sum + Number(run.totalNet), 0);
+  const paidPayroll = payroll.filter((run) => run.status === "PAID");
+  const payrollNet = paidPayroll.reduce((sum, run) => sum + Number(run.totalNet), 0);
+  const payrollGrossPaid = paidPayroll.reduce((sum, run) => sum + Number(run.totalGross), 0);
   const currentYear = (yearsQuery.data ?? []).find((year) => year.isCurrent);
   const currentTerm = currentYear?.terms.find((term) => term.isCurrent);
   const exportFinanceReport = () => {
@@ -311,11 +317,11 @@ export function AccountantPortalWorkspace({
       ["Academic period", [currentYear?.name, currentTerm?.name].filter(Boolean).join(" - ") || "All available records"],
       [],
       ["Metric", "Amount (GHS)", "Record count"],
-      ["Payments collected", collected.toFixed(2), String(payments.length)],
+      ["Payments collected (completed only)", collected.toFixed(2), String(settledPayments.length)],
       ["Outstanding balances", outstanding.toFixed(2), String(debtors.length)],
       ["Operating expenses", expenseTotal.toFixed(2), String(expenses.length)],
-      ["Payroll gross", payroll.reduce((sum, run) => sum + Number(run.totalGross), 0).toFixed(2), String(payroll.length)],
-      ["Payroll net", payrollNet.toFixed(2), String(payroll.length)],
+      ["Paid payroll gross", payrollGrossPaid.toFixed(2), String(paidPayroll.length)],
+      ["Paid payroll net", payrollNet.toFixed(2), String(paidPayroll.length)],
       [],
       ["Receipts"],
       ["Receipt number", "Student", "Date", "Method", "Reference", "Amount (GHS)", "Status"],
@@ -588,10 +594,10 @@ export function AccountantPortalWorkspace({
 
       {activeTab === "overview" && (
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <MetricCard label="Payments collected" value={paymentsQuery.error ? "Unavailable" : currency(collected)} detail={paymentsQuery.error ? "Could not load payment records" : `${payments.length} recorded receipts`} icon={ArrowUpRight} />
+          <MetricCard label="Payments collected" value={paymentsQuery.error ? "Unavailable" : currency(collected)} detail={paymentsQuery.error ? "Could not load payment records" : `${settledPayments.length} completed receipts`} icon={ArrowUpRight} />
           <MetricCard label="Outstanding fees" value={billsQuery.error ? "Unavailable" : currency(outstanding)} detail={billsQuery.error ? "Could not load bill records" : `${debtors.length} bills with balances`} icon={AlertCircle} />
           <MetricCard label="Recorded expenses" value={expensesQuery.error ? "Unavailable" : currency(expenseTotal)} detail={expensesQuery.error ? "Could not load expense records" : `${expenses.length} expense entries`} icon={ArrowDownRight} />
-          <MetricCard label="Payroll net total" value={payrollQuery.error ? "Unavailable" : currency(payrollNet)} detail={payrollQuery.error ? "Could not load payroll records" : `${payroll.length} saved payroll run(s)`} icon={Wallet} />
+          <MetricCard label="Paid payroll net" value={payrollQuery.error ? "Unavailable" : currency(payrollNet)} detail={payrollQuery.error ? "Could not load payroll records" : `${paidPayroll.length} paid payroll run(s)`} icon={Wallet} />
         </div>
       )}
 
@@ -666,7 +672,7 @@ export function AccountantPortalWorkspace({
             <MetricCard label="Receivables" value={billsQuery.error ? "Unavailable" : String(debtors.length)} detail={debtors.filter(bill => bill.status === "OVERDUE").length + " overdue bills"} icon={Receipt} />
           </div>
           <div className="mt-5 grid gap-5 xl:grid-cols-2">
-            <div className="rounded-xl border border-border p-4"><h3 className="font-semibold text-foreground">Collection by payment method</h3><p className="mt-1 text-xs text-muted-foreground">Based on recorded receipts.</p>{payments.length ? <div className="mt-3 space-y-3">{Object.entries(payments.reduce<Record<string, number>>((totals, payment) => { totals[payment.paymentMethod] = (totals[payment.paymentMethod] ?? 0) + Number(payment.amount); return totals; }, {})).sort((a,b) => b[1]-a[1]).map(([method,total]) => <div key={method}><div className="flex justify-between gap-3 text-sm"><span>{method.replaceAll("_", " ")}</span><span className="font-semibold tabular-nums">{currency(total)}</span></div><div className="mt-1 h-2 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-primary" style={{ width: (collected > 0 ? Math.min(100, total / collected * 100) : 0) + "%" }} /></div></div>)}</div> : <EmptyState icon={Receipt} title="No receipt data yet" description="Payment method analysis will appear when receipts have been recorded." />}</div>
+            <div className="rounded-xl border border-border p-4"><h3 className="font-semibold text-foreground">Collection by payment method</h3><p className="mt-1 text-xs text-muted-foreground">Completed receipts only; unsettled and refunded payments are excluded.</p>{settledPayments.length ? <div className="mt-3 space-y-3">{Object.entries(settledPayments.reduce<Record<string, number>>((totals, payment) => { totals[payment.paymentMethod] = (totals[payment.paymentMethod] ?? 0) + Number(payment.amount); return totals; }, {})).sort((a,b) => b[1]-a[1]).map(([method,total]) => <div key={method}><div className="flex justify-between gap-3 text-sm"><span>{method.replaceAll("_", " ")}</span><span className="font-semibold tabular-nums">{currency(total)}</span></div><div className="mt-1 h-2 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-primary" style={{ width: (collected > 0 ? Math.min(100, total / collected * 100) : 0) + "%" }} /></div></div>)}</div> : <EmptyState icon={Receipt} title="No receipt data yet" description="Payment method analysis will appear when receipts have been recorded." />}</div>
             <div className="rounded-xl border border-border p-4"><h3 className="font-semibold text-foreground">Financial position</h3><p className="mt-1 text-xs text-muted-foreground">A high-level comparison of recorded money in and operating money out.</p><div className="mt-4 space-y-3"><div className="flex items-center justify-between gap-3"><span className="text-sm text-muted-foreground">Collections</span><span className="font-semibold text-foreground">{currency(collected)}</span></div><div className="flex items-center justify-between gap-3"><span className="text-sm text-muted-foreground">Expenses</span><span className="font-semibold text-foreground">{currency(expenseTotal)}</span></div><div className="flex items-center justify-between gap-3 border-t border-border pt-3"><span className="text-sm font-semibold text-foreground">Collections less expenses</span><span className="text-lg font-bold tabular-nums text-foreground">{currency(collected - expenseTotal)}</span></div><p className="text-xs leading-5 text-muted-foreground">This is a simple cash-flow indicator, not an audited profit figure; it excludes receivables, payroll timing and other accounting adjustments.</p></div></div>
           </div>
         </section>
