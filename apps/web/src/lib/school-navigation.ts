@@ -4,6 +4,8 @@ import {
   Bell,
   BookOpen,
   CalendarDays,
+  Clock3,
+  BookOpenCheck,
   ClipboardCheck,
   FileBarChart,
   FileText,
@@ -147,6 +149,43 @@ export const schoolNavGroups: SchoolNavGroup[] = [
         icon: FileText,
         description: "Homework, coursework, and task submissions.",
         section: "Academics",
+        apiStatus: "available",
+      },
+    ],
+  },
+  {
+    label: "Family",
+    items: [
+      {
+        id: "guardian-attendance",
+        label: "Children's attendance",
+        icon: Activity,
+        description: "Review attendance summaries and recent register entries for linked children.",
+        section: "Family",
+        apiStatus: "available",
+      },
+      {
+        id: "guardian-timetable",
+        label: "Children's timetable",
+        icon: Clock3,
+        description: "View the weekly class timetable for each linked child.",
+        section: "Family",
+        apiStatus: "available",
+      },
+      {
+        id: "guardian-reports",
+        label: "Academic reports",
+        icon: BookOpenCheck,
+        description: "Read official academic reports published for linked children.",
+        section: "Family",
+        apiStatus: "available",
+      },
+      {
+        id: "guardian-notices",
+        label: "School notices",
+        icon: Bell,
+        description: "Read school announcements available to your guardian account.",
+        section: "Family",
         apiStatus: "available",
       },
     ],
@@ -429,7 +468,7 @@ const rolePages: Record<string, string[]> = {
     "clubs",
     "announcements",
   ],
-  guardian: ["guardian-portal"],
+  guardian: ["guardian-portal", "guardian-attendance", "guardian-timetable", "guardian-reports", "guardian-notices"],
 };
 
 /**
