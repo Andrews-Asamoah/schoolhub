@@ -16,7 +16,7 @@ export type ProvisionableRole = Exclude<Role, "owner">;
 export function newGuardianLoginEmail(name: string) {
   const parts = name
     .normalize("NFKD")
-    .replace(/[\\u0300-\\u036f]/g, "")
+    .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
     .split(/[^a-z0-9]+/)
     .filter(Boolean);
