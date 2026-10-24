@@ -150,7 +150,7 @@ export function ClassRegister({ classId, className, canMark }: { classId: string
       {rows && rows.length > 0 && (
         <>
           {weekend && (
-            <p className="mx-4 mt-4 flex items-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2.5 text-sm font-medium text-amber-700 dark:text-amber-300">
+            <p className="mx-4 mt-4 flex items-center gap-2 rounded-xl border border-warning/30 bg-warning/10 px-3 py-2.5 text-sm font-medium text-warning">
               <CircleAlert className="size-4 shrink-0" />
               This date falls on a weekend. Attendance is usually recorded on school days.
             </p>
@@ -263,28 +263,28 @@ function SummaryCard({
 }) {
   const tones = {
     present: {
-      border: "border-emerald-500/30",
-      icon: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400",
-      value: "text-emerald-700 dark:text-emerald-300",
-      dot: "bg-emerald-500",
+      border: "border-success/30",
+      icon: "bg-success/10 text-success",
+      value: "text-success",
+      dot: "bg-success",
     },
     absent: {
-      border: "border-rose-500/30",
-      icon: "bg-rose-500/15 text-rose-600 dark:text-rose-400",
-      value: "text-rose-700 dark:text-rose-300",
-      dot: "bg-rose-500",
+      border: "border-destructive/30",
+      icon: "bg-destructive/10 text-destructive",
+      value: "text-destructive",
+      dot: "bg-destructive",
     },
     late: {
-      border: "border-amber-500/30",
-      icon: "bg-amber-500/15 text-amber-600 dark:text-amber-400",
-      value: "text-amber-700 dark:text-amber-300",
-      dot: "bg-amber-500",
+      border: "border-warning/30",
+      icon: "bg-warning/10 text-warning",
+      value: "text-warning",
+      dot: "bg-warning",
     },
     progress: {
-      border: "border-sky-500/30",
-      icon: "bg-sky-500/15 text-sky-600 dark:text-sky-400",
-      value: "text-sky-700 dark:text-sky-300",
-      dot: "bg-sky-500",
+      border: "border-info/30",
+      icon: "bg-info/10 text-info",
+      value: "text-info",
+      dot: "bg-info",
     },
   }[tone];
 
