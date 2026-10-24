@@ -329,7 +329,8 @@ export function StudentTimetableView() {
       : selectedEntries[0]?.id;
 
   return (
-    <div className="space-y-6">
+    <>
+      <div className="space-y-6">
       <section className="relative isolate overflow-hidden rounded-[28px] bg-gradient-to-br from-brand via-brand-mid to-brand p-5 text-brand-foreground shadow-xl shadow-foreground/10 sm:p-7 lg:p-8">
         <div aria-hidden="true" className="pointer-events-none absolute -right-12 -top-20 size-72 rounded-full bg-brand-glow/20 blur-3xl" />
         <div aria-hidden="true" className="pointer-events-none absolute -bottom-28 left-1/3 size-72 rounded-full bg-brand-accent/15 blur-3xl" />
@@ -856,8 +857,8 @@ export function StudentTimetableView() {
           </section>
         </>
       )}
-    </div>
-    {createPortal(
+      </div>
+      {createPortal(
       <section
         className="student-timetable-print"
         aria-hidden={!isPrinting}
@@ -961,6 +962,7 @@ export function StudentTimetableView() {
         </footer>
       </section>,
       document.body,
-    )}
+      )}
+    </>
   );
 }
