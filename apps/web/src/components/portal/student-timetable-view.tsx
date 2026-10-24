@@ -973,7 +973,7 @@ export function StudentTimetableView() {
 
         <footer className="student-timetable-print-footer">
           <span>Times and allocations follow the school's published timetable.</span>
-          <span>{printSlots.length} time slots · Monday–Sunday</span>
+          <span>{printSlots.length} time slots · Monday–Friday</span>
         </footer>
       </section>,
       document.body,
