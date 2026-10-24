@@ -791,7 +791,8 @@ export class FinanceService {
       const voucherPrefix = `PV-${date.getUTCFullYear()}-`;
       // Serialize voucher allocation per school to avoid duplicate numbers
       // when two accountants record expenses at the same time.
-      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${schoolId}), hashtext("expense-voucher"))`;
+      const voucherLockKey = "expense-voucher";
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${schoolId}), hashtext(${voucherLockKey}))`;
       let voucherNumber = requestedVoucher;
       if (voucherNumber) {
         const existing = await tx.expense.findFirst({
@@ -800,15 +801,16 @@ export class FinanceService {
         });
         if (existing) throw new BadRequestException("That voucher number is already used by another expense in this school.");
       } else {
-        const latest = await tx.expense.findFirst({
+        const existingVouchers = await tx.expense.findMany({
           where: { schoolId, voucherNumber: { startsWith: voucherPrefix } },
-          orderBy: { voucherNumber: "desc" },
           select: { voucherNumber: true },
         });
-        const lastSequence = latest?.voucherNumber?.startsWith(voucherPrefix)
-          ? Number(latest.voucherNumber.slice(voucherPrefix.length))
-          : 0;
-        voucherNumber = voucherPrefix + String(Number.isFinite(lastSequence) ? lastSequence + 1 : 1).padStart(5, "0");
+        const lastSequence = existingVouchers.reduce((highest, expense) => {
+          const suffix = expense.voucherNumber?.slice(voucherPrefix.length) ?? "";
+          if (!/^\d+$/.test(suffix)) return highest;
+          return Math.max(highest, Number(suffix));
+        }, 0);
+        voucherNumber = voucherPrefix + String(lastSequence + 1).padStart(5, "0");
       }
       const expense = await tx.expense.create({
         data: {
