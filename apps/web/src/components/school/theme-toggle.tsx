@@ -12,7 +12,7 @@ export function ThemeToggle({ className = "" }: { className?: string }) {
       title={`Switch to ${nextTheme} mode`}
       aria-pressed={theme === "dark"}
       onClick={toggleTheme}
-      className={`group relative flex size-9 items-center justify-center rounded-lg text-slate-500 transition-all duration-200 hover:bg-slate-100 hover:text-slate-900 active:scale-95 dark:text-slate-400 dark:hover:bg-slate-800/80 dark:hover:text-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/80 dark:focus-visible:ring-blue-400/80 ${className}`}
+      className={`group relative flex size-9 items-center justify-center rounded-lg text-muted-foreground transition-all duration-200 hover:bg-accent hover:text-accent-foreground active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${className}`}
     >
       {theme === "dark" ? (
         <Sun className="size-4.5 transition-transform duration-300 ease-out group-hover:rotate-45" aria-hidden="true" />
