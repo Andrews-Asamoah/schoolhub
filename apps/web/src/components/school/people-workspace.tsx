@@ -34,6 +34,7 @@ import {
 } from "@/components/school/workspace-ui";
 import { useSchoolRole } from "@/components/school/school-role-switcher";
 import { TeacherBiodataDialog } from "@/components/school/teacher-biodata-dialog";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { apiFetch } from "@/lib/api";
 
 type PeopleKind = "teachers" | "staff" | "guardians";
@@ -244,6 +245,7 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<{ id: string; name: string } | null>(null);
   const [viewing, setViewing] = useState<{ id: string; name: string } | null>(null);
+  const [confirmingLogin, setConfirmingLogin] = useState<{ id: string; name: string; hasLogin: boolean } | null>(null);
   const [issued, setIssued] = useState<CredentialEntry[]>([]);
   const [notice, setNotice] = useState<string | null>(null);
   const deferredSearch = useDeferredValue(search.trim());
@@ -521,17 +523,13 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
                 <button
                   type="button"
                   disabled={resetLoginMutation.isPending}
-                  onClick={() => {
-                    if (
-                      window.confirm(
-                        isGuardianPage && !row.hasLogin
-                          ? `Create a parent-portal login for ${row.name}?`
-                          : `Issue a new temporary password for ${row.name}? Their current password will stop working and they will be signed out.`,
-                      )
-                    ) {
-                      resetLoginMutation.mutate({ id: row.id, name: row.name });
-                    }
-                  }}
+                  onClick={() =>
+                    setConfirmingLogin({
+                      id: row.id,
+                      name: row.name,
+                      hasLogin: row.hasLogin ?? true,
+                    })
+                  }
                   className="rounded-md px-2 py-1.5 text-xs font-semibold text-primary hover:bg-primary/10 disabled:opacity-50"
                 >
                   {isGuardianPage && !row.hasLogin ? "Create login" : "Reset login"}
@@ -555,6 +553,34 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
 
   return (
     <div className="space-y-5">
+      <ConfirmDialog
+        open={confirmingLogin !== null}
+        title={
+          confirmingLogin && isGuardianPage && !confirmingLogin.hasLogin
+            ? "Create guardian login?"
+            : "Reset login credentials?"
+        }
+        description={
+          confirmingLogin && isGuardianPage && !confirmingLogin.hasLogin
+            ? `Create a parent-portal login for ${confirmingLogin.name}. A temporary password will be generated and shown once after creation.`
+            : `Issue a new temporary password for ${confirmingLogin?.name ?? "this person"}? Their current password will stop working and they will be signed out.`
+        }
+        confirmLabel={
+          confirmingLogin && isGuardianPage && !confirmingLogin.hasLogin
+            ? "Create login"
+            : "Reset login"
+        }
+        confirmVariant={confirmingLogin && isGuardianPage && !confirmingLogin.hasLogin ? "primary" : "danger"}
+        loading={resetLoginMutation.isPending}
+        onCancel={() => setConfirmingLogin(null)}
+        onConfirm={() => {
+          if (!confirmingLogin) return;
+          resetLoginMutation.mutate(
+            { id: confirmingLogin.id, name: confirmingLogin.name },
+            { onSettled: () => setConfirmingLogin(null) },
+          );
+        }}
+      />
       {viewing && kind === "teachers" && (
         <TeacherBiodataDialog teacherId={viewing.id} fallbackName={viewing.name} onClose={() => setViewing(null)} />
       )}
