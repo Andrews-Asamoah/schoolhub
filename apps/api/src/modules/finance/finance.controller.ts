@@ -94,8 +94,8 @@ const scholarshipSchema = z.object({
   reason: z.string().trim().max(500).optional(),
   academicYearId: z.string().min(1).optional(),
   termId: z.string().min(1).optional(),
-  startDate: z.string().regex(/^\\d{4}-\\d{2}-\\d{2}$/).optional(),
-  endDate: z.string().regex(/^\\d{4}-\\d{2}-\\d{2}$/).optional(),
+  startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
 });
 const concessionStatusSchema = z.object({ isActive: z.boolean() });
 
