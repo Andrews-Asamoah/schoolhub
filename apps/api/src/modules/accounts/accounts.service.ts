@@ -17,6 +17,7 @@ import {
 import { PrismaService } from "../../prisma/prisma.service.js";
 import {
   CredentialsService,
+  newGuardianLoginEmail,
   toIssuedCredentials,
   type PreparedCredential,
   type ProvisionableRole,
@@ -195,12 +196,10 @@ export class AccountsService {
           userId = guardian.profile.userId;
           email = guardian.profile.user.email;
         } else {
-          if (!guardian.email) {
-            throw new BadRequestException("Add an email address for this guardian first.");
-          }
+          const loginEmail = guardian.email?.trim().toLowerCase() || newGuardianLoginEmail();
           const created = await this.credentials.createLogin(tx, {
             name: displayName,
-            email: guardian.email,
+            email: loginEmail,
             role,
             organizationId: school.organizationId,
             credential,

@@ -21,6 +21,7 @@ import {
   CredentialsService,
   toIssuedCredentials,
   type PreparedCredential,
+  newGuardianLoginEmail,
 } from '../accounts/credentials.service.js';
 
 @Injectable()
@@ -370,15 +371,12 @@ export class StudentsService {
     // BEFORE opening the transaction (hashing is deliberately slow).
     const guardianPlans = await Promise.all(
       input.guardians.map(async (guardian) => {
-        const email = guardian.email?.trim().toLowerCase() || null;
-        if (guardian.createLogin && !email) {
-          throw new BadRequestException(
-            `An email address is required to create a login for ${guardian.firstName} ${guardian.lastName}.`,
-          );
-        }
+        const contactEmail = guardian.email?.trim().toLowerCase() || null;
+        const loginEmail = contactEmail || (guardian.createLogin ? newGuardianLoginEmail() : null);
         return {
           guardian,
-          email,
+          contactEmail,
+          loginEmail,
           credential: guardian.createLogin ? await this.credentials.prepare('guardian') : null,
         };
       }),
@@ -592,16 +590,27 @@ export class StudentsService {
       }> = [];
 
       for (const plan of guardianPlans) {
-        const { guardian, email, credential } = plan;
+        const { guardian, contactEmail, loginEmail, credential } = plan;
         const name = `${guardian.firstName} ${guardian.lastName}`.trim();
 
         // A parent with several children is ONE guardian record (matched by
-        // email within the school) so they get one login, not one per child.
-        const existing = email
+        // contact email or, when absent, matching name and phone.
+        const existing = contactEmail
           ? await tx.guardian.findFirst({
-              where: { schoolId, email, deletedAt: null },
+              where: { schoolId, email: contactEmail, deletedAt: null },
             })
-          : null;
+          : guardian.createLogin
+            ? await tx.guardian.findFirst({
+                where: {
+                  schoolId,
+                  firstName: guardian.firstName,
+                  lastName: guardian.lastName,
+                  phone: guardian.phone,
+                  email: null,
+                  deletedAt: null,
+                },
+              })
+            : null;
 
         let guardianRecordId: string;
         let issued: IssuedCredentials | null = null;
@@ -616,7 +625,7 @@ export class StudentsService {
               tx,
               school,
               existing.id,
-              { ...guardian, email: email! },
+              { ...guardian, email: loginEmail! },
               credential,
             );
             issued = login.credentials;
@@ -632,7 +641,7 @@ export class StudentsService {
               otherNames: guardian.otherNames,
               phone: guardian.phone,
               alternatePhone: guardian.alternatePhone,
-              email,
+              email: contactEmail,
               gender: guardian.gender,
               relationshipType: guardian.relationshipType,
               occupation: guardian.occupation,
@@ -648,7 +657,7 @@ export class StudentsService {
               tx,
               school,
               record.id,
-              { ...guardian, email: email! },
+              { ...guardian, email: loginEmail! },
               credential,
             );
             issued = login.credentials;

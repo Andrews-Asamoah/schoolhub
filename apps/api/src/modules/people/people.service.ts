@@ -395,6 +395,7 @@ export class PeopleService {
         take: limit,
         orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
         include: {
+          profile: { select: { user: { select: { email: true } } } },
           students: {
             where: { student: { schoolId, deletedAt: null } },
             include: {

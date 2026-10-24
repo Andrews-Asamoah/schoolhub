@@ -1,11 +1,20 @@
 import { ConflictException, Injectable } from "@nestjs/common";
 import { generateId } from "better-auth";
+import { randomUUID } from "node:crypto";
 import { hashPassword } from "better-auth/crypto";
 import type { AuditAction, Prisma } from "@prisma/client";
 import type { IssuedCredentials, Role } from "@schoolhub/shared";
 
 /** Roles an administrator may provision. "owner" is only created at school enrolment. */
 export type ProvisionableRole = Exclude<Role, "owner">;
+
+/**
+ * Creates a unique sign-in identifier for guardians without a contact email.
+ * The reserved .invalid domain is deliberately non-deliverable.
+ */
+export function newGuardianLoginEmail() {
+  return `guardian-${randomUUID()}@login.schoolhub.invalid`;
+}
 
 export interface PreparedCredential {
   temporaryPassword: string;
