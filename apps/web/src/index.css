@@ -668,7 +668,7 @@
  */
 @page student-timetable-sheet {
   size: A4 landscape;
-  margin: 6mm;
+  margin: 4mm;
 }
 
 .student-timetable-print {
@@ -676,9 +676,17 @@
 }
 
 @media print {
-  body.printing-student-timetable {
+  html.printing-student-timetable,
+  html.printing-student-timetable body {
+    width: auto !important;
+    height: auto !important;
+    min-height: 0 !important;
     margin: 0 !important;
     padding: 0 !important;
+    overflow: hidden !important;
+  }
+
+  body.printing-student-timetable {
     background: #fff !important;
   }
 
@@ -694,6 +702,10 @@
     margin: 0 !important;
     padding: 0 !important;
     overflow: visible !important;
+    height: auto !important;
+    min-height: 0 !important;
+    break-after: avoid-page !important;
+    page-break-after: avoid !important;
     color: #111 !important;
     background: #fff !important;
     font-family: Arial, Helvetica, sans-serif;
@@ -714,10 +726,38 @@
     display: flex;
     align-items: flex-end;
     justify-content: space-between;
-    gap: 8mm;
-    margin: 0 0 3mm;
-    padding: 0 0 2.5mm;
+    gap: 5mm;
+    margin: 0 0 2mm;
+    padding: 0 0 1.5mm;
     border-bottom: 1.2pt solid #222;
+    break-after: avoid-page;
+    page-break-after: avoid;
+  }
+
+  .student-timetable-print-school {
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+
+  .student-timetable-print-motto {
+    margin: 0.6mm 0 0;
+    color: #374151;
+    font-size: 6.2pt;
+    font-style: italic;
+  }
+
+  .student-timetable-print-contact {
+    margin: 0.6mm 0 0;
+    color: #374151;
+    font-size: 5.8pt;
+    line-height: 1.08;
+    overflow-wrap: anywhere;
+  }
+
+  .student-timetable-print-document-title {
+    color: #111;
+    font-size: 8pt;
+    letter-spacing: 0.06em;
   }
 
   .student-timetable-print-eyebrow {
@@ -732,15 +772,17 @@
   .student-timetable-print-header h1 {
     margin: 0;
     color: #111;
-    font-size: 15pt;
+    font-size: 14pt;
     font-weight: 800;
-    line-height: 1.05;
+    line-height: 1.02;
+    overflow-wrap: anywhere;
   }
 
   .student-timetable-print-subtitle {
     margin: 1.2mm 0 0;
     color: #374151;
-    font-size: 7pt;
+    font-size: 6.4pt;
+    line-height: 1.08;
   }
 
   .student-timetable-print-datestamp {
@@ -765,9 +807,11 @@
     border-collapse: collapse;
     border-spacing: 0;
     color: #111;
-    font-size: 6.8pt;
+    font-size: 6.2pt;
     page-break-inside: avoid;
     break-inside: avoid;
+    page-break-after: avoid;
+    break-after: avoid-page;
   }
 
   .student-timetable-print-table .student-timetable-print-time-column {
@@ -786,7 +830,7 @@
   .student-timetable-print-table th,
   .student-timetable-print-table td {
     border: 0.5pt solid #9ca3af;
-    padding: 1.15mm 1.2mm;
+    padding: 0.75mm 0.9mm;
     vertical-align: top;
     overflow-wrap: anywhere;
     word-break: normal;
@@ -795,7 +839,7 @@
   .student-timetable-print-table thead th {
     background: #e5e7eb !important;
     color: #111 !important;
-    font-size: 7pt;
+    font-size: 6.5pt;
     font-weight: 800;
     text-align: left;
     text-transform: uppercase;
@@ -839,9 +883,9 @@
   .student-timetable-print-period-title {
     display: block;
     color: #111;
-    font-size: 6.8pt;
+    font-size: 6.2pt;
     font-weight: 700;
-    line-height: 1.12;
+    line-height: 1.06;
     overflow-wrap: anywhere;
   }
 
@@ -890,12 +934,14 @@
     padding-top: 1.5mm;
     border-top: 0.5pt solid #9ca3af;
     color: #4b5563;
-    font-size: 5.7pt;
+    font-size: 5.4pt;
+    break-before: avoid-page;
+    page-break-before: avoid;
   }
 
   .student-timetable-print[data-density="compact"] .student-timetable-print-table th,
   .student-timetable-print[data-density="compact"] .student-timetable-print-table td {
-    padding: 0.75mm 0.85mm;
+    padding: 0.5mm 0.65mm;
   }
 
   .student-timetable-print[data-density="compact"] .student-timetable-print-period-title {
@@ -912,7 +958,15 @@
   }
 
   .student-timetable-print[data-density="tight"] .student-timetable-print-header h1 {
-    font-size: 12pt;
+    font-size: 11pt;
+  }
+
+  .student-timetable-print[data-density="tight"] .student-timetable-print-contact {
+    font-size: 5pt;
+  }
+
+  .student-timetable-print[data-density="tight"] .student-timetable-print-motto {
+    font-size: 5.3pt;
   }
 
   .student-timetable-print[data-density="tight"] .student-timetable-print-table {
@@ -921,17 +975,17 @@
 
   .student-timetable-print[data-density="tight"] .student-timetable-print-table th,
   .student-timetable-print[data-density="tight"] .student-timetable-print-table td {
-    padding: 0.45mm 0.6mm;
+    padding: 0.35mm 0.5mm;
   }
 
   .student-timetable-print[data-density="tight"] .student-timetable-print-period-title {
-    font-size: 5.8pt;
-    line-height: 1.02;
+    font-size: 5.4pt;
+    line-height: 1;
   }
 
   .student-timetable-print[data-density="tight"] .student-timetable-print-meta {
     margin-top: 0.25mm;
-    font-size: 4.8pt;
+    font-size: 4.5pt;
     line-height: 1;
   }
 
