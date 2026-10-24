@@ -692,6 +692,11 @@ export const inventoryStockMovementSchema = z.object({
 });
 export type InventoryStockMovementInput = z.infer<typeof inventoryStockMovementSchema>;
 
+export const updatePayrollSalarySchema = z.object({
+  monthlySalary: z.number().finite().min(0, "Monthly salary cannot be negative").max(10000000),
+});
+export type UpdatePayrollSalaryInput = z.infer<typeof updatePayrollSalarySchema>;
+
 
 
 // ============================================================================
