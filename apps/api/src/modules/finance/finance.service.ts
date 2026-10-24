@@ -287,6 +287,11 @@ export class FinanceService {
     input: { name: string; minimumWardCount: number; valueType: "PERCENTAGE" | "FIXED"; value: number },
   ) {
     const name = input.name.trim();
+    const existingThreshold = await this.prisma.client.siblingDiscountPolicy.findFirst({
+      where: { schoolId, minimumWardCount: input.minimumWardCount, isActive: true },
+      select: { id: true },
+    });
+    if (existingThreshold) throw new ConflictException("An active rule already exists for this number of linked wards. Deactivate it before replacing it.");
     const existing = await this.prisma.client.siblingDiscountPolicy.findFirst({
       where: { schoolId, name: { equals: name, mode: "insensitive" } },
       select: { id: true },
@@ -311,6 +316,13 @@ export class FinanceService {
       where: { id: policyId, schoolId }, select: { id: true },
     });
     if (!policy) throw new NotFoundException("Sibling discount policy not found.");
+    if (isActive) {
+      const duplicateThreshold = await this.prisma.client.siblingDiscountPolicy.findFirst({
+        where: { schoolId, minimumWardCount: policy.minimumWardCount, isActive: true, id: { not: policyId } },
+        select: { id: true },
+      });
+      if (duplicateThreshold) throw new ConflictException("Another active rule already exists for this number of linked wards.");
+    }
     return this.prisma.client.siblingDiscountPolicy.update({ where: { id: policyId }, data: { isActive } });
   }
 
@@ -377,6 +389,7 @@ export class FinanceService {
     grossAmount: number,
   ) {
     const today = new Date();
+    today.setUTCHours(0, 0, 0, 0);
     const scholarships = await tx.studentScholarship.findMany({
       where: {
         schoolId, studentId, isActive: true,
