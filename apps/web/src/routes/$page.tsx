@@ -42,6 +42,7 @@ import { HousesWorkspace } from "@/components/school/houses-workspace";
 import { ClubsWorkspace } from "@/components/school/clubs-workspace";
 import { TeacherPortalWorkspace } from "@/components/portal/teacher-portal-workspace";
 import { AccountantPortalWorkspace } from "@/components/portal/accountant-portal-workspace";
+import { ExpenseManagementWorkspace } from "@/components/portal/expense-management-workspace";
 import { FeeStructuresWorkspace } from "@/components/portal/fee-structures-workspace";
 import { GuardianPortalWorkspace } from "@/components/portal/guardian-portal-workspace";
 import { GuardianChildRecordsWorkspace } from "@/components/portal/guardian-child-records-workspace";
@@ -231,7 +232,7 @@ function WorkspaceContent({ pageId }: { pageId: string }) {
           {pageId === "invoices" && <AccountantPortalWorkspace defaultTab="invoices" />}
           {pageId === "outstanding" && <AccountantPortalWorkspace defaultTab="debtors" />}
           {pageId === "finance-reports" && <AccountantPortalWorkspace defaultTab="reports" />}
-          {pageId === "expenses" && <AccountantPortalWorkspace defaultTab="expenses" />}
+          {pageId === "expenses" && <ExpenseManagementWorkspace />}
           {pageId === "payroll" && <AccountantPortalWorkspace defaultTab="payroll" />}
           {pageId === "inventory" && <AccountantPortalWorkspace defaultTab="inventory" />}
           {pageId === "timetable" && (
