@@ -99,7 +99,7 @@ export function GuardianPortalWorkspace({ defaultTab = "overview", showSectionNa
   const greeting = firstName ? `Welcome back, ${firstName}` : "Welcome to your family hub";
 
   return (
-    <div className="space-y-6">
+    <div className="mx-auto w-full min-w-0 max-w-screen-2xl space-y-6">
       <section className="relative isolate overflow-hidden rounded-[1.75rem] border border-primary/20 bg-gradient-to-br from-primary/15 via-card to-card p-5 shadow-sm sm:p-8">
         <div aria-hidden="true" className="pointer-events-none absolute -right-16 -top-20 -z-10 size-64 rounded-full bg-primary/10 blur-3xl" />
         <div aria-hidden="true" className="pointer-events-none absolute -bottom-24 left-1/3 -z-10 size-56 rounded-full bg-primary/10 blur-3xl" />
@@ -131,7 +131,7 @@ export function GuardianPortalWorkspace({ defaultTab = "overview", showSectionNa
         </div>
       )}
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+      <div className="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-3">
         <Metric label="Linked children" value={wardsQuery.isPending ? "—" : String(wards.length)} detail="Children currently linked to this guardian account" icon={UsersRound} />
         <Metric label="Published reports" value="View reports" detail="Official report cards released by the school" icon={GraduationCap} />
         <Metric label="School updates" value={announcementsQuery.isPending || announcementsQuery.isError ? "—" : String(announcements.length)} detail={announcementsQuery.isError ? "School updates could not be loaded" : "Current notices available to your account"} icon={BellRing} />
