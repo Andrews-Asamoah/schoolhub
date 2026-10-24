@@ -1,4 +1,4 @@
-import { BookOpen, Calendar, ClipboardCheck, FileSpreadsheet, GraduationCap, LayoutDashboard, UserCheck, Users } from "lucide-react";
+import { BookOpen, Calendar, ClipboardCheck, FileSpreadsheet, GraduationCap, LayoutDashboard, Megaphone, UserCheck, Users } from "lucide-react";
 import { useState } from "react";
 import { AssessmentEntryWorkspace } from "@/components/school/assessment-entry-workspace";
 import { ClassRegister } from "@/components/school/class-register";
@@ -7,8 +7,9 @@ import { useTeachingOverview } from "@/lib/teaching";
 import { cn } from "@/lib/utils";
 import { PortalStatCard } from "./portal-stat-card";
 import { TeacherClassesView } from "./teacher-classes-view";
+import { AdminAnnouncementsWorkspace } from "./admin-announcements-workspace";
 
-type Tab = "overview" | "classes" | "gradebook" | "attendance" | "timetable";
+type Tab = "overview" | "classes" | "gradebook" | "attendance" | "timetable" | "announcements";
 
 interface TeacherPortalWorkspaceProps {
   defaultTab?: Tab;
@@ -46,6 +47,7 @@ export function TeacherPortalWorkspace({ defaultTab = "overview" }: TeacherPorta
     { id: "gradebook", label: "Gradebook & Marks", icon: FileSpreadsheet },
     { id: "attendance", label: "Attendance Register", icon: ClipboardCheck },
     { id: "timetable", label: "Weekly Timetable", icon: Calendar },
+    { id: "announcements", label: "Announcements", icon: Megaphone },
   ];
 
   return (
@@ -151,6 +153,7 @@ export function TeacherPortalWorkspace({ defaultTab = "overview" }: TeacherPorta
           </div>
         ))}
       {activeTab === "timetable" && <TimetableWorkspace />}
+      {activeTab === "announcements" && <AdminAnnouncementsWorkspace mode="teacher" />}
     </div>
   );
 }

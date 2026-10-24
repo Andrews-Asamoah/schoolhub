@@ -18,6 +18,7 @@ import {
   FileText,
   Filter,
   Layers,
+  Megaphone,
   Package,
   PackageCheck,
   Plus,
@@ -33,12 +34,13 @@ import {
 } from "lucide-react";
 import { PortalStatCard } from "./portal-stat-card";
 import { PortalModal } from "./portal-modal";
+import { AdminAnnouncementsWorkspace } from "./admin-announcements-workspace";
 import { cn } from "@/lib/utils";
 import { DataTable } from "@/components/ui/data-table";
 import { useCanExportTables } from "@/lib/table-export-policy";
 
 interface AccountantPortalWorkspaceProps {
-  defaultTab?: "overview" | "invoices" | "payments" | "debtors" | "payroll" | "expenses" | "inventory";
+  defaultTab?: "overview" | "invoices" | "payments" | "debtors" | "payroll" | "expenses" | "inventory" | "announcements";
 }
 
 interface InvoiceRecord {
@@ -354,6 +356,7 @@ export function AccountantPortalWorkspace({ defaultTab = "overview" }: Accountan
           { id: "payroll", label: "Staff Payroll", icon: Users },
           { id: "expenses", label: "Operating Expenses", icon: TrendingDown },
           { id: "inventory", label: "Supplies & Inventory", icon: Package, badge: lowStockItems.length > 0 ? "Alert" : undefined },
+          { id: "announcements", label: "Announcements", icon: Megaphone },
         ].map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
@@ -384,6 +387,8 @@ export function AccountantPortalWorkspace({ defaultTab = "overview" }: Accountan
           );
         })}
       </div>
+
+      {activeTab === "announcements" && <AdminAnnouncementsWorkspace mode="accountant" />}
 
       {/* Toast Notice */}
       {notice && (
