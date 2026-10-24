@@ -134,7 +134,7 @@ export function DashboardInfographics({
       </InfographicCard>
 
       <InfographicCard title="Enrollment growth" description="Active student population by admission date, with new admissions each month" icon={TrendingUp} aside={periodSelect}>
-        {isLoading ? <ChartLoading /> : isError ? <EmptyChart message={unavailable} /> : !data?.enrollmentGrowth.length ? <EmptyChart message="No enrollment history is available yet." /> : (
+        {isLoading ? <ChartLoading /> : isError ? <EmptyChart message={unavailable} /> : (data?.metrics.activeStudents ?? 0) === 0 ? <EmptyChart message="No active student enrollment history is available yet." /> : (
           <div className="h-64 w-full min-w-0" role="img" aria-label="Enrollment population and new admissions by month">
             <ResponsiveContainer width="100%" height="100%" minWidth={0}>
               <LineChart data={data.enrollmentGrowth} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
@@ -154,7 +154,7 @@ export function DashboardInfographics({
 
       {data?.canViewFinance && (
         <InfographicCard title="Financial status" description="Recorded revenue from completed payments versus recorded expenditures" icon={WalletCards} className="lg:col-span-2">
-          {isLoading ? <ChartLoading /> : isError ? <EmptyChart message={unavailable} /> : !data.financialStatus.length ? <EmptyChart message="No payment or expenditure records exist for this period." /> : (
+          {isLoading ? <ChartLoading /> : isError ? <EmptyChart message={unavailable} /> : !data.hasFinancialRecords ? <EmptyChart message="No payment or expenditure records exist for this period." /> : (
             <>
               <div className="mb-4 grid gap-3 sm:grid-cols-3">
                 <div className="rounded-xl bg-muted/50 p-3"><p className="text-xs text-muted-foreground">Revenue this month</p><p className="mt-1 text-lg font-bold text-foreground">{money(data.metrics.revenueThisMonth ?? 0)}</p></div>
