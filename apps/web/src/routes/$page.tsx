@@ -521,8 +521,8 @@ function PlannedWorkspace({ title }: { title: string }) {
 
 function LoadingState({ label }: { label: string }) {
   return (
-    <div className="flex min-h-52 items-center justify-center gap-2 rounded-2xl border border-slate-200/80 bg-white text-xs text-slate-500">
-      <LoaderCircle className="size-4 animate-spin text-blue-600" />
+    <div className="flex min-h-52 items-center justify-center gap-2 rounded-2xl border border-border bg-card text-sm text-muted-foreground">
+      <LoaderCircle className="size-4 animate-spin text-primary" />
       {label}…
     </div>
   );
@@ -538,34 +538,10 @@ function QueryError({ error }: { error: Error }) {
   return (
     <div
       role="alert"
-      className="rounded-2xl border border-rose-200 bg-rose-50 p-5 text-xs text-rose-800"
+      className="rounded-2xl border border-destructive/30 bg-destructive/5 p-5 text-sm text-destructive"
     >
       <p className="font-semibold">Could not load this workspace data</p>
       <p className="mt-1 leading-relaxed">{message}</p>
     </div>
   );
 }
-
-function StatusBadge({ value }: { value: string }) {
-  const normalized = value.toUpperCase();
-  const isPositive = ["ACTIVE", "PRESENT", "PAID", "CURRENT"].includes(
-    normalized,
-  );
-  const isNegative = ["ABSENT", "SUSPENDED", "WITHDRAWN", "OVERDUE"].includes(
-    normalized,
-  );
-  return (
-    <span
-      className={`inline-flex rounded-full px-2 py-1 text-[9px] font-semibold ${
-        isPositive
-          ? "bg-emerald-50 text-emerald-700"
-          : isNegative
-            ? "bg-rose-50 text-rose-700"
-            : "bg-slate-100 text-slate-600"
-      }`}
-    >
-      {normalized.replaceAll("_", " ")}
-    </span>
-  );
-}
-
