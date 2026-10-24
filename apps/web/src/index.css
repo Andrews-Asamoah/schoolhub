@@ -682,7 +682,7 @@
     background: #fff !important;
   }
 
-  body.printing-student-timetable #root {
+  body.printing-student-timetable > *:not(.student-timetable-print) {
     display: none !important;
   }
 
