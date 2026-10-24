@@ -1243,7 +1243,7 @@ export class FinanceService {
         : "not specified";
       for (const guardian of target.guardians.values()) {
         const key = `${target.studentId}|${guardian.phone ?? ""}|${guardian.email ?? ""}|${guardian.name}`;
-        if (installment && sentKeys.has(key)) {
+        if (sentKeys.has(key)) {
           alreadySentCount++;
           continue;
         }
