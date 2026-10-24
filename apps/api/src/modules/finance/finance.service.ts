@@ -313,7 +313,7 @@ export class FinanceService {
 
   async setSiblingDiscountPolicyActive(schoolId: string, policyId: string, isActive: boolean) {
     const policy = await this.prisma.client.siblingDiscountPolicy.findFirst({
-      where: { id: policyId, schoolId }, select: { id: true },
+      where: { id: policyId, schoolId }, select: { id: true, minimumWardCount: true },
     });
     if (!policy) throw new NotFoundException("Sibling discount policy not found.");
     if (isActive) {
