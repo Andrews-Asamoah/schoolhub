@@ -935,6 +935,7 @@ export class FinanceService {
           select: { id: true, description: true, amount: true, quantity: true, totalAmount: true, paidAmount: true, balanceAmount: true },
           orderBy: { createdAt: "asc" },
         },
+        concessions: { select: { id: true, type: true, label: true, amount: true }, orderBy: { createdAt: "asc" } },
       },
     });
   }
