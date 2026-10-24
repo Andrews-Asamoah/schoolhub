@@ -455,16 +455,41 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
     {
       id: "contact",
       header: "Contact",
-      cell: (row) => (
-        <span>
-          <span className="block">{row.contact || "—"}</span>
-          {row.relatedStudents && (
-            <span className="block text-[11px] text-muted-foreground">
-              Students: {row.relatedStudents}
+      cell: (row) => {
+        if (isGuardianPage) {
+          const [phone, email] = row.contact.split(" · ");
+          return (
+            <span className="flex min-w-0 flex-col gap-1.5">
+              <span className="flex items-center gap-2 text-sm text-foreground">
+                <Phone className="size-3.5 shrink-0 text-muted-foreground" />
+                <span>{phone || "No phone number"}</span>
+              </span>
+              {email && (
+                <span className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
+                  <Mail className="size-3.5 shrink-0" />
+                  <span className="max-w-[240px] truncate">{email}</span>
+                </span>
+              )}
+              {row.relatedStudents && (
+                <span className="flex items-start gap-1.5 pt-0.5 text-[11px] text-muted-foreground">
+                  <GraduationCap className="mt-0.5 size-3.5 shrink-0" />
+                  <span className="max-w-[260px] leading-4">Linked students: {row.relatedStudents}</span>
+                </span>
+              )}
             </span>
-          )}
-        </span>
-      ),
+          );
+        }
+        return (
+          <span>
+            <span className="block">{row.contact || "—"}</span>
+            {row.relatedStudents && (
+              <span className="block text-[11px] text-muted-foreground">
+                Students: {row.relatedStudents}
+              </span>
+            )}
+          </span>
+        );
+      },
     },
     {
       id: "status",
