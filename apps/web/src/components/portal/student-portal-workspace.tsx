@@ -12,8 +12,6 @@ import {
   LayoutDashboard,
   Megaphone,
   School,
-  Sparkles,
-  Trophy,
   Users,
 } from "lucide-react";
 import { PortalStatCard } from "./portal-stat-card";
@@ -23,7 +21,6 @@ import { StudentAttendanceView } from "./student-attendance-view";
 import { StudentTimetableView } from "./student-timetable-view";
 import { StudentReportView } from "./student-report-view";
 import { StudentClassmatesView } from "./student-classmates-view";
-import { StudentHouseClubsView } from "./student-house-clubs-view";
 import { StudentAssignmentsView } from "./student-assignments-view";
 import { StudentAnnouncementsView } from "./student-announcements-view";
 import { StudentOverview } from "./student-overview";
@@ -37,9 +34,7 @@ export interface StudentPortalWorkspaceProps {
     | "grades"
     | "assignments"
     | "classmates"
-    | "house"
     | "attendance"
-    | "clubs"
     | "announcements";
 }
 
@@ -60,13 +55,11 @@ export function StudentPortalWorkspace({ defaultTab = "dashboard" }: StudentPort
           { id: "assignments", label: "Assignments", icon: FileText },
           { id: "attendance", label: "Attendance", icon: Calendar },
           { id: "classmates", label: "Classmates", icon: Users },
-          { id: "house", label: "House & Clubs", icon: Trophy },
           { id: "announcements", label: "Notices", icon: Megaphone },
         ].map((tab) => {
           const Icon = tab.icon;
           const isActive =
             activeTab === tab.id ||
-            (tab.id === "house" && activeTab === "clubs") ||
             (tab.id === "grades" && (activeTab as string) === "assessments");
 
           return (
@@ -95,9 +88,6 @@ export function StudentPortalWorkspace({ defaultTab = "dashboard" }: StudentPort
       {activeTab === "assignments" && <StudentAssignmentsView />}
       {activeTab === "attendance" && <StudentAttendanceView />}
       {activeTab === "classmates" && <StudentClassmatesView />}
-      {(activeTab === "house" || activeTab === "clubs") && (
-        <StudentHouseClubsView defaultTab={activeTab === "clubs" ? "CLUBS" : "HOUSE"} />
-      )}
       {activeTab === "announcements" && <StudentAnnouncementsView />}
     </div>
   );
