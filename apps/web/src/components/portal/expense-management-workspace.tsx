@@ -1,6 +1,6 @@
 import { useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowDownRight, CalendarDays, CheckCircle2, Download, FileText, LoaderCircle, Plus, Printer, Search, Tags, Wallet, X } from "lucide-react";
+import { ArrowDownRight, CalendarDays, Download, FileText, LoaderCircle, Plus, Printer, Search, Tags, Wallet, X } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
