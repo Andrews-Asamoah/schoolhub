@@ -1,6 +1,6 @@
 import type { TeacherAssignments } from "./teacher-scope.service.js";
 
-/** Roles that can work with any class's register and marks. */
+/** Roles allowed to manage academic marks; attendance marking is class-teacher-only. */
 export const SCHOOL_MANAGER_ROLES = ["owner", "admin", "headteacher"] as const;
 
 export function isSchoolManager(role: string | undefined) {
@@ -18,7 +18,6 @@ export function canMarkRegister(
   assignments: TeacherAssignments,
   classIds: readonly string[],
 ): boolean {
-  if (isSchoolManager(role)) return true;
   if (role !== "teacher" || classIds.length === 0) return false;
   const owned = new Set(assignments.classTeacherClassIds);
   return classIds.every((classId) => owned.has(classId));
