@@ -5,7 +5,7 @@ import {
   ForbiddenException,
 } from "@nestjs/common";
 import { PrismaService } from "../../prisma/prisma.service.js";
-import type { GenerateBillInput, RecordPaymentInput } from "@schoolhub/shared";
+import type { CreateExpenseInput, GenerateBillInput, RecordPaymentInput } from "@schoolhub/shared";
 import { Prisma, type TransactionCategory } from "@prisma/client";
 import { canManageAcademicContext } from "../../common/academic-context.js";
 
