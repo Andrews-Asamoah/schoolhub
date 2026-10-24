@@ -1,6 +1,6 @@
 import { useQuery, type UseQueryResult } from "@tanstack/react-query";
 import { useState } from "react";
-import { AlertCircle, CalendarDays, CheckCircle2, Clock3, LoaderCircle, RefreshCw, UserRound, XCircle } from "lucide-react";
+import { AlertCircle, CalendarDays, CheckCircle2, Clock3, LoaderCircle, Printer, RefreshCw, UserRound, XCircle } from "lucide-react";
 import type { StudentProfileData } from "@/components/school/student-profile-panel";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { apiFetch } from "@/lib/api";
@@ -70,7 +70,7 @@ export function GuardianChildRecordsWorkspace({ view }: { view: View }) {
     retry: false,
   });
   const title = view === "attendance" ? "Attendance" : "Timetable";
-  return <div className="space-y-6">
+  return <div className="mx-auto w-full min-w-0 max-w-screen-2xl space-y-6">
     <section className="rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div><p className="text-xs font-bold uppercase tracking-[0.14em] text-primary">Family centre</p><h2 className="mt-1 text-2xl font-bold tracking-tight text-foreground">{title}</h2><p className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground">{view === "attendance" ? "Review your child's recorded attendance, punctuality and recent register entries." : "View your child's current class schedule, including lesson times, subjects, teachers and rooms."}</p></div>
@@ -81,7 +81,7 @@ export function GuardianChildRecordsWorkspace({ view }: { view: View }) {
     {wardsQuery.isPending ? <div className="flex items-center justify-center gap-2 rounded-xl border border-border bg-card py-12 text-sm text-muted-foreground"><LoaderCircle className="size-4 animate-spin" /> Loading your linked children…</div> :
       wardsQuery.isError ? <div role="alert" className="rounded-xl border border-destructive/25 bg-destructive/5 p-4 text-sm text-destructive"><AlertCircle className="mr-2 inline size-4" /> Your linked children could not be loaded. Please try again later.</div> :
       wards.length === 0 ? <EmptyState title="No children linked yet" message="Contact the school office to verify your guardian record and link your child or children." /> :
-      view === "attendance" ? <AttendancePanel query={attendanceQuery} /> : <TimetablePanel query={timetableQuery} />}
+      view === "attendance" ? <AttendancePanel query={attendanceQuery} /> : <TimetablePanel query={timetableQuery} childName={selectedWard ? wardName(selectedWard) : ""} />}
   </div>;
 }
 function AttendancePanel({ query }: { query: UseQueryResult<AttendanceData, Error> }) {
@@ -102,7 +102,7 @@ function AttendancePanel({ query }: { query: UseQueryResult<AttendanceData, Erro
     </section>
   </div>;
 }
-function TimetablePanel({ query }: { query: UseQueryResult<TimetableData, Error> }) {
+function TimetablePanel({ query, childName }: { query: UseQueryResult<TimetableData, Error>; childName: string }) {
   if (query.isPending) return <LoadingState label="Loading timetable…" />;
   if (query.isError) return <RetryState message="The timetable could not be loaded." onRetry={() => void query.refetch()} fetching={query.isFetching} />;
   const data = query.data;
@@ -112,8 +112,9 @@ function TimetablePanel({ query }: { query: UseQueryResult<TimetableData, Error>
   const labels: Record<string, string> = { MONDAY: "Mon", TUESDAY: "Tue", WEDNESDAY: "Wed", THURSDAY: "Thu", FRIDAY: "Fri" };
   const periods = [...new Set(entries.map(entry => entry.startTime + "|" + entry.endTime))].sort((a,b) => a.localeCompare(b));
   const getEntry = (day: string, period: string) => entries.find(entry => entry.dayOfWeek === day && entry.startTime + "|" + entry.endTime === period);
-  return <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
-    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-4 py-3"><div><h3 className="font-semibold text-foreground">Weekly timetable</h3><p className="mt-1 text-xs text-muted-foreground">{data.class.name} · {data.academicYear?.name ?? "Current academic year"}{data.term?.name ? " · " + data.term.name : ""}</p></div><span className="rounded-full bg-muted px-2.5 py-1 text-xs text-muted-foreground">{entries.length} periods</span></div>
+  return <section className="guardian-timetable-print-area min-w-0 overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+    <style>{`@media print { body * { visibility: hidden !important; } .guardian-timetable-print-area, .guardian-timetable-print-area * { visibility: visible !important; } .guardian-timetable-print-area { position: absolute !important; top: 0 !important; left: 0 !important; width: 100% !important; max-width: none !important; border: 0 !important; box-shadow: none !important; overflow: visible !important; background: white !important; color: black !important; } .guardian-timetable-print-area table { min-width: 0 !important; width: 100% !important; font-size: 9pt !important; } .guardian-timetable-print-area th, .guardian-timetable-print-area td { color: black !important; border-color: #bbb !important; } .guardian-timetable-print-area td > div { min-height: 0 !important; background: white !important; border-color: #bbb !important; } .guardian-timetable-actions { display: none !important; } .guardian-timetable-print-area p { color: black !important; } @page { size: landscape; margin: 10mm; } }`}</style>
+    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-3"><div><h3 className="font-semibold text-foreground">Weekly timetable</h3><p className="mt-1 text-xs text-muted-foreground">{childName ? childName + " · " : ""}{data.class.name} · {data.academicYear?.name ?? "Current academic year"}{data.term?.name ? " · " + data.term.name : ""}</p></div><div className="guardian-timetable-actions flex flex-wrap items-center gap-2"><span className="rounded-full bg-muted px-2.5 py-1 text-xs text-muted-foreground">{entries.length} periods</span><button type="button" onClick={() => window.print()} className="inline-flex h-9 items-center gap-2 rounded-lg border border-border bg-background px-3 text-xs font-semibold text-foreground transition hover:bg-accent"><Printer className="size-3.5" /> Print / Save PDF</button></div></div>
     {!entries.length ? <EmptyState title="No lessons published yet" message="The school has not added timetable entries for this class yet." /> : <div className="overflow-x-auto"><table className="w-full min-w-[780px] border-collapse text-left text-xs"><thead><tr className="bg-muted/50 text-muted-foreground"><th className="w-32 border-b border-border px-3 py-3 font-semibold uppercase tracking-wide">Period</th>{weekDays.map(day => <th key={day} className="border-b border-border px-2 py-3 font-semibold uppercase tracking-wide">{labels[day]}</th>)}</tr></thead><tbody>{periods.map((period,index) => { const [startTime,endTime] = period.split("|"); return <tr key={period} className="border-b border-border last:border-0"><th className="align-top px-3 py-3"><p className="font-semibold text-foreground">Period {index+1}</p><p className="mt-1 whitespace-nowrap text-[10px] text-muted-foreground">{startTime}–{endTime}</p></th>{weekDays.map(day => { const entry = getEntry(day,period); const isBreak = entry ? /break|lunch/i.test((entry.label ?? "") + " " + entry.type) : false; return <td key={day} className="min-w-32 align-top px-1.5 py-1.5">{entry ? <div className={"min-h-[54px] rounded-xl border p-2 " + (isBreak ? "border-amber-500/20 bg-amber-500/10" : "border-primary/15 bg-primary/5")}><p className="font-semibold leading-4 text-foreground">{entry.subject?.name ?? entry.label ?? (entry.type === "BREAK" ? "Break" : "Lesson")}</p>{entry.teacher?.name && <p className="mt-1 leading-4 text-muted-foreground">{entry.teacher.name}</p>}{entry.classroom?.name && <p className="mt-0.5 text-[10px] text-muted-foreground">{entry.classroom.name}</p>}</div> : <div className="min-h-[54px] rounded-xl border border-dashed border-border/60 bg-muted/20" aria-label="No scheduled lesson" />}</td>})}</tr>})}</tbody></table></div>}
   </section>;
 }
