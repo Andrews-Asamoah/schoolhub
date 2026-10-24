@@ -674,6 +674,15 @@ export const createInventoryItemSchema = z.object({
 });
 export type CreateInventoryItemInput = z.infer<typeof createInventoryItemSchema>;
 
+export const updateInventoryItemSchema = z.object({
+  name: z.string().trim().min(2, "Item name must contain at least 2 characters").max(150),
+  description: z.string().trim().max(500).optional(),
+  category: z.string().trim().max(100).optional(),
+  unit: z.string().trim().min(1).max(20).default("pcs"),
+  minQuantity: z.number().int().min(0).default(0),
+});
+export type UpdateInventoryItemInput = z.infer<typeof updateInventoryItemSchema>;
+
 export const inventoryStockMovementSchema = z.object({
   type: z.enum(["IN", "OUT"]),
   quantity: z.number().int().positive("Quantity must be a positive whole number"),
