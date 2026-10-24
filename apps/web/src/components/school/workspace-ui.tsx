@@ -91,12 +91,12 @@ export function WorkspaceEmptyState({
   description: string;
 }) {
   return (
-    <div className="flex min-h-56 flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-white px-6 text-center">
-      <span className="mb-3 flex size-10 items-center justify-center rounded-xl bg-slate-100 text-slate-500">
+    <div className="flex min-h-56 flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-card px-6 text-center">
+      <span className="mb-3 flex size-10 items-center justify-center rounded-xl bg-muted text-muted-foreground">
         <Inbox className="size-5" />
       </span>
-      <h2 className="text-sm font-semibold text-slate-800">{title}</h2>
-      <p className="mt-1 max-w-md text-xs leading-relaxed text-slate-500">
+      <h2 className="text-sm font-semibold text-foreground">{title}</h2>
+      <p className="mt-1 max-w-md text-xs leading-relaxed text-muted-foreground">
         {description}
       </p>
     </div>
@@ -107,19 +107,31 @@ export function WorkspaceStat({
   label,
   value,
   detail,
+  icon: Icon,
 }: {
   label: string;
   value: string;
   detail: string;
+  icon?: LucideIcon;
 }) {
   return (
-    <article className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_2px_12px_rgba(15,23,42,0.025)]">
-      <p className="text-xs font-medium text-slate-500">{label}</p>
-      <div className="mt-2 flex items-end justify-between gap-3">
-        <p className="text-2xl font-bold tracking-tight text-slate-900">{value}</p>
-        <span className="inline-flex items-center gap-1 text-[10px] font-medium text-slate-400">
-          {detail} <ArrowUpRight className="size-3" />
-        </span>
+    <article className="group relative overflow-hidden rounded-2xl border border-border bg-card p-4 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-md sm:p-5">
+      <span aria-hidden="true" className="pointer-events-none absolute -right-6 -top-8 size-24 rounded-full bg-primary/5 blur-2xl transition group-hover:bg-primary/10" />
+      <div className="relative flex items-start justify-between gap-3">
+        <div>
+          <p className="text-xs font-medium text-muted-foreground">{label}</p>
+          <p className="mt-2 text-2xl font-bold tracking-tight text-foreground">{value}</p>
+        </div>
+        {Icon && (
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-xl border border-primary/10 bg-primary/10 text-primary">
+            <Icon className="size-4" />
+          </span>
+        )}
+      </div>
+      <div className="relative mt-3 flex items-center gap-1.5 border-t border-border/70 pt-3 text-[10px] font-medium text-muted-foreground">
+        <span className="size-1.5 rounded-full bg-primary/70" />
+        {detail}
+        <ArrowUpRight className="ml-auto size-3 opacity-70" />
       </div>
     </article>
   );

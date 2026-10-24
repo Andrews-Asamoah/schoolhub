@@ -2,10 +2,16 @@ import { useForm } from "@tanstack/react-form";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Check,
+  CheckCircle2,
   Eye,
+  Filter,
+  GraduationCap,
   LoaderCircle,
+  Mail,
+  Phone,
   Plus,
   Search,
+  ShieldCheck,
   UserRound,
   UsersRound,
   X,
@@ -435,7 +441,14 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
     {
       id: "details",
       header: isGuardianPage ? "Relationship" : "Role",
-      cell: (row) => row.detail,
+      cell: (row) =>
+        isGuardianPage ? (
+          <span className="inline-flex items-center rounded-lg border border-primary/15 bg-primary/5 px-2.5 py-1 text-xs font-medium text-foreground">
+            {row.detail}
+          </span>
+        ) : (
+          row.detail
+        ),
     },
     ...(!isGuardianPage
       ? [
@@ -449,16 +462,41 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
     {
       id: "contact",
       header: "Contact",
-      cell: (row) => (
-        <span>
-          <span className="block">{row.contact || "—"}</span>
-          {row.relatedStudents && (
-            <span className="block text-[11px] text-muted-foreground">
-              Students: {row.relatedStudents}
+      cell: (row) => {
+        if (isGuardianPage) {
+          const [phone, email] = row.contact.split(" · ");
+          return (
+            <span className="flex min-w-0 flex-col gap-1.5">
+              <span className="flex items-center gap-2 text-sm text-foreground">
+                <Phone className="size-3.5 shrink-0 text-muted-foreground" />
+                <span>{phone || "No phone number"}</span>
+              </span>
+              {email && (
+                <span className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
+                  <Mail className="size-3.5 shrink-0" />
+                  <span className="max-w-[240px] truncate">{email}</span>
+                </span>
+              )}
+              {row.relatedStudents && (
+                <span className="flex items-start gap-1.5 pt-0.5 text-[11px] text-muted-foreground">
+                  <GraduationCap className="mt-0.5 size-3.5 shrink-0" />
+                  <span className="max-w-[260px] leading-4">Linked students: {row.relatedStudents}</span>
+                </span>
+              )}
             </span>
-          )}
-        </span>
-      ),
+          );
+        }
+        return (
+          <span>
+            <span className="block">{row.contact || "—"}</span>
+            {row.relatedStudents && (
+              <span className="block text-[11px] text-muted-foreground">
+                Students: {row.relatedStudents}
+              </span>
+            )}
+          </span>
+        );
+      },
     },
     {
       id: "status",
@@ -590,21 +628,38 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
           onClose={() => setViewing(null)}
         />
       )}
-      <section className="rounded-2xl border border-border bg-gradient-to-br from-primary/10 via-card to-sky-500/5 p-5 sm:p-6">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="flex items-start gap-3">
-            <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+      <section
+        className={`relative isolate overflow-hidden rounded-2xl border p-5 shadow-sm sm:p-6 ${
+          isGuardianPage
+            ? "border-primary/20 bg-gradient-to-br from-primary/15 via-card to-violet-500/10 dark:from-primary/20 dark:via-card dark:to-violet-500/10"
+            : "border-border bg-gradient-to-br from-primary/10 via-card to-sky-500/5"
+        }`}
+      >
+        {isGuardianPage && (
+          <>
+            <span aria-hidden="true" className="pointer-events-none absolute -right-12 -top-16 size-48 rounded-full bg-primary/10 blur-3xl" />
+            <span aria-hidden="true" className="pointer-events-none absolute -bottom-20 right-36 size-36 rounded-full bg-violet-500/10 blur-3xl" />
+          </>
+        )}
+        <div className="relative flex flex-wrap items-start justify-between gap-4">
+          <div className="flex items-start gap-3.5">
+            <span className="flex size-11 shrink-0 items-center justify-center rounded-xl border border-primary/20 bg-primary/10 text-primary shadow-sm">
               <UsersRound className="size-5" />
             </span>
-            <div>
-              <h2 className="text-base font-bold text-foreground">
+            <div className="max-w-3xl">
+              {isGuardianPage && (
+                <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.18em] text-primary">
+                  Family & student connections
+                </p>
+              )}
+              <h2 className="text-lg font-bold tracking-tight text-foreground">
                 {title} directory
               </h2>
-              <p className="mt-1 max-w-3xl text-sm leading-6 text-muted-foreground">
+              <p className="mt-1.5 max-w-3xl text-sm leading-6 text-muted-foreground">
                 {kind === "teachers"
                   ? "Manage teaching personnel and their school department. Teachers are not duplicated in the non-teaching Staff directory."
                   : isGuardianPage
-                    ? "Maintain family contacts and their links to student records. Tick “Create parent-portal login” to give a guardian access."
+                    ? "Keep guardian contacts, linked students and parent-portal access organised in one place."
                     : "Manage non-teaching employees, departments, and operational roles. Teaching personnel are managed separately under Teachers."}
               </p>
             </div>
@@ -620,7 +675,7 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
                 setEditing(null);
                 setShowForm((value) => !value);
               }}
-              className="inline-flex h-10 items-center gap-2 rounded-lg bg-primary px-4 text-xs font-semibold text-primary-foreground shadow-sm hover:opacity-90"
+              className="inline-flex h-10 items-center gap-2 rounded-lg bg-primary px-4 text-xs font-semibold text-primary-foreground shadow-sm transition hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             >
               <Plus className="size-4" />
               Add {resourceName}
@@ -1044,25 +1099,28 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
         </section>
       )}
 
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className={`grid gap-3 sm:grid-cols-3 ${isGuardianPage ? "xl:gap-4" : ""}`}>
         <WorkspaceStat
-          label="Directory records"
+          label={isGuardianPage ? "Total guardians" : "Directory records"}
           value={String(total)}
-          detail="matching filters"
+          detail={isGuardianPage ? "in the directory" : "matching filters"}
+          icon={UsersRound}
         />
         <WorkspaceStat
-          label="Active on this page"
+          label={isGuardianPage ? "Active guardians" : "Active on this page"}
           value={String(activeCount)}
-          detail={title.toLowerCase()}
+          detail={isGuardianPage ? "active records" : title.toLowerCase()}
+          icon={CheckCircle2}
         />
         <WorkspaceStat
-          label="Page"
-          value={`${directoryQuery.data?.meta.page ?? 1} / ${directoryQuery.data?.meta.totalPages || 1}`}
-          detail="directory pagination"
+          label={isGuardianPage ? "Portal access" : "Page"}
+          value={isGuardianPage ? String(rows.filter((row) => row.hasLogin).length) : String(directoryQuery.data?.meta.page ?? 1) + " / " + String(directoryQuery.data?.meta.totalPages || 1)}
+          detail={isGuardianPage ? "guardians with a login" : "directory pagination"}
+          icon={isGuardianPage ? ShieldCheck : undefined}
         />
       </div>
 
-      <section className={`grid gap-3 rounded-2xl border border-border bg-card p-4 ${isGuardianPage ? "md:grid-cols-1" : "md:grid-cols-[minmax(220px,1fr)_180px]"}`}>
+      <section className={`rounded-2xl border border-border bg-card/80 p-4 shadow-sm backdrop-blur-sm ${isGuardianPage ? "flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between" : "grid gap-3 md:grid-cols-[minmax(220px,1fr)_180px]"}`}>
         {!isGuardianPage && (
           <label className="relative">
             <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -1078,7 +1136,18 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
             />
           </label>
         )}
-        <label>
+        {isGuardianPage && (
+          <div className="flex items-center gap-2.5">
+            <span className="flex size-9 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+              <Filter className="size-4" />
+            </span>
+            <div>
+              <p className="text-sm font-semibold text-foreground">Filter guardians</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">Narrow the directory by account status</p>
+            </div>
+          </div>
+        )}
+        <label className={isGuardianPage ? "w-full sm:w-52" : ""}>
           <span className="sr-only">Filter by status</span>
           <select
             value={activeFilter}
@@ -1086,7 +1155,7 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
               setActiveFilter(event.target.value);
               setPage(1);
             }}
-            className={`${inputClasses} mt-0`}
+            className={`${inputClasses} mt-0 ${isGuardianPage ? "sm:h-11 sm:px-3" : ""}`}
           >
             <option value="">All statuses</option>
             <option value="true">Active</option>
