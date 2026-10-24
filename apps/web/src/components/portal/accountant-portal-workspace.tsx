@@ -527,10 +527,10 @@ export function AccountantPortalWorkspace({
       )}
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <MetricCard label="Payments collected" value={currency(collected)} detail={`${payments.length} recorded receipts`} icon={ArrowUpRight} />
-        <MetricCard label="Outstanding fees" value={currency(outstanding)} detail={`${debtors.length} bills with balances`} icon={AlertCircle} />
-        <MetricCard label="Recorded expenses" value={currency(expenseTotal)} detail={`${expenses.length} expense entries`} icon={ArrowDownRight} />
-        <MetricCard label="Payroll net total" value={currency(payrollNet)} detail={`${payroll.length} saved payroll run(s)`} icon={Wallet} />
+        <MetricCard label="Payments collected" value={paymentsQuery.error ? "Unavailable" : currency(collected)} detail={paymentsQuery.error ? "Could not load payment records" : `${payments.length} recorded receipts`} icon={ArrowUpRight} />
+        <MetricCard label="Outstanding fees" value={billsQuery.error ? "Unavailable" : currency(outstanding)} detail={billsQuery.error ? "Could not load bill records" : `${debtors.length} bills with balances`} icon={AlertCircle} />
+        <MetricCard label="Recorded expenses" value={expensesQuery.error ? "Unavailable" : currency(expenseTotal)} detail={expensesQuery.error ? "Could not load expense records" : `${expenses.length} expense entries`} icon={ArrowDownRight} />
+        <MetricCard label="Payroll net total" value={payrollQuery.error ? "Unavailable" : currency(payrollNet)} detail={payrollQuery.error ? "Could not load payroll records" : `${payroll.length} saved payroll run(s)`} icon={Wallet} />
       </div>
 
       <nav aria-label="Accountant sections" className="flex gap-1 overflow-x-auto rounded-2xl border border-border bg-card p-1.5">
@@ -546,7 +546,7 @@ export function AccountantPortalWorkspace({
         })}
       </nav>
 
-      {loading && activeTab !== "announcements" && activeTab !== "inventory" && (
+      {loading && activeTab !== "announcements" && (
         <div role="status" className="flex items-center justify-center gap-2 rounded-2xl border border-border bg-card p-12 text-sm text-muted-foreground">
           <LoaderCircle className="size-4 animate-spin" /> Loading live finance records…
         </div>
@@ -562,7 +562,7 @@ export function AccountantPortalWorkspace({
               </div>
               <button className={buttonSecondary} onClick={() => setActiveTab("payments")}>View payments</button>
             </div>
-            <PaymentsTable payments={payments.slice(0, 6)} />
+            {paymentsQuery.error ? <QueryError message={paymentsQuery.error.message} /> : <PaymentsTable payments={payments.slice(0, 6)} />}
           </section>
           <section className="rounded-2xl border border-border bg-card p-5">
             <h2 className="font-semibold text-foreground">Attention required</h2>
@@ -580,7 +580,7 @@ export function AccountantPortalWorkspace({
         <section className="rounded-2xl border border-border bg-card p-5">
           <SectionHeader title="Invoices & bills" description="Search bills, review balances, and generate billing for an active class." action={<button className={buttonPrimary} onClick={() => setShowBillForm(true)}><Plus className="size-4" /> Generate bills</button>} />
           <SearchFilters search={search} setSearch={setSearch} statusFilter={statusFilter} setStatusFilter={setStatusFilter} statuses={["PENDING", "PARTIALLY_PAID", "PAID", "OVERDUE"]} />
-          <BillsTable bills={filteredBills} onRecordPayment={(bill) => { setSelectedBillId(bill.id); setShowPaymentForm(true); }} />
+          {billsQuery.error ? <QueryError message={billsQuery.error.message} /> : <BillsTable bills={filteredBills} onRecordPayment={(bill) => { setSelectedBillId(bill.id); setShowPaymentForm(true); }} />}
         </section>
       )}
 
@@ -588,14 +588,14 @@ export function AccountantPortalWorkspace({
         <section className="rounded-2xl border border-border bg-card p-5">
           <SectionHeader title="Payments & receipts" description="Saved payment transactions from the school finance ledger." action={<button className={buttonPrimary} onClick={() => setShowPaymentForm(true)}><Plus className="size-4" /> Record payment</button>} />
           <div className="relative my-4 max-w-md"><Search className="absolute left-3 top-3 size-4 text-muted-foreground" /><input className={cn(inputClass, "pl-9")} value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search receipt, student, or reference" /></div>
-          <PaymentsTable payments={filteredPayments} />
+          {paymentsQuery.error ? <QueryError message={paymentsQuery.error.message} /> : <PaymentsTable payments={filteredPayments} />}
         </section>
       )}
 
       {!loading && activeTab === "debtors" && (
         <section className="rounded-2xl border border-border bg-card p-5">
           <SectionHeader title="Outstanding fees" description="Bills with a positive balance, calculated from saved billing records." />
-          <BillsTable bills={debtors.filter((bill) => {
+          {billsQuery.error ? <QueryError message={billsQuery.error.message} /> : <BillsTable bills={debtors.filter((bill) => {
             const term = search.trim().toLowerCase();
             return !term || bill.billNumber.toLowerCase().includes(term) || studentName(bill.student).toLowerCase().includes(term) || (bill.class?.name ?? "").toLowerCase().includes(term);
           })} onRecordPayment={(bill) => { setSelectedBillId(bill.id); setShowPaymentForm(true); }} />
@@ -605,11 +605,11 @@ export function AccountantPortalWorkspace({
       {!loading && activeTab === "expenses" && (
         <section className="rounded-2xl border border-border bg-card p-5">
           <SectionHeader title="Operating expenses" description="Expense entries saved to the school database." action={<button className={buttonPrimary} onClick={() => setShowExpenseForm(true)}><Plus className="size-4" /> Add expense</button>} />
-          <ExpensesTable expenses={expenses} />
+          {expensesQuery.error ? <QueryError message={expensesQuery.error.message} /> : <ExpensesTable expenses={expenses} />}
         </section>
       )}
 
-      {!payrollQuery.isPending && activeTab === "payroll" && (
+      {!loading && !payrollQuery.isPending && activeTab === "payroll" && (
         <section className="rounded-2xl border border-border bg-card p-5">
           <SectionHeader title="Payroll records" description="Saved payroll runs and totals. This workspace does not fabricate salary data." />
           {payrollQuery.error ? <QueryError message={payrollQuery.error.message} /> : payroll.length ? (
@@ -623,7 +623,7 @@ export function AccountantPortalWorkspace({
         </section>
       )}
 
-      {activeTab === "inventory" && (
+      {!loading && activeTab === "inventory" && (
         <section className="rounded-2xl border border-border bg-card p-5">
           <SectionHeader
             title="Supplies & inventory"
