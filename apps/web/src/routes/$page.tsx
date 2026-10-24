@@ -267,7 +267,12 @@ function WorkspaceContent({ pageId }: { pageId: string }) {
           {pageId === "classmates" && <StudentClassmatesView />}
           {pageId === "assignments" && <StudentAssignmentsView />}
           {pageId === "announcements" && (
-            activeRole === "student" ? <StudentAnnouncementsView /> : <AdminAnnouncementsWorkspace />
+            activeRole === "student" ? <StudentAnnouncementsView />
+              : activeRole === "teacher" ? <AdminAnnouncementsWorkspace mode="teacher" />
+                : activeRole === "accountant" ? <AdminAnnouncementsWorkspace mode="accountant" />
+                  : ["owner", "admin", "headteacher"].includes(activeRole ?? "")
+                    ? <AdminAnnouncementsWorkspace />
+                    : <AdminAnnouncementsWorkspace mode="viewer" />
           )}
           {pageId === "classes" && (
             <ClassesWorkspace

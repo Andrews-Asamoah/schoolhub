@@ -22,7 +22,7 @@ import {
 
 type CategoryFilter = "ALL" | AnnouncementCategory;
 type Notice = { kind: "success" | "error"; message: string };
-type AnnouncementWorkspaceMode = "admin" | "teacher" | "accountant";
+type AnnouncementWorkspaceMode = "admin" | "teacher" | "accountant" | "viewer";
 type AnnouncementClassOption = { id: string; name: string; level: string };
 
 const filterOptions: { value: CategoryFilter; label: string }[] = [
@@ -66,7 +66,7 @@ export function AdminAnnouncementsWorkspace({ mode = "admin" }: { mode?: Announc
   const classOptionsQuery = useQuery({
     queryKey: ["announcement-classes", announcementQueryRoleKey()],
     queryFn: () => apiFetch<AnnouncementClassOption[]>("/announcements/classes"),
-    enabled: mode !== "accountant",
+    enabled: mode !== "accountant" && mode !== "viewer",
     retry: false,
   });
   const classOptions = classOptionsQuery.data ?? [];
@@ -74,7 +74,9 @@ export function AdminAnnouncementsWorkspace({ mode = "admin" }: { mode?: Announc
     ? ANNOUNCEMENT_TARGET_OPTIONS.filter((option) => option.value === "SELECTED_CLASSES" || option.value === "SELECTED_CLASS_GUARDIANS")
     : mode === "accountant"
       ? ANNOUNCEMENT_TARGET_OPTIONS.filter((option) => option.value === "OUTSTANDING_FEE_GUARDIANS")
-      : ANNOUNCEMENT_TARGET_OPTIONS;
+      : mode === "viewer"
+        ? []
+        : ANNOUNCEMENT_TARGET_OPTIONS;
   const requiresClassTargets = form.target === "SELECTED_CLASSES" || form.target === "SELECTED_CLASS_GUARDIANS";
   const selectedClasses = classOptions.filter((option) => form.classIds.includes(option.id));
 
@@ -180,9 +182,9 @@ export function AdminAnnouncementsWorkspace({ mode = "admin" }: { mode?: Announc
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-xl font-black text-foreground">{mode === "teacher" ? "Class Announcements" : mode === "accountant" ? "Fee Announcements" : "School Announcements"}</h2>
+          <h2 className="text-xl font-black text-foreground">{mode === "teacher" ? "Class Announcements" : mode === "accountant" ? "Fee Announcements" : mode === "viewer" ? "Announcements" : "School Announcements"}</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            {mode === "teacher" ? "Share notices with students and guardians in the classes you teach." : mode === "accountant" ? "Send announcements to guardians of students with outstanding school fees." : "Create and manage school notices, event updates, and academic bulletins."}
+            {mode === "teacher" ? "Share notices with students and guardians in the classes you teach." : mode === "accountant" ? "Send announcements to guardians of students with outstanding school fees." : mode === "viewer" ? "Read updates and notices shared with you by your school." : "Create and manage school notices, event updates, and academic bulletins."}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -195,6 +197,7 @@ export function AdminAnnouncementsWorkspace({ mode = "admin" }: { mode?: Announc
             <RefreshCw className={cn("size-4", announcementsQuery.isFetching && "animate-spin")} />
             Refresh
           </button>
+{mode !== "viewer" && (
           <button
             type="button"
             onClick={() => { setForm(emptyForm(mode)); setNotice(null); setIsCreateOpen(true); }}
@@ -203,6 +206,7 @@ export function AdminAnnouncementsWorkspace({ mode = "admin" }: { mode?: Announc
             <Plus className="size-4" />
             {mode === "accountant" ? "New fee announcement" : mode === "teacher" ? "New class announcement" : "New announcement"}
           </button>
+          )}
         </div>
       </div>
 
