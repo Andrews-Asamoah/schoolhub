@@ -19,6 +19,10 @@ import {
   createExpenseSchema,
   generateBillSchema,
   recordPaymentSchema,
+  createInventoryItemSchema,
+  inventoryStockMovementSchema,
+  type CreateInventoryItemInput,
+  type InventoryStockMovementInput,
   type CreateExpenseInput,
   type GenerateBillInput,
   type RecordPaymentInput,
@@ -120,6 +124,18 @@ interface ApiAcademicYear {
   terms: ApiTerm[];
 }
 
+interface ApiInventoryItem {
+  id: string;
+  name: string;
+  description?: string | null;
+  category?: string | null;
+  quantity: number;
+  unit?: string | null;
+  minQuantity: number;
+  updatedAt: string;
+  transactions?: { id: string; type: string; quantity: number; date: string; description?: string | null }[];
+}
+
 interface ApiPayroll {
   id: string;
   month: number;
@@ -196,6 +212,8 @@ export function AccountantPortalWorkspace({
   const [selectedFeeStructureId, setSelectedFeeStructureId] = useState("");
   const [showBillForm, setShowBillForm] = useState(false);
   const [showExpenseForm, setShowExpenseForm] = useState(false);
+  const [showInventoryForm, setShowInventoryForm] = useState(false);
+  const [stockItemId, setStockItemId] = useState("");
   const [message, setMessage] = useState<{ kind: "success" | "error"; text: string } | null>(null);
 
   const billsQuery = useQuery({
@@ -228,6 +246,11 @@ export function AccountantPortalWorkspace({
     queryFn: () => apiFetch<ApiAcademicYear[]>("/schools/academic-years"),
     retry: false,
   });
+  const inventoryQuery = useQuery({
+    queryKey: ["inventory", "items"],
+    queryFn: () => apiFetch<ApiInventoryItem[]>("/inventory/items"),
+    retry: false,
+  });
   const payrollQuery = useQuery({
     queryKey: ["finance", "payroll"],
     queryFn: () => apiFetch<ApiPayroll[]>("/finance/payroll"),
@@ -242,6 +265,7 @@ export function AccountantPortalWorkspace({
   const feeStructures = feeStructuresQuery.data ?? [];
   const classes = (classesQuery.data ?? []).filter((schoolClass) => schoolClass.isActive);
   const payroll = payrollQuery.data ?? [];
+  const inventoryItems = inventoryQuery.data ?? [];
 
   const filteredBills = useMemo(() => bills.filter((bill) => {
     const term = search.trim().toLowerCase();
@@ -274,6 +298,34 @@ export function AccountantPortalWorkspace({
   const billTargetClasses = selectedFeeStructure?.targetClasses.length
     ? classes.filter((schoolClass) => selectedFeeStructure.targetClasses.some((target) => target.class.id === schoolClass.id))
     : classes;
+
+  const createInventoryItem = useMutation({
+    mutationFn: (input: CreateInventoryItemInput) =>
+      apiFetch<ApiInventoryItem>("/inventory/items", {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    onSuccess: async () => {
+      setMessage({ kind: "success", text: "Inventory item created and opening stock recorded." });
+      setShowInventoryForm(false);
+      await queryClient.invalidateQueries({ queryKey: ["inventory", "items"] });
+    },
+    onError: (error: Error) => setMessage({ kind: "error", text: error.message }),
+  });
+
+  const recordStockMovement = useMutation({
+    mutationFn: ({ itemId, input }: { itemId: string; input: InventoryStockMovementInput }) =>
+      apiFetch("/inventory/items/" + itemId + "/movements", {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    onSuccess: async () => {
+      setMessage({ kind: "success", text: "Stock movement recorded and inventory quantity updated." });
+      setStockItemId("");
+      await queryClient.invalidateQueries({ queryKey: ["inventory", "items"] });
+    },
+    onError: (error: Error) => setMessage({ kind: "error", text: error.message }),
+  });
 
   const recordPayment = useMutation({
     mutationFn: (input: RecordPaymentInput) =>
@@ -327,6 +379,43 @@ export function AccountantPortalWorkspace({
     },
     onError: (error: Error) => setMessage({ kind: "error", text: error.message }),
   });
+
+  function submitInventoryItem(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const result = createInventoryItemSchema.safeParse({
+      name: form.get("name"),
+      description: String(form.get("description") ?? "").trim() || undefined,
+      category: String(form.get("category") ?? "").trim() || undefined,
+      unit: form.get("unit"),
+      minQuantity: Number(form.get("minQuantity")),
+      initialQuantity: Number(form.get("initialQuantity")),
+    });
+    if (!result.success) {
+      setMessage({ kind: "error", text: result.error.issues[0]?.message ?? "Check the inventory details." });
+      return;
+    }
+    setMessage(null);
+    createInventoryItem.mutate(result.data);
+  }
+
+  function submitStockMovement(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const result = inventoryStockMovementSchema.safeParse({
+      type: form.get("type"),
+      quantity: Number(form.get("quantity")),
+      date: form.get("date"),
+      description: String(form.get("description") ?? "").trim() || undefined,
+      recipientName: String(form.get("recipientName") ?? "").trim() || undefined,
+    });
+    if (!result.success) {
+      setMessage({ kind: "error", text: result.error.issues[0]?.message ?? "Check the stock movement details." });
+      return;
+    }
+    setMessage(null);
+    recordStockMovement.mutate({ itemId: stockItemId, input: result.data });
+  }
 
   function submitPayment(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -394,7 +483,7 @@ export function AccountantPortalWorkspace({
 
   const loading =
     billsQuery.isPending || paymentsQuery.isPending || expensesQuery.isPending ||
-    feeStructuresQuery.isPending || classesQuery.isPending || yearsQuery.isPending;
+    feeStructuresQuery.isPending || classesQuery.isPending || yearsQuery.isPending || (activeTab === "inventory" && inventoryQuery.isPending);
 
   return (
     <div className="space-y-6">
@@ -535,8 +624,31 @@ export function AccountantPortalWorkspace({
       )}
 
       {activeTab === "inventory" && (
-        <section className="rounded-2xl border border-border bg-card p-6">
-          <EmptyState icon={Package} title="Inventory is not connected to a live stock register" description="This page intentionally does not show sample stock figures. The current API has no inventory-item CRUD workflow, so stock levels cannot yet be safely created, adjusted, or audited from this portal." />
+        <section className="rounded-2xl border border-border bg-card p-5">
+          <SectionHeader
+            title="Supplies & inventory"
+            description="Track stock quantities, minimum levels, and auditable stock-in / stock-out movements."
+            action={<button className={buttonPrimary} onClick={() => setShowInventoryForm(true)}><Plus className="size-4" /> Add item</button>}
+          />
+          {inventoryQuery.error ? <QueryError message={inventoryQuery.error.message} /> : inventoryItems.length ? (
+            <div className="mt-4 overflow-x-auto">
+              <table className="w-full min-w-[720px] text-left text-sm">
+                <thead><tr className="border-b border-border text-xs text-muted-foreground"><th className="p-3">Item</th><th className="p-3">Category</th><th className="p-3 text-right">On hand</th><th className="p-3 text-right">Minimum</th><th className="p-3">Stock status</th><th className="p-3">Updated</th><th className="p-3"></th></tr></thead>
+                <tbody>{inventoryItems.map((item) => {
+                  const low = item.quantity <= item.minQuantity;
+                  return <tr key={item.id} className="border-b border-border/70 last:border-0">
+                    <td className="p-3"><div className="font-semibold text-foreground">{item.name}</div><div className="text-xs text-muted-foreground">{item.description || item.unit || "—"}</div></td>
+                    <td className="p-3">{item.category || "Uncategorised"}</td>
+                    <td className="p-3 text-right font-semibold tabular-nums">{item.quantity} {item.unit || "pcs"}</td>
+                    <td className="p-3 text-right tabular-nums">{item.minQuantity}</td>
+                    <td className="p-3"><StatusBadge value={low ? "LOW STOCK" : "IN STOCK"} /></td>
+                    <td className="p-3">{dateLabel(item.updatedAt)}</td>
+                    <td className="p-3 text-right"><button className="text-xs font-semibold text-primary hover:underline" onClick={() => setStockItemId(item.id)}>Record movement</button></td>
+                  </tr>;
+                })}</tbody>
+              </table>
+            </div>
+          ) : <EmptyState icon={Package} title="No inventory items yet" description="Create an item and record its opening quantity. Every subsequent stock-in or stock-out is stored as a dated movement." />}
         </section>
       )}
 
@@ -585,6 +697,37 @@ export function AccountantPortalWorkspace({
             <Field label="Notes (optional)"><textarea name="notes" className={cn(inputClass, "h-20 py-2")} placeholder="Optional note shown on generated bills" /></Field>
             <p className="text-xs leading-5 text-muted-foreground">The operation is performed by the server using the selected class roster and current term. Review the count and total in the confirmation message after generation.</p>
             <ModalActions onCancel={() => setShowBillForm(false)} busy={generateBills.isPending} submitLabel="Generate bills" />
+          </form>
+        </Modal>
+      )}
+
+      {showInventoryForm && (
+        <Modal title="Add inventory item" description="Create a stock item with a minimum quantity threshold and optional opening stock." onClose={() => setShowInventoryForm(false)}>
+          <form onSubmit={submitInventoryItem} className="space-y-4">
+            <Field label="Item name"><input name="name" required minLength={2} maxLength={150} className={inputClass} placeholder="e.g. Exercise books, lab glassware" /></Field>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="Category"><input name="category" className={inputClass} placeholder="Books, stationery, equipment…" /></Field>
+              <Field label="Unit"><input name="unit" required defaultValue="pcs" className={inputClass} placeholder="pcs, boxes, litres…" /></Field>
+              <Field label="Opening quantity"><input name="initialQuantity" type="number" min="0" step="1" required defaultValue="0" className={inputClass} /></Field>
+              <Field label="Minimum quantity"><input name="minQuantity" type="number" min="0" step="1" required defaultValue="0" className={inputClass} /></Field>
+            </div>
+            <Field label="Description (optional)"><textarea name="description" maxLength={500} className={cn(inputClass, "h-20 py-2")} placeholder="Storage location or item details" /></Field>
+            <ModalActions onCancel={() => setShowInventoryForm(false)} busy={createInventoryItem.isPending} submitLabel="Create item" />
+          </form>
+        </Modal>
+      )}
+
+      {stockItemId && (
+        <Modal title="Record stock movement" description={`Update quantities for ${inventoryItems.find((item) => item.id === stockItemId)?.name ?? "this item"}. Stock cannot go below zero.`} onClose={() => setStockItemId("")}>
+          <form onSubmit={submitStockMovement} className="space-y-4">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="Movement type"><select name="type" required className={inputClass} defaultValue="IN"><option value="IN">Stock in — received</option><option value="OUT">Stock out — issued</option></select></Field>
+              <Field label="Quantity"><input name="quantity" type="number" required min="1" step="1" className={inputClass} /></Field>
+              <Field label="Movement date"><input name="date" type="date" required defaultValue={new Date().toISOString().slice(0, 10)} className={inputClass} /></Field>
+              <Field label="Recipient (optional)"><input name="recipientName" maxLength={150} className={inputClass} placeholder="Staff member / department" /></Field>
+            </div>
+            <Field label="Description (optional)"><textarea name="description" maxLength={500} className={cn(inputClass, "h-20 py-2")} placeholder="Reason or reference" /></Field>
+            <ModalActions onCancel={() => setStockItemId("")} busy={recordStockMovement.isPending} submitLabel="Save movement" />
           </form>
         </Modal>
       )}
