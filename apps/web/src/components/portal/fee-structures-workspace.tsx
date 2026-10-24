@@ -99,7 +99,7 @@ export function FeeStructuresWorkspace() {
 
   const structuresQuery = useQuery({
     queryKey: ["finance", "fee-structures"],
-    queryFn: () => apiFetch<FeeStructure[]>("/finance/fee-structures"),
+    queryFn: () => apiFetch<FeeStructure[]>("/finance/fee-structures?includeArchived=true"),
     retry: false,
   });
   const registryQuery = useQuery({
