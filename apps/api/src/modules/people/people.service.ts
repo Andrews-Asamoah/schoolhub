@@ -9,11 +9,13 @@ import {
 import { PrismaService } from '../../prisma/prisma.service.js';
 import {
   CredentialsService,
+  newGuardianLoginEmail,
   toIssuedCredentials,
 } from '../accounts/credentials.service.js';
 import { roleForStaffType } from '../accounts/staff-roles.js';
 import { toTeacherBiodata } from './teacher-biodata.js';
 import type { Prisma } from '@prisma/client';
+import { guardianEmailDomain } from '@schoolhub/shared';
 import type {
   UpdateGuardianInput,
   UpdateStaffInput,
@@ -424,12 +426,21 @@ export class PeopleService {
     input: CreateGuardianInput,
   ) {
     const schoolId = school.id;
-    const email = input.email?.trim().toLowerCase() || null;
-    if (input.createLogin && !email) {
-      throw new BadRequestException(
-        'An email address is required to create a parent-portal login.',
-      );
-    }
+    const schoolEmailInfo = await this.prisma.client.school.findUnique({
+      where: { id: schoolId },
+      select: { email: true, subdomain: true },
+    });
+    if (!schoolEmailInfo) throw new NotFoundException('School not found.');
+    const guardianDomain = guardianEmailDomain(
+      schoolEmailInfo.email,
+      schoolEmailInfo.subdomain,
+    );
+    const suppliedEmail = input.email?.trim().toLowerCase() || null;
+    const email =
+      suppliedEmail ||
+      (input.createLogin
+        ? newGuardianLoginEmail(`${input.firstName} ${input.lastName}`.trim(), guardianDomain)
+        : null);
     const credential = input.createLogin ? await this.credentials.prepare('guardian') : null;
     const uniqueStudentIds = [...new Set(input.studentIds)];
     if (uniqueStudentIds.length !== input.studentIds.length) {
