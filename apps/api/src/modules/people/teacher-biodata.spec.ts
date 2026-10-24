@@ -68,7 +68,7 @@ describe("toTeacherBiodata", () => {
 
 describe("canSeePrivateBiodata", () => {
   it("is limited to the school's managers", () => {
-    for (const role of ["owner", "admin", "headmistress"]) expect(canSeePrivateBiodata(role)).toBe(true);
+    for (const role of ["owner", "admin", "headteacher"]) expect(canSeePrivateBiodata(role)).toBe(true);
     for (const role of ["teacher", "staff", "accountant", "student", "guardian", undefined]) expect(canSeePrivateBiodata(role)).toBe(false);
   });
 });
