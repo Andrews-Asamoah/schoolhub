@@ -16,7 +16,13 @@ export interface ChartDatum {
   value: number;
 }
 
-export interface BreakdownDatum {\n  label: string;\n  count: number;\n  color: string;\n}\n\nexport interface InfographicCardProps {
+export interface BreakdownDatum {
+  label: string;
+  count: number;
+  color: string;
+}
+
+export interface InfographicCardProps {
   title: string;
   description: string;
   icon: LucideIcon;
@@ -216,10 +222,10 @@ export function DonutProgressChart({
   );
 }
 
-function HorizontalBreakdown({
+export function HorizontalBreakdown({
   data,
 }: {
-  data: { label: string; count: number; color: string }[];
+  data: BreakdownDatum[];
 }) {
   const total = data.reduce((sum, item) => sum + item.count, 0);
 
