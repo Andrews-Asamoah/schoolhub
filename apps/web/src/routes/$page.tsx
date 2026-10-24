@@ -35,6 +35,7 @@ import { SchoolLogoUploader } from "@/components/school/school-logo-uploader";
 import { AssessmentEntryWorkspace } from "@/components/school/assessment-entry-workspace";
 import { AssessmentsAdmin } from "@/components/school/assessments-admin";
 import { ClassRegister } from "@/components/school/class-register";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SchoolSettingsForm } from "@/components/school/school-settings-form";
 import { ProfileWorkspace } from "@/components/school/profile-workspace";
 import { HousesWorkspace } from "@/components/school/houses-workspace";
@@ -101,13 +102,6 @@ interface FeeStructure {
   termBased: boolean;
   items: { id: string; name: string; amount: number | string }[];
   targetClasses: { class: { id: string; name: string } }[];
-}
-
-interface AttendanceRow {
-  studentId: string;
-  admissionNumber: string;
-  name: string;
-  attendance: { status: string; remarks?: string | null } | null;
 }
 
 interface School {
@@ -393,132 +387,85 @@ function AttendanceWorkspace({
   query: UseQueryResult<SchoolClass[], Error>;
 }) {
   const [selectedClassId, setSelectedClassId] = useState("");
-  const [selectedDate, setSelectedDate] = useState(
-    new Date().toISOString().slice(0, 10),
-  );
   const { activeRole: attendanceRole } = useSchoolRole();
   const teaching = useTeachingOverview(attendanceRole === "teacher");
-  const classId = selectedClassId || query.data?.[0]?.id || "";
-  const attendanceQuery = useQuery({
-    queryKey: ["attendance", "class", classId, selectedDate],
-    queryFn: () =>
-      apiFetch<AttendanceRow[]>(
-        `/attendance/class/${classId}?date=${selectedDate}`,
-      ),
-    enabled: !!classId,
-    retry: false,
-  });
 
-  if (query.isPending) return <LoadingState label="Loading classes" />;
+  if (query.isPending || (attendanceRole === "teacher" && teaching.isPending)) {
+    return <LoadingState label="Loading attendance classes" />;
+  }
   if (query.error) return <QueryError error={query.error} />;
-  if (!query.data?.length) {
+  if (attendanceRole === "teacher" && teaching.error) {
+    return <QueryError error={teaching.error} />;
+  }
+
+  // Only assigned class teachers can mark attendance; every other school role is read-only.
+  const availableClasses =
+    attendanceRole === "teacher"
+      ? (query.data ?? []).filter((schoolClass) =>
+          teaching.data?.classes.some(
+            (item) => item.id === schoolClass.id && item.isClassTeacher,
+          ),
+        )
+      : (query.data ?? []);
+  const classId =
+    availableClasses.find((schoolClass) => schoolClass.id === selectedClassId)?.id ??
+    availableClasses[0]?.id ??
+    "";
+
+  if (!availableClasses.length) {
     return (
       <WorkspaceEmptyState
-        title="Set up a class to begin attendance"
-        description="Attendance records are recorded against a class roster. Create a class and add students first."
+        title={attendanceRole === "teacher" ? "No class register assigned to you" : "No classes available"}
+        description={
+          attendanceRole === "teacher"
+            ? "Only the assigned class teacher can record attendance. Ask the school administrator to review your class-teacher assignment if a class is missing."
+            : "Create a class and enrol students before reviewing attendance records."
+        }
       />
     );
   }
 
-  const columns: WorkspaceColumn<AttendanceRow>[] = [
-    {
-      id: "student",
-      header: "Student",
-      cell: (row) => (
-        <span className="font-semibold text-foreground">{row.name}</span>
-      ),
-    },
-    {
-      id: "admission",
-      header: "Admission no.",
-      cell: (row) => row.admissionNumber,
-    },
-    {
-      id: "attendance",
-      header: "Attendance",
-      value: (row) => row.attendance?.status ?? "Not recorded",
-      cell: (row) =>
-        row.attendance ? (
-          <StatusBadge value={row.attendance.status} />
-        ) : (
-          <span className="text-slate-400">Not recorded</span>
-        ),
-    },
-  ];
-
-  // Managers can mark any class; a teacher only the classes they are class teacher of.
+  const className =
+    availableClasses.find((schoolClass) => schoolClass.id === classId)?.name ?? "Class";
   const canMark =
-    ["owner", "admin", "headteacher"].includes(attendanceRole ?? "") ||
-    (attendanceRole === "teacher" && !!teaching.data?.classes.find((item) => item.id === classId)?.isClassTeacher);
-  if (canMark) {
-    return (
-      <div className="space-y-4">
-        <div className="flex flex-wrap items-end gap-3 rounded-2xl border border-slate-200/80 bg-white p-4">
-          <label className="grid gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
-            Class
-            <select
-              value={classId}
-              onChange={(event) => setSelectedClassId(event.target.value)}
-              className="h-9 min-w-48 rounded-lg border border-slate-200 bg-white px-3 text-xs font-medium normal-case tracking-normal text-slate-700 outline-none focus:border-blue-400"
-            >
-              {query.data.map((schoolClass) => (
-                <option key={schoolClass.id} value={schoolClass.id}>{schoolClass.name}</option>
-              ))}
-            </select>
-          </label>
-        </div>
-        <ClassRegister
-          key={classId}
-          classId={classId}
-          className={query.data.find((schoolClass) => schoolClass.id === classId)?.name ?? "Class"}
-          canMark
-        />
-      </div>
+    attendanceRole === "teacher" &&
+    !!teaching.data?.classes.some(
+      (item) => item.id === classId && item.isClassTeacher,
     );
-  }
 
   return (
-    <>
-      <div className="mb-4 flex flex-wrap items-end gap-3 rounded-2xl border border-slate-200/80 bg-white p-4">
-        <label className="grid gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
-          Class
-          <select
-            value={classId}
-            onChange={(event) => setSelectedClassId(event.target.value)}
-            className="h-9 min-w-48 rounded-lg border border-slate-200 bg-white px-3 text-xs font-medium normal-case tracking-normal text-slate-700 outline-none focus:border-blue-400"
-          >
-            {query.data.map((schoolClass) => (
-              <option key={schoolClass.id} value={schoolClass.id}>
-                {schoolClass.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="grid gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
-          Date
-          <input
-            type="date"
-            value={selectedDate}
-            onChange={(event) => setSelectedDate(event.target.value)}
-            className="h-9 rounded-lg border border-slate-200 bg-white px-3 text-xs font-medium normal-case tracking-normal text-slate-700 outline-none focus:border-blue-400"
-          />
-        </label>
+    <div className="space-y-5">
+      <div className="flex flex-col gap-4 rounded-2xl border border-border bg-card p-4 shadow-sm sm:flex-row sm:items-end sm:justify-between sm:p-5">
+        <div className="min-w-0">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">School operations</p>
+          <h2 className="mt-1 text-lg font-semibold tracking-tight text-foreground">Daily attendance</h2>
+          <p className="mt-1 max-w-xl text-sm text-muted-foreground">
+            {canMark
+              ? "Record and review attendance for your assigned class."
+              : "Review attendance records. Only the assigned class teacher can edit the register."}
+          </p>
+        </div>
+        <div className="grid gap-1.5 sm:w-64">
+          <label className="text-xs font-medium text-muted-foreground" htmlFor="attendance-class">Class</label>
+          <Select value={classId} onValueChange={setSelectedClassId}>
+            <SelectTrigger id="attendance-class" className="w-full">
+              <SelectValue placeholder="Choose a class" />
+            </SelectTrigger>
+            <SelectContent>
+              {availableClasses.map((schoolClass) => (
+                <SelectItem key={schoolClass.id} value={schoolClass.id}>{schoolClass.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
-      {attendanceQuery.isPending ? (
-        <LoadingState label="Loading attendance" />
-      ) : attendanceQuery.error ? (
-        <QueryError error={attendanceQuery.error} />
-      ) : (
-        <WorkspaceDataTable
-          rows={attendanceQuery.data ?? []}
-          columns={columns}
-          getRowId={(row) => row.studentId}
-          exportTitle="Class attendance"
-          emptyTitle="No students in this class"
-          emptyDescription="Add students to this class to record attendance."
-        />
-      )}
-    </>
+      <ClassRegister
+        key={classId}
+        classId={classId}
+        className={className}
+        canMark={canMark}
+      />
+    </div>
   );
 }
 
@@ -574,8 +521,8 @@ function PlannedWorkspace({ title }: { title: string }) {
 
 function LoadingState({ label }: { label: string }) {
   return (
-    <div className="flex min-h-52 items-center justify-center gap-2 rounded-2xl border border-slate-200/80 bg-white text-xs text-slate-500">
-      <LoaderCircle className="size-4 animate-spin text-blue-600" />
+    <div className="flex min-h-52 items-center justify-center gap-2 rounded-2xl border border-border bg-card text-sm text-muted-foreground">
+      <LoaderCircle className="size-4 animate-spin text-primary" />
       {label}…
     </div>
   );
@@ -591,34 +538,10 @@ function QueryError({ error }: { error: Error }) {
   return (
     <div
       role="alert"
-      className="rounded-2xl border border-rose-200 bg-rose-50 p-5 text-xs text-rose-800"
+      className="rounded-2xl border border-destructive/30 bg-destructive/5 p-5 text-sm text-destructive"
     >
       <p className="font-semibold">Could not load this workspace data</p>
       <p className="mt-1 leading-relaxed">{message}</p>
     </div>
   );
 }
-
-function StatusBadge({ value }: { value: string }) {
-  const normalized = value.toUpperCase();
-  const isPositive = ["ACTIVE", "PRESENT", "PAID", "CURRENT"].includes(
-    normalized,
-  );
-  const isNegative = ["ABSENT", "SUSPENDED", "WITHDRAWN", "OVERDUE"].includes(
-    normalized,
-  );
-  return (
-    <span
-      className={`inline-flex rounded-full px-2 py-1 text-[9px] font-semibold ${
-        isPositive
-          ? "bg-emerald-50 text-emerald-700"
-          : isNegative
-            ? "bg-rose-50 text-rose-700"
-            : "bg-slate-100 text-slate-600"
-      }`}
-    >
-      {normalized.replaceAll("_", " ")}
-    </span>
-  );
-}
-

@@ -41,9 +41,9 @@ export class AttendanceService {
         "Attendance can only be recorded for students enrolled in the current term.",
       );
     }
-    // Only a class teacher (or a school manager) may mark that class's register.
+    // Marking attendance is restricted to the assigned class teacher, never school managers.
     const assignments = await this.teacherScope.getAssignments(schoolId, markedById);
-    if (!canMarkRegister(role, assignments, [...new Set(placements.map((placement) => placement.classId))])) {
+    if (role !== "teacher" || !canMarkRegister(role, assignments, [...new Set(placements.map((placement) => placement.classId))])) {
       throw new ForbiddenException("Only the class teacher can mark this class's register.");
     }
 
@@ -79,6 +79,35 @@ export class AttendanceService {
       count: results.length,
       date: input.date,
     };
+  }
+
+  async getClassAttendanceDates(
+    schoolId: string,
+    classId: string,
+    role?: string,
+    academicYearId?: string,
+    termId?: string,
+    userId?: string,
+  ) {
+    if (role === "teacher") {
+      const taught = userId ? await this.teacherScope.getTaughtClassIds(schoolId, userId) : [];
+      if (!taught.includes(classId)) throw new ForbiddenException("You do not teach this class.");
+    }
+    const { academicYear, term } = await this.resolveAcademicContext(schoolId, academicYearId, termId, role);
+    const records = await this.prisma.client.attendance.findMany({
+      where: {
+        student: {
+          schoolId,
+          deletedAt: null,
+          enrollments: { some: { classId, academicYearId: academicYear.id, termId: term.id, status: "ACTIVE" } },
+        },
+        date: { gte: term.startDate, lte: term.endDate },
+      },
+      distinct: ["date"],
+      select: { date: true },
+      orderBy: { date: "asc" },
+    });
+    return records.map(({ date }) => date.toISOString().slice(0, 10));
   }
 
   async getClassAttendance(

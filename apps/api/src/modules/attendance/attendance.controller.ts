@@ -28,7 +28,7 @@ export class AttendanceController {
   constructor(private readonly attendanceService: AttendanceService) {}
 
   @Post("batch")
-  @Roles("owner", "admin", "teacher")
+  @Roles("teacher")
   batchRecordAttendance(
     @CurrentSchool() school: School,
     @CurrentUser() user: AuthenticatedUser,
@@ -41,6 +41,21 @@ export class AttendanceController {
       user.id,
       body,
       role,
+    );
+  }
+
+  @Get("class/:classId/dates")
+  @Roles("owner", "admin", "teacher", "staff", "accountant")
+  getClassAttendanceDates(
+    @CurrentSchool() school: School,
+    @CurrentUser() user: AuthenticatedUser,
+    @Param("classId") classId: string,
+    @CurrentSchoolRole() role: string | undefined,
+    @Headers("x-academic-year-id") academicYearId?: string,
+    @Headers("x-academic-term-id") termId?: string,
+  ) {
+    return this.attendanceService.getClassAttendanceDates(
+      school.id, classId, role, academicYearId, termId, user.id,
     );
   }
 

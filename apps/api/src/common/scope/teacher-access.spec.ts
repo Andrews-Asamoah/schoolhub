@@ -13,8 +13,10 @@ const ama: TeacherAssignments = {
 const none: TeacherAssignments = { teacherId: null, classTeacherClassIds: [], subjectAssignments: [] };
 
 describe("canMarkRegister", () => {
-  it("lets managers mark any class", () => {
-    for (const role of ["owner", "admin", "headteacher"]) expect(canMarkRegister(role, none, ["c-9"])).toBe(true);
+  it("keeps attendance marking restricted to assigned class teachers", () => {
+    for (const role of ["owner", "admin", "headteacher", "accountant", "staff", "student", undefined]) {
+      expect(canMarkRegister(role, none, ["c-9"])).toBe(false);
+    }
   });
   it("lets a class teacher mark only their own class", () => {
     expect(canMarkRegister("teacher", ama, ["c-1a"])).toBe(true);
