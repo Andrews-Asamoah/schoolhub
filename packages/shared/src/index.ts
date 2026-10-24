@@ -652,10 +652,13 @@ export const createExpenseSchema = z.object({
   category: z.enum([
     "SALARY", "UTILITIES", "SUPPLIES", "MAINTENANCE", "TRANSPORT",
     "RENT", "INSURANCE", "TAXES", "OTHER",
-  ]),
+  ]).default("OTHER"),
   paymentMethod: z.enum([
     "CASH", "BANK_TRANSFER", "CHEQUE", "MOBILE_MONEY", "CARD", "ONLINE", "OTHER",
-  ]),
+  ]).default("CASH"),
+  registryCategoryId: optionalId,
+  checkNumber: z.string().trim().max(120).optional(),
+  voucherNumber: z.string().trim().max(120).optional(),
   referenceNumber: z.string().trim().max(120).optional(),
 });
 export type CreateExpenseInput = z.infer<typeof createExpenseSchema>;
