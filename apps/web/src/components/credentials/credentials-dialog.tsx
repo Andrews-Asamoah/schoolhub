@@ -44,7 +44,7 @@ export function CredentialsDialog({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4 print:static print:bg-white print:p-0" role="presentation">
-      <div role="dialog" aria-modal="true" aria-labelledby="credentials-title" className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl dark:border-white/10 dark:bg-slate-900 print:max-h-none print:border-0 print:shadow-none">
+      <div id="credentials-print-root" role="dialog" aria-modal="true" aria-labelledby="credentials-title" className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl dark:border-white/10 dark:bg-slate-900 print:max-h-none print:border-0 print:shadow-none">
         <h2 id="credentials-title" className="text-lg font-bold text-slate-900 dark:text-white">Login details created</h2>
         <div className="mt-3 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs leading-relaxed text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-200">
           <AlertTriangle className="mt-0.5 size-4 shrink-0" />
