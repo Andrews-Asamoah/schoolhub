@@ -7,7 +7,7 @@ import { z } from "zod";
 export const ROLES = [
   "owner",
   "admin",
-  "headmistress",
+  "headteacher",
   "teacher",
   "accountant",
   "staff",
@@ -1299,11 +1299,13 @@ export type AnnouncementCategory = (typeof ANNOUNCEMENT_CATEGORIES)[number];
 
 export const ANNOUNCEMENT_TARGETS = [
   "ALL_STUDENTS",
-  "JHS_STUDENTS",
+  "SELECTED_CLASSES",
+  "SELECTED_CLASS_GUARDIANS",
   "SCHOOL_HOUSES",
   "SCHOOL_COMMUNITY",
   "PARENTS_GUARDIANS",
   "TEACHERS",
+  "OUTSTANDING_FEE_GUARDIANS",
 ] as const;
 export type AnnouncementTarget = (typeof ANNOUNCEMENT_TARGETS)[number];
 
@@ -1315,6 +1317,8 @@ export const createAnnouncementSchema = z.object({
   content: z.string().trim().min(1, "Announcement content is required").max(10000),
   category: z.enum(ANNOUNCEMENT_CATEGORIES).default("GENERAL"),
   target: z.enum(ANNOUNCEMENT_TARGETS).default("SCHOOL_COMMUNITY"),
+  /** Explicit class audience used for class and class-guardian announcements. */
+  classIds: z.array(z.string().trim().min(1)).max(100).default([]),
   isPinned: z.boolean().default(false),
   status: z.enum(ANNOUNCEMENT_STATUSES).default("PUBLISHED"),
 });
