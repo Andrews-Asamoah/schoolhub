@@ -1,72 +1,64 @@
-import {
-  ChevronDown,
-  CircleHelp,
-  Check,
-  CircleAlert,
-  ArrowRight,
-  BookOpen,
-  Building2,
-  CalendarDays,
-  Plus,
-  UsersRound,
-} from "lucide-react";
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { dashboardMetrics } from "@/components/school/dashboard/dashboard-data";
 import {
-  RecentActivityCard,
-  ScheduleCard,
-  SchoolYearCard,
-} from "@/components/school/dashboard/dashboard-activity";
-import { MetricCard } from "@/components/school/dashboard/dashboard-metrics";
+  ArrowRight, BookOpen, Building2, CalendarDays, CircleAlert, GraduationCap,
+  UsersRound, WalletCards, UserRoundPlus, type LucideIcon,
+} from "lucide-react";
 import { DashboardInfographics } from "@/components/school/dashboard/dashboard-infographics";
+import { RecentActivityCard, SchoolYearCard } from "@/components/school/dashboard/dashboard-activity";
+import type { DashboardAnalytics } from "@/components/school/dashboard/dashboard-data";
 import { apiFetch } from "@/lib/api";
-import {
-  schoolRoleLabel,
-  useSchoolRole,
-} from "@/components/school/school-role-switcher";
+import { schoolRoleLabel, useSchoolRole } from "@/components/school/school-role-switcher";
 import { getSchoolNavGroupsForRole } from "@/lib/school-navigation";
 import { StudentOverview } from "@/components/portal/student-overview";
+import { useSchoolOrganization } from "@/components/school/school-organization";
 
 interface SetupYear {
-  id: string;
-  name: string;
-  startDate: string;
-  endDate: string;
-  isCurrent: boolean;
-  terms: {
-    id: string;
-    name: string;
-    startDate: string;
-    endDate: string;
-    isCurrent: boolean;
-  }[];
+  id: string; name: string; startDate: string; endDate: string; isCurrent: boolean;
+  terms: { id: string; name: string; startDate: string; endDate: string; isCurrent: boolean }[];
 }
-
 interface SetupSchool {
-  id: string;
-  name: string;
-  email?: string | null;
-  phone?: string | null;
-  address?: string | null;
+  id: string; name: string; email?: string | null; phone?: string | null; address?: string | null;
   academicYears: SetupYear[];
 }
-
-interface DashboardContentProps {
-  today: string;
-  greetingName: string;
-  search: string;
+interface DashboardContentProps { today: string; greetingName: string; search: string; }
+interface Metric { label: string; value: string; detail: string; icon: LucideIcon; className: string; }
+const numberFormat = new Intl.NumberFormat("en-GH");
+const moneyFormat = new Intl.NumberFormat("en-GH", { style: "currency", currency: "GHS", maximumFractionDigits: 2 });
+function MetricTile({ metric }: { metric: Metric }) {
+  return <article className="min-w-0 rounded-2xl border border-border bg-card p-4 shadow-sm sm:p-5">
+    <div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="text-xs font-medium text-muted-foreground">{metric.label}</p><p className="mt-3 break-words text-2xl font-bold tracking-tight text-foreground">{metric.value}</p></div><span className={`flex size-10 shrink-0 items-center justify-center rounded-xl ${metric.className}`}><metric.icon className="size-[18px]" /></span></div>
+    <p className="mt-2 text-[11px] text-muted-foreground">{metric.detail}</p>
+  </article>;
+}
+function Metrics({ data, isLoading, isError }: { data?: DashboardAnalytics; isLoading: boolean; isError: boolean }) {
+  if (isLoading) return <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="Loading school statistics">{[1,2,3,4].map((item) => <div key={item} className="h-28 animate-pulse rounded-2xl bg-muted/60" />)}</section>;
+  if (isError || !data) return <p role="alert" className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">Live school statistics could not be loaded.</p>;
+  const metrics: Metric[] = [
+    { label: "Active students", value: numberFormat.format(data.metrics.activeStudents), detail: "Current active student records", icon: UsersRound, className: "bg-blue-500/10 text-blue-600" },
+    { label: "Teaching staff", value: numberFormat.format(data.metrics.activeTeachers), detail: "Active teacher records", icon: GraduationCap, className: "bg-violet-500/10 text-violet-600" },
+    { label: "New admissions", value: numberFormat.format(data.metrics.newAdmissionsThisMonth), detail: "Admitted this month", icon: UserRoundPlus, className: "bg-sky-500/10 text-sky-600" },
+  ];
+  if (data.canViewFinance) {
+    metrics.push({ label: "Revenue this month", value: moneyFormat.format(data.metrics.revenueThisMonth ?? 0), detail: "Completed payments recorded", icon: WalletCards, className: "bg-emerald-500/10 text-emerald-600" });
+    metrics.push({ label: "Expenditures this month", value: moneyFormat.format(data.metrics.expendituresThisMonth ?? 0), detail: "Recorded school expenses", icon: WalletCards, className: "bg-orange-500/10 text-orange-600" });
+  }
+  return <section aria-label="Live school statistics" className={`grid gap-3 sm:grid-cols-2 ${data.canViewFinance ? "xl:grid-cols-5" : "xl:grid-cols-3"}`}>{metrics.map((metric) => <MetricTile key={metric.label} metric={metric} />)}</section>;
 }
 
-export function DashboardContent({
-  today,
-  greetingName,
-  search,
-}: DashboardContentProps) {
+export function DashboardContent({ today, greetingName }: DashboardContentProps) {
   const { activeRole } = useSchoolRole();
-  const isManagementRole = ["owner", "admin", "headteacher"].includes(
-    activeRole ?? "",
-  );
+  const { activeOrganization } = useSchoolOrganization();
+  const [selectedMonths, setSelectedMonths] = useState(6);
+  const isManagementRole = ["owner", "admin", "headteacher"].includes(activeRole ?? "");
+  const analyticsQuery = useQuery({
+    queryKey: ["dashboard", "analytics", selectedMonths, activeOrganization?.id],
+    queryFn: () => apiFetch<DashboardAnalytics>(`/dashboard/analytics?months=${selectedMonths}`),
+    enabled: Boolean(activeRole && activeRole !== "student" && activeOrganization),
+    retry: false,
+    refetchInterval: 60_000,
+  });
   const schoolQuery = useQuery({
     queryKey: ["school", "current"],
     queryFn: () => apiFetch<SetupSchool>("/schools/current"),
@@ -88,216 +80,44 @@ export function DashboardContent({
   const years = schoolQuery.data?.academicYears ?? [];
   const activeYear = years.find((year) => year.isCurrent);
   const setupItems = [
-    {
-      title: "Complete school profile",
-      detail: "Confirm the school contact details.",
-      complete:
-        !!schoolQuery.data?.email &&
-        !!schoolQuery.data.phone &&
-        !!schoolQuery.data.address,
-      icon: Building2,
-      page: "settings",
-    },
-    {
-      title: "Create academic year and terms",
-      detail: "Define the dates that classes and school records follow.",
-      complete: years.some((year) => year.terms.length > 0),
-      icon: CalendarDays,
-      page: "academic-years",
-    },
-    {
-      title: "Add subjects",
-      detail: "Set up the subjects taught at your school.",
-      complete: (subjectsQuery.data?.length ?? 0) > 0,
-      icon: BookOpen,
-      page: "subjects",
-    },
-    {
-      title: "Create classes",
-      detail: "Organize learners under the current academic year.",
-      complete: (classesQuery.data?.length ?? 0) > 0,
-      icon: UsersRound,
-      page: "classes",
-    },
+    { title: "Complete school profile", detail: "Confirm the school contact details.", complete: !!schoolQuery.data?.email && !!schoolQuery.data.phone && !!schoolQuery.data.address, icon: Building2, page: "settings" },
+    { title: "Create academic year and terms", detail: "Define the dates that classes and school records follow.", complete: years.some((year) => year.terms.length > 0), icon: CalendarDays, page: "academic-years" },
+    { title: "Add subjects", detail: "Set up the subjects taught at your school.", complete: (subjectsQuery.data?.length ?? 0) > 0, icon: BookOpen, page: "subjects" },
+    { title: "Create classes", detail: "Organize learners under the current academic year.", complete: (classesQuery.data?.length ?? 0) > 0, icon: UsersRound, page: "classes" },
   ];
   const completedSteps = setupItems.filter((item) => item.complete).length;
-  const setupHasError =
-    schoolQuery.isError || classesQuery.isError || subjectsQuery.isError;
+  const setupHasError = schoolQuery.isError || classesQuery.isError || subjectsQuery.isError;
+  const roleLinks = getSchoolNavGroupsForRole(activeRole ?? undefined).flatMap((group) => group.items).slice(0, 6);
+  const data = analyticsQuery.data;
 
-  if (activeRole === "student") {
-    return (
-      <main className="mx-auto max-w-[1440px] px-4 py-7 sm:px-6 lg:px-9 lg:py-9">
-        <StudentOverview />
-      </main>
-    );
-  }
-
-  if (!isManagementRole) {
-    const roleLinks = getSchoolNavGroupsForRole(activeRole ?? undefined)
-      .flatMap((group) => group.items)
-      .slice(0, 6);
-    return (
-      <main className="mx-auto max-w-[1440px] px-4 py-7 sm:px-6 lg:px-9 lg:py-9">
-        <div className="rounded-3xl border border-indigo-100 bg-gradient-to-br from-white via-indigo-50/60 to-sky-50/70 p-6 shadow-sm sm:p-9 dark:border-indigo-900/30 dark:from-slate-900 dark:via-indigo-950/40 dark:to-sky-950/30">
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-indigo-700 dark:text-indigo-300">
-            {schoolRoleLabel(activeRole)}
-          </p>
-          <h1 className="mt-2 text-2xl font-bold tracking-tight text-slate-900 dark:text-white sm:text-3xl">
-            Welcome, {greetingName}
-          </h1>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-300">
-            You are viewing your {schoolRoleLabel(activeRole).toLowerCase()} workspace. Choose an area to continue.
-          </p>
-        </div>
-        <section className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {roleLinks.map((item) => (
-            <Link
-              key={item.id}
-              to="/$page"
-              params={{ page: item.id }}
-              className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-indigo-200 hover:bg-indigo-50/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:border-slate-800 dark:bg-slate-900 dark:hover:border-indigo-800 dark:hover:bg-indigo-950/30"
-            >
-              <span className="flex size-10 items-center justify-center rounded-xl bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300">
-                <item.icon className="size-5" />
-              </span>
-              <span>
-                <span className="block text-sm font-semibold text-slate-900 dark:text-white">
-                  {item.label}
-                </span>
-                <span className="mt-0.5 block text-xs text-slate-500 dark:text-slate-400">
-                  {item.description}
-                </span>
-              </span>
-            </Link>
-          ))}
-        </section>
-        {activeRole === "accountant" && <DashboardInfographics />}
-      </main>
-    );
-  }
+  if (activeRole === "student") return <main className="mx-auto max-w-[1440px] px-4 py-7 sm:px-6 lg:px-9 lg:py-9"><StudentOverview /></main>;
 
   return (
     <main className="mx-auto max-w-[1440px] px-4 py-7 sm:px-6 lg:px-9 lg:py-9">
-      <div className="mb-7 flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <div className="mb-2 flex items-center gap-2">
-            <p className="text-xs font-medium text-slate-500 dark:text-slate-400">{today}</p>
-            <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-amber-700">
-              Preview data
-            </span>
-          </div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white sm:text-[30px]">
-            Good morning, {greetingName}
-            <span className="ml-2 inline-block origin-bottom-right animate-[wave_1.8s_ease-in-out_infinite]">
-              👋
-            </span>
-          </h1>
-          <p className="mt-1.5 text-sm text-slate-500 dark:text-slate-400">
-            Here&apos;s what&apos;s happening at your school today.
-          </p>
-        </div>
-        <button
-          type="button"
-          className="inline-flex h-10 items-center gap-2 rounded-lg bg-blue-600 px-4 text-xs font-semibold text-white shadow-sm shadow-blue-600/20 transition hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
-        >
-          <Plus className="size-4" />
-          Quick action
-          <ChevronDown className="size-3.5 opacity-80" />
-        </button>
+      <div className="mb-7">
+        <p className="mb-2 text-xs font-medium text-muted-foreground">{today}</p>
+        <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-[30px]">Good day, {greetingName}<span className="ml-2">👋</span></h1>
+        <p className="mt-1.5 text-sm text-muted-foreground">A live overview of your school&apos;s records and activity.</p>
       </div>
 
-      <section className="mb-6 overflow-hidden rounded-2xl border border-indigo-100 bg-white shadow-sm dark:border-indigo-300/10 dark:bg-slate-900/70">
-        <div className="flex flex-wrap items-start justify-between gap-4 border-b border-slate-100 bg-gradient-to-r from-indigo-50/90 via-white to-sky-50/70 px-5 py-5 sm:px-6 dark:border-white/10 dark:from-indigo-400/[0.08] dark:via-slate-900 dark:to-sky-400/[0.04]">
-          <div>
-            <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-indigo-700 dark:text-indigo-300">
-              Getting started
-            </p>
-            <h2 className="mt-1 text-lg font-bold tracking-tight text-slate-900 dark:text-white">
-              Prepare your school to run
-            </h2>
-            <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-600 dark:text-slate-400">
-              Set the calendar first, then complete the school profile, subjects, and classes. These are live setup checks—not sample dashboard figures.
-            </p>
-          </div>
-          <div className="min-w-40 rounded-xl border border-indigo-100 bg-white/90 px-4 py-3 dark:border-white/10 dark:bg-slate-950/50">
-            <p className="text-lg font-bold text-slate-900 dark:text-white">
-              {completedSteps}<span className="text-slate-400">/{setupItems.length}</span>
-            </p>
-            <p className="text-[10px] font-medium text-slate-500 dark:text-slate-400">setup steps complete</p>
-            <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-100 dark:bg-white/10">
-              <div
-                className="h-full rounded-full bg-indigo-600 transition-all dark:bg-indigo-400"
-                style={{ width: `${(completedSteps / setupItems.length) * 100}%` }}
-              />
-            </div>
-          </div>
+      {isManagementRole && <section className="mb-6 overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+        <div className="flex flex-wrap items-start justify-between gap-4 border-b border-border bg-muted/30 px-5 py-5 sm:px-6">
+          <div><p className="text-[10px] font-bold uppercase tracking-[0.16em] text-primary">Getting started</p><h2 className="mt-1 text-lg font-bold tracking-tight text-foreground">Prepare your school to run</h2><p className="mt-1 max-w-2xl text-xs leading-5 text-muted-foreground">These checks reflect your current school configuration.</p></div>
+          <div className="min-w-32 rounded-xl border border-border bg-card px-4 py-3"><p className="text-lg font-bold text-foreground">{completedSteps}<span className="text-muted-foreground">/{setupItems.length}</span></p><p className="text-[10px] font-medium text-muted-foreground">setup steps complete</p><div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-primary transition-all" style={{ width: `${(completedSteps / setupItems.length) * 100}%` }} /></div></div>
         </div>
-        {setupHasError && (
-          <p role="alert" className="flex items-center gap-2 border-b border-rose-100 bg-rose-50 px-5 py-2.5 text-xs text-rose-800 dark:border-rose-400/10 dark:bg-rose-400/[0.06] dark:text-rose-200">
-            <CircleAlert className="size-4 shrink-0" />
-            Some setup checks could not load. Refresh the page or retry after the API connection is restored.
-          </p>
-        )}
-        <div className="grid gap-px bg-slate-100 sm:grid-cols-2 xl:grid-cols-4 dark:bg-white/[0.06]">
-          {setupItems.map(({ title, detail, complete, icon: Icon, page }) => (
-            <Link
-              key={page}
-              to="/$page"
-              params={{ page }}
-              className="group flex min-h-24 items-start gap-3 bg-white p-4 transition hover:bg-indigo-50/60 focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-500 dark:bg-slate-900 dark:hover:bg-white/[0.04]"
-            >
-              <span className={`mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg ${
-                complete
-                  ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-400/10 dark:text-emerald-200"
-                  : "bg-indigo-50 text-indigo-700 dark:bg-indigo-400/10 dark:text-indigo-200"
-              }`}>
-                {complete ? <Check className="size-4" /> : <Icon className="size-4" />}
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block text-xs font-semibold text-slate-900 dark:text-slate-100">
-                  {title}
-                </span>
-                <span className="mt-1 block text-[10px] leading-4 text-slate-500 dark:text-slate-400">
-                  {complete ? "Done" : detail}
-                </span>
-              </span>
-              <ArrowRight className="mt-1 size-3.5 shrink-0 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-indigo-600 dark:text-slate-600 dark:group-hover:text-indigo-300" />
-            </Link>
-          ))}
-        </div>
+        {setupHasError && <p role="alert" className="flex items-center gap-2 border-b border-destructive/20 bg-destructive/5 px-5 py-2.5 text-xs text-destructive"><CircleAlert className="size-4 shrink-0" />Some setup checks could not load. Retry after the API connection is restored.</p>}
+        <div className="grid gap-px bg-border sm:grid-cols-2 xl:grid-cols-4">{setupItems.map(({ title, detail, complete, icon: Icon, page }) => <Link key={page} to="/$page" params={{ page }} className="group flex min-h-24 items-start gap-3 bg-card p-4 transition hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary"><span className={`mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg ${complete ? "bg-emerald-500/10 text-emerald-600" : "bg-primary/10 text-primary"}`}>{complete ? <ArrowRight className="size-4" /> : <Icon className="size-4" />}</span><span className="min-w-0 flex-1"><span className="block text-xs font-semibold text-foreground">{title}</span><span className="mt-1 block text-[10px] leading-4 text-muted-foreground">{complete ? "Complete" : detail}</span></span></Link>)}</div>
+      </section>}
+
+      {!isManagementRole && <section className="mb-5 rounded-2xl border border-border bg-card p-5"><p className="text-xs font-semibold uppercase tracking-wide text-primary">{schoolRoleLabel(activeRole)}</p><p className="mt-1 text-sm text-muted-foreground">Quick links for your workspace</p><div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{roleLinks.map((item) => <Link key={item.id} to="/$page" params={{ page: item.id }} className="flex items-center gap-3 rounded-xl border border-border p-3 transition hover:bg-muted/50"><span className="flex size-9 items-center justify-center rounded-lg bg-primary/10 text-primary"><item.icon className="size-4" /></span><span><span className="block text-sm font-semibold text-foreground">{item.label}</span><span className="mt-0.5 block text-xs text-muted-foreground">{item.description}</span></span></Link>)}</div></section>}
+
+      <Metrics data={data} isLoading={analyticsQuery.isPending} isError={analyticsQuery.isError} />
+      <DashboardInfographics data={data} isLoading={analyticsQuery.isPending} isError={analyticsQuery.isError} selectedMonths={selectedMonths} onMonthsChange={setSelectedMonths} />
+      <section className={`mt-5 grid gap-5 ${isManagementRole ? "xl:grid-cols-2" : "xl:grid-cols-1"}`}>
+        <RecentActivityCard activities={data?.recentActivities ?? []} isLoading={analyticsQuery.isPending} isError={analyticsQuery.isError} canViewFinance={Boolean(data?.canViewFinance)} />
+        {isManagementRole && <SchoolYearCard academicYear={activeYear} />}
       </section>
-
-      {search && (
-        <p className="mb-4 text-xs text-slate-500">
-          Dashboard preview for{" "}
-          <span className="font-medium text-slate-700">{search}</span>
-        </p>
-      )}
-
-      <section
-        aria-label="School statistics"
-        className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"
-      >
-        {dashboardMetrics.map((metric) => (
-          <MetricCard key={metric.label} {...metric} />
-        ))}
-      </section>
-
-      <DashboardInfographics />
-
-      <section className="mt-5 grid gap-5 xl:grid-cols-3">
-        <ScheduleCard />
-        <RecentActivityCard />
-        <SchoolYearCard academicYear={activeYear} />
-      </section>
-
-      <div className="mt-6 flex flex-wrap items-center justify-center gap-x-2 gap-y-1 pb-2 text-[10px] text-slate-400">
-        <CircleHelp className="size-3.5" />
-        <span>
-          Dashboard figures are sample data and will be connected to your
-          school&apos;s live records.
-        </span>
-      </div>
+      {data?.generatedAt && <p className="mt-5 text-center text-[10px] text-muted-foreground">Updated {new Intl.DateTimeFormat("en-GH", { dateStyle: "medium", timeStyle: "short" }).format(new Date(data.generatedAt))} · automatically refreshes every minute</p>}
     </main>
   );
 }
