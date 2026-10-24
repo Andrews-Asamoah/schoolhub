@@ -104,13 +104,6 @@ interface FeeStructure {
   targetClasses: { class: { id: string; name: string } }[];
 }
 
-interface AttendanceRow {
-  studentId: string;
-  admissionNumber: string;
-  name: string;
-  attendance: { status: string; remarks?: string | null } | null;
-}
-
 interface School {
   id: string;
   name: string;
