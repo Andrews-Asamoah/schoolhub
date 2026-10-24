@@ -9,11 +9,7 @@ import { AcademicContextSwitcher } from "@/components/school/academic-context-sw
 import {
   useSchoolOrganization,
 } from "@/components/school/school-organization";
-import {
-  SchoolRoleSwitcher,
-  schoolRoleLabel,
-  useSchoolRole,
-} from "@/components/school/school-role-switcher";
+import { SchoolRoleSwitcher } from "@/components/school/school-role-switcher";
 import { ThemeToggle } from "@/components/school/theme-toggle";
 import { DashboardNotificationsMenu } from "@/components/school/dashboard/dashboard-notifications-menu";
 import {
@@ -50,7 +46,6 @@ export function SchoolWorkspaceLayout({
     isPending: organizationLoading,
     selectionError,
   } = useSchoolOrganization();
-  const { activeRole } = useSchoolRole();
   const navigate = useNavigate();
   const { data: school, error: schoolError } = useQuery({
     queryKey: ["school", "current"],
