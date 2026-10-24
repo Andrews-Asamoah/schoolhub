@@ -43,6 +43,16 @@ export class FinanceService {
       );
     }
 
+    if (input.classId) {
+      const schoolClass = await this.prisma.client.class.findFirst({
+        where: { id: input.classId, schoolId, deletedAt: null },
+        select: { id: true },
+      });
+      if (!schoolClass) {
+        throw new NotFoundException("Class not found in this school.");
+      }
+    }
+
     const feeStructure = await this.prisma.client.feeStructure.findFirst({
       where: { id: input.feeStructureId, schoolId, isActive: true },
       include: { items: true, targetClasses: { select: { classId: true } } },
