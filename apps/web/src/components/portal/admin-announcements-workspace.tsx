@@ -90,7 +90,10 @@ export function AdminAnnouncementsWorkspace({ mode = "admin" }: { mode?: Announc
         body: JSON.stringify(input),
       }),
     onSuccess: async (_, input) => {
-      await refreshAnnouncements();
+      await Promise.all([
+        refreshAnnouncements(),
+        queryClient.invalidateQueries({ queryKey: ["notifications"] }),
+      ]);
       setIsCreateOpen(false);
       setForm(emptyForm(mode));
       setNotice({
@@ -124,7 +127,10 @@ export function AdminAnnouncementsWorkspace({ mode = "admin" }: { mode?: Announc
         body: JSON.stringify({ status }),
       }),
     onSuccess: async (_, variables) => {
-      await refreshAnnouncements();
+      await Promise.all([
+        refreshAnnouncements(),
+        ...(variables.status === "PUBLISHED" ? [queryClient.invalidateQueries({ queryKey: ["notifications"] })] : []),
+      ]);
       setNotice({
         kind: "success",
         message: variables.status === "PUBLISHED" ? "Announcement published." : "Announcement moved to drafts.",

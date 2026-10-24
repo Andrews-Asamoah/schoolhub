@@ -3,6 +3,7 @@ import { Bell, CheckCheck, LoaderCircle, RefreshCw } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { announcementQueryRoleKey } from "@/components/portal/announcement-utils";
 
 interface NotificationItem {
   id: string;
@@ -30,7 +31,7 @@ export function DashboardNotificationsMenu() {
   const [open, setOpen] = useState(false);
   const queryClient = useQueryClient();
   const query = useQuery({
-    queryKey: ["notifications"],
+    queryKey: ["notifications", announcementQueryRoleKey()],
     queryFn: () => apiFetch<NotificationResponse>("/notifications"),
     refetchInterval: 30_000,
     refetchOnWindowFocus: true,
