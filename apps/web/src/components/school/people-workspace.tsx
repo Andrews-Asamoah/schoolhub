@@ -1067,25 +1067,28 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
         </section>
       )}
 
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className={`grid gap-3 sm:grid-cols-3 ${isGuardianPage ? "xl:gap-4" : ""}`}>
         <WorkspaceStat
-          label="Directory records"
+          label={isGuardianPage ? "Total guardians" : "Directory records"}
           value={String(total)}
-          detail="matching filters"
+          detail={isGuardianPage ? "in the directory" : "matching filters"}
+          icon={UsersRound}
         />
         <WorkspaceStat
-          label="Active on this page"
+          label={isGuardianPage ? "Active guardians" : "Active on this page"}
           value={String(activeCount)}
-          detail={title.toLowerCase()}
+          detail={isGuardianPage ? "active records" : title.toLowerCase()}
+          icon={CheckCircle2}
         />
         <WorkspaceStat
-          label="Page"
-          value={`${directoryQuery.data?.meta.page ?? 1} / ${directoryQuery.data?.meta.totalPages || 1}`}
-          detail="directory pagination"
+          label={isGuardianPage ? "Portal access" : "Page"}
+          value={isGuardianPage ? String(rows.filter((row) => row.hasLogin).length) : String(directoryQuery.data?.meta.page ?? 1) + " / " + String(directoryQuery.data?.meta.totalPages || 1)}
+          detail={isGuardianPage ? "guardians with a login" : "directory pagination"}
+          icon={isGuardianPage ? ShieldCheck : undefined}
         />
       </div>
 
-      <section className={`grid gap-3 rounded-2xl border border-border bg-card p-4 ${isGuardianPage ? "md:grid-cols-1" : "md:grid-cols-[minmax(220px,1fr)_180px]"}`}>
+      <section className={`rounded-2xl border border-border bg-card/80 p-4 shadow-sm backdrop-blur-sm ${isGuardianPage ? "flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between" : "grid gap-3 md:grid-cols-[minmax(220px,1fr)_180px]"}`}>
         {!isGuardianPage && (
           <label className="relative">
             <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -1101,7 +1104,18 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
             />
           </label>
         )}
-        <label>
+        {isGuardianPage && (
+          <div className="flex items-center gap-2.5">
+            <span className="flex size-9 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+              <Filter className="size-4" />
+            </span>
+            <div>
+              <p className="text-sm font-semibold text-foreground">Filter guardians</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">Narrow the directory by account status</p>
+            </div>
+          </div>
+        )}
+        <label className={isGuardianPage ? "w-full sm:w-52" : ""}>
           <span className="sr-only">Filter by status</span>
           <select
             value={activeFilter}
@@ -1109,7 +1123,7 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
               setActiveFilter(event.target.value);
               setPage(1);
             }}
-            className={`${inputClasses} mt-0`}
+            className={`${inputClasses} mt-0 ${isGuardianPage ? "sm:h-11 sm:px-3" : ""}`}
           >
             <option value="">All statuses</option>
             <option value="true">Active</option>
