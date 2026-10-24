@@ -102,6 +102,7 @@ export class DashboardService {
       })) : []),
     ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).slice(0, 8);
 
+    const hasFinancialRecords = canViewFinance && (monthlyPayments.length > 0 || monthlyExpenses.length > 0);
     const currentMonthPayments = canViewFinance ? monthlyPayments.filter((payment) => payment.paymentDate >= currentMonthStart && payment.paymentDate <= now).reduce((sum, payment) => sum + Number(payment.amount), 0) : null;
     const currentMonthExpenses = canViewFinance ? monthlyExpenses.filter((expense) => expense.date >= currentMonthStart && expense.date <= now).reduce((sum, expense) => sum + Number(expense.amount), 0) : null;
     const newThisMonth = students.filter((student) => student.admissionDate >= currentMonthStart && student.admissionDate <= now).length;
@@ -125,6 +126,7 @@ export class DashboardService {
       ],
       enrollmentGrowth,
       financialStatus,
+      hasFinancialRecords,
       recentActivities: activities,
     };
   }
