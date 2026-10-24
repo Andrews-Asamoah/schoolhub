@@ -1,5 +1,5 @@
 import { useMemo, useState, type ReactNode } from "react";
-import { Activity, UsersRound, WalletCards } from "lucide-react";
+import { Activity, UsersRound, WalletCards, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   Select,
@@ -11,15 +11,15 @@ import {
 
 type AttendancePeriod = "week" | "month" | "term";
 
-interface ChartDatum {
+export interface ChartDatum {
   label: string;
   value: number;
 }
 
-interface InfographicCardProps {
+export interface BreakdownDatum {\n  label: string;\n  count: number;\n  color: string;\n}\n\nexport interface InfographicCardProps {
   title: string;
   description: string;
-  icon: typeof Activity;
+  icon: LucideIcon;
   children: ReactNode;
   className?: string;
   aside?: ReactNode;
@@ -47,7 +47,7 @@ const attendanceSeries: Record<AttendancePeriod, ChartDatum[]> = {
   ],
 };
 
-const enrollmentMix = [
+const enrollmentMix: BreakdownDatum[] = [
   { label: "Kindergarten", count: 180, color: "bg-violet-500" },
   { label: "Primary", count: 710, color: "bg-sky-500" },
   { label: "Junior high", count: 394, color: "bg-primary" },
@@ -57,7 +57,7 @@ const collectedFees = 84_250;
 const feeTarget = 120_000;
 const feeProgress = Math.min(100, Math.round((collectedFees / feeTarget) * 1000) / 10);
 
-function InfographicCard({
+export function InfographicCard({
   title,
   description,
   icon: Icon,
@@ -94,7 +94,7 @@ function InfographicCard({
   );
 }
 
-function VerticalBarChart({
+export function VerticalBarChart({
   data,
   maxValue = 100,
   suffix = "%",
@@ -140,14 +140,20 @@ function VerticalBarChart({
   );
 }
 
-function DonutProgressChart({
+export function DonutProgressChart({
   value,
   label,
   sublabel,
+  amount,
+  targetAmount,
+  currencyPrefix = "GHS",
 }: {
   value: number;
   label: string;
   sublabel: string;
+  amount: number;
+  targetAmount: number;
+  currencyPrefix?: string;
 }) {
   const radius = 45;
   const circumference = 2 * Math.PI * radius;
@@ -194,10 +200,10 @@ function DonutProgressChart({
       <div className="min-w-0">
         <p className="text-xs text-muted-foreground">{sublabel}</p>
         <p className="mt-1 text-xl font-bold tracking-tight text-foreground">
-          GHS {collectedFees.toLocaleString("en-GH")}
+          {currencyPrefix} {amount.toLocaleString("en-GH")}
         </p>
         <p className="mt-1 text-xs text-muted-foreground">
-          of GHS {feeTarget.toLocaleString("en-GH")} target
+          of {currencyPrefix} {targetAmount.toLocaleString("en-GH")} target
         </p>
         <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-muted">
           <div
