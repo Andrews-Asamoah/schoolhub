@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { Bell, Search, LoaderCircle } from "lucide-react";
+import { Search, LoaderCircle } from "lucide-react";
 import { useEffect, type ReactNode } from "react";
 import { apiFetch } from "@/lib/api";
 import { useSession } from "@/lib/auth-client";
@@ -15,6 +15,7 @@ import {
   useSchoolRole,
 } from "@/components/school/school-role-switcher";
 import { ThemeToggle } from "@/components/school/theme-toggle";
+import { DashboardNotificationsMenu } from "@/components/school/dashboard/dashboard-notifications-menu";
 import {
   SidebarProvider,
   SidebarTrigger,
@@ -144,14 +145,7 @@ export function SchoolWorkspaceLayout({
 
               <ThemeToggle />
               
-              <button
-                type="button"
-                aria-label="Notifications"
-                className="relative flex size-9 items-center justify-center rounded-xl border border-slate-200/60 bg-white/50 text-slate-600 shadow-sm transition hover:bg-white hover:text-slate-900 dark:border-slate-800 dark:bg-slate-900/50 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white"
-              >
-                <Bell className="size-4" />
-                <span className="absolute right-2 top-2 size-2 rounded-full bg-rose-500 ring-2 ring-white dark:ring-slate-900 animate-pulse" />
-              </button>
+              <DashboardNotificationsMenu />
             </div>
           </header>
 
