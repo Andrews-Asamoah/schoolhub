@@ -172,8 +172,24 @@ export function ConcessionsWorkspace() {
       </div>
 
       <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-        <div className="mb-4 flex items-center gap-2"><BadgeCheck className="size-5 text-primary" /><div><h2 className="font-semibold">Student scholarships</h2><p className="text-sm text-muted-foreground">Existing awards and their current status.</p></div></div>
+        <div className="mb-4 flex items-center gap-2">
+          <BadgeCheck className="size-5 text-primary" />
+          <div><h2 className="font-semibold">Student scholarships</h2><p className="text-sm text-muted-foreground">Existing awards and their current status.</p></div>
+        </div>
+        {concessionsQuery.isPending ? <p className="text-sm text-muted-foreground">Loading scholarships…</p>
+          : concessionsQuery.error ? <p role="alert" className="text-sm text-destructive">{concessionsQuery.error.message}</p>
+          : scholarships.length === 0 ? <p className="rounded-xl border border-dashed border-border p-4 text-sm text-muted-foreground">No student scholarships have been recorded.</p>
+          : <div className="overflow-x-auto"><table className="w-full min-w-[720px] text-left text-sm">
+            <thead><tr className="border-b border-border text-xs uppercase tracking-wide text-muted-foreground"><th className="p-3">Student</th><th className="p-3">Award</th><th className="p-3">Value</th><th className="p-3">Period</th><th className="p-3">Status</th><th className="p-3">Action</th></tr></thead>
+            <tbody>{scholarships.map((award) => <tr key={award.id} className="border-b border-border/70 last:border-0">
+              <td className="p-3"><p className="font-medium">{personName(award.student)}</p><p className="text-xs text-muted-foreground">{award.student.admissionNumber || "No admission number"}</p></td>
+              <td className="p-3"><p>{award.name}</p><p className="max-w-xs truncate text-xs text-muted-foreground">{award.reason || "No note provided"}</p></td>
+              <td className="p-3 font-medium">{award.valueType === "PERCENTAGE" ? award.value + "%" : money(award.value)}</td>
               <td className="p-3 text-muted-foreground">{periodLabel(award, years)}</td>
+              <td className="p-3"><span className={cn("rounded-full px-2.5 py-1 text-xs font-semibold", award.isActive ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300" : "bg-muted text-muted-foreground")}>{award.isActive ? "Active" : "Inactive"}</span></td>
+              <td className="p-3"><button type="button" className={secondary} disabled={toggleScholarship.isPending} onClick={() => toggleScholarship.mutate({ id: award.id, isActive: !award.isActive })}>{award.isActive ? "Deactivate" : "Reactivate"}</button></td>
+            </tr>)}</tbody>
+          </table></div>}
       </section>
       <p className="text-xs leading-5 text-muted-foreground">These concessions apply to newly generated bills only. Bills already issued retain their original balances and audit history. The system caps combined concessions at the bill amount and applies scholarships before the sibling discount rule.</p>
     </div>
