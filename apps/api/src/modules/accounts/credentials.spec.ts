@@ -51,7 +51,7 @@ describe("login identifiers and roles", () => {
   });
   it("generates a readable guardian sign-in email on the school's own domain", () => {
     expect(newGuardianLoginEmail("Ama Mensah", "hdm.edu.gh")).toMatch(
-      /^amensah-g\\d{4}@hdm\\.edu\\.gh$/,
+      /^amensah-g\d{4}@hdm\.edu\.gh$/,
     );
   });
   it("uses the school's own email domain for guardian logins", () => {
