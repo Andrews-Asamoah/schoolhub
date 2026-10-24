@@ -301,8 +301,8 @@ export function StudentTimetableView() {
           <div>
             <div className="inline-flex items-center gap-2 rounded-full border border-brand-foreground/15 bg-brand-foreground/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.16em] text-brand-foreground/95">
               <span className="relative flex size-2">
-                <span className="absolute inline-flex size-full animate-ping rounded-full bg-success/10 opacity-70" />
-                <span className="relative inline-flex size-2 rounded-full bg-success/10" />
+                <span className="absolute inline-flex size-full animate-ping rounded-full bg-success opacity-70" />
+                <span className="relative inline-flex size-2 rounded-full bg-success" />
               </span>
               Live timetable
             </div>
@@ -369,7 +369,7 @@ export function StudentTimetableView() {
             Your timetable is getting ready
           </h2>
           <p className="mx-auto mt-1 max-w-md text-sm leading-6 text-muted-foreground">
-            ${!data?.class ? "There is no current class enrollment linked to your student account." : "There are no published periods for your current class yet."} Check back later or contact your school office if you expect to see your schedule.
+            {!data?.class ? "There is no current class enrollment linked to your student account." : "There are no published periods for your current class yet."} Check back later or contact your school office if you expect to see your schedule.
           </p>
           <button
             type="button"
@@ -740,12 +740,12 @@ export function StudentTimetableView() {
                                     {periodTitle(entry)}
                                   </h4>
                                   {isCurrent && (
-                                    <span className="inline-flex items-center gap-1 rounded-full bg-success px-2 py-0.5 text-[9px] font-black uppercase tracking-wide text-primary-foreground">
+                                    <span className="inline-flex items-center gap-1 rounded-full bg-success px-2 py-0.5 text-[9px] font-black uppercase tracking-wide text-success-foreground">
                                       <span className="size-1.5 animate-pulse rounded-full bg-success-foreground" /> Live now
                                     </span>
                                   )}
                                   {isNext && (
-                                    <span className="rounded-full bg-highlight px-2 py-0.5 text-[9px] font-black uppercase tracking-wide text-primary-foreground">
+                                    <span className="rounded-full bg-highlight px-2 py-0.5 text-[9px] font-black uppercase tracking-wide text-highlight-foreground">
                                       Next up
                                     </span>
                                   )}
@@ -799,7 +799,7 @@ export function StudentTimetableView() {
                           {isCurrent && (
                             <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-success/10 ">
                               <div
-                                className="h-full rounded-full bg-gradient-to-r from-success to-success transition-[width] duration-1000"
+                                className="h-full rounded-full bg-gradient-to-r from-success to-info transition-[width] duration-1000"
                                 style={{ width: `${entryProgress}%` }}
                               />
                             </div>
