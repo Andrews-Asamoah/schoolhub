@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import type { LucideIcon } from "lucide-react";
 import { Activity, TrendingUp, UsersRound, WalletCards } from "lucide-react";
 import {
   Bar,
@@ -44,7 +45,7 @@ const money = (value: number) => moneyFormat.format(value);
 export interface InfographicCardProps {
   title: string;
   description: string;
-  icon: typeof Activity;
+  icon: LucideIcon;
   children: ReactNode;
   className?: string;
   aside?: ReactNode;
