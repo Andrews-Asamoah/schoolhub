@@ -1,8 +1,10 @@
 import {
   Activity,
+  AlertCircle,
   BadgeDollarSign,
   Bell,
   BookOpen,
+  ChartNoAxesCombined,
   CalendarDays,
   Clock3,
   BookOpenCheck,
@@ -295,6 +297,22 @@ export const schoolNavGroups: SchoolNavGroup[] = [
         section: "Finance",
         apiStatus: "available",
       },
+      {
+        id: "outstanding",
+        label: "Outstanding fees",
+        icon: AlertCircle,
+        description: "Review unpaid and overdue student bills and follow-up priorities.",
+        section: "Finance",
+        apiStatus: "available",
+      },
+      {
+        id: "finance-reports",
+        label: "Finance reports",
+        icon: ChartNoAxesCombined,
+        description: "Review revenue, receivables, expenses, payroll and export finance summaries.",
+        section: "Finance",
+        apiStatus: "available",
+      },
     ],
   },
   {
@@ -442,6 +460,8 @@ const rolePages: Record<string, string[]> = {
   ],
   accountant: [
     "accountant-portal",
+    "finance-reports",
+    "outstanding",
     "admissions",
     "fees",
     "payments",
