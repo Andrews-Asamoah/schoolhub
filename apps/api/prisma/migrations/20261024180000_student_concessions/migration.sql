@@ -5,6 +5,7 @@ CREATE TYPE "ConcessionType" AS ENUM ('SIBLING_DISCOUNT', 'SCHOLARSHIP');
 ALTER TABLE "bills"
   ADD COLUMN "grossAmount" DECIMAL(10,2) NOT NULL DEFAULT 0,
   ADD COLUMN "discountAmount" DECIMAL(10,2) NOT NULL DEFAULT 0;
+ALTER TABLE "bill_items" ADD COLUMN "discountAmount" DECIMAL(10,2) NOT NULL DEFAULT 0;
 
 CREATE TABLE "sibling_discount_policies" (
   "id" TEXT NOT NULL,
