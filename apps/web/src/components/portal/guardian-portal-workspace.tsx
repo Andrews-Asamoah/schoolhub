@@ -98,10 +98,10 @@ export function GuardianPortalWorkspace({ defaultTab = "overview" }: { defaultTa
 
   const wards = wardsQuery.data ?? [];
   const announcements = (announcementsQuery.data ?? [])
-  const firstName = session?.user?.name?.trim().split(/\s+/)[0];
-  const greeting = firstName ? `Welcome back, ${firstName}` : "Welcome to your family hub";
     .filter((item) => !item.expiresAt || new Date(item.expiresAt).getTime() >= Date.now())
     .sort((a, b) => Number(b.isPinned) - Number(a.isPinned) || new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  const firstName = session?.user?.name?.trim().split(/\s+/)[0];
+  const greeting = firstName ? `Welcome back, ${firstName}` : "Welcome to your family hub";
 
   return (
     <div className="space-y-6">
