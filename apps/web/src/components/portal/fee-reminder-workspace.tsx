@@ -82,6 +82,8 @@ export function FeeReminderWorkspace() {
   const queryClient = useQueryClient();
   const [draft, setDraft] = useState<ScheduleDraft>(initialDraft);
   const [createOpen, setCreateOpen] = useState(false);
+  const [installmentTarget, setInstallmentTarget] = useState<ReminderSchedule | null>(null);
+  const [installmentDraft, setInstallmentDraft] = useState({ label: "Follow-up reminder", dueDate: today(), sendDate: today() });
   const [previewTarget, setPreviewTarget] = useState<ReminderSchedule | null>(null);
   const [preview, setPreview] = useState<ReminderPreview | null>(null);
   const [sendResult, setSendResult] = useState<ReminderResult | null>(null);
@@ -106,6 +108,19 @@ export function FeeReminderWorkspace() {
       setFeedback({ kind: "success", text: `Reminder schedule “${schedule.name}” created. It is configured for in-app notices only.` });
       setCreateOpen(false);
       setDraft(initialDraft());
+      await queryClient.invalidateQueries({ queryKey: ["finance", "fee-reminders"] });
+    },
+    onError: (error: Error) => setFeedback({ kind: "error", text: error.message }),
+  });
+  const addInstallment = useMutation({
+    mutationFn: ({ scheduleId, input }: { scheduleId: string; input: { label: string; dueDate: string; sendDate: string } }) =>
+      apiFetch<Installment>(`/finance/fee-reminders/${encodeURIComponent(scheduleId)}/installments`, {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    onSuccess: async (installment) => {
+      setFeedback({ kind: "success", text: `Reminder date “${installment.label}” added to the schedule.` });
+      setInstallmentTarget(null);
       await queryClient.invalidateQueries({ queryKey: ["finance", "fee-reminders"] });
     },
     onError: (error: Error) => setFeedback({ kind: "error", text: error.message }),
@@ -179,7 +194,7 @@ export function FeeReminderWorkspace() {
       {schedule.description && <p className="mt-3 text-sm leading-5 text-muted-foreground">{schedule.description}</p>}
       <div className="mt-4 grid grid-cols-2 gap-3"><Summary label="Minimum balance" value={money(schedule.minimumOutstanding)} /><Summary label="Logged attempts" value={String(schedule._count?.logs ?? 0)} /></div>
       {schedule.installments?.length ? <div className="mt-4 space-y-2"><p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Reminder dates</p>{schedule.installments.map(installment => <div key={installment.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-muted/30 p-3"><div className="flex items-center gap-2"><CalendarClock className="size-4 text-muted-foreground" /><div><p className="text-sm font-medium text-foreground">{installment.label}</p><p className="text-xs text-muted-foreground">Send {dateLabel(installment.sendDate)} · Due {dateLabel(installment.dueDate)}</p></div></div><span className={cn("text-[10px] font-bold uppercase", installment.sent ? "text-success" : "text-muted-foreground")}>{installment.sent ? "Sent" : "Not sent"}</span></div>)}</div> : <p className="mt-4 text-xs text-muted-foreground">No installment date configured. Manual sends still require a live preview and confirmation.</p>}
-      <div className="mt-5 flex flex-wrap gap-2 border-t border-border pt-4"><button type="button" className={primaryButton} disabled={!schedule.isActive || previewQuery.isPending || sendReminder.isPending} onClick={() => void openPreview(schedule)}><Users className="size-4" /> Preview & send</button><button type="button" className={secondaryButton} disabled={changeActive.isPending} onClick={() => changeActive.mutate({ id: schedule.id, isActive: !schedule.isActive })}>{changeActive.isPending ? <LoaderCircle className="size-4 animate-spin" /> : schedule.isActive ? <Pause className="size-4" /> : <Play className="size-4" />}{schedule.isActive ? "Pause" : "Activate"}</button></div>
+      <div className="mt-5 flex flex-wrap gap-2 border-t border-border pt-4"><button type="button" className={primaryButton} disabled={!schedule.isActive || previewQuery.isPending || sendReminder.isPending} onClick={() => void openPreview(schedule)}><Users className="size-4" /> Preview & send</button><button type="button" className={secondaryButton} onClick={() => { setInstallmentTarget(schedule); setInstallmentDraft({ label: "Follow-up reminder", dueDate: today(), sendDate: today() }); }}><CalendarClock className="size-4" /> Add reminder date</button><button type="button" className={secondaryButton} disabled={changeActive.isPending} onClick={() => changeActive.mutate({ id: schedule.id, isActive: !schedule.isActive })}>{changeActive.isPending ? <LoaderCircle className="size-4 animate-spin" /> : schedule.isActive ? <Pause className="size-4" /> : <Play className="size-4" />}{schedule.isActive ? "Pause" : "Activate"}</button></div>
     </div></article>)}</div> : <EmptyState title="No reminder schedules" description="Create a reminder plan, set a minimum outstanding balance and optionally add a due date. You will preview the eligible families before sending anything." onCreate={() => { setDraft(initialDraft()); setCreateOpen(true); }} />}
 
     {createOpen && <Modal title="Create fee reminder schedule" description="Schedules are saved for the current academic period when one is configured. Delivery is in-app only." onClose={() => !createSchedule.isPending && setCreateOpen(false)}>
@@ -193,6 +208,23 @@ export function FeeReminderWorkspace() {
         {draft.addInstallment && <div className="grid gap-3 sm:grid-cols-3"><Field label="Installment label"><input className={fieldClass} required minLength={1} maxLength={100} value={draft.installmentLabel} onChange={event => updateDraft("installmentLabel", event.target.value)} /></Field><Field label="Send date"><input type="date" className={fieldClass} required value={draft.sendDate} max={draft.dueDate} onChange={event => updateDraft("sendDate", event.target.value)} /></Field><Field label="Due date"><input type="date" className={fieldClass} required value={draft.dueDate} min={draft.sendDate} onChange={event => updateDraft("dueDate", event.target.value)} /></Field></div>}
         {createSchedule.error && <ErrorState message={createSchedule.error.message} />}
         <div className="flex justify-end gap-2 border-t border-border pt-4"><button type="button" className={secondaryButton} onClick={() => setCreateOpen(false)} disabled={createSchedule.isPending}>Cancel</button><button type="submit" className={primaryButton} disabled={createSchedule.isPending}>{createSchedule.isPending && <LoaderCircle className="size-4 animate-spin" />} Save schedule</button></div>
+      </form>
+    </Modal>}
+
+    {installmentTarget && <Modal title="Add reminder date" description={installmentTarget.name} onClose={() => !addInstallment.isPending && setInstallmentTarget(null)}>
+      <form className="space-y-4" onSubmit={(event) => {
+        event.preventDefault();
+        if (installmentDraft.sendDate > installmentDraft.dueDate) {
+          setFeedback({ kind: "error", text: "The send date must be on or before the due date." });
+          return;
+        }
+        addInstallment.mutate({ scheduleId: installmentTarget.id, input: installmentDraft });
+      }}>
+        <Field label="Installment label"><input className={fieldClass} required minLength={1} maxLength={100} value={installmentDraft.label} onChange={event => setInstallmentDraft(current => ({ ...current, label: event.target.value }))} /></Field>
+        <div className="grid gap-3 sm:grid-cols-2"><Field label="Send date"><input type="date" className={fieldClass} required max={installmentDraft.dueDate} value={installmentDraft.sendDate} onChange={event => setInstallmentDraft(current => ({ ...current, sendDate: event.target.value }))} /></Field><Field label="Due date"><input type="date" className={fieldClass} required min={installmentDraft.sendDate} value={installmentDraft.dueDate} onChange={event => setInstallmentDraft(current => ({ ...current, dueDate: event.target.value }))} /></Field></div>
+        {addInstallment.error && <ErrorState message={addInstallment.error.message} />}
+        <p className="rounded-xl bg-muted/40 p-3 text-xs leading-5 text-muted-foreground">Adding a date does not send a message automatically. The new date becomes the next reminder available for preview and manual in-app delivery.</p>
+        <div className="flex justify-end gap-2 border-t border-border pt-4"><button type="button" className={secondaryButton} onClick={() => setInstallmentTarget(null)} disabled={addInstallment.isPending}>Cancel</button><button type="submit" className={primaryButton} disabled={addInstallment.isPending}>{addInstallment.isPending && <LoaderCircle className="size-4 animate-spin" />} Add date</button></div>
       </form>
     </Modal>}
 
