@@ -292,9 +292,9 @@ export class PeopleService {
     input: CreateStaffInput,
   ) {
     const role = roleForStaffType(input.staffType);
-    // Administrator accounts can manage every other login, so a headmistress
+    // Administrator accounts can manage every other login, so a headteacher
     // (who is an administrator for most routes) may not mint new ones.
-    if (role === 'admin' && actor.schoolRole === 'headmistress') {
+    if (role === 'admin' && actor.schoolRole === 'headteacher') {
       throw new ForbiddenException(
         'Only a school owner or administrator can create an administrator account.',
       );
@@ -699,7 +699,7 @@ export class PeopleService {
     // and nobody may change their own access level.
     if (
       (nextRole === 'admin' || currentRole === 'admin') &&
-      actor.schoolRole === 'headmistress'
+      actor.schoolRole === 'headteacher'
     ) {
       throw new ForbiddenException(
         'Only a school owner or administrator can change administrator accounts.',

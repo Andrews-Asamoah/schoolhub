@@ -1,4 +1,5 @@
-import { Bell, Search } from "lucide-react";
+import { Search } from "lucide-react";
+import { DashboardNotificationsMenu } from "@/components/school/dashboard/dashboard-notifications-menu";
 import { AcademicContextSwitcher } from "@/components/school/academic-context-switcher";
 import { ThemeToggle } from "@/components/school/theme-toggle";
 import {
@@ -64,18 +65,7 @@ export function DashboardHeader({
         {/* Theme Toggle Button */}
         <ThemeToggle />
 
-        {/* Notifications Button */}
-        <button
-          type="button"
-          aria-label="Notifications"
-          className="relative flex size-9 shrink-0 items-center justify-center rounded-xl text-slate-500 transition-all duration-150 hover:bg-slate-100 hover:text-slate-900 active:scale-95 dark:text-slate-400 dark:hover:bg-slate-800/80 dark:hover:text-slate-100"
-        >
-          <Bell className="size-[18px]" />
-          <span className="absolute right-2 top-2 flex size-2">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-rose-400 opacity-75" />
-            <span className="relative inline-flex size-2 rounded-full bg-rose-500 ring-2 ring-white dark:ring-slate-900" />
-          </span>
-        </button>
+        <DashboardNotificationsMenu />
       </div>
     </header>
   );

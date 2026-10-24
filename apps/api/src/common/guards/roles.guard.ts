@@ -40,7 +40,7 @@ export class RolesGuard implements CanActivate {
 
     const activeRole = request.schoolRole ?? membership.role;
     const effectiveRoles =
-      activeRole === "headmistress" ? [activeRole, "admin"] : [activeRole];
+      activeRole === "headteacher" ? [activeRole, "admin"] : [activeRole];
     const hasRole = requiredRoles.some((role) => effectiveRoles.includes(role));
     if (!hasRole) {
       throw new ForbiddenException(

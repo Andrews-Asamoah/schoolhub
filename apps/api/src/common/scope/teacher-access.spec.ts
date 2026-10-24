@@ -14,7 +14,7 @@ const none: TeacherAssignments = { teacherId: null, classTeacherClassIds: [], su
 
 describe("canMarkRegister", () => {
   it("lets managers mark any class", () => {
-    for (const role of ["owner", "admin", "headmistress"]) expect(canMarkRegister(role, none, ["c-9"])).toBe(true);
+    for (const role of ["owner", "admin", "headteacher"]) expect(canMarkRegister(role, none, ["c-9"])).toBe(true);
   });
   it("lets a class teacher mark only their own class", () => {
     expect(canMarkRegister("teacher", ama, ["c-1a"])).toBe(true);

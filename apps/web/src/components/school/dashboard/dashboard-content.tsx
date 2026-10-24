@@ -66,7 +66,7 @@ export function DashboardContent({
   search,
 }: DashboardContentProps) {
   const { activeRole } = useSchoolRole();
-  const isManagementRole = ["owner", "admin", "headmistress"].includes(
+  const isManagementRole = ["owner", "admin", "headteacher"].includes(
     activeRole ?? "",
   );
   const schoolQuery = useQuery({

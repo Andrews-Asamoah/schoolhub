@@ -1,7 +1,7 @@
 import type { TeacherAssignments } from "./teacher-scope.service.js";
 
 /** Roles that can work with any class's register and marks. */
-export const SCHOOL_MANAGER_ROLES = ["owner", "admin", "headmistress"] as const;
+export const SCHOOL_MANAGER_ROLES = ["owner", "admin", "headteacher"] as const;
 
 export function isSchoolManager(role: string | undefined) {
   return (SCHOOL_MANAGER_ROLES as readonly string[]).includes(role ?? "");

@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Bell, LoaderCircle, Megaphone, Pin, Plus, RefreshCw, Search, Send, Trash2, X } from "lucide-react";
 import type {
@@ -8,6 +8,7 @@ import type {
 } from "@schoolhub/shared";
 import { apiFetch } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PortalModal } from "./portal-modal";
 import {
   ANNOUNCEMENT_CATEGORY_STYLES,
@@ -21,6 +22,8 @@ import {
 
 type CategoryFilter = "ALL" | AnnouncementCategory;
 type Notice = { kind: "success" | "error"; message: string };
+type AnnouncementWorkspaceMode = "admin" | "teacher" | "accountant" | "viewer";
+type AnnouncementClassOption = { id: string; name: string; level: string };
 
 const filterOptions: { value: CategoryFilter; label: string }[] = [
   { value: "ALL", label: "All" },
@@ -30,11 +33,12 @@ const filterOptions: { value: CategoryFilter; label: string }[] = [
   { value: "GENERAL", label: "General" },
 ];
 
-const emptyForm = (): CreateAnnouncementInput => ({
+const emptyForm = (mode: AnnouncementWorkspaceMode = "admin"): CreateAnnouncementInput => ({
   title: "",
   content: "",
   category: "GENERAL",
-  target: "SCHOOL_COMMUNITY",
+  target: mode === "teacher" ? "SELECTED_CLASSES" : mode === "accountant" ? "OUTSTANDING_FEE_GUARDIANS" : "SCHOOL_COMMUNITY",
+  classIds: [],
   isPinned: false,
   status: "PUBLISHED",
 });
@@ -43,7 +47,7 @@ function errorText(error: unknown) {
   return error instanceof Error ? error.message : "The request failed. Please try again.";
 }
 
-export function AdminAnnouncementsWorkspace() {
+export function AdminAnnouncementsWorkspace({ mode = "admin" }: { mode?: AnnouncementWorkspaceMode }) {
   const queryClient = useQueryClient();
   const [filter, setFilter] = useState<CategoryFilter>("ALL");
   const [search, setSearch] = useState("");
@@ -51,13 +55,30 @@ export function AdminAnnouncementsWorkspace() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<AnnouncementItem | null>(null);
   const [notice, setNotice] = useState<Notice | null>(null);
-  const [form, setForm] = useState<CreateAnnouncementInput>(emptyForm);
+  const [form, setForm] = useState<CreateAnnouncementInput>(() => emptyForm(mode));
 
   const announcementsQuery = useQuery({
     queryKey: ["announcements", announcementQueryRoleKey()],
     queryFn: () => apiFetch<AnnouncementItem[]>("/announcements"),
     retry: false,
   });
+
+  const classOptionsQuery = useQuery({
+    queryKey: ["announcement-classes", announcementQueryRoleKey()],
+    queryFn: () => apiFetch<AnnouncementClassOption[]>("/announcements/classes"),
+    enabled: mode !== "accountant" && mode !== "viewer",
+    retry: false,
+  });
+  const classOptions = classOptionsQuery.data ?? [];
+  const availableTargets = mode === "teacher"
+    ? ANNOUNCEMENT_TARGET_OPTIONS.filter((option) => option.value === "SELECTED_CLASSES" || option.value === "SELECTED_CLASS_GUARDIANS")
+    : mode === "accountant"
+      ? ANNOUNCEMENT_TARGET_OPTIONS.filter((option) => option.value === "OUTSTANDING_FEE_GUARDIANS")
+      : mode === "viewer"
+        ? []
+        : ANNOUNCEMENT_TARGET_OPTIONS;
+  const requiresClassTargets = form.target === "SELECTED_CLASSES" || form.target === "SELECTED_CLASS_GUARDIANS";
+  const selectedClasses = classOptions.filter((option) => form.classIds.includes(option.id));
 
   const refreshAnnouncements = () =>
     queryClient.invalidateQueries({ queryKey: ["announcements"] });
@@ -69,9 +90,12 @@ export function AdminAnnouncementsWorkspace() {
         body: JSON.stringify(input),
       }),
     onSuccess: async (_, input) => {
-      await refreshAnnouncements();
+      await Promise.all([
+        refreshAnnouncements(),
+        queryClient.invalidateQueries({ queryKey: ["notifications"] }),
+      ]);
       setIsCreateOpen(false);
-      setForm(emptyForm());
+      setForm(emptyForm(mode));
       setNotice({
         kind: "success",
         message: input.status === "DRAFT" ? "Draft saved." : "Announcement published.",
@@ -103,7 +127,10 @@ export function AdminAnnouncementsWorkspace() {
         body: JSON.stringify({ status }),
       }),
     onSuccess: async (_, variables) => {
-      await refreshAnnouncements();
+      await Promise.all([
+        refreshAnnouncements(),
+        ...(variables.status === "PUBLISHED" ? [queryClient.invalidateQueries({ queryKey: ["notifications"] })] : []),
+      ]);
       setNotice({
         kind: "success",
         message: variables.status === "PUBLISHED" ? "Announcement published." : "Announcement moved to drafts.",
@@ -125,6 +152,18 @@ export function AdminAnnouncementsWorkspace() {
   });
 
   const announcements = announcementsQuery.data ?? [];
+
+  useEffect(() => {
+    const announcementId = new URLSearchParams(window.location.search).get("announcementId");
+    if (!announcementId) return;
+    const matchingAnnouncement = announcements.find((item) => item.id === announcementId);
+    if (!matchingAnnouncement) return;
+    setSelected(matchingAnnouncement);
+    const url = new URL(window.location.href);
+    url.searchParams.delete("announcementId");
+    window.history.replaceState(window.history.state, "", url.pathname + url.search + url.hash);
+  }, [announcements]);
+
   const normalizedSearch = search.trim().toLowerCase();
   const filtered = announcements.filter((item) => {
     const matchesCategory = filter === "ALL" || item.category === filter;
@@ -152,6 +191,8 @@ export function AdminAnnouncementsWorkspace() {
       ...form,
       title: form.title.trim(),
       content: form.content.trim(),
+      status: mode === "admin" ? form.status : "PUBLISHED",
+      isPinned: mode === "admin" ? form.isPinned : false,
     });
   }
 
@@ -159,9 +200,9 @@ export function AdminAnnouncementsWorkspace() {
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-xl font-black text-foreground">School Announcements</h2>
+          <h2 className="text-xl font-black text-foreground">{mode === "teacher" ? "Class Announcements" : mode === "accountant" ? "Fee Announcements" : mode === "viewer" ? "Announcements" : "School Announcements"}</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Create and manage school notices, event updates, and academic bulletins.
+            {mode === "teacher" ? "Share notices with students and guardians in the classes you teach." : mode === "accountant" ? "Send announcements to guardians of students with outstanding school fees." : mode === "viewer" ? "Read updates and notices shared with you by your school." : "Create and manage school notices, event updates, and academic bulletins."}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -174,14 +215,16 @@ export function AdminAnnouncementsWorkspace() {
             <RefreshCw className={cn("size-4", announcementsQuery.isFetching && "animate-spin")} />
             Refresh
           </button>
+{mode !== "viewer" && (
           <button
             type="button"
-            onClick={() => { setForm(emptyForm()); setNotice(null); setIsCreateOpen(true); }}
+            onClick={() => { setForm(emptyForm(mode)); setNotice(null); setIsCreateOpen(true); }}
             className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground transition hover:opacity-90"
           >
             <Plus className="size-4" />
-            New announcement
+            {mode === "accountant" ? "New fee announcement" : mode === "teacher" ? "New class announcement" : "New announcement"}
           </button>
+          )}
         </div>
       </div>
 
@@ -329,18 +372,25 @@ export function AdminAnnouncementsWorkspace() {
                   <span>{item.author.name}</span>
                 </div>
                 <p className="mt-2 text-xs text-muted-foreground">Audience: {announcementTargetLabel(item.target)}</p>
+                {item.targetClassIds.length > 0 && (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Classes: {classOptions.filter((klass) => item.targetClassIds.includes(klass.id)).map((klass) => klass.name).join(", ") || item.targetClassIds.length + " selected"}
+                  </p>
+                )}
                 <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
                   <div className="flex gap-1">
-                    <button
-                      type="button"
-                      onClick={() => pinMutation.mutate({ id: item.id, isPinned: !item.isPinned })}
-                      disabled={isSaving}
-                      title={item.isPinned ? "Unpin announcement" : "Pin announcement"}
-                      aria-label={item.isPinned ? "Unpin announcement" : "Pin announcement"}
-                      className="rounded-lg p-2 text-muted-foreground hover:bg-muted hover:text-primary disabled:opacity-50"
-                    >
-                      <Pin className="size-4" />
-                    </button>
+                    {mode === "admin" && (
+                      <button
+                        type="button"
+                        onClick={() => pinMutation.mutate({ id: item.id, isPinned: !item.isPinned })}
+                        disabled={isSaving}
+                        title={item.isPinned ? "Unpin announcement" : "Pin announcement"}
+                        aria-label={item.isPinned ? "Unpin announcement" : "Pin announcement"}
+                        className="rounded-lg p-2 text-muted-foreground hover:bg-muted hover:text-primary disabled:opacity-50"
+                      >
+                        <Pin className="size-4" />
+                      </button>
+                    )}
                     <button
                       type="button"
                       onClick={() => setSelected(item)}
@@ -348,35 +398,39 @@ export function AdminAnnouncementsWorkspace() {
                     >
                       View
                     </button>
-                    {item.status === "DRAFT" ? (
-                      <button
-                        type="button"
-                        onClick={() => statusMutation.mutate({ id: item.id, status: "PUBLISHED" })}
-                        disabled={isSaving}
-                        className="rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground disabled:opacity-50"
-                      >
-                        Publish
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => statusMutation.mutate({ id: item.id, status: "DRAFT" })}
-                        disabled={isSaving}
-                        className="rounded-lg border border-border px-3 py-2 text-xs font-semibold text-foreground hover:bg-muted disabled:opacity-50"
-                      >
-                        Move to draft
-                      </button>
+                    {mode === "admin" && (
+                      item.status === "DRAFT" ? (
+                        <button
+                          type="button"
+                          onClick={() => statusMutation.mutate({ id: item.id, status: "PUBLISHED" })}
+                          disabled={isSaving}
+                          className="rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground disabled:opacity-50"
+                        >
+                          Publish
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => statusMutation.mutate({ id: item.id, status: "DRAFT" })}
+                          disabled={isSaving}
+                          className="rounded-lg border border-border px-3 py-2 text-xs font-semibold text-foreground hover:bg-muted disabled:opacity-50"
+                        >
+                          Move to draft
+                        </button>
+                      )
                     )}
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setDeleteTarget(item)}
-                    disabled={isSaving}
-                    aria-label={`Delete ${item.title}`}
-                    className="rounded-lg p-2 text-destructive hover:bg-destructive/10 disabled:opacity-50"
-                  >
-                    <Trash2 className="size-4" />
-                  </button>
+                  {mode === "admin" && (
+                    <button
+                      type="button"
+                      onClick={() => setDeleteTarget(item)}
+                      disabled={isSaving}
+                      aria-label={"Delete " + item.title}
+                      className="rounded-lg p-2 text-destructive hover:bg-destructive/10 disabled:opacity-50"
+                    >
+                      <Trash2 className="size-4" />
+                    </button>
+                  )}
                 </div>
               </article>
             );
@@ -387,8 +441,8 @@ export function AdminAnnouncementsWorkspace() {
       <PortalModal
         isOpen={isCreateOpen}
         onClose={() => !createMutation.isPending && setIsCreateOpen(false)}
-        title="New announcement"
-        description="Write a notice and choose who should see it."
+        title={mode === "accountant" ? "New fee announcement" : mode === "teacher" ? "New class announcement" : "New announcement"}
+        description={mode === "teacher" ? "Send a message to students or guardians in your assigned classes." : mode === "accountant" ? "Notify parents and guardians whose wards have unpaid fees." : "Write a notice and choose who should see it."}
         maxWidth="lg"
       >
         <form onSubmit={handleCreate} className="space-y-4">
@@ -408,43 +462,92 @@ export function AdminAnnouncementsWorkspace() {
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <label htmlFor="announcement-category" className="mb-1.5 block text-sm font-semibold text-foreground">Category</label>
-              <select
-                id="announcement-category"
-                value={form.category}
-                onChange={(event) => setForm((current) => ({ ...current, category: event.target.value as AnnouncementCategory }))}
-                className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-              >
-                {filterOptions.filter((option) => option.value !== "ALL").map((option) => (
-                  <option key={option.value} value={option.value}>{option.label}</option>
-                ))}
-              </select>
+              <Select value={form.category} onValueChange={(value) => setForm((current) => ({ ...current, category: value as AnnouncementCategory }))}>
+                <SelectTrigger id="announcement-category" className="h-10 w-full">
+                  <SelectValue placeholder="Choose a category" />
+                </SelectTrigger>
+                <SelectContent>
+                  {filterOptions.filter((option) => option.value !== "ALL").map((option) => (
+                    <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div>
               <label htmlFor="announcement-target" className="mb-1.5 block text-sm font-semibold text-foreground">Target audience</label>
-              <select
-                id="announcement-target"
-                value={form.target}
-                onChange={(event) => setForm((current) => ({ ...current, target: event.target.value as CreateAnnouncementInput["target"] }))}
-                className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-              >
-                {ANNOUNCEMENT_TARGET_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>{option.label}</option>
-                ))}
-              </select>
+              <Select value={form.target} onValueChange={(value) => setForm((current) => ({ ...current, target: value as CreateAnnouncementInput["target"], classIds: [] }))}>
+                <SelectTrigger id="announcement-target" className="h-10 w-full">
+                  <SelectValue placeholder="Choose an audience" />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableTargets.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
-          <div>
-            <label htmlFor="announcement-status" className="mb-1.5 block text-sm font-semibold text-foreground">Publication status</label>
-            <select
-              id="announcement-status"
-              value={form.status}
-              onChange={(event) => setForm((current) => ({ ...current, status: event.target.value as AnnouncementStatus }))}
-              className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-            >
-              <option value="PUBLISHED">Publish now</option>
-              <option value="DRAFT">Save as draft</option>
-            </select>
-          </div>
+          {requiresClassTargets && (
+            <div className="space-y-2 rounded-xl border border-border bg-muted/30 p-3">
+              <label htmlFor="announcement-class-selector" className="block text-sm font-semibold text-foreground">Target classes</label>
+              <p className="text-xs text-muted-foreground">Choose one or more classes. Teachers can only select classes assigned to them.</p>
+              <Select
+                value=""
+                onValueChange={(classId) => setForm((current) => ({
+                  ...current,
+                  classIds: current.classIds.includes(classId) ? current.classIds : [...current.classIds, classId],
+                }))}
+              >
+                <SelectTrigger id="announcement-class-selector" disabled={classOptionsQuery.isPending || classOptions.length === 0 || form.classIds.length >= 100} className="h-10 w-full bg-background">
+                  <SelectValue placeholder={classOptionsQuery.isPending ? "Loading classes…" : "Add a class"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {classOptions.filter((option) => !form.classIds.includes(option.id)).map((option) => (
+                    <SelectItem key={option.id} value={option.id}>{option.level} · {option.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {classOptionsQuery.isError && (
+                <div role="alert" className="space-y-2 text-xs text-destructive">
+                  <p>Could not load classes.</p>
+                  <button type="button" onClick={() => void classOptionsQuery.refetch()} className="rounded-lg border border-border px-2.5 py-1.5 font-semibold text-foreground hover:bg-muted">
+                    Retry loading classes
+                  </button>
+                </div>
+              )}
+              {!classOptionsQuery.isPending && classOptions.length === 0 && !classOptionsQuery.isError && (
+                <p className="text-xs text-muted-foreground">No active classes are available for your account.</p>
+              )}
+              {selectedClasses.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {selectedClasses.map((klass) => (
+                    <span key={klass.id} className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-2.5 py-1 text-xs font-medium text-foreground">
+                      {klass.level} · {klass.name}
+                      <button type="button" onClick={() => setForm((current) => ({ ...current, classIds: current.classIds.filter((id) => id !== klass.id) }))} aria-label={"Remove " + klass.name} className="rounded-full p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground">
+                        <X className="size-3" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground">No classes selected yet.</p>
+              )}
+            </div>
+          )}
+          {mode === "admin" && (
+            <div>
+              <label htmlFor="announcement-status" className="mb-1.5 block text-sm font-semibold text-foreground">Publication status</label>
+              <Select value={form.status} onValueChange={(value) => setForm((current) => ({ ...current, status: value as AnnouncementStatus }))}>
+                <SelectTrigger id="announcement-status" className="h-10 w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="PUBLISHED">Publish now</SelectItem>
+                  <SelectItem value="DRAFT">Save as draft</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
           <div>
             <label htmlFor="announcement-content" className="mb-1.5 block text-sm font-semibold text-foreground">Announcement content</label>
             <textarea
@@ -458,6 +561,7 @@ export function AdminAnnouncementsWorkspace() {
               className="w-full rounded-lg border border-input bg-background p-3 text-sm leading-relaxed text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
             />
           </div>
+          {mode === "admin" && (
           <label className="flex items-center gap-3 rounded-lg border border-border p-3 text-sm text-foreground">
             <input
               type="checkbox"
@@ -467,6 +571,7 @@ export function AdminAnnouncementsWorkspace() {
             />
             Pin this announcement to the top
           </label>
+          )}
           {createMutation.isError && (
             <p role="alert" className="text-sm text-destructive">{errorText(createMutation.error)}</p>
           )}
@@ -481,11 +586,11 @@ export function AdminAnnouncementsWorkspace() {
             </button>
             <button
               type="submit"
-              disabled={createMutation.isPending}
+              disabled={createMutation.isPending || (requiresClassTargets && form.classIds.length === 0)}
               className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-bold text-primary-foreground disabled:opacity-50"
             >
               {createMutation.isPending ? <LoaderCircle className="size-4 animate-spin" /> : <Send className="size-4" />}
-              {createMutation.isPending ? "Saving…" : form.status === "DRAFT" ? "Save draft" : "Publish"}
+              {createMutation.isPending ? "Saving…" : mode === "admin" && form.status === "DRAFT" ? "Save draft" : "Publish"}
             </button>
           </div>
         </form>

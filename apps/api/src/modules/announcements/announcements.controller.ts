@@ -23,54 +23,43 @@ export class AnnouncementsController {
   constructor(private readonly announcementsService: AnnouncementsService) {}
 
   @Get()
-  @Roles("owner", "admin", "headmistress", "teacher", "accountant", "staff", "student", "guardian")
-  list(
-    @CurrentSchool() school: School,
-    @CurrentSchoolRole() role: string | undefined,
-    @CurrentUser() user: AuthenticatedUser,
-  ) {
+  @Roles("owner", "admin", "headteacher", "teacher", "accountant", "staff", "student", "guardian")
+  list(@CurrentSchool() school: School, @CurrentSchoolRole() role: string | undefined, @CurrentUser() user: AuthenticatedUser) {
     return this.announcementsService.list(school.id, role, user.id);
   }
 
+  @Get("classes")
+  @Roles("owner", "admin", "headteacher", "teacher")
+  listClasses(@CurrentSchool() school: School, @CurrentSchoolRole() role: string | undefined, @CurrentUser() user: AuthenticatedUser) {
+    return this.announcementsService.listClasses(school.id, role, user.id);
+  }
+
   @Post()
-  @Roles("owner", "admin", "headmistress")
+  @Roles("owner", "admin", "headteacher", "teacher", "accountant")
   create(
     @CurrentSchool() school: School,
     @CurrentUser() user: AuthenticatedUser,
-    @Body(new ZodValidationPipe(createAnnouncementSchema))
-    input: CreateAnnouncementInput,
+    @CurrentSchoolRole() role: string | undefined,
+    @Body(new ZodValidationPipe(createAnnouncementSchema)) input: CreateAnnouncementInput,
   ) {
-    return this.announcementsService.create(school.id, user.id, input);
+    return this.announcementsService.create(school.id, user.id, role ?? "", input);
   }
 
   @Patch(":id/pin")
-  @Roles("owner", "admin", "headmistress")
-  updatePin(
-    @CurrentSchool() school: School,
-    @Param("id") id: string,
-    @Body(new ZodValidationPipe(updateAnnouncementPinSchema))
-    input: UpdateAnnouncementPinInput,
-  ) {
+  @Roles("owner", "admin", "headteacher")
+  updatePin(@CurrentSchool() school: School, @Param("id") id: string, @Body(new ZodValidationPipe(updateAnnouncementPinSchema)) input: UpdateAnnouncementPinInput) {
     return this.announcementsService.updatePin(school.id, id, input);
   }
 
   @Patch(":id/status")
-  @Roles("owner", "admin", "headmistress")
-  updateStatus(
-    @CurrentSchool() school: School,
-    @Param("id") id: string,
-    @Body(new ZodValidationPipe(updateAnnouncementStatusSchema))
-    input: UpdateAnnouncementStatusInput,
-  ) {
+  @Roles("owner", "admin", "headteacher")
+  updateStatus(@CurrentSchool() school: School, @Param("id") id: string, @Body(new ZodValidationPipe(updateAnnouncementStatusSchema)) input: UpdateAnnouncementStatusInput) {
     return this.announcementsService.updateStatus(school.id, id, input);
   }
 
   @Delete(":id")
-  @Roles("owner", "admin", "headmistress")
-  remove(
-    @CurrentSchool() school: School,
-    @Param("id") id: string,
-  ) {
+  @Roles("owner", "admin", "headteacher")
+  remove(@CurrentSchool() school: School, @Param("id") id: string) {
     return this.announcementsService.remove(school.id, id);
   }
 }

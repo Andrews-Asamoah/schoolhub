@@ -1,7 +1,7 @@
 export const ACADEMIC_CONTEXT_MANAGER_ROLES = [
   "owner",
   "admin",
-  "headmistress",
+  "headteacher",
   "accountant",
 ] as const;
 

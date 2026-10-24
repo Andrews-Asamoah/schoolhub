@@ -1,5 +1,5 @@
 /** Roles that give management access, so only the school owner may grant or take them away. */
-export const OWNER_ONLY_ROLES = ["admin", "headmistress"] as const;
+export const OWNER_ONLY_ROLES = ["admin", "headteacher"] as const;
 
 export interface RoleChangeRequest {
   /** The primary role of the person making the change. */
@@ -34,7 +34,7 @@ export function checkRoleChange({ actorRole, target, requested }: RoleChangeRequ
     return {
       ok: false,
       kind: "forbidden",
-      message: "Only the school owner can grant or remove administrator or headmistress access.",
+      message: "Only the school owner can grant or remove administrator or headteacher access.",
     };
   }
 

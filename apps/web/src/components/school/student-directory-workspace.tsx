@@ -142,7 +142,7 @@ const statuses = [
 export function StudentDirectoryWorkspace() {
   const queryClient = useQueryClient();
   const { activeRole } = useSchoolRole();
-  const canManage = ["owner", "admin", "headmistress", "staff"].includes(
+  const canManage = ["owner", "admin", "headteacher", "staff"].includes(
     activeRole ?? "",
   );
   const [search, setSearch] = useState("");
@@ -286,7 +286,7 @@ export function StudentDirectoryWorkspace() {
             className: "w-44 text-right",
             cell: (student: Student) => (
               <span className="inline-flex gap-1">
-                {["owner", "admin", "headmistress"].includes(activeRole ?? "") && (
+                {["owner", "admin", "headteacher"].includes(activeRole ?? "") && (
                   <button
                     type="button"
                     disabled={resetLoginMutation.isPending}

@@ -267,7 +267,12 @@ function WorkspaceContent({ pageId }: { pageId: string }) {
           {pageId === "classmates" && <StudentClassmatesView />}
           {pageId === "assignments" && <StudentAssignmentsView />}
           {pageId === "announcements" && (
-            activeRole === "student" ? <StudentAnnouncementsView /> : <AdminAnnouncementsWorkspace />
+            activeRole === "student" ? <StudentAnnouncementsView />
+              : activeRole === "teacher" ? <AdminAnnouncementsWorkspace mode="teacher" />
+                : activeRole === "accountant" ? <AdminAnnouncementsWorkspace mode="accountant" />
+                  : ["owner", "admin", "headteacher"].includes(activeRole ?? "")
+                    ? <AdminAnnouncementsWorkspace />
+                    : <AdminAnnouncementsWorkspace mode="viewer" />
           )}
           {pageId === "classes" && (
             <ClassesWorkspace
@@ -447,7 +452,7 @@ function AttendanceWorkspace({
 
   // Managers can mark any class; a teacher only the classes they are class teacher of.
   const canMark =
-    ["owner", "admin", "headmistress"].includes(attendanceRole ?? "") ||
+    ["owner", "admin", "headteacher"].includes(attendanceRole ?? "") ||
     (attendanceRole === "teacher" && !!teaching.data?.classes.find((item) => item.id === classId)?.isClassTeacher);
   if (canMark) {
     return (

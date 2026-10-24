@@ -55,13 +55,13 @@ export class SchoolsController {
   }
 
   @Get("members")
-  @Roles("owner", "admin", "headmistress")
+  @Roles("owner", "admin", "headteacher")
   listMembers(@CurrentSchool() school: School) {
     return this.schoolsService.listSchoolMembers(school.id);
   }
 
   @Patch("members/:userId/roles")
-  @Roles("owner", "admin", "headmistress")
+  @Roles("owner", "admin", "headteacher")
   updateMemberRoles(
     @CurrentSchool() school: School,
     @CurrentUser() user: { id: string },
@@ -101,7 +101,7 @@ export class SchoolsController {
   }
 
   @Patch("academic-context")
-  @Roles("owner", "admin", "headmistress")
+  @Roles("owner", "admin", "headteacher")
   setAcademicContext(
     @CurrentSchool() school: School,
     @CurrentUser() user: { id: string },

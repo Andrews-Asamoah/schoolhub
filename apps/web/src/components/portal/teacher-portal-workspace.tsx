@@ -1,4 +1,4 @@
-import { BookOpen, Calendar, ClipboardCheck, FileSpreadsheet, GraduationCap, LayoutDashboard, UserCheck, Users } from "lucide-react";
+import { BookOpen, Calendar, ClipboardCheck, FileSpreadsheet, GraduationCap, LayoutDashboard, Megaphone, UserCheck, Users } from "lucide-react";
 import { useState } from "react";
 import { AssessmentEntryWorkspace } from "@/components/school/assessment-entry-workspace";
 import { ClassRegister } from "@/components/school/class-register";
@@ -7,8 +7,9 @@ import { useTeachingOverview } from "@/lib/teaching";
 import { cn } from "@/lib/utils";
 import { PortalStatCard } from "./portal-stat-card";
 import { TeacherClassesView } from "./teacher-classes-view";
+import { AdminAnnouncementsWorkspace } from "./admin-announcements-workspace";
 
-type Tab = "overview" | "classes" | "gradebook" | "attendance" | "timetable";
+type Tab = "overview" | "classes" | "gradebook" | "attendance" | "timetable" | "announcements";
 
 interface TeacherPortalWorkspaceProps {
   defaultTab?: Tab;
@@ -46,22 +47,23 @@ export function TeacherPortalWorkspace({ defaultTab = "overview" }: TeacherPorta
     { id: "gradebook", label: "Gradebook & Marks", icon: FileSpreadsheet },
     { id: "attendance", label: "Attendance Register", icon: ClipboardCheck },
     { id: "timetable", label: "Weekly Timetable", icon: Calendar },
+    { id: "announcements", label: "Announcements", icon: Megaphone },
   ];
 
   return (
     <div className="space-y-6">
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-indigo-700 via-blue-700 to-indigo-900 p-6 text-white shadow-xl sm:p-8">
-        <div className="pointer-events-none absolute right-0 top-0 -m-16 size-72 rounded-full bg-white/10 blur-3xl" />
+      <div className="relative overflow-hidden rounded-3xl bg-primary p-6 text-primary-foreground shadow-xl sm:p-8">
+        <div className="pointer-events-none absolute right-0 top-0 -m-16 size-72 rounded-full bg-primary-foreground/10 blur-3xl" />
         <div className="relative flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
           <div className="space-y-2">
-            <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-wider backdrop-blur-md">
-              <GraduationCap className="size-3.5 text-blue-200" />
+            <div className="inline-flex items-center gap-2 rounded-full border border-primary-foreground/20 bg-primary-foreground/10 px-3 py-1 text-xs font-semibold uppercase tracking-wider backdrop-blur-md">
+              <GraduationCap className="size-3.5 text-primary-foreground/80" />
               Teacher workspace{overview.data?.term ? ` • ${overview.data.term.name}` : ""}
             </div>
             <h1 className="text-2xl font-black tracking-tight sm:text-3xl">
               {overview.data?.teacher?.name ? `Welcome, ${overview.data.teacher.name}` : "Teacher Instruction Hub"}
             </h1>
-            <p className="max-w-xl text-sm leading-relaxed text-blue-100/90">
+            <p className="max-w-xl text-sm leading-relaxed text-primary-foreground/85">
               Enter marks for the subjects you teach{ownClasses.length ? ", and take the register for the class you look after" : ""}.
             </p>
           </div>
@@ -70,16 +72,16 @@ export function TeacherPortalWorkspace({ defaultTab = "overview" }: TeacherPorta
               <button
                 type="button"
                 onClick={() => openRegister(ownClasses[0]!.id)}
-                className="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-xs font-bold text-indigo-900 shadow-md transition hover:bg-blue-50"
+                className="inline-flex items-center gap-2 rounded-xl bg-background px-4 py-2.5 text-xs font-bold text-foreground shadow-md transition hover:bg-muted"
               >
-                <ClipboardCheck className="size-4 text-indigo-700" />
+                <ClipboardCheck className="size-4 text-primary" />
                 Take register
               </button>
             )}
             <button
               type="button"
               onClick={() => setActiveTab("gradebook")}
-              className="inline-flex items-center gap-2 rounded-xl border border-white/30 bg-white/10 px-4 py-2.5 text-xs font-bold text-white backdrop-blur-md transition hover:bg-white/20"
+              className="inline-flex items-center gap-2 rounded-xl border border-primary-foreground/30 bg-primary-foreground/10 px-4 py-2.5 text-xs font-bold text-primary-foreground backdrop-blur-md transition hover:bg-primary-foreground/20"
             >
               <FileSpreadsheet className="size-4" />
               Enter marks
@@ -95,7 +97,7 @@ export function TeacherPortalWorkspace({ defaultTab = "overview" }: TeacherPorta
         <PortalStatCard label="Class teacher of" value={ownClasses.length} subValue={ownClasses.map((klass) => klass.name).join(", ") || "No class"} icon={UserCheck} variant="emerald" onClick={() => ownClasses.length && setActiveTab("classes")} />
       </div>
 
-      <div role="tablist" aria-label="Teacher workspace" className="flex items-center gap-1 overflow-x-auto rounded-2xl border border-slate-200/80 bg-white p-1.5 shadow-xs dark:border-slate-800 dark:bg-slate-900">
+      <div role="tablist" aria-label="Teacher workspace" className="flex items-center gap-1 overflow-x-auto rounded-2xl border border-border bg-card p-1.5 shadow-xs">
         {tabs.map((tab) => {
           const active = activeTab === tab.id;
           return (
@@ -107,13 +109,13 @@ export function TeacherPortalWorkspace({ defaultTab = "overview" }: TeacherPorta
               onClick={() => setActiveTab(tab.id)}
               className={cn(
                 "inline-flex shrink-0 items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-semibold transition",
-                active ? "bg-indigo-600 text-white shadow-md" : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800",
+                active ? "bg-primary text-primary-foreground shadow-md" : "text-muted-foreground hover:bg-muted hover:text-foreground",
               )}
             >
               <tab.icon className="size-4" />
               {tab.label}
               {tab.badge !== undefined && (
-                <span className={cn("rounded-full px-1.5 text-[10px]", active ? "bg-white/20" : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300")}>{tab.badge}</span>
+                <span className={cn("rounded-full px-1.5 text-[10px]", active ? "bg-primary-foreground/20" : "bg-muted text-muted-foreground")}>{tab.badge}</span>
               )}
             </button>
           );
@@ -151,6 +153,7 @@ export function TeacherPortalWorkspace({ defaultTab = "overview" }: TeacherPorta
           </div>
         ))}
       {activeTab === "timetable" && <TimetableWorkspace />}
+      {activeTab === "announcements" && <AdminAnnouncementsWorkspace mode="teacher" />}
     </div>
   );
 }

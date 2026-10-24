@@ -21,7 +21,7 @@ export interface PreparedCredential {
 export const DEFAULT_PASSWORDS: Record<ProvisionableRole | "owner", string> = {
   owner: "Owner@123",
   admin: "Admin@123",
-  headmistress: "Headteacher@123",
+  headteacher: "Headteacher@123",
   teacher: "Teacher@123",
   accountant: "Accountant@123",
   staff: "Staff@123",

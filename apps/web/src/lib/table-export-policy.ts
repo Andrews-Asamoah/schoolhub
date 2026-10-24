@@ -6,7 +6,7 @@ import { useSchoolRole } from "@/components/school/school-role-switcher";
  * stays the real access check: exports only contain rows the user could
  * already load.
  */
-export const TABLE_EXPORT_ROLES = ["owner", "admin", "headmistress", "accountant", "teacher", "staff"] as const;
+export const TABLE_EXPORT_ROLES = ["owner", "admin", "headteacher", "accountant", "teacher", "staff"] as const;
 
 export function canExportTables(role: string | null | undefined) {
   return !!role && (TABLE_EXPORT_ROLES as readonly string[]).includes(role);

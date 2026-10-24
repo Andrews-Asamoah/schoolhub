@@ -24,13 +24,13 @@ describe("checkRoleChange", () => {
     const result = checkRoleChange({ actorRole: "owner", target: teacher, requested: ["teacher", "owner"] });
     expect(result).toMatchObject({ ok: false, kind: "bad-request" });
   });
-  it("only the owner may grant administrator or headmistress", () => {
-    for (const role of ["admin", "headmistress"]) {
+  it("only the owner may grant administrator or headteacher", () => {
+    for (const role of ["admin", "headteacher"]) {
       expect(checkRoleChange({ actorRole: "admin", target: teacher, requested: ["teacher", role] })).toMatchObject({
         ok: false,
         kind: "forbidden",
       });
-      expect(checkRoleChange({ actorRole: "headmistress", target: teacher, requested: ["teacher", role] })).toMatchObject({
+      expect(checkRoleChange({ actorRole: "headteacher", target: teacher, requested: ["teacher", role] })).toMatchObject({
         ok: false,
         kind: "forbidden",
       });

@@ -882,7 +882,7 @@ function ExemptFeeDialog({ app, onClose, onDone }: { app: Application; onClose: 
         </p>
         <label className="mt-3 block text-xs font-semibold">
           Reason for exemption (required)
-          <textarea className={`${input} h-24 py-2`} value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. Child of a staff member, approved by the headmaster" />
+          <textarea className={`${input} h-24 py-2`} value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. Child of a staff member, approved by the headteacher" />
         </label>
         {exempt.error && <p role="alert" className="mt-3 text-xs text-rose-600">{errorText(exempt.error)}</p>}
         <div className="mt-4 flex justify-end gap-2">

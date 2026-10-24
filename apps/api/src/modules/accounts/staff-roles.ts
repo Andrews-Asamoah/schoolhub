@@ -21,7 +21,7 @@ export function roleForStaffType(staffType: StaffTypeValue): Exclude<Role, "owne
     case "ACCOUNTANT":
       return "accountant";
     case "HEADTEACHER":
-      return "headmistress";
+      return "headteacher";
     case "ADMIN":
       return "admin";
     default:

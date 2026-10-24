@@ -18,6 +18,7 @@ import {
   FileText,
   Filter,
   Layers,
+  Megaphone,
   Package,
   PackageCheck,
   Plus,
@@ -33,12 +34,13 @@ import {
 } from "lucide-react";
 import { PortalStatCard } from "./portal-stat-card";
 import { PortalModal } from "./portal-modal";
+import { AdminAnnouncementsWorkspace } from "./admin-announcements-workspace";
 import { cn } from "@/lib/utils";
 import { DataTable } from "@/components/ui/data-table";
 import { useCanExportTables } from "@/lib/table-export-policy";
 
 interface AccountantPortalWorkspaceProps {
-  defaultTab?: "overview" | "invoices" | "payments" | "debtors" | "payroll" | "expenses" | "inventory";
+  defaultTab?: "overview" | "invoices" | "payments" | "debtors" | "payroll" | "expenses" | "inventory" | "announcements";
 }
 
 interface InvoiceRecord {
@@ -128,7 +130,7 @@ const mockExpenses: ExpenseRecord[] = [
 ];
 
 const mockStaffSalaries: StaffSalaryRecord[] = [
-  { id: "sal-1", staffName: "Dr. Mensah Ofori", role: "Headmaster", department: "Administration", basicSalary: 7500, allowances: 1500, taxDeductions: 1350, netPay: 7650, status: "DISBURSED" },
+  { id: "sal-1", staffName: "Dr. Mensah Ofori", role: "Headteacher", department: "Administration", basicSalary: 7500, allowances: 1500, taxDeductions: 1350, netPay: 7650, status: "DISBURSED" },
   { id: "sal-2", staffName: "Mrs. Grace Appiah", role: "Senior Science Tutor", department: "Science", basicSalary: 3850, allowances: 1000, taxDeductions: 765, netPay: 4085, status: "DISBURSED" },
   { id: "sal-3", staffName: "Mr. Kwabena Darko", role: "Math Lead Tutor", department: "Mathematics", basicSalary: 3900, allowances: 950, taxDeductions: 780, netPay: 4070, status: "DISBURSED" },
   { id: "sal-4", staffName: "Ms. Veronica Kusi", role: "English Tutor", department: "Languages", basicSalary: 3500, allowances: 800, taxDeductions: 680, netPay: 3620, status: "DISBURSED" },
@@ -345,7 +347,7 @@ export function AccountantPortalWorkspace({ defaultTab = "overview" }: Accountan
       </div>
 
       {/* Navigation Tabs */}
-      <div className="flex items-center gap-1 overflow-x-auto rounded-2xl border border-slate-200/80 bg-white p-1.5 shadow-xs dark:border-slate-800 dark:bg-slate-900">
+      <div className="flex items-center gap-1 overflow-x-auto rounded-2xl border border-border bg-card p-1.5 shadow-xs">
         {[
           { id: "overview", label: "Financial Overview", icon: BadgeDollarSign },
           { id: "invoices", label: "Invoices & Billing", icon: Receipt, badge: invoices.length },
@@ -354,6 +356,7 @@ export function AccountantPortalWorkspace({ defaultTab = "overview" }: Accountan
           { id: "payroll", label: "Staff Payroll", icon: Users },
           { id: "expenses", label: "Operating Expenses", icon: TrendingDown },
           { id: "inventory", label: "Supplies & Inventory", icon: Package, badge: lowStockItems.length > 0 ? "Alert" : undefined },
+          { id: "announcements", label: "Announcements", icon: Megaphone },
         ].map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
@@ -364,8 +367,8 @@ export function AccountantPortalWorkspace({ defaultTab = "overview" }: Accountan
               className={cn(
                 "flex shrink-0 items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition-all",
                 isActive
-                  ? "bg-emerald-700 text-white shadow-sm shadow-emerald-700/20"
-                  : "text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800",
+                  ? "bg-primary text-primary-foreground shadow-sm"
+                  : "text-muted-foreground hover:bg-muted hover:text-foreground",
               )}
             >
               <Icon className="size-4" />
@@ -374,7 +377,7 @@ export function AccountantPortalWorkspace({ defaultTab = "overview" }: Accountan
                 <span
                   className={cn(
                     "rounded-full px-1.5 py-0.2 text-[10px]",
-                    isActive ? "bg-white/20 text-white" : "bg-slate-100 text-slate-600 dark:bg-slate-800",
+                    isActive ? "bg-primary-foreground/20 text-primary-foreground" : "bg-muted text-muted-foreground",
                   )}
                 >
                   {tab.badge}
@@ -384,6 +387,8 @@ export function AccountantPortalWorkspace({ defaultTab = "overview" }: Accountan
           );
         })}
       </div>
+
+      {activeTab === "announcements" && <AdminAnnouncementsWorkspace mode="accountant" />}
 
       {/* Toast Notice */}
       {notice && (

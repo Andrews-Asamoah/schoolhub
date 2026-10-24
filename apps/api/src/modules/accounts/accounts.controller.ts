@@ -52,7 +52,7 @@ export class AccountsAdminController {
 
   /** Issue or reset a temporary login for a student/teacher/staff/guardian record. */
   @Post("people/:kind/:id/credentials")
-  @Roles("owner", "admin", "headmistress")
+  @Roles("owner", "admin", "headteacher")
   @HttpCode(200)
   @Header("Cache-Control", "no-store")
   issue(

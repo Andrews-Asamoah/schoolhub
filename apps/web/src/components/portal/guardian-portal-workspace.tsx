@@ -928,7 +928,7 @@ export function GuardianPortalWorkspace({ defaultTab = "overview" }: GuardianPor
 
           <div className="py-2 border-t border-slate-200 text-xs">
             <p>Class Teacher&apos;s General Remark: <strong className="font-bold text-slate-900">An exceptionally hardworking student with exemplary conduct and leadership aptitude.</strong></p>
-            <p className="mt-1">Headmaster&apos;s Signature: <strong>[ Certified — School Seal Affixed ]</strong></p>
+            <p className="mt-1">Headteacher&apos;s Signature: <strong>[ Certified — School Seal Affixed ]</strong></p>
           </div>
         </div>
       </PortalModal>

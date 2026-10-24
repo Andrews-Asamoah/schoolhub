@@ -1,5 +1,5 @@
 /** Roles that may see a teacher's home address and emergency contact. */
-export const BIODATA_PRIVATE_ROLES = ["owner", "admin", "headmistress"] as const;
+export const BIODATA_PRIVATE_ROLES = ["owner", "admin", "headteacher"] as const;
 
 export function canSeePrivateBiodata(role: string | undefined) {
   return (BIODATA_PRIVATE_ROLES as readonly string[]).includes(role ?? "");
