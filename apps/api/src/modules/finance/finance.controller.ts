@@ -69,6 +69,11 @@ const feeReminderCreateSchema = z.object({
   }).optional(),
 });
 const reminderScheduleActiveSchema = z.object({ isActive: z.boolean() });
+const feeReminderInstallmentSchema = z.object({
+  label: z.string().trim().min(1, "Enter an installment label").max(100),
+  dueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Format: YYYY-MM-DD"),
+  sendDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Format: YYYY-MM-DD"),
+});
 
 
 
@@ -257,6 +262,16 @@ export class FinanceController {
     @Body(new ZodValidationPipe(reminderScheduleActiveSchema)) body: z.infer<typeof reminderScheduleActiveSchema>,
   ) {
     return this.financeService.setFeeReminderScheduleActive(school.id, scheduleId, body.isActive);
+  }
+
+  @Post("fee-reminders/:scheduleId/installments")
+  @Roles("owner", "admin", "accountant")
+  addFeeReminderInstallment(
+    @CurrentSchool() school: School,
+    @Param("scheduleId") scheduleId: string,
+    @Body(new ZodValidationPipe(feeReminderInstallmentSchema)) body: z.infer<typeof feeReminderInstallmentSchema>,
+  ) {
+    return this.financeService.addFeeReminderInstallment(school.id, scheduleId, body);
   }
 
   @Get("fee-reminders/:scheduleId/preview")
