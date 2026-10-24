@@ -1103,7 +1103,6 @@ export class StudentsService {
             id: true,
             studentId: true,
             admissionNumber: true,
-            gender: true,
             profile: { select: { firstName: true, lastName: true, gender: true } },
             house: { select: { id: true, name: true, color: true } },
           },
@@ -1124,7 +1123,7 @@ export class StudentsService {
         lastName: e.student.profile.lastName,
         house: e.student.house?.name ?? 'No House',
         houseColor: e.student.house?.color ?? '#2563EB',
-        gender: e.student.profile.gender ?? e.student.gender,
+        gender: e.student.profile.gender ?? null,
       })),
     };
   }
