@@ -414,6 +414,11 @@ export function AccountantRecordPaymentDialog({
               ))}
             </select>
           </label>
+          {studentBillsQuery.error && (
+            <p role="alert" className="text-sm text-destructive">
+              Outstanding bills could not be refreshed: {studentBillsQuery.error.message}
+            </p>
+          )}
 
           {selectedBill && (
             <section className="rounded-2xl border border-border bg-muted/20 p-4">
