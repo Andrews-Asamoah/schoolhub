@@ -1042,7 +1042,9 @@ export class FinanceService {
       if (bill.student.deletedAt || bill.student.status !== "ACTIVE") continue;
       const existing = byStudent.get(bill.studentId) ?? {
         id: bill.student.id,
-        admissionNumber: bill.student.admissionNumber,
+        // Admission numbers are nullable in the database; keep the API's
+        // selector contract string-safe for students without one.
+        admissionNumber: bill.student.admissionNumber ?? "",
         profile: bill.student.profile,
         classes: new Map<string, { id: string; name: string }>(),
         outstandingBalance: 0,
