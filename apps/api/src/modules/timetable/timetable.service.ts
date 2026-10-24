@@ -608,4 +608,43 @@ export class TimetableService {
     }
     throw error;
   }
+
+  /** The current class timetable for a child linked to the authenticated guardian. */
+  async getGuardianWardTimetable(schoolId: string, userId: string, studentId: string) {
+    const db = this.prisma.client;
+    const guardian = await db.guardian.findFirst({
+      where: { schoolId, deletedAt: null, isActive: true, profile: { userId } },
+      select: { id: true },
+    });
+    if (!guardian) throw new NotFoundException('Guardian record not found');
+    const link = await db.guardianStudent.findFirst({
+      where: { guardianId: guardian.id, studentId, student: { schoolId, deletedAt: null } },
+      select: { id: true },
+    });
+    if (!link) throw new NotFoundException('Student not found');
+
+    const enrollment = await db.enrollment.findFirst({
+      where: {
+        studentId, status: 'ACTIVE',
+        term: { isCurrent: true, academicYear: { isCurrent: true, schoolId } },
+        class: { schoolId, deletedAt: null },
+      },
+      orderBy: { enrolledAt: 'desc' },
+      select: {
+        classId: true,
+        class: { select: { id: true, name: true, level: true } },
+        academicYear: { select: { id: true, name: true } },
+        term: { select: { id: true, name: true } },
+      },
+    });
+    if (!enrollment) return { class: null, academicYear: null, term: null, entries: [] };
+    const entries = await this.findEntries(schoolId, enrollment.academicYear.id, { classId: enrollment.classId });
+    return {
+      class: enrollment.class,
+      academicYear: enrollment.academicYear,
+      term: enrollment.term,
+      entries: entries.map((row) => this.toDto(row)),
+    };
+  }
+
 }
