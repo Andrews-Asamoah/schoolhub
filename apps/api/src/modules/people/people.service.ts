@@ -98,6 +98,7 @@ export class PeopleService {
               phone: true,
               gender: true,
               dateOfBirth: true,
+              signatureUrl: true,
               user: { select: { email: true } },
             },
           },
