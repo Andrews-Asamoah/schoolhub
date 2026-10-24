@@ -905,6 +905,335 @@ export class FinanceService {
     });
   }
 
+  async listFeeReminderSchedules(schoolId: string) {
+    return this.prisma.client.feeReminderSchedule.findMany({
+      where: { schoolId },
+      orderBy: { createdAt: "desc" },
+      include: {
+        installments: { orderBy: { dueDate: "asc" } },
+        createdBy: { select: { name: true } },
+        academicYear: { select: { name: true } },
+        term: { select: { name: true } },
+        _count: { select: { logs: true } },
+      },
+    });
+  }
+
+  async createFeeReminderSchedule(
+    schoolId: string,
+    createdById: string,
+    input: {
+      name: string;
+      description?: string;
+      messageTemplate: string;
+      minimumOutstanding: number;
+      installment?: { label: string; dueDate: string; sendDate: string };
+    },
+  ) {
+    const name = input.name.trim();
+    const currentYear = await this.prisma.client.academicYear.findFirst({
+      where: { schoolId, isCurrent: true },
+      include: { terms: { where: { isCurrent: true }, take: 1 } },
+    });
+    const currentTerm = currentYear?.terms[0];
+    const installment = input.installment;
+    const parseDate = (value: string, field: string) => {
+      if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(value)) throw new BadRequestException(`Enter ${field} as YYYY-MM-DD.`);
+      const date = new Date(`${value}T00:00:00.000Z`);
+      if (Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== value) {
+        throw new BadRequestException(`Enter a valid ${field.toLowerCase()}.`);
+      }
+      return date;
+    };
+    const dueDate = installment ? parseDate(installment.dueDate, "due date") : undefined;
+    const sendDate = installment ? parseDate(installment.sendDate, "send date") : undefined;
+    if (dueDate && sendDate && sendDate > dueDate) {
+      throw new BadRequestException("The reminder send date must be on or before the due date.");
+    }
+
+    return this.prisma.client.feeReminderSchedule.create({
+      data: {
+        schoolId,
+        name,
+        description: input.description?.trim() || null,
+        isActive: true,
+        sendSms: false,
+        sendEmail: false,
+        sendInApp: true,
+        targetOutstandingOnly: true,
+        minimumOutstanding: new Prisma.Decimal(input.minimumOutstanding),
+        messageTemplate: input.messageTemplate.trim(),
+        academicYearId: currentYear?.id ?? null,
+        termId: currentTerm?.id ?? null,
+        createdById,
+        ...(installment && dueDate && sendDate ? {
+          installments: { create: { label: installment.label.trim(), dueDate, sendDate } },
+        } : {}),
+      },
+      include: {
+        installments: { orderBy: { dueDate: "asc" } },
+        createdBy: { select: { name: true } },
+        academicYear: { select: { name: true } },
+        term: { select: { name: true } },
+        _count: { select: { logs: true } },
+      },
+    });
+  }
+
+  async setFeeReminderScheduleActive(schoolId: string, scheduleId: string, isActive: boolean) {
+    const existing = await this.prisma.client.feeReminderSchedule.findFirst({
+      where: { id: scheduleId, schoolId },
+      select: { id: true },
+    });
+    if (!existing) throw new NotFoundException("Fee reminder schedule not found.");
+    return this.prisma.client.feeReminderSchedule.update({
+      where: { id: scheduleId },
+      data: { isActive },
+      include: {
+        installments: { orderBy: { dueDate: "asc" } },
+        createdBy: { select: { name: true } },
+        academicYear: { select: { name: true } },
+        term: { select: { name: true } },
+        _count: { select: { logs: true } },
+      },
+    });
+  }
+
+  private async collectFeeReminderTargets(
+    schoolId: string,
+    minimumOutstanding: number,
+    academicYearId?: string | null,
+    termId?: string | null,
+  ) {
+    const bills = await this.prisma.client.bill.findMany({
+      where: {
+        schoolId,
+        status: { notIn: ["PAID", "CANCELLED", "WAIVED"] },
+        balanceAmount: { gt: 0 },
+        ...(academicYearId ? { academicYearId } : {}),
+        ...(termId ? { termId } : {}),
+      },
+      include: {
+        student: {
+          select: {
+            id: true,
+            profile: { select: { firstName: true, lastName: true, otherNames: true } },
+            guardians: {
+              where: { receiveAlerts: true },
+              include: {
+                guardian: {
+                  select: {
+                    id: true,
+                    firstName: true,
+                    lastName: true,
+                    otherNames: true,
+                    phone: true,
+                    email: true,
+                    canLogin: true,
+                    isActive: true,
+                    deletedAt: true,
+                    profile: { select: { userId: true } },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+    type GuardianTarget = {
+      id: string;
+      userId: string | null;
+      name: string;
+      phone: string | null;
+      email: string | null;
+    };
+    type StudentTarget = {
+      studentId: string;
+      name: string;
+      balance: number;
+      earliestDueDate: Date | null;
+      guardians: Map<string, GuardianTarget>;
+    };
+    const targets = new Map<string, StudentTarget>();
+    for (const bill of bills) {
+      const student = bill.student;
+      const studentName = [student.profile.firstName, student.profile.otherNames, student.profile.lastName].filter(Boolean).join(" ").trim() || "Student";
+      let target = targets.get(student.id);
+      if (!target) {
+        target = { studentId: student.id, name: studentName, balance: 0, earliestDueDate: bill.dueDate, guardians: new Map() };
+        targets.set(student.id, target);
+      }
+      target.balance += Number(bill.balanceAmount);
+      if (bill.dueDate && (!target.earliestDueDate || bill.dueDate < target.earliestDueDate)) target.earliestDueDate = bill.dueDate;
+      for (const link of student.guardians) {
+        const guardian = link.guardian;
+        if (!guardian.isActive || guardian.deletedAt || !guardian.canLogin) continue;
+        const guardianName = [guardian.firstName, guardian.otherNames, guardian.lastName].filter(Boolean).join(" ").trim() || "Parent/guardian";
+        target.guardians.set(guardian.id, {
+          id: guardian.id,
+          userId: guardian.profile?.userId ?? null,
+          name: guardianName,
+          phone: guardian.phone ?? null,
+          email: guardian.email ?? null,
+        });
+      }
+    }
+    return [...targets.values()].filter((target) => target.balance > 0 && target.balance >= minimumOutstanding);
+  }
+
+  async previewFeeReminder(schoolId: string, scheduleId: string) {
+    const schedule = await this.prisma.client.feeReminderSchedule.findFirst({
+      where: { id: scheduleId, schoolId },
+      select: { id: true, minimumOutstanding: true, academicYearId: true, termId: true },
+    });
+    if (!schedule) throw new NotFoundException("Fee reminder schedule not found.");
+    const targets = await this.collectFeeReminderTargets(
+      schoolId,
+      Number(schedule.minimumOutstanding),
+      schedule.academicYearId,
+      schedule.termId,
+    );
+    const recipientTargets = targets.flatMap((target) => [...target.guardians.values()]);
+    return {
+      studentCount: targets.length,
+      guardianCount: recipientTargets.filter((guardian) => Boolean(guardian.userId)).length,
+      guardiansWithoutPortal: recipientTargets.filter((guardian) => !guardian.userId).length,
+      totalOutstanding: targets.reduce((sum, target) => sum + target.balance, 0),
+      sampleStudents: targets.slice(0, 5).map((target) => ({ name: target.name, balance: target.balance })),
+    };
+  }
+
+  async sendFeeReminderInApp(schoolId: string, scheduleId: string) {
+    const db = this.prisma.client;
+    const schedule = await db.feeReminderSchedule.findFirst({
+      where: { id: scheduleId, schoolId },
+      include: { installments: { where: { sent: false }, orderBy: { sendDate: "asc" }, take: 1 } },
+    });
+    if (!schedule) throw new NotFoundException("Fee reminder schedule not found.");
+    if (!schedule.isActive) throw new BadRequestException("Activate this schedule before sending reminders.");
+    if (!schedule.sendInApp) throw new BadRequestException("In-app reminders are not enabled for this schedule.");
+
+    const installment = schedule.installments[0];
+    const targets = await this.collectFeeReminderTargets(
+      schoolId,
+      Number(schedule.minimumOutstanding),
+      schedule.academicYearId,
+      schedule.termId,
+    );
+    if (!targets.length) {
+      throw new BadRequestException("No students currently meet this schedule's outstanding-balance threshold.");
+    }
+
+    const alreadySent = installment
+      ? await db.feeReminderLog.findMany({
+          where: { scheduleId, installmentId: installment.id, channel: "IN_APP", status: "SENT" },
+          select: { studentId: true, guardianPhone: true, guardianEmail: true, guardianName: true },
+        })
+      : [];
+    const sentKeys = new Set(alreadySent.map((log) => `${log.studentId}|${log.guardianPhone ?? ""}|${log.guardianEmail ?? ""}|${log.guardianName}`));
+    let inAppSent = 0;
+    let skippedNoLogin = 0;
+    let failed = 0;
+    let alreadySentCount = 0;
+    const today = new Date();
+
+    for (const target of targets) {
+      const balanceText = new Intl.NumberFormat("en-GH", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(target.balance);
+      const dueDateText = target.earliestDueDate
+        ? target.earliestDueDate.toISOString().slice(0, 10)
+        : "not specified";
+      for (const guardian of target.guardians.values()) {
+        const key = `${target.studentId}|${guardian.phone ?? ""}|${guardian.email ?? ""}|${guardian.name}`;
+        if (installment && sentKeys.has(key)) {
+          alreadySentCount++;
+          continue;
+        }
+        const message = schedule.messageTemplate
+          .replaceAll("{{studentName}}", target.name)
+          .replaceAll("{{guardianName}}", guardian.name)
+          .replaceAll("{{outstandingBalance}}", `GHS ${balanceText}`)
+          .replaceAll("{{dueDate}}", dueDateText)
+          .replaceAll("{{installmentLabel}}", installment?.label ?? "school fees")
+          .slice(0, 2000);
+        if (!guardian.userId) {
+          skippedNoLogin++;
+          await db.feeReminderLog.create({
+            data: {
+              scheduleId,
+              installmentId: installment?.id ?? null,
+              guardianPhone: guardian.phone,
+              guardianEmail: guardian.email,
+              guardianName: guardian.name,
+              studentName: target.name,
+              studentId: target.studentId,
+              outstandingBalance: new Prisma.Decimal(target.balance),
+              channel: "IN_APP",
+              status: "SKIPPED",
+              error: "Guardian has no linked portal login.",
+            },
+          });
+          continue;
+        }
+        try {
+          await db.$transaction(async (tx) => {
+            await tx.notification.create({
+              data: {
+                schoolId,
+                userId: guardian.userId!,
+                type: "FEE_REMINDER",
+                title: `Fee reminder for ${target.name}`,
+                message,
+                link: "/guardian-fees",
+                academicYearId: schedule.academicYearId,
+                termId: schedule.termId,
+              },
+            });
+            await tx.feeReminderLog.create({
+              data: {
+                scheduleId,
+                installmentId: installment?.id ?? null,
+                guardianPhone: guardian.phone,
+                guardianEmail: guardian.email,
+                guardianName: guardian.name,
+                studentName: target.name,
+                studentId: target.studentId,
+                outstandingBalance: new Prisma.Decimal(target.balance),
+                channel: "IN_APP",
+                status: "SENT",
+              },
+            });
+          });
+          inAppSent++;
+        } catch (error) {
+          failed++;
+          await db.feeReminderLog.create({
+            data: {
+              scheduleId,
+              installmentId: installment?.id ?? null,
+              guardianPhone: guardian.phone,
+              guardianEmail: guardian.email,
+              guardianName: guardian.name,
+              studentName: target.name,
+              studentId: target.studentId,
+              outstandingBalance: new Prisma.Decimal(target.balance),
+              channel: "IN_APP",
+              status: "FAILED",
+              error: error instanceof Error ? error.message.slice(0, 500) : "Could not create notification.",
+            },
+          });
+        }
+      }
+    }
+    if (installment && failed === 0) {
+      await db.feeReminderInstallment.update({
+        where: { id: installment.id },
+        data: { sent: true, sentAt: new Date() },
+      });
+    }
+    return { studentCount: targets.length, inAppSent, skippedNoLogin, failed, alreadySent: alreadySentCount };
+  }
+
   async getStudentLedger(
     schoolId: string,
     studentId: string,
