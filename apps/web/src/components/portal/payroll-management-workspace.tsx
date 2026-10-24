@@ -1,6 +1,6 @@
 import { useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertCircle, BadgeCheck, Banknote, CalendarClock, CheckCircle2, Download, FileText, LoaderCircle, LockKeyhole, PlayCircle, Printer, ShieldCheck, Users, Wallet, X } from "lucide-react";
+import { AlertCircle, BadgeCheck, CalendarClock, CheckCircle2, Download, FileText, LoaderCircle, PlayCircle, Printer, Wallet, X } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -148,6 +148,15 @@ export function PayrollManagementWorkspace() {
   };
 
   return <div className="mx-auto w-full min-w-0 max-w-screen-2xl space-y-6">
+    <style>{`@media print {
+      body * { visibility: hidden !important; }
+      .payroll-slips-print, .payroll-slips-print * { visibility: visible !important; }
+      .payroll-slips-print { position: absolute !important; top: 0 !important; left: 0 !important; width: 100% !important; max-width: none !important; margin: 0 !important; padding: 8px !important; border: 0 !important; box-shadow: none !important; background: white !important; color: black !important; overflow: visible !important; }
+      .payroll-slips-print table { min-width: 0 !important; width: 100% !important; table-layout: fixed !important; font-size: 7pt !important; }
+      .payroll-slips-print th, .payroll-slips-print td { color: black !important; padding: 3px !important; border-color: #bbb !important; overflow-wrap: anywhere !important; }
+      .payroll-slips-actions { display: none !important; }
+      @page { size: A4 landscape; margin: 8mm; }
+    }`}</style>
     <section className="flex flex-col gap-4 rounded-2xl border border-border bg-card p-5 shadow-sm sm:flex-row sm:items-end sm:justify-between sm:p-6">
       <div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">Finance & bursary</p><h1 className="mt-1 text-2xl font-bold tracking-tight text-foreground">Payroll</h1><p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">Generate payroll drafts from employee salary records, review statutory deductions, approve runs and record confirmed disbursements.</p></div>
       <div className="flex flex-wrap gap-2"><button type="button" className={secondaryButton} onClick={exportRegister} disabled={!visiblePayroll.length}><Download className="size-4" /> Export register</button><button type="button" className={primaryButton} onClick={() => { setFeedback(null); setShowGenerate(true); }}><PlayCircle className="size-4" /> Generate payroll draft</button></div>
@@ -190,7 +199,7 @@ export function PayrollManagementWorkspace() {
 
     {selectedDetail && <Modal title={`Payslips · ${monthName(selectedDetail.month, selectedDetail.year)}`} description="Review salary values and recorded deductions before approving payroll." onClose={() => setSelectedDetail(null)}>
       <div className="payroll-slips-print overflow-x-auto"><div className="mb-3 grid gap-2 sm:grid-cols-3"><Summary label="Employees" value={String(selectedDetail.payslips.length)} /><Summary label="Gross" value={money(selectedDetail.totalGross)} /><Summary label="Net" value={money(selectedDetail.totalNet)} /></div><table className="w-full min-w-[850px] text-left text-sm"><thead><tr className="border-b border-border text-xs text-muted-foreground"><th className="p-2">Employee</th><th className="p-2 text-right">Basic</th><th className="p-2 text-right">Employee SSNIT</th><th className="p-2 text-right">PAYE</th><th className="p-2 text-right">Employer SSNIT</th><th className="p-2 text-right">Net</th><th className="p-2">Status</th></tr></thead><tbody>{selectedDetail.payslips.map(slip => <tr key={slip.id} className="border-b border-border/70"><td className="p-2"><p className="font-medium text-foreground">{personName(slip)}</p><p className="text-[10px] text-muted-foreground">{slip.staff?.staffId ?? slip.teacher?.teacherId ?? ""}</p></td><td className="p-2 text-right tabular-nums">{money(slip.basicSalary)}</td><td className="p-2 text-right tabular-nums">{money(slip.ssnitEmployee)}</td><td className="p-2 text-right tabular-nums">{money(slip.incomeTax)}</td><td className="p-2 text-right tabular-nums">{money(slip.ssnitEmployer)}</td><td className="p-2 text-right font-semibold tabular-nums">{money(slip.netSalary)}</td><td className="p-2 text-xs">{slip.paymentStatus}</td></tr>)}</tbody></table><p className="mt-4 text-xs leading-5 text-muted-foreground">These are draft amounts from saved monthly salary data. Allowances, overtime and other deductions are not included in this version.</p></div>
-      <div className="mt-4 flex justify-end gap-2"><button type="button" className={secondaryButton} onClick={() => { const rows = [["Employee","Employee ID","Basic","Employee SSNIT","PAYE","Employer SSNIT","Net","Payment status"], ...selectedDetail.payslips.map(slip => [personName(slip),slip.staff?.staffId ?? slip.teacher?.teacherId ?? "",Number(slip.basicSalary).toFixed(2),Number(slip.ssnitEmployee).toFixed(2),Number(slip.incomeTax).toFixed(2),Number(slip.ssnitEmployer).toFixed(2),Number(slip.netSalary).toFixed(2),slip.paymentStatus])]; downloadCsv(rows,`payslips-${selectedDetail.year}-${selectedDetail.month}.csv"); }}><Download className="size-4" /> Export payslips</button><button type="button" className={primaryButton} onClick={() => window.print()}><Printer className="size-4" /> Print slips</button></div>
+      <div className="payroll-slips-actions mt-4 flex justify-end gap-2"><button type="button" className={secondaryButton} onClick={() => { const rows = [["Employee","Employee ID","Basic","Employee SSNIT","PAYE","Employer SSNIT","Net","Payment status"], ...selectedDetail.payslips.map(slip => [personName(slip),slip.staff?.staffId ?? slip.teacher?.teacherId ?? "",Number(slip.basicSalary).toFixed(2),Number(slip.ssnitEmployee).toFixed(2),Number(slip.incomeTax).toFixed(2),Number(slip.ssnitEmployer).toFixed(2),Number(slip.netSalary).toFixed(2),slip.paymentStatus])]; downloadCsv(rows,`payslips-${selectedDetail.year}-${selectedDetail.month}.csv"); }}><Download className="size-4" /> Export payslips</button><button type="button" className={primaryButton} onClick={() => window.print()}><Printer className="size-4" /> Print slips</button></div>
     </Modal>}
   </div>;
 }
