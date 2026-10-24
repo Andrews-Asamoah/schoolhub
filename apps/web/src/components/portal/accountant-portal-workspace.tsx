@@ -584,7 +584,7 @@ export function AccountantPortalWorkspace({
 
       {!loading && activeTab === "invoices" && (
         <section className="rounded-2xl border border-border bg-card p-5">
-          <SectionHeader title="Invoices & bills" description="Search bills, review balances, and generate billing for an active class." action={<button className={buttonPrimary} onClick={() => setShowBillForm(true)}><Plus className="size-4" /> Generate bills</button>} />
+          <SectionHeader title="Invoices & bills" description="Search bills, review balances, and generate billing for an active class." action={<button className={buttonPrimary} onClick={() => { setMessage(null); setSelectedFeeStructureId(""); setSelectedClassId(""); setShowBillForm(true); }}><Plus className="size-4" /> Generate bills</button>} />
           <SearchFilters search={search} setSearch={setSearch} statusFilter={statusFilter} setStatusFilter={setStatusFilter} statuses={["PENDING", "PARTIALLY_PAID", "PAID", "OVERDUE"]} />
           {billsQuery.error ? <QueryError message={billsQuery.error.message} /> : <BillsTable bills={filteredBills} onRecordPayment={(bill) => { setSelectedBillId(bill.id); setShowPaymentForm(true); }} />}
         </section>
@@ -592,7 +592,7 @@ export function AccountantPortalWorkspace({
 
       {!loading && activeTab === "payments" && (
         <section className="rounded-2xl border border-border bg-card p-5">
-          <SectionHeader title="Payments & receipts" description="Saved payment transactions from the school finance ledger." action={<button className={buttonPrimary} onClick={() => setShowPaymentForm(true)}><Plus className="size-4" /> Record payment</button>} />
+          <SectionHeader title="Payments & receipts" description="Saved payment transactions from the school finance ledger." action={<button className={buttonPrimary} onClick={() => { setMessage(null); setSelectedBillId(""); setShowPaymentForm(true); }}><Plus className="size-4" /> Record payment</button>} />
           <div className="relative my-4 max-w-md"><Search className="absolute left-3 top-3 size-4 text-muted-foreground" /><input className={cn(inputClass, "pl-9")} value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search receipt, student, or reference" /></div>
           {paymentsQuery.error ? <QueryError message={paymentsQuery.error.message} /> : <PaymentsTable payments={filteredPayments} />}
         </section>
@@ -610,7 +610,7 @@ export function AccountantPortalWorkspace({
 
       {!loading && activeTab === "expenses" && (
         <section className="rounded-2xl border border-border bg-card p-5">
-          <SectionHeader title="Operating expenses" description="Expense entries saved to the school database." action={<button className={buttonPrimary} onClick={() => setShowExpenseForm(true)}><Plus className="size-4" /> Add expense</button>} />
+          <SectionHeader title="Operating expenses" description="Expense entries saved to the school database." action={<button className={buttonPrimary} onClick={() => { setMessage(null); setShowExpenseForm(true); }}><Plus className="size-4" /> Add expense</button>} />
           {expensesQuery.error ? <QueryError message={expensesQuery.error.message} /> : <ExpensesTable expenses={expenses} />}
         </section>
       )}
