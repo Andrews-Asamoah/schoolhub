@@ -10,6 +10,7 @@ export interface AnnouncementItem {
   content: string;
   category: AnnouncementCategory;
   target: AnnouncementTarget | string;
+  targetClassIds: string[];
   status: AnnouncementStatus | string;
   isPinned: boolean;
   createdAt: string;
@@ -33,21 +34,26 @@ export const ANNOUNCEMENT_TARGET_OPTIONS: {
   label: string;
 }[] = [
   { value: "ALL_STUDENTS", label: "All Students" },
-  { value: "JHS_STUDENTS", label: "All JHS Students" },
+  { value: "SELECTED_CLASSES", label: "Students in Selected Classes" },
+  { value: "SELECTED_CLASS_GUARDIANS", label: "Parents / Guardians of Selected Classes" },
   { value: "SCHOOL_HOUSES", label: "All School Houses" },
   { value: "SCHOOL_COMMUNITY", label: "Entire School Community" },
   { value: "PARENTS_GUARDIANS", label: "All Parents & Guardians" },
   { value: "TEACHERS", label: "All Teachers" },
+  { value: "OUTSTANDING_FEE_GUARDIANS", label: "Parents / Guardians with Outstanding Fees" },
 ];
 
 const targetLabels: Record<string, string> = {
   ALL: "Entire School Community",
   ALL_STUDENTS: "All Students",
-  JHS_STUDENTS: "All JHS Students",
+  JHS_STUDENTS: "All JHS Students (legacy audience)",
+  SELECTED_CLASSES: "Students in Selected Classes",
+  SELECTED_CLASS_GUARDIANS: "Parents / Guardians of Selected Classes",
   SCHOOL_HOUSES: "All School Houses",
   SCHOOL_COMMUNITY: "Entire School Community",
   PARENTS_GUARDIANS: "All Parents & Guardians",
   TEACHERS: "All Teachers",
+  OUTSTANDING_FEE_GUARDIANS: "Parents / Guardians with Outstanding Fees",
 };
 
 export function announcementTargetLabel(target: string) {
