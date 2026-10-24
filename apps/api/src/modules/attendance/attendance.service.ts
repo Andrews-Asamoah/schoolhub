@@ -341,4 +341,36 @@ export class AttendanceService {
       );
     }
   }
+
+  async getGuardianWardAttendance(
+    schoolId: string,
+    userId: string,
+    studentId: string,
+    academicYearId?: string,
+    termId?: string,
+  ) {
+    const guardian = await this.prisma.client.guardian.findFirst({
+      where: { schoolId, deletedAt: null, isActive: true, profile: { userId } },
+      select: { id: true },
+    });
+    if (!guardian) throw new NotFoundException("Guardian record not found");
+    const link = await this.prisma.client.guardianStudent.findFirst({
+      where: { guardianId: guardian.id, studentId, student: { schoolId, deletedAt: null } },
+      select: { id: true },
+    });
+    if (!link) throw new NotFoundException("Student not found");
+
+    const summary = await this.getStudentAttendanceSummary(
+      schoolId, studentId, "guardian", academicYearId, termId,
+    );
+    const { term } = await this.resolveAcademicContext(schoolId, academicYearId, termId, "guardian");
+    const recentRecords = await this.prisma.client.attendance.findMany({
+      where: { studentId, date: { gte: term.startDate, lte: term.endDate }, student: { schoolId, deletedAt: null } },
+      orderBy: { date: "desc" },
+      take: 30,
+      select: { id: true, date: true, status: true, remarks: true },
+    });
+    return { ...summary, recentRecords };
+  }
+
 }
