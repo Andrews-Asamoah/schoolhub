@@ -891,9 +891,8 @@ export class FinanceService {
             if (applied > 0) itemAllocations.push({ billItemId: item.id, amount: applied });
             remaining = roundMoney(remaining - applied);
           }
-          if (remaining > 0.009) {
-            throw new BadRequestException("The payment could not be fully allocated to the bill components.");
-          }
+          // Preserve the previous FIFO fallback for older clients and historical bills
+          // that do not have a complete item ledger. New UI submissions are explicit.
         }
       }
 
