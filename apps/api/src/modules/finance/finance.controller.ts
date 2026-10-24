@@ -47,6 +47,7 @@ const feeItemRegistrySchema = z.object({
   description: z.string().trim().max(500).optional(),
 });
 const feeStructureStatusSchema = z.object({ isActive: z.boolean() });
+const expenditureCategorySchema = z.object({ name: z.string().trim().min(2, "Enter a category name").max(120), description: z.string().trim().max(500).optional() });
 
 @Controller("finance")
 @UseGuards(SchoolTenantGuard, RolesGuard)
@@ -120,8 +121,37 @@ export class FinanceController {
 
   @Get("expenses")
   @Roles("owner", "admin", "accountant")
-  listExpenses(@CurrentSchool() school: School) {
-    return this.financeService.listExpenses(school.id);
+  listExpenses(
+    @CurrentSchool() school: School,
+    @Query("from") fromDate?: string,
+    @Query("to") toDate?: string,
+  ) {
+    return this.financeService.listExpenses(school.id, fromDate, toDate);
+  }
+
+  @Get("expenditure-categories")
+  @Roles("owner", "admin", "accountant")
+  listExpenditureCategories(@CurrentSchool() school: School) {
+    return this.financeService.listExpenditureCategories(school.id);
+  }
+
+  @Post("expenditure-categories")
+  @Roles("owner", "admin", "accountant")
+  createExpenditureCategory(
+    @CurrentSchool() school: School,
+    @Body(new ZodValidationPipe(expenditureCategorySchema)) body: z.infer<typeof expenditureCategorySchema>,
+  ) {
+    return this.financeService.createExpenditureCategory(school.id, body);
+  }
+
+  @Patch("expenditure-categories/:categoryId")
+  @Roles("owner", "admin", "accountant")
+  updateExpenditureCategory(
+    @CurrentSchool() school: School,
+    @Param("categoryId") categoryId: string,
+    @Body(new ZodValidationPipe(expenditureCategorySchema)) body: z.infer<typeof expenditureCategorySchema>,
+  ) {
+    return this.financeService.updateExpenditureCategory(school.id, categoryId, body);
   }
 
   @Post("expenses")
