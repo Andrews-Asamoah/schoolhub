@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Bell, CheckCheck, LoaderCircle, RefreshCw } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api";
@@ -29,6 +29,27 @@ function formatNotificationDate(value: string) {
 /** A live, user-scoped notification inbox. Server-side ownership checks protect reads and updates. */
 export function DashboardNotificationsMenu() {
   const [open, setOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+
+    const handlePointerDown = (event: PointerEvent) => {
+      if (event.target instanceof Node && !menuRef.current?.contains(event.target)) {
+        setOpen(false);
+      }
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpen(false);
+    };
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [open]);
   const queryClient = useQueryClient();
   const query = useQuery({
     queryKey: ["notifications", announcementQueryRoleKey()],
@@ -50,7 +71,7 @@ export function DashboardNotificationsMenu() {
   const items = query.data?.items ?? [];
 
   return (
-    <div className="relative shrink-0">
+    <div ref={menuRef} className="relative shrink-0">
       <button
         type="button"
         aria-label={unreadCount ? "Notifications, " + unreadCount + " unread" : "Notifications"}
