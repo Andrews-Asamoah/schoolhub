@@ -353,6 +353,10 @@ export class StudentsService {
     input: CreateStudentInput,
     options: {
       role?: string;
+      /** Keep the number an existing student already has (importing), instead of generating one. */
+      admissionNumber?: string;
+      /** When an existing student joined (importing). Defaults to today. */
+      admissionDate?: string;
       /** Runs inside the same transaction (used by admissions to link the application). */
       afterCreate?: (
         tx: Prisma.TransactionClient,
@@ -441,32 +445,46 @@ export class StudentsService {
         )
       `;
 
-      const schoolPrefix =
-        schoolRow.code
-          .replace(/[^a-zA-Z0-9]/g, '')
-          .toUpperCase()
-          .slice(0, 8) || 'SCH';
-      const admissionPrefix = `${schoolPrefix}${String(admissionYear).slice(-2)}`;
-      const existingNumbers = await tx.student.findMany({
-        where: {
-          schoolId,
-          admissionNumber: { startsWith: admissionPrefix },
-        },
-        select: { admissionNumber: true },
-      });
-      const lastSequence = existingNumbers.reduce((max, student) => {
-        const sequencePart = student.admissionNumber?.slice(
-          admissionPrefix.length,
-        );
-        if (!sequencePart || !/^\d{4}$/.test(sequencePart)) return max;
-        return Math.max(max, Number(sequencePart));
-      }, 0);
-      if (lastSequence >= 9999) {
-        throw new ConflictException(
-          'This school has reached the 9,999 admission numbers available for the current two-digit year code.',
-        );
+      let admissionNumber: string;
+      if (options.admissionNumber) {
+        const taken = await tx.student.findFirst({
+          where: { schoolId, admissionNumber: options.admissionNumber },
+          select: { id: true },
+        });
+        if (taken) {
+          throw new ConflictException(
+            `Admission number ${options.admissionNumber} is already in use.`,
+          );
+        }
+        admissionNumber = options.admissionNumber;
+      } else {
+        const schoolPrefix =
+          schoolRow.code
+            .replace(/[^a-zA-Z0-9]/g, '')
+            .toUpperCase()
+            .slice(0, 8) || 'SCH';
+        const admissionPrefix = `${schoolPrefix}${String(admissionYear).slice(-2)}`;
+        const existingNumbers = await tx.student.findMany({
+          where: {
+            schoolId,
+            admissionNumber: { startsWith: admissionPrefix },
+          },
+          select: { admissionNumber: true },
+        });
+        const lastSequence = existingNumbers.reduce((max, student) => {
+          const sequencePart = student.admissionNumber?.slice(
+            admissionPrefix.length,
+          );
+          if (!sequencePart || !/^\d{4}$/.test(sequencePart)) return max;
+          return Math.max(max, Number(sequencePart));
+        }, 0);
+        if (lastSequence >= 9999) {
+          throw new ConflictException(
+            'This school has reached the 9,999 admission numbers available for the current two-digit year code.',
+          );
+        }
+        admissionNumber = `${admissionPrefix}${String(lastSequence + 1).padStart(4, '0')}`;
       }
-      const admissionNumber = `${admissionPrefix}${String(lastSequence + 1).padStart(4, '0')}`;
       const studentId = `ID-${randomUUID().replaceAll('-', '').slice(0, 10).toUpperCase()}`;
 
       // Student login: username = first initial + "." + surname
@@ -541,6 +559,7 @@ export class StudentsService {
           profileId: studentLogin.profileId!,
           studentId,
           admissionNumber,
+          ...(options.admissionDate ? { admissionDate: new Date(options.admissionDate) } : {}),
           username,
           departmentId: departmentId ?? null,
           classId: placement?.isCurrentPeriod ? placement.class.id : null,

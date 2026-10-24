@@ -32,7 +32,7 @@ export function exportFileName(title: string, extension: string) {
   return `${slug}-${new Date().toISOString().slice(0, 10)}.${extension}`;
 }
 
-function download(blob: Blob, fileName: string) {
+export function download(blob: Blob, fileName: string) {
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;

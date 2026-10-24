@@ -6,6 +6,7 @@ import {
   Check,
   LoaderCircle,
   Plus,
+  Upload,
   Search,
   SquarePen,
   Trash2,
@@ -28,6 +29,7 @@ import {
   type WorkspaceColumn,
 } from "@/components/school/workspace-ui";
 import { useSchoolRole } from "@/components/school/school-role-switcher";
+import { StudentImportWizard } from "@/components/school/student-import-wizard";
 import { apiFetch } from "@/lib/api";
 import {
   CredentialsDialog,
@@ -145,6 +147,8 @@ export function StudentDirectoryWorkspace() {
   const canManage = ["owner", "admin", "headteacher", "staff"].includes(
     activeRole ?? "",
   );
+  const canImport = ["owner", "admin", "headteacher"].includes(activeRole ?? "");
+  const [showImport, setShowImport] = useState(false);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
   const [classId, setClassId] = useState("");
@@ -381,17 +385,37 @@ export function StudentDirectoryWorkspace() {
             </div>
           </div>
           {canManage && (
-            <button
-              type="button"
-              onClick={openCreate}
-              className="inline-flex h-10 items-center gap-2 rounded-lg bg-primary px-4 text-xs font-semibold text-primary-foreground shadow-sm hover:opacity-90"
-            >
-              <Plus className="size-4" />
-              Add student
-            </button>
+            <div className="flex flex-wrap gap-2">
+              {canImport && (
+                <button
+                  type="button"
+                  onClick={() => setShowImport(true)}
+                  className="inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-card px-4 text-xs font-semibold text-foreground shadow-sm hover:bg-muted"
+                >
+                  <Upload className="size-4" />
+                  Import students
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={openCreate}
+                className="inline-flex h-10 items-center gap-2 rounded-lg bg-primary px-4 text-xs font-semibold text-primary-foreground shadow-sm hover:opacity-90"
+              >
+                <Plus className="size-4" />
+                Add student
+              </button>
+            </div>
           )}
         </div>
       </section>
+
+      {showImport && canImport && (
+        <StudentImportWizard
+          classNames={(classesQuery.data ?? []).map((item) => item.name)}
+          houseNames={(housesQuery.data ?? []).map((item) => item.name)}
+          onClose={() => setShowImport(false)}
+        />
+      )}
 
       {viewingId && <StudentProfileModal studentId={viewingId} onClose={() => setViewingId(null)} />}
 

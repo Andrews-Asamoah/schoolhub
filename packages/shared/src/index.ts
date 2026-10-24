@@ -1333,3 +1333,143 @@ export const updateAnnouncementStatusSchema = z.object({
   status: z.enum(ANNOUNCEMENT_STATUSES),
 });
 export type UpdateAnnouncementStatusInput = z.infer<typeof updateAnnouncementStatusSchema>;
+
+// ============================================================================
+// STUDENT IMPORT (bulk upload of existing students)
+// ============================================================================
+
+export const STUDENT_IMPORT_LIMITS = {
+  /** Most students in one file. */
+  maxRows: 1000,
+  /** Students sent to the server per request, so each request stays short and progress can be shown. */
+  batchSize: 25,
+  maxFileBytes: 2 * 1024 * 1024,
+} as const;
+
+export const STUDENT_IMPORT_FIELDS = [
+  "firstName",
+  "lastName",
+  "otherNames",
+  "gender",
+  "dateOfBirth",
+  "admissionNumber",
+  "admissionDate",
+  "className",
+  "houseName",
+  "nationality",
+  "residentialAddress",
+  "city",
+  "region",
+  "bloodGroup",
+  "allergies",
+  "medicalConditions",
+  "emergencyContactName",
+  "emergencyContactPhone",
+  "emergencyRelationship",
+  "g1FirstName",
+  "g1LastName",
+  "g1Relationship",
+  "g1Phone",
+  "g1Email",
+  "g2FirstName",
+  "g2LastName",
+  "g2Relationship",
+  "g2Phone",
+  "g2Email",
+] as const;
+export type StudentImportField = (typeof STUDENT_IMPORT_FIELDS)[number];
+
+export interface StudentImportColumn {
+  key: StudentImportField;
+  /** The heading used in the template. */
+  label: string;
+  required?: boolean;
+  /** Other headings people commonly use, written as lowercase letters and digits only. */
+  aliases: string[];
+  help: string;
+  example: string;
+}
+
+const guardianColumns = (n: 1 | 2): StudentImportColumn[] => {
+  const prefix = `g${n}` as "g1" | "g2";
+  const label = `Guardian ${n}`;
+  const alias = (suffix: string) => [`guardian${n}${suffix}`, `parent${n}${suffix}`, ...(n === 1 ? [`guardian${suffix}`, `parent${suffix}`] : [])];
+  return [
+    { key: `${prefix}FirstName` as StudentImportField, label: `${label} first name`, aliases: alias("firstname"), help: n === 1 ? "The main parent or guardian. Needs a phone number to be saved." : "Optional second guardian.", example: n === 1 ? "Kofi" : "Ama" },
+    { key: `${prefix}LastName` as StudentImportField, label: `${label} last name`, aliases: alias("lastname").concat(alias("surname")), help: "", example: "Mensah" },
+    { key: `${prefix}Relationship` as StudentImportField, label: `${label} relationship`, aliases: alias("relationship").concat(alias("relation")), help: "Father, Mother, Guardian, Grandmother, Relative...", example: n === 1 ? "Father" : "Mother" },
+    { key: `${prefix}Phone` as StudentImportField, label: `${label} phone`, aliases: alias("phone").concat(alias("contact"), alias("telephone")), help: "For example 0244123456 or +233244123456.", example: "0244123456" },
+    { key: `${prefix}Email` as StudentImportField, label: `${label} email`, aliases: alias("email"), help: "Optional. Needed only to create a parent-portal login.", example: "" },
+  ];
+};
+
+export const STUDENT_IMPORT_COLUMNS: StudentImportColumn[] = [
+  { key: "firstName", label: "First name", required: true, aliases: ["firstname", "givenname", "forename", "first"], help: "", example: "Akosua" },
+  { key: "lastName", label: "Last name", required: true, aliases: ["lastname", "surname", "familyname", "last"], help: "", example: "Mensah" },
+  { key: "otherNames", label: "Other names", aliases: ["othernames", "middlename", "middlenames", "othername"], help: "", example: "Serwaa" },
+  { key: "gender", label: "Gender", required: true, aliases: ["gender", "sex"], help: "Male or Female (M or F also works).", example: "Female" },
+  { key: "dateOfBirth", label: "Date of birth", required: true, aliases: ["dateofbirth", "dob", "birthdate", "birthday", "dateborn"], help: "Day first: 25/12/2012 or 25 Dec 2012. Year-first 2012-12-25 also works.", example: "25/12/2012" },
+  { key: "admissionNumber", label: "Admission number", aliases: ["admissionnumber", "admissionno", "admissionnum", "admno", "admission", "admissionid"], help: "The number the student already has. Leave blank to have one generated.", example: "" },
+  { key: "admissionDate", label: "Admission date", aliases: ["admissiondate", "dateadmitted", "dateofadmission", "enrolmentdate", "enrollmentdate"], help: "When the student joined the school. Leave blank for today.", example: "" },
+  { key: "className", label: "Class", aliases: ["class", "classname", "grade", "form", "level", "currentclass"], help: "Must match a class you have already created, such as JHS 1A.", example: "JHS 1A" },
+  { key: "houseName", label: "House", aliases: ["house", "housename"], help: "Must match an existing house. Optional.", example: "" },
+  { key: "nationality", label: "Nationality", aliases: ["nationality", "citizenship"], help: "Blank means Ghanaian.", example: "Ghanaian" },
+  { key: "residentialAddress", label: "Residential address", aliases: ["residentialaddress", "address", "homeaddress"], help: "", example: "12 Palm Street" },
+  { key: "city", label: "City", aliases: ["city", "town"], help: "", example: "Accra" },
+  { key: "region", label: "Region", aliases: ["region", "state", "province"], help: "", example: "Greater Accra" },
+  { key: "bloodGroup", label: "Blood group", aliases: ["bloodgroup", "bloodtype"], help: "", example: "O+" },
+  { key: "allergies", label: "Allergies", aliases: ["allergies", "allergy"], help: "", example: "" },
+  { key: "medicalConditions", label: "Medical conditions", aliases: ["medicalconditions", "medicalcondition", "medical", "healthconditions"], help: "", example: "" },
+  { key: "emergencyContactName", label: "Emergency contact name", aliases: ["emergencycontactname", "emergencycontact", "emergencyname"], help: "", example: "Kofi Mensah" },
+  { key: "emergencyContactPhone", label: "Emergency contact phone", aliases: ["emergencycontactphone", "emergencyphone", "emergencycontactnumber"], help: "", example: "0244123456" },
+  { key: "emergencyRelationship", label: "Emergency contact relationship", aliases: ["emergencycontactrelationship", "emergencyrelationship", "emergencyrelation"], help: "", example: "Father" },
+  ...guardianColumns(1),
+  ...guardianColumns(2),
+];
+
+const importText = (max: number) => z.string().trim().max(max).optional();
+const importIsoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use a date like 2012-12-25");
+
+export const importedGuardianSchema = z.object({
+  firstName: z.string().trim().min(1).max(100),
+  lastName: z.string().trim().min(1).max(100),
+  relationshipType: z.enum(["FATHER", "MOTHER", "GUARDIAN", "SIBLING", "GRANDFATHER", "GRANDMOTHER", "RELATIVE", "OTHER"]),
+  phone: z.string().trim().min(5).max(30),
+  email: z.email().optional(),
+});
+export type ImportedGuardian = z.infer<typeof importedGuardianSchema>;
+
+/** One student as cleaned up by the preview step. The import step accepts only this shape. */
+export const normalizedStudentRowSchema = z.object({
+  rowNumber: z.number().int().min(1).max(100000),
+  firstName: z.string().trim().min(1).max(100),
+  lastName: z.string().trim().min(1).max(100),
+  otherNames: importText(100),
+  gender: z.enum(["MALE", "FEMALE", "OTHER"]),
+  dateOfBirth: importIsoDate,
+  admissionNumber: z.string().trim().regex(/^[A-Za-z0-9][A-Za-z0-9/_.\- ]{0,29}$/, "Admission numbers use letters, digits and / _ . - only").optional(),
+  admissionDate: importIsoDate.optional(),
+  className: importText(60),
+  houseName: importText(60),
+  nationality: importText(60),
+  residentialAddress: importText(250),
+  city: importText(100),
+  region: importText(100),
+  bloodGroup: importText(10),
+  allergies: importText(300),
+  medicalConditions: importText(500),
+  emergencyContactName: importText(150),
+  emergencyContactPhone: importText(30),
+  emergencyRelationship: importText(100),
+  guardians: z.array(importedGuardianSchema).max(2).default([]),
+});
+export type NormalizedStudentRow = z.infer<typeof normalizedStudentRowSchema>;
+
+export const importStudentBatchSchema = z.object({
+  /** Ties the batches of one upload together in the audit trail. */
+  batchId: z.string().trim().min(8).max(64),
+  /** Create parent-portal logins for guardians who have an email address. */
+  createGuardianLogins: z.boolean().default(false),
+  rows: z.array(normalizedStudentRowSchema).min(1).max(STUDENT_IMPORT_LIMITS.batchSize),
+});
+export type ImportStudentBatchInput = z.infer<typeof importStudentBatchSchema>;
