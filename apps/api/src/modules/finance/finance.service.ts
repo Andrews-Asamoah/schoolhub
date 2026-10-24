@@ -6,7 +6,7 @@ import {
 } from "@nestjs/common";
 import { PrismaService } from "../../prisma/prisma.service.js";
 import type { CreateExpenseInput, GenerateBillInput, RecordPaymentInput } from "@schoolhub/shared";
-import { Prisma, type TransactionCategory } from "@prisma/client";
+import { Prisma, type AccountCategory, type AccountType, type PaymentMethod, type TransactionCategory } from "@prisma/client";
 import { canManageAcademicContext } from "../../common/academic-context.js";
 
 const PAYE_MONTHLY_BANDS_2026 = [
@@ -342,8 +342,8 @@ export class FinanceService {
     tx: Prisma.TransactionClient,
     schoolId: string,
     spec: {
-      accountType: "ASSET" | "REVENUE";
-      category: "CASH" | "OTHER_INCOME";
+      accountType: AccountType;
+      category: AccountCategory;
       name: string;
       code: string;
     },
@@ -441,6 +441,90 @@ export class FinanceService {
     });
     await tx.chartAccount.update({ where: { id: cash.id }, data: { balance: { increment: input.amount } } });
     await tx.chartAccount.update({ where: { id: revenue.id }, data: { balance: { increment: input.amount } } });
+    return transaction;
+  }
+  /**
+   * Post an expense using double-entry bookkeeping: debit the matching
+   * expense account and credit cash. The source expense and ledger entry
+   * are written inside the same database transaction.
+   */
+  async postExpense(
+    tx: Prisma.TransactionClient,
+    input: {
+      schoolId: string;
+      amount: Prisma.Decimal;
+      date: Date;
+      description: string;
+      category: TransactionCategory;
+      referenceType: string;
+      referenceId: string;
+      referenceNumber?: string;
+      notes?: string;
+    },
+  ) {
+    const accountByCategory: Record<string, { name: string; code: string; category: AccountCategory }> = {
+      SALARY: { name: "Salaries & Wages", code: "6000", category: "SALARY_WAGES" },
+      UTILITIES: { name: "Utilities", code: "6100", category: "UTILITIES" },
+      SUPPLIES: { name: "School Supplies", code: "6200", category: "SUPPLIES" },
+      MAINTENANCE: { name: "Repairs & Maintenance", code: "6300", category: "MAINTENANCE" },
+      TRANSPORT: { name: "Transport", code: "6400", category: "TRANSPORT" },
+      RENT: { name: "Rent", code: "6500", category: "RENT" },
+      INSURANCE: { name: "Insurance", code: "6600", category: "INSURANCE" },
+      TAXES: { name: "Taxes", code: "6700", category: "TAXES" },
+    };
+    const accountSpec = accountByCategory[input.category] ?? {
+      name: "Other Operating Expenses",
+      code: "6900",
+      category: "OTHER_EXPENSE" as AccountCategory,
+    };
+    const [cash, expenseAccount] = await Promise.all([
+      this.ensureAccount(tx, input.schoolId, {
+        accountType: "ASSET",
+        category: "CASH",
+        name: "Cash on Hand",
+        code: "1000",
+      }),
+      this.ensureAccount(tx, input.schoolId, {
+        accountType: "EXPENSE",
+        category: accountSpec.category,
+        name: accountSpec.name,
+        code: accountSpec.code,
+      }),
+    ]);
+
+    const prefix = "TXN-" + input.date.getUTCFullYear() + "-";
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${input.schoolId}), hashtext(${prefix}))`;
+    const last = await tx.transaction.findFirst({
+      where: { schoolId: input.schoolId, transactionNumber: { startsWith: prefix } },
+      orderBy: { transactionNumber: "desc" },
+      select: { transactionNumber: true },
+    });
+    const seq = last ? Number(last.transactionNumber.slice(prefix.length)) + 1 : 1;
+    const transaction = await tx.transaction.create({
+      data: {
+        schoolId: input.schoolId,
+        transactionNumber: prefix + String(seq).padStart(5, "0"),
+        transactionDate: input.date,
+        description: input.description,
+        amount: input.amount,
+        debitAccountId: expenseAccount.id,
+        creditAccountId: cash.id,
+        transactionType: "EXPENSE",
+        category: input.category,
+        referenceType: input.referenceType,
+        referenceId: input.referenceId,
+        referenceNumber: input.referenceNumber,
+        notes: input.notes,
+      },
+    });
+    await tx.chartAccount.update({
+      where: { id: expenseAccount.id },
+      data: { balance: { increment: input.amount } },
+    });
+    await tx.chartAccount.update({
+      where: { id: cash.id },
+      data: { balance: { decrement: input.amount } },
+    });
     return transaction;
   }
 
@@ -701,28 +785,41 @@ export class FinanceService {
     });
     const currentTerm = academicYear?.terms[0];
 
-    return this.prisma.client.expense.create({
-      data: {
+    return this.prisma.client.$transaction(async (tx) => {
+      const expense = await tx.expense.create({
+        data: {
+          schoolId,
+          date,
+          amount: new Prisma.Decimal(input.amount),
+          description: input.description,
+          payee: input.payee || null,
+          category: input.category,
+          paymentMethod: input.paymentMethod,
+          registryCategoryId: input.registryCategoryId || null,
+          checkNumber: input.checkNumber || null,
+          voucherNumber: input.voucherNumber || null,
+          referenceNumber: input.referenceNumber || null,
+          recordedById,
+          academicYearId: academicYear?.id ?? null,
+          termId: currentTerm?.id ?? null,
+        },
+        include: {
+          customCategory: { select: { name: true } },
+          registryCategory: { select: { id: true, name: true, description: true } },
+          recordedBy: { select: { name: true } },
+        },
+      });
+      await this.postExpense(tx, {
         schoolId,
-        date,
         amount: new Prisma.Decimal(input.amount),
+        date,
         description: input.description,
-        payee: input.payee || null,
         category: input.category,
-        paymentMethod: input.paymentMethod,
-        registryCategoryId: input.registryCategoryId || null,
-        checkNumber: input.checkNumber || null,
-        voucherNumber: input.voucherNumber || null,
-        referenceNumber: input.referenceNumber || null,
-        recordedById,
-        academicYearId: academicYear?.id ?? null,
-        termId: currentTerm?.id ?? null,
-      },
-      include: {
-        customCategory: { select: { name: true } },
-        registryCategory: { select: { id: true, name: true, description: true } },
-        recordedBy: { select: { name: true } },
-      },
+        referenceType: "EXPENSE",
+        referenceId: expense.id,
+        referenceNumber: input.voucherNumber || input.referenceNumber || undefined,
+      });
+      return expense;
     });
   }
 
@@ -873,7 +970,7 @@ export class FinanceService {
       return db.$transaction(async (tx) => {
         await tx.payslip.updateMany({
           where: { payrollRecordId: payroll.id, schoolId },
-          data: { paymentStatus: "COMPLETED", paymentMethod: paymentMethod as "CASH", paidAt: new Date() },
+          data: { paymentStatus: "COMPLETED", paymentMethod: paymentMethod as PaymentMethod, paidAt: new Date() },
         });
         return tx.payrollRecord.update({
           where: { id: payroll.id },
