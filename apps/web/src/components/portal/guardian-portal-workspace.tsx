@@ -6,7 +6,6 @@ import {
   BellRing,
   BookOpenCheck,
   CalendarDays,
-  CheckCircle2,
   ChevronRight,
   Clock3,
   GraduationCap,
@@ -101,7 +100,6 @@ export function GuardianPortalWorkspace({ defaultTab = "overview" }: { defaultTa
     .sort((a, b) => Number(b.isPinned) - Number(a.isPinned) || new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   const firstName = wards[0]?.profile.firstName;
   const greeting = firstName ? `Welcome to your family hub, ${firstName}'s family` : "Your family hub";
-  const schoolName = "your school";
 
   return (
     <div className="space-y-6">
