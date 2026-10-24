@@ -118,6 +118,26 @@ export function studentEmailDomain(
   return `st.${schoolSubdomain.trim().toLowerCase()}.${STUDENT_LOGIN_EMAIL_DOMAIN}`;
 }
 
+/**
+ * Domain part for guardian login emails. Unlike student addresses, guardian
+ * addresses use the school's own domain without the "st." prefix.
+ */
+export function guardianEmailDomain(
+  schoolEmail: string | null | undefined,
+  schoolSubdomain: string,
+): string {
+  const domain = schoolEmail?.split("@")[1]?.trim().toLowerCase();
+  if (
+    domain &&
+    /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/.test(domain) &&
+    !PUBLIC_EMAIL_DOMAINS.has(domain)
+  ) {
+    return domain;
+  }
+  return `${schoolSubdomain.trim().toLowerCase()}.${STUDENT_LOGIN_EMAIL_DOMAIN}`;
+}
+
+
 const toLetters = (value: string) =>
   value
     .normalize("NFD")

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { verifyPassword } from "better-auth/crypto";
-import { changePasswordSchema, passwordSchema, studentLoginEmail } from "@schoolhub/shared";
-import { CredentialsService, DEFAULT_PASSWORDS } from "./credentials.service.js";
+import { changePasswordSchema, guardianEmailDomain, passwordSchema, studentLoginEmail } from "@schoolhub/shared";
+import { CredentialsService, DEFAULT_PASSWORDS, newGuardianLoginEmail } from "./credentials.service.js";
 import { roleForStaffType } from "./staff-roles.js";
 
 describe("default passwords", () => {
@@ -49,6 +49,20 @@ describe("login identifiers and roles", () => {
       "abc260001@students.abc-school.schoolhub.gh",
     );
   });
+  it("generates a readable guardian sign-in email on the school's own domain", () => {
+    expect(newGuardianLoginEmail("Ama Mensah", "hdm.edu.gh")).toMatch(
+      /^amensah-g\d{4}@hdm\.edu\.gh$/,
+    );
+  });
+  it("uses the school's own email domain for guardian logins", () => {
+    expect(guardianEmailDomain("info@hdm.edu.gh", "hdm")).toBe("hdm.edu.gh");
+  });
+  it("falls back to the school's SchoolHub domain for public email providers", () => {
+    expect(guardianEmailDomain("info@gmail.com", "heavens-dew")).toBe(
+      "heavens-dew.schoolhub.gh",
+    );
+  });
+
   it("maps staff types to school roles", () => {
     expect(roleForStaffType("ACCOUNTANT")).toBe("accountant");
     expect(roleForStaffType("HEADTEACHER")).toBe("headteacher");
