@@ -1,5 +1,4 @@
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
 import { Home, RefreshCw, Sparkles, Trophy, Users } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -37,8 +36,6 @@ interface House {
 interface StudentProfile {
   house?: { id: string; name: string } | null;
 }
-type Tab = "HOUSE" | "CLUBS";
-
 function teacherName(teacher?: TeacherSummary | null) {
   const first = teacher?.profile?.firstName ?? teacher?.firstName ?? "";
   const last = teacher?.profile?.lastName ?? teacher?.lastName ?? "";
@@ -60,28 +57,30 @@ function RetryMessage({ message, onRetry, isFetching }: {
   );
 }
 
-export function StudentHouseClubsView({ defaultTab = "CLUBS" }: { defaultTab?: Tab }) {
-  const [activeTab, setActiveTab] = useState<Tab>(defaultTab);
-  useEffect(() => setActiveTab(defaultTab), [defaultTab]);
+export function StudentHouseClubsView({ view }: { view: "HOUSE" | "CLUBS" }) {
 
   const profileQuery = useQuery({
     queryKey: ["students", "me"],
     queryFn: () => apiFetch<StudentProfile>("/students/me"),
+    enabled: view === "HOUSE",
     retry: false,
   });
   const housesQuery = useQuery({
     queryKey: ["academics", "houses"],
     queryFn: () => apiFetch<House[]>("/academics/houses"),
+    enabled: view === "HOUSE",
     retry: false,
   });
   const myClubsQuery = useQuery({
     queryKey: ["students", "me", "clubs"],
     queryFn: () => apiFetch<ClubMembership[]>("/students/me/clubs"),
+    enabled: view === "CLUBS",
     retry: false,
   });
   const allClubsQuery = useQuery({
     queryKey: ["academics", "clubs"],
     queryFn: () => apiFetch<Club[]>("/academics/clubs"),
+    enabled: view === "CLUBS",
     retry: false,
   });
 
@@ -95,27 +94,18 @@ export function StudentHouseClubsView({ defaultTab = "CLUBS" }: { defaultTab?: T
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-        <div>
-          <h2 className="text-xl font-black text-slate-900 dark:text-white">House & Clubs</h2>
-          <p className="text-xs text-slate-500">Your house assignment and school clubs, using current school records</p>
-        </div>
-        <div className="inline-flex w-fit items-center rounded-xl border border-slate-200 bg-white p-1 text-xs dark:border-slate-800 dark:bg-slate-900">
-          <button type="button" onClick={() => setActiveTab("CLUBS")}
-            className={cn("flex items-center gap-1.5 rounded-lg px-3.5 py-2 font-bold transition",
-              activeTab === "CLUBS" ? "bg-indigo-600 text-white shadow-xs" : "text-slate-600 hover:text-slate-900 dark:text-slate-300")}>
-            <Sparkles className="size-3.5" /> Clubs Joined
-            {!myClubsQuery.isLoading && !myClubsQuery.isError && <span>({myClubsQuery.data?.length ?? 0})</span>}
-          </button>
-          <button type="button" onClick={() => setActiveTab("HOUSE")}
-            className={cn("flex items-center gap-1.5 rounded-lg px-3.5 py-2 font-bold transition",
-              activeTab === "HOUSE" ? "bg-indigo-600 text-white shadow-xs" : "text-slate-600 hover:text-slate-900 dark:text-slate-300")}>
-            <Trophy className="size-3.5" /> My House
-          </button>
-        </div>
+      <div>
+        <h2 className="text-xl font-black text-slate-900 dark:text-white">
+          {view === "HOUSE" ? "My House" : "Clubs & Societies"}
+        </h2>
+        <p className="text-xs text-slate-500">
+          {view === "HOUSE"
+            ? "View your assigned house and the active houses in your school."
+            : "View your club memberships and other clubs available at your school."}
+        </p>
       </div>
 
-      {activeTab === "CLUBS" ? (
+      {view === "CLUBS" ? (
         <div className="space-y-7">
           <section>
             <div className="flex items-center justify-between gap-3 pb-3">
