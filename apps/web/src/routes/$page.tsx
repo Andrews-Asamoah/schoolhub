@@ -42,6 +42,7 @@ import { HousesWorkspace } from "@/components/school/houses-workspace";
 import { ClubsWorkspace } from "@/components/school/clubs-workspace";
 import { TeacherPortalWorkspace } from "@/components/portal/teacher-portal-workspace";
 import { AccountantPortalWorkspace } from "@/components/portal/accountant-portal-workspace";
+import { FeeStructuresWorkspace } from "@/components/portal/fee-structures-workspace";
 import { GuardianPortalWorkspace } from "@/components/portal/guardian-portal-workspace";
 import { GuardianChildRecordsWorkspace } from "@/components/portal/guardian-child-records-workspace";
 import { GuardianFeesWorkspace } from "@/components/portal/guardian-fees-workspace";
@@ -94,16 +95,6 @@ interface AcademicYear {
     endDate: string;
     isCurrent: boolean;
   }[];
-}
-
-interface FeeStructure {
-  id: string;
-  name: string;
-  description?: string | null;
-  classLevel?: string | null;
-  termBased: boolean;
-  items: { id: string; name: string; amount: number | string }[];
-  targetClasses: { class: { id: string; name: string } }[];
 }
 
 interface School {
@@ -197,12 +188,6 @@ function WorkspaceContent({ pageId }: { pageId: string }) {
     queryKey: ["schools", "academic-years"],
     queryFn: () => apiFetch<AcademicYear[]>("/schools/academic-years"),
     enabled: isSignedIn && ["academic-years", "enrollments"].includes(pageId),
-    retry: false,
-  });
-  const feesQuery = useQuery({
-    queryKey: ["finance", "fee-structures"],
-    queryFn: () => apiFetch<FeeStructure[]>("/finance/fee-structures"),
-    enabled: isSignedIn && pageId === "fees",
     retry: false,
   });
   const schoolQuery = useQuery({
@@ -312,7 +297,7 @@ function WorkspaceContent({ pageId }: { pageId: string }) {
                 description="Detailed billing schedules and payment invoices are accessible to your parent or guardian on their guardian portal."
               />
             ) : (
-              <FeeStructureList query={feesQuery} />
+              <FeeStructuresWorkspace />
             )
           )}
           {pageId === "payments" && <AccountantPortalWorkspace defaultTab="payments" />}
@@ -337,57 +322,6 @@ function AcademicYears({
   if (query.isPending) return <LoadingState label="Loading academic years" />;
   if (query.error) return <QueryError error={query.error} />;
   return <AcademicYearSetup years={query.data ?? []} />;
-}
-
-function FeeStructureList({
-  query,
-}: {
-  query: UseQueryResult<FeeStructure[], Error>;
-}) {
-  if (query.isPending) return <LoadingState label="Loading fee structures" />;
-  if (query.error) return <QueryError error={query.error} />;
-  const columns: WorkspaceColumn<FeeStructure>[] = [
-    {
-      id: "name",
-      header: "Fee structure",
-      cell: (fee) => (
-        <span className="font-semibold text-foreground">{fee.name}</span>
-      ),
-    },
-    {
-      id: "class",
-      header: "Applies to",
-      cell: (fee) =>
-        fee.targetClasses.length > 0
-          ? fee.targetClasses
-              .map(({ class: schoolClass }) => schoolClass.name)
-              .join(", ")
-          : (fee.classLevel ?? "All classes"),
-    },
-    { id: "items", header: "Fee items", value: (fee) => fee.items.length, cell: (fee) => fee.items.length },
-    {
-      id: "total",
-      header: "Structure total (GHS)",
-      value: (fee) => fee.items.reduce((total, item) => total + Number(item.amount), 0),
-      cell: (fee) =>
-        new Intl.NumberFormat("en-GH", {
-          style: "currency",
-          currency: "GHS",
-        }).format(
-          fee.items.reduce((total, item) => total + Number(item.amount), 0),
-        ),
-    },
-  ];
-  return (
-    <WorkspaceDataTable
-      rows={query.data ?? []}
-      columns={columns}
-      getRowId={(fee) => fee.id}
-      exportTitle="Fee structures"
-      emptyTitle="No active fee structures"
-      emptyDescription="Add an active fee structure before generating student bills."
-    />
-  );
 }
 
 function AttendanceWorkspace({
