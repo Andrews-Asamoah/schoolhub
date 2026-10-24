@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { Activity, UsersRound, WalletCards } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -20,9 +20,9 @@ interface InfographicCardProps {
   title: string;
   description: string;
   icon: typeof Activity;
-  children: React.ReactNode;
+  children: ReactNode;
   className?: string;
-  aside?: React.ReactNode;
+  aside?: ReactNode;
 }
 
 const attendanceSeries: Record<AttendancePeriod, ChartDatum[]> = {
