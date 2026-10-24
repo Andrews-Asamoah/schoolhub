@@ -214,6 +214,7 @@ export function AccountantPortalWorkspace({
   const [showExpenseForm, setShowExpenseForm] = useState(false);
   const [showInventoryForm, setShowInventoryForm] = useState(false);
   const [stockItemId, setStockItemId] = useState("");
+  const [selectedPayrollId, setSelectedPayrollId] = useState("");
   const [message, setMessage] = useState<{ kind: "success" | "error"; text: string } | null>(null);
 
   const billsQuery = useQuery({
@@ -249,6 +250,7 @@ export function AccountantPortalWorkspace({
   const inventoryQuery = useQuery({
     queryKey: ["inventory", "items"],
     queryFn: () => apiFetch<ApiInventoryItem[]>("/inventory/items"),
+    enabled: activeTab === "inventory",
     retry: false,
   });
   const payrollQuery = useQuery({
@@ -265,6 +267,7 @@ export function AccountantPortalWorkspace({
   const feeStructures = feeStructuresQuery.data ?? [];
   const classes = (classesQuery.data ?? []).filter((schoolClass) => schoolClass.isActive);
   const payroll = payrollQuery.data ?? [];
+  const selectedPayroll = payroll.find((run) => run.id === selectedPayrollId);
   const inventoryItems = inventoryQuery.data ?? [];
 
   const filteredBills = useMemo(() => bills.filter((bill) => {
@@ -615,8 +618,8 @@ export function AccountantPortalWorkspace({
           {payrollQuery.error ? <QueryError message={payrollQuery.error.message} /> : payroll.length ? (
             <div className="mt-4 overflow-x-auto">
               <table className="w-full min-w-[720px] text-left text-sm">
-                <thead><tr className="border-b border-border text-xs text-muted-foreground"><th className="p-3">Payroll period</th><th className="p-3">Status</th><th className="p-3 text-right">Gross</th><th className="p-3 text-right">Tax</th><th className="p-3 text-right">Net</th><th className="p-3 text-right">Payslips</th></tr></thead>
-                <tbody>{payroll.map((run) => <tr key={run.id} className="border-b border-border/70 last:border-0"><td className="p-3 font-medium">{new Date(run.year, run.month - 1, 1).toLocaleDateString("en-GH", { month: "long", year: "numeric" })}</td><td className="p-3"><StatusBadge value={run.status} /></td><td className="p-3 text-right tabular-nums">{currency(run.totalGross)}</td><td className="p-3 text-right tabular-nums">{currency(run.totalTax)}</td><td className="p-3 text-right tabular-nums">{currency(run.totalNet)}</td><td className="p-3 text-right">{run.payslips.length}</td></tr>)}</tbody>
+                <thead><tr className="border-b border-border text-xs text-muted-foreground"><th className="p-3">Payroll period</th><th className="p-3">Status</th><th className="p-3 text-right">Gross</th><th className="p-3 text-right">Tax</th><th className="p-3 text-right">Net</th><th className="p-3 text-right">Payslips</th><th className="p-3"></th></tr></thead>
+                <tbody>{payroll.map((run) => <tr key={run.id} className="border-b border-border/70 last:border-0"><td className="p-3 font-medium">{new Date(run.year, run.month - 1, 1).toLocaleDateString("en-GH", { month: "long", year: "numeric" })}</td><td className="p-3"><StatusBadge value={run.status} /></td><td className="p-3 text-right tabular-nums">{currency(run.totalGross)}</td><td className="p-3 text-right tabular-nums">{currency(run.totalTax)}</td><td className="p-3 text-right tabular-nums">{currency(run.totalNet)}</td><td className="p-3 text-right">{run.payslips.length}</td><td className="p-3 text-right"><button className="text-xs font-semibold text-primary hover:underline" onClick={() => setSelectedPayrollId(run.id)}>View payslips</button></td></tr>)}</tbody>
               </table>
             </div>
           ) : <EmptyState icon={Wallet} title="No payroll runs yet" description="Payroll becomes available here when an authorised payroll process creates a saved payroll run." />}
@@ -698,6 +701,24 @@ export function AccountantPortalWorkspace({
             <p className="text-xs leading-5 text-muted-foreground">The operation is performed by the server using the selected class roster and current term. Review the count and total in the confirmation message after generation.</p>
             <ModalActions onCancel={() => setShowBillForm(false)} busy={generateBills.isPending} submitLabel="Generate bills" />
           </form>
+        </Modal>
+      )}
+
+      {selectedPayroll && (
+        <Modal
+          title={`Payslips · ${new Date(selectedPayroll.year, selectedPayroll.month - 1, 1).toLocaleDateString("en-GH", { month: "long", year: "numeric" })}`}
+          description="Review the saved salary components and payment status for this payroll run."
+          onClose={() => setSelectedPayrollId("")}
+        >
+          {selectedPayroll.payslips.length ? (
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[620px] text-left text-sm">
+                <thead><tr className="border-b border-border text-xs text-muted-foreground"><th className="p-3">Staff reference</th><th className="p-3 text-right">Basic</th><th className="p-3 text-right">Allowances</th><th className="p-3 text-right">Gross</th><th className="p-3 text-right">Net</th><th className="p-3">Payment</th></tr></thead>
+                <tbody>{selectedPayroll.payslips.map((slip) => <tr key={slip.id} className="border-b border-border/70 last:border-0"><td className="p-3">{slip.staffId ? `Staff · ${slip.staffId}` : slip.teacherId ? `Teacher · ${slip.teacherId}` : "Staff not linked"}</td><td className="p-3 text-right tabular-nums">{currency(slip.basicSalary)}</td><td className="p-3 text-right tabular-nums">{currency(slip.allowances)}</td><td className="p-3 text-right tabular-nums">{currency(slip.grossSalary)}</td><td className="p-3 text-right font-semibold tabular-nums">{currency(slip.netSalary)}</td><td className="p-3"><StatusBadge value={slip.paymentStatus} /></td></tr>)}</tbody>
+              </table>
+            </div>
+          ) : <EmptyState icon={Wallet} title="No payslips in this run" description="This payroll record does not contain saved payslips." />}
+          <div className="mt-5 flex justify-end"><button type="button" className={buttonSecondary} onClick={() => setSelectedPayrollId("")}>Close</button></div>
         </Modal>
       )}
 
