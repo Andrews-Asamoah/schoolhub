@@ -614,7 +614,7 @@ export type SaveAssessmentEntryInput = z.infer<typeof saveAssessmentEntrySchema>
 export const recordPaymentSchema = z.object({
   studentId: z.string().min(1, "Student ID is required"),
   billId: z.string().optional(),
-  amount: z.number().positive("Amount must be greater than zero"),
+  amount: z.number().finite().positive("Amount must be greater than zero"),
   paymentMethod: z.enum([
     "CASH",
     "BANK_TRANSFER",
@@ -627,6 +627,11 @@ export const recordPaymentSchema = z.object({
   paymentDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Format: YYYY-MM-DD"),
   referenceNumber: z.string().optional(),
   notes: z.string().optional(),
+  /** Explicit per-fee-component allocation. Older clients retain the API's FIFO fallback. */
+  allocations: z.array(z.object({
+    billItemId: z.string().min(1),
+    amount: z.number().finite().positive("Each allocation must be greater than zero"),
+  })).min(1).optional(),
 });
 export type RecordPaymentInput = z.infer<typeof recordPaymentSchema>;
 

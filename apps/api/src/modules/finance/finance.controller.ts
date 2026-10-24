@@ -216,8 +216,17 @@ export class FinanceController {
 
   @Get("bills")
   @Roles("owner", "admin", "accountant")
-  listBills(@CurrentSchool() school: School) {
-    return this.financeService.listBills(school.id);
+  listBills(
+    @CurrentSchool() school: School,
+    @Query("studentId") studentId?: string,
+  ) {
+    return this.financeService.listBills(school.id, studentId);
+  }
+
+  @Get("students/outstanding")
+  @Roles("owner", "admin", "accountant")
+  listOutstandingStudents(@CurrentSchool() school: School) {
+    return this.financeService.listOutstandingStudents(school.id);
   }
 
   @Get("payments")
