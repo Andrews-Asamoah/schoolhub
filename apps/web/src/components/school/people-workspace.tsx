@@ -169,6 +169,7 @@ interface Row {
   department: string;
   relatedStudents: string;
   isActive: boolean;
+  hasLogin?: boolean;
 }
 
 const inputClasses =
@@ -530,7 +531,7 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
                   }}
                   className="rounded-md px-2 py-1.5 text-xs font-semibold text-primary hover:bg-primary/10 disabled:opacity-50"
                 >
-                  Reset login
+                  {isGuardianPage && !row.hasLogin ? "Create login" : "Reset login"}
                 </button>
                 <button
                   type="button"
@@ -1290,6 +1291,7 @@ function toRow(person: Teacher | Staff | Guardian): Row {
       )
       .join(", "),
     isActive: guardian.isActive,
+    hasLogin: guardian.canLogin ?? Boolean(guardian.profile?.user.email),
   };
 }
 
