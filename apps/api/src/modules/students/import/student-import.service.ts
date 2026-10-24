@@ -225,7 +225,7 @@ export class StudentImportService {
         email: guardian.email ?? "",
         relationshipType: guardian.relationshipType,
         isPrimary: index === 0,
-        createLogin: createGuardianLogins && !!guardian.email,
+        createLogin: createGuardianLogins,
       })),
     };
   }
