@@ -80,10 +80,76 @@ const feeReminderInstallmentSchema = z.object({
 
 
 
+const siblingPolicySchema = z.object({
+  name: z.string().trim().min(2).max(120),
+  minimumWardCount: z.number().int().min(2).max(30),
+  valueType: z.enum(["PERCENTAGE", "FIXED"]),
+  value: z.number().finite().positive().max(100000000),
+});
+const scholarshipSchema = z.object({
+  studentId: z.string().min(1),
+  name: z.string().trim().min(2).max(120),
+  valueType: z.enum(["PERCENTAGE", "FIXED"]),
+  value: z.number().finite().positive().max(100000000),
+  reason: z.string().trim().max(500).optional(),
+  academicYearId: z.string().min(1).optional(),
+  termId: z.string().min(1).optional(),
+  startDate: z.string().regex(/^\\d{4}-\\d{2}-\\d{2}$/).optional(),
+  endDate: z.string().regex(/^\\d{4}-\\d{2}-\\d{2}$/).optional(),
+});
+const concessionStatusSchema = z.object({ isActive: z.boolean() });
+
 @Controller("finance")
 @UseGuards(SchoolTenantGuard, RolesGuard)
 export class FinanceController {
   constructor(private readonly financeService: FinanceService) {}
+
+
+  @Get("concessions")
+  @Roles("owner", "admin", "accountant", "headteacher")
+  listConcessions(@CurrentSchool() school: School) {
+    return this.financeService.listConcessions(school.id);
+  }
+
+  @Post("sibling-discount-policies")
+  @Roles("owner", "admin", "accountant", "headteacher")
+  createSiblingDiscountPolicy(
+    @CurrentSchool() school: School,
+    @CurrentUser() user: AuthenticatedUser,
+    @Body(new ZodValidationPipe(siblingPolicySchema)) body: z.infer<typeof siblingPolicySchema>,
+  ) {
+    return this.financeService.createSiblingDiscountPolicy(school.id, user.id, body);
+  }
+
+  @Patch("sibling-discount-policies/:policyId")
+  @Roles("owner", "admin", "accountant", "headteacher")
+  setSiblingDiscountPolicyActive(
+    @CurrentSchool() school: School,
+    @Param("policyId") policyId: string,
+    @Body(new ZodValidationPipe(concessionStatusSchema)) body: z.infer<typeof concessionStatusSchema>,
+  ) {
+    return this.financeService.setSiblingDiscountPolicyActive(school.id, policyId, body.isActive);
+  }
+
+  @Post("scholarships")
+  @Roles("owner", "admin", "accountant", "headteacher")
+  createStudentScholarship(
+    @CurrentSchool() school: School,
+    @CurrentUser() user: AuthenticatedUser,
+    @Body(new ZodValidationPipe(scholarshipSchema)) body: z.infer<typeof scholarshipSchema>,
+  ) {
+    return this.financeService.createStudentScholarship(school.id, user.id, body);
+  }
+
+  @Patch("scholarships/:scholarshipId")
+  @Roles("owner", "admin", "accountant", "headteacher")
+  setStudentScholarshipActive(
+    @CurrentSchool() school: School,
+    @Param("scholarshipId") scholarshipId: string,
+    @Body(new ZodValidationPipe(concessionStatusSchema)) body: z.infer<typeof concessionStatusSchema>,
+  ) {
+    return this.financeService.setStudentScholarshipActive(school.id, scholarshipId, body.isActive);
+  }
 
   @Get("fee-structures")
   @Roles("owner", "admin", "accountant")
