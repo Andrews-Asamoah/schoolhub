@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 import {
   AlertCircle,
@@ -160,12 +161,12 @@ export function GuardianPortalWorkspace({ defaultTab = "overview", showSectionNa
                 return <article key={ward.id} className="flex flex-col gap-4 rounded-2xl border border-border bg-background/60 p-4 transition hover:border-primary/30 sm:flex-row sm:items-center">
                   <Initials name={name} />
                   <div className="min-w-0 flex-1"><h3 className="font-semibold text-foreground">{name}</h3><p className="mt-1 text-xs text-muted-foreground">{ward.class?.name ?? "Class not assigned"}{ward.admissionNumber ? ` · Admission no. ${ward.admissionNumber}` : ""}</p><div className="mt-2 flex flex-wrap gap-2">{ward.house?.name && <span className="rounded-full bg-primary/10 px-2.5 py-1 text-[11px] font-medium text-primary">{ward.house.name}</span>}<span className="rounded-full bg-muted px-2.5 py-1 text-[11px] font-medium text-muted-foreground">{ward.subjects.length} subjects</span></div></div>
-                  <button type="button" onClick={() => setActiveTab("academics")} className="inline-flex h-9 items-center justify-center gap-2 self-start rounded-lg border border-border px-3 text-xs font-semibold text-foreground transition hover:bg-accent sm:self-center">View reports <ChevronRight className="size-3.5" /></button>
+                  <Link to="/$page" params={{ page: "guardian-reports" }} className="inline-flex h-9 items-center justify-center gap-2 self-start rounded-lg border border-border px-3 text-xs font-semibold text-foreground transition hover:bg-accent sm:self-center">View reports <ChevronRight className="size-3.5" /></Link>
                 </article>;
               })}</div>}
           </section>
           <section className="rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-6">
-            <div className="flex items-center justify-between gap-3"><div><p className="text-xs font-bold uppercase tracking-[0.15em] text-primary">Stay connected</p><h2 className="mt-1 text-lg font-bold text-foreground">Latest school notices</h2></div><button type="button" onClick={() => setActiveTab("notices")} className="text-xs font-semibold text-primary hover:underline">See all</button></div>
+            <div className="flex items-center justify-between gap-3"><div><p className="text-xs font-bold uppercase tracking-[0.15em] text-primary">Stay connected</p><h2 className="mt-1 text-lg font-bold text-foreground">Latest school notices</h2></div><Link to="/$page" params={{ page: "guardian-notices" }} className="text-xs font-semibold text-primary hover:underline">See all</Link></div>
             {announcementsQuery.isPending ? <div className="flex items-center gap-2 py-8 text-sm text-muted-foreground"><LoaderCircle className="size-4 animate-spin" /> Loading notices…</div> :
               announcementsQuery.isError ? <p className="py-8 text-sm text-muted-foreground">School notices could not be loaded right now.</p> :
               announcements.slice(0, 4).length === 0 ? <p className="py-8 text-sm text-muted-foreground">No current notices have been published for your account.</p> :
