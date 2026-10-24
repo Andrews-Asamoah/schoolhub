@@ -18,10 +18,8 @@ import {
   ScheduleCard,
   SchoolYearCard,
 } from "@/components/school/dashboard/dashboard-activity";
-import {
-  AttendanceOverviewCard,
-  MetricCard,
-} from "@/components/school/dashboard/dashboard-metrics";
+import { MetricCard } from "@/components/school/dashboard/dashboard-metrics";
+import { DashboardInfographics } from "@/components/school/dashboard/dashboard-infographics";
 import { apiFetch } from "@/lib/api";
 import {
   schoolRoleLabel,
@@ -173,6 +171,7 @@ export function DashboardContent({
             </Link>
           ))}
         </section>
+        {activeRole === "accountant" && <DashboardInfographics />}
       </main>
     );
   }
@@ -284,12 +283,10 @@ export function DashboardContent({
         ))}
       </section>
 
-      <section className="mt-5 grid gap-5 xl:grid-cols-[minmax(0,1.55fr)_minmax(320px,0.85fr)]">
-        <AttendanceOverviewCard />
-        <ScheduleCard />
-      </section>
+      <DashboardInfographics />
 
-      <section className="mt-5 grid gap-5 xl:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)]">
+      <section className="mt-5 grid gap-5 xl:grid-cols-3">
+        <ScheduleCard />
         <RecentActivityCard />
         <SchoolYearCard academicYear={activeYear} />
       </section>

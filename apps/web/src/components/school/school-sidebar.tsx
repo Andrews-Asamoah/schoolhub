@@ -74,7 +74,7 @@ export function SchoolSidebar({
               <span className="sidebar-expanded flex-1">Overview</span>
             </Link>
           </SidebarMenuButton>
-          {ownPortal && ownPortal.id !== "student-portal" && (
+          {ownPortal && ownPortal.id !== "student-portal" && ownPortal.id !== "accountant-portal" && (
             <SidebarMenuButton
               asChild
               active={activePage === ownPortal.id}
