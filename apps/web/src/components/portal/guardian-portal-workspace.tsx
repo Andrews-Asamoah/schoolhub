@@ -100,29 +100,31 @@ export function GuardianPortalWorkspace({ defaultTab = "overview", showSectionNa
 
   return (
     <div className="mx-auto w-full min-w-0 max-w-screen-2xl space-y-6">
-      <section className="relative isolate overflow-hidden rounded-[1.75rem] border border-primary/20 bg-gradient-to-br from-primary/15 via-card to-card p-5 shadow-sm sm:p-8">
-        <div aria-hidden="true" className="pointer-events-none absolute -right-16 -top-20 -z-10 size-64 rounded-full bg-primary/10 blur-3xl" />
-        <div aria-hidden="true" className="pointer-events-none absolute -bottom-24 left-1/3 -z-10 size-56 rounded-full bg-primary/10 blur-3xl" />
-        <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-          <div className="max-w-2xl">
-            <span className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-background/70 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.15em] text-primary">
-              <Sparkles className="size-3.5" /> SchoolHub · Family centre
-            </span>
-            <h1 className="mt-4 text-2xl font-bold tracking-tight text-foreground sm:text-3xl">{greeting}</h1>
-            <p className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground">
-              One trusted place to follow your children's school journey, read published reports and stay informed about school updates.
-            </p>
+      {activeTab === "overview" && (
+        <section className="relative isolate overflow-hidden rounded-[1.75rem] border border-primary/20 bg-gradient-to-br from-primary/15 via-card to-card p-5 shadow-sm sm:p-8">
+          <div aria-hidden="true" className="pointer-events-none absolute -right-16 -top-20 -z-10 size-64 rounded-full bg-primary/10 blur-3xl" />
+          <div aria-hidden="true" className="pointer-events-none absolute -bottom-24 left-1/3 -z-10 size-56 rounded-full bg-primary/10 blur-3xl" />
+          <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+            <div className="max-w-2xl">
+              <span className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-background/70 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.15em] text-primary">
+                <Sparkles className="size-3.5" /> SchoolHub · Family centre
+              </span>
+              <h1 className="mt-4 text-2xl font-bold tracking-tight text-foreground sm:text-3xl">{greeting}</h1>
+              <p className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground">
+                One trusted place to follow your children's school journey, read published reports and stay informed about school updates.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Link to="/$page" params={{ page: "guardian-reports" }} className="inline-flex h-10 items-center gap-2 rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-sm transition hover:opacity-90">
+                <BookOpenCheck className="size-4" /> View reports <ArrowUpRight className="size-3.5" />
+              </Link>
+              <Link to="/$page" params={{ page: "guardian-notices" }} className="inline-flex h-10 items-center gap-2 rounded-xl border border-border bg-background/80 px-4 text-sm font-semibold text-foreground transition hover:bg-accent">
+                <BellRing className="size-4" /> School notices
+              </Link>
+            </div>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <Link to="/$page" params={{ page: "guardian-reports" }} className="inline-flex h-10 items-center gap-2 rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-sm transition hover:opacity-90">
-              <BookOpenCheck className="size-4" /> View reports <ArrowUpRight className="size-3.5" />
-            </Link>
-            <Link to="/$page" params={{ page: "guardian-notices" }} className="inline-flex h-10 items-center gap-2 rounded-xl border border-border bg-background/80 px-4 text-sm font-semibold text-foreground transition hover:bg-accent">
-              <BellRing className="size-4" /> School notices
-            </Link>
-          </div>
-        </div>
-      </section>
+        </section>
+      )}
 
       {wardsQuery.isError && (
         <div role="alert" className="flex items-start gap-3 rounded-xl border border-destructive/25 bg-destructive/5 p-4 text-sm text-foreground">
@@ -131,11 +133,13 @@ export function GuardianPortalWorkspace({ defaultTab = "overview", showSectionNa
         </div>
       )}
 
-      <div className="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-3">
-        <Metric label="Linked children" value={wardsQuery.isPending ? "—" : String(wards.length)} detail="Children currently linked to this guardian account" icon={UsersRound} />
-        <Metric label="Published reports" value="View reports" detail="Official report cards released by the school" icon={GraduationCap} />
-        <Metric label="School updates" value={announcementsQuery.isPending || announcementsQuery.isError ? "—" : String(announcements.length)} detail={announcementsQuery.isError ? "School updates could not be loaded" : "Current notices available to your account"} icon={BellRing} />
-      </div>
+      {activeTab === "overview" && (
+        <div className="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          <Metric label="Linked children" value={wardsQuery.isPending ? "—" : String(wards.length)} detail="Children currently linked to this guardian account" icon={UsersRound} />
+          <Metric label="Published reports" value="View reports" detail="Official report cards released by the school" icon={GraduationCap} />
+          <Metric label="School updates" value={announcementsQuery.isPending || announcementsQuery.isError ? "—" : String(announcements.length)} detail={announcementsQuery.isError ? "School updates could not be loaded" : "Current notices available to your account"} icon={BellRing} />
+        </div>
+      )}
 
       {showSectionNav && <nav aria-label="Guardian portal sections" className="flex gap-1 overflow-x-auto rounded-2xl border border-border bg-card p-1.5 shadow-sm">
         {tabs.map(({ id, label, icon: Icon }) => (
