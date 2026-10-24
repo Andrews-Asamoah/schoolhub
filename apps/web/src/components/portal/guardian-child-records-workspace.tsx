@@ -1,5 +1,6 @@
 import { useQuery, type UseQueryResult } from "@tanstack/react-query";
 import { useState } from "react";
+import { Printer } from "lucide-react";
 import { AlertCircle, CalendarDays, CheckCircle2, Clock3, LoaderCircle, RefreshCw, UserRound, XCircle } from "lucide-react";
 import type { StudentProfileData } from "@/components/school/student-profile-panel";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -70,7 +71,7 @@ export function GuardianChildRecordsWorkspace({ view }: { view: View }) {
     retry: false,
   });
   const title = view === "attendance" ? "Attendance" : "Timetable";
-  return <div className="space-y-6">
+  return <div className="mx-auto w-full min-w-0 max-w-screen-2xl space-y-6">
     <section className="rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div><p className="text-xs font-bold uppercase tracking-[0.14em] text-primary">Family centre</p><h2 className="mt-1 text-2xl font-bold tracking-tight text-foreground">{title}</h2><p className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground">{view === "attendance" ? "Review your child's recorded attendance, punctuality and recent register entries." : "View your child's current class schedule, including lesson times, subjects, teachers and rooms."}</p></div>
@@ -81,7 +82,7 @@ export function GuardianChildRecordsWorkspace({ view }: { view: View }) {
     {wardsQuery.isPending ? <div className="flex items-center justify-center gap-2 rounded-xl border border-border bg-card py-12 text-sm text-muted-foreground"><LoaderCircle className="size-4 animate-spin" /> Loading your linked children…</div> :
       wardsQuery.isError ? <div role="alert" className="rounded-xl border border-destructive/25 bg-destructive/5 p-4 text-sm text-destructive"><AlertCircle className="mr-2 inline size-4" /> Your linked children could not be loaded. Please try again later.</div> :
       wards.length === 0 ? <EmptyState title="No children linked yet" message="Contact the school office to verify your guardian record and link your child or children." /> :
-      view === "attendance" ? <AttendancePanel query={attendanceQuery} /> : <TimetablePanel query={timetableQuery} />}
+      view === "attendance" ? <AttendancePanel query={attendanceQuery} /> : <TimetablePanel query={timetableQuery} childName={selectedWard ? wardName(selectedWard) : ""} />}
   </div>;
 }
 function AttendancePanel({ query }: { query: UseQueryResult<AttendanceData, Error> }) {
@@ -102,7 +103,7 @@ function AttendancePanel({ query }: { query: UseQueryResult<AttendanceData, Erro
     </section>
   </div>;
 }
-function TimetablePanel({ query }: { query: UseQueryResult<TimetableData, Error> }) {
+function TimetablePanel({ query, childName }: { query: UseQueryResult<TimetableData, Error>; childName: string }) {
   if (query.isPending) return <LoadingState label="Loading timetable…" />;
   if (query.isError) return <RetryState message="The timetable could not be loaded." onRetry={() => void query.refetch()} fetching={query.isFetching} />;
   const data = query.data;
