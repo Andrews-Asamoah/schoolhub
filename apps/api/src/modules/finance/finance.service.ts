@@ -787,6 +787,29 @@ export class FinanceService {
     const currentTerm = academicYear?.terms[0];
 
     return this.prisma.client.$transaction(async (tx) => {
+      const requestedVoucher = input.voucherNumber?.trim() || undefined;
+      const voucherPrefix = `PV-${date.getUTCFullYear()}-`;
+      // Serialize voucher allocation per school to avoid duplicate numbers
+      // when two accountants record expenses at the same time.
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${schoolId}), hashtext("expense-voucher"))`;
+      let voucherNumber = requestedVoucher;
+      if (voucherNumber) {
+        const existing = await tx.expense.findFirst({
+          where: { schoolId, voucherNumber: { equals: voucherNumber, mode: "insensitive" } },
+          select: { id: true },
+        });
+        if (existing) throw new BadRequestException("That voucher number is already used by another expense in this school.");
+      } else {
+        const latest = await tx.expense.findFirst({
+          where: { schoolId, voucherNumber: { startsWith: voucherPrefix } },
+          orderBy: { voucherNumber: "desc" },
+          select: { voucherNumber: true },
+        });
+        const lastSequence = latest?.voucherNumber?.startsWith(voucherPrefix)
+          ? Number(latest.voucherNumber.slice(voucherPrefix.length))
+          : 0;
+        voucherNumber = voucherPrefix + String(Number.isFinite(lastSequence) ? lastSequence + 1 : 1).padStart(5, "0");
+      }
       const expense = await tx.expense.create({
         data: {
           schoolId,
@@ -798,7 +821,7 @@ export class FinanceService {
           paymentMethod: input.paymentMethod,
           registryCategoryId: input.registryCategoryId || null,
           checkNumber: input.checkNumber || null,
-          voucherNumber: input.voucherNumber || null,
+          voucherNumber,
           referenceNumber: input.referenceNumber || null,
           recordedById,
           academicYearId: academicYear?.id ?? null,
@@ -819,7 +842,7 @@ export class FinanceService {
         paymentMethod: input.paymentMethod,
         referenceType: "EXPENSE",
         referenceId: expense.id,
-        referenceNumber: input.voucherNumber || input.referenceNumber || undefined,
+        referenceNumber: voucherNumber || input.referenceNumber || undefined,
         notes: input.registryCategoryId ? "Expenditure category: " + input.registryCategoryId : undefined,
       });
       return expense;
