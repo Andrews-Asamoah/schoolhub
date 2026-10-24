@@ -24,7 +24,7 @@ export function newGuardianLoginEmail(name: string) {
   const last = parts.length > 1 ? parts[parts.length - 1] : "";
   const namePart = (last ? `${first[0]}${last}` : first).slice(0, 18);
   const suffix = randomUUID().replaceAll("-", "").slice(0, 6);
-  return `${namePart}-${suffix}@login.schoolhub.invalid`;
+  return `${namePart}-${suffix}@schoolhub.invalid`;
 }
 
 export interface PreparedCredential {
