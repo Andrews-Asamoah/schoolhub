@@ -26,6 +26,7 @@ import { AdmissionsModule } from "./modules/admissions/admissions.module.js";
 import { AnnouncementsModule } from "./modules/announcements/announcements.module.js";
 import { NotificationsModule } from "./modules/notifications/notifications.module.js";
 import { InventoryModule } from "./modules/inventory/inventory.module.js";
+import { DashboardModule } from "./modules/dashboard/dashboard.module.js";
 
 @Module({
   imports: [
@@ -50,6 +51,7 @@ import { InventoryModule } from "./modules/inventory/inventory.module.js";
     AnnouncementsModule,
     NotificationsModule,
     InventoryModule,
+    DashboardModule,
   ],
   controllers: [HealthController],
   providers: [
