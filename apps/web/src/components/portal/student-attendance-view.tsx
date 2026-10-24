@@ -3,10 +3,8 @@ import {
   Calendar,
   CheckCircle2,
   Clock,
-  Flame,
   UserCheck,
   XCircle,
-  AlertCircle,
   HelpCircle,
 } from "lucide-react";
 import { apiFetch } from "@/lib/api";
@@ -26,42 +24,24 @@ interface StudentAttendanceResponse {
     ABSENT?: number;
     EXCUSED?: number;
     SICK?: number;
+    PERMISSION?: number;
   };
   totalDays: number;
   attendanceRate: number;
   recentRecords?: AttendanceRecord[];
 }
 
-const mockRecentAttendance: AttendanceRecord[] = [
-  { id: "att-1", date: "2026-10-19", status: "PRESENT", remarks: "On time for morning roll call" },
-  { id: "att-2", date: "2026-10-18", status: "PRESENT", remarks: "Punctual" },
-  { id: "att-3", date: "2026-10-17", status: "PRESENT", remarks: "Punctual" },
-  { id: "att-4", date: "2026-10-16", status: "LATE", remarks: "Arrived at 8:15 AM (Traffic delay)" },
-  { id: "att-5", date: "2026-10-15", status: "PRESENT", remarks: "Punctual" },
-  { id: "att-6", date: "2026-10-14", status: "PRESENT", remarks: "Punctual" },
-  { id: "att-7", date: "2026-10-13", status: "EXCUSED", remarks: "Inter-school debate tournament representation" },
-  { id: "att-8", date: "2026-10-10", status: "PRESENT", remarks: "Punctual" },
-  { id: "att-9", date: "2026-10-09", status: "PRESENT", remarks: "Punctual" },
-  { id: "att-10", date: "2026-10-08", status: "PRESENT", remarks: "Punctual" },
-];
-
 export function StudentAttendanceView() {
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch, isFetching } = useQuery({
     queryKey: ["attendance", "me"],
     queryFn: () => apiFetch<StudentAttendanceResponse>("/attendance/me"),
     retry: false,
   });
 
-  const summary = data?.summary ?? {
-    PRESENT: 36,
-    LATE: 2,
-    ABSENT: 0,
-    EXCUSED: 1,
-    SICK: 0,
-  };
-  const totalDays = data?.totalDays ?? 39;
-  const attendanceRate = data?.attendanceRate ?? 97.4;
-  const records = data?.recentRecords && data.recentRecords.length > 0 ? data.recentRecords : mockRecentAttendance;
+  const summary = data?.summary ?? {};
+  const totalDays = data?.totalDays ?? 0;
+  const attendanceRate = data?.attendanceRate ?? 0;
+  const records = data?.recentRecords ?? [];
 
   return (
     <div className="space-y-6">
@@ -88,13 +68,13 @@ export function StudentAttendanceView() {
 
         <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs dark:border-slate-800 dark:bg-slate-900">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500">Punctuality Streak</span>
+            <span className="text-xs font-semibold text-slate-500">Late Arrivals</span>
             <span className="flex size-9 items-center justify-center rounded-xl bg-amber-50 text-amber-600 dark:bg-amber-950/40">
-              <Flame className="size-4" />
+              <Clock className="size-4" />
             </span>
           </div>
-          <p className="mt-2 text-2xl font-black text-amber-600">18 Days</p>
-          <p className="mt-0.5 text-xs text-slate-400">Consecutive days on time</p>
+          <p className="mt-2 text-2xl font-black text-amber-600">{summary.LATE ?? 0}</p>
+          <p className="mt-0.5 text-xs text-slate-400">Recorded late arrivals this term</p>
         </div>
 
         <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs dark:border-slate-800 dark:bg-slate-900">
@@ -121,7 +101,7 @@ export function StudentAttendanceView() {
           <p className="mt-2 text-2xl font-black text-slate-900 dark:text-white">
             {summary.ABSENT ?? 0}
           </p>
-          <p className="mt-0.5 text-xs text-emerald-600 font-semibold">Exemplary record</p>
+          <p className="mt-0.5 text-xs text-slate-400">Recorded absences this term</p>
         </div>
       </div>
 
@@ -132,9 +112,26 @@ export function StudentAttendanceView() {
             <Calendar className="size-4 text-indigo-600" />
             Recent Roll Call Log
           </h3>
-          <span className="text-[11px] text-slate-400">Showing last 10 school days</span>
+          <span className="text-[11px] text-slate-400">Current term · latest records</span>
         </div>
 
+        {isLoading ? (
+          <p className="py-8 text-center text-sm text-slate-500">Loading your attendance records…</p>
+        ) : isError ? (
+          <div className="py-8 text-center">
+            <p className="text-sm text-rose-600">Attendance records could not be loaded.</p>
+            <button
+              type="button"
+              onClick={() => refetch()}
+              disabled={isFetching}
+              className="mt-3 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 disabled:opacity-50 dark:border-slate-700 dark:text-slate-200"
+            >
+              {isFetching ? "Retrying…" : "Try again"}
+            </button>
+          </div>
+        ) : records.length === 0 ? (
+          <p className="py-8 text-center text-sm text-slate-500">No attendance records have been recorded for the current term.</p>
+        ) : (
         <div className="divide-y divide-slate-100 dark:divide-slate-800 mt-2">
           {records.map((rec) => {
             const isPresent = rec.status === "PRESENT";
@@ -192,11 +189,11 @@ export function StudentAttendanceView() {
                   </div>
                 </div>
 
-                <span className="text-[11px] font-medium text-slate-400">Confirmed by Class Teacher</span>
               </div>
             );
           })}
         </div>
+        )}
       </div>
     </div>
   );
