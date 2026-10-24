@@ -372,7 +372,7 @@ export class StudentsService {
     const guardianPlans = await Promise.all(
       input.guardians.map(async (guardian) => {
         const contactEmail = guardian.email?.trim().toLowerCase() || null;
-        const loginEmail = contactEmail || (guardian.createLogin ? newGuardianLoginEmail() : null);
+        const loginEmail = contactEmail || (guardian.createLogin ? newGuardianLoginEmail(`${guardian.firstName ?? ""} ${guardian.lastName ?? ""}`.trim()) : null);
         return {
           guardian,
           contactEmail,
