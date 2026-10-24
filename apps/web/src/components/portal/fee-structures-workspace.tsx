@@ -140,6 +140,8 @@ export function FeeStructuresWorkspace() {
     onSuccess: async (created) => {
       setFeedback({ kind: "success", text: `“${created.name}” was created successfully.` });
       setCreateOpen(false);
+      setEditingStructure(null);
+      setDraftMode("create");
       setDraft(freshDraft());
       await queryClient.invalidateQueries({ queryKey: ["finance", "fee-structures"] });
     },
@@ -289,7 +291,7 @@ export function FeeStructuresWorkspace() {
         <div className="min-w-0">
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">Finance & bursary</p>
           <h1 className="mt-1 text-2xl font-bold tracking-tight text-foreground">Fee structures</h1>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">Build reusable fee templates from standard fee items, assign them to classes, and keep a clear record of which structures have already been billed.</p>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">Build reusable fee templates from standard fee items and assign them to classes. Once a structure has generated student bills, it becomes read-only; duplicate it to reuse the details with different amounts.</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <button type="button" className={secondaryButton} onClick={() => { setFeedback(null); setRegistryOpen(true); }}><Tags className="size-4" /> Fee item categories</button>
