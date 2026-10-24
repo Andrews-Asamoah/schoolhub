@@ -173,7 +173,7 @@ function RetryMessage({
   isFetching: boolean;
 }) {
   return (
-    <div className="rounded-2xl border border-border bg-white px-5 py-9 text-center shadow-sm  ">
+    <div className="rounded-2xl border border-border bg-card px-5 py-9 text-center shadow-sm  ">
       <div className="mx-auto flex size-11 items-center justify-center rounded-2xl bg-destructive/10 text-destructive  ">
         <RefreshCw className={cn("size-5", isFetching && "animate-spin")} />
       </div>
@@ -299,7 +299,7 @@ export function StudentTimetableView() {
         <div aria-hidden="true" className="pointer-events-none absolute -bottom-28 left-1/3 size-72 rounded-full bg-brand-accent/15 blur-3xl" />
         <div className="relative grid gap-7 lg:grid-cols-[minmax(0,1fr)_280px] lg:items-center">
           <div>
-            <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.16em] text-brand-foreground/95">
+            <div className="inline-flex items-center gap-2 rounded-full border border-brand-foreground/15 bg-brand-foreground/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.16em] text-brand-foreground/95">
               <span className="relative flex size-2">
                 <span className="absolute inline-flex size-full animate-ping rounded-full bg-success/10 opacity-70" />
                 <span className="relative inline-flex size-2 rounded-full bg-success/10" />
@@ -314,14 +314,14 @@ export function StudentTimetableView() {
               Know what’s happening now, where to go next, and how your day unfolds.
             </p>
             <div className="mt-5 flex flex-wrap gap-2">
-              <span className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-xs font-semibold">
+              <span className="inline-flex items-center gap-2 rounded-xl border border-brand-foreground/15 bg-brand-foreground/10 px-3 py-2 text-xs font-semibold">
                 <GraduationCap className="size-4 text-brand-accent" />
                 {data?.class
                   ? [data.class.name, data.class.level].filter(Boolean).join(" · ")
                   : "Your class timetable"}
               </span>
               {data?.academicYear?.name && (
-                <span className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-xs font-semibold">
+                <span className="inline-flex items-center gap-2 rounded-xl border border-brand-foreground/15 bg-brand-foreground/10 px-3 py-2 text-xs font-semibold">
                   <CalendarDays className="size-4 text-brand-accent" />
                   {data.academicYear.name}{data.term?.name ? ` · ${data.term.name}` : ""}
                 </span>
@@ -329,19 +329,19 @@ export function StudentTimetableView() {
             </div>
           </div>
 
-          <div className="rounded-2xl border border-white/15 bg-white/10 p-5 shadow-lg shadow-foreground/10 backdrop-blur-md sm:p-6">
+          <div className="rounded-2xl border border-brand-foreground/15 bg-brand-foreground/10 p-5 shadow-lg shadow-foreground/10 backdrop-blur-md sm:p-6">
             <div className="flex items-center justify-between gap-3">
-              <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-primary">Local time</span>
+              <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-brand-foreground/80">Local time</span>
               <Clock3 className="size-4 text-info" />
             </div>
             <time className="mt-2 block font-mono text-3xl font-black tracking-tight tabular-nums sm:text-4xl">
               {formatClock(now)}
             </time>
             <p className="mt-2 text-sm font-semibold text-primary-foreground">{formatLongDate(now)}</p>
-            <div className="mt-5 flex items-center justify-between border-t border-white/15 pt-4 text-xs">
+            <div className="mt-5 flex items-center justify-between border-t border-brand-foreground/15 pt-4 text-xs">
               <span className="text-brand-foreground/80">Schedule status</span>
               <span className="inline-flex items-center gap-1.5 font-bold text-success">
-                <span className="size-1.5 rounded-full bg-success/10" />
+                <span className="size-1.5 rounded-full bg-success" />
                 Updating live
               </span>
             </div>
@@ -361,15 +361,15 @@ export function StudentTimetableView() {
           isFetching={isFetching}
         />
       ) : entries.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-border bg-white px-5 py-10 text-center  ">
+        <div className="rounded-2xl border border-dashed border-border bg-card px-5 py-10 text-center  ">
           <div className="mx-auto flex size-14 items-center justify-center rounded-2xl bg-primary/10 text-primary  ">
             <CalendarDays className="size-6" />
           </div>
-          <h2 className="mt-4 text-base font-bold text-foreground dark:text-primary-foreground">
+          <h2 className="mt-4 text-base font-bold text-foreground ">
             Your timetable is getting ready
           </h2>
           <p className="mx-auto mt-1 max-w-md text-sm leading-6 text-muted-foreground">
-            There are no published periods for your current class yet. Check back later or contact your school office if you expect to see your schedule.
+            ${!data?.class ? "There is no current class enrollment linked to your student account." : "There are no published periods for your current class yet."} Check back later or contact your school office if you expect to see your schedule.
           </p>
           <button
             type="button"
@@ -387,14 +387,14 @@ export function StudentTimetableView() {
             <section
               aria-live="polite"
               className={cn(
-                "overflow-hidden rounded-2xl border bg-white shadow-sm ",
+                "overflow-hidden rounded-2xl border bg-card shadow-sm ",
                 currentEntry
                   ? "border-success/25 "
                   : "border-border ",
               )}
             >
               <div className="flex items-center justify-between gap-3 border-b border-border px-5 py-4 ">
-                <div className="flex items-center gap-2 text-sm font-bold text-foreground dark:text-primary-foreground">
+                <div className="flex items-center gap-2 text-sm font-bold text-foreground ">
                   <span className={cn(
                     "flex size-8 items-center justify-center rounded-xl",
                     currentEntry
@@ -422,7 +422,7 @@ export function StudentTimetableView() {
                       <p className="text-xs font-semibold text-success ">
                         {periodTypeLabel(currentEntry.type)} · {formatTime(currentEntry.startTime)} – {formatTime(currentEntry.endTime)}
                       </p>
-                      <h2 className="mt-2 text-2xl font-black tracking-tight text-foreground dark:text-primary-foreground sm:text-3xl">
+                      <h2 className="mt-2 text-2xl font-black tracking-tight text-foreground  sm:text-3xl">
                         {periodTitle(currentEntry)}
                       </h2>
                       {currentEntry.subject?.code && (
@@ -466,7 +466,7 @@ export function StudentTimetableView() {
                       className="h-2 overflow-hidden rounded-full bg-success/10 "
                     >
                       <div
-                        className="h-full rounded-full bg-gradient-to-r from-success to-success transition-[width] duration-1000"
+                        className="h-full rounded-full bg-gradient-to-r from-success to-info transition-[width] duration-1000"
                         style={{ width: `${currentProgress}%` }}
                       />
                     </div>
@@ -474,7 +474,7 @@ export function StudentTimetableView() {
                 </div>
               ) : (
                 <div className="flex h-full min-h-40 flex-col justify-center p-5 sm:p-6">
-                  <h2 className="text-xl font-black tracking-tight text-foreground dark:text-primary-foreground">
+                  <h2 className="text-xl font-black tracking-tight text-foreground ">
                     You’re between classes.
                   </h2>
                   <p className="mt-2 max-w-lg text-sm leading-6 text-muted-foreground ">
@@ -484,7 +484,7 @@ export function StudentTimetableView() {
                     <button
                       type="button"
                       onClick={() => setSelectedDay(nextEntry.entry.dayOfWeek as DayKey)}
-                      className="mt-4 inline-flex w-fit items-center gap-2 text-xs font-bold text-primary transition hover:text-primary  dark:hover:text-primary"
+                      className="mt-4 inline-flex w-fit items-center gap-2 text-xs font-bold text-primary transition hover:text-primary  "
                     >
                       View next period <ArrowRight className="size-3.5" />
                     </button>
@@ -493,9 +493,9 @@ export function StudentTimetableView() {
               )}
             </section>
 
-            <section className="overflow-hidden rounded-2xl border border-border bg-white shadow-sm  ">
+            <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm  ">
               <div className="flex items-center justify-between gap-3 border-b border-border px-5 py-4 ">
-                <div className="flex items-center gap-2 text-sm font-bold text-foreground dark:text-primary-foreground">
+                <div className="flex items-center gap-2 text-sm font-bold text-foreground ">
                   <span className="flex size-8 items-center justify-center rounded-xl bg-highlight/10 text-highlight  ">
                     <Timer className="size-4" />
                   </span>
@@ -507,7 +507,9 @@ export function StudentTimetableView() {
                       ? `In ${Math.max(1, Math.ceil(nextEntry.minutesAway))} min`
                       : nextEntry.dayOffset === 0
                         ? "Later today"
-                        : formatDay(nextEntry.entry.dayOfWeek)}
+                        : nextEntry.dayOffset === 7
+                          ? `Next ${formatDay(nextEntry.entry.dayOfWeek)}`
+                          : formatDay(nextEntry.entry.dayOfWeek)}
                   </span>
                 )}
               </div>
@@ -515,7 +517,7 @@ export function StudentTimetableView() {
                 <button
                   type="button"
                   onClick={() => setSelectedDay(nextEntry.entry.dayOfWeek as DayKey)}
-                  className="group block w-full p-5 text-left transition hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/15 dark:hover:bg-muted sm:p-6"
+                  className="group block w-full p-5 text-left transition hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/15  sm:p-6"
                 >
                   <p className="text-xs font-semibold text-muted-foreground ">
                     {nextEntry.dayOffset === 0
@@ -527,7 +529,7 @@ export function StudentTimetableView() {
                           : formatDay(nextEntry.entry.dayOfWeek)}
                     {nextEntry.dayOffset <= 1 ? "" : ` · ${formatTime(nextEntry.entry.startTime)}`}
                   </p>
-                  <h2 className="mt-2 text-xl font-black tracking-tight text-foreground transition group-hover:text-primary dark:text-primary-foreground dark:group-hover:text-primary">
+                  <h2 className="mt-2 text-xl font-black tracking-tight text-foreground transition group-hover:text-primary  ">
                     {periodTitle(nextEntry.entry)}
                   </h2>
                   <p className="mt-1 text-sm text-muted-foreground ">
@@ -565,7 +567,7 @@ export function StudentTimetableView() {
                   <CalendarDays className="size-4" />
                   Your weekly plan
                 </div>
-                <h2 className="mt-1 text-xl font-black tracking-tight text-foreground dark:text-primary-foreground sm:text-2xl">
+                <h2 className="mt-1 text-xl font-black tracking-tight text-foreground  sm:text-2xl">
                   Follow your day
                 </h2>
                 <p className="mt-1 text-sm text-muted-foreground ">
@@ -576,13 +578,13 @@ export function StudentTimetableView() {
                 type="button"
                 onClick={() => window.print()}
                 disabled={entries.length === 0}
-                className="inline-flex w-fit items-center gap-2 rounded-xl border border-border bg-white px-3.5 py-2.5 text-xs font-bold text-foreground shadow-sm transition hover:border-primary/20 hover:bg-primary/10 disabled:opacity-50    dark:hover:bg-muted"
+                className="inline-flex w-fit items-center gap-2 rounded-xl border border-border bg-card px-3.5 py-2.5 text-xs font-bold text-foreground shadow-sm transition hover:border-primary/20 hover:bg-primary/10 disabled:opacity-50    "
               >
                 <Printer className="size-4" /> Print schedule
               </button>
             </div>
 
-            <div className="rounded-2xl border border-border bg-white p-3 shadow-sm   sm:p-4">
+            <div className="rounded-2xl border border-border bg-card p-3 shadow-sm   sm:p-4">
               <div className="flex gap-2 overflow-x-auto pb-1">
                 {DAYS.map((day) => {
                   const isToday = day === todayKey;
@@ -599,7 +601,7 @@ export function StudentTimetableView() {
                         "relative flex min-w-[74px] flex-1 flex-col items-center rounded-xl border px-3 py-3 text-center transition sm:min-w-0 sm:px-2",
                         selected
                           ? "border-primary/20 bg-primary text-primary-foreground shadow-md shadow-primary/10"
-                          : "border-transparent bg-muted/50 text-muted-foreground hover:border-border hover:bg-muted   dark:hover:border-border",
+                          : "border-transparent bg-muted/50 text-muted-foreground hover:border-border hover:bg-muted   ",
                       )}
                     >
                       {isToday && (
@@ -635,10 +637,10 @@ export function StudentTimetableView() {
               </span>
             </div>
 
-            <div className="rounded-2xl border border-border bg-white p-4 shadow-sm   sm:p-6">
+            <div className="rounded-2xl border border-border bg-card p-4 shadow-sm   sm:p-6">
               <div className="mb-5 flex flex-col justify-between gap-2 border-b border-border pb-4  sm:flex-row sm:items-center">
                 <div>
-                  <h3 className="text-lg font-black text-foreground dark:text-primary-foreground">{formatDay(selectedDay)}</h3>
+                  <h3 className="text-lg font-black text-foreground ">{formatDay(selectedDay)}</h3>
                   <p className="mt-0.5 text-xs text-muted-foreground ">
                     {selectedDay === todayKey
                       ? `${completedToday} of ${todayEntries.length} periods completed today`
@@ -668,7 +670,7 @@ export function StudentTimetableView() {
                 <div className="relative">
                   <div
                     aria-hidden="true"
-                    className="absolute bottom-6 left-[7px] top-3 w-px bg-gradient-to-b from-muted bg-primary/10 to-muted   "
+                    className="absolute bottom-6 left-[7px] top-3 w-px bg-gradient-to-b from-muted via-primary/15 to-muted   "
                   />
                   <ol className="relative space-y-3" aria-label={`${formatDay(selectedDay)} periods`}>
                   {selectedEntries.map((entry) => {
@@ -693,7 +695,7 @@ export function StudentTimetableView() {
                         <span
                           aria-hidden="true"
                           className={cn(
-                            "absolute left-0 top-5 z-10 size-4 rounded-full border-[3px] border-white shadow-sm ",
+                            "absolute left-0 top-5 z-10 size-4 rounded-full border-[3px] border-card shadow-sm ",
                             isCurrent
                               ? "bg-success/20 ring-4 ring-success/20 "
                               : isNext
@@ -707,12 +709,12 @@ export function StudentTimetableView() {
                           className={cn(
                             "rounded-2xl border p-4 transition-all duration-300 sm:p-5",
                             isCurrent
-                              ? "border-success/25 bg-gradient-to-br bg-success/10 to-white shadow-lg shadow-success/10 ring-1 ring-success/20    "
+                              ? "border-success/25 bg-gradient-to-br from-success/10 to-card shadow-lg shadow-success/10 ring-1 ring-success/20    "
                               : isNext
                                 ? "border-highlight/20 bg-highlight/10 shadow-sm  "
                                 : isCompleted
                                   ? "border-border bg-muted/50  "
-                                  : "border-border bg-white hover:border-primary/20 hover:shadow-sm   dark:hover:border-primary/20",
+                                  : "border-border bg-card hover:border-primary/20 hover:shadow-sm   ",
                           )}
                         >
                           <div className="flex flex-wrap items-start justify-between gap-3">
@@ -733,13 +735,13 @@ export function StudentTimetableView() {
                                     "text-sm font-black sm:text-base",
                                     isCompleted
                                       ? "text-muted-foreground "
-                                      : "text-foreground dark:text-primary-foreground",
+                                      : "text-foreground ",
                                   )}>
                                     {periodTitle(entry)}
                                   </h4>
                                   {isCurrent && (
                                     <span className="inline-flex items-center gap-1 rounded-full bg-success px-2 py-0.5 text-[9px] font-black uppercase tracking-wide text-primary-foreground">
-                                      <span className="size-1.5 animate-pulse rounded-full bg-white" /> Live now
+                                      <span className="size-1.5 animate-pulse rounded-full bg-success-foreground" /> Live now
                                     </span>
                                   )}
                                   {isNext && (
@@ -762,7 +764,7 @@ export function StudentTimetableView() {
                               </div>
                             </div>
                             {isCurrent && (
-                              <span className="inline-flex items-center gap-1.5 rounded-full border border-success/25 bg-white/70 px-2.5 py-1 text-[10px] font-bold text-success   ">
+                              <span className="inline-flex items-center gap-1.5 rounded-full border border-success/25 bg-card/70 px-2.5 py-1 text-[10px] font-bold text-success   ">
                                 <Timer className="size-3.5" /> {currentMinutesLeft} min left
                               </span>
                             )}
