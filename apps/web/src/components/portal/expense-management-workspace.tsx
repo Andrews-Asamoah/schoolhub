@@ -83,7 +83,8 @@ export function ExpenseManagementWorkspace() {
       const params = new URLSearchParams();
       if (fromDate) params.set("from", fromDate);
       if (toDate) params.set("to", toDate);
-      const suffix = params.size ? `?${params.toString()}` : "";
+      const query = params.toString();
+      const suffix = query ? `?${query}` : "";
       return apiFetch<ExpenseRecord[]>(`/finance/expenses${suffix}`);
     },
     enabled: !rangeInvalid,
