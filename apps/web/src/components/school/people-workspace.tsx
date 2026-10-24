@@ -1658,9 +1658,10 @@ function GuardianDetailsDialog({
             This guardian does not currently have a parent-portal login. Use Reset login in the directory to create one.
           </p>
         )}
-        {loginEmail?.endsWith("@login.schoolhub.invalid") && (
+        {(loginEmail?.endsWith("@login.schoolhub.invalid") ||
+          /-g\d{4}@/i.test(loginEmail ?? "")) && (
           <p className="mt-2 text-xs text-muted-foreground">
-            This is a generated sign-in email, not a deliverable contact email. The guardian must use it with their temporary password to sign in.
+            This is a generated sign-in email for the parent portal. The guardian should use it with their password to sign in; it may not be a separately monitored mailbox.
           </p>
         )}
         <div className="mt-5 flex justify-end">
