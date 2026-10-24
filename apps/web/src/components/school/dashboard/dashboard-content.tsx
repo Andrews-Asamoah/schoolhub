@@ -171,6 +171,7 @@ export function DashboardContent({
             </Link>
           ))}
         </section>
+        {activeRole === "accountant" && <DashboardInfographics />}
       </main>
     );
   }
