@@ -316,7 +316,7 @@ function WorkspaceContent({ pageId }: { pageId: string }) {
               <FeeStructureList query={feesQuery} />
             )
           )}
-          {pageId === "payments" && <PaymentEntry />}
+          {pageId === "payments" && <AccountantPortalWorkspace defaultTab="payments" />}
           {pageId === "settings" && <SchoolSettings query={schoolQuery} />}
           {pageId === "profile" && <ProfileWorkspace />}
           {pageId === "team" && <TeamRoleWorkspace />}
