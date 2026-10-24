@@ -28,7 +28,7 @@ export class AttendanceController {
   constructor(private readonly attendanceService: AttendanceService) {}
 
   @Post("batch")
-  @Roles("owner", "admin", "teacher")
+  @Roles("teacher")
   batchRecordAttendance(
     @CurrentSchool() school: School,
     @CurrentUser() user: AuthenticatedUser,
