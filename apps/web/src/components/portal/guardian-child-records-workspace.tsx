@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, type UseQueryResult } from "@tanstack/react-query";
 import { useState } from "react";
 import { AlertCircle, CalendarDays, CheckCircle2, Clock3, LoaderCircle, RefreshCw, UserRound, XCircle } from "lucide-react";
 import type { StudentProfileData } from "@/components/school/student-profile-panel";
@@ -83,7 +83,7 @@ export function GuardianChildRecordsWorkspace({ view }: { view: View }) {
       view === "attendance" ? <AttendancePanel query={attendanceQuery} /> : <TimetablePanel query={timetableQuery} />}
   </div>;
 }
-function AttendancePanel({ query }: { query: ReturnType<typeof useQuery<AttendanceData, Error>> }) {
+function AttendancePanel({ query }: { query: UseQueryResult<AttendanceData, Error> }) {
   const data = query.data;
   if (query.isPending) return <LoadingState label="Loading attendance records…" />;
   if (query.isError) return <RetryState message="Attendance records could not be loaded." onRetry={() => void query.refetch()} fetching={query.isFetching} />;
@@ -101,7 +101,7 @@ function AttendancePanel({ query }: { query: ReturnType<typeof useQuery<Attendan
     </section>
   </div>;
 }
-function TimetablePanel({ query }: { query: ReturnType<typeof useQuery<TimetableData, Error>> }) {
+function TimetablePanel({ query }: { query: UseQueryResult<TimetableData, Error> }) {
   if (query.isPending) return <LoadingState label="Loading timetable…" />;
   if (query.isError) return <RetryState message="The timetable could not be loaded." onRetry={() => void query.refetch()} fetching={query.isFetching} />;
   const data = query.data;
