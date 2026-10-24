@@ -1040,10 +1040,6 @@
   }
 
   #credentials-print-root button,
-  #credentials-print-root .print\\:hidden {
-    display: none !important;
-  }
-
   #credentials-print-root section {
     break-inside: avoid;
     page-break-inside: avoid;
