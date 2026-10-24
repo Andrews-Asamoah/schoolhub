@@ -9,6 +9,32 @@ import type { CreateExpenseInput, GenerateBillInput, RecordPaymentInput } from "
 import { Prisma, type TransactionCategory } from "@prisma/client";
 import { canManageAcademicContext } from "../../common/academic-context.js";
 
+const PAYE_MONTHLY_BANDS_2026 = [
+  { limit: 588, rate: 0 },
+  { limit: 80, rate: 0.05 },
+  { limit: 100, rate: 0.10 },
+  { limit: 2_900, rate: 0.175 },
+  { limit: 16_000, rate: 0.25 },
+  { limit: 30_332, rate: 0.30 },
+  { limit: Number.POSITIVE_INFINITY, rate: 0.35 },
+] as const;
+
+function roundMoney(value: number) {
+  return Math.round((value + Number.EPSILON) * 100) / 100;
+}
+
+function calculateResidentPaye2026(chargeableIncome: number) {
+  let remaining = Math.max(0, chargeableIncome);
+  let tax = 0;
+  for (const band of PAYE_MONTHLY_BANDS_2026) {
+    if (remaining <= 0) break;
+    const taxableInBand = Math.min(remaining, band.limit);
+    tax += taxableInBand * band.rate;
+    remaining -= taxableInBand;
+  }
+  return roundMoney(tax);
+}
+
 @Injectable()
 export class FinanceService {
   constructor(private readonly prisma: PrismaService) {}
@@ -700,6 +726,168 @@ export class FinanceService {
     });
   }
 
+  async generatePayrollDraft(
+    schoolId: string,
+    processedById: string,
+    input: { month: number; year: number; confirmResidentTaxTreatment: true },
+  ) {
+    // GRA's 2026 monthly resident bands took effect on 1 September 2026.
+    // Refuse to silently apply these rules to historical periods.
+    if (input.year !== 2026 || input.month < 9) {
+      throw new BadRequestException(
+        "Automatic draft generation currently supports September–December 2026 only. Configure the applicable historical tax rules before generating an earlier period.",
+      );
+    }
+    const db = this.prisma.client;
+    const existing = await db.payrollRecord.findUnique({
+      where: { schoolId_month_year: { schoolId, month: input.month, year: input.year } },
+      select: { id: true },
+    });
+    if (existing) throw new BadRequestException("A payroll run already exists for this month and year.");
+
+    const [teachers, staff, currentYear] = await Promise.all([
+      db.teacher.findMany({
+        where: { schoolId, isActive: true, deletedAt: null },
+        select: { id: true, monthlySalary: true },
+      }),
+      db.staff.findMany({
+        where: { schoolId, isActive: true, deletedAt: null },
+        select: { id: true, monthlySalary: true },
+      }),
+      db.academicYear.findFirst({
+        where: { schoolId, isCurrent: true },
+        include: { terms: { where: { isCurrent: true }, take: 1 } },
+      }),
+    ]);
+    const eligible = [
+      ...teachers.filter((person) => Number(person.monthlySalary ?? 0) > 0).map((person) => ({
+        teacherId: person.id,
+        staffId: null as string | null,
+        basicSalary: Number(person.monthlySalary),
+      })),
+      ...staff.filter((person) => Number(person.monthlySalary ?? 0) > 0).map((person) => ({
+        teacherId: null as string | null,
+        staffId: person.id,
+        basicSalary: Number(person.monthlySalary),
+      })),
+    ];
+    if (!eligible.length) {
+      throw new BadRequestException("No active teachers or staff have a positive monthly salary. Add salary details before generating payroll.");
+    }
+
+    const payslips = eligible.map((person) => {
+      // SSNIT 2026 insurable earnings range: GHS 587.80–69,000.
+      const insurableSalary = Math.min(69_000, Math.max(587.80, person.basicSalary));
+      const ssnitEmployee = roundMoney(insurableSalary * 0.055);
+      const ssnitEmployer = roundMoney(insurableSalary * 0.13);
+      const grossSalary = roundMoney(person.basicSalary);
+      const incomeTax = calculateResidentPaye2026(Math.max(0, grossSalary - ssnitEmployee));
+      const netSalary = roundMoney(Math.max(0, grossSalary - ssnitEmployee - incomeTax));
+      return {
+        schoolId,
+        teacherId: person.teacherId,
+        staffId: person.staffId,
+        basicSalary: new Prisma.Decimal(roundMoney(person.basicSalary)),
+        allowances: new Prisma.Decimal(0),
+        grossSalary: new Prisma.Decimal(grossSalary),
+        ssnitEmployee: new Prisma.Decimal(ssnitEmployee),
+        ssnitEmployer: new Prisma.Decimal(ssnitEmployer),
+        incomeTax: new Prisma.Decimal(incomeTax),
+        otherDeductions: new Prisma.Decimal(0),
+        netSalary: new Prisma.Decimal(netSalary),
+        paymentMethod: "BANK_TRANSFER" as const,
+        paymentStatus: "PENDING" as const,
+      };
+    });
+    const sum = (key: "grossSalary" | "netSalary" | "incomeTax" | "ssnitEmployee" | "ssnitEmployer") =>
+      roundMoney(payslips.reduce((total, slip) => total + Number(slip[key]), 0));
+
+    const payrollRecord = await db.$transaction(async (tx) => {
+      const duplicate = await tx.payrollRecord.findUnique({
+        where: { schoolId_month_year: { schoolId, month: input.month, year: input.year } },
+        select: { id: true },
+      });
+      if (duplicate) throw new BadRequestException("A payroll run already exists for this month and year.");
+      return tx.payrollRecord.create({
+        data: {
+          schoolId,
+          month: input.month,
+          year: input.year,
+          status: "DRAFT",
+          totalGross: new Prisma.Decimal(sum("grossSalary")),
+          totalNet: new Prisma.Decimal(sum("netSalary")),
+          totalTax: new Prisma.Decimal(sum("incomeTax")),
+          totalSSNIT: new Prisma.Decimal(roundMoney(sum("ssnitEmployee") + sum("ssnitEmployer"))),
+          processedById,
+          academicYearId: currentYear?.id ?? null,
+          termId: currentYear?.terms[0]?.id ?? null,
+          payslips: { create: payslips },
+        },
+        include: {
+          _count: { select: { payslips: true } },
+        },
+      });
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+
+    return {
+      payrollRecord,
+      includedCount: eligible.length,
+      excludedCount: teachers.length + staff.length - eligible.length,
+    };
+  }
+
+  async transitionPayroll(
+    schoolId: string,
+    payrollRecordId: string,
+    input: { status: "APPROVED" | "PAID" | "CANCELLED"; paymentMethod?: string },
+  ) {
+    const db = this.prisma.client;
+    const payroll = await db.payrollRecord.findFirst({
+      where: { id: payrollRecordId, schoolId },
+      include: { _count: { select: { payslips: true } } },
+    });
+    if (!payroll) throw new NotFoundException("Payroll run not found.");
+    if (payroll.status === "DRAFT" && input.status === "APPROVED") {
+      if (!payroll._count.payslips) throw new BadRequestException("A payroll run without payslips cannot be approved.");
+      return db.payrollRecord.update({
+        where: { id: payroll.id },
+        data: { status: "APPROVED" },
+        include: {
+          payslips: { include: { staff: { select: { staffId: true, profile: { select: { firstName: true, lastName: true } } } }, teacher: { select: { teacherId: true, profile: { select: { firstName: true, lastName: true } } } } } },
+          _count: { select: { payslips: true } },
+        },
+      });
+    }
+    if (payroll.status === "DRAFT" && input.status === "CANCELLED") {
+      return db.payrollRecord.update({
+        where: { id: payroll.id },
+        data: { status: "CANCELLED" },
+        include: { payslips: true, _count: { select: { payslips: true } } },
+      });
+    }
+    if (payroll.status === "APPROVED" && input.status === "PAID") {
+      const paymentMethod = input.paymentMethod;
+      if (!paymentMethod || !["CASH", "BANK_TRANSFER", "CHEQUE", "MOBILE_MONEY", "CARD", "ONLINE", "OTHER"].includes(paymentMethod)) {
+        throw new BadRequestException("Choose a valid payment method before confirming payroll disbursement.");
+      }
+      return db.$transaction(async (tx) => {
+        await tx.payslip.updateMany({
+          where: { payrollRecordId: payroll.id, schoolId },
+          data: { paymentStatus: "COMPLETED", paymentMethod: paymentMethod as "CASH", paidAt: new Date() },
+        });
+        return tx.payrollRecord.update({
+          where: { id: payroll.id },
+          data: { status: "PAID" },
+          include: {
+            payslips: { include: { staff: { select: { staffId: true, profile: { select: { firstName: true, lastName: true } } } }, teacher: { select: { teacherId: true, profile: { select: { firstName: true, lastName: true } } } } } },
+            _count: { select: { payslips: true } },
+          },
+        });
+      });
+    }
+    throw new BadRequestException(`Payroll cannot move from ${payroll.status} to ${input.status}.`);
+  }
+
   async listPayrollRecords(schoolId: string) {
     return this.prisma.client.payrollRecord.findMany({
       where: { schoolId },
@@ -707,22 +895,12 @@ export class FinanceService {
       take: 100,
       include: {
         payslips: {
-          select: {
-            id: true,
-            staffId: true,
-            teacherId: true,
-            basicSalary: true,
-            allowances: true,
-            grossSalary: true,
-            ssnitEmployee: true,
-            incomeTax: true,
-            otherDeductions: true,
-            netSalary: true,
-            paymentMethod: true,
-            paymentStatus: true,
-            paidAt: true,
+          include: {
+            staff: { select: { staffId: true, profile: { select: { firstName: true, lastName: true } } } },
+            teacher: { select: { teacherId: true, profile: { select: { firstName: true, lastName: true } } } },
           },
         },
+        _count: { select: { payslips: true } },
       },
     });
   }
