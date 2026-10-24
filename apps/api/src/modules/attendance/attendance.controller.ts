@@ -44,6 +44,21 @@ export class AttendanceController {
     );
   }
 
+  @Get("class/:classId/dates")
+  @Roles("owner", "admin", "teacher", "staff", "accountant")
+  getClassAttendanceDates(
+    @CurrentSchool() school: School,
+    @CurrentUser() user: AuthenticatedUser,
+    @Param("classId") classId: string,
+    @CurrentSchoolRole() role: string | undefined,
+    @Headers("x-academic-year-id") academicYearId?: string,
+    @Headers("x-academic-term-id") termId?: string,
+  ) {
+    return this.attendanceService.getClassAttendanceDates(
+      school.id, classId, role, academicYearId, termId, user.id,
+    );
+  }
+
   @Get("class/:classId")
   @Roles("owner", "admin", "teacher", "staff", "accountant")
   getClassAttendance(
