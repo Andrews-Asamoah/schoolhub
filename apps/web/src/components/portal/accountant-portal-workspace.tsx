@@ -573,9 +573,9 @@ export function AccountantPortalWorkspace({
             <h2 className="font-semibold text-foreground">Attention required</h2>
             <p className="mt-1 text-sm text-muted-foreground">Items that may need follow-up</p>
             <div className="mt-4 space-y-3">
-              <AttentionItem title="Outstanding bills" value={String(debtors.length)} detail={currency(outstanding)} onClick={() => setActiveTab("debtors")} />
-              <AttentionItem title="Overdue bills" value={String(debtors.filter((bill) => bill.status === "OVERDUE").length)} detail="Review due dates and follow up" onClick={() => { setStatusFilter("OVERDUE"); setActiveTab("invoices"); }} />
-              <AttentionItem title="Expense records" value={String(expenses.length)} detail={currency(expenseTotal)} onClick={() => setActiveTab("expenses")} />
+              <AttentionItem title="Outstanding bills" value={billsQuery.error ? "—" : String(debtors.length)} detail={billsQuery.error ? "Could not load bill records" : currency(outstanding)} onClick={() => setActiveTab("debtors")} />
+              <AttentionItem title="Overdue bills" value={billsQuery.error ? "—" : String(debtors.filter((bill) => bill.status === "OVERDUE").length)} detail={billsQuery.error ? "Could not load bill records" : "Review due dates and follow up"} onClick={() => { setStatusFilter("OVERDUE"); setActiveTab("invoices"); }} />
+              <AttentionItem title="Expense records" value={expensesQuery.error ? "—" : String(expenses.length)} detail={expensesQuery.error ? "Could not load expense records" : currency(expenseTotal)} onClick={() => setActiveTab("expenses")} />
             </div>
           </section>
         </div>
