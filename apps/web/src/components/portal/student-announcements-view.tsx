@@ -63,6 +63,18 @@ export function StudentAnnouncementsView() {
   }, [readIds]);
 
   const announcements = announcementsQuery.data ?? [];
+
+  useEffect(() => {
+    const announcementId = new URLSearchParams(window.location.search).get("announcementId");
+    if (!announcementId) return;
+    const matchingAnnouncement = announcements.find((item) => item.id === announcementId);
+    if (!matchingAnnouncement) return;
+    setSelected(matchingAnnouncement);
+    setReadIds((current) => current.has(matchingAnnouncement.id)
+      ? current
+      : new Set([...current, matchingAnnouncement.id]));
+  }, [announcements]);
+
   const normalizedSearch = search.trim().toLowerCase();
   const filtered = announcements.filter((item) => {
     const matchesCategory = filter === "ALL" || item.category === filter;

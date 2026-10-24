@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Bell, LoaderCircle, Megaphone, Pin, Plus, RefreshCw, Search, Send, Trash2, X } from "lucide-react";
 import type {
@@ -146,6 +146,14 @@ export function AdminAnnouncementsWorkspace({ mode = "admin" }: { mode?: Announc
   });
 
   const announcements = announcementsQuery.data ?? [];
+
+  useEffect(() => {
+    const announcementId = new URLSearchParams(window.location.search).get("announcementId");
+    if (!announcementId) return;
+    const matchingAnnouncement = announcements.find((item) => item.id === announcementId);
+    if (matchingAnnouncement) setSelected(matchingAnnouncement);
+  }, [announcements]);
+
   const normalizedSearch = search.trim().toLowerCase();
   const filtered = announcements.filter((item) => {
     const matchesCategory = filter === "ALL" || item.category === filter;
