@@ -181,6 +181,14 @@ export const schoolNavGroups: SchoolNavGroup[] = [
         apiStatus: "available",
       },
       {
+        id: "guardian-fees",
+        label: "Ward fees",
+        icon: WalletCards,
+        description: "Review fee balances and payment history for linked children.",
+        section: "Family",
+        apiStatus: "available",
+      },
+      {
         id: "guardian-notices",
         label: "School notices",
         icon: Bell,
@@ -468,7 +476,7 @@ const rolePages: Record<string, string[]> = {
     "clubs",
     "announcements",
   ],
-  guardian: ["guardian-portal", "guardian-attendance", "guardian-timetable", "guardian-reports", "guardian-notices"],
+  guardian: ["guardian-attendance", "guardian-timetable", "guardian-reports", "guardian-notices", "guardian-fees"],
 };
 
 /**
@@ -477,7 +485,7 @@ const rolePages: Record<string, string[]> = {
  */
 const ownPortalByRole: Record<string, string> = {
   accountant: "accountant-portal",
-  guardian: "guardian-portal",
+  guardian: "dashboard",
 };
 
 /**

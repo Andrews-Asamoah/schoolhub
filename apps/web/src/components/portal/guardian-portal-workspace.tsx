@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   AlertCircle,
   ArrowUpRight,
@@ -75,6 +75,7 @@ function EmptyFeature({ title, description, icon: Icon }: { title: string; descr
 
 export function GuardianPortalWorkspace({ defaultTab = "overview", showSectionNav = true }: { defaultTab?: GuardianTab; showSectionNav?: boolean }) {
   const [activeTab, setActiveTab] = useState<GuardianTab>(defaultTab);
+  useEffect(() => { setActiveTab(defaultTab); }, [defaultTab]);
   const [selectedAnnouncement, setSelectedAnnouncement] = useState<AnnouncementItem | null>(null);
   const { data: session } = useSession();
 
@@ -113,12 +114,12 @@ export function GuardianPortalWorkspace({ defaultTab = "overview", showSectionNa
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <button type="button" onClick={() => setActiveTab("academics")} className="inline-flex h-10 items-center gap-2 rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-sm transition hover:opacity-90">
+            <Link to="/$page" params={{ page: "guardian-reports" }} className="inline-flex h-10 items-center gap-2 rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-sm transition hover:opacity-90">
               <BookOpenCheck className="size-4" /> View reports <ArrowUpRight className="size-3.5" />
-            </button>
-            <button type="button" onClick={() => setActiveTab("notices")} className="inline-flex h-10 items-center gap-2 rounded-xl border border-border bg-background/80 px-4 text-sm font-semibold text-foreground transition hover:bg-accent">
+            </Link>
+            <Link to="/$page" params={{ page: "guardian-notices" }} className="inline-flex h-10 items-center gap-2 rounded-xl border border-border bg-background/80 px-4 text-sm font-semibold text-foreground transition hover:bg-accent">
               <BellRing className="size-4" /> School notices
-            </button>
+            </Link>
           </div>
         </div>
       </section>
