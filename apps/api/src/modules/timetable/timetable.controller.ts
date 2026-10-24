@@ -173,4 +173,16 @@ export class TimetableController {
   deleteEntry(@CurrentSchool() school: School, @Param('id') id: string) {
     return this.timetable.deleteEntry(school.id, id);
   }
+
+  /** Weekly timetable for a child linked to the authenticated guardian. */
+  @Get('guardian/:studentId')
+  @Roles('guardian')
+  guardianWardTimetable(
+    @CurrentSchool() school: School,
+    @CurrentUser() user: AuthenticatedUser | undefined,
+    @Param('studentId') studentId: string,
+  ) {
+    return this.timetable.getGuardianWardTimetable(school.id, user!.id, studentId);
+  }
+
 }
