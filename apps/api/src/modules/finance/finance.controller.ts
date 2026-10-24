@@ -48,6 +48,16 @@ const feeItemRegistrySchema = z.object({
 });
 const feeStructureStatusSchema = z.object({ isActive: z.boolean() });
 const expenditureCategorySchema = z.object({ name: z.string().trim().min(2, "Enter a category name").max(120), description: z.string().trim().max(500).optional() });
+const payrollDraftSchema = z.object({
+  month: z.number().int().min(1).max(12),
+  year: z.literal(2026),
+  confirmResidentTaxTreatment: z.literal(true, "Confirm the resident PAYE assumptions before generating a draft"),
+});
+const payrollTransitionSchema = z.object({
+  status: z.enum(["APPROVED", "PAID", "CANCELLED"]),
+  paymentMethod: z.enum(["CASH", "BANK_TRANSFER", "CHEQUE", "MOBILE_MONEY", "CARD", "ONLINE", "OTHER"]).optional(),
+});
+
 
 @Controller("finance")
 @UseGuards(SchoolTenantGuard, RolesGuard)
@@ -168,6 +178,26 @@ export class FinanceController {
   @Roles("owner", "admin", "accountant")
   listPayrollRecords(@CurrentSchool() school: School) {
     return this.financeService.listPayrollRecords(school.id);
+  }
+
+  @Post("payroll")
+  @Roles("owner", "admin", "accountant")
+  generatePayrollDraft(
+    @CurrentSchool() school: School,
+    @CurrentUser() user: AuthenticatedUser,
+    @Body(new ZodValidationPipe(payrollDraftSchema)) body: z.infer<typeof payrollDraftSchema>,
+  ) {
+    return this.financeService.generatePayrollDraft(school.id, user.id, body);
+  }
+
+  @Patch("payroll/:recordId/status")
+  @Roles("owner", "admin", "accountant")
+  transitionPayroll(
+    @CurrentSchool() school: School,
+    @Param("recordId") recordId: string,
+    @Body(new ZodValidationPipe(payrollTransitionSchema)) body: z.infer<typeof payrollTransitionSchema>,
+  ) {
+    return this.financeService.transitionPayroll(school.id, recordId, body);
   }
 
   @Post("bills/generate")
