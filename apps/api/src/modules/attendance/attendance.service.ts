@@ -221,7 +221,7 @@ export class AttendanceService {
     const attendanceRate =
       totalDays > 0
         ? Math.round(((summary.PRESENT! + summary.LATE!) / totalDays) * 100)
-        : 100;
+        : 0;
 
     return {
       summary,

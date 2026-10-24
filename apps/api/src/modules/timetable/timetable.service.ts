@@ -301,6 +301,48 @@ export class TimetableService {
     };
   }
 
+  /** The signed-in student's class timetable for the current academic term. */
+  async getStudentOwnTimetable(schoolId: string, userId: string) {
+    const db = this.prisma.client;
+    const student = await db.student.findFirst({
+      where: { schoolId, deletedAt: null, profile: { userId } },
+      select: { id: true },
+    });
+    if (!student) {
+      throw new NotFoundException('No student record is linked to your account.');
+    }
+
+    const enrollment = await db.enrollment.findFirst({
+      where: {
+        studentId: student.id,
+        status: 'ACTIVE',
+        term: { isCurrent: true, academicYear: { isCurrent: true, schoolId } },
+        class: { schoolId, deletedAt: null },
+      },
+      orderBy: { enrolledAt: 'desc' },
+      select: {
+        classId: true,
+        class: { select: { id: true, name: true, level: true } },
+        academicYear: { select: { id: true, name: true } },
+        term: { select: { id: true, name: true } },
+      },
+    });
+
+    if (!enrollment) {
+      return { class: null, academicYear: null, term: null, entries: [] };
+    }
+
+    const entries = await this.findEntries(schoolId, enrollment.academicYear.id, {
+      classId: enrollment.classId,
+    });
+    return {
+      class: enrollment.class,
+      academicYear: enrollment.academicYear,
+      term: enrollment.term,
+      entries: entries.map((row) => this.toDto(row)),
+    };
+  }
+
   async saveEntry(
     schoolId: string,
     input: SaveTimetableEntryInput,

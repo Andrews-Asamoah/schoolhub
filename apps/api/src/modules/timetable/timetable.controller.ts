@@ -56,6 +56,16 @@ export class TimetableController {
     return this.timetable.getTeacherOwnTimetable(school.id, user!.id, academicYearId);
   }
 
+  /** Current class timetable for the authenticated student. */
+  @Get('me')
+  @Roles('student')
+  myTimetable(
+    @CurrentSchool() school: School,
+    @CurrentUser() user: AuthenticatedUser | undefined,
+  ) {
+    return this.timetable.getStudentOwnTimetable(school.id, user!.id);
+  }
+
   @Get()
   @Roles(...READ)
   view(

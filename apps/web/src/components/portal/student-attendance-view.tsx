@@ -13,7 +13,7 @@ import { cn } from "@/lib/utils";
 interface AttendanceRecord {
   id: string;
   date: string;
-  status: "PRESENT" | "LATE" | "ABSENT" | "EXCUSED" | "SICK";
+  status: "PRESENT" | "LATE" | "ABSENT" | "EXCUSED" | "SICK" | "PERMISSION";
   remarks?: string | null;
 }
 
@@ -63,7 +63,7 @@ export function StudentAttendanceView() {
             </span>
           </div>
           <p className="mt-2 text-2xl font-black text-emerald-600">{attendanceRate}%</p>
-          <p className="mt-0.5 text-xs text-slate-400">Target: Minimum 90% required</p>
+          <p className="mt-0.5 text-xs text-slate-400">Based on recorded attendance this term</p>
         </div>
 
         <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs dark:border-slate-800 dark:bg-slate-900">
@@ -136,7 +136,7 @@ export function StudentAttendanceView() {
           {records.map((rec) => {
             const isPresent = rec.status === "PRESENT";
             const isLate = rec.status === "LATE";
-            const isExcused = rec.status === "EXCUSED" || rec.status === "SICK";
+            const isExcused = rec.status === "EXCUSED" || rec.status === "SICK" || rec.status === "PERMISSION";
 
             return (
               <div key={rec.id} className="py-3 flex items-center justify-between gap-4 text-xs">
