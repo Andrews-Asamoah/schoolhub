@@ -2,10 +2,16 @@ import { useForm } from "@tanstack/react-form";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Check,
+  CheckCircle2,
   Eye,
+  Filter,
+  GraduationCap,
   LoaderCircle,
+  Mail,
+  Phone,
   Plus,
   Search,
+  ShieldCheck,
   UserRound,
   UsersRound,
   X,
@@ -590,21 +596,38 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
           onClose={() => setViewing(null)}
         />
       )}
-      <section className="rounded-2xl border border-border bg-gradient-to-br from-primary/10 via-card to-sky-500/5 p-5 sm:p-6">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="flex items-start gap-3">
-            <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+      <section
+        className={`relative isolate overflow-hidden rounded-2xl border p-5 shadow-sm sm:p-6 ${
+          isGuardianPage
+            ? "border-primary/20 bg-gradient-to-br from-primary/15 via-card to-violet-500/10 dark:from-primary/20 dark:via-card dark:to-violet-500/10"
+            : "border-border bg-gradient-to-br from-primary/10 via-card to-sky-500/5"
+        }`}
+      >
+        {isGuardianPage && (
+          <>
+            <span aria-hidden="true" className="pointer-events-none absolute -right-12 -top-16 size-48 rounded-full bg-primary/10 blur-3xl" />
+            <span aria-hidden="true" className="pointer-events-none absolute -bottom-20 right-36 size-36 rounded-full bg-violet-500/10 blur-3xl" />
+          </>
+        )}
+        <div className="relative flex flex-wrap items-start justify-between gap-4">
+          <div className="flex items-start gap-3.5">
+            <span className="flex size-11 shrink-0 items-center justify-center rounded-xl border border-primary/20 bg-primary/10 text-primary shadow-sm">
               <UsersRound className="size-5" />
             </span>
-            <div>
-              <h2 className="text-base font-bold text-foreground">
+            <div className="max-w-3xl">
+              {isGuardianPage && (
+                <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.18em] text-primary">
+                  Family & student connections
+                </p>
+              )}
+              <h2 className="text-lg font-bold tracking-tight text-foreground">
                 {title} directory
               </h2>
-              <p className="mt-1 max-w-3xl text-sm leading-6 text-muted-foreground">
+              <p className="mt-1.5 max-w-3xl text-sm leading-6 text-muted-foreground">
                 {kind === "teachers"
                   ? "Manage teaching personnel and their school department. Teachers are not duplicated in the non-teaching Staff directory."
                   : isGuardianPage
-                    ? "Maintain family contacts and their links to student records. Tick “Create parent-portal login” to give a guardian access."
+                    ? "Keep guardian contacts, linked students and parent-portal access organised in one place."
                     : "Manage non-teaching employees, departments, and operational roles. Teaching personnel are managed separately under Teachers."}
               </p>
             </div>
@@ -620,7 +643,7 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
                 setEditing(null);
                 setShowForm((value) => !value);
               }}
-              className="inline-flex h-10 items-center gap-2 rounded-lg bg-primary px-4 text-xs font-semibold text-primary-foreground shadow-sm hover:opacity-90"
+              className="inline-flex h-10 items-center gap-2 rounded-lg bg-primary px-4 text-xs font-semibold text-primary-foreground shadow-sm transition hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             >
               <Plus className="size-4" />
               Add {resourceName}
