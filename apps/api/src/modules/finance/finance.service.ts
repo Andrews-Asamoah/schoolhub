@@ -45,7 +45,7 @@ export class FinanceService {
 
     const feeStructure = await this.prisma.client.feeStructure.findFirst({
       where: { id: input.feeStructureId, schoolId, isActive: true },
-      include: { items: true },
+      include: { items: true, targetClasses: { select: { classId: true } } },
     });
 
     if (!feeStructure) {
@@ -54,6 +54,13 @@ export class FinanceService {
 
     if (feeStructure.items.length === 0) {
       throw new BadRequestException("Fee structure contains no billable items");
+    }
+    if (
+      input.classId &&
+      feeStructure.targetClasses.length > 0 &&
+      !feeStructure.targetClasses.some((target) => target.classId === input.classId)
+    ) {
+      throw new BadRequestException("This fee structure is not assigned to the selected class.");
     }
 
     const totalAmount = feeStructure.items.reduce(
@@ -104,6 +111,20 @@ export class FinanceService {
     const createdBills = await this.prisma.client.$transaction(async (tx) => {
       const results = [];
       for (const studentId of studentIds) {
+        // Avoid issuing the same fee structure twice for a student in the same term.
+        const existingBill = await tx.bill.findFirst({
+          where: {
+            schoolId,
+            studentId,
+            academicYearId: currentYear.id,
+            termId: currentTerm.id,
+            feeStructureId: input.feeStructureId,
+            status: { notIn: ["CANCELLED", "WAIVED"] },
+          },
+          select: { id: true },
+        });
+        if (existingBill) continue;
+
         const randomNum = Math.floor(10000 + Math.random() * 90000);
         const billNumber = `INV-${year}-${randomNum}`;
 
