@@ -1000,3 +1000,54 @@
     font-size: 5pt;
   }
 }
+
+
+/* Print only the one-time credentials dialog, never the dashboard behind it. */
+@media print {
+  @page {
+    margin: 12mm;
+  }
+
+  body * {
+    visibility: hidden !important;
+  }
+
+  #credentials-print-root,
+  #credentials-print-root * {
+    visibility: visible !important;
+  }
+
+  #credentials-print-root {
+    position: absolute !important;
+    inset: 0 auto auto 0 !important;
+    width: 100% !important;
+    max-width: none !important;
+    max-height: none !important;
+    overflow: visible !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    color: #111827 !important;
+    background: #ffffff !important;
+  }
+
+  #credentials-print-root * {
+    color: #111827 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  #credentials-print-root button,
+  #credentials-print-root .print\\:hidden {
+    display: none !important;
+  }
+
+  #credentials-print-root section {
+    break-inside: avoid;
+    page-break-inside: avoid;
+    border-color: #d1d5db !important;
+    margin-bottom: 12px;
+  }
+}
