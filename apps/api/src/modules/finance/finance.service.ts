@@ -826,6 +826,70 @@ export class FinanceService {
     });
   }
 
+  async listPayrollSalaryRegister(schoolId: string) {
+    const db = this.prisma.client;
+    const [teachers, staff] = await Promise.all([
+      db.teacher.findMany({
+        where: { schoolId, isActive: true, deletedAt: null },
+        select: {
+          id: true,
+          teacherId: true,
+          staffNumber: true,
+          firstName: true,
+          lastName: true,
+          monthlySalary: true,
+          profile: { select: { firstName: true, lastName: true } },
+        },
+      }),
+      db.staff.findMany({
+        where: { schoolId, isActive: true, deletedAt: null },
+        select: {
+          id: true,
+          staffId: true,
+          staffNumber: true,
+          monthlySalary: true,
+          profile: { select: { firstName: true, lastName: true } },
+        },
+      }),
+    ]);
+    return [
+      ...teachers.map((person) => ({
+        id: person.id,
+        type: "TEACHER" as const,
+        identifier: person.staffNumber || person.teacherId,
+        name: [person.profile?.firstName || person.firstName, person.profile?.lastName || person.lastName].filter(Boolean).join(" ").trim() || person.teacherId,
+        monthlySalary: person.monthlySalary == null ? null : Number(person.monthlySalary),
+      })),
+      ...staff.map((person) => ({
+        id: person.id,
+        type: "STAFF" as const,
+        identifier: person.staffNumber || person.staffId,
+        name: [person.profile.firstName, person.profile.lastName].filter(Boolean).join(" ").trim() || person.staffId,
+        monthlySalary: person.monthlySalary == null ? null : Number(person.monthlySalary),
+      })),
+    ].sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  async updatePayrollSalary(schoolId: string, kind: string, personId: string, monthlySalary: number) {
+    const data = { monthlySalary: new Prisma.Decimal(monthlySalary) };
+    if (kind === "TEACHER") {
+      const result = await this.prisma.client.teacher.updateMany({
+        where: { id: personId, schoolId, deletedAt: null },
+        data,
+      });
+      if (!result.count) throw new NotFoundException("Teacher not found.");
+    } else if (kind === "STAFF") {
+      const result = await this.prisma.client.staff.updateMany({
+        where: { id: personId, schoolId, deletedAt: null },
+        data,
+      });
+      if (!result.count) throw new NotFoundException("Staff member not found.");
+    } else {
+      throw new BadRequestException("Choose a valid payroll person type.");
+    }
+    return { id: personId, type: kind, monthlySalary };
+  }
+
   async generatePayrollDraft(
     schoolId: string,
     processedById: string,
