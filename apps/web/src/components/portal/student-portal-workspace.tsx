@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Award,
   BookOpen,
@@ -11,7 +11,6 @@ import {
   GraduationCap,
   LayoutDashboard,
   Megaphone,
-  Printer,
   School,
   Sparkles,
   Trophy,
@@ -21,6 +20,7 @@ import { PortalStatCard } from "./portal-stat-card";
 import { StudentFeeAlertBanner, StudentFeeBadge } from "./student-fee-badge";
 import { StudentSubjectsView } from "./student-subjects-view";
 import { StudentAttendanceView } from "./student-attendance-view";
+import { StudentTimetableView } from "./student-timetable-view";
 import { StudentReportView } from "./student-report-view";
 import { StudentClassmatesView } from "./student-classmates-view";
 import { StudentHouseClubsView } from "./student-house-clubs-view";
@@ -45,6 +45,8 @@ export interface StudentPortalWorkspaceProps {
 
 export function StudentPortalWorkspace({ defaultTab = "dashboard" }: StudentPortalWorkspaceProps) {
   const [activeTab, setActiveTab] = useState(defaultTab);
+
+  useEffect(() => setActiveTab(defaultTab), [defaultTab]);
 
   return (
     <div className="space-y-6">
@@ -88,73 +90,14 @@ export function StudentPortalWorkspace({ defaultTab = "dashboard" }: StudentPort
       {/* Tab Contents */}
       {activeTab === "dashboard" && <StudentOverview />}
       {activeTab === "subjects" && <StudentSubjectsView />}
-      {activeTab === "timetable" && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-xl font-black text-slate-900 dark:text-white">Class Timetable (JHS 3 Emerald)</h2>
-              <p className="text-xs text-slate-500">Weekly class periods, assigned teacher allocations, and lab rooms</p>
-            </div>
-            <button
-              onClick={() => window.print()}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
-            >
-              <Printer className="size-4" />
-              Print Timetable
-            </button>
-          </div>
-
-          <div className="overflow-x-auto rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-slate-900">
-            <div className="grid min-w-[700px] grid-cols-5 gap-3 text-xs">
-              {["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"].map((day) => (
-                <div key={day} className="rounded-xl border border-slate-100 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-800/40">
-                  <h4 className="border-b border-slate-200 pb-2 font-bold text-slate-900 dark:border-slate-700 dark:text-white">
-                    {day}
-                  </h4>
-                  <div className="mt-2.5 space-y-2">
-                    <div className="rounded-lg border border-slate-100 bg-white p-2 shadow-2xs dark:bg-slate-800">
-                      <p className="text-[10px] text-slate-400">08:00 - 08:50</p>
-                      <p className="font-bold text-indigo-700 dark:text-indigo-400">Integrated Science</p>
-                      <p className="text-[10px] text-slate-400">Room 102</p>
-                    </div>
-                    <div className="rounded-lg border border-slate-100 bg-white p-2 shadow-2xs dark:bg-slate-800">
-                      <p className="text-[10px] text-slate-400">09:00 - 09:50</p>
-                      <p className="font-bold text-blue-700 dark:text-blue-400">Core Mathematics</p>
-                      <p className="text-[10px] text-slate-400">Room 102</p>
-                    </div>
-                    <div className="rounded-lg bg-amber-50/70 p-1.5 text-center text-[10px] font-semibold text-amber-800 dark:bg-amber-950/40 dark:text-amber-300">
-                      Morning Break (10:00 - 10:30)
-                    </div>
-                    <div className="rounded-lg border border-slate-100 bg-white p-2 shadow-2xs dark:bg-slate-800">
-                      <p className="text-[10px] text-slate-400">10:30 - 11:20</p>
-                      <p className="font-bold text-emerald-700 dark:text-emerald-400">English Language</p>
-                      <p className="text-[10px] text-slate-400">Room 102</p>
-                    </div>
-                    <div className="rounded-lg border border-slate-100 bg-white p-2 shadow-2xs dark:bg-slate-800">
-                      <p className="text-[10px] text-slate-400">11:30 - 12:20</p>
-                      <p className="font-bold text-purple-700 dark:text-purple-400">Social Studies</p>
-                      <p className="text-[10px] text-slate-400">Room 102</p>
-                    </div>
-                    <div className="rounded-lg bg-blue-50/70 p-1.5 text-center text-[10px] font-semibold text-blue-800 dark:bg-blue-950/40 dark:text-blue-300">
-                      Lunch & Midday Break
-                    </div>
-                    <div className="rounded-lg border border-slate-100 bg-white p-2 shadow-2xs dark:bg-slate-800">
-                      <p className="text-[10px] text-slate-400">01:30 - 02:20</p>
-                      <p className="font-bold text-cyan-700 dark:text-cyan-400">ICT Lab / French</p>
-                      <p className="text-[10px] text-slate-400">Computer Lab</p>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
+      {activeTab === "timetable" && <StudentTimetableView />}
       {(activeTab === "grades" || (activeTab as string) === "assessments") && <StudentReportView />}
       {activeTab === "assignments" && <StudentAssignmentsView />}
       {activeTab === "attendance" && <StudentAttendanceView />}
       {activeTab === "classmates" && <StudentClassmatesView />}
-      {(activeTab === "house" || activeTab === "clubs") && <StudentHouseClubsView />}
+      {(activeTab === "house" || activeTab === "clubs") && (
+        <StudentHouseClubsView defaultTab={activeTab === "clubs" ? "CLUBS" : "HOUSE"} />
+      )}
       {activeTab === "announcements" && <StudentAnnouncementsView />}
     </div>
   );
