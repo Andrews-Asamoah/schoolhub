@@ -1,6 +1,6 @@
 import { useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Archive, CheckCircle2, CircleAlert, FileText, LoaderCircle, Plus, RefreshCw, Search, Settings2, Tags, X } from "lucide-react";
+import { Archive, CheckCircle2, CircleAlert, Copy, FileText, LoaderCircle, Pencil, Plus, RefreshCw, Search, Settings2, Tags, X } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -91,6 +91,8 @@ export function FeeStructuresWorkspace() {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("ACTIVE");
   const [createOpen, setCreateOpen] = useState(false);
+  const [editingStructure, setEditingStructure] = useState<FeeStructure | null>(null);
+  const [draftMode, setDraftMode] = useState<"create" | "edit" | "duplicate">("create");
   const [registryOpen, setRegistryOpen] = useState(false);
   const [draft, setDraft] = useState<StructureDraft>(freshDraft);
   const [registryName, setRegistryName] = useState("");
@@ -138,6 +140,24 @@ export function FeeStructuresWorkspace() {
     onSuccess: async (created) => {
       setFeedback({ kind: "success", text: `“${created.name}” was created successfully.` });
       setCreateOpen(false);
+      setEditingStructure(null);
+      setDraftMode("create");
+      setDraft(freshDraft());
+      await queryClient.invalidateQueries({ queryKey: ["finance", "fee-structures"] });
+    },
+    onError: (error: Error) => setFeedback({ kind: "error", text: error.message }),
+  });
+  const updateStructure = useMutation({
+    mutationFn: ({ id, input }: { id: string; input: FeeStructureInput }) =>
+      apiFetch<FeeStructure>(`/finance/fee-structures/${encodeURIComponent(id)}`, {
+        method: "PUT",
+        body: JSON.stringify(input),
+      }),
+    onSuccess: async (updated) => {
+      setFeedback({ kind: "success", text: `“${updated.name}” was updated successfully.` });
+      setCreateOpen(false);
+      setEditingStructure(null);
+      setDraftMode("create");
       setDraft(freshDraft());
       await queryClient.invalidateQueries({ queryKey: ["finance", "fee-structures"] });
     },
@@ -176,7 +196,7 @@ export function FeeStructuresWorkspace() {
       setFeedback({ kind: "error", text: "Give every fee item a name and a valid non-negative amount." });
       return;
     }
-    createStructure.mutate({
+    const input: FeeStructureInput = {
       name: draft.name.trim(),
       description: draft.description.trim() || undefined,
       classLevel: draft.classLevel.trim() || undefined,
@@ -189,7 +209,12 @@ export function FeeStructuresWorkspace() {
         isOptional: item.isOptional,
         description: item.description.trim() || undefined,
       })),
-    });
+    };
+    if (editingStructure) {
+      updateStructure.mutate({ id: editingStructure.id, input });
+    } else {
+      createStructure.mutate(input);
+    }
   }
 
   function updateDraft<K extends keyof StructureDraft>(key: K, value: StructureDraft[K]) {
@@ -198,6 +223,66 @@ export function FeeStructuresWorkspace() {
   function updateItem(rowId: string, patch: Partial<FeeItemDraft>) {
     setDraft((current) => ({ ...current, items: current.items.map((item) => item.rowId === rowId ? { ...item, ...patch } : item) }));
   }
+  function beginCreate() {
+    setFeedback(null);
+    setEditingStructure(null);
+    setDraftMode("create");
+    setDraft(freshDraft());
+    setCreateOpen(true);
+  }
+  function beginEdit(structure: FeeStructure) {
+    if ((structure._count?.bills ?? 0) > 0) {
+      setFeedback({ kind: "error", text: "This fee structure has already been used to generate student bills. Duplicate it to edit the figures in a new structure." });
+      return;
+    }
+    setFeedback(null);
+    setEditingStructure(structure);
+    setDraftMode("edit");
+    setDraft({
+      name: structure.name,
+      description: structure.description ?? "",
+      classLevel: structure.classLevel ?? "",
+      termBased: structure.termBased,
+      targetClassIds: structure.targetClasses.map((target) => target.class.id),
+      items: structure.items.map((item) => ({
+        rowId: `edit-${item.id}`,
+        registryItemId: item.registryItemId ?? "",
+        name: item.name,
+        amount: String(item.amount),
+        isOptional: item.isOptional,
+        description: item.description ?? "",
+      })),
+    });
+    setCreateOpen(true);
+  }
+  function beginDuplicate(structure: FeeStructure) {
+    setFeedback(null);
+    setEditingStructure(null);
+    setDraftMode("duplicate");
+    setDraft({
+      name: `Copy of ${structure.name}`.slice(0, 120),
+      description: structure.description ?? "",
+      classLevel: structure.classLevel ?? "",
+      termBased: structure.termBased,
+      targetClassIds: structure.targetClasses.map((target) => target.class.id),
+      items: structure.items.map((item) => ({
+        rowId: `copy-${item.id}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        registryItemId: item.registryItemId ?? "",
+        name: item.name,
+        amount: String(item.amount),
+        isOptional: item.isOptional,
+        description: item.description ?? "",
+      })),
+    });
+    setCreateOpen(true);
+  }
+  function closeStructureForm() {
+    if (createStructure.isPending || updateStructure.isPending) return;
+    setCreateOpen(false);
+    setEditingStructure(null);
+    setDraftMode("create");
+  }
+
   const draftTotal = draft.items.reduce((sum, item) => sum + Math.max(0, Number(item.amount) || 0), 0);
 
   return (
@@ -206,11 +291,11 @@ export function FeeStructuresWorkspace() {
         <div className="min-w-0">
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">Finance & bursary</p>
           <h1 className="mt-1 text-2xl font-bold tracking-tight text-foreground">Fee structures</h1>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">Build reusable fee templates from standard fee items, assign them to classes, and keep a clear record of which structures have already been billed.</p>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">Build reusable fee templates from standard fee items and assign them to classes. Once a structure has generated student bills, it becomes read-only; duplicate it to reuse the details with different amounts.</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <button type="button" className={secondaryButton} onClick={() => { setFeedback(null); setRegistryOpen(true); }}><Tags className="size-4" /> Fee item categories</button>
-          <button type="button" className={primaryButton} onClick={() => { setFeedback(null); setDraft(freshDraft()); setCreateOpen(true); }}><Plus className="size-4" /> Create structure</button>
+          <button type="button" className={primaryButton} onClick={beginCreate}><Plus className="size-4" /> Create structure</button>
         </div>
       </section>
 
@@ -229,11 +314,11 @@ export function FeeStructuresWorkspace() {
         </div>
         {structuresQuery.isPending ? <div className="grid gap-4 pt-5 sm:grid-cols-2 xl:grid-cols-3">{[1,2,3].map(item => <div key={item} className="h-60 animate-pulse rounded-2xl bg-muted" />)}</div>
         : structuresQuery.error ? <ErrorState message={structuresQuery.error.message} />
-        : filteredStructures.length ? <div className="grid min-w-0 gap-4 pt-5 sm:grid-cols-2 xl:grid-cols-3">{filteredStructures.map((structure) => <FeeStructureCard key={structure.id} structure={structure} busy={setActive.isPending} onToggle={() => setActive.mutate({ id: structure.id, isActive: !structure.isActive })} />)}</div>
-        : <EmptyState title={search ? "No matching structures" : status === "ARCHIVED" ? "No archived fee structures" : "No fee structures yet"} description="Create a reusable fee template and add one or more billing items. You can assign it to specific classes or leave it available to all classes." onCreate={() => { setDraft(freshDraft()); setCreateOpen(true); }} />}
+        : filteredStructures.length ? <div className="grid min-w-0 gap-4 pt-5 sm:grid-cols-2 xl:grid-cols-3">{filteredStructures.map((structure) => <FeeStructureCard key={structure.id} structure={structure} busy={setActive.isPending} onToggle={() => setActive.mutate({ id: structure.id, isActive: !structure.isActive })} onEdit={() => beginEdit(structure)} onDuplicate={() => beginDuplicate(structure)} />)}</div>
+        : <EmptyState title={search ? "No matching structures" : status === "ARCHIVED" ? "No archived fee structures" : "No fee structures yet"} description="Create a reusable fee template and add one or more billing items. You can assign it to specific classes or leave it available to all classes." onCreate={beginCreate} />}
       </section>
 
-      {createOpen && <Modal title="Create fee structure" description="Create a template first. Invoices are generated separately from the Invoices & Billing page." onClose={() => { if (!createStructure.isPending) setCreateOpen(false); }}>
+      {createOpen && <Modal title={editingStructure ? "Edit fee structure" : draftMode === "duplicate" ? "Duplicate fee structure" : "Create fee structure"} description={editingStructure ? "Changes are allowed only before student bills have been generated from this structure." : draftMode === "duplicate" ? "A new draft has been copied from the original. Change the figures or details, then save it as a separate fee structure." : "Create a reusable template. Invoices are generated separately from the Invoices & Billing page."} onClose={closeStructureForm}>
         <form onSubmit={submitStructure} className="space-y-5">
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Structure name"><input className={fieldClass} required minLength={2} maxLength={120} value={draft.name} onChange={(event) => updateDraft("name", event.target.value)} placeholder="e.g. JHS 1 Term Fees" /></Field>
@@ -261,8 +346,8 @@ export function FeeStructuresWorkspace() {
             </div>)}
             <div className="flex items-center justify-between rounded-xl bg-primary/5 p-3"><span className="text-sm font-semibold text-foreground">Structure total</span><span className="text-lg font-bold tabular-nums text-foreground">{money(draftTotal)}</span></div>
           </div>
-          {createStructure.error && <ErrorState message={createStructure.error.message} />}
-          <div className="flex flex-wrap justify-end gap-2 border-t border-border pt-4"><button type="button" className={secondaryButton} onClick={() => setCreateOpen(false)} disabled={createStructure.isPending}>Cancel</button><button type="submit" className={primaryButton} disabled={createStructure.isPending}>{createStructure.isPending && <LoaderCircle className="size-4 animate-spin" />} Save fee structure</button></div>
+          {(editingStructure ? updateStructure.error : createStructure.error) && <ErrorState message={(editingStructure ? updateStructure.error : createStructure.error)?.message ?? "The fee structure could not be saved."} />}
+          <div className="flex flex-wrap justify-end gap-2 border-t border-border pt-4"><button type="button" className={secondaryButton} onClick={closeStructureForm} disabled={createStructure.isPending || updateStructure.isPending}>Cancel</button><button type="submit" className={primaryButton} disabled={createStructure.isPending || updateStructure.isPending}>{(createStructure.isPending || updateStructure.isPending) && <LoaderCircle className="size-4 animate-spin" />}{editingStructure ? "Save changes" : draftMode === "duplicate" ? "Save as new structure" : "Save fee structure"}</button></div>
         </form>
       </Modal>}
 
@@ -278,20 +363,37 @@ export function FeeStructuresWorkspace() {
   );
 }
 
-function FeeStructureCard({ structure, busy, onToggle }: { structure: FeeStructure; busy: boolean; onToggle: () => void }) {
+function FeeStructureCard({
+  structure,
+  busy,
+  onToggle,
+  onEdit,
+  onDuplicate,
+}: {
+  structure: FeeStructure;
+  busy: boolean;
+  onToggle: () => void;
+  onEdit: () => void;
+  onDuplicate: () => void;
+}) {
   const total = structure.items.reduce((sum, item) => sum + Number(item.amount), 0);
   const optional = structure.items.filter(item => item.isOptional).reduce((sum, item) => sum + Number(item.amount), 0);
   const classes = structure.targetClasses.map(target => target.class.name);
+  const billCount = structure._count?.bills ?? 0;
+  const locked = billCount > 0;
   return <article className="flex min-w-0 flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
     <div className={cn("h-1 w-full", structure.isActive ? "bg-primary" : "bg-muted-foreground/30")} />
     <div className="flex-1 p-4 sm:p-5">
-      <div className="flex items-start justify-between gap-3"><div className="min-w-0"><h2 className="break-words font-semibold text-foreground">{structure.name}</h2><div className="mt-2 flex flex-wrap gap-1.5">{structure.isActive ? <Badge tone="success">Active</Badge> : <Badge>Archived</Badge>}<Badge>{structure.termBased ? "Per term" : "One-off"}</Badge></div></div><span className="rounded-xl bg-primary/10 p-2 text-primary"><FileText className="size-4" /></span></div>
+      <div className="flex items-start justify-between gap-3"><div className="min-w-0"><h2 className="break-words font-semibold text-foreground">{structure.name}</h2><div className="mt-2 flex flex-wrap gap-1.5">{structure.isActive ? <Badge tone="success">Active</Badge> : <Badge>Archived</Badge>}<Badge>{structure.termBased ? "Per term" : "One-off"}</Badge>{locked && <Badge>Locked after billing</Badge>}</div></div><span className="rounded-xl bg-primary/10 p-2 text-primary"><FileText className="size-4" /></span></div>
       {structure.description && <p className="mt-3 line-clamp-2 text-sm leading-5 text-muted-foreground">{structure.description}</p>}
       <p className="mt-3 text-xs text-muted-foreground">Applies to: <span className="font-medium text-foreground">{classes.length ? classes.join(", ") : structure.classLevel || "All classes"}</span></p>
       <div className="mt-4 space-y-2">{structure.items.map(item => <div key={item.id} className="flex items-start justify-between gap-3 text-sm"><div className="min-w-0"><p className="break-words font-medium text-foreground">{item.name}{item.isOptional && <span className="ml-2 rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">Optional</span>}</p>{item.description && <p className="text-xs text-muted-foreground">{item.description}</p>}</div><span className="shrink-0 tabular-nums text-foreground">{money(Number(item.amount))}</span></div>)}</div>
       <div className="mt-4 space-y-1 border-t border-border pt-3"><div className="flex items-center justify-between gap-3"><span className="text-xs text-muted-foreground">Structure total</span><span className="font-bold tabular-nums text-foreground">{money(total)}</span></div>{optional > 0 && <p className="text-[11px] text-muted-foreground">{money(optional)} of the total is marked optional.</p>}</div>
     </div>
-    <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border bg-muted/20 px-4 py-3"><span className="text-xs text-muted-foreground">{structure._count?.bills ?? 0} linked bill(s)</span><button type="button" className={cn("inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-xs font-semibold transition hover:bg-muted disabled:opacity-50", structure.isActive ? "text-muted-foreground" : "text-primary")} disabled={busy} onClick={onToggle}>{busy ? <LoaderCircle className="size-3.5 animate-spin" /> : structure.isActive ? <Archive className="size-3.5" /> : <RefreshCw className="size-3.5" />}{structure.isActive ? "Archive" : "Reactivate"}</button></div>
+    <div className="space-y-3 border-t border-border bg-muted/20 px-4 py-3">
+      <div className="flex flex-wrap items-center justify-between gap-2"><span className="text-xs text-muted-foreground">{billCount} linked bill(s){locked ? " · Editing locked" : " · Editable"}</span><button type="button" className={cn("inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-xs font-semibold transition hover:bg-muted disabled:opacity-50", structure.isActive ? "text-muted-foreground" : "text-primary")} disabled={busy} onClick={onToggle}>{busy ? <LoaderCircle className="size-3.5 animate-spin" /> : structure.isActive ? <Archive className="size-3.5" /> : <RefreshCw className="size-3.5" />}{structure.isActive ? "Archive" : "Reactivate"}</button></div>
+      <div className="grid grid-cols-2 gap-2"><button type="button" className={cn(secondaryButton, "min-h-9 px-2 py-1.5 text-xs")} title={locked ? "This structure has generated student bills. Duplicate it to change the amounts." : "Edit this fee structure"} disabled={busy || locked} onClick={onEdit}><Pencil className="size-3.5" /> Edit</button><button type="button" className={cn(secondaryButton, "min-h-9 px-2 py-1.5 text-xs")} disabled={busy} onClick={onDuplicate}><Copy className="size-3.5" /> Duplicate</button></div>
+    </div>
   </article>;
 }
 function Metric({ label, value, detail, icon: Icon }: { label: string; value: string; detail: string; icon: typeof FileText }) {

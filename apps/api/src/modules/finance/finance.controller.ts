@@ -3,6 +3,7 @@ import {
   Get,
   Post,
   Patch,
+  Put,
   Param,
   Query,
   Headers,
@@ -110,6 +111,16 @@ export class FinanceController {
     @Body(new ZodValidationPipe(feeStructureStatusSchema)) body: z.infer<typeof feeStructureStatusSchema>,
   ) {
     return this.financeService.setFeeStructureActive(school.id, feeStructureId, body.isActive);
+  }
+
+  @Put("fee-structures/:feeStructureId")
+  @Roles("owner", "admin", "accountant")
+  updateFeeStructure(
+    @CurrentSchool() school: School,
+    @Param("feeStructureId") feeStructureId: string,
+    @Body(new ZodValidationPipe(feeStructureSchema)) body: z.infer<typeof feeStructureSchema>,
+  ) {
+    return this.financeService.updateFeeStructure(school.id, feeStructureId, body);
   }
 
   @Get("fee-item-registry")

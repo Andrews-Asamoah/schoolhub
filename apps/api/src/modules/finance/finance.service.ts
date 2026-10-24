@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  ConflictException,
   ForbiddenException,
 } from "@nestjs/common";
 import { PrismaService } from "../../prisma/prisma.service.js";
@@ -153,6 +154,91 @@ export class FinanceService {
     });
   }
 
+  async updateFeeStructure(
+    schoolId: string,
+    feeStructureId: string,
+    input: {
+      name: string;
+      description?: string | null;
+      classLevel?: string | null;
+      termBased: boolean;
+      targetClassIds: string[];
+      items: { registryItemId?: string | null; name: string; amount: number; isOptional: boolean; description?: string | null }[];
+    },
+  ) {
+    const classIds = [...new Set(input.targetClassIds)];
+    const registryIds = [...new Set(input.items.map((item) => item.registryItemId).filter((id): id is string => Boolean(id)))];
+
+    return this.prisma.client.$transaction(async (tx) => {
+      // Share the same advisory lock with bill generation so an edit cannot
+      // race with a bill that is being created from this template.
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${schoolId}), hashtext(${feeStructureId}))`;
+      const existing = await tx.feeStructure.findFirst({
+        where: { id: feeStructureId, schoolId },
+        include: { _count: { select: { bills: true } } },
+      });
+      if (!existing) throw new NotFoundException("Fee structure not found.");
+      if (existing._count.bills > 0) {
+        throw new ConflictException(
+          "This fee structure has already been used to generate student bills and is locked. Duplicate it to create an editable version.",
+        );
+      }
+
+      const [classes, registryItems] = await Promise.all([
+        classIds.length
+          ? tx.class.findMany({
+              where: { id: { in: classIds }, schoolId, deletedAt: null },
+              select: { id: true },
+            })
+          : Promise.resolve([]),
+        registryIds.length
+          ? tx.feeItemRegistry.findMany({
+              where: { id: { in: registryIds }, schoolId },
+              select: { id: true, name: true },
+            })
+          : Promise.resolve([]),
+      ]);
+      if (classes.length !== classIds.length) {
+        throw new BadRequestException("One or more selected classes do not belong to this school.");
+      }
+      if (registryItems.length !== registryIds.length) {
+        throw new BadRequestException("One or more fee item categories are invalid for this school.");
+      }
+
+      // No bill has ever been generated from this structure, so replacing
+      // the template's item and class rows is safe. The operation is atomic.
+      await tx.feeStructureClass.deleteMany({ where: { feeStructureId } });
+      await tx.feeItem.deleteMany({ where: { feeStructureId } });
+      return tx.feeStructure.update({
+        where: { id: feeStructureId },
+        data: {
+          name: input.name.trim(),
+          description: input.description?.trim() || null,
+          classLevel: input.classLevel?.trim() || null,
+          termBased: input.termBased,
+          targetClasses: { create: classIds.map((classId) => ({ classId })) },
+          items: {
+            create: input.items.map((item) => {
+              const registryItem = registryItems.find((candidate) => candidate.id === item.registryItemId);
+              return {
+                name: item.name.trim() || registryItem?.name || "Fee item",
+                amount: new Prisma.Decimal(item.amount),
+                isOptional: item.isOptional,
+                description: item.description?.trim() || null,
+                registryItemId: item.registryItemId || null,
+              };
+            }),
+          },
+        },
+        include: {
+          items: true,
+          targetClasses: { include: { class: { select: { id: true, name: true } } } },
+          _count: { select: { bills: true } },
+        },
+      });
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+  }
+
   async setFeeStructureActive(schoolId: string, feeStructureId: string, isActive: boolean) {
     const existing = await this.prisma.client.feeStructure.findFirst({
       where: { id: feeStructureId, schoolId },
@@ -177,17 +263,13 @@ export class FinanceService {
     });
     const currentTerm = currentYear?.terms[0];
     if (!currentYear || !currentTerm) {
-      throw new BadRequestException(
-        "This school has not selected a current academic year and term.",
-      );
+      throw new BadRequestException("This school has not selected a current academic year and term.");
     }
     if (
       input.academicYearId !== currentYear.id ||
       (input.termId && input.termId !== currentTerm.id)
     ) {
-      throw new BadRequestException(
-        "Bills can only be generated for the currently selected academic year and term.",
-      );
+      throw new BadRequestException("Bills can only be generated for the currently selected academic year and term.");
     }
 
     if (input.classId) {
@@ -195,37 +277,11 @@ export class FinanceService {
         where: { id: input.classId, schoolId, deletedAt: null },
         select: { id: true },
       });
-      if (!schoolClass) {
-        throw new NotFoundException("Class not found in this school.");
-      }
+      if (!schoolClass) throw new NotFoundException("Class not found in this school.");
     }
 
-    const feeStructure = await this.prisma.client.feeStructure.findFirst({
-      where: { id: input.feeStructureId, schoolId, isActive: true },
-      include: { items: true, targetClasses: { select: { classId: true } } },
-    });
-
-    if (!feeStructure) {
-      throw new NotFoundException("Fee structure not found");
-    }
-
-    if (feeStructure.items.length === 0) {
-      throw new BadRequestException("Fee structure contains no billable items");
-    }
-    if (
-      input.classId &&
-      feeStructure.targetClasses.length > 0 &&
-      !feeStructure.targetClasses.some((target) => target.classId === input.classId)
-    ) {
-      throw new BadRequestException("This fee structure is not assigned to the selected class.");
-    }
-
-    const totalAmount = feeStructure.items.reduce(
-      (sum, item) => sum + Number(item.amount),
-      0,
-    );
-
-    // Target students: either specific student or all students in class
+    // Target students: either a single currently enrolled student or all
+    // currently enrolled students in the selected class.
     let studentIds: string[] = [];
     if (input.studentId) {
       const enrollment = await this.prisma.client.enrollment.findFirst({
@@ -239,9 +295,7 @@ export class FinanceService {
         select: { studentId: true },
       });
       if (!enrollment) {
-        throw new BadRequestException(
-          "The selected student is not enrolled in the current term.",
-        );
+        throw new BadRequestException("The selected student is not enrolled in the current term.");
       }
       studentIds = [enrollment.studentId];
     } else if (input.classId) {
@@ -259,13 +313,31 @@ export class FinanceService {
     } else {
       throw new BadRequestException("Either classId or studentId must be provided");
     }
-
     if (studentIds.length === 0) {
       return { success: true, count: 0, message: "No active students to bill" };
     }
 
     const year = new Date().getFullYear();
-    const createdBills = await this.prisma.client.$transaction(async (tx) => {
+    const billingResult = await this.prisma.client.$transaction(async (tx) => {
+      // Editing a structure and generating bills share this lock. The template
+      // and fee items are re-read after acquiring it, so bills always snapshot
+      // one consistent version of the structure.
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${schoolId}), hashtext(${input.feeStructureId}))`;
+      const feeStructure = await tx.feeStructure.findFirst({
+        where: { id: input.feeStructureId, schoolId, isActive: true },
+        include: { items: true, targetClasses: { select: { classId: true } } },
+      });
+      if (!feeStructure) throw new NotFoundException("Fee structure not found.");
+      if (!feeStructure.items.length) throw new BadRequestException("Fee structure contains no billable items.");
+      if (
+        input.classId &&
+        feeStructure.targetClasses.length > 0 &&
+        !feeStructure.targetClasses.some((target) => target.classId === input.classId)
+      ) {
+        throw new BadRequestException("This fee structure is not assigned to the selected class.");
+      }
+
+      const totalAmount = feeStructure.items.reduce((sum, item) => sum + Number(item.amount), 0);
       const results = [];
       for (const studentId of studentIds) {
         // Avoid issuing the same fee structure twice for a student in the same term.
@@ -284,7 +356,6 @@ export class FinanceService {
 
         const randomNum = Math.floor(10000 + Math.random() * 90000);
         const billNumber = `INV-${year}-${randomNum}`;
-
         const bill = await tx.bill.create({
           data: {
             schoolId,
@@ -311,26 +382,19 @@ export class FinanceService {
             },
           },
         });
-
-        // Increase student's outstanding balance
         await tx.student.update({
           where: { id: studentId },
-          data: {
-            outstandingBalance: {
-              increment: new Prisma.Decimal(totalAmount),
-            },
-          },
+          data: { outstandingBalance: { increment: new Prisma.Decimal(totalAmount) } },
         });
-
         results.push(bill);
       }
-      return results;
+      return { bills: results, totalAmount };
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 
     return {
       success: true,
-      count: createdBills.length,
-      totalBilled: totalAmount * createdBills.length,
+      count: billingResult.bills.length,
+      totalBilled: billingResult.totalAmount * billingResult.bills.length,
     };
   }
 
