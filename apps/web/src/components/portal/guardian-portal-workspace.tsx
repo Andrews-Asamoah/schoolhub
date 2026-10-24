@@ -42,13 +42,6 @@ const tabs: { id: GuardianTab; label: string; icon: typeof HeartHandshake }[] = 
   { id: "notices", label: "School notices", icon: BellRing },
 ];
 
-const formatDate = (value: string | null | undefined) => {
-  if (!value) return "Not recorded";
-  const date = new Date(value);
-  return Number.isNaN(date.getTime())
-    ? "Not recorded"
-    : new Intl.DateTimeFormat("en-GH", { day: "numeric", month: "short", year: "numeric" }).format(date);
-};
 
 function Initials({ name }: { name: string }) {
   const initials = name.trim().split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join("").toUpperCase();
