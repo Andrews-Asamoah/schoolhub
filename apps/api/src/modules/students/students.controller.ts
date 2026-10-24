@@ -37,7 +37,7 @@ export class StudentsController {
   ) {}
 
   @Get()
-  @Roles("owner", "admin", "teacher", "staff", "accountant")
+  @Roles("owner", "admin", "headteacher", "teacher", "staff", "accountant")
   async listStudents(
     @CurrentSchool() school: School,
     @CurrentSchoolRole() role: string | undefined,
