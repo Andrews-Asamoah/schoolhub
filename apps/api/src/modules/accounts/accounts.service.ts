@@ -179,7 +179,7 @@ export class AccountsService {
         email = staff.profile.user.email;
         role = roleForStaffType(staff.staffType);
         credential = await this.credentials.prepare(role);
-        if (role === "admin" && actor.schoolRole === "headmistress") {
+        if (role === "admin" && actor.schoolRole === "headteacher") {
           throw new ForbiddenException("Only a school owner or administrator can manage administrator logins.");
         }
       } else {

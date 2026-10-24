@@ -66,7 +66,7 @@ export class PeopleController {
   constructor(private readonly peopleService: PeopleService) {}
 
   @Get("teachers")
-  @Roles("owner", "admin", "headmistress", "teacher", "staff")
+  @Roles("owner", "admin", "headteacher", "teacher", "staff")
   listTeachers(
     @CurrentSchool() school: School,
     @Query("page") page?: string,
@@ -83,7 +83,7 @@ export class PeopleController {
   }
 
   @Get("teachers/:id")
-  @Roles("owner", "admin", "headmistress", "teacher", "staff")
+  @Roles("owner", "admin", "headteacher", "teacher", "staff")
   getTeacher(
     @CurrentSchool() school: School,
     @CurrentSchoolRole() role: string | undefined,
@@ -93,7 +93,7 @@ export class PeopleController {
   }
 
   @Post("teachers")
-  @Roles("owner", "admin", "headmistress")
+  @Roles("owner", "admin", "headteacher")
   @Header("Cache-Control", "no-store") // response carries a one-time password
   createTeacher(
     @CurrentSchool() school: School,
@@ -105,7 +105,7 @@ export class PeopleController {
   }
 
   @Patch("teachers/:id")
-  @Roles("owner", "admin", "headmistress")
+  @Roles("owner", "admin", "headteacher")
   updateTeacher(
     @CurrentSchool() school: School,
     @CurrentUser() actor: AuthenticatedUser | undefined,
@@ -116,7 +116,7 @@ export class PeopleController {
   }
 
   @Patch("teachers/:id/status")
-  @Roles("owner", "admin", "headmistress")
+  @Roles("owner", "admin", "headteacher")
   setTeacherStatus(
     @CurrentSchool() school: School,
     @Param("id") id: string,
@@ -127,7 +127,7 @@ export class PeopleController {
   }
 
   @Get("staff")
-  @Roles("owner", "admin", "headmistress", "staff")
+  @Roles("owner", "admin", "headteacher", "staff")
   listStaff(
     @CurrentSchool() school: School,
     @Query("page") page?: string,
@@ -144,7 +144,7 @@ export class PeopleController {
   }
 
   @Post("staff")
-  @Roles("owner", "admin", "headmistress")
+  @Roles("owner", "admin", "headteacher")
   @Header("Cache-Control", "no-store")
   createStaff(
     @CurrentSchool() school: School,
@@ -161,7 +161,7 @@ export class PeopleController {
   }
 
   @Patch("staff/:id")
-  @Roles("owner", "admin", "headmistress")
+  @Roles("owner", "admin", "headteacher")
   updateStaff(
     @CurrentSchool() school: School,
     @CurrentSchoolRole() schoolRole: string | undefined,
@@ -178,7 +178,7 @@ export class PeopleController {
   }
 
   @Patch("staff/:id/status")
-  @Roles("owner", "admin", "headmistress")
+  @Roles("owner", "admin", "headteacher")
   setStaffStatus(
     @CurrentSchool() school: School,
     @Param("id") id: string,
@@ -189,7 +189,7 @@ export class PeopleController {
   }
 
   @Get("guardians")
-  @Roles("owner", "admin", "headmistress", "staff")
+  @Roles("owner", "admin", "headteacher", "staff")
   listGuardians(
     @CurrentSchool() school: School,
     @Query("page") page?: string,
@@ -206,7 +206,7 @@ export class PeopleController {
   }
 
   @Post("guardians")
-  @Roles("owner", "admin", "headmistress", "staff")
+  @Roles("owner", "admin", "headteacher", "staff")
   @Header("Cache-Control", "no-store")
   createGuardian(
     @CurrentSchool() school: School,
@@ -218,7 +218,7 @@ export class PeopleController {
   }
 
   @Patch("guardians/:id")
-  @Roles("owner", "admin", "headmistress")
+  @Roles("owner", "admin", "headteacher")
   updateGuardian(
     @CurrentSchool() school: School,
     @CurrentUser() actor: AuthenticatedUser | undefined,
@@ -229,7 +229,7 @@ export class PeopleController {
   }
 
   @Patch("guardians/:id/status")
-  @Roles("owner", "admin", "headmistress")
+  @Roles("owner", "admin", "headteacher")
   setGuardianStatus(
     @CurrentSchool() school: School,
     @Param("id") id: string,

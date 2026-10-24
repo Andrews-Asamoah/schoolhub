@@ -17,7 +17,7 @@ import { AssessmentSetupService } from "./assessment-setup.service.js";
 /** Setting up assessments is for the people who run the school. */
 @Controller("assessments/setup")
 @UseGuards(SchoolTenantGuard, RolesGuard)
-@Roles("owner", "admin", "headmistress")
+@Roles("owner", "admin", "headteacher")
 export class AssessmentSetupController {
   constructor(private readonly setup: AssessmentSetupService) {}
 

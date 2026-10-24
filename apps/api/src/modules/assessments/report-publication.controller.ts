@@ -14,23 +14,23 @@ export class ReportPublicationController {
   constructor(private readonly reports: ReportPublicationService, private readonly templatePresets: ReportTemplatePresetsService) {}
 
   @Get("workspace")
-  @Roles("owner", "admin", "headmistress")
+  @Roles("owner", "admin", "headteacher")
   getWorkspace(@CurrentSchool() school: School) { return this.reports.getWorkspace(school.id); }
 
   @Get("sets/:id/reports")
-  @Roles("owner", "admin", "headmistress")
+  @Roles("owner", "admin", "headteacher")
   getSetReports(@CurrentSchool() school: School, @Param("id") id: string) {
     return this.reports.getSetReports(school.id, id);
   }
 
   @Post("templates/initialize-defaults")
-  @Roles("owner", "admin", "headmistress")
+  @Roles("owner", "admin", "headteacher")
   initializeTemplates(@CurrentSchool() school: School, @CurrentUser() user: AuthenticatedUser) {
     return this.templatePresets.initializeDefaultTemplates(school.id, user.id);
   }
 
   @Patch("templates/:id/activate")
-  @Roles("owner", "admin", "headmistress")
+  @Roles("owner", "admin", "headteacher")
   activateTemplate(@CurrentSchool() school: School, @CurrentUser() user: AuthenticatedUser, @Param("id") id: string) {
     return this.templatePresets.activateTemplate(school.id, user.id, id);
   }
@@ -48,7 +48,7 @@ export class ReportPublicationController {
   }
 
   @Post("sets")
-  @Roles("owner", "admin", "headmistress")
+  @Roles("owner", "admin", "headteacher")
   createSet(@CurrentSchool() school: School, @CurrentUser() user: AuthenticatedUser, @Body() body: unknown) {
     if (!body || typeof body !== "object") throw new BadRequestException("Provide report-set details.");
     const input = body as Record<string, unknown>;
@@ -63,19 +63,19 @@ export class ReportPublicationController {
   }
 
   @Post("sets/:id/generate")
-  @Roles("owner", "admin", "headmistress")
+  @Roles("owner", "admin", "headteacher")
   generate(@CurrentSchool() school: School, @CurrentUser() user: AuthenticatedUser, @Param("id") id: string) {
     return this.reports.generate(school.id, user.id, id);
   }
 
   @Patch("sets/:id/review")
-  @Roles("owner", "admin", "headmistress")
+  @Roles("owner", "admin", "headteacher")
   markReviewed(@CurrentSchool() school: School, @CurrentUser() user: AuthenticatedUser, @Param("id") id: string) {
     return this.reports.markReviewed(school.id, user.id, id);
   }
 
   @Patch("sets/:id/publish")
-  @Roles("owner", "admin", "headmistress")
+  @Roles("owner", "admin", "headteacher")
   publish(@CurrentSchool() school: School, @CurrentUser() user: AuthenticatedUser, @Param("id") id: string) {
     return this.reports.publish(school.id, user.id, id);
   }

@@ -10,7 +10,7 @@ describe("default passwords", () => {
     expect(DEFAULT_PASSWORDS.guardian).toBe("Guardian@123");
     expect(DEFAULT_PASSWORDS.teacher).toBe("Teacher@123");
     expect(DEFAULT_PASSWORDS.accountant).toBe("Accountant@123");
-    expect(DEFAULT_PASSWORDS.headmistress).toBe("Headteacher@123");
+    expect(DEFAULT_PASSWORDS.headteacher).toBe("Headteacher@123");
     expect(DEFAULT_PASSWORDS.admin).toBe("Admin@123");
   });
 
@@ -51,7 +51,7 @@ describe("login identifiers and roles", () => {
   });
   it("maps staff types to school roles", () => {
     expect(roleForStaffType("ACCOUNTANT")).toBe("accountant");
-    expect(roleForStaffType("HEADTEACHER")).toBe("headmistress");
+    expect(roleForStaffType("HEADTEACHER")).toBe("headteacher");
     expect(roleForStaffType("ADMIN")).toBe("admin");
     expect(roleForStaffType("DRIVER")).toBe("staff");
   });
