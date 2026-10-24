@@ -169,7 +169,7 @@ export class AnnouncementsService {
 
   private async getUserStudentClassIds(schoolId: string, userId: string) {
     const student = await this.prisma.client.student.findFirst({
-      where: { schoolId, deletedAt: null, profile: { userId } },
+      where: { schoolId, deletedAt: null, status: "ACTIVE", profile: { userId } },
       select: {
         classId: true,
         enrollments: {
@@ -208,8 +208,8 @@ export class AnnouncementsService {
   private async guardianHasOutstandingWard(schoolId: string, userId: string) {
     const guardian = await this.prisma.client.guardian.findFirst({
       where: {
-        schoolId, deletedAt: null, profile: { is: { userId } },
-        students: { some: { student: { schoolId, deletedAt: null, bills: {
+        schoolId, deletedAt: null, isActive: true, profile: { is: { userId } },
+        students: { some: { student: { schoolId, deletedAt: null, status: "ACTIVE", bills: {
           some: { schoolId, balanceAmount: { gt: 0 }, status: { in: [...debtorBillStatuses] } },
         } } } },
       },

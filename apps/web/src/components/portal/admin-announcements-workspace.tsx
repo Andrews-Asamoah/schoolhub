@@ -480,7 +480,7 @@ export function AdminAnnouncementsWorkspace({ mode = "admin" }: { mode?: Announc
                   classIds: current.classIds.includes(classId) ? current.classIds : [...current.classIds, classId],
                 }))}
               >
-                <SelectTrigger id="announcement-class-selector" className="h-10 w-full bg-background">
+                <SelectTrigger id="announcement-class-selector" disabled={classOptionsQuery.isPending || classOptions.length === 0 || form.classIds.length >= 100} className="h-10 w-full bg-background">
                   <SelectValue placeholder={classOptionsQuery.isPending ? "Loading classes…" : "Add a class"} />
                 </SelectTrigger>
                 <SelectContent>
@@ -496,6 +496,9 @@ export function AdminAnnouncementsWorkspace({ mode = "admin" }: { mode?: Announc
                     Retry loading classes
                   </button>
                 </div>
+              )}
+              {!classOptionsQuery.isPending && classOptions.length === 0 && !classOptionsQuery.isError && (
+                <p className="text-xs text-muted-foreground">No active classes are available for your account.</p>
               )}
               {selectedClasses.length > 0 ? (
                 <div className="flex flex-wrap gap-2">
