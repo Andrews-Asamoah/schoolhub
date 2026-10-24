@@ -247,6 +247,7 @@ export function StudentTimetableView() {
     const slots = new Map<string, { key: string; startTime: string; endTime: string; startMinutes: number; endMinutes: number }>();
 
     for (const entry of entries) {
+      if (!DAYS.includes(entry.dayOfWeek as DayKey)) continue;
       const startMinutes = parseTime(entry.startTime);
       const endMinutes = parseTime(entry.endTime);
       if (startMinutes === null || endMinutes === null || endMinutes <= startMinutes) continue;
@@ -265,6 +266,7 @@ export function StudentTimetableView() {
   useEffect(() => {
     if (!isPrinting) return;
 
+    document.documentElement.classList.add("printing-student-timetable");
     document.body.classList.add("printing-student-timetable");
     const finishPrinting = () => setIsPrinting(false);
     window.addEventListener("afterprint", finishPrinting);
@@ -274,6 +276,7 @@ export function StudentTimetableView() {
       window.clearTimeout(printTimeout);
       window.removeEventListener("afterprint", finishPrinting);
       document.body.classList.remove("printing-student-timetable");
+      document.documentElement.classList.remove("printing-student-timetable");
     };
   }, [isPrinting]);
 
@@ -871,17 +874,23 @@ export function StudentTimetableView() {
         data-density={printSlots.length > 12 ? "tight" : printSlots.length > 8 ? "compact" : "standard"}
       >
         <header className="student-timetable-print-header">
-          <div>
-            <p className="student-timetable-print-eyebrow">SchoolHub · Weekly schedule</p>
-            <h1>Class Timetable{data?.class?.name ? ` — ${data.class.name}` : ""}</h1>
-            <p className="student-timetable-print-subtitle">
-              {[data?.class?.level, data?.academicYear?.name, data?.term?.name].filter(Boolean).join(" · ") || "Current academic schedule"}
+          <div className="student-timetable-print-school">
+            <p className="student-timetable-print-eyebrow">
+              {school?.code ? `School code: ${school.code}` : "Weekly school timetable"}
             </p>
+            <h1>{school?.name || "School Timetable"}</h1>
+            {school?.motto && <p className="student-timetable-print-motto">{school.motto}</p>}
+            {(school?.address || school?.phone || school?.email || school?.website) && (
+              <p className="student-timetable-print-contact">
+                {[school?.address, school?.phone, school?.email, school?.website].filter(Boolean).join(" · ")}
+              </p>
+            )}
           </div>
           <div className="student-timetable-print-datestamp">
-            <span>Printed on</span>
-            <strong>{formatLongDate(now)}</strong>
-            <span>{formatClock(now)}</span>
+            <strong className="student-timetable-print-document-title">WEEKLY CLASS TIMETABLE</strong>
+            <strong>{data?.class?.name || "Class not assigned"}{data?.class?.level ? ` · ${data.class.level}` : ""}</strong>
+            <span>{[data?.academicYear?.name, data?.term?.name].filter(Boolean).join(" · ") || "Current academic schedule"}</span>
+            <span>Printed {formatLongDate(now)} · {formatClock(now)}</span>
           </div>
         </header>
 
