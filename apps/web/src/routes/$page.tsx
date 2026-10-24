@@ -249,10 +249,10 @@ function WorkspaceContent({ pageId }: { pageId: string }) {
           {pageId === "staff" && <PeopleWorkspace kind="staff" />}
           {pageId === "guardians" && <PeopleWorkspace kind="guardians" />}
           {pageId === "houses" && (
-            activeRole === "student" ? <StudentHouseClubsView /> : <HousesWorkspace />
+            activeRole === "student" ? <StudentHouseClubsView view="HOUSE" /> : <HousesWorkspace />
           )}
           {pageId === "clubs" && (
-            activeRole === "student" ? <StudentHouseClubsView /> : <ClubsWorkspace />
+            activeRole === "student" ? <StudentHouseClubsView view="CLUBS" /> : <ClubsWorkspace />
           )}
           {pageId === "classmates" && <StudentClassmatesView />}
           {pageId === "assignments" && <StudentAssignmentsView />}
