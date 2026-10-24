@@ -44,6 +44,7 @@ import { TeacherPortalWorkspace } from "@/components/portal/teacher-portal-works
 import { AccountantPortalWorkspace } from "@/components/portal/accountant-portal-workspace";
 import { ExpenseManagementWorkspace } from "@/components/portal/expense-management-workspace";
 import { PayrollManagementWorkspace } from "@/components/portal/payroll-management-workspace";
+import { FeeReminderWorkspace } from "@/components/portal/fee-reminder-workspace";
 import { FeeStructuresWorkspace } from "@/components/portal/fee-structures-workspace";
 import { GuardianPortalWorkspace } from "@/components/portal/guardian-portal-workspace";
 import { GuardianChildRecordsWorkspace } from "@/components/portal/guardian-child-records-workspace";
@@ -203,7 +204,7 @@ function WorkspaceContent({ pageId }: { pageId: string }) {
   return (
     <>
       {activeRole !== "student" &&
-        !["classes", "students", "teachers", "staff", "guardians", "teacher-portal", "accountant-portal", "fees", "payments", "invoices", "expenses", "payroll", "inventory", "outstanding", "finance-reports", "guardian-portal", "guardian-attendance", "guardian-timetable", "guardian-reports", "guardian-notices", "guardian-fees", "student-portal", "clubs", "houses", "assignments", "classmates", "announcements"].includes(
+        !["classes", "students", "teachers", "staff", "guardians", "teacher-portal", "accountant-portal", "fees", "payments", "invoices", "expenses", "payroll", "fee-reminders", "inventory", "outstanding", "finance-reports", "guardian-portal", "guardian-attendance", "guardian-timetable", "guardian-reports", "guardian-notices", "guardian-fees", "student-portal", "clubs", "houses", "assignments", "classmates", "announcements"].includes(
           pageId,
         ) && (
         <WorkspacePageHeading
@@ -235,6 +236,7 @@ function WorkspaceContent({ pageId }: { pageId: string }) {
           {pageId === "finance-reports" && <AccountantPortalWorkspace defaultTab="reports" />}
           {pageId === "expenses" && <ExpenseManagementWorkspace />}
           {pageId === "payroll" && <PayrollManagementWorkspace />}
+          {pageId === "fee-reminders" && <FeeReminderWorkspace />}
           {pageId === "inventory" && <AccountantPortalWorkspace defaultTab="inventory" />}
           {pageId === "timetable" && (
             activeRole === "student" ? <StudentPortalWorkspace page="timetable" /> : <TimetableWorkspace />
