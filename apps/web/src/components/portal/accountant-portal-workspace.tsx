@@ -30,6 +30,7 @@ import {
   type RecordPaymentInput,
 } from "@schoolhub/shared";
 import { AdminAnnouncementsWorkspace } from "./admin-announcements-workspace";
+import { AccountantFinanceCharts } from "./accountant-finance-charts";
 import { apiFetch } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
