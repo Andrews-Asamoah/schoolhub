@@ -1,10 +1,14 @@
-import { useMemo, useState, type ReactNode } from "react";
-import { Activity, UsersRound, WalletCards, type LucideIcon } from "lucide-react";
+import type { ReactNode } from "react";
+import type { LucideIcon } from "lucide-react";
+import { Activity, TrendingUp, UsersRound, WalletCards } from "lucide-react";
 import {
   Bar,
   BarChart,
   CartesianGrid,
   Cell,
+  Legend,
+  Line,
+  LineChart,
   Pie,
   PieChart,
   ResponsiveContainer,
@@ -12,6 +16,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import type { DashboardAnalytics } from "@/components/school/dashboard/dashboard-data";
 import { cn } from "@/lib/utils";
 import {
   Select,
@@ -21,18 +26,21 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-type AttendancePeriod = "week" | "month" | "term";
-
-export interface ChartDatum {
-  label: string;
-  value: number;
-}
-
-export interface BreakdownDatum {
-  label: string;
-  count: number;
-  color: string;
-}
+const GENDER_COLORS = ["#2563eb", "#db2777", "#8b5cf6", "#94a3b8"];
+const chartTooltipStyle = {
+  backgroundColor: "var(--popover)",
+  border: "1px solid var(--border)",
+  borderRadius: "12px",
+  color: "var(--popover-foreground)",
+  fontSize: 12,
+};
+const numberFormat = new Intl.NumberFormat("en-GH");
+const moneyFormat = new Intl.NumberFormat("en-GH", {
+  style: "currency",
+  currency: "GHS",
+  maximumFractionDigits: 2,
+});
+const money = (value: number) => moneyFormat.format(value);
 
 export interface InfographicCardProps {
   title: string;
@@ -43,350 +51,134 @@ export interface InfographicCardProps {
   aside?: ReactNode;
 }
 
-const CHART_COLORS = ["#8b5cf6", "#0ea5e9", "#6366f1", "#10b981"];
-
-const attendanceSeries: Record<AttendancePeriod, ChartDatum[]> = {
-  week: [
-    { label: "Mon", value: 88 },
-    { label: "Tue", value: 94 },
-    { label: "Wed", value: 86 },
-    { label: "Thu", value: 93 },
-    { label: "Fri", value: 91 },
-  ],
-  month: [
-    { label: "Week 1", value: 87 },
-    { label: "Week 2", value: 91 },
-    { label: "Week 3", value: 89 },
-    { label: "Week 4", value: 94 },
-  ],
-  term: [
-    { label: "Sep", value: 88 },
-    { label: "Oct", value: 92 },
-    { label: "Nov", value: 90 },
-    { label: "Dec", value: 95 },
-  ],
-};
-
-const enrollmentMix: BreakdownDatum[] = [
-  { label: "Kindergarten", count: 180, color: "bg-violet-500" },
-  { label: "Primary", count: 710, color: "bg-sky-500" },
-  { label: "Junior high", count: 394, color: "bg-primary" },
-];
-
-const collectedFees = 84_250;
-const feeTarget = 120_000;
-const feeProgress = Math.min(100, Math.round((collectedFees / feeTarget) * 1000) / 10);
-
-const chartTooltipStyle = {
-  backgroundColor: "var(--popover)",
-  border: "1px solid var(--border)",
-  borderRadius: "12px",
-  color: "var(--popover-foreground)",
-  fontSize: 12,
-};
-
 export function InfographicCard({
-  title,
-  description,
-  icon: Icon,
-  children,
-  className,
-  aside,
+  title, description, icon: Icon, children, className, aside,
 }: InfographicCardProps) {
   return (
-    <article
-      className={cn(
-        "min-w-0 rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-6",
-        className,
-      )}
-    >
+    <article className={cn("min-w-0 rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-6", className)}>
       <div className="mb-5 flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h2 className="text-sm font-semibold text-foreground">{title}</h2>
-          <p className="mt-1 text-xs leading-5 text-muted-foreground">
-            {description}
-          </p>
+          <p className="mt-1 text-xs leading-5 text-muted-foreground">{description}</p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
           {aside}
-          <span className="flex size-9 items-center justify-center rounded-xl bg-muted text-foreground">
-            <Icon className="size-4" aria-hidden="true" />
-          </span>
+          <span className="flex size-9 items-center justify-center rounded-xl bg-muted text-foreground"><Icon className="size-4" aria-hidden="true" /></span>
         </div>
       </div>
       {children}
-      <p className="mt-5 text-[10px] text-muted-foreground">
-        Illustrative sample data · not live school records
-      </p>
+      <p className="mt-4 border-t border-border/70 pt-3 text-[10px] text-muted-foreground">Based on live school records</p>
     </article>
   );
 }
 
-export function VerticalBarChart({
-  data,
-  maxValue = 100,
-  suffix = "%",
-  color = "var(--primary)",
-  label,
-}: {
-  data: ChartDatum[];
-  maxValue?: number;
-  suffix?: string;
-  color?: string;
-  label: string;
-}) {
-  return (
-    <div
-      role="img"
-      aria-label={label + ": " + data.map((item) => `${item.label} ${item.value}${suffix}`).join(", ")}
-      className="h-48 w-full min-w-0"
-    >
-      <ResponsiveContainer width="100%" height="100%" minWidth={0}>
-        <BarChart data={data} margin={{ top: 6, right: 4, bottom: 0, left: -18 }}>
-          <CartesianGrid stroke="var(--border)" strokeDasharray="3 3" vertical={false} />
-          <XAxis
-            dataKey="label"
-            tickLine={false}
-            axisLine={false}
-            tick={{ fill: "var(--muted-foreground)", fontSize: 10 }}
-          />
-          <YAxis
-            domain={[0, maxValue]}
-            tickFormatter={(value: number) => `${value}${suffix}`}
-            tickLine={false}
-            axisLine={false}
-            width={42}
-            tick={{ fill: "var(--muted-foreground)", fontSize: 10 }}
-          />
-          <Tooltip
-            cursor={{ fill: "var(--muted)", opacity: 0.45 }}
-            contentStyle={chartTooltipStyle}
-            formatter={(value) => [`${value ?? 0}${suffix}`, label]}
-          />
-          <Bar dataKey="value" fill={color} radius={[5, 5, 0, 0]} maxBarSize={34} />
-        </BarChart>
-      </ResponsiveContainer>
-    </div>
-  );
+function EmptyChart({ message }: { message: string }) {
+  return <div className="flex h-56 items-center justify-center rounded-xl border border-dashed border-border px-5 text-center text-sm text-muted-foreground">{message}</div>;
 }
 
-export function DonutProgressChart({
-  value,
-  label,
-  sublabel,
-  amount,
-  targetAmount,
-  currencyPrefix = "GHS",
-}: {
-  value: number;
-  label: string;
-  sublabel: string;
-  amount: number;
-  targetAmount: number;
-  currencyPrefix?: string;
-}) {
-  const boundedValue = Math.min(100, Math.max(0, value));
-  const data = [
-    { name: label, value: boundedValue },
-    { name: "Remaining", value: 100 - boundedValue },
-  ];
-
-  return (
-    <div className="flex min-w-0 items-center gap-4 sm:gap-5">
-      <div
-        role="img"
-        aria-label={`${label}: ${boundedValue}%`}
-        className="relative size-32 shrink-0"
-      >
-        <ResponsiveContainer width="100%" height="100%">
-          <PieChart>
-            <Pie
-              data={data}
-              dataKey="value"
-              nameKey="name"
-              cx="50%"
-              cy="50%"
-              innerRadius="72%"
-              outerRadius="94%"
-              startAngle={90}
-              endAngle={-270}
-              paddingAngle={0}
-              stroke="none"
-              isAnimationActive
-            >
-              <Cell fill="var(--primary)" />
-              <Cell fill="var(--muted)" />
-            </Pie>
-          </PieChart>
-        </ResponsiveContainer>
-        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center">
-          <span className="text-2xl font-bold tracking-tight text-foreground">
-            {boundedValue}%
-          </span>
-          <span className="text-[10px] text-muted-foreground">of target</span>
-        </div>
-      </div>
-      <div className="min-w-0 flex-1">
-        <p className="text-xs text-muted-foreground">{sublabel}</p>
-        <p className="mt-1 text-xl font-bold tracking-tight text-foreground">
-          {currencyPrefix} {amount.toLocaleString("en-GH")}
-        </p>
-        <p className="mt-1 text-xs text-muted-foreground">
-          of {currencyPrefix} {targetAmount.toLocaleString("en-GH")} target
-        </p>
-        <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-muted">
-          <div
-            className="h-full rounded-full bg-primary transition-[width] duration-500"
-            style={{ width: `${boundedValue}%` }}
-          />
-        </div>
-      </div>
-    </div>
-  );
+function ChartLoading() {
+  return <div className="h-56 animate-pulse rounded-xl bg-muted/60" aria-label="Loading chart" />;
 }
 
-export function HorizontalBreakdown({
+export function DashboardInfographics({
   data,
+  isLoading,
+  isError,
+  selectedMonths,
+  onMonthsChange,
 }: {
-  data: BreakdownDatum[];
+  data?: DashboardAnalytics;
+  isLoading: boolean;
+  isError: boolean;
+  selectedMonths: number;
+  onMonthsChange: (months: number) => void;
 }) {
-  const total = data.reduce((sum, item) => sum + item.count, 0);
-  if (total <= 0) {
-    return <p className="text-xs text-muted-foreground">No distribution data available.</p>;
-  }
+  const periodSelect = (
+    <Select value={String(selectedMonths)} onValueChange={(value) => onMonthsChange(Number(value))}>
+      <SelectTrigger className="h-8 w-[92px] text-xs" aria-label="Select chart period"><SelectValue /></SelectTrigger>
+      <SelectContent>
+        <SelectItem value="3">3 months</SelectItem>
+        <SelectItem value="6">6 months</SelectItem>
+        <SelectItem value="12">12 months</SelectItem>
+      </SelectContent>
+    </Select>
+  );
+  const unavailable = isError ? "Live analytics could not be loaded. Try refreshing the dashboard." : "No records are available for this chart yet.";
 
   return (
-    <div className="space-y-4">
-      <div
-        className="h-44 w-full min-w-0"
-        role="img"
-        aria-label={data.map((item) => `${item.label}: ${item.count} students`).join(", ")}
-      >
-        <ResponsiveContainer width="100%" height="100%">
-          <PieChart>
-            <Pie
-              data={data}
-              dataKey="count"
-              nameKey="label"
-              cx="50%"
-              cy="50%"
-              innerRadius="46%"
-              outerRadius="78%"
-              paddingAngle={2}
-              stroke="none"
-            >
-              {data.map((item, index) => (
-                <Cell key={item.label} fill={CHART_COLORS[index % CHART_COLORS.length]} />
-              ))}
-            </Pie>
-            <Tooltip contentStyle={chartTooltipStyle} formatter={(value) => [Number(value ?? 0).toLocaleString("en-GH"), "Students"]} />
-          </PieChart>
-        </ResponsiveContainer>
-      </div>
-      <div className="space-y-3">
-        {data.map((item, index) => {
-          const percentage = Math.round((item.count / total) * 1000) / 10;
-          return (
-            <div key={item.label} className="space-y-1.5">
-              <div className="flex items-center justify-between gap-3 text-xs">
-                <span className="flex min-w-0 items-center gap-2 text-foreground">
-                  <span
-                    className="size-2.5 shrink-0 rounded-sm"
-                    style={{ backgroundColor: CHART_COLORS[index % CHART_COLORS.length] }}
-                    aria-hidden="true"
-                  />
-                  <span>{item.label}</span>
-                </span>
-                <span className="shrink-0 tabular-nums text-muted-foreground">
-                  {item.count.toLocaleString("en-GH")} <span className="px-1">·</span> {percentage}%
-                </span>
-              </div>
-              <div className="h-1.5 overflow-hidden rounded-full bg-muted">
-                <div
-                  className="h-full rounded-full"
-                  style={{
-                    width: `${percentage}%`,
-                    backgroundColor: CHART_COLORS[index % CHART_COLORS.length],
-                  }}
-                />
-              </div>
+    <section aria-label="School analytics" className="mt-5 grid min-w-0 gap-5 lg:grid-cols-2">
+      <InfographicCard title="Student gender distribution" description="Gender recorded on active student profiles" icon={UsersRound}>
+        {isLoading ? <ChartLoading /> : isError ? <EmptyChart message={unavailable} /> : (data?.genderDistribution.reduce((sum, item) => sum + item.value, 0) ?? 0) === 0 ? <EmptyChart message="No active student profiles are available yet." /> : (
+          <>
+            <div className="h-56 w-full min-w-0" role="img" aria-label={data!.genderDistribution.map((item) => item.label + ": " + item.value).join(", ")}>
+              <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+                <PieChart>
+                  <Pie data={data!.genderDistribution} dataKey="value" nameKey="label" cx="50%" cy="50%" innerRadius="55%" outerRadius="80%" paddingAngle={2} stroke="none">
+                    {data!.genderDistribution.map((item, index) => <Cell key={item.label} fill={GENDER_COLORS[index % GENDER_COLORS.length]} />)}
+                  </Pie>
+                  <Tooltip contentStyle={chartTooltipStyle} formatter={(value) => [numberFormat.format(Number(value ?? 0)), "Students"]} />
+                </PieChart>
+              </ResponsiveContainer>
             </div>
-          );
-        })}
-      </div>
-      <div className="border-t border-border/70 pt-3 text-xs text-muted-foreground">
-        Sample total: <strong className="font-semibold text-foreground">{total.toLocaleString("en-GH")}</strong> students
-      </div>
-    </div>
-  );
-}
-
-export function DashboardInfographics() {
-  const [period, setPeriod] = useState<AttendancePeriod>("week");
-  const attendanceData = attendanceSeries[period];
-  const averageAttendance = useMemo(
-    () => Math.round((attendanceData.reduce((sum, item) => sum + item.value, 0) / attendanceData.length) * 10) / 10,
-    [attendanceData],
-  );
-
-  return (
-    <section aria-label="School infographics" className="mt-5 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-      <InfographicCard
-        title="Attendance trend"
-        description="Average attendance across the selected period"
-        icon={Activity}
-        aside={
-          <Select
-            value={period}
-            onValueChange={(value) => setPeriod(value as AttendancePeriod)}
-          >
-            <SelectTrigger className="h-8 w-[104px] rounded-lg px-2 text-[11px]" aria-label="Attendance time period">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="week">This week</SelectItem>
-              <SelectItem value="month">This month</SelectItem>
-              <SelectItem value="term">This term</SelectItem>
-            </SelectContent>
-          </Select>
-        }
-      >
-        <div className="mb-4 flex items-baseline gap-2">
-          <span className="text-3xl font-bold tracking-tight text-foreground">
-            {averageAttendance}%
-          </span>
-          <span className="text-xs text-muted-foreground">average attendance</span>
-        </div>
-        <VerticalBarChart data={attendanceData} label="Attendance trend" maxValue={100} />
+            <div className="grid grid-cols-2 gap-3">
+              {data!.genderDistribution.map((item, index) => {
+                const total = data!.genderDistribution.reduce((sum, entry) => sum + entry.value, 0);
+                const pct = total ? (item.value / total) * 100 : 0;
+                return <div key={item.label} className="flex items-start gap-2 text-xs">
+                  <span className="mt-0.5 size-2.5 shrink-0 rounded-sm" style={{ backgroundColor: GENDER_COLORS[index % GENDER_COLORS.length] }} />
+                  <div className="min-w-0"><p className="text-muted-foreground">{item.label}</p><p className="mt-0.5 font-semibold text-foreground">{numberFormat.format(item.value)} <span className="font-normal text-muted-foreground">({pct.toFixed(1)}%)</span></p></div>
+                </div>;
+              })}
+            </div>
+          </>
+        )}
       </InfographicCard>
 
-      <InfographicCard
-        title="Student distribution"
-        description="Sample enrolment mix by school level"
-        icon={UsersRound}
-      >
-        <HorizontalBreakdown data={enrollmentMix} />
+      <InfographicCard title="Enrollment growth" description="Active student population by admission date, with new admissions each month" icon={TrendingUp} aside={periodSelect}>
+        {isLoading ? <ChartLoading /> : isError ? <EmptyChart message={unavailable} /> : (data?.metrics.activeStudents ?? 0) === 0 ? <EmptyChart message="No active student enrollment history is available yet." /> : (
+          <div className="h-64 w-full min-w-0" role="img" aria-label="Enrollment population and new admissions by month">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+              <LineChart data={data.enrollmentGrowth} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
+                <CartesianGrid stroke="var(--border)" strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="month" tickLine={false} axisLine={false} tick={{ fill: "var(--muted-foreground)", fontSize: 11 }} />
+                <YAxis yAxisId="population" tickLine={false} axisLine={false} allowDecimals={false} width={42} tick={{ fill: "var(--muted-foreground)", fontSize: 10 }} />
+                <YAxis yAxisId="admissions" orientation="right" tickLine={false} axisLine={false} allowDecimals={false} width={30} tick={{ fill: "var(--muted-foreground)", fontSize: 10 }} />
+                <Tooltip contentStyle={chartTooltipStyle} formatter={(value, name) => [numberFormat.format(Number(value ?? 0)), name === "population" ? "Active population" : "New admissions"]} />
+                <Legend wrapperStyle={{ fontSize: 11, paddingTop: 8 }} formatter={(value) => value === "population" ? "Active population" : "New admissions"} />
+                <Line yAxisId="population" type="monotone" dataKey="population" name="population" stroke="#2563eb" strokeWidth={2.5} dot={{ r: 3 }} activeDot={{ r: 5 }} />
+                <Line yAxisId="admissions" type="monotone" dataKey="newAdmissions" name="newAdmissions" stroke="#10b981" strokeWidth={2} dot={{ r: 3 }} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        )}
       </InfographicCard>
 
-      <InfographicCard
-        title="Fee collection progress"
-        description="Collected fees compared with the term target"
-        icon={WalletCards}
-      >
-        <DonutProgressChart
-          value={feeProgress}
-          label="Fees collected"
-          sublabel="Collected this term"
-          amount={collectedFees}
-          targetAmount={feeTarget}
-        />
-        <p className="mt-4 text-[11px] leading-5 text-muted-foreground">
-          Remaining target:{" "}
-          <strong className="font-semibold text-foreground">
-            GHS {(feeTarget - collectedFees).toLocaleString("en-GH")}
-          </strong>
-        </p>
-      </InfographicCard>
+      {data?.canViewFinance && (
+        <InfographicCard title="Financial status" description="Recorded revenue from completed payments versus recorded expenditures" icon={WalletCards} className="lg:col-span-2">
+          {isLoading ? <ChartLoading /> : isError ? <EmptyChart message={unavailable} /> : !data.hasFinancialRecords ? <EmptyChart message="No payment or expenditure records exist for this period." /> : (
+            <>
+              <div className="mb-4 grid gap-3 sm:grid-cols-3">
+                <div className="rounded-xl bg-muted/50 p-3"><p className="text-xs text-muted-foreground">Revenue this month</p><p className="mt-1 text-lg font-bold text-foreground">{money(data.metrics.revenueThisMonth ?? 0)}</p></div>
+                <div className="rounded-xl bg-muted/50 p-3"><p className="text-xs text-muted-foreground">Expenditures this month</p><p className="mt-1 text-lg font-bold text-foreground">{money(data.metrics.expendituresThisMonth ?? 0)}</p></div>
+                <div className="rounded-xl bg-muted/50 p-3"><p className="text-xs text-muted-foreground">Net recorded movement</p><p className="mt-1 text-lg font-bold text-foreground">{money((data.metrics.revenueThisMonth ?? 0) - (data.metrics.expendituresThisMonth ?? 0))}</p></div>
+              </div>
+              <div className="h-64 w-full min-w-0" role="img" aria-label="Monthly revenue versus expenditures in Ghana cedis">
+                <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+                  <BarChart data={data.financialStatus} margin={{ top: 8, right: 8, left: 0, bottom: 0 }} barGap={6}>
+                    <CartesianGrid stroke="var(--border)" strokeDasharray="3 3" vertical={false} />
+                    <XAxis dataKey="month" tickLine={false} axisLine={false} tick={{ fill: "var(--muted-foreground)", fontSize: 11 }} />
+                    <YAxis tickFormatter={(value: number) => value >= 1000 ? (value / 1000).toFixed(0) + "k" : String(value)} tickLine={false} axisLine={false} width={45} tick={{ fill: "var(--muted-foreground)", fontSize: 10 }} />
+                    <Tooltip contentStyle={chartTooltipStyle} formatter={(value, name) => [money(Number(value ?? 0)), name === "revenue" ? "Revenue" : "Expenditures"]} />
+                    <Legend wrapperStyle={{ fontSize: 11, paddingTop: 8 }} />
+                    <Bar dataKey="revenue" name="Revenue" fill="#0d9488" radius={[5, 5, 0, 0]} maxBarSize={30} />
+                    <Bar dataKey="expenditures" name="Expenditures" fill="#f97316" radius={[5, 5, 0, 0]} maxBarSize={30} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </>
+          )}
+        </InfographicCard>
+      )}
     </section>
   );
 }
