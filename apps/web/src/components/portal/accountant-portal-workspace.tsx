@@ -10,7 +10,6 @@ import {
   Download,
   FileText,
   LoaderCircle,
-  Megaphone,
   Package,
   Plus,
   Receipt,
