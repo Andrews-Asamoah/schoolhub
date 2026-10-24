@@ -5,7 +5,7 @@ import {
   ForbiddenException,
 } from "@nestjs/common";
 import { PrismaService } from "../../prisma/prisma.service.js";
-import type { GenerateBillInput, RecordPaymentInput } from "@schoolhub/shared";
+import type { CreateExpenseInput, GenerateBillInput, RecordPaymentInput } from "@schoolhub/shared";
 import { Prisma, type TransactionCategory } from "@prisma/client";
 import { canManageAcademicContext } from "../../common/academic-context.js";
 
@@ -43,9 +43,19 @@ export class FinanceService {
       );
     }
 
+    if (input.classId) {
+      const schoolClass = await this.prisma.client.class.findFirst({
+        where: { id: input.classId, schoolId, deletedAt: null },
+        select: { id: true },
+      });
+      if (!schoolClass) {
+        throw new NotFoundException("Class not found in this school.");
+      }
+    }
+
     const feeStructure = await this.prisma.client.feeStructure.findFirst({
       where: { id: input.feeStructureId, schoolId, isActive: true },
-      include: { items: true },
+      include: { items: true, targetClasses: { select: { classId: true } } },
     });
 
     if (!feeStructure) {
@@ -54,6 +64,13 @@ export class FinanceService {
 
     if (feeStructure.items.length === 0) {
       throw new BadRequestException("Fee structure contains no billable items");
+    }
+    if (
+      input.classId &&
+      feeStructure.targetClasses.length > 0 &&
+      !feeStructure.targetClasses.some((target) => target.classId === input.classId)
+    ) {
+      throw new BadRequestException("This fee structure is not assigned to the selected class.");
     }
 
     const totalAmount = feeStructure.items.reduce(
@@ -104,6 +121,20 @@ export class FinanceService {
     const createdBills = await this.prisma.client.$transaction(async (tx) => {
       const results = [];
       for (const studentId of studentIds) {
+        // Avoid issuing the same fee structure twice for a student in the same term.
+        const existingBill = await tx.bill.findFirst({
+          where: {
+            schoolId,
+            studentId,
+            academicYearId: currentYear.id,
+            termId: currentTerm.id,
+            feeStructureId: input.feeStructureId,
+            status: { notIn: ["CANCELLED", "WAIVED"] },
+          },
+          select: { id: true },
+        });
+        if (existingBill) continue;
+
         const randomNum = Math.floor(10000 + Math.random() * 90000);
         const billNumber = `INV-${year}-${randomNum}`;
 
@@ -147,7 +178,7 @@ export class FinanceService {
         results.push(bill);
       }
       return results;
-    });
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 
     return {
       success: true,
@@ -285,7 +316,32 @@ export class FinanceService {
     const paymentAmount = new Prisma.Decimal(input.amount);
 
     return this.prisma.client.$transaction(async (tx) => {
-      // 1. Create payment record
+      // Validate the bill inside the transaction before writing anything. A bill
+      // must belong to this tenant and student, and must not be overpaid.
+      const bill = input.billId
+        ? await tx.bill.findFirst({
+            where: {
+              id: input.billId,
+              schoolId,
+              studentId: input.studentId,
+            },
+            include: { items: true },
+          })
+        : null;
+
+      if (input.billId && !bill) {
+        throw new NotFoundException("Bill not found for this student.");
+      }
+      if (bill && ["CANCELLED", "WAIVED"].includes(bill.status)) {
+        throw new BadRequestException("Payments cannot be recorded against a cancelled or waived bill.");
+      }
+      if (bill && input.amount > Number(bill.balanceAmount)) {
+        throw new BadRequestException(
+          `Payment exceeds the outstanding bill balance of ${Number(bill.balanceAmount).toFixed(2)}.`,
+        );
+      }
+
+      // 1. Create payment record only after all tenant/bill checks pass.
       const payment = await tx.payment.create({
         data: {
           schoolId,
@@ -301,39 +357,171 @@ export class FinanceService {
         },
       });
 
-      // 2. If attached to a bill, update bill status and balance
-      if (input.billId) {
-        const bill = await tx.bill.findUnique({
-          where: { id: input.billId },
+      // 2. Update the already-validated bill atomically.
+      if (bill) {
+        const newPaid = Number(bill.paidAmount) + input.amount;
+        const newBalance = Math.max(0, Number(bill.totalAmount) - newPaid);
+        const status = newBalance === 0 ? "PAID" : "PARTIALLY_PAID";
+
+        await tx.bill.update({
+          where: { id: bill.id },
+          data: {
+            paidAmount: new Prisma.Decimal(newPaid),
+            balanceAmount: new Prisma.Decimal(newBalance),
+            status,
+          },
         });
+      }
 
-        if (bill) {
-          const newPaid = Number(bill.paidAmount) + input.amount;
-          const newBalance = Math.max(0, Number(bill.totalAmount) - newPaid);
-          const status = newBalance === 0 ? "PAID" : "PARTIALLY_PAID";
-
-          await tx.bill.update({
-            where: { id: input.billId },
+      // 3. Allocate the payment to bill items in order, preserving the item ledger.
+      if (bill) {
+        let remaining = input.amount;
+        for (const item of bill.items) {
+          if (remaining <= 0) break;
+          const itemBalance = Number(item.balanceAmount);
+          if (itemBalance <= 0) continue;
+          const applied = Math.min(remaining, itemBalance);
+          const nextBalance = Math.max(0, itemBalance - applied);
+          const nextPaid = Number(item.paidAmount) + applied;
+          await tx.billItem.update({
+            where: { id: item.id },
             data: {
-              paidAmount: new Prisma.Decimal(newPaid),
-              balanceAmount: new Prisma.Decimal(newBalance),
-              status,
+              paidAmount: new Prisma.Decimal(nextPaid),
+              balanceAmount: new Prisma.Decimal(nextBalance),
+              status: nextBalance === 0 ? "FULLY_PAID" : "PARTIALLY_PAID",
             },
           });
+          await tx.paymentItem.create({
+            data: {
+              paymentId: payment.id,
+              billItemId: item.id,
+              amount: new Prisma.Decimal(applied),
+            },
+          });
+          remaining -= applied;
         }
       }
 
-      // 3. Decrement student outstanding balance
+      // Keep the aggregate student balance from dropping below zero if older
+      // records contain an out-of-sync aggregate balance.
+      const currentStudent = await tx.student.findFirst({
+        where: { id: input.studentId, schoolId, deletedAt: null },
+        select: { id: true, outstandingBalance: true },
+      });
+      if (!currentStudent) throw new NotFoundException("Student not found.");
       await tx.student.update({
-        where: { id: input.studentId },
+        where: { id: currentStudent.id },
         data: {
-          outstandingBalance: {
-            decrement: paymentAmount,
-          },
+          outstandingBalance: new Prisma.Decimal(
+            Math.max(0, Number(currentStudent.outstandingBalance) - input.amount),
+          ),
         },
       });
 
       return payment;
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+  }
+
+  async listBills(schoolId: string) {
+    return this.prisma.client.bill.findMany({
+      where: { schoolId },
+      orderBy: { issuedAt: "desc" },
+      take: 500,
+      include: {
+        student: {
+          select: {
+            id: true,
+            admissionNumber: true,
+            profile: { select: { firstName: true, lastName: true } },
+          },
+        },
+        class: { select: { id: true, name: true } },
+        feeStructure: { select: { name: true } },
+        academicYear: { select: { name: true } },
+        term: { select: { name: true } },
+      },
+    });
+  }
+
+  async listPayments(schoolId: string) {
+    return this.prisma.client.payment.findMany({
+      where: { schoolId },
+      orderBy: [{ paymentDate: "desc" }, { createdAt: "desc" }],
+      take: 500,
+      include: {
+        student: {
+          select: {
+            id: true,
+            admissionNumber: true,
+            profile: { select: { firstName: true, lastName: true } },
+          },
+        },
+        bill: { select: { id: true, billNumber: true } },
+        recordedBy: { select: { name: true, email: true } },
+      },
+    });
+  }
+
+  async listExpenses(schoolId: string) {
+    return this.prisma.client.expense.findMany({
+      where: { schoolId },
+      orderBy: [{ date: "desc" }, { createdAt: "desc" }],
+      take: 500,
+      include: {
+        customCategory: { select: { name: true } },
+        registryCategory: { select: { name: true } },
+      },
+    });
+  }
+
+  async createExpense(schoolId: string, recordedById: string, input: CreateExpenseInput) {
+    const date = new Date(`${input.date}T00:00:00.000Z`);
+    if (Number.isNaN(date.getTime())) {
+      throw new BadRequestException("Enter a valid expense date.");
+    }
+    return this.prisma.client.expense.create({
+      data: {
+        schoolId,
+        date,
+        amount: new Prisma.Decimal(input.amount),
+        description: input.description,
+        payee: input.payee || null,
+        category: input.category,
+        paymentMethod: input.paymentMethod,
+        referenceNumber: input.referenceNumber || null,
+        recordedById,
+      },
+      include: {
+        customCategory: { select: { name: true } },
+        registryCategory: { select: { name: true } },
+      },
+    });
+  }
+
+  async listPayrollRecords(schoolId: string) {
+    return this.prisma.client.payrollRecord.findMany({
+      where: { schoolId },
+      orderBy: [{ year: "desc" }, { month: "desc" }],
+      take: 100,
+      include: {
+        payslips: {
+          select: {
+            id: true,
+            staffId: true,
+            teacherId: true,
+            basicSalary: true,
+            allowances: true,
+            grossSalary: true,
+            ssnitEmployee: true,
+            incomeTax: true,
+            otherDeductions: true,
+            netSalary: true,
+            paymentMethod: true,
+            paymentStatus: true,
+            paidAt: true,
+          },
+        },
+      },
     });
   }
 

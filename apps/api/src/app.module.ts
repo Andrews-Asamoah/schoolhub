@@ -25,6 +25,7 @@ import { PeopleModule } from "./modules/people/people.module.js";
 import { AdmissionsModule } from "./modules/admissions/admissions.module.js";
 import { AnnouncementsModule } from "./modules/announcements/announcements.module.js";
 import { NotificationsModule } from "./modules/notifications/notifications.module.js";
+import { InventoryModule } from "./modules/inventory/inventory.module.js";
 
 @Module({
   imports: [
@@ -48,6 +49,7 @@ import { NotificationsModule } from "./modules/notifications/notifications.modul
     AdmissionsModule,
     AnnouncementsModule,
     NotificationsModule,
+    InventoryModule,
   ],
   controllers: [HealthController],
   providers: [

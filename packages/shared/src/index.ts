@@ -624,6 +624,43 @@ export const generateBillSchema = z.object({
 });
 export type GenerateBillInput = z.infer<typeof generateBillSchema>;
 
+export const createExpenseSchema = z.object({
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Format: YYYY-MM-DD"),
+  amount: z.number().positive("Amount must be greater than zero"),
+  description: z.string().trim().min(3, "Enter a meaningful expense description").max(500),
+  payee: z.string().trim().max(200).optional(),
+  category: z.enum([
+    "SALARY", "UTILITIES", "SUPPLIES", "MAINTENANCE", "TRANSPORT",
+    "RENT", "INSURANCE", "TAXES", "OTHER",
+  ]),
+  paymentMethod: z.enum([
+    "CASH", "BANK_TRANSFER", "CHEQUE", "MOBILE_MONEY", "CARD", "ONLINE", "OTHER",
+  ]),
+  referenceNumber: z.string().trim().max(120).optional(),
+});
+export type CreateExpenseInput = z.infer<typeof createExpenseSchema>;
+
+export const createInventoryItemSchema = z.object({
+  name: z.string().trim().min(2, "Item name must contain at least 2 characters").max(150),
+  description: z.string().trim().max(500).optional(),
+  category: z.string().trim().max(100).optional(),
+  unit: z.string().trim().min(1).max(20).default("pcs"),
+  minQuantity: z.number().int().min(0).default(0),
+  initialQuantity: z.number().int().min(0).default(0),
+});
+export type CreateInventoryItemInput = z.infer<typeof createInventoryItemSchema>;
+
+export const inventoryStockMovementSchema = z.object({
+  type: z.enum(["IN", "OUT"]),
+  quantity: z.number().int().positive("Quantity must be a positive whole number"),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Format: YYYY-MM-DD"),
+  description: z.string().trim().max(500).optional(),
+  recipientName: z.string().trim().max(150).optional(),
+});
+export type InventoryStockMovementInput = z.infer<typeof inventoryStockMovementSchema>;
+
+
+
 // ============================================================================
 // SUPER ADMIN SCHEMAS
 // ============================================================================

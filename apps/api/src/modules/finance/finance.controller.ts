@@ -16,8 +16,10 @@ import { CurrentSchoolRole } from "../../common/decorators/current-school-role.d
 import { CurrentUser, type AuthenticatedUser } from "../../common/decorators/current-user.decorator.js";
 import { ZodValidationPipe } from "../../common/pipes/zod-validation.pipe.js";
 import {
+  createExpenseSchema,
   generateBillSchema,
   recordPaymentSchema,
+  type CreateExpenseInput,
   type GenerateBillInput,
   type RecordPaymentInput,
 } from "@schoolhub/shared";
@@ -32,6 +34,40 @@ export class FinanceController {
   @Roles("owner", "admin", "accountant")
   listFeeStructures(@CurrentSchool() school: School) {
     return this.financeService.listFeeStructures(school.id);
+  }
+
+  @Get("bills")
+  @Roles("owner", "admin", "accountant")
+  listBills(@CurrentSchool() school: School) {
+    return this.financeService.listBills(school.id);
+  }
+
+  @Get("payments")
+  @Roles("owner", "admin", "accountant")
+  listPayments(@CurrentSchool() school: School) {
+    return this.financeService.listPayments(school.id);
+  }
+
+  @Get("expenses")
+  @Roles("owner", "admin", "accountant")
+  listExpenses(@CurrentSchool() school: School) {
+    return this.financeService.listExpenses(school.id);
+  }
+
+  @Post("expenses")
+  @Roles("owner", "admin", "accountant")
+  createExpense(
+    @CurrentSchool() school: School,
+    @CurrentUser() user: AuthenticatedUser,
+    @Body(new ZodValidationPipe(createExpenseSchema)) body: CreateExpenseInput,
+  ) {
+    return this.financeService.createExpense(school.id, user.id, body);
+  }
+
+  @Get("payroll")
+  @Roles("owner", "admin", "accountant")
+  listPayrollRecords(@CurrentSchool() school: School) {
+    return this.financeService.listPayrollRecords(school.id);
   }
 
   @Post("bills/generate")
