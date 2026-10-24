@@ -28,6 +28,7 @@ import {
 } from "@/components/portal/announcement-utils";
 import type { StudentProfileData } from "@/components/school/student-profile-panel";
 import { apiFetch } from "@/lib/api";
+import { useSession } from "@/lib/auth-client";
 import { cn } from "@/lib/utils";
 
 type GuardianTab = "overview" | "academics" | "attendance" | "fees" | "timetable" | "notices";
@@ -81,6 +82,7 @@ function EmptyFeature({ title, description, icon: Icon }: { title: string; descr
 export function GuardianPortalWorkspace({ defaultTab = "overview" }: { defaultTab?: GuardianTab }) {
   const [activeTab, setActiveTab] = useState<GuardianTab>(defaultTab);
   const [selectedAnnouncement, setSelectedAnnouncement] = useState<AnnouncementItem | null>(null);
+  const { data: session } = useSession();
 
   const wardsQuery = useQuery({
     queryKey: ["students", "my-wards"],
@@ -96,10 +98,10 @@ export function GuardianPortalWorkspace({ defaultTab = "overview" }: { defaultTa
 
   const wards = wardsQuery.data ?? [];
   const announcements = (announcementsQuery.data ?? [])
+  const firstName = session?.user?.name?.trim().split(/\s+/)[0];
+  const greeting = firstName ? `Welcome back, ${firstName}` : "Welcome to your family hub";
     .filter((item) => !item.expiresAt || new Date(item.expiresAt).getTime() >= Date.now())
     .sort((a, b) => Number(b.isPinned) - Number(a.isPinned) || new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-  const firstName = wards[0]?.profile.firstName;
-  const greeting = firstName ? `Welcome to your family hub, ${firstName}'s family` : "Your family hub";
 
   return (
     <div className="space-y-6">
