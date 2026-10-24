@@ -970,20 +970,163 @@ export class FinanceService {
       if (!paymentMethod || !["CASH", "BANK_TRANSFER", "CHEQUE", "MOBILE_MONEY", "CARD", "ONLINE", "OTHER"].includes(paymentMethod)) {
         throw new BadRequestException("Choose a valid payment method before confirming payroll disbursement.");
       }
+
       return db.$transaction(async (tx) => {
+        const current = await tx.payrollRecord.findFirst({
+          where: { id: payroll.id, schoolId },
+          include: {
+            payslips: {
+              select: {
+                grossSalary: true,
+                netSalary: true,
+                incomeTax: true,
+                ssnitEmployee: true,
+                ssnitEmployer: true,
+                otherDeductions: true,
+              },
+            },
+          },
+        });
+        if (!current) throw new NotFoundException("Payroll run not found.");
+        if (current.status !== "APPROVED") {
+          throw new BadRequestException("Only an approved payroll run can be marked paid.");
+        }
+        if (!current.payslips.length) throw new BadRequestException("A payroll run without payslips cannot be marked paid.");
+
+        const sum = (field: "grossSalary" | "netSalary" | "incomeTax" | "ssnitEmployee" | "ssnitEmployer" | "otherDeductions") =>
+          current.payslips.reduce((total, slip) => total + Number(slip[field]), 0);
+        const gross = roundMoney(sum("grossSalary"));
+        const net = roundMoney(sum("netSalary"));
+        const paye = roundMoney(sum("incomeTax"));
+        const employeeSsnit = roundMoney(sum("ssnitEmployee"));
+        const employerSsnit = roundMoney(sum("ssnitEmployer"));
+        const otherDeductions = roundMoney(sum("otherDeductions"));
+        const unreconciled = roundMoney(gross - net - paye - employeeSsnit - otherDeductions);
+        if (Math.abs(unreconciled) > 0.02) {
+          throw new BadRequestException(
+            "This payroll does not reconcile: gross pay must equal net pay plus PAYE, employee SSNIT and other deductions. Review the payslips before confirming payment.",
+          );
+        }
+
+        const paidAt = new Date();
+        const referenceNumber = `${current.year}-${String(current.month).padStart(2, "0")}`;
+        const paymentUsesBank = ["BANK_TRANSFER", "CHEQUE", "MOBILE_MONEY", "CARD", "ONLINE"].includes(paymentMethod);
+        const salaryExpense = await this.ensureAccount(tx, schoolId, {
+          accountType: "EXPENSE",
+          category: "SALARY_WAGES",
+          name: "Salaries & Wages",
+          code: "6000",
+        });
+        const payrollPayable = await this.ensureAccount(tx, schoolId, {
+          accountType: "LIABILITY",
+          category: "ACCOUNTS_PAYABLE",
+          name: "Payroll Payable",
+          code: "2100",
+        });
+        const paymentAccount = await this.ensureAccount(tx, schoolId, paymentUsesBank
+          ? { accountType: "ASSET", category: "BANK", name: "Bank & Electronic Payments", code: "1010" }
+          : { accountType: "ASSET", category: "CASH", name: "Cash on Hand", code: "1000" });
+        const employerSsnitExpense = await this.ensureAccount(tx, schoolId, {
+          accountType: "EXPENSE",
+          category: "SALARY_WAGES",
+          name: "Employer SSNIT Contributions",
+          code: "6010",
+        });
+        const payePayable = await this.ensureAccount(tx, schoolId, {
+          accountType: "LIABILITY",
+          category: "TAXES",
+          name: "PAYE Tax Payable",
+          code: "2200",
+        });
+        const ssnitPayable = await this.ensureAccount(tx, schoolId, {
+          accountType: "LIABILITY",
+          category: "ACCOUNTS_PAYABLE",
+          name: "SSNIT Payable",
+          code: "2210",
+        });
+        const otherDeductionPayable = await this.ensureAccount(tx, schoolId, {
+          accountType: "LIABILITY",
+          category: "ACCOUNTS_PAYABLE",
+          name: "Other Payroll Deductions Payable",
+          code: "2220",
+        });
+
+        const postLedgerEntry = async (
+          description: string,
+          amountValue: number,
+          debitAccount: { id: string; accountType: AccountType },
+          creditAccount: { id: string; accountType: AccountType },
+          transactionType: "EXPENSE" | "TRANSFER",
+          notes: string,
+        ) => {
+          const amount = roundMoney(amountValue);
+          if (amount <= 0) return;
+          const decimalAmount = new Prisma.Decimal(amount);
+          const prefix = `TXN-${paidAt.getUTCFullYear()}-`;
+          await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${schoolId}), hashtext(${prefix}))`;
+          const last = await tx.transaction.findFirst({
+            where: { schoolId, transactionNumber: { startsWith: prefix } },
+            orderBy: { transactionNumber: "desc" },
+            select: { transactionNumber: true },
+          });
+          const seq = last ? Number(last.transactionNumber.slice(prefix.length)) + 1 : 1;
+          await tx.transaction.create({
+            data: {
+              schoolId,
+              transactionNumber: prefix + String(seq).padStart(5, "0"),
+              transactionDate: paidAt,
+              description,
+              amount: decimalAmount,
+              debitAccountId: debitAccount.id,
+              creditAccountId: creditAccount.id,
+              transactionType,
+              category: "SALARY",
+              referenceType: "PAYROLL",
+              referenceId: current.id,
+              referenceNumber,
+              notes: `Payroll posting · ${notes} · Disbursement method: ${paymentMethod}`,
+            },
+          });
+          const debitNaturalBalanceIncreases = debitAccount.accountType === "ASSET" || debitAccount.accountType === "EXPENSE";
+          const creditNaturalBalanceIncreases = creditAccount.accountType === "LIABILITY" || creditAccount.accountType === "EQUITY" || creditAccount.accountType === "REVENUE";
+          await tx.chartAccount.update({
+            where: { id: debitAccount.id },
+            data: { balance: debitNaturalBalanceIncreases ? { increment: decimalAmount } : { decrement: decimalAmount } },
+          });
+          await tx.chartAccount.update({
+            where: { id: creditAccount.id },
+            data: { balance: creditNaturalBalanceIncreases ? { increment: decimalAmount } : { decrement: decimalAmount } },
+          });
+        };
+
+        // Accrue gross salary and employer pension cost, then allocate the
+        // payable to actual net disbursement and statutory/other withholdings.
+        await postLedgerEntry("Gross payroll accrual", gross, salaryExpense, payrollPayable, "EXPENSE", "Gross employee pay");
+        await postLedgerEntry("Employer SSNIT contribution", employerSsnit, employerSsnitExpense, ssnitPayable, "EXPENSE", "Employer contribution");
+        await postLedgerEntry("Net salary disbursement", net, payrollPayable, paymentAccount, "TRANSFER", "Net salaries confirmed paid");
+        await postLedgerEntry("PAYE withheld from payroll", paye, payrollPayable, payePayable, "TRANSFER", "PAYE liability recognised");
+        await postLedgerEntry("Employee SSNIT withheld from payroll", employeeSsnit, payrollPayable, ssnitPayable, "TRANSFER", "Employee SSNIT liability recognised");
+        await postLedgerEntry("Other payroll deductions withheld", otherDeductions, payrollPayable, otherDeductionPayable, "TRANSFER", "Other deductions liability recognised");
+
         await tx.payslip.updateMany({
           where: { payrollRecordId: payroll.id, schoolId },
-          data: { paymentStatus: "COMPLETED", paymentMethod: paymentMethod as PaymentMethod, paidAt: new Date() },
+          data: { paymentStatus: "COMPLETED", paymentMethod: paymentMethod as PaymentMethod, paidAt },
         });
-        return tx.payrollRecord.update({
-          where: { id: payroll.id },
+        const transition = await tx.payrollRecord.updateMany({
+          where: { id: payroll.id, schoolId, status: "APPROVED" },
           data: { status: "PAID" },
+        });
+        if (transition.count !== 1) {
+          throw new BadRequestException("Payroll status changed while it was being processed. Refresh and review the run before retrying.");
+        }
+        return tx.payrollRecord.findFirstOrThrow({
+          where: { id: payroll.id, schoolId },
           include: {
             payslips: { include: { staff: { select: { staffId: true, profile: { select: { firstName: true, lastName: true } } } }, teacher: { select: { teacherId: true, profile: { select: { firstName: true, lastName: true } } } } } },
             _count: { select: { payslips: true } },
           },
         });
-      });
+      }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
     }
     throw new BadRequestException(`Payroll cannot move from ${payroll.status} to ${input.status}.`);
   }
