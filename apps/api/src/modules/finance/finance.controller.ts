@@ -21,6 +21,8 @@ import {
   createExpenseSchema,
   generateBillSchema,
   recordPaymentSchema,
+  updatePayrollSalarySchema,
+  type UpdatePayrollSalaryInput,
   type CreateExpenseInput,
   type GenerateBillInput,
   type RecordPaymentInput,
