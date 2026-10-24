@@ -245,7 +245,7 @@ export function StudentTimetableView() {
       const endMinutes = parseTime(entry.endTime);
       if (startMinutes === null || endMinutes === null || endMinutes <= startMinutes) continue;
 
-      const key = `${entry.startTime}|${entry.endTime}`;
+      const key = `${startMinutes}|${endMinutes}`;
       if (!slots.has(key)) {
         slots.set(key, { key, startTime: entry.startTime, endTime: entry.endTime, startMinutes, endMinutes });
       }
@@ -906,7 +906,7 @@ export function StudentTimetableView() {
                   </th>
                   {DAYS.map((day) => {
                     const slotEntries = entriesByDay[day].filter(
-                      (entry) => entry.startTime === slot.startTime && entry.endTime === slot.endTime,
+                      (entry) => parseTime(entry.startTime) === slot.startMinutes && parseTime(entry.endTime) === slot.endMinutes,
                     );
                     return (
                       <td
