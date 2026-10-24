@@ -807,8 +807,8 @@ function ExpensesTable({ expenses }: { expenses: ApiExpense[] }) {
 
 function StatusBadge({ value }: { value: string }) {
   const normalized = value.replaceAll("_", " ").toUpperCase();
-  const positive = ["PAID", "COMPLETED", "APPROVED", "DISBURSED"].includes(normalized);
-  const negative = ["OVERDUE", "FAILED", "CANCELLED", "REJECTED"].includes(normalized);
+  const positive = ["PAID", "COMPLETED", "APPROVED", "DISBURSED", "IN STOCK"].includes(normalized);
+  const negative = ["OVERDUE", "FAILED", "CANCELLED", "REJECTED", "LOW STOCK"].includes(normalized);
   return <span className={cn("inline-flex whitespace-nowrap rounded-full px-2.5 py-1 text-[11px] font-semibold", positive ? "bg-success/10 text-success" : negative ? "bg-destructive/10 text-destructive" : "bg-muted text-muted-foreground")}>{normalized}</span>;
 }
 
