@@ -456,6 +456,7 @@ export class FinanceService {
       date: Date;
       description: string;
       category: TransactionCategory;
+      paymentMethod: PaymentMethod;
       referenceType: string;
       referenceId: string;
       referenceNumber?: string;
@@ -477,20 +478,16 @@ export class FinanceService {
       code: "6900",
       category: "OTHER_EXPENSE" as AccountCategory,
     };
-    const [cash, expenseAccount] = await Promise.all([
-      this.ensureAccount(tx, input.schoolId, {
-        accountType: "ASSET",
-        category: "CASH",
-        name: "Cash on Hand",
-        code: "1000",
-      }),
-      this.ensureAccount(tx, input.schoolId, {
-        accountType: "EXPENSE",
-        category: accountSpec.category,
-        name: accountSpec.name,
-        code: accountSpec.code,
-      }),
-    ]);
+    const paymentUsesBank = ["BANK_TRANSFER", "CHEQUE", "MOBILE_MONEY", "CARD", "ONLINE"].includes(input.paymentMethod);
+    const paymentAccount = await this.ensureAccount(tx, input.schoolId, paymentUsesBank
+      ? { accountType: "ASSET", category: "BANK", name: "Bank & Electronic Payments", code: "1010" }
+      : { accountType: "ASSET", category: "CASH", name: "Cash on Hand", code: "1000" });
+    const expenseAccount = await this.ensureAccount(tx, input.schoolId, {
+      accountType: "EXPENSE",
+      category: accountSpec.category,
+      name: accountSpec.name,
+      code: accountSpec.code,
+    });
 
     const prefix = "TXN-" + input.date.getUTCFullYear() + "-";
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${input.schoolId}), hashtext(${prefix}))`;
@@ -508,13 +505,13 @@ export class FinanceService {
         description: input.description,
         amount: input.amount,
         debitAccountId: expenseAccount.id,
-        creditAccountId: cash.id,
+        creditAccountId: paymentAccount.id,
         transactionType: "EXPENSE",
         category: input.category,
         referenceType: input.referenceType,
         referenceId: input.referenceId,
         referenceNumber: input.referenceNumber,
-        notes: input.notes,
+        notes: [input.notes, "Payment method: " + input.paymentMethod].filter(Boolean).join(" · "),
       },
     });
     await tx.chartAccount.update({
@@ -522,7 +519,7 @@ export class FinanceService {
       data: { balance: { increment: input.amount } },
     });
     await tx.chartAccount.update({
-      where: { id: cash.id },
+      where: { id: paymentAccount.id },
       data: { balance: { decrement: input.amount } },
     });
     return transaction;
@@ -815,9 +812,11 @@ export class FinanceService {
         date,
         description: input.description,
         category: input.category,
+        paymentMethod: input.paymentMethod,
         referenceType: "EXPENSE",
         referenceId: expense.id,
         referenceNumber: input.voucherNumber || input.referenceNumber || undefined,
+        notes: input.registryCategoryId ? "Expenditure category: " + input.registryCategoryId : undefined,
       });
       return expense;
     });
