@@ -1,0 +1,2 @@
+-- RenameIndex
+ALTER INDEX "sibling_discount_policies_schoolId_isActive_minimumWardCount_id" RENAME TO "sibling_discount_policies_schoolId_isActive_minimumWardCoun_idx";
