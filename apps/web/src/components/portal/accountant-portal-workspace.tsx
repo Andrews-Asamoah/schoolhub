@@ -164,8 +164,8 @@ interface ApiPayroll {
 }
 
 function downloadCsv(rows: unknown[][], filename: string) {
-  const csv = rows.map((row) => row.map((value) => '"' + String(value ?? "").replaceAll('"', '""') + '"').join(",")).join("\\r\\n");
-  const url = URL.createObjectURL(new Blob(["\\uFEFF", csv], { type: "text/csv;charset=utf-8;" }));
+  const csv = rows.map((row) => row.map((value) => '"' + String(value ?? "").replaceAll('"', '""') + '"').join(",")).join("\r\n");
+  const url = URL.createObjectURL(new Blob(["\uFEFF", csv], { type: "text/csv;charset=utf-8;" }));
   const link = document.createElement("a");
   link.href = url;
   link.download = filename;
@@ -332,8 +332,8 @@ export function AccountantPortalWorkspace({
     const csv = rows.map(row => row.map(value => {
       const field = String(value ?? "");
       return '"' + field.replaceAll('"', '""') + '"';
-    }).join(",")).join("\\r\\n");
-    const blob = new Blob(["\\uFEFF", csv], { type: "text/csv;charset=utf-8;" });
+    }).join(",")).join("\r\n");
+    const blob = new Blob(["\uFEFF", csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
