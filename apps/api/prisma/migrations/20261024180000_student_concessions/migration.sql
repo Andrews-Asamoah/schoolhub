@@ -13,7 +13,6 @@ CREATE TABLE "sibling_discount_policies" (
   "minimumWardCount" INTEGER NOT NULL,
   "valueType" "ConcessionValueType" NOT NULL DEFAULT 'PERCENTAGE',
   "value" DECIMAL(7,2) NOT NULL,
-  "appliesToAllWards" BOOLEAN NOT NULL DEFAULT true,
   "isActive" BOOLEAN NOT NULL DEFAULT true,
   "createdById" TEXT,
   "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
