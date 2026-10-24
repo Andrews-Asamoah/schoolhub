@@ -285,7 +285,31 @@ export class FinanceService {
     const paymentAmount = new Prisma.Decimal(input.amount);
 
     return this.prisma.client.$transaction(async (tx) => {
-      // 1. Create payment record
+      // Validate the bill inside the transaction before writing anything. A bill
+      // must belong to this tenant and student, and must not be overpaid.
+      const bill = input.billId
+        ? await tx.bill.findFirst({
+            where: {
+              id: input.billId,
+              schoolId,
+              studentId: input.studentId,
+            },
+          })
+        : null;
+
+      if (input.billId && !bill) {
+        throw new NotFoundException("Bill not found for this student.");
+      }
+      if (bill && ["CANCELLED", "WAIVED"].includes(bill.status)) {
+        throw new BadRequestException("Payments cannot be recorded against a cancelled or waived bill.");
+      }
+      if (bill && input.amount > Number(bill.balanceAmount)) {
+        throw new BadRequestException(
+          `Payment exceeds the outstanding bill balance of ${Number(bill.balanceAmount).toFixed(2)}.`,
+        );
+      }
+
+      // 1. Create payment record only after all tenant/bill checks pass.
       const payment = await tx.payment.create({
         data: {
           schoolId,
@@ -301,26 +325,20 @@ export class FinanceService {
         },
       });
 
-      // 2. If attached to a bill, update bill status and balance
-      if (input.billId) {
-        const bill = await tx.bill.findUnique({
-          where: { id: input.billId },
+      // 2. Update the already-validated bill atomically.
+      if (bill) {
+        const newPaid = Number(bill.paidAmount) + input.amount;
+        const newBalance = Math.max(0, Number(bill.totalAmount) - newPaid);
+        const status = newBalance === 0 ? "PAID" : "PARTIALLY_PAID";
+
+        await tx.bill.update({
+          where: { id: bill.id },
+          data: {
+            paidAmount: new Prisma.Decimal(newPaid),
+            balanceAmount: new Prisma.Decimal(newBalance),
+            status,
+          },
         });
-
-        if (bill) {
-          const newPaid = Number(bill.paidAmount) + input.amount;
-          const newBalance = Math.max(0, Number(bill.totalAmount) - newPaid);
-          const status = newBalance === 0 ? "PAID" : "PARTIALLY_PAID";
-
-          await tx.bill.update({
-            where: { id: input.billId },
-            data: {
-              paidAmount: new Prisma.Decimal(newPaid),
-              balanceAmount: new Prisma.Decimal(newBalance),
-              status,
-            },
-          });
-        }
       }
 
       // 3. Decrement student outstanding balance
