@@ -624,7 +624,7 @@ export const recordPaymentSchema = z.object({
     "ONLINE",
     "OTHER",
   ]),
-  paymentDate: z.string().regex(/^\\d{4}-\\d{2}-\\d{2}$/, "Format: YYYY-MM-DD"),
+  paymentDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Format: YYYY-MM-DD"),
   referenceNumber: z.string().optional(),
   notes: z.string().optional(),
   /** Explicit per-fee-component allocation. Older clients retain the API's FIFO fallback. */
