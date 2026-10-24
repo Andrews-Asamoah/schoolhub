@@ -26,6 +26,7 @@ export interface DatePickerProps {
   className?: string;
   placeholder?: string;
   ariaLabel?: string;
+  markedDates?: string[];
 }
 
 /** Reusable themed date picker with a custom calendar and Radix month/year selectors. */
@@ -38,6 +39,7 @@ export function DatePicker({
   className = "",
   placeholder = "Choose date",
   ariaLabel = "Choose date",
+  markedDates = [],
 }: DatePickerProps) {
   const selected = value ? parseIso(value) : null;
   const [open, setOpen] = useState(false);
@@ -153,6 +155,7 @@ export function DatePicker({
               const iso = toIso(date);
               const isSelected = iso === value;
               const isToday = iso === toIso(new Date());
+              const isMarked = markedDates.includes(iso);
               const outOfRange = Boolean((min && date < min) || (max && date > max));
               return (
                 <button
@@ -164,15 +167,16 @@ export function DatePicker({
                   onClick={() => chooseDay(day)}
                   className={`flex aspect-square items-center justify-center rounded-lg text-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-25 ${
                     isSelected ? "bg-primary font-semibold text-primary-foreground shadow-sm"
-                      : isToday ? "border border-primary/50 font-semibold text-primary"
-                        : "text-foreground hover:bg-muted"
+                      : isMarked ? "bg-success/15 font-semibold text-success ring-1 ring-success/30 hover:bg-success/25"
+                        : isToday ? "border border-primary/50 font-semibold text-primary"
+                          : "text-foreground hover:bg-muted"
                   }`}
                 >{day}</button>
               );
             })}
           </div>
           <div className="mt-3 flex items-center justify-between border-t border-border pt-3">
-            <span className="text-xs text-muted-foreground">Select a date</span>
+            <span className="flex items-center gap-2 text-xs text-muted-foreground"><span className="size-2 rounded-full bg-success" /> Attendance recorded</span>
             <button
               type="button"
               onClick={() => { const today = toIso(new Date()); if ((!min || today >= minDate!) && (!max || today <= maxDate!)) { onChange(today); setOpen(false); } }}
