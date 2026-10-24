@@ -13,12 +13,133 @@ import { canManageAcademicContext } from "../../common/academic-context.js";
 export class FinanceService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async listFeeStructures(schoolId: string) {
+  async listFeeStructures(schoolId: string, includeArchived = false) {
     return this.prisma.client.feeStructure.findMany({
-      where: { schoolId, isActive: true },
+      where: includeArchived ? { schoolId } : { schoolId, isActive: true },
+      orderBy: [{ isActive: "desc" }, { createdAt: "desc" }],
       include: {
         items: true,
         targetClasses: { include: { class: { select: { id: true, name: true } } } },
+        _count: { select: { bills: true } },
+      },
+    });
+  }
+
+  async listFeeItemRegistry(schoolId: string) {
+    return this.prisma.client.feeItemRegistry.findMany({
+      where: { schoolId },
+      orderBy: { name: "asc" },
+    });
+  }
+
+  async createFeeItemRegistry(schoolId: string, input: { name: string; description?: string | null }) {
+    const name = input.name.trim();
+    const duplicate = await this.prisma.client.feeItemRegistry.findFirst({
+      where: { schoolId, name: { equals: name, mode: "insensitive" } },
+      select: { id: true },
+    });
+    if (duplicate) throw new BadRequestException("A fee item category with that name already exists.");
+    return this.prisma.client.feeItemRegistry.create({
+      data: { schoolId, name, description: input.description?.trim() || null },
+    });
+  }
+
+  async updateFeeItemRegistry(schoolId: string, itemId: string, input: { name: string; description?: string | null }) {
+    const existing = await this.prisma.client.feeItemRegistry.findFirst({
+      where: { id: itemId, schoolId },
+      select: { id: true },
+    });
+    if (!existing) throw new NotFoundException("Fee item category not found.");
+    const name = input.name.trim();
+    const duplicate = await this.prisma.client.feeItemRegistry.findFirst({
+      where: { schoolId, id: { not: itemId }, name: { equals: name, mode: "insensitive" } },
+      select: { id: true },
+    });
+    if (duplicate) throw new BadRequestException("A fee item category with that name already exists.");
+    return this.prisma.client.feeItemRegistry.update({
+      where: { id: itemId },
+      data: { name, description: input.description?.trim() || null },
+    });
+  }
+
+  async createFeeStructure(
+    schoolId: string,
+    input: {
+      name: string;
+      description?: string | null;
+      classLevel?: string | null;
+      termBased: boolean;
+      targetClassIds: string[];
+      items: { registryItemId?: string | null; name: string; amount: number; isOptional: boolean; description?: string | null }[];
+    },
+  ) {
+    const classIds = [...new Set(input.targetClassIds)];
+    const registryIds = [...new Set(input.items.map((item) => item.registryItemId).filter((id): id is string => Boolean(id)))];
+    const [classes, registryItems] = await Promise.all([
+      classIds.length
+        ? this.prisma.client.class.findMany({
+            where: { id: { in: classIds }, schoolId, deletedAt: null },
+            select: { id: true },
+          })
+        : Promise.resolve([]),
+      registryIds.length
+        ? this.prisma.client.feeItemRegistry.findMany({
+            where: { id: { in: registryIds }, schoolId },
+            select: { id: true, name: true },
+          })
+        : Promise.resolve([]),
+    ]);
+    if (classes.length !== classIds.length) {
+      throw new BadRequestException("One or more selected classes do not belong to this school.");
+    }
+    if (registryItems.length !== registryIds.length) {
+      throw new BadRequestException("One or more fee item categories are invalid for this school.");
+    }
+
+    return this.prisma.client.feeStructure.create({
+      data: {
+        schoolId,
+        name: input.name.trim(),
+        description: input.description?.trim() || null,
+        classLevel: input.classLevel?.trim() || null,
+        termBased: input.termBased,
+        targetClasses: {
+          create: classIds.map((classId) => ({ classId })),
+        },
+        items: {
+          create: input.items.map((item) => {
+            const registryItem = registryItems.find((candidate) => candidate.id === item.registryItemId);
+            return {
+              name: item.name.trim() || registryItem?.name || "Fee item",
+              amount: new Prisma.Decimal(item.amount),
+              isOptional: item.isOptional,
+              description: item.description?.trim() || null,
+              registryItemId: item.registryItemId || null,
+            };
+          }),
+        },
+      },
+      include: {
+        items: true,
+        targetClasses: { include: { class: { select: { id: true, name: true } } } },
+        _count: { select: { bills: true } },
+      },
+    });
+  }
+
+  async setFeeStructureActive(schoolId: string, feeStructureId: string, isActive: boolean) {
+    const existing = await this.prisma.client.feeStructure.findFirst({
+      where: { id: feeStructureId, schoolId },
+      select: { id: true },
+    });
+    if (!existing) throw new NotFoundException("Fee structure not found.");
+    return this.prisma.client.feeStructure.update({
+      where: { id: feeStructureId },
+      data: { isActive },
+      include: {
+        items: true,
+        targetClasses: { include: { class: { select: { id: true, name: true } } } },
+        _count: { select: { bills: true } },
       },
     });
   }

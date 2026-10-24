@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
+import { useMemo, useState, type FormEvent, type ReactNode } from "react";
+import { Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AlertCircle,
@@ -9,7 +10,6 @@ import {
   Download,
   FileText,
   LoaderCircle,
-  Megaphone,
   Package,
   Plus,
   Receipt,
@@ -161,18 +161,6 @@ interface ApiPayroll {
   }[];
 }
 
-const tabs: { id: AccountantTab; label: string; icon: typeof Wallet }[] = [
-  { id: "overview", label: "Overview", icon: CircleDollarSign },
-  { id: "invoices", label: "Invoices & bills", icon: FileText },
-  { id: "payments", label: "Payments & receipts", icon: Receipt },
-  { id: "debtors", label: "Outstanding fees", icon: AlertCircle },
-  { id: "reports", label: "Finance reports", icon: FileText },
-  { id: "payroll", label: "Payroll", icon: Wallet },
-  { id: "expenses", label: "Expenses", icon: ArrowDownRight },
-  { id: "inventory", label: "Inventory", icon: Package },
-  { id: "announcements", label: "Announcements", icon: Megaphone },
-];
-
 const currency = (value: number | string) =>
   new Intl.NumberFormat("en-GH", {
     style: "currency",
@@ -207,7 +195,7 @@ export function AccountantPortalWorkspace({
   defaultTab = "overview",
 }: AccountantPortalWorkspaceProps) {
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState<AccountantTab>(defaultTab);
+  const activeTab = defaultTab;
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [showPaymentForm, setShowPaymentForm] = useState(false);
@@ -262,8 +250,6 @@ export function AccountantPortalWorkspace({
     queryFn: () => apiFetch<ApiPayroll[]>("/finance/payroll"),
     retry: false,
   });
-
-  useEffect(() => setActiveTab(defaultTab), [defaultTab]);
 
   const bills = billsQuery.data ?? [];
   const payments = paymentsQuery.data ?? [];
@@ -586,19 +572,6 @@ export function AccountantPortalWorkspace({
         </div>
       )}
 
-      <nav aria-label="Accountant sections" className="flex gap-1 overflow-x-auto rounded-2xl border border-border bg-card p-1.5">
-        {tabs.map((tab) => {
-          const Icon = tab.icon;
-          return (
-            <button key={tab.id} onClick={() => setActiveTab(tab.id)} aria-current={activeTab === tab.id ? "page" : undefined}
-              className={cn("inline-flex shrink-0 items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-medium transition",
-                activeTab === tab.id ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:bg-muted hover:text-foreground")}>
-              <Icon className="size-4" /> {tab.label}
-            </button>
-          );
-        })}
-      </nav>
-
       {loading && activeTab !== "announcements" && (
         <div role="status" className="flex items-center justify-center gap-2 rounded-2xl border border-border bg-card p-12 text-sm text-muted-foreground">
           <LoaderCircle className="size-4 animate-spin" /> Loading live finance records…
@@ -613,7 +586,7 @@ export function AccountantPortalWorkspace({
                 <h2 className="font-semibold text-foreground">Recent payments</h2>
                 <p className="mt-1 text-sm text-muted-foreground">Latest receipts recorded for this school</p>
               </div>
-              <button className={buttonSecondary} onClick={() => setActiveTab("payments")}>View payments</button>
+              <Link to="/$page" params={{ page: "payments" }} className={buttonSecondary}>View payments</Link>
             </div>
             {paymentsQuery.error ? <QueryError message={paymentsQuery.error.message} /> : <PaymentsTable payments={payments.slice(0, 6)} />}
           </section>
@@ -621,9 +594,9 @@ export function AccountantPortalWorkspace({
             <h2 className="font-semibold text-foreground">Attention required</h2>
             <p className="mt-1 text-sm text-muted-foreground">Items that may need follow-up</p>
             <div className="mt-4 space-y-3">
-              <AttentionItem title="Outstanding bills" value={billsQuery.error ? "—" : String(debtors.length)} detail={billsQuery.error ? "Could not load bill records" : currency(outstanding)} onClick={() => setActiveTab("debtors")} />
-              <AttentionItem title="Overdue bills" value={billsQuery.error ? "—" : String(debtors.filter((bill) => bill.status === "OVERDUE").length)} detail={billsQuery.error ? "Could not load bill records" : "Review due dates and follow up"} onClick={() => { setStatusFilter("OVERDUE"); setActiveTab("invoices"); }} />
-              <AttentionItem title="Expense records" value={expensesQuery.error ? "—" : String(expenses.length)} detail={expensesQuery.error ? "Could not load expense records" : currency(expenseTotal)} onClick={() => setActiveTab("expenses")} />
+              <AttentionItem title="Outstanding bills" value={billsQuery.error ? "—" : String(debtors.length)} detail={billsQuery.error ? "Could not load bill records" : currency(outstanding)} to="outstanding" />
+              <AttentionItem title="Overdue bills" value={billsQuery.error ? "—" : String(debtors.filter((bill) => bill.status === "OVERDUE").length)} detail={billsQuery.error ? "Could not load bill records" : "Review due dates and follow up"} to="invoices" />
+              <AttentionItem title="Expense records" value={expensesQuery.error ? "—" : String(expenses.length)} detail={expensesQuery.error ? "Could not load expense records" : currency(expenseTotal)} to="expenses" />
             </div>
           </section>
         </div>
@@ -886,8 +859,8 @@ function StatusBadge({ value }: { value: string }) {
   return <span className={cn("inline-flex whitespace-nowrap rounded-full px-2.5 py-1 text-[11px] font-semibold", positive ? "bg-success/10 text-success" : negative ? "bg-destructive/10 text-destructive" : "bg-muted text-muted-foreground")}>{normalized}</span>;
 }
 
-function AttentionItem({ title, value, detail, onClick }: { title: string; value: string; detail: string; onClick: () => void }) {
-  return <button onClick={onClick} className="flex w-full items-center justify-between gap-3 rounded-xl border border-border p-3 text-left transition hover:bg-muted/50"><span><span className="block text-sm font-medium text-foreground">{title}</span><span className="mt-1 block text-xs text-muted-foreground">{detail}</span></span><span className="text-lg font-bold tabular-nums text-foreground">{value}</span></button>;
+function AttentionItem({ title, value, detail, to }: { title: string; value: string; detail: string; to: string }) {
+  return <Link to="/$page" params={{ page: to }} className="flex w-full items-center justify-between gap-3 rounded-xl border border-border p-3 text-left transition hover:bg-muted/50"><span><span className="block text-sm font-medium text-foreground">{title}</span><span className="mt-1 block text-xs text-muted-foreground">{detail}</span></span><span className="text-lg font-bold tabular-nums text-foreground">{value}</span></Link>;
 }
 
 function Field({ label, children }: { label: string; children: ReactNode }) {
