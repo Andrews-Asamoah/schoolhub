@@ -361,7 +361,7 @@ export class FinanceService {
       data: {
         schoolId, createdById, studentId: student.id, name: input.name.trim(),
         valueType: input.valueType, value: new Prisma.Decimal(input.value),
-        reason: input.reason?.trim() || null, academicYearId: academicYear?.id ?? null,
+        reason: input.reason?.trim() || null, academicYearId: academicYear?.id ?? term?.academicYearId ?? null,
         termId: term?.id ?? null,
         startDate: input.startDate ? new Date(input.startDate) : null,
         endDate: input.endDate ? new Date(input.endDate) : null,
@@ -417,7 +417,7 @@ export class FinanceService {
     }
 
     const guardianLinks = await tx.guardianStudent.findMany({
-      where: { studentId, guardian: { schoolId, isActive: true } },
+      where: { studentId, guardian: { schoolId, isActive: true, deletedAt: null } },
       select: { guardianId: true },
     });
     const guardianIds = [...new Set(guardianLinks.map((link) => link.guardianId))];
@@ -426,7 +426,7 @@ export class FinanceService {
         where: {
           guardianId: { in: guardianIds },
           student: { schoolId, status: "ACTIVE", deletedAt: null },
-          guardian: { schoolId, isActive: true },
+          guardian: { schoolId, isActive: true, deletedAt: null },
         },
         select: { studentId: true },
       });
