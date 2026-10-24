@@ -210,6 +210,7 @@ export function AccountantPortalWorkspace({
   const [showPaymentForm, setShowPaymentForm] = useState(false);
   const [selectedBillId, setSelectedBillId] = useState("");
   const [selectedFeeStructureId, setSelectedFeeStructureId] = useState("");
+  const [selectedClassId, setSelectedClassId] = useState("");
   const [showBillForm, setShowBillForm] = useState(false);
   const [showExpenseForm, setShowExpenseForm] = useState(false);
   const [showInventoryForm, setShowInventoryForm] = useState(false);
@@ -364,6 +365,7 @@ export function AccountantPortalWorkspace({
       });
       setShowBillForm(false);
       setSelectedFeeStructureId("");
+      setSelectedClassId("");
       await queryClient.invalidateQueries({ queryKey: ["finance", "bills"] });
     },
     onError: (error: Error) => setMessage({ kind: "error", text: error.message }),
@@ -448,7 +450,7 @@ export function AccountantPortalWorkspace({
       academicYearId: currentYear?.id,
       termId: currentTerm?.id,
       feeStructureId: form.get("feeStructureId"),
-      classId: form.get("classId"),
+      classId: selectedClassId,
       dueDate: String(form.get("dueDate") ?? "") || undefined,
       notes: String(form.get("notes") ?? "").trim() || undefined,
     });
@@ -508,7 +510,7 @@ export function AccountantPortalWorkspace({
             <button className={buttonPrimary} onClick={() => { setMessage(null); setSelectedBillId(""); setShowPaymentForm(true); }}>
               <Plus className="size-4" /> Record payment
             </button>
-            <button className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-white/30 bg-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/20" onClick={() => { setMessage(null); setSelectedFeeStructureId(""); setShowBillForm(true); }}>
+            <button className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-white/30 bg-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/20" onClick={() => { setMessage(null); setSelectedFeeStructureId(""); setSelectedClassId(""); setShowBillForm(true); }}>
               <Receipt className="size-4" /> Generate bills
             </button>
             <button className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-white/30 bg-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/20" onClick={() => { setMessage(null); setShowExpenseForm(true); }}>
@@ -681,20 +683,20 @@ export function AccountantPortalWorkspace({
       )}
 
       {showBillForm && (
-        <Modal title="Generate student bills" description="Generate bills for every active student enrolled in one class for the current academic term." onClose={() => { setShowBillForm(false); setSelectedFeeStructureId(""); }}>
+        <Modal title="Generate student bills" description="Generate bills for every active student enrolled in one class for the current academic term." onClose={() => { setShowBillForm(false); setSelectedFeeStructureId(""); setSelectedClassId(""); }}>
           <form onSubmit={submitBill} className="space-y-4">
             {yearsQuery.error && <QueryError message={yearsQuery.error.message} />}
             {feeStructuresQuery.error && <QueryError message={feeStructuresQuery.error.message} />}
             {classesQuery.error && <QueryError message={classesQuery.error.message} />}
             {!currentYear || !currentTerm ? <div role="alert" className="rounded-xl border border-warning/30 bg-warning/5 p-3 text-sm text-foreground">A current academic year and term must be selected in School Settings before billing.</div> : <p className="rounded-xl bg-muted p-3 text-sm text-muted-foreground">Billing period: <span className="font-semibold text-foreground">{currentYear.name} · {currentTerm.name}</span></p>}
             <Field label="Fee structure">
-              <select name="feeStructureId" required className={inputClass} value={selectedFeeStructureId} onChange={(event) => setSelectedFeeStructureId(event.target.value)}>
+              <select name="feeStructureId" required className={inputClass} value={selectedFeeStructureId} onChange={(event) => { setSelectedFeeStructureId(event.target.value); setSelectedClassId(""); }}>
                 <option value="" disabled>Select a fee structure…</option>
                 {feeStructures.map((fee) => <option key={fee.id} value={fee.id}>{fee.name} · {currency(fee.items.reduce((sum, item) => sum + Number(item.amount), 0))}</option>)}
               </select>
             </Field>
             <Field label="Class">
-              <select name="classId" required className={inputClass} defaultValue="">
+              <select name="classId" required className={inputClass} value={selectedClassId} onChange={(event) => setSelectedClassId(event.target.value)}>
                 <option value="" disabled>Select a class…</option>
                 {billTargetClasses.map((schoolClass) => <option key={schoolClass.id} value={schoolClass.id}>{schoolClass.name}{typeof schoolClass._count?.students === "number" ? ` · ${schoolClass._count.students} students` : ""}</option>)}
               </select>
@@ -702,7 +704,7 @@ export function AccountantPortalWorkspace({
             <Field label="Due date (optional)"><input name="dueDate" type="date" className={inputClass} /></Field>
             <Field label="Notes (optional)"><textarea name="notes" className={cn(inputClass, "h-20 py-2")} placeholder="Optional note shown on generated bills" /></Field>
             <p className="text-xs leading-5 text-muted-foreground">The operation is performed by the server using the selected class roster and current term. Review the count and total in the confirmation message after generation.</p>
-            <ModalActions onCancel={() => { setShowBillForm(false); setSelectedFeeStructureId(""); }} busy={generateBills.isPending} submitLabel="Generate bills" />
+            <ModalActions onCancel={() => { setShowBillForm(false); setSelectedFeeStructureId(""); setSelectedClassId(""); }} busy={generateBills.isPending} submitLabel="Generate bills" />
           </form>
         </Modal>
       )}
