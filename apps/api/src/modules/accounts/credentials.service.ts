@@ -1,6 +1,6 @@
 import { ConflictException, Injectable } from "@nestjs/common";
 import { generateId } from "better-auth";
-import { randomUUID } from "node:crypto";
+import { randomInt } from "node:crypto";
 import { hashPassword } from "better-auth/crypto";
 import type { AuditAction, Prisma } from "@prisma/client";
 import type { IssuedCredentials, Role } from "@schoolhub/shared";
@@ -9,11 +9,11 @@ import type { IssuedCredentials, Role } from "@schoolhub/shared";
 export type ProvisionableRole = Exclude<Role, "owner">;
 
 /**
- * Creates a short, name-based sign-in identifier for guardians without a
- * contact email. A random suffix prevents collisions; .invalid is reserved
- * and deliberately non-deliverable.
+ * Creates a short guardian sign-in email using the school's email domain.
+ * The initial + surname keeps it readable; a four-digit suffix reduces
+ * collisions between guardians with similar names.
  */
-export function newGuardianLoginEmail(name: string) {
+export function newGuardianLoginEmail(name: string, emailDomain: string) {
   const parts = name
     .normalize("NFKD")
     .replace(/[\u0300-\u036f]/g, "")
@@ -22,9 +22,9 @@ export function newGuardianLoginEmail(name: string) {
     .filter(Boolean);
   const first = parts[0] ?? "guardian";
   const last = parts.length > 1 ? parts[parts.length - 1] : "";
-  const namePart = (last ? `${first[0]}${last}` : first).slice(0, 18);
-  const suffix = randomUUID().replaceAll("-", "").slice(0, 6);
-  return `${namePart}-${suffix}@schoolhub.invalid`;
+  const namePart = (last ? `${first[0]}${last}` : first).slice(0, 24);
+  const suffix = randomInt(0, 10_000).toString().padStart(4, "0");
+  return `${namePart}-g${suffix}@${emailDomain.trim().toLowerCase()}`;
 }
 
 export interface PreparedCredential {
