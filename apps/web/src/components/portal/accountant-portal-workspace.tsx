@@ -376,13 +376,13 @@ export function AccountantPortalWorkspace({
   };
   const reportPayments = useMemo(
     () => payments.filter((payment) => isInReportPeriod(payment.paymentDate)),
-    [payments, reportStartDate],
+    [payments, reportStartDate, reportEndDate],
   );
   const reportSettledPayments = reportPayments.filter((payment) => payment.status === "COMPLETED");
   const reportCollected = reportSettledPayments.reduce((sum, payment) => sum + Number(payment.amount), 0);
   const reportExpenses = useMemo(
     () => expenses.filter((expense) => isInReportPeriod(expense.date)),
-    [expenses, reportStartDate],
+    [expenses, reportStartDate, reportEndDate],
   );
   const reportExpenseTotal = reportExpenses.reduce((sum, expense) => sum + Number(expense.amount), 0);
   const reportPayroll = useMemo(() => {
