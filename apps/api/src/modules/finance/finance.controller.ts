@@ -113,6 +113,10 @@ const reversePaymentSchema = z.object({
 const arrearsPolicySchema = z.object({
   arrearsPolicy: z.enum(["SHOW_ONLY", "BLOCK_CLEARANCE_UNTIL_PAID"]),
 });
+const markFormerStudentsSchema = z.object({
+  studentIds: z.array(z.string().min(1)).min(1).max(200),
+  reason: z.string().trim().min(10).max(500),
+});
 
 @Controller("finance")
 @UseGuards(SchoolTenantGuard, RolesGuard, SuperAdminReasonGuard, FinanceWriteRateLimitGuard)
@@ -240,6 +244,32 @@ export class FinanceController {
     @Query("termId") termId?: string,
   ) {
     return this.financeService.getFinanceSummary(school.id, { from, to, yearId, termId });
+  }
+
+  @Get("term-end-review")
+  @Roles(...FINANCE_READ_ROLES)
+  getTermEndReview(
+    @CurrentSchool() school: School,
+    @Query("yearId") yearId?: string,
+    @Query("termId") termId?: string,
+  ) {
+    return this.financeService.getTermEndReview(school.id, yearId ?? "", termId ?? "");
+  }
+
+  @Get("former-students")
+  @Roles(...FINANCE_READ_ROLES)
+  getFormerStudentsWithBalances(@CurrentSchool() school: School) {
+    return this.financeService.getFormerStudentsWithBalances(school.id);
+  }
+
+  @Post("term-end-review/former-students")
+  @Roles("owner", "admin", "headteacher")
+  markFormerStudents(
+    @CurrentSchool() school: School,
+    @CurrentUser() user: AuthenticatedUser,
+    @Body(new ZodValidationPipe(markFormerStudentsSchema)) body: z.infer<typeof markFormerStudentsSchema>,
+  ) {
+    return this.financeService.markFormerStudents(school.id, user.id, body.studentIds, body.reason);
   }
 
   @Get("arrears-policy")
