@@ -17,7 +17,7 @@ import {
   type IssuedCredentials,
   type UpdateStudentInput,
 } from '@schoolhub/shared';
-import type { Prisma, School, StudentStatus } from '@prisma/client';
+import { Prisma, type School, type StudentStatus } from '@prisma/client';
 import { canManageAcademicContext } from '../../common/academic-context.js';
 import { FinanceService } from '../finance/finance.service.js';
 import {
@@ -1258,14 +1258,14 @@ export class StudentsService {
         _count: { _all: true },
       }),
       this.prisma.client.bill.aggregate({
-        where: { ...activeBillWhere, balanceAmount: { gt: new (await import('@prisma/client')).Prisma.Decimal(0) } },
+        where: { ...activeBillWhere, balanceAmount: { gt: new Prisma.Decimal(0) } },
         _sum: { balanceAmount: true },
       }),
     ]);
-    const totalBilled = currentAgg._sum.totalAmount ?? new (await import('@prisma/client')).Prisma.Decimal(0);
-    const totalPaid = currentAgg._sum.paidAmount ?? new (await import('@prisma/client')).Prisma.Decimal(0);
-    const currentOutstanding = currentAgg._sum.balanceAmount ?? new (await import('@prisma/client')).Prisma.Decimal(0);
-    const allOutstanding = allOpenAgg._sum.balanceAmount ?? new (await import('@prisma/client')).Prisma.Decimal(0);
+    const totalBilled = currentAgg._sum.totalAmount ?? new Prisma.Decimal(0);
+    const totalPaid = currentAgg._sum.paidAmount ?? new Prisma.Decimal(0);
+    const currentOutstanding = currentAgg._sum.balanceAmount ?? new Prisma.Decimal(0);
+    const allOutstanding = allOpenAgg._sum.balanceAmount ?? new Prisma.Decimal(0);
     const clearanceBalance = arrearsPolicy === 'BLOCK_CLEARANCE_UNTIL_PAID' ? allOutstanding : currentOutstanding;
 
     let status: 'FULLY_PAID' | 'PARTIALLY_PAID' | 'YET_TO_PAY' | 'UNKNOWN';
