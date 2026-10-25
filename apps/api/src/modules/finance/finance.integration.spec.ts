@@ -118,6 +118,7 @@ describe.skipIf(!enabled)("finance (database)", { timeout: 60_000 }, () => {
     await quiet(prisma.payment.deleteMany({ where: { schoolId } }));
     await quiet(prisma.transaction.deleteMany({ where: { schoolId } }));
     await quiet(prisma.chartAccount.deleteMany({ where: { schoolId } }));
+    await quiet(prisma.billCarryForward.deleteMany({ where: { schoolId } }));
     await quiet(prisma.bill.deleteMany({ where: { schoolId } }));
     await quiet(prisma.student.deleteMany({ where: { schoolId } }));
     await quiet(prisma.financePeriodLock.deleteMany({ where: { schoolId } }));
@@ -408,4 +409,109 @@ describe.skipIf(!enabled)("finance (database)", { timeout: 60_000 }, () => {
       expect(other.items).toHaveLength(0);
     });
   });
+  describe("Phase 2 reporting and allocations", () => {
+    it("returns independent page totals and accurate summary totals beyond 500 records", async () => {
+      const dateRange = { from: day(-1), to: day(0) };
+      const before = await service.getFinanceSummary(schoolId, dateRange);
+      const { student } = await studentWithBill(10);
+      await prisma.bill.createMany({
+        data: Array.from({ length: 500 }, (_, index) => ({
+          schoolId,
+          studentId: student.id,
+          academicYearId: yearId,
+          billNumber: `TEST-${run}-PAGE-${index.toString().padStart(4, "0")}`,
+          totalAmount: new Prisma.Decimal("10.00"),
+          grossAmount: new Prisma.Decimal("10.00"),
+          discountAmount: new Prisma.Decimal("0.00"),
+          paidAmount: new Prisma.Decimal("0.00"),
+          balanceAmount: new Prisma.Decimal("10.00"),
+          status: "PENDING" as const,
+          issuedAt: new Date(),
+        })),
+      });
+      await prisma.payment.createMany({
+        data: Array.from({ length: 501 }, (_, index) => ({
+          schoolId,
+          studentId: student.id,
+          paymentNumber: `RCT-${run}-PAGE-${index.toString().padStart(4, "0")}`,
+          amount: new Prisma.Decimal("2.00"),
+          paymentMethod: "CASH" as const,
+          paymentDate: new Date(day(0)),
+          status: "COMPLETED" as const,
+          recordedById: userId,
+        })),
+      });
+
+      const billsPage = await service.listBills(schoolId, { studentId: student.id, limit: 50 });
+      const paymentsPage = await service.listPayments(schoolId, { limit: 50, search: `RCT-${run}-PAGE` });
+      const after = await service.getFinanceSummary(schoolId, dateRange);
+      expect(billsPage.items).toHaveLength(50);
+      expect(billsPage.total).toBe(501);
+      expect(billsPage.nextCursor).toBeTruthy();
+      expect(paymentsPage.items).toHaveLength(50);
+      expect(paymentsPage.total).toBe(501);
+      expect(paymentsPage.nextCursor).toBeTruthy();
+      expect(new Prisma.Decimal(after.billed).minus(before.billed).toFixed(2)).toBe("5010.00");
+      expect(new Prisma.Decimal(after.collected).minus(before.collected).toFixed(2)).toBe("1002.00");
+    });
+
+    it("reconstructs the statement running balance from bills and actual receipt allocations", async () => {
+      const { student, bill } = await studentWithBill(1000);
+      await pay(student.id, bill.id, 200);
+      const statement = await service.getStudentStatement(schoolId, student.id, "owner", { scope: "all" });
+      expect(statement.openingBalance).toBe("0.00");
+      expect(statement.entries.map((entry) => entry.type)).toEqual(["INVOICE", "RECEIPT"]);
+      expect(statement.entries.at(-1)?.runningBalance).toBe("800.00");
+      expect(statement.closingBalance).toBe("800.00");
+      expect(statement.dataSource).toBe("bills_and_payments");
+    });
+
+    it("does not expose another school's student statement or finance lists", async () => {
+      const { student } = await studentWithBill(100);
+      await expect(service.getStudentStatement("other-school", student.id, "owner", { scope: "all" })).rejects.toThrow(/not found/i);
+      expect((await service.listBills("other-school", { studentId: student.id })).total).toBe(0);
+      expect((await service.listPayments("other-school", { limit: 10 })).total).toBe(0);
+      const summary = await service.getFinanceSummary("other-school", { from: day(-1), to: day(0) });
+      expect(summary.billed).toBe("0.00");
+      expect(summary.collected).toBe("0.00");
+    });
+
+    it("allocates one receipt oldest-first across invoices and reverses every affected bill", async () => {
+      const { student, bill: firstBill } = await studentWithBill(1000);
+      const secondBill = await prisma.bill.create({
+        data: {
+          schoolId,
+          studentId: student.id,
+          academicYearId: yearId,
+          billNumber: `TEST-${run}-SPILLOVER`,
+          totalAmount: new Prisma.Decimal("300.00"),
+          grossAmount: new Prisma.Decimal("300.00"),
+          discountAmount: new Prisma.Decimal("0.00"),
+          paidAmount: new Prisma.Decimal("0.00"),
+          balanceAmount: new Prisma.Decimal("300.00"),
+          status: "PENDING",
+          items: { create: [{ description: "Additional charge", amount: new Prisma.Decimal("300.00"), totalAmount: new Prisma.Decimal("300.00"), balanceAmount: new Prisma.Decimal("300.00") }] },
+        },
+      });
+      const payment = await pay(student.id, firstBill.id, 1200);
+      const [firstAfterPay, secondAfterPay, allocations] = await Promise.all([
+        prisma.bill.findUniqueOrThrow({ where: { id: firstBill.id } }),
+        prisma.bill.findUniqueOrThrow({ where: { id: secondBill.id } }),
+        prisma.paymentBillAllocation.findMany({ where: { paymentId: payment.id }, orderBy: { createdAt: "asc" } }),
+      ]);
+      expect(firstAfterPay.balanceAmount.toFixed(2)).toBe("0.00");
+      expect(secondAfterPay.balanceAmount.toFixed(2)).toBe("100.00");
+      expect(allocations.map((row) => row.amount.toFixed(2))).toEqual(["1000.00", "200.00"]);
+
+      await service.reversePayment(schoolId, userId, payment.id, { kind: "VOID", reason: "Spillover allocation test reversal" });
+      const [firstAfterReverse, secondAfterReverse] = await Promise.all([
+        prisma.bill.findUniqueOrThrow({ where: { id: firstBill.id } }),
+        prisma.bill.findUniqueOrThrow({ where: { id: secondBill.id } }),
+      ]);
+      expect(firstAfterReverse.balanceAmount.toFixed(2)).toBe("1000.00");
+      expect(secondAfterReverse.balanceAmount.toFixed(2)).toBe("300.00");
+      expect((await prisma.student.findUniqueOrThrow({ where: { id: student.id } })).outstandingBalance.toFixed(2)).toBe("1300.00");
+    });
+  });
+
 });
