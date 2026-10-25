@@ -511,6 +511,61 @@ export class FinanceExportsService {
     return { buffer, fileName: "student-statement-" + (student.admissionNumber ?? student.id) + ".pdf", contentType: "application/pdf" };
   }
 
+  async payslipPdf(context: FinanceExportContext, payslipId: string): Promise<FinanceExportFile> {
+    const school = await this.school(context.schoolId);
+    const slip = await this.prisma.client.payslip.findFirst({
+      where: { id: payslipId, schoolId: context.schoolId },
+      include: {
+        payrollRecord: { select: { id: true, month: true, year: true, status: true, schoolId: true } },
+        staff: { select: { staffId: true, profile: { select: { firstName: true, lastName: true } } } },
+        teacher: { select: { teacherId: true, profile: { select: { firstName: true, lastName: true } } } },
+      },
+    });
+    if (!slip || slip.payrollRecord.schoolId !== context.schoolId) throw new NotFoundException("Payslip not found.");
+
+    const period = String(slip.payrollRecord.year) + "-" + String(slip.payrollRecord.month).padStart(2, "0");
+    const employee = studentName({
+      profile: slip.staff?.profile ?? slip.teacher?.profile,
+      admissionNumber: slip.staff?.staffId ?? slip.teacher?.teacherId,
+    });
+    const employeeId = slip.staff?.staffId ?? slip.teacher?.teacherId ?? "—";
+    const { doc } = await this.pdfDocument(school, "Confidential employee payslip", employeeId, "payslip");
+    doc.setFontSize(10);
+    doc.text("Employee: " + employee, 36, 152);
+    doc.text("Employee ID: " + employeeId, 36, 168);
+    doc.text("Payroll period: " + period, 36, 184);
+    doc.text("Run status: " + slip.payrollRecord.status + " · Payment status: " + slip.paymentStatus, 36, 200);
+    autoTable(doc, {
+      startY: 218,
+      head: [["Pay item", "Amount (GHS)"]],
+      body: [
+        ["Basic salary", formatMoney(slip.basicSalary)],
+        ["Allowances", formatMoney(slip.allowances)],
+        ["Gross pay", formatMoney(slip.grossSalary)],
+        ["Employee SSNIT", formatMoney(slip.ssnitEmployee)],
+        ["PAYE", formatMoney(slip.incomeTax)],
+        ["Other deductions", formatMoney(slip.otherDeductions)],
+        ["Net pay", formatMoney(slip.netSalary)],
+        ["Employer SSNIT (memo)", formatMoney(slip.ssnitEmployer)],
+      ],
+      styles: { fontSize: 9, cellPadding: 6 },
+      headStyles: { fillColor: primaryRgb(school.primaryColor) },
+      columnStyles: { 1: { halign: "right" } },
+      margin: { left: 36, right: 36, bottom: 46 },
+    });
+    const y = (doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY ?? 340;
+    doc.setFontSize(8);
+    doc.text("Net pay in words: " + amountInWords(slip.netSalary), 36, y + 22, { maxWidth: 520 });
+    this.finishPdf(doc, "Payslip", true, slip.payrollRecord.status === "CANCELLED" ? "VOID" : undefined);
+    const buffer = this.pdfBuffer(doc);
+    await this.auditExport(context, "payslip.pdf", 1, { from: period });
+    return {
+      buffer,
+      fileName: "confidential-payslip-" + period + "-" + employeeId + ".pdf",
+      contentType: "application/pdf",
+    };
+  }
+
   async payrollPdf(context: FinanceExportContext, recordId: string): Promise<FinanceExportFile> {
     const school = await this.school(context.schoolId);
     const run = await this.prisma.client.payrollRecord.findFirst({
