@@ -132,6 +132,8 @@ model Bill {
   items        BillItem[]
   payments     Payment[]
   concessions  BillConcession[]
+  arrearsSnapshots       BillArrearsSnapshot[] @relation("CurrentBillArrears")
+  sourceArrearsSnapshots BillArrearsSnapshot[] @relation("SourceBillArrears")
 
   classId  String?
   billType BillType @default(INVOICE)
@@ -139,6 +141,9 @@ model Bill {
   @@unique([billNumber, schoolId])
   @@unique([billCode, schoolId])
   @@index([schoolId, status])
+  @@index([schoolId, issuedAt, id])
+  @@index([schoolId, dueDate, balanceAmount])
+  @@index([schoolId, classId, issuedAt])
   @@index([studentId, academicYearId, status])
   @@index([billNumber])
   @@index([billCode])
@@ -149,6 +154,27 @@ model Bill {
   @@index([classId])
   @@index([billType])
   @@map("bills")
+}
+
+model BillArrearsSnapshot {
+  id                    String   @id @default(cuid())
+  schoolId              String
+  billId                String
+  sourceBillId          String
+  sourceBillNumber      String
+  sourceAcademicYear    String
+  sourceTerm            String?
+  amountAtGeneration    Decimal  @db.Decimal(10, 2)
+  capturedAt            DateTime @default(now())
+
+  school     School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  bill       Bill   @relation("CurrentBillArrears", fields: [billId], references: [id], onDelete: Cascade)
+  sourceBill Bill   @relation("SourceBillArrears", fields: [sourceBillId], references: [id], onDelete: Restrict)
+
+  @@unique([billId, sourceBillId])
+  @@index([schoolId, sourceBillId])
+  @@index([billId])
+  @@map("bill_arrears_snapshots")
 }
 
 model BillItem {
@@ -208,6 +234,8 @@ model Payment {
   @@unique([paymentNumber, schoolId])
   @@unique([schoolId, idempotencyKey])
   @@index([schoolId, paymentDate])
+  @@index([schoolId, paymentDate, id])
+  @@index([schoolId, paymentMethod, paymentDate])
   @@index([studentId])
   @@index([billId])
   @@index([paymentNumber])
