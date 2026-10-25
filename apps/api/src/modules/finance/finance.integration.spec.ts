@@ -597,6 +597,48 @@ describe.skipIf(!enabled)("finance (database)", { timeout: 60_000 }, () => {
     });
   });
 
+  it("blocks fee clearance when the school's arrears policy requires prior balances to be settled", async () => {
+    const { StudentsService } = await import("../students/students.service.js");
+    const studentsService = new StudentsService({ client: prisma } as never, {} as never);
+    const { student } = await studentWithBill(100);
+    const profile = await prisma.userProfile.findUniqueOrThrow({
+      where: { id: student.profileId },
+      select: { userId: true },
+    });
+    const previousYear = await prisma.academicYear.create({
+      data: {
+        schoolId,
+        name: `${run} previous clearance year`,
+        startDate: new Date("2025-01-01"),
+        endDate: new Date("2025-12-31"),
+        isCurrent: false,
+      },
+    });
+    await prisma.bill.create({
+      data: {
+        schoolId,
+        studentId: student.id,
+        academicYearId: previousYear.id,
+        billNumber: `CLEARANCE-OLD-${run}`,
+        grossAmount: new Prisma.Decimal("150.00"),
+        totalAmount: new Prisma.Decimal("150.00"),
+        paidAmount: new Prisma.Decimal("0.00"),
+        balanceAmount: new Prisma.Decimal("150.00"),
+        status: "PENDING",
+        issuedAt: new Date("2025-09-01T00:00:00.000Z"),
+      },
+    });
+    await prisma.school.update({
+      where: { id: schoolId },
+      data: { arrearsPolicy: "BLOCK_CLEARANCE_UNTIL_PAID" },
+    });
+
+    const status = await studentsService.getMyFeeStatus(schoolId, profile.userId);
+    expect(status.status).toBe("BLOCKED_BY_ARREARS");
+    expect(status.clearanceAllowed).toBe(false);
+    expect(status.arrearsPolicy).toBe("BLOCK_CLEARANCE_UNTIL_PAID");
+  });
+
   it("allows a guardian to view only a linked ward's fee statement", async () => {
     const { StudentsService } = await import("../students/students.service.js");
     const studentsService = new StudentsService({ client: prisma } as never, {} as never);
