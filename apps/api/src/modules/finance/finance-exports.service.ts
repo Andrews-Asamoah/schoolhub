@@ -2,7 +2,6 @@ import { Injectable, NotFoundException, BadRequestException } from "@nestjs/comm
 import { Prisma, type School } from "@prisma/client";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
-import QRCode from "qrcode";
 import { PrismaService } from "../../prisma/prisma.service.js";
 import { buildFinanceWorkbook, type FinanceExportCell, type FinanceWorkbookInput } from "./finance-exports.helpers.js";
 
@@ -332,7 +331,7 @@ export class FinanceExportsService {
     };
   }
 
-  private async pdfDocument(school: School, title: string, reference: string, kind: string) {
+  private async pdfDocument(school: School, title: string, reference: string) {
     const doc = new jsPDF({ orientation: "portrait", unit: "pt", format: "a4" });
     const pageWidth = doc.internal.pageSize.getWidth();
     const [red, green, blue] = primaryRgb(school.primaryColor);
@@ -341,14 +340,12 @@ export class FinanceExportsService {
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(16);
     doc.setFont("helvetica", "bold");
-    doc.text(school.name, 36, 30, { maxWidth: pageWidth - 125 });
+    doc.text(school.name, 36, 30, { maxWidth: pageWidth - 72 });
     doc.setFont("helvetica", "normal");
     doc.setFontSize(8);
     const contact = [school.code, school.address, school.phone, school.email, school.website].filter(Boolean).join(" · ");
     doc.text(contact || "School finance office", 36, 47, { maxWidth: pageWidth - 125 });
     if (school.motto) doc.text(school.motto, 36, 62, { maxWidth: pageWidth - 125 });
-    const qr = await QRCode.toDataURL("SCHOOLHUB|" + school.code + "|" + kind + "|" + reference, { errorCorrectionLevel: "M", margin: 1, width: 180 });
-    doc.addImage(qr, "PNG", pageWidth - 82, 10, 48, 48);
     doc.setTextColor(25, 35, 50);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(14);
@@ -402,7 +399,7 @@ export class FinanceExportsService {
   async invoicePdf(context: FinanceExportContext, billId: string): Promise<FinanceExportFile> {
     const school = await this.school(context.schoolId);
     const bill = await this.findBill(context.schoolId, billId);
-    const { doc } = await this.pdfDocument(school, "Student invoice", bill.billNumber, "invoice");
+    const { doc } = await this.pdfDocument(school, "Student invoice", bill.billNumber);
     const student = studentName(bill.student);
     doc.setFontSize(10);
     doc.text("Student: " + student, 36, 150);
@@ -452,7 +449,7 @@ export class FinanceExportsService {
       },
     });
     if (!payment) throw new NotFoundException("Receipt not found.");
-    const { doc } = await this.pdfDocument(school, "Payment receipt", payment.paymentNumber, "receipt");
+    const { doc } = await this.pdfDocument(school, "Payment receipt", payment.paymentNumber);
     const fields = [
       ["Student", studentName(payment.student)],
       ["Admission number", payment.student.admissionNumber ?? "—"],
@@ -549,7 +546,7 @@ export class FinanceExportsService {
       balance = balance.plus(entry.debit).minus(entry.credit);
       return [isoDay(entry.date), entry.reference, entry.description, formatMoney(entry.debit), formatMoney(entry.credit), formatMoney(balance)];
     });
-    const { doc } = await this.pdfDocument(school, "Student statement of account", student.admissionNumber ?? student.id, "statement");
+    const { doc } = await this.pdfDocument(school, "Student statement of account", student.admissionNumber ?? student.id);
     doc.setFontSize(10);
     doc.text("Student: " + studentName(student), 36, 150);
     doc.text("Admission number: " + (student.admissionNumber ?? "—"), 36, 166);
@@ -594,7 +591,7 @@ export class FinanceExportsService {
       admissionNumber: slip.staff?.staffId ?? slip.teacher?.teacherId,
     });
     const employeeId = slip.staff?.staffId ?? slip.teacher?.teacherId ?? "—";
-    const { doc } = await this.pdfDocument(school, "Confidential employee payslip", employeeId, "payslip");
+    const { doc } = await this.pdfDocument(school, "Confidential employee payslip", employeeId);
     doc.setFontSize(10);
     doc.text("Employee: " + employee, 36, 152);
     doc.text("Employee ID: " + employeeId, 36, 168);
@@ -646,7 +643,7 @@ export class FinanceExportsService {
       },
     });
     if (!run) throw new NotFoundException("Payroll run not found.");
-    const { doc } = await this.pdfDocument(school, "Payroll payslip schedule", String(run.year) + "-" + String(run.month).padStart(2,"0"), "payroll");
+    const { doc } = await this.pdfDocument(school, "Payroll payslip schedule", String(run.year) + "-" + String(run.month).padStart(2,"0"));
     autoTable(doc, {
       startY: 152,
       head: [["Employee", "Employee ID", "Basic", "Allowance", "Gross", "Employee SSNIT", "PAYE", "Employer SSNIT", "Other deductions", "Net pay"]],
