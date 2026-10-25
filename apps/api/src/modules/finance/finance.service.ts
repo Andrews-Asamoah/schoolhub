@@ -3447,10 +3447,16 @@ export class FinanceService {
         // Accrue gross salary and employer pension cost, then allocate the
         // payable to actual net disbursement and statutory/other withholdings.
         await postLedgerEntry("Gross payroll accrual", gross, salaryExpense, payrollPayable, "EXPENSE", "Gross employee pay");
-        await postLedgerEntry("Employer SSNIT contribution", employerSsnit, employerSsnitExpense, ssnitPayable, "EXPENSE", "Employer contribution");
+        await postLedgerEntry("Employer SSNIT contribution", employerSsnit.add(employeeSsnitBorne), employerSsnitExpense, ssnitPayable, "EXPENSE", "Employer contribution and employee share borne by school");
+        await postLedgerEntry("Tier 2 employer contribution", tier2Employer, employerPensionExpense, tier2Payable, "EXPENSE", "Employer Tier 2 contribution");
+        await postLedgerEntry("Tier 2 employee share borne by school", tier2EmployeeBorne, employerPensionExpense, tier2Payable, "EXPENSE", "Employee Tier 2 share borne by school");
+        await postLedgerEntry("Tier 3 employer contribution", tier3Employer, employerPensionExpense, tier3Payable, "EXPENSE", "Employer Tier 3 contribution");
+        await postLedgerEntry("Tier 3 employee share borne by school", tier3EmployeeBorne, employerPensionExpense, tier3Payable, "EXPENSE", "Employee Tier 3 share borne by school");
         await postLedgerEntry("Net salary disbursement", net, payrollPayable, paymentAccount, "TRANSFER", "Net salaries confirmed paid");
         await postLedgerEntry("PAYE withheld from payroll", paye, payrollPayable, payePayable, "TRANSFER", "PAYE liability recognised");
-        await postLedgerEntry("Employee SSNIT withheld from payroll", employeeSsnit, payrollPayable, ssnitPayable, "TRANSFER", "Employee SSNIT liability recognised");
+        await postLedgerEntry("Employee SSNIT withheld from payroll", employeeSsnitDeducted, payrollPayable, ssnitPayable, "TRANSFER", "Employee SSNIT liability recognised");
+        await postLedgerEntry("Tier 2 employee contribution withheld", tier2EmployeeDeducted, payrollPayable, tier2Payable, "TRANSFER", "Employee Tier 2 liability recognised");
+        await postLedgerEntry("Tier 3 employee contribution withheld", tier3EmployeeDeducted, payrollPayable, tier3Payable, "TRANSFER", "Employee Tier 3 liability recognised");
         await postLedgerEntry("Other payroll deductions withheld", otherDeductions, payrollPayable, otherDeductionPayable, "TRANSFER", "Other deductions liability recognised");
 
         await tx.payslip.updateMany({
