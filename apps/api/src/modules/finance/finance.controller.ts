@@ -113,6 +113,12 @@ const reversePaymentSchema = z.object({
 const arrearsPolicySchema = z.object({
   arrearsPolicy: z.enum(["SHOW_ONLY", "BLOCK_CLEARANCE_UNTIL_PAID"]),
 });
+const lateFeePolicySchema = z.object({
+  enabled: z.boolean(),
+  mode: z.enum(["PERCENTAGE", "FIXED"]),
+  value: z.string().regex(/^\d{1,8}(?:\.\d{1,2})?$/, "Enter a non-negative value to two decimal places."),
+  graceDays: z.number().int().min(0).max(3650),
+});
 const markFormerStudentsSchema = z.object({
   studentIds: z.array(z.string().min(1)).min(1).max(200),
   reason: z.string().trim().min(10).max(500),
@@ -270,6 +276,22 @@ export class FinanceController {
     @Body(new ZodValidationPipe(markFormerStudentsSchema)) body: z.infer<typeof markFormerStudentsSchema>,
   ) {
     return this.financeService.markFormerStudents(school.id, user.id, body.studentIds, body.reason);
+  }
+
+  @Get("late-fee-policy")
+  @Roles(...FINANCE_READ_ROLES)
+  getLateFeePolicy(@CurrentSchool() school: School) {
+    return this.financeService.getLateFeePolicy(school.id);
+  }
+
+  @Put("late-fee-policy")
+  @Roles("owner", "admin", "headteacher")
+  setLateFeePolicy(
+    @CurrentSchool() school: School,
+    @CurrentUser() user: AuthenticatedUser,
+    @Body(new ZodValidationPipe(lateFeePolicySchema)) body: z.infer<typeof lateFeePolicySchema>,
+  ) {
+    return this.financeService.setLateFeePolicy(school.id, user.id, body);
   }
 
   @Get("arrears-policy")
