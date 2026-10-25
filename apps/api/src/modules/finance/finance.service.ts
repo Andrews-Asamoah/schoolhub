@@ -607,7 +607,7 @@ export class FinanceService {
     studentId: string,
     academicYearId: string,
     termId: string,
-    grossAmount: number,
+    grossAmount: Prisma.Decimal,
   ) {
     const today = new Date();
     today.setUTCHours(0, 0, 0, 0);
@@ -621,19 +621,26 @@ export class FinanceService {
           { OR: [{ endDate: null }, { endDate: { gte: today } }] },
         ],
       },
-      orderBy: { createdAt: "asc" },
+      orderBy: [{ createdAt: "asc" }, { id: "asc" }],
     });
-    const details: { type: "SCHOLARSHIP" | "SIBLING_DISCOUNT"; label: string; amount: number; scholarshipId?: string; policyId?: string }[] = [];
+    const details: {
+      type: "SCHOLARSHIP" | "SIBLING_DISCOUNT";
+      label: string;
+      amount: Prisma.Decimal;
+      scholarshipId?: string;
+      policyId?: string;
+    }[] = [];
     let remaining = grossAmount;
+    const round = (value: Prisma.Decimal) => value.toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP);
     for (const scholarship of scholarships) {
-      if (remaining <= 0) break;
+      if (remaining.lte(0)) break;
       const requested = scholarship.valueType === "PERCENTAGE"
-        ? roundMoney(grossAmount * Number(scholarship.value) / 100)
-        : Number(scholarship.value);
-      const amount = roundMoney(Math.min(remaining, Math.max(0, requested)));
-      if (amount > 0) {
+        ? round(grossAmount.mul(scholarship.value).div(100))
+        : scholarship.value;
+      const amount = Prisma.Decimal.min(remaining, Prisma.Decimal.max(0, requested));
+      if (amount.gt(0)) {
         details.push({ type: "SCHOLARSHIP", label: scholarship.name, amount, scholarshipId: scholarship.id });
-        remaining = roundMoney(remaining - amount);
+        remaining = round(remaining.minus(amount));
       }
     }
 
@@ -642,7 +649,7 @@ export class FinanceService {
       select: { guardianId: true },
     });
     const guardianIds = [...new Set(guardianLinks.map((link) => link.guardianId))];
-    if (remaining > 0 && guardianIds.length) {
+    if (remaining.gt(0) && guardianIds.length) {
       const linkedStudents = await tx.guardianStudent.findMany({
         where: {
           guardianId: { in: guardianIds },
@@ -658,13 +665,14 @@ export class FinanceService {
       });
       if (policy) {
         const requested = policy.valueType === "PERCENTAGE"
-          ? roundMoney(remaining * Number(policy.value) / 100)
-          : Number(policy.value);
-        const amount = roundMoney(Math.min(remaining, Math.max(0, requested)));
-        if (amount > 0) details.push({ type: "SIBLING_DISCOUNT", label: policy.name, amount, policyId: policy.id });
+          ? round(remaining.mul(policy.value).div(100))
+          : policy.value;
+        const amount = Prisma.Decimal.min(remaining, Prisma.Decimal.max(0, requested));
+        if (amount.gt(0)) details.push({ type: "SIBLING_DISCOUNT", label: policy.name, amount, policyId: policy.id });
       }
     }
-    return { details, totalDiscount: roundMoney(details.reduce((sum, item) => sum + item.amount, 0)) };
+    const totalDiscount = details.reduce((sum, item) => sum.plus(item.amount), new Prisma.Decimal(0));
+    return { details, totalDiscount: round(totalDiscount) };
   }
 
   async generateBills(schoolId: string, input: GenerateBillInput, actorId: string) {
