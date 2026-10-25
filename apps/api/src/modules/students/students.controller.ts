@@ -27,6 +27,16 @@ import {
   type UpdateStudentInput,
 } from "@schoolhub/shared";
 import type { School, StudentStatus } from "@prisma/client";
+import { z } from "zod";
+import type { StudentStatementScope } from "@schoolhub/shared";
+
+const guardianStatementQuerySchema = z.object({
+  scope: z.enum(["term", "year", "all"]).default("term"),
+  yearId: z.string().trim().min(1).optional(),
+  termId: z.string().trim().min(1).optional(),
+  from: z.string().regex(/^\\d{4}-\\d{2}-\\d{2}$/).optional(),
+  to: z.string().regex(/^\\d{4}-\\d{2}-\\d{2}$/).optional(),
+});
 
 @Controller("students")
 @UseGuards(SchoolTenantGuard, RolesGuard)
@@ -90,6 +100,21 @@ export class StudentsController {
     @CurrentUser() user: AuthenticatedUser | undefined,
   ) {
     return this.studentsService.getMyWards(school.id, user!.id);
+  }
+
+  /** Finance statement for one of this guardian's own wards. */
+  @Get("my-wards/:id/fees")
+  @Roles("guardian")
+  myWardFeeStatement(
+    @CurrentSchool() school: School,
+    @CurrentUser() user: AuthenticatedUser | undefined,
+    @Param("id") studentId: string,
+    @Query(new ZodValidationPipe(guardianStatementQuerySchema)) query: z.infer<typeof guardianStatementQuerySchema>,
+  ) {
+    return this.studentsService.getMyWardFeeStatement(school.id, user!.id, studentId, {
+      ...query,
+      scope: query.scope as StudentStatementScope,
+    });
   }
 
   @Get("my-wards/:id")
