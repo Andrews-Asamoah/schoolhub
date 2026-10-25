@@ -424,6 +424,27 @@ export class FinanceController {
     return this.financeService.listFinanceAudit(school.id, { category, from, to, cursor, limit });
   }
 
+  @Get("arrears-review")
+  @Roles(...FINANCE_READ_ROLES)
+  getArrearsReview(@CurrentSchool() school: School) {
+    return this.financeService.getArrearsReview(school.id);
+  }
+
+  @Post("arrears-review/:studentId/mark-former")
+  @Roles("owner", "admin", "headteacher")
+  @FinanceSelfAudited()
+  markArrearsStudentFormer(
+    @CurrentSchool() school: School,
+    @CurrentUser() user: AuthenticatedUser,
+    @Param("studentId") studentId: string,
+    @Body(new ZodValidationPipe(z.object({
+      status: z.enum(["WITHDRAWN", "TRANSFERRED", "GRADUATED"]),
+      reason: z.string().trim().min(10).max(500),
+    }))) body: { status: "WITHDRAWN" | "TRANSFERRED" | "GRADUATED"; reason: string },
+  ) {
+    return this.financeService.markArrearsStudentFormer(school.id, user.id, studentId, body);
+  }
+
   @Get("arrears-policy")
   @Roles(...FINANCE_READ_ROLES)
   getArrearsPolicy(@CurrentSchool() school: School) {
