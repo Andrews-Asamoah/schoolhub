@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { CreditCard, FileSpreadsheet, FileText, LoaderCircle, Printer, ShieldCheck, UserRound } from "lucide-react";
+import { FileSpreadsheet, FileText, LoaderCircle, Printer, ShieldCheck, UserRound } from "lucide-react";
 import { useMemo, useState } from "react";
 import ExcelJS from "exceljs";
 import { jsPDF } from "jspdf";
@@ -8,7 +8,6 @@ import type { StudentStatementResponse } from "@schoolhub/shared";
 import type { StudentProfileData } from "@/components/school/student-profile-panel";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { apiFetch } from "@/lib/api";
-import { cn } from "@/lib/utils";
 
 function fullName(ward: StudentProfileData) {
   return [ward.profile.firstName, ward.profile.otherNames, ward.profile.lastName].filter(Boolean).join(" ") || ward.admissionNumber || "Student";
