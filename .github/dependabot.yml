@@ -1,0 +1,24 @@
+# Keeps dependencies and CI actions patched. Security updates are opened as
+# separate pull requests automatically; these schedules cover routine updates.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
+    # Auth, ORM and framework majors need a human to read the changelog first.
+    ignore:
+      - dependency-name: better-auth
+        update-types: [version-update:semver-major]
+      - dependency-name: "@prisma/*"
+        update-types: [version-update:semver-major]
+      - dependency-name: prisma
+        update-types: [version-update:semver-major]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
