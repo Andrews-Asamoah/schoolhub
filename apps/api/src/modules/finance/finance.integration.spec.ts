@@ -195,6 +195,34 @@ describe.skipIf(!enabled)("finance (database)", { timeout: 60_000 }, () => {
     });
   });
 
+  describe("all-time student statements", () => {
+    it("returns invoices and payment history with reconciled balances", async () => {
+      const { student, bill } = await studentWithBill(500);
+      await pay(student.id, bill.id, 125);
+
+      const statement = await service.getStudentStatement(schoolId, student.id);
+
+      expect(statement.student.id).toBe(student.id);
+      expect(statement.bills.map((row) => row.id)).toContain(bill.id);
+      expect(statement.payments).toHaveLength(1);
+      expect(statement.payments[0]?.bill?.billNumber).toBe(bill.billNumber);
+      expect(statement.summary.totalBilled).toBe(500);
+      expect(statement.summary.totalReceipts).toBe(125);
+      expect(statement.summary.totalReversals).toBe(0);
+      expect(statement.summary.netReceipts).toBe(125);
+      expect(statement.summary.openInvoiceBalance).toBe(375);
+      expect(statement.summary.studentOutstandingBalance).toBe(375);
+      expect(statement.summary.reconciliationDifference).toBe(0);
+    });
+
+    it("does not disclose a student from another school", async () => {
+      const { student } = await studentWithBill(100);
+      await expect(
+        service.getStudentStatement(`${schoolId}-another-tenant`, student.id),
+      ).rejects.toThrow(/student not found/i);
+    });
+  });
+
   describe("idempotency", () => {
     it("returns the same receipt when a request is retried with the same key", async () => {
       const { student, bill } = await studentWithBill(1000);
