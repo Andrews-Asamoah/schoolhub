@@ -32,6 +32,7 @@ import { AdminAnnouncementsWorkspace } from "./admin-announcements-workspace";
 import { AccountantFinanceCharts } from "./accountant-finance-charts";
 import { AccountantFinanceReportingWorkspace } from "./accountant-finance-reporting-workspace";
 import { AccountantRecordPaymentDialog } from "./accountant-record-payment-dialog";
+import { StudentAccountStatementDialog } from "./student-account-statement-dialog";
 import { apiFetch } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { useFinanceAccess } from "@/components/portal/finance-access";
@@ -191,7 +192,12 @@ interface ApiPayroll {
 }
 
 function downloadCsv(rows: unknown[][], filename: string) {
-  const csv = rows.map((row) => row.map((value) => '"' + String(value ?? "").replaceAll('"', '""') + '"').join(",")).join("\r\n");
+  const csv = rows.map((row) => row.map((value) => {
+    let text = String(value ?? "");
+    // Prevent spreadsheet formula injection through student names, references, and other saved fields.
+    if (/^[\\t\\r\\n ]*[=+\\-@]/.test(text)) text = "'" + text;
+    return '"' + text.replaceAll('"', '""') + '"';
+  }).join(",")).join("\r\n");
   const url = URL.createObjectURL(new Blob(["\uFEFF", csv], { type: "text/csv;charset=utf-8;" }));
   const link = document.createElement("a");
   link.href = url;
@@ -246,6 +252,7 @@ export function AccountantPortalWorkspace({
   const [showPaymentForm, setShowPaymentForm] = useState(false);
   const [selectedBillId, setSelectedBillId] = useState("");
   const [selectedReceipt, setSelectedReceipt] = useState<ApiPayment | null>(null);
+  const [selectedStatementStudent, setSelectedStatementStudent] = useState<StudentSummary | null>(null);
   const [reverseTarget, setReverseTarget] = useState<ApiPayment | null>(null);
   const [reverseKind, setReverseKind] = useState<"VOID" | "REFUND">("VOID");
   const [reverseReason, setReverseReason] = useState("");
@@ -621,10 +628,10 @@ export function AccountantPortalWorkspace({
   return (
     <div className="space-y-6"><style>{`@media print {
         body * { visibility: hidden !important; }
-        .payment-receipt-print, .payment-receipt-print *, .invoice-print-area, .invoice-print-area * { visibility: visible !important; }
-        .payment-receipt-print, .invoice-print-area { position: absolute !important; inset: 0 auto auto 0 !important; width: 100% !important; max-width: none !important; margin: 0 !important; padding: 24px !important; border: 0 !important; box-shadow: none !important; background: white !important; color: black !important; }
-        .payment-receipt-actions, .invoice-print-actions { display: none !important; }
-        .payment-receipt-print p, .payment-receipt-print span, .payment-receipt-print h2, .payment-receipt-print h3, .invoice-print-area p, .invoice-print-area span, .invoice-print-area h2, .invoice-print-area h3 { color: black !important; }
+        .payment-receipt-print, .payment-receipt-print *, .invoice-print-area, .invoice-print-area *, .student-statement-print, .student-statement-print * { visibility: visible !important; }
+        .payment-receipt-print, .invoice-print-area, .student-statement-print { position: absolute !important; inset: 0 auto auto 0 !important; width: 100% !important; max-width: none !important; margin: 0 !important; padding: 24px !important; border: 0 !important; box-shadow: none !important; background: white !important; color: black !important; }
+        .payment-receipt-actions, .invoice-print-actions, .student-statement-actions { display: none !important; }
+        .payment-receipt-print p, .payment-receipt-print span, .payment-receipt-print h2, .payment-receipt-print h3, .invoice-print-area p, .invoice-print-area span, .invoice-print-area h2, .invoice-print-area h3, .student-statement-print p, .student-statement-print span, .student-statement-print h2, .student-statement-print h3, .student-statement-print th, .student-statement-print td { color: black !important; }
         @page { size: A4 portrait; margin: 12mm; }
       }`}</style>
       {activeTab === "overview" && (
@@ -739,7 +746,7 @@ export function AccountantPortalWorkspace({
           <div className="grid gap-5 xl:grid-cols-[1.3fr_0.7fr]">
             <section className="rounded-2xl border border-border bg-card p-5">
               <div className="mb-4 flex flex-wrap items-center justify-between gap-3"><div><h2 className="font-semibold text-foreground">Recent payments</h2><p className="mt-1 text-sm text-muted-foreground">Latest receipts recorded for this school</p></div><Link to="/$page" params={{ page: "payments" }} className={buttonSecondary}>View payments</Link></div>
-              {paymentsQuery.error ? <QueryError message={paymentsQuery.error.message} /> : <PaymentsTable payments={recentPayments.slice(0, 6)} onViewReceipt={setSelectedReceipt} />}
+              {paymentsQuery.error ? <QueryError message={paymentsQuery.error.message} /> : <PaymentsTable payments={recentPayments.slice(0, 6)} onViewReceipt={setSelectedReceipt} onViewStatement={(payment) => setSelectedStatementStudent(payment.student)} />}
             </section>
             <section className="rounded-2xl border border-border bg-card p-5">
               <h2 className="font-semibold text-foreground">Finance activity</h2><p className="mt-1 text-sm text-muted-foreground">Quick access to records that need attention.</p>
@@ -753,7 +760,7 @@ export function AccountantPortalWorkspace({
         <section className="rounded-2xl border border-border bg-card p-5">
           <SectionHeader title="Invoices & bills" description="Search bills, review balances, and generate billing for an active class." action={<div className="flex flex-wrap gap-2"><button type="button" className={buttonSecondary} onClick={() => downloadCsv([["Invoice","Student","Admission number","Class","Fee structure","Due date","Gross (GHS)","Discount (GHS)","Total (GHS)","Paid (GHS)","Balance (GHS)","Status"], ...filteredBills.map(bill => [bill.billNumber, studentName(bill.student), bill.student?.admissionNumber ?? "", bill.class?.name ?? "", bill.feeStructure?.name ?? "", dateLabel(bill.dueDate), Number(bill.grossAmount ?? bill.totalAmount).toFixed(2), Number(bill.discountAmount ?? 0).toFixed(2), Number(bill.totalAmount).toFixed(2), Number(bill.paidAmount).toFixed(2), Number(bill.balanceAmount).toFixed(2), bill.status])], "schoolhub-invoices.csv")} disabled={!filteredBills.length}><Download className="size-4" /> Export CSV</button>{canWrite && <button className={buttonPrimary} onClick={() => { setMessage(null); setSelectedFeeStructureId(""); setSelectedClassId(""); setShowBillForm(true); }}><Plus className="size-4" /> Generate bills</button>}</div>} />
           <SearchFilters search={search} setSearch={setSearch} statusFilter={statusFilter} setStatusFilter={setStatusFilter} statuses={["PENDING", "PARTIALLY_PAID", "PAID", "OVERDUE"]} />
-          {billsQuery.error ? <QueryError message={billsQuery.error.message} /> : <BillsTable bills={filteredBills} onRecordPayment={canWrite ? (bill) => { setSelectedBillId(bill.id); setShowPaymentForm(true); } : undefined} onViewInvoice={setSelectedInvoiceForPrint} />}
+          {billsQuery.error ? <QueryError message={billsQuery.error.message} /> : <BillsTable bills={filteredBills} onRecordPayment={canWrite ? (bill) => { setSelectedBillId(bill.id); setShowPaymentForm(true); } : undefined} onViewInvoice={setSelectedInvoiceForPrint} onViewStatement={(bill) => setSelectedStatementStudent(bill.student)} />}
         </section>
       )}
 
@@ -761,7 +768,7 @@ export function AccountantPortalWorkspace({
         <section className="rounded-2xl border border-border bg-card p-5">
           <SectionHeader title="Payments & receipts" description="Saved payment transactions from the school finance ledger." action={<div className="flex flex-wrap gap-2"><button type="button" className={buttonSecondary} onClick={() => downloadCsv([["Receipt","Student","Admission number","Bill","Date","Method","Reference","Amount (GHS)","Status"], ...filteredPayments.map(payment => [payment.paymentNumber, studentName(payment.student), payment.student?.admissionNumber ?? "", payment.bill?.billNumber ?? "", dateLabel(payment.paymentDate), payment.paymentMethod, payment.referenceNumber ?? "", Number(payment.amount).toFixed(2), payment.status])], "schoolhub-payment-register.csv")} disabled={!filteredPayments.length}><Download className="size-4" /> Export CSV</button>{canWrite && <button className={buttonPrimary} onClick={() => { setMessage(null); setSelectedBillId(""); setShowPaymentForm(true); }}><Plus className="size-4" /> Record payment</button>}</div>} />
           <div className="relative my-4 max-w-md"><Search className="absolute left-3 top-3 size-4 text-muted-foreground" /><input className={cn(inputClass, "pl-9")} value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search receipt, student, or reference" /></div>
-          {paymentsQuery.error ? <QueryError message={paymentsQuery.error.message} /> : <PaymentsTable payments={filteredPayments} onViewReceipt={setSelectedReceipt} onReverse={canWrite ? (payment) => { setReverseKind("VOID"); setReverseReason(""); setReverseTarget(payment); } : undefined} />}
+          {paymentsQuery.error ? <QueryError message={paymentsQuery.error.message} /> : <PaymentsTable payments={filteredPayments} onViewReceipt={setSelectedReceipt} onViewStatement={(payment) => setSelectedStatementStudent(payment.student)} onReverse={canWrite ? (payment) => { setReverseKind("VOID"); setReverseReason(""); setReverseTarget(payment); } : undefined} />}
         </section>
       )}
 
@@ -771,7 +778,7 @@ export function AccountantPortalWorkspace({
           {billsQuery.error ? <QueryError message={billsQuery.error.message} /> : <BillsTable bills={debtors.filter((bill) => {
             const term = search.trim().toLowerCase();
             return !term || bill.billNumber.toLowerCase().includes(term) || studentName(bill.student).toLowerCase().includes(term) || (bill.class?.name ?? "").toLowerCase().includes(term);
-          })} onRecordPayment={canWrite ? (bill) => { setSelectedBillId(bill.id); setShowPaymentForm(true); } : undefined} onViewInvoice={setSelectedInvoiceForPrint} />}
+          })} onRecordPayment={canWrite ? (bill) => { setSelectedBillId(bill.id); setShowPaymentForm(true); } : undefined} onViewInvoice={setSelectedInvoiceForPrint} onViewStatement={(bill) => setSelectedStatementStudent(bill.student)} />}
         </section>
       )}
 
@@ -1028,6 +1035,7 @@ export function AccountantPortalWorkspace({
           </form>
         </Modal>
       )}
+      {selectedStatementStudent && <StudentAccountStatementDialog student={selectedStatementStudent} onClose={() => setSelectedStatementStudent(null)} />}
     </div>
   );
 }
@@ -1052,14 +1060,14 @@ function SearchFilters({ search, setSearch, statusFilter, setStatusFilter, statu
   return <div className="my-4 flex flex-wrap gap-3"><div className="relative min-w-56 flex-1"><Search className="absolute left-3 top-3 size-4 text-muted-foreground" /><input className={cn(inputClass, "pl-9")} value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search bill, student, or class" /></div><select className={cn(inputClass, "w-auto min-w-40")} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="ALL">All statuses</option>{statuses.map((status) => <option key={status} value={status}>{status.replaceAll("_", " ")}</option>)}</select></div>;
 }
 
-function BillsTable({ bills, onRecordPayment, onViewInvoice }: { bills: ApiBill[]; onRecordPayment?: (bill: ApiBill) => void; onViewInvoice: (bill: ApiBill) => void }) {
+function BillsTable({ bills, onRecordPayment, onViewInvoice, onViewStatement }: { bills: ApiBill[]; onRecordPayment?: (bill: ApiBill) => void; onViewInvoice: (bill: ApiBill) => void; onViewStatement?: (bill: ApiBill) => void }) {
   if (!bills.length) return <EmptyState icon={FileText} title="No matching bills" description="Bills appear here after they are generated for an active class and term." />;
-  return <div className="mt-4 overflow-x-auto"><table className="w-full min-w-[820px] text-left text-sm"><thead><tr className="border-b border-border text-xs text-muted-foreground"><th className="p-3">Bill</th><th className="p-3">Student / class</th><th className="p-3">Due date</th><th className="p-3 text-right">Amount</th><th className="p-3 text-right">Paid</th><th className="p-3 text-right">Balance</th><th className="p-3">Status</th><th className="p-3"></th></tr></thead><tbody>{bills.map((bill) => <tr key={bill.id} className="border-b border-border/70 last:border-0 hover:bg-muted/40"><td className="p-3"><div className="font-semibold text-foreground">{bill.billNumber}</div><div className="text-xs text-muted-foreground">{bill.feeStructure?.name ?? "Fee bill"}</div></td><td className="p-3"><div className="font-medium text-foreground">{studentName(bill.student)}</div><div className="text-xs text-muted-foreground">{bill.student?.admissionNumber} · {bill.class?.name ?? "Class not recorded"}</div></td><td className="p-3">{dateLabel(bill.dueDate)}</td><td className="p-3 text-right tabular-nums">{currency(bill.totalAmount)}</td><td className="p-3 text-right tabular-nums">{currency(bill.paidAmount)}</td><td className="p-3 text-right font-semibold tabular-nums">{currency(bill.balanceAmount)}</td><td className="p-3"><StatusBadge value={bill.status} /></td><td className="p-3 text-right"><div className="flex flex-col items-end gap-1"><button type="button" className="text-xs font-semibold text-primary hover:underline" onClick={() => onViewInvoice(bill)}>View invoice</button>{onRecordPayment && Number(bill.balanceAmount) > 0 && <button type="button" className="text-xs font-semibold text-foreground hover:underline" onClick={() => onRecordPayment(bill)}>Record payment</button>}</div></td></tr>)}</tbody></table></div>;
+  return <div className="mt-4 overflow-x-auto"><table className="w-full min-w-[820px] text-left text-sm"><thead><tr className="border-b border-border text-xs text-muted-foreground"><th className="p-3">Bill</th><th className="p-3">Student / class</th><th className="p-3">Due date</th><th className="p-3 text-right">Amount</th><th className="p-3 text-right">Paid</th><th className="p-3 text-right">Balance</th><th className="p-3">Status</th><th className="p-3"></th></tr></thead><tbody>{bills.map((bill) => <tr key={bill.id} className="border-b border-border/70 last:border-0 hover:bg-muted/40"><td className="p-3"><div className="font-semibold text-foreground">{bill.billNumber}</div><div className="text-xs text-muted-foreground">{bill.feeStructure?.name ?? "Fee bill"}</div></td><td className="p-3"><div className="font-medium text-foreground">{studentName(bill.student)}</div><div className="text-xs text-muted-foreground">{bill.student?.admissionNumber} · {bill.class?.name ?? "Class not recorded"}</div></td><td className="p-3">{dateLabel(bill.dueDate)}</td><td className="p-3 text-right tabular-nums">{currency(bill.totalAmount)}</td><td className="p-3 text-right tabular-nums">{currency(bill.paidAmount)}</td><td className="p-3 text-right font-semibold tabular-nums">{currency(bill.balanceAmount)}</td><td className="p-3"><StatusBadge value={bill.status} /></td><td className="p-3 text-right"><div className="flex flex-col items-end gap-1"><button type="button" className="text-xs font-semibold text-primary hover:underline" onClick={() => onViewInvoice(bill)}>View invoice</button>{onViewStatement && <button type="button" className="text-xs font-semibold text-foreground hover:underline" onClick={() => onViewStatement(bill)}>Statement</button>}{onRecordPayment && Number(bill.balanceAmount) > 0 && <button type="button" className="text-xs font-semibold text-foreground hover:underline" onClick={() => onRecordPayment(bill)}>Record payment</button>}</div></td></tr>)}</tbody></table></div>;
 }
 
-function PaymentsTable({ payments, onViewReceipt, onReverse }: { payments: ApiPayment[]; onViewReceipt: (payment: ApiPayment) => void; onReverse?: (payment: ApiPayment) => void }) {
+function PaymentsTable({ payments, onViewReceipt, onReverse, onViewStatement }: { payments: ApiPayment[]; onViewReceipt: (payment: ApiPayment) => void; onReverse?: (payment: ApiPayment) => void; onViewStatement?: (payment: ApiPayment) => void }) {
   if (!payments.length) return <EmptyState icon={Receipt} title="No payments recorded" description="When an accountant records a payment, the saved receipt will appear here." />;
-  return <div className="mt-4 overflow-x-auto"><table className="w-full min-w-[760px] text-left text-sm"><thead><tr className="border-b border-border text-xs text-muted-foreground"><th className="p-3">Receipt</th><th className="p-3">Student</th><th className="p-3">Date</th><th className="p-3">Method / reference</th><th className="p-3 text-right">Amount</th><th className="p-3">Status</th><th className="p-3"></th></tr></thead><tbody>{payments.map((payment) => <tr key={payment.id} className="border-b border-border/70 last:border-0 hover:bg-muted/40"><td className="p-3 font-semibold text-foreground">{payment.paymentNumber}</td><td className="p-3"><div className="font-medium">{studentName(payment.student)}</div><div className="text-xs text-muted-foreground">{payment.student?.admissionNumber}</div></td><td className="p-3">{dateLabel(payment.paymentDate)}</td><td className="p-3"><div>{payment.paymentMethod.replaceAll("_", " ")}</div><div className="text-xs text-muted-foreground">{payment.referenceNumber || "No reference"}</div></td><td className="p-3 text-right font-semibold tabular-nums">{currency(payment.amount)}</td><td className="p-3"><StatusBadge value={payment.status} /></td><td className="p-3 text-right"><button type="button" className="text-xs font-semibold text-primary hover:underline" onClick={() => onViewReceipt(payment)}>View receipt</button>{onReverse && payment.status === "COMPLETED" && <button type="button" className="ml-3 text-xs font-semibold text-destructive hover:underline" onClick={() => onReverse(payment)}>Reverse</button>}</td></tr>)}</tbody></table></div>;
+  return <div className="mt-4 overflow-x-auto"><table className="w-full min-w-[760px] text-left text-sm"><thead><tr className="border-b border-border text-xs text-muted-foreground"><th className="p-3">Receipt</th><th className="p-3">Student</th><th className="p-3">Date</th><th className="p-3">Method / reference</th><th className="p-3 text-right">Amount</th><th className="p-3">Status</th><th className="p-3"></th></tr></thead><tbody>{payments.map((payment) => <tr key={payment.id} className="border-b border-border/70 last:border-0 hover:bg-muted/40"><td className="p-3 font-semibold text-foreground">{payment.paymentNumber}</td><td className="p-3"><div className="font-medium">{studentName(payment.student)}</div><div className="text-xs text-muted-foreground">{payment.student?.admissionNumber}</div></td><td className="p-3">{dateLabel(payment.paymentDate)}</td><td className="p-3"><div>{payment.paymentMethod.replaceAll("_", " ")}</div><div className="text-xs text-muted-foreground">{payment.referenceNumber || "No reference"}</div></td><td className="p-3 text-right font-semibold tabular-nums">{currency(payment.amount)}</td><td className="p-3"><StatusBadge value={payment.status} /></td><td className="p-3 text-right"><div className="flex flex-col items-end gap-1"><button type="button" className="text-xs font-semibold text-primary hover:underline" onClick={() => onViewReceipt(payment)}>View receipt</button>{onViewStatement && <button type="button" className="text-xs font-semibold text-foreground hover:underline" onClick={() => onViewStatement(payment)}>Statement</button>}{onReverse && payment.status === "COMPLETED" && <button type="button" className="text-xs font-semibold text-destructive hover:underline" onClick={() => onReverse(payment)}>Reverse</button>}</div></td></tr>)}</tbody></table></div>;
 }
 
 function ExpensesTable({ expenses }: { expenses: ApiExpense[] }) {
