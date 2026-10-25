@@ -169,7 +169,7 @@ export async function exportPdf(table: ExportTable) {
   const body = table.rows.map((row) => row.map((cell) => cell instanceof Date ? cell.toLocaleDateString() : (cell == null ? "" : String(cell))));
   if (table.totals) body.push(table.headers.map((_, index) => index === 0 ? table.totalLabel ?? String(table.totals?.[0] ?? "Total") : String(table.totals?.[index] ?? "")));
   autoTable(doc, { startY: 64, head: [table.headers], body, styles: { fontSize: 7.5, cellPadding: 3, overflow: "linebreak" }, headStyles: { fillColor: [51, 65, 85] }, margin: { left: 36, right: 36, top: 64, bottom: 34 } });
-  const pages = doc.internal.getNumberOfPages();
+  const pages = doc.getNumberOfPages();
   for (let page = 1; page <= pages; page++) {
     doc.setPage(page);
     const pageHeight = doc.internal.pageSize.getHeight();
