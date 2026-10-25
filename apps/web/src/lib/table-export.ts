@@ -56,6 +56,46 @@ function inferColumnType(header: string, values: (string | number | Date | null)
 function columnType(table: ExportTable, index: number): ExportColumnType {
   return table.columnTypes?.[index] ?? inferColumnType(table.headers[index] ?? "", table.rows.map((row) => row[index] ?? null));
 }
+
+function displayCell(value: string | number | Date | null, type: ExportColumnType): string {
+  if (value == null) return "";
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? "" : value.toLocaleDateString("en-GB", { timeZone: "UTC" });
+  }
+  if (type === "date") {
+    const parsed = new Date(String(value));
+    return Number.isNaN(parsed.getTime()) ? String(value) : parsed.toLocaleDateString("en-GB", { timeZone: "UTC" });
+  }
+  if (type === "money" || type === "number") {
+    const number = numericValue(value);
+    if (number !== null) {
+      return new Intl.NumberFormat("en-GH", {
+        minimumFractionDigits: type === "money" ? 2 : 0,
+        maximumFractionDigits: 2,
+      }).format(number);
+    }
+  }
+  return String(value);
+}
+
+function displayTotals(table: ExportTable, types: ExportColumnType[]): string[] {
+  return table.headers.map((_, index) => {
+    if (index === 0) return String(table.totalLabel ?? table.totals?.[0] ?? "Total");
+    const explicit = table.totals?.[index];
+    const type = types[index] ?? "text";
+    if (explicit !== null && explicit !== undefined && explicit !== "") {
+      return displayCell(explicit, type);
+    }
+    if (type === "money" || type === "number") {
+      const values = table.rows
+        .map((row) => numericValue(row[index] ?? null))
+        .filter((value): value is number => value !== null);
+      if (values.length === 0) return table.rows.length === 0 ? (type === "money" ? "0.00" : "0") : "";
+      return displayCell(values.reduce((sum, value) => sum + value, 0), type);
+    }
+    return "";
+  });
+}
 function excelValue(value: string | number | Date | null, type: ExportColumnType): string | number | Date {
   if (value == null) return "";
   if (type === "text") return escapeCellText(value);
@@ -166,8 +206,9 @@ export async function exportPdf(table: ExportTable) {
   doc.setTextColor(100);
   const subtitle = [period ? "Period: " + period : "", "Generated " + (table.reportInfo?.generatedAt ? String(table.reportInfo.generatedAt) : new Date().toLocaleString()), table.reportInfo?.generatedBy ? "By " + table.reportInfo.generatedBy : ""].filter(Boolean).join(" · ");
   doc.text(subtitle, 36, 52, { maxWidth: doc.internal.pageSize.getWidth() - 72 });
-  const body = table.rows.map((row) => row.map((cell) => cell instanceof Date ? cell.toLocaleDateString() : (cell == null ? "" : String(cell))));
-  if (table.totals) body.push(table.headers.map((_, index) => index === 0 ? table.totalLabel ?? String(table.totals?.[0] ?? "Total") : String(table.totals?.[index] ?? "")));
+  const types = table.headers.map((_, index) => columnType(table, index));
+  const body = table.rows.map((row) => row.map((cell, index) => displayCell(cell, types[index] ?? "text")));
+  if (table.totals) body.push(displayTotals(table, types));
   autoTable(doc, { startY: 64, head: [table.headers], body, styles: { fontSize: 7.5, cellPadding: 3, overflow: "linebreak" }, headStyles: { fillColor: [51, 65, 85] }, margin: { left: 36, right: 36, top: 64, bottom: 34 } });
   const pages = doc.getNumberOfPages();
   for (let page = 1; page <= pages; page++) {
@@ -184,8 +225,9 @@ export async function exportPdf(table: ExportTable) {
 const escapeHtml = (value: unknown) => String(value ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 export function printTable(table: ExportTable) {
   const head = table.headers.map((header) => "<th>" + escapeHtml(header) + "</th>").join("");
-  const body = table.rows.map((row) => "<tr>" + row.map((cell) => "<td>" + escapeHtml(cell instanceof Date ? cell.toLocaleDateString() : cell) + "</td>").join("") + "</tr>").join("");
-  const totals = table.totals ? "<tr class='totals'>" + table.headers.map((_, index) => "<td>" + escapeHtml(index === 0 ? table.totalLabel ?? table.totals?.[0] ?? "Total" : table.totals?.[index] ?? "") + "</td>").join("") + "</tr>" : "";
+  const types = table.headers.map((_, index) => columnType(table, index));
+  const body = table.rows.map((row) => "<tr>" + row.map((cell, index) => "<td>" + escapeHtml(displayCell(cell, types[index] ?? "text")) + "</td>").join("") + "</tr>").join("");
+  const totals = table.totals ? "<tr class='totals'>" + displayTotals(table, types).map((cell) => "<td>" + escapeHtml(cell) + "</td>").join("") + "</tr>" : "";
   const meta = reportInfoEntries(table).map(([key, value]) => "<p><strong>" + escapeHtml(key) + ":</strong> " + escapeHtml(value) + "</p>").join("");
   const confidential = table.confidential || /payroll|salary|payslip/i.test(table.title);
   const html = "<!doctype html><html><head><meta charset='utf-8'><title>" + escapeHtml(table.title) + "</title><style>" +
