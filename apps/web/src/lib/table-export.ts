@@ -124,6 +124,7 @@ export async function exportXlsx(table: ExportTable) {
       const type = columnType(table, index);
       const hasValues = table.rows.some((row) => numericValue(row[index]) !== null);
       if ((type === "number" || type === "money") && hasValues) {
+        if (table.rows.length === 0) return 0;
         const col = excelCellFormulaColumn(index);
         return { formula: "SUM(" + col + "2:" + col + (rowNumber - 1) + ")" };
       }
