@@ -3362,6 +3362,34 @@ export class FinanceService {
           name: "SSNIT Payable",
           code: "2210",
         });
+        const snapshot = current.settingsSnapshot && typeof current.settingsSnapshot === "object" && !Array.isArray(current.settingsSnapshot)
+          ? current.settingsSnapshot as Record<string, unknown>
+          : {};
+        const schemeSnapshots = Array.isArray(snapshot.schemes) ? snapshot.schemes as Array<Record<string, unknown>> : [];
+        const trusteeFor = (code: string) => {
+          const scheme = schemeSnapshots.find((item) => item.code === code);
+          return typeof scheme?.trusteeName === "string" && scheme.trusteeName.trim() ? scheme.trusteeName.trim() : null;
+        };
+        const tier2Trustee = trusteeFor("TIER2");
+        const tier3Trustee = trusteeFor("TIER3");
+        const employerPensionExpense = await this.ensureAccount(tx, schoolId, {
+          accountType: "EXPENSE",
+          category: "SALARY_WAGES",
+          name: "Employer Pension Contributions",
+          code: "6020",
+        });
+        const tier2Payable = await this.ensureAccount(tx, schoolId, {
+          accountType: "LIABILITY",
+          category: "ACCOUNTS_PAYABLE",
+          name: tier2Trustee ? `Tier 2 Pension Payable - ${tier2Trustee}` : "Tier 2 Pension Payable",
+          code: "2230",
+        });
+        const tier3Payable = await this.ensureAccount(tx, schoolId, {
+          accountType: "LIABILITY",
+          category: "ACCOUNTS_PAYABLE",
+          name: tier3Trustee ? `Tier 3 Pension Payable - ${tier3Trustee}` : "Tier 3 Pension Payable",
+          code: "2240",
+        });
         const otherDeductionPayable = await this.ensureAccount(tx, schoolId, {
           accountType: "LIABILITY",
           category: "ACCOUNTS_PAYABLE",
