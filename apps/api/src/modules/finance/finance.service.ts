@@ -846,7 +846,16 @@ export class FinanceService {
         const lateFeeTotal = lateFeeSources.reduce((sum, source) => sum.plus(source.amount), new Prisma.Decimal(0));
         const billTotal = netTotal.plus(lateFeeTotal);
         let allocatedDiscount = new Prisma.Decimal(0);
-        const billItems = billableItems.map((item, index) => {
+        const billItems: Array<{
+          feeItemId: string | null;
+          description: string;
+          amount: Prisma.Decimal;
+          quantity: number;
+          totalAmount: Prisma.Decimal;
+          discountAmount: Prisma.Decimal;
+          balanceAmount: Prisma.Decimal;
+          status: "FULLY_PAID" | "UNPAID";
+        }> = billableItems.map((item, index) => {
           const grossLine = item.amount;
           const lineDiscount = index === billableItems.length - 1
             ? round(concessions.totalDiscount.minus(allocatedDiscount))
