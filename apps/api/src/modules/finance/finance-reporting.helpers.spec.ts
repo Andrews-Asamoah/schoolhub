@@ -10,7 +10,7 @@ describe("finance reporting helpers", () => {
 
   it("rejects invalid cursors and dates", () => {
     expect(() => decodeReportingCursor("not-json")).toThrow();
-    expect(parseReportingDate("2026-02-31", "date")).toBeUndefined(); // date validation is invoked below with a valid format check
+    expect(() => parseReportingDate("2026-02-31", "date")).toThrow();
   });
 
   it("parses valid ISO date boundaries in UTC", () => {
