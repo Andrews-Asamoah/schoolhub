@@ -780,6 +780,52 @@ export class FinanceService {
         carryForwardsByStudent.set(previousBill.studentId, list);
       }
 
+      const schoolSettingsRow = await tx.school.findFirst({ where: { id: schoolId }, select: { settings: true } });
+      const schoolSettings = schoolSettingsRow?.settings && typeof schoolSettingsRow.settings === "object" && !Array.isArray(schoolSettingsRow.settings)
+        ? schoolSettingsRow.settings as Record<string, unknown>
+        : {};
+      const rawLateFeePolicy = schoolSettings.lateFeePolicy && typeof schoolSettings.lateFeePolicy === "object" && !Array.isArray(schoolSettings.lateFeePolicy)
+        ? schoolSettings.lateFeePolicy as Record<string, unknown>
+        : {};
+      const lateFeeMode = rawLateFeePolicy.mode === "PERCENTAGE" ? "PERCENTAGE" as const : "FIXED" as const;
+      let lateFeeValue = new Prisma.Decimal(0);
+      try {
+        lateFeeValue = new Prisma.Decimal(String(rawLateFeePolicy.value ?? "0.00"));
+        if (!lateFeeValue.isFinite() || lateFeeValue.lt(0) || (lateFeeMode === "PERCENTAGE" && lateFeeValue.gt(100))) {
+          lateFeeValue = new Prisma.Decimal(0);
+        }
+      } catch {
+        lateFeeValue = new Prisma.Decimal(0);
+      }
+      const lateFeeEnabled = rawLateFeePolicy.enabled === true && lateFeeValue.gt(0);
+      const rawGraceDays = Number.isInteger(rawLateFeePolicy.graceDays) ? Number(rawLateFeePolicy.graceDays) : 0;
+      const lateFeeGraceDays = Math.min(3650, Math.max(0, rawGraceDays));
+      const priorBillIds = previousBills.map((bill) => bill.id);
+      const existingLateFeeAssessments = priorBillIds.length
+        ? await tx.lateFeeAssessment.findMany({
+            where: { schoolId, sourceBillId: { in: priorBillIds } },
+            select: { sourceBillId: true },
+          })
+        : [];
+      const assessedSourceBillIds = new Set(existingLateFeeAssessments.map((row) => row.sourceBillId));
+      const today = new Date();
+      today.setUTCHours(0, 0, 0, 0);
+      const lateFeeSourcesByStudent = new Map<string, Array<{ bill: (typeof previousBills)[number]; amount: Prisma.Decimal }>>();
+      if (lateFeeEnabled) {
+        for (const previousBill of previousBills) {
+          const termStart = previousBill.term?.startDate ?? previousBill.academicYear.startDate;
+          if (termStart >= currentTerm.startDate || assessedSourceBillIds.has(previousBill.id) || !previousBill.dueDate) continue;
+          if (daysPastDue(previousBill.dueDate, today) <= lateFeeGraceDays) continue;
+          const amount = lateFeeMode === "PERCENTAGE"
+            ? previousBill.balanceAmount.mul(lateFeeValue).div(100).toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP)
+            : lateFeeValue.toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP);
+          if (amount.lte(0)) continue;
+          const current = lateFeeSourcesByStudent.get(previousBill.studentId) ?? [];
+          current.push({ bill: previousBill, amount });
+          lateFeeSourcesByStudent.set(previousBill.studentId, current);
+        }
+      }
+
       const results: Array<{ id: string; billNumber: string; totalAmount: Prisma.Decimal }> = [];
       for (const studentId of studentIds) {
         const existingBill = await tx.bill.findFirst({
@@ -796,6 +842,9 @@ export class FinanceService {
         );
         const round = (value: Prisma.Decimal) => value.toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP);
         const netTotal = Prisma.Decimal.max(0, round(totalAmount.minus(concessions.totalDiscount)));
+        const lateFeeSources = lateFeeSourcesByStudent.get(studentId) ?? [];
+        const lateFeeTotal = lateFeeSources.reduce((sum, source) => sum.plus(source.amount), new Prisma.Decimal(0));
+        const billTotal = netTotal.plus(lateFeeTotal);
         let allocatedDiscount = new Prisma.Decimal(0);
         const billItems = billableItems.map((item, index) => {
           const grossLine = item.amount;
@@ -815,6 +864,16 @@ export class FinanceService {
             status: netLine.eq(0) ? "FULLY_PAID" as const : "UNPAID" as const,
           };
         });
+        billItems.push(...lateFeeSources.map((source) => ({
+          feeItemId: null,
+          description: `Late fee on invoice ${source.bill.billNumber}`,
+          amount: source.amount,
+          quantity: 1,
+          totalAmount: source.amount,
+          discountAmount: new Prisma.Decimal(0),
+          balanceAmount: source.amount,
+          status: "UNPAID" as const,
+        })));
 
         const alreadySnapshotted = await tx.bill.findFirst({
           where: {
@@ -838,12 +897,12 @@ export class FinanceService {
             classId: input.classId,
             carryForwardSnapshotCreated: true,
             billNumber,
-            grossAmount: totalAmount,
+            grossAmount: totalAmount.plus(lateFeeTotal),
             discountAmount: concessions.totalDiscount,
-            totalAmount: netTotal,
+            totalAmount: billTotal,
             paidAmount: new Prisma.Decimal(0),
-            balanceAmount: netTotal,
-            status: netTotal.eq(0) ? "PAID" : "PENDING",
+            balanceAmount: billTotal,
+            status: billTotal.eq(0) ? "PAID" : "PENDING",
             dueDate: input.dueDate ? new Date(input.dueDate) : undefined,
             notes: input.notes,
             items: { create: billItems },
@@ -870,9 +929,23 @@ export class FinanceService {
           },
           select: { id: true, billNumber: true, totalAmount: true },
         });
+        if (lateFeeSources.length) {
+          await tx.lateFeeAssessment.createMany({
+            data: lateFeeSources.map((source) => ({
+              schoolId,
+              sourceBillId: source.bill.id,
+              targetBillId: bill.id,
+              amount: source.amount,
+              mode: lateFeeMode,
+              value: lateFeeValue,
+              graceDays: lateFeeGraceDays,
+              createdBy: actorId,
+            })),
+          });
+        }
         await tx.student.update({
           where: { id: studentId },
-          data: { outstandingBalance: { increment: netTotal } },
+          data: { outstandingBalance: { increment: billTotal } },
         });
         results.push(bill);
       }
@@ -891,6 +964,8 @@ export class FinanceService {
           studentId: input.studentId ?? null,
           termId: currentTerm.id,
           optionalItemIds: [...optionalIds],
+          lateFeesEnabled: lateFeeEnabled,
+          lateFeeCount: lateFeeSourcesByStudent.size,
           totalBilled: results.reduce((sum, bill) => sum.plus(bill.totalAmount), new Prisma.Decimal(0)).toFixed(2),
         },
       });
