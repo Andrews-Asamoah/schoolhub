@@ -2488,26 +2488,31 @@ export class FinanceService {
     const chargeableBills = bills.filter(
       (bill) => bill.billType === "INVOICE" && !["CANCELLED", "WAIVED"].includes(bill.status),
     );
-    const totalBilled = roundMoney(
-      chargeableBills.reduce((sum, bill) => sum + Number(bill.totalAmount), 0),
-    );
-    const openInvoiceBalance = roundMoney(
-      chargeableBills.reduce((sum, bill) => sum + Number(bill.balanceAmount), 0),
-    );
+    // Sum monetary values with Decimal arithmetic rather than binary floating
+    // point so aggregate balances remain accurate for finance statements.
+    const totalBilled = chargeableBills
+      .reduce((sum, bill) => sum.plus(bill.totalAmount), new Prisma.Decimal(0))
+      .toDecimalPlaces(2)
+      .toNumber();
+    const openInvoiceBalance = chargeableBills
+      .reduce((sum, bill) => sum.plus(bill.balanceAmount), new Prisma.Decimal(0))
+      .toDecimalPlaces(2)
+      .toNumber();
 
     // Reversed receipts remain part of the historical gross receipt total;
     // their separate reversal entry brings the net credited amount back down.
     const postedReceipts = payments.filter(
       (payment) => payment.status === "COMPLETED" || payment.reversedAt !== null,
     );
-    const totalReceipts = roundMoney(
-      postedReceipts.reduce((sum, payment) => sum + Number(payment.amount), 0),
-    );
-    const totalReversals = roundMoney(
-      payments
-        .filter((payment) => payment.reversedAt !== null)
-        .reduce((sum, payment) => sum + Number(payment.amount), 0),
-    );
+    const totalReceipts = postedReceipts
+      .reduce((sum, payment) => sum.plus(payment.amount), new Prisma.Decimal(0))
+      .toDecimalPlaces(2)
+      .toNumber();
+    const totalReversals = payments
+      .filter((payment) => payment.reversedAt !== null)
+      .reduce((sum, payment) => sum.plus(payment.amount), new Prisma.Decimal(0))
+      .toDecimalPlaces(2)
+      .toNumber();
     const studentOutstandingBalance = roundMoney(Number(student.outstandingBalance));
 
     return {
