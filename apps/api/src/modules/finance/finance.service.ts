@@ -3289,8 +3289,8 @@ export class FinanceService {
                 otherDeductions: true,
                 lines: { select: { code: true, kind: true, amount: true } },
               },
-            settingsSnapshot: true,
             },
+            settingsSnapshot: true,
           },
         });
         if (!current) throw new NotFoundException("Payroll run not found.");
