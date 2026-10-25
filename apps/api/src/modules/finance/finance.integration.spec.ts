@@ -120,16 +120,6 @@ describe.skipIf(!enabled)("finance (database)", { timeout: 60_000 }, () => {
         isCurrent: true,
       },
     })).id;
-    termId = (await prisma.term.create({
-      data: {
-        academicYearId: yearId,
-        name: "Test Term 1",
-        termNumber: 1,
-        startDate: new Date("2026-01-01"),
-        endDate: new Date("2026-04-30"),
-        isCurrent: true,
-      },
-    })).id;
   });
 
   afterAll(async () => {
