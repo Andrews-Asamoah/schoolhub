@@ -13,6 +13,7 @@ import { schoolRoleLabel, useSchoolRole } from "@/components/school/school-role-
 import { getSchoolNavGroupsForRole } from "@/lib/school-navigation";
 import { StudentOverview } from "@/components/portal/student-overview";
 import { AccountantFinanceCharts } from "@/components/portal/accountant-finance-charts";
+import type { FinanceSummaryResponse } from "@schoolhub/shared";
 import { useSchoolOrganization } from "@/components/school/school-organization";
 
 interface SetupYear {
@@ -79,9 +80,9 @@ export function DashboardContent({ today, greetingName }: DashboardContentProps)
     retry: false,
     refetchInterval: 60_000,
   });
-  const accountantPaymentsQuery = useQuery({
-    queryKey: ["dashboard", "accountant-finance", "payments", activeOrganization?.id],
-    queryFn: () => apiFetch<AccountantDashboardPayment[]>("/finance/payments"),
+  const accountantSummaryQuery = useQuery({
+    queryKey: ["dashboard", "accountant-finance", "summary", activeOrganization?.id],
+    queryFn: () => apiFetch<FinanceSummaryResponse>("/finance/summary"),
     enabled: activeRole === "accountant" && Boolean(activeOrganization),
     retry: false,
     refetchInterval: 60_000,
@@ -89,13 +90,6 @@ export function DashboardContent({ today, greetingName }: DashboardContentProps)
   const accountantExpensesQuery = useQuery({
     queryKey: ["dashboard", "accountant-finance", "expenses", activeOrganization?.id],
     queryFn: () => apiFetch<AccountantDashboardExpense[]>("/finance/expenses"),
-    enabled: activeRole === "accountant" && Boolean(activeOrganization),
-    retry: false,
-    refetchInterval: 60_000,
-  });
-  const accountantBillsQuery = useQuery({
-    queryKey: ["dashboard", "accountant-finance", "bills", activeOrganization?.id],
-    queryFn: () => apiFetch<AccountantDashboardBill[]>("/finance/bills"),
     enabled: activeRole === "accountant" && Boolean(activeOrganization),
     retry: false,
     refetchInterval: 60_000,
@@ -160,20 +154,21 @@ export function DashboardContent({ today, greetingName }: DashboardContentProps)
             <h2 className="text-lg font-semibold tracking-tight text-foreground">Finance overview</h2>
             <p className="mt-1 text-sm text-muted-foreground">Live collections, expenses and breakdowns from saved finance records.</p>
           </div>
-          {(accountantPaymentsQuery.isPending || accountantExpensesQuery.isPending || accountantBillsQuery.isPending) ? (
+          {(accountantSummaryQuery.isPending || accountantExpensesQuery.isPending) ? (
             <div className="grid gap-5 xl:grid-cols-2" aria-label="Loading finance analytics">
               <div className="h-80 animate-pulse rounded-2xl bg-muted/60" />
               <div className="h-80 animate-pulse rounded-2xl bg-muted/60" />
             </div>
-          ) : accountantPaymentsQuery.isError || accountantExpensesQuery.isError || accountantBillsQuery.isError ? (
+          ) : accountantSummaryQuery.isError || accountantExpensesQuery.isError ? (
             <p role="alert" className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
               Finance charts could not load. Check your accountant finance permissions and API connection, then refresh this dashboard.
             </p>
           ) : (
             <AccountantFinanceCharts
-              payments={accountantPaymentsQuery.data ?? []}
+              summary={accountantSummaryQuery.data}
               expenses={accountantExpensesQuery.data ?? []}
-              bills={accountantBillsQuery.data ?? []}
+              loading={accountantSummaryQuery.isPending}
+              error={accountantSummaryQuery.error?.message}
             />
           )}
         </section>
