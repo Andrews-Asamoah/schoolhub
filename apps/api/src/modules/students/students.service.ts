@@ -1223,66 +1223,84 @@ export class StudentsService {
   async getMyFeeStatus(schoolId: string, userId: string) {
     const student = await this.prisma.client.student.findFirst({
       where: { schoolId, deletedAt: null, profile: { userId } },
-      select: { id: true, outstandingBalance: true },
+      select: { id: true },
     });
     if (!student) throw new NotFoundException('Student record not found');
 
-    const currentYear = await this.prisma.client.academicYear.findFirst({
-      where: { schoolId, isCurrent: true },
-      include: { terms: { where: { isCurrent: true }, take: 1 } },
-    });
-    const currentTerm = currentYear?.terms[0];
-
-    const [bills, payments] = await Promise.all([
-      this.prisma.client.bill.findMany({
-        where: {
-          studentId: student.id,
-          schoolId,
-          ...(currentYear && currentTerm
-            ? { academicYearId: currentYear.id, termId: currentTerm.id }
-            : {}),
-        },
-        select: { id: true, totalAmount: true, balanceAmount: true },
+    const [currentYear, school] = await Promise.all([
+      this.prisma.client.academicYear.findFirst({
+        where: { schoolId, isCurrent: true },
+        include: { terms: { where: { isCurrent: true }, take: 1 } },
       }),
-      this.prisma.client.payment.findMany({
-        where: {
-          studentId: student.id,
-          schoolId,
-        },
-        select: { id: true, amount: true },
+      this.prisma.client.school.findFirst({ where: { id: schoolId }, select: { settings: true } }),
+    ]);
+    const currentTerm = currentYear?.terms[0];
+    const settings = school?.settings && typeof school.settings === 'object' && !Array.isArray(school.settings)
+      ? school.settings as Record<string, unknown>
+      : {};
+    const arrearsPolicy = settings.arrearsPolicy === 'BLOCK_CLEARANCE_UNTIL_PAID'
+      ? 'BLOCK_CLEARANCE_UNTIL_PAID'
+      : 'SHOW_ONLY';
+
+    const activeBillWhere = {
+      schoolId,
+      studentId: student.id,
+      status: { notIn: ['CANCELLED', 'WAIVED'] as ('CANCELLED' | 'WAIVED')[] },
+    };
+    const currentBillWhere = {
+      ...activeBillWhere,
+      ...(currentYear && currentTerm ? { academicYearId: currentYear.id, termId: currentTerm.id } : {}),
+    };
+    const [currentAgg, allOpenAgg] = await Promise.all([
+      this.prisma.client.bill.aggregate({
+        where: currentBillWhere,
+        _sum: { totalAmount: true, paidAmount: true, balanceAmount: true },
+        _count: { _all: true },
+      }),
+      this.prisma.client.bill.aggregate({
+        where: { ...activeBillWhere, balanceAmount: { gt: new (await import('@prisma/client')).Prisma.Decimal(0) } },
+        _sum: { balanceAmount: true },
       }),
     ]);
+    const totalBilled = currentAgg._sum.totalAmount ?? new (await import('@prisma/client')).Prisma.Decimal(0);
+    const totalPaid = currentAgg._sum.paidAmount ?? new (await import('@prisma/client')).Prisma.Decimal(0);
+    const currentOutstanding = currentAgg._sum.balanceAmount ?? new (await import('@prisma/client')).Prisma.Decimal(0);
+    const allOutstanding = allOpenAgg._sum.balanceAmount ?? new (await import('@prisma/client')).Prisma.Decimal(0);
+    const clearanceBalance = arrearsPolicy === 'BLOCK_CLEARANCE_UNTIL_PAID' ? allOutstanding : currentOutstanding;
 
-    const totalBilled = bills.reduce((sum, b) => sum + Number(b.totalAmount), 0);
-    const totalRemaining = bills.reduce((sum, b) => sum + Number(b.balanceAmount), 0);
-    const totalPaid = payments.reduce((sum, p) => sum + Number(p.amount), 0);
-
-    let status: 'FULLY_PAID' | 'PARTIALLY_PAID' | 'YET_TO_PAY';
+    let status: 'FULLY_PAID' | 'PARTIALLY_PAID' | 'YET_TO_PAY' | 'UNKNOWN';
     let label: string;
     let description: string;
-
-    if (totalBilled > 0 && totalRemaining <= 0) {
-      status = 'FULLY_PAID';
-      label = 'Fully Paid';
-      description = 'All required school fees have been cleared. Examination hall pass is approved.';
-    } else if (totalPaid > 0 && totalRemaining > 0) {
-      status = 'PARTIALLY_PAID';
-      label = 'Partially Paid';
-      description = 'A partial payment has been recorded. Please have your parent or guardian complete the remaining balance on their portal.';
-    } else if (totalBilled > 0) {
-      status = 'YET_TO_PAY';
-      label = 'Yet to Make Payment';
-      description = 'Term fees are currently pending payment. Please remind your parent or guardian to make payment via the parent portal.';
+    let clearanceAllowed: boolean;
+    if (currentAgg._count._all === 0 && clearanceBalance.eq(0)) {
+      status = 'UNKNOWN';
+      label = 'Fee status unknown';
+      description = 'There are no active bills for this period, so a fee-clearance status cannot be confirmed.';
+      clearanceAllowed = false;
+    } else if (clearanceBalance.gt(0)) {
+      status = totalPaid.gt(0) ? 'PARTIALLY_PAID' : 'YET_TO_PAY';
+      label = status === 'PARTIALLY_PAID' ? 'Partially Paid' : 'Yet to Make Payment';
+      description = arrearsPolicy === 'BLOCK_CLEARANCE_UNTIL_PAID' && allOutstanding.gt(currentOutstanding)
+        ? 'Previous-term arrears remain unpaid. Examination clearance is blocked until all outstanding fees are settled.'
+        : 'Your school fee account has an outstanding balance. Please ask your parent or guardian to review the statement.';
+      clearanceAllowed = false;
     } else {
       status = 'FULLY_PAID';
       label = 'Fully Paid';
-      description = 'Your student account is in good standing with no pending fee obligations.';
+      description = arrearsPolicy === 'SHOW_ONLY' && allOutstanding.gt(0)
+        ? 'The current term is settled. Previous-term balances are still shown on the account but do not block clearance under this school policy.'
+        : 'All fee obligations required by the current school policy are settled.';
+      clearanceAllowed = true;
     }
 
     return {
       status,
       label,
       description,
+      clearanceAllowed,
+      arrearsPolicy,
+      currentOutstanding: currentOutstanding.toFixed(2),
+      totalOutstanding: allOutstanding.toFixed(2),
       academicYear: currentYear?.name ?? null,
       term: currentTerm?.name ?? null,
     };
