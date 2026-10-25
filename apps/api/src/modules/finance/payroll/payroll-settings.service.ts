@@ -73,8 +73,8 @@ export class PayrollSettingsService {
     await tx.auditLog.create({
       data: {
         userId: actorId, schoolId, action, entityType, entityId,
-        oldValues: oldValues as Prisma.InputJsonValue,
-        newValues: newValues as Prisma.InputJsonValue,
+        oldValues: oldValues === null ? Prisma.DbNull : oldValues as Prisma.InputJsonValue,
+        newValues: newValues === null ? Prisma.DbNull : newValues as Prisma.InputJsonValue,
       },
     });
   }
