@@ -40,7 +40,7 @@ const financeListQuerySchema = z.object({
   cursor: z.string().trim().min(1).optional(),
   limit: z.coerce.number().int().min(1).max(100).default(50),
   search: z.string().trim().max(200).optional(),
-  status: z.enum(["ALL", "PENDING", "PARTIALLY_PAID", "PAID", "OVERDUE", "CANCELLED", "WAIVED", "COMPLETED", "REFUNDED", "FAILED", "CASH", "BANK_TRANSFER", "CHEQUE", "MOBILE_MONEY", "CARD", "ONLINE", "OTHER"]).optional(),
+  status: z.enum(["ALL", "PENDING", "PARTIALLY_PAID", "PAID", "OVERDUE", "OUTSTANDING", "CANCELLED", "WAIVED", "COMPLETED", "REFUNDED", "FAILED", "CASH", "BANK_TRANSFER", "CHEQUE", "MOBILE_MONEY", "CARD", "ONLINE", "OTHER"]).optional(),
   studentId: z.string().trim().min(1).optional(),
   classId: z.string().trim().min(1).optional(),
   method: z.enum(["CASH", "BANK_TRANSFER", "CHEQUE", "MOBILE_MONEY", "CARD", "ONLINE", "OTHER"]).optional(),
