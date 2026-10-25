@@ -138,7 +138,7 @@ export function DashboardInfographics({
         {isLoading ? <ChartLoading /> : isError ? <EmptyChart message={unavailable} /> : (data?.metrics.activeStudents ?? 0) === 0 ? <EmptyChart message="No active student enrollment history is available yet." /> : (
           <div className="h-64 w-full min-w-0" role="img" aria-label="Enrollment population and new admissions by month">
             <ResponsiveContainer width="100%" height="100%" minWidth={0}>
-              <LineChart data={data.enrollmentGrowth} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
+              <LineChart data={data?.enrollmentGrowth ?? []} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
                 <CartesianGrid stroke="var(--border)" strokeDasharray="3 3" vertical={false} />
                 <XAxis dataKey="month" tickLine={false} axisLine={false} tick={{ fill: "var(--muted-foreground)", fontSize: 11 }} />
                 <YAxis yAxisId="population" tickLine={false} axisLine={false} allowDecimals={false} width={42} tick={{ fill: "var(--muted-foreground)", fontSize: 10 }} />

@@ -12,9 +12,35 @@ const toIso = (date: Date) => {
   const day = String(date.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
 };
-const parseIso = (value: string) => {
-  const [year, month, day] = value.split("-").map(Number);
-  return new Date(year, month - 1, day);
+const parseIso = (value: string): Date | null => {
+  const parts = value.split("-");
+  if (parts.length !== 3) return null;
+
+  const year = Number(parts[0]);
+  const month = Number(parts[1]);
+  const day = Number(parts[2]);
+  if (
+    !Number.isInteger(year) ||
+    !Number.isInteger(month) ||
+    !Number.isInteger(day) ||
+    year < 1 ||
+    month < 1 ||
+    month > 12 ||
+    day < 1 ||
+    day > 31
+  ) {
+    return null;
+  }
+
+  const date = new Date(year, month - 1, day);
+  if (
+    date.getFullYear() !== year ||
+    date.getMonth() !== month - 1 ||
+    date.getDate() !== day
+  ) {
+    return null;
+  }
+  return date;
 };
 
 export interface DatePickerProps {
@@ -43,7 +69,7 @@ export function DatePicker({
 }: DatePickerProps) {
   const selected = value ? parseIso(value) : null;
   const [open, setOpen] = useState(false);
-  const [view, setView] = useState(() => selected ?? (maxDate ? parseIso(maxDate) : new Date()));
+  const [view, setView] = useState(() => selected ?? (maxDate ? parseIso(maxDate) : null) ?? new Date());
   const rootRef = useRef<HTMLDivElement>(null);
   const max = maxDate ? parseIso(maxDate) : null;
   const min = minDate ? parseIso(minDate) : null;
