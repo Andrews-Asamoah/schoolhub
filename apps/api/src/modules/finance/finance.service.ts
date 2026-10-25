@@ -3361,15 +3361,14 @@ export class FinanceService {
 
         const postLedgerEntry = async (
           description: string,
-          amountValue: number,
+          amountValue: Prisma.Decimal,
           debitAccount: { id: string; accountType: AccountType },
           creditAccount: { id: string; accountType: AccountType },
           transactionType: "EXPENSE" | "TRANSFER",
           notes: string,
         ) => {
-          const amount = roundMoney(amountValue);
-          if (amount <= 0) return;
-          const decimalAmount = new Prisma.Decimal(amount);
+          const decimalAmount = amountValue.toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP);
+          if (decimalAmount.lessThanOrEqualTo(0)) return;
           const prefix = `TXN-${paidAt.getUTCFullYear()}-`;
           await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${schoolId}), hashtext(${prefix}))`;
           const last = await tx.transaction.findFirst({
