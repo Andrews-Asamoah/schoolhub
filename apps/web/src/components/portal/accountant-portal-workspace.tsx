@@ -345,30 +345,7 @@ export function AccountantPortalWorkspace({
   }), [payments, search]);
 
   const debtors = bills.filter((bill) => Number(bill.balanceAmount) > 0 && bill.status !== "CANCELLED" && bill.status !== "WAIVED");
-  const todayStart = new Date();
-  todayStart.setHours(0, 0, 0, 0);
-  const overdueBills = debtors.filter((bill) => {
-    if (!bill.dueDate) return bill.status === "OVERDUE";
-    const dueDate = new Date(bill.dueDate);
-    dueDate.setHours(0, 0, 0, 0);
-    return bill.status === "OVERDUE" || (!Number.isNaN(dueDate.getTime()) && dueDate < todayStart);
-  }).sort((a, b) => {
-    const aDue = a.dueDate ? new Date(a.dueDate).getTime() : 0;
-    const bDue = b.dueDate ? new Date(b.dueDate).getTime() : 0;
-    return aDue - bDue;
-  });
-  const overdueTotal = overdueBills.reduce((sum, bill) => sum + Number(bill.balanceAmount), 0);
-  const billedInPeriod = bills.filter((bill) => isInReportPeriod(bill.issuedAt)).reduce((sum, bill) => sum + Number(bill.totalAmount), 0);
-  const collectionRate = billedInPeriod > 0 ? Math.min(100, (reportCollected / billedInPeriod) * 100) : null;
-  const visibleOverdueBills = overdueBills.filter((bill) => {
-    const term = overdueSearch.trim().toLowerCase();
-    const matchesSearch = !term ||
-      bill.billNumber.toLowerCase().includes(term) ||
-      studentName(bill.student).toLowerCase().includes(term) ||
-      (bill.student?.admissionNumber ?? "").toLowerCase().includes(term) ||
-      (bill.class?.name ?? "").toLowerCase().includes(term);
-    return matchesSearch && (overdueClassFilter === "ALL" || bill.class?.id === overdueClassFilter);
-  });
+
   // Only settled receipts are counted as collections. Failed, pending,
   // cancelled and refunded transactions remain visible in history but are not
   // treated as cash received in dashboard totals or payment-method analysis.
@@ -436,6 +413,30 @@ export function AccountantPortalWorkspace({
       return totals;
     }, {});
   }, [reportSettledPayments]);
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+  const overdueBills = debtors.filter((bill) => {
+    if (!bill.dueDate) return bill.status === "OVERDUE";
+    const dueDate = new Date(bill.dueDate);
+    dueDate.setHours(0, 0, 0, 0);
+    return bill.status === "OVERDUE" || (!Number.isNaN(dueDate.getTime()) && dueDate < todayStart);
+  }).sort((a, b) => {
+    const aDue = a.dueDate ? new Date(a.dueDate).getTime() : 0;
+    const bDue = b.dueDate ? new Date(b.dueDate).getTime() : 0;
+    return aDue - bDue;
+  });
+  const overdueTotal = overdueBills.reduce((sum, bill) => sum + Number(bill.balanceAmount), 0);
+  const billedInPeriod = bills.filter((bill) => isInReportPeriod(bill.issuedAt)).reduce((sum, bill) => sum + Number(bill.totalAmount), 0);
+  const collectionRate = billedInPeriod > 0 ? Math.min(100, (reportCollected / billedInPeriod) * 100) : null;
+  const visibleOverdueBills = overdueBills.filter((bill) => {
+    const term = overdueSearch.trim().toLowerCase();
+    const matchesSearch = !term ||
+      bill.billNumber.toLowerCase().includes(term) ||
+      studentName(bill.student).toLowerCase().includes(term) ||
+      (bill.student?.admissionNumber ?? "").toLowerCase().includes(term) ||
+      (bill.class?.name ?? "").toLowerCase().includes(term);
+    return matchesSearch && (overdueClassFilter === "ALL" || bill.class?.id === overdueClassFilter);
+  });
   const currentYear = (yearsQuery.data ?? []).find((year) => year.isCurrent);
   const currentTerm = currentYear?.terms.find((term) => term.isCurrent);
   const exportFinanceReport = () => {
