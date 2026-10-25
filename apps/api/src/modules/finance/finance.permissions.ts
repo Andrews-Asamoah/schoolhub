@@ -34,3 +34,7 @@ export const PAYROLL_SETTINGS_APPROVER_ROLES = ["owner", "headteacher"] as const
 export function isPayrollSettingsApproverRole(role: string | null | undefined): boolean {
   return !!role && (PAYROLL_SETTINGS_APPROVER_ROLES as readonly string[]).includes(role);
 }
+
+export function isPayrollSettingsApproverRole(role: string | null | undefined): boolean {
+  return !!role && (PAYROLL_SETTINGS_APPROVER_ROLES as readonly string[]).includes(role);
+}
