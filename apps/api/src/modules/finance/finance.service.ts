@@ -3297,16 +3297,20 @@ export class FinanceService {
         }
         if (!current.payslips.length) throw new BadRequestException("A payroll run without payslips cannot be marked paid.");
 
-        const sum = (field: "grossSalary" | "netSalary" | "incomeTax" | "ssnitEmployee" | "ssnitEmployer" | "otherDeductions") =>
-          current.payslips.reduce((total, slip) => total + Number(slip[field]), 0);
-        const gross = roundMoney(sum("grossSalary"));
-        const net = roundMoney(sum("netSalary"));
-        const paye = roundMoney(sum("incomeTax"));
-        const employeeSsnit = roundMoney(sum("ssnitEmployee"));
-        const employerSsnit = roundMoney(sum("ssnitEmployer"));
-        const otherDeductions = roundMoney(sum("otherDeductions"));
-        const unreconciled = roundMoney(gross - net - paye - employeeSsnit - otherDeductions);
-        if (Math.abs(unreconciled) > 0.02) {
+        const sum = (field: "grossSalary" | "netSalary" | "incomeTax" | "ssnitEmployee" | "ssnitEmployer" | "tier2Employee" | "tier2Employer" | "tier3Employee" | "tier3Employer" | "otherDeductions") =>
+          current.payslips.reduce((total, slip) => total.add(slip[field]), new Prisma.Decimal(0)).toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP);
+        const gross = sum("grossSalary");
+        const net = sum("netSalary");
+        const paye = sum("incomeTax");
+        const employeeSsnit = sum("ssnitEmployee");
+        const employerSsnit = sum("ssnitEmployer");
+        const tier2Employee = sum("tier2Employee");
+        const tier2Employer = sum("tier2Employer");
+        const tier3Employee = sum("tier3Employee");
+        const tier3Employer = sum("tier3Employer");
+        const otherDeductions = sum("otherDeductions");
+        const unreconciled = gross.sub(net).sub(paye).sub(employeeSsnit).sub(tier2Employee).sub(tier3Employee).sub(otherDeductions);
+        if (unreconciled.abs().greaterThan("0.02")) {
           throw new BadRequestException(
             "This payroll does not reconcile: gross pay must equal net pay plus PAYE, employee SSNIT and other deductions. Review the payslips before confirming payment.",
           );
