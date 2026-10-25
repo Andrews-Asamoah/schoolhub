@@ -1,4 +1,4 @@
-name: Repair theme token violations (Prisma generation)
+name: Repair theme token violations (Prisma config fix)
 
 on:
   push:
