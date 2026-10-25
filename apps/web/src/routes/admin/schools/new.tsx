@@ -13,15 +13,15 @@ function EnrollSchoolPage() {
       <div>
         <Link
           to="/admin/schools"
-          className="mb-4 inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-slate-800"
+          className="mb-4 inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground"
         >
           <ArrowLeft className="size-3.5" />
           Back to Schools
         </Link>
-        <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+        <h1 className="text-2xl font-bold tracking-tight text-foreground">
           Enroll New School
         </h1>
-        <p className="mt-1 text-sm text-slate-500">
+        <p className="mt-1 text-sm text-muted-foreground">
           Create an organization, school record, and admin account in one step.
         </p>
       </div>

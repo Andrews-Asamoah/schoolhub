@@ -792,7 +792,7 @@ export function AccountantFinanceReportingWorkspace({
             <span
               className={
                 comparisonDelta >= 0
-                  ? "text-sm font-semibold text-emerald-700 dark:text-emerald-300"
+                  ? "text-sm font-semibold text-success"
                   : "text-sm font-semibold text-destructive"
               }
             >

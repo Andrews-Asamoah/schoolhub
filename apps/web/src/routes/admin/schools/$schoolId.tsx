@@ -236,8 +236,8 @@ function SchoolDetailPage() {
   if (isPending) {
     return (
       <div className="flex items-center justify-center py-24">
-        <div className="flex items-center gap-3 text-sm text-slate-400">
-          <span className="size-2 animate-pulse rounded-full bg-indigo-500" />
+        <div className="flex items-center gap-3 text-sm text-muted-foreground/70">
+          <span className="size-2 animate-pulse rounded-full bg-primary" />
           Loading school…
         </div>
       </div>
@@ -247,8 +247,8 @@ function SchoolDetailPage() {
   if (!school) {
     return (
       <div className="flex flex-col items-center justify-center py-24 text-center">
-        <p className="text-sm text-slate-500">School not found</p>
-        <Link to="/admin/schools" className="mt-3 text-xs text-indigo-600 hover:underline">
+        <p className="text-sm text-muted-foreground">School not found</p>
+        <Link to="/admin/schools" className="mt-3 text-xs text-primary hover:underline">
           Back to schools
         </Link>
       </div>
@@ -266,24 +266,24 @@ function SchoolDetailPage() {
       {/* Back */}
       <Link
         to="/admin/schools"
-        className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-slate-800"
+        className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground"
       >
         <ArrowLeft className="size-3.5" />
         Back to Schools
       </Link>
 
       {/* School header */}
-      <div className="superadmin-surface rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+      <div className="superadmin-surface rounded-2xl border border-border bg-card p-6 shadow-sm">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+            <h1 className="text-2xl font-bold tracking-tight text-foreground">
               {school.name}
             </h1>
             <div className="mt-2 flex flex-wrap items-center gap-2">
-              <code className="rounded bg-slate-100 px-2 py-0.5 text-xs font-mono text-slate-600">
+              <code className="rounded bg-muted px-2 py-0.5 text-xs font-mono text-muted-foreground">
                 {school.code}
               </code>
-              <span className="rounded-full border border-indigo-200 bg-indigo-50 px-2.5 py-0.5 text-xs font-medium text-indigo-600">
+              <span className="rounded-full border border-primary/20 bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">
                 {school.subdomain}
               </span>
               <SubscriptionBadge status={school.organization.subscriptionStatus} />
@@ -291,20 +291,20 @@ function SchoolDetailPage() {
           </div>
           <div className="flex gap-4 text-center">
             <div>
-              <p className="text-2xl font-bold text-slate-900">{school._count.students}</p>
-              <p className="text-xs text-slate-400">Students</p>
+              <p className="text-2xl font-bold text-foreground">{school._count.students}</p>
+              <p className="text-xs text-muted-foreground/70">Students</p>
             </div>
-            <div className="w-px bg-slate-200" />
+            <div className="w-px bg-muted-foreground/20" />
             <div>
-              <p className="text-2xl font-bold text-slate-900">{school._count.teachers}</p>
-              <p className="text-xs text-slate-400">Teachers</p>
+              <p className="text-2xl font-bold text-foreground">{school._count.teachers}</p>
+              <p className="text-xs text-muted-foreground/70">Teachers</p>
             </div>
           </div>
         </div>
       </div>
 
       {/* Tabs */}
-      <div className="superadmin-surface flex gap-1 rounded-xl border border-slate-200 bg-white p-1 shadow-sm">
+      <div className="superadmin-surface flex gap-1 rounded-xl border border-border bg-card p-1 shadow-sm">
         {tabs.map((tab) => (
           <button
             key={tab.id}
@@ -314,10 +314,10 @@ function SchoolDetailPage() {
               "flex-1 rounded-lg py-2 text-sm font-medium transition",
               `superadmin-tab flex-1 rounded-lg py-2 text-sm transition ${
                 activeTab === tab.id
-                  ? "bg-indigo-600 font-semibold text-white shadow-sm dark:bg-indigo-400/20 dark:text-indigo-100 dark:ring-1 dark:ring-indigo-300/20"
-                  : "text-slate-600 hover:bg-slate-100 hover:text-slate-950 dark:text-slate-400 dark:hover:bg-white/[0.06] dark:hover:text-white"
+                  ? "bg-primary font-semibold text-primary-foreground shadow-sm dark:ring-1 dark:ring-primary/30"
+                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
               }`,
-            ].join(" ")}
+            ].join("  ")}
             aria-pressed={activeTab === tab.id}
           >
             {tab.label}
@@ -333,29 +333,29 @@ function SchoolDetailPage() {
               event.preventDefault();
               schoolMutation.mutate(schoolForm);
             }}
-            className="superadmin-surface rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"
+            className="superadmin-surface rounded-2xl border border-border bg-card p-6 shadow-sm"
           >
             <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
               <div>
-                <h2 className="text-base font-semibold text-slate-900">School profile</h2>
-                <p className="mt-1 text-xs text-slate-500">
+                <h2 className="text-base font-semibold text-foreground">School profile</h2>
+                <p className="mt-1 text-xs text-muted-foreground">
                   Edit the school's directory and contact information.
                 </p>
               </div>
               <button
                 type="submit"
                 disabled={schoolMutation.isPending}
-                className="superadmin-button-primary inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"
+                className="superadmin-button-primary inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
               >
                 <Check className="size-4" />
                 {schoolMutation.isPending ? "Saving…" : "Save changes"}
               </button>
             </div>
             {schoolMutation.isSuccess && (
-              <p className="mb-4 text-xs font-medium text-emerald-700">School profile saved.</p>
+              <p className="mb-4 text-xs font-medium text-success">School profile saved.</p>
             )}
             {schoolMutation.error && (
-              <p role="alert" className="mb-4 text-xs text-rose-700">
+              <p role="alert" className="mb-4 text-xs text-destructive">
                 Could not save school profile: {schoolMutation.error.message}
               </p>
             )}
@@ -438,11 +438,11 @@ function SchoolDetailPage() {
               event.preventDefault();
               addAdminMutation.mutate({ name: adminName, email: adminEmail });
             }}
-            className="superadmin-surface rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"
+            className="superadmin-surface rounded-2xl border border-border bg-card p-6 shadow-sm"
           >
             <div className="mb-4">
-              <h2 className="text-base font-semibold text-slate-900">Add a school administrator</h2>
-              <p className="mt-1 text-xs text-slate-500">
+              <h2 className="text-base font-semibold text-foreground">Add a school administrator</h2>
+              <p className="mt-1 text-xs text-muted-foreground">
                 Existing accounts keep their current password. New accounts receive a random one-time password, shown once.
               </p>
             </div>
@@ -456,33 +456,33 @@ function SchoolDetailPage() {
               <button
                 type="submit"
                 disabled={addAdminMutation.isPending}
-                className="superadmin-button-primary inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"
+                className="superadmin-button-primary inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
               >
                 <UserPlus className="size-4" />
                 {addAdminMutation.isPending ? "Adding…" : "Add admin"}
               </button>
             </div>
             {(addAdminMutation.error || adminActionMutation.error) && (
-              <p role="alert" className="mt-3 flex items-center gap-2 text-xs text-rose-700">
+              <p role="alert" className="mt-3 flex items-center gap-2 text-xs text-destructive">
                 <CircleAlert className="size-4" />
                 {addAdminMutation.error?.message ?? adminActionMutation.error?.message}
               </p>
             )}
             <CredentialsDialog entries={issued} onClose={() => setIssued([])} />
-            {adminMessage && <p role="status" className="mt-3 text-xs font-medium text-emerald-700">{adminMessage}</p>}
+            {adminMessage && <p role="status" className="mt-3 text-xs font-medium text-success">{adminMessage}</p>}
           </form>
 
-          <section className="superadmin-surface overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-            <div className="border-b border-slate-100 px-6 py-4">
-              <h2 className="text-base font-semibold text-slate-900">School administrators</h2>
-              <p className="mt-1 text-xs text-slate-500">
+          <section className="superadmin-surface overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+            <div className="border-b border-border/60 px-6 py-4">
+              <h2 className="text-base font-semibold text-foreground">School administrators</h2>
+              <p className="mt-1 text-xs text-muted-foreground">
                 Ban or remove access for this school only. At least one active administrator must remain.
               </p>
             </div>
             {school.organization.members.filter((member) => ["owner", "admin"].includes(member.role)).length === 0 ? (
-              <p className="p-6 text-sm text-slate-500">No administrators found.</p>
+              <p className="p-6 text-sm text-muted-foreground">No administrators found.</p>
             ) : (
-              <ul className="divide-y divide-slate-100">
+              <ul className="divide-y divide-border/60">
                 {school.organization.members
                   .filter((member) => ["owner", "admin"].includes(member.role))
                   .map((member) => {
@@ -497,10 +497,10 @@ function SchoolDetailPage() {
                     return (
                       <li key={member.id} className="flex flex-wrap items-center justify-between gap-4 px-6 py-4">
                         <div className="min-w-0">
-                          <p className="text-sm font-semibold text-slate-900">{member.user.name}</p>
-                          <p className="text-xs text-slate-500">{member.user.email}</p>
+                          <p className="text-sm font-semibold text-foreground">{member.user.name}</p>
+                          <p className="text-xs text-muted-foreground">{member.user.email}</p>
                           <div className="mt-2 flex flex-wrap gap-1.5">
-                            <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold capitalize ${isActive ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700"}`}>
+                            <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold capitalize ${isActive ? "bg-success/10 text-success" : "bg-destructive/10 text-destructive"}`}>
                               {member.user.banned ? "Account banned" : member.banned ? "Banned for this school" : member.role}
                             </span>
                             <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${member.user.twoFactorEnabled ? "bg-success/10 text-success" : "bg-warning/10 text-warning"}`}>
@@ -536,7 +536,7 @@ function SchoolDetailPage() {
                                   })
                             }
                             title={isActive && lastActiveAdmin ? "Keep at least one active school admin" : undefined}
-                            className="superadmin-button-warning inline-flex items-center gap-1.5 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-900 hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-40"
+                            className="superadmin-button-warning inline-flex items-center gap-1.5 rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-xs font-semibold text-warning hover:bg-warning/15 disabled:cursor-not-allowed disabled:opacity-40"
                           >
                             <Ban className="size-3.5" />
                             {member.banned ? "Restore access" : "Ban"}
@@ -552,7 +552,7 @@ function SchoolDetailPage() {
                               })
                             }
                             title={isActive && lastActiveAdmin ? "Keep at least one active school admin" : undefined}
-                            className="superadmin-button-danger inline-flex items-center gap-1.5 rounded-lg border border-rose-200 px-3 py-2 text-xs font-semibold text-rose-800 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-40"
+                            className="superadmin-button-danger inline-flex items-center gap-1.5 rounded-lg border border-destructive/20 px-3 py-2 text-xs font-semibold text-destructive hover:bg-destructive/10 disabled:cursor-not-allowed disabled:opacity-40"
                           >
                             <Trash2 className="size-3.5" />
                             Remove
@@ -568,20 +568,20 @@ function SchoolDetailPage() {
       )}
 
       {activeTab === "subscription" && (
-        <div className="superadmin-surface rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 className="mb-4 text-base font-semibold text-slate-900">
+        <div className="superadmin-surface rounded-2xl border border-border bg-card p-6 shadow-sm">
+          <h2 className="mb-4 text-base font-semibold text-foreground">
             Subscription Management
           </h2>
           <div className="mb-6 flex flex-wrap gap-6">
             <div>
-              <p className="text-xs font-medium text-slate-500">Current Status</p>
+              <p className="text-xs font-medium text-muted-foreground">Current Status</p>
               <div className="mt-1">
                 <SubscriptionBadge status={school.organization.subscriptionStatus} />
               </div>
             </div>
             <div>
-              <p className="text-xs font-medium text-slate-500">Expires At</p>
-              <p className="mt-1 text-sm font-semibold text-slate-800">
+              <p className="text-xs font-medium text-muted-foreground">Expires At</p>
+              <p className="mt-1 text-sm font-semibold text-foreground">
                 {school.organization.expiresAt
                   ? new Date(school.organization.expiresAt).toLocaleDateString(
                       "en-GB",
@@ -592,7 +592,7 @@ function SchoolDetailPage() {
             </div>
           </div>
 
-          <div className="superadmin-surface rounded-xl border border-slate-200 p-4">
+          <div className="superadmin-surface rounded-xl border border-border p-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <p className="max-w-md text-sm text-muted-foreground">
                 Change the plan status or expiry date. A suspended, cancelled or expired school is locked out immediately.
@@ -653,15 +653,15 @@ function SchoolDetailPage() {
                     aria-label="Close confirmation dialog"
                     onClick={closeAdminConfirmation}
                     disabled={adminActionMutation.isPending}
-                    className="absolute right-4 top-4 inline-flex size-9 items-center justify-center rounded-xl text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 disabled:opacity-50 dark:text-slate-400 dark:hover:bg-white/10 dark:hover:text-white"
+                    className="absolute right-4 top-4 inline-flex size-9 items-center justify-center rounded-xl text-muted-foreground transition hover:bg-muted hover:text-foreground disabled:opacity-50"
                   >
                     <X className="size-4" />
                   </button>
                   <span
                     className={`mb-5 flex size-12 items-center justify-center rounded-2xl ring-1 ${
                       adminConfirmation.action === "remove"
-                        ? "bg-rose-50 text-rose-600 ring-rose-200 dark:bg-rose-400/10 dark:text-rose-200 dark:ring-rose-300/15"
-                        : "bg-amber-50 text-amber-700 ring-amber-200 dark:bg-amber-400/10 dark:text-amber-200 dark:ring-amber-300/15"
+                        ? "bg-destructive/10 text-destructive ring-destructive/20"
+                        : "bg-warning/10 text-warning ring-warning/20"
                     }`}
                   >
                     {adminConfirmation.action === "remove" ? (
@@ -670,12 +670,12 @@ function SchoolDetailPage() {
                       <ShieldAlert className="size-5" />
                     )}
                   </span>
-                  <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-indigo-600 dark:text-indigo-300">
+                  <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-primary">
                     Confirm admin access change
                   </p>
                   <h2
                     id="admin-confirmation-title"
-                    className="mt-2 pr-7 text-xl font-bold tracking-tight text-slate-900 dark:text-white"
+                    className="mt-2 pr-7 text-xl font-bold tracking-tight text-foreground"
                   >
                     {adminConfirmation.action === "remove"
                       ? "Remove this administrator?"
@@ -683,11 +683,11 @@ function SchoolDetailPage() {
                   </h2>
                   <p
                     id="admin-confirmation-description"
-                    className="mt-3 text-sm leading-6 text-slate-600 dark:text-slate-300"
+                    className="mt-3 text-sm leading-6 text-muted-foreground"
                   >
                     {adminConfirmation.action === "remove" ? (
                       <>
-                        <strong className="font-semibold text-slate-900 dark:text-white">
+                        <strong className="font-semibold text-foreground">
                           {adminConfirmation.name}
                         </strong>{" "}
                         will lose membership in this school. Their account and access to
@@ -695,7 +695,7 @@ function SchoolDetailPage() {
                       </>
                     ) : (
                       <>
-                        <strong className="font-semibold text-slate-900 dark:text-white">
+                        <strong className="font-semibold text-foreground">
                           {adminConfirmation.name}
                         </strong>{" "}
                         will be blocked from this school only. Their user account and
@@ -704,7 +704,7 @@ function SchoolDetailPage() {
                     )}
                   </p>
                   {adminActionMutation.error && (
-                    <p role="alert" className="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2.5 text-xs text-rose-700 dark:border-rose-300/15 dark:bg-rose-400/10 dark:text-rose-200">
+                    <p role="alert" className="mt-4 rounded-xl border border-destructive/20 bg-destructive/10 px-3 py-2.5 text-xs text-destructive">
                       {adminActionMutation.error.message}
                     </p>
                   )}
@@ -714,7 +714,7 @@ function SchoolDetailPage() {
                       type="button"
                       disabled={adminActionMutation.isPending}
                       onClick={closeAdminConfirmation}
-                      className="inline-flex h-11 items-center justify-center rounded-xl border border-slate-200 bg-white/70 px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 disabled:opacity-50 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-200 dark:hover:bg-white/[0.08]"
+                      className="inline-flex h-11 items-center justify-center rounded-xl border border-border bg-card/70 px-4 text-sm font-semibold text-foreground/80 transition hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 disabled:opacity-50"
                     >
                       Cancel
                     </button>
@@ -727,10 +727,10 @@ function SchoolDetailPage() {
                           action: adminConfirmation.action,
                         })
                       }
-                      className={`inline-flex h-11 items-center justify-center gap-2 rounded-xl px-4 text-sm font-semibold text-white shadow-lg transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:cursor-wait disabled:opacity-60 ${
+                      className={`inline-flex h-11 items-center justify-center gap-2 rounded-xl px-4 text-sm font-semibold text-destructive-foreground shadow-lg transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:cursor-wait disabled:opacity-60 ${
                         adminConfirmation.action === "remove"
-                          ? "bg-rose-600 shadow-rose-900/20 hover:bg-rose-700 focus-visible:ring-rose-400 dark:bg-rose-500 dark:hover:bg-rose-400"
-                          : "bg-amber-600 shadow-amber-900/20 hover:bg-amber-700 focus-visible:ring-amber-400 dark:bg-amber-500 dark:hover:bg-amber-400"
+                          ? "bg-destructive shadow-destructive/20 hover:bg-destructive/90 focus-visible:ring-destructive/50"
+                          : "bg-warning shadow-warning/20 hover:bg-warning/90 focus-visible:ring-warning/50"
                       }`}
                     >
                       {adminActionMutation.isPending ? (
@@ -768,24 +768,24 @@ function InfoCard({
   value: string;
 }) {
   return (
-    <div className="superadmin-surface flex items-start gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-      <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-indigo-50 text-indigo-500">
+    <div className="superadmin-surface flex items-start gap-3 rounded-xl border border-border bg-card p-4 shadow-sm">
+      <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
         <Icon className="size-4" />
       </span>
       <div>
-        <p className="text-xs font-medium text-slate-400">{label}</p>
-        <p className="text-sm font-semibold text-slate-800">{value}</p>
+        <p className="text-xs font-medium text-muted-foreground/70">{label}</p>
+        <p className="text-sm font-semibold text-foreground">{value}</p>
       </div>
     </div>
   );
 }
 
 const profileInputClass =
-  "superadmin-input mt-1.5 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 dark:focus:border-indigo-300 dark:focus:ring-indigo-300/20";
+  "superadmin-input mt-1.5 w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground outline-none transition focus:border-primary/50 focus:ring-2 focus:ring-primary/20";
 
 function ProfileField({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <label className="block text-xs font-medium text-slate-600">
+    <label className="block text-xs font-medium text-muted-foreground">
       {label}
       {children}
     </label>

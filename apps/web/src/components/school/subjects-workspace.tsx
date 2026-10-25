@@ -40,11 +40,11 @@ type Panel =
   | null;
 
 const linkButton =
-  "rounded-md px-2 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-50 disabled:opacity-50 dark:text-indigo-300 dark:hover:bg-white/5";
+  "rounded-md px-2 py-1.5 text-xs font-semibold text-primary hover:bg-primary/10 disabled:opacity-50";
 const primary =
-  "inline-flex h-9 items-center gap-2 rounded-lg bg-indigo-600 px-4 text-xs font-semibold text-white hover:bg-indigo-700 disabled:opacity-60";
+  "inline-flex h-9 items-center gap-2 rounded-lg bg-primary px-4 text-xs font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-60";
 const outline =
-  "inline-flex h-9 items-center gap-2 rounded-lg border border-slate-200 px-4 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-white/10 dark:text-slate-200 dark:hover:bg-white/5";
+  "inline-flex h-9 items-center gap-2 rounded-lg border border-border px-4 text-xs font-semibold text-foreground/80 hover:bg-muted/50";
 
 export function SubjectsWorkspace() {
   const queryClient = useQueryClient();
@@ -144,8 +144,8 @@ export function SubjectsWorkspace() {
       header: "Subject",
       cell: (subject) => (
         <span>
-          <span className="block font-semibold text-slate-800 dark:text-slate-100">{subject.name}</span>
-          <span className="text-[11px] text-slate-500">{subject.code}</span>
+          <span className="block font-semibold text-foreground">{subject.name}</span>
+          <span className="text-[11px] text-muted-foreground">{subject.code}</span>
         </span>
       ),
     },
@@ -160,14 +160,14 @@ export function SubjectsWorkspace() {
               <span
                 key={row.classId}
                 title={row.teacherName ? `Taught by ${row.teacherName}` : "No teacher assigned"}
-                className="rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-medium text-indigo-700 dark:bg-indigo-400/10 dark:text-indigo-200"
+                className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary"
               >
                 {row.className}
               </span>
             ))}
           </span>
         ) : (
-          <span className="text-slate-400">Not assigned</span>
+          <span className="text-muted-foreground/70">Not assigned</span>
         ),
     },
     {
@@ -183,8 +183,8 @@ export function SubjectsWorkspace() {
         <span
           className={
             subject.isActive
-              ? "rounded-full bg-emerald-50 px-2 py-1 text-[10px] font-semibold text-emerald-700"
-              : "rounded-full bg-slate-100 px-2 py-1 text-[10px] font-semibold text-slate-500"
+              ? "rounded-full bg-success/10 px-2 py-1 text-[10px] font-semibold text-success"
+              : "rounded-full bg-muted px-2 py-1 text-[10px] font-semibold text-muted-foreground"
           }
         >
           {subject.isActive ? "Active" : "Inactive"}
@@ -207,7 +207,7 @@ export function SubjectsWorkspace() {
                 </button>
                 <button
                   type="button"
-                  className="rounded-md px-2 py-1.5 text-xs font-semibold text-rose-700 hover:bg-rose-50 disabled:opacity-50"
+                  className="rounded-md px-2 py-1.5 text-xs font-semibold text-destructive hover:bg-destructive/10 disabled:opacity-50"
                   disabled={deleteMutation.isPending}
                   onClick={() => {
                     if (window.confirm(`Delete ${subject.name}? This cannot be undone.`)) {
@@ -226,20 +226,20 @@ export function SubjectsWorkspace() {
 
   return (
     <div className="space-y-5">
-      <section className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-slate-900/70">
+      <section className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-card p-4 shadow-sm">
         <div className="flex flex-1 flex-wrap items-center gap-3">
           <label className="relative min-w-[220px] flex-1 sm:max-w-xs">
-            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground/70" />
             <input
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               placeholder="Search by name or code"
               aria-label="Search subjects"
-              className="h-10 w-full rounded-lg border border-slate-200 bg-white pl-9 pr-3 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 dark:border-white/10 dark:bg-slate-950"
+              className="h-10 w-full rounded-lg border border-border bg-card pl-9 pr-3 text-sm outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/20"
             />
           </label>
-          <label className="flex items-center gap-2 text-xs font-medium text-slate-600 dark:text-slate-300">
-            <input type="checkbox" checked={showInactive} onChange={(e) => setShowInactive(e.target.checked)} className="size-4 accent-indigo-600" />
+          <label className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+            <input type="checkbox" checked={showInactive} onChange={(e) => setShowInactive(e.target.checked)} className="size-4 accent-primary" />
             Show inactive
           </label>
         </div>
@@ -306,8 +306,8 @@ function Notice({ children, tone = "info" }: { children: React.ReactNode; tone?:
       role={tone === "error" ? "alert" : "status"}
       className={
         tone === "error"
-          ? "flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs text-rose-800"
-          : "rounded-xl border border-slate-200 bg-white px-4 py-6 text-center text-xs text-slate-500"
+          ? "flex items-start gap-2 rounded-xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-xs text-destructive"
+          : "rounded-xl border border-border bg-card px-4 py-6 text-center text-xs text-muted-foreground"
       }
     >
       {tone === "error" && <CircleAlert className="mt-0.5 size-4 shrink-0" />}
@@ -328,16 +328,16 @@ function PanelShell({
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-2xl border border-indigo-200 bg-white p-5 shadow-sm dark:border-indigo-300/20 dark:bg-slate-900/70">
+    <section className="rounded-2xl border border-primary/20 bg-card p-5 shadow-sm">
       <div className="mb-4 flex items-start justify-between gap-3">
         <div className="flex items-start gap-3">
-          <span className="flex size-9 items-center justify-center rounded-xl bg-indigo-100 text-indigo-700"><BookOpen className="size-4" /></span>
+          <span className="flex size-9 items-center justify-center rounded-xl bg-primary/15 text-primary"><BookOpen className="size-4" /></span>
           <div>
-            <h3 className="text-sm font-bold text-slate-900 dark:text-white">{title}</h3>
-            {description && <p className="mt-0.5 text-xs text-slate-500">{description}</p>}
+            <h3 className="text-sm font-bold text-foreground">{title}</h3>
+            {description && <p className="mt-0.5 text-xs text-muted-foreground">{description}</p>}
           </div>
         </div>
-        <button type="button" onClick={onCancel} aria-label="Close" className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100"><X className="size-4" /></button>
+        <button type="button" onClick={onCancel} aria-label="Close" className="rounded-lg p-1.5 text-muted-foreground/70 hover:bg-muted"><X className="size-4" /></button>
       </div>
       {children}
     </section>
@@ -465,7 +465,7 @@ function ClassAssignmentPanel({
       onCancel={onCancel}
     >
       {!loading && subjectTeachers.length === 0 && (
-        <p className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-400/20 dark:bg-amber-400/10 dark:text-amber-200">
+        <p className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-warning/20 bg-warning/10 px-3 py-2 text-xs text-warning">
           No teachers are assigned to {subject.name} yet.
           <button type="button" className="font-semibold underline" onClick={onManageTeachers}>
             Assign teachers to this subject
@@ -473,17 +473,17 @@ function ClassAssignmentPanel({
         </p>
       )}
       {loading ? (
-        <p className="text-xs text-slate-500">Loading classes and teachers…</p>
+        <p className="text-xs text-muted-foreground">Loading classes and teachers…</p>
       ) : classes.length === 0 ? (
-        <p className="text-xs text-slate-500">Create classes first, then assign subjects to them.</p>
+        <p className="text-xs text-muted-foreground">Create classes first, then assign subjects to them.</p>
       ) : (
-        <ul className="divide-y divide-slate-100 rounded-xl border border-slate-200 dark:divide-white/10 dark:border-white/10">
+        <ul className="divide-y divide-border/60 rounded-xl border border-border">
           {classes.map((schoolClass) => {
             const row = selected.get(schoolClass.id);
             return (
               <li key={schoolClass.id} className="flex flex-wrap items-center gap-3 px-3 py-2.5 text-xs">
-                <label className="flex min-w-[160px] items-center gap-2 font-medium text-slate-800 dark:text-slate-100">
-                  <input type="checkbox" className="size-4 accent-indigo-600" checked={Boolean(row)} onChange={(e) => toggle(schoolClass.id, e.target.checked)} />
+                <label className="flex min-w-[160px] items-center gap-2 font-medium text-foreground">
+                  <input type="checkbox" className="size-4 accent-primary" checked={Boolean(row)} onChange={(e) => toggle(schoolClass.id, e.target.checked)} />
                   {schoolClass.name}
                 </label>
                 {row && (
@@ -492,7 +492,7 @@ function ClassAssignmentPanel({
                       aria-label={`Teacher for ${schoolClass.name}`}
                       value={row.teacherId}
                       onChange={(e) => patch(schoolClass.id, { teacherId: e.target.value })}
-                      className="h-8 rounded-lg border border-slate-200 bg-white px-2 text-xs dark:border-white/10 dark:bg-slate-950"
+                      className="h-8 rounded-lg border border-border bg-card px-2 text-xs"
                     >
                       <option value="">No teacher yet</option>
                       {subjectTeachers.map((teacher) => (
@@ -505,8 +505,8 @@ function ClassAssignmentPanel({
                         </option>
                       )}
                     </select>
-                    <label className="flex items-center gap-1.5 text-slate-600 dark:text-slate-300">
-                      <input type="checkbox" className="size-3.5 accent-indigo-600" checked={row.isCompulsory} onChange={(e) => patch(schoolClass.id, { isCompulsory: e.target.checked })} />
+                    <label className="flex items-center gap-1.5 text-muted-foreground">
+                      <input type="checkbox" className="size-3.5 accent-primary" checked={row.isCompulsory} onChange={(e) => patch(schoolClass.id, { isCompulsory: e.target.checked })} />
                       Compulsory
                     </label>
                   </>
@@ -563,15 +563,15 @@ function TeacherPanel({
       onCancel={onCancel}
     >
       {loading ? (
-        <p className="text-xs text-slate-500">Loading teachers…</p>
+        <p className="text-xs text-muted-foreground">Loading teachers…</p>
       ) : (
         <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
           {teachers.map((teacher) => (
             <li key={teacher.id}>
-              <label className="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs dark:border-white/10">
+              <label className="flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-xs">
                 <input
                   type="checkbox"
-                  className="size-4 accent-indigo-600"
+                  className="size-4 accent-primary"
                   checked={selected.has(teacher.id)}
                   onChange={(e) =>
                     setSelected((current) => {
@@ -586,7 +586,7 @@ function TeacherPanel({
               </label>
             </li>
           ))}
-          {teachers.length === 0 && <li className="text-xs text-slate-500">No active teachers yet.</li>}
+          {teachers.length === 0 && <li className="text-xs text-muted-foreground">No active teachers yet.</li>}
         </ul>
       )}
       <div className="mt-4 flex justify-end gap-2">

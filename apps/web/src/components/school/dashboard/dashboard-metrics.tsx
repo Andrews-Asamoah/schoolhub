@@ -35,11 +35,11 @@ export function MetricCard({
   const TrendIcon = trend === "up" ? ArrowUpRight : ArrowDownRight;
 
   return (
-    <article className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_2px_12px_rgba(15,23,42,0.025)] transition hover:-translate-y-0.5 hover:shadow-[0_8px_24px_rgba(15,23,42,0.06)] dark:border-slate-800 dark:bg-slate-900">
+    <article className="rounded-2xl border border-border/80 bg-card p-5 shadow-[0_2px_12px_rgba(15,23,42,0.025)] transition hover:-translate-y-0.5 hover:shadow-[0_8px_24px_rgba(15,23,42,0.06)]">
       <div className="flex items-start justify-between">
         <div>
-          <p className="text-xs font-medium text-slate-500 dark:text-slate-400">{label}</p>
-          <p className="mt-3 text-[26px] font-bold tracking-tight text-slate-900 dark:text-white">
+          <p className="text-xs font-medium text-muted-foreground">{label}</p>
+          <p className="mt-3 text-[26px] font-bold tracking-tight text-foreground">
             {value}
           </p>
         </div>
@@ -56,13 +56,13 @@ export function MetricCard({
         <span
           className={cn(
             "inline-flex items-center gap-0.5 text-[11px] font-semibold",
-            trend === "up" ? "text-emerald-600" : "text-rose-600",
+            trend === "up" ? "text-success" : "text-destructive",
           )}
         >
           <TrendIcon className="size-3.5" />
           {change}
         </span>
-        <span className="text-[11px] text-slate-400">{detail}</span>
+        <span className="text-[11px] text-muted-foreground/70">{detail}</span>
       </div>
     </article>
   );
@@ -70,34 +70,34 @@ export function MetricCard({
 
 export function AttendanceOverviewCard() {
   return (
-    <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_2px_12px_rgba(15,23,42,0.025)] sm:p-6 dark:border-slate-800 dark:bg-slate-900">
+    <div className="rounded-2xl border border-border/80 bg-card p-5 shadow-[0_2px_12px_rgba(15,23,42,0.025)] sm:p-6">
       <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-sm font-semibold text-slate-900 dark:text-white">
+          <h2 className="text-sm font-semibold text-foreground">
             Attendance overview
           </h2>
-          <p className="mt-1 text-xs text-slate-500">
+          <p className="mt-1 text-xs text-muted-foreground">
             Student attendance throughout this week
           </p>
         </div>
         <button
           type="button"
-          className="inline-flex h-8 items-center gap-2 rounded-lg border border-slate-200 px-2.5 text-[11px] font-medium text-slate-600 hover:bg-slate-50"
+          className="inline-flex h-8 items-center gap-2 rounded-lg border border-border px-2.5 text-[11px] font-medium text-muted-foreground hover:bg-muted/50"
         >
           This week <ChevronDown className="size-3.5" />
         </button>
       </div>
       <div className="mb-4 flex items-baseline gap-2">
-        <span className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
+        <span className="text-3xl font-bold tracking-tight text-foreground">
           92.8%
         </span>
-        <span className="inline-flex items-center text-[11px] font-semibold text-emerald-600">
+        <span className="inline-flex items-center text-[11px] font-semibold text-success">
           <ArrowUpRight className="size-3.5" />
           3.2%
         </span>
-        <span className="text-[11px] text-slate-400">vs. last week</span>
+        <span className="text-[11px] text-muted-foreground/70">vs. last week</span>
       </div>
-      <div className="flex h-44 items-end gap-3 border-b border-slate-100 pb-2 sm:gap-5">
+      <div className="flex h-44 items-end gap-3 border-b border-border/60 pb-2 sm:gap-5">
         {weeklyAttendance.map(({ day, value }) => (
           <div
             key={day}
@@ -108,21 +108,21 @@ export function AttendanceOverviewCard() {
                 className={cn(
                   "w-full max-w-12 rounded-t-md transition-colors",
                   day === "Thu"
-                    ? "bg-blue-600"
-                    : "bg-blue-100 hover:bg-blue-200 dark:bg-blue-900/40 dark:hover:bg-blue-800/50",
+                    ? "bg-primary"
+                    : "bg-primary/15 hover:bg-primary/20",
                 )}
                 style={{ height: `${value}%` }}
                 aria-label={`${day}: ${value}%`}
                 role="img"
               />
             </div>
-            <span className="text-[10px] font-medium text-slate-400">
+            <span className="text-[10px] font-medium text-muted-foreground/70">
               {day}
             </span>
           </div>
         ))}
       </div>
-      <div className="mt-4 flex items-center justify-between text-[10px] text-slate-400">
+      <div className="mt-4 flex items-center justify-between text-[10px] text-muted-foreground/70">
         <span>Mon, Oct 12</span>
         <span>Fri, Oct 16</span>
       </div>

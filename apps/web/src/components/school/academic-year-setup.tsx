@@ -108,20 +108,20 @@ export function AcademicYearSetup({ years }: AcademicYearSetupProps) {
 
   return (
     <div className="space-y-5">
-      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-        <div className="border-b border-slate-100 bg-gradient-to-r from-indigo-50 via-white to-sky-50 px-5 py-5 sm:px-6 dark:border-white/10 dark:from-indigo-400/[0.08] dark:via-slate-900 dark:to-sky-400/[0.05]">
+      <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+        <div className="border-b border-border/60 bg-gradient-to-r from-primary/10 via-card to-info/10 px-5 py-5 sm:px-6">
           <div className="flex items-start gap-3">
-            <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-indigo-100 text-indigo-700 dark:bg-indigo-400/15 dark:text-indigo-200">
+            <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/15 text-primary">
               <CalendarDays className="size-5" />
             </span>
             <div>
-              <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-indigo-700 dark:text-indigo-300">
+              <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-primary">
                 School setup · Step 1
               </p>
-              <h2 className="mt-1 text-lg font-bold tracking-tight text-slate-900 dark:text-white">
+              <h2 className="mt-1 text-lg font-bold tracking-tight text-foreground">
                 Set up the academic calendar
               </h2>
-              <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-600 dark:text-slate-400">
+              <p className="mt-1 max-w-2xl text-xs leading-5 text-muted-foreground">
                 Set the school-year dates and create its terms together. Classes, billing, attendance, and assessments can then be attached to the correct year and term.
               </p>
             </div>
@@ -182,7 +182,7 @@ export function AcademicYearSetup({ years }: AcademicYearSetupProps) {
             </form.Field>
             <form.Field name="isCurrent">
               {(field) => (
-                <label className="flex min-h-10 items-center gap-2 self-end rounded-lg border border-slate-200 px-3 text-xs font-medium text-slate-700 dark:border-white/10 dark:text-slate-300">
+                <label className="flex min-h-10 items-center gap-2 self-end rounded-lg border border-border px-3 text-xs font-medium text-foreground/80">
                   <input
                     type="checkbox"
                     checked={field.state.value}
@@ -199,7 +199,7 @@ export function AcademicYearSetup({ years }: AcademicYearSetupProps) {
                         );
                       }
                     }}
-                    className="size-4 rounded border-slate-300 accent-indigo-600"
+                    className="size-4 rounded border-input accent-primary"
                   />
                   Set as current year
                 </label>
@@ -207,11 +207,11 @@ export function AcademicYearSetup({ years }: AcademicYearSetupProps) {
             </form.Field>
           </div>
 
-          <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4 dark:border-white/10 dark:bg-white/[0.025]">
+          <div className="rounded-xl border border-border bg-muted/70 p-4">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
               <div>
-                <h3 className="text-sm font-semibold text-slate-900 dark:text-white">Terms</h3>
-                <p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">
+                <h3 className="text-sm font-semibold text-foreground">Terms</h3>
+                <p className="mt-0.5 text-[11px] text-muted-foreground">
                   Add at least one term; dates must fit inside the academic year and must not overlap.
                 </p>
               </div>
@@ -229,7 +229,7 @@ export function AcademicYearSetup({ years }: AcademicYearSetupProps) {
                       );
                       if (nextNumber) field.pushValue(blankTerm(nextNumber));
                     }}
-                    className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-indigo-200 bg-white px-3 text-xs font-semibold text-indigo-700 transition hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-indigo-300/20 dark:bg-slate-900 dark:text-indigo-200 dark:hover:bg-indigo-400/10"
+                    className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-primary/20 bg-card px-3 text-xs font-semibold text-primary transition hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     <Plus className="size-3.5" />
                     Add term
@@ -244,7 +244,7 @@ export function AcademicYearSetup({ years }: AcademicYearSetupProps) {
                   {(termsField.state.value ?? []).map((term, index) => (
                     <div
                       key={`${index}-${term.termNumber}`}
-                      className="grid gap-3 rounded-xl border border-slate-200 bg-white p-3 sm:grid-cols-2 xl:grid-cols-[1.1fr_0.65fr_0.65fr_auto_auto]"
+                      className="grid gap-3 rounded-xl border border-border bg-card p-3 sm:grid-cols-2 xl:grid-cols-[1.1fr_0.65fr_0.65fr_auto_auto]"
                     >
                       <FormField label={`Term ${index + 1} name`} htmlFor={`term-${index}-name`}>
                         <FormInput
@@ -294,7 +294,7 @@ export function AcademicYearSetup({ years }: AcademicYearSetupProps) {
                           }}
                         />
                       </FormField>
-                      <label className="flex items-center gap-2 self-end rounded-lg px-2 py-2 text-xs font-medium text-slate-700 dark:text-slate-300">
+                      <label className="flex items-center gap-2 self-end rounded-lg px-2 py-2 text-xs font-medium text-foreground/80">
                         <input
                           type="checkbox"
                           checked={term.isCurrent}
@@ -310,7 +310,7 @@ export function AcademicYearSetup({ years }: AcademicYearSetupProps) {
                               })),
                             );
                           }}
-                          className="size-4 rounded border-slate-300 accent-indigo-600"
+                          className="size-4 rounded border-input accent-primary"
                         />
                         Current
                       </label>
@@ -319,14 +319,14 @@ export function AcademicYearSetup({ years }: AcademicYearSetupProps) {
                         disabled={(termsField.state.value ?? []).length === 1}
                         onClick={() => termsField.removeValue(index)}
                         aria-label={`Remove term ${index + 1}`}
-                        className="flex size-9 items-center justify-center self-end rounded-lg text-slate-400 transition hover:bg-rose-50 hover:text-rose-700 disabled:cursor-not-allowed disabled:opacity-30 dark:hover:bg-rose-400/10 dark:hover:text-rose-200"
+                        className="flex size-9 items-center justify-center self-end rounded-lg text-muted-foreground/70 transition hover:bg-destructive/10 hover:text-destructive disabled:cursor-not-allowed disabled:opacity-30"
                       >
                         <Trash2 className="size-4" />
                       </button>
                     </div>
                   ))}
                   {termsField.state.meta.errors.length > 0 && (
-                    <p role="alert" className="flex items-center gap-1.5 text-xs text-rose-700 dark:text-rose-300">
+                    <p role="alert" className="flex items-center gap-1.5 text-xs text-destructive">
                       <CircleAlert className="size-3.5" />
                       {String(termsField.state.meta.errors[0])}
                     </p>
@@ -337,19 +337,19 @@ export function AcademicYearSetup({ years }: AcademicYearSetupProps) {
           </div>
 
           {mutation.error && (
-            <p role="alert" className="flex items-center gap-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2.5 text-xs text-rose-800 dark:border-rose-400/20 dark:bg-rose-400/10 dark:text-rose-200">
+            <p role="alert" className="flex items-center gap-2 rounded-lg border border-destructive/20 bg-destructive/10 px-3 py-2.5 text-xs text-destructive">
               <CircleAlert className="size-4 shrink-0" />
               Could not save the academic calendar: {mutation.error.message}
             </p>
           )}
           {mutation.isSuccess && (
-            <p role="status" className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-xs font-medium text-emerald-800 dark:border-emerald-400/20 dark:bg-emerald-400/10 dark:text-emerald-200">
+            <p role="status" className="flex items-center gap-2 rounded-lg border border-success/20 bg-success/10 px-3 py-2.5 text-xs font-medium text-success">
               <Check className="size-4" />
               Academic year and terms saved. The setup checklist has been updated.
             </p>
           )}
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <p className="flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400">
+            <p className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
               <Clock3 className="size-3.5" />
               Each academic year can contain up to three terms.
             </p>
@@ -367,7 +367,7 @@ export function AcademicYearSetup({ years }: AcademicYearSetupProps) {
         ))}
       </section>
       {!years.length && (
-        <p className="rounded-xl border border-dashed border-slate-300 bg-white p-5 text-center text-xs text-slate-500 dark:border-white/10 dark:bg-slate-900/50 dark:text-slate-400">
+        <p className="rounded-xl border border-dashed border-input bg-card p-5 text-center text-xs text-muted-foreground">
           No academic calendars have been configured for this school.
         </p>
       )}

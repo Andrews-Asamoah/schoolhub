@@ -45,11 +45,11 @@ export function StudentFeeBadge({ status, label, className }: StudentFeeBadgePro
     return (
       <span
         className={cn(
-          "inline-flex items-center gap-1.5 rounded-full border border-emerald-300 bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-800 shadow-2xs dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300",
+          "inline-flex items-center gap-1.5 rounded-full border border-success/30 bg-success/10 px-3 py-1 text-xs font-bold text-success shadow-2xs",
           className,
         )}
       >
-        <CheckCircle2 className="size-3.5 text-emerald-600 dark:text-emerald-400" />
+        <CheckCircle2 className="size-3.5 text-success" />
         <span>Fee Status: {currentLabel}</span>
       </span>
     );
@@ -59,11 +59,11 @@ export function StudentFeeBadge({ status, label, className }: StudentFeeBadgePro
     return (
       <span
         className={cn(
-          "inline-flex items-center gap-1.5 rounded-full border border-amber-300 bg-amber-50 px-3 py-1 text-xs font-bold text-amber-800 shadow-2xs dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300",
+          "inline-flex items-center gap-1.5 rounded-full border border-warning/30 bg-warning/10 px-3 py-1 text-xs font-bold text-warning shadow-2xs",
           className,
         )}
       >
-        <Clock className="size-3.5 text-amber-600 dark:text-amber-400" />
+        <Clock className="size-3.5 text-warning" />
         <span>Fee Status: {currentLabel}</span>
       </span>
     );
@@ -72,11 +72,11 @@ export function StudentFeeBadge({ status, label, className }: StudentFeeBadgePro
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1.5 rounded-full border border-rose-300 bg-rose-50 px-3 py-1 text-xs font-bold text-rose-800 shadow-2xs dark:border-rose-800 dark:bg-rose-950/40 dark:text-rose-300",
+        "inline-flex items-center gap-1.5 rounded-full border border-destructive/30 bg-destructive/10 px-3 py-1 text-xs font-bold text-destructive shadow-2xs",
         className,
       )}
     >
-      <AlertTriangle className="size-3.5 text-rose-600 dark:text-rose-400" />
+      <AlertTriangle className="size-3.5 text-destructive" />
       <span>Fee Status: {currentLabel}</span>
     </span>
   );
@@ -102,24 +102,24 @@ export function StudentFeeAlertBanner({ className }: { className?: string }) {
     return (
       <div
         className={cn(
-          "flex items-center justify-between rounded-2xl border border-emerald-200/80 bg-gradient-to-r from-emerald-50 via-emerald-50/50 to-white p-4 text-xs dark:border-emerald-900/40 dark:bg-slate-900",
+          "flex items-center justify-between rounded-2xl border border-success/20 bg-gradient-to-r from-success/10 via-success/10 to-card p-4 text-xs dark:bg-card",
           className,
         )}
       >
         <div className="flex items-center gap-3">
-          <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-emerald-600 text-white shadow-xs">
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-success text-success-foreground shadow-xs">
             <ShieldCheck className="size-5" />
           </span>
           <div>
             <div className="flex items-center gap-2">
-              <span className="font-black text-emerald-950 dark:text-emerald-200">
+              <span className="font-black text-success">
                 School Fees: Fully Paid
               </span>
-              <span className="rounded-md bg-emerald-200/60 px-1.5 py-0.2 text-[10px] font-bold text-emerald-900 dark:bg-emerald-900/60 dark:text-emerald-200">
+              <span className="rounded-md bg-success/20 px-1.5 py-0.2 text-[10px] font-bold text-success">
                 Cleared
               </span>
             </div>
-            <p className="mt-0.5 text-[11px] text-emerald-800/90 dark:text-emerald-300">
+            <p className="mt-0.5 text-[11px] text-success/90">
               {description}
             </p>
           </div>
@@ -132,24 +132,24 @@ export function StudentFeeAlertBanner({ className }: { className?: string }) {
     return (
       <div
         className={cn(
-          "flex items-center justify-between rounded-2xl border border-amber-200/80 bg-gradient-to-r from-amber-50 via-amber-50/50 to-white p-4 text-xs dark:border-amber-900/40 dark:bg-slate-900",
+          "flex items-center justify-between rounded-2xl border border-warning/20 bg-gradient-to-r from-warning/10 via-warning/10 to-card p-4 text-xs dark:bg-card",
           className,
         )}
       >
         <div className="flex items-center gap-3">
-          <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-amber-500 text-white shadow-xs">
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-warning text-warning-foreground shadow-xs">
             <Clock className="size-5" />
           </span>
           <div>
             <div className="flex items-center gap-2">
-              <span className="font-black text-amber-950 dark:text-amber-200">
+              <span className="font-black text-warning">
                 School Fees: Partially Paid
               </span>
-              <span className="rounded-md bg-amber-200/60 px-1.5 py-0.2 text-[10px] font-bold text-amber-900 dark:bg-amber-900/60 dark:text-amber-200">
+              <span className="rounded-md bg-warning/20 px-1.5 py-0.2 text-[10px] font-bold text-warning">
                 Pending Balance
               </span>
             </div>
-            <p className="mt-0.5 text-[11px] text-amber-800/90 dark:text-amber-300">
+            <p className="mt-0.5 text-[11px] text-warning/90">
               {description}
             </p>
           </div>
@@ -161,24 +161,24 @@ export function StudentFeeAlertBanner({ className }: { className?: string }) {
   return (
     <div
       className={cn(
-        "flex items-center justify-between rounded-2xl border border-rose-200/80 bg-gradient-to-r from-rose-50 via-rose-50/50 to-white p-4 text-xs dark:border-rose-900/40 dark:bg-slate-900",
+        "flex items-center justify-between rounded-2xl border border-destructive/20 bg-gradient-to-r from-destructive/10 via-destructive/10 to-card p-4 text-xs dark:bg-card",
         className,
       )}
     >
       <div className="flex items-center gap-3">
-        <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-rose-600 text-white shadow-xs">
+        <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-destructive text-destructive-foreground shadow-xs">
           <AlertTriangle className="size-5" />
         </span>
         <div>
           <div className="flex items-center gap-2">
-            <span className="font-black text-rose-950 dark:text-rose-200">
+            <span className="font-black text-destructive">
               School Fees: Yet to Make Payment
             </span>
-            <span className="rounded-md bg-rose-200/60 px-1.5 py-0.2 text-[10px] font-bold text-rose-900 dark:bg-rose-900/60 dark:text-rose-200">
+            <span className="rounded-md bg-destructive/20 px-1.5 py-0.2 text-[10px] font-bold text-destructive">
               Action Required by Guardian
             </span>
           </div>
-          <p className="mt-0.5 text-[11px] text-rose-800/90 dark:text-rose-300">
+          <p className="mt-0.5 text-[11px] text-destructive/90">
             {description}
           </p>
         </div>

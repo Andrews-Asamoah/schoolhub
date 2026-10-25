@@ -121,20 +121,20 @@ export function EnrollSchoolForm() {
         }}
       />
       {successMsg && (
-        <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-medium text-emerald-700">
+        <div className="rounded-xl border border-success/20 bg-success/10 p-4 text-sm font-medium text-success">
           {successMsg}
         </div>
       )}
 
       {/* School Details Section */}
-      <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+      <section className="rounded-2xl border border-border bg-card p-6 shadow-sm">
         <div className="mb-6 flex items-center gap-3">
-          <span className="flex size-9 items-center justify-center rounded-xl bg-indigo-100 text-indigo-600">
+          <span className="flex size-9 items-center justify-center rounded-xl bg-primary/15 text-primary">
             <Building2 className="size-5" />
           </span>
           <div>
-            <h2 className="text-base font-semibold text-slate-900">School Details</h2>
-            <p className="text-xs text-slate-500">Basic information about the school</p>
+            <h2 className="text-base font-semibold text-foreground">School Details</h2>
+            <p className="text-xs text-muted-foreground">Basic information about the school</p>
           </div>
         </div>
 
@@ -217,14 +217,14 @@ export function EnrollSchoolForm() {
       </section>
 
       {/* Admin Account Section */}
-      <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+      <section className="rounded-2xl border border-border bg-card p-6 shadow-sm">
         <div className="mb-6 flex items-center gap-3">
-          <span className="flex size-9 items-center justify-center rounded-xl bg-indigo-100 text-indigo-600">
+          <span className="flex size-9 items-center justify-center rounded-xl bg-primary/15 text-primary">
             <User className="size-5" />
           </span>
           <div>
-            <h2 className="text-base font-semibold text-slate-900">Administrator Account</h2>
-            <p className="text-xs text-slate-500">Login details for the school owner</p>
+            <h2 className="text-base font-semibold text-foreground">Administrator Account</h2>
+            <p className="text-xs text-muted-foreground">Login details for the school owner</p>
           </div>
         </div>
 
@@ -249,7 +249,7 @@ export function EnrollSchoolForm() {
             />
           </FieldGroup>
         </div>
-        <p className="mt-5 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+        <p className="mt-5 rounded-lg border border-warning/20 bg-warning/10 px-4 py-3 text-sm text-warning">
           A random one-time password is generated and shown once after enrolment. The owner must replace it at first sign-in. The school starts on a 30-day trial.
           Share it securely with the administrator.
         </p>
@@ -260,14 +260,14 @@ export function EnrollSchoolForm() {
         <button
           type="button"
           onClick={() => void navigate({ to: "/admin/schools" })}
-          className="superadmin-button-secondary rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-800 transition hover:bg-slate-50"
+          className="superadmin-button-secondary rounded-xl border border-border bg-card px-5 py-2.5 text-sm font-semibold text-foreground transition hover:bg-muted/50"
         >
           Cancel
         </button>
         <button
           type="submit"
           disabled={mutation.isPending}
-          className="superadmin-button-primary rounded-xl bg-indigo-600 px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700 disabled:opacity-60"
+          className="superadmin-button-primary rounded-xl bg-primary px-6 py-2.5 text-sm font-semibold text-primary-foreground shadow-sm transition hover:bg-primary/90 disabled:opacity-60"
         >
           {mutation.isPending ? "Enrolling school…" : "Enroll School"}
         </button>
@@ -283,9 +283,9 @@ function inputClass(hasError: boolean) {
     "w-full rounded-lg border px-3 py-2 text-sm transition",
     "focus:outline-none focus:ring-2",
     hasError
-      ? "border-rose-300 focus:border-rose-400 focus:ring-rose-100"
-      : "border-slate-300 focus:border-indigo-400 focus:ring-indigo-100",
-  ].join(" ");
+      ? "border-destructive/30 focus:border-destructive/50 focus:ring-destructive/20"
+      : "border-input focus:border-primary/50 focus:ring-primary/20",
+  ].join("  ");
 }
 
 function FieldGroup({
@@ -301,10 +301,10 @@ function FieldGroup({
 }) {
   return (
     <div>
-      <label className="mb-1 block text-sm font-medium text-slate-700">{label}</label>
+      <label className="mb-1 block text-sm font-medium text-foreground/80">{label}</label>
       {children}
-      {hint && !error && <p className="mt-1 text-xs text-slate-400">{hint}</p>}
-      {error && <p className="mt-1 text-xs text-rose-600">{error}</p>}
+      {hint && !error && <p className="mt-1 text-xs text-muted-foreground/70">{hint}</p>}
+      {error && <p className="mt-1 text-xs text-destructive">{error}</p>}
     </div>
   );
 }

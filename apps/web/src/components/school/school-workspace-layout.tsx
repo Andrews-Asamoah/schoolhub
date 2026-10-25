@@ -135,7 +135,7 @@ export function SchoolWorkspaceLayout({
                 <input
                   placeholder={`Search ${title.toLowerCase()}…`}
                   aria-label={`Search ${title.toLowerCase()}`}
-                  className="h-9 w-48 rounded-xl border border-input bg-muted/60 pl-9 pr-3 text-xs text-foreground outline-none transition placeholder:text-slate-400 focus:border-ring focus:bg-card focus:ring-2 focus:ring-ring/20 "
+                  className="h-9 w-48 rounded-xl border border-input bg-muted/60 pl-9 pr-3 text-xs text-foreground outline-none transition placeholder:text-muted-foreground/70 focus:border-ring focus:bg-card focus:ring-2 focus:ring-ring/20 "
                 />
               </label>
 
@@ -150,14 +150,14 @@ export function SchoolWorkspaceLayout({
             <TwoFactorNudge />
 
             {organizationLoading && (
-              <div className="mb-6 flex items-center gap-2.5 rounded-2xl border border-indigo-100 bg-indigo-50/50 px-4 py-3 text-xs font-medium text-indigo-900 shadow-sm dark:">
+              <div className="mb-6 flex items-center gap-2.5 rounded-2xl border border-primary/20 bg-primary/10 px-4 py-3 text-xs font-medium text-primary shadow-sm dark:">
                 <LoaderCircle className="size-3.5 animate-spin text-primary" />
                 Loading your school workspace…
               </div>
             )}
             
             {selectionError && (
-              <div role="alert" className="mb-6 rounded-2xl border border-rose-200 bg-rose-50/80 px-4 py-3 text-xs font-medium text-rose-800 shadow-sm backdrop-blur-sm ">
+              <div role="alert" className="mb-6 rounded-2xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-xs font-medium text-destructive shadow-sm backdrop-blur-sm ">
                 {selectionError}
               </div>
             )}
@@ -165,7 +165,7 @@ export function SchoolWorkspaceLayout({
             {!organizationLoading && organizations.length > 1 && (
               <div
                 role="alert"
-                className="mb-6 rounded-2xl border border-amber-200 bg-amber-50/90 px-5 py-4 text-sm text-amber-900 shadow-sm backdrop-blur-sm "
+                className="mb-6 rounded-2xl border border-warning/20 bg-warning/10 px-5 py-4 text-sm text-warning shadow-sm backdrop-blur-sm "
               >
                 <p className="font-bold tracking-tight">This account is linked to multiple schools.</p>
                 <p className="mt-1 text-xs opacity-90 leading-relaxed">
@@ -177,7 +177,7 @@ export function SchoolWorkspaceLayout({
             {!organizationLoading &&
               organizations.length === 0 &&
               session?.user && (
-                <div role="alert" className="mb-6 rounded-2xl border border-amber-200 bg-amber-50/90 px-5 py-4 text-sm text-amber-900 shadow-sm backdrop-blur-sm ">
+                <div role="alert" className="mb-6 rounded-2xl border border-warning/20 bg-warning/10 px-5 py-4 text-sm text-warning shadow-sm backdrop-blur-sm ">
                   <p className="font-bold tracking-tight">No school workspace is linked to this account.</p>
                   <p className="mt-1 text-xs opacity-90 leading-relaxed">
                     Ask a platform administrator to enroll your school and add this account as a member.
@@ -188,7 +188,7 @@ export function SchoolWorkspaceLayout({
             {schoolError && activeOrganization && (
               <div
                 role="alert"
-                className="mb-6 rounded-2xl border border-rose-200 bg-rose-50/80 px-4 py-3 text-xs font-medium text-rose-800 shadow-sm "
+                className="mb-6 rounded-2xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-xs font-medium text-destructive shadow-sm "
               >
                 School details could not be loaded: {schoolError.message}
               </div>

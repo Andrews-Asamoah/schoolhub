@@ -59,9 +59,9 @@ function DashboardPage() {
 
   if (sessionLoading || !session?.user) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-50 dark:bg-background">
-        <div className="flex items-center gap-3 text-sm text-slate-500">
-          <span className="size-2 animate-pulse rounded-full bg-blue-600" />
+      <div className="flex min-h-screen items-center justify-center bg-background dark:bg-background">
+        <div className="flex items-center gap-3 text-sm text-muted-foreground">
+          <span className="size-2 animate-pulse rounded-full bg-primary" />
           {sessionLoading ? "Loading your workspace…" : "Redirecting to sign in…"}
         </div>
       </div>
@@ -70,7 +70,7 @@ function DashboardPage() {
 
   return (
     <SidebarProvider>
-      <div className="min-h-screen bg-slate-50 dark:bg-background md:flex">
+      <div className="min-h-screen bg-background dark:bg-background md:flex">
         <SchoolSidebar
           activePage="dashboard"
           schoolName={school?.name}
@@ -87,31 +87,31 @@ function DashboardPage() {
             onSearchChange={setSearch}
           />
           {organizationLoading ? (
-            <div className="mx-auto mt-8 flex max-w-3xl items-center gap-2 rounded-2xl border border-slate-200 bg-white p-6 text-sm text-slate-600 shadow-sm dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300">
-              <span className="size-2 animate-pulse rounded-full bg-indigo-600" />
+            <div className="mx-auto mt-8 flex max-w-3xl items-center gap-2 rounded-2xl border border-border bg-card p-6 text-sm text-muted-foreground shadow-sm">
+              <span className="size-2 animate-pulse rounded-full bg-primary" />
               Loading your school workspace…
             </div>
           ) : selectionError ? (
-            <div role="alert" className="mx-auto mt-8 max-w-3xl rounded-2xl border border-rose-200 bg-rose-50 p-6 text-sm text-rose-800 shadow-sm">
+            <div role="alert" className="mx-auto mt-8 max-w-3xl rounded-2xl border border-destructive/20 bg-destructive/10 p-6 text-sm text-destructive shadow-sm">
               {selectionError}
             </div>
           ) : organizations.length > 1 ? (
-            <div role="alert" className="mx-auto mt-8 max-w-3xl rounded-2xl border border-amber-200 bg-amber-50 p-6 text-amber-950 shadow-sm">
+            <div role="alert" className="mx-auto mt-8 max-w-3xl rounded-2xl border border-warning/20 bg-warning/10 p-6 text-warning shadow-sm">
               <h1 className="text-lg font-bold">This account is linked to multiple schools</h1>
-              <p className="mt-1 text-sm text-amber-800">
+              <p className="mt-1 text-sm text-warning">
                 School accounts cannot be shared across schools. Contact support to correct the memberships, then use separate credentials for each school.
               </p>
             </div>
           ) : organizations.length === 0 ? (
-            <div className="mx-auto mt-8 max-w-3xl rounded-2xl border border-amber-200 bg-amber-50 p-6 text-amber-950 shadow-sm">
+            <div className="mx-auto mt-8 max-w-3xl rounded-2xl border border-warning/20 bg-warning/10 p-6 text-warning shadow-sm">
               <h1 className="text-lg font-bold">No school workspace linked</h1>
-              <p className="mt-1 text-sm text-amber-800">
+              <p className="mt-1 text-sm text-warning">
                 Ask a platform administrator to enroll your school and add your account as a member.
               </p>
             </div>
           ) : !activeOrganization ? (
-            <div className="mx-auto mt-8 flex max-w-3xl items-center gap-2 rounded-2xl border border-slate-200 bg-white p-6 text-sm text-slate-600 shadow-sm">
-              <span className="size-2 animate-pulse rounded-full bg-indigo-600" />
+            <div className="mx-auto mt-8 flex max-w-3xl items-center gap-2 rounded-2xl border border-border bg-card p-6 text-sm text-muted-foreground shadow-sm">
+              <span className="size-2 animate-pulse rounded-full bg-primary" />
               Activating your school workspace…
             </div>
           ) : (

@@ -32,7 +32,7 @@ const ROLE_HELP: Record<Role, string> = {
 
 const assignable = ROLES.filter((role) => role !== "owner");
 const inputClass =
-  "h-9 rounded-lg border border-slate-200 bg-white px-3 text-xs text-slate-700 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 dark:border-white/10 dark:bg-slate-950 dark:text-slate-200";
+  "h-9 rounded-lg border border-border bg-card px-3 text-xs text-foreground/80 outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/20";
 
 export function TeamRoleWorkspace() {
   const queryClient = useQueryClient();
@@ -61,7 +61,7 @@ export function TeamRoleWorkspace() {
 
   if (members.isPending) {
     return (
-      <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white p-5 text-sm text-slate-600 dark:border-white/10 dark:bg-slate-900 dark:text-slate-300">
+      <div className="flex items-center gap-2 rounded-xl border border-border bg-card p-5 text-sm text-muted-foreground">
         <LoaderCircle className="size-4 animate-spin" />
         Loading school accounts…
       </div>
@@ -69,7 +69,7 @@ export function TeamRoleWorkspace() {
   }
   if (members.error) {
     return (
-      <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">
+      <div role="alert" className="rounded-xl border border-destructive/20 bg-destructive/10 p-4 text-sm text-destructive">
         School accounts could not be loaded: {members.error.message}
       </div>
     );
@@ -85,7 +85,7 @@ export function TeamRoleWorkspace() {
           <p className="truncate text-sm font-semibold text-foreground">
             {member.name}
             {member.userId === session?.user?.id && (
-              <span className="ml-2 rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-semibold text-indigo-700 dark:bg-indigo-400/10 dark:text-indigo-300">You</span>
+              <span className="ml-2 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">You</span>
             )}
           </p>
           <p className="truncate text-xs text-muted-foreground">{member.email}</p>
@@ -97,7 +97,7 @@ export function TeamRoleWorkspace() {
       header: "Primary role",
       value: (member) => schoolRoleLabel(member.primaryRole),
       cell: (member) => (
-        <span className="inline-flex items-center gap-1 rounded-full border border-indigo-100 bg-indigo-50 px-2.5 py-1 text-[11px] font-semibold text-indigo-700 dark:border-indigo-400/20 dark:bg-indigo-400/10 dark:text-indigo-300">
+        <span className="inline-flex items-center gap-1 rounded-full border border-primary/20 bg-primary/10 px-2.5 py-1 text-[11px] font-semibold text-primary">
           {member.primaryRole === "owner" && <Crown className="size-3" />}
           {schoolRoleLabel(member.primaryRole)}
         </span>
@@ -148,14 +148,14 @@ export function TeamRoleWorkspace() {
 
   return (
     <div className="space-y-4">
-      <div className="rounded-2xl border border-indigo-100 bg-gradient-to-br from-white via-indigo-50/50 to-sky-50/60 p-5 shadow-sm sm:p-6 dark:border-white/10 dark:from-slate-900 dark:via-slate-900 dark:to-slate-900">
+      <div className="rounded-2xl border border-primary/20 bg-gradient-to-br from-card via-primary/10 to-info/10 p-5 shadow-sm sm:p-6">
         <div className="flex items-start gap-3">
-          <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-indigo-100 text-indigo-700 dark:bg-indigo-400/10 dark:text-indigo-300">
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/15 text-primary">
             <ShieldCheck className="size-5" />
           </span>
           <div>
-            <h2 className="text-base font-bold text-slate-900 dark:text-slate-100">Team roles</h2>
-            <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600 dark:text-slate-300">
+            <h2 className="text-base font-bold text-foreground">Team roles</h2>
+            <p className="mt-1 max-w-3xl text-sm leading-6 text-muted-foreground">
               One account can hold several roles in this school, for example a teacher who is also an accountant. Each person keeps their primary role and can switch between the roles you give them. Only the school owner can grant or remove administrator and headteacher access.
             </p>
           </div>
@@ -163,13 +163,13 @@ export function TeamRoleWorkspace() {
       </div>
 
       {notice && (
-        <p role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 dark:border-emerald-400/20 dark:bg-emerald-400/10 dark:text-emerald-200">
+        <p role="status" className="rounded-xl border border-success/20 bg-success/10 px-4 py-3 text-sm text-success">
           {notice}
         </p>
       )}
 
       <div className="flex flex-wrap items-center gap-2">
-        <label className="flex items-center gap-2 text-xs font-medium text-slate-600 dark:text-slate-300">
+        <label className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
           Show
           <select className={inputClass} value={filter} onChange={(event) => setFilter(event.target.value as Role | "all")}>
             <option value="all">Everyone ({members.data?.length ?? 0})</option>
@@ -303,7 +303,7 @@ function RoleDialog({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/50 p-4"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget && !save.isPending) onClose();
       }}
@@ -313,20 +313,20 @@ function RoleDialog({
         role="dialog"
         aria-modal="true"
         aria-labelledby="role-dialog-title"
-        className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl sm:p-6 dark:border-white/10 dark:bg-slate-900"
+        className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-border bg-card p-5 shadow-2xl sm:p-6"
       >
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <h2 id="role-dialog-title" className="text-sm font-bold text-slate-900 dark:text-slate-100">
+            <h2 id="role-dialog-title" className="text-sm font-bold text-foreground">
               Roles for {member.name}
             </h2>
-            <p className="truncate text-xs text-slate-500">{member.email}</p>
+            <p className="truncate text-xs text-muted-foreground">{member.email}</p>
           </div>
           <button
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 dark:hover:bg-white/10"
+            className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted"
           >
             <X className="size-4" />
           </button>
@@ -361,8 +361,8 @@ function RoleDialog({
           </fieldset>
 
           {newTeacher && (
-            <div className="mt-4 rounded-xl border border-indigo-100 bg-indigo-50/50 p-3 dark:border-indigo-400/20 dark:bg-indigo-400/5">
-              <label className="block text-xs font-semibold text-slate-800 dark:text-slate-100">
+            <div className="mt-4 rounded-xl border border-primary/20 bg-primary/10 p-3">
+              <label className="block text-xs font-semibold text-foreground">
                 Teacher&apos;s department
                 <select
                   value={teacherDepartmentId}
@@ -388,15 +388,15 @@ function RoleDialog({
                     ))}
                 </select>
               </label>
-              <p className="mt-1.5 text-[11px] text-slate-500 dark:text-slate-400">
+              <p className="mt-1.5 text-[11px] text-muted-foreground">
                 A teacher record is created so this person can be assigned to classes, subjects and the timetable.
               </p>
             </div>
           )}
 
           {newGuardian && (
-            <div className="mt-4 rounded-xl border border-indigo-100 bg-indigo-50/50 p-3 dark:border-indigo-400/20 dark:bg-indigo-400/5">
-              <label className="block text-xs font-semibold text-slate-800 dark:text-slate-100">
+            <div className="mt-4 rounded-xl border border-primary/20 bg-primary/10 p-3">
+              <label className="block text-xs font-semibold text-foreground">
                 Parent&apos;s phone number
                 <input
                   type="tel"
@@ -409,7 +409,7 @@ function RoleDialog({
                   className={`${inputClass} mt-1.5 w-full`}
                 />
               </label>
-              <p className="mt-1.5 text-[11px] text-slate-500 dark:text-slate-400">
+              <p className="mt-1.5 text-[11px] text-muted-foreground">
                 A parent record is created so this person can be linked to their children and see them
                 in the parent portal. Link children from the Guardians page. They keep their current
                 password and sign in as usual.
@@ -418,7 +418,7 @@ function RoleDialog({
           )}
 
           {(problem || save.error) && (
-            <p role="alert" className="mt-4 flex items-start gap-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-800">
+            <p role="alert" className="mt-4 flex items-start gap-2 rounded-lg border border-destructive/20 bg-destructive/10 px-3 py-2 text-xs text-destructive">
               <CircleAlert className="mt-0.5 size-3.5 shrink-0" />
               {problem ?? `Roles could not be saved: ${save.error?.message}`}
             </p>
@@ -429,14 +429,14 @@ function RoleDialog({
               type="button"
               onClick={onClose}
               disabled={save.isPending}
-              className="inline-flex h-9 items-center rounded-lg border border-slate-200 px-4 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60 dark:border-white/10 dark:text-slate-200 dark:hover:bg-white/5"
+              className="inline-flex h-9 items-center rounded-lg border border-border px-4 text-xs font-semibold text-foreground/80 hover:bg-muted/50 disabled:opacity-60"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={!changed || save.isPending}
-              className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-indigo-600 px-4 text-xs font-semibold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+              className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary px-4 text-xs font-semibold text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {save.isPending && <LoaderCircle className="size-3.5 animate-spin" />}
               Save roles
@@ -467,23 +467,23 @@ function RoleOption({
     <label
       className={`flex items-start gap-3 rounded-xl border px-3 py-2.5 ${
         checked
-          ? "border-indigo-200 bg-indigo-50/60 dark:border-indigo-400/30 dark:bg-indigo-400/10"
-          : "border-slate-100 dark:border-white/10"
-      } ${disabled ? "opacity-80" : "cursor-pointer hover:bg-slate-50 dark:hover:bg-white/5"}`}
+          ? "border-primary/20 bg-primary/10"
+          : "border-border/60"
+      }  ${disabled ? "opacity-80" : "cursor-pointer hover:bg-muted/50"}`}
     >
       <input
         type="checkbox"
         checked={checked}
         disabled={disabled}
         onChange={(event) => onChange?.(event.target.checked)}
-        className="mt-0.5 size-4 rounded border-slate-300 accent-indigo-600"
+        className="mt-0.5 size-4 rounded border-input accent-primary"
       />
       <span className="min-w-0 flex-1">
-        <span className="flex items-center gap-1.5 text-xs font-semibold text-slate-800 dark:text-slate-100">
+        <span className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
           {schoolRoleLabel(role)}
-          {locked && <Lock className="size-3 text-slate-400" aria-hidden="true" />}
+          {locked && <Lock className="size-3 text-muted-foreground/70" aria-hidden="true" />}
         </span>
-        <span className="block text-[11px] text-slate-500 dark:text-slate-400">{note}</span>
+        <span className="block text-[11px] text-muted-foreground">{note}</span>
       </span>
     </label>
   );

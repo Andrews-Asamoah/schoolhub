@@ -189,7 +189,7 @@ export function ConcessionsWorkspace() {
               <td className="p-3"><p>{award.name}</p><p className="max-w-xs truncate text-xs text-muted-foreground">{award.reason || "No note provided"}</p></td>
               <td className="p-3 font-medium">{award.valueType === "PERCENTAGE" ? award.value + "%" : money(award.value)}</td>
               <td className="p-3 text-muted-foreground">{periodLabel(award, years)}</td>
-              <td className="p-3"><span className={cn("rounded-full px-2.5 py-1 text-xs font-semibold", award.isActive ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300" : "bg-muted text-muted-foreground")}>{award.isActive ? "Active" : "Inactive"}</span></td>
+              <td className="p-3"><span className={cn("rounded-full px-2.5 py-1 text-xs font-semibold", award.isActive ? "bg-success/10 text-success" : "bg-muted text-muted-foreground")}>{award.isActive ? "Active" : "Inactive"}</span></td>
               <td className="p-3">{canWrite && <button type="button" className={secondary} disabled={toggleScholarship.isPending} onClick={() => toggleScholarship.mutate({ id: award.id, isActive: !award.isActive })}>{award.isActive ? "Deactivate" : "Reactivate"}</button>}</td>
             </tr>)}</tbody>
           </table></div>}

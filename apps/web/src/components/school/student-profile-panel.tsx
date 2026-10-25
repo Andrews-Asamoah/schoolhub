@@ -44,8 +44,8 @@ const date = (value: string | null | undefined) => (value ? new Date(value).toLo
 function Field({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">{label}</dt>
-      <dd className="mt-0.5 break-words text-sm text-slate-900 dark:text-white">{value}</dd>
+      <dt className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{label}</dt>
+      <dd className="mt-0.5 break-words text-sm text-foreground">{value}</dd>
     </div>
   );
 }
@@ -54,14 +54,14 @@ function CopyField({ label, value }: { label: string; value: string | null }) {
   const [copied, setCopied] = useState(false);
   return (
     <div>
-      <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">{label}</dt>
+      <dt className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{label}</dt>
       <dd className="mt-0.5 flex items-center gap-2">
-        <span className="break-all font-mono text-sm text-slate-900 dark:text-white">{value ?? "Not generated"}</span>
+        <span className="break-all font-mono text-sm text-foreground">{value ?? "Not generated"}</span>
         {value && (
           <button
             type="button"
             aria-label={`Copy ${label}`}
-            className="rounded-md p-1 text-slate-500 hover:bg-slate-100 dark:hover:bg-white/10"
+            className="rounded-md p-1 text-muted-foreground hover:bg-muted"
             onClick={() => {
               void navigator.clipboard?.writeText(value);
               setCopied(true);
@@ -76,8 +76,8 @@ function CopyField({ label, value }: { label: string; value: string | null }) {
   );
 }
 
-const card = "rounded-2xl border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-white/5";
-const heading = "mb-3 text-xs font-bold uppercase tracking-wide text-slate-600 dark:text-slate-300";
+const card = "rounded-2xl border border-border bg-card p-4";
+const heading = "mb-3 text-xs font-bold uppercase tracking-wide text-muted-foreground";
 
 export function StudentProfileCard({ data }: { data: StudentProfileData }) {
   const p = data.profile;
@@ -85,13 +85,13 @@ export function StudentProfileCard({ data }: { data: StudentProfileData }) {
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-3">
-        <div className="flex size-14 items-center justify-center rounded-2xl bg-indigo-600 text-lg font-bold text-white">
+        <div className="flex size-14 items-center justify-center rounded-2xl bg-primary text-lg font-bold text-primary-foreground">
           {p.firstName.charAt(0)}
           {p.lastName.charAt(0)}
         </div>
         <div>
-          <h3 className="text-lg font-bold text-slate-900 dark:text-white">{fullName}</h3>
-          <p className="text-xs text-slate-500">
+          <h3 className="text-lg font-bold text-foreground">{fullName}</h3>
+          <p className="text-xs text-muted-foreground">
             {data.class?.name ?? "No class this term"}
             {data.admissionNumber ? ` · Admission no. ${data.admissionNumber}` : ""} · {nice(data.status)}
           </p>
@@ -136,15 +136,15 @@ export function StudentProfileCard({ data }: { data: StudentProfileData }) {
       <section className={card}>
         <h4 className={heading}>Parents / guardians</h4>
         {data.guardians.length === 0 ? (
-          <p className="text-sm text-slate-500">No guardian linked yet.</p>
+          <p className="text-sm text-muted-foreground">No guardian linked yet.</p>
         ) : (
           <ul className="space-y-2">
             {data.guardians.map((g) => (
-              <li key={g.id} className="text-sm text-slate-900 dark:text-white">
+              <li key={g.id} className="text-sm text-foreground">
                 <span className="font-semibold">{g.name}</span> · {nice(g.relationshipType)}
                 {g.isPrimary ? " (primary)" : ""}
                 {(g.phone || g.email) && (
-                  <span className="block text-xs text-slate-500">{[g.phone, g.email].filter(Boolean).join(" · ")}</span>
+                  <span className="block text-xs text-muted-foreground">{[g.phone, g.email].filter(Boolean).join(" · ")}</span>
                 )}
               </li>
             ))}
@@ -155,15 +155,15 @@ export function StudentProfileCard({ data }: { data: StudentProfileData }) {
       <section className={card}>
         <h4 className={heading}>Subjects (inherited from {data.class?.name ?? "the class"})</h4>
         {data.subjects.length === 0 ? (
-          <p className="text-sm text-slate-500">No subjects are linked to this class yet.</p>
+          <p className="text-sm text-muted-foreground">No subjects are linked to this class yet.</p>
         ) : (
-          <ul className="divide-y divide-slate-100 dark:divide-white/10">
+          <ul className="divide-y divide-border/60">
             {data.subjects.map((subject) => (
               <li key={subject.subjectId} className="flex items-center justify-between gap-3 py-2 text-sm">
-                <span className="text-slate-900 dark:text-white">
-                  {subject.name} <span className="text-xs text-slate-500">{subject.code}</span>
+                <span className="text-foreground">
+                  {subject.name} <span className="text-xs text-muted-foreground">{subject.code}</span>
                 </span>
-                <span className="text-xs text-slate-500">{subject.teacherName ?? "Teacher not assigned"}</span>
+                <span className="text-xs text-muted-foreground">{subject.teacherName ?? "Teacher not assigned"}</span>
               </li>
             ))}
           </ul>
@@ -181,17 +181,17 @@ export function StudentProfileModal({ studentId, onClose }: { studentId: string;
     retry: false,
   });
   return (
-    <div role="dialog" aria-modal="true" className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4">
-      <div className="my-6 w-full max-w-2xl rounded-2xl bg-slate-50 p-5 shadow-xl dark:bg-slate-900">
+    <div role="dialog" aria-modal="true" className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-overlay p-4">
+      <div className="my-6 w-full max-w-2xl rounded-2xl bg-muted/50 p-5 shadow-xl">
         <div className="mb-3 flex justify-end">
-          <button type="button" aria-label="Close" onClick={onClose} className="rounded-lg p-1.5 hover:bg-slate-200 dark:hover:bg-white/10">
+          <button type="button" aria-label="Close" onClick={onClose} className="rounded-lg p-1.5 hover:bg-muted-foreground/20">
             <X className="size-4" />
           </button>
         </div>
         {query.isPending ? (
-          <p className="text-sm text-slate-500">Loading profile…</p>
+          <p className="text-sm text-muted-foreground">Loading profile…</p>
         ) : query.error ? (
-          <p role="alert" className="text-sm text-rose-600">{query.error instanceof Error ? query.error.message : "Could not load the profile."}</p>
+          <p role="alert" className="text-sm text-destructive">{query.error instanceof Error ? query.error.message : "Could not load the profile."}</p>
         ) : (
           <StudentProfileCard data={query.data} />
         )}
@@ -211,21 +211,21 @@ export function MyWardsPanel() {
   if (query.isPending || query.error || query.data.length === 0) return null;
   const selected = query.data.find((w) => w.id === openId) ?? null;
   return (
-    <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-white/5">
-      <h2 className="text-sm font-bold text-slate-900 dark:text-white">My children: school records</h2>
-      <p className="mt-0.5 text-xs text-slate-500">Details held by the school. Contact the school office to correct anything.</p>
+    <section className="rounded-3xl border border-border bg-card p-5 shadow-sm">
+      <h2 className="text-sm font-bold text-foreground">My children: school records</h2>
+      <p className="mt-0.5 text-xs text-muted-foreground">Details held by the school. Contact the school office to correct anything.</p>
       <div className="mt-3 flex flex-wrap gap-2">
         {query.data.map((ward) => (
           <button
             key={ward.id}
             type="button"
             onClick={() => setOpenId(openId === ward.id ? null : ward.id)}
-            className={`rounded-xl border px-3 py-2 text-left text-sm ${openId === ward.id ? "border-indigo-500 bg-indigo-50 dark:bg-indigo-500/10" : "border-slate-200 dark:border-white/10"}`}
+            className={`rounded-xl border px-3 py-2 text-left text-sm ${openId === ward.id ? "border-primary bg-primary/10" : "border-border"}`}
           >
-            <span className="font-semibold text-slate-900 dark:text-white">
+            <span className="font-semibold text-foreground">
               {ward.profile.firstName} {ward.profile.lastName}
             </span>
-            <span className="block text-xs text-slate-500">{ward.class?.name ?? "No class this term"}</span>
+            <span className="block text-xs text-muted-foreground">{ward.class?.name ?? "No class this term"}</span>
           </button>
         ))}
       </div>
@@ -247,8 +247,8 @@ export function MyProfilePanel() {
   });
   if (query.isPending || query.error) return null;
   return (
-    <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-white/5">
-      <h2 className="mb-3 text-sm font-bold text-slate-900 dark:text-white">My profile</h2>
+    <section className="rounded-3xl border border-border bg-card p-5 shadow-sm">
+      <h2 className="mb-3 text-sm font-bold text-foreground">My profile</h2>
       <StudentProfileCard data={query.data} />
     </section>
   );

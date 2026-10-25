@@ -84,7 +84,7 @@ export function TeacherBiodataDialog({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/50 p-4"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) onClose();
       }}
@@ -105,7 +105,7 @@ export function TeacherBiodataDialog({
                   {data.teacherId}
                   <span
                     className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-                      data.isActive ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300" : "bg-muted text-muted-foreground"
+                      data.isActive ? "bg-success/10 text-success" : "bg-muted text-muted-foreground"
                     }`}
                   >
                     {data.isActive ? "Active" : "Inactive"}
@@ -131,7 +131,7 @@ export function TeacherBiodataDialog({
           </p>
         )}
         {query.error && (
-          <p role="alert" className="mt-6 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-800">
+          <p role="alert" className="mt-6 rounded-lg border border-destructive/20 bg-destructive/10 px-3 py-2 text-xs text-destructive">
             Biodata could not be loaded: {query.error.message}
           </p>
         )}

@@ -74,7 +74,7 @@ export function ConfirmDialog({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/55 p-4 backdrop-blur-[2px]"
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-foreground/55 p-4 backdrop-blur-[2px]"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget && !loading) onCancel();
       }}
@@ -87,7 +87,7 @@ export function ConfirmDialog({
         className="w-full max-w-md overflow-hidden rounded-2xl border border-border bg-card text-card-foreground shadow-2xl"
       >
         <div className="flex gap-4 p-5 sm:p-6">
-          <span className={`flex size-10 shrink-0 items-center justify-center rounded-xl ${confirmVariant === "danger" ? "bg-rose-500/10 text-rose-600 dark:text-rose-300" : "bg-primary/10 text-primary"}`}>
+          <span className={`flex size-10 shrink-0 items-center justify-center rounded-xl ${confirmVariant === "danger" ? "bg-destructive/10 text-destructive" : "bg-primary/10 text-primary"}`}>
             <AlertTriangle className="size-5" aria-hidden="true" />
           </span>
           <div className="min-w-0 pt-0.5">
@@ -109,7 +109,7 @@ export function ConfirmDialog({
             type="button"
             disabled={loading}
             onClick={onConfirm}
-            className={`inline-flex h-10 items-center justify-center gap-2 rounded-lg px-4 text-sm font-semibold text-white transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${confirmVariant === "danger" ? "bg-rose-600 hover:bg-rose-700" : "bg-primary hover:opacity-90"}`}
+            className={`inline-flex h-10 items-center justify-center gap-2 rounded-lg px-4 text-sm font-semibold text-destructive-foreground transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${confirmVariant === "danger" ? "bg-destructive hover:bg-destructive/90" : "bg-primary hover:opacity-90"}`}
           >
             {loading && <LoaderCircle className="size-4 animate-spin" aria-hidden="true" />}
             {loading ? "Please wait…" : confirmLabel}

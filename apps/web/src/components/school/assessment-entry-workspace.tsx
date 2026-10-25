@@ -42,7 +42,7 @@ interface SubjectRow {
 
 const cellKey = (studentId: string, componentId: string, slot: number) => `${studentId}|${componentId}|${slot}`;
 const field =
-  "h-9 rounded-lg border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 outline-none focus:border-indigo-400 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200";
+  "h-9 rounded-lg border border-border bg-card px-3 text-xs font-medium text-foreground/80 outline-none focus:border-primary/50";
 
 /**
  * Marks entry. Teachers pick one of their own class and subject pairs;
@@ -167,15 +167,15 @@ export function AssessmentEntryWorkspace({
   }
 
   if ((mode === "teacher" && teaching.isPending) || (mode === "manager" && subjects.isPending)) {
-    return <p className="text-xs text-slate-500">Loading classes…</p>;
+    return <p className="text-xs text-muted-foreground">Loading classes…</p>;
   }
   const loadError = (mode === "teacher" ? teaching.error : subjects.error)?.message;
-  if (loadError) return <p role="alert" className="text-xs text-rose-700">Could not load your classes: {loadError}</p>;
+  if (loadError) return <p role="alert" className="text-xs text-destructive">Could not load your classes: {loadError}</p>;
   if (catalogue.length === 0) {
     return (
-      <div className="rounded-2xl border border-dashed border-slate-300 p-8 text-center dark:border-slate-700">
-        <h2 className="text-sm font-semibold text-slate-900 dark:text-white">No classes to enter marks for yet</h2>
-        <p className="mx-auto mt-1 max-w-md text-xs text-slate-500">
+      <div className="rounded-2xl border border-dashed border-input p-8 text-center">
+        <h2 className="text-sm font-semibold text-foreground">No classes to enter marks for yet</h2>
+        <p className="mx-auto mt-1 max-w-md text-xs text-muted-foreground">
           {mode === "teacher"
             ? "Marks are entered by the teacher assigned to a subject in a class. Ask an administrator to assign you in Subjects."
             : "Add subjects to classes first, then marks can be entered here."}
@@ -189,8 +189,8 @@ export function AssessmentEntryWorkspace({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-end gap-3 rounded-2xl border border-slate-200/80 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-        <label className="grid gap-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+      <div className="flex flex-wrap items-end gap-3 rounded-2xl border border-border/80 bg-card p-4">
+        <label className="grid gap-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70">
           Class
           <select
             className={`${field} min-w-40`}
@@ -200,7 +200,7 @@ export function AssessmentEntryWorkspace({
             {catalogue.map((entry) => <option key={entry.id} value={entry.id}>{entry.name}</option>)}
           </select>
         </label>
-        <label className="grid gap-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+        <label className="grid gap-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70">
           Subject
           <select
             className={`${field} min-w-44`}
@@ -211,7 +211,7 @@ export function AssessmentEntryWorkspace({
           </select>
         </label>
         {sheet && sheet.templates.length > 1 && (
-          <label className="grid gap-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+          <label className="grid gap-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70">
             Assessment
             <select
               className={`${field} min-w-44`}
@@ -222,14 +222,14 @@ export function AssessmentEntryWorkspace({
             </select>
           </label>
         )}
-        {sheet && <p className="ml-auto text-xs text-slate-500">{sheet.term.name}</p>}
+        {sheet && <p className="ml-auto text-xs text-muted-foreground">{sheet.term.name}</p>}
       </div>
 
-      {sheetQuery.isPending && <p className="flex items-center gap-2 text-xs text-slate-500"><LoaderCircle className="size-4 animate-spin" /> Loading marks…</p>}
-      {sheetQuery.error && <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-800">{sheetQuery.error.message}</p>}
+      {sheetQuery.isPending && <p className="flex items-center gap-2 text-xs text-muted-foreground"><LoaderCircle className="size-4 animate-spin" /> Loading marks…</p>}
+      {sheetQuery.error && <p role="alert" className="rounded-lg border border-destructive/20 bg-destructive/10 px-3 py-2 text-xs text-destructive">{sheetQuery.error.message}</p>}
 
       {sheet && !sheet.template && (
-        <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900 dark:border-amber-400/20 dark:bg-amber-400/10 dark:text-amber-200">
+        <p className="rounded-xl border border-warning/20 bg-warning/10 px-4 py-3 text-xs text-warning">
           {sheet.readOnlyReason}
           {onOpenSetup && (
             <button type="button" onClick={onOpenSetup} className="ml-2 font-semibold underline">
@@ -240,48 +240,48 @@ export function AssessmentEntryWorkspace({
       )}
 
       {sheet?.template && (
-        <section className="rounded-2xl border border-slate-200/80 bg-white shadow-xs dark:border-slate-800 dark:bg-slate-900">
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 p-4 dark:border-slate-800">
+        <section className="rounded-2xl border border-border/80 bg-card shadow-xs">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/60 p-4">
             <div>
-              <h3 className="text-sm font-bold text-slate-900 dark:text-white">{sheet.subject.name} · {sheet.class.name}</h3>
-              <p className="mt-0.5 text-xs text-slate-500">
+              <h3 className="text-sm font-bold text-foreground">{sheet.subject.name} · {sheet.class.name}</h3>
+              <p className="mt-0.5 text-xs text-muted-foreground">
                 {sheet.template.name}
                 {sheet.template.deadline && ` · due ${new Date(sheet.template.deadline).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}`}
               </p>
             </div>
             {sheet.readOnlyReason && (
-              <p className="flex items-center gap-1.5 rounded-lg bg-slate-100 px-3 py-1.5 text-[11px] text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+              <p className="flex items-center gap-1.5 rounded-lg bg-muted px-3 py-1.5 text-[11px] text-muted-foreground">
                 <Lock className="size-3.5" /> {sheet.readOnlyReason}
               </p>
             )}
           </div>
 
           {sheet.students.length === 0 ? (
-            <p className="p-5 text-xs text-slate-500">No pupils are enrolled in this class this term.</p>
+            <p className="p-5 text-xs text-muted-foreground">No pupils are enrolled in this class this term.</p>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
-                <thead className="bg-slate-50 dark:bg-slate-800/50">
+                <thead className="bg-muted/50">
                   <tr>
-                    <th scope="col" className="px-4 py-3 text-[10px] font-semibold uppercase tracking-wide text-slate-400">Pupil</th>
+                    <th scope="col" className="px-4 py-3 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70">Pupil</th>
                     {components.map((component) => (
-                      <th key={component.id} scope="col" colSpan={component.slots} className="px-2 py-3 text-center text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                      <th key={component.id} scope="col" colSpan={component.slots} className="px-2 py-3 text-center text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70">
                         {component.name}
                         <span className="block font-normal normal-case tracking-normal">out of {component.maxMarks} · {component.weight}%</span>
                       </th>
                     ))}
-                    <th scope="col" className="px-3 py-3 text-center text-[10px] font-semibold uppercase tracking-wide text-slate-400">Total</th>
-                    <th scope="col" className="px-3 py-3 text-center text-[10px] font-semibold uppercase tracking-wide text-slate-400">%</th>
-                    <th scope="col" className="px-3 py-3 text-center text-[10px] font-semibold uppercase tracking-wide text-slate-400">Grade</th>
-                    <th scope="col" className="px-3 py-3 text-center text-[10px] font-semibold uppercase tracking-wide text-slate-400">Pos.</th>
+                    <th scope="col" className="px-3 py-3 text-center text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70">Total</th>
+                    <th scope="col" className="px-3 py-3 text-center text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70">%</th>
+                    <th scope="col" className="px-3 py-3 text-center text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70">Grade</th>
+                    <th scope="col" className="px-3 py-3 text-center text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70">Pos.</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                <tbody className="divide-y divide-border/60">
                   {sheet.students.map((student) => (
                     <tr key={student.studentId}>
-                      <th scope="row" className="px-4 py-2 text-left font-semibold text-slate-900 dark:text-white">
+                      <th scope="row" className="px-4 py-2 text-left font-semibold text-foreground">
                         {student.name}
-                        <span className="block text-[10px] font-normal text-slate-400">{student.admissionNumber ?? ""}</span>
+                        <span className="block text-[10px] font-normal text-muted-foreground/70">{student.admissionNumber ?? ""}</span>
                       </th>
                       {components.flatMap((component) =>
                         Array.from({ length: component.slots }, (_, slot) => {
@@ -302,26 +302,26 @@ export function AssessmentEntryWorkspace({
                                 aria-invalid={bad || undefined}
                                 aria-label={`${student.name}, ${component.name}${component.slots > 1 ? ` ${slot + 1}` : ""}, out of ${component.maxMarks}`}
                                 onChange={(event) => { setNotice(null); setDraft((current) => ({ ...current, [key]: event.target.value })); }}
-                                className={`h-9 w-16 rounded-lg border px-2 text-center text-xs tabular-nums outline-none focus:ring-2 disabled:bg-slate-50 disabled:text-slate-500 dark:disabled:bg-slate-800/50 ${
+                                className={`h-9 w-16 rounded-lg border px-2 text-center text-xs tabular-nums outline-none focus:ring-2 disabled:bg-muted/50 disabled:text-muted-foreground ${
                                   bad
-                                    ? "border-rose-400 bg-rose-50 text-rose-800 focus:ring-rose-200"
-                                    : "border-slate-200 bg-white text-slate-800 focus:border-indigo-400 focus:ring-indigo-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                    ? "border-destructive/50 bg-destructive/10 text-destructive focus:ring-destructive/20"
+                                    : "border-border bg-card text-foreground focus:border-primary/50 focus:ring-primary/20"
                                 }`}
                               />
                             </td>
                           );
                         }),
                       )}
-                      <td className="px-3 py-2 text-center font-semibold tabular-nums text-slate-900 dark:text-white">{student.marks.length ? student.totalScore : "—"}</td>
-                      <td className="px-3 py-2 text-center tabular-nums text-slate-600 dark:text-slate-300">{student.marks.length ? `${student.percentage}%` : "—"}</td>
+                      <td className="px-3 py-2 text-center font-semibold tabular-nums text-foreground">{student.marks.length ? student.totalScore : "—"}</td>
+                      <td className="px-3 py-2 text-center tabular-nums text-muted-foreground">{student.marks.length ? `${student.percentage}%` : "—"}</td>
                       <td className="px-3 py-2 text-center">
                         {student.grade ? (
-                          <span className="rounded-md bg-indigo-50 px-2 py-0.5 font-bold text-indigo-700 dark:bg-indigo-400/10 dark:text-indigo-300">{student.grade}</span>
+                          <span className="rounded-md bg-primary/10 px-2 py-0.5 font-bold text-primary">{student.grade}</span>
                         ) : (
-                          <span className="text-slate-400" title={student.marks.length ? "Waiting for the remaining marks" : undefined}>{student.marks.length ? "Incomplete" : "—"}</span>
+                          <span className="text-muted-foreground/70" title={student.marks.length ? "Waiting for the remaining marks" : undefined}>{student.marks.length ? "Incomplete" : "—"}</span>
                         )}
                       </td>
-                      <td className="px-3 py-2 text-center tabular-nums text-slate-600 dark:text-slate-300">{student.position ?? "—"}</td>
+                      <td className="px-3 py-2 text-center tabular-nums text-muted-foreground">{student.position ?? "—"}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -329,7 +329,7 @@ export function AssessmentEntryWorkspace({
             </div>
           )}
 
-          <div className="flex flex-wrap items-center gap-3 border-t border-slate-100 p-4 dark:border-slate-800">
+          <div className="flex flex-wrap items-center gap-3 border-t border-border/60 p-4">
             {editable && (
               <button
                 type="button"
@@ -342,16 +342,16 @@ export function AssessmentEntryWorkspace({
                     entries: changes.map(({ studentId, componentId, occurrenceIndex, marks }) => ({ studentId, componentId, occurrenceIndex, marks })),
                   })
                 }
-                className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-indigo-600 px-4 text-xs font-semibold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+                className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary px-4 text-xs font-semibold text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {save.isPending && <LoaderCircle className="size-3.5 animate-spin" />}
                 Save marks{changes.length ? ` (${changes.length})` : ""}
               </button>
             )}
-            {invalid > 0 && <p role="alert" className="flex items-center gap-1.5 text-xs text-rose-700"><CircleAlert className="size-3.5" /> {invalid} mark{invalid === 1 ? " is" : "s are"} outside the allowed range.</p>}
-            {notice && <p role="status" className="flex items-center gap-1.5 text-xs text-emerald-700"><CircleCheck className="size-3.5" /> {notice}</p>}
-            {save.error && <p role="alert" className="flex items-center gap-1.5 text-xs text-rose-700"><CircleAlert className="size-3.5" /> {save.error.message}</p>}
-            <p className="ml-auto text-[11px] text-slate-500">
+            {invalid > 0 && <p role="alert" className="flex items-center gap-1.5 text-xs text-destructive"><CircleAlert className="size-3.5" /> {invalid} mark{invalid === 1 ? " is" : "s are"} outside the allowed range.</p>}
+            {notice && <p role="status" className="flex items-center gap-1.5 text-xs text-success"><CircleCheck className="size-3.5" /> {notice}</p>}
+            {save.error && <p role="alert" className="flex items-center gap-1.5 text-xs text-destructive"><CircleAlert className="size-3.5" /> {save.error.message}</p>}
+            <p className="ml-auto text-[11px] text-muted-foreground">
               Grades appear once every required column has a mark.
               {sheet.template.grades.length > 0 && (
                 <> {[...sheet.template.grades].sort((a, b) => b.minScore - a.minScore).map((band) => `${band.grade} ${band.minScore}+`).join(" · ")}</>

@@ -50,13 +50,13 @@ const DAY_LABEL: Record<TimetableDay, string> = {
   MONDAY: "Mon", TUESDAY: "Tue", WEDNESDAY: "Wed", THURSDAY: "Thu", FRIDAY: "Fri", SATURDAY: "Sat", SUNDAY: "Sun",
 };
 const typeStyle: Record<Entry["type"], string> = {
-  LESSON: "border-indigo-200 bg-indigo-50 text-indigo-900 dark:border-indigo-300/20 dark:bg-indigo-400/10 dark:text-indigo-100",
-  BREAK: "border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-300/20 dark:bg-amber-400/10 dark:text-amber-100",
-  ACTIVITY: "border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-300/20 dark:bg-emerald-400/10 dark:text-emerald-100",
+  LESSON: "border-primary/20 bg-primary/10 text-primary",
+  BREAK: "border-warning/20 bg-warning/10 text-warning",
+  ACTIVITY: "border-success/20 bg-success/10 text-success",
 };
-const primary = "inline-flex h-9 items-center gap-2 rounded-lg bg-indigo-600 px-4 text-xs font-semibold text-white hover:bg-indigo-700 disabled:opacity-60";
-const outline = "inline-flex h-9 items-center gap-2 rounded-lg border border-slate-200 px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60 dark:border-white/10 dark:text-slate-200 dark:hover:bg-white/5";
-const selectClass = "h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 dark:border-white/10 dark:bg-slate-950";
+const primary = "inline-flex h-9 items-center gap-2 rounded-lg bg-primary px-4 text-xs font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-60";
+const outline = "inline-flex h-9 items-center gap-2 rounded-lg border border-border px-3 text-xs font-semibold text-foreground/80 hover:bg-muted/50 disabled:opacity-60";
+const selectClass = "h-10 w-full rounded-lg border border-border bg-card px-3 text-sm outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/20";
 
 export function TimetableWorkspace() {
   const queryClient = useQueryClient();
@@ -172,9 +172,9 @@ export function TimetableWorkspace() {
 
   return (
     <div className="space-y-5">
-      <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-slate-900/70">
+      <section className="rounded-2xl border border-border bg-card p-4 shadow-sm">
         <div className="flex flex-wrap items-end gap-3">
-          <div role="tablist" aria-label="Timetable view" className="flex rounded-lg border border-slate-200 p-0.5 dark:border-white/10">
+          <div role="tablist" aria-label="Timetable view" className="flex rounded-lg border border-border p-0.5">
             {(["class", "teacher", "room"] as View[]).map((option) => (
               <button
                 key={option}
@@ -182,14 +182,14 @@ export function TimetableWorkspace() {
                 type="button"
                 aria-selected={view === option}
                 onClick={() => { setView(option); setTargetId(""); setEditor(null); }}
-                className={`h-8 rounded-md px-3 text-xs font-semibold capitalize ${view === option ? "bg-indigo-600 text-white" : "text-slate-600 hover:bg-slate-50 dark:text-slate-300"}`}
+                className={`h-8 rounded-md px-3 text-xs font-semibold capitalize ${view === option ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted/50"}`}
               >
                 {option === "room" ? "Room" : option}
               </button>
             ))}
           </div>
           <div className="min-w-[180px]">
-            <label htmlFor="tt-target" className="mb-1 block text-[11px] font-medium text-slate-500">
+            <label htmlFor="tt-target" className="mb-1 block text-[11px] font-medium text-muted-foreground">
               {view === "class" ? "Class" : view === "teacher" ? "Teacher" : "Room"}
             </label>
             <select id="tt-target" className={selectClass} value={targetId} onChange={(e) => setTargetId(e.target.value)}>
@@ -199,7 +199,7 @@ export function TimetableWorkspace() {
           </div>
           {setup.academicYears.length > 1 && (
             <div className="min-w-[150px]">
-              <label htmlFor="tt-year" className="mb-1 block text-[11px] font-medium text-slate-500">Academic year</label>
+              <label htmlFor="tt-year" className="mb-1 block text-[11px] font-medium text-muted-foreground">Academic year</label>
               <select id="tt-year" className={selectClass} value={setup.academicYear.id} onChange={(e) => setYearId(e.target.value)}>
                 {setup.academicYears.map((year) => <option key={year.id} value={year.id}>{year.name}{year.isCurrent ? " (current)" : ""}</option>)}
               </select>
@@ -220,7 +220,7 @@ export function TimetableWorkspace() {
           )}
         </div>
         {canEdit && view !== "class" && (
-          <p className="mt-3 text-[11px] text-slate-500">Switch to the Class view to add or change lessons.</p>
+          <p className="mt-3 text-[11px] text-muted-foreground">Switch to the Class view to add or change lessons.</p>
         )}
       </section>
 
@@ -249,27 +249,27 @@ export function TimetableWorkspace() {
       ) : entriesQuery.error ? (
         <Status tone="error">{entriesQuery.error.message}</Status>
       ) : (
-        <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-white/10 dark:bg-slate-900/70">
+        <div className="overflow-x-auto rounded-2xl border border-border bg-card shadow-sm">
           {view === "class" && (
-            <p className="border-b border-slate-100 px-4 py-2 text-[11px] text-slate-500 dark:border-white/10">
-              Periods for <span className="font-semibold text-slate-700 dark:text-slate-200">{classDeptId ? departmentName : "classes without a department"}</span>
+            <p className="border-b border-border/60 px-4 py-2 text-[11px] text-muted-foreground">
+              Periods for <span className="font-semibold text-foreground/80">{classDeptId ? departmentName : "classes without a department"}</span>
             </p>
           )}
           <table className="w-full min-w-[720px] border-collapse text-left">
             <thead>
-              <tr className="border-b border-slate-100 bg-slate-50/70 dark:border-white/10 dark:bg-white/[0.03]">
-                <th className="w-32 px-3 py-3 text-[10px] font-semibold uppercase tracking-wider text-slate-400">Period</th>
+              <tr className="border-b border-border/60 bg-muted/70">
+                <th className="w-32 px-3 py-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70">Period</th>
                 {days.map((day) => (
-                  <th key={day} className="px-3 py-3 text-[10px] font-semibold uppercase tracking-wider text-slate-400">{DAY_LABEL[day]}</th>
+                  <th key={day} className="px-3 py-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70">{DAY_LABEL[day]}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {visiblePeriods.map((period) => (
-                <tr key={period.id} className="border-b border-slate-100 last:border-0 dark:border-white/10">
+                <tr key={period.id} className="border-b border-border/60 last:border-0">
                   <th scope="row" className="px-3 py-2 align-top text-left">
-                    <span className="block text-xs font-semibold text-slate-800 dark:text-slate-100">{period.name}</span>
-                    <span className="text-[10px] text-slate-500">{period.startTime}–{period.endTime}</span>
+                    <span className="block text-xs font-semibold text-foreground">{period.name}</span>
+                    <span className="text-[10px] text-muted-foreground">{period.startTime}–{period.endTime}</span>
                   </th>
                   {days.map((day) => {
                     const cell = cellMap.get(`${day}|${period.startTime}|${period.endTime}`) ?? [];
@@ -288,7 +288,7 @@ export function TimetableWorkspace() {
                             type="button"
                             aria-label={`Add lesson on ${DAY_LABEL[day]} during ${period.name}`}
                             onClick={() => setEditor({ day, period })}
-                            className="flex h-full min-h-[58px] w-full items-center justify-center rounded-lg border border-dashed border-slate-200 text-slate-300 transition hover:border-indigo-300 hover:text-indigo-500 dark:border-white/10"
+                            className="flex h-full min-h-[58px] w-full items-center justify-center rounded-lg border border-dashed border-border text-muted-foreground/50 transition hover:border-primary/30 hover:text-primary"
                           >
                             <Plus className="size-4" />
                           </button>
@@ -301,7 +301,7 @@ export function TimetableWorkspace() {
             </tbody>
           </table>
           {entriesQuery.isFetching && (
-            <p className="px-4 py-2 text-[11px] text-slate-400" role="status">Updating…</p>
+            <p className="px-4 py-2 text-[11px] text-muted-foreground/70" role="status">Updating…</p>
           )}
         </div>
       )}
@@ -325,8 +325,8 @@ function Status({ children, tone = "info" }: { children: React.ReactNode; tone?:
     <p
       role={tone === "error" ? "alert" : "status"}
       className={tone === "error"
-        ? "flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs text-rose-800"
-        : "rounded-xl border border-slate-200 bg-white px-4 py-6 text-center text-xs text-slate-500"}
+        ? "flex items-start gap-2 rounded-xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-xs text-destructive"
+        : "rounded-xl border border-border bg-card px-4 py-6 text-center text-xs text-muted-foreground"}
     >
       {tone === "error" && <CircleAlert className="mt-0.5 size-4 shrink-0" />}
       {children}
@@ -419,13 +419,13 @@ function EntryEditor({
 
   const error = problem ?? mutation.error?.message ?? remove.error?.message;
   return (
-    <section className="rounded-2xl border border-indigo-200 bg-white p-5 shadow-sm dark:border-indigo-300/20 dark:bg-slate-900/70">
+    <section className="rounded-2xl border border-primary/20 bg-card p-5 shadow-sm">
       <div className="mb-4 flex items-start justify-between gap-3">
         <div>
-          <h3 className="text-sm font-bold text-slate-900 dark:text-white">{entry ? "Edit lesson" : "Add to timetable"}</h3>
-          <p className="text-xs text-slate-500">{DAY_LABEL[day]} · {period.name} ({period.startTime}–{period.endTime})</p>
+          <h3 className="text-sm font-bold text-foreground">{entry ? "Edit lesson" : "Add to timetable"}</h3>
+          <p className="text-xs text-muted-foreground">{DAY_LABEL[day]} · {period.name} ({period.startTime}–{period.endTime})</p>
         </div>
-        <button type="button" onClick={onClose} aria-label="Close" className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100"><X className="size-4" /></button>
+        <button type="button" onClick={onClose} aria-label="Close" className="rounded-lg p-1.5 text-muted-foreground/70 hover:bg-muted"><X className="size-4" /></button>
       </div>
       <form onSubmit={submit} className="space-y-4" noValidate>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -478,7 +478,7 @@ function EntryEditor({
         {error && <Status tone="error">{error}</Status>}
         <div className="flex items-center justify-between gap-2">
           {entry ? (
-            <button type="button" className="inline-flex h-9 items-center gap-2 rounded-lg px-3 text-xs font-semibold text-rose-700 hover:bg-rose-50 disabled:opacity-60" disabled={remove.isPending} onClick={() => remove.mutate()}>
+            <button type="button" className="inline-flex h-9 items-center gap-2 rounded-lg px-3 text-xs font-semibold text-destructive hover:bg-destructive/10 disabled:opacity-60" disabled={remove.isPending} onClick={() => remove.mutate()}>
               <Trash2 className="size-4" /> Remove
             </button>
           ) : <span />}
@@ -497,13 +497,13 @@ function EntryEditor({
 
 function ManagerShell({ title, description, onClose, children }: { title: string; description: string; onClose: () => void; children: React.ReactNode }) {
   return (
-    <section className="rounded-2xl border border-indigo-200 bg-white p-5 shadow-sm dark:border-indigo-300/20 dark:bg-slate-900/70">
+    <section className="rounded-2xl border border-primary/20 bg-card p-5 shadow-sm">
       <div className="mb-4 flex items-start justify-between gap-3">
         <div>
-          <h3 className="text-sm font-bold text-slate-900 dark:text-white">{title}</h3>
-          <p className="text-xs text-slate-500">{description}</p>
+          <h3 className="text-sm font-bold text-foreground">{title}</h3>
+          <p className="text-xs text-muted-foreground">{description}</p>
         </div>
-        <button type="button" onClick={onClose} aria-label="Close" className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100"><X className="size-4" /></button>
+        <button type="button" onClick={onClose} aria-label="Close" className="rounded-lg p-1.5 text-muted-foreground/70 hover:bg-muted"><X className="size-4" /></button>
       </div>
       {children}
     </section>
@@ -613,21 +613,21 @@ function PeriodManager({
       onClose={onClose}
     >
       <div className="mb-4 max-w-xs">
-        <label htmlFor="period-department" className="mb-1 block text-[11px] font-medium text-slate-500">Department</label>
+        <label htmlFor="period-department" className="mb-1 block text-[11px] font-medium text-muted-foreground">Department</label>
         <select id="period-department" className={selectClass} value={departmentId} onChange={(e) => chooseDepartment(e.target.value)}>
           {showDefault && <option value="">Default (no department)</option>}
           {departments.map((department) => <option key={department.id} value={department.id}>{department.name}</option>)}
         </select>
       </div>
-      <ul className="mb-4 divide-y divide-slate-100 rounded-xl border border-slate-200 dark:divide-white/10 dark:border-white/10">
+      <ul className="mb-4 divide-y divide-border/60 rounded-xl border border-border">
         {periods.map((period) => (
           <li key={period.id} className="flex items-center justify-between gap-3 px-3 py-2 text-xs">
-            <span><span className="font-semibold text-slate-800 dark:text-slate-100">{period.name}</span> <span className="text-slate-500">{period.startTime}–{period.endTime}</span></span>
+            <span><span className="font-semibold text-foreground">{period.name}</span> <span className="text-muted-foreground">{period.startTime}–{period.endTime}</span></span>
             <span className="flex gap-1">
-              <button type="button" className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 dark:hover:bg-white/10" aria-label={`Edit ${period.name}`} onClick={() => open(period)}><Pencil className="size-3.5" /></button>
+              <button type="button" className="rounded-md p-1.5 text-muted-foreground hover:bg-muted" aria-label={`Edit ${period.name}`} onClick={() => open(period)}><Pencil className="size-3.5" /></button>
               <button
                 type="button"
-                className="rounded-md p-1.5 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-400/10"
+                className="rounded-md p-1.5 text-destructive hover:bg-destructive/10"
                 aria-label={`Delete ${period.name}`}
                 disabled={remove.isPending}
                 onClick={() => { if (window.confirm(`Delete ${period.name}?`)) remove.mutate(period.id); }}
@@ -635,7 +635,7 @@ function PeriodManager({
             </span>
           </li>
         ))}
-        {periods.length === 0 && <li className="px-3 py-3 text-xs text-slate-500">No periods for {currentName} yet.{copyTargets.length > 0 || departmentId ? " Add one below, or copy another department's periods from that department." : ""}</li>}
+        {periods.length === 0 && <li className="px-3 py-3 text-xs text-muted-foreground">No periods for {currentName} yet.{copyTargets.length > 0 || departmentId ? " Add one below, or copy another department's periods from that department." : ""}</li>}
       </ul>
       {editingId ? (
         <form onSubmit={submit} className="space-y-3" noValidate>
@@ -662,25 +662,25 @@ function PeriodManager({
           </div>
           {error && <div className="mt-3"><Status tone="error">{error}</Status></div>}
           {copying && (
-            <div className="mt-4 space-y-3 rounded-xl border border-slate-200 p-4 dark:border-white/10">
+            <div className="mt-4 space-y-3 rounded-xl border border-border p-4">
               <div>
-                <p className="text-xs font-semibold text-slate-800 dark:text-slate-100">Copy {periods.length} period{periods.length === 1 ? "" : "s"} from {currentName} to:</p>
-                <p className="mt-0.5 text-[11px] text-slate-500">Existing periods in the target are kept. Periods with the same times are skipped, and ones that would overlap are skipped and reported. Lessons are not copied because teachers differ.</p>
+                <p className="text-xs font-semibold text-foreground">Copy {periods.length} period{periods.length === 1 ? "" : "s"} from {currentName} to:</p>
+                <p className="mt-0.5 text-[11px] text-muted-foreground">Existing periods in the target are kept. Periods with the same times are skipped, and ones that would overlap are skipped and reported. Lessons are not copied because teachers differ.</p>
               </div>
               <ul className="grid gap-1.5 sm:grid-cols-2">
                 {copyTargets.map((department) => {
                   const existing = allPeriods.filter((p) => p.departmentId === department.id).length;
                   return (
                     <li key={department.id}>
-                      <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs hover:bg-slate-50 dark:border-white/10 dark:hover:bg-white/5">
+                      <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-border px-3 py-2 text-xs hover:bg-muted/50">
                         <input
                           type="checkbox"
-                          className="size-3.5 accent-indigo-600"
+                          className="size-3.5 accent-primary"
                           checked={targets.includes(department.id)}
                           onChange={(e) => setTargets((current) => e.target.checked ? [...current, department.id] : current.filter((id) => id !== department.id))}
                         />
-                        <span className="font-medium text-slate-800 dark:text-slate-100">{department.name}</span>
-                        <span className="ml-auto text-[10px] text-slate-500">{existing} existing</span>
+                        <span className="font-medium text-foreground">{department.name}</span>
+                        <span className="ml-auto text-[10px] text-muted-foreground">{existing} existing</span>
                       </label>
                     </li>
                   );
@@ -690,11 +690,11 @@ function PeriodManager({
               {copyResult && (
                 <ul className="space-y-1 text-xs" role="status">
                   {copyResult.results.map((result) => (
-                    <li key={result.departmentId} className="rounded-lg bg-slate-50 px-3 py-2 dark:bg-white/5">
-                      <span className="font-semibold text-slate-800 dark:text-slate-100">{result.departmentName}:</span>{" "}
+                    <li key={result.departmentId} className="rounded-lg bg-muted/50 px-3 py-2">
+                      <span className="font-semibold text-foreground">{result.departmentName}:</span>{" "}
                       copied {result.created}
                       {result.skipped.length > 0 && (
-                        <span className="text-slate-500">
+                        <span className="text-muted-foreground">
                           , skipped {result.skipped.length} ({result.skipped.map((p) => `${p.name} ${p.startTime}–${p.endTime} ${p.reason === "exists" ? "already exists" : "overlaps"}`).join("; ")})
                         </span>
                       )}
@@ -754,15 +754,15 @@ function RoomManager({ rooms, onClose, onChanged }: { rooms: Room[]; onClose: ()
 
   return (
     <ManagerShell title="Rooms" description="Rooms can be picked for lessons; a room cannot host two classes in the same period." onClose={onClose}>
-      <ul className="mb-4 divide-y divide-slate-100 rounded-xl border border-slate-200 dark:divide-white/10 dark:border-white/10">
+      <ul className="mb-4 divide-y divide-border/60 rounded-xl border border-border">
         {rooms.map((room) => (
           <li key={room.id} className="flex items-center justify-between gap-3 px-3 py-2 text-xs">
-            <span><span className="font-semibold text-slate-800 dark:text-slate-100">{room.name}</span>{room.capacity ? <span className="ml-2 text-slate-500">Seats {room.capacity}</span> : null}</span>
+            <span><span className="font-semibold text-foreground">{room.name}</span>{room.capacity ? <span className="ml-2 text-muted-foreground">Seats {room.capacity}</span> : null}</span>
             <span className="flex gap-1">
-              <button type="button" className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100" aria-label={`Edit ${room.name}`} onClick={() => open(room)}><Pencil className="size-3.5" /></button>
+              <button type="button" className="rounded-md p-1.5 text-muted-foreground hover:bg-muted" aria-label={`Edit ${room.name}`} onClick={() => open(room)}><Pencil className="size-3.5" /></button>
               <button
                 type="button"
-                className="rounded-md p-1.5 text-rose-600 hover:bg-rose-50"
+                className="rounded-md p-1.5 text-destructive hover:bg-destructive/10"
                 aria-label={`Delete ${room.name}`}
                 disabled={remove.isPending}
                 onClick={() => { if (window.confirm(`Delete ${room.name}? Lessons keep running without a room.`)) remove.mutate(room.id); }}
@@ -770,7 +770,7 @@ function RoomManager({ rooms, onClose, onChanged }: { rooms: Room[]; onClose: ()
             </span>
           </li>
         ))}
-        {rooms.length === 0 && <li className="px-3 py-3 text-xs text-slate-500">No rooms yet. Rooms are optional.</li>}
+        {rooms.length === 0 && <li className="px-3 py-3 text-xs text-muted-foreground">No rooms yet. Rooms are optional.</li>}
       </ul>
       {editingId ? (
         <form onSubmit={submit} className="space-y-3" noValidate>

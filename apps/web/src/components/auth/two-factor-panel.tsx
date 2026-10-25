@@ -182,7 +182,7 @@ export function TwoFactorPanel({ required = false, onEnabled }: TwoFactorPanelPr
               <p className="mt-0.5 text-xs text-muted-foreground">Use Google Authenticator, Microsoft Authenticator, Authy or 1Password.</p>
               <div className="mt-3 flex flex-wrap items-center gap-4">
                 {/* A QR code must stay dark-on-white in both themes or phones cannot scan it. */}
-                <div className="flex size-[236px] items-center justify-center rounded-2xl border border-border bg-white p-2"> {/* theme-allow: QR contrast */}
+                <div className="flex size-[236px] items-center justify-center rounded-2xl border border-border bg-card p-2"> {/* theme-allow: QR contrast */}
                   {qr ? <img src={qr} alt="QR code for your authenticator app" width={220} height={220} /> : <LoaderCircle className="size-5 animate-spin text-muted-foreground" />}
                 </div>
                 <div className="min-w-0 text-xs text-muted-foreground">

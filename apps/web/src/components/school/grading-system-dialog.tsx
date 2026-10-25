@@ -15,7 +15,7 @@ interface Row {
 }
 
 const input =
-  "h-9 w-full rounded-lg border border-slate-200 bg-white px-2.5 text-xs text-slate-800 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 disabled:bg-slate-50 disabled:text-slate-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:disabled:bg-slate-800/50";
+  "h-9 w-full rounded-lg border border-border bg-card px-2.5 text-xs text-foreground outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/20 disabled:bg-muted/50 disabled:text-muted-foreground";
 
 let rowKey = 0;
 const toRows = (bands: SetupBand[]): Row[] =>
@@ -104,7 +104,7 @@ export function GradingSystemDialog({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/50 p-4"
       onMouseDown={(event) => event.target === event.currentTarget && !save.isPending && onClose()}
     >
       <div
@@ -112,27 +112,27 @@ export function GradingSystemDialog({
         role="dialog"
         aria-modal="true"
         aria-labelledby="grading-title"
-        className="max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl sm:p-6 dark:border-white/10 dark:bg-slate-900"
+        className="max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-2xl border border-border bg-card p-5 shadow-2xl sm:p-6"
       >
         <div className="flex items-start justify-between gap-3">
           <div>
-            <h2 id="grading-title" className="text-sm font-bold text-slate-900 dark:text-white">
+            <h2 id="grading-title" className="text-sm font-bold text-foreground">
               {editing ? "Edit grading scale" : asCopy ? "Copy grading scale" : "New grading scale"}
             </h2>
-            <p className="mt-0.5 text-xs text-slate-500">Choose which scores earn which grade. Assessments use this to grade pupils.</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">Choose which scores earn which grade. Assessments use this to grade pupils.</p>
           </div>
-          <button type="button" onClick={onClose} aria-label="Close" className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 dark:hover:bg-white/10">
+          <button type="button" onClick={onClose} aria-label="Close" className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted">
             <X className="size-4" />
           </button>
         </div>
 
         <form onSubmit={submit} noValidate className="mt-4 space-y-4">
           <div className="grid gap-3 sm:grid-cols-2">
-            <label className="grid gap-1 text-[11px] font-medium text-slate-500">
+            <label className="grid gap-1 text-[11px] font-medium text-muted-foreground">
               Name
               <input className={input} value={name} onChange={(event) => setName(event.target.value)} placeholder="e.g. Standard scale" />
             </label>
-            <label className="grid gap-1 text-[11px] font-medium text-slate-500">
+            <label className="grid gap-1 text-[11px] font-medium text-muted-foreground">
               Description (optional)
               <input className={input} value={description} onChange={(event) => setDescription(event.target.value)} />
             </label>
@@ -140,16 +140,16 @@ export function GradingSystemDialog({
 
           <div>
             <div className="mb-2 flex items-center justify-between">
-              <h3 className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Grades</h3>
+              <h3 className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/70">Grades</h3>
               <button
                 type="button"
                 onClick={() => setRows(toRows(STANDARD_BANDS))}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1 text-[11px] font-semibold text-foreground/80 hover:bg-muted/50"
               >
                 <Wand2 className="size-3.5" /> Use the standard A to F scale
               </button>
             </div>
-            <div className="grid grid-cols-[4rem_1fr_5rem_5rem_5rem_2rem] gap-2 px-1 pb-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400" aria-hidden="true">
+            <div className="grid grid-cols-[4rem_1fr_5rem_5rem_5rem_2rem] gap-2 px-1 pb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70" aria-hidden="true">
               <span>Grade</span><span>Meaning</span><span>From</span><span>To</span><span>Point</span><span />
             </div>
             <ul className="space-y-2">
@@ -165,7 +165,7 @@ export function GradingSystemDialog({
                     aria-label={`Remove grade ${row.grade || index + 1}`}
                     disabled={rows.length <= 2}
                     onClick={() => setRows((current) => current.filter((item) => item.key !== row.key))}
-                    className="rounded-md p-1.5 text-rose-600 hover:bg-rose-50 disabled:opacity-30 dark:hover:bg-rose-400/10"
+                    className="rounded-md p-1.5 text-destructive hover:bg-destructive/10 disabled:opacity-30"
                   >
                     <Trash2 className="size-3.5" />
                   </button>
@@ -175,33 +175,33 @@ export function GradingSystemDialog({
             <button
               type="button"
               onClick={() => setRows((current) => [...current, { key: ++rowKey, grade: "", description: "", minScore: "", maxScore: "", gradePoint: "" }])}
-              className="mt-2 inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-[11px] font-semibold text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-400/10"
+              className="mt-2 inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-[11px] font-semibold text-primary hover:bg-primary/10"
             >
               <Plus className="size-3.5" /> Add a grade
             </button>
           </div>
 
           {liveProblems.length > 0 && (
-            <ul className="space-y-1 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:bg-amber-400/10 dark:text-amber-200" aria-live="polite">
+            <ul className="space-y-1 rounded-lg bg-warning/10 px-3 py-2 text-xs text-warning" aria-live="polite">
               {liveProblems.map((problem) => <li key={problem}>{problem}</li>)}
             </ul>
           )}
           {attempted && problems.length > 0 && liveProblems.length === 0 && (
-            <ul role="alert" className="space-y-1 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-800">
+            <ul role="alert" className="space-y-1 rounded-lg border border-destructive/20 bg-destructive/10 px-3 py-2 text-xs text-destructive">
               {problems.map((problem) => <li key={problem}>{problem}</li>)}
             </ul>
           )}
           {save.error && (
-            <p role="alert" className="flex items-start gap-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-800">
+            <p role="alert" className="flex items-start gap-2 rounded-lg border border-destructive/20 bg-destructive/10 px-3 py-2 text-xs text-destructive">
               <CircleAlert className="mt-0.5 size-3.5 shrink-0" /> {save.error.message}
             </p>
           )}
 
           <div className="flex justify-end gap-2">
-            <button type="button" onClick={onClose} disabled={save.isPending} className="inline-flex h-9 items-center rounded-lg border border-slate-200 px-4 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-white/10 dark:text-slate-200 dark:hover:bg-white/5">
+            <button type="button" onClick={onClose} disabled={save.isPending} className="inline-flex h-9 items-center rounded-lg border border-border px-4 text-xs font-semibold text-foreground/80 hover:bg-muted/50">
               Cancel
             </button>
-            <button type="submit" disabled={save.isPending} className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-indigo-600 px-4 text-xs font-semibold text-white hover:bg-indigo-700 disabled:opacity-60">
+            <button type="submit" disabled={save.isPending} className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary px-4 text-xs font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-60">
               {save.isPending && <LoaderCircle className="size-3.5 animate-spin" />}
               {editing ? "Save changes" : "Create grading scale"}
             </button>

@@ -226,7 +226,7 @@ export function EnrollmentWorkspace({
   return (
     <div className="space-y-6">
       <section className="overflow-hidden rounded-3xl border border-border bg-card shadow-sm">
-        <div className="border-b border-border bg-gradient-to-br from-primary/10 via-card to-sky-500/5 px-5 py-6 sm:px-7">
+        <div className="border-b border-border bg-gradient-to-br from-primary/10 via-card to-info/5 px-5 py-6 sm:px-7">
           <p className="text-xs font-semibold uppercase tracking-[0.15em] text-primary">
             Student placement history
           </p>

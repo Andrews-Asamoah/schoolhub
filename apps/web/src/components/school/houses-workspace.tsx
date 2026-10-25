@@ -186,7 +186,7 @@ export function HousesWorkspace() {
 
   return (
     <div className="space-y-5">
-      <section className="rounded-2xl border border-border bg-gradient-to-br from-primary/10 via-card to-amber-500/5 p-5 sm:p-6">
+      <section className="rounded-2xl border border-border bg-gradient-to-br from-primary/10 via-card to-warning/5 p-5 sm:p-6">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="flex items-start gap-3">
             <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
@@ -428,7 +428,7 @@ export function HousesWorkspace() {
                     <span
                       className={`rounded-full px-2 py-1 text-[10px] font-semibold ${
                         house.isActive
-                          ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+                          ? "bg-success/10 text-success"
                           : "bg-muted text-muted-foreground"
                       }`}
                     >

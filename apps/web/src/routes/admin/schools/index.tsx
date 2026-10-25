@@ -92,7 +92,7 @@ function SchoolsListPage() {
         <Link
           to="/admin/schools/$schoolId"
           params={{ schoolId: school.id }}
-          className="superadmin-button-secondary rounded-lg bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-800 transition hover:bg-indigo-100"
+          className="superadmin-button-secondary rounded-lg bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary transition hover:bg-primary/15"
         >
           View →
         </Link>

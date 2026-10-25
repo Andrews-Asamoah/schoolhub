@@ -35,9 +35,9 @@ function AdminLayout() {
 
   if (isPending) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-900">
-        <div className="flex items-center gap-3 text-sm text-slate-400">
-          <span className="size-2 animate-pulse rounded-full bg-indigo-500" />
+      <div className="flex min-h-screen items-center justify-center bg-foreground">
+        <div className="flex items-center gap-3 text-sm text-muted-foreground/70">
+          <span className="size-2 animate-pulse rounded-full bg-primary" />
           Loading…
         </div>
       </div>

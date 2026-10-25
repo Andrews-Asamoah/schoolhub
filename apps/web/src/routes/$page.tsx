@@ -430,7 +430,7 @@ function SchoolSettings({ query }: { query: UseQueryResult<School, Error> }) {
   if (!school) return null;
 
   return (
-    <div className="rounded-2xl border border-slate-200/80 bg-white p-5 sm:p-6 dark:border-white/10 dark:bg-slate-900/70">
+    <div className="rounded-2xl border border-border/80 bg-card p-5 sm:p-6">
       <SchoolLogoUploader logo={school.logo} />
       <SchoolSettingsForm school={school} />
     </div>
@@ -452,16 +452,16 @@ function PlannedWorkspace({ title }: { title: string }) {
           detail="feature API"
         />
       </div>
-      <div className="mt-5 rounded-2xl border border-slate-200/80 bg-white p-5 sm:p-6">
+      <div className="mt-5 rounded-2xl border border-border/80 bg-card p-5 sm:p-6">
         <div className="flex items-start gap-3">
-          <span className="mt-0.5 flex size-8 items-center justify-center rounded-lg bg-blue-50 text-blue-600">
+          <span className="mt-0.5 flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
             <CircleAlert className="size-4" />
           </span>
           <div>
-            <h2 className="text-sm font-semibold text-slate-900">
+            <h2 className="text-sm font-semibold text-foreground">
               This page is ready for its feature data
             </h2>
-            <p className="mt-1 max-w-2xl text-xs leading-relaxed text-slate-500">
+            <p className="mt-1 max-w-2xl text-xs leading-relaxed text-muted-foreground">
               The reference SMS includes this workflow. The data model and
               endpoints need to be connected before SchoolHub can show live
               records here. No sample records are presented as real school data.
