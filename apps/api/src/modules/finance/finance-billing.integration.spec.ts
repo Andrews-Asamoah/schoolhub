@@ -3,7 +3,7 @@
  * (its database name must contain "test"). See apps/api/TESTING.md.
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import type { PrismaClient } from "@prisma/client";
+import { Prisma, type PrismaClient } from "@prisma/client";
 import type { FinanceService as FinanceServiceType } from "./finance.service.js";
 
 const url = process.env.TEST_DATABASE_URL ?? "";
