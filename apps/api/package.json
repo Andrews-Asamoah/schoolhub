@@ -24,7 +24,8 @@
     "dev": "nest start --watch",
     "migrate": "prisma migrate dev",
     "studio": "prisma studio",
-    "seed": "node --import tsx/esm prisma/seed.ts"
+    "seed": "node --import tsx/esm prisma/seed.ts",
+    "finance:reset-payments": "node --import tsx/esm scripts/reset-dev-payments.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1152.0",

@@ -48,6 +48,7 @@ import { FeeReminderWorkspace } from "@/components/portal/fee-reminder-workspace
 import { InventoryManagementWorkspace } from "@/components/portal/inventory-management-workspace";
 import { FeeStructuresWorkspace } from "@/components/portal/fee-structures-workspace";
 import { ConcessionsWorkspace } from "@/components/portal/concessions-workspace";
+import { FinanceAuditWorkspace } from "@/components/portal/finance-audit-workspace";
 import { SignaturesWorkspace } from "@/components/school/signatures-workspace";
 import { GuardianPortalWorkspace } from "@/components/portal/guardian-portal-workspace";
 import { GuardianChildRecordsWorkspace } from "@/components/portal/guardian-child-records-workspace";
@@ -310,6 +311,7 @@ function WorkspaceContent({ pageId }: { pageId: string }) {
             )
           )}
           {pageId === "payments" && <AccountantPortalWorkspace defaultTab="payments" />}
+          {pageId === "finance-audit" && <FinanceAuditWorkspace />}
           {pageId === "settings" && <SchoolSettings query={schoolQuery} />}
           {pageId === "profile" && <ProfileWorkspace />}
           {pageId === "team" && <TeamRoleWorkspace />}

@@ -59,3 +59,25 @@ describe("withSerializableRetry", () => {
     expect(run).toHaveBeenCalledTimes(3);
   });
 });
+
+import { postingDateProblem } from "./finance.helpers.js";
+
+describe("postingDateProblem", () => {
+  const now = new Date("2026-10-25T12:00:00Z");
+  const day = (iso: string) => new Date(`${iso}T00:00:00.000Z`);
+  it("accepts today, past dates and one day of time-zone slack", () => {
+    expect(postingDateProblem(day("2026-10-25"), null, now)).toBeNull();
+    expect(postingDateProblem(day("2026-01-02"), null, now)).toBeNull();
+    expect(postingDateProblem(day("2026-10-26"), null, now)).toBeNull();
+  });
+  it("rejects future dates and invalid dates", () => {
+    expect(postingDateProblem(day("2026-10-27"), null, now)).toMatch(/future/);
+    expect(postingDateProblem(new Date("nope"), null, now)).toMatch(/valid/);
+  });
+  it("rejects dates on or before the closed-through date", () => {
+    const locked = day("2026-09-30");
+    expect(postingDateProblem(day("2026-09-30"), locked, now)).toMatch(/closed through 2026-09-30/);
+    expect(postingDateProblem(day("2026-08-15"), locked, now)).toMatch(/closed/);
+    expect(postingDateProblem(day("2026-10-01"), locked, now)).toBeNull();
+  });
+});

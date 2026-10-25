@@ -60,3 +60,21 @@ export async function withSerializableRetry<T>(
   }
   throw options.onExhausted ? options.onExhausted(lastError) : lastError;
 }
+
+const isoDay = (date: Date) => date.toISOString().slice(0, 10);
+
+/**
+ * Why a transaction cannot be dated `date`, or null when it is fine.
+ * - not a real date
+ * - in the future (one day of slack for time zones)
+ * - on or before the date the books were closed through
+ */
+export function postingDateProblem(date: Date, lockedThrough: Date | null, now: Date = new Date()): string | null {
+  if (Number.isNaN(date.getTime())) return "Enter a valid date.";
+  const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+  if (isoDay(date) > isoDay(tomorrow)) return "Transactions cannot be dated in the future.";
+  if (lockedThrough && isoDay(date) <= isoDay(lockedThrough)) {
+    return `The books are closed through ${isoDay(lockedThrough)}. Use a later date, or ask for the period to be reopened.`;
+  }
+  return null;
+}

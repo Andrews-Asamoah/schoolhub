@@ -4,6 +4,7 @@ import { ArrowDownRight, CalendarDays, Download, FileText, LoaderCircle, Plus, P
 import { apiFetch } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { FinanceReadOnlyNotice, useFinanceAccess } from "@/components/portal/finance-access";
 
 interface ExpenseCategory {
   id: string;
@@ -59,6 +60,7 @@ const secondaryButton = "inline-flex min-h-10 items-center justify-center gap-2 
 const freshDraft = (): ExpenseDraft => ({ date: today(), amount: "", description: "", payee: "", category: "OTHER", paymentMethod: "CASH", registryCategoryId: "", voucherNumber: "", checkNumber: "", referenceNumber: "" });
 
 export function ExpenseManagementWorkspace() {
+  const { canWrite } = useFinanceAccess();
   const queryClient = useQueryClient();
   const [fromDate, setFromDate] = useState(monthStart);
   const [toDate, setToDate] = useState(today);
@@ -229,9 +231,10 @@ export function ExpenseManagementWorkspace() {
       }`}</style>
       <section className="flex flex-col gap-4 rounded-2xl border border-border bg-card p-5 shadow-sm sm:flex-row sm:items-end sm:justify-between sm:p-6">
         <div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">Finance & bursary</p><h1 className="mt-1 text-2xl font-bold tracking-tight text-foreground">Expenses</h1><p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">Record school expenditure, keep voucher references together, and analyse spend by date, category and payment method.</p></div>
-        <div className="flex flex-wrap gap-2"><button type="button" className={secondaryButton} onClick={() => setShowCategoryManager(true)}><Tags className="size-4" /> Manage categories</button><button type="button" className={secondaryButton} onClick={exportCsv} disabled={!visibleExpenses.length}><Download className="size-4" /> Export CSV</button><button type="button" className={primaryButton} onClick={() => { setFeedback(null); setDraft(freshDraft()); setShowExpenseForm(true); }}><Plus className="size-4" /> Record expense</button></div>
+        <div className="flex flex-wrap gap-2">{canWrite && <button type="button" className={secondaryButton} onClick={() => setShowCategoryManager(true)}><Tags className="size-4" /> Manage categories</button>}<button type="button" className={secondaryButton} onClick={exportCsv} disabled={!visibleExpenses.length}><Download className="size-4" /> Export CSV</button>{canWrite && <button type="button" className={primaryButton} onClick={() => { setFeedback(null); setDraft(freshDraft()); setShowExpenseForm(true); }}><Plus className="size-4" /> Record expense</button>}</div>
       </section>
 
+      {!canWrite && <FinanceReadOnlyNotice />}
       {feedback && <div role={feedback.kind === "error" ? "alert" : "status"} className={cn("flex items-start gap-3 rounded-xl border p-3 text-sm", feedback.kind === "error" ? "border-destructive/30 bg-destructive/5 text-destructive" : "border-success/30 bg-success/5 text-foreground")}><span className="min-w-0 flex-1">{feedback.text}</span><button type="button" onClick={() => setFeedback(null)} aria-label="Dismiss message"><X className="size-4" /></button></div>}
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -298,4 +301,5 @@ function Modal({ title, description, onClose, children }: { title: string; descr
 }
 function ErrorState({ message }: { message: string }) { return <div role="alert" className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">{message}</div>; }
 function LoadingState() { return <div className="flex items-center justify-center gap-2 rounded-xl border border-border py-8 text-sm text-muted-foreground"><LoaderCircle className="size-4 animate-spin" />Loading expenses…</div>; }
-function EmptyState({ title, description, onAction }: { title: string; description: string; onAction: () => void }) { return <div className="py-12 text-center"><FileText className="mx-auto size-8 text-muted-foreground" /><h3 className="mt-3 font-semibold text-foreground">{title}</h3><p className="mx-auto mt-2 max-w-lg text-sm text-muted-foreground">{description}</p><button className={cn(primaryButton, "mt-4")} onClick={onAction}><Plus className="size-4" />Record an expense</button></div>; }
+function EmptyState({ title, description, onAction }: { title: string; description: string; onAction: () => void }) { const { canWrite } = useFinanceAccess(); return <div className="py-12 text-center"><FileText className="mx-auto size-8 text-muted-foreground" /><h3 className="mt-3 font-semibold text-foreground">{title}</h3><p className="mx-auto mt-2 max-w-lg text-sm text-muted-foreground">{description}</p>{canWrite && <button className={cn(primaryButton, "mt-4")} onClick={onAction}><Plus className="size-4" />Record an expense</button>}</div>; }
+function Detail({ label, value }: { label: string; value?: string | null }) { return <div className="rounded-xl border border-border p-3"><p className="text-xs font-semibold text-muted-foreground">{label}</p><p className="mt-1 break-words text-sm text-foreground">{value || "—"}</p></div>; }

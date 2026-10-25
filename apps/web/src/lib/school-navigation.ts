@@ -1,4 +1,5 @@
 import {
+  ShieldCheck,
   Activity,
   AlertCircle,
   BadgeDollarSign,
@@ -323,6 +324,14 @@ export const schoolNavGroups: SchoolNavGroup[] = [
         apiStatus: "available",
       },
       {
+        id: "finance-audit",
+        label: "Audit trail",
+        icon: ShieldCheck,
+        description: "Who recorded, reversed or changed financial records, and when.",
+        section: "Finance",
+        apiStatus: "available",
+      },
+      {
         id: "finance-reports",
         label: "Finance reports",
         icon: ChartNoAxesCombined,
@@ -487,6 +496,7 @@ const rolePages: Record<string, string[]> = {
     "accountant-portal",
     "concessions",
     "finance-reports",
+    "finance-audit",
     "outstanding",
     "admissions",
     "fees",

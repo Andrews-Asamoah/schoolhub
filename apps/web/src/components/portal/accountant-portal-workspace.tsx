@@ -1,4 +1,4 @@
-import { useMemo, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -33,6 +33,8 @@ import { AccountantFinanceCharts } from "./accountant-finance-charts";
 import { AccountantRecordPaymentDialog } from "./accountant-record-payment-dialog";
 import { apiFetch } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { useFinanceAccess } from "@/components/portal/finance-access";
+import { PeriodLockCard } from "@/components/portal/period-lock-card";
 
 type AccountantTab =
   | "overview"
@@ -225,6 +227,7 @@ const buttonSecondary =
 export function AccountantPortalWorkspace({
   defaultTab = "overview",
 }: AccountantPortalWorkspaceProps) {
+  const { canWrite } = useFinanceAccess();
   const queryClient = useQueryClient();
   const activeTab = defaultTab;
   const [search, setSearch] = useState("");
@@ -232,6 +235,12 @@ export function AccountantPortalWorkspace({
   const [showPaymentForm, setShowPaymentForm] = useState(false);
   const [selectedBillId, setSelectedBillId] = useState("");
   const [selectedReceipt, setSelectedReceipt] = useState<ApiPayment | null>(null);
+  const [reverseTarget, setReverseTarget] = useState<ApiPayment | null>(null);
+  const [reverseKind, setReverseKind] = useState<"VOID" | "REFUND">("VOID");
+  const [reverseReason, setReverseReason] = useState("");
+  // One key per payment attempt: if the request is retried (double click, bad network)
+  // the server returns the receipt it already recorded instead of creating a second one.
+  const paymentKeyRef = useRef<string | null>(null);
   const [selectedInvoiceForPrint, setSelectedInvoiceForPrint] = useState<ApiBill | null>(null);
   const [selectedFeeStructureId, setSelectedFeeStructureId] = useState("");
   const [selectedClassId, setSelectedClassId] = useState("");
@@ -421,12 +430,36 @@ export function AccountantPortalWorkspace({
     mutationFn: (input: RecordPaymentInput) =>
       apiFetch<ApiPayment>("/finance/payments", {
         method: "POST",
-        body: JSON.stringify(input),
+        body: JSON.stringify({ ...input, idempotencyKey: (paymentKeyRef.current ??= crypto.randomUUID()) }),
       }),
     onSuccess: async (payment) => {
+      paymentKeyRef.current = null;
       setMessage({ kind: "success", text: `Payment recorded. Receipt ${payment.paymentNumber} is ready.` });
       setShowPaymentForm(false);
       setSelectedBillId("");
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["finance", "payments"] }),
+        queryClient.invalidateQueries({ queryKey: ["finance", "bills"] }),
+        queryClient.invalidateQueries({ queryKey: ["students"] }),
+      ]);
+    },
+    onError: (error: Error) => setMessage({ kind: "error", text: error.message }),
+  });
+
+  useEffect(() => {
+    if (!showPaymentForm) paymentKeyRef.current = null;
+  }, [showPaymentForm]);
+
+  const reversePayment = useMutation({
+    mutationFn: (input: { id: string; kind: "VOID" | "REFUND"; reason: string }) =>
+      apiFetch<ApiPayment>(`/finance/payments/${encodeURIComponent(input.id)}/reverse`, {
+        method: "POST",
+        body: JSON.stringify({ kind: input.kind, reason: input.reason }),
+      }),
+    onSuccess: async (payment) => {
+      setMessage({ kind: "success", text: `Receipt ${payment.paymentNumber} was reversed and the bill balance restored.` });
+      setReverseTarget(null);
+      setReverseReason("");
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["finance", "payments"] }),
         queryClient.invalidateQueries({ queryKey: ["finance", "bills"] }),
@@ -582,7 +615,7 @@ export function AccountantPortalWorkspace({
                 Figures on this page are calculated from the school’s saved finance records.
               </p>
             </div>
-            <div className="flex flex-wrap gap-2">
+            {canWrite ? (<div className="flex flex-wrap gap-2">
               <button className={buttonPrimary} onClick={() => { setMessage(null); setSelectedBillId(""); setShowPaymentForm(true); }}>
                 <Plus className="size-4" /> Record payment
               </button>
@@ -592,7 +625,7 @@ export function AccountantPortalWorkspace({
               <button className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-white/30 bg-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/20" onClick={() => { setMessage(null); setShowExpenseForm(true); }}>
                 <Plus className="size-4" /> Add expense
               </button>
-            </div>
+            </div>) : <p className="max-w-xs text-sm text-white/80">View only. Only the school accountant can record or change financial data.</p>}
           </div>
         </section>
       )}
@@ -649,17 +682,17 @@ export function AccountantPortalWorkspace({
 
       {!loading && activeTab === "invoices" && (
         <section className="rounded-2xl border border-border bg-card p-5">
-          <SectionHeader title="Invoices & bills" description="Search bills, review balances, and generate billing for an active class." action={<div className="flex flex-wrap gap-2"><button type="button" className={buttonSecondary} onClick={() => downloadCsv([["Invoice","Student","Admission number","Class","Fee structure","Due date","Gross (GHS)","Discount (GHS)","Total (GHS)","Paid (GHS)","Balance (GHS)","Status"], ...filteredBills.map(bill => [bill.billNumber, studentName(bill.student), bill.student?.admissionNumber ?? "", bill.class?.name ?? "", bill.feeStructure?.name ?? "", dateLabel(bill.dueDate), Number(bill.grossAmount ?? bill.totalAmount).toFixed(2), Number(bill.discountAmount ?? 0).toFixed(2), Number(bill.totalAmount).toFixed(2), Number(bill.paidAmount).toFixed(2), Number(bill.balanceAmount).toFixed(2), bill.status])], "schoolhub-invoices.csv")} disabled={!filteredBills.length}><Download className="size-4" /> Export CSV</button><button className={buttonPrimary} onClick={() => { setMessage(null); setSelectedFeeStructureId(""); setSelectedClassId(""); setShowBillForm(true); }}><Plus className="size-4" /> Generate bills</button></div>} />
+          <SectionHeader title="Invoices & bills" description="Search bills, review balances, and generate billing for an active class." action={<div className="flex flex-wrap gap-2"><button type="button" className={buttonSecondary} onClick={() => downloadCsv([["Invoice","Student","Admission number","Class","Fee structure","Due date","Gross (GHS)","Discount (GHS)","Total (GHS)","Paid (GHS)","Balance (GHS)","Status"], ...filteredBills.map(bill => [bill.billNumber, studentName(bill.student), bill.student?.admissionNumber ?? "", bill.class?.name ?? "", bill.feeStructure?.name ?? "", dateLabel(bill.dueDate), Number(bill.grossAmount ?? bill.totalAmount).toFixed(2), Number(bill.discountAmount ?? 0).toFixed(2), Number(bill.totalAmount).toFixed(2), Number(bill.paidAmount).toFixed(2), Number(bill.balanceAmount).toFixed(2), bill.status])], "schoolhub-invoices.csv")} disabled={!filteredBills.length}><Download className="size-4" /> Export CSV</button>{canWrite && <button className={buttonPrimary} onClick={() => { setMessage(null); setSelectedFeeStructureId(""); setSelectedClassId(""); setShowBillForm(true); }}><Plus className="size-4" /> Generate bills</button>}</div>} />
           <SearchFilters search={search} setSearch={setSearch} statusFilter={statusFilter} setStatusFilter={setStatusFilter} statuses={["PENDING", "PARTIALLY_PAID", "PAID", "OVERDUE"]} />
-          {billsQuery.error ? <QueryError message={billsQuery.error.message} /> : <BillsTable bills={filteredBills} onRecordPayment={(bill) => { setSelectedBillId(bill.id); setShowPaymentForm(true); }} onViewInvoice={setSelectedInvoiceForPrint} />}
+          {billsQuery.error ? <QueryError message={billsQuery.error.message} /> : <BillsTable bills={filteredBills} onRecordPayment={canWrite ? (bill) => { setSelectedBillId(bill.id); setShowPaymentForm(true); } : undefined} onViewInvoice={setSelectedInvoiceForPrint} />}
         </section>
       )}
 
       {!loading && activeTab === "payments" && (
         <section className="rounded-2xl border border-border bg-card p-5">
-          <SectionHeader title="Payments & receipts" description="Saved payment transactions from the school finance ledger." action={<div className="flex flex-wrap gap-2"><button type="button" className={buttonSecondary} onClick={() => downloadCsv([["Receipt","Student","Admission number","Bill","Date","Method","Reference","Amount (GHS)","Status"], ...filteredPayments.map(payment => [payment.paymentNumber, studentName(payment.student), payment.student?.admissionNumber ?? "", payment.bill?.billNumber ?? "", dateLabel(payment.paymentDate), payment.paymentMethod, payment.referenceNumber ?? "", Number(payment.amount).toFixed(2), payment.status])], "schoolhub-payment-register.csv")} disabled={!filteredPayments.length}><Download className="size-4" /> Export CSV</button><button className={buttonPrimary} onClick={() => { setMessage(null); setSelectedBillId(""); setShowPaymentForm(true); }}><Plus className="size-4" /> Record payment</button></div>} />
+          <SectionHeader title="Payments & receipts" description="Saved payment transactions from the school finance ledger." action={<div className="flex flex-wrap gap-2"><button type="button" className={buttonSecondary} onClick={() => downloadCsv([["Receipt","Student","Admission number","Bill","Date","Method","Reference","Amount (GHS)","Status"], ...filteredPayments.map(payment => [payment.paymentNumber, studentName(payment.student), payment.student?.admissionNumber ?? "", payment.bill?.billNumber ?? "", dateLabel(payment.paymentDate), payment.paymentMethod, payment.referenceNumber ?? "", Number(payment.amount).toFixed(2), payment.status])], "schoolhub-payment-register.csv")} disabled={!filteredPayments.length}><Download className="size-4" /> Export CSV</button>{canWrite && <button className={buttonPrimary} onClick={() => { setMessage(null); setSelectedBillId(""); setShowPaymentForm(true); }}><Plus className="size-4" /> Record payment</button>}</div>} />
           <div className="relative my-4 max-w-md"><Search className="absolute left-3 top-3 size-4 text-muted-foreground" /><input className={cn(inputClass, "pl-9")} value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search receipt, student, or reference" /></div>
-          {paymentsQuery.error ? <QueryError message={paymentsQuery.error.message} /> : <PaymentsTable payments={filteredPayments} onViewReceipt={setSelectedReceipt} />}
+          {paymentsQuery.error ? <QueryError message={paymentsQuery.error.message} /> : <PaymentsTable payments={filteredPayments} onViewReceipt={setSelectedReceipt} onReverse={canWrite ? (payment) => { setReverseKind("VOID"); setReverseReason(""); setReverseTarget(payment); } : undefined} />}
         </section>
       )}
 
@@ -669,11 +702,12 @@ export function AccountantPortalWorkspace({
           {billsQuery.error ? <QueryError message={billsQuery.error.message} /> : <BillsTable bills={debtors.filter((bill) => {
             const term = search.trim().toLowerCase();
             return !term || bill.billNumber.toLowerCase().includes(term) || studentName(bill.student).toLowerCase().includes(term) || (bill.class?.name ?? "").toLowerCase().includes(term);
-          })} onRecordPayment={(bill) => { setSelectedBillId(bill.id); setShowPaymentForm(true); }} onViewInvoice={setSelectedInvoiceForPrint} />}
+          })} onRecordPayment={canWrite ? (bill) => { setSelectedBillId(bill.id); setShowPaymentForm(true); } : undefined} onViewInvoice={setSelectedInvoiceForPrint} />}
         </section>
       )}
 
 
+      {!loading && activeTab === "reports" && <PeriodLockCard />}
       {!loading && activeTab === "reports" && (
         <section className="rounded-2xl border border-border bg-card p-5">
           <SectionHeader title="Finance reports" description="A live summary calculated from saved bills, receipts, expense entries and payroll runs." action={<button type="button" className={buttonPrimary} onClick={exportFinanceReport} disabled={billsQuery.isError || paymentsQuery.isError || expensesQuery.isError || payrollQuery.isError}><Download className="size-4" /> Export CSV</button>} />
@@ -717,7 +751,7 @@ export function AccountantPortalWorkspace({
 
       {!loading && activeTab === "expenses" && (
         <section className="rounded-2xl border border-border bg-card p-5">
-          <SectionHeader title="Operating expenses" description="Expense entries saved to the school database." action={<button className={buttonPrimary} onClick={() => { setMessage(null); setShowExpenseForm(true); }}><Plus className="size-4" /> Add expense</button>} />
+          <SectionHeader title="Operating expenses" description="Expense entries saved to the school database." action={canWrite ? <button className={buttonPrimary} onClick={() => { setMessage(null); setShowExpenseForm(true); }}><Plus className="size-4" /> Add expense</button> : undefined} />
           {expensesQuery.error ? <QueryError message={expensesQuery.error.message} /> : <ExpensesTable expenses={expenses} />}
         </section>
       )}
@@ -832,6 +866,33 @@ export function AccountantPortalWorkspace({
         />
       )}
 
+        {reverseTarget && (
+          <Modal
+            title={`Reverse receipt ${reverseTarget.paymentNumber}`}
+            description="The receipt is kept on record as reversed. The amount is taken back off the bill and the ledger is corrected."
+            onClose={() => setReverseTarget(null)}
+          >
+            <form
+              className="space-y-4"
+              onSubmit={(event) => {
+                event.preventDefault();
+                reversePayment.mutate({ id: reverseTarget.id, kind: reverseKind, reason: reverseReason.trim() });
+              }}
+            >
+              <Field label="Reason for reversal">
+                <select className={inputClass} value={reverseKind} onChange={(event) => setReverseKind(event.target.value as "VOID" | "REFUND")}>
+                  <option value="VOID">Recorded in error (void)</option>
+                  <option value="REFUND">Money returned to the payer (refund)</option>
+                </select>
+              </Field>
+              <Field label="Explain what happened (kept in the audit trail)">
+                <textarea className={inputClass} rows={3} minLength={10} maxLength={500} required value={reverseReason} onChange={(event) => setReverseReason(event.target.value)} />
+              </Field>
+              <ModalActions onCancel={() => setReverseTarget(null)} busy={reversePayment.isPending} submitLabel="Reverse payment" />
+            </form>
+          </Modal>
+        )}
+
       {showBillForm && (
         <Modal title="Generate student bills" description="Generate bills for every active student enrolled in one class for the current academic term." onClose={() => { setShowBillForm(false); setSelectedFeeStructureId(""); setSelectedClassId(""); }}>
           <form onSubmit={submitBill} className="space-y-4">
@@ -944,14 +1005,14 @@ function SearchFilters({ search, setSearch, statusFilter, setStatusFilter, statu
   return <div className="my-4 flex flex-wrap gap-3"><div className="relative min-w-56 flex-1"><Search className="absolute left-3 top-3 size-4 text-muted-foreground" /><input className={cn(inputClass, "pl-9")} value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search bill, student, or class" /></div><select className={cn(inputClass, "w-auto min-w-40")} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="ALL">All statuses</option>{statuses.map((status) => <option key={status} value={status}>{status.replaceAll("_", " ")}</option>)}</select></div>;
 }
 
-function BillsTable({ bills, onRecordPayment, onViewInvoice }: { bills: ApiBill[]; onRecordPayment: (bill: ApiBill) => void; onViewInvoice: (bill: ApiBill) => void }) {
+function BillsTable({ bills, onRecordPayment, onViewInvoice }: { bills: ApiBill[]; onRecordPayment?: (bill: ApiBill) => void; onViewInvoice: (bill: ApiBill) => void }) {
   if (!bills.length) return <EmptyState icon={FileText} title="No matching bills" description="Bills appear here after they are generated for an active class and term." />;
-  return <div className="mt-4 overflow-x-auto"><table className="w-full min-w-[820px] text-left text-sm"><thead><tr className="border-b border-border text-xs text-muted-foreground"><th className="p-3">Bill</th><th className="p-3">Student / class</th><th className="p-3">Due date</th><th className="p-3 text-right">Amount</th><th className="p-3 text-right">Paid</th><th className="p-3 text-right">Balance</th><th className="p-3">Status</th><th className="p-3"></th></tr></thead><tbody>{bills.map((bill) => <tr key={bill.id} className="border-b border-border/70 last:border-0 hover:bg-muted/40"><td className="p-3"><div className="font-semibold text-foreground">{bill.billNumber}</div><div className="text-xs text-muted-foreground">{bill.feeStructure?.name ?? "Fee bill"}</div></td><td className="p-3"><div className="font-medium text-foreground">{studentName(bill.student)}</div><div className="text-xs text-muted-foreground">{bill.student?.admissionNumber} · {bill.class?.name ?? "Class not recorded"}</div></td><td className="p-3">{dateLabel(bill.dueDate)}</td><td className="p-3 text-right tabular-nums">{currency(bill.totalAmount)}</td><td className="p-3 text-right tabular-nums">{currency(bill.paidAmount)}</td><td className="p-3 text-right font-semibold tabular-nums">{currency(bill.balanceAmount)}</td><td className="p-3"><StatusBadge value={bill.status} /></td><td className="p-3 text-right"><div className="flex flex-col items-end gap-1"><button type="button" className="text-xs font-semibold text-primary hover:underline" onClick={() => onViewInvoice(bill)}>View invoice</button>{Number(bill.balanceAmount) > 0 && <button type="button" className="text-xs font-semibold text-foreground hover:underline" onClick={() => onRecordPayment(bill)}>Record payment</button>}</div></td></tr>)}</tbody></table></div>;
+  return <div className="mt-4 overflow-x-auto"><table className="w-full min-w-[820px] text-left text-sm"><thead><tr className="border-b border-border text-xs text-muted-foreground"><th className="p-3">Bill</th><th className="p-3">Student / class</th><th className="p-3">Due date</th><th className="p-3 text-right">Amount</th><th className="p-3 text-right">Paid</th><th className="p-3 text-right">Balance</th><th className="p-3">Status</th><th className="p-3"></th></tr></thead><tbody>{bills.map((bill) => <tr key={bill.id} className="border-b border-border/70 last:border-0 hover:bg-muted/40"><td className="p-3"><div className="font-semibold text-foreground">{bill.billNumber}</div><div className="text-xs text-muted-foreground">{bill.feeStructure?.name ?? "Fee bill"}</div></td><td className="p-3"><div className="font-medium text-foreground">{studentName(bill.student)}</div><div className="text-xs text-muted-foreground">{bill.student?.admissionNumber} · {bill.class?.name ?? "Class not recorded"}</div></td><td className="p-3">{dateLabel(bill.dueDate)}</td><td className="p-3 text-right tabular-nums">{currency(bill.totalAmount)}</td><td className="p-3 text-right tabular-nums">{currency(bill.paidAmount)}</td><td className="p-3 text-right font-semibold tabular-nums">{currency(bill.balanceAmount)}</td><td className="p-3"><StatusBadge value={bill.status} /></td><td className="p-3 text-right"><div className="flex flex-col items-end gap-1"><button type="button" className="text-xs font-semibold text-primary hover:underline" onClick={() => onViewInvoice(bill)}>View invoice</button>{onRecordPayment && Number(bill.balanceAmount) > 0 && <button type="button" className="text-xs font-semibold text-foreground hover:underline" onClick={() => onRecordPayment(bill)}>Record payment</button>}</div></td></tr>)}</tbody></table></div>;
 }
 
-function PaymentsTable({ payments, onViewReceipt }: { payments: ApiPayment[]; onViewReceipt: (payment: ApiPayment) => void }) {
+function PaymentsTable({ payments, onViewReceipt, onReverse }: { payments: ApiPayment[]; onViewReceipt: (payment: ApiPayment) => void; onReverse?: (payment: ApiPayment) => void }) {
   if (!payments.length) return <EmptyState icon={Receipt} title="No payments recorded" description="When an accountant records a payment, the saved receipt will appear here." />;
-  return <div className="mt-4 overflow-x-auto"><table className="w-full min-w-[760px] text-left text-sm"><thead><tr className="border-b border-border text-xs text-muted-foreground"><th className="p-3">Receipt</th><th className="p-3">Student</th><th className="p-3">Date</th><th className="p-3">Method / reference</th><th className="p-3 text-right">Amount</th><th className="p-3">Status</th><th className="p-3"></th></tr></thead><tbody>{payments.map((payment) => <tr key={payment.id} className="border-b border-border/70 last:border-0 hover:bg-muted/40"><td className="p-3 font-semibold text-foreground">{payment.paymentNumber}</td><td className="p-3"><div className="font-medium">{studentName(payment.student)}</div><div className="text-xs text-muted-foreground">{payment.student?.admissionNumber}</div></td><td className="p-3">{dateLabel(payment.paymentDate)}</td><td className="p-3"><div>{payment.paymentMethod.replaceAll("_", " ")}</div><div className="text-xs text-muted-foreground">{payment.referenceNumber || "No reference"}</div></td><td className="p-3 text-right font-semibold tabular-nums">{currency(payment.amount)}</td><td className="p-3"><StatusBadge value={payment.status} /></td><td className="p-3 text-right"><button type="button" className="text-xs font-semibold text-primary hover:underline" onClick={() => onViewReceipt(payment)}>View receipt</button></td></tr>)}</tbody></table></div>;
+  return <div className="mt-4 overflow-x-auto"><table className="w-full min-w-[760px] text-left text-sm"><thead><tr className="border-b border-border text-xs text-muted-foreground"><th className="p-3">Receipt</th><th className="p-3">Student</th><th className="p-3">Date</th><th className="p-3">Method / reference</th><th className="p-3 text-right">Amount</th><th className="p-3">Status</th><th className="p-3"></th></tr></thead><tbody>{payments.map((payment) => <tr key={payment.id} className="border-b border-border/70 last:border-0 hover:bg-muted/40"><td className="p-3 font-semibold text-foreground">{payment.paymentNumber}</td><td className="p-3"><div className="font-medium">{studentName(payment.student)}</div><div className="text-xs text-muted-foreground">{payment.student?.admissionNumber}</div></td><td className="p-3">{dateLabel(payment.paymentDate)}</td><td className="p-3"><div>{payment.paymentMethod.replaceAll("_", " ")}</div><div className="text-xs text-muted-foreground">{payment.referenceNumber || "No reference"}</div></td><td className="p-3 text-right font-semibold tabular-nums">{currency(payment.amount)}</td><td className="p-3"><StatusBadge value={payment.status} /></td><td className="p-3 text-right"><button type="button" className="text-xs font-semibold text-primary hover:underline" onClick={() => onViewReceipt(payment)}>View receipt</button>{onReverse && payment.status === "COMPLETED" && <button type="button" className="ml-3 text-xs font-semibold text-destructive hover:underline" onClick={() => onReverse(payment)}>Reverse</button>}</td></tr>)}</tbody></table></div>;
 }
 
 function ExpensesTable({ expenses }: { expenses: ApiExpense[] }) {

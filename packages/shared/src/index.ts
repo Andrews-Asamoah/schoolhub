@@ -625,8 +625,10 @@ export const recordPaymentSchema = z.object({
     "OTHER",
   ]),
   paymentDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Format: YYYY-MM-DD"),
-  referenceNumber: z.string().optional(),
-  notes: z.string().optional(),
+  referenceNumber: z.string().trim().max(100).optional(),
+  notes: z.string().trim().max(1000).optional(),
+  /** Client-generated unique key (e.g. a UUID). Retrying with the same key never records a second receipt. */
+  idempotencyKey: z.string().trim().min(8).max(100).optional(),
   /** Explicit per-fee-component allocation. Older clients retain the API's FIFO fallback. */
   allocations: z.array(z.object({
     billItemId: z.string().min(1),

@@ -188,6 +188,13 @@ model Payment {
   status          PaymentStatus @default(COMPLETED)
   notes           String?
   recordedById    String?
+  /// Client-generated key so a retried request can never record the same receipt twice.
+  idempotencyKey        String?
+  /// Set when the receipt is voided or refunded. The original row is never deleted.
+  reversedAt            DateTime?
+  reversedById          String?
+  reversalReason        String?
+  reversalTransactionId String?
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
 
@@ -199,6 +206,7 @@ model Payment {
   paymentItems PaymentItem[]
 
   @@unique([paymentNumber, schoolId])
+  @@unique([schoolId, idempotencyKey])
   @@index([schoolId, paymentDate])
   @@index([studentId])
   @@index([billId])
@@ -380,6 +388,8 @@ model PayrollRecord {
   totalTax      Decimal       @db.Decimal(15, 2)
   totalSSNIT    Decimal       @db.Decimal(15, 2)
   processedById String?
+  /// Who approved the run; must differ from processedById (separation of duties).
+  approvedById  String?
   academicYearId String?
   termId        String?
   createdAt     DateTime      @default(now())
@@ -638,4 +648,20 @@ model BillConcession {
   @@index([siblingDiscountPolicyId])
   @@index([studentScholarshipId])
   @@map("bill_concessions")
+}
+
+/// One row per school when its books are closed: nothing may be posted with a date on or before lockedThrough.
+/// Removing the row reopens every period. History of changes is kept in AuditLog.
+model FinancePeriodLock {
+  id            String   @id @default(cuid())
+  schoolId      String   @unique
+  lockedThrough DateTime @db.Date
+  updatedById   String?
+  reason        String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  school School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@map("finance_period_locks")
 }

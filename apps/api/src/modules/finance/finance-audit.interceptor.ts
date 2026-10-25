@@ -45,7 +45,8 @@ export class FinanceAuditInterceptor implements NestInterceptor {
     const request = context.switchToHttp().getRequest();
     if (request.method === "GET" || request.method === "HEAD") return next.handle();
     const selfAudited = this.reflector.get<boolean>(FINANCE_SELF_AUDITED, context.getHandler());
-    if (selfAudited) return next.handle();
+    // Platform admin actions are always logged here too, because this row carries the stated reason.
+    if (selfAudited && request.session?.user?.role !== "superAdmin") return next.handle();
     return next.handle().pipe(
       tap({
         next: (result) => {
@@ -76,6 +77,7 @@ export class FinanceAuditInterceptor implements NestInterceptor {
             actorPlatformRole: user.role ?? null,
             actorSchoolRole: request.schoolRole ?? null,
             actedAsSuperAdmin: user.role === "superAdmin",
+            supportReason: request.supportReason ?? null,
           } as object,
           ipAddress: request.ip ?? null,
           userAgent: request.headers?.["user-agent"] ?? null,

@@ -9,7 +9,8 @@ import { PrismaService } from "../../prisma/prisma.service.js";
 import type { CreateExpenseInput, GenerateBillInput, RecordPaymentInput } from "@schoolhub/shared";
 import { Prisma, type AccountCategory, type AccountType, type AuditAction, type PaymentMethod, type TransactionCategory } from "@prisma/client";
 import { canManageAcademicContext } from "../../common/academic-context.js";
-import { createSequence, withSerializableRetry } from "./finance.helpers.js";
+import { createSequence, postingDateProblem, withSerializableRetry } from "./finance.helpers.js";
+import { buildFinanceAuditWhere, categoryOf, clampPageSize, describeFinanceAudit, type FinanceAuditQuery } from "./finance-audit.helpers.js";
 
 const PAYE_MONTHLY_BANDS_2026 = [
   { limit: 588, rate: 0 },
@@ -40,6 +41,129 @@ function calculateResidentPaye2026(chargeableIncome: number) {
 @Injectable()
 export class FinanceService {
   constructor(private readonly prisma: PrismaService) {}
+
+  /** Rejects future dates and dates inside a closed period. Call inside the posting transaction. */
+  private async assertPostingDate(
+    db: Pick<Prisma.TransactionClient, "financePeriodLock">,
+    schoolId: string,
+    date: Date,
+  ) {
+    const lock = await db.financePeriodLock.findUnique({ where: { schoolId }, select: { lockedThrough: true } });
+    const problem = postingDateProblem(date, lock?.lockedThrough ?? null);
+    if (problem) throw new BadRequestException(problem);
+  }
+
+  /** Newest-first page of this school's finance audit entries. */
+  async listFinanceAudit(schoolId: string, query: FinanceAuditQuery) {
+    let where;
+    try {
+      where = buildFinanceAuditWhere(schoolId, query);
+    } catch (error) {
+      throw new BadRequestException((error as Error).message);
+    }
+    const take = clampPageSize(query.limit);
+    const rows = await this.prisma.client.auditLog.findMany({
+      where,
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      take: take + 1,
+      ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
+      include: { user: { select: { id: true, name: true, email: true } } },
+    });
+    const page = rows.slice(0, take);
+    return {
+      items: page.map((row) => {
+        const details = (row.newValues ?? null) as Record<string, unknown> | null;
+        return {
+          id: row.id,
+          createdAt: row.createdAt,
+          actor: row.user,
+          category: categoryOf(row.entityType, row.action),
+          title: describeFinanceAudit(row.entityType, row.action),
+          entityType: row.entityType,
+          entityId: row.entityId,
+          oldValues: row.oldValues,
+          newValues: row.newValues,
+          actedAsSuperAdmin: details?.actedAsSuperAdmin === true,
+          supportReason: typeof details?.supportReason === "string" ? details.supportReason : null,
+          ipAddress: row.ipAddress,
+        };
+      }),
+      nextCursor: rows.length > take ? page[page.length - 1]!.id : null,
+    };
+  }
+
+  async getPeriodLock(schoolId: string) {
+    const lock = await this.prisma.client.financePeriodLock.findUnique({ where: { schoolId } });
+    return {
+      lockedThrough: lock ? lock.lockedThrough.toISOString().slice(0, 10) : null,
+      reason: lock?.reason ?? null,
+      updatedAt: lock?.updatedAt ?? null,
+    };
+  }
+
+  /**
+   * Close the books through a date (or reopen them with null). Closing is a
+   * normal accountant action. Reopening, or moving the date earlier, undoes a
+   * close, so only a platform administrator may do it. Every change is audited.
+   */
+  async setPeriodLock(
+    schoolId: string,
+    actorId: string,
+    actorIsSuperAdmin: boolean,
+    input: { lockedThrough: string | null; reason: string },
+  ) {
+    let next: Date | null = null;
+    if (input.lockedThrough) {
+      next = new Date(`${input.lockedThrough}T00:00:00.000Z`);
+      if (Number.isNaN(next.getTime()) || next.toISOString().slice(0, 10) !== input.lockedThrough) {
+        throw new BadRequestException("Enter a valid date to close the books through.");
+      }
+      if (next.getTime() > Date.now()) {
+        throw new BadRequestException("You cannot close the books through a date in the future.");
+      }
+    }
+    await this.prisma.client.$transaction(async (tx) => {
+      const current = await tx.financePeriodLock.findUnique({ where: { schoolId } });
+      const reopening = !!current && (!next || next.getTime() < current.lockedThrough.getTime());
+      if (reopening && !actorIsSuperAdmin) {
+        throw new ForbiddenException("Only a platform administrator can reopen a closed period.");
+      }
+      if (next) {
+        await tx.financePeriodLock.upsert({
+          where: { schoolId },
+          create: { schoolId, lockedThrough: next, updatedById: actorId, reason: input.reason },
+          update: { lockedThrough: next, updatedById: actorId, reason: input.reason },
+        });
+      } else if (current) {
+        await tx.financePeriodLock.delete({ where: { schoolId } });
+      }
+      await this.writeAudit(tx, {
+        actorId,
+        schoolId,
+        action: "UPDATE",
+        entityType: "FINANCE_PERIOD_LOCK",
+        entityId: current?.id ?? schoolId,
+        oldValues: { lockedThrough: current?.lockedThrough.toISOString().slice(0, 10) ?? null },
+        newValues: { lockedThrough: next ? next.toISOString().slice(0, 10) : null, reason: input.reason },
+      });
+    });
+    return this.getPeriodLock(schoolId);
+  }
+
+  /**
+   * Separation of duties: the person who prepared a payroll run cannot approve
+   * it, and the approver cannot be the one who confirms it paid. A different
+   * accountant or a platform administrator completes the step. Single-person
+   * schools and local development can set FINANCE_ALLOW_SELF_APPROVAL=true.
+   */
+  private assertSeparationOfDuties(actorId: string, earlierActorId: string | null | undefined, step: "approved" | "marked as paid") {
+    if (process.env.FINANCE_ALLOW_SELF_APPROVAL === "true") return;
+    if (earlierActorId && earlierActorId === actorId) {
+      throw new ForbiddenException(
+        `A payroll run cannot be ${step} by the same person who ${step === "approved" ? "prepared" : "approved"} it. Ask another accountant or the platform administrator.`,
+      );
+    }
+  }
 
   /** Audit entry written inside the caller's transaction so it commits (or rolls back) with the change. */
   private async writeAudit(
@@ -905,6 +1029,25 @@ export class FinanceService {
       }
       await tx.$executeRaw`SELECT id FROM students WHERE id = ${input.studentId} AND "schoolId" = ${schoolId} FOR UPDATE`;
 
+      // Idempotency: a retried request (double click, flaky network) carrying the
+      // same key returns the receipt already recorded instead of creating a second one.
+      // The student row is locked above, so concurrent retries queue up behind each other.
+      if (input.idempotencyKey) {
+        const existing = await tx.payment.findFirst({ where: { schoolId, idempotencyKey: input.idempotencyKey } });
+        if (existing) {
+          if (
+            existing.studentId !== input.studentId ||
+            (existing.billId ?? null) !== (input.billId ?? null) ||
+            !existing.amount.eq(paymentAmount)
+          ) {
+            throw new ConflictException("This idempotency key was already used for a different payment.");
+          }
+          return existing;
+        }
+      }
+
+      await this.assertPostingDate(tx, schoolId, new Date(input.paymentDate));
+
       // Validate the bill inside the transaction before writing anything. A bill
       // must belong to this tenant and student, and must not be overpaid.
       const bill = input.billId
@@ -993,6 +1136,7 @@ export class FinanceService {
           referenceNumber: input.referenceNumber,
           notes: input.notes,
           recordedById,
+          idempotencyKey: input.idempotencyKey,
         },
       });
 
@@ -1081,6 +1225,127 @@ export class FinanceService {
       return payment;
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }), {
       onExhausted: () => new ConflictException("The system is busy recording other payments. Nothing was saved; please try again."),
+    });
+  }
+
+  /**
+   * Void or refund a receipt. The original payment is never deleted: it is
+   * marked reversed (with who, when and why), its allocations are taken back
+   * off the bill, and a balancing ledger entry is posted.
+   */
+  async reversePayment(
+    schoolId: string,
+    actorId: string,
+    paymentId: string,
+    input: { kind: "VOID" | "REFUND"; reason: string },
+  ) {
+    return withSerializableRetry(() => this.prisma.client.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT id FROM payments WHERE id = ${paymentId} AND "schoolId" = ${schoolId} FOR UPDATE`;
+      const payment = await tx.payment.findFirst({
+        where: { id: paymentId, schoolId },
+        include: { paymentItems: true, transaction: true },
+      });
+      if (!payment) throw new NotFoundException("Payment not found.");
+      if (payment.reversedAt || payment.status !== "COMPLETED") {
+        throw new BadRequestException("This payment has already been reversed or is not a completed payment.");
+      }
+
+      await tx.$executeRaw`SELECT id FROM students WHERE id = ${payment.studentId} AND "schoolId" = ${schoolId} FOR UPDATE`;
+      if (payment.billId) {
+        await tx.$executeRaw`SELECT id FROM bills WHERE id = ${payment.billId} AND "schoolId" = ${schoolId} FOR UPDATE`;
+        const bill = await tx.bill.findFirst({ where: { id: payment.billId, schoolId }, include: { items: true } });
+        if (bill) {
+          for (const allocation of payment.paymentItems) {
+            const item = bill.items.find((candidate) => candidate.id === allocation.billItemId);
+            if (!item) continue;
+            const nextPaid = Prisma.Decimal.max(0, item.paidAmount.minus(allocation.amount));
+            const netTotal = item.totalAmount.minus(item.discountAmount);
+            const nextBalance = Prisma.Decimal.min(netTotal, item.balanceAmount.plus(allocation.amount));
+            await tx.billItem.update({
+              where: { id: item.id },
+              data: {
+                paidAmount: nextPaid,
+                balanceAmount: nextBalance,
+                status: nextPaid.eq(0) ? "UNPAID" : nextBalance.eq(0) ? "FULLY_PAID" : "PARTIALLY_PAID",
+              },
+            });
+          }
+          const paid = Prisma.Decimal.max(0, bill.paidAmount.minus(payment.amount));
+          const balance = Prisma.Decimal.min(bill.totalAmount, bill.balanceAmount.plus(payment.amount));
+          await tx.bill.update({
+            where: { id: bill.id },
+            data: {
+              paidAmount: paid,
+              balanceAmount: balance,
+              status: ["CANCELLED", "WAIVED"].includes(bill.status)
+                ? bill.status
+                : paid.eq(0) ? "PENDING" : balance.eq(0) ? "PAID" : "PARTIALLY_PAID",
+            },
+          });
+        }
+      }
+      await tx.student.update({
+        where: { id: payment.studentId },
+        data: { outstandingBalance: { increment: payment.amount } },
+      });
+
+      // Balancing ledger entry (only fee receipts that were posted to the ledger have one).
+      let reversalTransactionId: string | null = null;
+      if (payment.transaction) {
+        const original = payment.transaction;
+        const date = new Date();
+        const prefix = `TXN-${date.getUTCFullYear()}-`;
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${schoolId}), hashtext(${prefix}))`;
+        const issued = await tx.transaction.findMany({
+          where: { schoolId, transactionNumber: { startsWith: prefix } },
+          select: { transactionNumber: true },
+        });
+        const number = createSequence(issued.map((row) => row.transactionNumber), prefix).next();
+        const reversal = await tx.transaction.create({
+          data: {
+            schoolId,
+            transactionNumber: number,
+            transactionDate: date,
+            description: `${input.kind === "REFUND" ? "Refund" : "Void"} of receipt ${payment.paymentNumber}: ${input.reason}`,
+            amount: original.amount,
+            // Income postings debit cash/bank and credit revenue, and both
+            // balances rise. The reversal swaps the sides and lowers both.
+            debitAccountId: original.creditAccountId,
+            creditAccountId: original.debitAccountId,
+            transactionType: "ADJUSTMENT",
+            category: original.category,
+            referenceType: "PAYMENT_REVERSAL",
+            referenceId: payment.id,
+            referenceNumber: payment.paymentNumber,
+          },
+        });
+        await tx.chartAccount.update({ where: { id: original.debitAccountId }, data: { balance: { decrement: original.amount } } });
+        await tx.chartAccount.update({ where: { id: original.creditAccountId }, data: { balance: { decrement: original.amount } } });
+        reversalTransactionId = reversal.id;
+      }
+
+      const updated = await tx.payment.update({
+        where: { id: payment.id },
+        data: {
+          status: input.kind === "REFUND" ? "REFUNDED" : "CANCELLED",
+          reversedAt: new Date(),
+          reversedById: actorId,
+          reversalReason: input.reason,
+          reversalTransactionId,
+        },
+      });
+      await this.writeAudit(tx, {
+        actorId,
+        schoolId,
+        action: "UPDATE",
+        entityType: "PAYMENT_REVERSAL",
+        entityId: payment.id,
+        oldValues: { status: payment.status, amount: payment.amount.toFixed(2) },
+        newValues: { status: updated.status, kind: input.kind, reason: input.reason, reversalTransactionId },
+      });
+      return updated;
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }), {
+      onExhausted: () => new ConflictException("The system is busy. Nothing was changed; please try again."),
     });
   }
 
@@ -1306,6 +1571,7 @@ export class FinanceService {
     const currentTerm = academicYear?.terms[0];
 
     return this.prisma.client.$transaction(async (tx) => {
+      await this.assertPostingDate(tx, schoolId, date);
       const requestedVoucher = input.voucherNumber?.trim() || undefined;
       const voucherPrefix = `PV-${date.getUTCFullYear()}-`;
       // Serialize voucher allocation per school to avoid duplicate numbers
@@ -1584,9 +1850,10 @@ export class FinanceService {
     if (!payroll) throw new NotFoundException("Payroll run not found.");
     if (payroll.status === "DRAFT" && input.status === "APPROVED") {
       if (!payroll._count.payslips) throw new BadRequestException("A payroll run without payslips cannot be approved.");
+      this.assertSeparationOfDuties(actorId, payroll.processedById, "approved");
       return db.payrollRecord.update({
         where: { id: payroll.id },
-        data: { status: "APPROVED" },
+        data: { status: "APPROVED", approvedById: actorId },
         include: {
           payslips: { include: { staff: { select: { staffId: true, profile: { select: { firstName: true, lastName: true } } } }, teacher: { select: { teacherId: true, profile: { select: { firstName: true, lastName: true } } } } } },
           _count: { select: { payslips: true } },
@@ -1601,6 +1868,7 @@ export class FinanceService {
       });
     }
     if (payroll.status === "APPROVED" && input.status === "PAID") {
+      this.assertSeparationOfDuties(actorId, payroll.approvedById, "marked as paid");
       const paymentMethod = input.paymentMethod;
       if (!paymentMethod || !["CASH", "BANK_TRANSFER", "CHEQUE", "MOBILE_MONEY", "CARD", "ONLINE", "OTHER"].includes(paymentMethod)) {
         throw new BadRequestException("Choose a valid payment method before confirming payroll disbursement.");

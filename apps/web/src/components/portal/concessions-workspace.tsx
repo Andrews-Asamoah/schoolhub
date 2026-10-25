@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { BadgeCheck, GraduationCap, HeartHandshake, LoaderCircle, Plus, ShieldCheck, ToggleLeft, ToggleRight } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { FinanceReadOnlyNotice, useFinanceAccess } from "@/components/portal/finance-access";
 
 type ValueType = "PERCENTAGE" | "FIXED";
 type StudentOption = {
@@ -42,6 +43,7 @@ const personName = (student?: StudentOption) => [student?.profile?.firstName, st
 const money = (value: number | string) => new Intl.NumberFormat("en-GH", { style: "currency", currency: "GHS", maximumFractionDigits: 2 }).format(Number(value) || 0);
 
 export function ConcessionsWorkspace() {
+  const { canWrite } = useFinanceAccess();
   const client = useQueryClient();
   const [studentSearch, setStudentSearch] = useState("");
   const [policyName, setPolicyName] = useState("Sibling discount");
@@ -138,24 +140,25 @@ export function ConcessionsWorkspace() {
         <div className="rounded-2xl border border-border bg-card p-4"><div className="flex items-center gap-2 text-sm text-muted-foreground"><ShieldCheck className="size-4" /> Billing protection</div><p className="mt-2 text-sm font-semibold">Audited & capped</p><p className="text-xs text-muted-foreground">Discounts cannot reduce a bill below zero</p></div>
       </div>
 
+      {!canWrite && <FinanceReadOnlyNotice />}
       <div className="grid items-start gap-5 xl:grid-cols-2">
         <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
           <div className="mb-4 flex items-start gap-3"><div className="rounded-xl bg-primary/10 p-2 text-primary"><HeartHandshake className="size-5" /></div><div><h2 className="font-semibold">Sibling discount rules</h2><p className="mt-1 text-sm text-muted-foreground">Based on active wards linked to the same guardian account.</p></div></div>
-          <form className="grid gap-3 sm:grid-cols-2" onSubmit={(event) => { event.preventDefault(); setFeedback(null); createPolicy.mutate(); }}>
+          {canWrite && (<form className="grid gap-3 sm:grid-cols-2" onSubmit={(event) => { event.preventDefault(); setFeedback(null); createPolicy.mutate(); }}>
             <label className="text-sm font-medium sm:col-span-2">Rule name<input className={cn(field, "mt-1")} value={policyName} onChange={(e) => setPolicyName(e.target.value)} required maxLength={120} placeholder="e.g. Three-ward family discount" /></label>
             <label className="text-sm font-medium">Minimum linked wards<input className={cn(field, "mt-1")} type="number" min="2" max="30" value={minimumWardCount} onChange={(e) => setMinimumWardCount(e.target.value)} required /></label>
             <label className="text-sm font-medium">Discount type<select className={cn(field, "mt-1")} value={policyType} onChange={(e) => setPolicyType(e.target.value as ValueType)}><option value="PERCENTAGE">Percentage (%)</option><option value="FIXED">Fixed amount (GHS)</option></select></label>
             <label className="text-sm font-medium sm:col-span-2">Discount value<input className={cn(field, "mt-1")} type="number" min="0.01" max={policyType === "PERCENTAGE" ? "100" : "100000000"} step="0.01" value={policyValue} onChange={(e) => setPolicyValue(e.target.value)} required /><span className="mt-1 block text-xs text-muted-foreground">{policyType === "PERCENTAGE" ? "Enter a percentage from 0.01% to 100%." : "The fixed discount is capped at the remaining bill amount."}</span></label>
             <button className={cn(primary, "sm:col-span-2")} type="submit" disabled={createPolicy.isPending}>{createPolicy.isPending ? <LoaderCircle className="size-4 animate-spin" /> : <Plus className="size-4" />} Save sibling rule</button>
-          </form>
+          </form>)}
           <div className="mt-5 space-y-2">
-            {concessionsQuery.isPending ? <p className="text-sm text-muted-foreground">Loading discount rules…</p> : concessionsQuery.error ? <p role="alert" className="text-sm text-destructive">{concessionsQuery.error.message}</p> : policies.length === 0 ? <p className="rounded-xl border border-dashed border-border p-4 text-sm text-muted-foreground">No sibling discount rules yet.</p> : policies.map((policy) => <div key={policy.id} className="flex items-center gap-3 rounded-xl border border-border p-3"><div className="min-w-0 flex-1"><p className="font-medium">{policy.name}</p><p className="text-xs text-muted-foreground">From {policy.minimumWardCount} linked wards · {policy.valueType === "PERCENTAGE" ? policy.value + "%" : money(policy.value)}</p></div><button type="button" className={secondary} onClick={() => togglePolicy.mutate({ id: policy.id, isActive: !policy.isActive })} disabled={togglePolicy.isPending} aria-label={policy.isActive ? "Deactivate " + policy.name : "Activate " + policy.name}>{policy.isActive ? <ToggleRight className="size-4 text-primary" /> : <ToggleLeft className="size-4" />}{policy.isActive ? "Active" : "Inactive"}</button></div>)}
+            {concessionsQuery.isPending ? <p className="text-sm text-muted-foreground">Loading discount rules…</p> : concessionsQuery.error ? <p role="alert" className="text-sm text-destructive">{concessionsQuery.error.message}</p> : policies.length === 0 ? <p className="rounded-xl border border-dashed border-border p-4 text-sm text-muted-foreground">No sibling discount rules yet.</p> : policies.map((policy) => <div key={policy.id} className="flex items-center gap-3 rounded-xl border border-border p-3"><div className="min-w-0 flex-1"><p className="font-medium">{policy.name}</p><p className="text-xs text-muted-foreground">From {policy.minimumWardCount} linked wards · {policy.valueType === "PERCENTAGE" ? policy.value + "%" : money(policy.value)}</p></div>{canWrite && <button type="button" className={secondary} onClick={() => togglePolicy.mutate({ id: policy.id, isActive: !policy.isActive })} disabled={togglePolicy.isPending} aria-label={policy.isActive ? "Deactivate " + policy.name : "Activate " + policy.name}>{policy.isActive ? <ToggleRight className="size-4 text-primary" /> : <ToggleLeft className="size-4" />}{policy.isActive ? "Active" : "Inactive"}</button>}</div>)}
           </div>
         </section>
 
         <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
           <div className="mb-4 flex items-start gap-3"><div className="rounded-xl bg-primary/10 p-2 text-primary"><GraduationCap className="size-5" /></div><div><h2 className="font-semibold">Award a scholarship</h2><p className="mt-1 text-sm text-muted-foreground">Apply a percentage or fixed amount to one student's future bills.</p></div></div>
-          <form className="grid gap-3 sm:grid-cols-2" onSubmit={(event) => { event.preventDefault(); setFeedback(null); createScholarship.mutate(); }}>
+          {canWrite && (<form className="grid gap-3 sm:grid-cols-2" onSubmit={(event) => { event.preventDefault(); setFeedback(null); createScholarship.mutate(); }}>
             <label className="text-sm font-medium sm:col-span-2">Find student<input className={cn(field, "mt-1")} value={studentSearch} onChange={(e) => setStudentSearch(e.target.value)} placeholder="Search by name or admission number" /></label>
             <label className="text-sm font-medium sm:col-span-2">Student<select className={cn(field, "mt-1")} value={studentId} onChange={(e) => setStudentId(e.target.value)} required><option value="">Select a student</option>{students.map((student) => <option key={student.id} value={student.id}>{personName(student)}{student.admissionNumber ? " · " + student.admissionNumber : ""}</option>)}</select>{studentsQuery.isPending && <span className="mt-1 block text-xs text-muted-foreground">Loading students…</span>}</label>
             <label className="text-sm font-medium sm:col-span-2">Scholarship name<input className={cn(field, "mt-1")} value={scholarshipName} onChange={(e) => setScholarshipName(e.target.value)} required maxLength={120} placeholder="e.g. Academic excellence scholarship" /></label>
@@ -167,7 +170,7 @@ export function ConcessionsWorkspace() {
             <label className="text-sm font-medium">Start date (optional)<input className={cn(field, "mt-1")} type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} /></label>
             <label className="text-sm font-medium">End date (optional)<input className={cn(field, "mt-1")} type="date" min={startDate || undefined} value={endDate} onChange={(e) => setEndDate(e.target.value)} /></label>
             <button className={cn(primary, "sm:col-span-2")} type="submit" disabled={createScholarship.isPending || !studentId}>{createScholarship.isPending ? <LoaderCircle className="size-4 animate-spin" /> : <Plus className="size-4" />} Save scholarship</button>
-          </form>
+          </form>)}
         </section>
       </div>
 
@@ -187,7 +190,7 @@ export function ConcessionsWorkspace() {
               <td className="p-3 font-medium">{award.valueType === "PERCENTAGE" ? award.value + "%" : money(award.value)}</td>
               <td className="p-3 text-muted-foreground">{periodLabel(award, years)}</td>
               <td className="p-3"><span className={cn("rounded-full px-2.5 py-1 text-xs font-semibold", award.isActive ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300" : "bg-muted text-muted-foreground")}>{award.isActive ? "Active" : "Inactive"}</span></td>
-              <td className="p-3"><button type="button" className={secondary} disabled={toggleScholarship.isPending} onClick={() => toggleScholarship.mutate({ id: award.id, isActive: !award.isActive })}>{award.isActive ? "Deactivate" : "Reactivate"}</button></td>
+              <td className="p-3">{canWrite && <button type="button" className={secondary} disabled={toggleScholarship.isPending} onClick={() => toggleScholarship.mutate({ id: award.id, isActive: !award.isActive })}>{award.isActive ? "Deactivate" : "Reactivate"}</button>}</td>
             </tr>)}</tbody>
           </table></div>}
       </section>

@@ -16,6 +16,7 @@ import { SchoolTenantGuard } from "../../common/guards/school-tenant.guard.js";
 import { RolesGuard } from "../../common/guards/roles.guard.js";
 import { FINANCE_READ_ROLES, FINANCE_WRITE_ROLES } from "./finance.permissions.js";
 import { FinanceAuditInterceptor, FinanceSelfAudited } from "./finance-audit.interceptor.js";
+import { FinanceWriteRateLimitGuard, SuperAdminReasonGuard } from "./finance-safeguards.js";
 import { Roles } from "../../common/decorators/roles.decorator.js";
 import { CurrentSchool } from "../../common/decorators/current-school.decorator.js";
 import { CurrentSchoolRole } from "../../common/decorators/current-school-role.decorator.js";
@@ -101,9 +102,17 @@ const scholarshipSchema = z.object({
   endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
 });
 const concessionStatusSchema = z.object({ isActive: z.boolean() });
+const periodLockSchema = z.object({
+  lockedThrough: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Format: YYYY-MM-DD").nullable(),
+  reason: z.string().trim().min(10, "Explain why the books are being closed or reopened (at least 10 characters)").max(500),
+});
+const reversePaymentSchema = z.object({
+  kind: z.enum(["VOID", "REFUND"]).default("VOID"),
+  reason: z.string().trim().min(10, "Explain why this payment is being reversed (at least 10 characters)").max(500),
+});
 
 @Controller("finance")
-@UseGuards(SchoolTenantGuard, RolesGuard)
+@UseGuards(SchoolTenantGuard, RolesGuard, SuperAdminReasonGuard, FinanceWriteRateLimitGuard)
 @UseInterceptors(FinanceAuditInterceptor)
 export class FinanceController {
   constructor(private readonly financeService: FinanceService) {}
@@ -352,6 +361,47 @@ export class FinanceController {
     return this.financeService.recordPayment(school.id, user.id, body);
   }
 
+
+  @Get("audit-log")
+  @Roles(...FINANCE_READ_ROLES)
+  listFinanceAudit(
+    @CurrentSchool() school: School,
+    @Query("category") category?: string,
+    @Query("from") from?: string,
+    @Query("to") to?: string,
+    @Query("cursor") cursor?: string,
+    @Query("limit") limit?: string,
+  ) {
+    return this.financeService.listFinanceAudit(school.id, { category, from, to, cursor, limit });
+  }
+
+  @Get("period-lock")
+  @Roles(...FINANCE_READ_ROLES)
+  getPeriodLock(@CurrentSchool() school: School) {
+    return this.financeService.getPeriodLock(school.id);
+  }
+
+  @Put("period-lock")
+  @Roles(...FINANCE_WRITE_ROLES)
+  setPeriodLock(
+    @CurrentSchool() school: School,
+    @CurrentUser() user: AuthenticatedUser,
+    @Body(new ZodValidationPipe(periodLockSchema)) body: z.infer<typeof periodLockSchema>,
+  ) {
+    return this.financeService.setPeriodLock(school.id, user.id, user.role === "superAdmin", body);
+  }
+
+  @Post("payments/:paymentId/reverse")
+  @Roles(...FINANCE_WRITE_ROLES)
+  @FinanceSelfAudited()
+  reversePayment(
+    @CurrentSchool() school: School,
+    @CurrentUser() user: AuthenticatedUser,
+    @Param("paymentId") paymentId: string,
+    @Body(new ZodValidationPipe(reversePaymentSchema)) body: z.infer<typeof reversePaymentSchema>,
+  ) {
+    return this.financeService.reversePayment(school.id, user.id, paymentId, body);
+  }
 
   @Get("fee-reminders")
   @Roles(...FINANCE_READ_ROLES)

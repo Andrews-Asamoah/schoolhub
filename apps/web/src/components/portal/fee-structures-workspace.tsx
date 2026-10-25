@@ -4,6 +4,7 @@ import { Archive, CheckCircle2, CircleAlert, Copy, FileText, LoaderCircle, Penci
 import { apiFetch } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { FinanceReadOnlyNotice, useFinanceAccess } from "@/components/portal/finance-access";
 
 interface FeeRegistryItem {
   id: string;
@@ -87,6 +88,7 @@ const primaryButton = "inline-flex min-h-10 items-center justify-center gap-2 ro
 const secondaryButton = "inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-border bg-card px-4 py-2 text-sm font-semibold text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50";
 
 export function FeeStructuresWorkspace() {
+  const { canWrite } = useFinanceAccess();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("ACTIVE");
@@ -294,11 +296,12 @@ export function FeeStructuresWorkspace() {
           <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">Build reusable fee templates from standard fee items and assign them to classes. Once a structure has generated student bills, it becomes read-only; duplicate it to reuse the details with different amounts.</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <button type="button" className={secondaryButton} onClick={() => { setFeedback(null); setRegistryOpen(true); }}><Tags className="size-4" /> Fee item categories</button>
-          <button type="button" className={primaryButton} onClick={beginCreate}><Plus className="size-4" /> Create structure</button>
+          {canWrite && <button type="button" className={secondaryButton} onClick={() => { setFeedback(null); setRegistryOpen(true); }}><Tags className="size-4" /> Fee item categories</button>}
+          {canWrite && <button type="button" className={primaryButton} onClick={beginCreate}><Plus className="size-4" /> Create structure</button>}
         </div>
       </section>
 
+      {!canWrite && <FinanceReadOnlyNotice />}
       {feedback && <div role={feedback.kind === "error" ? "alert" : "status"} className={cn("flex items-start gap-3 rounded-xl border p-3 text-sm", feedback.kind === "error" ? "border-destructive/30 bg-destructive/5 text-destructive" : "border-success/30 bg-success/5 text-foreground")}><span className="min-w-0 flex-1">{feedback.text}</span><button type="button" onClick={() => setFeedback(null)} aria-label="Dismiss message"><X className="size-4" /></button></div>}
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
@@ -376,6 +379,7 @@ function FeeStructureCard({
   onEdit: () => void;
   onDuplicate: () => void;
 }) {
+  const { canWrite } = useFinanceAccess();
   const total = structure.items.reduce((sum, item) => sum + Number(item.amount), 0);
   const optional = structure.items.filter(item => item.isOptional).reduce((sum, item) => sum + Number(item.amount), 0);
   const classes = structure.targetClasses.map(target => target.class.name);
@@ -391,8 +395,8 @@ function FeeStructureCard({
       <div className="mt-4 space-y-1 border-t border-border pt-3"><div className="flex items-center justify-between gap-3"><span className="text-xs text-muted-foreground">Structure total</span><span className="font-bold tabular-nums text-foreground">{money(total)}</span></div>{optional > 0 && <p className="text-[11px] text-muted-foreground">{money(optional)} of the total is marked optional.</p>}</div>
     </div>
     <div className="space-y-3 border-t border-border bg-muted/20 px-4 py-3">
-      <div className="flex flex-wrap items-center justify-between gap-2"><span className="text-xs text-muted-foreground">{billCount} linked bill(s){locked ? " · Editing locked" : " · Editable"}</span><button type="button" className={cn("inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-xs font-semibold transition hover:bg-muted disabled:opacity-50", structure.isActive ? "text-muted-foreground" : "text-primary")} disabled={busy} onClick={onToggle}>{busy ? <LoaderCircle className="size-3.5 animate-spin" /> : structure.isActive ? <Archive className="size-3.5" /> : <RefreshCw className="size-3.5" />}{structure.isActive ? "Archive" : "Reactivate"}</button></div>
-      <div className="grid grid-cols-2 gap-2"><button type="button" className={cn(secondaryButton, "min-h-9 px-2 py-1.5 text-xs")} title={locked ? "This structure has generated student bills. Duplicate it to change the amounts." : "Edit this fee structure"} disabled={busy || locked} onClick={onEdit}><Pencil className="size-3.5" /> Edit</button><button type="button" className={cn(secondaryButton, "min-h-9 px-2 py-1.5 text-xs")} disabled={busy} onClick={onDuplicate}><Copy className="size-3.5" /> Duplicate</button></div>
+      <div className="flex flex-wrap items-center justify-between gap-2"><span className="text-xs text-muted-foreground">{billCount} linked bill(s){locked ? " · Editing locked" : " · Editable"}</span>{canWrite && <button type="button" className={cn("inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-xs font-semibold transition hover:bg-muted disabled:opacity-50", structure.isActive ? "text-muted-foreground" : "text-primary")} disabled={busy} onClick={onToggle}>{busy ? <LoaderCircle className="size-3.5 animate-spin" /> : structure.isActive ? <Archive className="size-3.5" /> : <RefreshCw className="size-3.5" />}{structure.isActive ? "Archive" : "Reactivate"}</button>}</div>
+      {canWrite && <div className="grid grid-cols-2 gap-2"><button type="button" className={cn(secondaryButton, "min-h-9 px-2 py-1.5 text-xs")} title={locked ? "This structure has generated student bills. Duplicate it to change the amounts." : "Edit this fee structure"} disabled={busy || locked} onClick={onEdit}><Pencil className="size-3.5" /> Edit</button><button type="button" className={cn(secondaryButton, "min-h-9 px-2 py-1.5 text-xs")} disabled={busy} onClick={onDuplicate}><Copy className="size-3.5" /> Duplicate</button></div>}
     </div>
   </article>;
 }
@@ -408,8 +412,8 @@ function Modal({ title, description, onClose, children }: { title: string; descr
 function Badge({ children, tone = "muted" }: { children: ReactNode; tone?: "muted" | "success" }) {
   return <span className={cn("inline-flex rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide", tone === "success" ? "bg-success/10 text-success" : "bg-muted text-muted-foreground")}>{children}</span>;
 }
-function EmptyState({ title, description, onCreate }: { title: string; description: string; onCreate: () => void }) {
-  return <div className="col-span-full rounded-xl border border-dashed border-border bg-muted/20 px-5 py-12 text-center"><FileText className="mx-auto size-8 text-muted-foreground" /><h3 className="mt-3 font-semibold text-foreground">{title}</h3><p className="mx-auto mt-2 max-w-md text-sm leading-6 text-muted-foreground">{description}</p><button type="button" className={cn(primaryButton, "mt-4")} onClick={onCreate}><Plus className="size-4" /> Create fee structure</button></div>;
+function EmptyState({ title, description, onCreate }: { title: string; description: string; onCreate: () => void }) { const { canWrite } = useFinanceAccess();
+  return <div className="col-span-full rounded-xl border border-dashed border-border bg-muted/20 px-5 py-12 text-center"><FileText className="mx-auto size-8 text-muted-foreground" /><h3 className="mt-3 font-semibold text-foreground">{title}</h3><p className="mx-auto mt-2 max-w-md text-sm leading-6 text-muted-foreground">{description}</p>{canWrite && <button type="button" className={cn(primaryButton, "mt-4")} onClick={onCreate}><Plus className="size-4" /> Create fee structure</button>}</div>;
 }
 function ErrorState({ message }: { message: string }) {
   return <div role="alert" className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive"><CircleAlert className="mr-2 inline size-4" />{message}</div>;

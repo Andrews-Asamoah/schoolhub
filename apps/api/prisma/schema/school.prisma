@@ -56,6 +56,7 @@ model School {
   notifications               Notification[]
   announcements               Announcement[]
   feeReminderSchedules        FeeReminderSchedule[]
+  financePeriodLock           FinancePeriodLock?
   expenses                    Expense[]
   inventoryItems              InventoryItem[]
   inventoryTransactions       InventoryTransaction[]

@@ -7,7 +7,8 @@ import { RolesGuard } from "../../common/guards/roles.guard.js";
 import { FINANCE_READ_ROLES, FINANCE_WRITE_ROLES } from "./finance.permissions.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const controllerSource = readFileSync(join(here, "finance.controller.ts"), "utf8");
+// Normalise line endings so the checks behave the same on Windows (CRLF) checkouts.
+const controllerSource = readFileSync(join(here, "finance.controller.ts"), "utf8").replace(/\r\n/g, "\n");
 
 function check(requiredRoles: readonly string[], user: { role?: string }, schoolRole?: string, membershipRole = schoolRole) {
   const guard = new RolesGuard({ getAllAndOverride: () => requiredRoles } as never);
