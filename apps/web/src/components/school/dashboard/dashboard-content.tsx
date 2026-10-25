@@ -168,7 +168,6 @@ export function DashboardContent({ today, greetingName }: DashboardContentProps)
               summary={accountantSummaryQuery.data}
               expenses={accountantExpensesQuery.data ?? []}
               loading={accountantSummaryQuery.isPending}
-              error={accountantSummaryQuery.error?.message}
             />
           )}
         </section>
