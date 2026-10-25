@@ -1,4 +1,5 @@
 import { TableExportMenu } from "@/components/ui/data-table";
+import type { ExportTable } from "@/lib/table-export";
 import { ServerExportButton } from "@/components/portal/server-export-button";
 import { useCanExportPayrollTables } from "@/lib/table-export-policy";
 import { useMemo, useState, type FormEvent, type ReactNode } from "react";
@@ -174,7 +175,7 @@ export function PayrollManagementWorkspace() {
     }
     updateSalary.mutate({ person: salaryTarget, monthlySalary: Math.round((amount + Number.EPSILON) * 100) / 100 });
   }
-  const buildSalaryRegisterExport = () => ({
+  const buildSalaryRegisterExport = (): ExportTable => ({
     title: "Salary register",
     headers: ["Employee", "Employee reference", "Type", "Monthly salary (GHS)", "Payroll eligible"],
     columnTypes: ["text", "text", "text", "money", "text"],
@@ -192,7 +193,7 @@ export function PayrollManagementWorkspace() {
     }
     generatePayroll.mutate({ month: Number(month), year: 2026, confirmResidentTaxTreatment: true });
   }
-  const buildPayrollRegisterExport = () => ({
+  const buildPayrollRegisterExport = (): ExportTable => ({
     title: "Payroll register",
     headers: ["Period", "Run status", "Employee", "Employee ID", "Basic (GHS)", "Employee SSNIT (GHS)", "PAYE (GHS)", "Employer SSNIT (GHS)", "Net (GHS)", "Payment status"],
     columnTypes: ["text", "text", "text", "text", "money", "money", "money", "money", "money", "text"],
