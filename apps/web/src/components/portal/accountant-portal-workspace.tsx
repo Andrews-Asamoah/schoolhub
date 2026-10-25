@@ -88,7 +88,6 @@ interface ApiBill {
   overdueDays?: number | null;
   previousBalanceTotal?: string;
   totalDueAtIssue?: string;
-  totalDueAtIssue?: string;
 }
 
 interface FinancePage<T> {
@@ -769,7 +768,7 @@ export function AccountantPortalWorkspace({
           <section className="rounded-2xl border border-border bg-card p-5">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div><h2 className="text-lg font-semibold text-foreground">Overdue-fees management</h2><p className="mt-1 text-sm text-muted-foreground">Prioritise bills past their due date with an outstanding balance, then open the bill or record a payment.</p></div>
-              <div className="rounded-xl bg-destructive/5 px-4 py-3 text-right"><p className="text-xs text-muted-foreground">Overdue balance</p><p className="mt-1 text-lg font-bold tabular-nums text-destructive">{billsQuery.error ? "Unavailable" : currency(overdueTotal)}</p><p className="text-xs text-muted-foreground">{overdueBills.length} overdue bill(s)</p></div>
+              <div className="rounded-xl bg-destructive/5 px-4 py-3 text-right"><p className="text-xs text-muted-foreground">Overdue balance</p><p className="mt-1 text-lg font-bold tabular-nums text-destructive">{summaryQuery.error ? "Unavailable" : currency(overdueTotal)}</p><p className="text-xs text-muted-foreground">{summaryQuery.data?.overdueBillCount ?? 0} overdue bill(s)</p></div>
             </div>
             <div className="my-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_220px]">
               <div className="relative"><Search className="absolute left-3 top-3 size-4 text-muted-foreground" /><input className={cn(inputClass, "pl-9")} value={overdueSearch} onChange={(event) => setOverdueSearch(event.target.value)} placeholder="Search student, admission no., bill or class" aria-label="Search overdue bills" /></div>
@@ -799,7 +798,7 @@ export function AccountantPortalWorkspace({
             </section>
             <section className="rounded-2xl border border-border bg-card p-5">
               <h2 className="font-semibold text-foreground">Finance activity</h2><p className="mt-1 text-sm text-muted-foreground">Quick access to records that need attention.</p>
-              <div className="mt-4 space-y-3"><AttentionItem title="Bills with balances" value={billsQuery.error ? "—" : String(debtors.length)} detail={billsQuery.error ? "Could not load bill records" : currency(outstanding)} to="debtors" /><AttentionItem title="Overdue bills" value={billsQuery.error ? "—" : String(overdueBills.length)} detail={billsQuery.error ? "Could not load bill records" : currency(overdueTotal)} to="debtors" /><AttentionItem title="Expense records" value={expensesQuery.error ? "—" : String(reportExpenses.length)} detail={expensesQuery.error ? "Could not load expense records" : currency(reportExpenseTotal)} to="expenses" /></div>
+              <div className="mt-4 space-y-3"><AttentionItem title="Bills with balances" value={summaryQuery.error ? "—" : String(summaryQuery.data?.outstandingBillCount ?? 0)} detail={summaryQuery.error ? "Could not load receivables" : currency(outstanding)} to="debtors" /><AttentionItem title="Overdue bills" value={summaryQuery.error ? "—" : String(summaryQuery.data?.overdueBillCount ?? 0)} detail={summaryQuery.error ? "Could not load receivables" : currency(overdueTotal)} to="debtors" /><AttentionItem title="Expense records" value={expensesQuery.error ? "—" : String(reportExpenses.length)} detail={expensesQuery.error ? "Could not load expense records" : currency(reportExpenseTotal)} to="expenses" /></div>
             </section>
           </div>
         </div>
