@@ -130,7 +130,7 @@ export function AccountantFinanceReportingWorkspace({ bills, payments, classes }
     : bills.filter(bill => (classId === "ALL" || bill.class?.id === classId) && bill.status !== "CANCELLED" && bill.status !== "WAIVED").reduce((sum, bill) => sum + Math.max(0, amount(bill.balanceAmount)), 0);
 
   const classSummary = useMemo(() => {
-    const byBillId = new Map(bills.map(bill => [bill.id, bill]));
+    const byBillId = new Map<string, FinanceBill>(bills.map(bill => [bill.id, bill] as const));
     const totals = new Map<string, { name: string; collected: number; receipts: number; billed: number; outstanding: number }>();
     for (const bill of visibleBills) {
       const key = bill.class?.id ?? "no-class";
