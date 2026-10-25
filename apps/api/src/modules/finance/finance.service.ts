@@ -677,9 +677,15 @@ export class FinanceService {
     if (studentIds.length === 0) {
       return { success: true, count: 0, message: "No active students to bill" };
     }
+    // Always touch students in the same order, so two bill runs over the same class can never deadlock.
+    studentIds.sort();
 
     const year = new Date().getFullYear();
     const billingResult = await withSerializableRetry(() => this.prisma.client.$transaction(async (tx) => {
+      // Runs at READ COMMITTED: the statements after this lock wait see what the
+      // previous holder committed, so a repeated or overlapping run skips students
+      // that were just billed. (Under SERIALIZABLE the snapshot is taken before the
+      // wait, which made overlapping runs for different structures fail with "busy".)
       // Editing a structure and generating bills share this lock. The template
       // and fee items are re-read after acquiring it, so bills always snapshot
       // one consistent version of the structure.
@@ -791,7 +797,7 @@ export class FinanceService {
         },
       });
       return { bills: results, totalAmount };
-    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }), {
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted }), {
       onExhausted: () => new ConflictException("The system is busy generating other bills. Please try again in a moment."),
     });
 
