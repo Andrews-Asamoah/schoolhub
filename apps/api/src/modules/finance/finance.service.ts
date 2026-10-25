@@ -2870,6 +2870,14 @@ export class FinanceService {
       throw new BadRequestException("Provide a reason of at least 10 characters and no more than 500 characters.");
     }
     return this.prisma.client.$transaction(async (tx) => {
+      const currentYear = await tx.academicYear.findFirst({
+        where: { schoolId, isCurrent: true },
+        include: { terms: { where: { isCurrent: true }, take: 1 } },
+      });
+      const currentTerm = currentYear?.terms[0];
+      if (!currentYear || !currentTerm) {
+        throw new BadRequestException("The school has not selected a current academic year and term.");
+      }
       await tx.$executeRaw`SELECT id FROM students WHERE id = ${studentId} AND "schoolId" = ${schoolId} FOR UPDATE`;
       const student = await tx.student.findFirst({
         where: { id: studentId, schoolId, deletedAt: null },
@@ -2880,14 +2888,22 @@ export class FinanceService {
           admissionNumber: true,
           profile: { select: { firstName: true, lastName: true, otherNames: true } },
           bills: {
-            where: { schoolId, balanceAmount: { gt: 0 }, status: { notIn: ["CANCELLED", "WAIVED"] } },
+            where: {
+              schoolId,
+              balanceAmount: { gt: 0 },
+              status: { notIn: ["CANCELLED", "WAIVED"] },
+              OR: [
+                { academicYear: { endDate: { lt: currentTerm.startDate } } },
+                { academicYearId: currentYear.id, term: { endDate: { lt: currentTerm.startDate } } },
+              ],
+            },
             select: { id: true, balanceAmount: true },
           },
         },
       });
       if (!student) throw new NotFoundException("Student not found in this school.");
       if (student.status !== "ACTIVE") throw new BadRequestException("Only an active student can be marked as a former student.");
-      if (!student.bills.length) throw new BadRequestException("This student has no open fee arrears to move to the former-student list.");
+      if (!student.bills.length) throw new BadRequestException("This student has no unpaid previous-term invoices to move to the former-student list.");
       const previousBalance = student.bills.reduce((sum, bill) => sum.plus(bill.balanceAmount), new Prisma.Decimal(0));
       const updated = await tx.student.update({
         where: { id: student.id },
