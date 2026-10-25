@@ -22,7 +22,7 @@ export interface FinanceExportContext {
   to?: string;
 }
 
-type ExportKind = "bills" | "payments" | "expenses" | "payroll";
+type ExportKind = "bills" | "payments" | "expenses" | "payroll" | "salaries";
 type DateRange = { gte?: Date; lte?: Date };
 
 const dayStart = (value: string) => new Date(value + "T00:00:00.000Z");
@@ -230,6 +230,54 @@ export class FinanceExportsService {
         reportInfo,
       };
       fileName = "schoolhub-expense-register.xlsx";
+    } else if (kind === "salaries") {
+      const [teachers, staff] = await Promise.all([
+        this.prisma.client.teacher.findMany({
+          where: { schoolId: context.schoolId, isActive: true, deletedAt: null },
+          select: {
+            teacherId: true,
+            staffNumber: true,
+            firstName: true,
+            lastName: true,
+            monthlySalary: true,
+            profile: { select: { firstName: true, lastName: true } },
+          },
+        }),
+        this.prisma.client.staff.findMany({
+          where: { schoolId: context.schoolId, isActive: true, deletedAt: null },
+          select: {
+            staffId: true,
+            staffNumber: true,
+            monthlySalary: true,
+            profile: { select: { firstName: true, lastName: true } },
+          },
+        }),
+      ]);
+      const employees = [
+        ...teachers.map((person) => ({
+          type: "TEACHER",
+          identifier: person.staffNumber || person.teacherId,
+          name: [person.profile?.firstName || person.firstName, person.profile?.lastName || person.lastName].filter(Boolean).join(" ").trim() || person.teacherId,
+          monthlySalary: person.monthlySalary,
+        })),
+        ...staff.map((person) => ({
+          type: "STAFF",
+          identifier: person.staffNumber || person.staffId,
+          name: [person.profile.firstName, person.profile.lastName].filter(Boolean).join(" ").trim() || person.staffId,
+          monthlySalary: person.monthlySalary,
+        })),
+      ].sort((a, b) => a.name.localeCompare(b.name));
+      rowCount = employees.length;
+      input = {
+        title: "Confidential salary register",
+        headers: ["Employee", "Employee ID", "Employee type", "Monthly salary (GHS)", "Salary configured"],
+        columnTypes: ["text", "text", "text", "money", "text"],
+        rows: employees.map((person) => [person.name, person.identifier, person.type, asNumber(person.monthlySalary), person.monthlySalary == null ? "No" : "Yes"]),
+        totalColumns: [3],
+        totalLabel: "Total monthly salary",
+        reportInfo: { ...reportInfo, Confidentiality: "Confidential employee salary information" },
+      };
+      fileName = "schoolhub-confidential-salary-register.xlsx";
     } else {
       const periodFrom = validateDate(context.from, "start date");
       const periodTo = validateDate(context.to, "end date");
