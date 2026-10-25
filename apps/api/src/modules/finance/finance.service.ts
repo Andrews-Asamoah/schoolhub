@@ -2975,10 +2975,10 @@ export class FinanceService {
         entityType: `PAYROLL_SALARY_${kind}`,
         entityId: personId,
         oldValues: { monthlySalary: previous?.toFixed(2) ?? null },
-        newValues: { monthlySalary: next.toFixed(2) },
+        newValues: { monthlySalary: next.toFixed(2), reason: reason.trim() },
       });
     });
-    return { id: personId, type: kind, monthlySalary };
+    return { id: personId, type: kind, monthlySalary: next.toFixed(2), reason: reason.trim() };
   }
 
   async generatePayrollDraft(
