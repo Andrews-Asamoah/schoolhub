@@ -2986,7 +2986,7 @@ export class FinanceService {
   async generatePayrollDraft(
     schoolId: string,
     processedById: string,
-    input: { month: number; year: number; confirmResidentTaxTreatment: true },
+    input: { month: number; year: number },
   ) {
     if (!Number.isInteger(input.month) || input.month < 1 || input.month > 12 || !Number.isInteger(input.year) || input.year < 2000 || input.year > 2100) {
       throw new BadRequestException("Enter a valid payroll month and year.");
