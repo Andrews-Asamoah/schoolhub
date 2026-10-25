@@ -21,6 +21,7 @@ model School {
   secondaryColor String   @default("#10B981")
   settings       Json?
   features       Json?
+  arrearsPolicy  ArrearsPolicy @default(SHOW_ONLY)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
@@ -28,6 +29,7 @@ model School {
   academicYears               AcademicYear[]
   assessmentTemplates         AssessmentTemplate[]
   bills                       Bill[]
+  billArrearsSnapshots        BillArrearsSnapshot[]
   siblingDiscountPolicies     SiblingDiscountPolicy[]
   studentScholarships         StudentScholarship[]
   chartAccounts               ChartAccount[]
