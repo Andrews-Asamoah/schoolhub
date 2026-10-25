@@ -2759,6 +2759,44 @@ export class FinanceService {
     return { studentCount: targets.length, inAppSent, skippedNoLogin, failed, alreadySent: alreadySentCount };
   }
 
+  async getArrearsPolicy(schoolId: string) {
+    const school = await this.prisma.client.school.findFirst({
+      where: { id: schoolId },
+      select: { id: true, arrearsPolicy: true },
+    });
+    if (!school) throw new NotFoundException("School not found.");
+    return { schoolId: school.id, arrearsPolicy: school.arrearsPolicy };
+  }
+
+  async setArrearsPolicy(
+    schoolId: string,
+    actorId: string,
+    arrearsPolicy: "SHOW_ONLY" | "BLOCK_CLEARANCE_UNTIL_PAID",
+  ) {
+    return this.prisma.client.$transaction(async (tx) => {
+      const school = await tx.school.findFirst({
+        where: { id: schoolId },
+        select: { id: true, arrearsPolicy: true },
+      });
+      if (!school) throw new NotFoundException("School not found.");
+      const updated = await tx.school.update({
+        where: { id: school.id },
+        data: { arrearsPolicy },
+        select: { id: true, arrearsPolicy: true },
+      });
+      await this.writeAudit(tx, {
+        actorId,
+        schoolId,
+        action: "UPDATE",
+        entityType: "SCHOOL",
+        entityId: school.id,
+        oldValues: { arrearsPolicy: school.arrearsPolicy },
+        newValues: { arrearsPolicy: updated.arrearsPolicy },
+      });
+      return { schoolId: updated.id, arrearsPolicy: updated.arrearsPolicy };
+    });
+  }
+
   async getStudentStatement(
     schoolId: string,
     studentId: string,
