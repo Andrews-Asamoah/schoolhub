@@ -750,14 +750,14 @@ export class FinanceService {
           tx, schoolId, studentId, currentYear.id, currentTerm.id, totalAmountDecimal,
         );
         const totalDiscountDecimal = concessions.totalDiscount;
-        const netTotalDecimal = Prisma.Decimal.max(0, totalAmountDecimal.minus(totalDiscountDecimal));
+        const netTotalDecimal = Prisma.Decimal.max(0, totalAmountDecimal.minus(totalDiscountDecimal)).toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP);
         let allocatedDiscountDecimal = new Prisma.Decimal(0);
         const billItems = billableItems.map((item, index) => {
           const grossLine = item.amount;
           const lineDiscount = index === billableItems.length - 1
             ? totalDiscountDecimal.minus(allocatedDiscountDecimal)
             : (totalAmountDecimal.gt(0)
-              ? totalDiscountDecimal.mul(grossLine).div(totalAmountDecimal).toDecimalPlaces(2)
+              ? totalDiscountDecimal.mul(grossLine).div(totalAmountDecimal).toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP)
               : new Prisma.Decimal(0));
           allocatedDiscountDecimal = allocatedDiscountDecimal.plus(lineDiscount);
           const netLine = Prisma.Decimal.max(0, grossLine.minus(lineDiscount));
@@ -841,7 +841,7 @@ export class FinanceService {
         }
         await tx.student.update({
           where: { id: studentId },
-          data: { outstandingBalance: { increment: new Prisma.Decimal(netTotal) } },
+          data: { outstandingBalance: { increment: netTotalDecimal } },
         });
         results.push(bill);
       }
