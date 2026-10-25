@@ -5,7 +5,13 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { weeklyAttendance } from "@/components/school/dashboard/dashboard-data";
+const weeklyAttendance: { day: string; value: number }[] = [
+  { day: "Mon", value: 88 },
+  { day: "Tue", value: 94 },
+  { day: "Wed", value: 91 },
+  { day: "Thu", value: 97 },
+  { day: "Fri", value: 94 },
+];
 
 interface MetricCardProps {
   label: string;
