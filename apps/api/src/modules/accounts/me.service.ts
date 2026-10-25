@@ -120,10 +120,10 @@ export class MeService {
     return { staffId: staff?.id ?? null, teacherId: teacher?.id ?? null };
   }
 
-  private async filterPrivateContributionLines(
+  private async filterPrivateContributionLines<T extends { code: string }>(
     schoolId: string,
-    payslip: { staffId: string | null; teacherId: string | null; payrollRecord: { month: number; year: number }; lines: Array<{ code: string }> },
-  ) {
+    payslip: { staffId: string | null; teacherId: string | null; payrollRecord: { month: number; year: number }; lines: T[] },
+  ): Promise<T[]> {
     const start = new Date(Date.UTC(payslip.payrollRecord.year, payslip.payrollRecord.month - 1, 1));
     const end = new Date(Date.UTC(payslip.payrollRecord.year, payslip.payrollRecord.month, 0));
     const enrolments = await this.prisma.client.staffContributionEnrolment.findMany({
