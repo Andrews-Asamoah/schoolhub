@@ -240,6 +240,8 @@ export function AccountantPortalWorkspace({
   const activeTab = defaultTab;
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
+  const [overdueSearch, setOverdueSearch] = useState("");
+  const [overdueClassFilter, setOverdueClassFilter] = useState("ALL");
   const [reportPeriod, setReportPeriod] = useState<"month" | "quarter" | "year" | "all">("year");
   const [showPaymentForm, setShowPaymentForm] = useState(false);
   const [selectedBillId, setSelectedBillId] = useState("");
@@ -343,6 +345,30 @@ export function AccountantPortalWorkspace({
   }), [payments, search]);
 
   const debtors = bills.filter((bill) => Number(bill.balanceAmount) > 0 && bill.status !== "CANCELLED" && bill.status !== "WAIVED");
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+  const overdueBills = debtors.filter((bill) => {
+    if (!bill.dueDate) return bill.status === "OVERDUE";
+    const dueDate = new Date(bill.dueDate);
+    dueDate.setHours(0, 0, 0, 0);
+    return bill.status === "OVERDUE" || (!Number.isNaN(dueDate.getTime()) && dueDate < todayStart);
+  }).sort((a, b) => {
+    const aDue = a.dueDate ? new Date(a.dueDate).getTime() : 0;
+    const bDue = b.dueDate ? new Date(b.dueDate).getTime() : 0;
+    return aDue - bDue;
+  });
+  const overdueTotal = overdueBills.reduce((sum, bill) => sum + Number(bill.balanceAmount), 0);
+  const billedInPeriod = bills.filter((bill) => isInReportPeriod(bill.issuedAt)).reduce((sum, bill) => sum + Number(bill.totalAmount), 0);
+  const collectionRate = billedInPeriod > 0 ? Math.min(100, (reportCollected / billedInPeriod) * 100) : null;
+  const visibleOverdueBills = overdueBills.filter((bill) => {
+    const term = overdueSearch.trim().toLowerCase();
+    const matchesSearch = !term ||
+      bill.billNumber.toLowerCase().includes(term) ||
+      studentName(bill.student).toLowerCase().includes(term) ||
+      (bill.student?.admissionNumber ?? "").toLowerCase().includes(term) ||
+      (bill.class?.name ?? "").toLowerCase().includes(term);
+    return matchesSearch && (overdueClassFilter === "ALL" || bill.class?.id === overdueClassFilter);
+  });
   // Only settled receipts are counted as collections. Failed, pending,
   // cancelled and refunded transactions remain visible in history but are not
   // treated as cash received in dashboard totals or payment-method analysis.
@@ -706,12 +732,35 @@ export function AccountantPortalWorkspace({
       )}
 
       {activeTab === "overview" && (
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <MetricCard label="Payments collected" value={paymentsQuery.error ? "Unavailable" : currency(collected)} detail={paymentsQuery.error ? "Could not load payment records" : `${settledPayments.length} completed receipts`} icon={ArrowUpRight} />
-          <MetricCard label="Outstanding fees" value={billsQuery.error ? "Unavailable" : currency(outstanding)} detail={billsQuery.error ? "Could not load bill records" : `${debtors.length} bills with balances`} icon={AlertCircle} />
-          <MetricCard label="Recorded expenses" value={expensesQuery.error ? "Unavailable" : currency(expenseTotal)} detail={expensesQuery.error ? "Could not load expense records" : `${expenses.length} expense entries`} icon={ArrowDownRight} />
-          <MetricCard label="Paid payroll net" value={payrollQuery.error ? "Unavailable" : currency(payrollNet)} detail={payrollQuery.error ? "Could not load payroll records" : `${paidPayroll.length} paid payroll run(s)`} icon={Wallet} />
-        </div>
+        <section aria-label="Financial performance indicators" className="space-y-3">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div><h2 className="text-lg font-semibold text-foreground">Financial performance</h2><p className="mt-1 text-sm text-muted-foreground">A live summary of saved records. Select a card to review its supporting records.</p></div>
+            <label className="flex items-center gap-2 text-xs font-medium text-muted-foreground">Reporting period
+              <select className={cn(inputClass, "w-auto min-w-40")} value={reportPeriod} onChange={(event) => setReportPeriod(event.target.value as typeof reportPeriod)} aria-label="Dashboard reporting period">
+                <option value="month">This month to date</option><option value="quarter">This quarter to date</option><option value="year">This year to date</option><option value="all">All available records</option>
+              </select>
+            </label>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+            <DashboardMetricLink to="payments" label="Fees collected" value={paymentsQuery.error ? "Unavailable" : currency(reportCollected)} detail={paymentsQuery.error ? "Payment data unavailable" : `${reportSettledPayments.length} completed receipts in period`} icon={ArrowUpRight} />
+            <DashboardMetricLink to="invoices" label="Fees billed" value={billsQuery.error ? "Unavailable" : currency(billedInPeriod)} detail={billsQuery.error ? "Bill data unavailable" : "Bills issued in selected period"} icon={Receipt} />
+            <DashboardMetricLink to="debtors" label="Outstanding fees" value={billsQuery.error ? "Unavailable" : currency(outstanding)} detail={billsQuery.error ? "Bill data unavailable" : `${debtors.length} bills with balances`} icon={AlertCircle} />
+            <DashboardMetricLink to="debtors" label="Overdue balances" value={billsQuery.error ? "Unavailable" : currency(overdueTotal)} detail={billsQuery.error ? "Bill data unavailable" : `${overdueBills.length} overdue bills`} icon={ArrowDownRight} />
+            <DashboardMetricLink to="expenses" label="Operating expenses" value={expensesQuery.error ? "Unavailable" : currency(reportExpenseTotal)} detail={expensesQuery.error ? "Expense data unavailable" : `${reportExpenses.length} expense records in period`} icon={Wallet} />
+          </div>
+          <div className="grid gap-3 md:grid-cols-2">
+            <div className="rounded-2xl border border-border bg-card p-4">
+              <div className="flex items-center justify-between gap-3"><span className="text-sm font-medium text-muted-foreground">Collection rate</span><span className="text-lg font-bold tabular-nums text-foreground">{collectionRate === null ? "—" : `${collectionRate.toFixed(1)}%`}</span></div>
+              <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-primary transition-all" style={{ width: `${collectionRate ?? 0}%` }} /></div>
+              <p className="mt-2 text-xs leading-5 text-muted-foreground">{collectionRate === null ? "No bills were issued in this reporting period, so a collection rate cannot be calculated." : "Completed collections divided by the value of bills issued in the selected period. This is an operational indicator, not a full receivables reconciliation."}</p>
+            </div>
+            <div className="rounded-2xl border border-border bg-card p-4">
+              <div className="flex items-center justify-between gap-3"><span className="text-sm font-medium text-muted-foreground">Payroll paid (net)</span><span className="text-lg font-bold tabular-nums text-foreground">{payrollQuery.error ? "Unavailable" : currency(reportPayrollNet)}</span></div>
+              <p className="mt-2 text-xs text-muted-foreground">{payrollQuery.error ? "Payroll data unavailable" : `${reportPayrollPaid.length} paid payroll run(s) in the selected period`}</p>
+              <Link to="/$page" params={{ page: "payroll" }} className="mt-3 inline-flex text-xs font-semibold text-primary hover:underline">Review payroll records →</Link>
+            </div>
+          </div>
+        </section>
       )}
 
       {loading && activeTab !== "announcements" && (
@@ -721,26 +770,45 @@ export function AccountantPortalWorkspace({
       )}
 
       {!loading && activeTab === "overview" && (
-        <div className="grid gap-5 xl:grid-cols-[1.3fr_0.7fr]">
+        <div className="space-y-5">
+          <AccountantFinanceCharts payments={reportPayments} expenses={reportExpenses} />
           <section className="rounded-2xl border border-border bg-card p-5">
-            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <h2 className="font-semibold text-foreground">Recent payments</h2>
-                <p className="mt-1 text-sm text-muted-foreground">Latest receipts recorded for this school</p>
-              </div>
-              <Link to="/$page" params={{ page: "payments" }} className={buttonSecondary}>View payments</Link>
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div><h2 className="text-lg font-semibold text-foreground">Overdue-fees management</h2><p className="mt-1 text-sm text-muted-foreground">Prioritise bills past their due date with an outstanding balance, then open the bill or record a payment.</p></div>
+              <div className="rounded-xl bg-destructive/5 px-4 py-3 text-right"><p className="text-xs text-muted-foreground">Overdue balance</p><p className="mt-1 text-lg font-bold tabular-nums text-destructive">{billsQuery.error ? "Unavailable" : currency(overdueTotal)}</p><p className="text-xs text-muted-foreground">{overdueBills.length} overdue bill(s)</p></div>
             </div>
-            {paymentsQuery.error ? <QueryError message={paymentsQuery.error.message} /> : <PaymentsTable payments={recentPayments.slice(0, 6)} onViewReceipt={setSelectedReceipt} />}
-          </section>
-          <section className="rounded-2xl border border-border bg-card p-5">
-            <h2 className="font-semibold text-foreground">Attention required</h2>
-            <p className="mt-1 text-sm text-muted-foreground">Items that may need follow-up</p>
-            <div className="mt-4 space-y-3">
-              <AttentionItem title="Outstanding bills" value={billsQuery.error ? "—" : String(debtors.length)} detail={billsQuery.error ? "Could not load bill records" : currency(outstanding)} to="outstanding" />
-              <AttentionItem title="Overdue bills" value={billsQuery.error ? "—" : String(debtors.filter((bill) => bill.status === "OVERDUE").length)} detail={billsQuery.error ? "Could not load bill records" : "Review due dates and follow up"} to="invoices" />
-              <AttentionItem title="Expense records" value={expensesQuery.error ? "—" : String(expenses.length)} detail={expensesQuery.error ? "Could not load expense records" : currency(expenseTotal)} to="expenses" />
+            <div className="my-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_220px]">
+              <div className="relative"><Search className="absolute left-3 top-3 size-4 text-muted-foreground" /><input className={cn(inputClass, "pl-9")} value={overdueSearch} onChange={(event) => setOverdueSearch(event.target.value)} placeholder="Search student, admission no., bill or class" aria-label="Search overdue bills" /></div>
+              <select className={inputClass} value={overdueClassFilter} onChange={(event) => setOverdueClassFilter(event.target.value)} aria-label="Filter overdue bills by class"><option value="ALL">All classes</option>{classes.map((schoolClass) => <option key={schoolClass.id} value={schoolClass.id}>{schoolClass.name}</option>)}</select>
             </div>
+            {billsQuery.error ? <QueryError message={billsQuery.error.message} /> : visibleOverdueBills.length ? (
+              <div className="overflow-x-auto"><table className="w-full min-w-[800px] text-left text-sm">
+                <thead><tr className="border-b border-border text-xs text-muted-foreground"><th className="p-3">Student / bill</th><th className="p-3">Class</th><th className="p-3">Due date</th><th className="p-3 text-right">Days overdue</th><th className="p-3 text-right">Outstanding</th><th className="p-3">Action</th></tr></thead>
+                <tbody>{visibleOverdueBills.slice(0, 8).map((bill) => {
+                  const due = bill.dueDate ? new Date(bill.dueDate) : null;
+                  const days = due && !Number.isNaN(due.getTime()) ? Math.max(0, Math.floor((todayStart.getTime() - new Date(due.getFullYear(), due.getMonth(), due.getDate()).getTime()) / 86400000)) : null;
+                  return <tr key={bill.id} className="border-b border-border/70 last:border-0 hover:bg-muted/40">
+                    <td className="p-3"><p className="font-semibold text-foreground">{studentName(bill.student)}</p><p className="text-xs text-muted-foreground">{bill.billNumber} · {bill.student?.admissionNumber ?? "No admission number"}</p></td>
+                    <td className="p-3">{bill.class?.name ?? "Class not recorded"}</td><td className="p-3">{dateLabel(bill.dueDate)}</td>
+                    <td className="p-3 text-right tabular-nums">{days === null ? "—" : days}</td><td className="p-3 text-right font-semibold tabular-nums">{currency(bill.balanceAmount)}</td>
+                    <td className="p-3"><div className="flex items-center gap-3"><button type="button" className="text-xs font-semibold text-primary hover:underline" onClick={() => setSelectedInvoiceForPrint(bill)}>View bill</button>{canWrite && <button type="button" className="text-xs font-semibold text-foreground hover:underline" onClick={() => { setSelectedBillId(bill.id); setShowPaymentForm(true); }}>Record payment</button>}</div></td>
+                  </tr>;
+                })}</tbody>
+              </table>
+              {visibleOverdueBills.length > 8 && <p className="mt-3 text-xs text-muted-foreground">Showing 8 of {visibleOverdueBills.length} matching overdue bills. Use the Debtors page for the full list.</p>}</div>
+            ) : <EmptyState icon={CheckCircle2} title={overdueBills.length ? "No matching overdue bills" : "No overdue fees"} description={overdueBills.length ? "Try another search or class filter." : "There are no bills past their due date with an outstanding balance. Keep monitoring this panel as payments are recorded."} />}
+            <div className="mt-4 flex flex-wrap gap-2"><Link to="/$page" params={{ page: "debtors" }} className={buttonSecondary}>View all outstanding fees</Link><Link to="/$page" params={{ page: "invoices" }} className={buttonSecondary}>Open all invoices</Link></div>
           </section>
+          <div className="grid gap-5 xl:grid-cols-[1.3fr_0.7fr]">
+            <section className="rounded-2xl border border-border bg-card p-5">
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-3"><div><h2 className="font-semibold text-foreground">Recent payments</h2><p className="mt-1 text-sm text-muted-foreground">Latest receipts recorded for this school</p></div><Link to="/$page" params={{ page: "payments" }} className={buttonSecondary}>View payments</Link></div>
+              {paymentsQuery.error ? <QueryError message={paymentsQuery.error.message} /> : <PaymentsTable payments={recentPayments.slice(0, 6)} onViewReceipt={setSelectedReceipt} />}
+            </section>
+            <section className="rounded-2xl border border-border bg-card p-5">
+              <h2 className="font-semibold text-foreground">Finance activity</h2><p className="mt-1 text-sm text-muted-foreground">Quick access to records that need attention.</p>
+              <div className="mt-4 space-y-3"><AttentionItem title="Bills with balances" value={billsQuery.error ? "—" : String(debtors.length)} detail={billsQuery.error ? "Could not load bill records" : currency(outstanding)} to="debtors" /><AttentionItem title="Overdue bills" value={billsQuery.error ? "—" : String(overdueBills.length)} detail={billsQuery.error ? "Could not load bill records" : currency(overdueTotal)} to="debtors" /><AttentionItem title="Expense records" value={expensesQuery.error ? "—" : String(reportExpenses.length)} detail={expensesQuery.error ? "Could not load expense records" : currency(reportExpenseTotal)} to="expenses" /></div>
+            </section>
+          </div>
         </div>
       )}
 
@@ -1063,6 +1131,14 @@ export function AccountantPortalWorkspace({
       )}
     </div>
   );
+}
+
+function DashboardMetricLink({ to, label, value, detail, icon: Icon }: { to: string; label: string; value: string; detail: string; icon: typeof Wallet }) {
+  return <Link to="/$page" params={{ page: to }} className="group rounded-2xl border border-border bg-card p-4 transition hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+    <div className="flex items-center justify-between gap-3"><p className="text-sm text-muted-foreground">{label}</p><span className="rounded-xl bg-muted p-2 transition group-hover:bg-primary/10"><Icon className="size-4 text-foreground" /></span></div>
+    <p className="mt-3 break-words text-xl font-bold tracking-tight text-foreground sm:text-2xl">{value}</p><p className="mt-1 text-xs text-muted-foreground">{detail}</p>
+    <span className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-primary">View records <span aria-hidden="true">→</span></span>
+  </Link>;
 }
 
 function MetricCard({ label, value, detail, icon: Icon }: { label: string; value: string; detail: string; icon: typeof Wallet }) {
