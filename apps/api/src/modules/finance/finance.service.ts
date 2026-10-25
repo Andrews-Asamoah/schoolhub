@@ -2940,7 +2940,7 @@ export class FinanceService {
     ].sort((a, b) => a.name.localeCompare(b.name));
   }
 
-  async updatePayrollSalary(schoolId: string, kind: string, personId: string, monthlySalary: number, actorId: string) {
+  async updatePayrollSalary(schoolId: string, kind: string, personId: string, monthlySalary: number, actorId: string, reason: string) {
     if (kind !== "TEACHER" && kind !== "STAFF") {
       throw new BadRequestException("Choose a valid payroll person type.");
     }
