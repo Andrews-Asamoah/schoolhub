@@ -15,3 +15,15 @@ export const FINANCE_WRITE_ROLES = ["accountant"] as const;
 
 /** Roles that may view financial data and reports. */
 export const FINANCE_READ_ROLES = ["owner", "admin", "accountant", "headteacher"] as const;
+
+/** Payroll and salary exports are confidential: only accountant, owner and headteacher may export. */
+export const FINANCE_PAYROLL_EXPORT_ROLES = ["accountant", "owner", "headteacher"] as const;
+
+export function isFinancePayrollExportRole(role: string | null | undefined): boolean {
+  return !!role && (FINANCE_PAYROLL_EXPORT_ROLES as readonly string[]).includes(role);
+}
+
+/** RolesGuard has a global superAdmin bypass; payroll exports intentionally override that bypass. */
+export function canExportFinancePayroll(actorPlatformRole: string | null | undefined, activeSchoolRole: string | null | undefined): boolean {
+  return actorPlatformRole !== "superAdmin" && isFinancePayrollExportRole(activeSchoolRole);
+}

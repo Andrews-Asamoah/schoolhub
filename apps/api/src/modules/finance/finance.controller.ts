@@ -1,5 +1,6 @@
 import {
   Controller,
+  ForbiddenException,
   Get,
   Post,
   Patch,
@@ -10,11 +11,15 @@ import {
   Body,
   UseGuards,
   UseInterceptors,
+  Req,
+  Res,
 } from "@nestjs/common";
+import type { Request, Response } from "express";
 import { FinanceService } from "./finance.service.js";
+import { FinanceExportsService, type FinanceExportContext, type FinanceExportFile } from "./finance-exports.service.js";
 import { SchoolTenantGuard } from "../../common/guards/school-tenant.guard.js";
 import { RolesGuard } from "../../common/guards/roles.guard.js";
-import { FINANCE_READ_ROLES, FINANCE_WRITE_ROLES } from "./finance.permissions.js";
+import { FINANCE_PAYROLL_EXPORT_ROLES, FINANCE_READ_ROLES, FINANCE_WRITE_ROLES, canExportFinancePayroll } from "./finance.permissions.js";
 import { FinanceAuditInterceptor, FinanceSelfAudited } from "./finance-audit.interceptor.js";
 import { FinanceWriteRateLimitGuard, SuperAdminReasonGuard } from "./finance-safeguards.js";
 import { Roles } from "../../common/decorators/roles.decorator.js";
@@ -110,12 +115,28 @@ const reversePaymentSchema = z.object({
   kind: z.enum(["VOID", "REFUND"]).default("VOID"),
   reason: z.string().trim().min(10, "Explain why this payment is being reversed (at least 10 characters)").max(500),
 });
+const arrearsPolicySchema = z.object({
+  arrearsPolicy: z.enum(["SHOW_ONLY", "BLOCK_CLEARANCE_UNTIL_PAID"]),
+});
+const lateFeePolicySchema = z.object({
+  enabled: z.boolean(),
+  mode: z.enum(["PERCENTAGE", "FIXED"]),
+  value: z.string().regex(/^\d{1,8}(?:\.\d{1,2})?$/, "Enter a non-negative value to two decimal places."),
+  graceDays: z.number().int().min(0).max(3650),
+});
+const markFormerStudentsSchema = z.object({
+  studentIds: z.array(z.string().min(1)).min(1).max(200),
+  reason: z.string().trim().min(10).max(500),
+});
 
 @Controller("finance")
 @UseGuards(SchoolTenantGuard, RolesGuard, SuperAdminReasonGuard, FinanceWriteRateLimitGuard)
 @UseInterceptors(FinanceAuditInterceptor)
 export class FinanceController {
-  constructor(private readonly financeService: FinanceService) {}
+  constructor(
+    private readonly financeService: FinanceService,
+    private readonly financeExports: FinanceExportsService,
+  ) {}
 
 
   @Get("concessions")
@@ -227,13 +248,97 @@ export class FinanceController {
     return this.financeService.updateFeeItemRegistry(school.id, itemId, body);
   }
 
+  @Get("summary")
+  @Roles(...FINANCE_READ_ROLES)
+  getFinanceSummary(
+    @CurrentSchool() school: School,
+    @Query("from") from?: string,
+    @Query("to") to?: string,
+    @Query("yearId") yearId?: string,
+    @Query("termId") termId?: string,
+  ) {
+    return this.financeService.getFinanceSummary(school.id, { from, to, yearId, termId });
+  }
+
+  @Get("term-end-review")
+  @Roles(...FINANCE_READ_ROLES)
+  getTermEndReview(
+    @CurrentSchool() school: School,
+    @Query("yearId") yearId?: string,
+    @Query("termId") termId?: string,
+  ) {
+    return this.financeService.getTermEndReview(school.id, yearId ?? "", termId ?? "");
+  }
+
+  @Get("former-students")
+  @Roles(...FINANCE_READ_ROLES)
+  getFormerStudentsWithBalances(@CurrentSchool() school: School) {
+    return this.financeService.getFormerStudentsWithBalances(school.id);
+  }
+
+  @Post("term-end-review/former-students")
+  @Roles(...FINANCE_WRITE_ROLES)
+  markFormerStudents(
+    @CurrentSchool() school: School,
+    @CurrentUser() user: AuthenticatedUser,
+    @Body(new ZodValidationPipe(markFormerStudentsSchema)) body: z.infer<typeof markFormerStudentsSchema>,
+  ) {
+    return this.financeService.markFormerStudents(school.id, user.id, body.studentIds, body.reason);
+  }
+
+  @Get("late-fee-policy")
+  @Roles(...FINANCE_READ_ROLES)
+  getLateFeePolicy(@CurrentSchool() school: School) {
+    return this.financeService.getLateFeePolicy(school.id);
+  }
+
+  @Put("late-fee-policy")
+  @Roles(...FINANCE_WRITE_ROLES)
+  setLateFeePolicy(
+    @CurrentSchool() school: School,
+    @CurrentUser() user: AuthenticatedUser,
+    @Body(new ZodValidationPipe(lateFeePolicySchema)) body: z.infer<typeof lateFeePolicySchema>,
+  ) {
+    return this.financeService.setLateFeePolicy(school.id, user.id, body);
+  }
+
+  @Get("arrears-policy")
+  @Roles(...FINANCE_READ_ROLES)
+  getArrearsPolicy(@CurrentSchool() school: School) {
+    return this.financeService.getArrearsPolicy(school.id);
+  }
+
+  @Put("arrears-policy")
+  @Roles(...FINANCE_WRITE_ROLES)
+  setArrearsPolicy(
+    @CurrentSchool() school: School,
+    @CurrentUser() user: AuthenticatedUser,
+    @Body(new ZodValidationPipe(arrearsPolicySchema)) body: z.infer<typeof arrearsPolicySchema>,
+  ) {
+    return this.financeService.setArrearsPolicy(school.id, user.id, body.arrearsPolicy);
+  }
+
   @Get("bills")
   @Roles(...FINANCE_READ_ROLES)
   listBills(
     @CurrentSchool() school: School,
     @Query("studentId") studentId?: string,
+    @Query("cursor") cursor?: string,
+    @Query("limit") limit?: string,
+    @Query("search") search?: string,
+    @Query("status") status?: string,
+    @Query("classId") classId?: string,
+    @Query("from") from?: string,
+    @Query("to") to?: string,
+    @Query("outstanding") outstanding?: string,
+    @Query("overdue") overdue?: string,
+    @Query("yearId") yearId?: string,
+    @Query("termId") termId?: string,
   ) {
-    return this.financeService.listBills(school.id, studentId);
+    return this.financeService.listBills(school.id, {
+      studentId, cursor, limit, search, status, classId, from, to,
+      outstanding, overdue, yearId, termId,
+    });
   }
 
   @Get("students/outstanding")
@@ -244,8 +349,22 @@ export class FinanceController {
 
   @Get("payments")
   @Roles(...FINANCE_READ_ROLES)
-  listPayments(@CurrentSchool() school: School) {
-    return this.financeService.listPayments(school.id);
+  listPayments(
+    @CurrentSchool() school: School,
+    @Query("cursor") cursor?: string,
+    @Query("limit") limit?: string,
+    @Query("search") search?: string,
+    @Query("status") status?: string,
+    @Query("paymentMethod") paymentMethod?: string,
+    @Query("classId") classId?: string,
+    @Query("from") from?: string,
+    @Query("to") to?: string,
+    @Query("yearId") yearId?: string,
+    @Query("termId") termId?: string,
+  ) {
+    return this.financeService.listPayments(school.id, {
+      cursor, limit, search, status, paymentMethod, classId, from, to, yearId, termId,
+    });
   }
 
   @Get("expenses")
@@ -455,6 +574,212 @@ export class FinanceController {
     @Param("scheduleId") scheduleId: string,
   ) {
     return this.financeService.sendFeeReminderInApp(school.id, scheduleId);
+  }
+
+
+  @Get("students/:studentId/statement")
+  @Roles(...FINANCE_READ_ROLES)
+  getStudentStatement(
+    @CurrentSchool() school: School,
+    @Param("studentId") studentId: string,
+    @CurrentSchoolRole() role: string | undefined,
+    @Query("scope") scope?: "term" | "year" | "all",
+    @Query("from") from?: string,
+    @Query("to") to?: string,
+    @Query("yearId") yearId?: string,
+    @Query("termId") termId?: string,
+  ) {
+    return this.financeService.getStudentStatement(school.id, studentId, role, {
+      scope, from, to, yearId, termId,
+    });
+  }
+
+  /** Server-side, school-scoped exports. Each successful export is audited by FinanceExportsService. */
+  private assertPayrollExportAllowed(user: AuthenticatedUser, schoolRole: string | undefined) {
+    // RolesGuard grants platform superAdmins a global bypass. Confidential payroll exports intentionally do not.
+    if (!canExportFinancePayroll(user.role, schoolRole)) {
+      throw new ForbiddenException("Payroll and salary exports are limited to the accountant, owner and headteacher roles.");
+    }
+  }
+
+  private financeExportContext(
+    school: School,
+    user: AuthenticatedUser,
+    request: Request,
+    from?: string,
+    to?: string,
+  ): FinanceExportContext {
+    return {
+      schoolId: school.id,
+      actorId: user.id,
+      actorName: user.name,
+      ipAddress: request.ip,
+      userAgent: request.get("user-agent") ?? undefined,
+      from,
+      to,
+    };
+  }
+
+  private sendFinanceExport(
+    response: Response,
+    file: FinanceExportFile,
+    disposition: "attachment" | "inline" = "attachment",
+  ) {
+    const safeFileName = file.fileName.replace(/[^a-zA-Z0-9._-]/g, "_");
+    response.setHeader("Content-Type", file.contentType);
+    response.setHeader("Content-Disposition", disposition + '; filename="' + safeFileName + '"');
+    response.setHeader("Cache-Control", "private, no-store, max-age=0");
+    response.setHeader("X-Content-Type-Options", "nosniff");
+    return response.status(200).send(file.buffer);
+  }
+
+  @Get("exports/bills.xlsx")
+  @Roles(...FINANCE_READ_ROLES)
+  async exportBillsExcel(
+    @CurrentSchool() school: School,
+    @CurrentUser() user: AuthenticatedUser,
+    @Req() request: Request,
+    @Res() response: Response,
+    @Query("from") from?: string,
+    @Query("to") to?: string,
+  ) {
+    const context = this.financeExportContext(school, user, request, from, to);
+    return this.sendFinanceExport(response, await this.financeExports.exportExcel(context, "bills"));
+  }
+
+  @Get("exports/payments.xlsx")
+  @Roles(...FINANCE_READ_ROLES)
+  async exportPaymentsExcel(
+    @CurrentSchool() school: School,
+    @CurrentUser() user: AuthenticatedUser,
+    @Req() request: Request,
+    @Res() response: Response,
+    @Query("from") from?: string,
+    @Query("to") to?: string,
+  ) {
+    const context = this.financeExportContext(school, user, request, from, to);
+    return this.sendFinanceExport(response, await this.financeExports.exportExcel(context, "payments"));
+  }
+
+  @Get("exports/expenses.xlsx")
+  @Roles(...FINANCE_READ_ROLES)
+  async exportExpensesExcel(
+    @CurrentSchool() school: School,
+    @CurrentUser() user: AuthenticatedUser,
+    @Req() request: Request,
+    @Res() response: Response,
+    @Query("from") from?: string,
+    @Query("to") to?: string,
+  ) {
+    const context = this.financeExportContext(school, user, request, from, to);
+    return this.sendFinanceExport(response, await this.financeExports.exportExcel(context, "expenses"));
+  }
+
+  @Get("exports/payroll.xlsx")
+  @Roles(...FINANCE_PAYROLL_EXPORT_ROLES)
+  async exportPayrollExcel(
+    @CurrentSchool() school: School,
+    @CurrentUser() user: AuthenticatedUser,
+    @CurrentSchoolRole() schoolRole: string | undefined,
+    @Req() request: Request,
+    @Res() response: Response,
+    @Query("from") from?: string,
+    @Query("to") to?: string,
+  ) {
+    this.assertPayrollExportAllowed(user, schoolRole);
+    const context = this.financeExportContext(school, user, request, from, to);
+    return this.sendFinanceExport(response, await this.financeExports.exportExcel(context, "payroll"));
+  }
+
+  @Get("exports/salaries.xlsx")
+  @Roles(...FINANCE_PAYROLL_EXPORT_ROLES)
+  async exportSalaryExcel(
+    @CurrentSchool() school: School,
+    @CurrentUser() user: AuthenticatedUser,
+    @CurrentSchoolRole() schoolRole: string | undefined,
+    @Req() request: Request,
+    @Res() response: Response,
+    @Query("from") from?: string,
+    @Query("to") to?: string,
+  ) {
+    this.assertPayrollExportAllowed(user, schoolRole);
+    const context = this.financeExportContext(school, user, request, from, to);
+    return this.sendFinanceExport(response, await this.financeExports.exportExcel(context, "salaries"));
+  }
+
+  @Get("bills/:billId/invoice.pdf")
+  @Roles(...FINANCE_READ_ROLES)
+  async exportInvoicePdf(
+    @CurrentSchool() school: School,
+    @CurrentUser() user: AuthenticatedUser,
+    @Req() request: Request,
+    @Res() response: Response,
+    @Param("billId") billId: string,
+  ) {
+    const context = this.financeExportContext(school, user, request);
+    return this.sendFinanceExport(response, await this.financeExports.invoicePdf(context, billId), "inline");
+  }
+
+  @Get("payments/:paymentId/receipt.pdf")
+  @Roles(...FINANCE_READ_ROLES)
+  async exportReceiptPdf(
+    @CurrentSchool() school: School,
+    @CurrentUser() user: AuthenticatedUser,
+    @Req() request: Request,
+    @Res() response: Response,
+    @Param("paymentId") paymentId: string,
+  ) {
+    const context = this.financeExportContext(school, user, request);
+    return this.sendFinanceExport(response, await this.financeExports.receiptPdf(context, paymentId), "inline");
+  }
+
+  @Get("students/:studentId/statement.pdf")
+  @Roles(...FINANCE_READ_ROLES)
+  async exportStudentStatementPdf(
+    @CurrentSchool() school: School,
+    @CurrentUser() user: AuthenticatedUser,
+    @Req() request: Request,
+    @Res() response: Response,
+    @Param("studentId") studentId: string,
+    @Query("from") from?: string,
+    @Query("to") to?: string,
+  ) {
+    const context = this.financeExportContext(school, user, request, from, to);
+    return this.sendFinanceExport(
+      response,
+      await this.financeExports.studentStatementPdf(context, studentId),
+      "inline",
+    );
+  }
+
+  @Get("payslips/:payslipId.pdf")
+  @Roles(...FINANCE_PAYROLL_EXPORT_ROLES)
+  async exportSinglePayslipPdf(
+    @CurrentSchool() school: School,
+    @CurrentUser() user: AuthenticatedUser,
+    @CurrentSchoolRole() schoolRole: string | undefined,
+    @Req() request: Request,
+    @Res() response: Response,
+    @Param("payslipId") payslipId: string,
+  ) {
+    this.assertPayrollExportAllowed(user, schoolRole);
+    const context = this.financeExportContext(school, user, request);
+    return this.sendFinanceExport(response, await this.financeExports.payslipPdf(context, payslipId), "inline");
+  }
+
+  @Get("payroll/:recordId/payslips.pdf")
+  @Roles(...FINANCE_PAYROLL_EXPORT_ROLES)
+  async exportPayrollPdf(
+    @CurrentSchool() school: School,
+    @CurrentUser() user: AuthenticatedUser,
+    @CurrentSchoolRole() schoolRole: string | undefined,
+    @Req() request: Request,
+    @Res() response: Response,
+    @Param("recordId") recordId: string,
+  ) {
+    this.assertPayrollExportAllowed(user, schoolRole);
+    const context = this.financeExportContext(school, user, request);
+    return this.sendFinanceExport(response, await this.financeExports.payrollPdf(context, recordId), "inline");
   }
 
   @Get("students/:studentId/ledger")

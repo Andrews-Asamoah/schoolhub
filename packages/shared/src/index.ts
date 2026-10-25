@@ -648,8 +648,49 @@ export const generateBillSchema = z.object({
     .regex(/^\d{4}-\d{2}-\d{2}$/)
     .optional(),
   notes: z.string().optional(),
+  /** Optional fee item IDs are explicit opt-ins; all mandatory items remain billable. */
+  optionalItemIds: z.array(z.string().min(1)).max(100).default([]),
 });
 export type GenerateBillInput = z.infer<typeof generateBillSchema>;
+
+export type StudentStatementEntryType =
+  | "INVOICE"
+  | "DISCOUNT"
+  | "RECEIPT"
+  | "REVERSAL"
+  | "REFUND"
+  | "ADJUSTMENT";
+
+export interface StudentStatementEntry {
+  id: string;
+  date: string;
+  type: StudentStatementEntryType;
+  reference: string;
+  description: string;
+  academicYear?: string | null;
+  term?: string | null;
+  billId?: string | null;
+  paymentId?: string | null;
+  /** Signed amount: positive increases receivables; negative reduces receivables. */
+  amount: string;
+  runningBalance: string;
+}
+
+export interface StudentStatementResponse {
+  student: {
+    id: string;
+    admissionNumber: string | null;
+    name: string;
+  };
+  scope: "term" | "year" | "all";
+  period: { from: string | null; to: string | null; academicYear?: string | null; term?: string | null };
+  openingBalance: string;
+  entries: StudentStatementEntry[];
+  closingBalance: string;
+  ageing: { days0To30: string; days31To60: string; days61To90: string; days90Plus: string; notDue: string };
+  unallocatedCredit: string;
+  dataSource: "bills_and_payments";
+}
 
 export const createExpenseSchema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Format: YYYY-MM-DD"),

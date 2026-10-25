@@ -92,6 +92,23 @@ export class StudentsController {
     return this.studentsService.getMyWards(school.id, user!.id);
   }
 
+  @Get("my-wards/:id/fees")
+  @Roles("guardian")
+  myWardFees(
+    @CurrentSchool() school: School,
+    @CurrentUser() user: AuthenticatedUser | undefined,
+    @Param("id") id: string,
+    @Query("scope") scope?: "term" | "year" | "all",
+    @Query("from") from?: string,
+    @Query("to") to?: string,
+    @Query("yearId") yearId?: string,
+    @Query("termId") termId?: string,
+  ) {
+    return this.studentsService.getMyWardFees(school.id, user!.id, id, {
+      scope, from, to, yearId, termId,
+    });
+  }
+
   @Get("my-wards/:id")
   @Roles("guardian")
   myWard(

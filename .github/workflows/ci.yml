@@ -57,6 +57,9 @@ jobs:
       - name: Baseline typecheck
         if: ${{ always() && steps.install.outcome == 'success' }}
         run: pnpm typecheck
+      - name: Baseline web build
+        if: ${{ always() && steps.install.outcome == 'success' }}
+        run: pnpm --filter @schoolhub/web build
       - name: Baseline API lint
         if: ${{ always() && steps.install.outcome == 'success' }}
         run: pnpm --filter @schoolhub/api lint
@@ -106,6 +109,8 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Typecheck
         run: pnpm typecheck
+      - name: Web build
+        run: pnpm --filter @schoolhub/web build
       - name: API lint
         run: pnpm --filter @schoolhub/api lint
       - name: Apply database migrations

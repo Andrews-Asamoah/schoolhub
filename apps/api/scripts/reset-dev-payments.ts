@@ -98,7 +98,10 @@ async function main() {
           await tx.chartAccount.update({ where: { id: entry.creditAccountId }, data: { balance: change } });
         }
 
-        // 2. Payments first (they reference the ledger entries); allocations cascade.
+        // Bill-level allocations are derived from saved receipts. Remove these
+        // development-only reset records before deleting payments (FK is restrictive).
+        await tx.paymentBillAllocation.deleteMany({ where: { schoolId: school.id } });
+        // Payments first (their item allocations cascade).
         await tx.payment.deleteMany({ where: { schoolId: school.id } });
         if (entries.length) {
           await tx.transaction.deleteMany({ where: { id: { in: entries.map((entry) => entry.id) } } });
