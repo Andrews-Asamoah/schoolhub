@@ -226,6 +226,15 @@ importers:
       exceljs:
         specifier: ^4.4.0
         version: 4.4.0
+      jspdf:
+        specifier: ^4.2.1
+        version: 4.2.1
+      jspdf-autotable:
+        specifier: ^5.0.9
+        version: 5.0.9(jspdf@4.2.1)
+      qrcode:
+        specifier: ^1.5.4
+        version: 1.5.4
       helmet:
         specifier: ^8.3.0
         version: 8.3.0
@@ -266,6 +275,9 @@ importers:
       '@types/pg':
         specifier: ^8.23.1
         version: 8.23.1
+      '@types/qrcode':
+        specifier: ^1.5.6
+        version: 1.5.6
       '@types/supertest':
         specifier: ^7.0.0
         version: 7.2.1
