@@ -235,7 +235,31 @@ describe.skipIf(!enabled)("bill generation (database)", { timeout: 60_000 }, () 
   });
 
   it("snapshots earlier unpaid bills without adding a duplicate charge", async () => {
-    const studentId = studentIds[0]!;
+    // Use a fresh student so earlier bill-generation cases cannot mark this term's
+    // first bill as already snapshotted before this test creates its prior-year debt.
+    const carryForwardUser = await prisma.user.create({
+      data: {
+        id: `${run}-carryforward`,
+        name: "Carry Forward Student",
+        email: `${run}-carryforward@example.test`,
+      },
+    });
+    userIds.push(carryForwardUser.id);
+    const carryForwardProfile = await prisma.userProfile.create({
+      data: { userId: carryForwardUser.id, firstName: "Carry", lastName: "Forward" },
+    });
+    const carryForwardStudent = await prisma.student.create({
+      data: {
+        profileId: carryForwardProfile.id,
+        schoolId,
+        studentId: `${run}-carryforward`,
+        classId,
+      },
+    });
+    const studentId = carryForwardStudent.id;
+    await prisma.enrollment.create({
+      data: { studentId, classId, academicYearId: yearId, termId, status: "ACTIVE" },
+    });
     const oldYear = await prisma.academicYear.create({
       data: { schoolId, name: `${run} prior year`, startDate: new Date("2025-01-01"), endDate: new Date("2025-12-31"), isCurrent: false },
     });
