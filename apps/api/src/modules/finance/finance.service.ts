@@ -2940,11 +2940,13 @@ export class FinanceService {
     ].sort((a, b) => a.name.localeCompare(b.name));
   }
 
-  async updatePayrollSalary(schoolId: string, kind: string, personId: string, monthlySalary: number, actorId: string, reason: string) {
+  async updatePayrollSalary(schoolId: string, kind: string, personId: string, monthlySalary: string, actorId: string, reason: string) {
     if (kind !== "TEACHER" && kind !== "STAFF") {
       throw new BadRequestException("Choose a valid payroll person type.");
     }
-    const next = new Prisma.Decimal(monthlySalary);
+    let next: Prisma.Decimal;
+    try { next = new Prisma.Decimal(monthlySalary); } catch { throw new BadRequestException("Enter a valid salary amount."); }
+    if (!next.isFinite() || next.lessThan(0) || next.greaterThan(10000000)) throw new BadRequestException("Monthly salary must be between 0 and GHS 10,000,000.");
     if (!reason.trim() || reason.trim().length < 10) throw new BadRequestException("Explain why the salary is changing (at least 10 characters).");
     await this.prisma.client.$transaction(async (tx) => {
       // The change and its audit entry (old and new salary) commit together.
