@@ -1513,11 +1513,18 @@ export class FinanceService {
       balanceAmount: { gt: 0 },
       dueDate: { lt: dayStart },
     };
+    const openBillsWhere: Prisma.BillWhereInput = {
+      ...billWhere,
+      balanceAmount: { gt: 0 },
+      status: { notIn: ["CANCELLED", "WAIVED"] },
+    };
 
-    const [billedAggregate, outstandingAggregate, overdueAggregate, methodGroups, classGroups, ageingBills, paymentByBill] = await Promise.all([
+    const [billedAggregate, outstandingAggregate, overdueAggregate, openBillCount, overdueBillCount, methodGroups, classGroups, ageingBills, paymentByBill] = await Promise.all([
       this.prisma.client.bill.aggregate({ where: billWhere, _sum: { totalAmount: true } }),
       this.prisma.client.bill.aggregate({ where: { ...billWhere, balanceAmount: { gt: 0 } }, _sum: { balanceAmount: true } }),
       this.prisma.client.bill.aggregate({ where: overdueWhere, _sum: { balanceAmount: true } }),
+      this.prisma.client.bill.count({ where: openBillsWhere }),
+      this.prisma.client.bill.count({ where: overdueWhere }),
       this.prisma.client.payment.groupBy({
         by: ["paymentMethod"],
         where: paymentWhere,
@@ -1587,6 +1594,8 @@ export class FinanceService {
       collected: methodGroups.reduce((sum, group) => sum + asNumber(group._sum.amount), 0),
       outstanding: asNumber(outstandingAggregate._sum.balanceAmount),
       overdue: asNumber(overdueAggregate._sum.balanceAmount),
+      openBillCount,
+      overdueBillCount,
       byPaymentMethod: methodGroups.map((group) => ({
         method: group.paymentMethod,
         amount: asNumber(group._sum.amount),
@@ -1622,7 +1631,7 @@ export class FinanceService {
     const billStatuses = ["PENDING", "PARTIALLY_PAID", "PAID", "CANCELLED", "WAIVED"];
     const dayStart = new Date();
     dayStart.setUTCHours(0, 0, 0, 0);
-    if (status && status !== "OVERDUE" && !billStatuses.includes(status)) throw new BadRequestException("Unsupported bill status filter.");
+    if (status && status !== "OVERDUE" && status !== "OUTSTANDING" && !billStatuses.includes(status)) throw new BadRequestException("Unsupported bill status filter.");
     const search = input.search?.trim();
     const baseWhere: Prisma.BillWhereInput = {
       schoolId,
@@ -1633,7 +1642,9 @@ export class FinanceService {
       ...(dates.start || dates.end ? { issuedAt: { ...(dates.start ? { gte: dates.start } : {}), ...(dates.end ? { lte: dates.end } : {}) } } : {}),
       ...(status === "OVERDUE"
         ? { balanceAmount: { gt: 0 }, dueDate: { lt: dayStart }, status: { notIn: ["CANCELLED", "WAIVED"] } }
-        : status ? { status } : {}),
+        : status === "OUTSTANDING"
+          ? { balanceAmount: { gt: 0 }, status: { notIn: ["CANCELLED", "WAIVED"] } }
+          : status ? { status: status as "PENDING" | "PARTIALLY_PAID" | "PAID" | "CANCELLED" | "WAIVED" } : {}),
       ...(search ? { OR: [
         { billNumber: { contains: search, mode: "insensitive" } },
         { student: { admissionNumber: { contains: search, mode: "insensitive" } } },
