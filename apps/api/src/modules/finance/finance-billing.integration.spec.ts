@@ -46,6 +46,23 @@ describe.skipIf(!enabled)("bill generation (database)", { timeout: 60_000 }, () 
   const generate = (feeStructureId: string, extra: Record<string, unknown> = {}) =>
     service.generateBills(schoolId, { academicYearId: yearId, termId, feeStructureId, classId, ...extra } as never, actorId);
 
+  async function structureWithOptionalItem() {
+    structureCounter += 1;
+    return prisma.feeStructure.create({
+      data: {
+        schoolId,
+        name: `Optional structure ${run}-${structureCounter}`,
+        items: {
+          create: [
+            { name: "Mandatory tuition", amount: new (await import("@prisma/client")).Prisma.Decimal("100.00"), isOptional: false },
+            { name: "Optional trip", amount: new (await import("@prisma/client")).Prisma.Decimal("50.00"), isOptional: true },
+          ],
+        },
+      },
+      include: { items: true },
+    });
+  }
+
   const billsFor = (feeStructureId: string) => prisma.bill.findMany({ where: { schoolId, feeStructureId }, include: { items: true } });
   const outstanding = async () =>
     Object.fromEntries((await prisma.student.findMany({ where: { id: { in: studentIds } } })).map((s) => [s.id, s.outstandingBalance.toNumber()]));
@@ -88,6 +105,7 @@ describe.skipIf(!enabled)("bill generation (database)", { timeout: 60_000 }, () 
     if (!prisma || !schoolId) return;
     const quiet = (promise: Promise<unknown>) => promise.catch(() => undefined);
     await quiet(prisma.auditLog.deleteMany({ where: { schoolId } }));
+    await quiet(prisma.billCarryForward.deleteMany({ where: { schoolId } }));
     await quiet(prisma.bill.deleteMany({ where: { schoolId } }));
     await quiet(prisma.enrollment.deleteMany({ where: { academicYearId: yearId } }));
     await quiet(prisma.student.deleteMany({ where: { schoolId } }));
@@ -194,6 +212,65 @@ describe.skipIf(!enabled)("bill generation (database)", { timeout: 60_000 }, () 
     const student = await prisma.student.findUniqueOrThrow({ where: { id: bill.studentId } });
     const unpaid = await prisma.bill.findMany({ where: { studentId: bill.studentId, status: { notIn: ["CANCELLED", "WAIVED"] } } });
     expect(student.outstandingBalance.toNumber()).toBe(unpaid.reduce((sum, b) => sum + Number(b.balanceAmount), 0));
+  });
+
+  it("excludes optional fee items unless explicitly selected", async () => {
+    const defaultFees = await structureWithOptionalItem();
+    await generate(defaultFees.id);
+    const defaultBills = await billsFor(defaultFees.id);
+    expect(defaultBills).toHaveLength(STUDENTS);
+    expect(defaultBills.every((bill) => bill.totalAmount.eq("100.00"))).toBe(true);
+    expect(defaultBills.every((bill) => bill.items.length === 1 && bill.items[0]?.description === "Mandatory tuition")).toBe(true);
+
+    const selectedFees = await structureWithOptionalItem();
+    const optionalItem = selectedFees.items.find((item) => item.isOptional)!;
+    await generate(selectedFees.id, { optionalItemIds: [optionalItem.id] });
+    const selectedBills = await billsFor(selectedFees.id);
+    expect(selectedBills).toHaveLength(STUDENTS);
+    expect(selectedBills.every((bill) => bill.totalAmount.eq("150.00"))).toBe(true);
+    expect(selectedBills.every((bill) => bill.items.some((item) => item.description === "Optional trip"))).toBe(true);
+  });
+
+  it("snapshots earlier unpaid bills without adding a duplicate charge", async () => {
+    const studentId = studentIds[0]!;
+    const oldYear = await prisma.academicYear.create({
+      data: { schoolId, name: `${run} prior year`, startDate: new Date("2025-01-01"), endDate: new Date("2025-12-31"), isCurrent: false },
+    });
+    const oldTerm = await prisma.term.create({
+      data: { academicYearId: oldYear.id, name: "Prior Term", termNumber: 1, startDate: new Date("2025-01-01"), endDate: new Date("2025-04-30"), isCurrent: false },
+    });
+    const oldBill = await prisma.bill.create({
+      data: {
+        schoolId,
+        studentId,
+        academicYearId: oldYear.id,
+        termId: oldTerm.id,
+        billNumber: `HIST-${run}`,
+        totalAmount: new (await import("@prisma/client")).Prisma.Decimal("250.00"),
+        grossAmount: new (await import("@prisma/client")).Prisma.Decimal("250.00"),
+        discountAmount: new (await import("@prisma/client")).Prisma.Decimal("0.00"),
+        paidAmount: new (await import("@prisma/client")).Prisma.Decimal("0.00"),
+        balanceAmount: new (await import("@prisma/client")).Prisma.Decimal("250.00"),
+        status: "PENDING",
+        items: { create: [{ description: "Prior term charge", amount: "250.00", totalAmount: "250.00", balanceAmount: "250.00" }] },
+      },
+    });
+    await prisma.student.update({ where: { id: studentId }, data: { outstandingBalance: { increment: "250.00" } } });
+    const fees = await structure([100]);
+    await generate(fees.id, { studentId, classId: undefined });
+    const newBill = (await billsFor(fees.id)).find((bill) => bill.studentId === studentId)!;
+    const snapshot = await prisma.billCarryForward.findMany({ where: { schoolId, billId: newBill.id } });
+    expect(snapshot).toHaveLength(1);
+    expect(snapshot[0]?.sourceBillId).toBe(oldBill.id);
+    expect(snapshot[0]?.amount.toFixed(2)).toBe("250.00");
+    expect(newBill.totalAmount.toFixed(2)).toBe("100.00");
+    expect(newBill.balanceAmount.toFixed(2)).toBe("100.00");
+    const openBills = await prisma.bill.findMany({
+      where: { schoolId, studentId, status: { notIn: ["CANCELLED", "WAIVED"] } },
+      select: { balanceAmount: true },
+    });
+    const receivableTotal = openBills.reduce((sum, bill) => sum.plus(bill.balanceAmount), new (await import("@prisma/client")).Prisma.Decimal(0));
+    expect(receivableTotal.toFixed(2)).toBe("350.00");
   });
 
   it("refuses bills for a term that is not the current one", async () => {
