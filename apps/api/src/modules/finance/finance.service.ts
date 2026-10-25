@@ -2426,6 +2426,89 @@ export class FinanceService {
     return { studentCount: targets.length, inAppSent, skippedNoLogin, failed, alreadySent: alreadySentCount };
   }
 
+  /**
+   * Complete, school-scoped student statement across all academic years.
+   * Unlike the term ledger used by student/guardian views, this is intended
+   * for finance staff reviewing the student's full payment history.
+   */
+  async getStudentStatement(schoolId: string, studentId: string) {
+    const student = await this.prisma.client.student.findFirst({
+      where: { id: studentId, schoolId, deletedAt: null },
+      select: {
+        id: true,
+        admissionNumber: true,
+        outstandingBalance: true,
+        profile: { select: { firstName: true, lastName: true } },
+      },
+    });
+    if (!student) throw new NotFoundException("Student not found.");
+
+    const [bills, payments] = await Promise.all([
+      this.prisma.client.bill.findMany({
+        where: { schoolId, studentId },
+        orderBy: [{ issuedAt: "asc" }, { createdAt: "asc" }],
+        include: {
+          academicYear: { select: { id: true, name: true } },
+          term: { select: { id: true, name: true } },
+          feeStructure: { select: { name: true } },
+          class: { select: { id: true, name: true } },
+        },
+      }),
+      this.prisma.client.payment.findMany({
+        where: { schoolId, studentId },
+        orderBy: [{ paymentDate: "asc" }, { createdAt: "asc" }],
+        include: {
+          bill: { select: { id: true, billNumber: true } },
+          recordedBy: { select: { name: true, email: true } },
+        },
+      }),
+    ]);
+
+    // Pro-forma, waived and cancelled bills are retained in the history but
+    // are not counted as enforceable tuition debt.
+    const chargeableBills = bills.filter(
+      (bill) => bill.billType === "INVOICE" && !["CANCELLED", "WAIVED"].includes(bill.status),
+    );
+    const totalBilled = roundMoney(
+      chargeableBills.reduce((sum, bill) => sum + Number(bill.totalAmount), 0),
+    );
+    const openInvoiceBalance = roundMoney(
+      chargeableBills.reduce((sum, bill) => sum + Number(bill.balanceAmount), 0),
+    );
+
+    // Reversed receipts remain part of the historical gross receipt total;
+    // their separate reversal entry brings the net credited amount back down.
+    const postedReceipts = payments.filter(
+      (payment) => payment.status === "COMPLETED" || payment.reversedAt !== null,
+    );
+    const totalReceipts = roundMoney(
+      postedReceipts.reduce((sum, payment) => sum + Number(payment.amount), 0),
+    );
+    const totalReversals = roundMoney(
+      payments
+        .filter((payment) => payment.reversedAt !== null)
+        .reduce((sum, payment) => sum + Number(payment.amount), 0),
+    );
+    const studentOutstandingBalance = roundMoney(Number(student.outstandingBalance));
+
+    return {
+      student,
+      bills,
+      payments,
+      summary: {
+        totalBilled,
+        totalReceipts,
+        totalReversals,
+        netReceipts: roundMoney(totalReceipts - totalReversals),
+        openInvoiceBalance,
+        studentOutstandingBalance,
+        // Non-zero differences can reveal unallocated receipts or legacy
+        // records that need reconciliation; never silently label them equal.
+        reconciliationDifference: roundMoney(openInvoiceBalance - studentOutstandingBalance),
+      },
+    };
+  }
+
   async getStudentLedger(
     schoolId: string,
     studentId: string,
