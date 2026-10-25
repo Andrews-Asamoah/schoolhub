@@ -49,7 +49,7 @@ describe("FinanceExportsService tenant scoping and audit", () => {
     expect(query).not.toHaveProperty("take");
 
     const workbook = new ExcelJS.Workbook();
-    await workbook.xlsx.load(file.buffer);
+    await workbook.xlsx.load(Uint8Array.from(file.buffer).buffer as ArrayBuffer);
     expect(workbook.getWorksheet("Invoice register")!.getCell("A1").value).toBe("Invoice");
 
     expect(client.auditLog.create).toHaveBeenCalledWith(expect.objectContaining({
