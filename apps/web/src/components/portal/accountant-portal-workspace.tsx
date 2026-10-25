@@ -658,8 +658,12 @@ export function AccountantPortalWorkspace({
   }
 
   const loading =
-    billsQuery.isPending || paymentsQuery.isPending || expensesQuery.isPending ||
-    feeStructuresQuery.isPending || classesQuery.isPending || yearsQuery.isPending || payrollQuery.isPending || (activeTab === "inventory" && inventoryQuery.isPending);
+    (activeTab === "overview" && (summaryQuery.isPending || overdueBillsQuery.isPending)) ||
+    (["invoices", "debtors"].includes(activeTab) && billsQuery.isPending) ||
+    (activeTab === "payments" && paymentsQuery.isPending) ||
+    expensesQuery.isPending ||
+    feeStructuresQuery.isPending || classesQuery.isPending || yearsQuery.isPending ||
+    payrollQuery.isPending || (activeTab === "inventory" && inventoryQuery.isPending);
 
   return (
     <div className="space-y-6"><style>{`@media print {
@@ -724,8 +728,8 @@ export function AccountantPortalWorkspace({
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
             <DashboardMetricLink to="payments" label="Fees collected" value={paymentsQuery.error ? "Unavailable" : currency(reportCollected)} detail={paymentsQuery.error ? "Payment data unavailable" : `${reportSettledPaymentCount} completed receipts in period`} icon={ArrowUpRight} />
             <DashboardMetricLink to="invoices" label="Fees billed" value={billsQuery.error ? "Unavailable" : currency(billedInPeriod)} detail={billsQuery.error ? "Bill data unavailable" : "Bills issued in selected period"} icon={Receipt} />
-            <DashboardMetricLink to="debtors" label="Outstanding fees" value={billsQuery.error ? "Unavailable" : currency(outstanding)} detail={billsQuery.error ? "Bill data unavailable" : `${debtors.length} bills with balances`} icon={AlertCircle} />
-            <DashboardMetricLink to="debtors" label="Overdue balances" value={billsQuery.error ? "Unavailable" : currency(overdueTotal)} detail={billsQuery.error ? "Bill data unavailable" : `${overdueBills.length} overdue bills`} icon={ArrowDownRight} />
+            <DashboardMetricLink to="debtors" label="Outstanding fees" value={summaryQuery.error ? "Unavailable" : currency(outstanding)} detail={billsQuery.error ? "Bill data unavailable" : `$${summaryQuery.data?.outstandingBillCount ?? 0} bills with balances`} icon={AlertCircle} />
+            <DashboardMetricLink to="debtors" label="Overdue balances" value={summaryQuery.error ? "Unavailable" : currency(overdueTotal)} detail={billsQuery.error ? "Bill data unavailable" : `${overdueBills.length} overdue bills`} icon={ArrowDownRight} />
             <DashboardMetricLink to="expenses" label="Operating expenses" value={expensesQuery.error ? "Unavailable" : currency(reportExpenseTotal)} detail={expensesQuery.error ? "Expense data unavailable" : `${reportExpenses.length} expense records in period`} icon={Wallet} />
           </div>
           <div className="grid gap-3 md:grid-cols-2">
@@ -751,7 +755,7 @@ export function AccountantPortalWorkspace({
 
       {!loading && activeTab === "overview" && (
         <div className="space-y-5">
-          <AccountantFinanceCharts payments={payments} expenses={expenses} bills={bills} />
+          <AccountantFinanceCharts summary={summaryQuery.data ?? null} expenses={reportExpenses} />
           <section className="rounded-2xl border border-border bg-card p-5">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div><h2 className="text-lg font-semibold text-foreground">Overdue-fees management</h2><p className="mt-1 text-sm text-muted-foreground">Prioritise bills past their due date with an outstanding balance, then open the bill or record a payment.</p></div>
@@ -761,7 +765,7 @@ export function AccountantPortalWorkspace({
               <div className="relative"><Search className="absolute left-3 top-3 size-4 text-muted-foreground" /><input className={cn(inputClass, "pl-9")} value={overdueSearch} onChange={(event) => setOverdueSearch(event.target.value)} placeholder="Search student, admission no., bill or class" aria-label="Search overdue bills" /></div>
               <select className={inputClass} value={overdueClassFilter} onChange={(event) => setOverdueClassFilter(event.target.value)} aria-label="Filter overdue bills by class"><option value="ALL">All classes</option>{classes.map((schoolClass) => <option key={schoolClass.id} value={schoolClass.id}>{schoolClass.name}</option>)}</select>
             </div>
-            {billsQuery.error ? <QueryError message={billsQuery.error.message} /> : visibleOverdueBills.length ? (
+            {overdueBillsQuery.error ? <QueryError message={overdueBillsQuery.error.message} /> : visibleOverdueBills.length ? (
               <div className="overflow-x-auto"><table className="w-full min-w-[800px] text-left text-sm">
                 <thead><tr className="border-b border-border text-xs text-muted-foreground"><th className="p-3">Student / bill</th><th className="p-3">Class</th><th className="p-3">Due date</th><th className="p-3 text-right">Days overdue</th><th className="p-3 text-right">Outstanding</th><th className="p-3">Action</th></tr></thead>
                 <tbody>{visibleOverdueBills.slice(0, 8).map((bill) => {
@@ -819,7 +823,7 @@ export function AccountantPortalWorkspace({
       )}
 
 
-      {!loading && activeTab === "reports" && <AccountantFinanceReportingWorkspace bills={bills} payments={payments} classes={classes} />}
+      {!loading && activeTab === "reports" && <AccountantFinanceReportingWorkspace />}
 
 
 
