@@ -1757,23 +1757,27 @@ export class FinanceService {
       ...(input.status && input.status !== "ALL" ? { status: input.status as "PENDING" | "COMPLETED" | "FAILED" | "REFUNDED" | "CANCELLED" } : {}),
       ...(input.classId ? { bill: { schoolId, classId: input.classId } } : {}),
       ...(dates.start || dates.end ? { paymentDate: { ...(dates.start ? { gte: dates.start } : {}), ...(dates.end ? { lte: dates.end } : {}) } } : {}),
-      ...(period.year || period.term
-        ? {
-            OR: [
-              { bill: { schoolId, ...(period.year ? { academicYearId: period.year.id } : {}), ...(period.term ? { termId: period.term.id } : {}), ...(input.classId ? { classId: input.classId } : {}) } },
-              ...(scopeStart || scopeEnd
-                ? [{ billId: null, paymentDate: { ...(scopeStart ? { gte: scopeStart } : {}), ...(scopeEnd ? { lte: scopeEnd } : {}) } }]
-                : []),
-            ],
-          }
-        : {}),
-      ...(search ? { OR: [
-        { paymentNumber: { contains: search, mode: "insensitive" } },
-        { referenceNumber: { contains: search, mode: "insensitive" } },
-        { student: { admissionNumber: { contains: search, mode: "insensitive" } } },
-        { student: { profile: { firstName: { contains: search, mode: "insensitive" } } } },
-        { student: { profile: { lastName: { contains: search, mode: "insensitive" } } },
-      ] } : {}),
+      ...((period.year || period.term) && (scopeStart || scopeEnd) ? {
+        AND: [{
+          OR: [
+            { bill: { schoolId, ...(period.year ? { academicYearId: period.year.id } : {}), ...(period.term ? { termId: period.term.id } : {}), ...(input.classId ? { classId: input.classId } : {}) } },
+            { billId: null, paymentDate: { ...(scopeStart ? { gte: scopeStart } : {}), ...(scopeEnd ? { lte: scopeEnd } : {}) } },
+          ],
+        }],
+      } : (period.year || period.term) ? {
+        bill: { schoolId, ...(period.year ? { academicYearId: period.year.id } : {}), ...(period.term ? { termId: period.term.id } : {}), ...(input.classId ? { classId: input.classId } : {}) },
+      } : {}),
+      ...(search ? {
+        AND: [{
+          OR: [
+            { paymentNumber: { contains: search, mode: "insensitive" } },
+            { referenceNumber: { contains: search, mode: "insensitive" } },
+            { student: { admissionNumber: { contains: search, mode: "insensitive" } } },
+            { student: { profile: { firstName: { contains: search, mode: "insensitive" } } } },
+            { student: { profile: { lastName: { contains: search, mode: "insensitive" } } } },
+          ],
+        }],
+      } : {}),
     };
     const cursor = decodeReportingCursor(input.cursor);
     if (cursor) {
