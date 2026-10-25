@@ -648,8 +648,67 @@ export const generateBillSchema = z.object({
     .regex(/^\d{4}-\d{2}-\d{2}$/)
     .optional(),
   notes: z.string().optional(),
+  /** Optional fee components are never billed unless explicitly selected. */
+  optionalItemIds: z.array(z.string().min(1)).max(100).default([]),
 });
 export type GenerateBillInput = z.infer<typeof generateBillSchema>;
+
+export interface FinancePage<T> {
+  items: T[];
+  nextCursor: string | null;
+  total: number;
+}
+
+export interface FinanceSummaryResponse {
+  scope: {
+    from: string | null;
+    to: string | null;
+    academicYearId: string | null;
+    academicYearName: string | null;
+    termId: string | null;
+    termName: string | null;
+  };
+  billed: number;
+  collected: number;
+  outstanding: number;
+  overdue: number;
+  byPaymentMethod: { method: string; amount: number; count: number }[];
+  byClass: { classId: string | null; className: string; billed: number; outstanding: number; collected: number; billCount: number }[];
+  ageing: { bucket: "0-30" | "31-60" | "61-90" | "90+"; amount: number; count: number }[];
+}
+
+export type StudentStatementScope = "term" | "year" | "all";
+export type StudentStatementEntryType = "INVOICE" | "DISCOUNT" | "RECEIPT" | "REVERSAL" | "REFUND" | "ADJUSTMENT";
+
+export interface StudentStatementEntry {
+  id: string;
+  date: string;
+  type: StudentStatementEntryType;
+  reference: string;
+  description: string;
+  debit: number;
+  credit: number;
+  balance: number;
+  billId?: string | null;
+  paymentId?: string | null;
+}
+
+export interface StudentStatementResponse {
+  student: {
+    id: string;
+    admissionNumber: string | null;
+    firstName: string | null;
+    lastName: string | null;
+  };
+  scope: StudentStatementScope;
+  period: { label: string; from: string | null; to: string | null; academicYearId: string | null; termId: string | null };
+  openingBalance: number;
+  entries: StudentStatementEntry[];
+  closingBalance: number;
+  ageing: { bucket: "not-due" | "0-30" | "31-60" | "61-90" | "90+"; amount: number }[];
+  unallocatedCredit: number;
+  arrearsPolicy: "SHOW_ONLY" | "BLOCK_CLEARANCE_UNTIL_PAID";
+}
 
 export const createExpenseSchema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Format: YYYY-MM-DD"),
