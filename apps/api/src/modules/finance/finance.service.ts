@@ -56,7 +56,7 @@ const PAYMENT_METHODS = ["CASH", "BANK_TRANSFER", "CHEQUE", "MOBILE_MONEY", "CAR
 
 function parseIsoDate(value: string | undefined, label: string, endOfDay = false): Date | undefined {
   if (value === undefined || value === "") return undefined;
-  if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(value)) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
     throw new BadRequestException(`Enter a valid ${label} in YYYY-MM-DD format.`);
   }
   const date = new Date(`${value}T${endOfDay ? "23:59:59.999" : "00:00:00.000"}Z`);
