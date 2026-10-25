@@ -29,7 +29,7 @@ import {
   type PreviewRow,
   type RowStatus,
 } from "@/lib/student-import";
-import { exportCsv, exportPdf, printTable } from "@/lib/table-export";
+import { exportPdf, exportXlsx, printTable } from "@/lib/table-export";
 
 type Phase = "upload" | "review" | "importing" | "done";
 type Filter = "all" | "attention" | "ready" | "duplicate";
@@ -191,10 +191,10 @@ export function StudentImportWizard({
     }
   }
 
-  const saveLogins = (how: "csv" | "print" | "pdf") => {
+  const saveLogins = (how: "excel" | "print" | "pdf") => {
     const table = credentialsTable(results);
     setCredentialsSaved(true);
-    if (how === "csv") exportCsv(table);
+    if (how === "excel") void exportXlsx(table);
     else if (how === "print") printTable(table);
     else void exportPdf(table);
   };
@@ -359,8 +359,8 @@ export function StudentImportWizard({
               <div className="flex flex-wrap gap-2">
                 <button type="button" onClick={startOver} className="inline-flex h-9 items-center rounded-lg border border-border px-4 text-xs font-semibold text-foreground hover:bg-muted">Choose a different file</button>
                 {preview.summary.error > 0 && (
-                  <button type="button" onClick={() => exportCsv(problemsTable(preview.rows))} className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-border px-4 text-xs font-semibold text-foreground hover:bg-muted">
-                    <Download className="size-3.5" /> Download problem report
+                  <button type="button" onClick={() => void exportXlsx(problemsTable(preview.rows))} className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-border px-4 text-xs font-semibold text-foreground hover:bg-muted">
+                    <FileSpreadsheet className="size-3.5" /> Download problem report (Excel)
                   </button>
                 )}
               </div>
@@ -421,7 +421,7 @@ export function StudentImportWizard({
                   Each student signs in with their username and a temporary password, and must change it the first time. For safety these are shown only on this screen and can&rsquo;t be looked up again once you close it.
                 </p>
                 <div className="mt-3 flex flex-wrap gap-2">
-                  <button type="button" onClick={() => saveLogins("csv")} className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary px-3 text-xs font-semibold text-primary-foreground hover:opacity-90"><Download className="size-3.5" /> Download CSV</button>
+                  <button type="button" onClick={() => saveLogins("excel")} className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary px-3 text-xs font-semibold text-primary-foreground hover:opacity-90"><FileSpreadsheet className="size-3.5" /> Excel</button>
                   <button type="button" onClick={() => saveLogins("pdf")} className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-border px-3 text-xs font-semibold text-foreground hover:bg-muted"><FileText className="size-3.5" /> PDF</button>
                   <button type="button" onClick={() => saveLogins("print")} className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-border px-3 text-xs font-semibold text-foreground hover:bg-muted"><Printer className="size-3.5" /> Print</button>
                 </div>

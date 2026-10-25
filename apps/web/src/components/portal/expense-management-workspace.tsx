@@ -1,6 +1,9 @@
+import { TableExportMenu } from "@/components/ui/data-table";
+import type { ExportTable } from "@/lib/table-export";
+import { ServerExportButton } from "@/components/portal/server-export-button";
 import { useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowDownRight, CalendarDays, Download, FileText, LoaderCircle, Plus, Printer, Search, Tags, Wallet, X } from "lucide-react";
+import { ArrowDownRight, CalendarDays, FileText, LoaderCircle, Plus, Printer, Search, Tags, Wallet, X } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -188,36 +191,18 @@ export function ExpenseManagementWorkspace() {
     }
     createExpense.mutate(draft);
   }
-  function exportCsv() {
-    const rows: unknown[][] = [
-      ["SchoolHub Expense Register"],
-      ["Period", `${fromDate || "Any date"} to ${toDate || "Any date"}`],
-      ["Exported", new Date().toLocaleString("en-GB")],
-      [],
-      ["Date", "Voucher", "Description", "Payee", "Expense category", "Accounting group", "Payment method", "Cheque", "Reference", "Amount (GHS)", "Recorded by"],
-      ...visibleExpenses.map((expense) => [
-        formatDate(expense.date), expense.voucherNumber ?? "", expense.description, expense.payee ?? "",
-        expense.registryCategory?.name ?? expense.customCategory?.name ?? "Uncategorised",
-        expense.category ?? "", expense.paymentMethod, expense.checkNumber ?? "", expense.referenceNumber ?? "",
-        Number(expense.amount).toFixed(2), expense.recordedBy?.name ?? "",
-      ]),
-      [],
-      ["Total (GHS)", visibleExpenses.reduce((sum, expense) => sum + Number(expense.amount), 0).toFixed(2)],
-    ];
-    const csv = rows.map((row) => row.map((value) => {
-      const field = String(value ?? "");
-      return '"' + field.replaceAll('"', '""') + '"';
-    }).join(",")).join("\r\n");
-    const blob = new Blob(["\uFEFF", csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `schoolhub-expenses-${fromDate || "all"}-${toDate || "dates"}.csv`;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    URL.revokeObjectURL(url);
-  }
+  const buildExpenseExportTable = (): ExportTable => ({
+    title: "Expense register",
+    headers: ["Date", "Voucher", "Description", "Payee", "Expense category", "Accounting group", "Payment method", "Cheque", "Reference", "Amount (GHS)", "Recorded by"],
+    columnTypes: ["date", "text", "text", "text", "text", "text", "text", "text", "text", "money", "text"],
+    rows: visibleExpenses.map((expense) => [
+      formatDate(expense.date), expense.voucherNumber ?? "", expense.description, expense.payee ?? "",
+      expense.registryCategory?.name ?? expense.customCategory?.name ?? "Uncategorised", expense.category ?? "",
+      expense.paymentMethod, expense.checkNumber ?? "", expense.referenceNumber ?? "", Number(expense.amount), expense.recordedBy?.name ?? "",
+    ]),
+    totals: ["Total", "", "", "", "", "", "", "", "", null, ""],
+    reportInfo: { period: (fromDate || "Any date") + " to " + (toDate || "Any date"), filters: { from: fromDate, to: toDate } },
+  });
 
   return (
     <div className="mx-auto w-full min-w-0 max-w-screen-2xl space-y-6">
@@ -231,7 +216,7 @@ export function ExpenseManagementWorkspace() {
       }`}</style>
       <section className="flex flex-col gap-4 rounded-2xl border border-border bg-card p-5 shadow-sm sm:flex-row sm:items-end sm:justify-between sm:p-6">
         <div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">Finance & bursary</p><h1 className="mt-1 text-2xl font-bold tracking-tight text-foreground">Expenses</h1><p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">Record school expenditure, keep voucher references together, and analyse spend by date, category and payment method.</p></div>
-        <div className="flex flex-wrap gap-2">{canWrite && <button type="button" className={secondaryButton} onClick={() => setShowCategoryManager(true)}><Tags className="size-4" /> Manage categories</button>}<button type="button" className={secondaryButton} onClick={exportCsv} disabled={!visibleExpenses.length}><Download className="size-4" /> Export CSV</button>{canWrite && <button type="button" className={primaryButton} onClick={() => { setFeedback(null); setDraft(freshDraft()); setShowExpenseForm(true); }}><Plus className="size-4" /> Record expense</button>}</div>
+        <div className="flex flex-wrap gap-2">{canWrite && <button type="button" className={secondaryButton} onClick={() => setShowCategoryManager(true)}><Tags className="size-4" /> Manage categories</button>}<TableExportMenu build={buildExpenseExportTable} note="Exports reflect the selected date range." /><ServerExportButton endpoint={"/finance/exports/expenses.xlsx?from=" + encodeURIComponent(fromDate) + "&to=" + encodeURIComponent(toDate)} label="Full Excel" className={secondaryButton} />{canWrite && <button type="button" className={primaryButton} onClick={() => { setFeedback(null); setDraft(freshDraft()); setShowExpenseForm(true); }}><Plus className="size-4" /> Record expense</button>}</div>
       </section>
 
       {!canWrite && <FinanceReadOnlyNotice />}
@@ -284,7 +269,7 @@ export function ExpenseManagementWorkspace() {
           <div className="grid gap-x-6 gap-y-4 py-4 sm:grid-cols-2"><Detail label="Description" value={selectedExpense.description} /><Detail label="Payee / beneficiary" value={selectedExpense.payee} /><Detail label="Expense category" value={selectedExpense.registryCategory?.name ?? selectedExpense.customCategory?.name ?? label(selectedExpense.category)} /><Detail label="Accounting group" value={label(selectedExpense.category)} /><Detail label="Payment method" value={label(selectedExpense.paymentMethod)} /><Detail label="Cheque number" value={selectedExpense.checkNumber} /><Detail label="Reference" value={selectedExpense.referenceNumber} /><Detail label="Recorded by" value={selectedExpense.recordedBy?.name} /></div>
           <div className="border-t border-border pt-4"><p className="text-xs text-muted-foreground">This voucher reflects the saved expense record. It is not proof of a bank transfer unless supported by the reference shown above.</p><div className="mt-8 grid grid-cols-2 gap-8 text-xs text-muted-foreground"><div className="border-t border-border pt-2">Prepared by</div><div className="border-t border-border pt-2">Authorised by</div></div></div>
         </section>
-        <div className="expense-voucher-actions mt-4 flex flex-wrap justify-end gap-2"><button type="button" className={secondaryButton} onClick={() => { const csvRows = [["Field","Value"],["Voucher",selectedExpense.voucherNumber || selectedExpense.id],["Date",formatDate(selectedExpense.date)],["Description",selectedExpense.description],["Payee",selectedExpense.payee ?? ""],["Category",selectedExpense.registryCategory?.name ?? ""],["Amount (GHS)",Number(selectedExpense.amount).toFixed(2)],["Method",selectedExpense.paymentMethod],["Reference",selectedExpense.referenceNumber ?? ""]]; const csv = csvRows.map(row => row.map(value => '"' + String(value ?? "").replaceAll('"','""') + '"').join(",")).join("\r\n"); const url = URL.createObjectURL(new Blob(["\uFEFF",csv],{type:"text/csv;charset=utf-8;"})); const link = document.createElement("a"); link.href=url; link.download=`expense-voucher-${selectedExpense.voucherNumber || selectedExpense.id}.csv`; link.click(); URL.revokeObjectURL(url); }}><Download className="size-4" /> Export voucher</button><button type="button" className={primaryButton} onClick={() => window.print()}><Printer className="size-4" /> Print / Save PDF</button></div>
+        <div className="expense-voucher-actions mt-4 flex flex-wrap justify-end gap-2"><TableExportMenu build={() => ({ title: "Expense voucher " + (selectedExpense.voucherNumber || selectedExpense.id), headers: ["Field", "Value"], rows: [["Voucher", selectedExpense.voucherNumber || selectedExpense.id], ["Date", formatDate(selectedExpense.date)], ["Description", selectedExpense.description], ["Payee", selectedExpense.payee ?? ""], ["Category", selectedExpense.registryCategory?.name ?? selectedExpense.customCategory?.name ?? ""], ["Amount (GHS)", Number(selectedExpense.amount)], ["Method", selectedExpense.paymentMethod], ["Reference", selectedExpense.referenceNumber ?? ""]], columnTypes: ["text", "text"], reportInfo: { period: formatDate(selectedExpense.date) } })} /><button type="button" className={primaryButton} onClick={() => window.print()}><Printer className="size-4" /> Print / Save PDF</button></div>
       </Modal>}
     </div>
   );

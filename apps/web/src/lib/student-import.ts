@@ -4,7 +4,7 @@ import {
   type StudentImportColumn,
   type StudentImportField,
 } from "@schoolhub/shared";
-import { download, exportCsv, type ExportTable } from "@/lib/table-export";
+import { download, exportXlsx, type ExportTable } from "@/lib/table-export";
 
 export type RowStatus = "ready" | "warning" | "duplicate" | "error";
 
@@ -180,12 +180,13 @@ const cellsFor = (row: NormalizedStudentRow): Record<StudentImportField, string>
  * is ignored on upload because it isn't a known heading.
  */
 export function downloadFailedRows(failed: { row: NormalizedStudentRow; message: string }[]) {
-  exportCsv({
+  void exportXlsx({
     title: "Students to fix and re-upload",
     headers: [...headers, "Reason"],
     rows: failed.map(({ row, message }) => {
       const cells = cellsFor(row);
       return [...STUDENT_IMPORT_COLUMNS.map((item) => cells[item.key]), message];
     }),
+    columnTypes: [...STUDENT_IMPORT_COLUMNS.map(() => "text" as const), "text"],
   });
 }

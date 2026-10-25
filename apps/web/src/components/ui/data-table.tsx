@@ -26,7 +26,6 @@ import {
   Printer,
   Search,
   SlidersHorizontal,
-  Table2,
 } from "lucide-react";
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import {
@@ -38,7 +37,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
-  exportCsv,
   exportPdf,
   exportXlsx,
   nodeToText,
@@ -78,7 +76,7 @@ export interface DataTableProps<T> {
   emptyDescription: string;
   /** Names the export files and the printed/PDF heading. */
   exportTitle?: string;
-  /** Show Print / CSV / Excel / PDF. Callers decide with useCanExportTables(). */
+  /** Show Print / PDF / Excel. Callers decide with useCanExportTables(). */
   canExport?: boolean;
   searchPlaceholder?: string;
   pageSize?: number;
@@ -349,12 +347,11 @@ export function DataTable<T>({
   );
 }
 
-/** Print / CSV / Excel / PDF menu for any table-shaped data (also used by the timetable grid). */
+/** Print / PDF / Excel menu for any table-shaped data (also used by the timetable grid). */
 export function TableExportMenu({ build, note }: { build: () => ExportTable; note?: string }) {
   return (
     <Menu label="Export" icon={<Download className="size-3.5" />}>
       <MenuButton icon={<Printer className="size-3.5" />} onClick={() => printTable(build())}>Print</MenuButton>
-      <MenuButton icon={<Table2 className="size-3.5" />} onClick={() => exportCsv(build())}>Download CSV</MenuButton>
       <MenuButton icon={<FileSpreadsheet className="size-3.5" />} onClick={() => void exportXlsx(build())}>Export Excel</MenuButton>
       <MenuButton icon={<FileText className="size-3.5" />} onClick={() => void exportPdf(build())}>Export PDF</MenuButton>
       {note && <p className="border-t border-border px-2 pb-1 pt-2 text-[10px] text-muted-foreground">{note}</p>}
