@@ -340,7 +340,7 @@ export function StudentAccountStatementDialog({
 
             <section>
               <div className="student-statement-actions mb-3 flex flex-wrap items-end justify-between gap-3">
-                <div><h3 className="font-semibold">Account activity</h3><p className="mt-1 text-xs text-muted-foreground">{rows.length} transaction, invoice, and reversal record(s). Opening balance is shown as zero because no brought-forward balance is stored in this statement.</p></div>
+                <div><h3 className="font-semibold">Account activity</h3><p className="mt-1 text-xs text-muted-foreground">{rows.length} transaction, invoice, and reversal record(s). The running balance uses activity recorded in SchoolHub; no historical brought-forward balance is stored, so imported or legacy balances must be reconciled separately.</p></div>
                 <div className="relative w-full sm:max-w-sm">
                   <Search className="absolute left-3 top-3 size-4 text-muted-foreground" />
                   <input aria-label="Search statement activity" className={cn("h-10 w-full rounded-xl border border-border bg-card pl-9 pr-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring")} value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search receipt, invoice, reference…" />
