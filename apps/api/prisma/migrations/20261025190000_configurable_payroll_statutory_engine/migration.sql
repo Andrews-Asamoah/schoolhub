@@ -341,3 +341,20 @@ ALTER TABLE "payslips"
   ADD COLUMN "tier2Employee" DECIMAL(15,2) NOT NULL DEFAULT 0,
   ADD COLUMN "tier2Employer" DECIMAL(15,2) NOT NULL DEFAULT 0,
   ADD COLUMN "tier3Employee" DECIMAL(15,2) NOT NULL DEFAULT 0;
+
+-- Record existing salaries as opening history rows; no salary value is changed.
+INSERT INTO "salary_history" ("id", "staffId", "monthlySalary", "effectiveDate", "reason", "changedById")
+SELECT 'legacy-salary-staff-' || s."id", s."id", s."monthlySalary", s."hireDate",
+       'Initial salary history backfill; copied from the existing staff salary field.',
+       'system-migration'
+FROM "staff" s
+WHERE s."monthlySalary" IS NOT NULL
+ON CONFLICT ("id") DO NOTHING;
+
+INSERT INTO "salary_history" ("id", "teacherId", "monthlySalary", "effectiveDate", "reason", "changedById")
+SELECT 'legacy-salary-teacher-' || t."id", t."id", t."monthlySalary", t."hireDate",
+       'Initial salary history backfill; copied from the existing teacher salary field.',
+       'system-migration'
+FROM "teachers" t
+WHERE t."monthlySalary" IS NOT NULL
+ON CONFLICT ("id") DO NOTHING;
