@@ -31,15 +31,21 @@ describe.skipIf(!enabled)("bill generation (database)", { timeout: 60_000 }, () 
   const userIds: string[] = [];
 
   /** A fee structure with the given item amounts. */
-  async function structure(amounts: number[]) {
+  async function structure(amounts: number[], optionalAmounts: number[] = []) {
     structureCounter += 1;
     const n = structureCounter;
     return prisma.feeStructure.create({
       data: {
         schoolId,
         name: `Structure ${run}-${n}`,
-        items: { create: amounts.map((amount, index) => ({ name: `Item ${index + 1}`, amount })) },
+        items: {
+          create: [
+            ...amounts.map((amount, index) => ({ name: `Item ${index + 1}`, amount, isOptional: false })),
+            ...optionalAmounts.map((amount, index) => ({ name: `Optional item ${index + 1}`, amount, isOptional: true })),
+          ],
+        },
       },
+      include: { items: true },
     });
   }
 
@@ -88,6 +94,7 @@ describe.skipIf(!enabled)("bill generation (database)", { timeout: 60_000 }, () 
     if (!prisma || !schoolId) return;
     const quiet = (promise: Promise<unknown>) => promise.catch(() => undefined);
     await quiet(prisma.auditLog.deleteMany({ where: { schoolId } }));
+    await quiet(prisma.billArrearsSnapshot.deleteMany({ where: { schoolId } }));
     await quiet(prisma.bill.deleteMany({ where: { schoolId } }));
     await quiet(prisma.enrollment.deleteMany({ where: { academicYearId: yearId } }));
     await quiet(prisma.student.deleteMany({ where: { schoolId } }));
@@ -173,6 +180,70 @@ describe.skipIf(!enabled)("bill generation (database)", { timeout: 60_000 }, () 
     for (const fees of list) expect(await billsFor(fees.id)).toHaveLength(STUDENTS);
     const numbers = (await prisma.bill.findMany({ where: { schoolId }, select: { billNumber: true } })).map((bill) => bill.billNumber);
     expect(new Set(numbers).size).toBe(numbers.length);
+  });
+
+  it("does not bill optional items unless their IDs are selected", async () => {
+    const fees = await structure([400], [75]);
+    const optional = fees.items.find((item) => item.isOptional);
+    expect(optional).toBeDefined();
+
+    await generate(fees.id);
+    const defaults = await billsFor(fees.id);
+    expect(defaults).toHaveLength(STUDENTS);
+    expect(defaults.every((bill) => Number(bill.totalAmount) === 400)).toBe(true);
+    expect(defaults.every((bill) => bill.items.length === 1 && !bill.items.some((item) => item.feeItemId === optional!.id))).toBe(true);
+
+    const selectedFees = await structure([400], [75]);
+    const selectedOptional = selectedFees.items.find((item) => item.isOptional)!;
+    await generate(selectedFees.id, { optionalItemIds: [selectedOptional.id] });
+    const selectedBills = await billsFor(selectedFees.id);
+    expect(selectedBills).toHaveLength(STUDENTS);
+    expect(selectedBills.every((bill) => Number(bill.totalAmount) === 475)).toBe(true);
+    expect(selectedBills.every((bill) => bill.items.length === 2 && bill.items.some((item) => item.feeItemId === selectedOptional.id))).toBe(true);
+  });
+
+  it("snapshots previous-term arrears without adding a second charge", async () => {
+    const previousYear = await prisma.academicYear.create({
+      data: {
+        schoolId,
+        name: `${run} previous year`,
+        startDate: new Date("2025-01-01"),
+        endDate: new Date("2025-12-31"),
+        isCurrent: false,
+      },
+    });
+    const studentId = studentIds[0]!;
+    const previousBill = await prisma.bill.create({
+      data: {
+        schoolId,
+        studentId,
+        academicYearId: previousYear.id,
+        billNumber: `OLD-${run}`,
+        totalAmount: new Prisma.Decimal("550.00"),
+        grossAmount: new Prisma.Decimal("550.00"),
+        paidAmount: new Prisma.Decimal("0.00"),
+        balanceAmount: new Prisma.Decimal("550.00"),
+        status: "PENDING",
+        issuedAt: new Date("2025-09-01T00:00:00.000Z"),
+        items: { create: [{ description: "Prior year fees", amount: 550, totalAmount: 550, balanceAmount: 550 }] },
+      },
+    });
+    const fees = await structure([300]);
+    const before = await prisma.bill.count({ where: { schoolId } });
+    await generate(fees.id);
+    const newlyGenerated = await prisma.bill.findMany({
+      where: { schoolId, feeStructureId: fees.id, studentId },
+      include: { arrearsSnapshots: true },
+    });
+    expect(await prisma.bill.count({ where: { schoolId } })).toBeGreaterThan(before);
+    expect(newlyGenerated).toHaveLength(1);
+    expect(Number(newlyGenerated[0]!.totalAmount)).toBe(300);
+    expect(Number(newlyGenerated[0]!.balanceAmount)).toBe(300);
+    expect(newlyGenerated[0]!.arrearsSnapshots).toHaveLength(1);
+    expect(newlyGenerated[0]!.arrearsSnapshots[0]!.sourceBillId).toBe(previousBill.id);
+    expect(Number(newlyGenerated[0]!.arrearsSnapshots[0]!.amountAtGeneration)).toBe(550);
+    const sourceStillOpen = await prisma.bill.findFirstOrThrow({ where: { id: previousBill.id } });
+    expect(Number(sourceStillOpen.balanceAmount)).toBe(550);
   });
 
   it("keeps bills, students and payments consistent when billing and paying overlap", async () => {
