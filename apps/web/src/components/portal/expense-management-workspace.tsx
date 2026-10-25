@@ -192,7 +192,7 @@ export function ExpenseManagementWorkspace() {
   const buildExpenseExportTable = () => ({
     title: "Expense register",
     headers: ["Date", "Voucher", "Description", "Payee", "Expense category", "Accounting group", "Payment method", "Cheque", "Reference", "Amount (GHS)", "Recorded by"],
-    columnTypes: ["date", "text", "text", "text", "text", "text", "text", "text", "text", "money", "text"] as const,
+    columnTypes: ["date", "text", "text", "text", "text", "text", "text", "text", "text", "money", "text"],
     rows: visibleExpenses.map((expense) => [
       formatDate(expense.date), expense.voucherNumber ?? "", expense.description, expense.payee ?? "",
       expense.registryCategory?.name ?? expense.customCategory?.name ?? "Uncategorised", expense.category ?? "",
