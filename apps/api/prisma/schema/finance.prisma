@@ -134,6 +134,7 @@ model Bill {
   concessions  BillConcession[]
   carryForwards BillCarryForward[] @relation("CarryForwardTarget")
   carriedTo     BillCarryForward[] @relation("CarryForwardSource")
+  receiptAllocations PaymentBillAllocation[] @relation("BillReceiptAllocations")
 
   classId  String?
   billType BillType @default(INVOICE)
@@ -208,6 +209,7 @@ model Payment {
   transaction  Transaction?  @relation(fields: [transactionId], references: [id])
   recordedBy   user?         @relation("PaymentRecordedBy", fields: [recordedById], references: [id], onDelete: SetNull)
   paymentItems PaymentItem[]
+  billAllocations PaymentBillAllocation[]
 
   @@unique([paymentNumber, schoolId])
   @@unique([schoolId, idempotencyKey])
@@ -693,4 +695,23 @@ model BillCarryForward {
   @@index([schoolId, billId])
   @@index([schoolId, sourceBillId])
   @@map("bill_carry_forwards")
+}
+
+/// Allocation of a receipt to a bill; supports one receipt clearing several bills.
+model PaymentBillAllocation {
+  id        String   @id @default(cuid())
+  schoolId  String
+  paymentId String
+  billId    String
+  amount    Decimal  @db.Decimal(10, 2)
+  createdAt DateTime @default(now())
+
+  school  School  @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  payment Payment @relation(fields: [paymentId], references: [id], onDelete: Restrict)
+  bill    Bill    @relation("BillReceiptAllocations", fields: [billId], references: [id], onDelete: Restrict)
+
+  @@unique([paymentId, billId])
+  @@index([schoolId, paymentId])
+  @@index([schoolId, billId])
+  @@map("payment_bill_allocations")
 }
