@@ -27,3 +27,6 @@ export function isFinancePayrollExportRole(role: string | null | undefined): boo
 export function canExportFinancePayroll(actorPlatformRole: string | null | undefined, activeSchoolRole: string | null | undefined): boolean {
   return actorPlatformRole !== "superAdmin" && isFinancePayrollExportRole(activeSchoolRole);
 }
+
+/** Statutory payroll settings may only be approved by the actual owner or headteacher membership role. */
+export const PAYROLL_SETTINGS_APPROVER_ROLES = ["owner", "headteacher"] as const;
