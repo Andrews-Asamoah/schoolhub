@@ -816,10 +816,13 @@ export class FinanceService {
           };
         });
 
-        const alreadySnapshotted = await tx.billCarryForward.findFirst({
+        const alreadySnapshotted = await tx.bill.findFirst({
           where: {
             schoolId,
-            bill: { schoolId, studentId, academicYearId: currentYear.id, termId: currentTerm.id },
+            studentId,
+            academicYearId: currentYear.id,
+            termId: currentTerm.id,
+            carryForwardSnapshotCreated: true,
           },
           select: { id: true },
         });
@@ -833,6 +836,7 @@ export class FinanceService {
             termId: currentTerm.id,
             feeStructureId: input.feeStructureId,
             classId: input.classId,
+            carryForwardSnapshotCreated: true,
             billNumber,
             grossAmount: totalAmount,
             discountAmount: concessions.totalDiscount,
@@ -1401,6 +1405,74 @@ export class FinanceService {
         newValues: { arrearsPolicy },
       });
       return { arrearsPolicy };
+    });
+  }
+
+  async getLateFeePolicy(schoolId: string) {
+    const school = await this.prisma.client.school.findFirst({ where: { id: schoolId }, select: { settings: true } });
+    if (!school) throw new NotFoundException("School not found.");
+    const settings = school.settings && typeof school.settings === "object" && !Array.isArray(school.settings)
+      ? school.settings as Record<string, unknown>
+      : {};
+    const stored = settings.lateFeePolicy && typeof settings.lateFeePolicy === "object" && !Array.isArray(settings.lateFeePolicy)
+      ? settings.lateFeePolicy as Record<string, unknown>
+      : {};
+    const mode = stored.mode === "PERCENTAGE" ? "PERCENTAGE" : "FIXED";
+    let value = new Prisma.Decimal(0);
+    try {
+      value = new Prisma.Decimal(String(stored.value ?? "0.00"));
+      if (!value.isFinite() || value.lt(0)) value = new Prisma.Decimal(0);
+      if (mode === "PERCENTAGE" && value.gt(100)) value = new Prisma.Decimal(0);
+    } catch {
+      value = new Prisma.Decimal(0);
+    }
+    const rawGrace = Number.isInteger(stored.graceDays) ? Number(stored.graceDays) : 0;
+    return {
+      enabled: stored.enabled === true,
+      mode,
+      value: value.toFixed(2),
+      graceDays: Math.min(3650, Math.max(0, rawGrace)),
+    };
+  }
+
+  async setLateFeePolicy(
+    schoolId: string,
+    actorId: string,
+    policy: { enabled: boolean; mode: "PERCENTAGE" | "FIXED"; value: string; graceDays: number },
+  ) {
+    const value = new Prisma.Decimal(policy.value);
+    if (!value.isFinite() || value.lt(0) || value.decimalPlaces() > 2) {
+      throw new BadRequestException("Late-fee value must be a non-negative amount with no more than two decimal places.");
+    }
+    if (policy.mode === "PERCENTAGE" && value.gt(100)) {
+      throw new BadRequestException("A percentage late-fee rate cannot exceed 100 percent.");
+    }
+    if (!Number.isInteger(policy.graceDays) || policy.graceDays < 0 || policy.graceDays > 3650) {
+      throw new BadRequestException("Grace days must be a whole number from 0 to 3650.");
+    }
+    return this.prisma.client.$transaction(async (tx) => {
+      const school = await tx.school.findFirst({ where: { id: schoolId }, select: { id: true, settings: true } });
+      if (!school) throw new NotFoundException("School not found.");
+      const settings = school.settings && typeof school.settings === "object" && !Array.isArray(school.settings)
+        ? school.settings as Record<string, unknown>
+        : {};
+      const old = settings.lateFeePolicy ?? { enabled: false, mode: "FIXED", value: "0.00", graceDays: 0 };
+      const saved = {
+        enabled: policy.enabled,
+        mode: policy.mode,
+        value: value.toFixed(2),
+        graceDays: policy.graceDays,
+      };
+      await tx.school.update({
+        where: { id: schoolId },
+        data: { settings: { ...settings, lateFeePolicy: saved } as Prisma.InputJsonValue },
+      });
+      await this.writeAudit(tx, {
+        actorId, schoolId, action: "UPDATE", entityType: "FINANCE_LATE_FEE_POLICY", entityId: schoolId,
+        oldValues: { lateFeePolicy: old },
+        newValues: { lateFeePolicy: saved },
+      });
+      return saved;
     });
   }
 
