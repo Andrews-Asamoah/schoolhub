@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, type ReactNode } from "react";
 import { Activity, ChartColumn, ChartPie, WalletCards } from "lucide-react";
 import {
   Area,
@@ -57,7 +57,7 @@ function ChartPanel({ title, description, icon: Icon, children }: {
   title: string;
   description: string;
   icon: typeof Activity;
-  children: React.ReactNode;
+  children: ReactNode;
 }) {
   return (
     <article className="min-w-0 rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-6">
