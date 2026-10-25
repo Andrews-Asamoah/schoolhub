@@ -51,7 +51,7 @@ export type WorkspaceColumn<T> = DataTableColumn<T>;
 
 /**
  * School-workspace data table (shadcn data-table pattern): sorting, search,
- * pagination, column visibility, and Print / CSV / Excel / PDF export for the
+ * pagination, column visibility, and Print / PDF / Excel export for the
  * roles allowed to export. Follows light and dark mode through theme tokens.
  */
 export function WorkspaceDataTable<T>({
