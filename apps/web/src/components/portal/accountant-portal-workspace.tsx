@@ -286,6 +286,8 @@ export function AccountantPortalWorkspace({
     queryFn: () => apiFetch<ApiAcademicYear[]>("/schools/academic-years"),
     retry: false,
   });
+  const currentYear = (yearsQuery.data ?? []).find((year) => year.isCurrent);
+  const currentTerm = currentYear?.terms.find((term) => term.isCurrent);
   const reportParams = new URLSearchParams();
   if (reportPeriod !== "all" && currentYear) reportParams.set("yearId", currentYear.id);
   if (reportPeriod === "term" && currentTerm) reportParams.set("termId", currentTerm.id);
@@ -495,6 +497,9 @@ export function AccountantPortalWorkspace({
     setDebtorCursor(debtorCursorStack[debtorCursorStack.length - 1] ?? null);
     setDebtorCursorStack((stack) => stack.slice(0, -1));
   };
+
+  const todayStart = new Date();
+  todayStart.setUTCHours(0, 0, 0, 0);
 
   const selectedFeeStructure = feeStructures.find((fee) => fee.id === selectedFeeStructureId);
   const billTargetClasses = selectedFeeStructure?.targetClasses.length
