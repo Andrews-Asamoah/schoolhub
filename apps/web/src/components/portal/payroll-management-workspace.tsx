@@ -179,7 +179,7 @@ export function PayrollManagementWorkspace() {
     title: "Salary register",
     headers: ["Employee", "Employee reference", "Type", "Monthly salary (GHS)", "Payroll eligible"],
     columnTypes: ["text", "text", "text", "money", "text"],
-    rows: salaryRegister.map(person => [person.name, person.identifier, person.type, person.monthlySalary == null ? null : Number(person.monthlySalary), Number(person.monthlySalary) > 0 ? "Yes" : "No"]),
+    rows: filteredSalaryRegister.map(person => [person.name, person.identifier, person.type, person.monthlySalary == null ? null : Number(person.monthlySalary), Number(person.monthlySalary) > 0 ? "Yes" : "No"]),
     totals: ["Total", "", "", null, ""],
     confidential: true,
     reportInfo: { period: "Current salary register", filters: { search: salarySearch } },
