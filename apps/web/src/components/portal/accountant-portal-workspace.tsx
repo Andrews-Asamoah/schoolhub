@@ -329,25 +329,10 @@ export function AccountantPortalWorkspace({
   // treated as cash received in dashboard totals or payment-method analysis.
   const settledPayments = payments.filter((payment) => payment.status === "COMPLETED");
   const collected = settledPayments.reduce((sum, payment) => sum + Number(payment.amount), 0);
-  const collectionsByFeeComponent = settledPayments.reduce<Record<string, number>>((totals, payment) => {
-    for (const allocation of payment.paymentItems ?? []) {
-      const feeItem = allocation.billItem.feeItem;
-      const category =
-        feeItem?.customCategory?.name ??
-        feeItem?.registryItem?.name ??
-        feeItem?.category?.replaceAll("_", " ") ??
-        allocation.billItem.description ??
-        "Uncategorised";
-      totals[category] = (totals[category] ?? 0) + Number(allocation.amount);
-    }
-    return totals;
-  }, {});
-  const feeComponentCollections = Object.entries(collectionsByFeeComponent).sort((a, b) => b[1] - a[1]);
   const outstanding = debtors.reduce((sum, bill) => sum + Number(bill.balanceAmount), 0);
   const expenseTotal = expenses.reduce((sum, expense) => sum + Number(expense.amount), 0);
   const paidPayroll = payroll.filter((run) => run.status === "PAID");
   const payrollNet = paidPayroll.reduce((sum, run) => sum + Number(run.totalNet), 0);
-  const payrollGrossPaid = paidPayroll.reduce((sum, run) => sum + Number(run.totalGross), 0);
   const reportStartDate = useMemo(() => {
     if (reportPeriod === "all") return null;
     const start = new Date();
@@ -359,11 +344,16 @@ export function AccountantPortalWorkspace({
     if (reportPeriod === "year") start.setMonth(0, 1);
     return start;
   }, [reportPeriod]);
+  const reportEndDate = useMemo(() => {
+    const end = new Date();
+    end.setHours(23, 59, 59, 999);
+    return end;
+  }, [reportPeriod]);
   const isInReportPeriod = (value?: string | null) => {
     if (!reportStartDate) return true;
     if (!value) return false;
     const date = new Date(value);
-    return !Number.isNaN(date.getTime()) && date >= reportStartDate;
+    return !Number.isNaN(date.getTime()) && date >= reportStartDate && date <= reportEndDate;
   };
   const reportPayments = useMemo(
     () => payments.filter((payment) => isInReportPeriod(payment.paymentDate)),
@@ -378,8 +368,11 @@ export function AccountantPortalWorkspace({
   const reportExpenseTotal = reportExpenses.reduce((sum, expense) => sum + Number(expense.amount), 0);
   const reportPayroll = useMemo(() => {
     if (!reportStartDate) return payroll;
-    return payroll.filter((run) => new Date(run.year, run.month - 1, 1) >= reportStartDate);
-  }, [payroll, reportStartDate]);
+    return payroll.filter((run) => {
+      const periodDate = new Date(run.year, run.month - 1, 1);
+      return periodDate >= reportStartDate && periodDate <= reportEndDate;
+    });
+  }, [payroll, reportStartDate, reportEndDate]);
   const reportPayrollPaid = reportPayroll.filter((run) => run.status === "PAID");
   const reportPayrollNet = reportPayrollPaid.reduce((sum, run) => sum + Number(run.totalNet), 0);
   const reportPayrollGross = reportPayroll.reduce((sum, run) => sum + Number(run.totalGross), 0);
