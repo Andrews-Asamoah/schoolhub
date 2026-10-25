@@ -12,6 +12,7 @@ import { apiFetch } from "@/lib/api";
 import { schoolRoleLabel, useSchoolRole } from "@/components/school/school-role-switcher";
 import { getSchoolNavGroupsForRole } from "@/lib/school-navigation";
 import { StudentOverview } from "@/components/portal/student-overview";
+import { AccountantFinanceCharts } from "@/components/portal/accountant-finance-charts";
 import { useSchoolOrganization } from "@/components/school/school-organization";
 
 interface SetupYear {
@@ -23,6 +24,25 @@ interface SetupSchool {
   academicYears: SetupYear[];
 }
 interface DashboardContentProps { today: string; greetingName: string; search: string; }
+interface AccountantDashboardPayment {
+  id?: string;
+  amount: number | string;
+  paymentDate: string;
+  status: string;
+  paymentMethod?: string;
+  bill?: { id: string; billNumber?: string } | null;
+}
+interface AccountantDashboardExpense {
+  amount: number | string;
+  date: string;
+  category?: string | null;
+  customCategory?: { name: string } | null;
+  registryCategory?: { name: string } | null;
+}
+interface AccountantDashboardBill {
+  id: string;
+  class?: { id: string; name: string } | null;
+}
 interface Metric { label: string; value: string; detail: string; icon: LucideIcon; className: string; }
 const numberFormat = new Intl.NumberFormat("en-GH");
 const moneyFormat = new Intl.NumberFormat("en-GH", { style: "currency", currency: "GHS", maximumFractionDigits: 2 });
@@ -56,6 +76,27 @@ export function DashboardContent({ today, greetingName }: DashboardContentProps)
     queryKey: ["dashboard", "analytics", selectedMonths, activeOrganization?.id],
     queryFn: () => apiFetch<DashboardAnalytics>(`/dashboard/analytics?months=${selectedMonths}`),
     enabled: Boolean(activeRole && activeRole !== "student" && activeOrganization),
+    retry: false,
+    refetchInterval: 60_000,
+  });
+  const accountantPaymentsQuery = useQuery({
+    queryKey: ["dashboard", "accountant-finance", "payments", activeOrganization?.id],
+    queryFn: () => apiFetch<AccountantDashboardPayment[]>("/finance/payments"),
+    enabled: activeRole === "accountant" && Boolean(activeOrganization),
+    retry: false,
+    refetchInterval: 60_000,
+  });
+  const accountantExpensesQuery = useQuery({
+    queryKey: ["dashboard", "accountant-finance", "expenses", activeOrganization?.id],
+    queryFn: () => apiFetch<AccountantDashboardExpense[]>("/finance/expenses"),
+    enabled: activeRole === "accountant" && Boolean(activeOrganization),
+    retry: false,
+    refetchInterval: 60_000,
+  });
+  const accountantBillsQuery = useQuery({
+    queryKey: ["dashboard", "accountant-finance", "bills", activeOrganization?.id],
+    queryFn: () => apiFetch<AccountantDashboardBill[]>("/finance/bills"),
+    enabled: activeRole === "accountant" && Boolean(activeOrganization),
     retry: false,
     refetchInterval: 60_000,
   });
@@ -113,6 +154,30 @@ export function DashboardContent({ today, greetingName }: DashboardContentProps)
 
       <Metrics data={data} isLoading={analyticsQuery.isPending} isError={analyticsQuery.isError} />
       <DashboardInfographics data={data} isLoading={analyticsQuery.isPending} isError={analyticsQuery.isError} selectedMonths={selectedMonths} onMonthsChange={setSelectedMonths} />
+      {activeRole === "accountant" && (
+        <section className="mt-6 space-y-3" aria-label="Accountant finance dashboard">
+          <div>
+            <h2 className="text-lg font-semibold tracking-tight text-foreground">Finance overview</h2>
+            <p className="mt-1 text-sm text-muted-foreground">Live collections, expenses and breakdowns from saved finance records.</p>
+          </div>
+          {(accountantPaymentsQuery.isPending || accountantExpensesQuery.isPending || accountantBillsQuery.isPending) ? (
+            <div className="grid gap-5 xl:grid-cols-2" aria-label="Loading finance analytics">
+              <div className="h-80 animate-pulse rounded-2xl bg-muted/60" />
+              <div className="h-80 animate-pulse rounded-2xl bg-muted/60" />
+            </div>
+          ) : accountantPaymentsQuery.isError || accountantExpensesQuery.isError || accountantBillsQuery.isError ? (
+            <p role="alert" className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
+              Finance charts could not load. Check your accountant finance permissions and API connection, then refresh this dashboard.
+            </p>
+          ) : (
+            <AccountantFinanceCharts
+              payments={accountantPaymentsQuery.data ?? []}
+              expenses={accountantExpensesQuery.data ?? []}
+              bills={accountantBillsQuery.data ?? []}
+            />
+          )}
+        </section>
+      )}
       <section className={`mt-5 grid gap-5 ${isManagementRole ? "xl:grid-cols-2" : "xl:grid-cols-1"}`}>
         <RecentActivityCard activities={data?.recentActivities ?? []} isLoading={analyticsQuery.isPending} isError={analyticsQuery.isError} canViewFinance={Boolean(data?.canViewFinance)} />
         {isManagementRole && <SchoolYearCard academicYear={activeYear} />}
