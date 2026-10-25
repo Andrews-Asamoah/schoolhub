@@ -1497,9 +1497,14 @@ export class FinanceService {
       status: { notIn: ["CANCELLED", "WAIVED"] },
       ...(period.year ? { academicYearId: period.year.id } : {}),
       ...(period.term ? { termId: period.term.id } : {}),
-      ...(dates.start || dates.end ? { issuedAt: { ...(dates.start ? { gte: dates.start } : {}), ...(dates.end ? { lte: dates.end } : {}) } } : {}),
+      ...(dates.start || dates.end
+        ? { issuedAt: { ...(dates.start ? { gte: dates.start } : {}), ...(dates.end ? { lte: dates.end } : {}) } }
+        : {}),
     };
 
+    // Receipts are periodised by transaction date, not by the term of the bill
+    // they happen to clear. Explicit from/to filters intersect with the academic
+    // period instead of accidentally overriding it.
     const periodFrom = period.term?.startDate ?? period.year?.startDate;
     const periodTo = period.term?.endDate ?? period.year?.endDate;
     const rangeFrom = dates.start && periodFrom
@@ -1515,7 +1520,9 @@ export class FinanceService {
       schoolId,
       status: "COMPLETED",
       reversedAt: null,
-      ...(rangeFrom || rangeTo ? { paymentDate: { ...(rangeFrom ? { gte: rangeFrom } : {}), ...(rangeTo ? { lte: rangeTo } : {}) } } : {}),
+      ...(rangeFrom || rangeTo
+        ? { paymentDate: { ...(rangeFrom ? { gte: rangeFrom } : {}), ...(rangeTo ? { lte: rangeTo } : {}) } }
+        : {}),
     };
 
     const overdueWhere: Prisma.BillWhereInput = {
@@ -1529,9 +1536,71 @@ export class FinanceService {
       status: { notIn: ["CANCELLED", "WAIVED"] },
     };
 
-    const [billedAggregate, outstandingAggregate, overdueAggregate, openBillCount, overdueBillCount, methodGroups, classGroups, ageingBills, paymentAllocations] = await Promise.all([
+    const daysBeforeToday = (days: number) => new Date(dayStart.getTime() - days * 86_400_000);
+    const thirtyDaysAgo = daysBeforeToday(30);
+    const sixtyDaysAgo = daysBeforeToday(60);
+    const ninetyDaysAgo = daysBeforeToday(90);
+    const ageingWhere: { bucket: "0-30" | "31-60" | "61-90" | "90+"; where: Prisma.BillWhereInput }[] = [
+      { bucket: "0-30", where: { ...overdueWhere, dueDate: { gte: thirtyDaysAgo, lt: dayStart } } },
+      { bucket: "31-60", where: { ...overdueWhere, dueDate: { gte: sixtyDaysAgo, lt: thirtyDaysAgo } } },
+      { bucket: "61-90", where: { ...overdueWhere, dueDate: { gte: ninetyDaysAgo, lt: sixtyDaysAgo } } },
+      { bucket: "90+", where: { ...overdueWhere, dueDate: { lt: ninetyDaysAgo } } },
+    ];
+
+    const ageingPromise = Promise.all(ageingWhere.map(async ({ bucket, where }) => {
+      const [aggregate, count] = await Promise.all([
+        this.prisma.client.bill.aggregate({ where, _sum: { balanceAmount: true } }),
+        this.prisma.client.bill.count({ where }),
+      ]);
+      return { bucket, amount: aggregate._sum.balanceAmount ?? new Prisma.Decimal(0), count };
+    }));
+
+    const classCollectionPromise = this.prisma.client.$queryRaw<Array<{ classId: string | null; amount: Prisma.Decimal }>>`
+      WITH selected_payments AS (
+        SELECT p.id, p."billId", p.amount
+        FROM "payments" p
+        WHERE p."schoolId" = ${schoolId}
+          AND p.status = 'COMPLETED'
+          AND p."reversedAt" IS NULL
+          AND (${rangeFrom ?? null}::date IS NULL OR p."paymentDate" >= ${rangeFrom ?? null}::date)
+          AND (${rangeTo ?? null}::date IS NULL OR p."paymentDate" <= ${rangeTo ?? null}::date)
+      ),
+      class_allocations AS (
+        SELECT allocated_bill."classId" AS "classId", pi.amount AS amount
+        FROM selected_payments sp
+        INNER JOIN "payment_items" pi ON pi."paymentId" = sp.id
+        INNER JOIN "bill_items" bi ON bi.id = pi."billItemId"
+        INNER JOIN "bills" allocated_bill
+          ON allocated_bill.id = bi."billId"
+         AND allocated_bill."schoolId" = ${schoolId}
+        UNION ALL
+        SELECT legacy_bill."classId" AS "classId", sp.amount AS amount
+        FROM selected_payments sp
+        INNER JOIN "bills" legacy_bill
+          ON legacy_bill.id = sp."billId"
+         AND legacy_bill."schoolId" = ${schoolId}
+        WHERE NOT EXISTS (
+          SELECT 1 FROM "payment_items" pi WHERE pi."paymentId" = sp.id
+        )
+      )
+      SELECT "classId", COALESCE(SUM(amount), 0)::numeric AS amount
+      FROM class_allocations
+      GROUP BY "classId"
+    `;
+
+    const [
+      billedAggregate,
+      outstandingAggregate,
+      overdueAggregate,
+      openBillCount,
+      overdueBillCount,
+      methodGroups,
+      classGroups,
+      ageing,
+      classCollectionRows,
+    ] = await Promise.all([
       this.prisma.client.bill.aggregate({ where: billWhere, _sum: { totalAmount: true } }),
-      this.prisma.client.bill.aggregate({ where: { ...billWhere, balanceAmount: { gt: 0 } }, _sum: { balanceAmount: true } }),
+      this.prisma.client.bill.aggregate({ where: openBillsWhere, _sum: { balanceAmount: true } }),
       this.prisma.client.bill.aggregate({ where: overdueWhere, _sum: { balanceAmount: true } }),
       this.prisma.client.bill.count({ where: openBillsWhere }),
       this.prisma.client.bill.count({ where: overdueWhere }),
@@ -1547,61 +1616,40 @@ export class FinanceService {
         _sum: { totalAmount: true, balanceAmount: true },
         _count: { _all: true },
       }),
-      this.prisma.client.bill.findMany({
-        where: overdueWhere,
-        select: { id: true, dueDate: true, balanceAmount: true },
-      }),
-      this.prisma.client.paymentItem.findMany({
-        where: {
-          payment: paymentWhere,
-          billItem: { bill: { schoolId } },
-        },
-        select: { amount: true, billItem: { select: { bill: { select: { classId: true } } } } },
-      }),
+      ageingPromise,
+      classCollectionPromise,
     ]);
 
-    const asNumber = (amount: Prisma.Decimal | null | undefined) => amount ? Number(amount.toFixed(2)) : 0;
-    const ageing = [
-      { bucket: "0-30" as const, amount: new Prisma.Decimal(0), count: 0 },
-      { bucket: "31-60" as const, amount: new Prisma.Decimal(0), count: 0 },
-      { bucket: "61-90" as const, amount: new Prisma.Decimal(0), count: 0 },
-      { bucket: "90+" as const, amount: new Prisma.Decimal(0), count: 0 },
-    ];
-    for (const bill of ageingBills) {
-      if (!bill.dueDate || bill.balanceAmount.lte(0)) continue;
-      const days = Math.max(0, Math.floor((dayStart.getTime() - bill.dueDate.getTime()) / 86_400_000));
-      const index = days <= 30 ? 0 : days <= 60 ? 1 : days <= 90 ? 2 : 3;
-      ageing[index].amount = ageing[index].amount.plus(bill.balanceAmount);
-      ageing[index].count += 1;
-    }
-
+    const asNumber = (amount: Prisma.Decimal | null | undefined) =>
+      amount ? Number(amount.toFixed(2)) : 0;
     const schoolClasses = classGroups.some((group) => group.classId)
       ? await this.prisma.client.class.findMany({
-          where: { schoolId, id: { in: classGroups.map((group) => group.classId).filter((id): id is string => Boolean(id)) } },
+          where: {
+            schoolId,
+            id: { in: classGroups.map((group) => group.classId).filter((id): id is string => Boolean(id)) },
+          },
           select: { id: true, name: true },
         })
       : [];
     const classNames = new Map(schoolClasses.map((row) => [row.id, row.name]));
-    const classCollected = new Map<string | null, Prisma.Decimal>();
-    for (const allocation of paymentAllocations) {
-      const classId = allocation.billItem.bill.classId;
-      classCollected.set(classId, (classCollected.get(classId) ?? new Prisma.Decimal(0)).plus(allocation.amount));
-    }
+    const classCollected = new Map(classCollectionRows.map((row) => [row.classId, row.amount]));
+
+    const collected = methodGroups.reduce(
+      (sum, group) => sum.plus(group._sum.amount ?? new Prisma.Decimal(0)),
+      new Prisma.Decimal(0),
+    );
 
     return {
       scope: {
-        from: query.from ?? (period.term?.startDate.toISOString().slice(0, 10) ?? period.year?.startDate.toISOString().slice(0, 10) ?? null),
-        to: query.to ?? (period.term?.endDate.toISOString().slice(0, 10) ?? period.year?.endDate.toISOString().slice(0, 10) ?? null),
+        from: rangeFrom?.toISOString().slice(0, 10) ?? null,
+        to: rangeTo?.toISOString().slice(0, 10) ?? null,
         academicYearId: period.year?.id ?? null,
         academicYearName: period.year?.name ?? null,
         termId: period.term?.id ?? null,
         termName: period.term?.name ?? null,
       },
       billed: asNumber(billedAggregate._sum.totalAmount),
-      collected: Number(methodGroups.reduce(
-        (sum, group) => sum.plus(group._sum.amount ?? new Prisma.Decimal(0)),
-        new Prisma.Decimal(0),
-      ).toFixed(2)),
+      collected: Number(collected.toFixed(2)),
       outstanding: asNumber(outstandingAggregate._sum.balanceAmount),
       overdue: asNumber(overdueAggregate._sum.balanceAmount),
       openBillCount,
