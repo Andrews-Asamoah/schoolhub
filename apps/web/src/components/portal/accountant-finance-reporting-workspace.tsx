@@ -6,6 +6,21 @@ import { apiFetch } from "@/lib/api";
 import { useSchoolRole } from "@/components/school/school-role-switcher";
 import { exportPdf, exportXlsx, printTable, type ExportTable } from "@/lib/table-export";
 
+type FormerStudentStatus = "WITHDRAWN" | "TRANSFERRED" | "GRADUATED";
+interface ArrearsReviewStudent {
+  studentId: string;
+  status: string;
+  admissionNumber: string | null;
+  name: string;
+  outstanding: number;
+  bills: { id: string; billNumber: string; academicYear: string; term: string | null; balance: number }[];
+}
+interface ArrearsReviewResponse {
+  currentPeriod: { academicYearId: string; academicYear: string; termId: string; term: string };
+  activeWithArrears: ArrearsReviewStudent[];
+  formerStudents: ArrearsReviewStudent[];
+  totalOutstanding: number;
+}
 interface AcademicYearOption {
   id: string;
   name: string;
@@ -27,6 +42,28 @@ export function AccountantFinanceReportingWorkspace() {
   const queryClient = useQueryClient();
   const { activeRole } = useSchoolRole();
   const canChangeArrearsPolicy = ["owner", "admin", "headteacher"].includes(activeRole ?? "");
+  const [formerChoices, setFormerChoices] = useState<Record<string, { status: FormerStudentStatus; reason: string }>>({});
+
+  const arrearsReviewQuery = useQuery({
+    queryKey: ["finance", "arrears-review"],
+    queryFn: () => apiFetch<ArrearsReviewResponse>("/finance/arrears-review"),
+    retry: false,
+  });
+  const markFormerStudent = useMutation({
+    mutationFn: (input: { studentId: string; status: FormerStudentStatus; reason: string }) =>
+      apiFetch(`/finance/arrears-review/${encodeURIComponent(input.studentId)}/mark-former`, {
+        method: "POST",
+        body: JSON.stringify({ status: input.status, reason: input.reason }),
+      }),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["finance", "arrears-review"] }),
+        queryClient.invalidateQueries({ queryKey: ["finance", "bills"] }),
+        queryClient.invalidateQueries({ queryKey: ["finance", "summary"] }),
+        queryClient.invalidateQueries({ queryKey: ["students"] }),
+      ]);
+    },
+  });
 
   const arrearsPolicyQuery = useQuery({
     queryKey: ["finance", "arrears-policy"],
@@ -141,6 +178,62 @@ export function AccountantFinanceReportingWorkspace() {
             {!canChangeArrearsPolicy && <p className="mt-1 text-xs text-muted-foreground">Only an owner, administrator or headteacher may change this policy.</p>}
           </div>
         </div>
+      </section>
+
+      <section className="rounded-xl border border-border p-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h3 className="font-semibold text-foreground">Term-end arrears review</h3>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Review unpaid previous-term invoices before generating new-term bills. Mark a student as withdrawn, transferred or graduated only when confirmed by the school; the source invoices remain open and are never deleted.
+            </p>
+          </div>
+          {arrearsReviewQuery.data && <span className="rounded-lg bg-muted px-3 py-2 text-xs text-muted-foreground">{arrearsReviewQuery.data.currentPeriod.academicYear} · {arrearsReviewQuery.data.currentPeriod.term}</span>}
+        </div>
+        {arrearsReviewQuery.isPending ? <p className="mt-4 text-sm text-muted-foreground">Loading students with previous-term arrears…</p>
+          : arrearsReviewQuery.isError ? <p role="alert" className="mt-4 text-sm text-destructive">Arrears review could not be loaded: {arrearsReviewQuery.error.message}</p>
+            : arrearsReviewQuery.data ? (
+              <div className="mt-4 space-y-5">
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <div className="rounded-xl border border-border p-3"><p className="text-xs text-muted-foreground">Active students with arrears</p><p className="mt-1 text-lg font-bold text-foreground">{arrearsReviewQuery.data.activeWithArrears.length}</p></div>
+                  <div className="rounded-xl border border-border p-3"><p className="text-xs text-muted-foreground">Former students with arrears</p><p className="mt-1 text-lg font-bold text-foreground">{arrearsReviewQuery.data.formerStudents.length}</p></div>
+                  <div className="rounded-xl border border-border p-3"><p className="text-xs text-muted-foreground">Total previous balance</p><p className="mt-1 text-lg font-bold text-foreground tabular-nums">{money(arrearsReviewQuery.data.totalOutstanding)}</p></div>
+                </div>
+                <div>
+                  <h4 className="text-sm font-semibold text-foreground">Active students</h4>
+                  {arrearsReviewQuery.data.activeWithArrears.length === 0
+                    ? <p className="mt-2 rounded-lg bg-muted/40 p-3 text-sm text-muted-foreground">No active students have unpaid previous-term invoices.</p>
+                    : <div className="mt-2 divide-y divide-border rounded-xl border border-border">
+                      {arrearsReviewQuery.data.activeWithArrears.map((student) => {
+                        const choice = formerChoices[student.studentId] ?? { status: "WITHDRAWN" as FormerStudentStatus, reason: "" };
+                        return <div key={student.studentId} className="space-y-3 p-3">
+                          <div className="flex flex-wrap items-start justify-between gap-3">
+                            <div><p className="text-sm font-semibold text-foreground">{student.name}</p><p className="mt-0.5 text-xs text-muted-foreground">{student.admissionNumber ?? "No admission number"} · {student.bills.length} unpaid invoice(s)</p></div>
+                            <p className="text-sm font-bold tabular-nums text-foreground">{money(student.outstanding)}</p>
+                          </div>
+                          <div className="flex flex-col gap-2 md:flex-row md:items-end">
+                            <label className="text-xs font-semibold text-muted-foreground">If the student has left<select value={choice.status} disabled={!canChangeArrearsPolicy || markFormerStudent.isPending} onChange={(event) => setFormerChoices((state) => ({ ...state, [student.studentId]: { ...choice, status: event.target.value as FormerStudentStatus } }))} className="mt-1.5 h-9 w-full rounded-lg border border-border bg-background px-2 text-sm text-foreground md:w-44"><option value="WITHDRAWN">Withdrawn</option><option value="TRANSFERRED">Transferred</option><option value="GRADUATED">Graduated</option></select></label>
+                            <label className="flex-1 text-xs font-semibold text-muted-foreground">Reason (required)<input value={choice.reason} disabled={!canChangeArrearsPolicy || markFormerStudent.isPending} onChange={(event) => setFormerChoices((state) => ({ ...state, [student.studentId]: { ...choice, reason: event.target.value } }))} placeholder="e.g. Transfer confirmed by school" className="mt-1.5 h-9 w-full rounded-lg border border-border bg-background px-3 text-sm text-foreground" /></label>
+                            {canChangeArrearsPolicy && <button type="button" disabled={markFormerStudent.isPending || choice.reason.trim().length < 10} onClick={() => markFormerStudent.mutate({ studentId: student.studentId, status: choice.status, reason: choice.reason.trim() })} className="h-9 rounded-lg border border-border px-3 text-xs font-semibold text-foreground hover:bg-muted disabled:opacity-50">Mark former</button>}
+                          </div>
+                          <p className="text-xs text-muted-foreground">This changes the student status and records the reason. Unpaid invoices remain unchanged and visible in the former-student list.</p>
+                        </div>;
+                      })}
+                    </div>}
+                </div>
+                <div>
+                  <h4 className="text-sm font-semibold text-foreground">Former students with unpaid balances</h4>
+                  <div className="mt-2 overflow-x-auto rounded-xl border border-border">
+                    <table className="w-full min-w-[500px] text-left text-sm"><thead className="bg-muted/50 text-xs uppercase tracking-wide text-muted-foreground"><tr><th className="px-3 py-2">Student</th><th className="px-3 py-2">Status</th><th className="px-3 py-2 text-right">Outstanding</th></tr></thead><tbody>
+                      {arrearsReviewQuery.data.formerStudents.map((student) => <tr key={student.studentId} className="border-t border-border"><td className="px-3 py-2">{student.name}<span className="mt-0.5 block text-xs text-muted-foreground">{student.admissionNumber ?? "No admission number"}</span></td><td className="px-3 py-2">{student.status.replaceAll("_", " ")}</td><td className="px-3 py-2 text-right tabular-nums">{money(student.outstanding)}</td></tr>)}
+                      {!arrearsReviewQuery.data.formerStudents.length && <tr><td colSpan={3} className="px-3 py-5 text-center text-sm text-muted-foreground">No former students have outstanding previous-term balances.</td></tr>}
+                    </tbody></table>
+                  </div>
+                </div>
+                {!canChangeArrearsPolicy && <p className="text-xs text-muted-foreground">Only an owner, administrator or headteacher may change student status from this review.</p>}
+                {markFormerStudent.isError && <p role="alert" className="text-sm text-destructive">Student status was not changed: {markFormerStudent.error.message}</p>}
+              </div>
+            ) : null}
       </section>
 
       {scope !== "all" && !activeYear ? <div className="rounded-xl border border-warning/20 bg-warning/10 p-4 text-sm text-warning">Select or configure an academic year before running a report.</div> : null}
