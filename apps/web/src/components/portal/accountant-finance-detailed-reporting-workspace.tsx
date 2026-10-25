@@ -3,6 +3,8 @@ import { ServerExportButton } from "@/components/portal/server-export-button";
 import type { ExportTable } from "@/lib/table-export";
 
 import { useCallback, useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { apiFetch } from "@/lib/api";
 import { Search, Users, WalletCards } from "lucide-react";
 
 interface Student {
@@ -47,6 +49,37 @@ interface Props {
   bills: FinanceBill[];
   payments: FinancePayment[];
   classes: FinanceClass[];
+}
+
+interface FinancePage<T> {
+  items: T[];
+  nextCursor: string | null;
+  total: number;
+}
+
+async function fetchAllFinancePages<T>(path: string): Promise<T[]> {
+  const records: T[] = [];
+  const seenCursors = new Set<string>();
+  let cursor: string | null = null;
+  let pageCount = 0;
+
+  do {
+    if (pageCount >= 1000) {
+      throw new Error("Finance report exceeded the safe pagination limit. Narrow the reporting period and try again.");
+    }
+    const params = new URLSearchParams({ limit: "100" });
+    if (cursor) params.set("cursor", cursor);
+    const page = await apiFetch<FinancePage<T>>(`${path}?${params.toString()}`);
+    records.push(...page.items);
+    cursor = page.nextCursor;
+    pageCount += 1;
+    if (cursor && seenCursors.has(cursor)) {
+      throw new Error("Finance report pagination returned a repeated cursor. No partial report has been displayed.");
+    }
+    if (cursor) seenCursors.add(cursor);
+  } while (cursor);
+
+  return records;
 }
 
 const money = (value: number) =>
@@ -104,11 +137,22 @@ function defaultStart() {
   return localDate(date);
 }
 
-export function AccountantFinanceDetailedReportingWorkspace({
-  bills,
-  payments,
-  classes,
-}: Props) {
+export function AccountantFinanceDetailedReportingWorkspace({ classes }: Props) {
+  // The main portal registers are paginated. Reports fetch every page independently.
+  const completeFinanceQuery = useQuery({
+    queryKey: ["finance", "complete-report-dataset"],
+    queryFn: async () => {
+      const [allBills, allPayments] = await Promise.all([
+        fetchAllFinancePages<FinanceBill>("/finance/bills"),
+        fetchAllFinancePages<FinancePayment>("/finance/payments"),
+      ]);
+      return { bills: allBills, payments: allPayments };
+    },
+    retry: false,
+    staleTime: 30_000,
+  });
+  const bills = completeFinanceQuery.data?.bills ?? [];
+  const payments = completeFinanceQuery.data?.payments ?? [];
   const [reportType, setReportType] = useState<"class" | "student">("class");
   const [classId, setClassId] = useState("ALL");
   const [studentId, setStudentId] = useState("");
@@ -252,7 +296,7 @@ export function AccountantFinanceDetailedReportingWorkspace({
     );
   });
 
-  const completedPayments = visiblePayments.filter((payment) =>
+  const completedPayments = scopedPayments.filter((payment) =>
     settled(payment.status),
   );
 
@@ -261,7 +305,7 @@ export function AccountantFinanceDetailedReportingWorkspace({
     0,
   );
 
-  const billed = visibleBills
+  const billed = scopedBills
     .filter(
       (bill) =>
         bill.status !== "CANCELLED" && bill.status !== "WAIVED",
@@ -311,7 +355,7 @@ export function AccountantFinanceDetailedReportingWorkspace({
       }
     >();
 
-    for (const bill of visibleBills) {
+    for (const bill of scopedBills) {
       const key = bill.class?.id ?? "no-class";
 
       const entry = totals.get(key) ?? {
@@ -792,7 +836,19 @@ export function AccountantFinanceDetailedReportingWorkspace({
             Select a student to build their statement.
           </div>
         ) : (
-          <div className="space-y-5">
+          {completeFinanceQuery.isPending && (
+        <div role="status" className="mb-4 rounded-xl border border-border bg-muted/30 p-4 text-sm text-muted-foreground">
+          Loading all finance records for a complete report…
+        </div>
+      )}
+      {completeFinanceQuery.error && (
+        <div role="alert" className="mb-4 rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
+          Unable to load the complete finance dataset. Report totals are unavailable; do not rely on partial totals. {completeFinanceQuery.error.message}
+          <button type="button" className="ml-2 font-semibold underline" onClick={() => void completeFinanceQuery.refetch()}>Retry</button>
+        </div>
+      )}
+      <div className="space-y-5" aria-busy={completeFinanceQuery.isPending || undefined}>
+        {completeFinanceQuery.isPending || completeFinanceQuery.error ? null : (
             <div>
               <h4 className="mb-2 font-semibold text-foreground">
                 Bills issued
@@ -914,6 +970,7 @@ export function AccountantFinanceDetailedReportingWorkspace({
           include completed receipts only. Outstanding balances are current
           bill balances and may cover dates outside this report period.
         </p>
+        )}
       </div>
     </section>
   );
