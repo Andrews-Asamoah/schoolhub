@@ -1728,7 +1728,26 @@ export class FinanceService {
               bill: { select: { id: true, billNumber: true, academicYearId: true, termId: true, academicYear: { select: { name: true } }, term: { select: { name: true } } } },
             },
           },
-          paymentItems: { select: { amount: true, billItem: { select: { billId: true, bill: { select: { id: true, billNumber: true, academicYearId: true, termId: true, academicYear: { select: { name: true } }, term: { select: { name: true } } } } } } },
+          paymentItems: {
+            select: {
+              amount: true,
+              billItem: {
+                select: {
+                  billId: true,
+                  bill: {
+                    select: {
+                      id: true,
+                      billNumber: true,
+                      academicYearId: true,
+                      termId: true,
+                      academicYear: { select: { name: true } },
+                      term: { select: { name: true } },
+                    },
+                  },
+                },
+              },
+            },
+          },
         },
       }),
       this.prisma.client.bill.findMany({
@@ -1977,8 +1996,8 @@ export class FinanceService {
       filters.push({ OR: [
         { billNumber: { contains: term, mode: "insensitive" } },
         { student: { admissionNumber: { contains: term, mode: "insensitive" } } },
-        { student: { profile: { firstName: { contains: term, mode: "insensitive" } } },
-        { student: { profile: { lastName: { contains: term, mode: "insensitive" } } },
+        { student: { profile: { firstName: { contains: term, mode: "insensitive" } } } },
+        { student: { profile: { lastName: { contains: term, mode: "insensitive" } } } },
         { class: { name: { contains: term, mode: "insensitive" } } },
       ] });
     }
@@ -2132,7 +2151,7 @@ export class FinanceService {
       filters.push({ OR: [
         { paymentNumber: { contains: term, mode: "insensitive" } },
         { referenceNumber: { contains: term, mode: "insensitive" } },
-        { student: { admissionNumber: { contains: term, mode: "insensitive" } },
+        { student: { admissionNumber: { contains: term, mode: "insensitive" } } },
         { student: { profile: { firstName: { contains: term, mode: "insensitive" } } },
         { student: { profile: { lastName: { contains: term, mode: "insensitive" } } },
       ] });
