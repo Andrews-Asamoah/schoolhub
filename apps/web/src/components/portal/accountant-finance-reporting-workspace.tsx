@@ -5,7 +5,6 @@ import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import { FileSpreadsheet, FileText, LoaderCircle, Printer } from "lucide-react";
 import { apiFetch } from "@/lib/api";
-import { cn } from "@/lib/utils";
 
 interface AcademicTerm { id: string; name: string; isCurrent: boolean; }
 interface AcademicYear { id: string; name: string; isCurrent: boolean; terms: AcademicTerm[]; }
