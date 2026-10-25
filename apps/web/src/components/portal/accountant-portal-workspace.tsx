@@ -27,6 +27,8 @@ import {
   type CreateExpenseInput,
   type GenerateBillInput,
   type RecordPaymentInput,
+  type FinancePage,
+  type FinanceSummaryResponse,
 } from "@schoolhub/shared";
 import { AdminAnnouncementsWorkspace } from "./admin-announcements-workspace";
 import { AccountantFinanceCharts } from "./accountant-finance-charts";
@@ -146,12 +148,16 @@ interface ApiTerm {
   id: string;
   name: string;
   isCurrent: boolean;
+  startDate: string;
+  endDate: string;
 }
 
 interface ApiAcademicYear {
   id: string;
   name: string;
   isCurrent: boolean;
+  startDate: string;
+  endDate: string;
   terms: ApiTerm[];
 }
 
@@ -242,7 +248,13 @@ export function AccountantPortalWorkspace({
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [overdueSearch, setOverdueSearch] = useState("");
   const [overdueClassFilter, setOverdueClassFilter] = useState("ALL");
-  const [reportPeriod, setReportPeriod] = useState<"month" | "quarter" | "year" | "all">("year");
+  const [reportPeriod, setReportPeriod] = useState<"term" | "year" | "all">("term");
+  const [billCursor, setBillCursor] = useState<string | null>(null);
+  const [billCursorStack, setBillCursorStack] = useState<(string | null)[]>([]);
+  const [paymentCursor, setPaymentCursor] = useState<string | null>(null);
+  const [paymentCursorStack, setPaymentCursorStack] = useState<(string | null)[]>([]);
+  const [debtorCursor, setDebtorCursor] = useState<string | null>(null);
+  const [debtorCursorStack, setDebtorCursorStack] = useState<(string | null)[]>([]);
   const [showPaymentForm, setShowPaymentForm] = useState(false);
   const [selectedBillId, setSelectedBillId] = useState("");
   const [selectedReceipt, setSelectedReceipt] = useState<ApiPayment | null>(null);
@@ -268,14 +280,68 @@ export function AccountantPortalWorkspace({
     enabled: Boolean(selectedInvoiceForPrint || selectedReceipt),
     retry: false,
   });
-  const billsQuery = useQuery({
-    queryKey: ["finance", "bills"],
-    queryFn: () => apiFetch<ApiBill[]>("/finance/bills"),
+  const yearsQuery = useQuery({
+    queryKey: ["schools", "academic-years"],
+    queryFn: () => apiFetch<ApiAcademicYear[]>("/schools/academic-years"),
     retry: false,
   });
+  const currentYear = (yearsQuery.data ?? []).find((year) => year.isCurrent);
+  const currentTerm = currentYear?.terms.find((term) => term.isCurrent);
+  const reportParams = new URLSearchParams();
+  if (reportPeriod !== "all" && currentYear) reportParams.set("yearId", currentYear.id);
+  if (reportPeriod === "term" && currentTerm) reportParams.set("termId", currentTerm.id);
+  const summaryQuery = useQuery({
+    queryKey: ["finance", "summary", reportPeriod, currentYear?.id, currentTerm?.id],
+    queryFn: () => apiFetch<FinanceSummaryResponse>(`/finance/summary?${reportParams.toString()}`),
+    enabled: Boolean(reportPeriod === "all" || (currentYear && (reportPeriod === "year" || currentTerm))),
+    retry: false,
+  });
+
+  useEffect(() => {
+    setBillCursor(null);
+    setBillCursorStack([]);
+    setDebtorCursor(null);
+    setDebtorCursorStack([]);
+  }, [search, statusFilter]);
+
+  useEffect(() => {
+    setPaymentCursor(null);
+    setPaymentCursorStack([]);
+  }, [search]);
+
+  const billParams = new URLSearchParams({ limit: "50" });
+  if (search.trim()) billParams.set("search", search.trim());
+  if (statusFilter !== "ALL") billParams.set("status", statusFilter);
+  if (billCursor) billParams.set("cursor", billCursor);
+  const billsQuery = useQuery({
+    queryKey: ["finance", "bills", search.trim(), statusFilter, billCursor],
+    queryFn: () => apiFetch<FinancePage<ApiBill>>(`/finance/bills?${billParams.toString()}`),
+    retry: false,
+  });
+  const paymentParams = new URLSearchParams({ limit: "50" });
+  if (search.trim()) paymentParams.set("search", search.trim());
+  if (paymentCursor) paymentParams.set("cursor", paymentCursor);
   const paymentsQuery = useQuery({
-    queryKey: ["finance", "payments"],
-    queryFn: () => apiFetch<ApiPayment[]>("/finance/payments"),
+    queryKey: ["finance", "payments", search.trim(), paymentCursor],
+    queryFn: () => apiFetch<FinancePage<ApiPayment>>(`/finance/payments?${paymentParams.toString()}`),
+    retry: false,
+  });
+  const debtorParams = new URLSearchParams({ limit: "50", status: "OUTSTANDING" });
+  if (search.trim()) debtorParams.set("search", search.trim());
+  if (debtorCursor) debtorParams.set("cursor", debtorCursor);
+  const outstandingBillsQuery = useQuery({
+    queryKey: ["finance", "outstanding-bills", search.trim(), debtorCursor],
+    queryFn: () => apiFetch<FinancePage<ApiBill>>(`/finance/bills?${debtorParams.toString()}`),
+    enabled: activeTab === "debtors" || activeTab === "overview",
+    retry: false,
+  });
+  const overdueParams = new URLSearchParams({ limit: "50", status: "OVERDUE" });
+  if (overdueSearch.trim()) overdueParams.set("search", overdueSearch.trim());
+  if (overdueClassFilter !== "ALL") overdueParams.set("classId", overdueClassFilter);
+  const overdueBillsQuery = useQuery({
+    queryKey: ["finance", "overdue-bills", overdueSearch.trim(), overdueClassFilter],
+    queryFn: () => apiFetch<FinancePage<ApiBill>>(`/finance/bills?${overdueParams.toString()}`),
+    enabled: activeTab === "overview",
     retry: false,
   });
   const expensesQuery = useQuery({
@@ -293,11 +359,6 @@ export function AccountantPortalWorkspace({
     queryFn: () => apiFetch<ApiClass[]>("/academics/classes"),
     retry: false,
   });
-  const yearsQuery = useQuery({
-    queryKey: ["schools", "academic-years"],
-    queryFn: () => apiFetch<ApiAcademicYear[]>("/schools/academic-years"),
-    retry: false,
-  });
   const inventoryQuery = useQuery({
     queryKey: ["inventory", "items"],
     queryFn: () => apiFetch<ApiInventoryItem[]>("/inventory/items"),
@@ -310,8 +371,9 @@ export function AccountantPortalWorkspace({
     retry: false,
   });
 
-  const bills = billsQuery.data ?? [];
-  const payments = paymentsQuery.data ?? [];
+  const bills = billsQuery.data?.items ?? [];
+  const payments = paymentsQuery.data?.items ?? [];
+  const summary = summaryQuery.data;
   const expenses = expensesQuery.data ?? [];
   const feeStructures = feeStructuresQuery.data ?? [];
   const classes = (classesQuery.data ?? []).filter((schoolClass) => schoolClass.isActive);
