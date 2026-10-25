@@ -47,7 +47,7 @@ describe("finance export workbook", () => {
     });
     const workbook = new ExcelJS.Workbook();
     await workbook.xlsx.load(buffer);
-    expect(workbook.getWorksheet("Audit export")!.getCell("A2").value).toBe("PLACEHOLDER");
+    expect(workbook.getWorksheet("Audit export")!.getCell("A2").value).toBe(`\'=HYPERLINK("https://example.test")`);
   });
 
   it("produces a non-circular zero total for an empty report", async () => {
