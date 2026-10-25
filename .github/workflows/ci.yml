@@ -1,0 +1,111 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  baseline:
+    name: Baseline on PR base
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: schoolhub_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d schoolhub_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/schoolhub_test?schema=public
+      TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/schoolhub_test?schema=public
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 12.4.1
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Install baseline dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Baseline typecheck
+        continue-on-error: true
+        run: pnpm typecheck
+      - name: Baseline API lint
+        continue-on-error: true
+        run: pnpm --filter @schoolhub/api lint
+      - name: Apply baseline migrations
+        run: pnpm --filter @schoolhub/api exec prisma migrate deploy --config prisma.config.ts
+      - name: Baseline API tests (including PostgreSQL integration)
+        continue-on-error: true
+        run: pnpm --filter @schoolhub/api test
+      - name: Baseline web theme lint
+        continue-on-error: true
+        run: pnpm --filter @schoolhub/web lint:theme
+
+  validate:
+    name: Validate proposed changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: schoolhub_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d schoolhub_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/schoolhub_test?schema=public
+      TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/schoolhub_test?schema=public
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 12.4.1
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Typecheck
+        run: pnpm typecheck
+      - name: API lint
+        run: pnpm --filter @schoolhub/api lint
+      - name: Apply database migrations
+        run: pnpm --filter @schoolhub/api exec prisma migrate deploy --config prisma.config.ts
+      - name: API tests (including PostgreSQL integration)
+        run: pnpm --filter @schoolhub/api test
+      - name: Web theme lint
+        run: pnpm --filter @schoolhub/web lint:theme
