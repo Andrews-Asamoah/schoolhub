@@ -32,6 +32,7 @@ import {
 import { AdminAnnouncementsWorkspace } from "./admin-announcements-workspace";
 import { AccountantFinanceCharts } from "./accountant-finance-charts";
 import { AccountantFinanceReportingWorkspace } from "./accountant-finance-reporting-workspace";
+import { AccountantFinanceDetailedReportingWorkspace } from "./accountant-finance-detailed-reporting-workspace";
 import { AccountantRecordPaymentDialog } from "./accountant-record-payment-dialog";
 import { apiFetch } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -85,6 +86,32 @@ interface ApiBill {
   dueDate?: string | null;
   issuedAt: string;
   items?: { id: string; description: string; amount: number | string; quantity: number; totalAmount: number | string; discountAmount?: number | string; paidAmount: number | string; balanceAmount: number | string }[];
+  carryForwards?: { id: string; sourceBillId: string; sourceBillNumber: string; sourceAcademicYearName?: string | null; sourceTermName?: string | null; amount: number | string }[];
+  overdueDays?: number | null;
+  previousBalanceTotal?: string;
+  totalDueAtIssue?: string;
+}
+
+interface FinancePage<T> {
+  items: T[];
+  nextCursor: string | null;
+  total: number;
+}
+
+interface FinanceSummary {
+  asOf: string;
+  billed: string;
+  billedCount: number;
+  collected: string;
+  receiptCount: number;
+  outstanding: string;
+  outstandingBillCount: number;
+  overdue: string;
+  overdueBillCount: number;
+  collectionRate: string | null;
+  byMethod: { method: string; amount: string; receiptCount: number }[];
+  byClass: { classId: string | null; className: string; billed: string; collected: string; outstanding: string; billCount: number }[];
+  ageing: { days0To30: string; days31To60: string; days61To90: string; days90Plus: string; notDue: string };
 }
 
 interface ApiPaymentItem {
@@ -104,7 +131,8 @@ interface ApiPayment {
   paymentNumber: string;
   studentId: string;
   student: StudentSummary;
-  bill?: { id: string; billNumber: string } | null;
+  bill?: { id: string; billNumber: string; classId?: string | null; class?: { id: string; name: string } | null; academicYearId?: string; termId?: string | null } | null;
+  billAllocations?: { id: string; billId: string; amount: number | string; bill: { id: string; billNumber: string; classId?: string | null; academicYearId?: string; termId?: string | null } }[];
   amount: number | string;
   paymentMethod: RecordPaymentInput["paymentMethod"];
   referenceNumber?: string | null;
@@ -132,7 +160,7 @@ interface ApiFeeStructure {
   id: string;
   name: string;
   description?: string | null;
-  items: { id: string; name: string; amount: number | string }[];
+  items: { id: string; name: string; amount: number | string; isOptional?: boolean }[];
   targetClasses: { class: { id: string; name: string } }[];
 }
 
@@ -147,12 +175,16 @@ interface ApiTerm {
   id: string;
   name: string;
   isCurrent: boolean;
+  startDate?: string;
+  endDate?: string;
 }
 
 interface ApiAcademicYear {
   id: string;
   name: string;
   isCurrent: boolean;
+  startDate?: string;
+  endDate?: string;
   terms: ApiTerm[];
 }
 
@@ -229,9 +261,13 @@ export function AccountantPortalWorkspace({
   const activeTab = defaultTab;
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
+  const [billCursorStack, setBillCursorStack] = useState<Array<string | null>>([null]);
+  const [paymentCursorStack, setPaymentCursorStack] = useState<Array<string | null>>([null]);
+  const billCursor = billCursorStack[billCursorStack.length - 1] ?? null;
+  const paymentCursor = paymentCursorStack[paymentCursorStack.length - 1] ?? null;
   const [overdueSearch, setOverdueSearch] = useState("");
   const [overdueClassFilter, setOverdueClassFilter] = useState("ALL");
-  const [reportPeriod, setReportPeriod] = useState<"month" | "quarter" | "year" | "all">("year");
+  const [reportPeriod, setReportPeriod] = useState<"term" | "year" | "all">("term");
   const [showPaymentForm, setShowPaymentForm] = useState(false);
   const [selectedBillId, setSelectedBillId] = useState("");
   const [selectedReceipt, setSelectedReceipt] = useState<ApiPayment | null>(null);
@@ -244,6 +280,7 @@ export function AccountantPortalWorkspace({
   const [selectedInvoiceForPrint, setSelectedInvoiceForPrint] = useState<ApiBill | null>(null);
   const [selectedFeeStructureId, setSelectedFeeStructureId] = useState("");
   const [selectedClassId, setSelectedClassId] = useState("");
+  const [selectedOptionalItemIds, setSelectedOptionalItemIds] = useState<string[]>([]);
   const [showBillForm, setShowBillForm] = useState(false);
   const [showExpenseForm, setShowExpenseForm] = useState(false);
   const [showInventoryForm, setShowInventoryForm] = useState(false);
@@ -258,13 +295,25 @@ export function AccountantPortalWorkspace({
     retry: false,
   });
   const billsQuery = useQuery({
-    queryKey: ["finance", "bills"],
-    queryFn: () => apiFetch<ApiBill[]>("/finance/bills"),
+    queryKey: ["finance", "bills", billCursor, search, statusFilter, activeTab],
+    queryFn: () => {
+      const params = new URLSearchParams({ limit: "50" });
+      if (billCursor) params.set("cursor", billCursor);
+      if (search.trim()) params.set("search", search.trim());
+      if (statusFilter !== "ALL") params.set("status", statusFilter);
+      if (activeTab === "debtors") params.set("outstanding", "true");
+      return apiFetch<FinancePage<ApiBill>>(`/finance/bills?${params.toString()}`);
+    },
     retry: false,
   });
   const paymentsQuery = useQuery({
-    queryKey: ["finance", "payments"],
-    queryFn: () => apiFetch<ApiPayment[]>("/finance/payments"),
+    queryKey: ["finance", "payments", paymentCursor, search],
+    queryFn: () => {
+      const params = new URLSearchParams({ limit: "50" });
+      if (paymentCursor) params.set("cursor", paymentCursor);
+      if (search.trim()) params.set("search", search.trim());
+      return apiFetch<FinancePage<ApiPayment>>(`/finance/payments?${params.toString()}`);
+    },
     retry: false,
   });
   const expensesQuery = useQuery({
@@ -287,6 +336,30 @@ export function AccountantPortalWorkspace({
     queryFn: () => apiFetch<ApiAcademicYear[]>("/schools/academic-years"),
     retry: false,
   });
+  const currentYear = (yearsQuery.data ?? []).find((year) => year.isCurrent);
+  const currentTerm = currentYear?.terms.find((term) => term.isCurrent);
+  const summaryQuery = useQuery({
+    queryKey: ["finance", "summary", reportPeriod, currentYear?.id ?? null, currentTerm?.id ?? null],
+    queryFn: () => {
+      const params = new URLSearchParams();
+      if (reportPeriod !== "all" && currentYear) params.set("yearId", currentYear.id);
+      if (reportPeriod === "term" && currentTerm) params.set("termId", currentTerm.id);
+      return apiFetch<FinanceSummary>(`/finance/summary${params.size ? `?${params.toString()}` : ""}`);
+    },
+    retry: false,
+  });
+  const overdueBillsQuery = useQuery({
+    queryKey: ["finance", "overdue-bills", overdueSearch, overdueClassFilter, activeTab],
+    queryFn: () => {
+      const params = new URLSearchParams({ limit: "50", overdue: "true" });
+      if (overdueSearch.trim()) params.set("search", overdueSearch.trim());
+      if (overdueClassFilter !== "ALL") params.set("classId", overdueClassFilter);
+      return apiFetch<FinancePage<ApiBill>>(`/finance/bills?${params.toString()}`);
+    },
+    enabled: activeTab === "overview",
+    retry: false,
+  });
+
   const inventoryQuery = useQuery({
     queryKey: ["inventory", "items"],
     queryFn: () => apiFetch<ApiInventoryItem[]>("/inventory/items"),
@@ -299,8 +372,8 @@ export function AccountantPortalWorkspace({
     retry: false,
   });
 
-  const bills = billsQuery.data ?? [];
-  const payments = paymentsQuery.data ?? [];
+  const bills = billsQuery.data?.items ?? [];
+  const payments = paymentsQuery.data?.items ?? [];
   const expenses = expensesQuery.data ?? [];
   const feeStructures = feeStructuresQuery.data ?? [];
   const classes = (classesQuery.data ?? []).filter((schoolClass) => schoolClass.isActive);
@@ -335,40 +408,30 @@ export function AccountantPortalWorkspace({
 
   const debtors = bills.filter((bill) => Number(bill.balanceAmount) > 0 && bill.status !== "CANCELLED" && bill.status !== "WAIVED");
 
-  // Only settled receipts are counted as collections. Failed, pending,
-  // cancelled and refunded transactions remain visible in history but are not
-  // treated as cash received in dashboard totals or payment-method analysis.
-  const settledPayments = payments.filter((payment) => payment.status === "COMPLETED");
-  const collected = settledPayments.reduce((sum, payment) => sum + Number(payment.amount), 0);
-  const outstanding = debtors.reduce((sum, bill) => sum + Number(bill.balanceAmount), 0);
+  // Financial totals and ageing come from SQL/Prisma server aggregates, never
+  // from a paginated page of receipt or bill rows.
+  const collected = Number(summaryQuery.data?.collected ?? 0);
+  const outstanding = Number(summaryQuery.data?.outstanding ?? 0);
   const expenseTotal = expenses.reduce((sum, expense) => sum + Number(expense.amount), 0);
   const paidPayroll = payroll.filter((run) => run.status === "PAID");
   const payrollNet = paidPayroll.reduce((sum, run) => sum + Number(run.totalNet), 0);
   const reportStartDate = useMemo(() => {
     if (reportPeriod === "all") return null;
-    const start = new Date();
-    start.setHours(0, 0, 0, 0);
-    if (reportPeriod === "month") start.setDate(1);
-    if (reportPeriod === "quarter") {
-      start.setMonth(Math.floor(start.getMonth() / 3) * 3, 1);
-    }
-    if (reportPeriod === "year") start.setMonth(0, 1);
-    return start;
-  }, [reportPeriod]);
+    if (reportPeriod === "year" && currentYear?.startDate) return new Date(currentYear.startDate);
+    if (reportPeriod === "term" && currentTerm?.startDate) return new Date(currentTerm.startDate);
+    return null;
+  }, [reportPeriod, currentYear?.startDate, currentTerm?.startDate]);
   const reportEndDate = useMemo(() => {
-    const end = new Date();
-    end.setHours(23, 59, 59, 999);
-    return end;
-  }, [reportPeriod]);
+    if (reportPeriod === "year" && currentYear?.endDate) return new Date(currentYear.endDate);
+    if (reportPeriod === "term" && currentTerm?.endDate) return new Date(currentTerm.endDate);
+    return new Date();
+  }, [reportPeriod, currentYear?.endDate, currentTerm?.endDate]);
   const isInReportPeriod = (value?: string | null) => {
     if (!reportStartDate) return true;
     if (!value) return false;
     const date = new Date(value);
     return !Number.isNaN(date.getTime()) && date >= reportStartDate && date <= reportEndDate;
   };
-  const reportPayments = payments.filter((payment) => isInReportPeriod(payment.paymentDate));
-  const reportSettledPayments = reportPayments.filter((payment) => payment.status === "COMPLETED");
-  const reportCollected = reportSettledPayments.reduce((sum, payment) => sum + Number(payment.amount), 0);
   const reportExpenses = useMemo(
     () => expenses.filter((expense) => isInReportPeriod(expense.date)),
     [expenses, reportStartDate, reportEndDate],
@@ -384,31 +447,15 @@ export function AccountantPortalWorkspace({
   const reportPayrollPaid = reportPayroll.filter((run) => run.status === "PAID");
   const reportPayrollNet = reportPayrollPaid.reduce((sum, run) => sum + Number(run.totalNet), 0);
   const todayStart = new Date();
-  todayStart.setHours(0, 0, 0, 0);
-  const overdueBills = debtors.filter((bill) => {
-    if (!bill.dueDate) return bill.status === "OVERDUE";
-    const dueDate = new Date(bill.dueDate);
-    dueDate.setHours(0, 0, 0, 0);
-    return bill.status === "OVERDUE" || (!Number.isNaN(dueDate.getTime()) && dueDate < todayStart);
-  }).sort((a, b) => {
-    const aDue = a.dueDate ? new Date(a.dueDate).getTime() : 0;
-    const bDue = b.dueDate ? new Date(b.dueDate).getTime() : 0;
-    return aDue - bDue;
-  });
-  const overdueTotal = overdueBills.reduce((sum, bill) => sum + Number(bill.balanceAmount), 0);
-  const billedInPeriod = bills.filter((bill) => isInReportPeriod(bill.issuedAt)).reduce((sum, bill) => sum + Number(bill.totalAmount), 0);
-  const collectionRate = billedInPeriod > 0 ? (reportCollected / billedInPeriod) * 100 : null;
-  const visibleOverdueBills = overdueBills.filter((bill) => {
-    const term = overdueSearch.trim().toLowerCase();
-    const matchesSearch = !term ||
-      bill.billNumber.toLowerCase().includes(term) ||
-      studentName(bill.student).toLowerCase().includes(term) ||
-      (bill.student?.admissionNumber ?? "").toLowerCase().includes(term) ||
-      (bill.class?.name ?? "").toLowerCase().includes(term);
-    return matchesSearch && (overdueClassFilter === "ALL" || bill.class?.id === overdueClassFilter);
-  });
-  const currentYear = (yearsQuery.data ?? []).find((year) => year.isCurrent);
-  const currentTerm = currentYear?.terms.find((term) => term.isCurrent);
+  todayStart.setUTCHours(0, 0, 0, 0);
+  const overdueBills = overdueBillsQuery.data?.items ?? [];
+  const overdueTotal = Number(summaryQuery.data?.overdue ?? 0);
+  const billedInPeriod = Number(summaryQuery.data?.billed ?? 0);
+  const reportCollected = collected;
+  const reportSettledPaymentCount = summaryQuery.data?.receiptCount ?? 0;
+  const collectionRate = summaryQuery.data?.collectionRate == null ? null : Number(summaryQuery.data.collectionRate);
+  const visibleOverdueBills = overdueBills;
+
   const selectedFeeStructure = feeStructures.find((fee) => fee.id === selectedFeeStructureId);
   const billTargetClasses = selectedFeeStructure?.targetClasses.length
     ? classes.filter((schoolClass) => selectedFeeStructure.targetClasses.some((target) => target.class.id === schoolClass.id))
@@ -465,6 +512,11 @@ export function AccountantPortalWorkspace({
   useEffect(() => {
     if (!showPaymentForm) paymentKeyRef.current = null;
   }, [showPaymentForm]);
+
+  useEffect(() => {
+    setBillCursorStack([null]);
+    setPaymentCursorStack([null]);
+  }, [search, statusFilter]);
 
   const reversePayment = useMutation({
     mutationFn: (input: { id: string; kind: "VOID" | "REFUND"; reason: string }) =>
@@ -570,6 +622,7 @@ export function AccountantPortalWorkspace({
       classId: selectedClassId,
       dueDate: String(form.get("dueDate") ?? "") || undefined,
       notes: String(form.get("notes") ?? "").trim() || undefined,
+      optionalItemIds: selectedOptionalItemIds,
     });
     if (!currentYear || !currentTerm) {
       setMessage({ kind: "error", text: "Set a current academic year and term before generating bills." });
@@ -604,8 +657,12 @@ export function AccountantPortalWorkspace({
   }
 
   const loading =
-    billsQuery.isPending || paymentsQuery.isPending || expensesQuery.isPending ||
-    feeStructuresQuery.isPending || classesQuery.isPending || yearsQuery.isPending || payrollQuery.isPending || (activeTab === "inventory" && inventoryQuery.isPending);
+    (activeTab === "overview" && (summaryQuery.isPending || overdueBillsQuery.isPending)) ||
+    (["invoices", "debtors"].includes(activeTab) && billsQuery.isPending) ||
+    (activeTab === "payments" && paymentsQuery.isPending) ||
+    expensesQuery.isPending ||
+    feeStructuresQuery.isPending || classesQuery.isPending || yearsQuery.isPending ||
+    payrollQuery.isPending || (activeTab === "inventory" && inventoryQuery.isPending);
 
   return (
     <div className="space-y-6"><style>{`@media print {
@@ -663,15 +720,15 @@ export function AccountantPortalWorkspace({
             <div><h2 className="text-lg font-semibold text-foreground">Financial performance</h2><p className="mt-1 text-sm text-muted-foreground">A live summary of saved records. Select a card to review its supporting records.</p></div>
             <label className="flex items-center gap-2 text-xs font-medium text-muted-foreground">Reporting period
               <select className={cn(inputClass, "w-auto min-w-40")} value={reportPeriod} onChange={(event) => setReportPeriod(event.target.value as typeof reportPeriod)} aria-label="Dashboard reporting period">
-                <option value="month">This month to date</option><option value="quarter">This quarter to date</option><option value="year">This year to date</option><option value="all">All available records</option>
+                <option value="term">Current term</option><option value="year">Current academic year</option><option value="all">All available records</option>
               </select>
             </label>
           </div>
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-            <DashboardMetricLink to="payments" label="Fees collected" value={paymentsQuery.error ? "Unavailable" : currency(reportCollected)} detail={paymentsQuery.error ? "Payment data unavailable" : `${reportSettledPayments.length} completed receipts in period`} icon={ArrowUpRight} />
-            <DashboardMetricLink to="invoices" label="Fees billed" value={billsQuery.error ? "Unavailable" : currency(billedInPeriod)} detail={billsQuery.error ? "Bill data unavailable" : "Bills issued in selected period"} icon={Receipt} />
-            <DashboardMetricLink to="debtors" label="Outstanding fees" value={billsQuery.error ? "Unavailable" : currency(outstanding)} detail={billsQuery.error ? "Bill data unavailable" : `${debtors.length} bills with balances`} icon={AlertCircle} />
-            <DashboardMetricLink to="debtors" label="Overdue balances" value={billsQuery.error ? "Unavailable" : currency(overdueTotal)} detail={billsQuery.error ? "Bill data unavailable" : `${overdueBills.length} overdue bills`} icon={ArrowDownRight} />
+            <DashboardMetricLink to="payments" label="Fees collected" value={summaryQuery.error ? "Unavailable" : currency(reportCollected)} detail={summaryQuery.error ? "Collection data unavailable" : `${reportSettledPaymentCount} completed receipts in period`} icon={ArrowUpRight} />
+            <DashboardMetricLink to="invoices" label="Fees billed" value={summaryQuery.error ? "Unavailable" : currency(billedInPeriod)} detail={summaryQuery.error ? "Billing data unavailable" : "Bills issued in selected period"} icon={Receipt} />
+            <DashboardMetricLink to="debtors" label="Outstanding fees" value={summaryQuery.error ? "Unavailable" : currency(outstanding)} detail={summaryQuery.error ? "Receivable data unavailable" : `${summaryQuery.data?.outstandingBillCount ?? 0} bills with balances`} icon={AlertCircle} />
+            <DashboardMetricLink to="debtors" label="Overdue balances" value={summaryQuery.error ? "Unavailable" : currency(overdueTotal)} detail={summaryQuery.error ? "Receivable data unavailable" : `${summaryQuery.data?.overdueBillCount ?? 0} overdue bills`} icon={ArrowDownRight} />
             <DashboardMetricLink to="expenses" label="Operating expenses" value={expensesQuery.error ? "Unavailable" : currency(reportExpenseTotal)} detail={expensesQuery.error ? "Expense data unavailable" : `${reportExpenses.length} expense records in period`} icon={Wallet} />
           </div>
           <div className="grid gap-3 md:grid-cols-2">
@@ -697,24 +754,23 @@ export function AccountantPortalWorkspace({
 
       {!loading && activeTab === "overview" && (
         <div className="space-y-5">
-          <AccountantFinanceCharts payments={payments} expenses={expenses} bills={bills} />
+          <AccountantFinanceCharts summary={summaryQuery.data ?? null} expenses={reportExpenses} />
           <section className="rounded-2xl border border-border bg-card p-5">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div><h2 className="text-lg font-semibold text-foreground">Overdue-fees management</h2><p className="mt-1 text-sm text-muted-foreground">Prioritise bills past their due date with an outstanding balance, then open the bill or record a payment.</p></div>
-              <div className="rounded-xl bg-destructive/5 px-4 py-3 text-right"><p className="text-xs text-muted-foreground">Overdue balance</p><p className="mt-1 text-lg font-bold tabular-nums text-destructive">{billsQuery.error ? "Unavailable" : currency(overdueTotal)}</p><p className="text-xs text-muted-foreground">{overdueBills.length} overdue bill(s)</p></div>
+              <div className="rounded-xl bg-destructive/5 px-4 py-3 text-right"><p className="text-xs text-muted-foreground">Overdue balance</p><p className="mt-1 text-lg font-bold tabular-nums text-destructive">{summaryQuery.error ? "Unavailable" : currency(overdueTotal)}</p><p className="text-xs text-muted-foreground">{summaryQuery.data?.overdueBillCount ?? 0} overdue bill(s)</p></div>
             </div>
             <div className="my-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_220px]">
               <div className="relative"><Search className="absolute left-3 top-3 size-4 text-muted-foreground" /><input className={cn(inputClass, "pl-9")} value={overdueSearch} onChange={(event) => setOverdueSearch(event.target.value)} placeholder="Search student, admission no., bill or class" aria-label="Search overdue bills" /></div>
               <select className={inputClass} value={overdueClassFilter} onChange={(event) => setOverdueClassFilter(event.target.value)} aria-label="Filter overdue bills by class"><option value="ALL">All classes</option>{classes.map((schoolClass) => <option key={schoolClass.id} value={schoolClass.id}>{schoolClass.name}</option>)}</select>
             </div>
-            {billsQuery.error ? <QueryError message={billsQuery.error.message} /> : visibleOverdueBills.length ? (
+            {overdueBillsQuery.error ? <QueryError message={overdueBillsQuery.error.message} /> : visibleOverdueBills.length ? (
               <div className="overflow-x-auto"><table className="w-full min-w-[800px] text-left text-sm">
                 <thead><tr className="border-b border-border text-xs text-muted-foreground"><th className="p-3">Student / bill</th><th className="p-3">Class</th><th className="p-3">Due date</th><th className="p-3 text-right">Days overdue</th><th className="p-3 text-right">Outstanding</th><th className="p-3">Action</th></tr></thead>
                 <tbody>{visibleOverdueBills.slice(0, 8).map((bill) => {
-                  const due = bill.dueDate ? new Date(bill.dueDate) : null;
-                  const days = due && !Number.isNaN(due.getTime()) ? Math.max(0, Math.floor((todayStart.getTime() - new Date(due.getFullYear(), due.getMonth(), due.getDate()).getTime()) / 86400000)) : null;
+                  const days = bill.overdueDays ?? null;
                   return <tr key={bill.id} className="border-b border-border/70 last:border-0 hover:bg-muted/40">
-                    <td className="p-3"><p className="font-semibold text-foreground">{studentName(bill.student)}</p><p className="text-xs text-muted-foreground">{bill.billNumber} · {bill.student?.admissionNumber ?? "No admission number"}</p></td>
+                    <td className="p-3"><p className="font-semibold text-foreground"><button type="button" className="text-left font-semibold text-primary hover:underline" onClick={() => openStudentStatement(bill.studentId)}>{studentName(bill.student)}</button></p><p className="text-xs text-muted-foreground">{bill.billNumber} · {bill.student?.admissionNumber ?? "No admission number"}</p></td>
                     <td className="p-3">{bill.class?.name ?? "Class not recorded"}</td><td className="p-3">{dateLabel(bill.dueDate)}</td>
                     <td className="p-3 text-right tabular-nums">{days === null ? "—" : days}</td><td className="p-3 text-right font-semibold tabular-nums">{currency(bill.balanceAmount)}</td>
                     <td className="p-3"><div className="flex items-center gap-3"><button type="button" className="text-xs font-semibold text-primary hover:underline" onClick={() => setSelectedInvoiceForPrint(bill)}>View bill</button>{canWrite && <button type="button" className="text-xs font-semibold text-foreground hover:underline" onClick={() => { setSelectedBillId(bill.id); setShowPaymentForm(true); }}>Record payment</button>}</div></td>
@@ -732,7 +788,7 @@ export function AccountantPortalWorkspace({
             </section>
             <section className="rounded-2xl border border-border bg-card p-5">
               <h2 className="font-semibold text-foreground">Finance activity</h2><p className="mt-1 text-sm text-muted-foreground">Quick access to records that need attention.</p>
-              <div className="mt-4 space-y-3"><AttentionItem title="Bills with balances" value={billsQuery.error ? "—" : String(debtors.length)} detail={billsQuery.error ? "Could not load bill records" : currency(outstanding)} to="debtors" /><AttentionItem title="Overdue bills" value={billsQuery.error ? "—" : String(overdueBills.length)} detail={billsQuery.error ? "Could not load bill records" : currency(overdueTotal)} to="debtors" /><AttentionItem title="Expense records" value={expensesQuery.error ? "—" : String(reportExpenses.length)} detail={expensesQuery.error ? "Could not load expense records" : currency(reportExpenseTotal)} to="expenses" /></div>
+              <div className="mt-4 space-y-3"><AttentionItem title="Bills with balances" value={summaryQuery.error ? "—" : String(summaryQuery.data?.outstandingBillCount ?? 0)} detail={summaryQuery.error ? "Could not load receivables" : currency(outstanding)} to="debtors" /><AttentionItem title="Overdue bills" value={summaryQuery.error ? "—" : String(summaryQuery.data?.overdueBillCount ?? 0)} detail={summaryQuery.error ? "Could not load receivables" : currency(overdueTotal)} to="debtors" /><AttentionItem title="Expense records" value={expensesQuery.error ? "—" : String(reportExpenses.length)} detail={expensesQuery.error ? "Could not load expense records" : currency(reportExpenseTotal)} to="expenses" /></div>
             </section>
           </div>
         </div>
@@ -742,7 +798,8 @@ export function AccountantPortalWorkspace({
         <section className="rounded-2xl border border-border bg-card p-5">
           <SectionHeader title="Invoices & bills" description="Search bills, review balances, and generate billing for an active class." action={<div className="flex flex-wrap gap-2"><TableExportMenu build={() => ({ title: "Invoice register", headers: ["Invoice","Student","Admission number","Class","Fee structure","Due date","Gross (GHS)","Discount (GHS)","Total (GHS)","Paid (GHS)","Balance (GHS)","Status"], columnTypes: ["text","text","text","text","text","date","money","money","money","money","money","text"], rows: filteredBills.map(bill => [bill.billNumber, studentName(bill.student), bill.student?.admissionNumber ?? "", bill.class?.name ?? "", bill.feeStructure?.name ?? "", dateLabel(bill.dueDate), Number(bill.grossAmount ?? bill.totalAmount), Number(bill.discountAmount ?? 0), Number(bill.totalAmount), Number(bill.paidAmount), Number(bill.balanceAmount), bill.status]), reportInfo: { school: schoolQuery.data?.name, filters: { search, status: statusFilter } } })} note="Export reflects the current invoice filters." /><ServerExportButton endpoint="/finance/exports/bills.xlsx" label="Full Excel" className={buttonSecondary} />{canWrite && <button className={buttonPrimary} onClick={() => { setMessage(null); setSelectedFeeStructureId(""); setSelectedClassId(""); setShowBillForm(true); }}><Plus className="size-4" /> Generate bills</button>}</div>} />
           <SearchFilters search={search} setSearch={setSearch} statusFilter={statusFilter} setStatusFilter={setStatusFilter} statuses={["PENDING", "PARTIALLY_PAID", "PAID", "OVERDUE"]} />
-          {billsQuery.error ? <QueryError message={billsQuery.error.message} /> : <BillsTable bills={filteredBills} onRecordPayment={canWrite ? (bill) => { setSelectedBillId(bill.id); setShowPaymentForm(true); } : undefined} onViewInvoice={setSelectedInvoiceForPrint} />}
+          {billsQuery.error ? <QueryError message={billsQuery.error.message} /> : <BillsTable bills={filteredBills} onViewStudentStatement={openStudentStatement} onRecordPayment={canWrite ? (bill) => { setSelectedBillId(bill.id); setShowPaymentForm(true); } : undefined} onViewInvoice={setSelectedInvoiceForPrint} />}
+          <PageControls shown={filteredBills.length} total={billsQuery.data?.total ?? 0} canPrevious={billCursorStack.length > 1} canNext={Boolean(billsQuery.data?.nextCursor)} onPrevious={() => setBillCursorStack((stack) => stack.slice(0, -1))} onNext={() => { if (billsQuery.data?.nextCursor) setBillCursorStack((stack) => [...stack, billsQuery.data!.nextCursor!]); }} />
         </section>
       )}
 
@@ -750,7 +807,8 @@ export function AccountantPortalWorkspace({
         <section className="rounded-2xl border border-border bg-card p-5">
           <SectionHeader title="Payments & receipts" description="Saved payment transactions from the school finance ledger." action={<div className="flex flex-wrap gap-2"><TableExportMenu build={() => ({ title: "Payment register", headers: ["Receipt","Student","Admission number","Bill","Date","Method","Reference","Amount (GHS)","Status"], columnTypes: ["text","text","text","text","date","text","text","money","text"], rows: filteredPayments.map(payment => [payment.paymentNumber, studentName(payment.student), payment.student?.admissionNumber ?? "", payment.bill?.billNumber ?? "", dateLabel(payment.paymentDate), payment.paymentMethod, payment.referenceNumber ?? "", Number(payment.amount), payment.status]), reportInfo: { school: schoolQuery.data?.name, filters: { search } } })} note="Export reflects the current payment filters." /><ServerExportButton endpoint="/finance/exports/payments.xlsx" label="Full Excel" className={buttonSecondary} />{canWrite && <button className={buttonPrimary} onClick={() => { setMessage(null); setSelectedBillId(""); setShowPaymentForm(true); }}><Plus className="size-4" /> Record payment</button>}</div>} />
           <div className="relative my-4 max-w-md"><Search className="absolute left-3 top-3 size-4 text-muted-foreground" /><input className={cn(inputClass, "pl-9")} value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search receipt, student, or reference" /></div>
-          {paymentsQuery.error ? <QueryError message={paymentsQuery.error.message} /> : <PaymentsTable payments={filteredPayments} onViewReceipt={setSelectedReceipt} onReverse={canWrite ? (payment) => { setReverseKind("VOID"); setReverseReason(""); setReverseTarget(payment); } : undefined} />}
+          {paymentsQuery.error ? <QueryError message={paymentsQuery.error.message} /> : <PaymentsTable payments={filteredPayments} onViewStudentStatement={openStudentStatement} onViewReceipt={setSelectedReceipt} onReverse={canWrite ? (payment) => { setReverseKind("VOID"); setReverseReason(""); setReverseTarget(payment); } : undefined} />}
+          <PageControls shown={filteredPayments.length} total={paymentsQuery.data?.total ?? 0} canPrevious={paymentCursorStack.length > 1} canNext={Boolean(paymentsQuery.data?.nextCursor)} onPrevious={() => setPaymentCursorStack((stack) => stack.slice(0, -1))} onNext={() => { if (paymentsQuery.data?.nextCursor) setPaymentCursorStack((stack) => [...stack, paymentsQuery.data!.nextCursor!]); }} />
         </section>
       )}
 
@@ -760,14 +818,21 @@ export function AccountantPortalWorkspace({
           {billsQuery.error ? <QueryError message={billsQuery.error.message} /> : <BillsTable bills={debtors.filter((bill) => {
             const term = search.trim().toLowerCase();
             return !term || bill.billNumber.toLowerCase().includes(term) || studentName(bill.student).toLowerCase().includes(term) || (bill.class?.name ?? "").toLowerCase().includes(term);
-          })} onRecordPayment={canWrite ? (bill) => { setSelectedBillId(bill.id); setShowPaymentForm(true); } : undefined} onViewInvoice={setSelectedInvoiceForPrint} />}
+          })} onViewStudentStatement={openStudentStatement} onRecordPayment={canWrite ? (bill) => { setSelectedBillId(bill.id); setShowPaymentForm(true); } : undefined} onViewInvoice={setSelectedInvoiceForPrint} />}
+          <PageControls shown={debtors.filter((bill) => { const term = search.trim().toLowerCase(); return !term || bill.billNumber.toLowerCase().includes(term) || studentName(bill.student).toLowerCase().includes(term) || (bill.class?.name ?? "").toLowerCase().includes(term); }).length} total={billsQuery.data?.total ?? 0} canPrevious={billCursorStack.length > 1} canNext={Boolean(billsQuery.data?.nextCursor)} onPrevious={() => setBillCursorStack((stack) => stack.slice(0, -1))} onNext={() => { if (billsQuery.data?.nextCursor) setBillCursorStack((stack) => [...stack, billsQuery.data!.nextCursor!]); }} />
         </section>
       )}
 
-
-      {!loading && activeTab === "reports" && <AccountantFinanceReportingWorkspace bills={bills} payments={payments} classes={classes} />}
-
-
+      {!loading && activeTab === "reports" && (
+        <div className="space-y-6">
+          <AccountantFinanceReportingWorkspace />
+          <AccountantFinanceDetailedReportingWorkspace
+            bills={bills}
+            payments={payments}
+            classes={classes}
+          />
+        </div>
+      )}
 
       {!loading && activeTab === "expenses" && (
         <section className="rounded-2xl border border-border bg-card p-5">
@@ -830,7 +895,7 @@ export function AccountantPortalWorkspace({
             </div>
             <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border pb-4">
               <div><p className="text-xs font-bold uppercase tracking-[0.15em] text-primary">SchoolHub · Student invoice</p><h2 className="mt-1 text-xl font-bold text-foreground">{selectedInvoiceForPrint.billNumber}</h2><p className="mt-1 text-sm text-muted-foreground">Issued {dateLabel(selectedInvoiceForPrint.issuedAt)}</p></div>
-              <div className="text-right"><p className="text-xs text-muted-foreground">Invoice total</p><p className="mt-1 text-2xl font-bold tabular-nums text-foreground">{currency(selectedInvoiceForPrint.totalAmount)}</p><StatusBadge value={selectedInvoiceForPrint.status} /></div>
+              <div className="text-right"><p className="text-xs text-muted-foreground">Current invoice charge</p><p className="mt-1 text-xl font-bold tabular-nums text-foreground">{currency(selectedInvoiceForPrint.totalAmount)}</p><p className="mt-1 text-xs text-muted-foreground">Total due at issue incl. previous balances</p><p className="font-bold tabular-nums text-foreground">{currency(selectedInvoiceForPrint.totalDueAtIssue ?? selectedInvoiceForPrint.totalAmount)}</p><StatusBadge value={selectedInvoiceForPrint.status} /></div>
             </div>
             <div className="grid gap-x-6 gap-y-4 py-4 sm:grid-cols-2">
               <div><p className="text-xs uppercase tracking-wide text-muted-foreground">Student</p><p className="mt-1 font-semibold text-foreground">{studentName(selectedInvoiceForPrint.student)}</p><p className="mt-1 text-xs text-muted-foreground">Admission no. {selectedInvoiceForPrint.student?.admissionNumber || "—"}</p></div>
@@ -839,8 +904,9 @@ export function AccountantPortalWorkspace({
               <div><p className="text-xs uppercase tracking-wide text-muted-foreground">Academic period</p><p className="mt-1 font-semibold text-foreground">{[selectedInvoiceForPrint.academicYear?.name, selectedInvoiceForPrint.term?.name].filter(Boolean).join(" · ") || "Not specified"}</p></div>
               <div><p className="text-xs uppercase tracking-wide text-muted-foreground">Due date</p><p className="mt-1 font-semibold text-foreground">{dateLabel(selectedInvoiceForPrint.dueDate)}</p></div>
             </div>
+            {selectedInvoiceForPrint.carryForwards?.length ? <section className="rounded-xl border border-warning/30 bg-warning/5 p-4"><h3 className="text-sm font-semibold text-foreground">Previous balance brought forward</h3><p className="mt-1 text-xs leading-5 text-muted-foreground">Amounts below are snapshots from earlier invoices. Those original invoices remain open; this section does not create a second charge.</p><div className="mt-3 space-y-2">{selectedInvoiceForPrint.carryForwards.map((carry) => <div key={carry.id} className="grid grid-cols-[1fr_auto] gap-3 text-sm"><span className="text-foreground">{carry.sourceBillNumber} · {[carry.sourceAcademicYearName,carry.sourceTermName].filter(Boolean).join(" / ") || "Earlier term"}</span><span className="font-semibold tabular-nums">{currency(carry.amount)}</span></div>)}</div><div className="mt-3 flex items-center justify-between border-t border-border pt-3 text-sm font-semibold"><span>Total of prior-balance snapshots</span><span className="tabular-nums">{currency(selectedInvoiceForPrint.previousBalanceTotal ?? "0.00")}</span></div></section> : null}
             {selectedInvoiceForPrint.items?.length ? <div className="py-4"><h3 className="mb-2 text-sm font-semibold text-foreground">Fee items</h3><div className="overflow-x-auto"><table className="w-full min-w-[520px] text-left text-sm"><thead><tr className="border-b border-border text-xs text-muted-foreground"><th className="py-2 pr-3">Description</th><th className="px-2 py-2 text-right">Qty</th><th className="px-2 py-2 text-right">Unit amount</th><th className="px-2 py-2 text-right">Total</th><th className="pl-2 py-2 text-right">Discount</th></tr></thead><tbody>{selectedInvoiceForPrint.items.map(item => <tr key={item.id} className="border-b border-border/70 last:border-0"><td className="py-2 pr-3 text-foreground">{item.description}</td><td className="px-2 py-2 text-right tabular-nums">{item.quantity}</td><td className="px-2 py-2 text-right tabular-nums">{currency(item.amount)}</td><td className="px-2 py-2 text-right font-medium tabular-nums">{currency(item.totalAmount)}</td><td className="pl-2 py-2 text-right tabular-nums text-success">{Number(item.discountAmount ?? 0) > 0 ? "−" + currency(item.discountAmount ?? 0) : "—"}</td></tr>)}</tbody></table></div></div> : null}
-            <div className="border-y border-border py-4">{Number(selectedInvoiceForPrint.discountAmount ?? 0) > 0 && <><div className="grid grid-cols-[1fr_auto] gap-3 py-2 text-sm"><span className="text-muted-foreground">Original fees</span><span className="font-medium tabular-nums text-foreground">{currency(selectedInvoiceForPrint.grossAmount ?? selectedInvoiceForPrint.totalAmount)}</span></div>{selectedInvoiceForPrint.concessions?.map((concession) => <div key={concession.id} className="grid grid-cols-[1fr_auto] gap-3 py-1 text-sm"><span className="text-success">{concession.label}</span><span className="font-medium tabular-nums text-success">−{currency(concession.amount)}</span></div>)}<div className="grid grid-cols-[1fr_auto] gap-3 border-t border-border py-2 text-sm"><span className="text-muted-foreground">Discounts & scholarships</span><span className="font-semibold tabular-nums text-success">−{currency(selectedInvoiceForPrint.discountAmount ?? 0)}</span></div></>}<div className="grid grid-cols-[1fr_auto] gap-3 py-2 text-sm"><span className="text-muted-foreground">Total billed</span><span className="font-semibold tabular-nums text-foreground">{currency(selectedInvoiceForPrint.totalAmount)}</span></div><div className="grid grid-cols-[1fr_auto] gap-3 py-2 text-sm"><span className="text-muted-foreground">Payments recorded</span><span className="font-semibold tabular-nums text-foreground">{currency(selectedInvoiceForPrint.paidAmount)}</span></div><div className="grid grid-cols-[1fr_auto] gap-3 border-t border-border pt-3 text-base"><span className="font-semibold text-foreground">Balance due</span><span className="font-bold tabular-nums text-foreground">{currency(selectedInvoiceForPrint.balanceAmount)}</span></div></div>
+            <div className="border-y border-border py-4">{Number(selectedInvoiceForPrint.discountAmount ?? 0) > 0 && <><div className="grid grid-cols-[1fr_auto] gap-3 py-2 text-sm"><span className="text-muted-foreground">Original fees</span><span className="font-medium tabular-nums text-foreground">{currency(selectedInvoiceForPrint.grossAmount ?? selectedInvoiceForPrint.totalAmount)}</span></div>{selectedInvoiceForPrint.concessions?.map((concession) => <div key={concession.id} className="grid grid-cols-[1fr_auto] gap-3 py-1 text-sm"><span className="text-success">{concession.label}</span><span className="font-medium tabular-nums text-success">−{currency(concession.amount)}</span></div>)}<div className="grid grid-cols-[1fr_auto] gap-3 border-t border-border py-2 text-sm"><span className="text-muted-foreground">Discounts & scholarships</span><span className="font-semibold tabular-nums text-success">−{currency(selectedInvoiceForPrint.discountAmount ?? 0)}</span></div></>}<div className="grid grid-cols-[1fr_auto] gap-3 py-2 text-sm"><span className="text-muted-foreground">Current-term charge</span><span className="font-semibold tabular-nums text-foreground">{currency(selectedInvoiceForPrint.totalAmount)}</span></div><div className="grid grid-cols-[1fr_auto] gap-3 py-2 text-sm"><span className="text-muted-foreground">Payments recorded</span><span className="font-semibold tabular-nums text-foreground">{currency(selectedInvoiceForPrint.paidAmount)}</span></div><div className="grid grid-cols-[1fr_auto] gap-3 border-t border-border pt-3 text-base"><span className="font-semibold text-foreground">Current-invoice balance</span><span className="font-bold tabular-nums text-foreground">{currency(selectedInvoiceForPrint.balanceAmount)}</span></div></div><p className="mt-3 text-xs leading-5 text-muted-foreground">Previous-term receivables remain open against their original invoices. The total due at issue is shown for family convenience; payment allocation clears the oldest open invoice first.</p>
             <p className="mt-4 text-xs leading-5 text-muted-foreground">This invoice summary reflects the saved SchoolHub bill and its recorded line items.</p>
           </section>
           <div className="invoice-print-actions mt-4 flex flex-wrap justify-end gap-2"><ServerExportButton endpoint={`/finance/bills/${encodeURIComponent(selectedInvoiceForPrint.id)}/invoice.pdf`} label="Official PDF" className={buttonSecondary} /><TableExportMenu build={() => ({ title: "Invoice " + selectedInvoiceForPrint.billNumber, headers: ["Field","Value"], rows: [["Invoice",selectedInvoiceForPrint.billNumber],["Student",studentName(selectedInvoiceForPrint.student)],["Admission number",selectedInvoiceForPrint.student?.admissionNumber ?? ""],["Class",selectedInvoiceForPrint.class?.name ?? ""],["Fee structure",selectedInvoiceForPrint.feeStructure?.name ?? ""],["Academic year",selectedInvoiceForPrint.academicYear?.name ?? ""],["Term",selectedInvoiceForPrint.term?.name ?? ""],["Issued",dateLabel(selectedInvoiceForPrint.issuedAt)],["Due date",dateLabel(selectedInvoiceForPrint.dueDate)],["Gross fees (GHS)",Number(selectedInvoiceForPrint.grossAmount ?? selectedInvoiceForPrint.totalAmount)],["Discounts (GHS)",Number(selectedInvoiceForPrint.discountAmount ?? 0)],["Total (GHS)",Number(selectedInvoiceForPrint.totalAmount)],["Paid (GHS)",Number(selectedInvoiceForPrint.paidAmount)],["Balance (GHS)",Number(selectedInvoiceForPrint.balanceAmount)],["Status",selectedInvoiceForPrint.status]], reportInfo: { school: schoolQuery.data?.name, period: [selectedInvoiceForPrint.academicYear?.name, selectedInvoiceForPrint.term?.name].filter(Boolean).join(" · ") } })} /><button type="button" className={buttonPrimary} onClick={() => window.print()}><Printer className="size-4" /> Print / Save PDF</button></div>
@@ -922,7 +988,7 @@ export function AccountantPortalWorkspace({
         )}
 
       {showBillForm && (
-        <Modal title="Generate student bills" description="Generate bills for every active student enrolled in one class for the current academic term." onClose={() => { setShowBillForm(false); setSelectedFeeStructureId(""); setSelectedClassId(""); }}>
+        <Modal title="Generate student bills" description="Generate bills for every active student enrolled in one class for the current academic term." onClose={() => { setShowBillForm(false); setSelectedFeeStructureId(""); setSelectedClassId(""); setSelectedOptionalItemIds([]); }}>
           <form onSubmit={submitBill} className="space-y-4">
             {message?.kind === "error" && <QueryError message={message.text} />}
             {yearsQuery.error && <QueryError message={yearsQuery.error.message} />}
@@ -930,11 +996,12 @@ export function AccountantPortalWorkspace({
             {classesQuery.error && <QueryError message={classesQuery.error.message} />}
             {!currentYear || !currentTerm ? <div role="alert" className="rounded-xl border border-warning/30 bg-warning/5 p-3 text-sm text-foreground">A current academic year and term must be selected in School Settings before billing.</div> : <p className="rounded-xl bg-muted p-3 text-sm text-muted-foreground">Billing period: <span className="font-semibold text-foreground">{currentYear.name} · {currentTerm.name}</span></p>}
             <Field label="Fee structure">
-              <select name="feeStructureId" required className={inputClass} value={selectedFeeStructureId} onChange={(event) => { setSelectedFeeStructureId(event.target.value); setSelectedClassId(""); }}>
+              <select name="feeStructureId" required className={inputClass} value={selectedFeeStructureId} onChange={(event) => { setSelectedFeeStructureId(event.target.value); setSelectedClassId(""); setSelectedOptionalItemIds([]); }}>
                 <option value="" disabled>Select a fee structure…</option>
-                {feeStructures.map((fee) => <option key={fee.id} value={fee.id}>{fee.name} · {currency(fee.items.reduce((sum, item) => sum + Number(item.amount), 0))}</option>)}
+                {feeStructures.map((fee) => <option key={fee.id} value={fee.id}>{fee.name} · {currency(fee.items.filter((item) => !item.isOptional).reduce((sum, item) => sum + Number(item.amount), 0))}{fee.items.some((item) => item.isOptional) ? " + optional items" : ""}</option>)}
               </select>
             </Field>
+            {selectedFeeStructure?.items.some((item) => item.isOptional) && <fieldset className="space-y-2 rounded-xl border border-border p-3"><legend className="px-1 text-sm font-semibold text-foreground">Optional fee items</legend><p className="text-xs text-muted-foreground">Optional items are excluded unless you select them. They will be included on every bill in this batch.</p>{selectedFeeStructure.items.filter((item) => item.isOptional).map((item) => <label key={item.id} className="flex cursor-pointer items-start gap-3 rounded-lg p-2 hover:bg-muted/50"><input type="checkbox" className="mt-1 size-4 accent-primary" checked={selectedOptionalItemIds.includes(item.id)} onChange={(event) => setSelectedOptionalItemIds((current) => event.target.checked ? [...current, item.id] : current.filter((id) => id !== item.id))} /><span className="flex-1 text-sm text-foreground">{item.name}</span><span className="text-sm font-semibold tabular-nums">{currency(item.amount)}</span></label>)}</fieldset>}
             <Field label="Class">
               <select name="classId" required className={inputClass} value={selectedClassId} onChange={(event) => setSelectedClassId(event.target.value)}>
                 <option value="" disabled>Select a class…</option>
@@ -1041,14 +1108,22 @@ function SearchFilters({ search, setSearch, statusFilter, setStatusFilter, statu
   return <div className="my-4 flex flex-wrap gap-3"><div className="relative min-w-56 flex-1"><Search className="absolute left-3 top-3 size-4 text-muted-foreground" /><input className={cn(inputClass, "pl-9")} value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search bill, student, or class" /></div><select className={cn(inputClass, "w-auto min-w-40")} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="ALL">All statuses</option>{statuses.map((status) => <option key={status} value={status}>{status.replaceAll("_", " ")}</option>)}</select></div>;
 }
 
-function BillsTable({ bills, onRecordPayment, onViewInvoice }: { bills: ApiBill[]; onRecordPayment?: (bill: ApiBill) => void; onViewInvoice: (bill: ApiBill) => void }) {
-  if (!bills.length) return <EmptyState icon={FileText} title="No matching bills" description="Bills appear here after they are generated for an active class and term." />;
-  return <div className="mt-4 overflow-x-auto"><table className="w-full min-w-[820px] text-left text-sm"><thead><tr className="border-b border-border text-xs text-muted-foreground"><th className="p-3">Bill</th><th className="p-3">Student / class</th><th className="p-3">Due date</th><th className="p-3 text-right">Amount</th><th className="p-3 text-right">Paid</th><th className="p-3 text-right">Balance</th><th className="p-3">Status</th><th className="p-3"></th></tr></thead><tbody>{bills.map((bill) => <tr key={bill.id} className="border-b border-border/70 last:border-0 hover:bg-muted/40"><td className="p-3"><div className="font-semibold text-foreground">{bill.billNumber}</div><div className="text-xs text-muted-foreground">{bill.feeStructure?.name ?? "Fee bill"}</div></td><td className="p-3"><div className="font-medium text-foreground">{studentName(bill.student)}</div><div className="text-xs text-muted-foreground">{bill.student?.admissionNumber} · {bill.class?.name ?? "Class not recorded"}</div></td><td className="p-3">{dateLabel(bill.dueDate)}</td><td className="p-3 text-right tabular-nums">{currency(bill.totalAmount)}</td><td className="p-3 text-right tabular-nums">{currency(bill.paidAmount)}</td><td className="p-3 text-right font-semibold tabular-nums">{currency(bill.balanceAmount)}</td><td className="p-3"><StatusBadge value={bill.status} /></td><td className="p-3 text-right"><div className="flex flex-col items-end gap-1"><button type="button" className="text-xs font-semibold text-primary hover:underline" onClick={() => onViewInvoice(bill)}>View invoice</button>{onRecordPayment && Number(bill.balanceAmount) > 0 && <button type="button" className="text-xs font-semibold text-foreground hover:underline" onClick={() => onRecordPayment(bill)}>Record payment</button>}</div></td></tr>)}</tbody></table></div>;
+function openStudentStatement(studentId: string) {
+  window.location.href = `/student-statements?studentId=${encodeURIComponent(studentId)}`;
 }
 
-function PaymentsTable({ payments, onViewReceipt, onReverse }: { payments: ApiPayment[]; onViewReceipt: (payment: ApiPayment) => void; onReverse?: (payment: ApiPayment) => void }) {
+function PageControls({ shown, total, canPrevious, canNext, onPrevious, onNext }: { shown: number; total: number; canPrevious: boolean; canNext: boolean; onPrevious: () => void; onNext: () => void }) {
+  return <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-3"><p className="text-xs text-muted-foreground">Showing {shown} of {total}</p><div className="flex gap-2"><button type="button" className={buttonSecondary} disabled={!canPrevious} onClick={onPrevious}>Previous page</button><button type="button" className={buttonSecondary} disabled={!canNext} onClick={onNext}>Next page</button></div></div>;
+}
+
+function BillsTable({ bills, onRecordPayment, onViewInvoice, onViewStudentStatement }: { bills: ApiBill[]; onRecordPayment?: (bill: ApiBill) => void; onViewInvoice: (bill: ApiBill) => void; onViewStudentStatement?: (studentId: string) => void }) {
+  if (!bills.length) return <EmptyState icon={FileText} title="No matching bills" description="Bills appear here after they are generated for an active class and term." />;
+  return <div className="mt-4 overflow-x-auto"><table className="w-full min-w-[850px] text-left text-sm"><thead><tr className="border-b border-border text-xs text-muted-foreground"><th className="p-3">Bill</th><th className="p-3">Student / class</th><th className="p-3">Due date</th><th className="p-3 text-right">Amount</th><th className="p-3 text-right">Paid</th><th className="p-3 text-right">Balance</th><th className="p-3">Status</th><th className="p-3"></th></tr></thead><tbody>{bills.map((bill) => <tr key={bill.id} className="border-b border-border/70 last:border-0 hover:bg-muted/40"><td className="p-3"><div className="font-semibold text-foreground">{bill.billNumber}</div><div className="text-xs text-muted-foreground">{bill.feeStructure?.name ?? "Fee bill"}</div></td><td className="p-3"><button type="button" className="text-left font-medium text-primary hover:underline" onClick={() => onViewStudentStatement?.(bill.studentId)}>{studentName(bill.student)}</button><div className="text-xs text-muted-foreground">{bill.student?.admissionNumber} · {bill.class?.name ?? "Class not recorded"}</div></td><td className="p-3">{dateLabel(bill.dueDate)}</td><td className="p-3 text-right tabular-nums">{currency(bill.totalAmount)}</td><td className="p-3 text-right tabular-nums">{currency(bill.paidAmount)}</td><td className="p-3 text-right font-semibold tabular-nums">{currency(bill.balanceAmount)}</td><td className="p-3"><StatusBadge value={bill.status} /></td><td className="p-3 text-right"><div className="flex flex-col items-end gap-1"><button type="button" className="text-xs font-semibold text-primary hover:underline" onClick={() => onViewInvoice(bill)}>View invoice</button>{onRecordPayment && Number(bill.balanceAmount) > 0 && <button type="button" className="text-xs font-semibold text-foreground hover:underline" onClick={() => onRecordPayment(bill)}>Record payment</button>}</div></td></tr>)}</tbody></table></div>;
+}
+
+function PaymentsTable({ payments, onViewReceipt, onReverse, onViewStudentStatement }: { payments: ApiPayment[]; onViewReceipt: (payment: ApiPayment) => void; onReverse?: (payment: ApiPayment) => void; onViewStudentStatement?: (studentId: string) => void }) {
   if (!payments.length) return <EmptyState icon={Receipt} title="No payments recorded" description="When an accountant records a payment, the saved receipt will appear here." />;
-  return <div className="mt-4 overflow-x-auto"><table className="w-full min-w-[760px] text-left text-sm"><thead><tr className="border-b border-border text-xs text-muted-foreground"><th className="p-3">Receipt</th><th className="p-3">Student</th><th className="p-3">Date</th><th className="p-3">Method / reference</th><th className="p-3 text-right">Amount</th><th className="p-3">Status</th><th className="p-3"></th></tr></thead><tbody>{payments.map((payment) => <tr key={payment.id} className="border-b border-border/70 last:border-0 hover:bg-muted/40"><td className="p-3 font-semibold text-foreground">{payment.paymentNumber}</td><td className="p-3"><div className="font-medium">{studentName(payment.student)}</div><div className="text-xs text-muted-foreground">{payment.student?.admissionNumber}</div></td><td className="p-3">{dateLabel(payment.paymentDate)}</td><td className="p-3"><div>{payment.paymentMethod.replaceAll("_", " ")}</div><div className="text-xs text-muted-foreground">{payment.referenceNumber || "No reference"}</div></td><td className="p-3 text-right font-semibold tabular-nums">{currency(payment.amount)}</td><td className="p-3"><StatusBadge value={payment.status} /></td><td className="p-3 text-right"><button type="button" className="text-xs font-semibold text-primary hover:underline" onClick={() => onViewReceipt(payment)}>View receipt</button>{onReverse && payment.status === "COMPLETED" && <button type="button" className="ml-3 text-xs font-semibold text-destructive hover:underline" onClick={() => onReverse(payment)}>Reverse</button>}</td></tr>)}</tbody></table></div>;
+  return <div className="mt-4 overflow-x-auto"><table className="w-full min-w-[760px] text-left text-sm"><thead><tr className="border-b border-border text-xs text-muted-foreground"><th className="p-3">Receipt</th><th className="p-3">Student</th><th className="p-3">Date</th><th className="p-3">Method / reference</th><th className="p-3 text-right">Amount</th><th className="p-3">Status</th><th className="p-3"></th></tr></thead><tbody>{payments.map((payment) => <tr key={payment.id} className="border-b border-border/70 last:border-0 hover:bg-muted/40"><td className="p-3 font-semibold text-foreground">{payment.paymentNumber}</td><td className="p-3"><button type="button" className="text-left font-medium text-primary hover:underline" onClick={() => onViewStudentStatement?.(payment.studentId)}>{studentName(payment.student)}</button><div className="text-xs text-muted-foreground">{payment.student?.admissionNumber}</div></td><td className="p-3">{dateLabel(payment.paymentDate)}</td><td className="p-3"><div>{payment.paymentMethod.replaceAll("_", " ")}</div><div className="text-xs text-muted-foreground">{payment.referenceNumber || "No reference"}</div></td><td className="p-3 text-right font-semibold tabular-nums">{currency(payment.amount)}</td><td className="p-3"><StatusBadge value={payment.status} /></td><td className="p-3 text-right"><button type="button" className="text-xs font-semibold text-primary hover:underline" onClick={() => onViewReceipt(payment)}>View receipt</button>{onReverse && payment.status === "COMPLETED" && <button type="button" className="ml-3 text-xs font-semibold text-destructive hover:underline" onClick={() => onReverse(payment)}>Reverse</button>}</td></tr>)}</tbody></table></div>;
 }
 
 function ExpensesTable({ expenses }: { expenses: ApiExpense[] }) {

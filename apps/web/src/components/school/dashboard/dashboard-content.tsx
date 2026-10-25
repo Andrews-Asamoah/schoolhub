@@ -24,14 +24,6 @@ interface SetupSchool {
   academicYears: SetupYear[];
 }
 interface DashboardContentProps { today: string; greetingName: string; search: string; }
-interface AccountantDashboardPayment {
-  id?: string;
-  amount: number | string;
-  paymentDate: string;
-  status: string;
-  paymentMethod?: string;
-  bill?: { id: string; billNumber?: string } | null;
-}
 interface AccountantDashboardExpense {
   amount: number | string;
   date: string;
@@ -39,9 +31,16 @@ interface AccountantDashboardExpense {
   customCategory?: { name: string } | null;
   registryCategory?: { name: string } | null;
 }
-interface AccountantDashboardBill {
-  id: string;
-  class?: { id: string; name: string } | null;
+interface AccountantFinanceSummary {
+  asOf: string;
+  billed: string;
+  collected: string;
+  outstanding: string;
+  overdue: string;
+  collectionRate: string | null;
+  byMethod: { method: string; amount: string; receiptCount: number }[];
+  byClass: { classId: string | null; className: string; billed: string; collected: string; outstanding: string; billCount: number }[];
+  ageing: { days0To30: string; days31To60: string; days61To90: string; days90Plus: string; notDue: string };
 }
 interface Metric { label: string; value: string; detail: string; icon: LucideIcon; className: string; }
 const numberFormat = new Intl.NumberFormat("en-GH");
@@ -79,9 +78,23 @@ export function DashboardContent({ today, greetingName }: DashboardContentProps)
     retry: false,
     refetchInterval: 60_000,
   });
-  const accountantPaymentsQuery = useQuery({
-    queryKey: ["dashboard", "accountant-finance", "payments", activeOrganization?.id],
-    queryFn: () => apiFetch<AccountantDashboardPayment[]>("/finance/payments"),
+  const accountantYearsQuery = useQuery({
+    queryKey: ["dashboard", "accountant-finance", "academic-years", activeOrganization?.id],
+    queryFn: () => apiFetch<SetupYear[]>("/schools/academic-years"),
+    enabled: activeRole === "accountant" && Boolean(activeOrganization),
+    retry: false,
+    staleTime: 60_000,
+  });
+  const accountantCurrentYear = accountantYearsQuery.data?.find((year) => year.isCurrent);
+  const accountantCurrentTerm = accountantCurrentYear?.terms.find((term) => term.isCurrent);
+  const accountantSummaryQuery = useQuery({
+    queryKey: ["dashboard", "accountant-finance", "summary", activeOrganization?.id, accountantCurrentYear?.id, accountantCurrentTerm?.id],
+    queryFn: () => {
+      const params = new URLSearchParams();
+      if (accountantCurrentYear) params.set("yearId", accountantCurrentYear.id);
+      if (accountantCurrentTerm) params.set("termId", accountantCurrentTerm.id);
+      return apiFetch<AccountantFinanceSummary>(`/finance/summary${params.size ? `?${params.toString()}` : ""}`);
+    },
     enabled: activeRole === "accountant" && Boolean(activeOrganization),
     retry: false,
     refetchInterval: 60_000,
@@ -89,13 +102,6 @@ export function DashboardContent({ today, greetingName }: DashboardContentProps)
   const accountantExpensesQuery = useQuery({
     queryKey: ["dashboard", "accountant-finance", "expenses", activeOrganization?.id],
     queryFn: () => apiFetch<AccountantDashboardExpense[]>("/finance/expenses"),
-    enabled: activeRole === "accountant" && Boolean(activeOrganization),
-    retry: false,
-    refetchInterval: 60_000,
-  });
-  const accountantBillsQuery = useQuery({
-    queryKey: ["dashboard", "accountant-finance", "bills", activeOrganization?.id],
-    queryFn: () => apiFetch<AccountantDashboardBill[]>("/finance/bills"),
     enabled: activeRole === "accountant" && Boolean(activeOrganization),
     retry: false,
     refetchInterval: 60_000,
@@ -160,20 +166,19 @@ export function DashboardContent({ today, greetingName }: DashboardContentProps)
             <h2 className="text-lg font-semibold tracking-tight text-foreground">Finance overview</h2>
             <p className="mt-1 text-sm text-muted-foreground">Live collections, expenses and breakdowns from saved finance records.</p>
           </div>
-          {(accountantPaymentsQuery.isPending || accountantExpensesQuery.isPending || accountantBillsQuery.isPending) ? (
+          {(accountantSummaryQuery.isPending || accountantExpensesQuery.isPending || accountantYearsQuery.isPending) ? (
             <div className="grid gap-5 xl:grid-cols-2" aria-label="Loading finance analytics">
               <div className="h-80 animate-pulse rounded-2xl bg-muted/60" />
               <div className="h-80 animate-pulse rounded-2xl bg-muted/60" />
             </div>
-          ) : accountantPaymentsQuery.isError || accountantExpensesQuery.isError || accountantBillsQuery.isError ? (
+          ) : accountantSummaryQuery.isError || accountantExpensesQuery.isError ? (
             <p role="alert" className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
               Finance charts could not load. Check your accountant finance permissions and API connection, then refresh this dashboard.
             </p>
           ) : (
             <AccountantFinanceCharts
-              payments={accountantPaymentsQuery.data ?? []}
+              summary={accountantSummaryQuery.data ?? null}
               expenses={accountantExpensesQuery.data ?? []}
-              bills={accountantBillsQuery.data ?? []}
             />
           )}
         </section>

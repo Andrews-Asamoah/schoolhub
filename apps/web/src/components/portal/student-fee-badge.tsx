@@ -4,7 +4,7 @@ import { apiFetch } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
 export interface StudentFeeStatus {
-  status: "FULLY_PAID" | "PARTIALLY_PAID" | "YET_TO_PAY";
+  status: "FULLY_PAID" | "PARTIALLY_PAID" | "YET_TO_PAY" | "UNKNOWN";
   label: string;
   description: string;
   academicYear?: string | null;
@@ -12,7 +12,7 @@ export interface StudentFeeStatus {
 }
 
 interface StudentFeeBadgeProps {
-  status?: "FULLY_PAID" | "PARTIALLY_PAID" | "YET_TO_PAY";
+  status?: "FULLY_PAID" | "PARTIALLY_PAID" | "YET_TO_PAY" | "UNKNOWN";
   label?: string;
   className?: string;
 }
@@ -31,15 +31,25 @@ export function useStudentFeeStatus() {
  * Exposes ONLY payment clearance status and never numerical balances or invoices.
  */
 export function StudentFeeBadge({ status, label, className }: StudentFeeBadgeProps) {
-  const { data } = useStudentFeeStatus();
-  const currentStatus = status ?? data?.status ?? "FULLY_PAID";
+  const statusQuery = useStudentFeeStatus();
+  const { data } = statusQuery;
+  if (!status && (statusQuery.isPending || statusQuery.isError || !data || data.status === "UNKNOWN")) {
+    return <span className={cn("inline-flex items-center gap-1.5 rounded-full border border-border bg-muted px-3 py-1 text-xs font-bold text-muted-foreground", className)}><ShieldCheck className="size-3.5" /><span>Fee Status: Unknown</span></span>;
+  }
+  const currentStatus = status ?? data?.status ?? "UNKNOWN";
   const currentLabel = label ?? data?.label ?? (
     currentStatus === "FULLY_PAID"
       ? "Fully Paid"
       : currentStatus === "PARTIALLY_PAID"
         ? "Partially Paid"
-        : "Yet to Make Payment"
+        : currentStatus === "YET_TO_PAY"
+          ? "Yet to Make Payment"
+          : "Unknown"
   );
+
+  if (currentStatus === "UNKNOWN") {
+    return <span className={cn("inline-flex items-center gap-1.5 rounded-full border border-border bg-muted px-3 py-1 text-xs font-bold text-muted-foreground", className)}><ShieldCheck className="size-3.5" /><span>Fee Status: {currentLabel}</span></span>;
+  }
 
   if (currentStatus === "FULLY_PAID") {
     return (
@@ -88,8 +98,12 @@ export function StudentFeeBadge({ status, label, className }: StudentFeeBadgePro
  * enquiries to parents/guardians.
  */
 export function StudentFeeAlertBanner({ className }: { className?: string }) {
-  const { data } = useStudentFeeStatus();
-  const currentStatus = data?.status ?? "FULLY_PAID";
+  const statusQuery = useStudentFeeStatus();
+  const { data } = statusQuery;
+  if (statusQuery.isPending || statusQuery.isError || !data || data.status === "UNKNOWN") {
+    return <div role="status" className={cn("rounded-2xl border border-border bg-muted/50 p-4 text-sm text-muted-foreground", className)}><strong>School fee status: Unknown</strong><p className="mt-1">The current fee status could not be verified. Please check again later or contact the school accounts office.</p></div>;
+  }
+  const currentStatus = data.status;
   const description =
     data?.description ??
     (currentStatus === "FULLY_PAID"
