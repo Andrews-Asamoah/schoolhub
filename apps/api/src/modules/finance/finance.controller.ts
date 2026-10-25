@@ -277,7 +277,7 @@ export class FinanceController {
   }
 
   @Post("term-end-review/former-students")
-  @Roles("owner", "admin", "headteacher")
+  @Roles(...FINANCE_WRITE_ROLES)
   markFormerStudents(
     @CurrentSchool() school: School,
     @CurrentUser() user: AuthenticatedUser,
@@ -293,7 +293,7 @@ export class FinanceController {
   }
 
   @Put("late-fee-policy")
-  @Roles("owner", "admin", "headteacher")
+  @Roles(...FINANCE_WRITE_ROLES)
   setLateFeePolicy(
     @CurrentSchool() school: School,
     @CurrentUser() user: AuthenticatedUser,
