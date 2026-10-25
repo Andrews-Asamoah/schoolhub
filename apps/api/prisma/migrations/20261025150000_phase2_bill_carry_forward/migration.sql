@@ -1,6 +1,9 @@
 -- Phase 2: source-referenced previous-balance snapshots and list indexes.
 -- Existing balances are intentionally untouched by this additive migration.
 ALTER TABLE "bills" ADD COLUMN "carryForwardSnapshotCreated" BOOLEAN NOT NULL DEFAULT false;
+-- Existing bills belong to a term that has already had a bill generated; prevent a later
+-- additional fee-structure bill from producing a duplicate first-bill carry-forward snapshot.
+UPDATE "bills" SET "carryForwardSnapshotCreated" = true;
 CREATE TABLE "bill_carry_forwards" (
   "id" TEXT NOT NULL,
   "schoolId" TEXT NOT NULL,
