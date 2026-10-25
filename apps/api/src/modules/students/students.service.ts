@@ -15,9 +15,13 @@ import {
   type CreateStudentInput,
   type IssuedCredentials,
   type UpdateStudentInput,
+  type StudentStatementEntry,
+  type StudentStatementResponse,
+  type StudentStatementScope,
 } from '@schoolhub/shared';
-import type { Prisma, School, StudentStatus } from '@prisma/client';
+import { Prisma, type School, type StudentStatus } from '@prisma/client';
 import { canManageAcademicContext } from '../../common/academic-context.js';
+import { buildRunningStatementEntries, parseReportingDate, type StatementLedgerEvent } from '../finance/finance-reporting.helpers.js';
 import {
   CredentialsService,
   toIssuedCredentials,
@@ -1014,6 +1018,199 @@ export class StudentsService {
     });
     if (!link) throw new NotFoundException('Student not found');
     return this.profileView(schoolId, studentId, { viewerGuardianId: guardian.id });
+  }
+
+  /** Fees and statement data for one linked ward only. */
+  async getMyWardFeeStatement(
+    schoolId: string,
+    userId: string,
+    studentId: string,
+    query: { scope: StudentStatementScope; yearId?: string; termId?: string; from?: string; to?: string },
+  ): Promise<StudentStatementResponse> {
+    const guardian = await this.requireGuardian(schoolId, userId);
+    const link = await this.prisma.client.guardianStudent.findFirst({
+      where: {
+        guardianId: guardian.id,
+        studentId,
+        student: { schoolId, deletedAt: null },
+        guardian: { schoolId, deletedAt: null, isActive: true },
+      },
+      select: { id: true },
+    });
+    if (!link) throw new NotFoundException("Student not found");
+
+    const currentYear = await this.prisma.client.academicYear.findFirst({
+      where: { schoolId, isCurrent: true },
+      include: { terms: { where: { isCurrent: true }, take: 1 } },
+    });
+    const currentTerm = currentYear?.terms[0];
+    if (!currentYear || !currentTerm) throw new BadRequestException("The school has not selected a current academic year and term.");
+    if (query.scope === "term" && Boolean(query.yearId) !== Boolean(query.termId)) {
+      throw new BadRequestException("Academic year and term must be supplied together.");
+    }
+    if (query.scope === "year" && query.termId) throw new BadRequestException("A year statement cannot be restricted to one term.");
+    if (query.scope === "all" && (query.yearId || query.termId)) {
+      throw new BadRequestException("Do not specify an academic year or term for an all-time statement.");
+    }
+
+    let year = currentYear;
+    let term = currentTerm;
+    if (query.scope === "term") {
+      const selectedTerm = await this.prisma.client.term.findFirst({
+        where: {
+          id: query.termId ?? currentTerm.id,
+          academicYearId: query.yearId ?? currentYear.id,
+          academicYear: { schoolId },
+        },
+        include: { academicYear: { select: { id: true, name: true, startDate: true, endDate: true } } },
+      });
+      if (!selectedTerm) throw new BadRequestException("Choose a term belonging to this school.");
+      term = selectedTerm;
+      year = selectedTerm.academicYear as typeof currentYear;
+    } else if (query.scope === "year") {
+      const selectedYear = await this.prisma.client.academicYear.findFirst({
+        where: { id: query.yearId ?? currentYear.id, schoolId },
+        select: { id: true, name: true, startDate: true, endDate: true, isCurrent: true },
+      });
+      if (!selectedYear) throw new BadRequestException("Choose an academic year belonging to this school.");
+      year = selectedYear as typeof currentYear;
+    }
+
+    const from = parseReportingDate(query.from, "start date");
+    const to = parseReportingDate(query.to, "end date", true);
+    if (from && to && from > to) throw new BadRequestException("Start date must be before or equal to end date.");
+    const displayFrom = from ?? (query.scope === "term" ? term.startDate : query.scope === "year" ? year.startDate : undefined);
+    const displayTo = to ?? (query.scope === "term" ? term.endDate : query.scope === "year" ? year.endDate : undefined);
+
+    const [student, bills, payments, school] = await Promise.all([
+      this.prisma.client.student.findFirst({
+        where: { id: studentId, schoolId, deletedAt: null },
+        select: { id: true, admissionNumber: true, profile: { select: { firstName: true, lastName: true } } },
+      }),
+      this.prisma.client.bill.findMany({
+        where: { schoolId, studentId, status: { notIn: ["CANCELLED", "WAIVED"] } },
+        orderBy: [{ issuedAt: "asc" }, { id: "asc" }],
+        select: {
+          id: true, billNumber: true, academicYearId: true, termId: true, grossAmount: true,
+          totalAmount: true, discountAmount: true, balanceAmount: true, dueDate: true, issuedAt: true,
+        },
+      }),
+      this.prisma.client.payment.findMany({
+        where: { schoolId, studentId },
+        orderBy: [{ paymentDate: "asc" }, { id: "asc" }],
+        select: {
+          id: true, billId: true, paymentNumber: true, amount: true, paymentMethod: true,
+          paymentDate: true, status: true, reversedAt: true, reversalReason: true,
+        },
+      }),
+      this.prisma.client.school.findFirst({ where: { id: schoolId }, select: { arrearsPolicy: true } }),
+    ]);
+    if (!student) throw new NotFoundException("Student not found");
+
+    const events: StatementLedgerEvent[] = [];
+    for (const bill of bills) {
+      const gross = bill.grossAmount.gt(0) ? bill.grossAmount : bill.totalAmount.plus(bill.discountAmount);
+      events.push({
+        id: `bill:${bill.id}`, date: bill.issuedAt, type: "INVOICE", reference: bill.billNumber,
+        description: `Invoice ${bill.billNumber}`, debit: gross, credit: new Prisma.Decimal(0), billId: bill.id,
+      });
+      if (bill.discountAmount.gt(0)) {
+        events.push({
+          id: `discount:${bill.id}`, date: bill.issuedAt, type: "DISCOUNT", reference: bill.billNumber,
+          description: `Discount on invoice ${bill.billNumber}`, debit: new Prisma.Decimal(0),
+          credit: bill.discountAmount, billId: bill.id,
+        });
+      }
+    }
+    for (const payment of payments) {
+      if (payment.status !== "COMPLETED" && !payment.reversedAt) continue;
+      events.push({
+        id: `receipt:${payment.id}`, date: payment.paymentDate, type: "RECEIPT",
+        reference: payment.paymentNumber, description: `Receipt ${payment.paymentNumber}`,
+        debit: new Prisma.Decimal(0), credit: payment.amount, billId: payment.billId, paymentId: payment.id,
+      });
+      if (payment.reversedAt) {
+        events.push({
+          id: `reversal:${payment.id}`, date: payment.reversedAt,
+          type: payment.status === "REFUNDED" ? "REFUND" : "REVERSAL",
+          reference: payment.paymentNumber,
+          description: `${payment.status === "REFUNDED" ? "Refund" : "Reversal"} of receipt ${payment.paymentNumber}${payment.reversalReason ? `: ${payment.reversalReason}` : ""}`,
+          debit: payment.amount, credit: new Prisma.Decimal(0), billId: payment.billId, paymentId: payment.id,
+        });
+      }
+    }
+
+    const inRange = (date: Date) =>
+      (!displayFrom || date.getTime() >= displayFrom.getTime()) &&
+      (!displayTo || date.getTime() <= displayTo.getTime());
+    let opening = new Prisma.Decimal(0);
+    if (displayFrom) {
+      for (const event of events) {
+        if (event.date.getTime() < displayFrom.getTime()) opening = opening.plus(event.debit).minus(event.credit);
+      }
+    }
+    const periodBills = bills.filter((bill) =>
+      query.scope === "term" ? bill.academicYearId === year.id && bill.termId === term.id
+        : query.scope === "year" ? bill.academicYearId === year.id : true,
+    );
+    const periodBillIds = new Set(periodBills.map((bill) => bill.id));
+    const visible = events.filter((event) => {
+      if (!inRange(event.date)) return false;
+      if (query.scope === "all") return true;
+      if (event.type === "INVOICE" || event.type === "DISCOUNT") return Boolean(event.billId && periodBillIds.has(event.billId));
+      // Receipts and reversals are shown by their transaction date, even if a
+      // receipt clears an earlier-term bill.
+      return true;
+    });
+    const entries = buildRunningStatementEntries(opening, visible) as StudentStatementEntry[];
+    const closing = entries.at(-1)?.balance ?? Number(opening.toFixed(2));
+
+    const today = new Date();
+    today.setUTCHours(0, 0, 0, 0);
+    const ageingTotals = new Map<"not-due" | "0-30" | "31-60" | "61-90" | "90+", Prisma.Decimal>([
+      ["not-due", new Prisma.Decimal(0)], ["0-30", new Prisma.Decimal(0)],
+      ["31-60", new Prisma.Decimal(0)], ["61-90", new Prisma.Decimal(0)], ["90+", new Prisma.Decimal(0)],
+    ]);
+    for (const bill of periodBills) {
+      if (bill.balanceAmount.lte(0)) continue;
+      const days = bill.dueDate ? Math.floor((today.getTime() - bill.dueDate.getTime()) / 86_400_000) : -1;
+      const bucket = days < 0 ? "not-due" : days <= 30 ? "0-30" : days <= 60 ? "31-60" : days <= 90 ? "61-90" : "90+";
+      ageingTotals.set(bucket, ageingTotals.get(bucket)!.plus(bill.balanceAmount));
+    }
+    const ids = payments.map((payment) => payment.id);
+    const allocated = ids.length ? await this.prisma.client.paymentItem.groupBy({
+      by: ["paymentId"],
+      where: { paymentId: { in: ids }, payment: { schoolId, studentId } },
+      _sum: { amount: true },
+    }) : [];
+    const allocatedByPayment = new Map(allocated.map((row) => [row.paymentId, row._sum.amount ?? new Prisma.Decimal(0)]));
+    let unallocated = new Prisma.Decimal(0);
+    for (const payment of payments) {
+      if (payment.status !== "COMPLETED" || payment.reversedAt || !inRange(payment.paymentDate)) continue;
+      const remaining = payment.amount.minus(allocatedByPayment.get(payment.id) ?? new Prisma.Decimal(0));
+      if (remaining.gt(0)) unallocated = unallocated.plus(remaining);
+    }
+
+    return {
+      student: {
+        id: student.id, admissionNumber: student.admissionNumber,
+        firstName: student.profile?.firstName ?? null, lastName: student.profile?.lastName ?? null,
+      },
+      scope: query.scope,
+      period: {
+        label: query.scope === "term" ? `${year.name} — ${term.name}` : query.scope === "year" ? year.name : "All time",
+        from: displayFrom?.toISOString().slice(0, 10) ?? null,
+        to: displayTo?.toISOString().slice(0, 10) ?? null,
+        academicYearId: query.scope === "all" ? null : year.id,
+        termId: query.scope === "term" ? term.id : null,
+      },
+      openingBalance: Number(opening.toFixed(2)),
+      entries,
+      closingBalance: closing,
+      ageing: [...ageingTotals.entries()].map(([bucket, amount]) => ({ bucket, amount: Number(amount.toFixed(2)) })),
+      unallocatedCredit: Number(unallocated.toFixed(2)),
+      arrearsPolicy: school?.arrearsPolicy ?? "SHOW_ONLY",
+    };
   }
 
   /** The signed-in student's own profile (shows their username and login email). */
