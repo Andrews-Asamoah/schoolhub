@@ -12,20 +12,7 @@ import { canManageAcademicContext } from "../../common/academic-context.js";
 import { createSequence, isIdempotencyRace, isSerializationFailure, postingDateProblem, withSerializableRetry } from "./finance.helpers.js";
 import { buildFinanceAuditWhere, categoryOf, clampPageSize, describeFinanceAudit, type FinanceAuditQuery } from "./finance-audit.helpers.js";
 import { buildRunningStatement, daysPastDue, type StatementEvent } from "./finance-reporting.helpers.js";
-
-const PAYE_MONTHLY_BANDS_2026 = [
-  { limit: 588, rate: 0 },
-  { limit: 80, rate: 0.05 },
-  { limit: 100, rate: 0.10 },
-  { limit: 2_900, rate: 0.175 },
-  { limit: 16_000, rate: 0.25 },
-  { limit: 30_332, rate: 0.30 },
-  { limit: Number.POSITIVE_INFINITY, rate: 0.35 },
-] as const;
-
-function roundMoney(value: number) {
-  return Math.round((value + Number.EPSILON) * 100) / 100;
-}
+import { calculatePayroll } from "./payroll/payroll-calculator.js";
 
 type FinanceListQuery = {
   cursor?: string;
@@ -2996,76 +2983,222 @@ export class FinanceService {
     processedById: string,
     input: { month: number; year: number; confirmResidentTaxTreatment: true },
   ) {
-    // GRA's 2026 monthly resident bands took effect on 1 September 2026.
-    // Refuse to silently apply these rules to historical periods.
-    if (input.year !== 2026 || input.month < 9) {
-      throw new BadRequestException(
-        "Automatic draft generation currently supports September–December 2026 only. Configure the applicable historical tax rules before generating an earlier period.",
-      );
+    if (!Number.isInteger(input.month) || input.month < 1 || input.month > 12 || !Number.isInteger(input.year) || input.year < 2000 || input.year > 2100) {
+      throw new BadRequestException("Enter a valid payroll month and year.");
     }
     const db = this.prisma.client;
-    const existing = await db.payrollRecord.findUnique({
-      where: { schoolId_month_year: { schoolId, month: input.month, year: input.year } },
-      select: { id: true },
-    });
-    if (existing) throw new BadRequestException("A payroll run already exists for this month and year.");
-
-    const [teachers, staff, currentYear] = await Promise.all([
+    const periodStart = new Date(Date.UTC(input.year, input.month - 1, 1));
+    const periodEnd = new Date(Date.UTC(input.year, input.month, 0, 23, 59, 59, 999));
+    const activeOnPeriod = {
+      schoolId,
+      status: "ACTIVE" as const,
+      needsVerification: false,
+      effectiveFrom: { lte: periodEnd },
+      OR: [{ effectiveTo: null }, { effectiveTo: { gte: periodStart } }],
+    };
+    const [schedule, schemes, teachers, staff, currentYear, existing] = await Promise.all([
+      db.payrollTaxSchedule.findFirst({
+        where: activeOnPeriod,
+        include: { bands: { orderBy: { order: "asc" } } },
+        orderBy: { effectiveFrom: "desc" },
+      }),
+      db.payrollContributionScheme.findMany({ where: activeOnPeriod }),
       db.teacher.findMany({
         where: { schoolId, isActive: true, deletedAt: null },
-        select: { id: true, monthlySalary: true },
+        select: {
+          id: true, monthlySalary: true,
+          payProfile: { select: { taxResidency: true } },
+          contributionEnrolments: {
+            where: { startsAt: { lte: periodEnd }, OR: [{ endsAt: null }, { endsAt: { gte: periodStart } }] },
+            include: { scheme: true },
+          },
+          payItemAssignments: {
+            where: { startsAt: { lte: periodEnd }, OR: [{ endsAt: null }, { endsAt: { gte: periodStart } }] },
+            include: { payItem: true },
+          },
+          payrollLoans: {
+            where: { isActive: true, balance: { gt: new Prisma.Decimal(0) }, startsAt: { lte: periodEnd }, OR: [{ endsAt: null }, { endsAt: { gte: periodStart } }] },
+          },
+        },
       }),
       db.staff.findMany({
         where: { schoolId, isActive: true, deletedAt: null },
-        select: { id: true, monthlySalary: true },
+        select: {
+          id: true, monthlySalary: true,
+          payProfile: { select: { taxResidency: true } },
+          contributionEnrolments: {
+            where: { startsAt: { lte: periodEnd }, OR: [{ endsAt: null }, { endsAt: { gte: periodStart } }] },
+            include: { scheme: true },
+          },
+          payItemAssignments: {
+            where: { startsAt: { lte: periodEnd }, OR: [{ endsAt: null }, { endsAt: { gte: periodStart } }] },
+            include: { payItem: true },
+          },
+          payrollLoans: {
+            where: { isActive: true, balance: { gt: new Prisma.Decimal(0) }, startsAt: { lte: periodEnd }, OR: [{ endsAt: null }, { endsAt: { gte: periodStart } }] },
+          },
+        },
       }),
       db.academicYear.findFirst({
         where: { schoolId, isCurrent: true },
         include: { terms: { where: { isCurrent: true }, take: 1 } },
       }),
+      db.payrollRecord.findUnique({
+        where: { schoolId_month_year: { schoolId, month: input.month, year: input.year } },
+        select: { id: true },
+      }),
     ]);
+    if (existing) throw new BadRequestException("A payroll run already exists for this month and year.");
+    if (!schedule) {
+      throw new BadRequestException(`No verified, approved PAYE schedule is configured for ${input.year}-${String(input.month).padStart(2, "0")}. Verify and approve the applicable schedule before generating payroll.`);
+    }
+    if (!schedule.bands.length || schedule.bands[schedule.bands.length - 1]?.width !== null) {
+      throw new BadRequestException("The effective PAYE schedule is invalid: its final band must be open-ended.");
+    }
+    const activeSchemes = schemes.filter((scheme) => scheme.effectiveFrom <= periodEnd && (!scheme.effectiveTo || scheme.effectiveTo >= periodStart));
+    const schemeForCode = (code: "SSNIT_TIER1" | "TIER2" | "TIER3") =>
+      activeSchemes.filter((scheme) => scheme.code === code).sort((a, b) => b.effectiveFrom.getTime() - a.effectiveFrom.getTime())[0];
+    const defaultTier1 = schemeForCode("SSNIT_TIER1");
+    if (!defaultTier1) {
+      throw new BadRequestException("No verified, approved SSNIT Tier 1 scheme is configured for this payroll month.");
+    }
+    const activeSchemeIds = new Set(activeSchemes.map((scheme) => scheme.id));
     const eligible = [
-      ...teachers.filter((person) => Number(person.monthlySalary ?? 0) > 0).map((person) => ({
-        teacherId: person.id,
-        staffId: null as string | null,
-        basicSalary: Number(person.monthlySalary),
-      })),
-      ...staff.filter((person) => Number(person.monthlySalary ?? 0) > 0).map((person) => ({
-        teacherId: null as string | null,
-        staffId: person.id,
-        basicSalary: Number(person.monthlySalary),
-      })),
+      ...teachers.filter((person) => person.monthlySalary && person.monthlySalary.greaterThan(0)).map((person) => ({ ...person, teacherId: person.id, staffId: null as string | null })),
+      ...staff.filter((person) => person.monthlySalary && person.monthlySalary.greaterThan(0)).map((person) => ({ ...person, teacherId: null as string | null, staffId: person.id })),
     ];
     if (!eligible.length) {
       throw new BadRequestException("No active teachers or staff have a positive monthly salary. Add salary details before generating payroll.");
     }
 
     const payslips = eligible.map((person) => {
-      // SSNIT 2026 insurable earnings range: GHS 587.80–69,000.
-      const insurableSalary = Math.min(69_000, Math.max(587.80, person.basicSalary));
-      const ssnitEmployee = roundMoney(insurableSalary * 0.055);
-      const ssnitEmployer = roundMoney(insurableSalary * 0.13);
-      const grossSalary = roundMoney(person.basicSalary);
-      const incomeTax = calculateResidentPaye2026(Math.max(0, grossSalary - ssnitEmployee));
-      const netSalary = roundMoney(Math.max(0, grossSalary - ssnitEmployee - incomeTax));
+      const enrollments = person.contributionEnrolments.filter((enrollment) => activeSchemeIds.has(enrollment.schemeId));
+      const enrollmentFor = (code: "SSNIT_TIER1" | "TIER2" | "TIER3") => enrollments.find((enrollment) => enrollment.scheme.code === code);
+      const tier1Enrollment = enrollmentFor("SSNIT_TIER1");
+      const tier2Enrollment = enrollmentFor("TIER2");
+      const tier3Enrollment = enrollmentFor("TIER3");
+      const tier1 = tier1Enrollment?.scheme ?? defaultTier1;
+      const tier2 = tier2Enrollment?.scheme ?? null;
+      const tier3 = tier3Enrollment?.scheme ?? null;
+      if ([tier1Enrollment, tier2Enrollment, tier3Enrollment].some((enrollment) => enrollment?.fixedAmountOverride !== null && enrollment?.fixedAmountOverride !== undefined)) {
+        // The calculator supports fixed overrides, but the schema's nullable value
+        // is passed explicitly below; this guard only protects invalid negative data.
+        if ([tier1Enrollment, tier2Enrollment, tier3Enrollment].some((enrollment) => enrollment?.fixedAmountOverride?.lessThan(0))) {
+          throw new BadRequestException("A contribution fixed-amount override cannot be negative.");
+        }
+      }
+      const earnings = person.payItemAssignments
+        .filter((assignment) => assignment.payItem.isActive && assignment.payItem.kind === "EARNING")
+        .map((assignment) => ({
+          code: assignment.payItem.code,
+          description: assignment.payItem.name,
+          amount: assignment.amount.toString(),
+          taxable: assignment.payItem.taxable,
+          pensionable: assignment.payItem.pensionable,
+        }));
+      const deductions = person.payItemAssignments
+        .filter((assignment) => assignment.payItem.isActive && assignment.payItem.kind === "DEDUCTION")
+        .map((assignment) => ({
+          code: assignment.payItem.code,
+          description: assignment.payItem.name,
+          amount: assignment.amount.toString(),
+        }));
+      const loans = person.payrollLoans.map((loan) => ({
+        code: `LOAN_${loan.id}`,
+        description: loan.description,
+        amount: Prisma.Decimal.min(loan.balance, loan.instalment).toString(),
+        balanceAfter: loan.balance.sub(Prisma.Decimal.min(loan.balance, loan.instalment)).toFixed(2),
+      }));
+      const calculation = calculatePayroll({
+        basicSalary: person.monthlySalary!.toString(),
+        earnings: [
+          ...earnings,
+          // Allowances are only included when configured as an active pay item.
+        ],
+        otherDeductions: [...deductions, ...loans.map(({ code, description, amount }) => ({ code, description, amount }))],
+        taxBands: schedule.bands.map((band) => ({ order: band.order, width: band.width?.toString() ?? null, rate: band.rate.toString() })),
+        nonResidentFlatRate: schedule.nonResidentFlatRate?.toString() ?? null,
+        taxResident: (person.payProfile?.taxResidency ?? "RESIDENT").toUpperCase() !== "NON_RESIDENT",
+        employeeSsnitRate: (tier1Enrollment?.rateOverride ?? tier1.employeeRate).toString(),
+        employerSsnitRate: tier1.employerRate.toString(),
+        ssnitBase: tier1.base,
+        insurableMinimum: tier1.insurableMinimum?.toString() ?? "0",
+        insurableMaximum: tier1.insurableMaximum?.toString() ?? person.monthlySalary!.toString(),
+        tier2EmployeeRate: tier2 ? (tier2Enrollment?.rateOverride ?? tier2.employeeRate).toString() : "0",
+        tier2EmployerRate: tier2?.employerRate.toString() ?? "0",
+        tier2Base: tier2?.base,
+        tier3EmployeeRate: tier3 ? (tier3Enrollment?.rateOverride ?? tier3.employeeRate).toString() : "0",
+        tier3Base: tier3?.base,
+        tier3ReliefCap: tier3?.tier3ReliefCap?.toString() ?? "0",
+        employeeContributionTaxDeductible: tier1.employeeShareTaxDeductible,
+        tier2ContributionTaxDeductible: tier2?.employeeShareTaxDeductible ?? true,
+        ssnitEmployerBearsEmployeeShare: tier1Enrollment?.employerBearsEmployeeShare ?? false,
+        ssnitEmployerShareTaxable: tier1Enrollment?.employerShareTaxable ?? false,
+        tier2EmployerBearsEmployeeShare: tier2Enrollment?.employerBearsEmployeeShare ?? false,
+        tier2EmployerShareTaxable: tier2Enrollment?.employerShareTaxable ?? false,
+        tier3EmployerBearsEmployeeShare: tier3Enrollment?.employerBearsEmployeeShare ?? false,
+        tier3EmployerShareTaxable: tier3Enrollment?.employerShareTaxable ?? false,
+        employeeSsnitFixedAmount: tier1Enrollment?.fixedAmountOverride?.toString() ?? null,
+        tier2EmployeeFixedAmount: tier2Enrollment?.fixedAmountOverride?.toString() ?? null,
+        tier3EmployeeFixedAmount: tier3Enrollment?.fixedAmountOverride?.toString() ?? null,
+      });
+      const lineRows = calculation.lines.map((line) => {
+        const loan = loans.find((candidate) => candidate.code === line.code);
+        return {
+          kind: line.kind,
+          code: line.code,
+          description: line.description,
+          amount: new Prisma.Decimal(line.amount),
+          originalAmount: new Prisma.Decimal(line.originalAmount),
+          balance: loan ? new Prisma.Decimal(loan.balanceAfter) : null,
+          memo: line.memo,
+        };
+      });
       return {
         schoolId,
         teacherId: person.teacherId,
         staffId: person.staffId,
-        basicSalary: new Prisma.Decimal(roundMoney(person.basicSalary)),
-        allowances: new Prisma.Decimal(0),
-        grossSalary: new Prisma.Decimal(grossSalary),
-        ssnitEmployee: new Prisma.Decimal(ssnitEmployee),
-        ssnitEmployer: new Prisma.Decimal(ssnitEmployer),
-        incomeTax: new Prisma.Decimal(incomeTax),
-        otherDeductions: new Prisma.Decimal(0),
-        netSalary: new Prisma.Decimal(netSalary),
+        basicSalary: new Prisma.Decimal(calculation.basicSalary),
+        allowances: new Prisma.Decimal(calculation.allowances),
+        grossSalary: new Prisma.Decimal(calculation.grossSalary),
+        ssnitEmployee: new Prisma.Decimal(calculation.ssnitEmployee),
+        ssnitEmployer: new Prisma.Decimal(calculation.ssnitEmployer),
+        tier2Employee: new Prisma.Decimal(calculation.tier2Employee),
+        tier2Employer: new Prisma.Decimal(calculation.tier2Employer),
+        tier3Employee: new Prisma.Decimal(calculation.tier3Employee),
+        incomeTax: new Prisma.Decimal(calculation.incomeTax),
+        otherDeductions: new Prisma.Decimal(calculation.otherDeductions),
+        netSalary: new Prisma.Decimal(calculation.netSalary),
         paymentMethod: "BANK_TRANSFER" as const,
         paymentStatus: "PENDING" as const,
+        lines: { create: lineRows },
       };
     });
-    const sum = (key: "grossSalary" | "netSalary" | "incomeTax" | "ssnitEmployee" | "ssnitEmployer") =>
-      roundMoney(payslips.reduce((total, slip) => total + Number(slip[key]), 0));
+    const total = (select: (slip: (typeof payslips)[number]) => Prisma.Decimal) =>
+      payslips.reduce((sum, slip) => sum.add(select(slip)), new Prisma.Decimal(0)).toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP);
+    const totalGross = total((slip) => slip.grossSalary);
+    const totalNet = total((slip) => slip.netSalary);
+    const totalTax = total((slip) => slip.incomeTax);
+    const totalEmployeeSSNIT = total((slip) => slip.ssnitEmployee);
+    const totalEmployerSSNIT = total((slip) => slip.ssnitEmployer);
+    const totalTier2 = total((slip) => slip.tier2Employee.add(slip.tier2Employer));
+    const totalTier3 = total((slip) => slip.tier3Employee);
+    const settingsSnapshot = {
+      schedule: {
+        id: schedule.id, name: schedule.name,
+        effectiveFrom: schedule.effectiveFrom.toISOString().slice(0, 10),
+        effectiveTo: schedule.effectiveTo?.toISOString().slice(0, 10) ?? null,
+        nonResidentFlatRate: schedule.nonResidentFlatRate?.toString() ?? null,
+        bands: schedule.bands.map((band) => ({ order: band.order, width: band.width?.toString() ?? null, rate: band.rate.toString() })),
+      },
+      schemes: activeSchemes.map((scheme) => ({
+        id: scheme.id, code: scheme.code, label: scheme.label, employeeRate: scheme.employeeRate.toString(),
+        employerRate: scheme.employerRate.toString(), base: scheme.base, insurableMinimum: scheme.insurableMinimum?.toString() ?? null,
+        insurableMaximum: scheme.insurableMaximum?.toString() ?? null, tier3ReliefCap: scheme.tier3ReliefCap?.toString() ?? null,
+      })),
+      needsVerification: false,
+      rounding: "decimal-half-up-2dp",
+    };
 
     const payrollRecord = await db.$transaction(async (tx) => {
       const duplicate = await tx.payrollRecord.findUnique({
@@ -3073,32 +3206,32 @@ export class FinanceService {
         select: { id: true },
       });
       if (duplicate) throw new BadRequestException("A payroll run already exists for this month and year.");
-      return tx.payrollRecord.create({
+      const created = await tx.payrollRecord.create({
         data: {
-          schoolId,
-          month: input.month,
-          year: input.year,
-          status: "DRAFT",
-          totalGross: new Prisma.Decimal(sum("grossSalary")),
-          totalNet: new Prisma.Decimal(sum("netSalary")),
-          totalTax: new Prisma.Decimal(sum("incomeTax")),
-          totalSSNIT: new Prisma.Decimal(roundMoney(sum("ssnitEmployee") + sum("ssnitEmployer"))),
-          processedById,
-          academicYearId: currentYear?.id ?? null,
-          termId: currentYear?.terms[0]?.id ?? null,
+          schoolId, month: input.month, year: input.year, status: "DRAFT",
+          totalGross, totalNet, totalTax,
+          totalSSNIT: totalEmployeeSSNIT.add(totalEmployerSSNIT),
+          totalEmployeeSSNIT, totalEmployerSSNIT, totalTier2, totalTier3,
+          taxScheduleId: schedule.id, settingsSnapshot, processedById,
+          academicYearId: currentYear?.id ?? null, termId: currentYear?.terms[0]?.id ?? null,
           payslips: { create: payslips },
         },
-        include: {
-          _count: { select: { payslips: true } },
+        include: { _count: { select: { payslips: true } } },
+      });
+      await this.writeAudit(tx, {
+        actorId: processedById, schoolId, action: "CREATE", entityType: "PAYROLL_RECORD", entityId: created.id,
+        oldValues: null,
+        newValues: {
+          month: input.month, year: input.year, status: "DRAFT", totalGross: totalGross.toFixed(2),
+          totalNet: totalNet.toFixed(2), totalTax: totalTax.toFixed(2), totalEmployeeSSNIT: totalEmployeeSSNIT.toFixed(2),
+          totalEmployerSSNIT: totalEmployerSSNIT.toFixed(2), totalTier2: totalTier2.toFixed(2), totalTier3: totalTier3.toFixed(2),
+          taxScheduleId: schedule.id, settingsSnapshot,
         },
       });
+      return created;
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 
-    return {
-      payrollRecord,
-      includedCount: eligible.length,
-      excludedCount: teachers.length + staff.length - eligible.length,
-    };
+    return { payrollRecord, includedCount: eligible.length, excludedCount: teachers.length + staff.length - eligible.length };
   }
 
   async transitionPayroll(
