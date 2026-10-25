@@ -34,14 +34,24 @@ export function isSerializationFailure(error: unknown): boolean {
   return /could not serialize access|serialization failure|deadlock detected/i.test(message);
 }
 
+/** True when a unique-index violation was on the payment idempotency key (a duplicate request racing itself). */
+export function isIdempotencyRace(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const err = error as { code?: unknown; meta?: { target?: unknown }; message?: unknown };
+  if (err.code !== "P2002") return false;
+  const target = Array.isArray(err.meta?.target) ? err.meta!.target.join(",") : String(err.meta?.target ?? "");
+  const message = typeof err.message === "string" ? err.message : "";
+  return /idempotencyKey/i.test(target) || /idempotencyKey/i.test(message);
+}
+
 /**
- * Run a Serializable transaction and retry it when PostgreSQL aborts it
+ * Run a transaction and retry it when PostgreSQL aborts it
  * because of a concurrent conflict. Any other error is rethrown immediately.
  * When every attempt conflicts, `onExhausted` builds the error to throw.
  */
 export async function withSerializableRetry<T>(
   run: () => Promise<T>,
-  options: { attempts?: number; baseDelayMs?: number; onExhausted?: (cause: unknown) => Error } = {},
+  options: { attempts?: number; baseDelayMs?: number; retryIf?: (error: unknown) => boolean; onExhausted?: (cause: unknown) => Error } = {},
 ): Promise<T> {
   const attempts = options.attempts ?? 4;
   const baseDelayMs = options.baseDelayMs ?? 25;
@@ -50,7 +60,7 @@ export async function withSerializableRetry<T>(
     try {
       return await run();
     } catch (error) {
-      if (!isSerializationFailure(error)) throw error;
+      if (!(options.retryIf ?? isSerializationFailure)(error)) throw error;
       lastError = error;
       if (attempt < attempts) {
         const delay = baseDelayMs * 2 ** (attempt - 1) + Math.floor(Math.random() * baseDelayMs);

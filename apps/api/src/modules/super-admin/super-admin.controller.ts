@@ -114,6 +114,16 @@ export class SuperAdminController {
     return this.superAdminService.setSchoolAdminBanned(id, userId, body.banned, actor);
   }
 
+  @Post("schools/:id/admins/:userId/reset-two-factor")
+  @Throttle(WRITE_LIMIT)
+  resetSchoolAdminTwoFactor(
+    @Param("id") id: string,
+    @Param("userId") userId: string,
+    @AuditActorParam() actor: AuditActor,
+  ) {
+    return this.superAdminService.resetSchoolAdminTwoFactor(id, userId, actor);
+  }
+
   @Delete("schools/:id/admins/:userId")
   @Throttle(WRITE_LIMIT)
   removeSchoolAdmin(

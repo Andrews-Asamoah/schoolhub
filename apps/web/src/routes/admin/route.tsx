@@ -19,12 +19,19 @@ function AdminLayout() {
   const navigate = useNavigate();
   const routerState = useRouterState();
 
+  // Platform administrators must use two-factor authentication. This is only
+  // the friendly redirect: the API refuses every /super-admin request without it.
+  const needsTwoFactor =
+    session?.user?.role === "superAdmin" && !session.user.mustChangePassword && !session.user.twoFactorEnabled;
+
   useEffect(() => {
     if (isPending) return;
     if (!session?.user || session.user.role !== "superAdmin") {
       void navigate({ to: "/login", replace: true });
+    } else if (needsTwoFactor) {
+      void navigate({ to: "/two-factor-setup", search: { audience: "super-admin" }, replace: true });
     }
-  }, [session, isPending, navigate]);
+  }, [session, isPending, navigate, needsTwoFactor]);
 
   if (isPending) {
     return (
@@ -38,7 +45,7 @@ function AdminLayout() {
   }
 
   // While navigating away (unauthenticated), render nothing to avoid flash
-  if (!session?.user || session.user.role !== "superAdmin") {
+  if (!session?.user || session.user.role !== "superAdmin" || needsTwoFactor) {
     return null;
   }
 

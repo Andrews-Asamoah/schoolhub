@@ -9,7 +9,7 @@ import { PrismaService } from "../../prisma/prisma.service.js";
 import type { CreateExpenseInput, GenerateBillInput, RecordPaymentInput } from "@schoolhub/shared";
 import { Prisma, type AccountCategory, type AccountType, type AuditAction, type PaymentMethod, type TransactionCategory } from "@prisma/client";
 import { canManageAcademicContext } from "../../common/academic-context.js";
-import { createSequence, postingDateProblem, withSerializableRetry } from "./finance.helpers.js";
+import { createSequence, isIdempotencyRace, isSerializationFailure, postingDateProblem, withSerializableRetry } from "./finance.helpers.js";
 import { buildFinanceAuditWhere, categoryOf, clampPageSize, describeFinanceAudit, type FinanceAuditQuery } from "./finance-audit.helpers.js";
 
 const PAYE_MONTHLY_BANDS_2026 = [
@@ -816,6 +816,8 @@ export class FinanceService {
       code: string;
     },
   ) {
+    // Two payments arriving together for a school with no ledger yet must not both create "Cash on Hand".
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${schoolId}), hashtext('chart-accounts'))`;
     const existing = await tx.chartAccount.findFirst({
       where:
         spec.category === "CASH"
@@ -1021,13 +1023,15 @@ export class FinanceService {
     const year = new Date().getFullYear();
 
     return withSerializableRetry(() => this.prisma.client.$transaction(async (tx) => {
-      // Lock the bill and student rows so concurrent payments queue up here
-      // instead of both reading the same balance. Serializable isolation stays
-      // as the safety net; withSerializableRetry handles any remaining abort.
+      // This runs at READ COMMITTED on purpose. Every statement after a lock
+      // wait sees what the previous holder committed, so concurrent payments
+      // simply queue here (student row, then bill row, always in this order) and
+      // each one reads the up-to-date balance. Under SERIALIZABLE the snapshot is
+      // taken before the wait, so queued payments were aborted for no reason.
+      await tx.$executeRaw`SELECT id FROM students WHERE id = ${input.studentId} AND "schoolId" = ${schoolId} FOR UPDATE`;
       if (input.billId) {
         await tx.$executeRaw`SELECT id FROM bills WHERE id = ${input.billId} AND "schoolId" = ${schoolId} FOR UPDATE`;
       }
-      await tx.$executeRaw`SELECT id FROM students WHERE id = ${input.studentId} AND "schoolId" = ${schoolId} FOR UPDATE`;
 
       // Idempotency: a retried request (double click, flaky network) carrying the
       // same key returns the receipt already recorded instead of creating a second one.
@@ -1223,7 +1227,10 @@ export class FinanceService {
       });
 
       return payment;
-    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }), {
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted }), {
+      // Two requests with the same new idempotency key can both pass the replay check;
+      // the unique index stops the second, which then retries and returns the first receipt.
+      retryIf: (error) => isSerializationFailure(error) || isIdempotencyRace(error),
       onExhausted: () => new ConflictException("The system is busy recording other payments. Nothing was saved; please try again."),
     });
   }
@@ -1344,7 +1351,7 @@ export class FinanceService {
         newValues: { status: updated.status, kind: input.kind, reason: input.reason, reversalTransactionId },
       });
       return updated;
-    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }), {
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted }), {
       onExhausted: () => new ConflictException("The system is busy. Nothing was changed; please try again."),
     });
   }

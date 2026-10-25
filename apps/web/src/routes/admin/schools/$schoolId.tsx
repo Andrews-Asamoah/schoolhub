@@ -27,6 +27,7 @@ import {
 } from "@/components/credentials/credentials-dialog";
 import { SubscriptionBadge } from "@/components/superadmin/subscription-badge";
 import { SubscriptionDialog } from "@/components/superadmin/subscription-dialog";
+import { ResetTwoFactorButton } from "@/components/superadmin/reset-two-factor-button";
 
 export const Route = createFileRoute("/admin/schools/$schoolId")({
   component: SchoolDetailPage,
@@ -36,7 +37,7 @@ interface Member {
   id: string;
   role: string;
   banned: boolean;
-  user: { id: string; name: string; email: string; banned?: boolean };
+  user: { id: string; name: string; email: string; banned?: boolean; twoFactorEnabled?: boolean };
 }
 
 interface SchoolDetail {
@@ -498,11 +499,27 @@ function SchoolDetailPage() {
                         <div className="min-w-0">
                           <p className="text-sm font-semibold text-slate-900">{member.user.name}</p>
                           <p className="text-xs text-slate-500">{member.user.email}</p>
-                          <span className={`mt-2 inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold capitalize ${isActive ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700"}`}>
-                            {member.user.banned ? "Account banned" : member.banned ? "Banned for this school" : member.role}
-                          </span>
+                          <div className="mt-2 flex flex-wrap gap-1.5">
+                            <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold capitalize ${isActive ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700"}`}>
+                              {member.user.banned ? "Account banned" : member.banned ? "Banned for this school" : member.role}
+                            </span>
+                            <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${member.user.twoFactorEnabled ? "bg-success/10 text-success" : "bg-warning/10 text-warning"}`}>
+                              {member.user.twoFactorEnabled ? "2FA on" : "2FA off"}
+                            </span>
+                          </div>
                         </div>
                         <div className="flex flex-wrap gap-2">
+                          {member.user.twoFactorEnabled && (
+                            <ResetTwoFactorButton
+                              schoolId={schoolId}
+                              userId={member.user.id}
+                              name={member.user.name}
+                              onDone={() => {
+                                refreshSchoolData();
+                                setAdminMessage("Two-factor authentication was reset. The administrator must set it up again.");
+                              }}
+                            />
+                          )}
                           <button
                             type="button"
                             disabled={adminActionMutation.isPending || (isActive && lastActiveAdmin)}

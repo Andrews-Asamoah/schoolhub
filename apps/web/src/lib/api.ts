@@ -124,6 +124,16 @@ export async function apiFetch<T>(
       const reason = (body as { reason?: string }).reason ?? "EXPIRED";
       window.location.assign(`/subscription-inactive?reason=${encodeURIComponent(reason)}`);
     }
+    // A second factor is mandatory for this account but not set up yet.
+    if (
+      res.status === 403 &&
+      (body as { error?: string }).error === "TWO_FACTOR_REQUIRED" &&
+      typeof window !== "undefined" &&
+      window.location.pathname !== "/two-factor-setup"
+    ) {
+      const audience = (body as { audience?: string }).audience ?? "school-admin";
+      window.location.assign(`/two-factor-setup?audience=${encodeURIComponent(audience)}`);
+    }
     throw new ApiError(
       res.status,
       (body as { message?: string }).message ?? res.statusText,

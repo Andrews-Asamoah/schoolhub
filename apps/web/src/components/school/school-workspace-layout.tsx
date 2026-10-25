@@ -11,6 +11,7 @@ import {
 } from "@/components/school/school-organization";
 import { SchoolRoleSwitcher } from "@/components/school/school-role-switcher";
 import { ThemeToggle } from "@/components/school/theme-toggle";
+import { TwoFactorNudge } from "./two-factor-nudge";
 import { DashboardNotificationsMenu } from "@/components/school/dashboard/dashboard-notifications-menu";
 import {
   SidebarProvider,
@@ -146,6 +147,8 @@ export function SchoolWorkspaceLayout({
 
           {/* Main Dashboard Workspace Body */}
           <main className="mx-auto w-full max-w-[1500px] px-4 py-6 sm:px-6 sm:py-8 lg:px-8 lg:py-10">
+            <TwoFactorNudge />
+
             {organizationLoading && (
               <div className="mb-6 flex items-center gap-2.5 rounded-2xl border border-indigo-100 bg-indigo-50/50 px-4 py-3 text-xs font-medium text-indigo-900 shadow-sm dark:">
                 <LoaderCircle className="size-3.5 animate-spin text-primary" />

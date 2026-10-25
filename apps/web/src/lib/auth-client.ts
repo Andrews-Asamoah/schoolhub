@@ -17,6 +17,7 @@ import {
   adminClient,
   inferAdditionalFields,
   organizationClient,
+  twoFactorClient,
 } from "better-auth/client/plugins";
 
 export const authClient = createAuthClient({
@@ -25,9 +26,15 @@ export const authClient = createAuthClient({
   plugins: [
     organizationClient(),
     adminClient(),
+    // Authenticator-app (TOTP) sign-in and backup codes. Sign-in returns
+    // `twoFactorRedirect: true` instead of a session until the code is verified.
+    twoFactorClient(),
     // Server-set flag: true while the password is an admin-issued temporary one.
     inferAdditionalFields({
-      user: { mustChangePassword: { type: "boolean", required: false } },
+      user: {
+        mustChangePassword: { type: "boolean", required: false },
+        twoFactorEnabled: { type: "boolean", required: false },
+      },
     }),
   ],
 });

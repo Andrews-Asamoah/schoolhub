@@ -6,6 +6,7 @@ import {
   UnauthorizedException,
 } from "@nestjs/common";
 import { assertPasswordChangeNotPending } from "./password-change.js";
+import { assertTwoFactorEnabled } from "./two-factor.js";
 
 /**
  * SuperAdminGuard — allows only users with role === "superAdmin" to proceed.
@@ -32,6 +33,9 @@ export class SuperAdminGuard implements CanActivate {
         "Access denied: SuperAdmin privileges required",
       );
     }
+
+    // The most powerful account on the platform must use a second factor.
+    assertTwoFactorEnabled(user, "super-admin");
 
     return true;
   }

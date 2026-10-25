@@ -143,6 +143,7 @@ export class SuperAdminService {
           email: true,
           role: true,
           banned: true,
+          twoFactorEnabled: true,
           createdAt: true,
           members: {
             select: {
@@ -221,7 +222,7 @@ export class SuperAdminService {
           include: {
             members: {
               include: {
-                user: { select: { id: true, name: true, email: true, banned: true } },
+                user: { select: { id: true, name: true, email: true, banned: true, twoFactorEnabled: true } },
               },
             },
           },
@@ -530,6 +531,34 @@ export class SuperAdminService {
       },
       { isolationLevel: "Serializable" },
     );
+    return { success: true };
+  }
+
+  /**
+   * Recovery for a school administrator who lost both their authenticator and
+   * their backup codes. Removes the second factor and ends every session, so
+   * the administrator must sign in again (password only) and set it up afresh.
+   * Audited; only reachable by a (two-factor-protected) platform super admin.
+   */
+  async resetSchoolAdminTwoFactor(id: string, userId: string, actor: AuditActor) {
+    const member = await this.findSchoolAdminMembership(id, userId);
+    await this.prisma.client.$transaction(async (tx) => {
+      const user = await tx.user.findUnique({
+        where: { id: userId },
+        select: { twoFactorEnabled: true },
+      });
+      await tx.twoFactor.deleteMany({ where: { userId } });
+      await tx.user.update({ where: { id: userId }, data: { twoFactorEnabled: false } });
+      await tx.session.deleteMany({ where: { userId } });
+      await writeAudit(tx, actor, {
+        action: "ACCESS_CHANGED",
+        entityType: "super-admin.school-admin.reset-two-factor",
+        entityId: userId,
+        schoolId: id,
+        oldValues: { twoFactorEnabled: user?.twoFactorEnabled ?? false, role: member.role },
+        newValues: { twoFactorEnabled: false },
+      });
+    });
     return { success: true };
   }
 

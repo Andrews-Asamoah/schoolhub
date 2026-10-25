@@ -6,6 +6,7 @@ import { FormField, FormInput, FormTextarea } from "@/components/forms/form-cont
 import { ProfilePhotoControls } from "@/components/school/profile-photo-controls";
 import { schoolRoleLabel, useSchoolRole } from "@/components/school/school-role-switcher";
 import { apiFetch } from "@/lib/api";
+import { TwoFactorPanel } from "@/components/auth/two-factor-panel";
 import { useSession } from "@/lib/auth-client";
 
 interface ProfileDetails {
@@ -189,6 +190,17 @@ function ProfileForm({ data }: { data: ProfileResponse }) {
           {save.error && <p role="alert" className="text-xs text-rose-700">{save.error.message}</p>}
         </div>
       </form>
+
+      {/* Students and guardians sign in with simple credentials; staff accounts can add a second step. */}
+      {!["student", "guardian", "parent"].includes(activeRole ?? "") && (
+        <section className={card} aria-labelledby="profile-security-heading">
+          <h2 id="profile-security-heading" className="text-sm font-semibold text-slate-900 dark:text-slate-100">Two-factor authentication</h2>
+          <p className="mb-4 mt-1 text-xs text-slate-500">
+            Add a second step when you sign in: a 6-digit code from an authenticator app on your phone.
+          </p>
+          <TwoFactorPanel />
+        </section>
+      )}
     </div>
   );
 }

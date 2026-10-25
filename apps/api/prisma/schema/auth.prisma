@@ -21,10 +21,14 @@ model user {
   // the owner of the account picks a new one.
   mustChangePassword Boolean   @default(false)
   passwordChangedAt  DateTime?
+  // Two-factor authentication (Better Auth twoFactor plugin). True only after
+  // the user has proved they can generate a code from their authenticator.
+  twoFactorEnabled   Boolean   @default(false)
 
   // Relations
   accounts             account[]
   sessions             session[]
+  twoFactors           twoFactor[]
   invitations          invitation[]
   members              member[]
   attendancesMarked    Attendance[]           @relation("AttendanceMarkedBy")
@@ -51,6 +55,24 @@ model user {
   @@index([email])
   @@index([role])
   @@map("users")
+}
+
+/// One row per user: the encrypted TOTP secret and hashed-at-rest backup codes
+/// (both encrypted with BETTER_AUTH_SECRET by the plugin). Never selected by the API.
+model twoFactor {
+  id                      String    @id
+  secret                  String
+  backupCodes             String
+  userId                  String
+  verified                Boolean   @default(true)
+  failedVerificationCount Int       @default(0)
+  lockedUntil             DateTime?
+
+  user user @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([secret])
+  @@index([userId])
+  @@map("two_factors")
 }
 
 model session {

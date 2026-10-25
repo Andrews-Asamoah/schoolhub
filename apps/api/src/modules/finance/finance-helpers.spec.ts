@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { createSequence, isSerializationFailure, withSerializableRetry } from "./finance.helpers.js";
+import { createSequence, isIdempotencyRace, isSerializationFailure, withSerializableRetry } from "./finance.helpers.js";
 
 describe("createSequence", () => {
   it("starts at 00001 for a new prefix", () => {
@@ -79,5 +79,27 @@ describe("postingDateProblem", () => {
     expect(postingDateProblem(day("2026-09-30"), locked, now)).toMatch(/closed through 2026-09-30/);
     expect(postingDateProblem(day("2026-08-15"), locked, now)).toMatch(/closed/);
     expect(postingDateProblem(day("2026-10-01"), locked, now)).toBeNull();
+  });
+});
+
+describe("isIdempotencyRace", () => {
+  it("matches only unique violations on the idempotency key", () => {
+    expect(isIdempotencyRace({ code: "P2002", meta: { target: ["schoolId", "idempotencyKey"] } })).toBe(true);
+    expect(isIdempotencyRace({ code: "P2002", meta: { target: "payments_schoolId_idempotencyKey_key" } })).toBe(true);
+    expect(isIdempotencyRace({ code: "P2002", meta: { target: ["paymentNumber", "schoolId"] } })).toBe(false);
+    expect(isIdempotencyRace({ code: "P2034" })).toBe(false);
+  });
+  it("withSerializableRetry honours a custom retry rule", async () => {
+    let calls = 0;
+    const result = await withSerializableRetry(
+      async () => {
+        calls += 1;
+        if (calls === 1) throw { code: "P2002", meta: { target: ["idempotencyKey"] } };
+        return "ok";
+      },
+      { baseDelayMs: 1, retryIf: isIdempotencyRace },
+    );
+    expect(result).toBe("ok");
+    expect(calls).toBe(2);
   });
 });

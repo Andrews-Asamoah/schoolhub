@@ -25,7 +25,9 @@
     "migrate": "prisma migrate dev",
     "studio": "prisma studio",
     "seed": "node --import tsx/esm prisma/seed.ts",
-    "finance:reset-payments": "node --import tsx/esm scripts/reset-dev-payments.ts"
+    "finance:reset-payments": "node --import tsx/esm scripts/reset-dev-payments.ts",
+    "test:e2e:2fa": "vitest run --config vitest.config.e2e.ts test/two-factor.e2e-spec.ts",
+    "reset-2fa": "node --import tsx/esm prisma/reset-two-factor.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1152.0",

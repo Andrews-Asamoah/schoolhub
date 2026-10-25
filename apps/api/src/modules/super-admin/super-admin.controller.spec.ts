@@ -36,7 +36,7 @@ describe("SuperAdminController (HTTP)", () => {
   });
 
   const asSuperAdmin = () => {
-    sessionUser = { id: "sa1", role: "superAdmin" };
+    sessionUser = { id: "sa1", role: "superAdmin", twoFactorEnabled: true };
   };
 
   it("401 for anonymous, 403 for school owners and admins", async () => {
@@ -48,6 +48,16 @@ describe("SuperAdminController (HTTP)", () => {
     await request(app.getHttpServer()).get("/super-admin/audit-logs").expect(403);
     expect(service.getPlatformStats).not.toHaveBeenCalled();
     expect(service.listAuditLogs).not.toHaveBeenCalled();
+  });
+
+  it("rejects a super admin who has not enrolled in two-factor, on every route", async () => {
+    sessionUser = { id: "sa1", role: "superAdmin", twoFactorEnabled: false };
+    const http = request(app.getHttpServer());
+    const res = await http.get("/super-admin/stats").expect(403);
+    expect(res.body.error).toBe("TWO_FACTOR_REQUIRED");
+    await http.post("/super-admin/schools/s1/admins/u1/reset-two-factor").send({}).expect(403);
+    await http.patch("/super-admin/schools/s1/subscription").send({ status: "ACTIVE" }).expect(403);
+    expect(service.getPlatformStats).not.toHaveBeenCalled();
   });
 
   it("every route is protected, including writes", async () => {
@@ -101,7 +111,7 @@ describe("SuperAdminController write throttling", () => {
     }).compile();
     const app = moduleRef.createNestApplication();
     app.use((req: any, _res: unknown, next: () => void) => {
-      req.session = { user: { id: "sa1", role: "superAdmin" } };
+      req.session = { user: { id: "sa1", role: "superAdmin", twoFactorEnabled: true } };
       next();
     });
     await app.init();

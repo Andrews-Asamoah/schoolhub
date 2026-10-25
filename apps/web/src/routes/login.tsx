@@ -16,6 +16,7 @@ import { apiFetch, getClientSubdomain } from "@/lib/api";
 import { ThemeToggle } from "@/components/school/theme-toggle";
 import { consumeLogoutNotice } from "@/hooks/use-logout";
 import { signIn, useSession } from "@/lib/auth-client";
+import { TwoFactorChallenge } from "@/components/auth/two-factor-challenge";
 
 export const Route = createFileRoute("/login")({
   component: LoginPage,
@@ -42,6 +43,8 @@ function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [logoutNotice, setLogoutNotice] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  // True once the password was accepted but a second factor is still required.
+  const [needsTwoFactor, setNeedsTwoFactor] = useState(false);
 
   // Fetch school branding dynamically if a tenant subdomain is active
   const { data: tenantData } = useQuery({
@@ -82,6 +85,16 @@ function LoginPage() {
     );
   }
 
+  async function finishSignIn(user: { role?: string | null; mustChangePassword?: boolean | null } | undefined) {
+    if (user?.mustChangePassword) {
+      await navigate({ to: "/change-password", replace: true });
+    } else if (user?.role === "superAdmin") {
+      await navigate({ to: "/admin/dashboard", replace: true });
+    } else {
+      await navigate({ to: "/dashboard", replace: true });
+    }
+  }
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
@@ -109,13 +122,15 @@ function LoginPage() {
         return;
       }
 
-      if (result.data?.user?.mustChangePassword) {
-        await navigate({ to: "/change-password", replace: true });
-      } else if (result.data?.user?.role === "superAdmin") {
-        await navigate({ to: "/admin/dashboard", replace: true });
-      } else {
-        await navigate({ to: "/dashboard", replace: true });
+      // The password was right but this account uses two-factor authentication:
+      // no session exists yet, so ask for the code instead of navigating.
+      if ((result.data as { twoFactorRedirect?: boolean } | null)?.twoFactorRedirect) {
+        setNeedsTwoFactor(true);
+        setPassword("");
+        return;
       }
+
+      await finishSignIn(result.data?.user);
     } catch {
       setError("We couldn’t connect. Check your internet connection and try again.");
     } finally {
@@ -252,6 +267,13 @@ function LoginPage() {
             </span>
           </div>
 
+          {needsTwoFactor ? (
+            <TwoFactorChallenge
+              onVerified={finishSignIn}
+              onCancel={() => { setNeedsTwoFactor(false); setError(null); }}
+            />
+          ) : (
+            <>
           <div className="mb-8">
             <p className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-blue-600 dark:text-blue-400">
               Welcome back
@@ -360,6 +382,8 @@ function LoginPage() {
               )}
             </button>
           </form>
+            </>
+          )}
 
           <div className="mt-7 flex items-center justify-center gap-2 text-[11px] text-slate-400">
             <LockKeyhole className="size-3.5" />

@@ -17,6 +17,7 @@ import { Route as ChangePasswordRouteImport } from './routes/change-password'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as SubscriptionInactiveRouteImport } from './routes/subscription-inactive'
+import { Route as TwoFactorSetupRouteImport } from './routes/two-factor-setup'
 import { Route as AdminIndexRouteImport } from './routes/admin/index'
 import { Route as AdminDashboardRouteImport } from './routes/admin/dashboard'
 import { Route as AdminProfileRouteImport } from './routes/admin/profile'
@@ -66,6 +67,11 @@ const LoginRoute = LoginRouteImport.update({
 const SubscriptionInactiveRoute = SubscriptionInactiveRouteImport.update({
   id: '/subscription-inactive',
   path: '/subscription-inactive',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TwoFactorSetupRoute = TwoFactorSetupRouteImport.update({
+  id: '/two-factor-setup',
+  path: '/two-factor-setup',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminIndexRoute = AdminIndexRouteImport.update({
@@ -128,6 +134,7 @@ export interface FileRoutesByFullPath {
   '/dashboard': typeof DashboardRoute
   '/login': typeof LoginRoute
   '/subscription-inactive': typeof SubscriptionInactiveRoute
+  '/two-factor-setup': typeof TwoFactorSetupRoute
   '/admin/dashboard': typeof AdminDashboardRoute
   '/admin/profile': typeof AdminProfileRoute
   '/admin/support': typeof AdminSupportRoute
@@ -147,6 +154,7 @@ export interface FileRoutesByTo {
   '/dashboard': typeof DashboardRoute
   '/login': typeof LoginRoute
   '/subscription-inactive': typeof SubscriptionInactiveRoute
+  '/two-factor-setup': typeof TwoFactorSetupRoute
   '/admin/dashboard': typeof AdminDashboardRoute
   '/admin/profile': typeof AdminProfileRoute
   '/admin/support': typeof AdminSupportRoute
@@ -168,6 +176,7 @@ export interface FileRoutesById {
   '/dashboard': typeof DashboardRoute
   '/login': typeof LoginRoute
   '/subscription-inactive': typeof SubscriptionInactiveRoute
+  '/two-factor-setup': typeof TwoFactorSetupRoute
   '/admin/dashboard': typeof AdminDashboardRoute
   '/admin/profile': typeof AdminProfileRoute
   '/admin/support': typeof AdminSupportRoute
@@ -190,6 +199,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/login'
     | '/subscription-inactive'
+    | '/two-factor-setup'
     | '/admin/dashboard'
     | '/admin/profile'
     | '/admin/support'
@@ -209,6 +219,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/login'
     | '/subscription-inactive'
+    | '/two-factor-setup'
     | '/admin/dashboard'
     | '/admin/profile'
     | '/admin/support'
@@ -229,6 +240,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/login'
     | '/subscription-inactive'
+    | '/two-factor-setup'
     | '/admin/dashboard'
     | '/admin/profile'
     | '/admin/support'
@@ -250,6 +262,7 @@ export interface RootRouteChildren {
   DashboardRoute: typeof DashboardRoute
   LoginRoute: typeof LoginRoute
   SubscriptionInactiveRoute: typeof SubscriptionInactiveRoute
+  TwoFactorSetupRoute: typeof TwoFactorSetupRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -308,6 +321,13 @@ declare module '@tanstack/react-router' {
       path: '/subscription-inactive'
       fullPath: '/subscription-inactive'
       preLoaderRoute: typeof SubscriptionInactiveRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/two-factor-setup': {
+      id: '/two-factor-setup'
+      path: '/two-factor-setup'
+      fullPath: '/two-factor-setup'
+      preLoaderRoute: typeof TwoFactorSetupRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin/': {
@@ -422,6 +442,7 @@ const rootRouteChildren: RootRouteChildren = {
   DashboardRoute: DashboardRoute,
   LoginRoute: LoginRoute,
   SubscriptionInactiveRoute: SubscriptionInactiveRoute,
+  TwoFactorSetupRoute: TwoFactorSetupRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

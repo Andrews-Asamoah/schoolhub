@@ -13,6 +13,11 @@ import { PrismaService } from "../../prisma/prisma.service.js";
 import { actorFromRequest, writeAudit } from "../audit/audit.js";
 import { ALLOW_INACTIVE_SUBSCRIPTION } from "../decorators/allow-inactive-subscription.decorator.js";
 import { assertPasswordChangeNotPending } from "./password-change.js";
+import {
+  assertTwoFactorEnabled,
+  hasSchoolAdminRole,
+  schoolAdminTwoFactorRequired,
+} from "./two-factor.js";
 
 /** A superAdmin entering a school is audited at most once per window, not per request. */
 const ACCESS_AUDIT_WINDOW_MS = 15 * 60 * 1000;
@@ -165,6 +170,12 @@ export class SchoolTenantGuard implements CanActivate {
         );
       }
       request.schoolRole = activeRole;
+
+      // Judge by every role the account holds, not the one requested in the
+      // header, so an admin cannot skip two-factor by asking to act as a teacher.
+      if (schoolAdminTwoFactorRequired() && hasSchoolAdminRole(availableRoles)) {
+        assertTwoFactorEnabled(user, "school-admin");
+      }
     }
 
     // Load school details (plus the subscription fields used for access control)

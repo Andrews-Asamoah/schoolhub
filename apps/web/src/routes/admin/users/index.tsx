@@ -21,6 +21,7 @@ interface PlatformUser {
   email: string;
   role: string;
   banned: boolean;
+  twoFactorEnabled?: boolean;
   createdAt: string;
   members: {
     role: string;
@@ -125,6 +126,16 @@ function SystemUsersPage() {
       cell: (user) => (
         <span className={cn("rounded-full px-2.5 py-1 text-xs font-medium", user.banned ? "bg-destructive/10 text-destructive" : "bg-success/10 text-success")}>
           {user.banned ? "Suspended" : "Active"}
+        </span>
+      ),
+    },
+    {
+      id: "twoFactor",
+      header: "2FA",
+      value: (user) => (user.twoFactorEnabled ? "On" : "Off"),
+      cell: (user) => (
+        <span className={cn("rounded-full px-2.5 py-1 text-xs font-medium", user.twoFactorEnabled ? "bg-success/10 text-success" : "bg-muted text-muted-foreground")}>
+          {user.twoFactorEnabled ? "On" : "Off"}
         </span>
       ),
     },

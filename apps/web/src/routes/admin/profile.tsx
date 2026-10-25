@@ -7,6 +7,7 @@ import { ApiError, apiFetch } from "@/lib/api";
 import { authClient, useSession } from "@/lib/auth-client";
 import { formatDateTime } from "@/lib/subscription";
 import { cn } from "@/lib/utils";
+import { TwoFactorPanel } from "@/components/auth/two-factor-panel";
 import { PageHeader } from "@/components/superadmin/page-header";
 import { ErrorPanel, LoadingPanel } from "@/components/superadmin/state-panels";
 
@@ -203,11 +204,8 @@ function AccountSecurityPage() {
 
       <SessionsCard currentToken={session?.session?.token} />
 
-      <Card title="Two-factor authentication" description="An extra sign-in step that protects the most powerful account on the platform.">
-        <p className="flex items-start gap-2 text-sm text-muted-foreground">
-          <CircleAlert className="mt-0.5 size-4 shrink-0 text-warning" />
-          Not available yet. Until it is, use a long unique password from a password manager and sign out on shared devices.
-        </p>
+      <Card title="Two-factor authentication" description="Required for platform administrators. Signing in needs your password and a code from your authenticator app.">
+        <TwoFactorPanel required />
       </Card>
     </div>
   );

@@ -13,6 +13,11 @@ export const env = z
     TRUST_PROXY: z.string().optional(),
     // API docs are off in production unless explicitly enabled.
     SWAGGER_ENABLED: z.enum(["true", "false"]).optional(),
+    // Make two-factor authentication mandatory for school owners/admins too.
+    // (Super-admins always need it.)
+    REQUIRE_2FA_SCHOOL_ADMINS: z.enum(["true", "false"]).optional(),
+    // Name shown in the authenticator app next to the account.
+    TWO_FACTOR_ISSUER: z.string().min(1).max(40).optional(),
 
     // Cloudflare R2 object storage (optional: uploads return 503 when unset).
     R2_ACCOUNT_ID: z.string().optional(),
