@@ -588,6 +588,19 @@ export class FinanceController {
     return this.sendFinanceExport(response, await this.financeExports.studentStatementPdf(context, studentId), "inline");
   }
 
+  @Get("payslips/:payslipId.pdf")
+  @Roles(...FINANCE_PAYROLL_EXPORT_ROLES)
+  async exportSinglePayslipPdf(
+    @CurrentSchool() school: School,
+    @CurrentUser() user: AuthenticatedUser,
+    @Req() request: Request,
+    @Res() response: Response,
+    @Param("payslipId") payslipId: string,
+  ) {
+    const context = this.financeExportContext(school, user, request);
+    return this.sendFinanceExport(response, await this.financeExports.payslipPdf(context, payslipId), "inline");
+  }
+
   @Get("payroll/:recordId/payslips.pdf")
   @Roles(...FINANCE_PAYROLL_EXPORT_ROLES)
   async exportPayrollPdf(
