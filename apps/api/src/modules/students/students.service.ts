@@ -4,6 +4,7 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { PrismaService } from '../../prisma/prisma.service.js';
@@ -18,6 +19,7 @@ import {
 } from '@schoolhub/shared';
 import type { Prisma, School, StudentStatus } from '@prisma/client';
 import { canManageAcademicContext } from '../../common/academic-context.js';
+import { FinanceService } from '../finance/finance.service.js';
 import {
   CredentialsService,
   toIssuedCredentials,
@@ -30,6 +32,7 @@ export class StudentsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly credentials: CredentialsService,
+    @Optional() private readonly financeService?: FinanceService,
   ) {}
 
   async listStudents(
@@ -1014,6 +1017,28 @@ export class StudentsService {
     });
     if (!link) throw new NotFoundException('Student not found');
     return this.profileView(schoolId, studentId, { viewerGuardianId: guardian.id });
+  }
+
+  /** Fees statement for a linked ward only. The guardian link is checked here, not trusted from the route. */
+  async getMyWardFees(
+    schoolId: string,
+    userId: string,
+    studentId: string,
+    query: { scope?: 'term' | 'year' | 'all'; from?: string; to?: string; yearId?: string; termId?: string } = {},
+  ) {
+    const guardian = await this.requireGuardian(schoolId, userId);
+    const link = await this.prisma.client.guardianStudent.findFirst({
+      where: {
+        guardianId: guardian.id,
+        studentId,
+        guardian: { schoolId, deletedAt: null, isActive: true },
+        student: { schoolId, deletedAt: null },
+      },
+      select: { id: true },
+    });
+    if (!link) throw new NotFoundException('Student not found');
+    if (!this.financeService) throw new NotFoundException('Fee statements are temporarily unavailable.');
+    return this.financeService.getStudentStatement(schoolId, studentId, 'guardian', query, true);
   }
 
   /** The signed-in student's own profile (shows their username and login email). */
