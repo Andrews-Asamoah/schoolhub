@@ -71,7 +71,12 @@ function personName(payslip: Payslip) {
   return name || (payslip.teacherId ? payslip.teacher?.teacherId : payslip.staff?.staffId) || "Unlinked employee";
 }
 function downloadCsv(rows: unknown[][], filename: string) {
-  const csv = rows.map(row => row.map(value => '"' + String(value ?? "").replaceAll('"', '""') + '"').join(",")).join("\r\n");
+  const csv = rows.map(row => row.map(value => {
+    let field = String(value ?? "");
+    // Employee names and references are untrusted text when opened in spreadsheets.
+    if (/^[\t\r\n ]*[=+\-@]/.test(field)) field = "'" + field;
+    return '"' + field.replaceAll('"', '""') + '"';
+  }).join(",")).join("\r\n");
   const url = URL.createObjectURL(new Blob(["\uFEFF", csv], { type: "text/csv;charset=utf-8;" }));
   const link = document.createElement("a");
   link.href = url; link.download = filename; document.body.appendChild(link); link.click(); link.remove(); URL.revokeObjectURL(url);
