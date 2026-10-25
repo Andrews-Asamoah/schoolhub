@@ -684,13 +684,9 @@ export class FinanceService {
     if (!currentYear || !currentTerm) {
       throw new BadRequestException("This school has not selected a current academic year and term.");
     }
-    if (
-      input.academicYearId !== currentYear.id ||
-      (input.termId && input.termId !== currentTerm.id)
-    ) {
+    if (input.academicYearId !== currentYear.id || (input.termId && input.termId !== currentTerm.id)) {
       throw new BadRequestException("Bills can only be generated for the currently selected academic year and term.");
     }
-
     if (input.classId) {
       const schoolClass = await this.prisma.client.class.findFirst({
         where: { id: input.classId, schoolId, deletedAt: null },
@@ -699,8 +695,6 @@ export class FinanceService {
       if (!schoolClass) throw new NotFoundException("Class not found in this school.");
     }
 
-    // Target students: either a single currently enrolled student or all
-    // currently enrolled students in the selected class.
     let studentIds: string[] = [];
     if (input.studentId) {
       const enrollment = await this.prisma.client.enrollment.findFirst({
@@ -713,9 +707,7 @@ export class FinanceService {
         },
         select: { studentId: true },
       });
-      if (!enrollment) {
-        throw new BadRequestException("The selected student is not enrolled in the current term.");
-      }
+      if (!enrollment) throw new BadRequestException("The selected student is not enrolled in the current term.");
       studentIds = [enrollment.studentId];
     } else if (input.classId) {
       const students = await this.prisma.client.enrollment.findMany({
@@ -732,21 +724,11 @@ export class FinanceService {
     } else {
       throw new BadRequestException("Either classId or studentId must be provided");
     }
-    if (studentIds.length === 0) {
-      return { success: true, count: 0, message: "No active students to bill" };
-    }
-    // Always touch students in the same order, so two bill runs over the same class can never deadlock.
+    if (studentIds.length === 0) return { success: true, count: 0, totalBilled: "0.00", message: "No active students to bill" };
     studentIds.sort();
 
-    const year = new Date().getFullYear();
+    const year = new Date().getUTCFullYear();
     const billingResult = await withSerializableRetry(() => this.prisma.client.$transaction(async (tx) => {
-      // Runs at READ COMMITTED: the statements after this lock wait see what the
-      // previous holder committed, so a repeated or overlapping run skips students
-      // that were just billed. (Under SERIALIZABLE the snapshot is taken before the
-      // wait, which made overlapping runs for different structures fail with "busy".)
-      // Editing a structure and generating bills share this lock. The template
-      // and fee items are re-read after acquiring it, so bills always snapshot
-      // one consistent version of the structure.
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${schoolId}), hashtext(${input.feeStructureId}))`;
       const feeStructure = await tx.feeStructure.findFirst({
         where: { id: input.feeStructureId, schoolId, isActive: true },
@@ -754,6 +736,17 @@ export class FinanceService {
       });
       if (!feeStructure) throw new NotFoundException("Fee structure not found.");
       if (!feeStructure.items.length) throw new BadRequestException("Fee structure contains no billable items.");
+
+      const optionalIds = new Set(input.optionalItemIds ?? []);
+      const optionalItems = feeStructure.items.filter((item) => item.isOptional);
+      const optionalItemsById = new Map(optionalItems.map((item) => [item.id, item]));
+      for (const optionalId of optionalIds) {
+        if (!optionalItemsById.has(optionalId)) {
+          throw new BadRequestException("Every optionalItemId must identify an optional item in this fee structure.");
+        }
+      }
+      const billableItems = feeStructure.items.filter((item) => !item.isOptional || optionalIds.has(item.id));
+      if (billableItems.length === 0) throw new BadRequestException("Select at least one fee item to generate this bill.");
       if (
         input.classId &&
         feeStructure.targetClasses.length > 0 &&
@@ -763,18 +756,36 @@ export class FinanceService {
       }
 
       const billNumbers = await this.createNumberSequence(tx, schoolId, "bill", `INV-${year}-`);
-      const totalAmount = feeStructure.items.reduce((sum, item) => sum + Number(item.amount), 0);
-      const results = [];
+      const totalAmount = billableItems.reduce((sum, item) => sum.plus(item.amount), new Prisma.Decimal(0));
+      const previousBills = await tx.bill.findMany({
+        where: {
+          schoolId,
+          studentId: { in: studentIds },
+          balanceAmount: { gt: new Prisma.Decimal(0) },
+          status: { notIn: ["CANCELLED", "WAIVED"] },
+        },
+        orderBy: [{ issuedAt: "asc" }, { id: "asc" }],
+        include: {
+          academicYear: { select: { id: true, name: true, startDate: true } },
+          term: { select: { id: true, name: true, startDate: true } },
+        },
+      });
+      const carryForwardsByStudent = new Map<string, typeof previousBills>();
+      for (const previousBill of previousBills) {
+        if (previousBill.academicYearId === currentYear.id && previousBill.termId === currentTerm.id) continue;
+        const termStart = previousBill.term?.startDate ?? previousBill.academicYear.startDate;
+        if (termStart >= currentTerm.startDate) continue;
+        const list = carryForwardsByStudent.get(previousBill.studentId) ?? [];
+        list.push(previousBill);
+        carryForwardsByStudent.set(previousBill.studentId, list);
+      }
+
+      const results: Array<{ id: string; billNumber: string; totalAmount: Prisma.Decimal }> = [];
       for (const studentId of studentIds) {
-        // Avoid issuing the same fee structure twice for a student in the same term.
         const existingBill = await tx.bill.findFirst({
           where: {
-            schoolId,
-            studentId,
-            academicYearId: currentYear.id,
-            termId: currentTerm.id,
-            feeStructureId: input.feeStructureId,
-            status: { notIn: ["CANCELLED", "WAIVED"] },
+            schoolId, studentId, academicYearId: currentYear.id, termId: currentTerm.id,
+            feeStructureId: input.feeStructureId, status: { notIn: ["CANCELLED", "WAIVED"] },
           },
           select: { id: true },
         });
@@ -783,26 +794,28 @@ export class FinanceService {
         const concessions = await this.calculateStudentConcessions(
           tx, schoolId, studentId, currentYear.id, currentTerm.id, totalAmount,
         );
-        const netTotal = roundMoney(Math.max(0, totalAmount - concessions.totalDiscount));
-        let allocatedDiscount = 0;
-        const billItems = feeStructure.items.map((item, index) => {
-          const grossLine = Number(item.amount);
-          const lineDiscount = index === feeStructure.items.length - 1
-            ? roundMoney(concessions.totalDiscount - allocatedDiscount)
-            : roundMoney(concessions.totalDiscount * grossLine / (totalAmount || 1));
-          allocatedDiscount = roundMoney(allocatedDiscount + lineDiscount);
-          const netLine = roundMoney(Math.max(0, grossLine - lineDiscount));
+        const round = (value: Prisma.Decimal) => value.toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP);
+        const netTotal = Prisma.Decimal.max(0, round(totalAmount.minus(concessions.totalDiscount)));
+        let allocatedDiscount = new Prisma.Decimal(0);
+        const billItems = billableItems.map((item, index) => {
+          const grossLine = item.amount;
+          const lineDiscount = index === billableItems.length - 1
+            ? round(concessions.totalDiscount.minus(allocatedDiscount))
+            : round(concessions.totalDiscount.mul(grossLine).div(totalAmount.eq(0) ? 1 : totalAmount));
+          allocatedDiscount = allocatedDiscount.plus(lineDiscount);
+          const netLine = Prisma.Decimal.max(0, round(grossLine.minus(lineDiscount)));
           return {
             feeItemId: item.id,
             description: item.name,
-            amount: new Prisma.Decimal(grossLine),
+            amount: grossLine,
             quantity: 1,
-            totalAmount: new Prisma.Decimal(grossLine),
-            discountAmount: new Prisma.Decimal(lineDiscount),
-            balanceAmount: new Prisma.Decimal(netLine),
-            status: netLine === 0 ? "FULLY_PAID" as const : "UNPAID" as const,
+            totalAmount: grossLine,
+            discountAmount: lineDiscount,
+            balanceAmount: netLine,
+            status: netLine.eq(0) ? "FULLY_PAID" as const : "UNPAID" as const,
           };
         });
+
         const billNumber = billNumbers.next();
         const bill = await tx.bill.create({
           data: {
@@ -813,12 +826,12 @@ export class FinanceService {
             feeStructureId: input.feeStructureId,
             classId: input.classId,
             billNumber,
-            grossAmount: new Prisma.Decimal(totalAmount),
-            discountAmount: new Prisma.Decimal(concessions.totalDiscount),
-            totalAmount: new Prisma.Decimal(netTotal),
+            grossAmount: totalAmount,
+            discountAmount: concessions.totalDiscount,
+            totalAmount: netTotal,
             paidAmount: new Prisma.Decimal(0),
-            balanceAmount: new Prisma.Decimal(netTotal),
-            status: netTotal === 0 ? "PAID" : "PENDING",
+            balanceAmount: netTotal,
+            status: netTotal.eq(0) ? "PAID" : "PENDING",
             dueDate: input.dueDate ? new Date(input.dueDate) : undefined,
             notes: input.notes,
             items: { create: billItems },
@@ -826,19 +839,32 @@ export class FinanceService {
               create: concessions.details.map((detail) => ({
                 type: detail.type,
                 label: detail.label,
-                amount: new Prisma.Decimal(detail.amount),
+                amount: detail.amount,
                 siblingDiscountPolicyId: detail.policyId,
                 studentScholarshipId: detail.scholarshipId,
               })),
             },
+            // Snapshot only. These rows describe earlier debts, never add them to totalAmount.
+            carryForwards: {
+              create: (carryForwardsByStudent.get(studentId) ?? []).map((previous) => ({
+                schoolId,
+                sourceBillId: previous.id,
+                sourceBillNumber: previous.billNumber,
+                sourceAcademicYearName: previous.academicYear.name,
+                sourceTermName: previous.term?.name ?? null,
+                amount: previous.balanceAmount,
+              })),
+            },
           },
+          select: { id: true, billNumber: true, totalAmount: true },
         });
         await tx.student.update({
           where: { id: studentId },
-          data: { outstandingBalance: { increment: new Prisma.Decimal(netTotal) } },
+          data: { outstandingBalance: { increment: netTotal } },
         });
         results.push(bill);
       }
+
       await this.writeAudit(tx, {
         actorId,
         schoolId,
@@ -852,9 +878,11 @@ export class FinanceService {
           classId: input.classId ?? null,
           studentId: input.studentId ?? null,
           termId: currentTerm.id,
+          optionalItemIds: [...optionalIds],
+          totalBilled: results.reduce((sum, bill) => sum.plus(bill.totalAmount), new Prisma.Decimal(0)).toFixed(2),
         },
       });
-      return { bills: results, totalAmount };
+      return { bills: results };
     }, { isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted }), {
       onExhausted: () => new ConflictException("The system is busy generating other bills. Please try again in a moment."),
     });
@@ -862,205 +890,8 @@ export class FinanceService {
     return {
       success: true,
       count: billingResult.bills.length,
-      totalBilled: roundMoney(billingResult.bills.reduce((sum, bill) => sum + Number(bill.totalAmount), 0)),
+      totalBilled: billingResult.bills.reduce((sum, bill) => sum.plus(bill.totalAmount), new Prisma.Decimal(0)).toFixed(2),
     };
-  }
-
-  /**
-   * Find (or lazily create) a ledger account. Schools start with an empty
-   * chart of accounts, so system postings provision what they need.
-   */
-  private async ensureAccount(
-    tx: Prisma.TransactionClient,
-    schoolId: string,
-    spec: {
-      accountType: AccountType;
-      category: AccountCategory;
-      name: string;
-      code: string;
-    },
-  ) {
-    // Two payments arriving together for a school with no ledger yet must not both create "Cash on Hand".
-    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${schoolId}), hashtext('chart-accounts'))`;
-    const existing = await tx.chartAccount.findFirst({
-      where:
-        spec.category === "CASH"
-          ? { schoolId, accountType: spec.accountType, category: spec.category, isActive: true }
-          : { schoolId, accountType: spec.accountType, category: spec.category, name: spec.name },
-      orderBy: { code: "asc" },
-    });
-    if (existing) return existing;
-    // The school may already use our preferred code for something else.
-    for (const code of [spec.code, `${spec.code}-1`, `${spec.code}-2`, `${spec.code}-3`]) {
-      const taken = await tx.chartAccount.findUnique({
-        where: { code_schoolId: { code, schoolId } },
-        select: { id: true },
-      });
-      if (!taken) {
-        return tx.chartAccount.create({
-          data: {
-            schoolId,
-            code,
-            name: spec.name,
-            accountType: spec.accountType,
-            category: spec.category,
-          },
-        });
-      }
-    }
-    throw new BadRequestException(
-      `Could not create the “${spec.name}” account: its code is already in use. Create it manually in the chart of accounts.`,
-    );
-  }
-
-  /**
-   * Post cash received as school income (double entry: debit cash on hand,
-   * credit a revenue account) and raise both account balances. Runs inside the
-   * caller's transaction so the income and the business record it relates to
-   * (e.g. an admission-fee receipt) are saved - or rolled back - together.
-   */
-  async postIncome(
-    tx: Prisma.TransactionClient,
-    input: {
-      schoolId: string;
-      amount: Prisma.Decimal;
-      date: Date;
-      description: string;
-      category: TransactionCategory;
-      revenueAccount: { name: string; code: string };
-      /** Defaults to OTHER_INCOME. */
-      revenueCategory?: AccountCategory;
-      /** Electronic methods debit the bank account; omitted or CASH debits cash on hand. */
-      paymentMethod?: PaymentMethod;
-      referenceType: string;
-      referenceId: string;
-      referenceNumber?: string;
-      notes?: string;
-    },
-  ) {
-    const usesBank = input.paymentMethod
-      ? ["BANK_TRANSFER", "CHEQUE", "MOBILE_MONEY", "CARD", "ONLINE"].includes(input.paymentMethod)
-      : false;
-    const cash = await this.ensureAccount(tx, input.schoolId, usesBank
-      ? { accountType: "ASSET", category: "BANK", name: "Bank & Electronic Payments", code: "1010" }
-      : { accountType: "ASSET", category: "CASH", name: "Cash on Hand", code: "1000" });
-    const revenue = await this.ensureAccount(tx, input.schoolId, {
-      accountType: "REVENUE",
-      category: input.revenueCategory ?? "OTHER_INCOME",
-      name: input.revenueAccount.name,
-      code: input.revenueAccount.code,
-    });
-
-    const prefix = `TXN-${input.date.getUTCFullYear()}-`;
-    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${input.schoolId}), hashtext(${prefix}))`;
-    const last = await tx.transaction.findFirst({
-      where: { schoolId: input.schoolId, transactionNumber: { startsWith: prefix } },
-      orderBy: { transactionNumber: "desc" },
-      select: { transactionNumber: true },
-    });
-    const seq = last ? Number(last.transactionNumber.slice(prefix.length)) + 1 : 1;
-
-    const transaction = await tx.transaction.create({
-      data: {
-        schoolId: input.schoolId,
-        transactionNumber: `${prefix}${String(seq).padStart(5, "0")}`,
-        transactionDate: input.date,
-        description: input.description,
-        amount: input.amount,
-        debitAccountId: cash.id,
-        creditAccountId: revenue.id,
-        transactionType: "INCOME",
-        category: input.category,
-        referenceType: input.referenceType,
-        referenceId: input.referenceId,
-        referenceNumber: input.referenceNumber,
-        notes: input.notes,
-      },
-    });
-    await tx.chartAccount.update({ where: { id: cash.id }, data: { balance: { increment: input.amount } } });
-    await tx.chartAccount.update({ where: { id: revenue.id }, data: { balance: { increment: input.amount } } });
-    return transaction;
-  }
-  /**
-   * Post an expense using double-entry bookkeeping: debit the matching
-   * expense account and credit cash. The source expense and ledger entry
-   * are written inside the same database transaction.
-   */
-  async postExpense(
-    tx: Prisma.TransactionClient,
-    input: {
-      schoolId: string;
-      amount: Prisma.Decimal;
-      date: Date;
-      description: string;
-      category: TransactionCategory;
-      paymentMethod: PaymentMethod;
-      referenceType: string;
-      referenceId: string;
-      referenceNumber?: string;
-      notes?: string;
-    },
-  ) {
-    const accountByCategory: Record<string, { name: string; code: string; category: AccountCategory }> = {
-      SALARY: { name: "Salaries & Wages", code: "6000", category: "SALARY_WAGES" },
-      UTILITIES: { name: "Utilities", code: "6100", category: "UTILITIES" },
-      SUPPLIES: { name: "School Supplies", code: "6200", category: "SUPPLIES" },
-      MAINTENANCE: { name: "Repairs & Maintenance", code: "6300", category: "MAINTENANCE" },
-      TRANSPORT: { name: "Transport", code: "6400", category: "TRANSPORT" },
-      RENT: { name: "Rent", code: "6500", category: "RENT" },
-      INSURANCE: { name: "Insurance", code: "6600", category: "INSURANCE" },
-      TAXES: { name: "Taxes", code: "6700", category: "TAXES" },
-    };
-    const accountSpec = accountByCategory[input.category] ?? {
-      name: "Other Operating Expenses",
-      code: "6900",
-      category: "OTHER_EXPENSE" as AccountCategory,
-    };
-    const paymentUsesBank = ["BANK_TRANSFER", "CHEQUE", "MOBILE_MONEY", "CARD", "ONLINE"].includes(input.paymentMethod);
-    const paymentAccount = await this.ensureAccount(tx, input.schoolId, paymentUsesBank
-      ? { accountType: "ASSET", category: "BANK", name: "Bank & Electronic Payments", code: "1010" }
-      : { accountType: "ASSET", category: "CASH", name: "Cash on Hand", code: "1000" });
-    const expenseAccount = await this.ensureAccount(tx, input.schoolId, {
-      accountType: "EXPENSE",
-      category: accountSpec.category,
-      name: accountSpec.name,
-      code: accountSpec.code,
-    });
-
-    const prefix = "TXN-" + input.date.getUTCFullYear() + "-";
-    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${input.schoolId}), hashtext(${prefix}))`;
-    const last = await tx.transaction.findFirst({
-      where: { schoolId: input.schoolId, transactionNumber: { startsWith: prefix } },
-      orderBy: { transactionNumber: "desc" },
-      select: { transactionNumber: true },
-    });
-    const seq = last ? Number(last.transactionNumber.slice(prefix.length)) + 1 : 1;
-    const transaction = await tx.transaction.create({
-      data: {
-        schoolId: input.schoolId,
-        transactionNumber: prefix + String(seq).padStart(5, "0"),
-        transactionDate: input.date,
-        description: input.description,
-        amount: input.amount,
-        debitAccountId: expenseAccount.id,
-        creditAccountId: paymentAccount.id,
-        transactionType: "EXPENSE",
-        category: input.category,
-        referenceType: input.referenceType,
-        referenceId: input.referenceId,
-        referenceNumber: input.referenceNumber,
-        notes: [input.notes, "Payment method: " + input.paymentMethod].filter(Boolean).join(" · "),
-      },
-    });
-    await tx.chartAccount.update({
-      where: { id: expenseAccount.id },
-      data: { balance: { increment: input.amount } },
-    });
-    await tx.chartAccount.update({
-      where: { id: paymentAccount.id },
-      data: { balance: { decrement: input.amount } },
-    });
-    return transaction;
   }
 
   async recordPayment(
