@@ -171,12 +171,16 @@ interface ApiTerm {
   id: string;
   name: string;
   isCurrent: boolean;
+  startDate?: string;
+  endDate?: string;
 }
 
 interface ApiAcademicYear {
   id: string;
   name: string;
   isCurrent: boolean;
+  startDate?: string;
+  endDate?: string;
   terms: ApiTerm[];
 }
 
@@ -713,12 +717,12 @@ export function AccountantPortalWorkspace({
             <div><h2 className="text-lg font-semibold text-foreground">Financial performance</h2><p className="mt-1 text-sm text-muted-foreground">A live summary of saved records. Select a card to review its supporting records.</p></div>
             <label className="flex items-center gap-2 text-xs font-medium text-muted-foreground">Reporting period
               <select className={cn(inputClass, "w-auto min-w-40")} value={reportPeriod} onChange={(event) => setReportPeriod(event.target.value as typeof reportPeriod)} aria-label="Dashboard reporting period">
-                <option value="month">This month to date</option><option value="quarter">This quarter to date</option><option value="year">This year to date</option><option value="all">All available records</option>
+                <option value="term">Current term</option><option value="year">Current academic year</option><option value="all">All available records</option>
               </select>
             </label>
           </div>
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-            <DashboardMetricLink to="payments" label="Fees collected" value={paymentsQuery.error ? "Unavailable" : currency(reportCollected)} detail={paymentsQuery.error ? "Payment data unavailable" : `${reportSettledPayments.length} completed receipts in period`} icon={ArrowUpRight} />
+            <DashboardMetricLink to="payments" label="Fees collected" value={paymentsQuery.error ? "Unavailable" : currency(reportCollected)} detail={paymentsQuery.error ? "Payment data unavailable" : `${reportSettledPaymentCount} completed receipts in period`} icon={ArrowUpRight} />
             <DashboardMetricLink to="invoices" label="Fees billed" value={billsQuery.error ? "Unavailable" : currency(billedInPeriod)} detail={billsQuery.error ? "Bill data unavailable" : "Bills issued in selected period"} icon={Receipt} />
             <DashboardMetricLink to="debtors" label="Outstanding fees" value={billsQuery.error ? "Unavailable" : currency(outstanding)} detail={billsQuery.error ? "Bill data unavailable" : `${debtors.length} bills with balances`} icon={AlertCircle} />
             <DashboardMetricLink to="debtors" label="Overdue balances" value={billsQuery.error ? "Unavailable" : currency(overdueTotal)} detail={billsQuery.error ? "Bill data unavailable" : `${overdueBills.length} overdue bills`} icon={ArrowDownRight} />
