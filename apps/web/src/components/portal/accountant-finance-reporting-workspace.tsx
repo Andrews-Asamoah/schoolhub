@@ -1,6 +1,8 @@
+import { TableExportMenu } from "@/components/ui/data-table";
+import type { ExportTable } from "@/lib/table-export";
 
 import { useCallback, useMemo, useState } from "react";
-import { Download, Printer, Search, Users, WalletCards } from "lucide-react";
+import { Search, Users, WalletCards } from "lucide-react";
 
 interface Student {
   id: string;
@@ -86,38 +88,6 @@ const secondaryButton =
 
 const primaryButton =
   "inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:opacity-90";
-
-function exportCsv(rows: unknown[][], filename: string) {
-  const escapeCell = (value: unknown) => {
-    let text = String(value ?? "");
-
-    // Protect spreadsheet exports from formula injection.
-    if (/^[\s]*[=+\-@\t\r]/.test(text)) {
-      text = "'" + text;
-    }
-
-    return '"' + text.replaceAll('"', '""') + '"';
-  };
-
-  const csv = rows
-    .map((row) => row.map(escapeCell).join(","))
-    .join("\r\n");
-
-  const blob = new Blob(["\uFEFF", csv], {
-    type: "text/csv;charset=utf-8;",
-  });
-
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-
-  link.href = url;
-  link.download = filename;
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-
-  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
-}
 
 function localDate(date: Date) {
   return [
@@ -470,94 +440,30 @@ export function AccountantFinanceReportingWorkspace({
 
   const invalidRange = !range.valid;
 
-  const exportReport = () => {
-    if (invalidRange) return;
-
+  const buildExportTable = (): ExportTable => {
+    const reportInfo = { period: from + " to " + to, filters: { reportType, student: selectedStudent ? studentLabel(selectedStudent) : undefined } };
     if (reportType === "student" && selectedStudent) {
-      exportCsv(
-        [
-          ["SchoolHub student account statement"],
-          ["Student", studentLabel(selectedStudent)],
-          ["Admission number", selectedStudent.admissionNumber],
-          ["Reporting period", from + " to " + to],
-          [],
-          ["BILLS"],
-          [
-            "Bill number",
-            "Issued",
-            "Due date",
-            "Class",
-            "Billed (GHS)",
-            "Paid (GHS)",
-            "Balance (GHS)",
-            "Status",
-          ],
-          ...visibleBills.map((bill) => [
-            bill.billNumber,
-            dateText(bill.issuedAt),
-            dateText(bill.dueDate),
-            bill.class?.name ?? "",
-            amount(bill.totalAmount).toFixed(2),
-            amount(bill.paidAmount).toFixed(2),
-            amount(bill.balanceAmount).toFixed(2),
-            bill.status,
-          ]),
-          [],
-          ["PAYMENTS"],
-          [
-            "Receipt",
-            "Date",
-            "Bill",
-            "Method",
-            "Reference",
-            "Amount (GHS)",
-            "Status",
-          ],
-          ...visiblePayments.map((payment) => [
-            payment.paymentNumber,
-            dateText(payment.paymentDate),
-            payment.bill?.billNumber ?? "Unallocated",
-            payment.paymentMethod,
-            payment.referenceNumber ?? "",
-            amount(payment.amount).toFixed(2),
-            payment.status,
-          ]),
-          [],
-          [
-            "Current outstanding balance (all open bills, regardless of date)",
-            outstanding.toFixed(2),
-          ],
+      return {
+        title: "Student statement of account",
+        headers: ["Entry type", "Reference", "Date", "Due date", "Class / Bill", "Method", "Amount (GHS)", "Paid (GHS)", "Balance (GHS)", "Status"],
+        columnTypes: ["text", "text", "date", "date", "text", "text", "money", "money", "money", "text"],
+        rows: [
+          ...visibleBills.map((bill) => ["Invoice", bill.billNumber, dateText(bill.issuedAt), dateText(bill.dueDate), bill.class?.name ?? "", "", amount(bill.totalAmount), amount(bill.paidAmount), amount(bill.balanceAmount), bill.status]),
+          ...visiblePayments.map((payment) => ["Receipt", payment.paymentNumber, dateText(payment.paymentDate), "", payment.bill?.billNumber ?? "Unallocated", payment.paymentMethod, amount(payment.amount), null, null, payment.status]),
+          ["Closing outstanding balance", "", "", "", "", "", null, null, outstanding, ""],
         ],
-        "schoolhub-student-statement-" +
-          selectedStudent.admissionNumber +
-          ".csv",
-      );
-
-      return;
+        totals: ["Total", "", "", "", "", "", null, null, null, ""],
+        reportInfo,
+      };
     }
-
-    exportCsv(
-      [
-        ["SchoolHub class collection report"],
-        ["Reporting period", from + " to " + to],
-        [],
-        [
-          "Class",
-          "Billed in period (GHS)",
-          "Collected in period (GHS)",
-          "Outstanding on period bills (GHS)",
-          "Completed receipts",
-        ],
-        ...classSummary.map((item) => [
-          item.name,
-          item.billed.toFixed(2),
-          item.collected.toFixed(2),
-          item.outstanding.toFixed(2),
-          item.receipts,
-        ]),
-      ],
-      "schoolhub-class-collections.csv",
-    );
+    return {
+      title: "Class collection report",
+      headers: ["Class", "Billed in period (GHS)", "Collected in period (GHS)", "Outstanding on period bills (GHS)", "Completed receipts"],
+      columnTypes: ["text", "money", "money", "money", "number"],
+      rows: classSummary.map((item) => [item.name, item.billed, item.collected, item.outstanding, item.receipts]),
+      totals: ["Total", null, null, null, null],
+      reportInfo,
+    };
   };
 
   return (
@@ -591,33 +497,8 @@ export function AccountantFinanceReportingWorkspace({
         </div>
 
         <div className="finance-report-print-actions flex flex-wrap gap-2">
-          <button
-            type="button"
-            className={secondaryButton}
-            disabled={
-              invalidRange ||
-              (reportType === "student" && !selectedStudent)
-            }
-            onClick={() => window.print()}
-          >
-            <Printer className="size-4" />
-            Print / Save PDF
-          </button>
-
-          <button
-            type="button"
-            className={primaryButton}
-            disabled={
-              invalidRange ||
-              (reportType === "student" && !selectedStudent)
-            }
-            onClick={exportReport}
-          >
-            <Download className="size-4" />
-            Export CSV
-          </button>
+          {!invalidRange && (reportType !== "student" || !!selectedStudent) && <TableExportMenu build={buildExportTable} note="Exports include the selected period and filters." />}
         </div>
-      </div>
 
       <div className="finance-report-print-actions grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         <label className="space-y-1 text-xs font-medium text-muted-foreground">
