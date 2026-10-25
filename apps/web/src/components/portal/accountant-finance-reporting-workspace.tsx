@@ -153,6 +153,28 @@ export function AccountantFinanceReportingWorkspace({ bills, payments, classes }
     return [...totals.values()].sort((a, b) => b.collected - a.collected);
   }, [bills, visibleBills, completedPayments]);
 
+  const periodCollected = scopedPayments.filter(payment => settled(payment.status)).reduce((sum, payment) => sum + amount(payment.amount), 0);
+  const previousPeriodCollected = useMemo(() => {
+    if (!range.start || !range.end || !range.valid) return null;
+    const duration = range.end.getTime() - range.start.getTime() + 1;
+    const previousStart = range.start.getTime() - duration;
+    const previousEnd = range.start.getTime() - 1;
+    return payments.filter(payment => {
+      if (!settled(payment.status)) return false;
+      if (reportType === "student" && (!studentId || payment.studentId !== studentId)) return false;
+      if (reportType === "class" && classId !== "ALL") {
+        const linkedBill = payment.bill?.id ? bills.find(bill => bill.id === payment.bill?.id) : undefined;
+        if (linkedBill?.class?.id !== classId) return false;
+      }
+      const timestamp = new Date(payment.paymentDate).getTime();
+      return !Number.isNaN(timestamp) && timestamp >= previousStart && timestamp <= previousEnd;
+    }).reduce((sum, payment) => sum + amount(payment.amount), 0);
+  }, [payments, bills, reportType, studentId, classId, range.start, range.end, range.valid]);
+  const comparisonDelta = previousPeriodCollected === null ? null : periodCollected - previousPeriodCollected;
+  const comparisonPercent = previousPeriodCollected === null || previousPeriodCollected === 0
+    ? null
+    : (comparisonDelta ?? 0) / previousPeriodCollected * 100;
+
   const selectedStudent = students.find(student => student.id === studentId);
   const invalidRange = !range.valid;
 
@@ -219,6 +241,18 @@ export function AccountantFinanceReportingWorkspace({ bills, payments, classes }
         <div className="rounded-xl bg-muted/60 p-4"><p className="text-xs text-muted-foreground">Current outstanding</p><p className="mt-1 text-xl font-bold tabular-nums text-foreground">{money(outstanding)}</p><p className="mt-1 text-xs text-muted-foreground">Open bill balances, all dates</p></div>
         <div className="rounded-xl bg-muted/60 p-4"><p className="text-xs text-muted-foreground">Filtered receipts</p><p className="mt-1 text-xl font-bold tabular-nums text-foreground">{visiblePayments.length}</p><p className="mt-1 text-xs text-muted-foreground">Includes non-completed statuses in the register</p></div>
       </div>
+
+      <section className="finance-report-print-actions rounded-xl border border-border p-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div><h3 className="font-semibold text-foreground">Period-over-period collections</h3><p className="mt-1 text-xs text-muted-foreground">Compares completed receipts in the selected date range with the immediately preceding range of equal length.</p></div>
+          <div className="text-right"><p className="text-xs text-muted-foreground">Previous period</p><p className="font-semibold tabular-nums text-foreground">{previousPeriodCollected === null ? "Choose a valid date range" : money(previousPeriodCollected)}</p></div>
+        </div>
+        <div className="mt-3 flex flex-wrap items-baseline gap-3">
+          <p className="text-2xl font-bold tabular-nums text-foreground">{money(periodCollected)}</p>
+          {comparisonDelta !== null && <span className={comparisonDelta >= 0 ? "text-sm font-semibold text-emerald-700 dark:text-emerald-300" : "text-sm font-semibold text-destructive"}>{comparisonDelta > 0 ? "+" : ""}{money(comparisonDelta)}{comparisonPercent === null ? "" : ` · ${comparisonPercent > 0 ? "+" : ""}${comparisonPercent.toFixed(1)}%`}</span>}
+        </div>
+        {previousPeriodCollected === 0 && range.valid && <p className="mt-2 text-xs text-muted-foreground">The previous period had no completed collections, so a percentage change is not meaningful.</p>}
+      </section>
 
       <div className="finance-report-print rounded-xl border border-border p-4 sm:p-5">
         <div className="mb-4 flex flex-wrap items-start justify-between gap-3 border-b border-border pb-4">
