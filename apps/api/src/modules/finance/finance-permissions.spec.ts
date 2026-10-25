@@ -91,10 +91,10 @@ describe("finance controller routes", () => {
   });
   it("gives payroll and salary exports the stricter export roles", () => {
     for (const route of routes.filter((r) => r.verb === "Get" && (
-      route.route.includes("exports/payroll.xlsx") ||
-      route.route.includes("exports/salaries.xlsx") ||
-      route.route.includes("payslips.pdf") ||
-      route.route.includes("payslips/:payslipId.pdf")
+      r.route.includes("exports/payroll.xlsx") ||
+      r.route.includes("exports/salaries.xlsx") ||
+      r.route.includes("payslips.pdf") ||
+      r.route.includes("payslips/:payslipId.pdf")
     ))) {
       expect(route.decorators, `GET ${route.route}`).toContain("@Roles(...FINANCE_PAYROLL_EXPORT_ROLES)");
     }
@@ -102,10 +102,10 @@ describe("finance controller routes", () => {
 
   it("gives every other GET route the finance read roles", () => {
     for (const route of routes.filter((r) => r.verb === "Get" && !(
-      route.route.includes("exports/payroll.xlsx") ||
-      route.route.includes("exports/salaries.xlsx") ||
-      route.route.includes("payslips.pdf") ||
-      route.route.includes("payslips/:payslipId.pdf")
+      r.route.includes("exports/payroll.xlsx") ||
+      r.route.includes("exports/salaries.xlsx") ||
+      r.route.includes("payslips.pdf") ||
+      r.route.includes("payslips/:payslipId.pdf")
     ))) {
       expect(route.decorators, `GET ${route.route}`).toContain("@Roles(...FINANCE_READ_ROLES)");
     }
