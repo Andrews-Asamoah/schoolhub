@@ -35,6 +35,9 @@ export type PayrollCalculatorInput = {
   taxResident?: boolean;
   employeeSsnitRate: string;
   employerSsnitRate: string;
+  ssnitBase?: "BASIC" | "GROSS" | "PENSIONABLE_ITEMS";
+  tier2Base?: "BASIC" | "GROSS" | "PENSIONABLE_ITEMS";
+  tier3Base?: "BASIC" | "GROSS" | "PENSIONABLE_ITEMS";
   insurableMinimum: string;
   insurableMaximum: string;
   tier2EmployeeRate?: string;
@@ -147,16 +150,28 @@ export function calculatePayroll(input: PayrollCalculatorInput): PayrollCalculat
   // Basic salary is pensionable by default; additional items are included only
   // when the caller's effective scheme marks them pensionable.
   const pensionableBase = basic.add(pensionableItems);
+  const contributionBase = (base: "BASIC" | "GROSS" | "PENSIONABLE_ITEMS" | undefined) =>
+    base === "GROSS" ? gross : base === "PENSIONABLE_ITEMS" ? pensionableBase : basic;
+  const ssnitContributionBase = contributionBase(input.ssnitBase);
+  const tier2ContributionBase = contributionBase(input.tier2Base);
+  const tier3ContributionBase = contributionBase(input.tier3Base);
   const minimum = decimal(input.insurableMinimum, "insurable minimum");
   const maximum = decimal(input.insurableMaximum, "insurable maximum");
   if (minimum.lessThan(ZERO) || maximum.lessThan(minimum)) throw new Error("Invalid insurable earnings range.");
-  const insurableBase = Prisma.Decimal.min(maximum, Prisma.Decimal.max(minimum, pensionableBase));
-
-  const employeeSsnit = percent(insurableBase, decimal(input.employeeSsnitRate, "employee SSNIT rate"));
-  const employerSsnit = percent(insurableBase, decimal(input.employerSsnitRate, "employer SSNIT rate"));
-  const tier2Employee = percent(pensionableBase, decimal(input.tier2EmployeeRate, "Tier 2 employee rate"));
-  const tier2Employer = percent(pensionableBase, decimal(input.tier2EmployerRate, "Tier 2 employer rate"));
-  const tier3Employee = percent(pensionableBase, decimal(input.tier3EmployeeRate, "Tier 3 employee rate"));
+  const insurableBase = Prisma.Decimal.min(maximum, Prisma.Decimal.max(minimum, ssnitContributionBase));
+  const employeeRate = decimal(input.employeeSsnitRate, "employee SSNIT rate");
+  const employerRate = decimal(input.employerSsnitRate, "employer SSNIT rate");
+  const tier2EmployeeRate = decimal(input.tier2EmployeeRate, "Tier 2 employee rate");
+  const tier2EmployerRate = decimal(input.tier2EmployerRate, "Tier 2 employer rate");
+  const tier3EmployeeRate = decimal(input.tier3EmployeeRate, "Tier 3 employee rate");
+  for (const [label, rate] of [["employee SSNIT", employeeRate], ["employer SSNIT", employerRate], ["Tier 2 employee", tier2EmployeeRate], ["Tier 2 employer", tier2EmployerRate], ["Tier 3 employee", tier3EmployeeRate]] as const) {
+    if (rate.lessThan(ZERO) || rate.greaterThan(HUNDRED)) throw new Error(`${label} rate must be between 0 and 100 percent.`);
+  }
+  const employeeSsnit = percent(insurableBase, employeeRate);
+  const employerSsnit = percent(insurableBase, employerRate);
+  const tier2Employee = percent(tier2ContributionBase, tier2EmployeeRate);
+  const tier2Employer = percent(tier2ContributionBase, tier2EmployerRate);
+  const tier3Employee = percent(tier3ContributionBase, tier3EmployeeRate);
 
   const employeeShareBorne = input.employerBearsEmployeeShare === true;
   const taxableBenefit = employeeShareBorne && input.employerShareTaxable === true
