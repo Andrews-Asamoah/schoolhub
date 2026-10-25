@@ -1750,6 +1750,32 @@ export class FinanceService {
     const search = input.search?.trim();
     const scopeStart = dates.start ?? period.term?.startDate ?? period.year?.startDate;
     const scopeEnd = dates.end ?? period.term?.endDate ?? period.year?.endDate;
+    const andFilters: Prisma.PaymentWhereInput[] = [];
+    if (period.year || period.term) {
+      if (scopeStart || scopeEnd) {
+        andFilters.push({
+          OR: [
+            { bill: { schoolId, ...(period.year ? { academicYearId: period.year.id } : {}), ...(period.term ? { termId: period.term.id } : {}), ...(input.classId ? { classId: input.classId } : {}) } },
+            { billId: null, paymentDate: { ...(scopeStart ? { gte: scopeStart } : {}), ...(scopeEnd ? { lte: scopeEnd } : {}) } },
+          ],
+        });
+      } else {
+        andFilters.push({
+          bill: { schoolId, ...(period.year ? { academicYearId: period.year.id } : {}), ...(period.term ? { termId: period.term.id } : {}), ...(input.classId ? { classId: input.classId } : {}) },
+        });
+      }
+    }
+    if (search) {
+      andFilters.push({
+        OR: [
+          { paymentNumber: { contains: search, mode: "insensitive" } },
+          { referenceNumber: { contains: search, mode: "insensitive" } },
+          { student: { admissionNumber: { contains: search, mode: "insensitive" } } },
+          { student: { profile: { firstName: { contains: search, mode: "insensitive" } } } },
+          { student: { profile: { lastName: { contains: search, mode: "insensitive" } } } },
+        ],
+      });
+    }
     const baseWhere: Prisma.PaymentWhereInput = {
       schoolId,
       ...(input.studentId ? { studentId: input.studentId } : {}),
@@ -1757,27 +1783,7 @@ export class FinanceService {
       ...(input.status && input.status !== "ALL" ? { status: input.status as "PENDING" | "COMPLETED" | "FAILED" | "REFUNDED" | "CANCELLED" } : {}),
       ...(input.classId ? { bill: { schoolId, classId: input.classId } } : {}),
       ...(dates.start || dates.end ? { paymentDate: { ...(dates.start ? { gte: dates.start } : {}), ...(dates.end ? { lte: dates.end } : {}) } } : {}),
-      ...((period.year || period.term) && (scopeStart || scopeEnd) ? {
-        AND: [{
-          OR: [
-            { bill: { schoolId, ...(period.year ? { academicYearId: period.year.id } : {}), ...(period.term ? { termId: period.term.id } : {}), ...(input.classId ? { classId: input.classId } : {}) } },
-            { billId: null, paymentDate: { ...(scopeStart ? { gte: scopeStart } : {}), ...(scopeEnd ? { lte: scopeEnd } : {}) } },
-          ],
-        }],
-      } : (period.year || period.term) ? {
-        bill: { schoolId, ...(period.year ? { academicYearId: period.year.id } : {}), ...(period.term ? { termId: period.term.id } : {}), ...(input.classId ? { classId: input.classId } : {}) },
-      } : {}),
-      ...(search ? {
-        AND: [{
-          OR: [
-            { paymentNumber: { contains: search, mode: "insensitive" } },
-            { referenceNumber: { contains: search, mode: "insensitive" } },
-            { student: { admissionNumber: { contains: search, mode: "insensitive" } } },
-            { student: { profile: { firstName: { contains: search, mode: "insensitive" } } } },
-            { student: { profile: { lastName: { contains: search, mode: "insensitive" } } } },
-          ],
-        }],
-      } : {}),
+      ...(andFilters.length ? { AND: andFilters } : {}),
     };
     const cursor = decodeReportingCursor(input.cursor);
     if (cursor) {
