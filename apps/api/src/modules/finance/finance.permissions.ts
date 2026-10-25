@@ -18,3 +18,7 @@ export const FINANCE_READ_ROLES = ["owner", "admin", "accountant", "headteacher"
 
 /** Payroll and salary exports are confidential: only accountant, owner and headteacher may export. */
 export const FINANCE_PAYROLL_EXPORT_ROLES = ["accountant", "owner", "headteacher"] as const;
+
+export function isFinancePayrollExportRole(role: string | null | undefined): boolean {
+  return !!role && (FINANCE_PAYROLL_EXPORT_ROLES as readonly string[]).includes(role);
+}
