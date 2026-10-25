@@ -25,6 +25,7 @@ describe.skipIf(!enabled)("guardian ward fee statements (database)", { timeout: 
   let yearId = "";
   let termId = "";
   let guardianUserId = "";
+  let wardUserId = "";
   let guardianProfileId = "";
   let guardianId = "";
   let wardId = "";
@@ -100,6 +101,7 @@ describe.skipIf(!enabled)("guardian ward fee statements (database)", { timeout: 
       data: { id: `${run}-ward-user`, name: "Linked Ward", email: `${run}-ward@example.test` },
     });
     userIds.push(wardUser.id);
+    wardUserId = wardUser.id;
     const wardProfile = await prisma.userProfile.create({
       data: { userId: wardUser.id, firstName: "Linked", lastName: "Ward" },
     });
@@ -218,6 +220,41 @@ describe.skipIf(!enabled)("guardian ward fee statements (database)", { timeout: 
     expect(statement.entries).toHaveLength(1);
     expect(statement.entries[0]?.reference).toBe(`INV-${run}-WARD`);
     expect(statement.closingBalance).toBe(100);
+  });
+
+  it("enforces the school's previous-term arrears clearance policy", async () => {
+    const previousYear = await prisma.academicYear.create({
+      data: {
+        schoolId,
+        name: "Prior year arrears",
+        startDate: new Date("2025-01-01"),
+        endDate: new Date("2025-12-31"),
+        isCurrent: false,
+      },
+    });
+    await prisma.bill.create({
+      data: {
+        schoolId,
+        studentId: wardId,
+        academicYearId: previousYear.id,
+        billNumber: `INV-${run}-PRIOR`,
+        totalAmount: "250.00",
+        grossAmount: "250.00",
+        paidAmount: "0.00",
+        balanceAmount: "250.00",
+        status: "PENDING",
+        issuedAt: new Date("2025-08-01T00:00:00.000Z"),
+      },
+    });
+    await prisma.school.update({ where: { id: schoolId }, data: { arrearsPolicy: "BLOCK_CLEARANCE_UNTIL_PAID" } });
+    const blocked = await service.getMyFeeStatus(schoolId, wardUserId);
+    expect(blocked.status).toBe("BLOCKED_BY_ARREARS");
+    expect(blocked.clearanceAllowed).toBe(false);
+
+    await prisma.school.update({ where: { id: schoolId }, data: { arrearsPolicy: "SHOW_ONLY" } });
+    const shown = await service.getMyFeeStatus(schoolId, wardUserId);
+    expect(shown.status).not.toBe("BLOCKED_BY_ARREARS");
+    expect(shown.arrearsPolicy).toBe("SHOW_ONLY");
   });
 
   it("denies another family member's student and a student from another tenant", async () => {
