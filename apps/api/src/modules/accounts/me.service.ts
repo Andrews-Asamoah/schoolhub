@@ -1,6 +1,11 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
 import { NAME_LOCKED_ROLES, type UpdateMyProfileInput } from "@schoolhub/shared";
 import { PrismaService } from "../../prisma/prisma.service.js";
+import { Prisma } from "@prisma/client";
+import { createHmac } from "node:crypto";
+import { jsPDF } from "jspdf";
+import autoTable from "jspdf-autotable";
+import QRCode from "qrcode";
 
 const PROFILE_FIELDS = {
   firstName: true,
