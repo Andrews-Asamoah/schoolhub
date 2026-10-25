@@ -231,7 +231,7 @@ export function PayrollManagementWorkspace() {
     <section className="rounded-2xl border border-border bg-card p-4 shadow-sm sm:p-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div><h2 className="text-lg font-semibold text-foreground">Salary register</h2><p className="mt-1 text-sm text-muted-foreground">Manage the monthly base salary used when creating new payroll drafts. Updating a salary does not alter already saved payroll runs.</p></div>
-        {canExportPayroll && <TableExportMenu build={buildSalaryRegisterExport} note="Confidential salary data. Export access is restricted." />}
+        {canExportPayroll && <><TableExportMenu build={buildSalaryRegisterExport} note="Confidential salary data. Export access is restricted." /><ServerExportButton endpoint="/finance/exports/salaries.xlsx" label="Full salary Excel" className={secondaryButton} /></>}
       </div>
       <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0 flex-1"><label className="mb-1.5 block text-xs font-semibold text-muted-foreground">Search employee</label><input className={fieldClass} value={salarySearch} onChange={event => setSalarySearch(event.target.value)} placeholder="Search by name, ID, or staff type…" /></div>
