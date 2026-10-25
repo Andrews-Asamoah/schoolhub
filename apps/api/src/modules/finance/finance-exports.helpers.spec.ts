@@ -46,7 +46,7 @@ describe("finance export workbook", () => {
       reportInfo: { School: "Test School" },
     });
     const workbook = new ExcelJS.Workbook();
-    await workbook.xlsx.load(buffer);
+    await workbook.xlsx.load(Uint8Array.from(buffer).buffer as ArrayBuffer);
     expect(workbook.getWorksheet("Audit export")!.getCell("A2").value).toBe(`\'=HYPERLINK("https://example.test")`);
   });
 
@@ -60,7 +60,7 @@ describe("finance export workbook", () => {
       reportInfo: { School: "Test School" },
     });
     const workbook = new ExcelJS.Workbook();
-    await workbook.xlsx.load(buffer);
+    await workbook.xlsx.load(Uint8Array.from(buffer).buffer as ArrayBuffer);
     expect(workbook.getWorksheet("Empty report")!.getCell("B2").value).toBe(0);
   });
 });
