@@ -114,6 +114,7 @@ model Bill {
   totalAmount    Decimal    @db.Decimal(10, 2)
   grossAmount    Decimal    @default(0) @db.Decimal(10, 2)
   discountAmount Decimal    @default(0) @db.Decimal(10, 2)
+  carryForwardSnapshotCreated Boolean @default(false)
   paidAmount     Decimal    @default(0) @db.Decimal(10, 2)
   balanceAmount  Decimal    @db.Decimal(10, 2)
   status         BillStatus @default(PENDING)
@@ -135,6 +136,8 @@ model Bill {
   carryForwards BillCarryForward[] @relation("CarryForwardTarget")
   carriedTo     BillCarryForward[] @relation("CarryForwardSource")
   receiptAllocations PaymentBillAllocation[] @relation("BillReceiptAllocations")
+  lateFeeSource LateFeeAssessment[] @relation("LateFeeSource")
+  lateFeeTarget LateFeeAssessment[] @relation("LateFeeTarget")
 
   classId  String?
   billType BillType @default(INVOICE)
@@ -714,4 +717,28 @@ model PaymentBillAllocation {
   @@index([schoolId, paymentId])
   @@index([schoolId, billId])
   @@map("payment_bill_allocations")
+}
+
+
+/// A one-time late-fee assessment on an earlier invoice, charged on a later invoice.
+/// Unique per source invoice so repeated bill generation cannot assess the same arrears twice.
+model LateFeeAssessment {
+  id                    String   @id @default(cuid())
+  schoolId              String
+  sourceBillId          String
+  targetBillId          String
+  amount                Decimal  @db.Decimal(10, 2)
+  mode                  String
+  value                 Decimal  @db.Decimal(10, 2)
+  graceDays             Int
+  createdBy             String
+  createdAt             DateTime @default(now())
+
+  school     School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  sourceBill Bill   @relation("LateFeeSource", fields: [sourceBillId], references: [id], onDelete: Restrict)
+  targetBill Bill   @relation("LateFeeTarget", fields: [targetBillId], references: [id], onDelete: Restrict)
+
+  @@unique([schoolId, sourceBillId])
+  @@index([schoolId, targetBillId])
+  @@map("late_fee_assessments")
 }
