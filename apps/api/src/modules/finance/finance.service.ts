@@ -1396,6 +1396,177 @@ export class FinanceService {
     });
   }
 
+  async getTermEndReview(schoolId: string, yearId: string, termId: string) {
+    if (!yearId || !termId) throw new BadRequestException("Choose an academic year and term for the term-end review.");
+    const term = await this.prisma.client.term.findFirst({
+      where: { id: termId, academicYearId: yearId, academicYear: { schoolId } },
+      select: { id: true, name: true, startDate: true, academicYear: { select: { id: true, name: true } } },
+    });
+    if (!term) throw new BadRequestException("The selected term does not belong to this school and academic year.");
+
+    const bills = await this.prisma.client.bill.findMany({
+      where: {
+        schoolId,
+        status: { notIn: ["CANCELLED", "WAIVED"] },
+        balanceAmount: { gt: new Prisma.Decimal(0) },
+        OR: [
+          { academicYear: { startDate: { lt: term.startDate } } },
+          { term: { startDate: { lt: term.startDate } } },
+        ],
+      },
+      orderBy: [{ studentId: "asc" }, { issuedAt: "asc" }, { id: "asc" }],
+      select: {
+        id: true,
+        billNumber: true,
+        issuedAt: true,
+        dueDate: true,
+        balanceAmount: true,
+        academicYear: { select: { id: true, name: true, startDate: true } },
+        term: { select: { id: true, name: true, startDate: true } },
+        student: {
+          select: {
+            id: true,
+            admissionNumber: true,
+            status: true,
+            profile: { select: { firstName: true, otherNames: true, lastName: true } },
+            class: { select: { id: true, name: true } },
+          },
+        },
+      },
+    });
+    const grouped = new Map<string, {
+      studentId: string;
+      admissionNumber: string | null;
+      name: string;
+      studentStatus: string;
+      className: string | null;
+      formerStudent: boolean;
+      totalArrears: Prisma.Decimal;
+      bills: Array<{ billId: string; billNumber: string; academicYear: string; term: string | null; dueDate: string | null; balance: string; issuedAt: string }>;
+    }>();
+    for (const bill of bills) {
+      const student = bill.student;
+      const existing = grouped.get(student.id) ?? {
+        studentId: student.id,
+        admissionNumber: student.admissionNumber,
+        name: [student.profile.firstName, student.profile.otherNames, student.profile.lastName].filter(Boolean).join(" ").trim() || student.admissionNumber || "Student",
+        studentStatus: student.status,
+        className: student.class?.name ?? null,
+        formerStudent: student.status !== "ACTIVE",
+        totalArrears: new Prisma.Decimal(0),
+        bills: [],
+      };
+      existing.totalArrears = existing.totalArrears.plus(bill.balanceAmount);
+      existing.bills.push({
+        billId: bill.id,
+        billNumber: bill.billNumber,
+        academicYear: bill.academicYear.name,
+        term: bill.term?.name ?? null,
+        dueDate: bill.dueDate?.toISOString().slice(0, 10) ?? null,
+        balance: bill.balanceAmount.toFixed(2),
+        issuedAt: bill.issuedAt.toISOString().slice(0, 10),
+      });
+      grouped.set(student.id, existing);
+    }
+    const students = [...grouped.values()]
+      .sort((a, b) => b.totalArrears.comparedTo(a.totalArrears) || a.name.localeCompare(b.name))
+      .map(({ totalArrears, ...student }) => ({ ...student, totalArrears: totalArrears.toFixed(2) }));
+    return {
+      target: { yearId: term.academicYear.id, academicYear: term.academicYear.name, termId: term.id, term: term.name, startDate: term.startDate.toISOString().slice(0, 10) },
+      studentCount: students.length,
+      totalArrears: students.reduce((sum, student) => sum.plus(student.totalArrears), new Prisma.Decimal(0)).toFixed(2),
+      students,
+    };
+  }
+
+  async getFormerStudentsWithBalances(schoolId: string) {
+    const bills = await this.prisma.client.bill.findMany({
+      where: {
+        schoolId,
+        status: { notIn: ["CANCELLED", "WAIVED"] },
+        balanceAmount: { gt: new Prisma.Decimal(0) },
+        student: { schoolId, status: { not: "ACTIVE" }, deletedAt: null },
+      },
+      orderBy: [{ studentId: "asc" }, { issuedAt: "asc" }, { id: "asc" }],
+      select: {
+        id: true, billNumber: true, issuedAt: true, dueDate: true, balanceAmount: true,
+        academicYear: { select: { name: true } },
+        term: { select: { name: true } },
+        student: {
+          select: {
+            id: true, admissionNumber: true, status: true,
+            profile: { select: { firstName: true, otherNames: true, lastName: true } },
+            class: { select: { name: true } },
+          },
+        },
+      },
+    });
+    const grouped = new Map<string, { studentId: string; admissionNumber: string | null; name: string; status: string; className: string | null; totalBalance: Prisma.Decimal; bills: Array<{ billNumber: string; academicYear: string; term: string | null; balance: string; dueDate: string | null }> }>();
+    for (const bill of bills) {
+      const s = bill.student;
+      const row = grouped.get(s.id) ?? {
+        studentId: s.id,
+        admissionNumber: s.admissionNumber,
+        name: [s.profile.firstName, s.profile.otherNames, s.profile.lastName].filter(Boolean).join(" ").trim() || s.admissionNumber || "Student",
+        status: s.status,
+        className: s.class?.name ?? null,
+        totalBalance: new Prisma.Decimal(0),
+        bills: [],
+      };
+      row.totalBalance = row.totalBalance.plus(bill.balanceAmount);
+      row.bills.push({
+        billNumber: bill.billNumber,
+        academicYear: bill.academicYear.name,
+        term: bill.term?.name ?? null,
+        balance: bill.balanceAmount.toFixed(2),
+        dueDate: bill.dueDate?.toISOString().slice(0, 10) ?? null,
+      });
+      grouped.set(s.id, row);
+    }
+    return [...grouped.values()]
+      .sort((a, b) => b.totalBalance.comparedTo(a.totalBalance) || a.name.localeCompare(b.name))
+      .map(({ totalBalance, ...row }) => ({ ...row, totalBalance: totalBalance.toFixed(2) }));
+  }
+
+  async markFormerStudents(
+    schoolId: string,
+    actorId: string,
+    studentIds: string[],
+    reason: string,
+  ) {
+    const uniqueIds = [...new Set(studentIds)];
+    if (uniqueIds.length === 0 || uniqueIds.length > 200) {
+      throw new BadRequestException("Select between 1 and 200 students to mark as former students.");
+    }
+    if (reason.trim().length < 10) throw new BadRequestException("Provide a reason of at least 10 characters.");
+
+    return this.prisma.client.$transaction(async (tx) => {
+      const students = await tx.student.findMany({
+        where: { schoolId, id: { in: uniqueIds }, deletedAt: null },
+        select: { id: true, admissionNumber: true, status: true },
+      });
+      if (students.length !== uniqueIds.length) {
+        throw new NotFoundException("One or more selected students do not belong to this school.");
+      }
+      const updated: string[] = [];
+      for (const student of students) {
+        if (student.status !== "ACTIVE") continue;
+        await tx.student.update({ where: { id: student.id }, data: { status: "WITHDRAWN" } });
+        await this.writeAudit(tx, {
+          actorId,
+          schoolId,
+          action: "STUDENT_MARKED_FORMER_WITH_ARREARS",
+          entityType: "STUDENT",
+          entityId: student.id,
+          oldValues: { status: student.status },
+          newValues: { status: "WITHDRAWN", reason: reason.trim(), admissionNumber: student.admissionNumber },
+        });
+        updated.push(student.id);
+      }
+      return { updatedCount: updated.length, studentIds: updated, status: "WITHDRAWN" as const };
+    });
+  }
+
   async getFinanceSummary(
     schoolId: string,
     query: Pick<FinanceListQuery, "from" | "to" | "yearId" | "termId"> = {},
