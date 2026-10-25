@@ -271,7 +271,7 @@ export function StudentStatementWorkspace() {
               ["Closing balance", statement.closingBalance],
               ["Overdue 90+ days", statement.ageing.days90Plus],
               ["Unallocated credit", statement.unallocatedCredit],
-            ].map(([label, value]) => <div key={label} className="rounded-2xl border border-border bg-card p-4"><p className="text-xs font-medium text-muted-foreground">{label}</p><p className="mt-2 text-xl font-bold tabular-nums text-foreground">{money(value)}</p></div>)}
+            ].map(([label, value]) => <div key={label} className="rounded-2xl border border-border bg-card p-4"><p className="text-xs font-medium text-muted-foreground">{label}</p><p className="mt-2 text-xl font-bold tabular-nums text-foreground">{money(value ?? "0.00")}</p></div>)}
           </div>
           <section className="rounded-2xl border border-border bg-card p-5">
             <div className="flex flex-wrap items-start justify-between gap-3">
@@ -303,7 +303,7 @@ export function StudentStatementWorkspace() {
                 ["61–90 days", statement.ageing.days61To90],
                 ["90+ days", statement.ageing.days90Plus],
                 ["Not due / no due date", statement.ageing.notDue],
-              ].map(([label, value]) => <div key={label} className="rounded-xl bg-muted/40 p-3"><p className="text-xs text-muted-foreground">{label}</p><p className="mt-1 text-sm font-semibold tabular-nums">{money(value)}</p></div>)}
+              ].map(([label, value]) => <div key={label} className="rounded-xl bg-muted/40 p-3"><p className="text-xs text-muted-foreground">{label}</p><p className="mt-1 text-sm font-semibold tabular-nums">{money(value ?? "0.00")}</p></div>)}
             </div>
           </section>
         </div>
