@@ -501,6 +501,7 @@ export function AccountantFinanceReportingWorkspace({
           {!invalidRange && (reportType !== "student" || !!selectedStudent) && <TableExportMenu build={buildExportTable} note="Exports include the selected period and filters." />}
           {!invalidRange && reportType === "student" && selectedStudent && <ServerExportButton endpoint={"/finance/students/" + encodeURIComponent(selectedStudent.id) + "/statement.pdf?from=" + encodeURIComponent(from) + "&to=" + encodeURIComponent(to)} label="Official statement PDF" className={secondaryButton} />}
         </div>
+        </div>
 
       <div className="finance-report-print-actions grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         <label className="space-y-1 text-xs font-medium text-muted-foreground">
