@@ -132,6 +132,8 @@ model Bill {
   items        BillItem[]
   payments     Payment[]
   concessions  BillConcession[]
+  carryForwards BillCarryForward[] @relation("CarryForwardTarget")
+  carriedTo     BillCarryForward[] @relation("CarryForwardSource")
 
   classId  String?
   billType BillType @default(INVOICE)
@@ -664,4 +666,28 @@ model FinancePeriodLock {
   school School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
 
   @@map("finance_period_locks")
+}
+
+
+/// Snapshot of a student's earlier unpaid invoices at the time a new bill is issued.
+/// This is presentation/audit data only; it does not create another receivable.
+model BillCarryForward {
+  id                     String   @id @default(cuid())
+  schoolId               String
+  billId                 String
+  sourceBillId           String
+  sourceBillNumber       String
+  sourceAcademicYearName String?
+  sourceTermName         String?
+  amount                 Decimal  @db.Decimal(10, 2)
+  createdAt              DateTime @default(now())
+
+  school     School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  bill       Bill   @relation("CarryForwardTarget", fields: [billId], references: [id], onDelete: Restrict)
+  sourceBill Bill   @relation("CarryForwardSource", fields: [sourceBillId], references: [id], onDelete: Restrict)
+
+  @@unique([billId, sourceBillId])
+  @@index([schoolId, billId])
+  @@index([schoolId, sourceBillId])
+  @@map("bill_carry_forwards")
 }
