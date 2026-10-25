@@ -50,8 +50,9 @@ export function ConfirmDialog({
           'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
         );
         if (!focusable?.length) return;
-        const first = focusable[0];
-        const last = focusable[focusable.length - 1];
+        const first = focusable.item(0);
+        const last = focusable.item(focusable.length - 1);
+        if (!first || !last) return;
         if (event.shiftKey && document.activeElement === first) {
           event.preventDefault();
           last.focus();
