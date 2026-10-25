@@ -1088,6 +1088,12 @@ export class FinanceService {
       await tx.$executeRaw`SELECT id FROM students WHERE id = ${input.studentId} AND "schoolId" = ${schoolId} FOR UPDATE`;
       if (input.billId) {
         await tx.$executeRaw`SELECT id FROM bills WHERE id = ${input.billId} AND "schoolId" = ${schoolId} FOR UPDATE`;
+      } else {
+        // Lock all open student bills in deterministic ID order before reading balances.
+        await tx.$executeRaw`SELECT id FROM bills
+          WHERE "schoolId" = ${schoolId} AND "studentId" = ${input.studentId}
+            AND "balanceAmount" > 0 AND status NOT IN ('CANCELLED', 'WAIVED')
+          ORDER BY id FOR UPDATE`;
       }
 
       // Idempotency: a retried request (double click, flaky network) carrying the
@@ -1098,7 +1104,7 @@ export class FinanceService {
         if (existing) {
           if (
             existing.studentId !== input.studentId ||
-            (existing.billId ?? null) !== (input.billId ?? null) ||
+            (input.billId ? existing.billId !== input.billId : false) ||
             !existing.amount.eq(paymentAmount)
           ) {
             throw new ConflictException("This idempotency key was already used for a different payment.");
@@ -1109,74 +1115,90 @@ export class FinanceService {
 
       await this.assertPostingDate(tx, schoolId, new Date(input.paymentDate));
 
-      // Validate the bill inside the transaction before writing anything. A bill
-      // must belong to this tenant and student, and must not be overpaid.
-      const bill = input.billId
-        ? await tx.bill.findFirst({
-            where: {
-              id: input.billId,
-              schoolId,
-              studentId: input.studentId,
-            },
-            include: { items: true },
+      // Receipts must clear open receivables. Without an explicit bill, allocate
+      // oldest-first and spill across bills; unsupported surplus remains rejected
+      // until the credit/prepayment model is added in Phase 5.
+      const candidateBills = input.billId
+        ? await tx.bill.findMany({
+            where: { id: input.billId, schoolId, studentId: input.studentId },
+            include: { items: { orderBy: [{ createdAt: "asc" }, { id: "asc" }] } },
+            take: 1,
           })
-        : null;
+        : await tx.bill.findMany({
+            where: { schoolId, studentId: input.studentId, balanceAmount: { gt: 0 }, status: { notIn: ["CANCELLED", "WAIVED"] } },
+            orderBy: [{ issuedAt: "asc" }, { id: "asc" }],
+            include: { items: { orderBy: [{ createdAt: "asc" }, { id: "asc" }] } },
+          });
 
-      if (input.billId && !bill) {
+      if (input.billId && candidateBills.length === 0) {
         throw new NotFoundException("Bill not found for this student.");
       }
-      if (bill && ["CANCELLED", "WAIVED"].includes(bill.status)) {
+      if (candidateBills.some((row) => ["CANCELLED", "WAIVED"].includes(row.status))) {
         throw new BadRequestException("Payments cannot be recorded against a cancelled or waived bill.");
       }
-      if (bill && paymentAmount.gt(bill.balanceAmount)) {
+      if (!candidateBills.length) {
+        throw new BadRequestException("This student has no open bill to allocate this receipt to. Prepayments and credits are not enabled yet.");
+      }
+
+      const totalOpen = candidateBills.reduce((sum, row) => sum.plus(row.balanceAmount), new Prisma.Decimal(0));
+      if (paymentAmount.gt(totalOpen)) {
         throw new BadRequestException(
-          `Payment exceeds the outstanding bill balance of ${bill.balanceAmount.toFixed(2)}.`,
+          `Payment exceeds open receivables of ${totalOpen.toFixed(2)}. Credit balances and prepayments are not enabled yet.`,
+        );
+      }
+      if (input.billId && paymentAmount.gt(candidateBills[0].balanceAmount)) {
+        throw new BadRequestException(
+          `Payment exceeds the outstanding bill balance of ${candidateBills[0].balanceAmount.toFixed(2)}.`,
         );
       }
 
-      // Validate explicit fee-component allocations before writing anything.
-      // Older clients may omit allocations; those retain the historical FIFO behaviour.
-      const itemAllocations: { billItemId: string; amount: Prisma.Decimal }[] = [];
-      if (!bill && input.allocations?.length) {
-        throw new BadRequestException("Fee-component allocations require a bill.");
+      const selectedBillId = candidateBills[0].id;
+      const itemAllocations: { billId: string; billItemId: string; amount: Prisma.Decimal }[] = [];
+      if (!input.billId && input.allocations?.length) {
+        throw new BadRequestException("Explicit fee-component allocations require selecting a bill.");
       }
-      if (bill) {
-        if (input.allocations) {
-          const seenItemIds = new Set<string>();
-          let allocatedTotal = new Prisma.Decimal(0);
-          for (const allocation of input.allocations) {
-            if (seenItemIds.has(allocation.billItemId)) {
-              throw new BadRequestException("Each bill component can only be selected once.");
-            }
-            seenItemIds.add(allocation.billItemId);
-            const item = bill.items.find((candidate) => candidate.id === allocation.billItemId);
-            if (!item) {
-              throw new BadRequestException("One or more selected components do not belong to this bill.");
-            }
-            const amount = toMoney(allocation.amount, "A component allocation");
-            if (amount.lte(0) || amount.gt(item.balanceAmount)) {
-              throw new BadRequestException(
-                `Allocation for "${item.description}" must be greater than zero and no more than ${item.balanceAmount.toFixed(2)}.`,
-              );
-            }
-            itemAllocations.push({ billItemId: item.id, amount });
-            allocatedTotal = allocatedTotal.plus(amount);
+
+      if (input.billId && input.allocations) {
+        const bill = candidateBills[0];
+        const seenItemIds = new Set<string>();
+        let allocatedTotal = new Prisma.Decimal(0);
+        for (const allocation of input.allocations) {
+          if (seenItemIds.has(allocation.billItemId)) throw new BadRequestException("Each bill component can only be selected once.");
+          seenItemIds.add(allocation.billItemId);
+          const item = bill.items.find((candidate) => candidate.id === allocation.billItemId);
+          if (!item) throw new BadRequestException("One or more selected components do not belong to this bill.");
+          const amount = toMoney(allocation.amount, "A component allocation");
+          if (amount.lte(0) || amount.gt(item.balanceAmount)) {
+            throw new BadRequestException(
+              `Allocation for "${item.description}" must be greater than zero and no more than ${item.balanceAmount.toFixed(2)}.`,
+            );
           }
-          if (!allocatedTotal.eq(paymentAmount)) {
-            throw new BadRequestException("The payment amount must equal the sum of the selected fee-component allocations.");
-          }
-        } else {
-          let remaining = paymentAmount;
-          for (const item of bill.items) {
-            if (remaining.lte(0)) break;
-            if (item.balanceAmount.lte(0)) continue;
-            const applied = Prisma.Decimal.min(remaining, item.balanceAmount);
-            if (applied.gt(0)) itemAllocations.push({ billItemId: item.id, amount: applied });
-            remaining = remaining.minus(applied);
-          }
-          // Preserve the previous FIFO fallback for older clients and historical bills
-          // that do not have a complete item ledger. New UI submissions are explicit.
+          itemAllocations.push({ billId: bill.id, billItemId: item.id, amount });
+          allocatedTotal = allocatedTotal.plus(amount);
         }
+        if (!allocatedTotal.eq(paymentAmount)) {
+          throw new BadRequestException("The payment amount must equal the sum of the selected fee-component allocations.");
+        }
+      } else {
+        let remaining = paymentAmount;
+        for (const bill of candidateBills) {
+          if (remaining.lte(0)) break;
+          if (bill.balanceAmount.lte(0)) continue;
+          const billApplied = Prisma.Decimal.min(remaining, bill.balanceAmount);
+          let billItemRemaining = billApplied;
+          for (const item of bill.items) {
+            if (billItemRemaining.lte(0)) break;
+            if (item.balanceAmount.lte(0)) continue;
+            const applied = Prisma.Decimal.min(billItemRemaining, item.balanceAmount);
+            if (applied.gt(0)) itemAllocations.push({ billId: bill.id, billItemId: item.id, amount: applied });
+            billItemRemaining = billItemRemaining.minus(applied);
+          }
+          if (billItemRemaining.gt(0)) {
+            throw new ConflictException(`Bill ${bill.billNumber} does not reconcile to its open component balances. No receipt was recorded.`);
+          }
+          remaining = remaining.minus(billApplied);
+        }
+        if (remaining.gt(0)) throw new ConflictException("The receipt could not be fully allocated to open bills.");
       }
 
       // Receipt numbers are sequential per school and year, issued under a
@@ -1189,7 +1211,7 @@ export class FinanceService {
         data: {
           schoolId,
           studentId: input.studentId,
-          billId: input.billId,
+          billId: selectedBillId,
           paymentNumber,
           amount: paymentAmount,
           paymentMethod: input.paymentMethod,
@@ -1222,37 +1244,39 @@ export class FinanceService {
         data: { transactionId: ledger.id },
       });
 
-      // 3. Update the already-validated bill atomically.
-      if (bill) {
-        const newPaid = bill.paidAmount.plus(paymentAmount);
-        const newBalance = Prisma.Decimal.max(0, bill.totalAmount.minus(newPaid));
-        const status = newBalance.eq(0) ? "PAID" : "PARTIALLY_PAID";
-
+      // Update every bill touched by this receipt; its allocation rows may span bills.
+      const appliedByBill = new Map<string, Prisma.Decimal>();
+      for (const allocation of itemAllocations) {
+        appliedByBill.set(
+          allocation.billId,
+          (appliedByBill.get(allocation.billId) ?? new Prisma.Decimal(0)).plus(allocation.amount),
+        );
+      }
+      for (const bill of candidateBills) {
+        const applied = appliedByBill.get(bill.id) ?? new Prisma.Decimal(0);
+        if (applied.lte(0)) continue;
+        if (applied.gt(bill.balanceAmount)) throw new ConflictException("A bill balance changed before allocation.");
+        const nextBalance = bill.balanceAmount.minus(applied);
+        const nextPaid = bill.paidAmount.plus(applied);
         await tx.bill.update({
           where: { id: bill.id },
-          data: { paidAmount: newPaid, balanceAmount: newBalance, status },
+          data: { paidAmount: nextPaid, balanceAmount: nextBalance, status: nextBalance.eq(0) ? "PAID" : nextPaid.gt(0) ? "PARTIALLY_PAID" : "PENDING" },
         });
       }
 
-      // 4. Apply each allocation to the matching bill component.
-      if (bill) {
-        for (const allocation of itemAllocations) {
-          const item = bill.items.find((candidate) => candidate.id === allocation.billItemId);
-          if (!item) throw new BadRequestException("A selected bill component no longer exists.");
-          const nextBalance = Prisma.Decimal.max(0, item.balanceAmount.minus(allocation.amount));
-          const nextPaid = item.paidAmount.plus(allocation.amount);
-          await tx.billItem.update({
-            where: { id: item.id },
-            data: {
-              paidAmount: nextPaid,
-              balanceAmount: nextBalance,
-              status: nextBalance.eq(0) ? "FULLY_PAID" : "PARTIALLY_PAID",
-            },
-          });
-          await tx.paymentItem.create({
-            data: { paymentId: payment.id, billItemId: item.id, amount: allocation.amount },
-          });
+      const itemById = new Map(candidateBills.flatMap((bill) => bill.items.map((item) => [item.id, item] as const)));
+      for (const allocation of itemAllocations) {
+        const item = itemById.get(allocation.billItemId);
+        if (!item || allocation.amount.gt(item.balanceAmount)) {
+          throw new ConflictException("A bill component balance changed before allocation.");
         }
+        const nextBalance = item.balanceAmount.minus(allocation.amount);
+        const nextPaid = item.paidAmount.plus(allocation.amount);
+        await tx.billItem.update({
+          where: { id: item.id },
+          data: { paidAmount: nextPaid, balanceAmount: nextBalance, status: nextBalance.eq(0) ? "FULLY_PAID" : "PARTIALLY_PAID" },
+        });
+        await tx.paymentItem.create({ data: { paymentId: payment.id, billItemId: item.id, amount: allocation.amount } });
       }
 
       // Keep the aggregate student balance from dropping below zero if older
@@ -1276,7 +1300,8 @@ export class FinanceService {
         newValues: {
           paymentNumber,
           studentId: input.studentId,
-          billId: input.billId ?? null,
+          billId: selectedBillId,
+          allocatedBillIds: [...appliedByBill.keys()],
           amount: paymentAmount.toFixed(2),
           paymentMethod: input.paymentMethod,
           ledgerTransactionId: ledger.id,
