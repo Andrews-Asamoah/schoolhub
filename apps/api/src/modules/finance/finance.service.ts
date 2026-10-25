@@ -3274,23 +3274,15 @@ export class FinanceService {
       return db.$transaction(async (tx) => {
         const current = await tx.payrollRecord.findFirst({
           where: { id: payroll.id, schoolId },
-          include: {
+          select: {
+            id: true, schoolId: true, month: true, year: true, status: true, settingsSnapshot: true,
             payslips: {
               select: {
-                grossSalary: true,
-                netSalary: true,
-                incomeTax: true,
-                ssnitEmployee: true,
-                ssnitEmployer: true,
-                tier2Employee: true,
-                tier2Employer: true,
-                tier3Employee: true,
-                tier3Employer: true,
-                otherDeductions: true,
+                grossSalary: true, netSalary: true, incomeTax: true, ssnitEmployee: true, ssnitEmployer: true,
+                tier2Employee: true, tier2Employer: true, tier3Employee: true, tier3Employer: true, otherDeductions: true,
                 lines: { select: { code: true, kind: true, amount: true } },
               },
             },
-            settingsSnapshot: true,
           },
         });
         if (!current) throw new NotFoundException("Payroll run not found.");
