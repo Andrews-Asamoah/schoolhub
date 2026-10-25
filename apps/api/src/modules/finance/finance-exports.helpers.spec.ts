@@ -18,7 +18,7 @@ describe("finance export workbook", () => {
     });
 
     const workbook = new ExcelJS.Workbook();
-    await workbook.xlsx.load(buffer);
+    await workbook.xlsx.load(Uint8Array.from(buffer).buffer as ArrayBuffer);
     const sheet = workbook.getWorksheet("Payment register");
     expect(sheet).toBeDefined();
     expect(sheet!.views[0]).toMatchObject({ state: "frozen", ySplit: 1 });
