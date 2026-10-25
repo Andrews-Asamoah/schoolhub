@@ -730,7 +730,7 @@ export function AccountantPortalWorkspace({
               <button className={buttonPrimary} onClick={() => { setMessage(null); setSelectedBillId(""); setShowPaymentForm(true); }}>
                 <Plus className="size-4" /> Record payment
               </button>
-              <button className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-background/30 bg-background/10 px-4 py-2 text-sm font-semibold text-background transition hover:bg-background/20" onClick={() => { setMessage(null); setSelectedFeeStructureId(""); setSelectedClassId(""); setShowBillForm(true); }}>
+              <button className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-background/30 bg-background/10 px-4 py-2 text-sm font-semibold text-background transition hover:bg-background/20" onClick={() => { setMessage(null); setSelectedFeeStructureId(""); setSelectedOptionalItemIds([]); setSelectedClassId(""); setShowBillForm(true); }}>
                 <Receipt className="size-4" /> Generate bills
               </button>
               <button className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-background/30 bg-background/10 px-4 py-2 text-sm font-semibold text-background transition hover:bg-background/20" onClick={() => { setMessage(null); setShowExpenseForm(true); }}>
@@ -1025,7 +1025,7 @@ export function AccountantPortalWorkspace({
         )}
 
       {showBillForm && (
-        <Modal title="Generate student bills" description="Generate bills for every active student enrolled in one class for the current academic term." onClose={() => { setShowBillForm(false); setSelectedFeeStructureId(""); setSelectedClassId(""); }}>
+        <Modal title="Generate student bills" description="Generate bills for every active student enrolled in one class for the current academic term." onClose={() => { setShowBillForm(false); setSelectedFeeStructureId(""); setSelectedOptionalItemIds([]); setSelectedClassId(""); }}>
           <form onSubmit={submitBill} className="space-y-4">
             {message?.kind === "error" && <QueryError message={message.text} />}
             {yearsQuery.error && <QueryError message={yearsQuery.error.message} />}
@@ -1073,7 +1073,7 @@ export function AccountantPortalWorkspace({
             <Field label="Due date (optional)"><input name="dueDate" type="date" className={inputClass} /></Field>
             <Field label="Notes (optional)"><textarea name="notes" className={cn(inputClass, "h-20 py-2")} placeholder="Optional note shown on generated bills" /></Field>
             <p className="text-xs leading-5 text-muted-foreground">The operation is performed by the server using the selected class roster and current term. Review the count and total in the confirmation message after generation.</p>
-            <ModalActions onCancel={() => { setShowBillForm(false); setSelectedFeeStructureId(""); setSelectedClassId(""); }} busy={generateBills.isPending} submitLabel="Generate bills" />
+            <ModalActions onCancel={() => { setShowBillForm(false); setSelectedFeeStructureId(""); setSelectedOptionalItemIds([]); setSelectedClassId(""); }} busy={generateBills.isPending} submitLabel="Generate bills" />
           </form>
         </Modal>
       )}
