@@ -1603,6 +1603,7 @@ export class FinanceService {
     studentId: string,
     role: string | undefined,
     query: StudentStatementQuery = {},
+    guardianAuthorized = false,
   ): Promise<StudentStatementResponse> {
     const scope = query.scope ?? "term";
     if (!["term", "year", "all"].includes(scope)) throw new BadRequestException("Choose term, year or all-time statement scope.");
@@ -1641,7 +1642,7 @@ export class FinanceService {
         include: { academicYear: { select: { id: true, name: true, startDate: true, endDate: true } } },
       });
       if (!term) throw new BadRequestException("Choose a term belonging to an academic year in this school.");
-      if (!canManageAcademicContext(role) && (selectedYearId !== currentYear?.id || selectedTermId !== currentTerm?.id)) {
+      if (!guardianAuthorized && !canManageAcademicContext(role) && (selectedYearId !== currentYear?.id || selectedTermId !== currentTerm?.id)) {
         throw new ForbiddenException("Only the current academic year and term are available for your role.");
       }
       yearLabel = term.academicYear.name;
@@ -1649,7 +1650,7 @@ export class FinanceService {
       periodStart = term.startDate;
       periodEnd = term.endDate;
     } else if (scope === "year") {
-      if (!canManageAcademicContext(role)) throw new ForbiddenException("Only finance and school management roles may view a full-year statement.");
+      if (!guardianAuthorized && !canManageAcademicContext(role)) throw new ForbiddenException("Only finance and school management roles may view a full-year statement.");
       selectedYearId = query.yearId ?? currentYear?.id;
       if (!selectedYearId) throw new BadRequestException("Choose an academic year.");
       const year = await this.prisma.client.academicYear.findFirst({
@@ -1661,7 +1662,7 @@ export class FinanceService {
       periodStart = year.startDate;
       periodEnd = year.endDate;
     } else {
-      if (!canManageAcademicContext(role)) throw new ForbiddenException("Only finance and school management roles may view an all-time statement.");
+      if (!guardianAuthorized && !canManageAcademicContext(role)) throw new ForbiddenException("Only finance and school management roles may view an all-time statement.");
     }
 
     const explicitFrom = parseIsoDate(query.from, "start date");
@@ -1689,8 +1690,13 @@ export class FinanceService {
         where: { schoolId, studentId, paymentDate: { lte: maxDate } },
         orderBy: [{ paymentDate: "asc" }, { createdAt: "asc" }, { id: "asc" }],
         include: {
-          bill: { select: { academicYear: { select: { name: true } }, term: { select: { name: true } } } },
-          paymentItems: { select: { amount: true, billItem: { select: { billId: true } } } },
+          bill: { select: { id: true, billNumber: true, academicYearId: true, termId: true, academicYear: { select: { name: true } }, term: { select: { name: true } } } },
+          billAllocations: {
+            include: {
+              bill: { select: { id: true, billNumber: true, academicYearId: true, termId: true, academicYear: { select: { name: true } }, term: { select: { name: true } } } },
+            },
+          },
+          paymentItems: { select: { amount: true, billItem: { select: { billId: true, bill: { select: { id: true, billNumber: true, academicYearId: true, termId: true, academicYear: { select: { name: true } }, term: { select: { name: true } } } } } } },
         },
       }),
       this.prisma.client.bill.findMany({
@@ -1750,45 +1756,97 @@ export class FinanceService {
 
     let unallocatedCredit = new Prisma.Decimal(0);
     for (const payment of payments) {
-      const allocatedTotal = payment.paymentItems.reduce((sum, item) => sum.plus(item.amount), new Prisma.Decimal(0));
-      const applied = payment.paymentItems.length > 0
-        ? Prisma.Decimal.min(payment.amount, allocatedTotal)
-        : payment.billId ? payment.amount : new Prisma.Decimal(0);
       const paymentDate = payment.paymentDate.toISOString().slice(0, 10);
       const reversedBeforeEnd = payment.reversedAt !== null && payment.reversedAt <= maxDate;
       const reversedAfterEnd = payment.reversedAt !== null && payment.reversedAt > maxDate;
       const wasCompletedAtEnd = payment.status === "COMPLETED" || reversedAfterEnd;
-      if (wasCompletedAtEnd && applied.gt(0)) {
-        allEvents.push({
-          id: `${payment.id}:receipt`,
-          date: paymentDate,
-          type: "RECEIPT",
-          reference: payment.paymentNumber,
-          description: `Receipt ${payment.paymentNumber}`,
-          academicYear: payment.bill?.academicYear.name ?? null,
-          term: payment.bill?.term?.name ?? null,
-          billId: payment.billId,
-          paymentId: payment.id,
-          amount: applied.negated(),
-        });
+
+      let paymentAllocations: Array<{
+        billId: string;
+        billNumber: string;
+        amount: Prisma.Decimal;
+        academicYearId: string;
+        termId: string | null;
+        academicYearName: string | null;
+        termName: string | null;
+      }> = payment.billAllocations.map((allocation) => ({
+        billId: allocation.billId,
+        billNumber: allocation.bill.billNumber,
+        amount: allocation.amount,
+        academicYearId: allocation.bill.academicYearId,
+        termId: allocation.bill.termId,
+        academicYearName: allocation.bill.academicYear?.name ?? null,
+        termName: allocation.bill.term?.name ?? null,
+      }));
+      // Compatibility with pre-migration records: derive bill-level allocation
+      // totals from item allocations, then from billId if no item rows exist.
+      if (paymentAllocations.length === 0 && payment.paymentItems.length) {
+        const grouped = new Map<string, { amount: Prisma.Decimal; bill: typeof payment.paymentItems[number]["billItem"]["bill"] }>();
+        for (const item of payment.paymentItems) {
+          const current = grouped.get(item.billItem.billId);
+          grouped.set(item.billItem.billId, {
+            amount: (current?.amount ?? new Prisma.Decimal(0)).plus(item.amount),
+            bill: item.billItem.bill,
+          });
+        }
+        paymentAllocations = [...grouped.entries()].map(([billId, row]) => ({
+          billId,
+          billNumber: row.bill.billNumber,
+          amount: row.amount,
+          academicYearId: row.bill.academicYearId,
+          termId: row.bill.termId,
+          academicYearName: row.bill.academicYear?.name ?? null,
+          termName: row.bill.term?.name ?? null,
+        }));
       }
-      if (payment.reversedAt && reversedBeforeEnd && applied.gt(0)) {
-        allEvents.push({
-          id: `${payment.id}:reversal`,
-          date: payment.reversedAt.toISOString().slice(0, 10),
-          type: payment.status === "REFUNDED" ? "REFUND" : "REVERSAL",
-          reference: payment.paymentNumber,
-          description: `${payment.status === "REFUNDED" ? "Refund" : "Void"} of receipt ${payment.paymentNumber}: ${payment.reversalReason ?? "No reason recorded"}`,
-          academicYear: payment.bill?.academicYear.name ?? null,
-          term: payment.bill?.term?.name ?? null,
-          billId: payment.billId,
-          paymentId: payment.id,
-          amount: applied,
-        });
+      if (paymentAllocations.length === 0 && payment.bill) {
+        paymentAllocations = [{
+          billId: payment.bill.id,
+          billNumber: payment.bill.billNumber,
+          amount: payment.amount,
+          academicYearId: payment.bill.academicYearId,
+          termId: payment.bill.termId,
+          academicYearName: payment.bill.academicYear?.name ?? null,
+          termName: payment.bill.term?.name ?? null,
+        }];
       }
-      if (wasCompletedAtEnd && !reversedBeforeEnd) {
+      const applied = paymentAllocations.reduce((sum, row) => sum.plus(row.amount), new Prisma.Decimal(0));
+      if (wasCompletedAtEnd) {
         const unallocated = Prisma.Decimal.max(0, payment.amount.minus(applied));
         unallocatedCredit = unallocatedCredit.plus(unallocated);
+      }
+
+      if (wasCompletedAtEnd && applied.gt(0)) {
+        for (const allocation of paymentAllocations) {
+          allEvents.push({
+            id: `${payment.id}:receipt:${allocation.billId}`,
+            date: paymentDate,
+            type: "RECEIPT",
+            reference: payment.paymentNumber,
+            description: `Receipt ${payment.paymentNumber} allocated to invoice ${allocation.billNumber}`,
+            academicYear: allocation.academicYearName,
+            term: allocation.termName,
+            billId: allocation.billId,
+            paymentId: payment.id,
+            amount: allocation.amount.negated(),
+          });
+        }
+      }
+      if (payment.reversedAt && reversedBeforeEnd && applied.gt(0)) {
+        for (const allocation of paymentAllocations) {
+          allEvents.push({
+            id: `${payment.id}:reversal:${allocation.billId}`,
+            date: payment.reversedAt.toISOString().slice(0, 10),
+            type: payment.status === "REFUNDED" ? "REFUND" : "REVERSAL",
+            reference: payment.paymentNumber,
+            description: `${payment.status === "REFUNDED" ? "Refund" : "Void"} of receipt ${payment.paymentNumber} against invoice ${allocation.billNumber}: ${payment.reversalReason ?? "No reason recorded"}`,
+            academicYear: allocation.academicYearName,
+            term: allocation.termName,
+            billId: allocation.billId,
+            paymentId: payment.id,
+            amount: allocation.amount,
+          });
+        }
       }
     }
 
@@ -1797,8 +1855,9 @@ export class FinanceService {
       const date = new Date(`${event.date}T00:00:00.000Z`);
       if (date.getTime() > statementEnd) return false;
       if (minDate && date < minDate) return false;
-      if ((event.type === "INVOICE" || event.type === "DISCOUNT" || event.type === "ADJUSTMENT") && event.billId) {
+      if (event.billId) {
         const bill = billPeriod.get(event.billId);
+        if ((scope === "term" || scope === "year") && !bill) return false;
         if (scope === "term" && bill?.termId !== selectedTermId) return false;
         if (scope === "year" && bill?.academicYearId !== selectedYearId) return false;
       }
