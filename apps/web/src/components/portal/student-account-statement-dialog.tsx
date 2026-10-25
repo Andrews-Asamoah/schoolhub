@@ -205,7 +205,10 @@ export function StudentAccountStatementDialog({
     }
 
     entries.sort((a, b) => {
-      const dateDiff = new Date(a.date).getTime() - new Date(b.date).getTime();
+      // Accountable activity is posted by calendar date. A database Date value
+      // serialises at midnight while issuedAt is a timestamp; compare calendar
+      // dates first so a same-day receipt cannot appear before its invoice.
+      const dateDiff = a.date.slice(0, 10).localeCompare(b.date.slice(0, 10));
       return dateDiff || a.order - b.order || a.reference.localeCompare(b.reference);
     });
 
