@@ -116,7 +116,6 @@ export class MeService {
   }
 
   private async filterPrivateContributionLines(
-    userId: string,
     schoolId: string,
     payslip: { staffId: string | null; teacherId: string | null; payrollRecord: { month: number; year: number }; lines: Array<{ code: string }> },
   ) {
@@ -166,7 +165,7 @@ export class MeService {
       netSalary: row.netSalary.toFixed(2),
       paymentStatus: row.paymentStatus,
       paidAt: row.paidAt,
-      lines: await this.filterPrivateContributionLines(userId, schoolId, row),
+      lines: await this.filterPrivateContributionLines(schoolId, row),
     })));
     return { items };
   }
