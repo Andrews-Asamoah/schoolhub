@@ -1,8 +1,9 @@
 import { useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChartColumn, FileDown, FileSpreadsheet, Printer, Search } from "lucide-react";
 import type { FinanceSummaryResponse } from "@schoolhub/shared";
 import { apiFetch } from "@/lib/api";
+import { useSchoolRole } from "@/components/school/school-role-switcher";
 import { exportPdf, exportXlsx, printTable, type ExportTable } from "@/lib/table-export";
 
 interface AcademicYearOption {
@@ -23,6 +24,27 @@ export function AccountantFinanceReportingWorkspace() {
   const [termId, setTermId] = useState("");
   const [classId, setClassId] = useState("ALL");
   const [search, setSearch] = useState("");
+  const queryClient = useQueryClient();
+  const { activeRole } = useSchoolRole();
+  const canChangeArrearsPolicy = ["owner", "admin", "headteacher"].includes(activeRole ?? "");
+
+  const arrearsPolicyQuery = useQuery({
+    queryKey: ["finance", "arrears-policy"],
+    queryFn: () => apiFetch<{ schoolId: string; arrearsPolicy: "SHOW_ONLY" | "BLOCK_CLEARANCE_UNTIL_PAID" }>("/finance/arrears-policy"),
+    retry: false,
+  });
+  const updateArrearsPolicy = useMutation({
+    mutationFn: (arrearsPolicy: "SHOW_ONLY" | "BLOCK_CLEARANCE_UNTIL_PAID") =>
+      apiFetch("/finance/arrears-policy", { method: "PUT", body: JSON.stringify({ arrearsPolicy }) }),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["finance", "arrears-policy"] }),
+        queryClient.invalidateQueries({ queryKey: ["finance", "summary"] }),
+        queryClient.invalidateQueries({ queryKey: ["finance", "student-statement"] }),
+        queryClient.invalidateQueries({ queryKey: ["students", "me", "fee-status"] }),
+      ]);
+    },
+  });
 
   const yearsQuery = useQuery({
     queryKey: ["schools", "academic-years"],
@@ -92,6 +114,34 @@ export function AccountantFinanceReportingWorkspace() {
         {scope === "term" && <label className="text-xs font-semibold text-muted-foreground">Term<select value={activeTerm?.id ?? ""} onChange={(event) => setTermId(event.target.value)} className="mt-1.5 h-10 w-full rounded-xl border border-border bg-background px-3 text-sm text-foreground" disabled={!activeYear}>{(activeYear?.terms ?? []).map((term) => <option key={term.id} value={term.id}>{term.name}{term.isCurrent ? " (Current)" : ""}</option>)}</select></label>}
         <label className="text-xs font-semibold text-muted-foreground">Class<select value={classId} onChange={(event) => setClassId(event.target.value)} className="mt-1.5 h-10 w-full rounded-xl border border-border bg-background px-3 text-sm text-foreground"><option value="ALL">All classes</option>{(summary?.byClass ?? []).filter((row) => row.classId).map((row) => <option key={row.classId!} value={row.classId!}>{row.className}</option>)}</select></label>
       </div>
+
+      <section className="rounded-xl border border-border p-4">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="max-w-2xl">
+            <h3 className="font-semibold text-foreground">Arrears and examination clearance</h3>
+            <p className="mt-1 text-sm text-muted-foreground">
+              SHOW_ONLY displays prior-term balances without automatically blocking clearance. BLOCK_CLEARANCE_UNTIL_PAID prevents fee clearance while previous-term arrears remain unpaid.
+            </p>
+          </div>
+          <div className="min-w-64">
+            <label htmlFor="arrears-policy" className="mb-1.5 block text-xs font-semibold text-muted-foreground">School arrears policy</label>
+            <select
+              id="arrears-policy"
+              value={arrearsPolicyQuery.data?.arrearsPolicy ?? "SHOW_ONLY"}
+              onChange={(event) => updateArrearsPolicy.mutate(event.target.value as "SHOW_ONLY" | "BLOCK_CLEARANCE_UNTIL_PAID")}
+              disabled={!canChangeArrearsPolicy || arrearsPolicyQuery.isPending || updateArrearsPolicy.isPending}
+              className="h-10 w-full rounded-xl border border-border bg-background px-3 text-sm text-foreground disabled:opacity-60"
+            >
+              <option value="SHOW_ONLY">Show arrears only (default)</option>
+              <option value="BLOCK_CLEARANCE_UNTIL_PAID">Block clearance until paid</option>
+            </select>
+            {updateArrearsPolicy.isPending && <p className="mt-1 text-xs text-muted-foreground">Saving policy…</p>}
+            {updateArrearsPolicy.isError && <p role="alert" className="mt-1 text-xs text-destructive">{updateArrearsPolicy.error.message}</p>}
+            {arrearsPolicyQuery.isError && <p role="alert" className="mt-1 text-xs text-destructive">The school policy could not be loaded.</p>}
+            {!canChangeArrearsPolicy && <p className="mt-1 text-xs text-muted-foreground">Only an owner, administrator or headteacher may change this policy.</p>}
+          </div>
+        </div>
+      </section>
 
       {scope !== "all" && !activeYear ? <div className="rounded-xl border border-warning/20 bg-warning/10 p-4 text-sm text-warning">Select or configure an academic year before running a report.</div> : null}
       {summaryQuery.isPending ? <div className="rounded-xl border border-border p-8 text-center text-sm text-muted-foreground">Loading server-side finance report…</div>
