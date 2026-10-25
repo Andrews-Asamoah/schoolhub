@@ -14,6 +14,10 @@ import { buildFinanceAuditWhere, categoryOf, clampPageSize, describeFinanceAudit
 import { buildRunningStatement, daysPastDue, type StatementEvent } from "./finance-reporting.helpers.js";
 import { calculatePayroll } from "./payroll/payroll-calculator.js";
 
+function roundMoney(value: number) {
+  return Math.round((value + Number.EPSILON) * 100) / 100;
+}
+
 type FinanceListQuery = {
   cursor?: string;
   limit?: string | number;
@@ -63,17 +67,6 @@ function moneyString(value: Prisma.Decimal | null | undefined): string {
   return (value ?? new Prisma.Decimal(0)).toFixed(2);
 }
 
-function calculateResidentPaye2026(chargeableIncome: number) {
-  let remaining = Math.max(0, chargeableIncome);
-  let tax = 0;
-  for (const band of PAYE_MONTHLY_BANDS_2026) {
-    if (remaining <= 0) break;
-    const taxableInBand = Math.min(remaining, band.limit);
-    tax += taxableInBand * band.rate;
-    remaining -= taxableInBand;
-  }
-  return roundMoney(tax);
-}
 
 @Injectable()
 export class FinanceService {
