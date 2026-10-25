@@ -397,6 +397,7 @@ describe.skipIf(!enabled)("finance (database)", { timeout: 60_000 }, () => {
     it("paginates more than 500 bills and payments while summaries include all rows", async () => {
       const { student } = await studentWithBill(100);
       const prefix = `RPT-${run}-`;
+      const currentTerm = await prisma.term.findFirstOrThrow({ where: { academicYearId: yearId, isCurrent: true }, select: { id: true } });
       const billRows = Array.from({ length: 501 }, (_, index) => ({
         schoolId,
         studentId: student.id,
@@ -408,7 +409,7 @@ describe.skipIf(!enabled)("finance (database)", { timeout: 60_000 }, () => {
         balanceAmount: new Prisma.Decimal("1.00"),
         status: "PENDING" as const,
         issuedAt: new Date(Date.UTC(2026, 0, (index % 28) + 1)),
-        termId: (await prisma.term.findFirst({ where: { academicYearId: yearId }, select: { id: true } }))!.id,
+        termId: currentTerm.id,
       }));
       await prisma.bill.createMany({ data: billRows });
       const insertedBills = await prisma.bill.findMany({
@@ -529,7 +530,7 @@ describe.skipIf(!enabled)("finance (database)", { timeout: 60_000 }, () => {
       try {
         await expect(service.getStudentStatement(schoolId, foreignStudent.id, "owner", { scope: "all" })).rejects.toThrow(/student not found/i);
         const localPage = await service.listBills(schoolId, { limit: 100 });
-        expect(localPage.items.some((row) => row.id === foreignStudent.id)).toBe(false);
+        expect(localPage.items.some((row) => (row.student as { id?: string } | undefined)?.id === foreignStudent.id)).toBe(false);
       } finally {
         await prisma.student.deleteMany({ where: { id: foreignStudent.id } });
         await prisma.school.deleteMany({ where: { id: foreignSchool.id } });
