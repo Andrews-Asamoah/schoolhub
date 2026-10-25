@@ -157,7 +157,7 @@ export function AccountantFinanceReportingWorkspace() {
           ["Outstanding", summary.outstanding, summary.outstandingBillCount + " open bills"],
           ["Overdue", summary.overdue, summary.overdueBillCount + " overdue bills"],
           ["Collection rate", summary.collectionRate == null ? "—" : summary.collectionRate + "%", "Server-calculated"],
-        ].map(([label, value, detail]) => <div key={label} className="rounded-2xl border border-border bg-card p-4"><p className="text-xs font-medium text-muted-foreground">{label}</p><p className="mt-2 text-xl font-bold tabular-nums text-foreground">{label === "Collection rate" ? value : money(value)}</p><p className="mt-1 text-xs text-muted-foreground">{detail}</p></div>)}
+        ].map(([label, value, detail]) => <div key={label} className="rounded-2xl border border-border bg-card p-4"><p className="text-xs font-medium text-muted-foreground">{label}</p><p className="mt-2 text-xl font-bold tabular-nums text-foreground">{label === "Collection rate" ? value : money(value ?? "0.00")}</p><p className="mt-1 text-xs text-muted-foreground">{detail}</p></div>)}
       </div>
       <section className="rounded-2xl border border-border bg-card p-5">
         <h3 className="text-lg font-semibold text-foreground">Receivables ageing</h3><p className="mt-1 text-sm text-muted-foreground">Open balance aged from each bill's due date, as of {summary.asOf}.</p>
