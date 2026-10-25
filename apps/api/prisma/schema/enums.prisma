@@ -154,6 +154,11 @@ enum FeeCategory {
   OTHER
 }
 
+enum ArrearsPolicy {
+  SHOW_ONLY
+  BLOCK_CLEARANCE_UNTIL_PAID
+}
+
 enum BillStatus {
   PENDING
   PARTIALLY_PAID
