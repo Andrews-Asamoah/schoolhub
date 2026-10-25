@@ -1835,7 +1835,20 @@ export class FinanceService {
         include: {
           student: { select: { id: true, admissionNumber: true, profile: { select: { firstName: true, lastName: true } } } },
           bill: { select: { id: true, billNumber: true, class: { select: { id: true, name: true } } } },
-          paymentItems: { include: { billItem: { include: { feeItem: { include: { customCategory: { select: { name: true } }, registryItem: { select: { name: true } } } } } } },
+          paymentItems: {
+            include: {
+              billItem: {
+                include: {
+                  feeItem: {
+                    include: {
+                      customCategory: { select: { name: true } },
+                      registryItem: { select: { name: true } },
+                    },
+                  },
+                },
+              },
+            },
+          },
           recordedBy: { select: { name: true, email: true } },
         },
       }),
