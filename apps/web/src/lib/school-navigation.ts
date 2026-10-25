@@ -507,7 +507,6 @@ const rolePages: Record<string, string[]> = {
     "fee-reminders",
     "inventory",
     "students",
-    "reports",
   ],
   staff: [
     "students",
