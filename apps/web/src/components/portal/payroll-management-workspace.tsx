@@ -1,6 +1,10 @@
+import { TableExportMenu } from "@/components/ui/data-table";
+import type { ExportTable } from "@/lib/table-export";
+import { ServerExportButton } from "@/components/portal/server-export-button";
+import { useCanExportPayrollTables } from "@/lib/table-export-policy";
 import { useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertCircle, BadgeCheck, CalendarClock, CheckCircle2, Download, FileText, LoaderCircle, PlayCircle, Printer, Wallet, X } from "lucide-react";
+import { AlertCircle, BadgeCheck, CalendarClock, CheckCircle2, FileText, LoaderCircle, PlayCircle, Printer, Wallet, X } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -70,15 +74,9 @@ function personName(payslip: Payslip) {
   const name = [profile?.firstName, profile?.lastName].filter(Boolean).join(" ").trim();
   return name || (payslip.teacherId ? payslip.teacher?.teacherId : payslip.staff?.staffId) || "Unlinked employee";
 }
-function downloadCsv(rows: unknown[][], filename: string) {
-  const csv = rows.map(row => row.map(value => '"' + String(value ?? "").replaceAll('"', '""') + '"').join(",")).join("\r\n");
-  const url = URL.createObjectURL(new Blob(["\uFEFF", csv], { type: "text/csv;charset=utf-8;" }));
-  const link = document.createElement("a");
-  link.href = url; link.download = filename; document.body.appendChild(link); link.click(); link.remove(); URL.revokeObjectURL(url);
-}
-
 export function PayrollManagementWorkspace() {
   const { canWrite } = useFinanceAccess();
+  const canExportPayroll = useCanExportPayrollTables();
   const queryClient = useQueryClient();
   const [showGenerate, setShowGenerate] = useState(false);
   const [month, setMonth] = useState(String(Math.max(9, Math.min(12, new Date().getMonth() + 1))));
@@ -177,13 +175,15 @@ export function PayrollManagementWorkspace() {
     }
     updateSalary.mutate({ person: salaryTarget, monthlySalary: Math.round((amount + Number.EPSILON) * 100) / 100 });
   }
-  const exportSalaryRegister = () => downloadCsv([
-    ["SchoolHub Salary Register"],
-    ["Exported at", new Date().toLocaleString("en-GB")],
-    [],
-    ["Employee", "Employee reference", "Type", "Monthly salary (GHS)", "Payroll eligible"],
-    ...salaryRegister.map(person => [person.name, person.identifier, person.type, person.monthlySalary == null ? "" : Number(person.monthlySalary).toFixed(2), Number(person.monthlySalary) > 0 ? "Yes" : "No"]),
-  ], "schoolhub-salary-register.csv");
+  const buildSalaryRegisterExport = (): ExportTable => ({
+    title: "Salary register",
+    headers: ["Employee", "Employee reference", "Type", "Monthly salary (GHS)", "Payroll eligible"],
+    columnTypes: ["text", "text", "text", "money", "text"],
+    rows: filteredSalaryRegister.map(person => [person.name, person.identifier, person.type, person.monthlySalary == null ? null : Number(person.monthlySalary), Number(person.monthlySalary) > 0 ? "Yes" : "No"]),
+    totals: ["Total", "", "", null, ""],
+    confidential: true,
+    reportInfo: { period: "Current salary register", filters: { search: salarySearch } },
+  });
 
   function submitGenerate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -193,20 +193,18 @@ export function PayrollManagementWorkspace() {
     }
     generatePayroll.mutate({ month: Number(month), year: 2026, confirmResidentTaxTreatment: true });
   }
-  const exportRegister = () => {
-    const rows: unknown[][] = [
-      ["SchoolHub Payroll Register"],
-      ["Exported at", new Date().toLocaleString("en-GB")],
-      [],
-      ["Period", "Status", "Employees", "Gross (GHS)", "PAYE (GHS)", "SSNIT total (GHS)", "Net (GHS)"],
-      ...visiblePayroll.map(run => [monthName(run.month, run.year), run.status, run._count?.payslips ?? run.payslips.length, Number(run.totalGross).toFixed(2), Number(run.totalTax).toFixed(2), Number(run.totalSSNIT).toFixed(2), Number(run.totalNet).toFixed(2)]),
-      [],
-      ["Payslip details"],
-      ["Period", "Employee", "Employee ID", "Basic (GHS)", "Employee SSNIT (GHS)", "PAYE (GHS)", "Employer SSNIT (GHS)", "Net (GHS)", "Payment status"],
-      ...visiblePayroll.flatMap(run => run.payslips.map(slip => [monthName(run.month, run.year), personName(slip), slip.staff?.staffId ?? slip.teacher?.teacherId ?? "", Number(slip.basicSalary).toFixed(2), Number(slip.ssnitEmployee).toFixed(2), Number(slip.incomeTax).toFixed(2), Number(slip.ssnitEmployer).toFixed(2), Number(slip.netSalary).toFixed(2), slip.paymentStatus])),
-    ];
-    downloadCsv(rows, "schoolhub-payroll-register.csv");
-  };
+  const buildPayrollRegisterExport = (): ExportTable => ({
+    title: "Payroll register",
+    headers: ["Period", "Run status", "Employee", "Employee ID", "Basic (GHS)", "Employee SSNIT (GHS)", "PAYE (GHS)", "Employer SSNIT (GHS)", "Net (GHS)", "Payment status"],
+    columnTypes: ["text", "text", "text", "text", "money", "money", "money", "money", "money", "text"],
+    rows: visiblePayroll.flatMap(run => run.payslips.map(slip => [
+      monthName(run.month, run.year), run.status, personName(slip), slip.staff?.staffId ?? slip.teacher?.teacherId ?? "",
+      Number(slip.basicSalary), Number(slip.ssnitEmployee), Number(slip.incomeTax), Number(slip.ssnitEmployer), Number(slip.netSalary), slip.paymentStatus,
+    ])),
+    totals: ["Total", "", "", "", null, null, null, null, null, ""],
+    confidential: true,
+    reportInfo: { period: "Selected payroll runs" },
+  });
 
   return <div className="mx-auto w-full min-w-0 max-w-screen-2xl space-y-6">
     <style>{`@media print {
@@ -220,7 +218,7 @@ export function PayrollManagementWorkspace() {
     }`}</style>
     <section className="flex flex-col gap-4 rounded-2xl border border-border bg-card p-5 shadow-sm sm:flex-row sm:items-end sm:justify-between sm:p-6">
       <div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">Finance & bursary</p><h1 className="mt-1 text-2xl font-bold tracking-tight text-foreground">Payroll</h1><p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">Generate payroll drafts from employee salary records, review statutory deductions, approve runs and record confirmed disbursements.</p></div>
-      <div className="flex flex-wrap gap-2"><button type="button" className={secondaryButton} onClick={exportRegister} disabled={!visiblePayroll.length}><Download className="size-4" /> Export register</button>{canWrite && <button type="button" className={primaryButton} onClick={() => { setFeedback(null); setShowGenerate(true); }}><PlayCircle className="size-4" /> Generate payroll draft</button>}</div>
+      <div className="flex flex-wrap gap-2">{canExportPayroll && <><TableExportMenu build={buildPayrollRegisterExport} note="Confidential payroll data. Export access is restricted." /><ServerExportButton endpoint="/finance/exports/payroll.xlsx" label="All-run Excel" className={secondaryButton} /></>}{canWrite && <button type="button" className={primaryButton} onClick={() => { setFeedback(null); setShowGenerate(true); }}><PlayCircle className="size-4" /> Generate payroll draft</button>}</div>
     </section>
     {!canWrite && <FinanceReadOnlyNotice />}
     {feedback && <div role={feedback.kind === "error" ? "alert" : "status"} className={cn("flex items-start gap-3 rounded-xl border p-3 text-sm", feedback.kind === "error" ? "border-destructive/30 bg-destructive/5 text-destructive" : "border-success/30 bg-success/5 text-foreground")}><span className="min-w-0 flex-1">{feedback.text}</span><button type="button" aria-label="Dismiss message" onClick={() => setFeedback(null)}><X className="size-4" /></button></div>}
@@ -234,7 +232,7 @@ export function PayrollManagementWorkspace() {
     <section className="rounded-2xl border border-border bg-card p-4 shadow-sm sm:p-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div><h2 className="text-lg font-semibold text-foreground">Salary register</h2><p className="mt-1 text-sm text-muted-foreground">Manage the monthly base salary used when creating new payroll drafts. Updating a salary does not alter already saved payroll runs.</p></div>
-        <button type="button" className={secondaryButton} onClick={exportSalaryRegister} disabled={!salaryRegister.length}><Download className="size-4" /> Export salaries</button>
+        {canExportPayroll && <><TableExportMenu build={buildSalaryRegisterExport} note="Confidential salary data. Export access is restricted." /><ServerExportButton endpoint="/finance/exports/salaries.xlsx" label="Full salary Excel" className={secondaryButton} /></>}
       </div>
       <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0 flex-1"><label className="mb-1.5 block text-xs font-semibold text-muted-foreground">Search employee</label><input className={fieldClass} value={salarySearch} onChange={event => setSalarySearch(event.target.value)} placeholder="Search by name, ID, or staff type…" /></div>
@@ -280,8 +278,8 @@ export function PayrollManagementWorkspace() {
     </Modal>}
 
     {selectedDetail && <Modal title={`Payslips · ${monthName(selectedDetail.month, selectedDetail.year)}`} description="Review salary values and recorded deductions before approving payroll." onClose={() => setSelectedDetail(null)}>
-      <div className="payroll-slips-print overflow-x-auto"><div className="mb-3 grid gap-2 sm:grid-cols-3"><Summary label="Employees" value={String(selectedDetail.payslips.length)} /><Summary label="Gross" value={money(selectedDetail.totalGross)} /><Summary label="Net" value={money(selectedDetail.totalNet)} /></div><table className="w-full min-w-[850px] text-left text-sm"><thead><tr className="border-b border-border text-xs text-muted-foreground"><th className="p-2">Employee</th><th className="p-2 text-right">Basic</th><th className="p-2 text-right">Employee SSNIT</th><th className="p-2 text-right">PAYE</th><th className="p-2 text-right">Employer SSNIT</th><th className="p-2 text-right">Net</th><th className="p-2">Status</th></tr></thead><tbody>{selectedDetail.payslips.map(slip => <tr key={slip.id} className="border-b border-border/70"><td className="p-2"><p className="font-medium text-foreground">{personName(slip)}</p><p className="text-[10px] text-muted-foreground">{slip.staff?.staffId ?? slip.teacher?.teacherId ?? ""}</p></td><td className="p-2 text-right tabular-nums">{money(slip.basicSalary)}</td><td className="p-2 text-right tabular-nums">{money(slip.ssnitEmployee)}</td><td className="p-2 text-right tabular-nums">{money(slip.incomeTax)}</td><td className="p-2 text-right tabular-nums">{money(slip.ssnitEmployer)}</td><td className="p-2 text-right font-semibold tabular-nums">{money(slip.netSalary)}</td><td className="p-2 text-xs">{slip.paymentStatus}</td></tr>)}</tbody></table><p className="mt-4 text-xs leading-5 text-muted-foreground">These are draft amounts from saved monthly salary data. Allowances, overtime and other deductions are not included in this version.</p></div>
-      <div className="payroll-slips-actions mt-4 flex justify-end gap-2"><button type="button" className={secondaryButton} onClick={() => { const rows = [["Employee","Employee ID","Basic","Employee SSNIT","PAYE","Employer SSNIT","Net","Payment status"], ...selectedDetail.payslips.map(slip => [personName(slip),slip.staff?.staffId ?? slip.teacher?.teacherId ?? "",Number(slip.basicSalary).toFixed(2),Number(slip.ssnitEmployee).toFixed(2),Number(slip.incomeTax).toFixed(2),Number(slip.ssnitEmployer).toFixed(2),Number(slip.netSalary).toFixed(2),slip.paymentStatus])]; downloadCsv(rows, `payslips-${selectedDetail.year}-${selectedDetail.month}.csv`); }}><Download className="size-4" /> Export payslips</button><button type="button" className={primaryButton} onClick={() => window.print()}><Printer className="size-4" /> Print slips</button></div>
+      <div className="payroll-slips-print overflow-x-auto"><div className="mb-3 grid gap-2 sm:grid-cols-3"><Summary label="Employees" value={String(selectedDetail.payslips.length)} /><Summary label="Gross" value={money(selectedDetail.totalGross)} /><Summary label="Net" value={money(selectedDetail.totalNet)} /></div><table className="w-full min-w-[850px] text-left text-sm"><thead><tr className="border-b border-border text-xs text-muted-foreground"><th className="p-2">Employee</th><th className="p-2 text-right">Basic</th><th className="p-2 text-right">Employee SSNIT</th><th className="p-2 text-right">PAYE</th><th className="p-2 text-right">Employer SSNIT</th><th className="p-2 text-right">Net</th><th className="p-2">Status</th>{canExportPayroll && <th className="p-2">PDF</th>}</tr></thead><tbody>{selectedDetail.payslips.map(slip => <tr key={slip.id} className="border-b border-border/70"><td className="p-2"><p className="font-medium text-foreground">{personName(slip)}</p><p className="text-[10px] text-muted-foreground">{slip.staff?.staffId ?? slip.teacher?.teacherId ?? ""}</p></td><td className="p-2 text-right tabular-nums">{money(slip.basicSalary)}</td><td className="p-2 text-right tabular-nums">{money(slip.ssnitEmployee)}</td><td className="p-2 text-right tabular-nums">{money(slip.incomeTax)}</td><td className="p-2 text-right tabular-nums">{money(slip.ssnitEmployer)}</td><td className="p-2 text-right font-semibold tabular-nums">{money(slip.netSalary)}</td><td className="p-2 text-xs">{slip.paymentStatus}</td>{canExportPayroll && <td className="p-2"><ServerExportButton endpoint={"/finance/payslips/" + encodeURIComponent(slip.id) + ".pdf"} label="PDF" className="inline-flex items-center gap-1 rounded-lg border border-border px-2 py-1 text-xs font-semibold text-foreground" /></td>}</tr>)}</tbody></table><p className="mt-4 text-xs leading-5 text-muted-foreground">These are draft amounts from saved monthly salary data. Allowances, overtime and other deductions are not included in this version.</p></div>
+      <div className="payroll-slips-actions mt-4 flex justify-end gap-2">{canExportPayroll && <><ServerExportButton endpoint={`/finance/payroll/${encodeURIComponent(selectedDetail.id)}/payslips.pdf`} label="Whole-run PDF" className={secondaryButton} /><TableExportMenu build={() => ({ title: "Payslips " + monthName(selectedDetail.month, selectedDetail.year), headers: ["Employee","Employee ID","Basic (GHS)","Employee SSNIT (GHS)","PAYE (GHS)","Employer SSNIT (GHS)","Net (GHS)","Payment status"], columnTypes: ["text","text","money","money","money","money","money","text"], rows: selectedDetail.payslips.map(slip => [personName(slip),slip.staff?.staffId ?? slip.teacher?.teacherId ?? "",Number(slip.basicSalary),Number(slip.ssnitEmployee),Number(slip.incomeTax),Number(slip.ssnitEmployer),Number(slip.netSalary),slip.paymentStatus]), totals: ["Total","","",null,null,null,null,""], confidential: true, reportInfo: { period: monthName(selectedDetail.month, selectedDetail.year) } })} note="Confidential payslip data." /><button type="button" className={primaryButton} onClick={() => window.print()}><Printer className="size-4" /> Print slips</button></>}</div>
     </Modal>}
   </div>;
 }

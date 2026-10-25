@@ -1,5 +1,6 @@
 import {
   Controller,
+  ForbiddenException,
   Get,
   Post,
   Patch,
@@ -10,11 +11,15 @@ import {
   Body,
   UseGuards,
   UseInterceptors,
+  Req,
+  Res,
 } from "@nestjs/common";
+import type { Request, Response } from "express";
 import { FinanceService } from "./finance.service.js";
+import { FinanceExportsService, type FinanceExportContext, type FinanceExportFile } from "./finance-exports.service.js";
 import { SchoolTenantGuard } from "../../common/guards/school-tenant.guard.js";
 import { RolesGuard } from "../../common/guards/roles.guard.js";
-import { FINANCE_READ_ROLES, FINANCE_WRITE_ROLES } from "./finance.permissions.js";
+import { FINANCE_PAYROLL_EXPORT_ROLES, FINANCE_READ_ROLES, FINANCE_WRITE_ROLES, canExportFinancePayroll } from "./finance.permissions.js";
 import { FinanceAuditInterceptor, FinanceSelfAudited } from "./finance-audit.interceptor.js";
 import { FinanceWriteRateLimitGuard, SuperAdminReasonGuard } from "./finance-safeguards.js";
 import { Roles } from "../../common/decorators/roles.decorator.js";
@@ -128,7 +133,10 @@ const markFormerStudentsSchema = z.object({
 @UseGuards(SchoolTenantGuard, RolesGuard, SuperAdminReasonGuard, FinanceWriteRateLimitGuard)
 @UseInterceptors(FinanceAuditInterceptor)
 export class FinanceController {
-  constructor(private readonly financeService: FinanceService) {}
+  constructor(
+    private readonly financeService: FinanceService,
+    private readonly financeExports: FinanceExportsService,
+  ) {}
 
 
   @Get("concessions")
@@ -568,6 +576,7 @@ export class FinanceController {
     return this.financeService.sendFeeReminderInApp(school.id, scheduleId);
   }
 
+
   @Get("students/:studentId/statement")
   @Roles(...FINANCE_READ_ROLES)
   getStudentStatement(
@@ -583,6 +592,194 @@ export class FinanceController {
     return this.financeService.getStudentStatement(school.id, studentId, role, {
       scope, from, to, yearId, termId,
     });
+  }
+
+  /** Server-side, school-scoped exports. Each successful export is audited by FinanceExportsService. */
+  private assertPayrollExportAllowed(user: AuthenticatedUser, schoolRole: string | undefined) {
+    // RolesGuard grants platform superAdmins a global bypass. Confidential payroll exports intentionally do not.
+    if (!canExportFinancePayroll(user.role, schoolRole)) {
+      throw new ForbiddenException("Payroll and salary exports are limited to the accountant, owner and headteacher roles.");
+    }
+  }
+
+  private financeExportContext(
+    school: School,
+    user: AuthenticatedUser,
+    request: Request,
+    from?: string,
+    to?: string,
+  ): FinanceExportContext {
+    return {
+      schoolId: school.id,
+      actorId: user.id,
+      actorName: user.name,
+      ipAddress: request.ip,
+      userAgent: request.get("user-agent") ?? undefined,
+      from,
+      to,
+    };
+  }
+
+  private sendFinanceExport(
+    response: Response,
+    file: FinanceExportFile,
+    disposition: "attachment" | "inline" = "attachment",
+  ) {
+    const safeFileName = file.fileName.replace(/[^a-zA-Z0-9._-]/g, "_");
+    response.setHeader("Content-Type", file.contentType);
+    response.setHeader("Content-Disposition", disposition + '; filename="' + safeFileName + '"');
+    response.setHeader("Cache-Control", "private, no-store, max-age=0");
+    response.setHeader("X-Content-Type-Options", "nosniff");
+    return response.status(200).send(file.buffer);
+  }
+
+  @Get("exports/bills.xlsx")
+  @Roles(...FINANCE_READ_ROLES)
+  async exportBillsExcel(
+    @CurrentSchool() school: School,
+    @CurrentUser() user: AuthenticatedUser,
+    @Req() request: Request,
+    @Res() response: Response,
+    @Query("from") from?: string,
+    @Query("to") to?: string,
+  ) {
+    const context = this.financeExportContext(school, user, request, from, to);
+    return this.sendFinanceExport(response, await this.financeExports.exportExcel(context, "bills"));
+  }
+
+  @Get("exports/payments.xlsx")
+  @Roles(...FINANCE_READ_ROLES)
+  async exportPaymentsExcel(
+    @CurrentSchool() school: School,
+    @CurrentUser() user: AuthenticatedUser,
+    @Req() request: Request,
+    @Res() response: Response,
+    @Query("from") from?: string,
+    @Query("to") to?: string,
+  ) {
+    const context = this.financeExportContext(school, user, request, from, to);
+    return this.sendFinanceExport(response, await this.financeExports.exportExcel(context, "payments"));
+  }
+
+  @Get("exports/expenses.xlsx")
+  @Roles(...FINANCE_READ_ROLES)
+  async exportExpensesExcel(
+    @CurrentSchool() school: School,
+    @CurrentUser() user: AuthenticatedUser,
+    @Req() request: Request,
+    @Res() response: Response,
+    @Query("from") from?: string,
+    @Query("to") to?: string,
+  ) {
+    const context = this.financeExportContext(school, user, request, from, to);
+    return this.sendFinanceExport(response, await this.financeExports.exportExcel(context, "expenses"));
+  }
+
+  @Get("exports/payroll.xlsx")
+  @Roles(...FINANCE_PAYROLL_EXPORT_ROLES)
+  async exportPayrollExcel(
+    @CurrentSchool() school: School,
+    @CurrentUser() user: AuthenticatedUser,
+    @CurrentSchoolRole() schoolRole: string | undefined,
+    @Req() request: Request,
+    @Res() response: Response,
+    @Query("from") from?: string,
+    @Query("to") to?: string,
+  ) {
+    this.assertPayrollExportAllowed(user, schoolRole);
+    const context = this.financeExportContext(school, user, request, from, to);
+    return this.sendFinanceExport(response, await this.financeExports.exportExcel(context, "payroll"));
+  }
+
+  @Get("exports/salaries.xlsx")
+  @Roles(...FINANCE_PAYROLL_EXPORT_ROLES)
+  async exportSalaryExcel(
+    @CurrentSchool() school: School,
+    @CurrentUser() user: AuthenticatedUser,
+    @CurrentSchoolRole() schoolRole: string | undefined,
+    @Req() request: Request,
+    @Res() response: Response,
+    @Query("from") from?: string,
+    @Query("to") to?: string,
+  ) {
+    this.assertPayrollExportAllowed(user, schoolRole);
+    const context = this.financeExportContext(school, user, request, from, to);
+    return this.sendFinanceExport(response, await this.financeExports.exportExcel(context, "salaries"));
+  }
+
+  @Get("bills/:billId/invoice.pdf")
+  @Roles(...FINANCE_READ_ROLES)
+  async exportInvoicePdf(
+    @CurrentSchool() school: School,
+    @CurrentUser() user: AuthenticatedUser,
+    @Req() request: Request,
+    @Res() response: Response,
+    @Param("billId") billId: string,
+  ) {
+    const context = this.financeExportContext(school, user, request);
+    return this.sendFinanceExport(response, await this.financeExports.invoicePdf(context, billId), "inline");
+  }
+
+  @Get("payments/:paymentId/receipt.pdf")
+  @Roles(...FINANCE_READ_ROLES)
+  async exportReceiptPdf(
+    @CurrentSchool() school: School,
+    @CurrentUser() user: AuthenticatedUser,
+    @Req() request: Request,
+    @Res() response: Response,
+    @Param("paymentId") paymentId: string,
+  ) {
+    const context = this.financeExportContext(school, user, request);
+    return this.sendFinanceExport(response, await this.financeExports.receiptPdf(context, paymentId), "inline");
+  }
+
+  @Get("students/:studentId/statement.pdf")
+  @Roles(...FINANCE_READ_ROLES)
+  async exportStudentStatementPdf(
+    @CurrentSchool() school: School,
+    @CurrentUser() user: AuthenticatedUser,
+    @Req() request: Request,
+    @Res() response: Response,
+    @Param("studentId") studentId: string,
+    @Query("from") from?: string,
+    @Query("to") to?: string,
+  ) {
+    const context = this.financeExportContext(school, user, request, from, to);
+    return this.sendFinanceExport(
+      response,
+      await this.financeExports.studentStatementPdf(context, studentId),
+      "inline",
+    );
+  }
+
+  @Get("payslips/:payslipId.pdf")
+  @Roles(...FINANCE_PAYROLL_EXPORT_ROLES)
+  async exportSinglePayslipPdf(
+    @CurrentSchool() school: School,
+    @CurrentUser() user: AuthenticatedUser,
+    @CurrentSchoolRole() schoolRole: string | undefined,
+    @Req() request: Request,
+    @Res() response: Response,
+    @Param("payslipId") payslipId: string,
+  ) {
+    this.assertPayrollExportAllowed(user, schoolRole);
+    const context = this.financeExportContext(school, user, request);
+    return this.sendFinanceExport(response, await this.financeExports.payslipPdf(context, payslipId), "inline");
+  }
+
+  @Get("payroll/:recordId/payslips.pdf")
+  @Roles(...FINANCE_PAYROLL_EXPORT_ROLES)
+  async exportPayrollPdf(
+    @CurrentSchool() school: School,
+    @CurrentUser() user: AuthenticatedUser,
+    @CurrentSchoolRole() schoolRole: string | undefined,
+    @Req() request: Request,
+    @Res() response: Response,
+    @Param("recordId") recordId: string,
+  ) {
+    this.assertPayrollExportAllowed(user, schoolRole);
+    const context = this.financeExportContext(school, user, request);
+    return this.sendFinanceExport(response, await this.financeExports.payrollPdf(context, recordId), "inline");
   }
 
   @Get("students/:studentId/ledger")

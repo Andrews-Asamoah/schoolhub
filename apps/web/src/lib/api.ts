@@ -146,3 +146,69 @@ export async function apiFetch<T>(
 
   return res.json() as Promise<T>;
 }
+
+/**
+ * Downloads a binary export through the authenticated API client. This mirrors
+ * the tenant and active-role headers used by apiFetch and honors the server's
+ * Content-Disposition filename.
+ */
+export async function apiDownload(path: string, fallbackFileName?: string): Promise<void> {
+  const headers = new Headers();
+  const subdomain = getClientSubdomain();
+  if (subdomain) headers.set("x-school-subdomain", subdomain);
+
+  if (typeof window !== "undefined" && path !== "/schools/roles") {
+    const activeRole = window.localStorage.getItem("schoolhub-active-role");
+    if (activeRole) headers.set("x-school-role", activeRole);
+    if (activeRole === "accountant") {
+      const period = window.sessionStorage.getItem("schoolhub-accountant-academic-view");
+      if (period) {
+        try {
+          const parsed = JSON.parse(period) as { academicYearId?: unknown; termId?: unknown };
+          if (typeof parsed.academicYearId === "string" && typeof parsed.termId === "string") {
+            headers.set("x-academic-year-id", parsed.academicYearId);
+            headers.set("x-academic-term-id", parsed.termId);
+          }
+        } catch {
+          window.sessionStorage.removeItem("schoolhub-accountant-academic-view");
+        }
+      }
+    }
+  }
+
+  const response = await fetch(`${API_BASE}${path}`, {
+    method: "GET",
+    credentials: "include",
+    cache: "no-store",
+    headers,
+  });
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({}));
+    if (response.status === 403 && (body as { error?: string }).error === "PASSWORD_CHANGE_REQUIRED" && typeof window !== "undefined" && window.location.pathname !== "/change-password") {
+      window.location.assign("/change-password");
+    }
+    if (response.status === 403 && (body as { error?: string }).error === "TWO_FACTOR_REQUIRED" && typeof window !== "undefined" && window.location.pathname !== "/two-factor-setup") {
+      const audience = (body as { audience?: string }).audience ?? "school-admin";
+      window.location.assign(`/two-factor-setup?audience=${encodeURIComponent(audience)}`);
+    }
+    if (response.status === 403 && (body as { error?: string }).error === "SUBSCRIPTION_INACTIVE" && typeof window !== "undefined" && window.location.pathname !== "/subscription-inactive") {
+      const reason = (body as { reason?: string }).reason ?? "EXPIRED";
+      window.location.assign(`/subscription-inactive?reason=${encodeURIComponent(reason)}`);
+    }
+    throw new ApiError(response.status, (body as { message?: string }).message ?? response.statusText, body);
+  }
+
+  const disposition = response.headers.get("content-disposition") ?? "";
+  const encodedName = /filename\*=UTF-8''([^;]+)/i.exec(disposition)?.[1];
+  const plainName = /filename="?([^";]+)"?/i.exec(disposition)?.[1];
+  const fileName = fallbackFileName ?? (encodedName ? decodeURIComponent(encodedName) : plainName) ?? "schoolhub-export";
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = fileName.replace(/[\\/:*?"<>|]/g, "_");
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+}

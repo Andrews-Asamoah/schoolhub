@@ -1,10 +1,10 @@
+import { TableExportMenu } from "@/components/ui/data-table";
 import { createFileRoute } from "@tanstack/react-router";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { ChevronDown, Download, FileClock, KeyRound, LogIn, Pencil, PlusCircle, ShieldAlert, Trash2, Wallet } from "lucide-react";
+import { ChevronDown, FileClock, KeyRound, LogIn, Pencil, PlusCircle, ShieldAlert, Trash2, Wallet } from "lucide-react";
 import { Fragment, useState, type ReactNode } from "react";
 import { SUPER_ADMIN_AUDIT_ACTIONS } from "@schoolhub/shared";
 import { apiFetch } from "@/lib/api";
-import { downloadCsv } from "@/lib/csv";
 import { formatDateTime } from "@/lib/subscription";
 import { cn } from "@/lib/utils";
 import { PageHeader } from "@/components/superadmin/page-header";
@@ -133,18 +133,6 @@ function AuditLogPage() {
   const filtersActive = Boolean(action || schoolId || from || to || q);
   const selectClass = "rounded-xl border border-input bg-card px-3 py-2.5 text-sm text-foreground shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-ring/30";
 
-  const exportPage = () => {
-    if (!logs.data) return;
-    downloadCsv(`audit-log-page-${page}.csv`, [
-      ["When", "Event", "Action", "Actor", "Actor email", "School", "Record", "IP address", "Details"],
-      ...logs.data.data.map((entry) => [
-        entry.createdAt, eventLabel(entry), entry.action, entry.user.name, entry.user.email,
-        entry.school?.name ?? "", entry.entityId, entry.ipAddress ?? "",
-        JSON.stringify({ before: entry.oldValues, after: entry.newValues }),
-      ]),
-    ]);
-  };
-
   return (
     <div className="space-y-6">
       <PageHeader
@@ -152,10 +140,7 @@ function AuditLogPage() {
         title="Audit log"
         description="A tamper-evident record of who did what across the platform: enrolments, subscription changes, access changes and school-data access."
         actions={
-          <button type="button" onClick={exportPage} disabled={!logs.data?.data.length} className="superadmin-button-secondary inline-flex items-center gap-2 rounded-xl px-3.5 py-2.5 text-sm font-semibold disabled:opacity-50">
-            <Download className="size-4" /> Export this page
-          </button>
-        }
+          logs.data?.data.length ? <TableExportMenu build={() => ({ title: "Platform audit log page " + page, headers: ["When", "Event", "Action", "Actor", "Actor email", "School", "Record", "IP address", "Details"], columnTypes: ["date","text","text","text","text","text","text","text","text"], rows: logs.data!.data.map(entry => [entry.createdAt, eventLabel(entry), entry.action, entry.user.name, entry.user.email, entry.school?.name ?? "Platform", entry.entityId, entry.ipAddress ?? "", JSON.stringify({ before: entry.oldValues, after: entry.newValues })]), reportInfo: { filters: { page, action, schoolId, from, to, search: q } } })} note="Exports the current filtered page only." /> : undefined}
       />
 
       <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
