@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import type { ExecutionContext } from "@nestjs/common";
 import { RolesGuard } from "../../common/guards/roles.guard.js";
-import { FINANCE_READ_ROLES, FINANCE_WRITE_ROLES } from "./finance.permissions.js";
+import { FINANCE_PAYROLL_EXPORT_ROLES, FINANCE_READ_ROLES, FINANCE_WRITE_ROLES } from "./finance.permissions.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 // Normalise line endings so the checks behave the same on Windows (CRLF) checkouts.
@@ -28,6 +28,10 @@ function check(requiredRoles: readonly string[], user: { role?: string }, school
 describe("finance policy constants", () => {
   it("only the accountant role may write financial data", () => {
     expect([...FINANCE_WRITE_ROLES]).toEqual(["accountant"]);
+  });
+
+  it("restricts salary and payroll exports to accountant, owner and headteacher", () => {
+    expect([...FINANCE_PAYROLL_EXPORT_ROLES]).toEqual(["accountant", "owner", "headteacher"]);
   });
 });
 
@@ -70,8 +74,20 @@ describe("finance controller routes", () => {
       expect(route.decorators, `${route.verb} ${route.route}`).toContain("@Roles(...FINANCE_WRITE_ROLES)");
     }
   });
-  it("gives every GET route the finance read roles", () => {
-    for (const route of routes.filter((r) => r.verb === "Get")) {
+  it("gives payroll and salary exports the stricter export roles", () => {
+    for (const route of routes.filter((r) => r.verb === "Get" && (
+      route.route.includes("exports/payroll.xlsx") ||
+      route.route.includes("payslips.pdf")
+    ))) {
+      expect(route.decorators, `GET ${route.route}`).toContain("@Roles(...FINANCE_PAYROLL_EXPORT_ROLES)");
+    }
+  });
+
+  it("gives every other GET route the finance read roles", () => {
+    for (const route of routes.filter((r) => r.verb === "Get" && !(
+      route.route.includes("exports/payroll.xlsx") ||
+      route.route.includes("payslips.pdf")
+    ))) {
       expect(route.decorators, `GET ${route.route}`).toContain("@Roles(...FINANCE_READ_ROLES)");
     }
   });
