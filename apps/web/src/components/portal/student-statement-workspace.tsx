@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { FileDown, FileSpreadsheet, LoaderCircle, Printer, Search, UserRound } from "lucide-react";
-import type { FinanceSummaryResponse, StudentStatementResponse, StudentStatementScope } from "@schoolhub/shared";
+import type { StudentStatementResponse, StudentStatementScope } from "@schoolhub/shared";
 import { WorkspacePageHeading } from "@/components/school/workspace-ui";
 import { exportPdf, exportXlsx, printTable, type ExportTable } from "@/lib/table-export";
 import { apiFetch } from "@/lib/api";
@@ -42,7 +42,6 @@ export function StudentStatementWorkspace() {
     retry: false,
   });
   const years = yearsQuery.data ?? [];
-  const selectedYear = years.find((year) => year.id === yearId) ?? years.find((year) => year.isCurrent);
   const [yearId, setYearId] = useState("");
   const [termId, setTermId] = useState("");
   const currentYear = years.find((year) => year.isCurrent);
