@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { Download, Printer, Search, Users, WalletCards } from "lucide-react";
 
 interface Student {
@@ -99,16 +99,16 @@ export function AccountantFinanceReportingWorkspace({ bills, payments, classes }
     return { start, end, valid: !start || !end || start <= end };
   }, [from, to]);
 
-  const inRange = (value: string) => {
+  const inRange = useCallback((value: string) => {
     const date = new Date(value);
     return !Number.isNaN(date.getTime()) && (!range.start || date >= range.start) && (!range.end || date <= range.end);
-  };
+  }, [range.start, range.end]);
 
   const scopedBills = useMemo(() => bills.filter(bill => {
     if (reportType === "student" && studentId && bill.studentId !== studentId) return false;
     if (reportType === "class" && classId !== "ALL" && bill.class?.id !== classId) return false;
     return inRange(bill.issuedAt);
-  }), [bills, reportType, studentId, classId, from, to, range.start, range.end]);
+  }), [bills, reportType, studentId, classId, inRange]);
 
   const scopedPayments = useMemo(() => payments.filter(payment => {
     if (reportType === "student" && studentId && payment.studentId !== studentId) return false;
@@ -117,7 +117,7 @@ export function AccountantFinanceReportingWorkspace({ bills, payments, classes }
       if (linkedBill?.class?.id !== classId) return false;
     }
     return inRange(payment.paymentDate);
-  }), [payments, bills, reportType, studentId, classId, from, to, range.start, range.end]);
+  }), [payments, bills, reportType, studentId, classId, inRange]);
 
   const query = search.trim().toLowerCase();
   const visibleBills = scopedBills.filter(bill => !query || bill.billNumber.toLowerCase().includes(query) || studentLabel(bill.student).toLowerCase().includes(query) || bill.student.admissionNumber.toLowerCase().includes(query));
