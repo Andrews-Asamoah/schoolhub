@@ -12,11 +12,12 @@
  * Bills, fee structures, expenses, payroll, admission-fee income and audit logs are NOT touched.
  *
  * Usage (from apps/api):
- *   pnpm finance:reset-payments                       # dry run, prints what would change
- *   pnpm finance:reset-payments -- --yes              # actually do it, all schools
- *   pnpm finance:reset-payments -- --yes --school achimota   # one school (by subdomain)
+ *   ALLOW_DEV_RESET=true pnpm finance:reset-payments                       # dry run
+ *   ALLOW_DEV_RESET=true pnpm finance:reset-payments -- --yes              # apply, all schools
+ *   ALLOW_DEV_RESET=true pnpm finance:reset-payments -- --yes --school achimota   # one school
  *
- * Refuses to run when NODE_ENV=production.
+ * Requires explicit ALLOW_DEV_RESET=true and a local or clearly labelled dev/test database.
+ * Refuses to run when NODE_ENV=production or the database target appears production-labelled.
  */
 import { config } from "dotenv";
 import { resolve } from "node:path";
@@ -28,16 +29,23 @@ config({ path: resolve(__dirname, "../../../.env") });
 import pg from "pg";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { Prisma, PrismaClient } from "@prisma/client";
+import { getDevResetSafetyError } from "../src/common/dev-reset-safety.js";
+
+const safetyError = getDevResetSafetyError({
+  allowDevReset: process.env.ALLOW_DEV_RESET,
+  nodeEnv: process.env.NODE_ENV,
+  databaseUrl: process.env.DATABASE_URL,
+});
+if (safetyError) {
+  console.error(safetyError);
+  process.exit(1);
+}
 
 const args = process.argv.slice(2);
 const confirmed = args.includes("--yes");
 const schoolFlag = args.indexOf("--school");
 const subdomain = schoolFlag >= 0 ? args[schoolFlag + 1] : undefined;
 
-if (process.env.NODE_ENV === "production") {
-  console.error("Refusing to run: NODE_ENV is production. This script deletes financial records.");
-  process.exit(1);
-}
 if (schoolFlag >= 0 && !subdomain) {
   console.error("--school needs a subdomain, e.g. --school achimota");
   process.exit(1);
