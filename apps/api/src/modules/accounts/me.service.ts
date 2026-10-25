@@ -193,6 +193,8 @@ export class MeService {
         payrollRecord: { select: { id: true, month: true, year: true, status: true } },
         lines: true,
         school: { select: { name: true, logo: true, address: true, phone: true, email: true } },
+        staff: { select: { staffId: true, profile: { select: { firstName: true, lastName: true } }, payProfile: { select: { ssnitNumber: true, tin: true, gradeOrPosition: true, department: true, paymentMode: true } } } },
+        teacher: { select: { teacherId: true, profile: { select: { firstName: true, lastName: true } }, payProfile: { select: { ssnitNumber: true, tin: true, gradeOrPosition: true, department: true, paymentMode: true } } } },
       },
     });
     if (!row) throw new NotFoundException("Payslip not found.");
@@ -202,6 +204,11 @@ export class MeService {
       year: row.payrollRecord.year,
       status: row.payrollRecord.status,
       school: row.school,
+      employee: {
+        name: [row.staff?.profile?.firstName ?? row.teacher?.profile?.firstName, row.staff?.profile?.lastName ?? row.teacher?.profile?.lastName].filter(Boolean).join(" "),
+        identifier: row.staff?.staffId ?? row.teacher?.teacherId ?? "N/A",
+        payProfile: row.staff?.payProfile ?? row.teacher?.payProfile ?? null,
+      },
       basicSalary: row.basicSalary.toFixed(2),
       allowances: row.allowances.toFixed(2),
       grossSalary: row.grossSalary.toFixed(2),
@@ -210,6 +217,7 @@ export class MeService {
       tier2Employee: row.tier2Employee.toFixed(2),
       tier2Employer: row.tier2Employer.toFixed(2),
       tier3Employee: row.tier3Employee.toFixed(2),
+      tier3Employer: row.tier3Employer.toFixed(2),
       incomeTax: row.incomeTax.toFixed(2),
       otherDeductions: row.otherDeductions.toFixed(2),
       netSalary: row.netSalary.toFixed(2),
