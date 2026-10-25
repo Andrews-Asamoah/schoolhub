@@ -1372,8 +1372,9 @@ export class FinanceService {
           status: { notIn: ["CANCELLED", "WAIVED"] },
         } : {}),
       },
+      // The accountant dashboard calculates school-wide totals from this list;
+      // do not silently cap it and omit older billed amounts from reports.
       orderBy: { issuedAt: "desc" },
-      take: 500,
       include: {
         student: {
           select: {
@@ -1461,8 +1462,9 @@ export class FinanceService {
   async listPayments(schoolId: string) {
     return this.prisma.client.payment.findMany({
       where: { schoolId },
+      // The accountant dashboard and reporting workspace calculate totals from
+      // this history; a hidden row cap makes those figures incomplete.
       orderBy: [{ paymentDate: "desc" }, { createdAt: "desc" }],
-      take: 500,
       include: {
         student: {
           select: {
