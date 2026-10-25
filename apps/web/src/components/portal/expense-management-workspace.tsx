@@ -1,4 +1,5 @@
 import { TableExportMenu } from "@/components/ui/data-table";
+import type { ExportTable } from "@/lib/table-export";
 import { ServerExportButton } from "@/components/portal/server-export-button";
 import { useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -190,7 +191,7 @@ export function ExpenseManagementWorkspace() {
     }
     createExpense.mutate(draft);
   }
-  const buildExpenseExportTable = () => ({
+  const buildExpenseExportTable = (): ExportTable => ({
     title: "Expense register",
     headers: ["Date", "Voucher", "Description", "Payee", "Expense category", "Accounting group", "Payment method", "Cheque", "Reference", "Amount (GHS)", "Recorded by"],
     columnTypes: ["date", "text", "text", "text", "text", "text", "text", "text", "text", "money", "text"],
