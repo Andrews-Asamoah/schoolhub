@@ -1,6 +1,7 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import { Prisma, type PayrollContributionCode } from "@prisma/client";
 import { PrismaService } from "../../prisma/prisma.service.js";
+import { isPayrollSettingsApproverRole } from "../finance.permissions.js";
 
 export type TaxBandDraft = { width: string | null; rate: string };
 export type TaxScheduleDraft = {
@@ -87,7 +88,7 @@ export class PayrollSettingsService {
       db.user.findUnique({ where: { id: actorId }, select: { twoFactorEnabled: true } }),
     ]);
     // Read the actual membership role. Never use the role guard's headteacher→admin alias here.
-    if (!membership || !["owner", "headteacher"].includes(membership.role)) {
+    if (!membership || !isPayrollSettingsApproverRole(membership.role)) {
       throw new ForbiddenException("Only a school owner or headteacher may verify or approve payroll statutory settings.");
     }
     if (mustDiffer && actorId === proposerId) throw new ForbiddenException("The person who proposed these settings cannot approve them.");
@@ -110,7 +111,7 @@ export class PayrollSettingsService {
     if (input.nonResidentFlatRate != null) decimalRate(input.nonResidentFlatRate, "non-resident flat rate");
 
     return this.prisma.client.$transaction(async (tx) => {
-      const existing = await tx.payrollTaxSchedule.findMany({ where: { schoolId, status: { not: "ARCHIVED" } }, select: { id: true, effectiveFrom: true, effectiveTo: true, status: true } });
+      const existing = await tx.payrollTaxSchedule.findMany({ where: { schoolId, status: { in: ["PENDING_APPROVAL", "ACTIVE"] } }, select: { id: true, effectiveFrom: true, effectiveTo: true, status: true } });
       const overlaps = existing.some((row) => effectiveFrom <= (row.effectiveTo ?? new Date("9999-12-31T00:00:00.000Z")) && (effectiveTo ?? new Date("9999-12-31T00:00:00.000Z")) >= row.effectiveFrom);
       if (overlaps) throw new ConflictException("This schedule overlaps an existing non-archived schedule for the school.");
       const created = await tx.payrollTaxSchedule.create({
@@ -163,6 +164,11 @@ export class PayrollSettingsService {
     if (current.status !== "PENDING_APPROVAL") throw new ConflictException("Only a submitted schedule can be approved.");
     if (current.needsVerification) throw new ConflictException("This schedule is unverified. Verify its official source before approval.");
     if (current.bands.length < 2 || current.bands.filter((band) => band.width === null).length !== 1) throw new BadRequestException("The schedule must have exactly one open-ended final band.");
+    const peers = await this.prisma.client.payrollTaxSchedule.findMany({ where: { schoolId, id: { not: id }, status: { in: ["PENDING_APPROVAL", "ACTIVE"] } }, select: { effectiveFrom: true, effectiveTo: true } });
+    const currentEnd = current.effectiveTo ?? new Date("9999-12-31T00:00:00.000Z");
+    if (peers.some((row) => current.effectiveFrom <= (row.effectiveTo ?? new Date("9999-12-31T00:00:00.000Z")) && currentEnd >= row.effectiveFrom)) {
+      throw new ConflictException("This schedule overlaps another pending or active schedule for the school.");
+    }
     return this.prisma.client.$transaction(async (tx) => {
       const updated = await tx.payrollTaxSchedule.update({ where: { id }, data: { status: "ACTIVE", approvedById: actorId, approvedAt: new Date() } });
       await this.writeAudit(tx, actorId, schoolId, "UPDATE", "PAYROLL_TAX_SCHEDULE", id, { status: current.status, needsVerification: current.needsVerification }, { status: updated.status, approvedById: actorId, approvedAt: updated.approvedAt?.toISOString() ?? null });
