@@ -11,6 +11,9 @@ permissions:
 jobs:
   migrate-and-verify:
     runs-on: ubuntu-latest
+    env:
+      # Prisma Client generation needs a syntactically valid URL but does not connect to the database.
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/schoolhub?schema=public
     steps:
       - name: Check out repair branch
         uses: actions/checkout@v4
