@@ -1776,6 +1776,14 @@ export class FinanceService {
       throw new BadRequestException("The requested dates do not overlap the selected academic period.");
     }
     const andFilters: Prisma.PaymentWhereInput[] = [];
+    if (input.classId) {
+      andFilters.push({
+        OR: [
+          { bill: { schoolId, classId: input.classId } },
+          { paymentItems: { some: { billItem: { bill: { schoolId, classId: input.classId } } } } },
+        ],
+      });
+    }
     if (search) {
       andFilters.push({
         OR: [
@@ -1792,14 +1800,6 @@ export class FinanceService {
       ...(input.studentId ? { studentId: input.studentId } : {}),
       ...(input.method ? { paymentMethod: input.method as PaymentMethod } : {}),
       ...(input.status && input.status !== "ALL" ? { status: input.status as "PENDING" | "COMPLETED" | "FAILED" | "REFUNDED" | "CANCELLED" } : {}),
-      ...(input.classId ? {
-        AND: [{
-          OR: [
-            { bill: { schoolId, classId: input.classId } },
-            { paymentItems: { some: { billItem: { bill: { schoolId, classId: input.classId } } } } },
-          ],
-        }],
-      } : {}),
       ...(scopeStart || scopeEnd ? { paymentDate: { ...(scopeStart ? { gte: scopeStart } : {}), ...(scopeEnd ? { lte: scopeEnd } : {}) } } : {}),
       ...(andFilters.length ? { AND: andFilters } : {}),
     };
