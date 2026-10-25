@@ -1945,37 +1945,74 @@ export class FinanceService {
     };
   }
 
-  async listBills(schoolId: string, studentId?: string) {
-    return this.prisma.client.bill.findMany({
-      where: {
-        schoolId,
-        ...(studentId ? {
-          studentId,
-          balanceAmount: { gt: 0 },
-          status: { notIn: ["CANCELLED", "WAIVED"] },
-        } : {}),
-      },
-      orderBy: { issuedAt: "desc" },
-      take: 500,
-      include: {
-        student: {
-          select: {
-            id: true,
-            admissionNumber: true,
-            profile: { select: { firstName: true, lastName: true } },
+  async listBills(schoolId: string, query: FinanceListQuery = {}) {
+    const limit = clampPageSize(query.limit);
+    const from = parseIsoDate(query.from, "start date");
+    const toStart = parseIsoDate(query.to, "end date");
+    const to = parseIsoDate(query.to, "end date", true);
+    if (from && toStart && from > toStart) throw new BadRequestException("The start date must be on or before the end date.");
+    if (query.status && !BILL_STATUSES.includes(query.status as (typeof BILL_STATUSES)[number])) {
+      throw new BadRequestException("Choose a valid bill status.");
+    }
+    if (query.classId) {
+      const schoolClass = await this.prisma.client.class.findFirst({ where: { id: query.classId, schoolId }, select: { id: true } });
+      if (!schoolClass) throw new NotFoundException("Class not found in this school.");
+    }
+    const { yearId, termId } = await this.resolveAcademicFilter(schoolId, query.yearId, query.termId);
+    const issuedAt: Prisma.DateTimeFilter = {};
+    if (from) issuedAt.gte = from;
+    if (to) issuedAt.lte = to;
+    const dueAsOf = to ?? new Date();
+    const where: Prisma.BillWhereInput = {
+      schoolId,
+      ...(query.studentId ? { studentId: query.studentId } : {}),
+      ...(query.classId ? { classId: query.classId } : {}),
+      ...(yearId ? { academicYearId: yearId } : {}),
+      ...(termId ? { termId } : {}),
+      ...(query.status ? { status: query.status as (typeof BILL_STATUSES)[number] } : {}),
+      ...(from || to ? { issuedAt } : {}),
+      ...(query.outstanding === "true" || query.overdue === "true" ? { balanceAmount: { gt: new Prisma.Decimal(0) }, status: { notIn: ["CANCELLED", "WAIVED"] } } : {}),
+      ...(query.overdue === "true" ? { dueDate: { lt: dueAsOf } } : {}),
+      ...(query.search?.trim() ? {
+        OR: [
+          { billNumber: { contains: query.search.trim(), mode: "insensitive" } },
+          { student: { admissionNumber: { contains: query.search.trim(), mode: "insensitive" } } },
+          { student: { profile: { firstName: { contains: query.search.trim(), mode: "insensitive" } } } },
+          { student: { profile: { lastName: { contains: query.search.trim(), mode: "insensitive" } } } },
+        ],
+      } : {}),
+    };
+    if (query.cursor) {
+      const cursorRow = await this.prisma.client.bill.findFirst({
+        where: { id: query.cursor, schoolId },
+        select: { id: true },
+      });
+      if (!cursorRow) throw new BadRequestException("The bill page cursor is invalid for this school.");
+    }
+    const [rows, total] = await Promise.all([
+      this.prisma.client.bill.findMany({
+        where,
+        orderBy: [{ issuedAt: "desc" }, { id: "desc" }],
+        take: limit + 1,
+        ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
+        include: {
+          student: { select: { id: true, admissionNumber: true, profile: { select: { firstName: true, lastName: true } } } },
+          class: { select: { id: true, name: true } },
+          feeStructure: { select: { name: true } },
+          academicYear: { select: { id: true, name: true } },
+          term: { select: { id: true, name: true } },
+          items: {
+            select: { id: true, description: true, amount: true, quantity: true, totalAmount: true, discountAmount: true, paidAmount: true, balanceAmount: true },
+            orderBy: [{ createdAt: "asc" }, { id: "asc" }],
           },
+          concessions: { select: { id: true, type: true, label: true, amount: true }, orderBy: { createdAt: "asc" } },
+          carryForwards: { orderBy: { createdAt: "asc" } },
         },
-        class: { select: { id: true, name: true } },
-        feeStructure: { select: { name: true } },
-        academicYear: { select: { name: true } },
-        term: { select: { name: true } },
-        items: {
-          select: { id: true, description: true, amount: true, quantity: true, totalAmount: true, discountAmount: true, paidAmount: true, balanceAmount: true },
-          orderBy: { createdAt: "asc" },
-        },
-        concessions: { select: { id: true, type: true, label: true, amount: true }, orderBy: { createdAt: "asc" } },
-      },
-    });
+      }),
+      this.prisma.client.bill.count({ where }),
+    ]);
+    const items = rows.slice(0, limit);
+    return { items, nextCursor: rows.length > limit ? items[items.length - 1]?.id ?? null : null, total };
   }
 
   async listOutstandingStudents(schoolId: string) {
@@ -2041,37 +2078,77 @@ export class FinanceService {
       });
   }
 
-  async listPayments(schoolId: string) {
-    return this.prisma.client.payment.findMany({
-      where: { schoolId },
-      orderBy: [{ paymentDate: "desc" }, { createdAt: "desc" }],
-      take: 500,
-      include: {
-        student: {
-          select: {
-            id: true,
-            admissionNumber: true,
-            profile: { select: { firstName: true, lastName: true } },
-          },
-        },
-        bill: { select: { id: true, billNumber: true } },
-        paymentItems: {
-          include: {
-            billItem: {
-              include: {
-                feeItem: {
-                  include: {
-                    customCategory: { select: { name: true } },
-                    registryItem: { select: { name: true } },
-                  },
+  async listPayments(schoolId: string, query: FinanceListQuery = {}) {
+    const limit = clampPageSize(query.limit);
+    const from = parseIsoDate(query.from, "start date");
+    const toStart = parseIsoDate(query.to, "end date");
+    const to = parseIsoDate(query.to, "end date", true);
+    if (from && toStart && from > toStart) throw new BadRequestException("The start date must be on or before the end date.");
+    if (query.status && !["COMPLETED", "PENDING", "FAILED", "CANCELLED", "REFUNDED"].includes(query.status)) {
+      throw new BadRequestException("Choose a valid payment status.");
+    }
+    if (query.paymentMethod && !PAYMENT_METHODS.includes(query.paymentMethod as (typeof PAYMENT_METHODS)[number])) {
+      throw new BadRequestException("Choose a valid payment method.");
+    }
+    const { yearId, termId } = await this.resolveAcademicFilter(schoolId, query.yearId, query.termId);
+    const paymentDate: Prisma.DateTimeFilter = {};
+    if (from) paymentDate.gte = from;
+    if (to) paymentDate.lte = to;
+    const where: Prisma.PaymentWhereInput = {
+      schoolId,
+      ...(query.status ? { status: query.status as Prisma.EnumPaymentStatusFilter["equals"] } : {}),
+      ...(query.paymentMethod ? { paymentMethod: query.paymentMethod as (typeof PAYMENT_METHODS)[number] } : {}),
+      ...(from || to ? { paymentDate } : {}),
+      ...(yearId || termId ? {
+        OR: [
+          { bill: { ...(yearId ? { academicYearId: yearId } : {}), ...(termId ? { termId } : {}) } },
+          { billId: null, paymentDate: { ...(from ? { gte: from } : {}), ...(to ? { lte: to } : {}) } },
+        ],
+      } : {}),
+      ...(query.classId ? { bill: { classId: query.classId, ...(yearId ? { academicYearId: yearId } : {}), ...(termId ? { termId } : {}) } } : {}),
+      ...(query.search?.trim() ? {
+        OR: [
+          { paymentNumber: { contains: query.search.trim(), mode: "insensitive" } },
+          { referenceNumber: { contains: query.search.trim(), mode: "insensitive" } },
+          { student: { admissionNumber: { contains: query.search.trim(), mode: "insensitive" } } },
+          { student: { profile: { firstName: { contains: query.search.trim(), mode: "insensitive" } } } },
+          { student: { profile: { lastName: { contains: query.search.trim(), mode: "insensitive" } } } },
+        ],
+      } : {}),
+    };
+    if (query.cursor) {
+      const cursorRow = await this.prisma.client.payment.findFirst({
+        where: { id: query.cursor, schoolId },
+        select: { id: true },
+      });
+      if (!cursorRow) throw new BadRequestException("The payment page cursor is invalid for this school.");
+    }
+    const [rows, total] = await Promise.all([
+      this.prisma.client.payment.findMany({
+        where,
+        orderBy: [{ paymentDate: "desc" }, { createdAt: "desc" }, { id: "desc" }],
+        take: limit + 1,
+        ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
+        include: {
+          student: { select: { id: true, admissionNumber: true, profile: { select: { firstName: true, lastName: true } } } },
+          bill: { select: { id: true, billNumber: true, classId: true, class: { select: { id: true, name: true } }, academicYearId: true, termId: true } },
+          paymentItems: {
+            include: {
+              billItem: {
+                include: {
+                  bill: { select: { id: true, billNumber: true, classId: true, academicYearId: true, termId: true } },
+                  feeItem: { include: { customCategory: { select: { name: true } }, registryItem: { select: { name: true } } } },
                 },
               },
             },
           },
+          recordedBy: { select: { name: true, email: true } },
         },
-        recordedBy: { select: { name: true, email: true } },
-      },
-    });
+      }),
+      this.prisma.client.payment.count({ where }),
+    ]);
+    const items = rows.slice(0, limit);
+    return { items, nextCursor: rows.length > limit ? items[items.length - 1]?.id ?? null : null, total };
   }
 
   async listExpenses(schoolId: string, fromDate?: string, toDate?: string) {
