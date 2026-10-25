@@ -277,7 +277,9 @@ export function AccountantPortalWorkspace({
   const needsPayments = needsOverview || ["payments", "reports"].includes(activeTab);
   const needsExpenses = needsOverview || activeTab === "expenses";
   const needsFeeStructures = needsOverview || activeTab === "invoices";
-  const needsClasses = needsOverview || ["invoices", "reports"].includes(activeTab);
+  // Payments and debtors can open the record-payment dialog, which uses
+  // this class list to filter the student selector.
+  const needsClasses = needsOverview || ["invoices", "debtors", "payments", "reports"].includes(activeTab);
   const needsYears = needsOverview || activeTab === "invoices";
   const needsPayroll = needsOverview || activeTab === "payroll";
 
