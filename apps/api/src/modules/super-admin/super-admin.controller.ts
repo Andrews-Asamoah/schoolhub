@@ -10,24 +10,37 @@ import {
   UseGuards,
   Header,
 } from "@nestjs/common";
+import { Throttle, ThrottlerGuard } from "@nestjs/throttler";
 import { SuperAdminService } from "./super-admin.service.js";
 import { SuperAdminGuard } from "../../common/guards/super-admin.guard.js";
 import { ZodValidationPipe } from "../../common/pipes/zod-validation.pipe.js";
+import { AuditActorParam } from "../../common/audit/audit-actor.decorator.js";
+import type { AuditActor } from "../../common/audit/audit.js";
 import {
   enrollSchoolSchema,
   updateSchoolSchema,
   addSchoolAdminSchema,
   setSchoolAdminBannedSchema,
   updateSubscriptionSchema,
+  superAdminSchoolsQuerySchema,
+  superAdminUsersQuerySchema,
+  superAdminAuditQuerySchema,
   type UpdateSchoolInput,
   type AddSchoolAdminInput,
   type SetSchoolAdminBannedInput,
   type EnrollSchoolInput,
   type UpdateSubscriptionInput,
+  type SuperAdminSchoolsQuery,
+  type SuperAdminUsersQuery,
+  type SuperAdminAuditQuery,
 } from "@schoolhub/shared";
 
+/** Writes are far rarer than reads, so they get a much tighter budget per client. */
+const WRITE_LIMIT = { default: { limit: 30, ttl: 60_000 } };
+
+// Throttle first (cheap, protects the auth lookup), then authenticate/authorise.
 @Controller("super-admin")
-@UseGuards(SuperAdminGuard)
+@UseGuards(ThrottlerGuard, SuperAdminGuard)
 export class SuperAdminController {
   constructor(private readonly superAdminService: SuperAdminService) {}
 
@@ -38,13 +51,9 @@ export class SuperAdminController {
 
   @Get("schools")
   listSchools(
-    @Query("page") page = "1",
-    @Query("limit") limit = "20",
+    @Query(new ZodValidationPipe(superAdminSchoolsQuerySchema)) query: SuperAdminSchoolsQuery,
   ) {
-    return this.superAdminService.listSchools(
-      Math.max(1, parseInt(page, 10) || 1),
-      Math.min(100, parseInt(limit, 10) || 20),
-    );
+    return this.superAdminService.listSchools(query);
   }
 
   @Get("schools/options")
@@ -54,13 +63,17 @@ export class SuperAdminController {
 
   @Get("users")
   listUsers(
-    @Query("page") page = "1",
-    @Query("limit") limit = "20",
+    @Query(new ZodValidationPipe(superAdminUsersQuerySchema)) query: SuperAdminUsersQuery,
   ) {
-    return this.superAdminService.listUsers(
-      Math.max(1, parseInt(page, 10) || 1),
-      Math.min(100, parseInt(limit, 10) || 20),
-    );
+    return this.superAdminService.listUsers(query);
+  }
+
+  @Get("audit-logs")
+  @Header("Cache-Control", "no-store")
+  listAuditLogs(
+    @Query(new ZodValidationPipe(superAdminAuditQuerySchema)) query: SuperAdminAuditQuery,
+  ) {
+    return this.superAdminService.listAuditLogs(query);
   }
 
   @Get("schools/:id")
@@ -69,58 +82,66 @@ export class SuperAdminController {
   }
 
   @Patch("schools/:id")
+  @Throttle(WRITE_LIMIT)
   updateSchool(
     @Param("id") id: string,
     @Body(new ZodValidationPipe(updateSchoolSchema)) body: UpdateSchoolInput,
+    @AuditActorParam() actor: AuditActor,
   ) {
-    return this.superAdminService.updateSchool(id, body);
+    return this.superAdminService.updateSchool(id, body, actor);
   }
 
   @Post("schools/:id/admins")
+  @Throttle(WRITE_LIMIT)
   @Header("Cache-Control", "no-store") // response carries a one-time password
   addSchoolAdmin(
     @Param("id") id: string,
     @Body(new ZodValidationPipe(addSchoolAdminSchema)) body: AddSchoolAdminInput,
+    @AuditActorParam() actor: AuditActor,
   ) {
-    return this.superAdminService.addSchoolAdmin(id, body);
+    return this.superAdminService.addSchoolAdmin(id, body, actor);
   }
 
   @Patch("schools/:id/admins/:userId")
+  @Throttle(WRITE_LIMIT)
   setSchoolAdminBanned(
     @Param("id") id: string,
     @Param("userId") userId: string,
     @Body(new ZodValidationPipe(setSchoolAdminBannedSchema))
     body: SetSchoolAdminBannedInput,
+    @AuditActorParam() actor: AuditActor,
   ) {
-    return this.superAdminService.setSchoolAdminBanned(
-      id,
-      userId,
-      body.banned,
-    );
+    return this.superAdminService.setSchoolAdminBanned(id, userId, body.banned, actor);
   }
 
   @Delete("schools/:id/admins/:userId")
+  @Throttle(WRITE_LIMIT)
   removeSchoolAdmin(
     @Param("id") id: string,
     @Param("userId") userId: string,
+    @AuditActorParam() actor: AuditActor,
   ) {
-    return this.superAdminService.removeSchoolAdmin(id, userId);
+    return this.superAdminService.removeSchoolAdmin(id, userId, actor);
   }
 
   @Post("schools")
+  @Throttle(WRITE_LIMIT)
   @Header("Cache-Control", "no-store") // response carries a one-time password
   enrollSchool(
     @Body(new ZodValidationPipe(enrollSchoolSchema)) body: EnrollSchoolInput,
+    @AuditActorParam() actor: AuditActor,
   ) {
-    return this.superAdminService.enrollSchool(body);
+    return this.superAdminService.enrollSchool(body, actor);
   }
 
   @Patch("schools/:id/subscription")
+  @Throttle(WRITE_LIMIT)
   updateSubscription(
     @Param("id") id: string,
     @Body(new ZodValidationPipe(updateSubscriptionSchema))
     body: UpdateSubscriptionInput,
+    @AuditActorParam() actor: AuditActor,
   ) {
-    return this.superAdminService.updateSubscription(id, body);
+    return this.superAdminService.updateSubscription(id, body, actor);
   }
 }

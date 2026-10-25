@@ -18,9 +18,26 @@ const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
 
 async function main() {
-  const SUPER_ADMIN_EMAIL = "orion@schoolhub.gh";
-  const SUPER_ADMIN_PASSWORD = "3Vpanw6@...";
-  const SUPER_ADMIN_NAME = "SchoolHub Admin";
+  // Credentials come from the environment (a secret manager in production),
+  // never from source control. See .env.example.
+  const SUPER_ADMIN_EMAIL = process.env.SUPER_ADMIN_EMAIL?.trim().toLowerCase();
+  const SUPER_ADMIN_PASSWORD = process.env.SUPER_ADMIN_PASSWORD;
+  const SUPER_ADMIN_NAME = process.env.SUPER_ADMIN_NAME?.trim() || "SchoolHub Admin";
+
+  if (!SUPER_ADMIN_EMAIL || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(SUPER_ADMIN_EMAIL)) {
+    throw new Error("Set SUPER_ADMIN_EMAIL to a valid email address before seeding.");
+  }
+  if (
+    !SUPER_ADMIN_PASSWORD ||
+    SUPER_ADMIN_PASSWORD.length < 14 ||
+    !/[a-z]/.test(SUPER_ADMIN_PASSWORD) ||
+    !/[A-Z]/.test(SUPER_ADMIN_PASSWORD) ||
+    !/[0-9]/.test(SUPER_ADMIN_PASSWORD)
+  ) {
+    throw new Error(
+      "Set SUPER_ADMIN_PASSWORD to at least 14 characters with upper-case, lower-case and a number.",
+    );
+  }
 
   // Check if superAdmin already exists (idempotent)
   const existing = await prisma.user.findUnique({
@@ -64,6 +81,8 @@ async function main() {
         email: SUPER_ADMIN_EMAIL,
         emailVerified: true,
         role: "superAdmin",
+        // The bootstrap password has been seen by whoever ran the seed.
+        mustChangePassword: true,
         createdAt: now,
         updatedAt: now,
       },

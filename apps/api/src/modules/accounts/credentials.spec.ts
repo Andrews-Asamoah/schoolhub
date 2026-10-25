@@ -70,3 +70,27 @@ describe("login identifiers and roles", () => {
     expect(roleForStaffType("DRIVER")).toBe("staff");
   });
 });
+
+describe("random temporary passwords (privileged accounts)", () => {
+  it("always satisfies the shared password policy and is not guessable", async () => {
+    const { generateTemporaryPassword } = await import("./credentials.service.js");
+    const seen = new Set<string>();
+    for (let i = 0; i < 200; i += 1) {
+      const password = generateTemporaryPassword();
+      expect(passwordSchema.safeParse(password).success).toBe(true);
+      expect(password).toHaveLength(16);
+      expect(Object.values(DEFAULT_PASSWORDS)).not.toContain(password);
+      seen.add(password);
+    }
+    expect(seen.size).toBe(200);
+  });
+
+  it("prepareRandom returns a hash that verifies only against its own password", async () => {
+    const service = new CredentialsService();
+    const a = await service.prepareRandom();
+    const b = await service.prepareRandom();
+    expect(a.temporaryPassword).not.toBe(b.temporaryPassword);
+    expect(await verifyPassword({ hash: a.passwordHash, password: a.temporaryPassword })).toBe(true);
+    expect(await verifyPassword({ hash: a.passwordHash, password: DEFAULT_PASSWORDS.admin })).toBe(false);
+  });
+});

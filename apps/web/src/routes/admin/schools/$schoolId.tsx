@@ -26,6 +26,7 @@ import {
   type CredentialEntry,
 } from "@/components/credentials/credentials-dialog";
 import { SubscriptionBadge } from "@/components/superadmin/subscription-badge";
+import { SubscriptionDialog } from "@/components/superadmin/subscription-dialog";
 
 export const Route = createFileRoute("/admin/schools/$schoolId")({
   component: SchoolDetailPage,
@@ -54,18 +55,10 @@ interface SchoolDetail {
     metadata: string | null;
     members: Member[];
   };
-  students: { id: string }[];
-  teachers: { id: string }[];
+  _count: { students: number; teachers: number };
   academicYears: { id: string; name: string; isCurrent: boolean }[];
 }
 
-const SUBSCRIPTION_STATUSES = [
-  "TRIALING",
-  "ACTIVE",
-  "PAST_DUE",
-  "CANCELLED",
-  "SUSPENDED",
-] as const;
 
 type Tab = "overview" | "admin" | "subscription";
 type AdminAction = "ban" | "unban" | "remove";
@@ -88,9 +81,7 @@ interface SchoolForm {
 function SchoolDetailPage() {
   const { schoolId } = Route.useParams();
   const [activeTab, setActiveTab] = useState<Tab>("overview");
-  const [newStatus, setNewStatus] = useState("");
-  const [expiresAt, setExpiresAt] = useState("");
-  const [statusMsg, setStatusMsg] = useState("");
+  const [subscriptionOpen, setSubscriptionOpen] = useState(false);
   const [schoolForm, setSchoolForm] = useState<SchoolForm>({
     schoolName: "",
     schoolCode: "",
@@ -186,7 +177,7 @@ function SchoolDetailPage() {
       }
       setAdminMessage(
         result.createdAccount
-          ? `${result.admin.name} was added. Their default password was shown; they must change it at first sign-in.`
+          ? `${result.admin.name} was added. Their one-time password was shown once; they must change it at first sign-in.`
           : `${result.admin.name} was added using their existing account.`,
       );
       setAdminName("");
@@ -240,18 +231,6 @@ function SchoolDetailPage() {
     return () => window.removeEventListener("keydown", closeOnEscape);
   }, [adminConfirmation, adminActionMutation.isPending]);
 
-  const subMutation = useMutation({
-    mutationFn: (body: { status: string; expiresAt?: string }) =>
-      apiFetch(`/super-admin/schools/${schoolId}/subscription`, {
-        method: "PATCH",
-        body: JSON.stringify(body),
-      }),
-    onSuccess: () => {
-      refreshSchoolData();
-      setStatusMsg("Subscription updated!");
-      setTimeout(() => setStatusMsg(""), 3000);
-    },
-  });
 
   if (isPending) {
     return (
@@ -311,12 +290,12 @@ function SchoolDetailPage() {
           </div>
           <div className="flex gap-4 text-center">
             <div>
-              <p className="text-2xl font-bold text-slate-900">{school.students.length}</p>
+              <p className="text-2xl font-bold text-slate-900">{school._count.students}</p>
               <p className="text-xs text-slate-400">Students</p>
             </div>
             <div className="w-px bg-slate-200" />
             <div>
-              <p className="text-2xl font-bold text-slate-900">{school.teachers.length}</p>
+              <p className="text-2xl font-bold text-slate-900">{school._count.teachers}</p>
               <p className="text-xs text-slate-400">Teachers</p>
             </div>
           </div>
@@ -424,12 +403,12 @@ function SchoolDetailPage() {
           <InfoCard
             icon={Users}
             label="Students"
-            value={`${school.students.length} enrolled`}
+            value={`${school._count.students} enrolled`}
           />
           <InfoCard
             icon={GraduationCap}
             label="Teachers"
-            value={`${school.teachers.length} registered`}
+            value={`${school._count.teachers} registered`}
           />
           <InfoCard
             icon={CalendarDays}
@@ -463,7 +442,7 @@ function SchoolDetailPage() {
             <div className="mb-4">
               <h2 className="text-base font-semibold text-slate-900">Add a school administrator</h2>
               <p className="mt-1 text-xs text-slate-500">
-                Existing accounts keep their current password. New accounts receive the current default password.
+                Existing accounts keep their current password. New accounts receive a random one-time password, shown once.
               </p>
             </div>
             <div className="grid gap-4 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
@@ -597,45 +576,23 @@ function SchoolDetailPage() {
           </div>
 
           <div className="superadmin-surface rounded-xl border border-slate-200 p-4">
-            <h3 className="mb-3 text-sm font-semibold text-slate-700">
-              Update Subscription
-            </h3>
-            <div className="flex flex-wrap gap-3">
-              <select
-                value={newStatus}
-                onChange={(e) => setNewStatus(e.target.value)}
-                className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
-              >
-                <option value="">Select new status…</option>
-                {SUBSCRIPTION_STATUSES.map((s) => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
-                ))}
-              </select>
-              <input
-                type="date"
-                value={expiresAt}
-                onChange={(e) => setExpiresAt(e.target.value)}
-                className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
-                placeholder="Expiry date (optional)"
-              />
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <p className="max-w-md text-sm text-muted-foreground">
+                Change the plan status or expiry date. A suspended, cancelled or expired school is locked out immediately.
+              </p>
               <button
                 type="button"
-                disabled={!newStatus || subMutation.isPending}
-                onClick={() =>
-                  subMutation.mutate({
-                    status: newStatus,
-                    expiresAt: expiresAt || undefined,
-                  })
-                }
-                className="superadmin-button-primary rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:opacity-50"
+                onClick={() => setSubscriptionOpen(true)}
+                className="superadmin-button-primary rounded-xl px-4 py-2.5 text-sm font-semibold"
               >
-                {subMutation.isPending ? "Updating…" : "Update"}
+                Manage subscription
               </button>
             </div>
-            {statusMsg && (
-              <p className="mt-2 text-xs font-medium text-emerald-600">{statusMsg}</p>
+            {subscriptionOpen && (
+              <SubscriptionDialog
+                school={{ id: school.id, name: school.name, organization: school.organization }}
+                onClose={() => setSubscriptionOpen(false)}
+              />
             )}
 
             {adminConfirmation && (

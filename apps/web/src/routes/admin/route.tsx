@@ -49,6 +49,7 @@ function AdminLayout() {
   else if (pathname.startsWith("/admin/users")) activePage = "users";
   else if (pathname.startsWith("/admin/subscriptions")) activePage = "subscriptions";
   else if (pathname.startsWith("/admin/support")) activePage = "support";
+  else if (pathname.startsWith("/admin/audit")) activePage = "audit";
   else if (pathname.startsWith("/admin/profile")) activePage = "profile";
   const breadcrumb = {
     dashboard: "Dashboard",
@@ -56,7 +57,8 @@ function AdminLayout() {
     users: "System users",
     subscriptions: "Subscriptions",
     support: "Support desk",
-    profile: "My profile",
+    audit: "Audit log",
+    profile: "Account & security",
   }[activePage];
 
   return (

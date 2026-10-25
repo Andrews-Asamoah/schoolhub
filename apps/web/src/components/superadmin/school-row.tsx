@@ -11,8 +11,7 @@ interface SchoolRowProps {
     organization: {
       subscriptionStatus: string;
     };
-    students: { id: string }[];
-    teachers: { id: string }[];
+    _count: { students: number; teachers: number };
   };
 }
 
@@ -32,13 +31,13 @@ export function SchoolRow({ school }: SchoolRowProps) {
       </td>
       <td className="px-3 py-3">
         <span className="inline-flex items-center gap-1 text-sm text-slate-600">
-          <span className="font-medium text-slate-800">{school.students.length}</span>
+          <span className="font-medium text-slate-800">{school._count.students}</span>
           <span className="text-slate-400">students</span>
         </span>
       </td>
       <td className="px-3 py-3">
         <span className="inline-flex items-center gap-1 text-sm text-slate-600">
-          <span className="font-medium text-slate-800">{school.teachers.length}</span>
+          <span className="font-medium text-slate-800">{school._count.teachers}</span>
           <span className="text-slate-400">teachers</span>
         </span>
       </td>

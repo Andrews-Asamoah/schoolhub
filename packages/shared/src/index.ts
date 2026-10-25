@@ -710,6 +710,18 @@ export type UpdatePayrollSalaryInput = z.infer<typeof updatePayrollSalarySchema>
 // SUPER ADMIN SCHEMAS
 // ============================================================================
 
+/** Subdomains the platform itself uses; a school may never claim them. */
+export const RESERVED_SUBDOMAINS = ["api", "admin", "www", "app", "demo", "staging", "mail", "static", "docs", "status", "support"] as const;
+
+export const subdomainSchema = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .min(3)
+  .max(30)
+  .regex(/^[a-z0-9]([a-z0-9-]*[a-z0-9])$/, "Lowercase letters, numbers and hyphens; cannot start or end with a hyphen")
+  .refine((value) => !(RESERVED_SUBDOMAINS as readonly string[]).includes(value), "This subdomain is reserved");
+
 export const enrollSchoolSchema = z.object({
   // School details
   schoolName: z.string().min(2),
@@ -721,11 +733,7 @@ export const enrollSchoolSchema = z.object({
   schoolEmail: z.email().optional(),
   schoolPhone: z.string().optional(),
   schoolAddress: z.string().optional(),
-  subdomain: z
-    .string()
-    .min(3)
-    .max(30)
-    .regex(/^[a-z0-9-]+$/, "Lowercase letters, numbers, hyphens only"),
+  subdomain: subdomainSchema,
   region: z.string().optional(),
 
   // Admin account
@@ -741,11 +749,7 @@ export const updateSchoolSchema = z.object({
     .min(3)
     .max(20)
     .regex(/^[A-Z0-9-]+$/, "Uppercase letters, numbers, hyphens only"),
-  subdomain: z
-    .string()
-    .min(3)
-    .max(30)
-    .regex(/^[a-z0-9-]+$/, "Lowercase letters, numbers, hyphens only"),
+  subdomain: subdomainSchema,
   schoolEmail: z.union([z.email(), z.literal("")]).optional(),
   schoolPhone: z.string().optional(),
   schoolAddress: z.string().optional(),
@@ -788,11 +792,146 @@ export type UpdateSupportTicketInput = z.infer<
   typeof updateSupportTicketSchema
 >;
 
+// ----------------------------------------------------------------------------
+// Subscription rules (single source of truth for API enforcement and the UI)
+// ----------------------------------------------------------------------------
+
+export const SUBSCRIPTION_STATUSES = [
+  "TRIALING",
+  "ACTIVE",
+  "PAST_DUE",
+  "CANCELLED",
+  "SUSPENDED",
+] as const;
+export type SubscriptionStatusValue = (typeof SUBSCRIPTION_STATUSES)[number];
+
+/** Length of the free trial granted when a school is enrolled. */
+export const SUBSCRIPTION_TRIAL_DAYS = 30;
+/** Days a school keeps working after its paid period / trial has lapsed. */
+export const SUBSCRIPTION_GRACE_DAYS = 7;
+
+export type SubscriptionAccessReason =
+  | "OK"
+  | "GRACE_PERIOD"
+  | "EXPIRED"
+  | "SUSPENDED"
+  | "CANCELLED"
+  | "PAST_DUE";
+
+export interface SubscriptionAccess {
+  allowed: boolean;
+  reason: SubscriptionAccessReason;
+  /** Whole days until the lapse date (negative once lapsed). Null when no expiry is set. */
+  daysRemaining: number | null;
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Decides whether a school may use the platform. Pure so the API guard, the
+ * dashboard and the tests all apply exactly the same policy.
+ *
+ * - SUSPENDED / CANCELLED: blocked immediately.
+ * - TRIALING / ACTIVE / PAST_DUE: allowed until `expiresAt`, then for a short
+ *   grace period (`SUBSCRIPTION_GRACE_DAYS`), then blocked.
+ * - Unknown legacy values are treated as blocked (fail closed).
+ */
+export function evaluateSubscriptionAccess(
+  status: string | null | undefined,
+  expiresAt: Date | string | null | undefined,
+  now: Date = new Date(),
+): SubscriptionAccess {
+  const expiry = expiresAt ? new Date(expiresAt) : null;
+  const validExpiry = expiry && !Number.isNaN(expiry.getTime()) ? expiry : null;
+  const daysRemaining = validExpiry
+    ? Math.ceil((validExpiry.getTime() - now.getTime()) / DAY_MS)
+    : null;
+
+  const normalised = status === "CANCELED" ? "CANCELLED" : status;
+  if (normalised === "SUSPENDED") return { allowed: false, reason: "SUSPENDED", daysRemaining };
+  if (normalised === "CANCELLED") return { allowed: false, reason: "CANCELLED", daysRemaining };
+  if (normalised !== "TRIALING" && normalised !== "ACTIVE" && normalised !== "PAST_DUE") {
+    return { allowed: false, reason: "SUSPENDED", daysRemaining };
+  }
+
+  if (validExpiry && validExpiry.getTime() <= now.getTime()) {
+    const graceEnds = validExpiry.getTime() + SUBSCRIPTION_GRACE_DAYS * DAY_MS;
+    return now.getTime() < graceEnds
+      ? { allowed: true, reason: "GRACE_PERIOD", daysRemaining }
+      : { allowed: false, reason: "EXPIRED", daysRemaining };
+  }
+  if (normalised === "PAST_DUE") return { allowed: true, reason: "PAST_DUE", daysRemaining };
+  return { allowed: true, reason: "OK", daysRemaining };
+}
+
+/** Machine-readable marker in the `error` field when a school's access is blocked. */
+export const SUBSCRIPTION_INACTIVE = "SUBSCRIPTION_INACTIVE";
+
 export const updateSubscriptionSchema = z.object({
-  status: z.enum(["TRIALING", "ACTIVE", "PAST_DUE", "CANCELLED", "SUSPENDED"]),
-  expiresAt: z.string().optional(),
+  status: z.enum(SUBSCRIPTION_STATUSES),
+  /** ISO date (YYYY-MM-DD) or full ISO timestamp. `null` clears the expiry. */
+  expiresAt: z
+    .union([
+      z
+        .string()
+        .trim()
+        .refine((value) => !Number.isNaN(new Date(value).getTime()), "Enter a valid date"),
+      z.null(),
+    ])
+    .optional(),
+  /** Why the change was made; stored in the audit trail. */
+  note: z.string().trim().max(500).optional(),
 });
 export type UpdateSubscriptionInput = z.infer<typeof updateSubscriptionSchema>;
+
+// ----------------------------------------------------------------------------
+// Super-admin list queries (validated server-side; never trust raw query strings)
+// ----------------------------------------------------------------------------
+
+const pageQuery = z.coerce.number().int().min(1).max(100000).default(1);
+const limitQuery = z.coerce.number().int().min(1).max(100).default(20);
+const searchQuery = z.string().trim().max(100).optional();
+
+export const superAdminSchoolsQuerySchema = z.object({
+  page: pageQuery,
+  limit: limitQuery,
+  q: searchQuery,
+  status: z.enum(SUBSCRIPTION_STATUSES).optional(),
+  /** `expiring` = lapses within 14 days; `lapsed` = past its expiry date. */
+  expiry: z.enum(["expiring", "lapsed"]).optional(),
+});
+export type SuperAdminSchoolsQuery = z.infer<typeof superAdminSchoolsQuerySchema>;
+
+export const superAdminUsersQuerySchema = z.object({
+  page: pageQuery,
+  limit: limitQuery,
+  q: searchQuery,
+  schoolId: z.string().trim().max(64).optional(),
+  role: z.string().trim().max(40).optional(),
+});
+export type SuperAdminUsersQuery = z.infer<typeof superAdminUsersQuerySchema>;
+
+export const SUPER_ADMIN_AUDIT_ACTIONS = [
+  "CREATE",
+  "UPDATE",
+  "DELETE",
+  "CREDENTIALS_ISSUED",
+  "ACCESS_CHANGED",
+  "SUBSCRIPTION_CHANGED",
+  "SCHOOL_ACCESSED",
+] as const;
+
+export const superAdminAuditQuerySchema = z.object({
+  page: pageQuery,
+  limit: limitQuery,
+  action: z.string().trim().max(40).optional(),
+  schoolId: z.string().trim().max(64).optional(),
+  actorId: z.string().trim().max(64).optional(),
+  from: z.string().trim().optional(),
+  to: z.string().trim().optional(),
+  q: searchQuery,
+});
+export type SuperAdminAuditQuery = z.infer<typeof superAdminAuditQuerySchema>;
 
 // ============================================================================
 // EDITING PEOPLE RECORDS

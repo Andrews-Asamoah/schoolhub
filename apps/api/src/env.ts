@@ -7,6 +7,12 @@ export const env = z
     BETTER_AUTH_URL: z.url(),
     WEB_ORIGIN: z.url(),
     PORT: z.coerce.number().default(3001),
+    NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
+    // Number of reverse proxies in front of the API ("1" for one load balancer).
+    // Required for correct client IPs in rate limits and audit logs.
+    TRUST_PROXY: z.string().optional(),
+    // API docs are off in production unless explicitly enabled.
+    SWAGGER_ENABLED: z.enum(["true", "false"]).optional(),
 
     // Cloudflare R2 object storage (optional: uploads return 503 when unset).
     R2_ACCOUNT_ID: z.string().optional(),

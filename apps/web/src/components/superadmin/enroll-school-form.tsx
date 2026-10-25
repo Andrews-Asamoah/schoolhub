@@ -250,7 +250,7 @@ export function EnrollSchoolForm() {
           </FieldGroup>
         </div>
         <p className="mt-5 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-          The default owner password (Owner@123) is assigned and the owner must change it at first sign-in.
+          A random one-time password is generated and shown once after enrolment. The owner must replace it at first sign-in. The school starts on a 30-day trial.
           Share it securely with the administrator.
         </p>
       </section>

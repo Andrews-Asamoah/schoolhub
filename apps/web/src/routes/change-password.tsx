@@ -102,7 +102,7 @@ function ChangePasswordPage() {
           </h1>
           <p className="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400">
             {forced
-              ? "You signed in with a default password. Create a personal one to continue — you’ll use it from now on."
+              ? "You signed in with a temporary password. Create a personal one to continue — you’ll use it from now on."
               : "Enter your current password, then choose a new one."}
           </p>
         </div>
@@ -114,7 +114,7 @@ function ChangePasswordPage() {
         )}
 
         <form onSubmit={(event) => void handleSubmit(event)} className="space-y-5" noValidate>
-          <PasswordField id="current" label={forced ? "Default password" : "Current password"} autoComplete="current-password" value={currentPassword} onChange={setCurrentPassword} show={show} inputClass={inputClass} />
+          <PasswordField id="current" label={forced ? "Temporary password" : "Current password"} autoComplete="current-password" value={currentPassword} onChange={setCurrentPassword} show={show} inputClass={inputClass} />
           <PasswordField id="new" label="New password" autoComplete="new-password" value={newPassword} onChange={setNewPassword} show={show} inputClass={inputClass} />
           <ul className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs" aria-label="Password requirements">
             {ruleResults.map((rule) => (

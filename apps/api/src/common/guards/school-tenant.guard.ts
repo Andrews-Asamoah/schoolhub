@@ -1,13 +1,28 @@
 import {
   Injectable,
+  Logger,
   type CanActivate,
   type ExecutionContext,
   ForbiddenException,
   NotFoundException,
   UnauthorizedException,
 } from "@nestjs/common";
+import { Reflector } from "@nestjs/core";
+import { evaluateSubscriptionAccess, SUBSCRIPTION_INACTIVE } from "@schoolhub/shared";
 import { PrismaService } from "../../prisma/prisma.service.js";
+import { actorFromRequest, writeAudit } from "../audit/audit.js";
+import { ALLOW_INACTIVE_SUBSCRIPTION } from "../decorators/allow-inactive-subscription.decorator.js";
 import { assertPasswordChangeNotPending } from "./password-change.js";
+
+/** A superAdmin entering a school is audited at most once per window, not per request. */
+const ACCESS_AUDIT_WINDOW_MS = 15 * 60 * 1000;
+const recentSuperAdminAccess = new Map<string, number>();
+
+const INACTIVE_MESSAGES: Record<string, string> = {
+  SUSPENDED: "This school's subscription is suspended. Please contact SchoolHub support.",
+  CANCELLED: "This school's subscription has been cancelled. Please contact SchoolHub support.",
+  EXPIRED: "This school's subscription has expired. Please renew to continue.",
+};
 
 function extractSubdomain(req: any): string | null {
   const customHeader = req.headers["x-school-subdomain"];
@@ -42,7 +57,12 @@ function extractSubdomain(req: any): string | null {
 
 @Injectable()
 export class SchoolTenantGuard implements CanActivate {
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly logger = new Logger(SchoolTenantGuard.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly reflector: Reflector,
+  ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest();
@@ -53,6 +73,9 @@ export class SchoolTenantGuard implements CanActivate {
     }
 
     const user = session.user;
+    if (user.banned === true) {
+      throw new ForbiddenException("This account has been suspended.");
+    }
     assertPasswordChangeNotPending(user);
     const isSuperAdmin = user.role === "superAdmin";
 
@@ -144,13 +167,37 @@ export class SchoolTenantGuard implements CanActivate {
       request.schoolRole = activeRole;
     }
 
-    // Load school details
-    const school = await this.prisma.client.school.findUnique({
+    // Load school details (plus the subscription fields used for access control)
+    const schoolWithOrg = await this.prisma.client.school.findUnique({
       where: { organizationId },
+      include: { organization: { select: { subscriptionStatus: true, expiresAt: true } } },
     });
 
-    if (!school) {
+    if (!schoolWithOrg) {
       throw new ForbiddenException("School not found for this organization.");
+    }
+    const { organization, ...school } = schoolWithOrg;
+
+    if (isSuperAdmin) {
+      this.auditSuperAdminAccess(request, user.id, school.id);
+    } else {
+      const allowInactive = this.reflector.get<boolean>(
+        ALLOW_INACTIVE_SUBSCRIPTION,
+        context.getHandler(),
+      );
+      const access = evaluateSubscriptionAccess(
+        organization.subscriptionStatus,
+        organization.expiresAt,
+      );
+      if (!access.allowed && !allowInactive) {
+        throw new ForbiddenException({
+          message:
+            INACTIVE_MESSAGES[access.reason] ??
+            "This school's subscription is not active. Please contact SchoolHub support.",
+          error: SUBSCRIPTION_INACTIVE,
+          reason: access.reason,
+        });
+      }
     }
 
     // Attach to request context
@@ -158,5 +205,28 @@ export class SchoolTenantGuard implements CanActivate {
     request.membership = member;
 
     return true;
+  }
+
+  /** Records that a platform superAdmin entered a school's data (rate-limited per user and school). */
+  private auditSuperAdminAccess(request: any, userId: string, schoolId: string) {
+    const key = `${userId}:${schoolId}`;
+    const now = Date.now();
+    const last = recentSuperAdminAccess.get(key);
+    if (last && now - last < ACCESS_AUDIT_WINDOW_MS) return;
+    recentSuperAdminAccess.set(key, now);
+    if (recentSuperAdminAccess.size > 1000) {
+      for (const [entry, at] of recentSuperAdminAccess) {
+        if (now - at > ACCESS_AUDIT_WINDOW_MS) recentSuperAdminAccess.delete(entry);
+      }
+    }
+    void writeAudit(this.prisma.client, actorFromRequest(request), {
+      action: "SCHOOL_ACCESSED",
+      entityType: "super-admin.school.access",
+      entityId: schoolId,
+      schoolId,
+      newValues: { method: request.method, path: request.originalUrl?.split("?")[0] ?? request.path },
+    }).catch((error: Error) => {
+      this.logger.error(`SuperAdmin access audit failed: ${error.message}`);
+    });
   }
 }

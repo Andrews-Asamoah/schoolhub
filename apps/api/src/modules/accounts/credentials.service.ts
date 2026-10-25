@@ -49,6 +49,27 @@ export const DEFAULT_PASSWORDS: Record<ProvisionableRole | "owner", string> = {
   guardian: "Guardian@123",
 };
 
+const LOWER = "abcdefghijkmnopqrstuvwxyz"; // no l
+const UPPER = "ABCDEFGHJKLMNPQRSTUVWXYZ"; // no I, O
+const DIGITS = "23456789"; // no 0, 1
+const SYMBOLS = "@#$%&*+=?";
+
+/**
+ * Cryptographically random one-time password that always satisfies the shared
+ * password policy and avoids look-alike characters (easy to read out loud).
+ */
+export function generateTemporaryPassword(length = 16): string {
+  const pick = (alphabet: string) => alphabet[randomInt(0, alphabet.length)]!;
+  const all = LOWER + UPPER + DIGITS + SYMBOLS;
+  const chars = [pick(LOWER), pick(UPPER), pick(DIGITS), pick(SYMBOLS)];
+  while (chars.length < length) chars.push(pick(all));
+  for (let i = chars.length - 1; i > 0; i -= 1) {
+    const j = randomInt(0, i + 1);
+    [chars[i], chars[j]] = [chars[j]!, chars[i]!];
+  }
+  return chars.join("");
+}
+
 export function toIssuedCredentials(
   loginEmail: string,
   credential: PreparedCredential,
@@ -89,6 +110,17 @@ export class CredentialsService {
    */
   async prepare(role: Role): Promise<PreparedCredential> {
     const temporaryPassword = DEFAULT_PASSWORDS[role];
+    return { temporaryPassword, passwordHash: await hashPassword(temporaryPassword) };
+  }
+
+  /**
+   * Like {@link prepare}, but the temporary password is random and unique to
+   * this issuance instead of the guessable role default. Use for privileged
+   * accounts (school owners and admins) where a predictable password would
+   * leave a window for account takeover before the first sign-in.
+   */
+  async prepareRandom(): Promise<PreparedCredential> {
+    const temporaryPassword = generateTemporaryPassword();
     return { temporaryPassword, passwordHash: await hashPassword(temporaryPassword) };
   }
 

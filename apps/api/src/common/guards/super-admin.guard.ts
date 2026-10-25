@@ -21,6 +21,10 @@ export class SuperAdminGuard implements CanActivate {
       throw new UnauthorizedException("Authentication required");
     }
 
+    if (user.banned === true) {
+      throw new ForbiddenException("This account has been suspended.");
+    }
+
     assertPasswordChangeNotPending(user);
 
     if (user.role !== "superAdmin") {

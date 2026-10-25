@@ -1,153 +1,171 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { ArrowUpRight, ChevronLeft, ChevronRight, CircleAlert, CreditCard } from "lucide-react";
+import { ArrowUpRight, Clock, CreditCard, Hourglass, PauseCircle, Settings2, ShieldCheck } from "lucide-react";
 import { apiFetch } from "@/lib/api";
+import { describeExpiry, formatDate } from "@/lib/subscription";
 import { SubscriptionBadge } from "@/components/superadmin/subscription-badge";
-import { DataTable, type DataTableColumn } from "@/components/ui/data-table";
+import { SubscriptionDialog, type SubscriptionTarget } from "@/components/superadmin/subscription-dialog";
+import { StatCard } from "@/components/superadmin/stat-card";
+import { PageHeader } from "@/components/superadmin/page-header";
+import { SearchInput } from "@/components/superadmin/search-input";
+import { FilterChips } from "@/components/superadmin/filter-chips";
+import { Pagination } from "@/components/superadmin/pagination";
+import { EmptyPanel, ErrorPanel, LoadingPanel } from "@/components/superadmin/state-panels";
+import { useDebouncedValue } from "@/components/superadmin/use-debounced-value";
+import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/admin/subscriptions/")({
   component: SubscriptionsPage,
 });
 
-interface SchoolSubscription {
-  id: string;
-  name: string;
+interface SchoolSubscription extends SubscriptionTarget {
   code: string;
   subdomain: string;
   createdAt: string;
-  organization: { subscriptionStatus: string; expiresAt: string | null };
+  _count: { students: number; teachers: number };
 }
 
 interface SchoolsResponse {
   data: SchoolSubscription[];
-  meta: { total: number; page: number; totalPages: number };
+  meta: { total: number; page: number; limit: number; totalPages: number };
 }
+
+interface PlatformStats {
+  totalSchools: number;
+  activeSubscriptions: number;
+  trialing: number;
+  pastDue: number;
+  suspended: number;
+  cancelled: number;
+  expiringSoon: number;
+  lapsed: number;
+}
+
+type Filter = "all" | "TRIALING" | "ACTIVE" | "PAST_DUE" | "SUSPENDED" | "CANCELLED" | "expiring" | "lapsed";
+
+const LIMIT = 15;
 
 function SubscriptionsPage() {
   const [page, setPage] = useState(1);
-  const { data, isPending, error } = useQuery({
-    queryKey: ["superadmin", "subscriptions", page],
-    queryFn: () =>
-      apiFetch<SchoolsResponse>(`/super-admin/schools?page=${page}&limit=20`),
+  const [filter, setFilter] = useState<Filter>("all");
+  const [search, setSearch] = useState("");
+  const [managing, setManaging] = useState<SubscriptionTarget | null>(null);
+  const q = useDebouncedValue(search.trim());
+
+  const stats = useQuery({
+    queryKey: ["superadmin", "stats"],
+    queryFn: () => apiFetch<PlatformStats>("/super-admin/stats"),
+  });
+
+  const params = new URLSearchParams({ page: String(page), limit: String(LIMIT) });
+  if (q) params.set("q", q);
+  if (filter === "expiring" || filter === "lapsed") params.set("expiry", filter);
+  else if (filter !== "all") params.set("status", filter);
+
+  const schools = useQuery({
+    queryKey: ["superadmin", "subscriptions", params.toString()],
+    queryFn: () => apiFetch<SchoolsResponse>(`/super-admin/schools?${params.toString()}`),
+    placeholderData: keepPreviousData,
     retry: false,
   });
 
-  const columns: DataTableColumn<SchoolSubscription>[] = [
-    {
-      id: "school",
-      header: "School",
-      value: (school) => `${school.name} (${school.code} · ${school.subdomain})`,
-      cell: (school) => (
-        <>
-          <p className="text-sm font-semibold text-foreground">{school.name}</p>
-          <p className="mt-0.5 text-xs text-muted-foreground">{school.code} · {school.subdomain}</p>
-        </>
-      ),
-    },
-    {
-      id: "status",
-      header: "Status",
-      value: (school) => school.organization.subscriptionStatus,
-      cell: (school) => <SubscriptionBadge status={school.organization.subscriptionStatus} />,
-    },
-    {
-      id: "expires",
-      header: "Expires",
-      value: (school) => school.organization.expiresAt?.slice(0, 10) ?? "No expiry set",
-      cell: (school) => (school.organization.expiresAt ? new Date(school.organization.expiresAt).toLocaleDateString() : "No expiry set"),
-    },
-    {
-      id: "enrolled",
-      header: "Enrolled",
-      value: (school) => school.createdAt.slice(0, 10),
-      cell: (school) => <span className="whitespace-nowrap">{new Date(school.createdAt).toLocaleDateString()}</span>,
-    },
-    {
-      id: "actions",
-      header: "",
-      className: "text-right",
-      cell: (school) => (
-        <Link
-          to="/admin/schools/$schoolId"
-          params={{ schoolId: school.id }}
-          className="superadmin-button-secondary inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-indigo-800 hover:bg-indigo-50"
-        >
-          Manage <ArrowUpRight className="size-3.5" />
-        </Link>
-      ),
-    },
-  ];
+  const s = stats.data;
+  const choose = (next: Filter) => {
+    setFilter((current) => (current === next ? "all" : next));
+    setPage(1);
+  };
 
   return (
     <div className="space-y-6">
-      <header className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-indigo-600">Platform management</p>
-          <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-900">Subscriptions</h1>
-          <p className="mt-1 text-sm text-slate-500">Review each school’s current subscription status and expiry.</p>
-        </div>
-        <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm">
-          <span className="font-semibold text-slate-900">{data?.meta.total ?? "—"}</span>
-          <span className="ml-2 text-slate-500">school subscriptions</span>
-        </div>
-      </header>
+      <PageHeader
+        eyebrow="Platform management"
+        title="Subscriptions"
+        description="Control which schools can use the platform. Changes take effect immediately and are recorded in the audit log."
+      />
 
-      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-        {isPending ? (
-          <div className="p-10 text-center text-sm text-slate-500">Loading subscriptions…</div>
-        ) : error ? (
-          <div role="alert" className="flex items-center gap-3 p-8 text-sm text-rose-700">
-            <CircleAlert className="size-4 shrink-0" />
-            Subscriptions could not be loaded: {error.message}
-          </div>
-        ) : !data?.data.length ? (
-          <div className="flex flex-col items-center p-12 text-center">
-            <CreditCard className="mb-3 size-8 text-slate-300" />
-            <p className="text-sm font-semibold text-slate-700">No subscriptions yet</p>
-            <p className="mt-1 text-xs text-slate-500">Enroll a school to see its subscription here.</p>
-          </div>
+      <section aria-label="Subscription overview" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard label="Active" value={s?.activeSubscriptions ?? "—"} icon={ShieldCheck} color="success" onClick={() => choose("ACTIVE")} active={filter === "ACTIVE"} />
+        <StatCard label="On trial" value={s?.trialing ?? "—"} icon={Hourglass} color="info" onClick={() => choose("TRIALING")} active={filter === "TRIALING"} />
+        <StatCard label="Expiring in 14 days" value={s?.expiringSoon ?? "—"} icon={Clock} color="warning" delta={s && s.lapsed > 0 ? `${s.lapsed} already lapsed` : undefined} onClick={() => choose("expiring")} active={filter === "expiring"} />
+        <StatCard label="Suspended" value={s?.suspended ?? "—"} icon={PauseCircle} color="danger" onClick={() => choose("SUSPENDED")} active={filter === "SUSPENDED"} />
+      </section>
+
+      <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+        <div className="flex flex-col gap-3 border-b border-border p-4 lg:flex-row lg:items-center lg:justify-between">
+          <FilterChips<Filter>
+            label="Filter subscriptions"
+            value={filter}
+            onChange={(next) => { setFilter(next); setPage(1); }}
+            options={[
+              { value: "all", label: "All" },
+              { value: "ACTIVE", label: "Active" },
+              { value: "TRIALING", label: "Trial" },
+              { value: "PAST_DUE", label: "Past due" },
+              { value: "expiring", label: "Expiring soon" },
+              { value: "lapsed", label: "Lapsed" },
+              { value: "SUSPENDED", label: "Suspended" },
+              { value: "CANCELLED", label: "Cancelled" },
+            ]}
+          />
+          <SearchInput className="w-full lg:w-72" label="Search schools" placeholder="Search name, code or subdomain…" value={search} onChange={(value) => { setSearch(value); setPage(1); }} />
+        </div>
+
+        {schools.isPending ? (
+          <LoadingPanel label="Loading subscriptions…" />
+        ) : schools.error ? (
+          <ErrorPanel message={`Subscriptions could not be loaded: ${schools.error.message}`} onRetry={() => void schools.refetch()} />
+        ) : schools.data.data.length === 0 ? (
+          <EmptyPanel icon={<CreditCard className="size-8" />} title="No schools match" description={q || filter !== "all" ? "Try a different filter or search term." : "Enroll a school to see its subscription here."} />
         ) : (
           <>
-            <DataTable
-              embedded
-              paginate={false}
-              canExport
-              rows={data.data}
-              columns={columns}
-              getRowId={(school) => school.id}
-              exportTitle="Subscriptions"
-              emptyTitle="No subscriptions"
-              emptyDescription="No subscriptions to show."
-            />
-            {data.meta.totalPages > 1 && (
-              <div className="flex items-center justify-between border-t border-slate-100 px-5 py-3">
-                <span className="text-xs text-slate-500">Page {data.meta.page} of {data.meta.totalPages}</span>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    disabled={page <= 1}
-                    onClick={() => setPage((current) => current - 1)}
-                    className="superadmin-button-page rounded-lg border border-slate-200 p-2 text-slate-700 disabled:opacity-40"
-                    aria-label="Previous page"
-                  >
-                    <ChevronLeft className="size-4" />
-                  </button>
-                  <button
-                    type="button"
-                    disabled={page >= data.meta.totalPages}
-                    onClick={() => setPage((current) => current + 1)}
-                    className="superadmin-button-page rounded-lg border border-slate-200 p-2 text-slate-700 disabled:opacity-40"
-                    aria-label="Next page"
-                  >
-                    <ChevronRight className="size-4" />
-                  </button>
-                </div>
-              </div>
-            )}
+            <div className={cn("overflow-x-auto transition-opacity", schools.isPlaceholderData && "opacity-60")}>
+              <table className="w-full min-w-[720px] text-left text-sm">
+                <thead>
+                  <tr className="border-b border-border bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground">
+                    <th scope="col" className="px-5 py-3 font-semibold">School</th>
+                    <th scope="col" className="px-5 py-3 font-semibold">Status</th>
+                    <th scope="col" className="px-5 py-3 font-semibold">Expires</th>
+                    <th scope="col" className="hidden px-5 py-3 font-semibold md:table-cell">Students</th>
+                    <th scope="col" className="px-5 py-3"><span className="sr-only">Actions</span></th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {schools.data.data.map((school) => (
+                    <tr key={school.id} className="transition hover:bg-muted/40">
+                      <td className="px-5 py-3.5">
+                        <p className="font-semibold text-foreground">{school.name}</p>
+                        <p className="mt-0.5 text-xs text-muted-foreground">{school.code} · {school.subdomain}</p>
+                      </td>
+                      <td className="px-5 py-3.5">
+                        <SubscriptionBadge status={school.organization.subscriptionStatus} expiresAt={school.organization.expiresAt} />
+                      </td>
+                      <td className="px-5 py-3.5">
+                        <p className="text-foreground">{formatDate(school.organization.expiresAt)}</p>
+                        <p className="mt-0.5 text-xs text-muted-foreground">{school.organization.expiresAt ? describeExpiry(school.organization.expiresAt) : "Never expires"}</p>
+                      </td>
+                      <td className="hidden px-5 py-3.5 tabular-nums text-foreground md:table-cell">{school._count.students.toLocaleString()}</td>
+                      <td className="px-5 py-3.5">
+                        <div className="flex justify-end gap-2">
+                          <button type="button" onClick={() => setManaging(school)} className="superadmin-button-secondary inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold">
+                            <Settings2 className="size-3.5" /> Manage
+                          </button>
+                          <Link to="/admin/schools/$schoolId" params={{ schoolId: school.id }} aria-label={`Open ${school.name}`} className="superadmin-button-secondary inline-flex items-center rounded-lg p-1.5">
+                            <ArrowUpRight className="size-3.5" />
+                          </Link>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <Pagination page={schools.data.meta.page} totalPages={schools.data.meta.totalPages} total={schools.data.meta.total} limit={LIMIT} onChange={setPage} />
           </>
         )}
       </section>
+
+      {managing && <SubscriptionDialog school={managing} onClose={() => setManaging(null)} />}
     </div>
   );
 }

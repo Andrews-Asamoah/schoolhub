@@ -49,8 +49,8 @@ export function CredentialsDialog({
         <div className="mt-3 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs leading-relaxed text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-200">
           <AlertTriangle className="mt-0.5 size-4 shrink-0" />
           <p>
-            These are default passwords for each role. Share them privately
-            (never in a group chat). The system blocks everything else until
+            These are temporary passwords. Share them privately (never in a
+            group chat) and only once. The system blocks everything else until
             each person chooses their own password at first sign-in, so have
             them sign in promptly.
           </p>
@@ -60,7 +60,7 @@ export function CredentialsDialog({
           {entries.map((entry, index) => {
             const { credentials } = entry;
             const signIn = credentials.loginId ?? credentials.loginEmail;
-            const block = `Username: ${signIn}\nLogin email: ${credentials.loginEmail}\nDefault password: ${credentials.temporaryPassword}`;
+            const block = `Username: ${signIn}\nLogin email: ${credentials.loginEmail}\nTemporary password: ${credentials.temporaryPassword}`;
             return (
               <section key={`${credentials.loginEmail}-${index}`} className="rounded-xl border border-slate-200 p-4 dark:border-white/10">
                 <h3 className="text-sm font-semibold text-slate-900 dark:text-white">{entry.label}</h3>
@@ -76,7 +76,7 @@ export function CredentialsDialog({
                     </div>
                   )}
                   <div className="flex justify-between gap-3">
-                    <dt className="text-slate-500">Default password</dt>
+                    <dt className="text-slate-500">Temporary password</dt>
                     <dd className="select-all font-mono font-semibold tracking-wide text-slate-900 dark:text-white">{credentials.temporaryPassword}</dd>
                   </div>
                 </dl>

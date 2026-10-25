@@ -1,61 +1,59 @@
 import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
+type Tone = "primary" | "success" | "warning" | "danger" | "info";
+
 interface StatCardProps {
   label: string;
   value: string | number;
   delta?: string;
   icon: LucideIcon;
-  color: "indigo" | "emerald" | "amber" | "rose";
+  /** Semantic tone. The legacy colour names are still accepted. */
+  color?: Tone | "indigo" | "emerald" | "amber" | "rose";
+  /** Makes the card a button, e.g. to filter a table by this metric. */
+  onClick?: () => void;
+  active?: boolean;
 }
 
-const colorMap = {
-  indigo: {
-    icon: "bg-indigo-50 text-indigo-600",
-    delta: "text-indigo-600",
-    glow: "bg-indigo-500",
-  },
-  emerald: {
-    icon: "bg-emerald-50 text-emerald-600",
-    delta: "text-emerald-600",
-    glow: "bg-emerald-500",
-  },
-  amber: {
-    icon: "bg-amber-50 text-amber-600",
-    delta: "text-amber-600",
-    glow: "bg-amber-500",
-  },
-  rose: {
-    icon: "bg-rose-50 text-rose-600",
-    delta: "text-rose-600",
-    glow: "bg-rose-500",
-  },
+const LEGACY: Record<string, Tone> = { indigo: "primary", emerald: "success", amber: "warning", rose: "danger" };
+
+const TONES: Record<Tone, { icon: string; bar: string; delta: string }> = {
+  primary: { icon: "bg-primary/10 text-primary", bar: "bg-primary", delta: "text-primary" },
+  success: { icon: "bg-success/10 text-success", bar: "bg-success", delta: "text-success" },
+  warning: { icon: "bg-warning/10 text-warning", bar: "bg-warning", delta: "text-warning" },
+  danger: { icon: "bg-destructive/10 text-destructive", bar: "bg-destructive", delta: "text-destructive" },
+  info: { icon: "bg-info/10 text-info", bar: "bg-info", delta: "text-info" },
 };
 
-export function StatCard({ label, value, delta, icon: Icon, color }: StatCardProps) {
-  const colors = colorMap[color];
-
-  return (
-    <div
-      className="group relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_2px_12px_rgba(15,23,42,0.025)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_12px_28px_rgba(15,23,42,0.08)] sm:p-6"
-    >
-      <span className={cn("absolute inset-x-0 top-0 h-0.5 opacity-70", colors.glow)} />
-      <div className="flex items-start justify-between">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">{label}</p>
-          <p className="mt-3 text-3xl font-bold tracking-tight text-slate-900">
+export function StatCard({ label, value, delta, icon: Icon, color = "primary", onClick, active }: StatCardProps) {
+  const tone = TONES[LEGACY[color] ?? (color as Tone)];
+  const body = (
+    <>
+      <span className={cn("absolute inset-x-0 top-0 h-0.5 opacity-70", tone.bar)} />
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 text-left">
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">{label}</p>
+          <p className="mt-3 text-3xl font-bold tracking-tight text-foreground tabular-nums">
             {typeof value === "number" ? value.toLocaleString() : value}
           </p>
-          {delta && (
-            <p className={cn("mt-1 text-xs font-medium", colors.delta)}>
-              {delta}
-            </p>
-          )}
+          {delta && <p className={cn("mt-1 text-xs font-medium", tone.delta)}>{delta}</p>}
         </div>
-        <span className={cn("flex size-11 items-center justify-center rounded-xl transition-transform group-hover:scale-105", colors.icon)}>
+        <span className={cn("flex size-11 shrink-0 items-center justify-center rounded-xl transition-transform group-hover:scale-105", tone.icon)}>
           <Icon className="size-[21px]" strokeWidth={1.8} />
         </span>
       </div>
-    </div>
+    </>
+  );
+  const classes = cn(
+    "group relative block w-full overflow-hidden rounded-2xl border bg-card p-5 shadow-sm transition duration-200 sm:p-6",
+    active ? "border-primary ring-2 ring-primary/20" : "border-border",
+    onClick && "cursor-pointer hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+  );
+  return onClick ? (
+    <button type="button" onClick={onClick} aria-pressed={active} className={classes}>
+      {body}
+    </button>
+  ) : (
+    <div className={classes}>{body}</div>
   );
 }

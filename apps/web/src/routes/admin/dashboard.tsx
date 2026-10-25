@@ -39,6 +39,11 @@ interface PlatformStats {
   totalStudents: number;
   totalTeachers: number;
   activeSubscriptions: number;
+  trialing?: number;
+  pastDue?: number;
+  suspended?: number;
+  expiringSoon?: number;
+  lapsed?: number;
 }
 
 interface SchoolSummary {
@@ -47,9 +52,8 @@ interface SchoolSummary {
   code: string;
   subdomain: string;
   createdAt: string;
-  organization: { subscriptionStatus: string; metadata: string | null };
-  students: { id: string }[];
-  teachers: { id: string }[];
+  organization: { subscriptionStatus: string; expiresAt: string | null; metadata: string | null };
+  _count: { students: number; teachers: number };
 }
 
 interface SchoolsListResponse {
@@ -104,12 +108,12 @@ function AdminDashboard() {
       ),
     },
     { id: "region", header: "Region", value: (school) => regionOf(school.organization.metadata), cell: (school) => regionOf(school.organization.metadata) || "—" },
-    { id: "students", header: "Students", value: (school) => school.students.length, cell: (school) => <span className="font-semibold tabular-nums">{school.students.length}</span> },
+    { id: "students", header: "Students", value: (school) => school._count.students, cell: (school) => <span className="font-semibold tabular-nums">{school._count.students}</span> },
     {
       id: "subscription",
       header: "Subscription",
       value: (school) => school.organization.subscriptionStatus,
-      cell: (school) => <SubscriptionBadge status={school.organization.subscriptionStatus} />,
+      cell: (school) => <SubscriptionBadge status={school.organization.subscriptionStatus} expiresAt={school.organization.expiresAt} />,
     },
     {
       id: "enrolled",
@@ -197,6 +201,28 @@ function AdminDashboard() {
           color="rose"
         />
       </section>
+
+      {stats && (stats.lapsed ?? 0) + (stats.expiringSoon ?? 0) + (stats.pastDue ?? 0) + (stats.suspended ?? 0) > 0 && (
+        <section aria-label="Needs attention" className="flex flex-col gap-4 rounded-2xl border border-warning/30 bg-warning/10 p-5 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-start gap-3">
+            <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-warning/15 text-warning"><CircleAlert className="size-5" /></span>
+            <div>
+              <h2 className="text-sm font-bold text-foreground">Subscriptions need attention</h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {[
+                  stats.lapsed ? `${stats.lapsed} lapsed` : null,
+                  stats.expiringSoon ? `${stats.expiringSoon} expiring within 14 days` : null,
+                  stats.pastDue ? `${stats.pastDue} past due` : null,
+                  stats.suspended ? `${stats.suspended} suspended` : null,
+                ].filter(Boolean).join(" · ")}
+              </p>
+            </div>
+          </div>
+          <Link to="/admin/subscriptions" className="superadmin-button-secondary inline-flex shrink-0 items-center gap-2 self-start rounded-xl px-4 py-2.5 text-sm font-semibold sm:self-center">
+            Review subscriptions <ArrowRight className="size-3.5" />
+          </Link>
+        </section>
+      )}
 
       <section aria-label="Platform analytics" className="grid gap-5 xl:grid-cols-[1.35fr_1fr]">
         <article className="min-w-0 rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_4px_24px_rgba(15,23,42,0.035)] sm:p-6">

@@ -11,7 +11,12 @@ import {
 /** Better Auth endpoints that accept a brand-new password from the client. */
 const PASSWORD_SETTING_PATHS = new Set(["/change-password", "/reset-password", "/set-password"]);
 
-export function createAuth(prisma: Parameters<typeof prismaAdapter>[0]) {
+/** Platform super-admin sessions are short-lived: re-authenticate every working day. */
+const SUPER_ADMIN_SESSION_SECONDS = 60 * 60 * 8;
+
+type PrismaLike = Parameters<typeof prismaAdapter>[0];
+
+export function createAuth(prisma: PrismaLike) {
   const trustedOrigins = [
     process.env.WEB_ORIGIN ?? "http://localhost:5173",
     "http://localhost:5173",
@@ -83,6 +88,41 @@ export function createAuth(prisma: Parameters<typeof prismaAdapter>[0]) {
           required: false,
           defaultValue: false,
           input: false,
+        },
+        // Exposed on the session so guards can refuse a banned account.
+        banned: {
+          type: "boolean",
+          required: false,
+          defaultValue: false,
+          input: false,
+        },
+      },
+    },
+    // Refuse to open a session for a banned account (sign-in, token refresh,
+    // anything that creates one) and cap how long a super-admin stays signed in.
+    databaseHooks: {
+      session: {
+        create: {
+          before: async (session) => {
+            const account = await (prisma as unknown as {
+              user: {
+                findUnique: (args: unknown) => Promise<{ banned: boolean; role: string } | null>;
+              };
+            }).user.findUnique({
+              where: { id: session.userId },
+              select: { banned: true, role: true },
+            });
+            if (account?.banned) {
+              throw new APIError("FORBIDDEN", { message: "This account has been suspended." });
+            }
+            if (account?.role === "superAdmin") {
+              const cap = new Date(Date.now() + SUPER_ADMIN_SESSION_SECONDS * 1000);
+              const expiresAt =
+                session.expiresAt && session.expiresAt < cap ? session.expiresAt : cap;
+              return { data: { ...session, expiresAt } };
+            }
+            return { data: session };
+          },
         },
       },
     },

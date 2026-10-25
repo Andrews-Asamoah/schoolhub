@@ -1,5 +1,6 @@
 import { Module } from "@nestjs/common";
 import { APP_FILTER } from "@nestjs/core";
+import { ThrottlerModule } from "@nestjs/throttler";
 import { AuthModule } from "@thallesp/nestjs-better-auth";
 import { auth } from "./auth/auth.js";
 import { HealthController } from "./health.controller.js";
@@ -30,6 +31,9 @@ import { DashboardModule } from "./modules/dashboard/dashboard.module.js";
 
 @Module({
   imports: [
+    // Named limit used by @UseGuards(ThrottlerGuard) on sensitive controllers.
+    // Deliberately NOT a global guard: many pupils share one school IP address.
+    ThrottlerModule.forRoot([{ name: "default", ttl: 60_000, limit: 120 }]),
     PrismaModule,
     StorageModule,
     AuthModule.forRoot({ auth }),

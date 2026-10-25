@@ -112,6 +112,18 @@ export async function apiFetch<T>(
     ) {
       window.location.assign("/change-password");
     }
+    // The school's subscription is suspended, cancelled or expired: every
+    // business endpoint refuses, so show one clear explanation instead of
+    // a page full of failed requests.
+    if (
+      res.status === 403 &&
+      (body as { error?: string }).error === "SUBSCRIPTION_INACTIVE" &&
+      typeof window !== "undefined" &&
+      window.location.pathname !== "/subscription-inactive"
+    ) {
+      const reason = (body as { reason?: string }).reason ?? "EXPIRED";
+      window.location.assign(`/subscription-inactive?reason=${encodeURIComponent(reason)}`);
+    }
     throw new ApiError(
       res.status,
       (body as { message?: string }).message ?? res.statusText,

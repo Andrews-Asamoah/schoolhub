@@ -7,6 +7,7 @@ import {
   CreditCard,
   UserCircle,
   LifeBuoy,
+  ScrollText,
 } from "lucide-react";
 import { SidebarUserMenu } from "@/components/ui/sidebar-user-menu";
 import {
@@ -42,9 +43,15 @@ const navSections = [
     ],
   },
   {
+    title: "Security",
+    items: [
+      { id: "audit", label: "Audit log", icon: ScrollText, to: "/admin/audit" as const },
+    ],
+  },
+  {
     title: "Personal",
     items: [
-      { id: "profile", label: "My profile", icon: UserCircle, to: "/admin/profile" as const },
+      { id: "profile", label: "Account & security", icon: UserCircle, to: "/admin/profile" as const },
     ],
   },
 ];

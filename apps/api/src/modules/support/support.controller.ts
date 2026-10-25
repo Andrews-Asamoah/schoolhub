@@ -23,6 +23,7 @@ import {
 import { Roles } from "../../common/decorators/roles.decorator.js";
 import { RolesGuard } from "../../common/guards/roles.guard.js";
 import { SchoolTenantGuard } from "../../common/guards/school-tenant.guard.js";
+import { AllowInactiveSubscription } from "../../common/decorators/allow-inactive-subscription.decorator.js";
 import { SuperAdminGuard } from "../../common/guards/super-admin.guard.js";
 import { ZodValidationPipe } from "../../common/pipes/zod-validation.pipe.js";
 import type { School } from "@prisma/client";
@@ -34,6 +35,7 @@ export class SupportController {
 
   @Get("tickets")
   @UseGuards(SchoolTenantGuard, RolesGuard)
+  @AllowInactiveSubscription()
   @Roles("owner", "admin")
   listSchoolTickets(@CurrentSchool() school: School) {
     return this.supportService.listSchoolTickets(school.id);
@@ -41,6 +43,7 @@ export class SupportController {
 
   @Post("tickets")
   @UseGuards(SchoolTenantGuard, RolesGuard)
+  @AllowInactiveSubscription()
   @Roles("owner", "admin")
   createSchoolTicket(
     @CurrentSchool() school: School,
@@ -53,6 +56,7 @@ export class SupportController {
 
   @Get("tickets/:ticketId")
   @UseGuards(SchoolTenantGuard, RolesGuard)
+  @AllowInactiveSubscription()
   @Roles("owner", "admin")
   getSchoolTicket(
     @CurrentSchool() school: School,
@@ -63,6 +67,7 @@ export class SupportController {
 
   @Post("tickets/:ticketId/replies")
   @UseGuards(SchoolTenantGuard, RolesGuard)
+  @AllowInactiveSubscription()
   @Roles("owner", "admin")
   replyToSchoolTicket(
     @CurrentSchool() school: School,
@@ -81,6 +86,7 @@ export class SupportController {
 
   @Patch("tickets/:ticketId/status")
   @UseGuards(SchoolTenantGuard, RolesGuard)
+  @AllowInactiveSubscription()
   @Roles("owner", "admin")
   updateSchoolTicket(
     @CurrentSchool() school: School,

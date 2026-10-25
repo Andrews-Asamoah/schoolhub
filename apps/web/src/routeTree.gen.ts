@@ -16,10 +16,12 @@ import { Route as ApplyRouteImport } from './routes/apply'
 import { Route as ChangePasswordRouteImport } from './routes/change-password'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as SubscriptionInactiveRouteImport } from './routes/subscription-inactive'
 import { Route as AdminIndexRouteImport } from './routes/admin/index'
 import { Route as AdminDashboardRouteImport } from './routes/admin/dashboard'
 import { Route as AdminProfileRouteImport } from './routes/admin/profile'
 import { Route as AdminSupportRouteImport } from './routes/admin/support'
+import { Route as AdminAuditIndexRouteImport } from './routes/admin/audit/index'
 import { Route as AdminSchoolsIndexRouteImport } from './routes/admin/schools/index'
 import { Route as AdminSchoolsSchoolIdRouteImport } from './routes/admin/schools/$schoolId'
 import { Route as AdminSchoolsNewRouteImport } from './routes/admin/schools/new'
@@ -61,6 +63,11 @@ const LoginRoute = LoginRouteImport.update({
   path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SubscriptionInactiveRoute = SubscriptionInactiveRouteImport.update({
+  id: '/subscription-inactive',
+  path: '/subscription-inactive',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdminIndexRoute = AdminIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -79,6 +86,11 @@ const AdminProfileRoute = AdminProfileRouteImport.update({
 const AdminSupportRoute = AdminSupportRouteImport.update({
   id: '/support',
   path: '/support',
+  getParentRoute: () => AdminRouteRoute,
+} as any)
+const AdminAuditIndexRoute = AdminAuditIndexRouteImport.update({
+  id: '/audit/',
+  path: '/audit/',
   getParentRoute: () => AdminRouteRoute,
 } as any)
 const AdminSchoolsIndexRoute = AdminSchoolsIndexRouteImport.update({
@@ -115,12 +127,14 @@ export interface FileRoutesByFullPath {
   '/change-password': typeof ChangePasswordRoute
   '/dashboard': typeof DashboardRoute
   '/login': typeof LoginRoute
+  '/subscription-inactive': typeof SubscriptionInactiveRoute
   '/admin/dashboard': typeof AdminDashboardRoute
   '/admin/profile': typeof AdminProfileRoute
   '/admin/support': typeof AdminSupportRoute
   '/admin/': typeof AdminIndexRoute
   '/admin/schools/$schoolId': typeof AdminSchoolsSchoolIdRoute
   '/admin/schools/new': typeof AdminSchoolsNewRoute
+  '/admin/audit/': typeof AdminAuditIndexRoute
   '/admin/schools/': typeof AdminSchoolsIndexRoute
   '/admin/subscriptions/': typeof AdminSubscriptionsIndexRoute
   '/admin/users/': typeof AdminUsersIndexRoute
@@ -132,12 +146,14 @@ export interface FileRoutesByTo {
   '/change-password': typeof ChangePasswordRoute
   '/dashboard': typeof DashboardRoute
   '/login': typeof LoginRoute
+  '/subscription-inactive': typeof SubscriptionInactiveRoute
   '/admin/dashboard': typeof AdminDashboardRoute
   '/admin/profile': typeof AdminProfileRoute
   '/admin/support': typeof AdminSupportRoute
   '/admin': typeof AdminIndexRoute
   '/admin/schools/$schoolId': typeof AdminSchoolsSchoolIdRoute
   '/admin/schools/new': typeof AdminSchoolsNewRoute
+  '/admin/audit': typeof AdminAuditIndexRoute
   '/admin/schools': typeof AdminSchoolsIndexRoute
   '/admin/subscriptions': typeof AdminSubscriptionsIndexRoute
   '/admin/users': typeof AdminUsersIndexRoute
@@ -151,12 +167,14 @@ export interface FileRoutesById {
   '/change-password': typeof ChangePasswordRoute
   '/dashboard': typeof DashboardRoute
   '/login': typeof LoginRoute
+  '/subscription-inactive': typeof SubscriptionInactiveRoute
   '/admin/dashboard': typeof AdminDashboardRoute
   '/admin/profile': typeof AdminProfileRoute
   '/admin/support': typeof AdminSupportRoute
   '/admin/': typeof AdminIndexRoute
   '/admin/schools/$schoolId': typeof AdminSchoolsSchoolIdRoute
   '/admin/schools/new': typeof AdminSchoolsNewRoute
+  '/admin/audit/': typeof AdminAuditIndexRoute
   '/admin/schools/': typeof AdminSchoolsIndexRoute
   '/admin/subscriptions/': typeof AdminSubscriptionsIndexRoute
   '/admin/users/': typeof AdminUsersIndexRoute
@@ -171,12 +189,14 @@ export interface FileRouteTypes {
     | '/change-password'
     | '/dashboard'
     | '/login'
+    | '/subscription-inactive'
     | '/admin/dashboard'
     | '/admin/profile'
     | '/admin/support'
     | '/admin/'
     | '/admin/schools/$schoolId'
     | '/admin/schools/new'
+    | '/admin/audit/'
     | '/admin/schools/'
     | '/admin/subscriptions/'
     | '/admin/users/'
@@ -188,12 +208,14 @@ export interface FileRouteTypes {
     | '/change-password'
     | '/dashboard'
     | '/login'
+    | '/subscription-inactive'
     | '/admin/dashboard'
     | '/admin/profile'
     | '/admin/support'
     | '/admin'
     | '/admin/schools/$schoolId'
     | '/admin/schools/new'
+    | '/admin/audit'
     | '/admin/schools'
     | '/admin/subscriptions'
     | '/admin/users'
@@ -206,12 +228,14 @@ export interface FileRouteTypes {
     | '/change-password'
     | '/dashboard'
     | '/login'
+    | '/subscription-inactive'
     | '/admin/dashboard'
     | '/admin/profile'
     | '/admin/support'
     | '/admin/'
     | '/admin/schools/$schoolId'
     | '/admin/schools/new'
+    | '/admin/audit/'
     | '/admin/schools/'
     | '/admin/subscriptions/'
     | '/admin/users/'
@@ -225,6 +249,7 @@ export interface RootRouteChildren {
   ChangePasswordRoute: typeof ChangePasswordRoute
   DashboardRoute: typeof DashboardRoute
   LoginRoute: typeof LoginRoute
+  SubscriptionInactiveRoute: typeof SubscriptionInactiveRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -278,6 +303,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/subscription-inactive': {
+      id: '/subscription-inactive'
+      path: '/subscription-inactive'
+      fullPath: '/subscription-inactive'
+      preLoaderRoute: typeof SubscriptionInactiveRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/admin/': {
       id: '/admin/'
       path: '/'
@@ -304,6 +336,13 @@ declare module '@tanstack/react-router' {
       path: '/support'
       fullPath: '/admin/support'
       preLoaderRoute: typeof AdminSupportRouteImport
+      parentRoute: typeof AdminRouteRoute
+    }
+    '/admin/audit/': {
+      id: '/admin/audit/'
+      path: '/audit'
+      fullPath: '/admin/audit/'
+      preLoaderRoute: typeof AdminAuditIndexRouteImport
       parentRoute: typeof AdminRouteRoute
     }
     '/admin/schools/': {
@@ -351,6 +390,7 @@ interface AdminRouteRouteChildren {
   AdminIndexRoute: typeof AdminIndexRoute
   AdminSchoolsSchoolIdRoute: typeof AdminSchoolsSchoolIdRoute
   AdminSchoolsNewRoute: typeof AdminSchoolsNewRoute
+  AdminAuditIndexRoute: typeof AdminAuditIndexRoute
   AdminSchoolsIndexRoute: typeof AdminSchoolsIndexRoute
   AdminSubscriptionsIndexRoute: typeof AdminSubscriptionsIndexRoute
   AdminUsersIndexRoute: typeof AdminUsersIndexRoute
@@ -363,6 +403,7 @@ const AdminRouteRouteChildren: AdminRouteRouteChildren = {
   AdminIndexRoute: AdminIndexRoute,
   AdminSchoolsSchoolIdRoute: AdminSchoolsSchoolIdRoute,
   AdminSchoolsNewRoute: AdminSchoolsNewRoute,
+  AdminAuditIndexRoute: AdminAuditIndexRoute,
   AdminSchoolsIndexRoute: AdminSchoolsIndexRoute,
   AdminSubscriptionsIndexRoute: AdminSubscriptionsIndexRoute,
   AdminUsersIndexRoute: AdminUsersIndexRoute,
@@ -380,6 +421,7 @@ const rootRouteChildren: RootRouteChildren = {
   ChangePasswordRoute: ChangePasswordRoute,
   DashboardRoute: DashboardRoute,
   LoginRoute: LoginRoute,
+  SubscriptionInactiveRoute: SubscriptionInactiveRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

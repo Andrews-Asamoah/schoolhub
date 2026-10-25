@@ -1,9 +1,15 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { Building2, ChevronLeft, ChevronRight, CircleAlert, Search, Users } from "lucide-react";
+import { Building2, Users } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { DataTable, type DataTableColumn } from "@/components/ui/data-table";
+import { PageHeader } from "@/components/superadmin/page-header";
+import { Pagination } from "@/components/superadmin/pagination";
+import { SearchInput } from "@/components/superadmin/search-input";
+import { EmptyPanel, ErrorPanel, LoadingPanel } from "@/components/superadmin/state-panels";
+import { useDebouncedValue } from "@/components/superadmin/use-debounced-value";
+import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/admin/users/")({
   component: SystemUsersPage,
@@ -29,29 +35,37 @@ interface PlatformUser {
 
 interface UsersResponse {
   data: PlatformUser[];
-  meta: { total: number; page: number; totalPages: number };
+  meta: { total: number; page: number; limit: number; totalPages: number };
 }
+
+const LIMIT = 20;
 
 function SystemUsersPage() {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
-  const { data, isPending, error } = useQuery({
-    queryKey: ["superadmin", "users", page],
-    queryFn: () =>
-      apiFetch<UsersResponse>(`/super-admin/users?page=${page}&limit=20`),
+  const [schoolId, setSchoolId] = useState("");
+  const [role, setRole] = useState("");
+  const q = useDebouncedValue(search.trim());
+
+  const params = new URLSearchParams({ page: String(page), limit: String(LIMIT) });
+  if (q) params.set("q", q);
+  if (schoolId) params.set("schoolId", schoolId);
+  if (role) params.set("role", role);
+
+  const { data, isPending, error, isPlaceholderData, refetch } = useQuery({
+    queryKey: ["superadmin", "users", params.toString()],
+    queryFn: () => apiFetch<UsersResponse>(`/super-admin/users?${params.toString()}`),
+    placeholderData: keepPreviousData,
     retry: false,
   });
-  const users = data?.data.filter((user) => {
-    const term = search.toLowerCase();
-    return (
-      !term ||
-      user.name.toLowerCase().includes(term) ||
-      user.email.toLowerCase().includes(term) ||
-      user.members.some((member) =>
-        member.organization.name.toLowerCase().includes(term),
-      )
-    );
+  const schools = useQuery({
+    queryKey: ["superadmin", "school-options"],
+    queryFn: () => apiFetch<{ id: string; name: string }[]>("/super-admin/schools/options"),
+    staleTime: 5 * 60_000,
   });
+  const users = data?.data;
+  const filtersActive = Boolean(q || schoolId || role);
+  const selectClass = "rounded-xl border border-input bg-card px-3 py-2.5 text-sm text-foreground shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-ring/30";
 
   const columns: DataTableColumn<PlatformUser>[] = [
     {
@@ -86,7 +100,7 @@ function SystemUsersPage() {
                 key={school.id}
                 to="/admin/schools/$schoolId"
                 params={{ schoolId: school.id }}
-                className="superadmin-button-secondary inline-flex items-center gap-1.5 rounded-lg bg-muted px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-indigo-50 hover:text-indigo-900"
+                className="superadmin-button-secondary inline-flex items-center gap-1.5 rounded-lg bg-muted px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-primary/10 hover:text-primary"
                 title={`${member.role}${member.banned ? " (membership suspended)" : ""}`}
               >
                 <Building2 className="size-3.5" />
@@ -109,7 +123,7 @@ function SystemUsersPage() {
       header: "Status",
       value: (user) => (user.banned ? "Suspended" : "Active"),
       cell: (user) => (
-        <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${user.banned ? "bg-rose-500/10 text-rose-700 dark:text-rose-300" : "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"}`}>
+        <span className={cn("rounded-full px-2.5 py-1 text-xs font-medium", user.banned ? "bg-destructive/10 text-destructive" : "bg-success/10 text-success")}>
           {user.banned ? "Suspended" : "Active"}
         </span>
       ),
@@ -124,86 +138,56 @@ function SystemUsersPage() {
 
   return (
     <div className="space-y-6">
-      <header className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-indigo-600">Platform management</p>
-          <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-900">System users</h1>
-          <p className="mt-1 text-sm text-slate-500">
-            School users and their organization memberships. Platform super admins are excluded.
-          </p>
-        </div>
-        <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm">
-          <span className="font-semibold text-slate-900">{data?.meta.total ?? "—"}</span>
-          <span className="ml-2 text-slate-500">tenant users</span>
-        </div>
-      </header>
+      <PageHeader
+        eyebrow="Platform management"
+        title="System users"
+        description="School users and their memberships. Platform super admins are excluded."
+        actions={
+          <div className="rounded-xl border border-border bg-card px-4 py-2.5 text-sm shadow-sm">
+            <span className="font-semibold text-foreground tabular-nums">{data?.meta.total.toLocaleString() ?? "—"}</span>
+            <span className="ml-2 text-muted-foreground">{filtersActive ? "matching users" : "tenant users"}</span>
+          </div>
+        }
+      />
 
-      <label className="relative block sm:max-w-sm">
-        <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
-        <input
-          type="search"
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
-          placeholder="Search this page by name, email, or school"
-          className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-9 pr-3 text-sm shadow-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
-        />
-      </label>
+      <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+        <div className="grid gap-3 border-b border-border p-4 md:grid-cols-[1.5fr_1fr_1fr]">
+          <SearchInput label="Search users" placeholder="Search every user by name or email…" value={search} onChange={(value) => { setSearch(value); setPage(1); }} />
+          <select aria-label="Filter by school" value={schoolId} onChange={(event) => { setSchoolId(event.target.value); setPage(1); }} className={selectClass}>
+            <option value="">All schools</option>
+            {schools.data?.map((school) => <option key={school.id} value={school.id}>{school.name}</option>)}
+          </select>
+          <select aria-label="Filter by school role" value={role} onChange={(event) => { setRole(event.target.value); setPage(1); }} className={selectClass}>
+            <option value="">All roles</option>
+            {["owner", "admin", "headteacher", "teacher", "accountant", "student", "guardian"].map((value) => (
+              <option key={value} value={value} className="capitalize">{value}</option>
+            ))}
+          </select>
+        </div>
 
-      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         {isPending ? (
-          <div className="p-10 text-center text-sm text-slate-500">Loading users…</div>
+          <LoadingPanel label="Loading users…" />
         ) : error ? (
-          <div role="alert" className="flex items-center gap-3 p-8 text-sm text-rose-700">
-            <CircleAlert className="size-4 shrink-0" />
-            Users could not be loaded: {error.message}
-          </div>
+          <ErrorPanel message={`Users could not be loaded: ${error.message}`} onRetry={() => void refetch()} />
         ) : !users?.length ? (
-          <div className="flex flex-col items-center p-12 text-center">
-            <Users className="mb-3 size-8 text-slate-300" />
-            <p className="text-sm font-semibold text-slate-700">No users found</p>
-            <p className="mt-1 text-xs text-slate-500">
-              {search ? "Try a different search." : "School user accounts will appear here."}
-            </p>
-          </div>
+          <EmptyPanel icon={<Users className="size-8" />} title="No users found" description={filtersActive ? "Try different filters or a different search." : "School user accounts will appear here."} />
         ) : (
           <>
-            <DataTable
-              embedded
-              searchable={false}
-              paginate={false}
-              canExport
-              rows={users}
-              columns={columns}
-              getRowId={(user) => user.id}
-              exportTitle="Platform users"
-              emptyTitle="No users"
-              emptyDescription="No users to show."
-            />
-            {data && data.meta.totalPages > 1 && (
-              <div className="flex items-center justify-between border-t border-slate-100 px-5 py-3">
-                <span className="text-xs text-slate-500">Page {data.meta.page} of {data.meta.totalPages}</span>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    disabled={page <= 1}
-                    onClick={() => setPage((current) => current - 1)}
-                    className="superadmin-button-page rounded-lg border border-slate-200 p-2 text-slate-700 disabled:opacity-40"
-                    aria-label="Previous page"
-                  >
-                    <ChevronLeft className="size-4" />
-                  </button>
-                  <button
-                    type="button"
-                    disabled={page >= data.meta.totalPages}
-                    onClick={() => setPage((current) => current + 1)}
-                    className="superadmin-button-page rounded-lg border border-slate-200 p-2 text-slate-700 disabled:opacity-40"
-                    aria-label="Next page"
-                  >
-                    <ChevronRight className="size-4" />
-                  </button>
-                </div>
-              </div>
-            )}
+            <div className={cn("transition-opacity", isPlaceholderData && "opacity-60")}>
+              <DataTable
+                embedded
+                searchable={false}
+                paginate={false}
+                canExport
+                rows={users}
+                columns={columns}
+                getRowId={(user) => user.id}
+                exportTitle="Platform users"
+                emptyTitle="No users"
+                emptyDescription="No users to show."
+              />
+            </div>
+            {data && <Pagination page={data.meta.page} totalPages={data.meta.totalPages} total={data.meta.total} limit={LIMIT} onChange={setPage} />}
           </>
         )}
       </section>

@@ -1,10 +1,17 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { Plus, School, Search } from "lucide-react";
+import { Plus, School } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { SubscriptionBadge } from "@/components/superadmin/subscription-badge";
 import { DataTable, type DataTableColumn } from "@/components/ui/data-table";
+import { PageHeader } from "@/components/superadmin/page-header";
+import { Pagination } from "@/components/superadmin/pagination";
+import { SearchInput } from "@/components/superadmin/search-input";
+import { FilterChips } from "@/components/superadmin/filter-chips";
+import { EmptyPanel, ErrorPanel, LoadingPanel } from "@/components/superadmin/state-panels";
+import { useDebouncedValue } from "@/components/superadmin/use-debounced-value";
+import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/admin/schools/")({
   component: SchoolsListPage,
@@ -16,9 +23,8 @@ interface SchoolSummary {
   code: string;
   subdomain: string;
   createdAt: string;
-  organization: { subscriptionStatus: string };
-  students: { id: string }[];
-  teachers: { id: string }[];
+  organization: { subscriptionStatus: string; expiresAt: string | null };
+  _count: { students: number; teachers: number };
 }
 
 interface SchoolsListResponse {
@@ -26,25 +32,25 @@ interface SchoolsListResponse {
   meta: { total: number; page: number; limit: number; totalPages: number };
 }
 
+const LIMIT = 20;
+
 function SchoolsListPage() {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
-  const limit = 20;
+  const [status, setStatus] = useState("all");
+  const q = useDebouncedValue(search.trim());
 
-  const { data, isPending } = useQuery({
-    queryKey: ["superadmin", "schools", page],
-    queryFn: () =>
-      apiFetch<SchoolsListResponse>(
-        `/super-admin/schools?page=${page}&limit=${limit}`,
-      ),
+  const params = new URLSearchParams({ page: String(page), limit: String(LIMIT) });
+  if (q) params.set("q", q);
+  if (status !== "all") params.set("status", status);
+
+  const { data, isPending, error, isPlaceholderData, refetch } = useQuery({
+    queryKey: ["superadmin", "schools", params.toString()],
+    queryFn: () => apiFetch<SchoolsListResponse>(`/super-admin/schools?${params.toString()}`),
+    placeholderData: keepPreviousData,
+    retry: false,
   });
-
-  const filtered = data?.data.filter(
-    (s) =>
-      !search ||
-      s.name.toLowerCase().includes(search.toLowerCase()) ||
-      s.code.toLowerCase().includes(search.toLowerCase()),
-  );
+  const filtered = data?.data;
 
   const columns: DataTableColumn<SchoolSummary>[] = [
     {
@@ -64,13 +70,13 @@ function SchoolsListPage() {
       value: (school) => school.code,
       cell: (school) => <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs text-foreground">{school.code}</code>,
     },
-    { id: "students", header: "Students", value: (school) => school.students.length, cell: (school) => <span className="text-sm font-medium text-foreground">{school.students.length}</span> },
-    { id: "teachers", header: "Teachers", value: (school) => school.teachers.length, cell: (school) => <span className="text-sm font-medium text-foreground">{school.teachers.length}</span> },
+    { id: "students", header: "Students", value: (school) => school._count.students, cell: (school) => <span className="text-sm font-medium text-foreground">{school._count.students}</span> },
+    { id: "teachers", header: "Teachers", value: (school) => school._count.teachers, cell: (school) => <span className="text-sm font-medium text-foreground">{school._count.teachers}</span> },
     {
       id: "subscription",
       header: "Subscription",
       value: (school) => school.organization.subscriptionStatus,
-      cell: (school) => <SubscriptionBadge status={school.organization.subscriptionStatus} />,
+      cell: (school) => <SubscriptionBadge status={school.organization.subscriptionStatus} expiresAt={school.organization.expiresAt} />,
     },
     {
       id: "enrolled",
@@ -96,108 +102,65 @@ function SchoolsListPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">Schools</h1>
-          <p className="mt-1 text-sm text-slate-500">
-            {data ? `${data.meta.total} schools registered` : "Loading…"}
-          </p>
+      <PageHeader
+        eyebrow="Platform management"
+        title="Schools"
+        description={data ? `${data.meta.total.toLocaleString()} ${q || status !== "all" ? "matching" : "registered"} schools` : "Loading…"}
+        actions={
+          <Link to="/admin/schools/new" className="superadmin-button-primary inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold">
+            <Plus className="size-4" /> Enroll school
+          </Link>
+        }
+      />
+
+      <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+        <div className="flex flex-col gap-3 border-b border-border p-4 lg:flex-row lg:items-center lg:justify-between">
+          <FilterChips
+            label="Filter by subscription"
+            value={status}
+            onChange={(next) => { setStatus(next); setPage(1); }}
+            options={[
+              { value: "all", label: "All" },
+              { value: "ACTIVE", label: "Active" },
+              { value: "TRIALING", label: "Trial" },
+              { value: "PAST_DUE", label: "Past due" },
+              { value: "SUSPENDED", label: "Suspended" },
+            ]}
+          />
+          <SearchInput className="w-full lg:w-80" label="Search schools" placeholder="Search name, code or subdomain…" value={search} onChange={(value) => { setSearch(value); setPage(1); }} />
         </div>
-        <Link
-          to="/admin/schools/new"
-          className="superadmin-button-primary inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700"
-        >
-          <Plus className="size-4" />
-          Enroll School
-        </Link>
-      </div>
 
-      {/* Search */}
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
-        <input
-          type="search"
-          placeholder="Search schools by name or code…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-9 pr-4 text-sm shadow-sm transition focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100 sm:max-w-sm"
-        />
-      </div>
-
-      {/* Table */}
-      <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
         {isPending ? (
-          <div className="flex items-center justify-center py-16">
-            <div className="flex items-center gap-3 text-sm text-slate-400">
-              <span className="size-2 animate-pulse rounded-full bg-indigo-500" />
-              Loading schools…
-            </div>
-          </div>
+          <LoadingPanel label="Loading schools…" />
+        ) : error ? (
+          <ErrorPanel message={`Schools could not be loaded: ${error.message}`} onRetry={() => void refetch()} />
         ) : !filtered || filtered.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 text-center">
-            <School className="mb-3 size-10 text-slate-300" />
-            <p className="text-sm font-medium text-slate-500">
-              {search ? "No schools match your search" : "No schools enrolled yet"}
-            </p>
-            {!search && (
-              <>
-                <p className="mb-4 mt-1 text-xs text-slate-400">
-                  Enroll your first school to get started
-                </p>
-                <Link
-                  to="/admin/schools/new"
-                  className="superadmin-button-primary rounded-lg bg-indigo-600 px-4 py-2 text-xs font-semibold text-white hover:bg-indigo-700"
-                >
-                  Enroll a School
-                </Link>
-              </>
-            )}
-          </div>
+          <EmptyPanel
+            icon={<School className="size-8" />}
+            title={q || status !== "all" ? "No schools match your filters" : "No schools enrolled yet"}
+            description={q || status !== "all" ? undefined : "Enroll your first school to get started."}
+            action={!q && status === "all" ? <Link to="/admin/schools/new" className="superadmin-button-primary rounded-lg px-4 py-2 text-xs font-semibold">Enroll a school</Link> : undefined}
+          />
         ) : (
           <>
-            <DataTable
-              embedded
-              searchable={false}
-              paginate={false}
-              canExport
-              rows={filtered ?? []}
-              columns={columns}
-              getRowId={(school) => school.id}
-              exportTitle="Schools"
-              emptyTitle="No schools"
-              emptyDescription="No schools match your search."
-            />
-
-            {/* Pagination */}
-            {data && data.meta.totalPages > 1 && (
-              <div className="flex items-center justify-between border-t border-slate-100 px-4 py-3">
-                <p className="text-xs text-slate-500">
-                  Page {data.meta.page} of {data.meta.totalPages}
-                </p>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    disabled={page === 1}
-                    onClick={() => setPage((p) => p - 1)}
-                    className="superadmin-button-page rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 transition disabled:opacity-40"
-                  >
-                    Previous
-                  </button>
-                  <button
-                    type="button"
-                    disabled={page >= data.meta.totalPages}
-                    onClick={() => setPage((p) => p + 1)}
-                    className="superadmin-button-page rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 transition disabled:opacity-40"
-                  >
-                    Next
-                  </button>
-                </div>
-              </div>
-            )}
+            <div className={cn("transition-opacity", isPlaceholderData && "opacity-60")}>
+              <DataTable
+                embedded
+                searchable={false}
+                paginate={false}
+                canExport
+                rows={filtered}
+                columns={columns}
+                getRowId={(school) => school.id}
+                exportTitle="Schools"
+                emptyTitle="No schools"
+                emptyDescription="No schools match your search."
+              />
+            </div>
+            {data && <Pagination page={data.meta.page} totalPages={data.meta.totalPages} total={data.meta.total} limit={LIMIT} onChange={setPage} />}
           </>
         )}
-      </div>
+      </section>
     </div>
   );
 }
