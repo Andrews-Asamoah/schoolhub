@@ -9,10 +9,13 @@ import {
   Headers,
   Body,
   UseGuards,
+  UseInterceptors,
 } from "@nestjs/common";
 import { FinanceService } from "./finance.service.js";
 import { SchoolTenantGuard } from "../../common/guards/school-tenant.guard.js";
 import { RolesGuard } from "../../common/guards/roles.guard.js";
+import { FINANCE_READ_ROLES, FINANCE_WRITE_ROLES } from "./finance.permissions.js";
+import { FinanceAuditInterceptor, FinanceSelfAudited } from "./finance-audit.interceptor.js";
 import { Roles } from "../../common/decorators/roles.decorator.js";
 import { CurrentSchool } from "../../common/decorators/current-school.decorator.js";
 import { CurrentSchoolRole } from "../../common/decorators/current-school-role.decorator.js";
@@ -101,18 +104,19 @@ const concessionStatusSchema = z.object({ isActive: z.boolean() });
 
 @Controller("finance")
 @UseGuards(SchoolTenantGuard, RolesGuard)
+@UseInterceptors(FinanceAuditInterceptor)
 export class FinanceController {
   constructor(private readonly financeService: FinanceService) {}
 
 
   @Get("concessions")
-  @Roles("owner", "admin", "accountant", "headteacher")
+  @Roles(...FINANCE_READ_ROLES)
   listConcessions(@CurrentSchool() school: School) {
     return this.financeService.listConcessions(school.id);
   }
 
   @Post("sibling-discount-policies")
-  @Roles("owner", "admin", "accountant", "headteacher")
+  @Roles(...FINANCE_WRITE_ROLES)
   createSiblingDiscountPolicy(
     @CurrentSchool() school: School,
     @CurrentUser() user: AuthenticatedUser,
@@ -122,7 +126,7 @@ export class FinanceController {
   }
 
   @Patch("sibling-discount-policies/:policyId")
-  @Roles("owner", "admin", "accountant", "headteacher")
+  @Roles(...FINANCE_WRITE_ROLES)
   setSiblingDiscountPolicyActive(
     @CurrentSchool() school: School,
     @Param("policyId") policyId: string,
@@ -132,7 +136,7 @@ export class FinanceController {
   }
 
   @Post("scholarships")
-  @Roles("owner", "admin", "accountant", "headteacher")
+  @Roles(...FINANCE_WRITE_ROLES)
   createStudentScholarship(
     @CurrentSchool() school: School,
     @CurrentUser() user: AuthenticatedUser,
@@ -142,7 +146,7 @@ export class FinanceController {
   }
 
   @Patch("scholarships/:scholarshipId")
-  @Roles("owner", "admin", "accountant", "headteacher")
+  @Roles(...FINANCE_WRITE_ROLES)
   setStudentScholarshipActive(
     @CurrentSchool() school: School,
     @Param("scholarshipId") scholarshipId: string,
@@ -152,7 +156,7 @@ export class FinanceController {
   }
 
   @Get("fee-structures")
-  @Roles("owner", "admin", "accountant")
+  @Roles(...FINANCE_READ_ROLES)
   listFeeStructures(
     @CurrentSchool() school: School,
     @Query("includeArchived") includeArchived?: string,
@@ -161,7 +165,7 @@ export class FinanceController {
   }
 
   @Post("fee-structures")
-  @Roles("owner", "admin", "accountant")
+  @Roles(...FINANCE_WRITE_ROLES)
   createFeeStructure(
     @CurrentSchool() school: School,
     @Body(new ZodValidationPipe(feeStructureSchema)) body: z.infer<typeof feeStructureSchema>,
@@ -170,7 +174,7 @@ export class FinanceController {
   }
 
   @Patch("fee-structures/:feeStructureId")
-  @Roles("owner", "admin", "accountant")
+  @Roles(...FINANCE_WRITE_ROLES)
   setFeeStructureActive(
     @CurrentSchool() school: School,
     @Param("feeStructureId") feeStructureId: string,
@@ -180,7 +184,7 @@ export class FinanceController {
   }
 
   @Put("fee-structures/:feeStructureId")
-  @Roles("owner", "admin", "accountant")
+  @Roles(...FINANCE_WRITE_ROLES)
   updateFeeStructure(
     @CurrentSchool() school: School,
     @Param("feeStructureId") feeStructureId: string,
@@ -190,13 +194,13 @@ export class FinanceController {
   }
 
   @Get("fee-item-registry")
-  @Roles("owner", "admin", "accountant")
+  @Roles(...FINANCE_READ_ROLES)
   listFeeItemRegistry(@CurrentSchool() school: School) {
     return this.financeService.listFeeItemRegistry(school.id);
   }
 
   @Post("fee-item-registry")
-  @Roles("owner", "admin", "accountant")
+  @Roles(...FINANCE_WRITE_ROLES)
   createFeeItemRegistry(
     @CurrentSchool() school: School,
     @Body(new ZodValidationPipe(feeItemRegistrySchema)) body: z.infer<typeof feeItemRegistrySchema>,
@@ -205,7 +209,7 @@ export class FinanceController {
   }
 
   @Patch("fee-item-registry/:itemId")
-  @Roles("owner", "admin", "accountant")
+  @Roles(...FINANCE_WRITE_ROLES)
   updateFeeItemRegistry(
     @CurrentSchool() school: School,
     @Param("itemId") itemId: string,
@@ -215,7 +219,7 @@ export class FinanceController {
   }
 
   @Get("bills")
-  @Roles("owner", "admin", "accountant")
+  @Roles(...FINANCE_READ_ROLES)
   listBills(
     @CurrentSchool() school: School,
     @Query("studentId") studentId?: string,
@@ -224,19 +228,19 @@ export class FinanceController {
   }
 
   @Get("students/outstanding")
-  @Roles("owner", "admin", "accountant")
+  @Roles(...FINANCE_READ_ROLES)
   listOutstandingStudents(@CurrentSchool() school: School) {
     return this.financeService.listOutstandingStudents(school.id);
   }
 
   @Get("payments")
-  @Roles("owner", "admin", "accountant")
+  @Roles(...FINANCE_READ_ROLES)
   listPayments(@CurrentSchool() school: School) {
     return this.financeService.listPayments(school.id);
   }
 
   @Get("expenses")
-  @Roles("owner", "admin", "accountant")
+  @Roles(...FINANCE_READ_ROLES)
   listExpenses(
     @CurrentSchool() school: School,
     @Query("from") fromDate?: string,
@@ -246,13 +250,13 @@ export class FinanceController {
   }
 
   @Get("expenditure-categories")
-  @Roles("owner", "admin", "accountant")
+  @Roles(...FINANCE_READ_ROLES)
   listExpenditureCategories(@CurrentSchool() school: School) {
     return this.financeService.listExpenditureCategories(school.id);
   }
 
   @Post("expenditure-categories")
-  @Roles("owner", "admin", "accountant")
+  @Roles(...FINANCE_WRITE_ROLES)
   createExpenditureCategory(
     @CurrentSchool() school: School,
     @Body(new ZodValidationPipe(expenditureCategorySchema)) body: z.infer<typeof expenditureCategorySchema>,
@@ -261,7 +265,7 @@ export class FinanceController {
   }
 
   @Patch("expenditure-categories/:categoryId")
-  @Roles("owner", "admin", "accountant")
+  @Roles(...FINANCE_WRITE_ROLES)
   updateExpenditureCategory(
     @CurrentSchool() school: School,
     @Param("categoryId") categoryId: string,
@@ -271,7 +275,8 @@ export class FinanceController {
   }
 
   @Post("expenses")
-  @Roles("owner", "admin", "accountant")
+  @Roles(...FINANCE_WRITE_ROLES)
+  @FinanceSelfAudited()
   createExpense(
     @CurrentSchool() school: School,
     @CurrentUser() user: AuthenticatedUser,
@@ -281,30 +286,31 @@ export class FinanceController {
   }
 
   @Get("payroll")
-  @Roles("owner", "admin", "accountant")
+  @Roles(...FINANCE_READ_ROLES)
   listPayrollRecords(@CurrentSchool() school: School) {
     return this.financeService.listPayrollRecords(school.id);
   }
 
   @Get("payroll/salaries")
-  @Roles("owner", "admin", "accountant")
+  @Roles(...FINANCE_READ_ROLES)
   listPayrollSalaryRegister(@CurrentSchool() school: School) {
     return this.financeService.listPayrollSalaryRegister(school.id);
   }
 
   @Patch("payroll/salaries/:kind/:personId")
-  @Roles("owner", "admin", "accountant")
+  @Roles(...FINANCE_WRITE_ROLES)
   updatePayrollSalary(
     @CurrentSchool() school: School,
+    @CurrentUser() user: AuthenticatedUser,
     @Param("kind") kind: string,
     @Param("personId") personId: string,
     @Body(new ZodValidationPipe(updatePayrollSalarySchema)) body: UpdatePayrollSalaryInput,
   ) {
-    return this.financeService.updatePayrollSalary(school.id, kind, personId, body.monthlySalary);
+    return this.financeService.updatePayrollSalary(school.id, kind, personId, body.monthlySalary, user.id);
   }
 
   @Post("payroll")
-  @Roles("owner", "admin", "accountant")
+  @Roles(...FINANCE_WRITE_ROLES)
   generatePayrollDraft(
     @CurrentSchool() school: School,
     @CurrentUser() user: AuthenticatedUser,
@@ -314,26 +320,30 @@ export class FinanceController {
   }
 
   @Patch("payroll/:recordId/status")
-  @Roles("owner", "admin", "accountant")
+  @Roles(...FINANCE_WRITE_ROLES)
   transitionPayroll(
     @CurrentSchool() school: School,
+    @CurrentUser() user: AuthenticatedUser,
     @Param("recordId") recordId: string,
     @Body(new ZodValidationPipe(payrollTransitionSchema)) body: z.infer<typeof payrollTransitionSchema>,
   ) {
-    return this.financeService.transitionPayroll(school.id, recordId, body);
+    return this.financeService.transitionPayroll(school.id, recordId, body, user.id);
   }
 
   @Post("bills/generate")
-  @Roles("owner", "admin", "accountant")
+  @Roles(...FINANCE_WRITE_ROLES)
+  @FinanceSelfAudited()
   generateBills(
     @CurrentSchool() school: School,
+    @CurrentUser() user: AuthenticatedUser,
     @Body(new ZodValidationPipe(generateBillSchema)) body: GenerateBillInput,
   ) {
-    return this.financeService.generateBills(school.id, body);
+    return this.financeService.generateBills(school.id, body, user.id);
   }
 
   @Post("payments")
-  @Roles("owner", "admin", "accountant")
+  @Roles(...FINANCE_WRITE_ROLES)
+  @FinanceSelfAudited()
   recordPayment(
     @CurrentSchool() school: School,
     @CurrentUser() user: AuthenticatedUser,
@@ -344,13 +354,13 @@ export class FinanceController {
 
 
   @Get("fee-reminders")
-  @Roles("owner", "admin", "accountant")
+  @Roles(...FINANCE_READ_ROLES)
   listFeeReminderSchedules(@CurrentSchool() school: School) {
     return this.financeService.listFeeReminderSchedules(school.id);
   }
 
   @Post("fee-reminders")
-  @Roles("owner", "admin", "accountant")
+  @Roles(...FINANCE_WRITE_ROLES)
   createFeeReminderSchedule(
     @CurrentSchool() school: School,
     @CurrentUser() user: AuthenticatedUser,
@@ -360,7 +370,7 @@ export class FinanceController {
   }
 
   @Patch("fee-reminders/:scheduleId")
-  @Roles("owner", "admin", "accountant")
+  @Roles(...FINANCE_WRITE_ROLES)
   setFeeReminderScheduleActive(
     @CurrentSchool() school: School,
     @Param("scheduleId") scheduleId: string,
@@ -370,7 +380,7 @@ export class FinanceController {
   }
 
   @Post("fee-reminders/:scheduleId/installments")
-  @Roles("owner", "admin", "accountant")
+  @Roles(...FINANCE_WRITE_ROLES)
   addFeeReminderInstallment(
     @CurrentSchool() school: School,
     @Param("scheduleId") scheduleId: string,
@@ -380,7 +390,7 @@ export class FinanceController {
   }
 
   @Get("fee-reminders/:scheduleId/preview")
-  @Roles("owner", "admin", "accountant")
+  @Roles(...FINANCE_READ_ROLES)
   previewFeeReminder(
     @CurrentSchool() school: School,
     @Param("scheduleId") scheduleId: string,
@@ -389,7 +399,7 @@ export class FinanceController {
   }
 
   @Post("fee-reminders/:scheduleId/send")
-  @Roles("owner", "admin", "accountant")
+  @Roles(...FINANCE_WRITE_ROLES)
   sendFeeReminderInApp(
     @CurrentSchool() school: School,
     @Param("scheduleId") scheduleId: string,
@@ -398,7 +408,7 @@ export class FinanceController {
   }
 
   @Get("students/:studentId/ledger")
-  @Roles("owner", "admin", "accountant")
+  @Roles(...FINANCE_READ_ROLES)
   getStudentLedger(
     @CurrentSchool() school: School,
     @Param("studentId") studentId: string,
