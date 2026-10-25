@@ -292,6 +292,14 @@ export const schoolNavGroups: SchoolNavGroup[] = [
         apiStatus: "available",
       },
       {
+        id: "student-statement",
+        label: "Statements of account",
+        icon: FileText,
+        description: "View student opening balances, fee invoices, receipts and running balances across terms.",
+        section: "Finance",
+        apiStatus: "available",
+      },
+      {
         id: "expenses",
         label: "Expenses",
         icon: TrendingDown,
@@ -502,6 +510,7 @@ const rolePages: Record<string, string[]> = {
     "fees",
     "payments",
     "invoices",
+    "student-statement",
     "expenses",
     "payroll",
     "fee-reminders",
