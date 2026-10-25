@@ -2945,6 +2945,7 @@ export class FinanceService {
       throw new BadRequestException("Choose a valid payroll person type.");
     }
     const next = new Prisma.Decimal(monthlySalary);
+    if (!reason.trim() || reason.trim().length < 10) throw new BadRequestException("Explain why the salary is changing (at least 10 characters).");
     await this.prisma.client.$transaction(async (tx) => {
       // The change and its audit entry (old and new salary) commit together.
       let previous: Prisma.Decimal | null;
