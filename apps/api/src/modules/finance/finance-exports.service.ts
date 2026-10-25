@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException } from "@nestjs/common";
 import { Prisma, type School } from "@prisma/client";
 import { jsPDF } from "jspdf";
-import autoTable from "jspdf-autotable";
+import { autoTable } from "jspdf-autotable";
 import { PrismaService } from "../../prisma/prisma.service.js";
 import { buildFinanceWorkbook, type FinanceExportCell, type FinanceWorkbookInput } from "./finance-exports.helpers.js";
 
@@ -357,7 +357,7 @@ export class FinanceExportsService {
   }
 
   private finishPdf(doc: jsPDF, kind: string, confidential = false, watermark?: "VOID" | "REVERSED") {
-    const pageCount = doc.internal.getNumberOfPages();
+    const pageCount = doc.getNumberOfPages();
     for (let page = 1; page <= pageCount; page += 1) {
       doc.setPage(page);
       const pageWidth = doc.internal.pageSize.getWidth();
