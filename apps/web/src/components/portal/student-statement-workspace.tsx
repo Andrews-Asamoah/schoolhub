@@ -34,7 +34,10 @@ const scopeLabels: Record<StudentStatementScope, string> = { term: "Term", year:
 
 export function StudentStatementWorkspace() {
   const [search, setSearch] = useState("");
-  const [selectedStudentId, setSelectedStudentId] = useState("");
+  const [selectedStudentId, setSelectedStudentId] = useState(() => {
+    if (typeof window === "undefined") return "";
+    return new URLSearchParams(window.location.search).get("studentId") ?? "";
+  });
   const [scope, setScope] = useState<StudentStatementScope>("term");
   const yearsQuery = useQuery({
     queryKey: ["schools", "academic-years"],
