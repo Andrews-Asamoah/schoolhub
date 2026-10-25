@@ -50,6 +50,7 @@ import { FeeStructuresWorkspace } from "@/components/portal/fee-structures-works
 import { ConcessionsWorkspace } from "@/components/portal/concessions-workspace";
 import { FinanceAuditWorkspace } from "@/components/portal/finance-audit-workspace";
 import { StudentStatementWorkspace } from "@/components/portal/student-statement-workspace";
+import { TermEndReviewWorkspace } from "@/components/portal/term-end-review-workspace";
 import { SignaturesWorkspace } from "@/components/school/signatures-workspace";
 import { GuardianPortalWorkspace } from "@/components/portal/guardian-portal-workspace";
 import { GuardianChildRecordsWorkspace } from "@/components/portal/guardian-child-records-workspace";
@@ -209,7 +210,7 @@ function WorkspaceContent({ pageId }: { pageId: string }) {
   return (
     <>
       {activeRole !== "student" &&
-        !["classes", "students", "teachers", "staff", "guardians", "teacher-portal", "accountant-portal", "fees", "concessions", "signatures", "payments", "invoices", "expenses", "payroll", "fee-reminders", "inventory", "outstanding", "finance-reports", "student-statements", "guardian-portal", "guardian-attendance", "guardian-timetable", "guardian-reports", "guardian-notices", "guardian-fees", "student-portal", "clubs", "houses", "assignments", "classmates", "announcements"].includes(
+        !["classes", "students", "teachers", "staff", "guardians", "teacher-portal", "accountant-portal", "fees", "concessions", "signatures", "payments", "invoices", "expenses", "payroll", "fee-reminders", "inventory", "outstanding", "finance-reports", "student-statements", "term-end-review", "guardian-portal", "guardian-attendance", "guardian-timetable", "guardian-reports", "guardian-notices", "guardian-fees", "student-portal", "clubs", "houses", "assignments", "classmates", "announcements"].includes(
           pageId,
         ) && (
         <WorkspacePageHeading
@@ -314,6 +315,7 @@ function WorkspaceContent({ pageId }: { pageId: string }) {
           {pageId === "payments" && <AccountantPortalWorkspace defaultTab="payments" />}
           {pageId === "finance-audit" && <FinanceAuditWorkspace />}
           {pageId === "student-statements" && <StudentStatementWorkspace />}
+          {pageId === "term-end-review" && <TermEndReviewWorkspace />}
           {pageId === "settings" && <SchoolSettings query={schoolQuery} />}
           {pageId === "profile" && <ProfileWorkspace />}
           {pageId === "team" && <TeamRoleWorkspace />}
