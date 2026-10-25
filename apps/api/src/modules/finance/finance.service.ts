@@ -3287,7 +3287,9 @@ export class FinanceService {
                 tier3Employee: true,
                 tier3Employer: true,
                 otherDeductions: true,
+                lines: { select: { code: true, kind: true, amount: true } },
               },
+            settingsSnapshot: true,
             },
           },
         });
