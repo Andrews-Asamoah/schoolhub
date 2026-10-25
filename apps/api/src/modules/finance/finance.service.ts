@@ -6,11 +6,12 @@ import {
   ForbiddenException,
 } from "@nestjs/common";
 import { PrismaService } from "../../prisma/prisma.service.js";
-import type { CreateExpenseInput, GenerateBillInput, RecordPaymentInput } from "@schoolhub/shared";
+import type { CreateExpenseInput, GenerateBillInput, RecordPaymentInput, StudentStatementResponse } from "@schoolhub/shared";
 import { Prisma, type AccountCategory, type AccountType, type AuditAction, type PaymentMethod, type TransactionCategory } from "@prisma/client";
 import { canManageAcademicContext } from "../../common/academic-context.js";
 import { createSequence, isIdempotencyRace, isSerializationFailure, postingDateProblem, withSerializableRetry } from "./finance.helpers.js";
 import { buildFinanceAuditWhere, categoryOf, clampPageSize, describeFinanceAudit, type FinanceAuditQuery } from "./finance-audit.helpers.js";
+import { buildRunningStatement, daysPastDue, type StatementEvent } from "./finance-reporting.helpers.js";
 
 const PAYE_MONTHLY_BANDS_2026 = [
   { limit: 588, rate: 0 },
@@ -24,6 +25,55 @@ const PAYE_MONTHLY_BANDS_2026 = [
 
 function roundMoney(value: number) {
   return Math.round((value + Number.EPSILON) * 100) / 100;
+}
+
+type FinanceListQuery = {
+  cursor?: string;
+  limit?: string | number;
+  search?: string;
+  status?: string;
+  classId?: string;
+  paymentMethod?: string;
+  from?: string;
+  to?: string;
+  studentId?: string;
+  outstanding?: string;
+  overdue?: string;
+  yearId?: string;
+  termId?: string;
+};
+
+type StudentStatementQuery = {
+  scope?: "term" | "year" | "all";
+  from?: string;
+  to?: string;
+  yearId?: string;
+  termId?: string;
+};
+
+const BILL_STATUSES = ["PENDING", "PARTIALLY_PAID", "PAID", "OVERDUE", "CANCELLED", "WAIVED"] as const;
+const PAYMENT_METHODS = ["CASH", "BANK_TRANSFER", "CHEQUE", "MOBILE_MONEY", "CARD", "ONLINE", "OTHER"] as const;
+
+function parseIsoDate(value: string | undefined, label: string, endOfDay = false): Date | undefined {
+  if (value === undefined || value === "") return undefined;
+  if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(value)) {
+    throw new BadRequestException(`Enter a valid ${label} in YYYY-MM-DD format.`);
+  }
+  const date = new Date(`${value}T${endOfDay ? "23:59:59.999" : "00:00:00.000"}Z`);
+  if (Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== value) {
+    throw new BadRequestException(`Enter a valid ${label} date.`);
+  }
+  return date;
+}
+
+function addUtcDays(date: Date, days: number): Date {
+  const result = new Date(date);
+  result.setUTCDate(result.getUTCDate() + days);
+  return result;
+}
+
+function moneyString(value: Prisma.Decimal | null | undefined): string {
+  return (value ?? new Prisma.Decimal(0)).toFixed(2);
 }
 
 function calculateResidentPaye2026(chargeableIncome: number) {
