@@ -597,8 +597,10 @@ export class FinanceController {
     @Req() request: Request,
     @Res() response: Response,
     @Param("studentId") studentId: string,
+    @Query("from") from?: string,
+    @Query("to") to?: string,
   ) {
-    const context = this.financeExportContext(school, user, request);
+    const context = this.financeExportContext(school, user, request, from, to);
     return this.sendFinanceExport(response, await this.financeExports.studentStatementPdf(context, studentId), "inline");
   }
 
