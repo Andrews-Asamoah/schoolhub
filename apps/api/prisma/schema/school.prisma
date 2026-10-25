@@ -67,6 +67,9 @@ model School {
   clubs                       Club[]
   payrollRecords              PayrollRecord[]
   payslips                    Payslip[]
+  payrollTaxSchedules         PayrollTaxSchedule[]
+  payrollContributionSchemes  PayrollContributionScheme[]
+  payrollPayItems             PayrollPayItem[]
   classrooms                  Classroom[]
   timeSlots                   TimeSlot[]
   periodTemplates             PeriodTemplate[]
@@ -274,6 +277,11 @@ model Staff {
   department Department? @relation("StaffDepartment", fields: [departmentId], references: [id])
   documents  Document[]
   payslips   Payslip[]
+  payProfile StaffPayProfile?
+  contributionEnrolments StaffContributionEnrolment[]
+  payItemAssignments StaffPayItemAssignment[]
+  payrollLoans PayrollLoan[]
+  salaryHistory SalaryHistory[]
 
   // Scoped to Academic Year
   assignments StaffAssignment[]
