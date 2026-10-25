@@ -110,6 +110,9 @@ const reversePaymentSchema = z.object({
   kind: z.enum(["VOID", "REFUND"]).default("VOID"),
   reason: z.string().trim().min(10, "Explain why this payment is being reversed (at least 10 characters)").max(500),
 });
+const arrearsPolicySchema = z.object({
+  arrearsPolicy: z.enum(["SHOW_ONLY", "BLOCK_CLEARANCE_UNTIL_PAID"]),
+});
 
 @Controller("finance")
 @UseGuards(SchoolTenantGuard, RolesGuard, SuperAdminReasonGuard, FinanceWriteRateLimitGuard)
@@ -227,13 +230,55 @@ export class FinanceController {
     return this.financeService.updateFeeItemRegistry(school.id, itemId, body);
   }
 
+  @Get("summary")
+  @Roles(...FINANCE_READ_ROLES)
+  getFinanceSummary(
+    @CurrentSchool() school: School,
+    @Query("from") from?: string,
+    @Query("to") to?: string,
+    @Query("yearId") yearId?: string,
+    @Query("termId") termId?: string,
+  ) {
+    return this.financeService.getFinanceSummary(school.id, { from, to, yearId, termId });
+  }
+
+  @Get("arrears-policy")
+  @Roles(...FINANCE_READ_ROLES)
+  getArrearsPolicy(@CurrentSchool() school: School) {
+    return this.financeService.getArrearsPolicy(school.id);
+  }
+
+  @Put("arrears-policy")
+  @Roles(...FINANCE_WRITE_ROLES)
+  setArrearsPolicy(
+    @CurrentSchool() school: School,
+    @CurrentUser() user: AuthenticatedUser,
+    @Body(new ZodValidationPipe(arrearsPolicySchema)) body: z.infer<typeof arrearsPolicySchema>,
+  ) {
+    return this.financeService.setArrearsPolicy(school.id, user.id, body.arrearsPolicy);
+  }
+
   @Get("bills")
   @Roles(...FINANCE_READ_ROLES)
   listBills(
     @CurrentSchool() school: School,
     @Query("studentId") studentId?: string,
+    @Query("cursor") cursor?: string,
+    @Query("limit") limit?: string,
+    @Query("search") search?: string,
+    @Query("status") status?: string,
+    @Query("classId") classId?: string,
+    @Query("from") from?: string,
+    @Query("to") to?: string,
+    @Query("outstanding") outstanding?: string,
+    @Query("overdue") overdue?: string,
+    @Query("yearId") yearId?: string,
+    @Query("termId") termId?: string,
   ) {
-    return this.financeService.listBills(school.id, studentId);
+    return this.financeService.listBills(school.id, {
+      studentId, cursor, limit, search, status, classId, from, to,
+      outstanding, overdue, yearId, termId,
+    });
   }
 
   @Get("students/outstanding")
@@ -244,8 +289,22 @@ export class FinanceController {
 
   @Get("payments")
   @Roles(...FINANCE_READ_ROLES)
-  listPayments(@CurrentSchool() school: School) {
-    return this.financeService.listPayments(school.id);
+  listPayments(
+    @CurrentSchool() school: School,
+    @Query("cursor") cursor?: string,
+    @Query("limit") limit?: string,
+    @Query("search") search?: string,
+    @Query("status") status?: string,
+    @Query("paymentMethod") paymentMethod?: string,
+    @Query("classId") classId?: string,
+    @Query("from") from?: string,
+    @Query("to") to?: string,
+    @Query("yearId") yearId?: string,
+    @Query("termId") termId?: string,
+  ) {
+    return this.financeService.listPayments(school.id, {
+      cursor, limit, search, status, paymentMethod, classId, from, to, yearId, termId,
+    });
   }
 
   @Get("expenses")
@@ -455,6 +514,23 @@ export class FinanceController {
     @Param("scheduleId") scheduleId: string,
   ) {
     return this.financeService.sendFeeReminderInApp(school.id, scheduleId);
+  }
+
+  @Get("students/:studentId/statement")
+  @Roles(...FINANCE_READ_ROLES)
+  getStudentStatement(
+    @CurrentSchool() school: School,
+    @Param("studentId") studentId: string,
+    @CurrentSchoolRole() role: string | undefined,
+    @Query("scope") scope?: "term" | "year" | "all",
+    @Query("from") from?: string,
+    @Query("to") to?: string,
+    @Query("yearId") yearId?: string,
+    @Query("termId") termId?: string,
+  ) {
+    return this.financeService.getStudentStatement(school.id, studentId, role, {
+      scope, from, to, yearId, termId,
+    });
   }
 
   @Get("students/:studentId/ledger")
