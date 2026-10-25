@@ -457,6 +457,15 @@ export class FinanceController {
     return this.financeService.sendFeeReminderInApp(school.id, scheduleId);
   }
 
+  @Get("students/:studentId/statement")
+  @Roles(...FINANCE_READ_ROLES)
+  getStudentStatement(
+    @CurrentSchool() school: School,
+    @Param("studentId") studentId: string,
+  ) {
+    return this.financeService.getStudentStatement(school.id, studentId);
+  }
+
   @Get("students/:studentId/ledger")
   @Roles(...FINANCE_READ_ROLES)
   getStudentLedger(
