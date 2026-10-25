@@ -1,4 +1,4 @@
-name: SchoolHub API build verification
+name: SchoolHub API build verification (standalone dependency fix)
 
 on:
   push:
