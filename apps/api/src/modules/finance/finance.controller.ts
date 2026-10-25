@@ -35,6 +35,43 @@ import {
 import type { School } from "@prisma/client";
 import { z } from "zod";
 
+const isoDateQuery = z.string().regex(/^\\d{4}-\\d{2}-\\d{2}$/, "Format: YYYY-MM-DD").optional();
+const financeListQuerySchema = z.object({
+  cursor: z.string().trim().min(1).optional(),
+  limit: z.coerce.number().int().min(1).max(100).default(50),
+  search: z.string().trim().max(200).optional(),
+  status: z.enum(["ALL", "PENDING", "PARTIALLY_PAID", "PAID", "OVERDUE", "CANCELLED", "WAIVED", "COMPLETED", "REFUNDED", "FAILED", "CASH", "BANK_TRANSFER", "CHEQUE", "MOBILE_MONEY", "CARD", "ONLINE", "OTHER"]).optional(),
+  studentId: z.string().trim().min(1).optional(),
+  classId: z.string().trim().min(1).optional(),
+  method: z.enum(["CASH", "BANK_TRANSFER", "CHEQUE", "MOBILE_MONEY", "CARD", "ONLINE", "OTHER"]).optional(),
+  from: isoDateQuery,
+  to: isoDateQuery,
+  yearId: z.string().trim().min(1).optional(),
+  termId: z.string().trim().min(1).optional(),
+}).refine((value) => !value.from || !value.to || value.from <= value.to, {
+  message: "Start date must be before or equal to end date.",
+  path: ["to"],
+});
+const financeSummaryQuerySchema = z.object({
+  from: isoDateQuery,
+  to: isoDateQuery,
+  yearId: z.string().trim().min(1).optional(),
+  termId: z.string().trim().min(1).optional(),
+}).refine((value) => !value.from || !value.to || value.from <= value.to, {
+  message: "Start date must be before or equal to end date.",
+  path: ["to"],
+});
+const statementQuerySchema = z.object({
+  scope: z.enum(["term", "year", "all"]).default("term"),
+  from: isoDateQuery,
+  to: isoDateQuery,
+  yearId: z.string().trim().min(1).optional(),
+  termId: z.string().trim().min(1).optional(),
+}).refine((value) => !value.from || !value.to || value.from <= value.to, {
+  message: "Start date must be before or equal to end date.",
+  path: ["to"],
+});
+
 const feeStructureSchema = z.object({
   name: z.string().trim().min(2, "Enter a fee structure name").max(120),
   description: z.string().trim().max(500).optional(),
@@ -227,25 +264,40 @@ export class FinanceController {
     return this.financeService.updateFeeItemRegistry(school.id, itemId, body);
   }
 
+  @Get("summary")
+  @Roles(...FINANCE_READ_ROLES)
+  getFinanceSummary(
+    @CurrentSchool() school: School,
+    @Query(new ZodValidationPipe(financeSummaryQuerySchema)) query: z.infer<typeof financeSummaryQuerySchema>,
+  ) {
+    return this.financeService.getFinanceSummary(school.id, query);
+  }
+
   @Get("bills")
   @Roles(...FINANCE_READ_ROLES)
   listBills(
     @CurrentSchool() school: School,
-    @Query("studentId") studentId?: string,
+    @Query(new ZodValidationPipe(financeListQuerySchema)) query: z.infer<typeof financeListQuerySchema>,
   ) {
-    return this.financeService.listBills(school.id, studentId);
+    return this.financeService.listBills(school.id, query);
   }
 
   @Get("students/outstanding")
   @Roles(...FINANCE_READ_ROLES)
-  listOutstandingStudents(@CurrentSchool() school: School) {
-    return this.financeService.listOutstandingStudents(school.id);
+  listOutstandingStudents(
+    @CurrentSchool() school: School,
+    @Query(new ZodValidationPipe(financeListQuerySchema)) query: z.infer<typeof financeListQuerySchema>,
+  ) {
+    return this.financeService.listOutstandingStudents(school.id, query);
   }
 
   @Get("payments")
   @Roles(...FINANCE_READ_ROLES)
-  listPayments(@CurrentSchool() school: School) {
-    return this.financeService.listPayments(school.id);
+  listPayments(
+    @CurrentSchool() school: School,
+    @Query(new ZodValidationPipe(financeListQuerySchema)) query: z.infer<typeof financeListQuerySchema>,
+  ) {
+    return this.financeService.listPayments(school.id, query);
   }
 
   @Get("expenses")
@@ -455,6 +507,17 @@ export class FinanceController {
     @Param("scheduleId") scheduleId: string,
   ) {
     return this.financeService.sendFeeReminderInApp(school.id, scheduleId);
+  }
+
+  @Get("students/:studentId/statement")
+  @Roles(...FINANCE_READ_ROLES)
+  getStudentStatement(
+    @CurrentSchool() school: School,
+    @Param("studentId") studentId: string,
+    @CurrentSchoolRole() role: string | undefined,
+    @Query(new ZodValidationPipe(statementQuerySchema)) query: z.infer<typeof statementQuerySchema>,
+  ) {
+    return this.financeService.getStudentStatement(school.id, studentId, role, query);
   }
 
   @Get("students/:studentId/ledger")
