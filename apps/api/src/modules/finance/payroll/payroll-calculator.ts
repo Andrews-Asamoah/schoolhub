@@ -212,6 +212,9 @@ export function calculatePayroll(input: PayrollCalculatorInput): PayrollCalculat
   const reliefCap = input.tier3ReliefCap == null ? ZERO : nonNegative(decimal(input.tier3ReliefCap, "Tier 3 relief cap"));
   const tier3Relief = Prisma.Decimal.min(tier3Employee, reliefCap);
   const taxableIncome = money(nonNegative(taxableEarnings.add(taxableBenefit).sub(deductibleContributions).sub(tier3Relief)));
+  if (input.taxResident === false && input.nonResidentFlatRate == null) {
+    throw new Error("No verified non-resident flat tax rate is configured.");
+  }
   const paye = input.taxResident === false
     ? percent(taxableIncome, decimal(input.nonResidentFlatRate, "non-resident flat rate"))
     : calculateProgressivePaye(taxableIncome, input.taxBands);
