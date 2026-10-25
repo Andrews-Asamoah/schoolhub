@@ -427,7 +427,7 @@ export function AccountantPortalWorkspace({
   });
   const overdueTotal = overdueBills.reduce((sum, bill) => sum + Number(bill.balanceAmount), 0);
   const billedInPeriod = bills.filter((bill) => isInReportPeriod(bill.issuedAt)).reduce((sum, bill) => sum + Number(bill.totalAmount), 0);
-  const collectionRate = billedInPeriod > 0 ? Math.min(100, (reportCollected / billedInPeriod) * 100) : null;
+  const collectionRate = billedInPeriod > 0 ? (reportCollected / billedInPeriod) * 100 : null;
   const visibleOverdueBills = overdueBills.filter((bill) => {
     const term = overdueSearch.trim().toLowerCase();
     const matchesSearch = !term ||
@@ -752,8 +752,8 @@ export function AccountantPortalWorkspace({
           <div className="grid gap-3 md:grid-cols-2">
             <div className="rounded-2xl border border-border bg-card p-4">
               <div className="flex items-center justify-between gap-3"><span className="text-sm font-medium text-muted-foreground">Collection rate</span><span className="text-lg font-bold tabular-nums text-foreground">{collectionRate === null ? "—" : `${collectionRate.toFixed(1)}%`}</span></div>
-              <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-primary transition-all" style={{ width: `${collectionRate ?? 0}%` }} /></div>
-              <p className="mt-2 text-xs leading-5 text-muted-foreground">{collectionRate === null ? "No bills were issued in this reporting period, so a collection rate cannot be calculated." : "Completed collections divided by the value of bills issued in the selected period. This is an operational indicator, not a full receivables reconciliation."}</p>
+              <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-primary transition-all" style={{ width: `${Math.min(100, Math.max(0, collectionRate ?? 0))}%` }} /></div>
+              <p className="mt-2 text-xs leading-5 text-muted-foreground">{collectionRate === null ? "No bills were issued in this reporting period, so a collection rate cannot be calculated." : "Completed collections divided by bills issued in the selected period; collections may include payments against earlier bills, so this is an operational indicator rather than a cohort collection rate."}</p>
             </div>
             <div className="rounded-2xl border border-border bg-card p-4">
               <div className="flex items-center justify-between gap-3"><span className="text-sm font-medium text-muted-foreground">Payroll paid (net)</span><span className="text-lg font-bold tabular-nums text-foreground">{payrollQuery.error ? "Unavailable" : currency(reportPayrollNet)}</span></div>
