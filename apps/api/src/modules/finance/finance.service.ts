@@ -2966,6 +2966,7 @@ export class FinanceService {
         if (!current) throw new NotFoundException("Staff member not found.");
         previous = current.monthlySalary;
         await tx.staff.updateMany({ where: { id: personId, schoolId, deletedAt: null }, data: { monthlySalary: next } });
+        await tx.salaryHistory.create({ data: { staffId: personId, monthlySalary: next, effectiveDate: new Date(), reason: reason.trim(), changedById: actorId } });
       }
       await this.writeAudit(tx, {
         actorId,
