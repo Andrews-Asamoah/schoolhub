@@ -3,7 +3,7 @@
  * (its database name must contain "test"). See apps/api/TESTING.md.
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import type { PrismaClient } from "@prisma/client";
+import { Prisma, type PrismaClient } from "@prisma/client";
 import type { FinanceService as FinanceServiceType } from "./finance.service.js";
 
 const url = process.env.TEST_DATABASE_URL ?? "";
@@ -54,8 +54,8 @@ describe.skipIf(!enabled)("bill generation (database)", { timeout: 60_000 }, () 
         name: `Optional structure ${run}-${structureCounter}`,
         items: {
           create: [
-            { name: "Mandatory tuition", amount: new (await import("@prisma/client")).Prisma.Decimal("100.00"), isOptional: false },
-            { name: "Optional trip", amount: new (await import("@prisma/client")).Prisma.Decimal("50.00"), isOptional: true },
+            { name: "Mandatory tuition", amount: new Prisma.Decimal("100.00"), isOptional: false },
+            { name: "Optional trip", amount: new Prisma.Decimal("50.00"), isOptional: true },
           ],
         },
       },
@@ -246,11 +246,11 @@ describe.skipIf(!enabled)("bill generation (database)", { timeout: 60_000 }, () 
         academicYearId: oldYear.id,
         termId: oldTerm.id,
         billNumber: `HIST-${run}`,
-        totalAmount: new (await import("@prisma/client")).Prisma.Decimal("250.00"),
-        grossAmount: new (await import("@prisma/client")).Prisma.Decimal("250.00"),
-        discountAmount: new (await import("@prisma/client")).Prisma.Decimal("0.00"),
-        paidAmount: new (await import("@prisma/client")).Prisma.Decimal("0.00"),
-        balanceAmount: new (await import("@prisma/client")).Prisma.Decimal("250.00"),
+        totalAmount: new Prisma.Decimal("250.00"),
+        grossAmount: new Prisma.Decimal("250.00"),
+        discountAmount: new Prisma.Decimal("0.00"),
+        paidAmount: new Prisma.Decimal("0.00"),
+        balanceAmount: new Prisma.Decimal("250.00"),
         status: "PENDING",
         items: { create: [{ description: "Prior term charge", amount: "250.00", totalAmount: "250.00", balanceAmount: "250.00" }] },
       },
@@ -269,7 +269,7 @@ describe.skipIf(!enabled)("bill generation (database)", { timeout: 60_000 }, () 
       where: { schoolId, studentId, status: { notIn: ["CANCELLED", "WAIVED"] } },
       select: { balanceAmount: true },
     });
-    const receivableTotal = openBills.reduce((sum, bill) => sum.plus(bill.balanceAmount), new (await import("@prisma/client")).Prisma.Decimal(0));
+    const receivableTotal = openBills.reduce((sum, bill) => sum.plus(bill.balanceAmount), new Prisma.Decimal(0));
     expect(receivableTotal.toFixed(2)).toBe("350.00");
   });
 
