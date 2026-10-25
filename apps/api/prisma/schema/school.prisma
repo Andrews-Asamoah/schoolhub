@@ -59,6 +59,7 @@ model School {
   financePeriodLock           FinancePeriodLock?
   billCarryForwards            BillCarryForward[]
   paymentBillAllocations        PaymentBillAllocation[]
+  lateFeeAssessments             LateFeeAssessment[]
   expenses                    Expense[]
   inventoryItems              InventoryItem[]
   inventoryTransactions       InventoryTransaction[]
