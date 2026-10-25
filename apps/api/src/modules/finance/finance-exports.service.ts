@@ -646,7 +646,7 @@ export class FinanceExportsService {
       },
     });
     if (!run) throw new NotFoundException("Payroll run not found.");
-    const { doc } = await this.pdfDocument(school, "Payroll payslip schedule", String(run.year) + "-" + String(run.month).padStart(2,"0"), "payroll";
+    const { doc } = await this.pdfDocument(school, "Payroll payslip schedule", String(run.year) + "-" + String(run.month).padStart(2,"0"), "payroll");
     autoTable(doc, {
       startY: 152,
       head: [["Employee", "Employee ID", "Basic", "Allowance", "Gross", "Employee SSNIT", "PAYE", "Employer SSNIT", "Other deductions", "Net pay"]],
