@@ -284,11 +284,8 @@ export class FinanceController {
 
   @Get("students/outstanding")
   @Roles(...FINANCE_READ_ROLES)
-  listOutstandingStudents(
-    @CurrentSchool() school: School,
-    @Query(new ZodValidationPipe(financeListQuerySchema)) query: z.infer<typeof financeListQuerySchema>,
-  ) {
-    return this.financeService.listOutstandingStudents(school.id, query);
+  listOutstandingStudents(@CurrentSchool() school: School) {
+    return this.financeService.listOutstandingStudents(school.id);
   }
 
   @Get("payments")
