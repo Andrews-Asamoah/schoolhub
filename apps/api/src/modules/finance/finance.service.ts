@@ -2449,7 +2449,16 @@ export class FinanceService {
       this.prisma.client.bill.findMany({
         where: { schoolId, studentId },
         orderBy: [{ issuedAt: "asc" }, { createdAt: "asc" }],
-        include: {
+        select: {
+          id: true,
+          billNumber: true,
+          billType: true,
+          status: true,
+          totalAmount: true,
+          paidAmount: true,
+          balanceAmount: true,
+          issuedAt: true,
+          dueDate: true,
           academicYear: { select: { id: true, name: true } },
           term: { select: { id: true, name: true } },
           feeStructure: { select: { name: true } },
@@ -2459,7 +2468,16 @@ export class FinanceService {
       this.prisma.client.payment.findMany({
         where: { schoolId, studentId },
         orderBy: [{ paymentDate: "asc" }, { createdAt: "asc" }],
-        include: {
+        select: {
+          id: true,
+          paymentNumber: true,
+          amount: true,
+          paymentMethod: true,
+          paymentDate: true,
+          status: true,
+          referenceNumber: true,
+          reversedAt: true,
+          reversalReason: true,
           bill: { select: { id: true, billNumber: true } },
           recordedBy: { select: { name: true, email: true } },
         },
