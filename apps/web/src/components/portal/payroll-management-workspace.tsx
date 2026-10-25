@@ -176,7 +176,7 @@ export function PayrollManagementWorkspace() {
   const buildSalaryRegisterExport = () => ({
     title: "Salary register",
     headers: ["Employee", "Employee reference", "Type", "Monthly salary (GHS)", "Payroll eligible"],
-    columnTypes: ["text", "text", "text", "money", "text"] as const,
+    columnTypes: ["text", "text", "text", "money", "text"],
     rows: salaryRegister.map(person => [person.name, person.identifier, person.type, person.monthlySalary == null ? null : Number(person.monthlySalary), Number(person.monthlySalary) > 0 ? "Yes" : "No"]),
     totals: ["Total", "", "", null, ""],
     confidential: true,
@@ -194,7 +194,7 @@ export function PayrollManagementWorkspace() {
   const buildPayrollRegisterExport = () => ({
     title: "Payroll register",
     headers: ["Period", "Run status", "Employee", "Employee ID", "Basic (GHS)", "Employee SSNIT (GHS)", "PAYE (GHS)", "Employer SSNIT (GHS)", "Net (GHS)", "Payment status"],
-    columnTypes: ["text", "text", "text", "text", "money", "money", "money", "money", "money", "text"] as const,
+    columnTypes: ["text", "text", "text", "text", "money", "money", "money", "money", "money", "text"],
     rows: visiblePayroll.flatMap(run => run.payslips.map(slip => [
       monthName(run.month, run.year), run.status, personName(slip), slip.staff?.staffId ?? slip.teacher?.teacherId ?? "",
       Number(slip.basicSalary), Number(slip.ssnitEmployee), Number(slip.incomeTax), Number(slip.ssnitEmployer), Number(slip.netSalary), slip.paymentStatus,
