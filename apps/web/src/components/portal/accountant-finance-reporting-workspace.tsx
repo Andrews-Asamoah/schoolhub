@@ -453,7 +453,6 @@ export function AccountantFinanceReportingWorkspace({
           ...visiblePayments.map((payment) => ["Receipt", payment.paymentNumber, dateText(payment.paymentDate), "", payment.bill?.billNumber ?? "Unallocated", payment.paymentMethod, amount(payment.amount), null, null, payment.status]),
           ["Closing outstanding balance", "", "", "", "", "", null, null, outstanding, ""],
         ],
-        totals: ["Total", "", "", "", "", "", null, null, null, ""],
         reportInfo,
       };
     }
