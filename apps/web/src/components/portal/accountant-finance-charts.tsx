@@ -1,4 +1,5 @@
-import { Activity, ChartColumn, ChartPie, WalletCards } from "lucide-react";
+import { Activity, ChartColumn, ChartPie, WalletCards, type LucideIcon } from "lucide-react";
+import type { ReactNode } from "react";
 import {
   Bar,
   BarChart,
@@ -30,7 +31,7 @@ const money = (value: number | string) =>
 const tooltipStyle = { backgroundColor: "var(--popover)", border: "1px solid var(--border)", borderRadius: 12, color: "var(--popover-foreground)", fontSize: 12 };
 const tickStyle = { fill: "var(--muted-foreground)", fontSize: 11 };
 
-function ChartPanel({ title, description, icon: Icon, children }: { title: string; description: string; icon: typeof Activity; children: React.ReactNode }) {
+function ChartPanel({ title, description, icon: Icon, children }: { title: string; description: string; icon: LucideIcon; children: ReactNode }) {
   return <article className="min-w-0 rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-6"><div className="mb-4 flex items-start gap-2"><span className="rounded-lg bg-muted p-2"><Icon className="size-4 text-primary" /></span><div><h3 className="text-sm font-semibold text-foreground">{title}</h3><p className="mt-1 text-xs text-muted-foreground">{description}</p></div></div>{children}</article>;
 }
 function ChartEmpty({ children }: { children: string }) {
