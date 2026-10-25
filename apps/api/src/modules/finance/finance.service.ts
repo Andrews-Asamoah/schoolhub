@@ -1487,25 +1487,22 @@ export class FinanceService {
       ...(dates.start || dates.end ? { issuedAt: { ...(dates.start ? { gte: dates.start } : {}), ...(dates.end ? { lte: dates.end } : {}) } } : {}),
     };
 
-    const periodFrom = dates.start ?? period.term?.startDate ?? period.year?.startDate;
-    const periodTo = dates.end ?? period.term?.endDate ?? period.year?.endDate;
+    const periodFrom = period.term?.startDate ?? period.year?.startDate;
+    const periodTo = period.term?.endDate ?? period.year?.endDate;
+    const rangeFrom = dates.start && periodFrom
+      ? new Date(Math.max(dates.start.getTime(), periodFrom.getTime()))
+      : dates.start ?? periodFrom;
+    const rangeTo = dates.end && periodTo
+      ? new Date(Math.min(dates.end.getTime(), periodTo.getTime()))
+      : dates.end ?? periodTo;
+    if (rangeFrom && rangeTo && rangeFrom > rangeTo) {
+      throw new BadRequestException("The requested dates do not overlap the selected academic period.");
+    }
     const paymentWhere: Prisma.PaymentWhereInput = {
       schoolId,
       status: "COMPLETED",
       reversedAt: null,
-      ...(period.term || period.year
-        ? {
-            OR: [
-              { bill: { schoolId, ...(period.year ? { academicYearId: period.year.id } : {}), ...(period.term ? { termId: period.term.id } : {}) } },
-              ...(periodFrom || periodTo
-                ? [{ billId: null, paymentDate: { ...(periodFrom ? { gte: periodFrom } : {}), ...(periodTo ? { lte: periodTo } : {}) } }]
-                : []),
-            ],
-          }
-        : {}),
-      ...(dates.start || dates.end
-        ? { paymentDate: { ...(dates.start ? { gte: dates.start } : {}), ...(dates.end ? { lte: dates.end } : {}) } }
-        : {}),
+      ...(rangeFrom || rangeTo ? { paymentDate: { ...(rangeFrom ? { gte: rangeFrom } : {}), ...(rangeTo ? { lte: rangeTo } : {}) } } : {}),
     };
 
     const overdueWhere: Prisma.BillWhereInput = {
@@ -1519,7 +1516,7 @@ export class FinanceService {
       status: { notIn: ["CANCELLED", "WAIVED"] },
     };
 
-    const [billedAggregate, outstandingAggregate, overdueAggregate, openBillCount, overdueBillCount, methodGroups, classGroups, ageingBills, paymentByBill] = await Promise.all([
+    const [billedAggregate, outstandingAggregate, overdueAggregate, openBillCount, overdueBillCount, methodGroups, classGroups, ageingBills, paymentAllocations] = await Promise.all([
       this.prisma.client.bill.aggregate({ where: billWhere, _sum: { totalAmount: true } }),
       this.prisma.client.bill.aggregate({ where: { ...billWhere, balanceAmount: { gt: 0 } }, _sum: { balanceAmount: true } }),
       this.prisma.client.bill.aggregate({ where: overdueWhere, _sum: { balanceAmount: true } }),
@@ -1541,10 +1538,12 @@ export class FinanceService {
         where: overdueWhere,
         select: { id: true, dueDate: true, balanceAmount: true },
       }),
-      this.prisma.client.payment.groupBy({
-        by: ["billId"],
-        where: { ...paymentWhere, billId: { not: null } },
-        _sum: { amount: true },
+      this.prisma.client.paymentItem.findMany({
+        where: {
+          payment: paymentWhere,
+          billItem: { bill: { schoolId } },
+        },
+        select: { amount: true, billItem: { select: { bill: { select: { classId: true } } } } },
       }),
     ]);
 
@@ -1563,22 +1562,17 @@ export class FinanceService {
       ageing[index].count += 1;
     }
 
-    const paymentBillIds = paymentByBill.map((group) => group.billId).filter((id): id is string => Boolean(id));
-    const [paymentBills, schoolClasses] = await Promise.all([
-      paymentBillIds.length
-        ? this.prisma.client.bill.findMany({ where: { schoolId, id: { in: paymentBillIds } }, select: { id: true, classId: true } })
-        : Promise.resolve([]),
-      classGroups.some((group) => group.classId)
-        ? this.prisma.client.class.findMany({ where: { schoolId, id: { in: classGroups.map((group) => group.classId).filter((id): id is string => Boolean(id)) } }, select: { id: true, name: true } })
-        : Promise.resolve([]),
-    ]);
+    const schoolClasses = classGroups.some((group) => group.classId)
+      ? await this.prisma.client.class.findMany({
+          where: { schoolId, id: { in: classGroups.map((group) => group.classId).filter((id): id is string => Boolean(id)) } },
+          select: { id: true, name: true },
+        })
+      : [];
     const classNames = new Map(schoolClasses.map((row) => [row.id, row.name]));
-    const billClass = new Map(paymentBills.map((row) => [row.id, row.classId]));
     const classCollected = new Map<string | null, Prisma.Decimal>();
-    const paymentSums = new Map(paymentByBill.map((row) => [row.billId, row._sum.amount ?? new Prisma.Decimal(0)]));
-    for (const [billId, amount] of paymentSums) {
-      const classId = billClass.get(billId ?? "") ?? null;
-      classCollected.set(classId, (classCollected.get(classId) ?? new Prisma.Decimal(0)).plus(amount));
+    for (const allocation of paymentAllocations) {
+      const classId = allocation.billItem.bill.classId;
+      classCollected.set(classId, (classCollected.get(classId) ?? new Prisma.Decimal(0)).plus(allocation.amount));
     }
 
     return {
@@ -1770,23 +1764,18 @@ export class FinanceService {
     const paymentStatuses = ["PENDING", "COMPLETED", "FAILED", "REFUNDED", "CANCELLED"];
     if (input.status && input.status !== "ALL" && !paymentStatuses.includes(input.status)) throw new BadRequestException("Unsupported payment status filter.");
     const search = input.search?.trim();
-    const scopeStart = dates.start ?? period.term?.startDate ?? period.year?.startDate;
-    const scopeEnd = dates.end ?? period.term?.endDate ?? period.year?.endDate;
-    const andFilters: Prisma.PaymentWhereInput[] = [];
-    if (period.year || period.term) {
-      if (scopeStart || scopeEnd) {
-        andFilters.push({
-          OR: [
-            { bill: { schoolId, ...(period.year ? { academicYearId: period.year.id } : {}), ...(period.term ? { termId: period.term.id } : {}), ...(input.classId ? { classId: input.classId } : {}) } },
-            { billId: null, paymentDate: { ...(scopeStart ? { gte: scopeStart } : {}), ...(scopeEnd ? { lte: scopeEnd } : {}) } },
-          ],
-        });
-      } else {
-        andFilters.push({
-          bill: { schoolId, ...(period.year ? { academicYearId: period.year.id } : {}), ...(period.term ? { termId: period.term.id } : {}), ...(input.classId ? { classId: input.classId } : {}) },
-        });
-      }
+    const periodStart = period.term?.startDate ?? period.year?.startDate;
+    const periodEnd = period.term?.endDate ?? period.year?.endDate;
+    const scopeStart = dates.start && periodStart
+      ? new Date(Math.max(dates.start.getTime(), periodStart.getTime()))
+      : dates.start ?? periodStart;
+    const scopeEnd = dates.end && periodEnd
+      ? new Date(Math.min(dates.end.getTime(), periodEnd.getTime()))
+      : dates.end ?? periodEnd;
+    if (scopeStart && scopeEnd && scopeStart > scopeEnd) {
+      throw new BadRequestException("The requested dates do not overlap the selected academic period.");
     }
+    const andFilters: Prisma.PaymentWhereInput[] = [];
     if (search) {
       andFilters.push({
         OR: [
@@ -1803,8 +1792,15 @@ export class FinanceService {
       ...(input.studentId ? { studentId: input.studentId } : {}),
       ...(input.method ? { paymentMethod: input.method as PaymentMethod } : {}),
       ...(input.status && input.status !== "ALL" ? { status: input.status as "PENDING" | "COMPLETED" | "FAILED" | "REFUNDED" | "CANCELLED" } : {}),
-      ...(input.classId ? { bill: { schoolId, classId: input.classId } } : {}),
-      ...(dates.start || dates.end ? { paymentDate: { ...(dates.start ? { gte: dates.start } : {}), ...(dates.end ? { lte: dates.end } : {}) } } : {}),
+      ...(input.classId ? {
+        AND: [{
+          OR: [
+            { bill: { schoolId, classId: input.classId } },
+            { paymentItems: { some: { billItem: { bill: { schoolId, classId: input.classId } } } } },
+          ],
+        }],
+      } : {}),
+      ...(scopeStart || scopeEnd ? { paymentDate: { ...(scopeStart ? { gte: scopeStart } : {}), ...(scopeEnd ? { lte: scopeEnd } : {}) } } : {}),
       ...(andFilters.length ? { AND: andFilters } : {}),
     };
     const cursor = decodeReportingCursor(input.cursor);
