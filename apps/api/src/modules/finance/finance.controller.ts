@@ -424,6 +424,25 @@ export class FinanceController {
     return this.financeService.listFinanceAudit(school.id, { category, from, to, cursor, limit });
   }
 
+  @Get("arrears-policy")
+  @Roles(...FINANCE_READ_ROLES)
+  getArrearsPolicy(@CurrentSchool() school: School) {
+    return this.financeService.getArrearsPolicy(school.id);
+  }
+
+  @Put("arrears-policy")
+  @Roles("owner", "admin", "headteacher")
+  @FinanceSelfAudited()
+  setArrearsPolicy(
+    @CurrentSchool() school: School,
+    @CurrentUser() user: AuthenticatedUser,
+    @Body(new ZodValidationPipe(z.object({
+      arrearsPolicy: z.enum(["SHOW_ONLY", "BLOCK_CLEARANCE_UNTIL_PAID"]),
+    }))) body: { arrearsPolicy: "SHOW_ONLY" | "BLOCK_CLEARANCE_UNTIL_PAID" },
+  ) {
+    return this.financeService.setArrearsPolicy(school.id, user.id, body.arrearsPolicy);
+  }
+
   @Get("period-lock")
   @Roles(...FINANCE_READ_ROLES)
   getPeriodLock(@CurrentSchool() school: School) {
