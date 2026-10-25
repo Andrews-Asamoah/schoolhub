@@ -377,10 +377,6 @@ export function AccountantPortalWorkspace({
     const date = new Date(value);
     return !Number.isNaN(date.getTime()) && date >= reportStartDate && date <= reportEndDate;
   };
-  const reportPayments = useMemo(
-    () => payments.filter((payment) => isInReportPeriod(payment.paymentDate)),
-    [payments, reportStartDate, reportEndDate],
-  );
   const reportSettledPayments = reportPayments.filter((payment) => payment.status === "COMPLETED");
   const reportCollected = reportSettledPayments.reduce((sum, payment) => sum + Number(payment.amount), 0);
   const reportExpenses = useMemo(
@@ -397,22 +393,6 @@ export function AccountantPortalWorkspace({
   }, [payroll, reportStartDate, reportEndDate]);
   const reportPayrollPaid = reportPayroll.filter((run) => run.status === "PAID");
   const reportPayrollNet = reportPayrollPaid.reduce((sum, run) => sum + Number(run.totalNet), 0);
-  const reportPayrollGross = reportPayroll.reduce((sum, run) => sum + Number(run.totalGross), 0);
-  const reportFeeComponentCollections = useMemo(() => {
-    return reportSettledPayments.reduce<Record<string, number>>((totals, payment) => {
-      for (const allocation of payment.paymentItems ?? []) {
-        const feeItem = allocation.billItem.feeItem;
-        const category =
-          feeItem?.customCategory?.name ??
-          feeItem?.registryItem?.name ??
-          feeItem?.category?.replaceAll("_", " ") ??
-          allocation.billItem.description ??
-          "Uncategorised";
-        totals[category] = (totals[category] ?? 0) + Number(allocation.amount);
-      }
-      return totals;
-    }, {});
-  }, [reportSettledPayments]);
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
   const overdueBills = debtors.filter((bill) => {
@@ -439,51 +419,6 @@ export function AccountantPortalWorkspace({
   });
   const currentYear = (yearsQuery.data ?? []).find((year) => year.isCurrent);
   const currentTerm = currentYear?.terms.find((term) => term.isCurrent);
-  const exportFinanceReport = () => {
-    const rows: unknown[][] = [
-      ["SchoolHub Finance Report"],
-      ["Generated at", new Date().toLocaleString("en-GH")],
-      ["Reporting period", reportPeriod === "all" ? "All available records" : reportPeriod === "month" ? "This month to date" : reportPeriod === "quarter" ? "This quarter to date" : "This year to date"],
-      ["Academic period", [currentYear?.name, currentTerm?.name].filter(Boolean).join(" - ") || "All available records"],
-      [],
-      ["Metric", "Amount (GHS)", "Record count"],
-      ["Payments collected (completed only)", reportCollected.toFixed(2), String(reportSettledPayments.length)],
-      ["Current outstanding balances (all open bills)", outstanding.toFixed(2), String(debtors.length)],
-      ["Operating expenses", reportExpenseTotal.toFixed(2), String(reportExpenses.length)],
-      ["Payroll gross", reportPayrollGross.toFixed(2), String(reportPayroll.length)],
-      ["Paid payroll net", reportPayrollNet.toFixed(2), String(reportPayrollPaid.length)],
-      [],
-      ["Receipts"],
-      ["Receipt number", "Student", "Date", "Method", "Reference", "Amount (GHS)", "Status"],
-      ...reportPayments.map(payment => [payment.paymentNumber, studentName(payment.student), dateLabel(payment.paymentDate), payment.paymentMethod, payment.referenceNumber ?? "", Number(payment.amount).toFixed(2), payment.status]),
-      [],
-      ["Collections by fee component"],
-      ["Fee component", "Collected (GHS)"],
-      ...Object.entries(reportFeeComponentCollections).sort((a, b) => b[1] - a[1]).map(([category, total]) => [category, total.toFixed(2)]),
-      [],
-      ["Outstanding bills"],
-      ["Bill number", "Student", "Class", "Due date", "Gross (GHS)", "Discount (GHS)", "Total (GHS)", "Paid (GHS)", "Balance (GHS)", "Status"],
-      ...debtors.map(bill => [bill.billNumber, studentName(bill.student), bill.class?.name ?? "", dateLabel(bill.dueDate), Number(bill.grossAmount ?? bill.totalAmount).toFixed(2), Number(bill.discountAmount ?? 0).toFixed(2), Number(bill.totalAmount).toFixed(2), Number(bill.paidAmount).toFixed(2), Number(bill.balanceAmount).toFixed(2), bill.status]),
-      [],
-      ["Expenses"],
-      ["Date", "Voucher", "Payee", "Description", "Category", "Payment method", "Amount (GHS)"],
-      ...reportExpenses.map(expense => [dateLabel(expense.date), expense.voucherNumber ?? expense.referenceNumber ?? "", expense.payee ?? "", expense.description, expense.customCategory?.name ?? expense.registryCategory?.name ?? expense.category ?? "OTHER", expense.paymentMethod, Number(expense.amount).toFixed(2)]),
-    ];
-    const csv = rows.map(row => row.map(value => {
-      const field = String(value ?? "");
-      return '"' + field.replaceAll('"', '""') + '"';
-    }).join(",")).join("\r\n");
-    const blob = new Blob(["\uFEFF", csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `schoolhub-finance-report-${reportPeriod}.csv`;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    URL.revokeObjectURL(url);
-  };
-
   const selectedFeeStructure = feeStructures.find((fee) => fee.id === selectedFeeStructureId);
   const billTargetClasses = selectedFeeStructure?.targetClasses.length
     ? classes.filter((schoolClass) => selectedFeeStructure.targetClasses.some((target) => target.class.id === schoolClass.id))
