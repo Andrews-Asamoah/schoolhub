@@ -1,4 +1,5 @@
 import { TableExportMenu } from "@/components/ui/data-table";
+import { ServerExportButton } from "@/components/portal/server-export-button";
 import { useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowDownRight, CalendarDays, FileText, LoaderCircle, Plus, Printer, Search, Tags, Wallet, X } from "lucide-react";
@@ -214,7 +215,7 @@ export function ExpenseManagementWorkspace() {
       }`}</style>
       <section className="flex flex-col gap-4 rounded-2xl border border-border bg-card p-5 shadow-sm sm:flex-row sm:items-end sm:justify-between sm:p-6">
         <div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">Finance & bursary</p><h1 className="mt-1 text-2xl font-bold tracking-tight text-foreground">Expenses</h1><p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">Record school expenditure, keep voucher references together, and analyse spend by date, category and payment method.</p></div>
-        <div className="flex flex-wrap gap-2">{canWrite && <button type="button" className={secondaryButton} onClick={() => setShowCategoryManager(true)}><Tags className="size-4" /> Manage categories</button>}<TableExportMenu build={buildExpenseExportTable} note="Exports reflect the selected date range." />{canWrite && <button type="button" className={primaryButton} onClick={() => { setFeedback(null); setDraft(freshDraft()); setShowExpenseForm(true); }}><Plus className="size-4" /> Record expense</button>}</div>
+        <div className="flex flex-wrap gap-2">{canWrite && <button type="button" className={secondaryButton} onClick={() => setShowCategoryManager(true)}><Tags className="size-4" /> Manage categories</button>}<TableExportMenu build={buildExpenseExportTable} note="Exports reflect the selected date range." /><ServerExportButton endpoint={"/finance/exports/expenses.xlsx?from=" + encodeURIComponent(fromDate) + "&to=" + encodeURIComponent(toDate)} label="Full Excel" className={secondaryButton} />{canWrite && <button type="button" className={primaryButton} onClick={() => { setFeedback(null); setDraft(freshDraft()); setShowExpenseForm(true); }}><Plus className="size-4" /> Record expense</button>}</div>
       </section>
 
       {!canWrite && <FinanceReadOnlyNotice />}
