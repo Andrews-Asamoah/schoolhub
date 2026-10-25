@@ -1598,7 +1598,10 @@ export class FinanceService {
         termName: period.term?.name ?? null,
       },
       billed: asNumber(billedAggregate._sum.totalAmount),
-      collected: methodGroups.reduce((sum, group) => sum + asNumber(group._sum.amount), 0),
+      collected: Number(methodGroups.reduce(
+        (sum, group) => sum.plus(group._sum.amount ?? new Prisma.Decimal(0)),
+        new Prisma.Decimal(0),
+      ).toFixed(2)),
       outstanding: asNumber(outstandingAggregate._sum.balanceAmount),
       overdue: asNumber(overdueAggregate._sum.balanceAmount),
       openBillCount,
@@ -1730,7 +1733,7 @@ export class FinanceService {
       admissionNumber: string;
       profile: { firstName: string; lastName: string } | null;
       classes: Map<string, { id: string; name: string }>;
-      outstandingBalance: number;
+      outstandingBalance: Prisma.Decimal;
     }>();
     for (const bill of bills) {
       if (bill.student.deletedAt || bill.student.status !== "ACTIVE") continue;
@@ -1739,10 +1742,10 @@ export class FinanceService {
         admissionNumber: bill.student.admissionNumber ?? "",
         profile: bill.student.profile,
         classes: new Map<string, { id: string; name: string }>(),
-        outstandingBalance: 0,
+        outstandingBalance: new Prisma.Decimal(0),
       };
       if (bill.class) existing.classes.set(bill.class.id, bill.class);
-      existing.outstandingBalance = roundMoney(existing.outstandingBalance + Number(bill.balanceAmount));
+      existing.outstandingBalance = existing.outstandingBalance.plus(bill.balanceAmount);
       byStudent.set(bill.studentId, existing);
     }
     return [...byStudent.values()]
@@ -1751,7 +1754,7 @@ export class FinanceService {
         admissionNumber: student.admissionNumber,
         profile: student.profile,
         classes: [...student.classes.values()].sort((a, b) => a.name.localeCompare(b.name)),
-        outstandingBalance: student.outstandingBalance,
+        outstandingBalance: Number(student.outstandingBalance.toFixed(2)),
       }))
       .sort((a, b) => {
         const aName = [a.profile?.firstName, a.profile?.lastName].filter(Boolean).join(" ") || a.admissionNumber;
