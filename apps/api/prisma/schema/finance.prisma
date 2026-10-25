@@ -438,6 +438,7 @@ model Payslip {
   tier2Employee   Decimal       @default(0) @db.Decimal(15, 2)
   tier2Employer   Decimal       @default(0) @db.Decimal(15, 2)
   tier3Employee   Decimal       @default(0) @db.Decimal(15, 2)
+  tier3Employer   Decimal       @default(0) @db.Decimal(15, 2)
   incomeTax       Decimal       @db.Decimal(15, 2)
   otherDeductions Decimal       @default(0) @db.Decimal(15, 2)
   netSalary       Decimal       @db.Decimal(15, 2)
