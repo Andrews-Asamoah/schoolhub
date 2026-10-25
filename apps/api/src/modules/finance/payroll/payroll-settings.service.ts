@@ -189,6 +189,23 @@ export class PayrollSettingsService {
     if (input.insurableMinimum != null && input.insurableMaximum != null && new Prisma.Decimal(input.insurableMinimum).greaterThan(new Prisma.Decimal(input.insurableMaximum))) throw new BadRequestException("Insurable minimum cannot exceed maximum.");
     if (!input.sourceNote.trim()) throw new BadRequestException("Record the source for this contribution scheme.");
     if (input.code === "TIER3" && input.tier3ReliefCap == null) throw new BadRequestException("Tier 3 remains unverified until its official relief cap is recorded.");
+    if (input.carveType === "CARVED_FROM_SCHEME") {
+      if (!input.carvedFromSchemeId) throw new BadRequestException("Choose the contribution scheme this amount is carved from.");
+      const parent = await this.prisma.client.payrollContributionScheme.findFirst({ where: { id: input.carvedFromSchemeId, schoolId }, select: { code: true } });
+      if (!parent) throw new NotFoundException("The source contribution scheme was not found in this school.");
+      if (input.code === "TIER2" && parent.code !== "SSNIT_TIER1") throw new BadRequestException("Tier 2 must be carved from the school's SSNIT Tier 1 scheme.");
+      if (new Prisma.Decimal(input.employerRate).greaterThan(0)) throw new BadRequestException("A contribution carved from another scheme cannot add an extra employer rate.");
+    }
+    if (input.code !== "CUSTOM") {
+      const peers = await this.prisma.client.payrollContributionScheme.findMany({
+        where: { schoolId, code: input.code, status: { in: ["PENDING_APPROVAL", "ACTIVE"] } },
+        select: { effectiveFrom: true, effectiveTo: true },
+      });
+      const end = effectiveTo ?? new Date("9999-12-31T00:00:00.000Z");
+      if (peers.some((row) => effectiveFrom <= (row.effectiveTo ?? new Date("9999-12-31T00:00:00.000Z")) && end >= row.effectiveFrom)) {
+        throw new ConflictException("This contribution scheme overlaps a pending or active scheme with the same code.");
+      }
+    }
     return this.prisma.client.$transaction(async (tx) => {
       const created = await tx.payrollContributionScheme.create({
         data: {
