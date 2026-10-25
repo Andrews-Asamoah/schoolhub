@@ -549,6 +549,20 @@ export class FinanceController {
     return this.sendFinanceExport(response, await this.financeExports.exportExcel(context, "payroll"));
   }
 
+  @Get("exports/salaries.xlsx")
+  @Roles(...FINANCE_PAYROLL_EXPORT_ROLES)
+  async exportSalaryExcel(
+    @CurrentSchool() school: School,
+    @CurrentUser() user: AuthenticatedUser,
+    @Req() request: Request,
+    @Res() response: Response,
+    @Query("from") from?: string,
+    @Query("to") to?: string,
+  ) {
+    const context = this.financeExportContext(school, user, request, from, to);
+    return this.sendFinanceExport(response, await this.financeExports.exportExcel(context, "salaries"));
+  }
+
   @Get("bills/:billId/invoice.pdf")
   @Roles(...FINANCE_READ_ROLES)
   async exportInvoicePdf(
