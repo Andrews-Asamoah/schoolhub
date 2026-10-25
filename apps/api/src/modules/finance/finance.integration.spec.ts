@@ -597,6 +597,52 @@ describe.skipIf(!enabled)("finance (database)", { timeout: 60_000 }, () => {
     });
   });
 
+  it("allows a guardian to view only a linked ward's fee statement", async () => {
+    const { StudentsService } = await import("../students/students.service.js");
+    const studentsService = new StudentsService({ client: prisma } as never, {} as never);
+    const { student } = await studentWithBill(100);
+    const { student: unlinkedStudent } = await studentWithBill(200);
+    const guardianUser = await prisma.user.create({
+      data: {
+        id: `${run}-guardian-user`,
+        name: "Test Guardian",
+        email: `${run}-guardian@example.test`,
+      },
+    });
+    createdUserIds.push(guardianUser.id);
+    const guardianProfile = await prisma.userProfile.create({
+      data: { userId: guardianUser.id, firstName: "Test", lastName: "Guardian" },
+    });
+    const guardian = await prisma.guardian.create({
+      data: {
+        schoolId,
+        profileId: guardianProfile.id,
+        guardianId: `${run}-guardian`,
+        firstName: "Test",
+        lastName: "Guardian",
+        phone: "0200000000",
+        relationshipType: "GUARDIAN",
+        canLogin: true,
+        isActive: true,
+      },
+    });
+    await prisma.guardianStudent.create({
+      data: { guardianId: guardian.id, studentId: student.id, isPrimary: true },
+    });
+
+    const statement = await studentsService.getMyWardFeeStatement(
+      schoolId,
+      guardianUser.id,
+      student.id,
+      { scope: "all" },
+    );
+    expect(statement.student.id).toBe(student.id);
+    expect(statement.entries.some((entry) => entry.type === "INVOICE")).toBe(true);
+    await expect(
+      studentsService.getMyWardFeeStatement(schoolId, guardianUser.id, unlinkedStudent.id, { scope: "all" }),
+    ).rejects.toThrow(/student not found/i);
+  });
+
   describe("audit trail", () => {
     it("lists this school's finance entries newest first, filters by type and pages", async () => {
       await service.setPeriodLock(schoolId, userId, true, { lockedThrough: null, reason: "Reset for this test case" });
