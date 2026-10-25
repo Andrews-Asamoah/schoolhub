@@ -1,0 +1,270 @@
+enum PayrollSettingsStatus {
+  DRAFT
+  PENDING_APPROVAL
+  ACTIVE
+  ARCHIVED
+}
+
+enum PayrollContributionCode {
+  SSNIT_TIER1
+  TIER2
+  TIER3
+  CUSTOM
+}
+
+enum PayrollContributionBase {
+  BASIC
+  GROSS
+  PENSIONABLE_ITEMS
+}
+
+enum PayrollContributionPayer {
+  EMPLOYEE
+  EMPLOYER
+  SHARED
+}
+
+enum PayrollContributionCarveType {
+  CARVED_FROM_SCHEME
+  ADDITIONAL
+}
+
+enum PayrollPayItemKind {
+  EARNING
+  DEDUCTION
+}
+
+enum PayslipLineKind {
+  EARNING
+  DEDUCTION
+  EMPLOYER_CONTRIBUTION
+  MEMO
+}
+
+model PayrollTaxSchedule {
+  id                 String               @id @default(cuid())
+  schoolId           String
+  name               String
+  effectiveFrom      DateTime             @db.Date
+  effectiveTo        DateTime?            @db.Date
+  status             PayrollSettingsStatus @default(DRAFT)
+  sourceNote         String?
+  nonResidentFlatRate Decimal?            @db.Decimal(7, 4)
+  createdById        String
+  approvedById       String?
+  approvedAt         DateTime?
+  needsVerification  Boolean              @default(true)
+  verificationNotes  String?
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+
+  school         School            @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  bands          PayrollTaxBand[]
+  payrollRecords PayrollRecord[]
+
+  @@unique([schoolId, name, effectiveFrom])
+  @@index([schoolId, status, effectiveFrom, effectiveTo])
+  @@map("payroll_tax_schedules")
+}
+
+model PayrollTaxBand {
+  id         String   @id @default(cuid())
+  scheduleId String
+  order      Int
+  width      Decimal? @db.Decimal(15, 2)
+  rate       Decimal  @db.Decimal(7, 4)
+  createdAt  DateTime @default(now())
+
+  schedule PayrollTaxSchedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+
+  @@unique([scheduleId, order])
+  @@index([scheduleId])
+  @@map("payroll_tax_bands")
+}
+
+model PayrollContributionScheme {
+  id                       String                    @id @default(cuid())
+  schoolId                 String
+  code                     PayrollContributionCode
+  label                    String
+  trusteeName              String?
+  employeeRate             Decimal                   @default(0) @db.Decimal(7, 4)
+  employerRate             Decimal                   @default(0) @db.Decimal(7, 4)
+  base                     PayrollContributionBase   @default(BASIC)
+  insurableMinimum         Decimal?                  @db.Decimal(15, 2)
+  insurableMaximum         Decimal?                  @db.Decimal(15, 2)
+  whoPays                  PayrollContributionPayer  @default(SHARED)
+  employeeShareTaxDeductible Boolean                  @default(true)
+  tier3ReliefCap           Decimal?                  @db.Decimal(15, 2)
+  carvedFromSchemeId       String?
+  carveType                PayrollContributionCarveType @default(ADDITIONAL)
+  effectiveFrom            DateTime                  @db.Date
+  effectiveTo              DateTime?                 @db.Date
+  status                   PayrollSettingsStatus     @default(DRAFT)
+  sourceNote               String?
+  createdById              String
+  approvedById             String?
+  approvedAt               DateTime?
+  needsVerification        Boolean                   @default(true)
+  verificationNotes        String?
+  createdAt                DateTime                  @default(now())
+  updatedAt                DateTime                  @updatedAt
+
+  school      School                      @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  carvedFrom  PayrollContributionScheme?  @relation("ContributionCarve", fields: [carvedFromSchemeId], references: [id], onDelete: SetNull)
+  carvedItems PayrollContributionScheme[] @relation("ContributionCarve")
+  enrolments  StaffContributionEnrolment[]
+
+  @@index([schoolId, code, status, effectiveFrom, effectiveTo])
+  @@index([carvedFromSchemeId])
+  @@map("payroll_contribution_schemes")
+}
+
+model StaffContributionEnrolment {
+  id                        String   @id @default(cuid())
+  staffId                   String?
+  teacherId                 String?
+  schemeId                  String
+  memberNumber              String?
+  rateOverride              Decimal? @db.Decimal(7, 4)
+  fixedAmountOverride       Decimal? @db.Decimal(15, 2)
+  employerBearsEmployeeShare Boolean  @default(false)
+  employerShareTaxable      Boolean  @default(false)
+  startsAt                  DateTime @db.Date
+  endsAt                    DateTime? @db.Date
+  createdAt                 DateTime @default(now())
+  updatedAt                 DateTime @updatedAt
+
+  staff   Staff?                    @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  teacher Teacher?                  @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  scheme  PayrollContributionScheme @relation(fields: [schemeId], references: [id], onDelete: Restrict)
+
+  @@index([staffId, startsAt, endsAt])
+  @@index([teacherId, startsAt, endsAt])
+  @@index([schemeId, startsAt, endsAt])
+  @@map("staff_contribution_enrolments")
+}
+
+model StaffPayProfile {
+  id                String       @id @default(cuid())
+  staffId           String?      @unique
+  teacherId         String?      @unique
+  ssnitNumber       String?
+  tin               String?
+  gradeOrPosition   String?
+  department        String?
+  taxResidency      String       @default("RESIDENT")
+  paymentMode       PaymentMethod @default(BANK_TRANSFER)
+  bankName          String?
+  bankBranch        String?
+  bankAccountEncrypted String?
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+
+  staff   Staff?   @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  teacher Teacher? @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+
+  @@map("staff_pay_profiles")
+}
+
+model PayrollPayItem {
+  id          String            @id @default(cuid())
+  schoolId    String
+  code        String
+  name        String
+  description String?
+  kind        PayrollPayItemKind
+  taxable     Boolean           @default(false)
+  pensionable Boolean           @default(false)
+  recurring   Boolean           @default(false)
+  isActive    Boolean           @default(true)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  school      School                      @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  assignments StaffPayItemAssignment[]
+
+  @@unique([schoolId, code])
+  @@index([schoolId, isActive, kind])
+  @@map("payroll_pay_items")
+}
+
+model StaffPayItemAssignment {
+  id        String   @id @default(cuid())
+  staffId   String?
+  teacherId String?
+  payItemId String
+  amount    Decimal  @db.Decimal(15, 2)
+  startsAt  DateTime @db.Date
+  endsAt    DateTime? @db.Date
+  createdAt DateTime @default(now())
+
+  staff   Staff?        @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  teacher Teacher?      @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  payItem PayrollPayItem @relation(fields: [payItemId], references: [id], onDelete: Restrict)
+
+  @@index([staffId, startsAt, endsAt])
+  @@index([teacherId, startsAt, endsAt])
+  @@index([payItemId])
+  @@map("staff_pay_item_assignments")
+}
+
+model PayrollLoan {
+  id             String   @id @default(cuid())
+  staffId        String?
+  teacherId      String?
+  reference      String
+  description    String
+  originalAmount Decimal  @db.Decimal(15, 2)
+  balance        Decimal  @db.Decimal(15, 2)
+  instalment     Decimal  @db.Decimal(15, 2)
+  startsAt       DateTime @db.Date
+  endsAt         DateTime? @db.Date
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  staff   Staff?   @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  teacher Teacher? @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+
+  @@index([staffId, isActive])
+  @@index([teacherId, isActive])
+  @@map("payroll_loans")
+}
+
+model PayslipLine {
+  id            String          @id @default(cuid())
+  payslipId     String
+  kind          PayslipLineKind
+  code          String
+  description   String
+  amount        Decimal         @db.Decimal(15, 2)
+  originalAmount Decimal?       @db.Decimal(15, 2)
+  balance       Decimal?        @db.Decimal(15, 2)
+  memo          Boolean         @default(false)
+  createdAt     DateTime        @default(now())
+
+  payslip Payslip @relation(fields: [payslipId], references: [id], onDelete: Cascade)
+
+  @@index([payslipId, kind])
+  @@index([payslipId, code])
+  @@map("payslip_lines")
+}
+
+model SalaryHistory {
+  id            String   @id @default(cuid())
+  staffId       String?
+  teacherId     String?
+  monthlySalary Decimal  @db.Decimal(15, 2)
+  effectiveDate DateTime @db.Date
+  reason        String
+  changedById   String
+  createdAt     DateTime @default(now())
+
+  staff   Staff?   @relation(fields: [staffId], references: [id], onDelete: Restrict)
+  teacher Teacher? @relation(fields: [teacherId], references: [id], onDelete: Restrict)
+
+  @@index([staffId, effectiveDate])
+  @@index([teacherId, effectiveDate])
+  @@map("salary_history")
+}
