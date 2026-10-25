@@ -625,6 +625,7 @@ export function getOwnPortalItem(role?: string) {
 export function canRoleAccessPage(role: string | null | undefined, pageId: string) {
   const item = schoolNavItems.find((entry) => entry.id === pageId);
   if (item?.section === "Account") return true;
+  if (pageId === "payroll-settings") return ["accountant", "owner", "headteacher"].includes(role ?? "");
   const allowed = rolePages[role ?? ""];
   return !allowed || allowed.includes(pageId);
 }
