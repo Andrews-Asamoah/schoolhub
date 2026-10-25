@@ -19,7 +19,7 @@ import { FinanceService } from "./finance.service.js";
 import { FinanceExportsService, type FinanceExportContext, type FinanceExportFile } from "./finance-exports.service.js";
 import { SchoolTenantGuard } from "../../common/guards/school-tenant.guard.js";
 import { RolesGuard } from "../../common/guards/roles.guard.js";
-import { FINANCE_PAYROLL_EXPORT_ROLES, FINANCE_READ_ROLES, FINANCE_WRITE_ROLES, isFinancePayrollExportRole } from "./finance.permissions.js";
+import { FINANCE_PAYROLL_EXPORT_ROLES, FINANCE_READ_ROLES, FINANCE_WRITE_ROLES, canExportFinancePayroll } from "./finance.permissions.js";
 import { FinanceAuditInterceptor, FinanceSelfAudited } from "./finance-audit.interceptor.js";
 import { FinanceWriteRateLimitGuard, SuperAdminReasonGuard } from "./finance-safeguards.js";
 import { Roles } from "../../common/decorators/roles.decorator.js";
@@ -469,7 +469,7 @@ export class FinanceController {
   /** Server-side, school-scoped exports. Each successful export is audited by FinanceExportsService. */
   private assertPayrollExportAllowed(user: AuthenticatedUser, schoolRole: string | undefined) {
     // RolesGuard grants platform superAdmins a global bypass. Confidential payroll exports intentionally do not.
-    if (user.role === "superAdmin" || !isFinancePayrollExportRole(schoolRole)) {
+    if (!canExportFinancePayroll(user.role, schoolRole)) {
       throw new ForbiddenException("Payroll and salary exports are limited to the accountant, owner and headteacher roles.");
     }
   }
