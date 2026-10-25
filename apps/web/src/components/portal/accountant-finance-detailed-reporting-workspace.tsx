@@ -138,15 +138,15 @@ function defaultStart() {
 }
 
 export function AccountantFinanceDetailedReportingWorkspace({ classes }: Props) {
-  // The main portal registers are paginated. Reports fetch every page independently.
+  // Registers are paginated; never calculate a school-wide report from page one only.
   const completeFinanceQuery = useQuery({
     queryKey: ["finance", "complete-report-dataset"],
     queryFn: async () => {
-      const [allBills, allPayments] = await Promise.all([
+      const [bills, payments] = await Promise.all([
         fetchAllFinancePages<FinanceBill>("/finance/bills"),
         fetchAllFinancePages<FinancePayment>("/finance/payments"),
       ]);
-      return { bills: allBills, payments: allPayments };
+      return { bills, payments };
     },
     retry: false,
     staleTime: 30_000,
@@ -546,6 +546,17 @@ export function AccountantFinanceDetailedReportingWorkspace({ classes }: Props) 
         </div>
         </div>
 
+      {completeFinanceQuery.isPending ? (
+        <div role="status" className="rounded-xl border border-border bg-muted/30 p-4 text-sm text-muted-foreground">
+          Loading all finance records for a complete report…
+        </div>
+      ) : completeFinanceQuery.error ? (
+        <div role="alert" className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
+          Unable to load the complete finance dataset. Report totals are unavailable; no partial totals are displayed. {completeFinanceQuery.error.message}
+          <button type="button" className="ml-2 font-semibold underline" onClick={() => void completeFinanceQuery.refetch()}>Retry</button>
+        </div>
+      ) : (
+      <>
       <div className="finance-report-print-actions grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         <label className="space-y-1 text-xs font-medium text-muted-foreground">
           Report type
@@ -836,19 +847,7 @@ export function AccountantFinanceDetailedReportingWorkspace({ classes }: Props) 
             Select a student to build their statement.
           </div>
         ) : (
-          {completeFinanceQuery.isPending && (
-        <div role="status" className="mb-4 rounded-xl border border-border bg-muted/30 p-4 text-sm text-muted-foreground">
-          Loading all finance records for a complete report…
-        </div>
-      )}
-      {completeFinanceQuery.error && (
-        <div role="alert" className="mb-4 rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
-          Unable to load the complete finance dataset. Report totals are unavailable; do not rely on partial totals. {completeFinanceQuery.error.message}
-          <button type="button" className="ml-2 font-semibold underline" onClick={() => void completeFinanceQuery.refetch()}>Retry</button>
-        </div>
-      )}
-      <div className="space-y-5" aria-busy={completeFinanceQuery.isPending || undefined}>
-        {completeFinanceQuery.isPending || completeFinanceQuery.error ? null : (
+          <div className="space-y-5">
             <div>
               <h4 className="mb-2 font-semibold text-foreground">
                 Bills issued
@@ -970,8 +969,9 @@ export function AccountantFinanceDetailedReportingWorkspace({ classes }: Props) 
           include completed receipts only. Outstanding balances are current
           bill balances and may cover dates outside this report period.
         </p>
-        )}
       </div>
+      </>
+      )}
     </section>
   );
 }
