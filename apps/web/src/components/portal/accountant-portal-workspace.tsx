@@ -828,7 +828,7 @@ export function AccountantPortalWorkspace({
         <section className="rounded-2xl border border-border bg-card p-5">
           <SectionHeader title="Invoices & bills" description="Search bills, review balances, and generate billing for an active class." action={<div className="flex flex-wrap gap-2"><button type="button" className={buttonSecondary} onClick={() => downloadCsv([["Invoice","Student","Admission number","Class","Fee structure","Due date","Gross (GHS)","Discount (GHS)","Total (GHS)","Paid (GHS)","Balance (GHS)","Status"], ...filteredBills.map(bill => [bill.billNumber, studentName(bill.student), bill.student?.admissionNumber ?? "", bill.class?.name ?? "", bill.feeStructure?.name ?? "", dateLabel(bill.dueDate), Number(bill.grossAmount ?? bill.totalAmount).toFixed(2), Number(bill.discountAmount ?? 0).toFixed(2), Number(bill.totalAmount).toFixed(2), Number(bill.paidAmount).toFixed(2), Number(bill.balanceAmount).toFixed(2), bill.status])], "schoolhub-invoices.csv")} disabled={!filteredBills.length}><Download className="size-4" /> Export CSV</button>{canWrite && <button className={buttonPrimary} onClick={() => { setMessage(null); setSelectedFeeStructureId(""); setSelectedClassId(""); setShowBillForm(true); }}><Plus className="size-4" /> Generate bills</button>}</div>} />
           <SearchFilters search={search} setSearch={setSearch} statusFilter={statusFilter} setStatusFilter={setStatusFilter} statuses={["PENDING", "PARTIALLY_PAID", "PAID", "OVERDUE"]} />
-          {billsQuery.error ? <QueryError message={billsQuery.error.message} /> : <BillsTable bills={filteredBills} onRecordPayment={canWrite ? (bill) => { setSelectedBillId(bill.id); setShowPaymentForm(true); } : undefined} onViewInvoice={setSelectedInvoiceForPrint} />}
+          {billsQuery.error ? <QueryError message={billsQuery.error.message} /> : <><BillsTable bills={filteredBills} onRecordPayment={canWrite ? (bill) => { setSelectedBillId(bill.id); setShowPaymentForm(true); } : undefined} onViewInvoice={setSelectedInvoiceForPrint} /><CursorPagination label="bills" start={(billCursorStack.length * 50) + (bills.length ? 1 : 0)} end={billCursorStack.length * 50 + bills.length} total={billsQuery.data?.total ?? 0} hasPrevious={billCursorStack.length > 0} hasNext={Boolean(billsQuery.data?.nextCursor)} onPrevious={goToPreviousBillPage} onNext={goToNextBillPage} onFirst={() => { setBillCursor(null); setBillCursorStack([]); }} /></>}
         </section>
       )}
 
@@ -836,17 +836,14 @@ export function AccountantPortalWorkspace({
         <section className="rounded-2xl border border-border bg-card p-5">
           <SectionHeader title="Payments & receipts" description="Saved payment transactions from the school finance ledger." action={<div className="flex flex-wrap gap-2"><button type="button" className={buttonSecondary} onClick={() => downloadCsv([["Receipt","Student","Admission number","Bill","Date","Method","Reference","Amount (GHS)","Status"], ...filteredPayments.map(payment => [payment.paymentNumber, studentName(payment.student), payment.student?.admissionNumber ?? "", payment.bill?.billNumber ?? "", dateLabel(payment.paymentDate), payment.paymentMethod, payment.referenceNumber ?? "", Number(payment.amount).toFixed(2), payment.status])], "schoolhub-payment-register.csv")} disabled={!filteredPayments.length}><Download className="size-4" /> Export CSV</button>{canWrite && <button className={buttonPrimary} onClick={() => { setMessage(null); setSelectedBillId(""); setShowPaymentForm(true); }}><Plus className="size-4" /> Record payment</button>}</div>} />
           <div className="relative my-4 max-w-md"><Search className="absolute left-3 top-3 size-4 text-muted-foreground" /><input className={cn(inputClass, "pl-9")} value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search receipt, student, or reference" /></div>
-          {paymentsQuery.error ? <QueryError message={paymentsQuery.error.message} /> : <PaymentsTable payments={filteredPayments} onViewReceipt={setSelectedReceipt} onReverse={canWrite ? (payment) => { setReverseKind("VOID"); setReverseReason(""); setReverseTarget(payment); } : undefined} />}
+          {paymentsQuery.error ? <QueryError message={paymentsQuery.error.message} /> : <><PaymentsTable payments={filteredPayments} onViewReceipt={setSelectedReceipt} onReverse={canWrite ? (payment) => { setReverseKind("VOID"); setReverseReason(""); setReverseTarget(payment); } : undefined} /><CursorPagination label="payments" start={paymentCursorStack.length * 50 + (payments.length ? 1 : 0)} end={paymentCursorStack.length * 50 + payments.length} total={paymentsQuery.data?.total ?? 0} hasPrevious={paymentCursorStack.length > 0} hasNext={Boolean(paymentsQuery.data?.nextCursor)} onPrevious={goToPreviousPaymentPage} onNext={goToNextPaymentPage} onFirst={() => { setPaymentCursor(null); setPaymentCursorStack([]); }} /></>}
         </section>
       )}
 
       {!loading && activeTab === "debtors" && (
         <section className="rounded-2xl border border-border bg-card p-5">
           <SectionHeader title="Outstanding fees" description="Bills with a positive balance, calculated from saved billing records." />
-          {billsQuery.error ? <QueryError message={billsQuery.error.message} /> : <BillsTable bills={debtors.filter((bill) => {
-            const term = search.trim().toLowerCase();
-            return !term || bill.billNumber.toLowerCase().includes(term) || studentName(bill.student).toLowerCase().includes(term) || (bill.class?.name ?? "").toLowerCase().includes(term);
-          })} onRecordPayment={canWrite ? (bill) => { setSelectedBillId(bill.id); setShowPaymentForm(true); } : undefined} onViewInvoice={setSelectedInvoiceForPrint} />}
+          {outstandingBillsQuery.error ? <QueryError message={outstandingBillsQuery.error.message} /> : <><BillsTable bills={debtors} onRecordPayment={canWrite ? (bill) => { setSelectedBillId(bill.id); setShowPaymentForm(true); } : undefined} onViewInvoice={setSelectedInvoiceForPrint} /><CursorPagination label="outstanding bills" start={debtorCursorStack.length * 50 + (debtors.length ? 1 : 0)} end={debtorCursorStack.length * 50 + debtors.length} total={outstandingBillsQuery.data?.total ?? 0} hasPrevious={debtorCursorStack.length > 0} hasNext={Boolean(outstandingBillsQuery.data?.nextCursor)} onPrevious={goToPreviousDebtorPage} onNext={goToNextDebtorPage} onFirst={() => { setDebtorCursor(null); setDebtorCursorStack([]); }} /></>}
         </section>
       )}
 
@@ -1163,6 +1160,39 @@ function Modal({ title, description, onClose, children }: { title: string; descr
 
 function ModalActions({ onCancel, busy, submitLabel }: { onCancel: () => void; busy: boolean; submitLabel: string }) {
   return <div className="flex justify-end gap-2 border-t border-border pt-4"><button type="button" className={buttonSecondary} onClick={onCancel} disabled={busy}>Cancel</button><button type="submit" className={buttonPrimary} disabled={busy}>{busy && <LoaderCircle className="size-4 animate-spin" />}{submitLabel}</button></div>;
+}
+
+function CursorPagination({
+  label,
+  start,
+  end,
+  total,
+  hasPrevious,
+  hasNext,
+  onPrevious,
+  onNext,
+  onFirst,
+}: {
+  label: string;
+  start: number;
+  end: number;
+  total: number;
+  hasPrevious: boolean;
+  hasNext: boolean;
+  onPrevious: () => void;
+  onNext: () => void;
+  onFirst: () => void;
+}) {
+  return (
+    <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-3">
+      <p className="text-xs text-muted-foreground">Showing {start}-{end} of {total} {label}</p>
+      <div className="flex items-center gap-2">
+        <button type="button" className={buttonSecondary} disabled={!hasPrevious} onClick={onFirst}>First page</button>
+        <button type="button" className={buttonSecondary} disabled={!hasPrevious} onClick={onPrevious}>Previous</button>
+        <button type="button" className={buttonSecondary} disabled={!hasNext} onClick={onNext}>Next</button>
+      </div>
+    </div>
+  );
 }
 
 function EmptyState({ icon: Icon, title, description }: { icon: typeof Wallet; title: string; description: string }) {
