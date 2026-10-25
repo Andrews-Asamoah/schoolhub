@@ -2,7 +2,7 @@
 
 **Branch:** phase-3/configurable-payroll-statutory-engine  
 **Base:** main at ba737d3f893478672c76d310151a784351387064  
-**Status:** Plan recorded; implementation paused at the required finance-policy decisions below.
+**Status:** Decisions confirmed; implementation may proceed on the feature branch. Verification is still required before phase completion.
 
 ## Goal
 
@@ -73,3 +73,13 @@ The API already depends on jspdf and jspdf-autotable, so reusing them for server
 - finance.permissions.ts centralizes finance roles; the new statutory-settings approver policy must be separate and based on the actual membership role.
 - apps/api/package.json already includes jspdf and jspdf-autotable.
 - The current finance model is in apps/api/prisma/schema/finance.prisma; related identity and staff relations must be inspected before defining new foreign keys.
+
+
+## Confirmed user decisions (2026-10-25)
+
+- Employer SSNIT uses standard decimal half-up rounding; the supplied example rounds to GHS 629.88.
+- Tier 3 relief and employer-borne share tax treatment remain unverified. A schedule containing unresolved statutory settings must not be approved or activated.
+- Seed the legacy GHS 30,332 PAYE band, with `needsVerification = true`.
+- Reuse jsPDF + jsPDF-AutoTable. No public QR verification endpoint; QR, if generated, contains only a private opaque token.
+
+These decisions do not certify the seeded statutory values as current legal advice. The implementation must preserve the unverified marker and block approval until all required statutory fields have been verified by an authorized reviewer.
