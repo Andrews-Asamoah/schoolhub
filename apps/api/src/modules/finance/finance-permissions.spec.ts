@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import type { ExecutionContext } from "@nestjs/common";
 import { RolesGuard } from "../../common/guards/roles.guard.js";
-import { FINANCE_PAYROLL_EXPORT_ROLES, FINANCE_READ_ROLES, FINANCE_WRITE_ROLES } from "./finance.permissions.js";
+import { FINANCE_PAYROLL_EXPORT_ROLES, FINANCE_READ_ROLES, FINANCE_WRITE_ROLES, isFinancePayrollExportRole } from "./finance.permissions.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 // Normalise line endings so the checks behave the same on Windows (CRLF) checkouts.
@@ -32,6 +32,13 @@ describe("finance policy constants", () => {
 
   it("restricts salary and payroll exports to accountant, owner and headteacher", () => {
     expect([...FINANCE_PAYROLL_EXPORT_ROLES]).toEqual(["accountant", "owner", "headteacher"]);
+  });
+
+  it("does not accept admin, teacher, staff, guardian, student or platform superAdmin for payroll exports", () => {
+    for (const role of ["admin", "teacher", "staff", "guardian", "student", "superAdmin", "", null, undefined]) {
+      expect(isFinancePayrollExportRole(role)).toBe(false);
+    }
+    for (const role of FINANCE_PAYROLL_EXPORT_ROLES) expect(isFinancePayrollExportRole(role)).toBe(true);
   });
 });
 
