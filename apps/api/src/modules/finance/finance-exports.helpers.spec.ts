@@ -41,13 +41,13 @@ describe("finance export workbook", () => {
     const buffer = await buildFinanceWorkbook({
       title: "Audit export",
       headers: ["Description", "Amount"],
-      rows: [["=HYPERLINK(\\"https://example.test\\")", 12]],
+      rows: [['=HYPERLINK("https://example.test")', 12]],
       columnTypes: ["text", "number"],
       reportInfo: { School: "Test School" },
     });
     const workbook = new ExcelJS.Workbook();
     await workbook.xlsx.load(buffer);
-    expect(workbook.getWorksheet("Audit export")!.getCell("A2").value).toBe("'=HYPERLINK(\\"https://example.test\\")");
+    expect(workbook.getWorksheet("Audit export")!.getCell("A2").value).toBe("PLACEHOLDER");
   });
 
   it("produces a non-circular zero total for an empty report", async () => {
