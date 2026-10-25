@@ -341,6 +341,14 @@ export const schoolNavGroups: SchoolNavGroup[] = [
         apiStatus: "available",
       },
       {
+        id: "term-end-review",
+        label: "Term-end review",
+        icon: ClipboardCheck,
+        description: "Review earlier-term arrears and track balances owed by former students.",
+        section: "Finance",
+        apiStatus: "available",
+      },
+      {
         id: "finance-reports",
         label: "Finance reports",
         icon: ChartNoAxesCombined,
@@ -506,6 +514,7 @@ const rolePages: Record<string, string[]> = {
     "concessions",
     "finance-reports",
     "student-statements",
+    "term-end-review",
     "finance-audit",
     "outstanding",
     "admissions",
