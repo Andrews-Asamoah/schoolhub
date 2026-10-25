@@ -28,6 +28,25 @@ function splitName(full: string) {
 
 }
 
+
+const SMALL_NUMBER_WORDS = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen", "seventeen", "eighteen", "nineteen"];
+const TENS_WORDS = ["", "", "twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety"];
+
+function integerToWords(value: bigint): string {
+  if (value < 20n) return SMALL_NUMBER_WORDS[Number(value)]!;
+  if (value < 100n) return `${TENS_WORDS[Number(value / 10n)]}${value % 10n ? `-${SMALL_NUMBER_WORDS[Number(value % 10n)]}` : ""}`;
+  if (value < 1000n) return `${integerToWords(value / 100n)} hundred${value % 100n ? ` ${integerToWords(value % 100n)}` : ""}`;
+  for (const [size, label] of [[1000000000n, "billion"], [1000000n, "million"], [1000n, "thousand"]] as const) {
+    if (value >= size) return `${integerToWords(value / size)} ${label}${value / size > 1n ? "s" : ""}${value % size ? ` ${integerToWords(value % size)}` : ""}`;
+  }
+  return value.toString();
+}
+
+function amountInWords(amount: string): string {
+  const [whole = "0", fraction = "00"] = new Prisma.Decimal(amount).toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP).toFixed(2).split(".");
+  return `${integerToWords(BigInt(whole))} Ghana cedis and ${integerToWords(BigInt(fraction))} pesewas only`;
+}
+
 /** A signed-in user's own basic details. Never touches email, role or anyone else's record. */
 @Injectable()
 export class MeService {
