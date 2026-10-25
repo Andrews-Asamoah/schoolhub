@@ -69,6 +69,36 @@ ALTER TABLE "payment_bill_allocations"
   FOREIGN KEY ("billId") REFERENCES "bills"("id")
   ON DELETE RESTRICT ON UPDATE CASCADE;
 
+-- Backfill bill allocations from immutable historical item allocations.
+-- Old receipts without item allocations fall back to their single recorded billId.
+INSERT INTO "payment_bill_allocations" ("id", "schoolId", "paymentId", "billId", "amount", "createdAt")
+SELECT
+  'pba_' || md5(p."id" || ':' || grouped."billId"),
+  p."schoolId",
+  p."id",
+  grouped."billId",
+  grouped."amount",
+  p."createdAt"
+FROM (
+  SELECT pi."paymentId", bi."billId", SUM(pi."amount")::numeric(10,2) AS "amount"
+  FROM "payment_items" pi
+  INNER JOIN "bill_items" bi ON bi."id" = pi."billItemId"
+  GROUP BY pi."paymentId", bi."billId"
+) grouped
+INNER JOIN "payments" p ON p."id" = grouped."paymentId";
+
+INSERT INTO "payment_bill_allocations" ("id", "schoolId", "paymentId", "billId", "amount", "createdAt")
+SELECT
+  'pba_' || md5(p."id" || ':' || p."billId"),
+  p."schoolId",
+  p."id",
+  p."billId",
+  p."amount",
+  p."createdAt"
+FROM "payments" p
+WHERE p."billId" IS NOT NULL
+  AND NOT EXISTS (SELECT 1 FROM "payment_items" pi WHERE pi."paymentId" = p."id");
+
 -- Rollback (manual, only if the feature is unused):
 -- DROP INDEX "payment_bill_allocations_schoolId_billId_idx";
 -- DROP INDEX "payment_bill_allocations_schoolId_paymentId_idx";
