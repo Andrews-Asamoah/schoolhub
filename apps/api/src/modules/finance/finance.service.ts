@@ -3311,7 +3311,23 @@ export class FinanceService {
         const tier3Employee = sum("tier3Employee");
         const tier3Employer = sum("tier3Employer");
         const otherDeductions = sum("otherDeductions");
-        const unreconciled = gross.sub(net).sub(paye).sub(employeeSsnit).sub(tier2Employee).sub(tier3Employee).sub(otherDeductions);
+        const lineSum = (code: string) => current.payslips.reduce(
+          (total, slip) => total.add(slip.lines.filter((line) => line.kind === "DEDUCTION" && line.code === code)
+            .reduce((lineTotal, line) => lineTotal.add(line.amount), new Prisma.Decimal(0))),
+          new Prisma.Decimal(0),
+        ).toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP);
+        const employeeSsnitDeducted = lineSum("SSNIT_EMPLOYEE");
+        const tier2EmployeeDeducted = lineSum("TIER2_EMPLOYEE");
+        const tier3EmployeeDeducted = lineSum("TIER3_EMPLOYEE");
+        const allEmployeeDeductions = current.payslips.reduce(
+          (total, slip) => total.add(slip.lines.filter((line) => line.kind === "DEDUCTION")
+            .reduce((lineTotal, line) => lineTotal.add(line.amount), new Prisma.Decimal(0))),
+          new Prisma.Decimal(0),
+        ).toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP);
+        const employeeSsnitBorne = Prisma.Decimal.max(new Prisma.Decimal(0), employeeSsnit.sub(employeeSsnitDeducted));
+        const tier2EmployeeBorne = Prisma.Decimal.max(new Prisma.Decimal(0), tier2Employee.sub(tier2EmployeeDeducted));
+        const tier3EmployeeBorne = Prisma.Decimal.max(new Prisma.Decimal(0), tier3Employee.sub(tier3EmployeeDeducted));
+        const unreconciled = gross.sub(net).sub(allEmployeeDeductions);
         if (unreconciled.abs().greaterThan("0.02")) {
           throw new BadRequestException(
             "This payroll does not reconcile: gross pay must equal net pay plus PAYE, employee SSNIT and other deductions. Review the payslips before confirming payment.",
