@@ -741,7 +741,7 @@ export const inventoryStockMovementSchema = z.object({
 export type InventoryStockMovementInput = z.infer<typeof inventoryStockMovementSchema>;
 
 export const updatePayrollSalarySchema = z.object({
-  monthlySalary: z.string().trim().regex(/^(?:0|[1-9][0-9]{0,7})(?:\\.[0-9]{1,2})?$/, "Enter a non-negative salary to two decimal places."),
+  monthlySalary: z.string().trim().regex(/^(?:0|[1-9][0-9]{0,7})(?:\.[0-9]{1,2})?$/, "Enter a non-negative salary to two decimal places."),
   reason: z.string().trim().min(10, "Explain why the salary is changing (at least 10 characters)").max(500),
 });
 export type UpdatePayrollSalaryInput = z.infer<typeof updatePayrollSalarySchema>;
