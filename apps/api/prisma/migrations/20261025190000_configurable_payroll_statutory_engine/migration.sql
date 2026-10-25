@@ -336,3 +336,8 @@ INSERT INTO "payslip_lines" ("id", "payslipId", "kind", "code", "description", "
 SELECT 'legacy-line-' || p."id" || '-SSNIT_EMPLOYER', p."id", 'EMPLOYER_CONTRIBUTION', 'SSNIT_EMPLOYER', 'Employer SSNIT (memo)', p."ssnitEmployer", p."ssnitEmployer", NULL, TRUE
 FROM "payslips" p
 ON CONFLICT ("id") DO NOTHING;
+
+ALTER TABLE "payslips"
+  ADD COLUMN "tier2Employee" DECIMAL(15,2) NOT NULL DEFAULT 0,
+  ADD COLUMN "tier2Employer" DECIMAL(15,2) NOT NULL DEFAULT 0,
+  ADD COLUMN "tier3Employee" DECIMAL(15,2) NOT NULL DEFAULT 0;
