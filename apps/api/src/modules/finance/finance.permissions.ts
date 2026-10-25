@@ -15,3 +15,6 @@ export const FINANCE_WRITE_ROLES = ["accountant"] as const;
 
 /** Roles that may view financial data and reports. */
 export const FINANCE_READ_ROLES = ["owner", "admin", "accountant", "headteacher"] as const;
+
+/** Payroll and salary exports are confidential: only accountant, owner and headteacher may export. */
+export const FINANCE_PAYROLL_EXPORT_ROLES = ["accountant", "owner", "headteacher"] as const;
