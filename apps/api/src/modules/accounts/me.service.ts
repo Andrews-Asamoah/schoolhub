@@ -247,4 +247,131 @@ export class MeService {
     };
   }
 
+
+  async getMyPayslipPdf(userId: string, schoolId: string, payslipId: string): Promise<Buffer> {
+    const slip = await this.getMyPayslip(userId, schoolId, payslipId);
+    const identity = await this.getPayrollIdentity(userId, schoolId);
+    const rows = await this.prisma.client.payslip.findMany({
+      where: {
+        schoolId,
+        payrollRecord: { year: slip.year, month: { lte: slip.month }, status: { in: ["APPROVED", "PAID"] } },
+        OR: [
+          ...(identity.staffId ? [{ staffId: identity.staffId }] : []),
+          ...(identity.teacherId ? [{ teacherId: identity.teacherId }] : []),
+        ],
+      },
+      select: {
+        grossSalary: true, ssnitEmployee: true, ssnitEmployer: true, incomeTax: true,
+        tier2Employee: true, tier2Employer: true, tier3Employee: true, tier3Employer: true,
+      },
+    });
+    const sum = (field: "grossSalary" | "ssnitEmployee" | "ssnitEmployer" | "incomeTax" | "tier2Employee" | "tier2Employer" | "tier3Employee" | "tier3Employer") =>
+      rows.reduce((total, row) => total.add(row[field]), new Prisma.Decimal(0)).toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP);
+
+    const period = new Intl.DateTimeFormat("en-GB", { month: "long", year: "numeric", timeZone: "UTC" })
+      .format(new Date(Date.UTC(slip.year, slip.month - 1, 1)));
+    const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+    const pageWidth = doc.internal.pageSize.getWidth();
+    doc.setProperties({ title: `Confidential payslip — ${period}`, subject: "Employee payroll statement", creator: "SchoolHub" });
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(16);
+    doc.text(slip.school.name, 14, 16);
+    doc.setFontSize(11);
+    doc.text("CONFIDENTIAL PAYSLIP", 14, 24);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    doc.text(period, pageWidth - 14, 24, { align: "right" });
+    const payProfile = slip.employee.payProfile;
+    const employeeInfo = [
+      [ "Employee", slip.employee.name || "Employee" ],
+      [ "Staff ID", slip.employee.identifier ],
+      [ "SSNIT No.", payProfile?.ssnitNumber || "Not recorded" ],
+      [ "TIN", payProfile?.tin || "Not recorded" ],
+      [ "Grade / Position", payProfile?.gradeOrPosition || "Not recorded" ],
+      [ "Department", payProfile?.department || "Not recorded" ],
+      [ "Payment mode", slip.paymentMethod || payProfile?.paymentMode || "Not recorded" ],
+    ];
+    autoTable(doc, {
+      startY: 30,
+      head: [["Employee details", "Value"]],
+      body: employeeInfo,
+      theme: "grid",
+      styles: { fontSize: 8, cellPadding: 2 },
+      headStyles: { fillColor: [37, 55, 80] },
+      columnStyles: { 0: { cellWidth: 42, fontStyle: "bold" } },
+      margin: { left: 14, right: 14 },
+    });
+    const lineRows = slip.lines.map((line) => [
+      line.code,
+      line.description,
+      line.originalAmount?.toFixed(2) ?? "",
+      line.kind === "EARNING" ? line.amount.toFixed(2) : "",
+      line.kind === "DEDUCTION" ? line.amount.toFixed(2) : "",
+      line.kind === "EMPLOYER_CONTRIBUTION" || line.kind === "MEMO" ? line.amount.toFixed(2) : "",
+    ]);
+    autoTable(doc, {
+      startY: (doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY ? (doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable!.finalY + 6 : 78,
+      head: [["Code", "Description", "Original amount", "Earnings (GHS)", "Deductions (GHS)", "Employer / memo (GHS)"]],
+      body: lineRows,
+      theme: "grid",
+      styles: { fontSize: 7.5, cellPadding: 1.7, overflow: "linebreak" },
+      headStyles: { fillColor: [37, 55, 80] },
+      columnStyles: { 0: { cellWidth: 25 }, 1: { cellWidth: 52 }, 2: { cellWidth: 27 }, 3: { cellWidth: 26 }, 4: { cellWidth: 26 }, 5: { cellWidth: 26 } },
+      margin: { left: 14, right: 14 },
+    });
+    let y = ((doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY ?? 160) + 8;
+    if (y > doc.internal.pageSize.getHeight() - 48) {
+      doc.addPage();
+      y = 20;
+    }
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(10);
+    doc.text("PAY SUMMARY", 14, y);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    y += 7;
+    const summary = [
+      `Basic salary: GHS ${slip.basicSalary}`,
+      `Gross earnings: GHS ${slip.grossSalary}`,
+      `PAYE: GHS ${slip.incomeTax}`,
+      `Net pay: GHS ${slip.netSalary}`,
+      `Net pay in words: ${amountInWords(slip.netSalary)}`,
+      `Annualised basic salary: GHS ${new Prisma.Decimal(slip.basicSalary).mul(12).toFixed(2)}`,
+      `YTD gross: GHS ${sum("grossSalary").toFixed(2)}`,
+      `YTD employee SSNIT: GHS ${sum("ssnitEmployee").toFixed(2)}`,
+      `YTD PAYE: GHS ${sum("incomeTax").toFixed(2)}`,
+      `YTD employer SSNIT: GHS ${sum("ssnitEmployer").toFixed(2)}`,
+      `Tier 2 employee / employer memo: GHS ${slip.tier2Employee} / GHS ${slip.tier2Employer}`,
+      `Tier 3 employee / employer memo: GHS ${slip.tier3Employee} / GHS ${slip.tier3Employer}`,
+    ];
+    for (const line of summary) {
+      doc.text(line, 14, y, { maxWidth: pageWidth - 62 });
+      y += 5.5;
+      if (y > doc.internal.pageSize.getHeight() - 28) {
+        doc.addPage();
+        y = 20;
+      }
+    }
+    const signingKey = process.env.PAYSLIP_QR_SIGNING_KEY ?? process.env.BETTER_AUTH_SECRET;
+    if (!signingKey) throw new NotFoundException("Payslip verification signing is not configured.");
+    const signature = createHmac("sha256", signingKey).update(`schoolhub-private-payslip:${schoolId}:${slip.id}:${slip.year}-${String(slip.month).padStart(2, "0")}`).digest("hex");
+    const qr = await QRCode.toDataURL(`schoolhub-private-payslip:${slip.id}:${signature}`, { errorCorrectionLevel: "M", margin: 1, width: 128 });
+    if (y > doc.internal.pageSize.getHeight() - 35) {
+      doc.addPage();
+      y = 20;
+    }
+    doc.addImage(qr, "PNG", pageWidth - 38, y - 2, 24, 24);
+    doc.setFontSize(7);
+    doc.text("Private verification token — no public lookup endpoint", pageWidth - 42, y + 25, { maxWidth: 34 });
+    for (let page = 1; page <= doc.getNumberOfPages(); page += 1) {
+      doc.setPage(page);
+      const height = doc.internal.pageSize.getHeight();
+      doc.setFontSize(7);
+      doc.setTextColor(100);
+      doc.text("CONFIDENTIAL — for the named employee only", 14, height - 10);
+      doc.text(`Page ${page} of ${doc.getNumberOfPages()}`, pageWidth - 14, height - 10, { align: "right" });
+    }
+    return Buffer.from(doc.output("arraybuffer"));
+  }
+
 }
