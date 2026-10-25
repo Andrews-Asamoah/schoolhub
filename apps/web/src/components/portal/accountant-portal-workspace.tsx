@@ -84,6 +84,30 @@ interface ApiBill {
   dueDate?: string | null;
   issuedAt: string;
   items?: { id: string; description: string; amount: number | string; quantity: number; totalAmount: number | string; discountAmount?: number | string; paidAmount: number | string; balanceAmount: number | string }[];
+  carryForwards?: { id: string; sourceBillId: string; sourceBillNumber: string; sourceAcademicYearName?: string | null; sourceTermName?: string | null; amount: number | string }[];
+  overdueDays?: number | null;
+}
+
+interface FinancePage<T> {
+  items: T[];
+  nextCursor: string | null;
+  total: number;
+}
+
+interface FinanceSummary {
+  asOf: string;
+  billed: string;
+  billedCount: number;
+  collected: string;
+  receiptCount: number;
+  outstanding: string;
+  outstandingBillCount: number;
+  overdue: string;
+  overdueBillCount: number;
+  collectionRate: string | null;
+  byMethod: { method: string; amount: string; receiptCount: number }[];
+  byClass: { classId: string | null; className: string; billed: string; collected: string; outstanding: string; billCount: number }[];
+  ageing: { days0To30: string; days31To60: string; days61To90: string; days90Plus: string; notDue: string };
 }
 
 interface ApiPaymentItem {
@@ -103,7 +127,8 @@ interface ApiPayment {
   paymentNumber: string;
   studentId: string;
   student: StudentSummary;
-  bill?: { id: string; billNumber: string } | null;
+  bill?: { id: string; billNumber: string; classId?: string | null; class?: { id: string; name: string } | null; academicYearId?: string; termId?: string | null } | null;
+  billAllocations?: { id: string; billId: string; amount: number | string; bill: { id: string; billNumber: string; classId?: string | null; academicYearId?: string; termId?: string | null } }[];
   amount: number | string;
   paymentMethod: RecordPaymentInput["paymentMethod"];
   referenceNumber?: string | null;
@@ -240,9 +265,13 @@ export function AccountantPortalWorkspace({
   const activeTab = defaultTab;
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
+  const [billCursorStack, setBillCursorStack] = useState<Array<string | null>>([null]);
+  const [paymentCursorStack, setPaymentCursorStack] = useState<Array<string | null>>([null]);
+  const billCursor = billCursorStack[billCursorStack.length - 1] ?? null;
+  const paymentCursor = paymentCursorStack[paymentCursorStack.length - 1] ?? null;
   const [overdueSearch, setOverdueSearch] = useState("");
   const [overdueClassFilter, setOverdueClassFilter] = useState("ALL");
-  const [reportPeriod, setReportPeriod] = useState<"month" | "quarter" | "year" | "all">("year");
+  const [reportPeriod, setReportPeriod] = useState<"term" | "year" | "all">("term");
   const [showPaymentForm, setShowPaymentForm] = useState(false);
   const [selectedBillId, setSelectedBillId] = useState("");
   const [selectedReceipt, setSelectedReceipt] = useState<ApiPayment | null>(null);
@@ -269,13 +298,25 @@ export function AccountantPortalWorkspace({
     retry: false,
   });
   const billsQuery = useQuery({
-    queryKey: ["finance", "bills"],
-    queryFn: () => apiFetch<ApiBill[]>("/finance/bills"),
+    queryKey: ["finance", "bills", billCursor, search, statusFilter, activeTab],
+    queryFn: () => {
+      const params = new URLSearchParams({ limit: "50" });
+      if (billCursor) params.set("cursor", billCursor);
+      if (search.trim()) params.set("search", search.trim());
+      if (statusFilter !== "ALL") params.set("status", statusFilter);
+      if (activeTab === "debtors") params.set("outstanding", "true");
+      return apiFetch<FinancePage<ApiBill>>(`/finance/bills?${params.toString()}`);
+    },
     retry: false,
   });
   const paymentsQuery = useQuery({
-    queryKey: ["finance", "payments"],
-    queryFn: () => apiFetch<ApiPayment[]>("/finance/payments"),
+    queryKey: ["finance", "payments", paymentCursor, search],
+    queryFn: () => {
+      const params = new URLSearchParams({ limit: "50" });
+      if (paymentCursor) params.set("cursor", paymentCursor);
+      if (search.trim()) params.set("search", search.trim());
+      return apiFetch<FinancePage<ApiPayment>>(`/finance/payments?${params.toString()}`);
+    },
     retry: false,
   });
   const expensesQuery = useQuery({
@@ -298,6 +339,30 @@ export function AccountantPortalWorkspace({
     queryFn: () => apiFetch<ApiAcademicYear[]>("/schools/academic-years"),
     retry: false,
   });
+  const currentYear = (yearsQuery.data ?? []).find((year) => year.isCurrent);
+  const currentTerm = currentYear?.terms.find((term) => term.isCurrent);
+  const summaryQuery = useQuery({
+    queryKey: ["finance", "summary", reportPeriod, currentYear?.id ?? null, currentTerm?.id ?? null],
+    queryFn: () => {
+      const params = new URLSearchParams();
+      if (reportPeriod !== "all" && currentYear) params.set("yearId", currentYear.id);
+      if (reportPeriod === "term" && currentTerm) params.set("termId", currentTerm.id);
+      return apiFetch<FinanceSummary>(`/finance/summary${params.size ? `?${params.toString()}` : ""}`);
+    },
+    retry: false,
+  });
+  const overdueBillsQuery = useQuery({
+    queryKey: ["finance", "overdue-bills", overdueSearch, overdueClassFilter, activeTab],
+    queryFn: () => {
+      const params = new URLSearchParams({ limit: "50", overdue: "true" });
+      if (overdueSearch.trim()) params.set("search", overdueSearch.trim());
+      if (overdueClassFilter !== "ALL") params.set("classId", overdueClassFilter);
+      return apiFetch<FinancePage<ApiBill>>(`/finance/bills?${params.toString()}`);
+    },
+    enabled: activeTab === "overview",
+    retry: false,
+  });
+
   const inventoryQuery = useQuery({
     queryKey: ["inventory", "items"],
     queryFn: () => apiFetch<ApiInventoryItem[]>("/inventory/items"),
@@ -310,8 +375,8 @@ export function AccountantPortalWorkspace({
     retry: false,
   });
 
-  const bills = billsQuery.data ?? [];
-  const payments = paymentsQuery.data ?? [];
+  const bills = billsQuery.data?.items ?? [];
+  const payments = paymentsQuery.data?.items ?? [];
   const expenses = expensesQuery.data ?? [];
   const feeStructures = feeStructuresQuery.data ?? [];
   const classes = (classesQuery.data ?? []).filter((schoolClass) => schoolClass.isActive);
@@ -346,40 +411,30 @@ export function AccountantPortalWorkspace({
 
   const debtors = bills.filter((bill) => Number(bill.balanceAmount) > 0 && bill.status !== "CANCELLED" && bill.status !== "WAIVED");
 
-  // Only settled receipts are counted as collections. Failed, pending,
-  // cancelled and refunded transactions remain visible in history but are not
-  // treated as cash received in dashboard totals or payment-method analysis.
-  const settledPayments = payments.filter((payment) => payment.status === "COMPLETED");
-  const collected = settledPayments.reduce((sum, payment) => sum + Number(payment.amount), 0);
-  const outstanding = debtors.reduce((sum, bill) => sum + Number(bill.balanceAmount), 0);
+  // Financial totals and ageing come from SQL/Prisma server aggregates, never
+  // from a paginated page of receipt or bill rows.
+  const collected = Number(summaryQuery.data?.collected ?? 0);
+  const outstanding = Number(summaryQuery.data?.outstanding ?? 0);
   const expenseTotal = expenses.reduce((sum, expense) => sum + Number(expense.amount), 0);
   const paidPayroll = payroll.filter((run) => run.status === "PAID");
   const payrollNet = paidPayroll.reduce((sum, run) => sum + Number(run.totalNet), 0);
   const reportStartDate = useMemo(() => {
     if (reportPeriod === "all") return null;
-    const start = new Date();
-    start.setHours(0, 0, 0, 0);
-    if (reportPeriod === "month") start.setDate(1);
-    if (reportPeriod === "quarter") {
-      start.setMonth(Math.floor(start.getMonth() / 3) * 3, 1);
-    }
-    if (reportPeriod === "year") start.setMonth(0, 1);
-    return start;
-  }, [reportPeriod]);
+    if (reportPeriod === "year" && currentYear?.startDate) return new Date(currentYear.startDate);
+    if (reportPeriod === "term" && currentTerm?.startDate) return new Date(currentTerm.startDate);
+    return null;
+  }, [reportPeriod, currentYear?.startDate, currentTerm?.startDate]);
   const reportEndDate = useMemo(() => {
-    const end = new Date();
-    end.setHours(23, 59, 59, 999);
-    return end;
-  }, [reportPeriod]);
+    if (reportPeriod === "year" && currentYear?.endDate) return new Date(currentYear.endDate);
+    if (reportPeriod === "term" && currentTerm?.endDate) return new Date(currentTerm.endDate);
+    return new Date();
+  }, [reportPeriod, currentYear?.endDate, currentTerm?.endDate]);
   const isInReportPeriod = (value?: string | null) => {
     if (!reportStartDate) return true;
     if (!value) return false;
     const date = new Date(value);
     return !Number.isNaN(date.getTime()) && date >= reportStartDate && date <= reportEndDate;
   };
-  const reportPayments = payments.filter((payment) => isInReportPeriod(payment.paymentDate));
-  const reportSettledPayments = reportPayments.filter((payment) => payment.status === "COMPLETED");
-  const reportCollected = reportSettledPayments.reduce((sum, payment) => sum + Number(payment.amount), 0);
   const reportExpenses = useMemo(
     () => expenses.filter((expense) => isInReportPeriod(expense.date)),
     [expenses, reportStartDate, reportEndDate],
@@ -395,31 +450,15 @@ export function AccountantPortalWorkspace({
   const reportPayrollPaid = reportPayroll.filter((run) => run.status === "PAID");
   const reportPayrollNet = reportPayrollPaid.reduce((sum, run) => sum + Number(run.totalNet), 0);
   const todayStart = new Date();
-  todayStart.setHours(0, 0, 0, 0);
-  const overdueBills = debtors.filter((bill) => {
-    if (!bill.dueDate) return bill.status === "OVERDUE";
-    const dueDate = new Date(bill.dueDate);
-    dueDate.setHours(0, 0, 0, 0);
-    return bill.status === "OVERDUE" || (!Number.isNaN(dueDate.getTime()) && dueDate < todayStart);
-  }).sort((a, b) => {
-    const aDue = a.dueDate ? new Date(a.dueDate).getTime() : 0;
-    const bDue = b.dueDate ? new Date(b.dueDate).getTime() : 0;
-    return aDue - bDue;
-  });
-  const overdueTotal = overdueBills.reduce((sum, bill) => sum + Number(bill.balanceAmount), 0);
-  const billedInPeriod = bills.filter((bill) => isInReportPeriod(bill.issuedAt)).reduce((sum, bill) => sum + Number(bill.totalAmount), 0);
-  const collectionRate = billedInPeriod > 0 ? (reportCollected / billedInPeriod) * 100 : null;
-  const visibleOverdueBills = overdueBills.filter((bill) => {
-    const term = overdueSearch.trim().toLowerCase();
-    const matchesSearch = !term ||
-      bill.billNumber.toLowerCase().includes(term) ||
-      studentName(bill.student).toLowerCase().includes(term) ||
-      (bill.student?.admissionNumber ?? "").toLowerCase().includes(term) ||
-      (bill.class?.name ?? "").toLowerCase().includes(term);
-    return matchesSearch && (overdueClassFilter === "ALL" || bill.class?.id === overdueClassFilter);
-  });
-  const currentYear = (yearsQuery.data ?? []).find((year) => year.isCurrent);
-  const currentTerm = currentYear?.terms.find((term) => term.isCurrent);
+  todayStart.setUTCHours(0, 0, 0, 0);
+  const overdueBills = overdueBillsQuery.data?.items ?? [];
+  const overdueTotal = Number(summaryQuery.data?.overdue ?? 0);
+  const billedInPeriod = Number(summaryQuery.data?.billed ?? 0);
+  const reportCollected = collected;
+  const reportSettledPaymentCount = summaryQuery.data?.receiptCount ?? 0;
+  const collectionRate = summaryQuery.data?.collectionRate == null ? null : Number(summaryQuery.data.collectionRate);
+  const visibleOverdueBills = overdueBills;
+
   const selectedFeeStructure = feeStructures.find((fee) => fee.id === selectedFeeStructureId);
   const billTargetClasses = selectedFeeStructure?.targetClasses.length
     ? classes.filter((schoolClass) => selectedFeeStructure.targetClasses.some((target) => target.class.id === schoolClass.id))
