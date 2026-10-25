@@ -332,6 +332,14 @@ export const schoolNavGroups: SchoolNavGroup[] = [
         apiStatus: "available",
       },
       {
+        id: "student-statements",
+        label: "Student statements",
+        icon: ReceiptText,
+        description: "Review a student's dated account activity, running balance and arrears.",
+        section: "Finance",
+        apiStatus: "available",
+      },
+      {
         id: "finance-reports",
         label: "Finance reports",
         icon: ChartNoAxesCombined,
@@ -496,6 +504,7 @@ const rolePages: Record<string, string[]> = {
     "accountant-portal",
     "concessions",
     "finance-reports",
+    "student-statements",
     "finance-audit",
     "outstanding",
     "admissions",
