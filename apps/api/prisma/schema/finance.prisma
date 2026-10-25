@@ -397,6 +397,12 @@ model PayrollRecord {
   totalNet      Decimal       @db.Decimal(15, 2)
   totalTax      Decimal       @db.Decimal(15, 2)
   totalSSNIT    Decimal       @db.Decimal(15, 2)
+  totalEmployeeSSNIT Decimal @default(0) @db.Decimal(15, 2)
+  totalEmployerSSNIT Decimal @default(0) @db.Decimal(15, 2)
+  totalTier2 Decimal @default(0) @db.Decimal(15, 2)
+  totalTier3 Decimal @default(0) @db.Decimal(15, 2)
+  taxScheduleId String?
+  settingsSnapshot Json?
   processedById String?
   /// Who approved the run; must differ from processedById (separation of duties).
   approvedById  String?
@@ -410,6 +416,7 @@ model PayrollRecord {
   term         Term?         @relation(fields: [termId], references: [id])
   processedBy  user?         @relation("PayrollProcessedBy", fields: [processedById], references: [id], onDelete: SetNull)
   payslips     Payslip[]
+  taxSchedule  PayrollTaxSchedule? @relation(fields: [taxScheduleId], references: [id], onDelete: Restrict)
 
   @@unique([schoolId, month, year])
   @@index([academicYearId])
@@ -439,6 +446,7 @@ model Payslip {
 
   payrollRecord PayrollRecord @relation(fields: [payrollRecordId], references: [id], onDelete: Cascade)
   school        School        @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  lines         PayslipLine[]
   staff         Staff?        @relation(fields: [staffId], references: [id], onDelete: SetNull)
   teacher       Teacher?      @relation(fields: [teacherId], references: [id], onDelete: SetNull)
 
