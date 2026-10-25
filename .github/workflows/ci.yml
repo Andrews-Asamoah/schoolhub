@@ -18,6 +18,8 @@ jobs:
   baseline:
     name: Baseline on PR base
     if: github.event_name == 'pull_request'
+    # Baseline failures are reported per step but do not block the proposed branch.
+    continue-on-error: true
     runs-on: ubuntu-latest
     timeout-minutes: 25
     services:
@@ -50,20 +52,23 @@ jobs:
           node-version: 22
           cache: pnpm
       - name: Install baseline dependencies
+        id: install
         run: pnpm install --frozen-lockfile
       - name: Baseline typecheck
-        continue-on-error: true
+        if: ${{ always() && steps.install.outcome == 'success' }}
         run: pnpm typecheck
       - name: Baseline API lint
-        continue-on-error: true
+        if: ${{ always() && steps.install.outcome == 'success' }}
         run: pnpm --filter @schoolhub/api lint
       - name: Apply baseline migrations
+        id: migrate
+        if: ${{ always() && steps.install.outcome == 'success' }}
         run: pnpm --filter @schoolhub/api exec prisma migrate deploy --config prisma.config.ts
       - name: Baseline API tests (including PostgreSQL integration)
-        continue-on-error: true
+        if: ${{ always() && steps.migrate.outcome == 'success' }}
         run: pnpm --filter @schoolhub/api test
       - name: Baseline web theme lint
-        continue-on-error: true
+        if: ${{ always() && steps.install.outcome == 'success' }}
         run: pnpm --filter @schoolhub/web lint:theme
 
   validate:
