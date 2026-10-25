@@ -201,7 +201,7 @@ export function PayrollManagementWorkspace() {
     ])),
     totals: ["Total", "", "", "", null, null, null, null, null, ""],
     confidential: true,
-    reportInfo: { period: "Selected payroll runs", filters: { search: payrollSearch ?? "" } },
+    reportInfo: { period: "Selected payroll runs" },
   });
 
   return <div className="mx-auto w-full min-w-0 max-w-screen-2xl space-y-6">
