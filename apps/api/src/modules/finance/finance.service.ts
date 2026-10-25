@@ -1406,7 +1406,8 @@ export class FinanceService {
     if (fromDate && toStart && fromDate > toStart) {
       throw new BadRequestException("The start date must be on or before the end date.");
     }
-    const asOf = toStart ?? new Date();
+    const asOfDayBase = toStart ?? new Date();
+    const asOf = new Date(`${asOfDayBase.toISOString().slice(0, 10)}T00:00:00.000Z`);
     const { yearId, termId } = await this.resolveAcademicFilter(schoolId, query.yearId, query.termId);
     const issuedAt: Prisma.DateTimeFilter = {};
     if (fromDate) issuedAt.gte = fromDate;
@@ -1425,49 +1426,89 @@ export class FinanceService {
       ...(yearId ? { academicYearId: yearId } : {}),
       ...(termId ? { termId } : {}),
     };
-    // Outstanding and ageing are a point-in-time school-wide receivables view.
-    // They intentionally include earlier-term bills so arrears do not disappear
-    // when the report period changes.
+    // Outstanding and ageing are point-in-time receivables. Earlier-term debt
+    // remains visible when the report is scoped to a newer academic term.
     const openWhere: Prisma.BillWhereInput = {
       ...activeBillFilter,
       balanceAmount: { gt: new Prisma.Decimal(0) },
       issuedAt: { lte: toDate },
     };
-    const overdueBase: Prisma.BillWhereInput = {
+    const overdueWhere: Prisma.BillWhereInput = {
       ...openWhere,
       dueDate: { lt: asOf },
     };
-    const collectedWhere: Prisma.PaymentWhereInput = {
-      schoolId,
-      status: "COMPLETED",
-      paymentDate,
-    };
+    const collectedWhere: Prisma.PaymentWhereInput = { schoolId, status: "COMPLETED", paymentDate };
 
-    const [billedAgg, collectedAgg, openAgg, overdueAgg, paidMethods, billedClasses, openClasses, classes] = await Promise.all([
+    const [billedAgg, openAgg, overdueAgg, billedClasses, openClasses, classes] = await Promise.all([
       this.prisma.client.bill.aggregate({ where: billedWhere, _sum: { totalAmount: true }, _count: { _all: true } }),
-      this.prisma.client.payment.aggregate({ where: collectedWhere, _sum: { amount: true }, _count: { _all: true } }),
       this.prisma.client.bill.aggregate({ where: openWhere, _sum: { balanceAmount: true }, _count: { _all: true } }),
-      this.prisma.client.bill.aggregate({ where: overdueBase, _sum: { balanceAmount: true }, _count: { _all: true } }),
-      this.prisma.client.payment.groupBy({
-        by: ["paymentMethod"],
-        where: collectedWhere,
-        _sum: { amount: true },
-        _count: { _all: true },
+      this.prisma.client.bill.aggregate({ where: overdueWhere, _sum: { balanceAmount: true }, _count: { _all: true } }),
+      this.prisma.client.bill.groupBy({
+        by: ["classId"], where: billedWhere, _sum: { totalAmount: true }, _count: { _all: true },
       }),
       this.prisma.client.bill.groupBy({
-        by: ["classId"],
-        where: billedWhere,
-        _sum: { totalAmount: true },
-        _count: { _all: true },
-      }),
-      this.prisma.client.bill.groupBy({
-        by: ["classId"],
-        where: openWhere,
-        _sum: { balanceAmount: true },
-        _count: { _all: true },
+        by: ["classId"], where: openWhere, _sum: { balanceAmount: true }, _count: { _all: true },
       }),
       this.prisma.client.class.findMany({ where: { schoolId }, select: { id: true, name: true } }),
     ]);
+
+    let collected = new Prisma.Decimal(0);
+    let receiptCount = 0;
+    let paidMethods: Array<{ paymentMethod: (typeof PAYMENT_METHODS)[number]; amount: Prisma.Decimal; receiptCount: number }> = [];
+    if (yearId || termId) {
+      // A receipt may clear several bills, possibly in different terms. Count
+      // only the portion allocated to the selected academic context.
+      const allocationFilters: Prisma.Sql[] = [
+        Prisma.sql`p."schoolId" = ${schoolId}`,
+        Prisma.sql`b."schoolId" = ${schoolId}`,
+        Prisma.sql`p."status" = 'COMPLETED'`,
+        Prisma.sql`p."paymentDate" <= ${toDate}`,
+      ];
+      if (fromDate) allocationFilters.push(Prisma.sql`p."paymentDate" >= ${fromDate}`);
+      if (yearId) allocationFilters.push(Prisma.sql`b."academicYearId" = ${yearId}`);
+      if (termId) allocationFilters.push(Prisma.sql`b."termId" = ${termId}`);
+      const [totals, methods] = await Promise.all([
+        this.prisma.client.$queryRaw<Array<{ amount: Prisma.Decimal; receiptCount: number }>>(
+          Prisma.sql`
+            SELECT COALESCE(SUM(pba."amount"), 0)::numeric AS "amount",
+                   COUNT(DISTINCT p."id")::int AS "receiptCount"
+            FROM "payment_bill_allocations" pba
+            INNER JOIN "payments" p ON p."id" = pba."paymentId"
+            INNER JOIN "bills" b ON b."id" = pba."billId"
+            WHERE ${Prisma.join(allocationFilters, " AND ")}
+          `,
+        ),
+        this.prisma.client.$queryRaw<Array<{ method: (typeof PAYMENT_METHODS)[number]; amount: Prisma.Decimal; receiptCount: number }>>(
+          Prisma.sql`
+            SELECT p."paymentMethod" AS "method",
+                   COALESCE(SUM(pba."amount"), 0)::numeric AS "amount",
+                   COUNT(DISTINCT p."id")::int AS "receiptCount"
+            FROM "payment_bill_allocations" pba
+            INNER JOIN "payments" p ON p."id" = pba."paymentId"
+            INNER JOIN "bills" b ON b."id" = pba."billId"
+            WHERE ${Prisma.join(allocationFilters, " AND ")}
+            GROUP BY p."paymentMethod"
+          `,
+        ),
+      ]);
+      collected = totals[0]?.amount ?? new Prisma.Decimal(0);
+      receiptCount = totals[0]?.receiptCount ?? 0;
+      paidMethods = methods.map((row) => ({ paymentMethod: row.method, amount: row.amount, receiptCount: row.receiptCount }));
+    } else {
+      const [collectedAgg, methods] = await Promise.all([
+        this.prisma.client.payment.aggregate({ where: collectedWhere, _sum: { amount: true }, _count: { _all: true } }),
+        this.prisma.client.payment.groupBy({
+          by: ["paymentMethod"], where: collectedWhere, _sum: { amount: true }, _count: { _all: true },
+        }),
+      ]);
+      collected = collectedAgg._sum.amount ?? new Prisma.Decimal(0);
+      receiptCount = collectedAgg._count._all;
+      paidMethods = methods.map((row) => ({
+        paymentMethod: row.paymentMethod,
+        amount: row._sum.amount ?? new Prisma.Decimal(0),
+        receiptCount: row._count._all,
+      }));
+    }
 
     const ageingRanges = [
       { key: "days0To30", from: addUtcDays(asOf, -30), to: asOf },
@@ -1479,10 +1520,7 @@ export class FinanceService {
       Promise.all(ageingRanges.map((range) => this.prisma.client.bill.aggregate({
         where: {
           ...openWhere,
-          dueDate: {
-            lt: range.to,
-            ...(range.from ? { gte: range.from } : {}),
-          },
+          dueDate: { lt: range.to, ...(range.from ? { gte: range.from } : {}) },
         },
         _sum: { balanceAmount: true },
       }))),
@@ -1496,18 +1534,17 @@ export class FinanceService {
       Prisma.sql`p."schoolId" = ${schoolId}`,
       Prisma.sql`b."schoolId" = ${schoolId}`,
       Prisma.sql`p."status" = 'COMPLETED'`,
+      Prisma.sql`p."paymentDate" <= ${toDate}`,
     ];
     if (fromDate) classCollectionFilters.push(Prisma.sql`p."paymentDate" >= ${fromDate}`);
-    classCollectionFilters.push(Prisma.sql`p."paymentDate" <= ${toDate}`);
     if (yearId) classCollectionFilters.push(Prisma.sql`b."academicYearId" = ${yearId}`);
     if (termId) classCollectionFilters.push(Prisma.sql`b."termId" = ${termId}`);
     const classCollections = await this.prisma.client.$queryRaw<Array<{ classId: string | null; collected: Prisma.Decimal }>>(
       Prisma.sql`
-        SELECT b."classId" AS "classId", COALESCE(SUM(pi."amount"), 0)::numeric AS "collected"
-        FROM "payment_items" pi
-        INNER JOIN "bill_items" bi ON bi."id" = pi."billItemId"
-        INNER JOIN "bills" b ON b."id" = bi."billId"
-        INNER JOIN "payments" p ON p."id" = pi."paymentId"
+        SELECT b."classId" AS "classId", COALESCE(SUM(pba."amount"), 0)::numeric AS "collected"
+        FROM "payment_bill_allocations" pba
+        INNER JOIN "bills" b ON b."id" = pba."billId"
+        INNER JOIN "payments" p ON p."id" = pba."paymentId"
         WHERE ${Prisma.join(classCollectionFilters, " AND ")}
         GROUP BY b."classId"
       `,
@@ -1555,16 +1592,11 @@ export class FinanceService {
     }
 
     const billed = billedAgg._sum.totalAmount ?? new Prisma.Decimal(0);
-    const collected = collectedAgg._sum.amount ?? new Prisma.Decimal(0);
     const outstanding = openAgg._sum.balanceAmount ?? new Prisma.Decimal(0);
     const overdue = overdueAgg._sum.balanceAmount ?? new Prisma.Decimal(0);
-    const collectionRate = billed.gt(0)
-      ? collected.div(billed).mul(100).toDecimalPlaces(1).toFixed(1)
-      : null;
+    const collectionRate = billed.gt(0) ? collected.div(billed).mul(100).toDecimalPlaces(1).toFixed(1) : null;
     const ageing: Record<string, string> = {};
-    ageingRanges.forEach((range, index) => {
-      ageing[range.key] = moneyString(ageingResults[index]?._sum.balanceAmount);
-    });
+    ageingRanges.forEach((range, index) => { ageing[range.key] = moneyString(ageingResults[index]?._sum.balanceAmount); });
     ageing.notDue = moneyString(notDueAgg._sum.balanceAmount);
 
     return {
@@ -1573,7 +1605,7 @@ export class FinanceService {
       billed: moneyString(billed),
       billedCount: billedAgg._count._all,
       collected: moneyString(collected),
-      receiptCount: collectedAgg._count._all,
+      receiptCount,
       outstanding: moneyString(outstanding),
       outstandingBillCount: openAgg._count._all,
       overdue: moneyString(overdue),
@@ -1581,8 +1613,8 @@ export class FinanceService {
       collectionRate,
       byMethod: paidMethods.map((row) => ({
         method: row.paymentMethod,
-        amount: moneyString(row._sum.amount),
-        receiptCount: row._count._all,
+        amount: moneyString(row.amount),
+        receiptCount: row.receiptCount,
       })),
       byClass: [...classTotals.values()]
         .sort((a, b) => b.billed.comparedTo(a.billed))
