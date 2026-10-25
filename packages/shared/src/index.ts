@@ -672,6 +672,8 @@ export interface FinanceSummaryResponse {
   collected: number;
   outstanding: number;
   overdue: number;
+  openBillCount: number;
+  overdueBillCount: number;
   byPaymentMethod: { method: string; amount: number; count: number }[];
   byClass: { classId: string | null; className: string; billed: number; outstanding: number; collected: number; billCount: number }[];
   ageing: { bucket: "0-30" | "31-60" | "61-90" | "90+"; amount: number; count: number }[];
