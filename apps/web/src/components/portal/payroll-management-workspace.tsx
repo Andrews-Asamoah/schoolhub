@@ -79,8 +79,8 @@ export function PayrollManagementWorkspace() {
   const canExportPayroll = useCanExportPayrollTables();
   const queryClient = useQueryClient();
   const [showGenerate, setShowGenerate] = useState(false);
-  const [month, setMonth] = useState(String(Math.max(9, Math.min(12, new Date().getMonth() + 1))));
-  const [taxConfirmed, setTaxConfirmed] = useState(false);
+  const [month, setMonth] = useState(String(new Date().getMonth() + 1));
+  const [year, setYear] = useState(String(new Date().getFullYear()));
   const [transitionTarget, setTransitionTarget] = useState<TransitionTarget | null>(null);
   const [paidConfirmation, setPaidConfirmation] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("BANK_TRANSFER");
@@ -90,6 +90,7 @@ export function PayrollManagementWorkspace() {
   const [salarySearch, setSalarySearch] = useState("");
   const [salaryTarget, setSalaryTarget] = useState<SalaryPerson | null>(null);
   const [salaryDraft, setSalaryDraft] = useState("");
+  const [salaryReason, setSalaryReason] = useState("");
   const [feedback, setFeedback] = useState<{ kind: "success" | "error"; text: string } | null>(null);
 
   const salaryRegisterQuery = useQuery({
@@ -122,26 +123,26 @@ export function PayrollManagementWorkspace() {
   const paidNetTotal = payroll.filter(record => record.status === "PAID").reduce((sum, record) => sum + Number(record.totalNet), 0);
 
   const generatePayroll = useMutation({
-    mutationFn: (payload: { month: number; year: 2026; confirmResidentTaxTreatment: true }) =>
+    mutationFn: (payload: { month: number; year: number }) =>
       apiFetch<GenerateResponse>("/finance/payroll", { method: "POST", body: JSON.stringify(payload) }),
     onSuccess: async (result) => {
       setFeedback({ kind: "success", text: `Draft created for ${result.includedCount} employees. ${result.excludedCount} active employee(s) without a positive monthly salary were excluded.` });
       setShowGenerate(false);
-      setTaxConfirmed(false);
       await queryClient.invalidateQueries({ queryKey: ["finance", "payroll"] });
     },
     onError: (error: Error) => setFeedback({ kind: "error", text: error.message }),
   });
   const updateSalary = useMutation({
-    mutationFn: ({ person, monthlySalary }: { person: SalaryPerson; monthlySalary: number }) =>
-      apiFetch<{ id: string; type: string; monthlySalary: number }>(
+    mutationFn: ({ person, monthlySalary, reason }: { person: SalaryPerson; monthlySalary: string; reason: string }) =>
+      apiFetch<{ id: string; type: string; monthlySalary: string }>(
         `/finance/payroll/salaries/${person.type}/${encodeURIComponent(person.id)}`,
-        { method: "PATCH", body: JSON.stringify({ monthlySalary }) },
+        { method: "PATCH", body: JSON.stringify({ monthlySalary, reason }) },
       ),
     onSuccess: async (_result, variables) => {
       setFeedback({ kind: "success", text: `Monthly salary updated for ${variables.person.name}. New payroll drafts will use this value.` });
       setSalaryTarget(null);
       setSalaryDraft("");
+      setSalaryReason("");
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["finance", "payroll-salaries"] }),
         queryClient.invalidateQueries({ queryKey: ["finance", "payroll"] }),
@@ -168,12 +169,15 @@ export function PayrollManagementWorkspace() {
   function submitSalary(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!salaryTarget) return;
-    const amount = Number(salaryDraft);
-    if (salaryDraft.trim() === "" || !Number.isFinite(amount) || amount < 0 || amount > 10000000) {
-      setFeedback({ kind: "error", text: "Enter a valid non-negative monthly salary in GHS." });
+    if (!/^(?:0|[1-9]\\d{0,7})(?:\\.\\d{1,2})?$/.test(salaryDraft.trim()) || salaryDraft.trim().length > 11) {
+      setFeedback({ kind: "error", text: "Enter a non-negative monthly salary with no more than two decimal places." });
       return;
     }
-    updateSalary.mutate({ person: salaryTarget, monthlySalary: Math.round((amount + Number.EPSILON) * 100) / 100 });
+    if (salaryReason.trim().length < 10) {
+      setFeedback({ kind: "error", text: "Explain why the salary is changing (at least 10 characters)." });
+      return;
+    }
+    updateSalary.mutate({ person: salaryTarget, monthlySalary: salaryDraft.trim(), reason: salaryReason.trim() });
   }
   const buildSalaryRegisterExport = (): ExportTable => ({
     title: "Salary register",
@@ -187,11 +191,13 @@ export function PayrollManagementWorkspace() {
 
   function submitGenerate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!taxConfirmed) {
-      setFeedback({ kind: "error", text: "Confirm the tax treatment before generating a payroll draft." });
+    const monthValue = Number(month);
+    const yearValue = Number(year);
+    if (!Number.isInteger(monthValue) || monthValue < 1 || monthValue > 12 || !Number.isInteger(yearValue) || yearValue < 2000 || yearValue > 2100) {
+      setFeedback({ kind: "error", text: "Enter a valid payroll month and year." });
       return;
     }
-    generatePayroll.mutate({ month: Number(month), year: 2026, confirmResidentTaxTreatment: true });
+    generatePayroll.mutate({ month: monthValue, year: yearValue });
   }
   const buildPayrollRegisterExport = (): ExportTable => ({
     title: "Payroll register",
@@ -252,18 +258,18 @@ export function PayrollManagementWorkspace() {
     {salaryTarget && <Modal title="Update monthly salary" description={`${salaryTarget.name} · ${salaryTarget.type === "TEACHER" ? "Teacher" : "Staff"}`} onClose={() => !updateSalary.isPending && setSalaryTarget(null)}>
       <form className="space-y-4" onSubmit={submitSalary}>
         <div className="rounded-xl bg-muted/40 p-3 text-sm text-muted-foreground">This value is used for future payroll drafts only. Saved or approved payroll runs will not be recalculated.</div>
-        <Field label="Monthly base salary (GHS)"><input type="number" min="0" max="10000000" step="0.01" required className={fieldClass} value={salaryDraft} onChange={event => setSalaryDraft(event.target.value)} placeholder="0.00" /></Field>
+        <Field label="Monthly base salary (GHS)"><input type="text" inputMode="decimal" required className={fieldClass} value={salaryDraft} onChange={event => setSalaryDraft(event.target.value)} placeholder="0.00" /></Field>
+        <Field label="Reason for salary change"><textarea required minLength={10} maxLength={500} className={cn(fieldClass, "min-h-24 py-2")} value={salaryReason} onChange={event => setSalaryReason(event.target.value)} placeholder="Explain the approved salary change" /></Field>
         {updateSalary.error && <ErrorState message={updateSalary.error.message} />}
         <div className="flex justify-end gap-2 border-t border-border pt-4"><button type="button" className={secondaryButton} onClick={() => setSalaryTarget(null)} disabled={updateSalary.isPending}>Cancel</button><button type="submit" className={primaryButton} disabled={updateSalary.isPending}>{updateSalary.isPending && <LoaderCircle className="size-4 animate-spin" />}Save salary</button></div>
       </form>
     </Modal>}
     {showGenerate && <Modal title="Generate payroll draft" description="Build a draft payroll from the school's active staff and teacher monthly salary values." onClose={() => !generatePayroll.isPending && setShowGenerate(false)}>
       <form onSubmit={submitGenerate} className="space-y-4">
-        <div className="grid gap-4 sm:grid-cols-2"><Field label="Payroll month"><Select value={month} onValueChange={setMonth}><SelectTrigger className="w-full"><SelectValue /></SelectTrigger><SelectContent>{[9,10,11,12].map(value => <SelectItem key={value} value={String(value)}>{new Date(Date.UTC(2026,value-1,1)).toLocaleDateString("en-GB",{month:"long",timeZone:"UTC"})}</SelectItem>)}</SelectContent></Select></Field><Field label="Year"><input disabled value="2026" className={cn(fieldClass,"opacity-70")} /></Field></div>
-        <div className="rounded-xl border border-warning/30 bg-warning/5 p-4"><div className="flex gap-2"><AlertCircle className="mt-0.5 size-4 shrink-0 text-muted-foreground" /><div><p className="text-sm font-semibold text-foreground">Payroll calculation assumptions</p><p className="mt-1 text-xs leading-5 text-muted-foreground">Uses GRA resident PAYE monthly bands effective 1 September 2026. It calculates from each person's stored monthly salary only; allowances, overtime, non-resident tax treatment and other deductions are not stored in this version. Employees without a positive salary are excluded. Review each draft before approving.</p></div></div></div>
-        <label className="flex items-start gap-3 rounded-xl border border-border p-3 text-sm"><input type="checkbox" className="mt-1 size-4 accent-primary" checked={taxConfirmed} onChange={event => setTaxConfirmed(event.target.checked)} /><span className="leading-5 text-foreground">I have verified employee salary inputs and confirm the resident PAYE schedule is appropriate for every employee included in this draft.</span></label>
+        <div className="grid gap-4 sm:grid-cols-2"><Field label="Payroll month"><Select value={month} onValueChange={setMonth}><SelectTrigger className="w-full"><SelectValue /></SelectTrigger><SelectContent>{Array.from({ length: 12 }, (_, index) => index + 1).map(value => <SelectItem key={value} value={String(value)}>{new Date(Date.UTC(Number(year) || new Date().getFullYear(),value-1,1)).toLocaleDateString("en-GB",{month:"long",timeZone:"UTC"})}</SelectItem>)}</SelectContent></Select></Field><Field label="Year"><input type="number" min="2000" max="2100" required value={year} onChange={event => setYear(event.target.value)} className={fieldClass} /></Field></div>
+        <div className="rounded-xl border border-warning/30 bg-warning/5 p-4"><div className="flex gap-2"><AlertCircle className="mt-0.5 size-4 shrink-0 text-muted-foreground" /><div><p className="text-sm font-semibold text-foreground">Verified settings required</p><p className="mt-1 text-xs leading-5 text-muted-foreground">Payroll uses the approved PAYE schedule and contribution schemes effective for the selected month. The server blocks generation if a verified schedule or required SSNIT scheme is unavailable. Employees without a positive salary are excluded.</p></div></div></div>
         {generatePayroll.error && <ErrorState message={generatePayroll.error.message} />}
-        <div className="flex justify-end gap-2 border-t border-border pt-4"><button type="button" className={secondaryButton} onClick={() => setShowGenerate(false)} disabled={generatePayroll.isPending}>Cancel</button><button type="submit" className={primaryButton} disabled={generatePayroll.isPending || !taxConfirmed}>{generatePayroll.isPending && <LoaderCircle className="size-4 animate-spin" />} Generate draft</button></div>
+        <div className="flex justify-end gap-2 border-t border-border pt-4"><button type="button" className={secondaryButton} onClick={() => setShowGenerate(false)} disabled={generatePayroll.isPending}>Cancel</button><button type="submit" className={primaryButton} disabled={generatePayroll.isPending}>{generatePayroll.isPending && <LoaderCircle className="size-4 animate-spin" />} Generate draft</button></div>
       </form>
     </Modal>}
 
