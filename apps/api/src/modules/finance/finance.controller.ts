@@ -434,7 +434,7 @@ export class FinanceController {
     @Param("personId") personId: string,
     @Body(new ZodValidationPipe(updatePayrollSalarySchema)) body: UpdatePayrollSalaryInput,
   ) {
-    return this.financeService.updatePayrollSalary(school.id, kind, personId, body.monthlySalary, user.id);
+    return this.financeService.updatePayrollSalary(school.id, kind, personId, body.monthlySalary, user.id, body.reason);
   }
 
   @Post("payroll")
