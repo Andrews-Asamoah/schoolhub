@@ -3220,7 +3220,6 @@ export class FinanceService {
       });
       await this.writeAudit(tx, {
         actorId: processedById, schoolId, action: "CREATE", entityType: "PAYROLL_RECORD", entityId: created.id,
-        oldValues: null,
         newValues: {
           month: input.month, year: input.year, status: "DRAFT", totalGross: totalGross.toFixed(2),
           totalNet: totalNet.toFixed(2), totalTax: totalTax.toFixed(2), totalEmployeeSSNIT: totalEmployeeSSNIT.toFixed(2),
