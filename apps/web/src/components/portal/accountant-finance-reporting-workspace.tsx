@@ -1,1037 +1,175 @@
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import ExcelJS from "exceljs";
+import { jsPDF } from "jspdf";
+import autoTable from "jspdf-autotable";
+import { FileSpreadsheet, FileText, LoaderCircle, Printer } from "lucide-react";
+import { apiFetch } from "@/lib/api";
+import { cn } from "@/lib/utils";
 
-import { useCallback, useMemo, useState } from "react";
-import { Download, Printer, Search, Users, WalletCards } from "lucide-react";
-
-interface Student {
-  id: string;
-  admissionNumber: string;
-  profile?: { firstName?: string | null; lastName?: string | null } | null;
+interface AcademicTerm { id: string; name: string; isCurrent: boolean; }
+interface AcademicYear { id: string; name: string; isCurrent: boolean; terms: AcademicTerm[]; }
+interface FinanceSummary {
+  asOf: string;
+  period: { from: string | null; to: string | null; yearId: string | null; termId: string | null };
+  billed: string;
+  billedCount: number;
+  collected: string;
+  receiptCount: number;
+  outstanding: string;
+  outstandingBillCount: number;
+  overdue: string;
+  overdueBillCount: number;
+  collectionRate: string | null;
+  byMethod: { method: string; amount: string; receiptCount: number }[];
+  byClass: { classId: string | null; className: string; billed: string; collected: string; outstanding: string; billCount: number }[];
+  ageing: { days0To30: string; days31To60: string; days61To90: string; days90Plus: string; notDue: string };
 }
+const money = (value: string | number) => new Intl.NumberFormat("en-GH", { style: "currency", currency: "GHS", maximumFractionDigits: 2 }).format(Number(value) || 0);
+const inputClass = "h-10 w-full rounded-xl border border-border bg-background px-3 text-sm text-foreground outline-none focus:ring-2 focus:ring-ring/30";
+const secondaryButton = "inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-border bg-card px-4 py-2 text-sm font-semibold text-foreground transition hover:bg-muted disabled:opacity-50";
 
-interface FinanceBill {
-  id: string;
-  billNumber: string;
-  studentId: string;
-  student: Student;
-  class?: { id: string; name: string } | null;
-  totalAmount: number | string;
-  paidAmount: number | string;
-  balanceAmount: number | string;
-  status: string;
-  issuedAt: string;
-  dueDate?: string | null;
-}
-
-interface FinancePayment {
-  id: string;
-  paymentNumber: string;
-  studentId: string;
-  student: Student;
-  bill?: { id: string; billNumber: string } | null;
-  amount: number | string;
-  paymentMethod: string;
-  paymentDate: string;
-  status: string;
-  referenceNumber?: string | null;
-}
-
-interface FinanceClass {
-  id: string;
-  name: string;
-}
-
-interface Props {
-  bills: FinanceBill[];
-  payments: FinancePayment[];
-  classes: FinanceClass[];
-}
-
-const money = (value: number) =>
-  new Intl.NumberFormat("en-GH", {
-    style: "currency",
-    currency: "GHS",
-    maximumFractionDigits: 2,
-  }).format(Number.isFinite(value) ? value : 0);
-
-const amount = (value: number | string) => {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : 0;
-};
-
-const settled = (status: string) => status.toUpperCase() === "COMPLETED";
-
-const dateText = (value?: string | null) => {
-  if (!value) return "—";
-
-  const date = new Date(value);
-
-  return Number.isNaN(date.getTime())
-    ? "—"
-    : new Intl.DateTimeFormat("en-GB", { dateStyle: "medium" }).format(date);
-};
-
-const studentLabel = (student: Student) =>
-  [student.profile?.firstName, student.profile?.lastName]
-    .filter(Boolean)
-    .join(" ")
-    .trim() ||
-  student.admissionNumber ||
-  "Unknown student";
-
-const inputClass =
-  "h-10 w-full rounded-xl border border-border bg-background px-3 text-sm text-foreground outline-none focus:ring-2 focus:ring-ring/30";
-
-const secondaryButton =
-  "inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-border bg-card px-4 py-2 text-sm font-semibold text-foreground transition hover:bg-muted";
-
-const primaryButton =
-  "inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:opacity-90";
-
-function exportCsv(rows: unknown[][], filename: string) {
-  const escapeCell = (value: unknown) => {
-    let text = String(value ?? "");
-
-    // Protect spreadsheet exports from formula injection.
-    if (/^[\s]*[=+\-@\t\r]/.test(text)) {
-      text = "'" + text;
-    }
-
-    return '"' + text.replaceAll('"', '""') + '"';
-  };
-
-  const csv = rows
-    .map((row) => row.map(escapeCell).join(","))
-    .join("\r\n");
-
-  const blob = new Blob(["\uFEFF", csv], {
-    type: "text/csv;charset=utf-8;",
+export function AccountantFinanceReportingWorkspace() {
+  const [yearId, setYearId] = useState("");
+  const [termId, setTermId] = useState("");
+  const [scope, setScope] = useState<"term" | "year" | "all">("term");
+  const yearsQuery = useQuery({
+    queryKey: ["schools", "academic-years"],
+    queryFn: () => apiFetch<AcademicYear[]>("/schools/academic-years"),
+    retry: false,
   });
-
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-
-  link.href = url;
-  link.download = filename;
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-
-  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
-}
-
-function localDate(date: Date) {
-  return [
-    date.getFullYear(),
-    String(date.getMonth() + 1).padStart(2, "0"),
-    String(date.getDate()).padStart(2, "0"),
-  ].join("-");
-}
-
-function defaultStart() {
-  const date = new Date();
-  date.setDate(1);
-  return localDate(date);
-}
-
-export function AccountantFinanceReportingWorkspace({
-  bills,
-  payments,
-  classes,
-}: Props) {
-  const [reportType, setReportType] = useState<"class" | "student">("class");
-  const [classId, setClassId] = useState("ALL");
-  const [studentId, setStudentId] = useState("");
-  const [from, setFrom] = useState(defaultStart);
-  const [to, setTo] = useState(() => localDate(new Date()));
-  const [search, setSearch] = useState("");
-
-  const students = useMemo(() => {
-    const byId = new Map<string, Student>();
-
-    for (const bill of bills) {
-      byId.set(bill.studentId, bill.student);
-    }
-
-    for (const payment of payments) {
-      byId.set(payment.studentId, payment.student);
-    }
-
-    return [...byId.values()].sort((a, b) =>
-      studentLabel(a).localeCompare(studentLabel(b)),
-    );
-  }, [bills, payments]);
-
-  const billsById = useMemo(
-    () => new Map(bills.map((bill) => [bill.id, bill])),
-    [bills],
-  );
-
-  const range = useMemo(() => {
-    const start = from ? new Date(from + "T00:00:00") : null;
-    const end = to ? new Date(to + "T23:59:59.999") : null;
-
-    const validDates =
-      (!start || !Number.isNaN(start.getTime())) &&
-      (!end || !Number.isNaN(end.getTime()));
-
-    return {
-      start,
-      end,
-      valid:
-        validDates &&
-        (!start || !end || start.getTime() <= end.getTime()),
-    };
-  }, [from, to]);
-
-  const inRange = useCallback(
-    (value: string) => {
-      const date = new Date(value);
-
-      return (
-        !Number.isNaN(date.getTime()) &&
-        (!range.start || date >= range.start) &&
-        (!range.end || date <= range.end)
-      );
+  const years = yearsQuery.data ?? [];
+  const currentYear = years.find((year) => year.isCurrent) ?? years[0];
+  const selectedYearId = yearId || currentYear?.id || "";
+  const selectedYear = years.find((year) => year.id === selectedYearId);
+  const selectedTermId = termId || selectedYear?.terms.find((term) => term.isCurrent)?.id || selectedYear?.terms[0]?.id || "";
+  const summaryQuery = useQuery({
+    queryKey: ["finance", "report-summary", scope, selectedYearId, selectedTermId],
+    queryFn: () => {
+      const params = new URLSearchParams();
+      if (scope !== "all" && selectedYearId) params.set("yearId", selectedYearId);
+      if (scope === "term" && selectedTermId) params.set("termId", selectedTermId);
+      return apiFetch<FinanceSummary>(`/finance/summary${params.size ? `?${params.toString()}` : ""}`);
     },
-    [range.start, range.end],
-  );
-
-  const scopedBills = useMemo(
-    () =>
-      bills.filter((bill) => {
-        if (
-          reportType === "student" &&
-          (!studentId || bill.studentId !== studentId)
-        ) {
-          return false;
-        }
-
-        if (
-          reportType === "class" &&
-          classId !== "ALL" &&
-          bill.class?.id !== classId
-        ) {
-          return false;
-        }
-
-        return inRange(bill.issuedAt);
-      }),
-    [bills, reportType, studentId, classId, inRange],
-  );
-
-  const scopedPayments = useMemo(
-    () =>
-      payments.filter((payment) => {
-        if (
-          reportType === "student" &&
-          (!studentId || payment.studentId !== studentId)
-        ) {
-          return false;
-        }
-
-        if (reportType === "class" && classId !== "ALL") {
-          const linkedBill = payment.bill?.id
-            ? billsById.get(payment.bill.id)
-            : undefined;
-
-          if (linkedBill?.class?.id !== classId) {
-            return false;
-          }
-        }
-
-        return inRange(payment.paymentDate);
-      }),
-    [
-      payments,
-      billsById,
-      reportType,
-      studentId,
-      classId,
-      inRange,
-    ],
-  );
-
-  const query = search.trim().toLowerCase();
-
-  const visibleBills = scopedBills.filter((bill) => {
-    const billNumber = (bill.billNumber ?? "").toLowerCase();
-    const admissionNumber = (
-      bill.student?.admissionNumber ?? ""
-    ).toLowerCase();
-
-    return (
-      !query ||
-      billNumber.includes(query) ||
-      studentLabel(bill.student).toLowerCase().includes(query) ||
-      admissionNumber.includes(query)
-    );
+    retry: false,
   });
+  const summary = summaryQuery.data;
 
-  const visiblePayments = scopedPayments.filter((payment) => {
-    const paymentNumber = (payment.paymentNumber ?? "").toLowerCase();
-    const referenceNumber = (
-      payment.referenceNumber ?? ""
-    ).toLowerCase();
-
-    return (
-      !query ||
-      paymentNumber.includes(query) ||
-      studentLabel(payment.student).toLowerCase().includes(query) ||
-      referenceNumber.includes(query)
-    );
-  });
-
-  const completedPayments = visiblePayments.filter((payment) =>
-    settled(payment.status),
-  );
-
-  const collected = completedPayments.reduce(
-    (sum, payment) => sum + amount(payment.amount),
-    0,
-  );
-
-  const billed = visibleBills
-    .filter(
-      (bill) =>
-        bill.status !== "CANCELLED" && bill.status !== "WAIVED",
-    )
-    .reduce((sum, bill) => sum + amount(bill.totalAmount), 0);
-
-  // Outstanding is the current balance across all dates, not just the
-  // selected reporting period or search-filtered rows.
-  const outstanding =
-    reportType === "student"
-      ? studentId
-        ? bills
-            .filter(
-              (bill) =>
-                bill.studentId === studentId &&
-                bill.status !== "CANCELLED" &&
-                bill.status !== "WAIVED",
-            )
-            .reduce(
-              (sum, bill) =>
-                sum + Math.max(0, amount(bill.balanceAmount)),
-              0,
-            )
-        : 0
-      : bills
-          .filter(
-            (bill) =>
-              (classId === "ALL" || bill.class?.id === classId) &&
-              bill.status !== "CANCELLED" &&
-              bill.status !== "WAIVED",
-          )
-          .reduce(
-            (sum, bill) =>
-              sum + Math.max(0, amount(bill.balanceAmount)),
-            0,
-          );
-
-  const classSummary = useMemo(() => {
-    const totals = new Map<
-      string,
-      {
-        name: string;
-        collected: number;
-        receipts: number;
-        billed: number;
-        outstanding: number;
-      }
-    >();
-
-    for (const bill of visibleBills) {
-      const key = bill.class?.id ?? "no-class";
-
-      const entry = totals.get(key) ?? {
-        name: bill.class?.name ?? "Class not recorded",
-        collected: 0,
-        receipts: 0,
-        billed: 0,
-        outstanding: 0,
-      };
-
-      if (
-        bill.status !== "CANCELLED" &&
-        bill.status !== "WAIVED"
-      ) {
-        entry.billed += amount(bill.totalAmount);
-        entry.outstanding += Math.max(0, amount(bill.balanceAmount));
-      }
-
-      totals.set(key, entry);
-    }
-
-    for (const payment of completedPayments) {
-      const bill = payment.bill?.id
-        ? billsById.get(payment.bill.id)
-        : undefined;
-
-      const key = bill?.class?.id
-        ?? (payment.bill ? "no-class" : "unallocated");
-
-      const name = bill?.class?.name
-        ?? (payment.bill ? "Class not recorded" : "Unallocated receipts");
-
-      const entry = totals.get(key) ?? {
-        name,
-        collected: 0,
-        receipts: 0,
-        billed: 0,
-        outstanding: 0,
-      };
-
-      entry.collected += amount(payment.amount);
-      entry.receipts += 1;
-      totals.set(key, entry);
-    }
-
-    return [...totals.values()].sort(
-      (a, b) => b.collected - a.collected,
-    );
-  }, [billsById, visibleBills, completedPayments]);
-
-  const periodCollected = scopedPayments
-    .filter((payment) => settled(payment.status))
-    .reduce((sum, payment) => sum + amount(payment.amount), 0);
-
-  const previousPeriodCollected = useMemo(() => {
-    if (
-      !range.start ||
-      !range.end ||
-      !range.valid
-    ) {
-      return null;
-    }
-
-    const duration =
-      range.end.getTime() - range.start.getTime() + 1;
-
-    const previousStart = range.start.getTime() - duration;
-    const previousEnd = range.start.getTime() - 1;
-
-    return payments
-      .filter((payment) => {
-        if (!settled(payment.status)) {
-          return false;
-        }
-
-        if (
-          reportType === "student" &&
-          (!studentId || payment.studentId !== studentId)
-        ) {
-          return false;
-        }
-
-        if (reportType === "class" && classId !== "ALL") {
-          const linkedBill = payment.bill?.id
-            ? billsById.get(payment.bill.id)
-            : undefined;
-
-          if (linkedBill?.class?.id !== classId) {
-            return false;
-          }
-        }
-
-        const timestamp = new Date(payment.paymentDate).getTime();
-
-        return (
-          !Number.isNaN(timestamp) &&
-          timestamp >= previousStart &&
-          timestamp <= previousEnd
-        );
-      })
-      .reduce((sum, payment) => sum + amount(payment.amount), 0);
-  }, [
-    payments,
-    billsById,
-    reportType,
-    studentId,
-    classId,
-    range.start,
-    range.end,
-    range.valid,
-  ]);
-
-  const comparisonDelta =
-    previousPeriodCollected === null
-      ? null
-      : periodCollected - previousPeriodCollected;
-
-  const comparisonPercent =
-    previousPeriodCollected === null ||
-    previousPeriodCollected === 0
-      ? null
-      : ((comparisonDelta ?? 0) / previousPeriodCollected) * 100;
-
-  const selectedStudent = students.find(
-    (student) => student.id === studentId,
-  );
-
-  const invalidRange = !range.valid;
-
-  const exportReport = () => {
-    if (invalidRange) return;
-
-    if (reportType === "student" && selectedStudent) {
-      exportCsv(
-        [
-          ["SchoolHub student account statement"],
-          ["Student", studentLabel(selectedStudent)],
-          ["Admission number", selectedStudent.admissionNumber],
-          ["Reporting period", from + " to " + to],
-          [],
-          ["BILLS"],
-          [
-            "Bill number",
-            "Issued",
-            "Due date",
-            "Class",
-            "Billed (GHS)",
-            "Paid (GHS)",
-            "Balance (GHS)",
-            "Status",
-          ],
-          ...visibleBills.map((bill) => [
-            bill.billNumber,
-            dateText(bill.issuedAt),
-            dateText(bill.dueDate),
-            bill.class?.name ?? "",
-            amount(bill.totalAmount).toFixed(2),
-            amount(bill.paidAmount).toFixed(2),
-            amount(bill.balanceAmount).toFixed(2),
-            bill.status,
-          ]),
-          [],
-          ["PAYMENTS"],
-          [
-            "Receipt",
-            "Date",
-            "Bill",
-            "Method",
-            "Reference",
-            "Amount (GHS)",
-            "Status",
-          ],
-          ...visiblePayments.map((payment) => [
-            payment.paymentNumber,
-            dateText(payment.paymentDate),
-            payment.bill?.billNumber ?? "Unallocated",
-            payment.paymentMethod,
-            payment.referenceNumber ?? "",
-            amount(payment.amount).toFixed(2),
-            payment.status,
-          ]),
-          [],
-          [
-            "Current outstanding balance (all open bills, regardless of date)",
-            outstanding.toFixed(2),
-          ],
-        ],
-        "schoolhub-student-statement-" +
-          selectedStudent.admissionNumber +
-          ".csv",
-      );
-
-      return;
-    }
-
-    exportCsv(
-      [
-        ["SchoolHub class collection report"],
-        ["Reporting period", from + " to " + to],
-        [],
-        [
-          "Class",
-          "Billed in period (GHS)",
-          "Collected in period (GHS)",
-          "Outstanding on period bills (GHS)",
-          "Completed receipts",
-        ],
-        ...classSummary.map((item) => [
-          item.name,
-          item.billed.toFixed(2),
-          item.collected.toFixed(2),
-          item.outstanding.toFixed(2),
-          item.receipts,
-        ]),
+  const exportPdf = () => {
+    if (!summary) return;
+    const pdf = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+    pdf.setFontSize(16);
+    pdf.text("School finance report", 14, 16);
+    pdf.setFontSize(9);
+    pdf.text(`Scope: ${scope === "all" ? "All available academic years" : `${selectedYear?.name ?? "Academic year"}${scope === "term" ? ` · ${selectedYear?.terms.find((term) => term.id === selectedTermId)?.name ?? "Term"}` : ""}`}`, 14, 23);
+    pdf.text(`As of ${summary.asOf}`, 14, 29);
+    autoTable(pdf, {
+      startY: 35,
+      head: [["Measure", "Amount / rate", "Count"]],
+      body: [
+        ["Billed", summary.billed, String(summary.billedCount)],
+        ["Collected", summary.collected, String(summary.receiptCount)],
+        ["Outstanding", summary.outstanding, String(summary.outstandingBillCount)],
+        ["Overdue", summary.overdue, String(summary.overdueBillCount)],
+        ["Collection rate", summary.collectionRate == null ? "Not available" : `${summary.collectionRate}%`, ""],
       ],
-      "schoolhub-class-collections.csv",
-    );
+      styles: { fontSize: 9 },
+    });
+    autoTable(pdf, {
+      startY: (pdf as jsPDF & { lastAutoTable?: { finalY?: number } }).lastAutoTable?.finalY
+        ? ((pdf as jsPDF & { lastAutoTable?: { finalY?: number } }).lastAutoTable?.finalY ?? 35) + 7
+        : 70,
+      head: [["Class", "Billed", "Collected", "Outstanding", "Bills"]],
+      body: summary.byClass.map((row) => [row.className, row.billed, row.collected, row.outstanding, String(row.billCount)]),
+      styles: { fontSize: 8 },
+      didDrawPage: () => {
+        pdf.setFontSize(8);
+        pdf.text("Confidential · SchoolHub", 14, 200);
+        pdf.text(`Page ${pdf.getNumberOfPages()}`, 280, 200, { align: "right" });
+      },
+    });
+    pdf.save("school-finance-report.pdf");
   };
 
-  return (
-    <section className="space-y-5 rounded-2xl border border-border bg-card p-5 sm:p-6">
-      <style>{`@media print {
-        body * { visibility: hidden !important; }
-        .finance-report-print, .finance-report-print * { visibility: visible !important; }
-        .finance-report-print { position: absolute !important; inset: 0 auto auto 0 !important; width: 100% !important; margin: 0 !important; padding: 16px !important; border: 0 !important; box-shadow: none !important; background: white !important; color: black !important; }
-        .finance-report-print-actions { display: none !important; }
-        .finance-report-print table { width: 100% !important; font-size: 10px !important; }
-        .finance-report-print th, .finance-report-print td { color: black !important; border-color: #ccc !important; }
-        @page { size: A4 landscape; margin: 10mm; }
-      }`}</style>
+  const exportExcel = async () => {
+    if (!summary) return;
+    const workbook = new ExcelJS.Workbook();
+    workbook.creator = "SchoolHub";
+    workbook.created = new Date();
+    const info = workbook.addWorksheet("Report info");
+    info.addRows([
+      ["Report", "School finance summary"],
+      ["Scope", scope],
+      ["Academic year", selectedYear?.name ?? "All academic years"],
+      ["Term", scope === "term" ? selectedYear?.terms.find((term) => term.id === selectedTermId)?.name ?? "—" : "—"],
+      ["As of", summary.asOf],
+      ["Billed (GHS)", Number(summary.billed)],
+      ["Collected (GHS)", Number(summary.collected)],
+      ["Outstanding (GHS)", Number(summary.outstanding)],
+      ["Overdue (GHS)", Number(summary.overdue)],
+      ["Collection rate (%)", summary.collectionRate == null ? "—" : Number(summary.collectionRate)],
+      ["Generated at", new Date().toISOString()],
+    ]);
+    info.getColumn(1).width = 24;
+    info.getColumn(2).width = 38;
+    [6,7,8,9].forEach((row) => { info.getCell(row,2).numFmt = "#,##0.00"; });
+    const classes = workbook.addWorksheet("By class", { views: [{ state: "frozen", ySplit: 1 }] });
+    classes.columns = [
+      { header: "Class", key: "className", width: 28 },
+      { header: "Billed (GHS)", key: "billed", width: 18, style: { numFmt: "#,##0.00" } },
+      { header: "Collected (GHS)", key: "collected", width: 18, style: { numFmt: "#,##0.00" } },
+      { header: "Outstanding (GHS)", key: "outstanding", width: 20, style: { numFmt: "#,##0.00" } },
+      { header: "Bill count", key: "billCount", width: 14 },
+    ];
+    summary.byClass.forEach((row) => classes.addRow({ className: row.className, billed: Number(row.billed), collected: Number(row.collected), outstanding: Number(row.outstanding), billCount: row.billCount }));
+    classes.getRow(1).font = { bold: true };
+    const methods = workbook.addWorksheet("By method");
+    methods.columns = [
+      { header: "Payment method", key: "method", width: 24 },
+      { header: "Collected (GHS)", key: "amount", width: 20, style: { numFmt: "#,##0.00" } },
+      { header: "Receipt count", key: "receiptCount", width: 16 },
+    ];
+    summary.byMethod.forEach((row) => methods.addRow({ method: row.method, amount: Number(row.amount), receiptCount: row.receiptCount }));
+    methods.getRow(1).font = { bold: true };
+    const bytes = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([bytes], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url; link.download = "school-finance-report.xlsx";
+    document.body.appendChild(link); link.click(); link.remove(); URL.revokeObjectURL(url);
+  };
 
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="rounded-xl bg-muted p-2">
-              <WalletCards className="size-4 text-primary" />
-            </span>
-            <div>
-              <h2 className="text-lg font-semibold text-foreground">
-                Finance reporting workspace
-              </h2>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Build class collection reports and individual student
-                account statements from saved finance records.
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="finance-report-print-actions flex flex-wrap gap-2">
-          <button
-            type="button"
-            className={secondaryButton}
-            disabled={
-              invalidRange ||
-              (reportType === "student" && !selectedStudent)
-            }
-            onClick={() => window.print()}
-          >
-            <Printer className="size-4" />
-            Print / Save PDF
-          </button>
-
-          <button
-            type="button"
-            className={primaryButton}
-            disabled={
-              invalidRange ||
-              (reportType === "student" && !selectedStudent)
-            }
-            onClick={exportReport}
-          >
-            <Download className="size-4" />
-            Export CSV
-          </button>
-        </div>
+  return <section className="space-y-5">
+    <div className="rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-6">
+      <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-xs font-bold uppercase tracking-[0.14em] text-primary">Finance</p><h2 className="mt-1 text-2xl font-bold tracking-tight text-foreground">Finance reports</h2><p className="mt-2 text-sm text-muted-foreground">Reports are calculated on the server using all matching school records, not the currently displayed page.</p></div><div className="flex gap-2"><button type="button" className={secondaryButton} onClick={() => window.print()}><Printer className="size-4" /> Print</button><button type="button" className={secondaryButton} onClick={exportPdf} disabled={!summary}><FileText className="size-4" /> PDF</button><button type="button" className={secondaryButton} onClick={() => void exportExcel()} disabled={!summary}><FileSpreadsheet className="size-4" /> Excel</button></div></div>
+      <div className="mt-5 grid gap-3 md:grid-cols-[190px_1fr_1fr]">
+        <select className={inputClass} value={scope} onChange={(event) => setScope(event.target.value as typeof scope)} aria-label="Report scope"><option value="term">Academic term</option><option value="year">Academic year</option><option value="all">All time</option></select>
+        {scope !== "all" ? <select className={inputClass} value={selectedYearId} onChange={(event) => { setYearId(event.target.value); setTermId(""); }} aria-label="Academic year">{years.map((year) => <option key={year.id} value={year.id}>{year.name}</option>)}</select> : <div />}
+        {scope === "term" ? <select className={inputClass} value={selectedTermId} onChange={(event) => setTermId(event.target.value)} aria-label="Academic term">{(selectedYear?.terms ?? []).map((term) => <option key={term.id} value={term.id}>{term.name}</option>)}</select> : <div />}
       </div>
-
-      <div className="finance-report-print-actions grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-        <label className="space-y-1 text-xs font-medium text-muted-foreground">
-          Report type
-          <select
-            className={inputClass + " mt-1"}
-            value={reportType}
-            onChange={(event) =>
-              setReportType(event.target.value as "class" | "student")
-            }
-          >
-            <option value="class">Class collections</option>
-            <option value="student">Student account statement</option>
-          </select>
-        </label>
-
-        {reportType === "class" ? (
-          <label className="space-y-1 text-xs font-medium text-muted-foreground">
-            Class
-            <select
-              className={inputClass + " mt-1"}
-              value={classId}
-              onChange={(event) => setClassId(event.target.value)}
-            >
-              <option value="ALL">All classes</option>
-              {classes.map((schoolClass) => (
-                <option key={schoolClass.id} value={schoolClass.id}>
-                  {schoolClass.name}
-                </option>
-              ))}
-            </select>
-          </label>
-        ) : (
-          <label className="space-y-1 text-xs font-medium text-muted-foreground">
-            Student
-            <select
-              className={inputClass + " mt-1"}
-              value={studentId}
-              onChange={(event) => setStudentId(event.target.value)}
-            >
-              <option value="">Select a student...</option>
-              {students.map((student) => (
-                <option key={student.id} value={student.id}>
-                  {studentLabel(student)} | {student.admissionNumber}
-                </option>
-              ))}
-            </select>
-          </label>
-        )}
-
-        <label className="space-y-1 text-xs font-medium text-muted-foreground">
-          From date
-          <input
-            className={inputClass + " mt-1"}
-            type="date"
-            value={from}
-            max={to || undefined}
-            onChange={(event) => setFrom(event.target.value)}
-          />
-        </label>
-
-        <label className="space-y-1 text-xs font-medium text-muted-foreground">
-          To date
-          <input
-            className={inputClass + " mt-1"}
-            type="date"
-            value={to}
-            min={from || undefined}
-            onChange={(event) => setTo(event.target.value)}
-          />
-        </label>
+    </div>
+    {summaryQuery.isPending || yearsQuery.isPending ? <div role="status" className="flex items-center justify-center gap-2 rounded-xl border border-border bg-card py-12 text-sm text-muted-foreground"><LoaderCircle className="size-4 animate-spin" /> Calculating report from saved records…</div> : null}
+    {summaryQuery.isError ? <div role="alert" className="rounded-xl border border-destructive/25 bg-destructive/5 p-4 text-sm text-destructive">The finance report could not be loaded. {summaryQuery.error.message}</div> : null}
+    {summary && <div className="finance-report-print space-y-5">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+        {[
+          ["Billed", summary.billed, summary.billedCount + " invoices"],
+          ["Collected", summary.collected, summary.receiptCount + " receipts"],
+          ["Outstanding", summary.outstanding, summary.outstandingBillCount + " open bills"],
+          ["Overdue", summary.overdue, summary.overdueBillCount + " overdue bills"],
+          ["Collection rate", summary.collectionRate == null ? "—" : summary.collectionRate + "%", "Server-calculated"],
+        ].map(([label, value, detail]) => <div key={label} className="rounded-2xl border border-border bg-card p-4"><p className="text-xs font-medium text-muted-foreground">{label}</p><p className="mt-2 text-xl font-bold tabular-nums text-foreground">{label === "Collection rate" ? value : money(value)}</p><p className="mt-1 text-xs text-muted-foreground">{detail}</p></div>)}
       </div>
-
-      <div className="finance-report-print-actions relative max-w-md">
-        <Search className="absolute left-3 top-3 size-4 text-muted-foreground" />
-        <input
-          className={inputClass + " pl-9"}
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
-          placeholder={
-            reportType === "student"
-              ? "Filter statement by bill, receipt or reference"
-              : "Filter class report by student or bill"
-          }
-          aria-label="Filter finance report"
-        />
-      </div>
-
-      {invalidRange && (
-        <p role="alert" className="text-sm text-destructive">
-          The start date must be on or before the end date, and both dates
-          must be valid.
-        </p>
-      )}
-
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <div className="rounded-xl bg-muted/60 p-4">
-          <p className="text-xs text-muted-foreground">
-            Bills issued in period
-          </p>
-          <p className="mt-1 text-xl font-bold tabular-nums text-foreground">
-            {money(billed)}
-          </p>
-          <p className="mt-1 text-xs text-muted-foreground">
-            {visibleBills.length} bill record(s)
-          </p>
-        </div>
-
-        <div className="rounded-xl bg-muted/60 p-4">
-          <p className="text-xs text-muted-foreground">
-            Completed collections
-          </p>
-          <p className="mt-1 text-xl font-bold tabular-nums text-foreground">
-            {money(collected)}
-          </p>
-          <p className="mt-1 text-xs text-muted-foreground">
-            {completedPayments.length} completed receipt(s)
-          </p>
-        </div>
-
-        <div className="rounded-xl bg-muted/60 p-4">
-          <p className="text-xs text-muted-foreground">
-            Current outstanding
-          </p>
-          <p className="mt-1 text-xl font-bold tabular-nums text-foreground">
-            {money(outstanding)}
-          </p>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Open bill balances, all dates
-          </p>
-        </div>
-
-        <div className="rounded-xl bg-muted/60 p-4">
-          <p className="text-xs text-muted-foreground">Filtered receipts</p>
-          <p className="mt-1 text-xl font-bold tabular-nums text-foreground">
-            {visiblePayments.length}
-          </p>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Includes non-completed statuses in the register
-          </p>
-        </div>
-      </div>
-
-      <section className="finance-report-print-actions rounded-xl border border-border p-4">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h3 className="font-semibold text-foreground">
-              Period-over-period collections
-            </h3>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Compares completed receipts in the selected date range with
-              the immediately preceding range of equal length.
-            </p>
-          </div>
-
-          <div className="text-right">
-            <p className="text-xs text-muted-foreground">Previous period</p>
-            <p className="font-semibold tabular-nums text-foreground">
-              {previousPeriodCollected === null
-                ? "Choose a valid date range"
-                : money(previousPeriodCollected)}
-            </p>
-          </div>
-        </div>
-
-        <div className="mt-3 flex flex-wrap items-baseline gap-3">
-          <p className="text-2xl font-bold tabular-nums text-foreground">
-            {money(periodCollected)}
-          </p>
-
-          {comparisonDelta !== null && (
-            <span
-              className={
-                comparisonDelta >= 0
-                  ? "text-sm font-semibold text-success"
-                  : "text-sm font-semibold text-destructive"
-              }
-            >
-              {comparisonDelta > 0 ? "+" : ""}
-              {money(comparisonDelta)}
-              {comparisonPercent === null
-                ? ""
-                : " | " +
-                  (comparisonPercent > 0 ? "+" : "") +
-                  comparisonPercent.toFixed(1) +
-                  "%"}
-            </span>
-          )}
-        </div>
-
-        {previousPeriodCollected === 0 &&
-          range.valid &&
-          !invalidRange && (
-            <p className="mt-2 text-xs text-muted-foreground">
-              The previous period had no completed collections, so a
-              percentage change is not meaningful.
-            </p>
-          )}
+      <section className="rounded-2xl border border-border bg-card p-5">
+        <h3 className="text-lg font-semibold text-foreground">Receivables ageing</h3><p className="mt-1 text-sm text-muted-foreground">Open balance aged from each bill's due date, as of {summary.asOf}.</p>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">{[["Not due",summary.ageing.notDue],["0–30 days",summary.ageing.days0To30],["31–60 days",summary.ageing.days31To60],["61–90 days",summary.ageing.days61To90],["90+ days",summary.ageing.days90Plus]].map(([label,value])=><div key={label} className="rounded-xl bg-muted/40 p-3"><p className="text-xs text-muted-foreground">{label}</p><p className="mt-1 font-semibold tabular-nums text-foreground">{money(value)}</p></div>)}</div>
       </section>
-
-      <div className="finance-report-print rounded-xl border border-border p-4 sm:p-5">
-        <div className="mb-4 flex flex-wrap items-start justify-between gap-3 border-b border-border pb-4">
-          <div>
-            <p className="text-xs font-bold uppercase tracking-wider text-primary">
-              SchoolHub | Finance report
-            </p>
-
-            <h3 className="mt-1 text-xl font-bold text-foreground">
-              {reportType === "class"
-                ? "Class collection report"
-                : "Student account statement"}
-            </h3>
-
-            <p className="mt-1 text-sm text-muted-foreground">
-              Period: {from || "All dates"} to {to || "All dates"} | Generated{" "}
-              {dateText(new Date().toISOString())}
-            </p>
-
-            {reportType === "student" && selectedStudent && (
-              <p className="mt-2 text-sm font-semibold text-foreground">
-                {studentLabel(selectedStudent)} | Admission no.{" "}
-                {selectedStudent.admissionNumber}
-              </p>
-            )}
-
-            {reportType === "class" && (
-              <p className="mt-2 text-sm font-semibold text-foreground">
-                {classes.find((item) => item.id === classId)?.name ??
-                  (classId === "ALL" ? "All classes" : "Selected class")}
-              </p>
-            )}
-          </div>
-
-          <div className="text-right">
-            <p className="text-xs text-muted-foreground">
-              Completed collections
-            </p>
-            <p className="mt-1 text-xl font-bold text-foreground">
-              {money(collected)}
-            </p>
-          </div>
-        </div>
-
-        {reportType === "class" ? (
-          classSummary.length ? (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[680px] text-left text-sm">
-                <thead>
-                  <tr className="border-b border-border text-xs text-muted-foreground">
-                    <th className="py-2 pr-3">Class</th>
-                    <th className="px-2 py-2 text-right">Billed</th>
-                    <th className="px-2 py-2 text-right">Collected</th>
-                    <th className="px-2 py-2 text-right">Outstanding</th>
-                    <th className="py-2 pl-2 text-right">Receipts</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {classSummary.map((item) => (
-                    <tr
-                      key={item.name}
-                      className="border-b border-border/70 last:border-0"
-                    >
-                      <td className="py-2 pr-3 font-medium">{item.name}</td>
-                      <td className="px-2 py-2 text-right tabular-nums">
-                        {money(item.billed)}
-                      </td>
-                      <td className="px-2 py-2 text-right tabular-nums">
-                        {money(item.collected)}
-                      </td>
-                      <td className="px-2 py-2 text-right tabular-nums">
-                        {money(item.outstanding)}
-                      </td>
-                      <td className="py-2 pl-2 text-right tabular-nums">
-                        {item.receipts}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <p className="py-8 text-center text-sm text-muted-foreground">
-              No bill or receipt records match the selected period and class.
-            </p>
-          )
-        ) : !selectedStudent ? (
-          <div className="py-8 text-center text-sm text-muted-foreground">
-            <Users className="mx-auto mb-2 size-5" />
-            Select a student to build their statement.
-          </div>
-        ) : (
-          <div className="space-y-5">
-            <div>
-              <h4 className="mb-2 font-semibold text-foreground">
-                Bills issued
-              </h4>
-
-              {visibleBills.length ? (
-                <div className="overflow-x-auto">
-                  <table className="w-full min-w-[640px] text-left text-sm">
-                    <thead>
-                      <tr className="border-b border-border text-xs text-muted-foreground">
-                        <th className="py-2 pr-3">Bill</th>
-                        <th className="px-2 py-2">Issued</th>
-                        <th className="px-2 py-2">Due</th>
-                        <th className="px-2 py-2 text-right">Billed</th>
-                        <th className="px-2 py-2 text-right">Paid</th>
-                        <th className="py-2 pl-2 text-right">Balance</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {visibleBills.map((bill) => (
-                        <tr
-                          key={bill.id}
-                          className="border-b border-border/70 last:border-0"
-                        >
-                          <td className="py-2 pr-3 font-medium">
-                            {bill.billNumber}
-                            <span className="block text-xs text-muted-foreground">
-                              {bill.class?.name ?? "Class not recorded"} |{" "}
-                              {bill.status}
-                            </span>
-                          </td>
-                          <td className="px-2 py-2">
-                            {dateText(bill.issuedAt)}
-                          </td>
-                          <td className="px-2 py-2">
-                            {dateText(bill.dueDate)}
-                          </td>
-                          <td className="px-2 py-2 text-right tabular-nums">
-                            {money(amount(bill.totalAmount))}
-                          </td>
-                          <td className="px-2 py-2 text-right tabular-nums">
-                            {money(amount(bill.paidAmount))}
-                          </td>
-                          <td className="py-2 pl-2 text-right tabular-nums">
-                            {money(amount(bill.balanceAmount))}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              ) : (
-                <p className="text-sm text-muted-foreground">
-                  No bills were issued in this date range.
-                </p>
-              )}
-            </div>
-
-            <div>
-              <h4 className="mb-2 font-semibold text-foreground">
-                Payments and receipts
-              </h4>
-
-              {visiblePayments.length ? (
-                <div className="overflow-x-auto">
-                  <table className="w-full min-w-[620px] text-left text-sm">
-                    <thead>
-                      <tr className="border-b border-border text-xs text-muted-foreground">
-                        <th className="py-2 pr-3">Receipt</th>
-                        <th className="px-2 py-2">Date</th>
-                        <th className="px-2 py-2">Bill</th>
-                        <th className="px-2 py-2">Method</th>
-                        <th className="px-2 py-2 text-right">Amount</th>
-                        <th className="py-2 pl-2">Status</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {visiblePayments.map((payment) => (
-                        <tr
-                          key={payment.id}
-                          className="border-b border-border/70 last:border-0"
-                        >
-                          <td className="py-2 pr-3 font-medium">
-                            {payment.paymentNumber}
-                          </td>
-                          <td className="px-2 py-2">
-                            {dateText(payment.paymentDate)}
-                          </td>
-                          <td className="px-2 py-2">
-                            {payment.bill?.billNumber ?? "Unallocated"}
-                          </td>
-                          <td className="px-2 py-2">
-                            {payment.paymentMethod.replaceAll("_", " ")}
-                          </td>
-                          <td className="px-2 py-2 text-right tabular-nums">
-                            {money(amount(payment.amount))}
-                          </td>
-                          <td className="py-2 pl-2">{payment.status}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              ) : (
-                <p className="text-sm text-muted-foreground">
-                  No payment records were recorded in this date range.
-                </p>
-              )}
-            </div>
-
-            <p className="border-t border-border pt-3 text-sm font-semibold text-foreground">
-              Current outstanding across all open bills: {money(outstanding)}
-            </p>
-          </div>
-        )}
-
-        <p className="mt-5 border-t border-border pt-3 text-xs leading-5 text-muted-foreground">
-          Report generated from saved SchoolHub records. Completed collections
-          include completed receipts only. Outstanding balances are current
-          bill balances and may cover dates outside this report period.
-        </p>
-      </div>
-    </section>
-  );
+      <section className="grid gap-5 xl:grid-cols-2">
+        <div className="rounded-2xl border border-border bg-card p-5"><h3 className="text-lg font-semibold text-foreground">Totals by class</h3><div className="mt-4 overflow-x-auto"><table className="w-full min-w-[560px] text-left text-sm"><thead><tr className="border-b border-border text-xs text-muted-foreground"><th className="p-3">Class</th><th className="p-3 text-right">Billed</th><th className="p-3 text-right">Collected</th><th className="p-3 text-right">Outstanding</th><th className="p-3 text-right">Bills</th></tr></thead><tbody>{summary.byClass.map((row)=><tr key={row.classId ?? "__unassigned"} className="border-b border-border/70"><td className="p-3">{row.className}</td><td className="p-3 text-right tabular-nums">{money(row.billed)}</td><td className="p-3 text-right tabular-nums">{money(row.collected)}</td><td className="p-3 text-right tabular-nums">{money(row.outstanding)}</td><td className="p-3 text-right tabular-nums">{row.billCount}</td></tr>)}{!summary.byClass.length&&<tr><td colSpan={5} className="p-5 text-center text-muted-foreground">No bill records in this scope.</td></tr>}</tbody></table></div></div>
+        <div className="rounded-2xl border border-border bg-card p-5"><h3 className="text-lg font-semibold text-foreground">Collections by method</h3><div className="mt-4 overflow-x-auto"><table className="w-full text-left text-sm"><thead><tr className="border-b border-border text-xs text-muted-foreground"><th className="p-3">Method</th><th className="p-3 text-right">Collected</th><th className="p-3 text-right">Receipts</th></tr></thead><tbody>{summary.byMethod.map((row)=><tr key={row.method} className="border-b border-border/70"><td className="p-3">{row.method.replaceAll("_"," ")}</td><td className="p-3 text-right tabular-nums">{money(row.amount)}</td><td className="p-3 text-right tabular-nums">{row.receiptCount}</td></tr>)}{!summary.byMethod.length&&<tr><td colSpan={3} className="p-5 text-center text-muted-foreground">No completed receipts in this scope.</td></tr>}</tbody></table></div></div>
+      </section>
+      <p className="border-t border-border pt-3 text-xs leading-5 text-muted-foreground">Generated from saved SchoolHub data. Billed and collected totals use the selected academic context; outstanding and overdue include earlier unpaid bills carried forward into receivables. Data source: current bills and receipt allocations pending the dedicated receivables-ledger phase.</p>
+      <style>{`@media print { body * { visibility: hidden !important; } .finance-report-print, .finance-report-print * { visibility: visible !important; } .finance-report-print { position: absolute !important; inset: 0 auto auto 0 !important; width: 100% !important; background: white !important; color: black !important; padding: 6mm !important; } @page { size: A4 landscape; margin: 8mm; } }`}</style>
+    </div>}
+  </section>;
 }
