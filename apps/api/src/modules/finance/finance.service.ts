@@ -3126,6 +3126,7 @@ export class FinanceService {
         tier2EmployerRate: tier2?.employerRate.toString() ?? "0",
         tier2Base: tier2?.base,
         tier3EmployeeRate: tier3 ? (tier3Enrollment?.rateOverride ?? tier3.employeeRate).toString() : "0",
+        tier3EmployerRate: tier3?.employerRate.toString() ?? "0",
         tier3Base: tier3?.base,
         tier3ReliefCap: tier3?.tier3ReliefCap?.toString() ?? "0",
         employeeContributionTaxDeductible: tier1.employeeShareTaxDeductible,
@@ -3164,6 +3165,7 @@ export class FinanceService {
         tier2Employee: new Prisma.Decimal(calculation.tier2Employee),
         tier2Employer: new Prisma.Decimal(calculation.tier2Employer),
         tier3Employee: new Prisma.Decimal(calculation.tier3Employee),
+        tier3Employer: new Prisma.Decimal(calculation.tier3Employer),
         incomeTax: new Prisma.Decimal(calculation.incomeTax),
         otherDeductions: new Prisma.Decimal(calculation.otherDeductions),
         netSalary: new Prisma.Decimal(calculation.netSalary),
@@ -3180,7 +3182,7 @@ export class FinanceService {
     const totalEmployeeSSNIT = total((slip) => slip.ssnitEmployee);
     const totalEmployerSSNIT = total((slip) => slip.ssnitEmployer);
     const totalTier2 = total((slip) => slip.tier2Employee.add(slip.tier2Employer));
-    const totalTier3 = total((slip) => slip.tier3Employee);
+    const totalTier3 = total((slip) => slip.tier3Employee.add(slip.tier3Employer));
     const settingsSnapshot = {
       schedule: {
         id: schedule.id, name: schedule.name,
