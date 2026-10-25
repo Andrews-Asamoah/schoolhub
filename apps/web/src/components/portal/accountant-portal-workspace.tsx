@@ -35,7 +35,6 @@ import { AccountantRecordPaymentDialog } from "./accountant-record-payment-dialo
 import { apiFetch } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { useFinanceAccess } from "@/components/portal/finance-access";
-import { PeriodLockCard } from "@/components/portal/period-lock-card";
 
 type AccountantTab =
   | "overview"
@@ -841,49 +840,9 @@ export function AccountantPortalWorkspace({
       )}
 
 
-      {!loading && activeTab === "reports" && <PeriodLockCard />}
-      {!loading && activeTab === "reports" && (
-        <section className="rounded-2xl border border-border bg-card p-5">
-          <SectionHeader title="Finance reports" description="Filter collections, expenses and payroll by reporting period, then export the matching records." action={<div className="flex flex-wrap items-center gap-2"><label className="sr-only" htmlFor="finance-report-period">Reporting period</label><select id="finance-report-period" className={cn(inputClass, "w-auto min-w-44")} value={reportPeriod} onChange={(event) => setReportPeriod(event.target.value as typeof reportPeriod)}><option value="month">This month to date</option><option value="quarter">This quarter to date</option><option value="year">This year to date</option><option value="all">All available records</option></select><button type="button" className={buttonPrimary} onClick={exportFinanceReport} disabled={billsQuery.isError || paymentsQuery.isError || expensesQuery.isError || payrollQuery.isError}><Download className="size-4" /> Export CSV</button></div>} />
-          <p className="mt-2 text-xs text-muted-foreground">Academic period: {[currentYear?.name, currentTerm?.name].filter(Boolean).join(" · ") || "Not set"}. Collection, expense and payroll totals use the selected reporting period; outstanding balances show the current position across all open bills.</p>
-          {(billsQuery.error || paymentsQuery.error || expensesQuery.error || payrollQuery.error) && <QueryError message="Some finance data could not be loaded. Resolve the errors before exporting a complete report." />}
-          <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-            <MetricCard label="Payments collected" value={paymentsQuery.error ? "Unavailable" : currency(reportCollected)} detail={reportSettledPayments.length + " completed receipts in period"} icon={ArrowUpRight} />
-            <MetricCard label="Current outstanding balances" value={billsQuery.error ? "Unavailable" : currency(outstanding)} detail={debtors.length + " bills with balances"} icon={AlertCircle} />
-            <MetricCard label="Operating expenses" value={expensesQuery.error ? "Unavailable" : currency(reportExpenseTotal)} detail={reportExpenses.length + " expense records in period"} icon={ArrowDownRight} />
-            <MetricCard label="Payroll gross" value={payrollQuery.error ? "Unavailable" : currency(reportPayrollGross)} detail={reportPayroll.length + " payroll runs in period"} icon={Wallet} />
-            <MetricCard label="Payroll net paid" value={payrollQuery.error ? "Unavailable" : currency(reportPayrollNet)} detail={reportPayrollPaid.length + " paid payroll runs in period"} icon={Wallet} />
-            <MetricCard label="Receivables" value={billsQuery.error ? "Unavailable" : String(debtors.length)} detail={debtors.filter(bill => bill.status === "OVERDUE").length + " overdue bills"} icon={Receipt} />
-          </div>
-          <div className="mt-5 grid gap-5 xl:grid-cols-2">
-            <div className="rounded-xl border border-border p-4"><h3 className="font-semibold text-foreground">Collection by payment method</h3><p className="mt-1 text-xs text-muted-foreground">Completed receipts only; unsettled and refunded payments are excluded.</p>{reportSettledPayments.length ? <div className="mt-3 space-y-3">{Object.entries(reportSettledPayments.reduce<Record<string, number>>((totals, payment) => { totals[payment.paymentMethod] = (totals[payment.paymentMethod] ?? 0) + Number(payment.amount); return totals; }, {})).sort((a,b) => b[1]-a[1]).map(([method,total]) => <div key={method}><div className="flex justify-between gap-3 text-sm"><span>{method.replaceAll("_", " ")}</span><span className="font-semibold tabular-nums">{currency(total)}</span></div><div className="mt-1 h-2 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-primary" style={{ width: (reportCollected > 0 ? Math.min(100, total / reportCollected * 100) : 0) + "%" }} /></div></div>)}</div> : <EmptyState icon={Receipt} title="No receipt data for this period" description="Choose another reporting period or record a completed receipt." />}</div>
-            <div className="rounded-xl border border-border p-4"><h3 className="font-semibold text-foreground">Financial position</h3><p className="mt-1 text-xs text-muted-foreground">A high-level comparison of recorded money in and operating money out.</p><div className="mt-4 space-y-3"><div className="flex items-center justify-between gap-3"><span className="text-sm text-muted-foreground">Collections</span><span className="font-semibold text-foreground">{currency(reportCollected)}</span></div><div className="flex items-center justify-between gap-3"><span className="text-sm text-muted-foreground">Expenses</span><span className="font-semibold text-foreground">{currency(reportExpenseTotal)}</span></div><div className="flex items-center justify-between gap-3 border-t border-border pt-3"><span className="text-sm font-semibold text-foreground">Collections less expenses</span><span className="text-lg font-bold tabular-nums text-foreground">{currency(reportCollected - reportExpenseTotal)}</span></div><p className="text-xs leading-5 text-muted-foreground">This is a simple cash-flow indicator, not an audited profit figure; it excludes receivables, payroll timing and other accounting adjustments.</p></div></div>
-          </div>
-          <div className="mt-5 rounded-xl border border-border p-4">
-            <h3 className="font-semibold text-foreground">Collections by fee component</h3>
-            <p className="mt-1 text-xs text-muted-foreground">Completed receipts in the selected reporting period, allocated to individual bill components. Categories come from the fee item setup.</p>
-            {Object.entries(reportFeeComponentCollections).length ? (
-              <div className="mt-4 space-y-3">
-                {Object.entries(reportFeeComponentCollections).sort((a, b) => b[1] - a[1]).map(([category, total]) => (
-                  <div key={category}>
-                    <div className="flex flex-wrap justify-between gap-3 text-sm">
-                      <span className="font-medium text-foreground">{category}</span>
-                      <span className="font-semibold tabular-nums">{currency(total)}</span>
-                    </div>
-                    <div className="mt-1 h-2 overflow-hidden rounded-full bg-muted">
-                      <div className="h-full rounded-full bg-primary" style={{ width: (collected > 0 ? Math.min(100, total / collected * 100) : 0) + "%" }} />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="mt-4 text-sm text-muted-foreground">No allocated fee-component collections are available yet.</p>
-            )}
-          </div>
-        </section>
-      )}
-
       {!loading && activeTab === "reports" && <AccountantFinanceReportingWorkspace bills={bills} payments={payments} classes={classes} />}
+
+
 
       {!loading && activeTab === "expenses" && (
         <section className="rounded-2xl border border-border bg-card p-5">
