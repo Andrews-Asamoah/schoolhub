@@ -51,7 +51,7 @@ const tooltipStyle = {
 const tickStyle = { fill: "var(--muted-foreground)", fontSize: 11 };
 const isSettled = (status: string) => ["COMPLETED", "SUCCESS", "PAID"].includes(status.toUpperCase());
 const categoryLabel = (value?: string | null) =>
-  (value?.trim() || "OTHER").replaceAll("_", " ").toLocaleLowerCase("en-GB").replace(/\\b\\w/g, (letter) => letter.toUpperCase());
+  (value?.trim() || "OTHER").replaceAll("_", " ").toLocaleLowerCase("en-GB").replace(/\b\w/g, (letter) => letter.toUpperCase());
 
 function ChartPanel({ title, description, icon: Icon, children }: {
   title: string;
