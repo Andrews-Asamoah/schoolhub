@@ -296,7 +296,7 @@ export function AccountantFinanceDetailedReportingWorkspace({ classes }: Props) 
     );
   });
 
-  const completedPayments = scopedPayments.filter((payment) =>
+  const completedPayments = visiblePayments.filter((payment) =>
     settled(payment.status),
   );
 
@@ -305,7 +305,7 @@ export function AccountantFinanceDetailedReportingWorkspace({ classes }: Props) 
     0,
   );
 
-  const billed = scopedBills
+  const billed = visibleBills
     .filter(
       (bill) =>
         bill.status !== "CANCELLED" && bill.status !== "WAIVED",
@@ -355,7 +355,7 @@ export function AccountantFinanceDetailedReportingWorkspace({ classes }: Props) 
       }
     >();
 
-    for (const bill of scopedBills) {
+    for (const bill of visibleBills) {
       const key = bill.class?.id ?? "no-class";
 
       const entry = totals.get(key) ?? {
