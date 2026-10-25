@@ -53,6 +53,7 @@ import { SignaturesWorkspace } from "@/components/school/signatures-workspace";
 import { GuardianPortalWorkspace } from "@/components/portal/guardian-portal-workspace";
 import { GuardianChildRecordsWorkspace } from "@/components/portal/guardian-child-records-workspace";
 import { GuardianFeesWorkspace } from "@/components/portal/guardian-fees-workspace";
+import { StudentStatementWorkspace } from "@/components/portal/student-statement-workspace";
 import { StudentPortalWorkspace } from "@/components/portal/student-portal-workspace";
 import { StudentSubjectsView } from "@/components/portal/student-subjects-view";
 import { StudentAttendanceView } from "@/components/portal/student-attendance-view";
@@ -237,6 +238,7 @@ function WorkspaceContent({ pageId }: { pageId: string }) {
           {pageId === "student-portal" && <StudentPortalWorkspace />}
           {pageId === "invoices" && <AccountantPortalWorkspace defaultTab="invoices" />}
           {pageId === "outstanding" && <AccountantPortalWorkspace defaultTab="debtors" />}
+          {pageId === "student-statement" && <StudentStatementWorkspace />}
           {pageId === "finance-reports" && <AccountantPortalWorkspace defaultTab="reports" />}
           {pageId === "expenses" && <ExpenseManagementWorkspace />}
           {pageId === "payroll" && <PayrollManagementWorkspace />}
