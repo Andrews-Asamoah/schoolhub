@@ -7,6 +7,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 const webSrc = join(here, "../../../../web/src");
 const exportFiles = [
   "lib/table-export.ts",
+  "lib/csv.ts",
   "components/ui/data-table.tsx",
   "components/school/workspace-ui.tsx",
   "components/portal/accountant-portal-workspace.tsx",
