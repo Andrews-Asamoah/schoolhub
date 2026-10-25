@@ -358,3 +358,6 @@ SELECT 'legacy-salary-teacher-' || t."id", t."id", t."monthlySalary", t."hireDat
 FROM "teachers" t
 WHERE t."monthlySalary" IS NOT NULL
 ON CONFLICT ("id") DO NOTHING;
+
+ALTER TABLE "payslips"
+  ADD COLUMN "tier3Employer" DECIMAL(15,2) NOT NULL DEFAULT 0;
