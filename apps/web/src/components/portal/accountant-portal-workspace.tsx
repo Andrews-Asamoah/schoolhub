@@ -30,6 +30,7 @@ import {
 } from "@schoolhub/shared";
 import { AdminAnnouncementsWorkspace } from "./admin-announcements-workspace";
 import { AccountantFinanceCharts } from "./accountant-finance-charts";
+import { AccountantFinanceReportingWorkspace } from "./accountant-finance-reporting-workspace";
 import { AccountantRecordPaymentDialog } from "./accountant-record-payment-dialog";
 import { apiFetch } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -881,6 +882,8 @@ export function AccountantPortalWorkspace({
           </div>
         </section>
       )}
+
+      {!loading && activeTab === "reports" && <AccountantFinanceReportingWorkspace bills={bills} payments={payments} classes={classes} />}
 
       {!loading && activeTab === "expenses" && (
         <section className="rounded-2xl border border-border bg-card p-5">
