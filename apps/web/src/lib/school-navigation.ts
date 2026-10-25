@@ -21,6 +21,7 @@ import {
   MessageSquare,
   Package,
   Receipt,
+  ReceiptText,
   School,
   Settings2,
   ShieldQuestion,
