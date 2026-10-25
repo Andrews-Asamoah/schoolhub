@@ -901,137 +901,171 @@ export class FinanceService {
   ) {
     const student = await this.prisma.client.student.findFirst({
       where: { id: input.studentId, schoolId, deletedAt: null },
+      select: { id: true },
     });
+    if (!student) throw new NotFoundException("Student not found.");
 
-    if (!student) {
-      throw new NotFoundException("Student not found");
+    const paymentAmount = new Prisma.Decimal(String(input.amount));
+    if (!paymentAmount.isFinite() || paymentAmount.lte(0)) {
+      throw new BadRequestException("The payment amount must be greater than zero.");
     }
-
-    // Money is handled as Decimal end to end. Reject sub-cent input instead of silently rounding it.
-    const toMoney = (value: number, label: string) => {
-      if (Math.abs(roundMoney(value) - value) > 1e-7) {
-        throw new BadRequestException(`${label} can have at most two decimal places.`);
-      }
-      return new Prisma.Decimal(roundMoney(value).toFixed(2));
-    };
-    const paymentAmount = toMoney(input.amount, "The payment amount");
-    const year = new Date().getFullYear();
+    if (paymentAmount.decimalPlaces() > 2) {
+      throw new BadRequestException("The payment amount can have at most two decimal places.");
+    }
+    const paymentDate = new Date(input.paymentDate);
+    if (Number.isNaN(paymentDate.getTime()) || paymentDate.toISOString().slice(0, 10) !== input.paymentDate) {
+      throw new BadRequestException("Enter a valid payment date.");
+    }
+    const year = paymentDate.getUTCFullYear();
 
     return withSerializableRetry(() => this.prisma.client.$transaction(async (tx) => {
-      // This runs at READ COMMITTED on purpose. Every statement after a lock
-      // wait sees what the previous holder committed, so concurrent payments
-      // simply queue here (student row, then bill row, always in this order) and
-      // each one reads the up-to-date balance. Under SERIALIZABLE the snapshot is
-      // taken before the wait, so queued payments were aborted for no reason.
       await tx.$executeRaw`SELECT id FROM students WHERE id = ${input.studentId} AND "schoolId" = ${schoolId} FOR UPDATE`;
-      if (input.billId) {
-        await tx.$executeRaw`SELECT id FROM bills WHERE id = ${input.billId} AND "schoolId" = ${schoolId} FOR UPDATE`;
-      }
+      // Lock all bills for the student in deterministic issue-date order. This
+      // serialises two receipts which may spill across the same set of invoices.
+      await tx.$executeRaw`
+        SELECT id FROM bills
+        WHERE "schoolId" = ${schoolId} AND "studentId" = ${input.studentId}
+        ORDER BY "issuedAt" ASC, id ASC FOR UPDATE
+      `;
 
-      // Idempotency: a retried request (double click, flaky network) carrying the
-      // same key returns the receipt already recorded instead of creating a second one.
-      // The student row is locked above, so concurrent retries queue up behind each other.
       if (input.idempotencyKey) {
-        const existing = await tx.payment.findFirst({ where: { schoolId, idempotencyKey: input.idempotencyKey } });
+        const existing = await tx.payment.findFirst({
+          where: { schoolId, idempotencyKey: input.idempotencyKey },
+          include: { billAllocations: true, paymentItems: true },
+        });
         if (existing) {
-          if (
-            existing.studentId !== input.studentId ||
-            (existing.billId ?? null) !== (input.billId ?? null) ||
-            !existing.amount.eq(paymentAmount)
-          ) {
+          const sameCoreRequest =
+            existing.studentId === input.studentId &&
+            existing.amount.eq(paymentAmount) &&
+            existing.paymentMethod === input.paymentMethod &&
+            existing.paymentDate.toISOString().slice(0, 10) === input.paymentDate;
+          if (!sameCoreRequest) {
             throw new ConflictException("This idempotency key was already used for a different payment.");
+          }
+          if (input.allocations?.length) {
+            const stored = new Map(existing.paymentItems.map((item) => [item.billItemId, item.amount.toFixed(2)]));
+            const requested = new Map(input.allocations.map((item) => [item.billItemId, new Prisma.Decimal(String(item.amount)).toFixed(2)]));
+            if (stored.size !== requested.size || [...stored].some(([id, amount]) => requested.get(id) !== amount)) {
+              throw new ConflictException("This idempotency key was already used with different bill-item allocations.");
+            }
           }
           return existing;
         }
       }
 
-      await this.assertPostingDate(tx, schoolId, new Date(input.paymentDate));
-
-      // Validate the bill inside the transaction before writing anything. A bill
-      // must belong to this tenant and student, and must not be overpaid.
-      const bill = input.billId
-        ? await tx.bill.findFirst({
-            where: {
-              id: input.billId,
-              schoolId,
-              studentId: input.studentId,
-            },
-            include: { items: true },
-          })
-        : null;
-
-      if (input.billId && !bill) {
-        throw new NotFoundException("Bill not found for this student.");
+      await this.assertPostingDate(tx, schoolId, paymentDate);
+      const allBills = await tx.bill.findMany({
+        where: { schoolId, studentId: input.studentId, status: { notIn: ["CANCELLED", "WAIVED"] } },
+        orderBy: [{ issuedAt: "asc" }, { id: "asc" }],
+        include: { items: { orderBy: [{ createdAt: "asc" }, { id: "asc" }] } },
+      });
+      if (input.billId) {
+        const selectedBill = await tx.bill.findFirst({
+          where: { id: input.billId, schoolId, studentId: input.studentId },
+          select: { id: true, status: true, balanceAmount: true },
+        });
+        if (!selectedBill) throw new NotFoundException("Bill not found for this student.");
+        if (["CANCELLED", "WAIVED"].includes(selectedBill.status)) {
+          throw new BadRequestException("Payments cannot be recorded against a cancelled or waived bill.");
+        }
+        if (selectedBill.balanceAmount.lte(0)) {
+          throw new BadRequestException("The selected bill is already settled.");
+        }
       }
-      if (bill && ["CANCELLED", "WAIVED"].includes(bill.status)) {
-        throw new BadRequestException("Payments cannot be recorded against a cancelled or waived bill.");
+
+      const openBills = allBills.filter((bill) => bill.balanceAmount.gt(0));
+      if (openBills.length === 0) {
+        throw new BadRequestException("There are no open bills for this student. Surplus payments will be supported with credit balances in a later phase.");
       }
-      if (bill && paymentAmount.gt(bill.balanceAmount)) {
+      const totalOpen = openBills.reduce((sum, bill) => sum.plus(bill.balanceAmount), new Prisma.Decimal(0));
+      if (paymentAmount.gt(totalOpen)) {
         throw new BadRequestException(
-          `Payment exceeds the outstanding bill balance of ${bill.balanceAmount.toFixed(2)}.`,
+          `Payment exceeds the student's total open balance of ${totalOpen.toFixed(2)}. Credit/prepayment balances are not enabled yet.`,
         );
       }
 
-      // Validate explicit fee-component allocations before writing anything.
-      // Older clients may omit allocations; those retain the historical FIFO behaviour.
-      const itemAllocations: { billItemId: string; amount: Prisma.Decimal }[] = [];
-      if (!bill && input.allocations?.length) {
-        throw new BadRequestException("Fee-component allocations require a bill.");
-      }
-      if (bill) {
-        if (input.allocations) {
-          const seenItemIds = new Set<string>();
-          let allocatedTotal = new Prisma.Decimal(0);
-          for (const allocation of input.allocations) {
-            if (seenItemIds.has(allocation.billItemId)) {
-              throw new BadRequestException("Each bill component can only be selected once.");
-            }
-            seenItemIds.add(allocation.billItemId);
-            const item = bill.items.find((candidate) => candidate.id === allocation.billItemId);
-            if (!item) {
-              throw new BadRequestException("One or more selected components do not belong to this bill.");
-            }
-            const amount = toMoney(allocation.amount, "A component allocation");
-            if (amount.lte(0) || amount.gt(item.balanceAmount)) {
-              throw new BadRequestException(
-                `Allocation for "${item.description}" must be greater than zero and no more than ${item.balanceAmount.toFixed(2)}.`,
-              );
-            }
-            itemAllocations.push({ billItemId: item.id, amount });
-            allocatedTotal = allocatedTotal.plus(amount);
+      const billById = new Map(openBills.map((bill) => [bill.id, bill]));
+      const itemAllocations: { billId: string; billItemId: string; amount: Prisma.Decimal }[] = [];
+      const billAmounts = new Map<string, Prisma.Decimal>();
+
+      if (input.allocations?.length) {
+        if (!input.billId) throw new BadRequestException("Explicit fee-component allocations require a billId.");
+        const bill = billById.get(input.billId);
+        if (!bill) throw new BadRequestException("The selected bill has no outstanding balance.");
+        const seen = new Set<string>();
+        let allocatedTotal = new Prisma.Decimal(0);
+        for (const allocation of input.allocations) {
+          if (seen.has(allocation.billItemId)) throw new BadRequestException("Each bill component can only be selected once.");
+          seen.add(allocation.billItemId);
+          const item = bill.items.find((candidate) => candidate.id === allocation.billItemId);
+          if (!item) throw new BadRequestException("One or more selected components do not belong to this bill.");
+          const amount = new Prisma.Decimal(String(allocation.amount));
+          if (!amount.isFinite() || amount.lte(0) || amount.decimalPlaces() > 2 || amount.gt(item.balanceAmount)) {
+            throw new BadRequestException(`Allocation for "${item.description}" must be a positive amount to two decimal places and not exceed ${item.balanceAmount.toFixed(2)}.`);
           }
-          if (!allocatedTotal.eq(paymentAmount)) {
-            throw new BadRequestException("The payment amount must equal the sum of the selected fee-component allocations.");
-          }
-        } else {
-          let remaining = paymentAmount;
+          itemAllocations.push({ billId: bill.id, billItemId: item.id, amount });
+          allocatedTotal = allocatedTotal.plus(amount);
+        }
+        if (!allocatedTotal.eq(paymentAmount)) {
+          throw new BadRequestException("The payment amount must equal the sum of the selected fee-component allocations.");
+        }
+        billAmounts.set(bill.id, allocatedTotal);
+      } else {
+        let remaining = paymentAmount;
+        for (const bill of openBills) {
           for (const item of bill.items) {
             if (remaining.lte(0)) break;
             if (item.balanceAmount.lte(0)) continue;
             const applied = Prisma.Decimal.min(remaining, item.balanceAmount);
-            if (applied.gt(0)) itemAllocations.push({ billItemId: item.id, amount: applied });
-            remaining = remaining.minus(applied);
+            if (applied.gt(0)) {
+              itemAllocations.push({ billId: bill.id, billItemId: item.id, amount: applied });
+              billAmounts.set(bill.id, (billAmounts.get(bill.id) ?? new Prisma.Decimal(0)).plus(applied));
+              remaining = remaining.minus(applied);
+            }
           }
-          // Preserve the previous FIFO fallback for older clients and historical bills
-          // that do not have a complete item ledger. New UI submissions are explicit.
+          if (remaining.lte(0)) break;
+        }
+        if (remaining.gt(0)) {
+          throw new ConflictException(
+            "The saved bill items do not reconcile to the outstanding bill balances. No receipt was recorded; the account needs reconciliation.",
+          );
         }
       }
 
-      // Receipt numbers are sequential per school and year, issued under a
-      // lock inside this transaction (no random numbers, no collisions).
+      const billAllocated = [...billAmounts.values()].reduce((sum, amount) => sum.plus(amount), new Prisma.Decimal(0));
+      if (!billAllocated.eq(paymentAmount)) {
+        throw new ConflictException("The receipt could not be fully allocated to open bills. Nothing was recorded.");
+      }
+      const allocationsByItem = new Map<string, Prisma.Decimal>();
+      for (const allocation of itemAllocations) {
+        allocationsByItem.set(
+          allocation.billItemId,
+          (allocationsByItem.get(allocation.billItemId) ?? new Prisma.Decimal(0)).plus(allocation.amount),
+        );
+      }
+      for (const [billId, billAmount] of billAmounts) {
+        const bill = billById.get(billId)!;
+        const itemBalance = bill.items.reduce((sum, item) => sum.plus(item.balanceAmount), new Prisma.Decimal(0));
+        if (!itemBalance.eq(bill.balanceAmount) && !input.allocations?.length) {
+          throw new ConflictException(`Bill ${bill.billNumber} has a mismatch between its item balances and bill balance. No receipt was recorded.`);
+        }
+        if (billAmount.gt(bill.balanceAmount)) {
+          throw new ConflictException("A receipt allocation exceeds its bill balance. No receipt was recorded.");
+        }
+      }
+
       const paymentNumbers = await this.createNumberSequence(tx, schoolId, "payment", `RCT-${year}-`);
       const paymentNumber = paymentNumbers.next();
-
-      // 1. Create payment record only after all tenant/bill/allocation checks pass.
+      const firstBillId = itemAllocations[0]?.billId ?? null;
       const created = await tx.payment.create({
         data: {
           schoolId,
           studentId: input.studentId,
-          billId: input.billId,
+          billId: firstBillId,
           paymentNumber,
           amount: paymentAmount,
           paymentMethod: input.paymentMethod,
-          paymentDate: new Date(input.paymentDate),
+          paymentDate,
           referenceNumber: input.referenceNumber,
           notes: input.notes,
           recordedById,
@@ -1039,12 +1073,60 @@ export class FinanceService {
         },
       });
 
-      // 2. Post the receipt to the general ledger (debit cash/bank, credit
-      // school-fees income) and link it, so financial reports include fees.
+      // Persist a bill-level allocation ledger in addition to per-item allocation
+      // rows. This explicitly represents one receipt clearing several invoices.
+      await tx.paymentBillAllocation.createMany({
+        data: [...billAmounts.entries()].map(([billId, amount]) => ({
+          schoolId, paymentId: created.id, billId, amount,
+        })),
+      });
+
+      for (const allocation of itemAllocations) {
+        const bill = billById.get(allocation.billId)!;
+        const item = bill.items.find((candidate) => candidate.id === allocation.billItemId)!;
+        const itemApplied = allocationsByItem.get(item.id)!;
+        const itemBalance = item.balanceAmount.minus(itemApplied);
+        const itemPaid = item.paidAmount.plus(itemApplied);
+        await tx.billItem.update({
+          where: { id: item.id },
+          data: {
+            paidAmount: itemPaid,
+            balanceAmount: itemBalance,
+            status: itemBalance.eq(0) ? "FULLY_PAID" : itemPaid.gt(0) ? "PARTIALLY_PAID" : "UNPAID",
+          },
+        });
+        await tx.paymentItem.create({
+          data: { paymentId: created.id, billItemId: item.id, amount: allocation.amount },
+        });
+      }
+
+      for (const [billId, amount] of billAmounts) {
+        const bill = billById.get(billId)!;
+        const paid = bill.paidAmount.plus(amount);
+        const balance = bill.balanceAmount.minus(amount);
+        await tx.bill.update({
+          where: { id: bill.id },
+          data: {
+            paidAmount: paid,
+            balanceAmount: balance,
+            status: balance.eq(0) ? "PAID" : paid.gt(0) ? "PARTIALLY_PAID" : "PENDING",
+          },
+        });
+      }
+
+      const updatedStudentBalance = await tx.bill.aggregate({
+        where: { schoolId, studentId: input.studentId, status: { notIn: ["CANCELLED", "WAIVED"] } },
+        _sum: { balanceAmount: true },
+      });
+      await tx.student.update({
+        where: { id: input.studentId },
+        data: { outstandingBalance: updatedStudentBalance._sum.balanceAmount ?? new Prisma.Decimal(0) },
+      });
+
       const ledger = await this.postIncome(tx, {
         schoolId,
         amount: paymentAmount,
-        date: new Date(input.paymentDate),
+        date: paymentDate,
         description: `School fees receipt ${paymentNumber}`,
         category: "SCHOOL_FEES",
         revenueAccount: { name: "School Fees Income", code: "4000" },
@@ -1060,51 +1142,6 @@ export class FinanceService {
         data: { transactionId: ledger.id },
       });
 
-      // 3. Update the already-validated bill atomically.
-      if (bill) {
-        const newPaid = bill.paidAmount.plus(paymentAmount);
-        const newBalance = Prisma.Decimal.max(0, bill.totalAmount.minus(newPaid));
-        const status = newBalance.eq(0) ? "PAID" : "PARTIALLY_PAID";
-
-        await tx.bill.update({
-          where: { id: bill.id },
-          data: { paidAmount: newPaid, balanceAmount: newBalance, status },
-        });
-      }
-
-      // 4. Apply each allocation to the matching bill component.
-      if (bill) {
-        for (const allocation of itemAllocations) {
-          const item = bill.items.find((candidate) => candidate.id === allocation.billItemId);
-          if (!item) throw new BadRequestException("A selected bill component no longer exists.");
-          const nextBalance = Prisma.Decimal.max(0, item.balanceAmount.minus(allocation.amount));
-          const nextPaid = item.paidAmount.plus(allocation.amount);
-          await tx.billItem.update({
-            where: { id: item.id },
-            data: {
-              paidAmount: nextPaid,
-              balanceAmount: nextBalance,
-              status: nextBalance.eq(0) ? "FULLY_PAID" : "PARTIALLY_PAID",
-            },
-          });
-          await tx.paymentItem.create({
-            data: { paymentId: payment.id, billItemId: item.id, amount: allocation.amount },
-          });
-        }
-      }
-
-      // Keep the aggregate student balance from dropping below zero if older
-      // records contain an out-of-sync aggregate balance (row is locked above).
-      const currentStudent = await tx.student.findFirst({
-        where: { id: input.studentId, schoolId, deletedAt: null },
-        select: { id: true, outstandingBalance: true },
-      });
-      if (!currentStudent) throw new NotFoundException("Student not found.");
-      await tx.student.update({
-        where: { id: currentStudent.id },
-        data: { outstandingBalance: Prisma.Decimal.max(0, currentStudent.outstandingBalance.minus(paymentAmount)) },
-      });
-
       await this.writeAudit(tx, {
         actorId: recordedById,
         schoolId,
@@ -1114,17 +1151,15 @@ export class FinanceService {
         newValues: {
           paymentNumber,
           studentId: input.studentId,
-          billId: input.billId ?? null,
+          billId: firstBillId,
+          allocations: [...billAmounts.entries()].map(([billId, amount]) => ({ billId, amount: amount.toFixed(2) })),
           amount: paymentAmount.toFixed(2),
           paymentMethod: input.paymentMethod,
           ledgerTransactionId: ledger.id,
         },
       });
-
       return payment;
     }, { isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted }), {
-      // Two requests with the same new idempotency key can both pass the replay check;
-      // the unique index stops the second, which then retries and returns the first receipt.
       retryIf: (error) => isSerializationFailure(error) || isIdempotencyRace(error),
       onExhausted: () => new ConflictException("The system is busy recording other payments. Nothing was saved; please try again."),
     });
