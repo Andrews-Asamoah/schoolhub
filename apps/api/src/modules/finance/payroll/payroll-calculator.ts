@@ -43,6 +43,7 @@ export type PayrollCalculatorInput = {
   tier2EmployeeRate?: string;
   tier2EmployerRate?: string;
   tier3EmployeeRate?: string;
+  tier3EmployerRate?: string;
   tier3ReliefCap?: string | null;
   employeeContributionTaxDeductible?: boolean;
   employerBearsEmployeeShare?: boolean;
@@ -69,6 +70,7 @@ export type PayrollCalculation = {
   tier2Employee: string;
   tier2Employer: string;
   tier3Employee: string;
+  tier3Employer: string;
   taxableBenefit: string;
   taxableIncome: string;
   incomeTax: string;
@@ -174,7 +176,8 @@ export function calculatePayroll(input: PayrollCalculatorInput): PayrollCalculat
   const tier2EmployeeRate = decimal(input.tier2EmployeeRate, "Tier 2 employee rate");
   const tier2EmployerRate = decimal(input.tier2EmployerRate, "Tier 2 employer rate");
   const tier3EmployeeRate = decimal(input.tier3EmployeeRate, "Tier 3 employee rate");
-  for (const [label, rate] of [["employee SSNIT", employeeRate], ["employer SSNIT", employerRate], ["Tier 2 employee", tier2EmployeeRate], ["Tier 2 employer", tier2EmployerRate], ["Tier 3 employee", tier3EmployeeRate]] as const) {
+  const tier3EmployerRate = decimal(input.tier3EmployerRate, "Tier 3 employer rate");
+  for (const [label, rate] of [["employee SSNIT", employeeRate], ["employer SSNIT", employerRate], ["Tier 2 employee", tier2EmployeeRate], ["Tier 2 employer", tier2EmployerRate], ["Tier 3 employee", tier3EmployeeRate], ["Tier 3 employer", tier3EmployerRate]] as const) {
     if (rate.lessThan(ZERO) || rate.greaterThan(HUNDRED)) throw new Error(`${label} rate must be between 0 and 100 percent.`);
   }
   const employeeSsnit = input.employeeSsnitFixedAmount == null
@@ -188,6 +191,7 @@ export function calculatePayroll(input: PayrollCalculatorInput): PayrollCalculat
   const tier3Employee = input.tier3EmployeeFixedAmount == null
     ? percent(tier3ContributionBase, tier3EmployeeRate)
     : money(nonNegative(decimal(input.tier3EmployeeFixedAmount, "fixed Tier 3 employee contribution")));
+  const tier3Employer = percent(tier3ContributionBase, tier3EmployerRate);
 
   const ssnitShareBorne = input.ssnitEmployerBearsEmployeeShare ?? input.employerBearsEmployeeShare ?? false;
   const tier2ShareBorne = input.tier2EmployerBearsEmployeeShare ?? input.employerBearsEmployeeShare ?? false;
@@ -236,6 +240,7 @@ export function calculatePayroll(input: PayrollCalculatorInput): PayrollCalculat
     ...(ssnitShareBorne ? [employeeSsnit] : []),
     ...(tier2ShareBorne ? [tier2Employee] : []),
     ...(tier3ShareBorne ? [tier3Employee] : []),
+    tier3Employer,
   ]));
 
   const lines: PayrollCalculation["lines"] = [
@@ -248,6 +253,7 @@ export function calculatePayroll(input: PayrollCalculatorInput): PayrollCalculat
     ...otherDeductions.map((line) => ({ kind: "DEDUCTION" as const, code: line.code, description: line.description, amount: line.amount.toFixed(2), originalAmount: line.amount.toFixed(2), balance: null, memo: false })),
     { kind: "EMPLOYER_CONTRIBUTION", code: "SSNIT_EMPLOYER", description: "Employer SSNIT", amount: employerSsnit.toFixed(2), originalAmount: employerSsnit.toFixed(2), balance: null, memo: true },
     { kind: "EMPLOYER_CONTRIBUTION", code: "TIER2_EMPLOYER", description: "Tier 2 employer contribution", amount: tier2Employer.toFixed(2), originalAmount: tier2Employer.toFixed(2), balance: null, memo: true },
+    { kind: "EMPLOYER_CONTRIBUTION", code: "TIER3_EMPLOYER", description: "Tier 3 employer contribution", amount: tier3Employer.toFixed(2), originalAmount: tier3Employer.toFixed(2), balance: null, memo: true },
   ];
 
   return {
@@ -260,6 +266,7 @@ export function calculatePayroll(input: PayrollCalculatorInput): PayrollCalculat
     tier2Employee: tier2Employee.toFixed(2),
     tier2Employer: tier2Employer.toFixed(2),
     tier3Employee: tier3Employee.toFixed(2),
+    tier3Employer: tier3Employer.toFixed(2),
     taxableBenefit: money(taxableBenefit).toFixed(2),
     taxableIncome: taxableIncome.toFixed(2),
     incomeTax: paye.toFixed(2),
