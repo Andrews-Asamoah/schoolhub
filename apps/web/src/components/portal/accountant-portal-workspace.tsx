@@ -267,6 +267,7 @@ export function AccountantPortalWorkspace({
   const paymentKeyRef = useRef<string | null>(null);
   const [selectedInvoiceForPrint, setSelectedInvoiceForPrint] = useState<ApiBill | null>(null);
   const [selectedFeeStructureId, setSelectedFeeStructureId] = useState("");
+  const [selectedOptionalItemIds, setSelectedOptionalItemIds] = useState<string[]>([]);
   const [selectedClassId, setSelectedClassId] = useState("");
   const [showBillForm, setShowBillForm] = useState(false);
   const [showExpenseForm, setShowExpenseForm] = useState(false);
@@ -592,6 +593,7 @@ export function AccountantPortalWorkspace({
       });
       setShowBillForm(false);
       setSelectedFeeStructureId("");
+      setSelectedOptionalItemIds([]);
       setSelectedClassId("");
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["finance", "bills"] }),
@@ -662,6 +664,7 @@ export function AccountantPortalWorkspace({
       classId: selectedClassId,
       dueDate: String(form.get("dueDate") ?? "") || undefined,
       notes: String(form.get("notes") ?? "").trim() || undefined,
+      optionalItemIds: selectedOptionalItemIds,
     });
     if (!currentYear || !currentTerm) {
       setMessage({ kind: "error", text: "Set a current academic year and term before generating bills." });
@@ -1030,11 +1033,37 @@ export function AccountantPortalWorkspace({
             {classesQuery.error && <QueryError message={classesQuery.error.message} />}
             {!currentYear || !currentTerm ? <div role="alert" className="rounded-xl border border-warning/30 bg-warning/5 p-3 text-sm text-foreground">A current academic year and term must be selected in School Settings before billing.</div> : <p className="rounded-xl bg-muted p-3 text-sm text-muted-foreground">Billing period: <span className="font-semibold text-foreground">{currentYear.name} · {currentTerm.name}</span></p>}
             <Field label="Fee structure">
-              <select name="feeStructureId" required className={inputClass} value={selectedFeeStructureId} onChange={(event) => { setSelectedFeeStructureId(event.target.value); setSelectedClassId(""); }}>
+              <select name="feeStructureId" required className={inputClass} value={selectedFeeStructureId} onChange={(event) => { setSelectedFeeStructureId(event.target.value); setSelectedOptionalItemIds([]); setSelectedClassId(""); }}>
                 <option value="" disabled>Select a fee structure…</option>
-                {feeStructures.map((fee) => <option key={fee.id} value={fee.id}>{fee.name} · {currency(fee.items.reduce((sum, item) => sum + Number(item.amount), 0))}</option>)}
+                {feeStructures.map((fee) => <option key={fee.id} value={fee.id}>{fee.name}</option>)}
               </select>
             </Field>
+            {selectedFeeStructure?.items.some((item) => item.isOptional) ? (
+              <fieldset className="rounded-xl border border-border p-3">
+                <legend className="px-1 text-sm font-semibold text-foreground">Optional fee items</legend>
+                <p className="mb-2 text-xs leading-5 text-muted-foreground">Optional fees are excluded by default. Select each optional item only when it should be charged to this class for this billing run.</p>
+                <div className="space-y-2">
+                  {selectedFeeStructure.items.filter((item) => item.isOptional).map((item) => (
+                    <label key={item.id} className="flex cursor-pointer items-start gap-3 rounded-lg border border-border p-3">
+                      <input
+                        type="checkbox"
+                        checked={selectedOptionalItemIds.includes(item.id)}
+                        onChange={(event) => setSelectedOptionalItemIds((current) =>
+                          event.target.checked
+                            ? [...current, item.id]
+                            : current.filter((id) => id !== item.id)
+                        )}
+                        className="mt-0.5 size-4 accent-primary"
+                      />
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-sm font-medium text-foreground">{item.name}</span>
+                        <span className="block text-xs text-muted-foreground">Optional · {currency(item.amount)}</span>
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
+            ) : null}
             <Field label="Class">
               <select name="classId" required className={inputClass} value={selectedClassId} onChange={(event) => setSelectedClassId(event.target.value)}>
                 <option value="" disabled>Select a class…</option>
