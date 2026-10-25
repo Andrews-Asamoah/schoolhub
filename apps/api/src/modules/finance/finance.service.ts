@@ -2957,6 +2957,7 @@ export class FinanceService {
         if (!current) throw new NotFoundException("Teacher not found.");
         previous = current.monthlySalary;
         await tx.teacher.updateMany({ where: { id: personId, schoolId, deletedAt: null }, data: { monthlySalary: next } });
+        await tx.salaryHistory.create({ data: { teacherId: personId, monthlySalary: next, effectiveDate: new Date(), reason: reason.trim(), changedById: actorId } });
       } else {
         const current = await tx.staff.findFirst({
           where: { id: personId, schoolId, deletedAt: null },
