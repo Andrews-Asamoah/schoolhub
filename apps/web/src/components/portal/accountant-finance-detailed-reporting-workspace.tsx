@@ -1,8 +1,10 @@
-import { TableExportMenu } from "@/components/ui/data-table";
+import { DataTable, TableExportMenu, type DataTableColumn } from "@/components/ui/data-table";
 import { ServerExportButton } from "@/components/portal/server-export-button";
 import type { ExportTable } from "@/lib/table-export";
 
 import { useCallback, useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { apiFetch } from "@/lib/api";
 import { Search, Users, WalletCards } from "lucide-react";
 
 interface Student {
@@ -47,6 +49,37 @@ interface Props {
   bills: FinanceBill[];
   payments: FinancePayment[];
   classes: FinanceClass[];
+}
+
+interface FinancePage<T> {
+  items: T[];
+  nextCursor: string | null;
+  total: number;
+}
+
+async function fetchAllFinancePages<T>(path: string): Promise<T[]> {
+  const records: T[] = [];
+  const seenCursors = new Set<string>();
+  let cursor: string | null = null;
+  let pageCount = 0;
+
+  do {
+    if (pageCount >= 1000) {
+      throw new Error("Finance report exceeded the safe pagination limit. Narrow the reporting period and try again.");
+    }
+    const params = new URLSearchParams({ limit: "100" });
+    if (cursor) params.set("cursor", cursor);
+    const page = await apiFetch<FinancePage<T>>(`${path}?${params.toString()}`);
+    records.push(...page.items);
+    cursor = page.nextCursor;
+    pageCount += 1;
+    if (cursor && seenCursors.has(cursor)) {
+      throw new Error("Finance report pagination returned a repeated cursor. No partial report has been displayed.");
+    }
+    if (cursor) seenCursors.add(cursor);
+  } while (cursor);
+
+  return records;
 }
 
 const money = (value: number) =>
@@ -104,11 +137,22 @@ function defaultStart() {
   return localDate(date);
 }
 
-export function AccountantFinanceDetailedReportingWorkspace({
-  bills,
-  payments,
-  classes,
-}: Props) {
+export function AccountantFinanceDetailedReportingWorkspace({ classes }: Props) {
+  // Registers are paginated; never calculate a school-wide report from page one only.
+  const completeFinanceQuery = useQuery({
+    queryKey: ["finance", "complete-report-dataset"],
+    queryFn: async () => {
+      const [bills, payments] = await Promise.all([
+        fetchAllFinancePages<FinanceBill>("/finance/bills"),
+        fetchAllFinancePages<FinancePayment>("/finance/payments"),
+      ]);
+      return { bills, payments };
+    },
+    retry: false,
+    staleTime: 30_000,
+  });
+  const bills = completeFinanceQuery.data?.bills ?? [];
+  const payments = completeFinanceQuery.data?.payments ?? [];
   const [reportType, setReportType] = useState<"class" | "student">("class");
   const [classId, setClassId] = useState("ALL");
   const [studentId, setStudentId] = useState("");
@@ -466,6 +510,30 @@ export function AccountantFinanceDetailedReportingWorkspace({
     };
   };
 
+  const classColumns: DataTableColumn<(typeof classSummary)[number]>[] = [
+    { id: "class", header: "Class", cell: (row) => row.name, value: (row) => row.name },
+    { id: "billed", header: "Billed", cell: (row) => money(row.billed), value: (row) => row.billed, className: "text-right tabular-nums" },
+    { id: "collected", header: "Collected", cell: (row) => money(row.collected), value: (row) => row.collected, className: "text-right tabular-nums" },
+    { id: "outstanding", header: "Outstanding", cell: (row) => money(row.outstanding), value: (row) => row.outstanding, className: "text-right tabular-nums" },
+    { id: "receipts", header: "Receipts", cell: (row) => row.receipts, value: (row) => row.receipts, className: "text-right tabular-nums" },
+  ];
+  const billColumns: DataTableColumn<FinanceBill>[] = [
+    { id: "bill", header: "Bill", cell: (row) => <><span className="font-medium">{row.billNumber}</span><span className="block text-xs text-muted-foreground">{row.class?.name ?? "Class not recorded"} | {row.status}</span></>, value: (row) => row.billNumber },
+    { id: "issued", header: "Issued", cell: (row) => dateText(row.issuedAt), value: (row) => row.issuedAt },
+    { id: "due", header: "Due", cell: (row) => dateText(row.dueDate), value: (row) => row.dueDate ?? "" },
+    { id: "billed", header: "Billed", cell: (row) => money(amount(row.totalAmount)), value: (row) => amount(row.totalAmount), className: "text-right tabular-nums" },
+    { id: "paid", header: "Paid", cell: (row) => money(amount(row.paidAmount)), value: (row) => amount(row.paidAmount), className: "text-right tabular-nums" },
+    { id: "balance", header: "Balance", cell: (row) => money(amount(row.balanceAmount)), value: (row) => amount(row.balanceAmount), className: "text-right tabular-nums" },
+  ];
+  const paymentColumns: DataTableColumn<FinancePayment>[] = [
+    { id: "receipt", header: "Receipt", cell: (row) => <span className="font-medium">{row.paymentNumber}</span>, value: (row) => row.paymentNumber },
+    { id: "date", header: "Date", cell: (row) => dateText(row.paymentDate), value: (row) => row.paymentDate },
+    { id: "bill", header: "Bill", cell: (row) => row.bill?.billNumber ?? "Unallocated", value: (row) => row.bill?.billNumber ?? "" },
+    { id: "method", header: "Method", cell: (row) => row.paymentMethod.replaceAll("_", " "), value: (row) => row.paymentMethod },
+    { id: "amount", header: "Amount", cell: (row) => money(amount(row.amount)), value: (row) => amount(row.amount), className: "text-right tabular-nums" },
+    { id: "status", header: "Status", cell: (row) => row.status, value: (row) => row.status },
+  ];
+
   return (
     <section className="space-y-5 rounded-2xl border border-border bg-card p-5 sm:p-6">
       <style>{`@media print {
@@ -502,6 +570,17 @@ export function AccountantFinanceDetailedReportingWorkspace({
         </div>
         </div>
 
+      {completeFinanceQuery.isPending ? (
+        <div role="status" className="rounded-xl border border-border bg-muted/30 p-4 text-sm text-muted-foreground">
+          Loading all finance records for a complete report…
+        </div>
+      ) : completeFinanceQuery.error ? (
+        <div role="alert" className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
+          Unable to load the complete finance dataset. Report totals are unavailable; no partial totals are displayed. {completeFinanceQuery.error.message}
+          <button type="button" className="ml-2 font-semibold underline" onClick={() => void completeFinanceQuery.refetch()}>Retry</button>
+        </div>
+      ) : (
+      <>
       <div className="finance-report-print-actions grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         <label className="space-y-1 text-xs font-medium text-muted-foreground">
           Report type
@@ -746,41 +825,7 @@ export function AccountantFinanceDetailedReportingWorkspace({
 
         {reportType === "class" ? (
           classSummary.length ? (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[680px] text-left text-sm">
-                <thead>
-                  <tr className="border-b border-border text-xs text-muted-foreground">
-                    <th className="py-2 pr-3">Class</th>
-                    <th className="px-2 py-2 text-right">Billed</th>
-                    <th className="px-2 py-2 text-right">Collected</th>
-                    <th className="px-2 py-2 text-right">Outstanding</th>
-                    <th className="py-2 pl-2 text-right">Receipts</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {classSummary.map((item) => (
-                    <tr
-                      key={item.name}
-                      className="border-b border-border/70 last:border-0"
-                    >
-                      <td className="py-2 pr-3 font-medium">{item.name}</td>
-                      <td className="px-2 py-2 text-right tabular-nums">
-                        {money(item.billed)}
-                      </td>
-                      <td className="px-2 py-2 text-right tabular-nums">
-                        {money(item.collected)}
-                      </td>
-                      <td className="px-2 py-2 text-right tabular-nums">
-                        {money(item.outstanding)}
-                      </td>
-                      <td className="py-2 pl-2 text-right tabular-nums">
-                        {item.receipts}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <DataTable rows={classSummary} columns={classColumns} getRowId={(row) => row.name} emptyTitle="No class collections" emptyDescription="No matching class collection records." exportTitle="Class collections" searchable={false} embedded />
           ) : (
             <p className="py-8 text-center text-sm text-muted-foreground">
               No bill or receipt records match the selected period and class.
@@ -799,51 +844,7 @@ export function AccountantFinanceDetailedReportingWorkspace({
               </h4>
 
               {visibleBills.length ? (
-                <div className="overflow-x-auto">
-                  <table className="w-full min-w-[640px] text-left text-sm">
-                    <thead>
-                      <tr className="border-b border-border text-xs text-muted-foreground">
-                        <th className="py-2 pr-3">Bill</th>
-                        <th className="px-2 py-2">Issued</th>
-                        <th className="px-2 py-2">Due</th>
-                        <th className="px-2 py-2 text-right">Billed</th>
-                        <th className="px-2 py-2 text-right">Paid</th>
-                        <th className="py-2 pl-2 text-right">Balance</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {visibleBills.map((bill) => (
-                        <tr
-                          key={bill.id}
-                          className="border-b border-border/70 last:border-0"
-                        >
-                          <td className="py-2 pr-3 font-medium">
-                            {bill.billNumber}
-                            <span className="block text-xs text-muted-foreground">
-                              {bill.class?.name ?? "Class not recorded"} |{" "}
-                              {bill.status}
-                            </span>
-                          </td>
-                          <td className="px-2 py-2">
-                            {dateText(bill.issuedAt)}
-                          </td>
-                          <td className="px-2 py-2">
-                            {dateText(bill.dueDate)}
-                          </td>
-                          <td className="px-2 py-2 text-right tabular-nums">
-                            {money(amount(bill.totalAmount))}
-                          </td>
-                          <td className="px-2 py-2 text-right tabular-nums">
-                            {money(amount(bill.paidAmount))}
-                          </td>
-                          <td className="py-2 pl-2 text-right tabular-nums">
-                            {money(amount(bill.balanceAmount))}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                <DataTable rows={visibleBills} columns={billColumns} getRowId={(row) => row.id} emptyTitle="No bills" emptyDescription="No bills were issued in this date range." exportTitle="Student bills" searchable={false} embedded />
               ) : (
                 <p className="text-sm text-muted-foreground">
                   No bills were issued in this date range.
@@ -857,45 +858,7 @@ export function AccountantFinanceDetailedReportingWorkspace({
               </h4>
 
               {visiblePayments.length ? (
-                <div className="overflow-x-auto">
-                  <table className="w-full min-w-[620px] text-left text-sm">
-                    <thead>
-                      <tr className="border-b border-border text-xs text-muted-foreground">
-                        <th className="py-2 pr-3">Receipt</th>
-                        <th className="px-2 py-2">Date</th>
-                        <th className="px-2 py-2">Bill</th>
-                        <th className="px-2 py-2">Method</th>
-                        <th className="px-2 py-2 text-right">Amount</th>
-                        <th className="py-2 pl-2">Status</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {visiblePayments.map((payment) => (
-                        <tr
-                          key={payment.id}
-                          className="border-b border-border/70 last:border-0"
-                        >
-                          <td className="py-2 pr-3 font-medium">
-                            {payment.paymentNumber}
-                          </td>
-                          <td className="px-2 py-2">
-                            {dateText(payment.paymentDate)}
-                          </td>
-                          <td className="px-2 py-2">
-                            {payment.bill?.billNumber ?? "Unallocated"}
-                          </td>
-                          <td className="px-2 py-2">
-                            {payment.paymentMethod.replaceAll("_", " ")}
-                          </td>
-                          <td className="px-2 py-2 text-right tabular-nums">
-                            {money(amount(payment.amount))}
-                          </td>
-                          <td className="py-2 pl-2">{payment.status}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                <DataTable rows={visiblePayments} columns={paymentColumns} getRowId={(row) => row.id} emptyTitle="No receipts" emptyDescription="No payment records were recorded in this date range." exportTitle="Student receipts" searchable={false} embedded />
               ) : (
                 <p className="text-sm text-muted-foreground">
                   No payment records were recorded in this date range.
@@ -915,6 +878,8 @@ export function AccountantFinanceDetailedReportingWorkspace({
           bill balances and may cover dates outside this report period.
         </p>
       </div>
+      </>
+      )}
     </section>
   );
 }
