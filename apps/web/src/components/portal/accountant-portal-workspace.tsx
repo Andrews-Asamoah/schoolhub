@@ -269,6 +269,18 @@ export function AccountantPortalWorkspace({
   const [selectedPayrollId, setSelectedPayrollId] = useState("");
   const [message, setMessage] = useState<{ kind: "success" | "error"; text: string } | null>(null);
 
+  // Load only the finance datasets used by the active workspace. The overview
+  // needs the broad summary; focused registers should not wait on payroll,
+  // inventory, or unrelated finance queries.
+  const needsOverview = activeTab === "overview";
+  const needsBills = needsOverview || ["invoices", "debtors", "reports"].includes(activeTab);
+  const needsPayments = needsOverview || ["payments", "reports"].includes(activeTab);
+  const needsExpenses = needsOverview || activeTab === "expenses";
+  const needsFeeStructures = needsOverview || activeTab === "invoices";
+  const needsClasses = needsOverview || ["invoices", "reports"].includes(activeTab);
+  const needsYears = needsOverview || activeTab === "invoices";
+  const needsPayroll = needsOverview || activeTab === "payroll";
+
   const schoolQuery = useQuery({
     queryKey: ["school", "current"],
     queryFn: () => apiFetch<FinanceSchool>("/schools/current"),
@@ -278,31 +290,37 @@ export function AccountantPortalWorkspace({
   const billsQuery = useQuery({
     queryKey: ["finance", "bills"],
     queryFn: () => apiFetch<ApiBill[]>("/finance/bills"),
+    enabled: needsBills,
     retry: false,
   });
   const paymentsQuery = useQuery({
     queryKey: ["finance", "payments"],
     queryFn: () => apiFetch<ApiPayment[]>("/finance/payments"),
+    enabled: needsPayments,
     retry: false,
   });
   const expensesQuery = useQuery({
     queryKey: ["finance", "expenses"],
     queryFn: () => apiFetch<ApiExpense[]>("/finance/expenses"),
+    enabled: needsExpenses,
     retry: false,
   });
   const feeStructuresQuery = useQuery({
     queryKey: ["finance", "fee-structures"],
     queryFn: () => apiFetch<ApiFeeStructure[]>("/finance/fee-structures"),
+    enabled: needsFeeStructures,
     retry: false,
   });
   const classesQuery = useQuery({
     queryKey: ["academics", "classes"],
     queryFn: () => apiFetch<ApiClass[]>("/academics/classes"),
+    enabled: needsClasses,
     retry: false,
   });
   const yearsQuery = useQuery({
     queryKey: ["schools", "academic-years"],
     queryFn: () => apiFetch<ApiAcademicYear[]>("/schools/academic-years"),
+    enabled: needsYears,
     retry: false,
   });
   const inventoryQuery = useQuery({
@@ -314,6 +332,7 @@ export function AccountantPortalWorkspace({
   const payrollQuery = useQuery({
     queryKey: ["finance", "payroll"],
     queryFn: () => apiFetch<ApiPayroll[]>("/finance/payroll"),
+    enabled: needsPayroll,
     retry: false,
   });
 
@@ -622,8 +641,14 @@ export function AccountantPortalWorkspace({
   }
 
   const loading =
-    billsQuery.isPending || paymentsQuery.isPending || expensesQuery.isPending ||
-    feeStructuresQuery.isPending || classesQuery.isPending || yearsQuery.isPending || payrollQuery.isPending || (activeTab === "inventory" && inventoryQuery.isPending);
+    (needsBills && billsQuery.isPending) ||
+    (needsPayments && paymentsQuery.isPending) ||
+    (needsExpenses && expensesQuery.isPending) ||
+    (needsFeeStructures && feeStructuresQuery.isPending) ||
+    (needsClasses && classesQuery.isPending) ||
+    (needsYears && yearsQuery.isPending) ||
+    (needsPayroll && payrollQuery.isPending) ||
+    (activeTab === "inventory" && inventoryQuery.isPending);
 
   return (
     <div className="space-y-6"><style>{`@media print {
@@ -675,7 +700,7 @@ export function AccountantPortalWorkspace({
         </div>
       )}
 
-      {activeTab === "overview" && (
+      {!loading && activeTab === "overview" && (
         <section aria-label="Financial performance indicators" className="space-y-3">
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div><h2 className="text-lg font-semibold text-foreground">Financial performance</h2><p className="mt-1 text-sm text-muted-foreground">A live summary of saved records. Select a card to review its supporting records.</p></div>
