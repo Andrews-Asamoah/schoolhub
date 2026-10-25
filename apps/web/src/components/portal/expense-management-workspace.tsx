@@ -205,7 +205,9 @@ export function ExpenseManagementWorkspace() {
       ["Total (GHS)", visibleExpenses.reduce((sum, expense) => sum + Number(expense.amount), 0).toFixed(2)],
     ];
     const csv = rows.map((row) => row.map((value) => {
-      const field = String(value ?? "");
+      let field = String(value ?? "");
+      // Treat user-supplied text as text when opened in spreadsheet software.
+      if (/^[\t\r\n ]*[=+\-@]/.test(field)) field = "'" + field;
       return '"' + field.replaceAll('"', '""') + '"';
     }).join(",")).join("\r\n");
     const blob = new Blob(["\uFEFF", csv], { type: "text/csv;charset=utf-8;" });
