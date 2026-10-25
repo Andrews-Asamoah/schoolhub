@@ -300,3 +300,39 @@ SELECT
   CURRENT_TIMESTAMP
 FROM "schools" s
 ON CONFLICT DO NOTHING;
+
+
+-- Backfill immutable line snapshots for historical payslips without changing
+-- any existing payslip or payroll-record totals. Existing values are copied
+-- verbatim; these lines are a display/audit snapshot, not a recomputation.
+INSERT INTO "payslip_lines" ("id", "payslipId", "kind", "code", "description", "amount", "originalAmount", "balance", "memo")
+SELECT 'legacy-line-' || p."id" || '-BASIC', p."id", 'EARNING', 'BASIC', 'Basic salary', p."basicSalary", p."basicSalary", NULL, FALSE
+FROM "payslips" p
+ON CONFLICT ("id") DO NOTHING;
+
+INSERT INTO "payslip_lines" ("id", "payslipId", "kind", "code", "description", "amount", "originalAmount", "balance", "memo")
+SELECT 'legacy-line-' || p."id" || '-ALLOWANCES', p."id", 'EARNING', 'ALLOWANCES', 'Allowances (historical aggregate)', p."allowances", p."allowances", NULL, FALSE
+FROM "payslips" p
+WHERE p."allowances" > 0
+ON CONFLICT ("id") DO NOTHING;
+
+INSERT INTO "payslip_lines" ("id", "payslipId", "kind", "code", "description", "amount", "originalAmount", "balance", "memo")
+SELECT 'legacy-line-' || p."id" || '-SSNIT_EMPLOYEE', p."id", 'DEDUCTION', 'SSNIT_EMPLOYEE', 'Employee SSNIT (historical aggregate)', p."ssnitEmployee", p."ssnitEmployee", NULL, FALSE
+FROM "payslips" p
+ON CONFLICT ("id") DO NOTHING;
+
+INSERT INTO "payslip_lines" ("id", "payslipId", "kind", "code", "description", "amount", "originalAmount", "balance", "memo")
+SELECT 'legacy-line-' || p."id" || '-PAYE', p."id", 'DEDUCTION', 'PAYE', 'PAYE (historical aggregate)', p."incomeTax", p."incomeTax", NULL, FALSE
+FROM "payslips" p
+ON CONFLICT ("id") DO NOTHING;
+
+INSERT INTO "payslip_lines" ("id", "payslipId", "kind", "code", "description", "amount", "originalAmount", "balance", "memo")
+SELECT 'legacy-line-' || p."id" || '-OTHER_DEDUCTIONS', p."id", 'DEDUCTION', 'OTHER_DEDUCTIONS', 'Other deductions (historical aggregate)', p."otherDeductions", p."otherDeductions", NULL, FALSE
+FROM "payslips" p
+WHERE p."otherDeductions" > 0
+ON CONFLICT ("id") DO NOTHING;
+
+INSERT INTO "payslip_lines" ("id", "payslipId", "kind", "code", "description", "amount", "originalAmount", "balance", "memo")
+SELECT 'legacy-line-' || p."id" || '-SSNIT_EMPLOYER', p."id", 'EMPLOYER_CONTRIBUTION', 'SSNIT_EMPLOYER', 'Employer SSNIT (memo)', p."ssnitEmployer", p."ssnitEmployer", NULL, TRUE
+FROM "payslips" p
+ON CONFLICT ("id") DO NOTHING;
