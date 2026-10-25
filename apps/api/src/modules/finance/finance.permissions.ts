@@ -30,3 +30,7 @@ export function canExportFinancePayroll(actorPlatformRole: string | null | undef
 
 /** Statutory payroll settings may only be approved by the actual owner or headteacher membership role. */
 export const PAYROLL_SETTINGS_APPROVER_ROLES = ["owner", "headteacher"] as const;
+
+export function isPayrollSettingsApproverRole(role: string | null | undefined): boolean {
+  return !!role && (PAYROLL_SETTINGS_APPROVER_ROLES as readonly string[]).includes(role);
+}
