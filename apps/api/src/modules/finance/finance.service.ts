@@ -1906,9 +1906,8 @@ export class FinanceService {
       const date = new Date(`${event.date}T00:00:00.000Z`);
       if (date.getTime() > statementEnd) return false;
       if (minDate && date < minDate) return false;
-      if (event.billId) {
+      if ((event.type === "INVOICE" || event.type === "DISCOUNT" || event.type === "ADJUSTMENT") && event.billId) {
         const bill = billPeriod.get(event.billId);
-        if ((scope === "term" || scope === "year") && !bill) return false;
         if (scope === "term" && bill?.termId !== selectedTermId) return false;
         if (scope === "year" && bill?.academicYearId !== selectedYearId) return false;
       }
@@ -1984,7 +1983,8 @@ export class FinanceService {
     const issuedAt: Prisma.DateTimeFilter = {};
     if (from) issuedAt.gte = from;
     if (to) issuedAt.lte = to;
-    const asOf = toStart ?? new Date();
+    const asOfSource = toStart ?? new Date();
+    const asOf = new Date(`${asOfSource.toISOString().slice(0, 10)}T00:00:00.000Z`);
     const filters: Prisma.BillWhereInput[] = [];
     if (query.status) filters.push({ status: query.status as (typeof BILL_STATUSES)[number] });
     if (query.outstanding === "true" || query.overdue === "true") {
@@ -2036,7 +2036,19 @@ export class FinanceService {
       }),
       this.prisma.client.bill.count({ where }),
     ]);
-    const items = rows.slice(0, limit);
+    const items = rows.slice(0, limit).map((bill) => {
+      const previousBalanceTotal = bill.carryForwards.reduce(
+        (sum, snapshot) => sum.plus(snapshot.amount),
+        new Prisma.Decimal(0),
+      );
+      const overdueDays = bill.dueDate ? daysPastDue(bill.dueDate, asOf) : null;
+      return {
+        ...bill,
+        previousBalanceTotal: previousBalanceTotal.toFixed(2),
+        totalDueAtIssue: bill.totalAmount.plus(previousBalanceTotal).toFixed(2),
+        overdueDays: bill.balanceAmount.gt(0) && overdueDays !== null && overdueDays > 0 ? overdueDays : null,
+      };
+    });
     return { items, nextCursor: rows.length > limit ? items[items.length - 1]?.id ?? null : null, total };
   }
 
