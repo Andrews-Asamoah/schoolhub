@@ -1,4 +1,5 @@
-import { Body, Controller, Get, Patch, Param, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, Patch, Param, Res, UseGuards } from "@nestjs/common";
+import type { Response } from "express";
 import { updateMyProfileSchema, type UpdateMyProfileInput } from "@schoolhub/shared";
 import { CurrentSchoolRole } from "../../common/decorators/current-school-role.decorator.js";
 import { CurrentUser } from "../../common/decorators/current-user.decorator.js";
@@ -41,6 +42,21 @@ export class MeController {
     @Param("payslipId") payslipId: string,
   ) {
     return this.me.getMyPayslip(user.id, school.id, payslipId);
+  }
+
+
+  @Get("payslips/:payslipId/pdf")
+  async downloadMyPayslipPdf(
+    @CurrentUser() user: { id: string },
+    @CurrentSchool() school: School,
+    @Param("payslipId") payslipId: string,
+    @Res() response: Response,
+  ) {
+    const pdf = await this.me.getMyPayslipPdf(user.id, school.id, payslipId);
+    response.setHeader("Content-Type", "application/pdf");
+    response.setHeader("Content-Disposition", `attachment; filename="schoolhub-payslip-${payslipId}.pdf"`);
+    response.setHeader("Cache-Control", "private, no-store");
+    return response.send(pdf);
   }
 
 }
