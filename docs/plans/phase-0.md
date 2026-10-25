@@ -22,14 +22,15 @@ Run these against the unmodified baseline before making implementation changes:
 
 The repository's finance integration suite is enabled only when `TEST_DATABASE_URL` is set and its database name contains `test`. CI must set it to the PostgreSQL service database and apply migrations before running the suite.
 
-## Environment limitation and baseline status
+## Baseline and environment notes
 
-The execution environment for this phase cannot resolve `github.com` for a local clone, so it cannot install the workspace from the repository directly. Consequently, no local baseline command result is claimed. The new pull-request CI is the executable baseline; its first run must be inspected and any pre-existing failures recorded below before treating Phase 0 as green.
+This execution environment could not resolve `github.com` for a local clone, so the checks were run on GitHub Actions rather than locally. The baseline job checked out the pull request base commit `f0e9d20ba1500739ab655963a21d91ead75a4795`, before any Phase 0 changes.
 
-- Dependency install: pending CI run.
-- Typecheck: pending CI run.
-- API lint: pending CI run.
-- API tests (including PostgreSQL finance integration suite): pending CI run.
+**Baseline outcome: no pre-existing failures observed.** The frozen install, typecheck, API lint, database migrations, API tests and web theme lint all passed. The API suite reported 260 passing tests across 26 files; the PostgreSQL-backed `finance (database)` suite ran 25 tests.
+
+- Baseline run: [GitHub Actions run 40215830582](https://github.com/Andrews-Asamoah/schoolhub/actions/runs/40215830582)
+- Proposed branch run: [GitHub Actions run 40215830582](https://github.com/Andrews-Asamoah/schoolhub/actions/runs/40215830582)
+- The earlier workflow run before improving baseline outcome reporting also passed, but the later run is the authoritative record because it exposes baseline step failures rather than masking them.
 
 ## CI design
 
@@ -52,15 +53,17 @@ The execution environment for this phase cannot resolve `github.com` for a local
 
 Fill in the following from the first CI run and the post-change CI run:
 
-| Check | Baseline | After change |
+| Check | Baseline (`f0e9d20`) | Proposed branch |
 | --- | --- | --- |
-| Frozen install | Pending | Pending |
-| Typecheck | Pending | Pending |
-| API lint | Pending | Pending |
-| Web theme lint | Pending | Pending |
-| API unit tests | Pending | Pending |
-| Finance PostgreSQL integration tests | Pending | Pending |
+| Frozen install | Pass | Pass |
+| Typecheck | Pass | Pass |
+| API lint | Pass | Pass |
+| Database migrations | Pass | Pass |
+| Web theme lint | Pass | Pass |
+| API test suite | 260 passed, 26 files | 266 passed, 27 files |
+| PostgreSQL finance integration suite | 25 passed | 25 passed |
+| Development reset guard tests | Not present | Included in passing suite |
 
 ## Phase gate
 
-Phase 0 is complete only when the workflow is green on the clean phase branch, the reset guard tests pass, and the exact baseline/post-change results are documented. Do not begin Phase 1 until the Phase 0 report is reviewed and approved.
+The latest CI run is green for both jobs (baseline and proposed branch). The new reset guard is covered by unit tests, and the API suite passes with PostgreSQL integration enabled. Phase 0's automated verification criteria are met. Do not begin Phase 1 until this Phase 0 report is reviewed and approved.
