@@ -105,13 +105,13 @@ export function AccountantFinanceReportingWorkspace({ bills, payments, classes }
   }, [range.start, range.end]);
 
   const scopedBills = useMemo(() => bills.filter(bill => {
-    if (reportType === "student" && studentId && bill.studentId !== studentId) return false;
+    if (reportType === "student" && (!studentId || bill.studentId !== studentId)) return false;
     if (reportType === "class" && classId !== "ALL" && bill.class?.id !== classId) return false;
     return inRange(bill.issuedAt);
   }), [bills, reportType, studentId, classId, inRange]);
 
   const scopedPayments = useMemo(() => payments.filter(payment => {
-    if (reportType === "student" && studentId && payment.studentId !== studentId) return false;
+    if (reportType === "student" && (!studentId || payment.studentId !== studentId)) return false;
     if (reportType === "class" && classId !== "ALL") {
       const linkedBill = payment.bill?.id ? bills.find(bill => bill.id === payment.bill?.id) : undefined;
       if (linkedBill?.class?.id !== classId) return false;
@@ -125,9 +125,9 @@ export function AccountantFinanceReportingWorkspace({ bills, payments, classes }
   const completedPayments = visiblePayments.filter(payment => settled(payment.status));
   const collected = completedPayments.reduce((sum, payment) => sum + amount(payment.amount), 0);
   const billed = visibleBills.filter(bill => bill.status !== "CANCELLED" && bill.status !== "WAIVED").reduce((sum, bill) => sum + amount(bill.totalAmount), 0);
-  const outstanding = reportType === "student" && studentId
-    ? bills.filter(bill => bill.studentId === studentId && bill.status !== "CANCELLED" && bill.status !== "WAIVED").reduce((sum, bill) => sum + Math.max(0, amount(bill.balanceAmount)), 0)
-    : visibleBills.filter(bill => bill.status !== "CANCELLED" && bill.status !== "WAIVED").reduce((sum, bill) => sum + Math.max(0, amount(bill.balanceAmount)), 0);
+  const outstanding = reportType === "student"
+    ? (studentId ? bills.filter(bill => bill.studentId === studentId && bill.status !== "CANCELLED" && bill.status !== "WAIVED").reduce((sum, bill) => sum + Math.max(0, amount(bill.balanceAmount)), 0) : 0)
+    : bills.filter(bill => (classId === "ALL" || bill.class?.id === classId) && bill.status !== "CANCELLED" && bill.status !== "WAIVED").reduce((sum, bill) => sum + Math.max(0, amount(bill.balanceAmount)), 0);
 
   const classSummary = useMemo(() => {
     const byBillId = new Map(bills.map(bill => [bill.id, bill]));
