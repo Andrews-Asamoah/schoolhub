@@ -1180,7 +1180,7 @@ export class FinanceService {
       await tx.$executeRaw`SELECT id FROM payments WHERE id = ${paymentId} AND "schoolId" = ${schoolId} FOR UPDATE`;
       const payment = await tx.payment.findFirst({
         where: { id: paymentId, schoolId },
-        include: { paymentItems: true, transaction: true },
+        include: { paymentItems: { include: { billItem: { select: { id: true, billId: true } } } }, billAllocations: true, transaction: true },
       });
       if (!payment) throw new NotFoundException("Payment not found.");
       if (payment.reversedAt || payment.status !== "COMPLETED") {
@@ -1188,42 +1188,80 @@ export class FinanceService {
       }
 
       await tx.$executeRaw`SELECT id FROM students WHERE id = ${payment.studentId} AND "schoolId" = ${schoolId} FOR UPDATE`;
-      if (payment.billId) {
-        await tx.$executeRaw`SELECT id FROM bills WHERE id = ${payment.billId} AND "schoolId" = ${schoolId} FOR UPDATE`;
-        const bill = await tx.bill.findFirst({ where: { id: payment.billId, schoolId }, include: { items: true } });
-        if (bill) {
-          for (const allocation of payment.paymentItems) {
-            const item = bill.items.find((candidate) => candidate.id === allocation.billItemId);
-            if (!item) continue;
-            const nextPaid = Prisma.Decimal.max(0, item.paidAmount.minus(allocation.amount));
-            const netTotal = item.totalAmount.minus(item.discountAmount);
-            const nextBalance = Prisma.Decimal.min(netTotal, item.balanceAmount.plus(allocation.amount));
-            await tx.billItem.update({
-              where: { id: item.id },
-              data: {
-                paidAmount: nextPaid,
-                balanceAmount: nextBalance,
-                status: nextPaid.eq(0) ? "UNPAID" : nextBalance.eq(0) ? "FULLY_PAID" : "PARTIALLY_PAID",
-              },
-            });
-          }
-          const paid = Prisma.Decimal.max(0, bill.paidAmount.minus(payment.amount));
-          const balance = Prisma.Decimal.min(bill.totalAmount, bill.balanceAmount.plus(payment.amount));
-          await tx.bill.update({
-            where: { id: bill.id },
-            data: {
-              paidAmount: paid,
-              balanceAmount: balance,
-              status: ["CANCELLED", "WAIVED"].includes(bill.status)
-                ? bill.status
-                : paid.eq(0) ? "PENDING" : balance.eq(0) ? "PAID" : "PARTIALLY_PAID",
-            },
-          });
-        }
+      const billAmounts = new Map<string, Prisma.Decimal>();
+      for (const allocation of payment.billAllocations) {
+        billAmounts.set(allocation.billId, (billAmounts.get(allocation.billId) ?? new Prisma.Decimal(0)).plus(allocation.amount));
       }
+      // Legacy receipts predate bill-level allocation rows. Recover the actual
+      // bill targets from saved item allocations before falling back to billId.
+      if (billAmounts.size === 0) {
+        for (const allocation of payment.paymentItems) {
+          const billId = allocation.billItem.billId;
+          billAmounts.set(billId, (billAmounts.get(billId) ?? new Prisma.Decimal(0)).plus(allocation.amount));
+        }
+        if (billAmounts.size === 0 && payment.billId) billAmounts.set(payment.billId, payment.amount);
+      }
+      const billIds = [...billAmounts.keys()].sort();
+      if (billIds.length) {
+        await tx.$executeRaw`
+          SELECT id FROM bills
+          WHERE "schoolId" = ${schoolId} AND id IN (${Prisma.join(billIds)})
+          ORDER BY id ASC FOR UPDATE
+        `;
+      }
+      const bills = await tx.bill.findMany({
+        where: { schoolId, id: { in: billIds } },
+        include: { items: true },
+      });
+      const billsById = new Map(bills.map((bill) => [bill.id, bill]));
+
+      const itemAmounts = new Map<string, Prisma.Decimal>();
+      for (const allocation of payment.paymentItems) {
+        itemAmounts.set(
+          allocation.billItem.id,
+          (itemAmounts.get(allocation.billItem.id) ?? new Prisma.Decimal(0)).plus(allocation.amount),
+        );
+      }
+      for (const [billItemId, allocatedAmount] of itemAmounts) {
+        const item = await tx.billItem.findFirst({
+          where: { id: billItemId, bill: { schoolId, studentId: payment.studentId } },
+        });
+        if (!item) throw new ConflictException("The original bill-item allocation is missing. No reversal was applied.");
+        const nextPaid = Prisma.Decimal.max(0, item.paidAmount.minus(allocatedAmount));
+        const netTotal = item.totalAmount.minus(item.discountAmount);
+        const nextBalance = Prisma.Decimal.min(netTotal, item.balanceAmount.plus(allocatedAmount));
+        await tx.billItem.update({
+          where: { id: item.id },
+          data: {
+            paidAmount: nextPaid,
+            balanceAmount: nextBalance,
+            status: nextPaid.eq(0) ? "UNPAID" : nextBalance.eq(0) ? "FULLY_PAID" : "PARTIALLY_PAID",
+          },
+        });
+      }
+      for (const [billId, allocatedAmount] of billAmounts) {
+        const bill = billsById.get(billId);
+        if (!bill) throw new ConflictException("The original bill allocation is missing. No reversal was applied.");
+        const paid = Prisma.Decimal.max(0, bill.paidAmount.minus(allocatedAmount));
+        const balance = Prisma.Decimal.min(bill.totalAmount, bill.balanceAmount.plus(allocatedAmount));
+        await tx.bill.update({
+          where: { id: bill.id },
+          data: {
+            paidAmount: paid,
+            balanceAmount: balance,
+            status: ["CANCELLED", "WAIVED"].includes(bill.status)
+              ? bill.status
+              : paid.eq(0) ? "PENDING" : balance.eq(0) ? "PAID" : "PARTIALLY_PAID",
+          },
+        });
+      }
+      const remainingBalance = await tx.bill.aggregate({
+        where: { schoolId, studentId: payment.studentId, status: { notIn: ["CANCELLED", "WAIVED"] } },
+        _sum: { balanceAmount: true },
+      });
       await tx.student.update({
         where: { id: payment.studentId },
-        data: { outstandingBalance: { increment: payment.amount } },
+        data: { outstandingBalance: remainingBalance._sum.balanceAmount ?? new Prisma.Decimal(0) },
       });
 
       // Balancing ledger entry (only fee receipts that were posted to the ledger have one).
