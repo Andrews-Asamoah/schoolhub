@@ -2515,8 +2515,8 @@ export class FinanceService {
         { paymentNumber: { contains: term, mode: "insensitive" } },
         { referenceNumber: { contains: term, mode: "insensitive" } },
         { student: { admissionNumber: { contains: term, mode: "insensitive" } } },
-        { student: { profile: { firstName: { contains: term, mode: "insensitive" } } },
-        { student: { profile: { lastName: { contains: term, mode: "insensitive" } } },
+        { student: { profile: { firstName: { contains: term, mode: "insensitive" } } } },
+        { student: { profile: { lastName: { contains: term, mode: "insensitive" } } } },
       ] });
     }
     const where: Prisma.PaymentWhereInput = {
