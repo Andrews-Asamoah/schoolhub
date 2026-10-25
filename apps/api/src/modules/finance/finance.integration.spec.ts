@@ -114,6 +114,7 @@ describe.skipIf(!enabled)("finance (database)", { timeout: 60_000 }, () => {
     if (!prisma || !schoolId) return;
     const quiet = (promise: Promise<unknown>) => promise.catch(() => undefined);
     await quiet(prisma.auditLog.deleteMany({ where: { schoolId } }));
+    await quiet(prisma.paymentBillAllocation.deleteMany({ where: { schoolId } }));
     await quiet(prisma.payment.deleteMany({ where: { schoolId } }));
     await quiet(prisma.transaction.deleteMany({ where: { schoolId } }));
     await quiet(prisma.chartAccount.deleteMany({ where: { schoolId } }));
