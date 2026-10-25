@@ -108,6 +108,16 @@ describe.skipIf(!enabled)("finance (database)", { timeout: 60_000 }, () => {
       data: { schoolId, name: `${run} year`, startDate: new Date("2026-01-01"), endDate: new Date("2026-12-31"), isCurrent: true },
     });
     yearId = year.id;
+    await prisma.term.create({
+      data: {
+        academicYearId: yearId,
+        name: "Test Term 1",
+        termNumber: 1,
+        startDate: new Date("2026-01-01"),
+        endDate: new Date("2026-04-30"),
+        isCurrent: true,
+      },
+    });
   });
 
   afterAll(async () => {
@@ -380,6 +390,153 @@ describe.skipIf(!enabled)("finance (database)", { timeout: 60_000 }, () => {
       await expect(
         service.setPeriodLock(schoolId, userId, true, { lockedThrough: day(3), reason: "This should not be accepted" }),
       ).rejects.toThrow(/future/i);
+    });
+  });
+
+  describe("reporting and statements", () => {
+    it("paginates more than 500 bills and payments while summaries include all rows", async () => {
+      const { student } = await studentWithBill(100);
+      const prefix = `RPT-${run}-`;
+      const billRows = Array.from({ length: 501 }, (_, index) => ({
+        schoolId,
+        studentId: student.id,
+        academicYearId: yearId,
+        billNumber: `${prefix}${index.toString().padStart(4, "0")}`,
+        totalAmount: new Prisma.Decimal("1.00"),
+        grossAmount: new Prisma.Decimal("1.00"),
+        paidAmount: new Prisma.Decimal("0.00"),
+        balanceAmount: new Prisma.Decimal("1.00"),
+        status: "PENDING" as const,
+        issuedAt: new Date(Date.UTC(2026, 0, (index % 28) + 1)),
+        termId: (await prisma.term.findFirst({ where: { academicYearId: yearId }, select: { id: true } }))!.id,
+      }));
+      await prisma.bill.createMany({ data: billRows });
+      const insertedBills = await prisma.bill.findMany({
+        where: { schoolId, billNumber: { startsWith: prefix } },
+        select: { id: true, billNumber: true },
+      });
+      expect(insertedBills).toHaveLength(501);
+      await prisma.payment.createMany({
+        data: insertedBills.map((bill, index) => ({
+          schoolId,
+          studentId: student.id,
+          billId: bill.id,
+          paymentNumber: `RPT-RCT-${run}-${index.toString().padStart(4, "0")}`,
+          amount: new Prisma.Decimal("1.00"),
+          paymentMethod: "CASH" as const,
+          paymentDate: new Date(Date.UTC(2026, 1, (index % 28) + 1)),
+          status: "COMPLETED" as const,
+        })),
+      });
+
+      const [billCount, paymentCount, firstBillPage, firstPaymentPage] = await Promise.all([
+        prisma.bill.count({ where: { schoolId } }),
+        prisma.payment.count({ where: { schoolId } }),
+        service.listBills(schoolId, { limit: 50 }),
+        service.listPayments(schoolId, { limit: 50 }),
+      ]);
+      expect(firstBillPage.items).toHaveLength(50);
+      expect(firstBillPage.total).toBe(billCount);
+      expect(firstBillPage.nextCursor).not.toBeNull();
+      expect(firstPaymentPage.items).toHaveLength(50);
+      expect(firstPaymentPage.total).toBe(paymentCount);
+      expect(firstPaymentPage.nextCursor).not.toBeNull();
+
+      const summary = await service.getFinanceSummary(schoolId, {});
+      const [billed, collected] = await Promise.all([
+        prisma.bill.aggregate({
+          where: { schoolId, status: { notIn: ["CANCELLED", "WAIVED"] } },
+          _sum: { totalAmount: true },
+        }),
+        prisma.payment.aggregate({
+          where: { schoolId, status: "COMPLETED", reversedAt: null },
+          _sum: { amount: true },
+        }),
+      ]);
+      expect(summary.billed).toBe(Number((billed._sum.totalAmount ?? new Prisma.Decimal(0)).toFixed(2)));
+      expect(summary.collected).toBe(Number((collected._sum.amount ?? new Prisma.Decimal(0)).toFixed(2)));
+    });
+
+    it("allocates a receipt oldest-first across bills and spills into the next bill", async () => {
+      const { student, bill: oldest } = await studentWithBill(100);
+      await prisma.bill.update({ where: { id: oldest.id }, data: { issuedAt: new Date("2026-01-01T00:00:00.000Z") } });
+      const newer = await prisma.bill.create({
+        data: {
+          schoolId,
+          studentId: student.id,
+          academicYearId: yearId,
+          billNumber: `FIFO-${run}`,
+          totalAmount: new Prisma.Decimal("200.00"),
+          grossAmount: new Prisma.Decimal("200.00"),
+          paidAmount: new Prisma.Decimal("0.00"),
+          balanceAmount: new Prisma.Decimal("200.00"),
+          status: "PENDING",
+          issuedAt: new Date("2026-02-01T00:00:00.000Z"),
+          items: { create: [{ description: "Additional fees", amount: 200, totalAmount: 200, balanceAmount: 200 }] },
+        },
+        include: { items: true },
+      });
+      await prisma.student.update({ where: { id: student.id }, data: { outstandingBalance: { increment: new Prisma.Decimal("200.00") } } });
+
+      const payment = await pay(student.id, undefined, 150);
+      const [oldBillAfter, newBillAfter, allocations] = await Promise.all([
+        prisma.bill.findFirstOrThrow({ where: { id: oldest.id } }),
+        prisma.bill.findFirstOrThrow({ where: { id: newer.id } }),
+        prisma.paymentItem.findMany({ where: { paymentId: payment.id } }),
+      ]);
+      expect(Number(oldBillAfter.balanceAmount)).toBe(0);
+      expect(Number(oldBillAfter.paidAmount)).toBe(100);
+      expect(Number(newBillAfter.balanceAmount)).toBe(150);
+      expect(Number(newBillAfter.paidAmount)).toBe(50);
+      expect(allocations.reduce((sum, row) => sum.plus(row.amount), new Prisma.Decimal(0)).toFixed(2)).toBe("150.00");
+      expect(allocations.some((row) => row.billItemId === newer.items[0]?.id && row.amount.eq("50.00"))).toBe(true);
+    });
+
+    it("returns a statement with an opening and exact running balances", async () => {
+      const { student, bill } = await studentWithBill(100);
+      await pay(student.id, bill.id, 25);
+      const statement = await service.getStudentStatement(schoolId, student.id, "owner", { scope: "all" });
+      expect(statement.openingBalance).toBe(0);
+      expect(statement.entries.map((entry) => entry.type)).toContain("INVOICE");
+      expect(statement.entries.map((entry) => entry.type)).toContain("RECEIPT");
+      expect(statement.closingBalance).toBe(75);
+      expect(statement.entries.at(-1)?.balance).toBe(75);
+      expect(statement.arrearsPolicy).toBe("SHOW_ONLY");
+    });
+
+    it("denies statements for a student belonging to another school", async () => {
+      const orgId = `${run}-foreign-org`;
+      const foreignOrg = await prisma.organization.create({
+        data: { id: orgId, name: `Foreign ${run}`, slug: orgId },
+      });
+      const foreignSchool = await prisma.school.create({
+        data: {
+          organizationId: foreignOrg.id,
+          name: `Foreign School ${run}`,
+          code: `F-${run}`,
+          subdomain: `f-${run}`,
+        },
+      });
+      const foreignUser = await prisma.user.create({
+        data: { id: `${run}-foreign-user`, name: "Foreign Student", email: `${run}-foreign@example.test` },
+      });
+      const foreignProfile = await prisma.userProfile.create({
+        data: { userId: foreignUser.id, firstName: "Foreign", lastName: "Student" },
+      });
+      const foreignStudent = await prisma.student.create({
+        data: { schoolId: foreignSchool.id, profileId: foreignProfile.id, studentId: `${run}-foreign-student` },
+      });
+      try {
+        await expect(service.getStudentStatement(schoolId, foreignStudent.id, "owner", { scope: "all" })).rejects.toThrow(/student not found/i);
+        const localPage = await service.listBills(schoolId, { limit: 100 });
+        expect(localPage.items.some((row) => row.id === foreignStudent.id)).toBe(false);
+      } finally {
+        await prisma.student.deleteMany({ where: { id: foreignStudent.id } });
+        await prisma.school.deleteMany({ where: { id: foreignSchool.id } });
+        await prisma.organization.deleteMany({ where: { id: foreignOrg.id } });
+        await prisma.userProfile.deleteMany({ where: { id: foreignProfile.id } });
+        await prisma.user.deleteMany({ where: { id: foreignUser.id } });
+      }
     });
   });
 
