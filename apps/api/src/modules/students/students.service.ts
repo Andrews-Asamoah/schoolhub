@@ -1198,68 +1198,96 @@ export class StudentsService {
   async getMyFeeStatus(schoolId: string, userId: string) {
     const student = await this.prisma.client.student.findFirst({
       where: { schoolId, deletedAt: null, profile: { userId } },
-      select: { id: true, outstandingBalance: true },
+      select: { id: true },
     });
-    if (!student) throw new NotFoundException('Student record not found');
+    if (!student) throw new NotFoundException("Student record not found");
 
-    const currentYear = await this.prisma.client.academicYear.findFirst({
-      where: { schoolId, isCurrent: true },
-      include: { terms: { where: { isCurrent: true }, take: 1 } },
-    });
+    const [currentYear, school] = await Promise.all([
+      this.prisma.client.academicYear.findFirst({
+        where: { schoolId, isCurrent: true },
+        include: { terms: { where: { isCurrent: true }, take: 1 } },
+      }),
+      this.prisma.client.school.findFirst({ where: { id: schoolId }, select: { arrearsPolicy: true } }),
+    ]);
     const currentTerm = currentYear?.terms[0];
+    if (!currentYear || !currentTerm) {
+      return {
+        status: "UNKNOWN" as const,
+        label: "Unknown",
+        description: "Fee clearance is unavailable because the school has not selected a current academic term.",
+        academicYear: currentYear?.name ?? null,
+        term: null,
+        arrearsPolicy: school?.arrearsPolicy ?? "SHOW_ONLY",
+        clearanceAllowed: false,
+      };
+    }
 
-    const [bills, payments] = await Promise.all([
+    const [currentBills, previousOutstanding] = await Promise.all([
       this.prisma.client.bill.findMany({
         where: {
-          studentId: student.id,
           schoolId,
-          ...(currentYear && currentTerm
-            ? { academicYearId: currentYear.id, termId: currentTerm.id }
-            : {}),
+          studentId: student.id,
+          academicYearId: currentYear.id,
+          termId: currentTerm.id,
+          status: { notIn: ["CANCELLED", "WAIVED"] },
         },
-        select: { id: true, totalAmount: true, balanceAmount: true },
+        select: { totalAmount: true, paidAmount: true, balanceAmount: true },
       }),
-      this.prisma.client.payment.findMany({
+      this.prisma.client.bill.aggregate({
         where: {
-          studentId: student.id,
           schoolId,
+          studentId: student.id,
+          balanceAmount: { gt: 0 },
+          status: { notIn: ["CANCELLED", "WAIVED"] },
+          OR: [
+            { academicYear: { endDate: { lt: currentTerm.startDate } } },
+            { academicYearId: currentYear.id, term: { endDate: { lt: currentTerm.startDate } } },
+          ],
         },
-        select: { id: true, amount: true },
+        _sum: { balanceAmount: true },
       }),
     ]);
 
-    const totalBilled = bills.reduce((sum, b) => sum + Number(b.totalAmount), 0);
-    const totalRemaining = bills.reduce((sum, b) => sum + Number(b.balanceAmount), 0);
-    const totalPaid = payments.reduce((sum, p) => sum + Number(p.amount), 0);
+    const totalBilled = currentBills.reduce((sum, bill) => sum.plus(bill.totalAmount), new Prisma.Decimal(0));
+    const totalRemaining = currentBills.reduce((sum, bill) => sum.plus(bill.balanceAmount), new Prisma.Decimal(0));
+    const totalPaid = currentBills.reduce((sum, bill) => sum.plus(bill.paidAmount), new Prisma.Decimal(0));
+    const previousBalance = previousOutstanding._sum.balanceAmount ?? new Prisma.Decimal(0);
+    const arrearsPolicy = school?.arrearsPolicy ?? "SHOW_ONLY";
+    const arrearsBlock = arrearsPolicy === "BLOCK_CLEARANCE_UNTIL_PAID" && previousBalance.gt(0);
 
-    let status: 'FULLY_PAID' | 'PARTIALLY_PAID' | 'YET_TO_PAY';
+    let status: "FULLY_PAID" | "PARTIALLY_PAID" | "YET_TO_PAY" | "BLOCKED_BY_ARREARS";
     let label: string;
     let description: string;
-
-    if (totalBilled > 0 && totalRemaining <= 0) {
-      status = 'FULLY_PAID';
-      label = 'Fully Paid';
-      description = 'All required school fees have been cleared. Examination hall pass is approved.';
-    } else if (totalPaid > 0 && totalRemaining > 0) {
-      status = 'PARTIALLY_PAID';
-      label = 'Partially Paid';
-      description = 'A partial payment has been recorded. Please have your parent or guardian complete the remaining balance on their portal.';
-    } else if (totalBilled > 0) {
-      status = 'YET_TO_PAY';
-      label = 'Yet to Make Payment';
-      description = 'Term fees are currently pending payment. Please remind your parent or guardian to make payment via the parent portal.';
+    if (arrearsBlock) {
+      status = "BLOCKED_BY_ARREARS";
+      label = "Clearance Blocked";
+      description = `Previous-term arrears of ${previousBalance.toFixed(2)} remain unpaid. Examination clearance is blocked until all arrears are settled.`;
+    } else if (totalBilled.gt(0) && totalRemaining.lte(0)) {
+      status = "FULLY_PAID";
+      label = "Fully Paid";
+      description = "All required fees for the current term have been cleared. Examination hall pass is approved.";
+    } else if (totalPaid.gt(0) && totalRemaining.gt(0)) {
+      status = "PARTIALLY_PAID";
+      label = "Partially Paid";
+      description = "A partial payment has been recorded. Please have your parent or guardian settle the remaining term balance.";
+    } else if (totalBilled.gt(0)) {
+      status = "YET_TO_PAY";
+      label = "Yet to Make Payment";
+      description = "Term fees are pending payment. Please remind your parent or guardian to settle the term bill.";
     } else {
-      status = 'FULLY_PAID';
-      label = 'Fully Paid';
-      description = 'Your student account is in good standing with no pending fee obligations.';
+      status = "FULLY_PAID";
+      label = "Fully Paid";
+      description = "No current-term fee obligations are recorded.";
     }
 
     return {
       status,
       label,
       description,
-      academicYear: currentYear?.name ?? null,
-      term: currentTerm?.name ?? null,
+      academicYear: currentYear.name,
+      term: currentTerm.name,
+      arrearsPolicy,
+      clearanceAllowed: status === "FULLY_PAID",
     };
   }
 
