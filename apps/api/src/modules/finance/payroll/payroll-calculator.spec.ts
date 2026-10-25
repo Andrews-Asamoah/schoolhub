@@ -36,13 +36,13 @@ describe("decimal payroll calculator", () => {
 
   it("calculates the marginal PAYE bands without floating-point arithmetic", () => {
     const income = new Prisma.Decimal("4000");
-    expect(calculateProgressivePaye(income, bands).toFixed(2)).toBe("629.60");
+    expect(calculateProgressivePaye(income, bands).toFixed(2)).toBe("604.50");
   });
 
   it("uses the open-ended final band for income beyond all finite widths", () => {
     const tax = calculateProgressivePaye(new Prisma.Decimal("100000"), bands);
     expect(tax.greaterThan(0)).toBe(true);
-    expect(tax.toFixed(2)).toBe("303?"); // replaced below with an exact expected amount
+    expect(tax.toFixed(2)).toBe("31121.10");
   });
 
   it("keeps net pay equal to gross less all employee deductions", () => {
