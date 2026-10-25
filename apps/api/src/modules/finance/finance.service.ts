@@ -1463,9 +1463,22 @@ export class FinanceService {
     return this.prisma.client.payment.findMany({
       where: { schoolId },
       // The accountant dashboard and reporting workspace calculate totals from
-      // this history; a hidden row cap makes those figures incomplete.
+      // this history; a hidden row cap makes those figures incomplete. Select
+      // only register fields so this all-history endpoint does not send deep
+      // fee-item relations or internal idempotency/ledger metadata for every row.
       orderBy: [{ paymentDate: "desc" }, { createdAt: "desc" }],
-      include: {
+      select: {
+        id: true,
+        studentId: true,
+        billId: true,
+        paymentNumber: true,
+        amount: true,
+        paymentMethod: true,
+        referenceNumber: true,
+        paymentDate: true,
+        status: true,
+        reversedAt: true,
+        reversalReason: true,
         student: {
           select: {
             id: true,
@@ -1474,20 +1487,6 @@ export class FinanceService {
           },
         },
         bill: { select: { id: true, billNumber: true } },
-        paymentItems: {
-          include: {
-            billItem: {
-              include: {
-                feeItem: {
-                  include: {
-                    customCategory: { select: { name: true } },
-                    registryItem: { select: { name: true } },
-                  },
-                },
-              },
-            },
-          },
-        },
         recordedBy: { select: { name: true, email: true } },
       },
     });
