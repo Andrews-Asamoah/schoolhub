@@ -1,4 +1,5 @@
 import { TableExportMenu } from "@/components/ui/data-table";
+import { ServerExportButton } from "@/components/portal/server-export-button";
 import type { ExportTable } from "@/lib/table-export";
 
 import { useCallback, useMemo, useState } from "react";
@@ -498,6 +499,7 @@ export function AccountantFinanceReportingWorkspace({
 
         <div className="finance-report-print-actions flex flex-wrap gap-2">
           {!invalidRange && (reportType !== "student" || !!selectedStudent) && <TableExportMenu build={buildExportTable} note="Exports include the selected period and filters." />}
+          {!invalidRange && reportType === "student" && selectedStudent && <ServerExportButton endpoint={"/finance/students/" + encodeURIComponent(selectedStudent.id) + "/statement.pdf?from=" + encodeURIComponent(from) + "&to=" + encodeURIComponent(to)} label="Official statement PDF" className={secondaryButton} />}
         </div>
 
       <div className="finance-report-print-actions grid gap-3 md:grid-cols-2 xl:grid-cols-4">
