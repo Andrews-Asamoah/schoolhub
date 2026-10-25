@@ -531,8 +531,21 @@ export class FinanceExportsService {
       }
     }
     entries.sort((a,b) => a.date.getTime() - b.date.getTime() || a.sort - b.sort || a.reference.localeCompare(b.reference));
-    let balance = new Prisma.Decimal(0);
-    const rows = entries.map((entry) => {
+    const rangeStart = validateDate(context.from, "start date");
+    const rangeEnd = validateDate(context.to, "end date");
+    if (rangeStart && rangeEnd && rangeStart.getTime() > rangeEnd.getTime()) {
+      throw new BadRequestException("Start date must be before or equal to end date.");
+    }
+    const rangeEndInclusive = context.to ? dayEnd(context.to) : undefined;
+    const inSelectedPeriod = (entry: StatementEntry) =>
+      (!rangeStart || entry.date.getTime() >= rangeStart.getTime()) &&
+      (!rangeEndInclusive || entry.date.getTime() <= rangeEndInclusive.getTime());
+    const openingBalance = entries
+      .filter((entry) => rangeStart && entry.date.getTime() < rangeStart.getTime())
+      .reduce((balance, entry) => balance.plus(entry.debit).minus(entry.credit), new Prisma.Decimal(0));
+    const visibleEntries = entries.filter(inSelectedPeriod);
+    let balance = openingBalance;
+    const rows = visibleEntries.map((entry) => {
       balance = balance.plus(entry.debit).minus(entry.credit);
       return [isoDay(entry.date), entry.reference, entry.description, formatMoney(entry.debit), formatMoney(entry.credit), formatMoney(balance)];
     });
@@ -541,9 +554,13 @@ export class FinanceExportsService {
     doc.text("Student: " + studentName(student), 36, 150);
     doc.text("Admission number: " + (student.admissionNumber ?? "—"), 36, 166);
     doc.setFontSize(8);
-    doc.text("This statement is based on the available SchoolHub bill and payment history. No separate opening balance is stored in the current model.", 36, 184, { maxWidth: 520 });
+    const periodLabel = context.from || context.to ? "Period: " + (context.from ?? "All history") + " to " + (context.to ?? "Present") : "Period: All available history";
+    doc.text(periodLabel, 36, 184);
+    doc.text("Opening balance for this period: " + formatMoney(openingBalance), 36, 198);
+    doc.setFontSize(7.5);
+    doc.text("Opening balance is calculated from available earlier bill/payment history; no separate opening balance is stored in this model.", 36, 211, { maxWidth: 520 });
     autoTable(doc, {
-      startY: 198,
+      startY: 224,
       head: [["Date", "Reference", "Description", "Debit", "Credit", "Running balance"]],
       body: rows,
       styles: { fontSize: 7.5, cellPadding: 4 },
@@ -555,7 +572,7 @@ export class FinanceExportsService {
     autoTable(doc, { startY: y + 12, body: [["Closing balance", formatMoney(balance)]], theme: "plain", styles: { fontSize: 10, fontStyle: "bold" }, columnStyles: { 1: { halign: "right" } }, margin: { left: 320, right: 30 } });
     this.finishPdf(doc, "Student statement");
     const buffer = this.pdfBuffer(doc);
-    await this.auditExport(context, "student-statement.pdf", entries.length, {});
+    await this.auditExport(context, "student-statement.pdf", visibleEntries.length, { from: context.from, to: context.to });
     return { buffer, fileName: "student-statement-" + (student.admissionNumber ?? student.id) + ".pdf", contentType: "application/pdf" };
   }
 
