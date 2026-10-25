@@ -816,6 +816,14 @@ export class FinanceService {
           };
         });
 
+        const alreadySnapshotted = await tx.billCarryForward.findFirst({
+          where: {
+            schoolId,
+            bill: { schoolId, studentId, academicYearId: currentYear.id, termId: currentTerm.id },
+          },
+          select: { id: true },
+        });
+        const carryForwardRows = alreadySnapshotted ? [] : (carryForwardsByStudent.get(studentId) ?? []);
         const billNumber = billNumbers.next();
         const bill = await tx.bill.create({
           data: {
@@ -846,7 +854,7 @@ export class FinanceService {
             },
             // Snapshot only. These rows describe earlier debts, never add them to totalAmount.
             carryForwards: {
-              create: (carryForwardsByStudent.get(studentId) ?? []).map((previous) => ({
+              create: carryForwardRows.map((previous) => ({
                 schoolId,
                 sourceBillId: previous.id,
                 sourceBillNumber: previous.billNumber,
@@ -1409,10 +1417,12 @@ export class FinanceService {
         schoolId,
         status: { notIn: ["CANCELLED", "WAIVED"] },
         balanceAmount: { gt: new Prisma.Decimal(0) },
-        OR: [
-          { academicYear: { startDate: { lt: term.startDate } } },
-          { term: { startDate: { lt: term.startDate } } },
-        ],
+        AND: [{
+          OR: [
+            { term: { startDate: { lt: term.startDate } } },
+            { termId: null, academicYear: { startDate: { lt: term.startDate } } },
+          ],
+        }],
       },
       orderBy: [{ studentId: "asc" }, { issuedAt: "asc" }, { id: "asc" }],
       select: {
@@ -1547,6 +1557,20 @@ export class FinanceService {
       });
       if (students.length !== uniqueIds.length) {
         throw new NotFoundException("One or more selected students do not belong to this school.");
+      }
+      const studentsWithArrears = await tx.bill.groupBy({
+        by: ["studentId"],
+        where: {
+          schoolId,
+          studentId: { in: uniqueIds },
+          status: { notIn: ["CANCELLED", "WAIVED"] },
+          balanceAmount: { gt: new Prisma.Decimal(0) },
+        },
+        _sum: { balanceAmount: true },
+      });
+      const hasOpenArrears = new Set(studentsWithArrears.filter((row) => (row._sum.balanceAmount ?? new Prisma.Decimal(0)).gt(0)).map((row) => row.studentId));
+      if (uniqueIds.some((studentId) => !hasOpenArrears.has(studentId))) {
+        throw new BadRequestException("Only students with outstanding bills may be marked as former in the term-end review.");
       }
       const updated: string[] = [];
       for (const student of students) {
