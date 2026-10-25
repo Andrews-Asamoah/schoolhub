@@ -57,6 +57,14 @@ interface StudentSummary {
   profile?: { firstName?: string | null; lastName?: string | null } | null;
 }
 
+interface FinanceSchool {
+  name: string;
+  email?: string | null;
+  phone?: string | null;
+  address?: string | null;
+  logo?: string | null;
+}
+
 interface ApiBill {
   id: string;
   billNumber: string;
@@ -252,6 +260,12 @@ export function AccountantPortalWorkspace({
   const [selectedPayrollId, setSelectedPayrollId] = useState("");
   const [message, setMessage] = useState<{ kind: "success" | "error"; text: string } | null>(null);
 
+  const schoolQuery = useQuery({
+    queryKey: ["school", "current"],
+    queryFn: () => apiFetch<FinanceSchool>("/schools/current"),
+    enabled: Boolean(selectedInvoiceForPrint || selectedReceipt),
+    retry: false,
+  });
   const billsQuery = useQuery({
     queryKey: ["finance", "bills"],
     queryFn: () => apiFetch<ApiBill[]>("/finance/bills"),
@@ -314,6 +328,11 @@ export function AccountantPortalWorkspace({
     const matchesStatus = statusFilter === "ALL" || bill.status === statusFilter;
     return matchesSearch && matchesStatus;
   }), [bills, search, statusFilter]);
+
+  const recentPayments = useMemo(
+    () => [...payments].sort((a, b) => new Date(b.paymentDate).getTime() - new Date(a.paymentDate).getTime()),
+    [payments],
+  );
 
   const filteredPayments = useMemo(() => payments.filter((payment) => {
     const term = search.trim().toLowerCase();
@@ -711,7 +730,7 @@ export function AccountantPortalWorkspace({
               </div>
               <Link to="/$page" params={{ page: "payments" }} className={buttonSecondary}>View payments</Link>
             </div>
-            {paymentsQuery.error ? <QueryError message={paymentsQuery.error.message} /> : <PaymentsTable payments={payments.slice(0, 6)} onViewReceipt={setSelectedReceipt} />}
+            {paymentsQuery.error ? <QueryError message={paymentsQuery.error.message} /> : <PaymentsTable payments={recentPayments.slice(0, 6)} onViewReceipt={setSelectedReceipt} />}
           </section>
           <section className="rounded-2xl border border-border bg-card p-5">
             <h2 className="font-semibold text-foreground">Attention required</h2>
@@ -849,6 +868,10 @@ export function AccountantPortalWorkspace({
       {selectedInvoiceForPrint && (
         <Modal title="Invoice summary" description="Print-ready summary of the saved bill record." onClose={() => setSelectedInvoiceForPrint(null)}>
           <section className="invoice-print-area rounded-xl border border-border p-5">
+            <div className="mb-5 flex items-center gap-3 border-b border-border pb-4">
+              {schoolQuery.data?.logo ? <img src={schoolQuery.data.logo} alt="" className="size-14 rounded-lg object-contain" /> : <div aria-hidden="true" className="flex size-14 items-center justify-center rounded-lg bg-muted text-lg font-bold text-foreground">{(schoolQuery.data?.name ?? "SH").slice(0, 2).toUpperCase()}</div>}
+              <div className="min-w-0 flex-1"><p className="font-bold text-foreground">{schoolQuery.data?.name ?? "SchoolHub"}</p><p className="mt-1 text-xs text-muted-foreground">{[schoolQuery.data?.address, schoolQuery.data?.phone, schoolQuery.data?.email].filter(Boolean).join(" · ") || "School finance office"}</p></div>
+            </div>
             <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border pb-4">
               <div><p className="text-xs font-bold uppercase tracking-[0.15em] text-primary">SchoolHub · Student invoice</p><h2 className="mt-1 text-xl font-bold text-foreground">{selectedInvoiceForPrint.billNumber}</h2><p className="mt-1 text-sm text-muted-foreground">Issued {dateLabel(selectedInvoiceForPrint.issuedAt)}</p></div>
               <div className="text-right"><p className="text-xs text-muted-foreground">Invoice total</p><p className="mt-1 text-2xl font-bold tabular-nums text-foreground">{currency(selectedInvoiceForPrint.totalAmount)}</p><StatusBadge value={selectedInvoiceForPrint.status} /></div>
@@ -871,6 +894,10 @@ export function AccountantPortalWorkspace({
       {selectedReceipt && (
         <Modal title="Payment receipt" description="Saved receipt details from the school payment ledger." onClose={() => setSelectedReceipt(null)}>
           <section className="payment-receipt-print rounded-xl border border-border p-5">
+            <div className="mb-5 flex items-center gap-3 border-b border-border pb-4">
+              {schoolQuery.data?.logo ? <img src={schoolQuery.data.logo} alt="" className="size-14 rounded-lg object-contain" /> : <div aria-hidden="true" className="flex size-14 items-center justify-center rounded-lg bg-muted text-lg font-bold text-foreground">{(schoolQuery.data?.name ?? "SH").slice(0, 2).toUpperCase()}</div>}
+              <div className="min-w-0 flex-1"><p className="font-bold text-foreground">{schoolQuery.data?.name ?? "SchoolHub"}</p><p className="mt-1 text-xs text-muted-foreground">{[schoolQuery.data?.address, schoolQuery.data?.phone, schoolQuery.data?.email].filter(Boolean).join(" · ") || "School finance office"}</p></div>
+            </div>
             <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border pb-4">
               <div><p className="text-xs font-bold uppercase tracking-[0.15em] text-primary">SchoolHub · Official receipt record</p><h2 className="mt-1 text-xl font-bold text-foreground">{selectedReceipt.paymentNumber}</h2><p className="mt-1 text-sm text-muted-foreground">{dateLabel(selectedReceipt.paymentDate)}</p></div>
               <div className="text-right"><p className="text-xs text-muted-foreground">Amount received</p><p className="mt-1 text-2xl font-bold tabular-nums text-foreground">{currency(selectedReceipt.amount)}</p><StatusBadge value={selectedReceipt.status} /></div>
