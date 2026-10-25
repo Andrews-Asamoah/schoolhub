@@ -32,6 +32,7 @@ describe.skipIf(!enabled)("finance (database)", { timeout: 60_000 }, () => {
   let schoolId = "";
   let userId = "";
   let yearId = "";
+  let termId = "";
   let counter = 0;
   const createdUserIds: string[] = [];
 
@@ -56,6 +57,7 @@ describe.skipIf(!enabled)("finance (database)", { timeout: 60_000 }, () => {
         schoolId,
         studentId: student.id,
         academicYearId: yearId,
+        termId,
         billNumber: `TEST-${run}-${n}`,
         totalAmount: total,
         grossAmount: total,
@@ -108,7 +110,7 @@ describe.skipIf(!enabled)("finance (database)", { timeout: 60_000 }, () => {
       data: { schoolId, name: `${run} year`, startDate: new Date("2026-01-01"), endDate: new Date("2026-12-31"), isCurrent: true },
     });
     yearId = year.id;
-    await prisma.term.create({
+    termId = (await prisma.term.create({
       data: {
         academicYearId: yearId,
         name: "Test Term 1",
@@ -117,7 +119,17 @@ describe.skipIf(!enabled)("finance (database)", { timeout: 60_000 }, () => {
         endDate: new Date("2026-04-30"),
         isCurrent: true,
       },
-    });
+    })).id;
+    termId = (await prisma.term.create({
+      data: {
+        academicYearId: yearId,
+        name: "Test Term 1",
+        termNumber: 1,
+        startDate: new Date("2026-01-01"),
+        endDate: new Date("2026-04-30"),
+        isCurrent: true,
+      },
+    })).id;
   });
 
   afterAll(async () => {
@@ -397,7 +409,7 @@ describe.skipIf(!enabled)("finance (database)", { timeout: 60_000 }, () => {
     it("paginates more than 500 bills and payments while summaries include all rows", async () => {
       const { student } = await studentWithBill(100);
       const prefix = `RPT-${run}-`;
-      const currentTerm = await prisma.term.findFirstOrThrow({ where: { academicYearId: yearId, isCurrent: true }, select: { id: true } });
+      const currentTermId = termId;
       const billRows = Array.from({ length: 501 }, (_, index) => ({
         schoolId,
         studentId: student.id,
@@ -409,7 +421,7 @@ describe.skipIf(!enabled)("finance (database)", { timeout: 60_000 }, () => {
         balanceAmount: new Prisma.Decimal("1.00"),
         status: "PENDING" as const,
         issuedAt: new Date(Date.UTC(2026, 0, (index % 28) + 1)),
-        termId: currentTerm.id,
+        termId: currentTermId,
       }));
       await prisma.bill.createMany({ data: billRows });
       const insertedBills = await prisma.bill.findMany({
@@ -503,6 +515,60 @@ describe.skipIf(!enabled)("finance (database)", { timeout: 60_000 }, () => {
       expect(statement.closingBalance).toBe(75);
       expect(statement.entries.at(-1)?.balance).toBe(75);
       expect(statement.arrearsPolicy).toBe("SHOW_ONLY");
+    });
+
+    it("audits arrears policy changes in the same transaction and restores the default", async () => {
+      expect((await service.getArrearsPolicy(schoolId)).arrearsPolicy).toBe("SHOW_ONLY");
+      const changed = await service.setArrearsPolicy(schoolId, userId, "BLOCK_CLEARANCE_UNTIL_PAID");
+      expect(changed.arrearsPolicy).toBe("BLOCK_CLEARANCE_UNTIL_PAID");
+      const audit = await prisma.auditLog.findFirst({
+        where: { schoolId, action: "UPDATE", entityType: "SCHOOL", entityId: schoolId },
+        orderBy: { createdAt: "desc" },
+      });
+      expect(audit).not.toBeNull();
+      expect(audit?.oldValues).toMatchObject({ arrearsPolicy: "SHOW_ONLY" });
+      expect(audit?.newValues).toMatchObject({ arrearsPolicy: "BLOCK_CLEARANCE_UNTIL_PAID" });
+      await service.setArrearsPolicy(schoolId, userId, "SHOW_ONLY");
+    });
+
+    it("reviews prior-term arrears and moves a former student without altering invoices", async () => {
+      const { student } = await studentWithBill(100);
+      const previousYear = await prisma.academicYear.create({
+        data: {
+          schoolId,
+          name: `${run} previous term year`,
+          startDate: new Date("2025-01-01"),
+          endDate: new Date("2025-12-31"),
+          isCurrent: false,
+        },
+      });
+      const previousBill = await prisma.bill.create({
+        data: {
+          schoolId,
+          studentId: student.id,
+          academicYearId: previousYear.id,
+          billNumber: `ARREARS-${run}`,
+          totalAmount: new Prisma.Decimal("200.00"),
+          grossAmount: new Prisma.Decimal("200.00"),
+          paidAmount: new Prisma.Decimal("0.00"),
+          balanceAmount: new Prisma.Decimal("200.00"),
+          status: "PENDING",
+          issuedAt: new Date("2025-10-01T00:00:00.000Z"),
+        },
+      });
+      const review = await service.getArrearsReview(schoolId);
+      expect(review.activeWithArrears.some((row) => row.studentId === student.id && row.outstanding === 200)).toBe(true);
+      const changed = await service.markArrearsStudentFormer(schoolId, userId, student.id, {
+        status: "TRANSFERRED",
+        reason: "Transfer confirmed by the receiving school",
+      });
+      expect(changed.status).toBe("TRANSFERRED");
+      expect(changed.previousArrears).toBe(200);
+      const after = await prisma.bill.findFirstOrThrow({ where: { id: previousBill.id } });
+      expect(Number(after.balanceAmount)).toBe(200);
+      const newReview = await service.getArrearsReview(schoolId);
+      expect(newReview.activeWithArrears.some((row) => row.studentId === student.id)).toBe(false);
+      expect(newReview.formerStudents.some((row) => row.studentId === student.id && row.outstanding === 200)).toBe(true);
     });
 
     it("denies statements for a student belonging to another school", async () => {
