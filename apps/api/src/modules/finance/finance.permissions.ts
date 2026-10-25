@@ -22,3 +22,8 @@ export const FINANCE_PAYROLL_EXPORT_ROLES = ["accountant", "owner", "headteacher
 export function isFinancePayrollExportRole(role: string | null | undefined): boolean {
   return !!role && (FINANCE_PAYROLL_EXPORT_ROLES as readonly string[]).includes(role);
 }
+
+/** RolesGuard has a global superAdmin bypass; payroll exports intentionally override that bypass. */
+export function canExportFinancePayroll(actorPlatformRole: string | null | undefined, activeSchoolRole: string | null | undefined): boolean {
+  return actorPlatformRole !== "superAdmin" && isFinancePayrollExportRole(activeSchoolRole);
+}
