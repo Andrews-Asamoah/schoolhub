@@ -333,7 +333,9 @@ export function AccountantPortalWorkspace({
     enabled: activeTab === "debtors" || activeTab === "overview",
     retry: false,
   });
-  const overdueParams = new URLSearchParams({ limit: "50", status: "OVERDUE" });
+  const overdueParams = new URLSearchParams(reportParams);
+  overdueParams.set("limit", "50");
+  overdueParams.set("status", "OVERDUE");
   if (overdueSearch.trim()) overdueParams.set("search", overdueSearch.trim());
   if (overdueClassFilter !== "ALL") overdueParams.set("classId", overdueClassFilter);
   const overdueBillsQuery = useQuery({
@@ -406,7 +408,6 @@ export function AccountantPortalWorkspace({
 
   // Lists supply visible rows only; totals always come from the aggregate endpoint.
   const debtors = outstandingBillsQuery.data?.items ?? [];
-  const collected = summary?.collected ?? 0;
   const outstanding = summary?.outstanding ?? 0;
   const expenseTotal = expenses.reduce((sum, expense) => sum + Number(expense.amount), 0);
   const paidPayroll = payroll.filter((run) => run.status === "PAID");
@@ -460,6 +461,40 @@ export function AccountantPortalWorkspace({
   const billedInPeriod = summary?.billed ?? 0;
   const collectionRate = billedInPeriod > 0 ? (reportCollected / billedInPeriod) * 100 : null;
   const visibleOverdueBills = overdueBills;
+  const goToNextBillPage = () => {
+    const cursor = billsQuery.data?.nextCursor;
+    if (!cursor) return;
+    setBillCursorStack((stack) => [...stack, billCursor]);
+    setBillCursor(cursor);
+  };
+  const goToPreviousBillPage = () => {
+    if (!billCursorStack.length) return;
+    setBillCursor(billCursorStack[billCursorStack.length - 1] ?? null);
+    setBillCursorStack((stack) => stack.slice(0, -1));
+  };
+  const goToNextPaymentPage = () => {
+    const cursor = paymentsQuery.data?.nextCursor;
+    if (!cursor) return;
+    setPaymentCursorStack((stack) => [...stack, paymentCursor]);
+    setPaymentCursor(cursor);
+  };
+  const goToPreviousPaymentPage = () => {
+    if (!paymentCursorStack.length) return;
+    setPaymentCursor(paymentCursorStack[paymentCursorStack.length - 1] ?? null);
+    setPaymentCursorStack((stack) => stack.slice(0, -1));
+  };
+  const goToNextDebtorPage = () => {
+    const cursor = outstandingBillsQuery.data?.nextCursor;
+    if (!cursor) return;
+    setDebtorCursorStack((stack) => [...stack, debtorCursor]);
+    setDebtorCursor(cursor);
+  };
+  const goToPreviousDebtorPage = () => {
+    if (!debtorCursorStack.length) return;
+    setDebtorCursor(debtorCursorStack[debtorCursorStack.length - 1] ?? null);
+    setDebtorCursorStack((stack) => stack.slice(0, -1));
+  };
+
   const selectedFeeStructure = feeStructures.find((fee) => fee.id === selectedFeeStructureId);
   const billTargetClasses = selectedFeeStructure?.targetClasses.length
     ? classes.filter((schoolClass) => selectedFeeStructure.targetClasses.some((target) => target.class.id === schoolClass.id))
@@ -714,15 +749,15 @@ export function AccountantPortalWorkspace({
             <div><h2 className="text-lg font-semibold text-foreground">Financial performance</h2><p className="mt-1 text-sm text-muted-foreground">A live summary of saved records. Select a card to review its supporting records.</p></div>
             <label className="flex items-center gap-2 text-xs font-medium text-muted-foreground">Reporting period
               <select className={cn(inputClass, "w-auto min-w-40")} value={reportPeriod} onChange={(event) => setReportPeriod(event.target.value as typeof reportPeriod)} aria-label="Dashboard reporting period">
-                <option value="month">This month to date</option><option value="quarter">This quarter to date</option><option value="year">This year to date</option><option value="all">All available records</option>
+                <option value="term">Current term</option><option value="year">Academic year</option><option value="all">All available records</option>
               </select>
             </label>
           </div>
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-            <DashboardMetricLink to="payments" label="Fees collected" value={paymentsQuery.error ? "Unavailable" : currency(reportCollected)} detail={paymentsQuery.error ? "Payment data unavailable" : `${reportSettledPayments.length} completed receipts in period`} icon={ArrowUpRight} />
-            <DashboardMetricLink to="invoices" label="Fees billed" value={billsQuery.error ? "Unavailable" : currency(billedInPeriod)} detail={billsQuery.error ? "Bill data unavailable" : "Bills issued in selected period"} icon={Receipt} />
-            <DashboardMetricLink to="debtors" label="Outstanding fees" value={billsQuery.error ? "Unavailable" : currency(outstanding)} detail={billsQuery.error ? "Bill data unavailable" : `${debtors.length} bills with balances`} icon={AlertCircle} />
-            <DashboardMetricLink to="debtors" label="Overdue balances" value={billsQuery.error ? "Unavailable" : currency(overdueTotal)} detail={billsQuery.error ? "Bill data unavailable" : `${overdueBills.length} overdue bills`} icon={ArrowDownRight} />
+            <DashboardMetricLink to="payments" label="Fees collected" value={paymentsQuery.error ? "Unavailable" : currency(reportCollected)} detail={paymentsQuery.error ? "Payment data unavailable" : `${reportReceiptCount} completed receipts in period`} icon={ArrowUpRight} />
+            <DashboardMetricLink to="invoices" label="Fees billed" value={billsQuery.error ? "Unavailable" : currency(billedInPeriod)} detail={summaryQuery.error ? "Bill totals unavailable" : "Bills issued in selected academic period"} icon={Receipt} />
+            <DashboardMetricLink to="debtors" label="Outstanding fees" value={summaryQuery.error ? "Unavailable" : currency(outstanding)} detail={summaryQuery.error ? "Bill totals unavailable" : `${summary?.openBillCount ?? "—"} bills with balances`} icon={AlertCircle} />
+            <DashboardMetricLink to="debtors" label="Overdue balances" value={summaryQuery.error ? "Unavailable" : currency(overdueTotal)} detail={summaryQuery.error ? "Bill totals unavailable" : `${summary?.overdueBillCount ?? "—"} overdue bills`} icon={ArrowDownRight} />
             <DashboardMetricLink to="expenses" label="Operating expenses" value={expensesQuery.error ? "Unavailable" : currency(reportExpenseTotal)} detail={expensesQuery.error ? "Expense data unavailable" : `${reportExpenses.length} expense records in period`} icon={Wallet} />
           </div>
           <div className="grid gap-3 md:grid-cols-2">
@@ -758,7 +793,7 @@ export function AccountantPortalWorkspace({
               <div className="relative"><Search className="absolute left-3 top-3 size-4 text-muted-foreground" /><input className={cn(inputClass, "pl-9")} value={overdueSearch} onChange={(event) => setOverdueSearch(event.target.value)} placeholder="Search student, admission no., bill or class" aria-label="Search overdue bills" /></div>
               <select className={inputClass} value={overdueClassFilter} onChange={(event) => setOverdueClassFilter(event.target.value)} aria-label="Filter overdue bills by class"><option value="ALL">All classes</option>{classes.map((schoolClass) => <option key={schoolClass.id} value={schoolClass.id}>{schoolClass.name}</option>)}</select>
             </div>
-            {billsQuery.error ? <QueryError message={billsQuery.error.message} /> : visibleOverdueBills.length ? (
+            {overdueBillsQuery.error ? <QueryError message={overdueBillsQuery.error.message} /> : visibleOverdueBills.length ? (
               <div className="overflow-x-auto"><table className="w-full min-w-[800px] text-left text-sm">
                 <thead><tr className="border-b border-border text-xs text-muted-foreground"><th className="p-3">Student / bill</th><th className="p-3">Class</th><th className="p-3">Due date</th><th className="p-3 text-right">Days overdue</th><th className="p-3 text-right">Outstanding</th><th className="p-3">Action</th></tr></thead>
                 <tbody>{visibleOverdueBills.slice(0, 8).map((bill) => {
@@ -773,7 +808,7 @@ export function AccountantPortalWorkspace({
                 })}</tbody>
               </table>
               {visibleOverdueBills.length > 8 && <p className="mt-3 text-xs text-muted-foreground">Showing 8 of {visibleOverdueBills.length} matching overdue bills. Use the Debtors page for the full list.</p>}</div>
-            ) : <EmptyState icon={CheckCircle2} title={overdueBills.length ? "No matching overdue bills" : "No overdue fees"} description={overdueBills.length ? "Try another search or class filter." : "There are no bills past their due date with an outstanding balance. Keep monitoring this panel as payments are recorded."} />}
+            ) : <EmptyState icon={CheckCircle2} title={(summary?.overdueBillCount ?? 0) > 0 ? "No matching overdue bills" : "No overdue fees"} description={(summary?.overdueBillCount ?? 0) > 0 ? "Try another search or class filter." : "There are no bills past their due date with an outstanding balance in this academic period."} />}
             <div className="mt-4 flex flex-wrap gap-2"><Link to="/$page" params={{ page: "debtors" }} className={buttonSecondary}>View all outstanding fees</Link><Link to="/$page" params={{ page: "invoices" }} className={buttonSecondary}>Open all invoices</Link></div>
           </section>
           <div className="grid gap-5 xl:grid-cols-[1.3fr_0.7fr]">
@@ -783,7 +818,7 @@ export function AccountantPortalWorkspace({
             </section>
             <section className="rounded-2xl border border-border bg-card p-5">
               <h2 className="font-semibold text-foreground">Finance activity</h2><p className="mt-1 text-sm text-muted-foreground">Quick access to records that need attention.</p>
-              <div className="mt-4 space-y-3"><AttentionItem title="Bills with balances" value={billsQuery.error ? "—" : String(debtors.length)} detail={billsQuery.error ? "Could not load bill records" : currency(outstanding)} to="debtors" /><AttentionItem title="Overdue bills" value={billsQuery.error ? "—" : String(overdueBills.length)} detail={billsQuery.error ? "Could not load bill records" : currency(overdueTotal)} to="debtors" /><AttentionItem title="Expense records" value={expensesQuery.error ? "—" : String(reportExpenses.length)} detail={expensesQuery.error ? "Could not load expense records" : currency(reportExpenseTotal)} to="expenses" /></div>
+              <div className="mt-4 space-y-3"><AttentionItem title="Bills with balances" value={billsQuery.error ? "—" : String(debtors.length)} detail={summaryQuery.error ? "Could not load aggregate balances" : currency(outstanding)} to="debtors" /><AttentionItem title="Overdue bills" value={billsQuery.error ? "—" : String(summary?.overdueBillCount ?? 0)} detail={summaryQuery.error ? "Could not load aggregate balances" : currency(overdueTotal)} to="debtors" /><AttentionItem title="Expense records" value={expensesQuery.error ? "—" : String(reportExpenses.length)} detail={expensesQuery.error ? "Could not load expense records" : currency(reportExpenseTotal)} to="expenses" /></div>
             </section>
           </div>
         </div>
