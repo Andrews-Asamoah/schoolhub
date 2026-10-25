@@ -63,7 +63,6 @@ const expenditureCategorySchema = z.object({ name: z.string().trim().min(2, "Ent
 const payrollDraftSchema = z.object({
   month: z.number().int().min(1).max(12),
   year: z.number().int().min(2000).max(2100),
-  confirmResidentTaxTreatment: z.literal(true),
 });
 const payrollTransitionSchema = z.object({
   status: z.enum(["APPROVED", "PAID", "CANCELLED"]),
