@@ -2770,6 +2770,152 @@ export class FinanceService {
     return { studentCount: targets.length, inAppSent, skippedNoLogin, failed, alreadySent: alreadySentCount };
   }
 
+  async getArrearsReview(schoolId: string) {
+    const year = await this.prisma.client.academicYear.findFirst({
+      where: { schoolId, isCurrent: true },
+      include: { terms: { where: { isCurrent: true }, take: 1 } },
+    });
+    const term = year?.terms[0];
+    if (!year || !term) {
+      throw new BadRequestException("The school has not selected a current academic year and term.");
+    }
+    const rows = await this.prisma.client.bill.findMany({
+      where: {
+        schoolId,
+        balanceAmount: { gt: 0 },
+        status: { notIn: ["CANCELLED", "WAIVED"] },
+        OR: [
+          { academicYear: { endDate: { lt: term.startDate } } },
+          { academicYearId: year.id, term: { endDate: { lt: term.startDate } } },
+        ],
+      },
+      select: {
+        id: true,
+        billNumber: true,
+        balanceAmount: true,
+        academicYear: { select: { name: true } },
+        term: { select: { name: true } },
+        student: {
+          select: {
+            id: true,
+            status: true,
+            admissionNumber: true,
+            profile: { select: { firstName: true, lastName: true, otherNames: true } },
+          },
+        },
+      },
+      orderBy: [{ issuedAt: "asc" }, { id: "asc" }],
+    });
+    const grouped = new Map<string, {
+      studentId: string;
+      status: string;
+      admissionNumber: string | null;
+      name: string;
+      outstanding: Prisma.Decimal;
+      bills: { id: string; billNumber: string; academicYear: string; term: string | null; balance: Prisma.Decimal }[];
+    }>();
+    for (const row of rows) {
+      const name = [row.student.profile?.firstName, row.student.profile?.otherNames, row.student.profile?.lastName]
+        .filter(Boolean).join(" ") || row.student.admissionNumber || "Student";
+      const existing = grouped.get(row.student.id) ?? {
+        studentId: row.student.id,
+        status: row.student.status,
+        admissionNumber: row.student.admissionNumber,
+        name,
+        outstanding: new Prisma.Decimal(0),
+        bills: [],
+      };
+      existing.outstanding = existing.outstanding.plus(row.balanceAmount);
+      existing.bills.push({
+        id: row.id,
+        billNumber: row.billNumber,
+        academicYear: row.academicYear.name,
+        term: row.term?.name ?? null,
+        balance: row.balanceAmount,
+      });
+      grouped.set(row.student.id, existing);
+    }
+    const all = [...grouped.values()]
+      .map((student) => ({
+        studentId: student.studentId,
+        status: student.status,
+        admissionNumber: student.admissionNumber,
+        name: student.name,
+        outstanding: Number(student.outstanding.toFixed(2)),
+        bills: student.bills.map((bill) => ({
+          id: bill.id,
+          billNumber: bill.billNumber,
+          academicYear: bill.academicYear,
+          term: bill.term,
+          balance: Number(bill.balance.toFixed(2)),
+        })),
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+    return {
+      currentPeriod: { academicYearId: year.id, academicYear: year.name, termId: term.id, term: term.name },
+      activeWithArrears: all.filter((student) => student.status === "ACTIVE"),
+      formerStudents: all.filter((student) => student.status !== "ACTIVE"),
+      totalOutstanding: Number(all.reduce((sum, student) => sum.plus(student.outstanding), new Prisma.Decimal(0)).toFixed(2)),
+    };
+  }
+
+  async markArrearsStudentFormer(
+    schoolId: string,
+    actorId: string,
+    studentId: string,
+    input: { status: "WITHDRAWN" | "TRANSFERRED" | "GRADUATED"; reason: string },
+  ) {
+    const reason = input.reason.trim();
+    if (reason.length < 10 || reason.length > 500) {
+      throw new BadRequestException("Provide a reason of at least 10 characters and no more than 500 characters.");
+    }
+    return this.prisma.client.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT id FROM students WHERE id = ${studentId} AND "schoolId" = ${schoolId} FOR UPDATE`;
+      const student = await tx.student.findFirst({
+        where: { id: studentId, schoolId, deletedAt: null },
+        select: {
+          id: true,
+          status: true,
+          outstandingBalance: true,
+          admissionNumber: true,
+          profile: { select: { firstName: true, lastName: true, otherNames: true } },
+          bills: {
+            where: { schoolId, balanceAmount: { gt: 0 }, status: { notIn: ["CANCELLED", "WAIVED"] } },
+            select: { id: true, balanceAmount: true },
+          },
+        },
+      });
+      if (!student) throw new NotFoundException("Student not found in this school.");
+      if (student.status !== "ACTIVE") throw new BadRequestException("Only an active student can be marked as a former student.");
+      if (!student.bills.length) throw new BadRequestException("This student has no open fee arrears to move to the former-student list.");
+      const previousBalance = student.bills.reduce((sum, bill) => sum.plus(bill.balanceAmount), new Prisma.Decimal(0));
+      const updated = await tx.student.update({
+        where: { id: student.id },
+        data: { status: input.status },
+        select: { id: true, status: true, admissionNumber: true },
+      });
+      await this.writeAudit(tx, {
+        actorId,
+        schoolId,
+        action: "UPDATE",
+        entityType: "STUDENT",
+        entityId: student.id,
+        oldValues: {
+          status: student.status,
+          openArrears: previousBalance.toFixed(2),
+          openBillIds: student.bills.map((bill) => bill.id),
+        },
+        newValues: {
+          status: updated.status,
+          reason,
+          openArrearsPreserved: previousBalance.toFixed(2),
+          openBillIdsPreserved: student.bills.map((bill) => bill.id),
+        },
+      });
+      return { ...updated, previousArrears: Number(previousBalance.toFixed(2)), reason };
+    });
+  }
+
   async getArrearsPolicy(schoolId: string) {
     const school = await this.prisma.client.school.findFirst({
       where: { id: schoolId },
