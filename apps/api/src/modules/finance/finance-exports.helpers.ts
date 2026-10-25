@@ -65,6 +65,7 @@ export async function buildFinanceWorkbook(input: FinanceWorkbookInput): Promise
     const totalValues = input.headers.map((_, index) => {
       if (index === 0) return input.totalLabel ?? "Total";
       if (!input.totalColumns?.includes(index)) return "";
+      if (input.rows.length === 0) return 0;
       const column = excelColumnName(index);
       return { formula: "SUM(" + column + "2:" + column + (totalRowIndex - 1) + ")" };
     });
