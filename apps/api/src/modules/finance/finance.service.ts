@@ -696,7 +696,16 @@ export class FinanceService {
         include: { items: true, targetClasses: { select: { classId: true } } },
       });
       if (!feeStructure) throw new NotFoundException("Fee structure not found.");
-      if (!feeStructure.items.length) throw new BadRequestException("Fee structure contains no billable items.");
+      const selectedOptionalIds = new Set(input.optionalItemIds ?? []);
+      const optionalItems = feeStructure.items.filter((item) => item.isOptional);
+      const knownOptionalIds = new Set(optionalItems.map((item) => item.id));
+      for (const selectedId of selectedOptionalIds) {
+        if (!knownOptionalIds.has(selectedId)) {
+          throw new BadRequestException("Select optional fee items from the chosen fee structure only.");
+        }
+      }
+      const billableItems = feeStructure.items.filter((item) => !item.isOptional || selectedOptionalIds.has(item.id));
+      if (!billableItems.length) throw new BadRequestException("Fee structure contains no selected billable items.");
       if (
         input.classId &&
         feeStructure.targetClasses.length > 0 &&
@@ -706,7 +715,8 @@ export class FinanceService {
       }
 
       const billNumbers = await this.createNumberSequence(tx, schoolId, "bill", `INV-${year}-`);
-      const totalAmount = feeStructure.items.reduce((sum, item) => sum + Number(item.amount), 0);
+      const totalAmountDecimal = billableItems.reduce((sum, item) => sum.plus(item.amount), new Prisma.Decimal(0));
+      const totalAmount = Number(totalAmountDecimal.toFixed(2));
       const results = [];
       for (const studentId of studentIds) {
         // Avoid issuing the same fee structure twice for a student in the same term.
@@ -724,26 +734,29 @@ export class FinanceService {
         if (existingBill) continue;
 
         const concessions = await this.calculateStudentConcessions(
-          tx, schoolId, studentId, currentYear.id, currentTerm.id, totalAmount,
+          tx, schoolId, studentId, currentYear.id, currentTerm.id, totalAmountDecimal.toNumber(),
         );
-        const netTotal = roundMoney(Math.max(0, totalAmount - concessions.totalDiscount));
-        let allocatedDiscount = 0;
-        const billItems = feeStructure.items.map((item, index) => {
-          const grossLine = Number(item.amount);
-          const lineDiscount = index === feeStructure.items.length - 1
-            ? roundMoney(concessions.totalDiscount - allocatedDiscount)
-            : roundMoney(concessions.totalDiscount * grossLine / (totalAmount || 1));
-          allocatedDiscount = roundMoney(allocatedDiscount + lineDiscount);
-          const netLine = roundMoney(Math.max(0, grossLine - lineDiscount));
+        const totalDiscountDecimal = new Prisma.Decimal(concessions.totalDiscount.toFixed(2));
+        const netTotalDecimal = Prisma.Decimal.max(0, totalAmountDecimal.minus(totalDiscountDecimal));
+        let allocatedDiscountDecimal = new Prisma.Decimal(0);
+        const billItems = billableItems.map((item, index) => {
+          const grossLine = item.amount;
+          const lineDiscount = index === billableItems.length - 1
+            ? totalDiscountDecimal.minus(allocatedDiscountDecimal)
+            : (totalAmountDecimal.gt(0)
+              ? totalDiscountDecimal.mul(grossLine).div(totalAmountDecimal).toDecimalPlaces(2)
+              : new Prisma.Decimal(0));
+          allocatedDiscountDecimal = allocatedDiscountDecimal.plus(lineDiscount);
+          const netLine = Prisma.Decimal.max(0, grossLine.minus(lineDiscount));
           return {
             feeItemId: item.id,
             description: item.name,
-            amount: new Prisma.Decimal(grossLine),
+            amount: grossLine,
             quantity: 1,
-            totalAmount: new Prisma.Decimal(grossLine),
-            discountAmount: new Prisma.Decimal(lineDiscount),
-            balanceAmount: new Prisma.Decimal(netLine),
-            status: netLine === 0 ? "FULLY_PAID" as const : "UNPAID" as const,
+            totalAmount: grossLine,
+            discountAmount: lineDiscount,
+            balanceAmount: netLine,
+            status: netLine.eq(0) ? "FULLY_PAID" as const : "UNPAID" as const,
           };
         });
         const billNumber = billNumbers.next();
@@ -756,12 +769,12 @@ export class FinanceService {
             feeStructureId: input.feeStructureId,
             classId: input.classId,
             billNumber,
-            grossAmount: new Prisma.Decimal(totalAmount),
-            discountAmount: new Prisma.Decimal(concessions.totalDiscount),
-            totalAmount: new Prisma.Decimal(netTotal),
+            grossAmount: totalAmountDecimal,
+            discountAmount: totalDiscountDecimal,
+            totalAmount: netTotalDecimal,
             paidAmount: new Prisma.Decimal(0),
-            balanceAmount: new Prisma.Decimal(netTotal),
-            status: netTotal === 0 ? "PAID" : "PENDING",
+            balanceAmount: netTotalDecimal,
+            status: netTotalDecimal.eq(0) ? "PAID" : "PENDING",
             dueDate: input.dueDate ? new Date(input.dueDate) : undefined,
             notes: input.notes,
             items: { create: billItems },
@@ -769,13 +782,50 @@ export class FinanceService {
               create: concessions.details.map((detail) => ({
                 type: detail.type,
                 label: detail.label,
-                amount: new Prisma.Decimal(detail.amount),
+                amount: new Prisma.Decimal(detail.amount.toFixed(2)),
                 siblingDiscountPolicyId: detail.policyId,
                 studentScholarshipId: detail.scholarshipId,
               })),
             },
           },
         });
+
+        // Snapshot only outstanding balances from genuinely earlier terms. These
+        // rows are for invoice display and do not change the new bill's amount.
+        const earlierOpenBills = await tx.bill.findMany({
+          where: {
+            schoolId,
+            studentId,
+            balanceAmount: { gt: 0 },
+            status: { notIn: ["CANCELLED", "WAIVED"] },
+            OR: [
+              { academicYear: { endDate: { lt: currentTerm.startDate } } },
+              { academicYearId: currentYear.id, term: { endDate: { lt: currentTerm.startDate } } },
+            ],
+          },
+          select: {
+            id: true,
+            billNumber: true,
+            balanceAmount: true,
+            academicYear: { select: { name: true } },
+            term: { select: { name: true } },
+          },
+          orderBy: [{ issuedAt: "asc" }, { id: "asc" }],
+        });
+        if (earlierOpenBills.length) {
+          await tx.billArrearsSnapshot.createMany({
+            data: earlierOpenBills.map((source) => ({
+              schoolId,
+              billId: bill.id,
+              sourceBillId: source.id,
+              sourceBillNumber: source.billNumber,
+              sourceAcademicYear: source.academicYear.name,
+              sourceTerm: source.term?.name ?? null,
+              amountAtGeneration: source.balanceAmount,
+            })),
+            skipDuplicates: true,
+          });
+        }
         await tx.student.update({
           where: { id: studentId },
           data: { outstandingBalance: { increment: new Prisma.Decimal(netTotal) } },
@@ -797,7 +847,7 @@ export class FinanceService {
           termId: currentTerm.id,
         },
       });
-      return { bills: results, totalAmount };
+      return { bills: results, totalAmount: Number(totalAmountDecimal.toFixed(2)) };
     }, { isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted }), {
       onExhausted: () => new ConflictException("The system is busy generating other bills. Please try again in a moment."),
     });
@@ -805,7 +855,7 @@ export class FinanceService {
     return {
       success: true,
       count: billingResult.bills.length,
-      totalBilled: roundMoney(billingResult.bills.reduce((sum, bill) => sum + Number(bill.totalAmount), 0)),
+      totalBilled: Number(billingResult.bills.reduce((sum, bill) => sum.plus(bill.totalAmount), new Prisma.Decimal(0)).toFixed(2)),
     };
   }
 
