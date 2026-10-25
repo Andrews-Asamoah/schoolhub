@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import type { ExecutionContext } from "@nestjs/common";
 import { RolesGuard } from "../../common/guards/roles.guard.js";
-import { FINANCE_PAYROLL_EXPORT_ROLES, FINANCE_READ_ROLES, FINANCE_WRITE_ROLES, isFinancePayrollExportRole } from "./finance.permissions.js";
+import { FINANCE_PAYROLL_EXPORT_ROLES, FINANCE_READ_ROLES, FINANCE_WRITE_ROLES, canExportFinancePayroll, isFinancePayrollExportRole } from "./finance.permissions.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 // Normalise line endings so the checks behave the same on Windows (CRLF) checkouts.
@@ -39,6 +39,14 @@ describe("finance policy constants", () => {
       expect(isFinancePayrollExportRole(role)).toBe(false);
     }
     for (const role of FINANCE_PAYROLL_EXPORT_ROLES) expect(isFinancePayrollExportRole(role)).toBe(true);
+  });
+
+  it("rejects the platform superAdmin even if a client requests an allowed school role", () => {
+    expect(canExportFinancePayroll("superAdmin", "accountant")).toBe(false);
+    expect(canExportFinancePayroll("user", "accountant")).toBe(true);
+    expect(canExportFinancePayroll("user", "owner")).toBe(true);
+    expect(canExportFinancePayroll("user", "headteacher")).toBe(true);
+    expect(canExportFinancePayroll("user", "admin")).toBe(false);
   });
 });
 
