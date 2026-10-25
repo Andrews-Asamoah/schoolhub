@@ -1,5 +1,6 @@
 -- Phase 2: source-referenced previous-balance snapshots and list indexes.
 -- Existing balances are intentionally untouched by this additive migration.
+ALTER TABLE "bills" ADD COLUMN "carryForwardSnapshotCreated" BOOLEAN NOT NULL DEFAULT false;
 CREATE TABLE "bill_carry_forwards" (
   "id" TEXT NOT NULL,
   "schoolId" TEXT NOT NULL,
@@ -98,6 +99,34 @@ SELECT
 FROM "payments" p
 WHERE p."billId" IS NOT NULL
   AND NOT EXISTS (SELECT 1 FROM "payment_items" pi WHERE pi."paymentId" = p."id");
+
+-- Configurable, one-time late fee assessments against original unpaid invoices.
+CREATE TABLE "late_fee_assessments" (
+  "id" TEXT NOT NULL,
+  "schoolId" TEXT NOT NULL,
+  "sourceBillId" TEXT NOT NULL,
+  "targetBillId" TEXT NOT NULL,
+  "amount" DECIMAL(10,2) NOT NULL,
+  "mode" TEXT NOT NULL,
+  "value" DECIMAL(10,2) NOT NULL,
+  "graceDays" INTEGER NOT NULL,
+  "createdBy" TEXT NOT NULL,
+  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT "late_fee_assessments_pkey" PRIMARY KEY ("id")
+);
+CREATE UNIQUE INDEX "late_fee_assessments_schoolId_sourceBillId_key"
+  ON "late_fee_assessments"("schoolId", "sourceBillId");
+CREATE INDEX "late_fee_assessments_schoolId_targetBillId_idx"
+  ON "late_fee_assessments"("schoolId", "targetBillId");
+ALTER TABLE "late_fee_assessments"
+  ADD CONSTRAINT "late_fee_assessments_schoolId_fkey"
+  FOREIGN KEY ("schoolId") REFERENCES "schools"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "late_fee_assessments"
+  ADD CONSTRAINT "late_fee_assessments_sourceBillId_fkey"
+  FOREIGN KEY ("sourceBillId") REFERENCES "bills"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "late_fee_assessments"
+  ADD CONSTRAINT "late_fee_assessments_targetBillId_fkey"
+  FOREIGN KEY ("targetBillId") REFERENCES "bills"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- Rollback (manual, only if the feature is unused):
 -- DROP INDEX "payment_bill_allocations_schoolId_billId_idx";
