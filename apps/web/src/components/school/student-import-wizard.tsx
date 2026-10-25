@@ -35,10 +35,10 @@ type Phase = "upload" | "review" | "importing" | "done";
 type Filter = "all" | "attention" | "ready" | "duplicate";
 
 const STATUS: Record<RowStatus, { label: string; className: string }> = {
-  ready: { label: "Ready", className: "bg-emerald-50 text-emerald-700 dark:bg-emerald-400/10 dark:text-emerald-300" },
-  warning: { label: "Check", className: "bg-amber-50 text-amber-800 dark:bg-amber-400/10 dark:text-amber-300" },
-  duplicate: { label: "Already added", className: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300" },
-  error: { label: "Problem", className: "bg-rose-50 text-rose-700 dark:bg-rose-400/10 dark:text-rose-300" },
+  ready: { label: "Ready", className: "bg-success/10 text-success" },
+  warning: { label: "Check", className: "bg-warning/10 text-warning" },
+  duplicate: { label: "Already added", className: "bg-muted text-muted-foreground" },
+  error: { label: "Problem", className: "bg-destructive/10 text-destructive" },
 };
 const mb = (bytes: number) => Math.round(bytes / 1024 / 1024);
 
@@ -232,8 +232,8 @@ export function StudentImportWizard({
           <span className="text-xs text-muted-foreground">Already in the school, will be skipped.</span>
         ) : (
           <ul className="max-w-md space-y-0.5 text-xs">
-            {row.errors.map((message) => <li key={message} className="text-rose-700 dark:text-rose-300">{message}</li>)}
-            {row.warnings.map((message) => <li key={message} className="text-amber-800 dark:text-amber-300">{message}</li>)}
+            {row.errors.map((message) => <li key={message} className="text-destructive">{message}</li>)}
+            {row.warnings.map((message) => <li key={message} className="text-warning">{message}</li>)}
           </ul>
         ),
     },
@@ -244,7 +244,7 @@ export function StudentImportWizard({
   const remaining = progress.total - progress.done;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4" onMouseDown={(event) => event.target === event.currentTarget && phase !== "importing" && closeRef.current()}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/50 p-4" onMouseDown={(event) => event.target === event.currentTarget && phase !== "importing" && closeRef.current()}>
       <div
         ref={panel}
         tabIndex={-1}
@@ -282,7 +282,7 @@ export function StudentImportWizard({
               <input type="file" accept=".csv,.xlsx" className="sr-only" aria-label="Choose a student file" disabled={busy} onChange={(event) => { void readFile(event.target.files?.[0]); event.target.value = ""; }} />
             </label>
             {error && (
-              <p role="alert" className="flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
+              <p role="alert" className="flex items-start gap-2 rounded-xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive">
                 <CircleAlert className="mt-0.5 size-4 shrink-0" /> {error}
               </p>
             )}
@@ -323,7 +323,7 @@ export function StudentImportWizard({
               <Stat label="Problems (not imported)" value={preview.summary.error} tone="rose" />
             </div>
             {preview.notices.map((notice) => (
-              <p key={notice} className="flex items-start gap-2 rounded-xl bg-amber-50 px-4 py-2.5 text-xs text-amber-900 dark:bg-amber-400/10 dark:text-amber-200">
+              <p key={notice} className="flex items-start gap-2 rounded-xl bg-warning/10 px-4 py-2.5 text-xs text-warning">
                 <TriangleAlert className="mt-0.5 size-3.5 shrink-0" /> {notice}
               </p>
             ))}
@@ -386,12 +386,12 @@ export function StudentImportWizard({
               <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${(progress.done / Math.max(progress.total, 1)) * 100}%` }} />
             </div>
             {paused ? (
-              <div role="alert" className="space-y-3 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">
+              <div role="alert" className="space-y-3 rounded-xl border border-destructive/20 bg-destructive/10 p-4 text-sm text-destructive">
                 <p className="flex items-start gap-2"><CircleAlert className="mt-0.5 size-4 shrink-0" /> The import was interrupted: {paused}</p>
                 <p className="text-xs">Nothing is lost. Students added so far are saved, and retrying carries on from where it stopped.</p>
                 <div className="flex gap-2">
-                  <button type="button" onClick={() => void runBatches()} className="inline-flex h-9 items-center rounded-lg bg-rose-700 px-4 text-xs font-semibold text-white hover:bg-rose-800">Retry</button>
-                  <button type="button" onClick={() => { setPaused(null); setPhase("done"); }} className="inline-flex h-9 items-center rounded-lg border border-rose-300 px-4 text-xs font-semibold">Stop here</button>
+                  <button type="button" onClick={() => void runBatches()} className="inline-flex h-9 items-center rounded-lg bg-destructive px-4 text-xs font-semibold text-destructive-foreground hover:bg-destructive/90">Retry</button>
+                  <button type="button" onClick={() => { setPaused(null); setPhase("done"); }} className="inline-flex h-9 items-center rounded-lg border border-destructive/30 px-4 text-xs font-semibold">Stop here</button>
                 </div>
               </div>
             ) : (
@@ -409,12 +409,12 @@ export function StudentImportWizard({
               <Stat label="Skipped (already there)" value={skipped.length} tone="slate" />
               <Stat label="Could not be added" value={failed.length + (stopped || paused ? remaining : 0)} tone="rose" />
             </div>
-            {remaining > 0 && <p className="rounded-xl bg-amber-50 px-4 py-2.5 text-xs text-amber-900">The import stopped early. {remaining} student{remaining === 1 ? " was" : "s were"} not processed. Upload the same file again to add them, and those already added will be skipped.</p>}
+            {remaining > 0 && <p className="rounded-xl bg-warning/10 px-4 py-2.5 text-xs text-warning">The import stopped early. {remaining} student{remaining === 1 ? " was" : "s were"} not processed. Upload the same file again to add them, and those already added will be skipped.</p>}
 
             {created.length > 0 && (
-              <section className={`rounded-xl border-2 p-4 ${credentialsSaved ? "border-emerald-200 bg-emerald-50/50 dark:border-emerald-400/20 dark:bg-emerald-400/5" : "border-amber-300 bg-amber-50 dark:border-amber-400/30 dark:bg-amber-400/10"}`}>
+              <section className={`rounded-xl border-2 p-4 ${credentialsSaved ? "border-success/20 bg-success/10" : "border-warning/30 bg-warning/10"}`}>
                 <h3 className="flex items-center gap-2 text-sm font-bold text-foreground">
-                  {credentialsSaved ? <CircleCheck className="size-4 text-emerald-600" /> : <TriangleAlert className="size-4 text-amber-600" />}
+                  {credentialsSaved ? <CircleCheck className="size-4 text-success" /> : <TriangleAlert className="size-4 text-warning" />}
                   Save the login details now
                 </h3>
                 <p className="mt-1 text-xs text-muted-foreground">
@@ -436,7 +436,7 @@ export function StudentImportWizard({
                     <li key={result.rowNumber} className="flex flex-wrap items-baseline gap-x-3 px-3 py-2">
                       <span className="font-semibold text-foreground">{result.name}</span>
                       <span className="text-muted-foreground">row {result.rowNumber}</span>
-                      <span className="text-rose-700 dark:text-rose-300">{result.message}</span>
+                      <span className="text-destructive">{result.message}</span>
                     </li>
                   ))}
                 </ul>
@@ -462,10 +462,10 @@ export function StudentImportWizard({
 
 function Stat({ label, value, tone }: { label: string; value: number; tone: "emerald" | "amber" | "slate" | "rose" }) {
   const tones = {
-    emerald: "border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-400/20 dark:bg-emerald-400/10 dark:text-emerald-200",
-    amber: "border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-400/20 dark:bg-amber-400/10 dark:text-amber-200",
+    emerald: "border-success/20 bg-success/10 text-success",
+    amber: "border-warning/20 bg-warning/10 text-warning",
     slate: "border-border bg-muted text-foreground",
-    rose: "border-rose-200 bg-rose-50 text-rose-800 dark:border-rose-400/20 dark:bg-rose-400/10 dark:text-rose-200",
+    rose: "border-destructive/20 bg-destructive/10 text-destructive",
   };
   return (
     <div className={`rounded-xl border px-4 py-3 ${tones[tone]}`}>

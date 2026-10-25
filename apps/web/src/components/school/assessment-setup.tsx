@@ -17,7 +17,7 @@ import {
 import { useCanExportTables } from "@/lib/table-export-policy";
 
 const iconButton =
-  "inline-flex size-8 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-800 disabled:opacity-40 dark:hover:bg-white/10 dark:hover:text-white";
+  "inline-flex size-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-40";
 
 /**
  * Where administrators set up how marks are collected and graded: grading
@@ -71,8 +71,8 @@ export function AssessmentSetupWorkspace() {
     },
   });
 
-  if (query.isPending) return <p className="flex items-center gap-2 text-xs text-slate-500"><LoaderCircle className="size-4 animate-spin" /> Loading assessment setup…</p>;
-  if (query.error) return <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">Assessment setup could not be loaded: {query.error.message}</p>;
+  if (query.isPending) return <p className="flex items-center gap-2 text-xs text-muted-foreground"><LoaderCircle className="size-4 animate-spin" /> Loading assessment setup…</p>;
+  if (query.error) return <p role="alert" className="rounded-xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive">Assessment setup could not be loaded: {query.error.message}</p>;
 
   const setup = query.data;
   const classNames = new Map(setup.classes.map((klass) => [klass.id, klass.name]));
@@ -137,10 +137,10 @@ export function AssessmentSetupWorkspace() {
           <span
             className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold ${
               template.isLocked
-                ? "bg-amber-50 text-amber-800 dark:bg-amber-400/10 dark:text-amber-300"
+                ? "bg-warning/10 text-warning"
                 : template.isActive
-                  ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-400/10 dark:text-emerald-300"
-                  : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300"
+                  ? "bg-success/10 text-success"
+                  : "bg-muted text-muted-foreground"
             }`}
           >
             {template.isLocked ? "Locked" : template.isActive ? "Active" : "Off"}
@@ -161,7 +161,7 @@ export function AssessmentSetupWorkspace() {
           <button type="button" className={iconButton} aria-label={`${template.isLocked ? "Unlock" : "Lock"} ${template.name}`} title={template.isLocked ? "Unlock marks" : "Lock marks"} disabled={change.isPending} onClick={() => change.mutate({ path: `templates/${template.id}`, method: "PUT", body: templateToInput(template, { isLocked: !template.isLocked }), message: `${template.name} is now ${template.isLocked ? "unlocked" : "locked"}.` })}>{template.isLocked ? <LockOpen className="size-4" /> : <Lock className="size-4" />}</button>
           <button
             type="button"
-            className={`${iconButton} text-rose-600 hover:text-rose-700`}
+            className={`${iconButton} text-destructive hover:text-destructive`}
             aria-label={`Delete ${template.name}`}
             title={template.marksRecorded ? "Has marks, turn it off instead" : "Delete"}
             disabled={change.isPending || template.marksRecorded > 0}
@@ -174,34 +174,34 @@ export function AssessmentSetupWorkspace() {
 
   return (
     <div className="space-y-8">
-      <div className="rounded-2xl border border-indigo-100 bg-gradient-to-br from-white via-indigo-50/50 to-sky-50/60 p-5 sm:p-6 dark:border-white/10 dark:from-slate-900 dark:via-slate-900 dark:to-slate-900">
-        <h2 className="text-base font-bold text-slate-900 dark:text-white">How assessments work</h2>
-        <ol className="mt-3 grid gap-3 text-xs leading-relaxed text-slate-600 sm:grid-cols-3 dark:text-slate-300">
-          <li><span className="font-semibold text-slate-900 dark:text-white">1. Grading scale.</span> Which scores earn which grade (A to F, for example).</li>
-          <li><span className="font-semibold text-slate-900 dark:text-white">2. Assessment.</span> What teachers mark (class assessment, exam) and how much each counts, for the classes and subjects you choose.</li>
-          <li><span className="font-semibold text-slate-900 dark:text-white">3. Marks entry.</span> Teachers enter marks for their subjects. Totals, grades and positions are worked out for them.</li>
+      <div className="rounded-2xl border border-primary/20 bg-gradient-to-br from-card via-primary/10 to-info/10 p-5 sm:p-6">
+        <h2 className="text-base font-bold text-foreground">How assessments work</h2>
+        <ol className="mt-3 grid gap-3 text-xs leading-relaxed text-muted-foreground sm:grid-cols-3">
+          <li><span className="font-semibold text-foreground">1. Grading scale.</span> Which scores earn which grade (A to F, for example).</li>
+          <li><span className="font-semibold text-foreground">2. Assessment.</span> What teachers mark (class assessment, exam) and how much each counts, for the classes and subjects you choose.</li>
+          <li><span className="font-semibold text-foreground">3. Marks entry.</span> Teachers enter marks for their subjects. Totals, grades and positions are worked out for them.</li>
         </ol>
       </div>
 
       {notice && (
-        <p role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 dark:border-emerald-400/20 dark:bg-emerald-400/10 dark:text-emerald-200">
+        <p role="status" className="rounded-xl border border-success/20 bg-success/10 px-4 py-3 text-sm text-success">
           {notice}
         </p>
       )}
       {(change.error || quickStart.error) && (
-        <p role="alert" className="flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
+        <p role="alert" className="flex items-start gap-2 rounded-xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive">
           <CircleAlert className="mt-0.5 size-4 shrink-0" /> {(change.error ?? quickStart.error)?.message}
         </p>
       )}
 
       {setup.templates.length === 0 && (
-        <section aria-labelledby="quick-start-heading" className="rounded-2xl border-2 border-dashed border-indigo-200 bg-white p-6 dark:border-indigo-400/30 dark:bg-slate-900">
+        <section aria-labelledby="quick-start-heading" className="rounded-2xl border-2 border-dashed border-primary/20 bg-card p-6">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="max-w-xl">
-              <h2 id="quick-start-heading" className="flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-white">
-                <Rocket className="size-4 text-indigo-600" /> Get teachers entering marks in one click
+              <h2 id="quick-start-heading" className="flex items-center gap-2 text-sm font-bold text-foreground">
+                <Rocket className="size-4 text-primary" /> Get teachers entering marks in one click
               </h2>
-              <p className="mt-1.5 text-xs leading-relaxed text-slate-600 dark:text-slate-300">
+              <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
                 No assessment is set up yet, which is why teachers see &ldquo;No assessment applies&rdquo;. This creates {setup.gradingSystems.length === 0 ? "the standard A to F grading scale and " : ""}a <strong>Termly assessment</strong> for every class and subject: class assessment out of 30 plus an end-of-term exam out of 70. You can change anything afterwards.
               </p>
             </div>
@@ -210,12 +210,12 @@ export function AssessmentSetupWorkspace() {
                 type="button"
                 disabled={quickStart.isPending}
                 onClick={() => { setNotice(null); quickStart.mutate(setup); }}
-                className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-indigo-600 px-4 text-xs font-semibold text-white hover:bg-indigo-700 disabled:opacity-60"
+                className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary px-4 text-xs font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-60"
               >
                 {quickStart.isPending && <LoaderCircle className="size-3.5 animate-spin" />}
                 Set up for all classes
               </button>
-              <button type="button" onClick={() => setEditing("new")} className="inline-flex h-9 items-center rounded-lg border border-slate-200 px-4 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800">
+              <button type="button" onClick={() => setEditing("new")} className="inline-flex h-9 items-center rounded-lg border border-border px-4 text-xs font-semibold text-foreground/80 hover:bg-muted/50">
                 Customise first
               </button>
             </div>
@@ -224,25 +224,25 @@ export function AssessmentSetupWorkspace() {
       )}
 
       {setup.templates.length > 0 && setup.uncovered.length > 0 && (
-        <section aria-label="Classes without an assessment" className="rounded-2xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-400/20 dark:bg-amber-400/10">
-          <p className="flex items-start gap-2 text-sm font-semibold text-amber-900 dark:text-amber-200">
+        <section aria-label="Classes without an assessment" className="rounded-2xl border border-warning/20 bg-warning/10 p-4">
+          <p className="flex items-start gap-2 text-sm font-semibold text-warning">
             <CircleAlert className="mt-0.5 size-4 shrink-0" />
             {setup.uncovered.length} class and subject combination{setup.uncovered.length === 1 ? " has" : "s have"} no assessment, so teachers can&rsquo;t enter marks there.
           </p>
           <ul className="mt-2 flex flex-wrap gap-1.5">
             {shownUncovered.map((item) => (
-              <li key={`${item.classId}-${item.subjectId}`} className="rounded-full bg-white px-2.5 py-1 text-[11px] font-medium text-amber-900 dark:bg-slate-900 dark:text-amber-200">
+              <li key={`${item.classId}-${item.subjectId}`} className="rounded-full bg-card px-2.5 py-1 text-[11px] font-medium text-warning">
                 {item.className} · {item.subjectName}
               </li>
             ))}
           </ul>
           <div className="mt-3 flex flex-wrap gap-3 text-xs font-semibold">
             {setup.uncovered.length > 6 && (
-              <button type="button" onClick={() => setShowAllUncovered((value) => !value)} className="text-amber-900 underline dark:text-amber-200">
+              <button type="button" onClick={() => setShowAllUncovered((value) => !value)} className="text-warning underline">
                 {showAllUncovered ? "Show fewer" : `Show all ${setup.uncovered.length}`}
               </button>
             )}
-            <button type="button" onClick={() => setEditing("new")} className="text-amber-900 underline dark:text-amber-200">Create an assessment for them</button>
+            <button type="button" onClick={() => setEditing("new")} className="text-warning underline">Create an assessment for them</button>
           </div>
         </section>
       )}
@@ -250,10 +250,10 @@ export function AssessmentSetupWorkspace() {
       <section aria-labelledby="assessments-heading" className="space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h2 id="assessments-heading" className="text-sm font-bold text-slate-900 dark:text-white">Assessments</h2>
-            <p className="text-xs text-slate-500">{setup.term ? `Current term: ${setup.term.name}` : "No academic term is selected, so coverage can't be checked."}</p>
+            <h2 id="assessments-heading" className="text-sm font-bold text-foreground">Assessments</h2>
+            <p className="text-xs text-muted-foreground">{setup.term ? `Current term: ${setup.term.name}` : "No academic term is selected, so coverage can't be checked."}</p>
           </div>
-          <button type="button" onClick={() => setEditing("new")} className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-indigo-600 px-4 text-xs font-semibold text-white hover:bg-indigo-700">
+          <button type="button" onClick={() => setEditing("new")} className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary px-4 text-xs font-semibold text-primary-foreground hover:bg-primary/90">
             <Plus className="size-4" /> New assessment
           </button>
         </div>
@@ -274,25 +274,25 @@ export function AssessmentSetupWorkspace() {
       <section aria-labelledby="scales-heading" className="space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h2 id="scales-heading" className="text-sm font-bold text-slate-900 dark:text-white">Grading scales</h2>
-            <p className="text-xs text-slate-500">Which scores earn which grade.</p>
+            <h2 id="scales-heading" className="text-sm font-bold text-foreground">Grading scales</h2>
+            <p className="text-xs text-muted-foreground">Which scores earn which grade.</p>
           </div>
-          <button type="button" onClick={() => setScaleDialog("new")} className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-slate-200 px-4 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800">
+          <button type="button" onClick={() => setScaleDialog("new")} className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-border px-4 text-xs font-semibold text-foreground/80 hover:bg-muted/50">
             <Plus className="size-4" /> New grading scale
           </button>
         </div>
         {setup.gradingSystems.length === 0 ? (
-          <p className="rounded-xl border border-dashed border-slate-300 px-4 py-6 text-center text-xs text-slate-500 dark:border-slate-700">No grading scale yet. Create one, or use the quick start above.</p>
+          <p className="rounded-xl border border-dashed border-input px-4 py-6 text-center text-xs text-muted-foreground">No grading scale yet. Create one, or use the quick start above.</p>
         ) : (
           <ul className="grid gap-4 md:grid-cols-2">
             {setup.gradingSystems.map((system) => {
               const readOnly = system.shared || system.hasMarks;
               return (
-                <li key={system.id} className="rounded-2xl border border-slate-200/80 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+                <li key={system.id} className="rounded-2xl border border-border/80 bg-card p-4">
                   <div className="flex items-start justify-between gap-2">
                     <div>
-                      <h3 className="flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-white"><GraduationCap className="size-4 text-indigo-600" />{system.name}</h3>
-                      <p className="mt-0.5 text-[11px] text-slate-500">
+                      <h3 className="flex items-center gap-2 text-sm font-bold text-foreground"><GraduationCap className="size-4 text-primary" />{system.name}</h3>
+                      <p className="mt-0.5 text-[11px] text-muted-foreground">
                         {system.shared ? "Shared by all schools" : system.usedBy ? `Used by ${system.usedBy} assessment${system.usedBy === 1 ? "" : "s"}` : "Not used yet"}
                         {system.hasMarks && " · marks graded with it"}
                       </p>
@@ -303,7 +303,7 @@ export function AssessmentSetupWorkspace() {
                       {!system.shared && (
                         <button
                           type="button"
-                          className={`${iconButton} text-rose-600 hover:text-rose-700`}
+                          className={`${iconButton} text-destructive hover:text-destructive`}
                           aria-label={`Delete ${system.name}`}
                           title={system.usedBy ? "In use" : "Delete"}
                           disabled={change.isPending || system.usedBy > 0}
@@ -314,7 +314,7 @@ export function AssessmentSetupWorkspace() {
                   </div>
                   <ul className="mt-3 flex flex-wrap gap-1.5">
                     {system.scales.map((band) => (
-                      <li key={band.grade} className="rounded-lg bg-slate-100 px-2.5 py-1 text-[11px] text-slate-700 dark:bg-slate-800 dark:text-slate-200" title={band.description}>
+                      <li key={band.grade} className="rounded-lg bg-muted px-2.5 py-1 text-[11px] text-foreground/80" title={band.description}>
                         <span className="font-bold">{band.grade}</span> {band.minScore}–{band.maxScore}
                       </li>
                     ))}
@@ -325,7 +325,7 @@ export function AssessmentSetupWorkspace() {
           </ul>
         )}
         {ownScales.length === 0 && setup.gradingSystems.length > 0 && (
-          <p className="text-[11px] text-slate-500">Shared scales can&rsquo;t be edited. Copy one to make your own version.</p>
+          <p className="text-[11px] text-muted-foreground">Shared scales can&rsquo;t be edited. Copy one to make your own version.</p>
         )}
       </section>
 

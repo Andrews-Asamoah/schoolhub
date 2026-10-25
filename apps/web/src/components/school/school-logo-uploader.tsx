@@ -60,17 +60,17 @@ export function SchoolLogoUploader({ logo }: { logo?: string | null }) {
   const busy = upload.isPending || remove.isPending;
 
   return (
-    <div className="mb-5 flex flex-wrap items-center gap-4 border-b border-slate-100 pb-5">
-      <div className="flex size-16 items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
+    <div className="mb-5 flex flex-wrap items-center gap-4 border-b border-border/60 pb-5">
+      <div className="flex size-16 items-center justify-center overflow-hidden rounded-xl border border-border bg-muted/50">
         {logo ? (
           <img src={logo} alt="School logo" className="size-full object-contain" />
         ) : (
-          <ImageUp className="size-6 text-slate-300" />
+          <ImageUp className="size-6 text-muted-foreground/50" />
         )}
       </div>
       <div className="min-w-0">
-        <p className="text-xs font-semibold text-slate-800">School logo</p>
-        <p className="mt-0.5 text-[11px] text-slate-500">JPEG, PNG or WebP, up to 2 MB.</p>
+        <p className="text-xs font-semibold text-foreground">School logo</p>
+        <p className="mt-0.5 text-[11px] text-muted-foreground">JPEG, PNG or WebP, up to 2 MB.</p>
         <div className="mt-2 flex items-center gap-2">
           <input
             ref={inputRef}
@@ -86,7 +86,7 @@ export function SchoolLogoUploader({ logo }: { logo?: string | null }) {
             type="button"
             disabled={busy}
             onClick={() => inputRef.current?.click()}
-            className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-blue-600 px-3 text-[11px] font-semibold text-white hover:bg-blue-700 disabled:opacity-60"
+            className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-primary px-3 text-[11px] font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-60"
           >
             {upload.isPending ? <LoaderCircle className="size-3.5 animate-spin" /> : <ImageUp className="size-3.5" />}
             {logo ? "Replace" : "Upload"}
@@ -96,14 +96,14 @@ export function SchoolLogoUploader({ logo }: { logo?: string | null }) {
               type="button"
               disabled={busy}
               onClick={() => remove.mutate()}
-              className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 px-3 text-[11px] font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-60"
+              className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border px-3 text-[11px] font-semibold text-muted-foreground hover:bg-muted/50 disabled:opacity-60"
             >
               <Trash2 className="size-3.5" /> Remove
             </button>
           )}
         </div>
         {message && (
-          <p role={message.ok ? "status" : "alert"} className={`mt-2 text-[11px] ${message.ok ? "text-emerald-700" : "text-red-600"}`}>
+          <p role={message.ok ? "status" : "alert"} className={`mt-2 text-[11px] ${message.ok ? "text-success" : "text-destructive"}`}>
             {message.text}
           </p>
         )}

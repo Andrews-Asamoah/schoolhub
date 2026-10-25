@@ -76,9 +76,9 @@ function LoginPage() {
 
   if (sessionPending || session?.user) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-slate-50 dark:bg-slate-950">
-        <div role="status" className="flex items-center gap-3 text-sm text-slate-500 dark:text-slate-400">
-          <span className="size-2 animate-pulse rounded-full bg-indigo-500" />
+      <main className="flex min-h-screen items-center justify-center bg-background">
+        <div role="status" className="flex items-center gap-3 text-sm text-muted-foreground">
+          <span className="size-2 animate-pulse rounded-full bg-primary" />
           {sessionPending ? "Checking your session…" : "Redirecting to your dashboard…"}
         </div>
       </main>
@@ -139,16 +139,16 @@ function LoginPage() {
   }
 
   return (
-    <main className="grid min-h-screen bg-slate-50 lg:grid-cols-[1.04fr_0.96fr] dark:bg-slate-950">
+    <main className="grid min-h-screen bg-background lg:grid-cols-[1.04fr_0.96fr]">
       
       {/* Left Hero Panel with dynamic school motto/branding adaptation */}
-      <section className="relative hidden min-h-screen overflow-hidden bg-[#101d48] px-12 py-10 text-white lg:flex lg:flex-col xl:px-16">
+      <section className="relative hidden min-h-screen overflow-hidden bg-brand px-12 py-10 text-brand-foreground lg:flex lg:flex-col xl:px-16">
         <div
           aria-hidden="true"
           className="pointer-events-none absolute inset-0 opacity-40"
           style={{
             backgroundImage:
-              "radial-gradient(circle at 15% 15%, #4169e1 0, transparent 28%), radial-gradient(circle at 90% 80%, #0ea5e9 0, transparent 28%)",
+              "radial-gradient(circle at 15% 15%, var(--brand-glow) 0, transparent 28%), radial-gradient(circle at 90% 80%, var(--brand-soft) 0, transparent 28%)",
           }}
         />
         <div
@@ -164,49 +164,49 @@ function LoginPage() {
 
         {/* Dynamic Header Brand (Subdomain logo + name) */}
         <div className="relative z-10 flex items-center gap-3">
-          <span className="flex size-12 items-center justify-center overflow-hidden rounded-2xl bg-white/10 ring-1 ring-white/20 backdrop-blur">
+          <span className="flex size-12 items-center justify-center overflow-hidden rounded-2xl bg-brand-foreground/10 ring-1 ring-brand-foreground/20 backdrop-blur">
             {school?.logo ? (
               <img src={school.logo} alt={school.name} className="size-full object-cover" />
             ) : (
-              <GraduationCap className="size-6 text-sky-200" strokeWidth={2.2} />
+              <GraduationCap className="size-6 text-brand-foreground/80" strokeWidth={2.2} />
             )}
           </span>
           <span>
             <span className="block text-lg font-bold tracking-tight">
               {school?.name ?? "SchoolHub"}
             </span>
-            <span className="block text-[10px] font-semibold uppercase tracking-[0.22em] text-blue-200/70">
+            <span className="block text-[10px] font-semibold uppercase tracking-[0.22em] text-brand-foreground/80">
               {school?.motto ?? "School management"}
             </span>
           </span>
         </div>
 
         <div className="relative z-10 my-auto max-w-xl py-16">
-          <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/[0.07] px-3 py-1.5 text-xs font-medium text-blue-100 shadow-lg shadow-blue-950/10 backdrop-blur">
-            <Sparkles className="size-3.5 text-sky-300" />
+          <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-brand-foreground/15 bg-brand-foreground/[0.07] px-3 py-1.5 text-xs font-medium text-brand-foreground/80 shadow-lg shadow-brand/10 backdrop-blur">
+            <Sparkles className="size-3.5 text-brand-accent" />
             {school?.name ? `Welcome to ${school.name} Portal` : "One connected school community"}
           </div>
           <h1 className="max-w-lg text-4xl font-semibold leading-[1.12] tracking-[-0.04em] xl:text-[54px]">
             A brighter way to{" "}
-            <span className="bg-linear-to-r from-sky-200 via-blue-200 to-indigo-200 bg-clip-text text-transparent">
+            <span className="bg-linear-to-r from-brand-accent via-brand-accent to-brand-foreground bg-clip-text text-transparent">
               run your school.
             </span>
           </h1>
-          <p className="mt-5 max-w-md text-[15px] leading-7 text-blue-100/70">
+          <p className="mt-5 max-w-md text-[15px] leading-7 text-brand-foreground/80">
             {school?.motto 
               ? `"${school.motto}" — Bringing your people, learning, and operations together in one clear workspace.` 
               : "Bring your people, learning, and day-to-day operations together in one calm, clear workspace."}
           </p>
 
-          <div className="mt-12 max-w-md rounded-2xl border border-white/15 bg-white/8 p-5 shadow-2xl shadow-blue-950/30 backdrop-blur-xl">
+          <div className="mt-12 max-w-md rounded-2xl border border-brand-foreground/15 bg-brand-foreground/8 p-5 shadow-2xl shadow-brand/30 backdrop-blur-xl">
             <div className="flex items-start justify-between">
               <div>
-                <p className="text-xs font-medium text-blue-100/65">
+                <p className="text-xs font-medium text-brand-foreground/80">
                   School overview
                 </p>
                 <p className="mt-1 text-lg font-semibold">A clearer picture</p>
               </div>
-              <span className="flex size-9 items-center justify-center rounded-xl bg-sky-300/15 text-sky-200">
+              <span className="flex size-9 items-center justify-center rounded-xl bg-brand-accent/20 text-brand-foreground/80">
                 <ShieldCheck className="size-4.5" />
               </span>
             </div>
@@ -214,12 +214,12 @@ function LoginPage() {
               {chartBars.map((height, index) => (
                 <span
                   key={index}
-                  className="flex-1 rounded-t-sm bg-linear-to-t from-blue-400/30 to-sky-200/90"
+                  className="flex-1 rounded-t-sm bg-linear-to-t from-brand-soft to-brand-accent"
                   style={{ height: `${height}%` }}
                 />
               ))}
             </div>
-            <div className="mt-4 flex items-center justify-between border-t border-white/10 pt-4 text-[11px] text-blue-100/60">
+            <div className="mt-4 flex items-center justify-between border-t border-brand-foreground/10 pt-4 text-[11px] text-brand-foreground/80">
               <span>People</span>
               <span>Academics</span>
               <span>Operations</span>
@@ -228,17 +228,17 @@ function LoginPage() {
           </div>
         </div>
 
-        <div className="relative z-10 flex items-center justify-between text-[11px] text-blue-100/50">
+        <div className="relative z-10 flex items-center justify-between text-[11px] text-brand-foreground/80">
           <span>Thoughtfully made for school communities</span>
           <span>© {new Date().getFullYear()} SchoolHub</span>
         </div>
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute -bottom-36 -right-28 size-110 rounded-full border border-white/8"
+          className="pointer-events-none absolute -bottom-36 -right-28 size-110 rounded-full border border-brand-foreground/8"
         />
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute -bottom-24 -right-16 size-80 rounded-full border border-white/8"
+          className="pointer-events-none absolute -bottom-24 -right-16 size-80 rounded-full border border-brand-foreground/8"
         />
       </section>
 
@@ -250,7 +250,7 @@ function LoginPage() {
 
         <div className="w-full max-w-105">
           <div className="mb-9 flex items-center gap-3 lg:hidden">
-            <span className="flex size-11 items-center justify-center overflow-hidden rounded-xl bg-blue-600 text-white shadow-lg shadow-blue-600/20">
+            <span className="flex size-11 items-center justify-center overflow-hidden rounded-xl bg-primary text-primary-foreground shadow-lg shadow-primary/20">
               {school?.logo ? (
                 <img src={school.logo} alt={school.name} className="size-full object-cover" />
               ) : (
@@ -258,10 +258,10 @@ function LoginPage() {
               )}
             </span>
             <span>
-              <span className="block text-base font-bold tracking-tight text-slate-900 dark:text-white">
+              <span className="block text-base font-bold tracking-tight text-foreground">
                 {school?.name ?? "SchoolHub"}
               </span>
-              <span className="block text-[9px] font-semibold uppercase tracking-[0.2em] text-slate-400">
+              <span className="block text-[9px] font-semibold uppercase tracking-[0.2em] text-muted-foreground/70">
                 {school?.motto ?? "School management"}
               </span>
             </span>
@@ -275,13 +275,13 @@ function LoginPage() {
           ) : (
             <>
           <div className="mb-8">
-            <p className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-blue-600 dark:text-blue-400">
+            <p className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-primary">
               Welcome back
             </p>
-            <h2 className="text-3xl font-bold tracking-[-0.035em] text-slate-950 dark:text-white sm:text-[34px]">
+            <h2 className="text-3xl font-bold tracking-[-0.035em] text-foreground sm:text-[34px]">
               Sign in to your workspace
             </h2>
-            <p className="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400">
+            <p className="mt-2 text-sm leading-6 text-muted-foreground">
               Enter your account details to continue to {school?.name ?? "SchoolHub"}.
             </p>
           </div>
@@ -290,7 +290,7 @@ function LoginPage() {
             <div
               role="status"
               aria-live="polite"
-              className="mb-5 flex items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/50 dark:text-emerald-200"
+              className="mb-5 flex items-center gap-3 rounded-xl border border-success/20 bg-success/10 px-4 py-3 text-sm text-success"
             >
               <ShieldCheck className="size-4 shrink-0" />
               {logoutNotice}
@@ -300,7 +300,7 @@ function LoginPage() {
           {error && (
             <div
               role="alert"
-              className="mb-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm leading-5 text-red-700 dark:border-red-900 dark:bg-red-950/50 dark:text-red-200"
+              className="mb-5 rounded-xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm leading-5 text-destructive"
             >
               {error}
             </div>
@@ -310,12 +310,12 @@ function LoginPage() {
             <div>
               <label
                 htmlFor="email"
-                className="mb-2 block text-xs font-semibold text-slate-700 dark:text-slate-200"
+                className="mb-2 block text-xs font-semibold text-foreground/80"
               >
                 Email or username
               </label>
               <div className="group relative">
-                <Mail className="pointer-events-none absolute left-3.5 top-1/2 size-4.25 -translate-y-1/2 text-slate-400 transition group-focus-within:text-blue-600" />
+                <Mail className="pointer-events-none absolute left-3.5 top-1/2 size-4.25 -translate-y-1/2 text-muted-foreground/70 transition group-focus-within:text-primary" />
                 <input
                   id="email"
                   name="email"
@@ -328,7 +328,7 @@ function LoginPage() {
                   value={email}
                   onChange={(event) => setEmail(event.target.value)}
                   placeholder="you@school.edu or a.asamoah"
-                  className="h-12 w-full rounded-xl border border-slate-200 bg-white pl-11 pr-4 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 hover:border-slate-300 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:hover:border-slate-600"
+                  className="h-12 w-full rounded-xl border border-border bg-card pl-11 pr-4 text-sm text-foreground outline-none transition placeholder:text-muted-foreground/70 hover:border-input focus:border-primary focus:ring-4 focus:ring-primary/10"
                 />
               </div>
             </div>
@@ -337,13 +337,13 @@ function LoginPage() {
               <div className="mb-2 flex items-center justify-between">
                 <label
                   htmlFor="password"
-                  className="block text-xs font-semibold text-slate-700 dark:text-slate-200"
+                  className="block text-xs font-semibold text-foreground/80"
                 >
                   Password
                 </label>
               </div>
               <div className="group relative">
-                <LockKeyhole className="pointer-events-none absolute left-3.5 top-1/2 size-4.25 -translate-y-1/2 text-slate-400 transition group-focus-within:text-blue-600" />
+                <LockKeyhole className="pointer-events-none absolute left-3.5 top-1/2 size-4.25 -translate-y-1/2 text-muted-foreground/70 transition group-focus-within:text-primary" />
                 <input
                   id="password"
                   name="password"
@@ -353,14 +353,14 @@ function LoginPage() {
                   value={password}
                   onChange={(event) => setPassword(event.target.value)}
                   placeholder="Enter your password"
-                  className="h-12 w-full rounded-xl border border-slate-200 bg-white pl-11 pr-12 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 hover:border-slate-300 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:hover:border-slate-600"
+                  className="h-12 w-full rounded-xl border border-border bg-card pl-11 pr-12 text-sm text-foreground outline-none transition placeholder:text-muted-foreground/70 hover:border-input focus:border-primary focus:ring-4 focus:ring-primary/10"
                 />
                 <button
                   type="button"
                   aria-label={showPassword ? "Hide password" : "Show password"}
                   aria-pressed={showPassword}
                   onClick={() => setShowPassword((visible) => !visible)}
-                  className="absolute right-2 top-1/2 flex size-9 -translate-y-1/2 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+                  className="absolute right-2 top-1/2 flex size-9 -translate-y-1/2 items-center justify-center rounded-lg text-muted-foreground/70 transition hover:bg-muted hover:text-foreground/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                 >
                   {showPassword ? (
                     <EyeOff className="size-4.25" />
@@ -374,7 +374,7 @@ function LoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="group flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 text-sm font-semibold text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-700 hover:shadow-xl hover:shadow-blue-600/25 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-500/25 disabled:cursor-wait disabled:opacity-70"
+              className="group flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/20 transition hover:bg-primary/90 hover:shadow-xl hover:shadow-primary/25 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/25 disabled:cursor-wait disabled:opacity-70"
             >
               {loading ? "Signing you in…" : "Sign in"}
               {!loading && (
@@ -385,7 +385,7 @@ function LoginPage() {
             </>
           )}
 
-          <div className="mt-7 flex items-center justify-center gap-2 text-[11px] text-slate-400">
+          <div className="mt-7 flex items-center justify-center gap-2 text-[11px] text-muted-foreground/70">
             <LockKeyhole className="size-3.5" />
             <span>Your school workspace is protected and secure.</span>
           </div>

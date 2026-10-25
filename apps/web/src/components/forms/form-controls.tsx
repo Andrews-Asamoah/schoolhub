@@ -9,7 +9,7 @@ import { LoaderCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const controlClassName =
-  "w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/10 dark:bg-slate-950 dark:text-white dark:focus:ring-indigo-400/10";
+  "w-full rounded-lg border border-border bg-card px-3 py-2.5 text-sm text-foreground outline-none transition placeholder:text-muted-foreground/70 focus:border-primary/50 focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-60";
 
 export function FormField({
   label,
@@ -32,17 +32,17 @@ export function FormField({
     <div className={cn("space-y-1.5", className)}>
       <label
         htmlFor={htmlFor}
-        className="block text-xs font-medium text-slate-700 dark:text-slate-300"
+        className="block text-xs font-medium text-foreground/80"
       >
         {label}
       </label>
       {children}
       {message ? (
-        <p id={`${htmlFor}-error`} role="alert" className="text-xs text-rose-700 dark:text-rose-300">
+        <p id={`${htmlFor}-error`} role="alert" className="text-xs text-destructive">
           {message}
         </p>
       ) : hint ? (
-        <p id={`${htmlFor}-hint`} className="text-[11px] text-slate-500 dark:text-slate-400">
+        <p id={`${htmlFor}-hint`} className="text-[11px] text-muted-foreground">
           {hint}
         </p>
       ) : null}
@@ -90,7 +90,7 @@ export function FormSubmitButton({
       {...props}
       type="submit"
       className={cn(
-        "inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 dark:focus-visible:ring-offset-slate-950",
+        "inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-sm transition hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 dark:focus-visible:ring-offset-foreground/10",
         className,
       )}
       disabled={isSubmitting || disabled}
@@ -112,7 +112,7 @@ export function FormCancelButton({
     <button
       type="button"
       className={cn(
-        "inline-flex h-10 items-center justify-center rounded-lg px-3 text-sm font-medium text-slate-600 transition hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:text-slate-300 dark:hover:bg-white/[0.06]",
+        "inline-flex h-10 items-center justify-center rounded-lg px-3 text-sm font-medium text-muted-foreground transition hover:bg-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
         className,
       )}
       {...props}

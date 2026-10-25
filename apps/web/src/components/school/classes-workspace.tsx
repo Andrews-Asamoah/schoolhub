@@ -243,7 +243,7 @@ export function ClassesWorkspace({
                 aria-valuemin={0}
                 aria-valuemax={100}
               >
-                <span className={`block h-full rounded-full ${occupancy >= 90 ? "bg-amber-500" : "bg-primary"}`} style={{ width: `${occupancy}%` }} />
+                <span className={`block h-full rounded-full ${occupancy >= 90 ? "bg-warning" : "bg-primary"}`} style={{ width: `${occupancy}%` }} />
               </div>
             )}
           </div>
@@ -263,8 +263,8 @@ export function ClassesWorkspace({
       header: "Status",
       value: (schoolClass) => (schoolClass.isActive ? "Active" : "Inactive"),
       cell: (schoolClass) => (
-        <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold ${schoolClass.isActive ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300" : "bg-muted text-muted-foreground"}`}>
-          <span className={`size-1.5 rounded-full ${schoolClass.isActive ? "bg-emerald-500" : "bg-muted-foreground"}`} />
+        <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold ${schoolClass.isActive ? "bg-success/10 text-success" : "bg-muted text-muted-foreground"}`}>
+          <span className={`size-1.5 rounded-full ${schoolClass.isActive ? "bg-success" : "bg-muted-foreground"}`} />
           {schoolClass.isActive ? "Active" : "Inactive"}
         </span>
       ),
@@ -308,7 +308,7 @@ export function ClassesWorkspace({
   return (
     <div className="space-y-7">
       <section className="overflow-hidden rounded-3xl border border-border bg-card shadow-sm">
-        <div className="relative isolate overflow-hidden border-b border-border bg-gradient-to-br from-primary/10 via-card to-sky-500/5 px-5 py-6 sm:px-7 sm:py-8">
+        <div className="relative isolate overflow-hidden border-b border-border bg-gradient-to-br from-primary/10 via-card to-info/5 px-5 py-6 sm:px-7 sm:py-8">
           <div className="pointer-events-none absolute -right-10 -top-16 -z-10 size-64 rounded-full bg-primary/10 blur-3xl" />
           <div className="flex flex-wrap items-end justify-between gap-5">
             <div className="max-w-2xl">

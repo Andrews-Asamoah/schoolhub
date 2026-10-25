@@ -61,7 +61,7 @@ export function ProfilePhotoControls({ avatarClassName = "size-16 text-xl" }: { 
     <div className="flex items-center gap-4">
       <UserAvatar name={user?.name} image={image} className={avatarClassName} />
       <div className="min-w-0">
-        <p className="text-[11px] text-slate-500">JPEG, PNG or WebP, up to 2 MB.</p>
+        <p className="text-[11px] text-muted-foreground">JPEG, PNG or WebP, up to 2 MB.</p>
         <div className="mt-2 flex flex-wrap items-center gap-2">
           <input
             ref={inputRef}
@@ -78,7 +78,7 @@ export function ProfilePhotoControls({ avatarClassName = "size-16 text-xl" }: { 
             type="button"
             disabled={busy}
             onClick={() => inputRef.current?.click()}
-            className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-blue-600 px-3 text-[11px] font-semibold text-white hover:bg-blue-700 disabled:opacity-60"
+            className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-primary px-3 text-[11px] font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-60"
           >
             {upload.isPending ? <LoaderCircle className="size-3.5 animate-spin" /> : <Camera className="size-3.5" />}
             {image ? "Replace photo" : "Upload photo"}
@@ -88,7 +88,7 @@ export function ProfilePhotoControls({ avatarClassName = "size-16 text-xl" }: { 
               type="button"
               disabled={busy}
               onClick={() => remove.mutate()}
-              className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 px-3 text-[11px] font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-60 dark:border-white/10 dark:text-slate-300 dark:hover:bg-white/5"
+              className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border px-3 text-[11px] font-semibold text-muted-foreground hover:bg-muted/50 disabled:opacity-60"
             >
               {remove.isPending ? <LoaderCircle className="size-3.5 animate-spin" /> : <Trash2 className="size-3.5" />}
               Remove
@@ -96,7 +96,7 @@ export function ProfilePhotoControls({ avatarClassName = "size-16 text-xl" }: { 
           )}
         </div>
         {message && (
-          <p role={message.ok ? "status" : "alert"} className={`mt-2 text-[11px] ${message.ok ? "text-emerald-700" : "text-red-600"}`}>
+          <p role={message.ok ? "status" : "alert"} className={`mt-2 text-[11px] ${message.ok ? "text-success" : "text-destructive"}`}>
             {message.text}
           </p>
         )}

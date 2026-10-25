@@ -366,7 +366,7 @@ export function StudentDirectoryWorkspace() {
 
   return (
     <div className="space-y-5">
-      <section className="rounded-2xl border border-border bg-gradient-to-br from-primary/10 via-card to-sky-500/5 p-5 sm:p-6">
+      <section className="rounded-2xl border border-border bg-gradient-to-br from-primary/10 via-card to-info/5 p-5 sm:p-6">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="flex items-start gap-3">
             <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
@@ -514,7 +514,7 @@ export function StudentDirectoryWorkspace() {
 
       <CredentialsDialog entries={issued} onClose={() => setIssued([])} />
       {notice && (
-        <p role="status" className="flex items-start justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs text-emerald-900 dark:border-emerald-400/20 dark:bg-emerald-400/10 dark:text-emerald-200">
+        <p role="status" className="flex items-start justify-between gap-3 rounded-xl border border-success/20 bg-success/10 px-4 py-3 text-xs text-success">
           <span>{notice}</span>
           <button type="button" onClick={() => setNotice(null)} className="font-semibold underline-offset-2 hover:underline">Dismiss</button>
         </p>
@@ -1290,7 +1290,7 @@ function StudentStatusBadge({ status }: { status: string }) {
   const active = status === "ACTIVE";
   return (
     <span
-      className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-semibold ${active ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300" : "bg-muted text-muted-foreground"}`}
+      className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-semibold ${active ? "bg-success/10 text-success" : "bg-muted text-muted-foreground"}`}
     >
       {formatStatus(status)}
     </span>

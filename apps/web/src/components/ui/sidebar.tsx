@@ -76,14 +76,14 @@ export function Sidebar({
       {mobileOpen && (
         <button
           aria-label="Close navigation menu"
-          className="fixed inset-0 z-40 bg-slate-950/60 backdrop-blur-xs md:hidden"
+          className="fixed inset-0 z-40 bg-foreground/60 backdrop-blur-xs md:hidden"
           onClick={closeMobile}
         />
       )}
       <aside
         data-collapsed={collapsed}
         className={cn(
-          "fixed inset-y-0 left-0 z-50 flex w-72 flex-col border-r border-slate-200 bg-white transition-[width,transform] duration-200 dark:border-slate-800 dark:bg-slate-900 md:sticky md:top-0 md:z-20 md:h-screen md:translate-x-0",
+          "fixed inset-y-0 left-0 z-50 flex w-72 flex-col border-r border-border bg-card transition-[width,transform] duration-200 md:sticky md:top-0 md:z-20 md:h-screen md:translate-x-0",
           collapsed && "md:w-[5.25rem]",
           mobileOpen ? "translate-x-0" : "-translate-x-full",
           className,
@@ -102,7 +102,7 @@ export function SidebarHeader({
 }: HTMLAttributes<HTMLDivElement>) {
   return (
     <div
-      className={cn("flex h-[4.5rem] items-center px-5 border-b border-slate-100 dark:border-slate-800/60", className)}
+      className={cn("flex h-[4.5rem] items-center px-5 border-b border-border/60", className)}
       {...props}
     />
   );
@@ -136,7 +136,7 @@ export function SidebarGroupLabel({
   return (
     <p
       className={cn(
-        "mb-2 px-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400 dark:text-slate-500",
+        "mb-2 px-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground/70",
         className,
       )}
       {...props}
@@ -150,7 +150,7 @@ export function SidebarFooter({
 }: HTMLAttributes<HTMLDivElement>) {
   return (
     <div
-      className={cn("border-t border-slate-100 p-3 dark:border-slate-800", className)}
+      className={cn("border-t border-border/60 p-3", className)}
       {...props}
     />
   );
@@ -168,7 +168,7 @@ export function SidebarTrigger({
       aria-label="Toggle navigation sidebar"
       onClick={toggle}
       className={cn(
-        "inline-flex size-9 items-center justify-center rounded-xl text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100",
+        "inline-flex size-9 items-center justify-center rounded-xl text-muted-foreground transition hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
         className,
       )}
       {...props}
@@ -205,10 +205,10 @@ export function SidebarMenuButton({
       onClick={closeMobile}
       title={tooltipText}
       className={cn(
-        "group flex h-10 w-full items-center gap-3 rounded-xl px-3 text-left text-[13px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500",
+        "group flex h-10 w-full items-center gap-3 rounded-xl px-3 text-left text-[13px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
         active
-          ? "bg-blue-50 text-primary dark:bg-blue-500/10 dark:text-primary"
-          : "text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/60 dark:hover:text-slate-100",
+          ? "bg-primary/10 text-primary dark:text-primary"
+          : "text-muted-foreground hover:bg-muted/50 hover:text-foreground",
         disabled && "cursor-not-allowed opacity-45 hover:bg-transparent",
         collapsed && "md:justify-center md:px-0",
         className,

@@ -505,7 +505,7 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
         <span
           className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
             row.isActive
-              ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+              ? "bg-success/10 text-success"
               : "bg-muted text-muted-foreground"
           }`}
         >
@@ -631,14 +631,14 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
       <section
         className={`relative isolate overflow-hidden rounded-2xl border p-5 shadow-sm sm:p-6 ${
           isGuardianPage
-            ? "border-primary/20 bg-gradient-to-br from-primary/15 via-card to-violet-500/10 dark:from-primary/20 dark:via-card dark:to-violet-500/10"
-            : "border-border bg-gradient-to-br from-primary/10 via-card to-sky-500/5"
+            ? "border-primary/20 bg-gradient-to-br from-primary/15 via-card to-highlight/10 dark:from-primary/20 dark:via-card"
+            : "border-border bg-gradient-to-br from-primary/10 via-card to-info/5"
         }`}
       >
         {isGuardianPage && (
           <>
             <span aria-hidden="true" className="pointer-events-none absolute -right-12 -top-16 size-48 rounded-full bg-primary/10 blur-3xl" />
-            <span aria-hidden="true" className="pointer-events-none absolute -bottom-20 right-36 size-36 rounded-full bg-violet-500/10 blur-3xl" />
+            <span aria-hidden="true" className="pointer-events-none absolute -bottom-20 right-36 size-36 rounded-full bg-highlight/10 blur-3xl" />
           </>
         )}
         <div className="relative flex flex-wrap items-start justify-between gap-4">
@@ -1171,7 +1171,7 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
       )}
       <CredentialsDialog entries={issued} onClose={() => setIssued([])} />
       {notice && (
-        <p role="status" className="flex items-start justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs text-emerald-900 dark:border-emerald-400/20 dark:bg-emerald-400/10 dark:text-emerald-200">
+        <p role="status" className="flex items-start justify-between gap-3 rounded-xl border border-success/20 bg-success/10 px-4 py-3 text-xs text-success">
           <span>{notice}</span>
           <button type="button" onClick={() => setNotice(null)} className="font-semibold underline-offset-2 hover:underline">Dismiss</button>
         </p>
@@ -1670,7 +1670,7 @@ function GuardianDetailsDialog({
 
   return (
     <div
-      className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/50 p-4"
+      className="fixed inset-0 z-[60] flex items-center justify-center bg-foreground/50 p-4"
       role="presentation"
       onMouseDown={(event) => event.target === event.currentTarget && onClose()}
     >
@@ -1723,7 +1723,7 @@ function GuardianDetailsDialog({
         </div>
 
         {!guardian.canLogin && (
-          <p className="mt-4 rounded-lg bg-amber-500/10 px-3 py-2 text-xs text-amber-800 dark:text-amber-200">
+          <p className="mt-4 rounded-lg bg-warning/10 px-3 py-2 text-xs text-warning">
             This guardian does not currently have a parent-portal login. Use Reset login in the directory to create one.
           </p>
         )}

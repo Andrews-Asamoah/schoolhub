@@ -276,37 +276,37 @@ export function ClubsWorkspace() {
     <div className="space-y-6">
       {/* Overview Stat Cards */}
       <div className="grid gap-4 sm:grid-cols-3">
-        <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs dark:border-slate-800 dark:bg-slate-900">
+        <div className="rounded-2xl border border-border/80 bg-card p-5 shadow-xs">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500">Total School Clubs</span>
-            <span className="flex size-9 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 dark:bg-indigo-950/40">
+            <span className="text-xs font-semibold text-muted-foreground">Total School Clubs</span>
+            <span className="flex size-9 items-center justify-center rounded-xl bg-primary/10 text-primary">
               <Sparkles className="size-4" />
             </span>
           </div>
-          <p className="mt-2 text-2xl font-black text-slate-900 dark:text-white">{totalClubs}</p>
-          <p className="mt-0.5 text-xs text-slate-400">Co-curricular associations</p>
+          <p className="mt-2 text-2xl font-black text-foreground">{totalClubs}</p>
+          <p className="mt-0.5 text-xs text-muted-foreground/70">Co-curricular associations</p>
         </div>
 
-        <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs dark:border-slate-800 dark:bg-slate-900">
+        <div className="rounded-2xl border border-border/80 bg-card p-5 shadow-xs">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500">Active Clubs</span>
-            <span className="flex size-9 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40">
+            <span className="text-xs font-semibold text-muted-foreground">Active Clubs</span>
+            <span className="flex size-9 items-center justify-center rounded-xl bg-success/10 text-success">
               <UserCheck className="size-4" />
             </span>
           </div>
-          <p className="mt-2 text-2xl font-black text-emerald-600">{activeClubs}</p>
-          <p className="mt-0.5 text-xs text-slate-400">Open for student membership</p>
+          <p className="mt-2 text-2xl font-black text-success">{activeClubs}</p>
+          <p className="mt-0.5 text-xs text-muted-foreground/70">Open for student membership</p>
         </div>
 
-        <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs dark:border-slate-800 dark:bg-slate-900">
+        <div className="rounded-2xl border border-border/80 bg-card p-5 shadow-xs">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500">Total Student Enrollments</span>
-            <span className="flex size-9 items-center justify-center rounded-xl bg-blue-50 text-blue-600 dark:bg-blue-950/40">
+            <span className="text-xs font-semibold text-muted-foreground">Total Student Enrollments</span>
+            <span className="flex size-9 items-center justify-center rounded-xl bg-primary/10 text-primary">
               <Users className="size-4" />
             </span>
           </div>
-          <p className="mt-2 text-2xl font-black text-slate-900 dark:text-white">{totalMembers}</p>
-          <p className="mt-0.5 text-xs text-slate-400">Members across all clubs</p>
+          <p className="mt-2 text-2xl font-black text-foreground">{totalMembers}</p>
+          <p className="mt-0.5 text-xs text-muted-foreground/70">Members across all clubs</p>
         </div>
       </div>
 
@@ -314,25 +314,25 @@ export function ClubsWorkspace() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-wrap items-center gap-3">
           <div className="relative">
-            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground/70" />
             <input
               type="text"
               placeholder="Search clubs, patrons..."
               value={searchFilter}
               onChange={(e) => setSearchFilter(e.target.value)}
-              className="h-9 w-60 rounded-xl border border-slate-200 bg-white pl-9 pr-3 text-xs text-slate-800 outline-none transition focus:border-indigo-500 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200"
+              className="h-9 w-60 rounded-xl border border-border bg-card pl-9 pr-3 text-xs text-foreground outline-none transition focus:border-primary"
             />
           </div>
 
-          <div className="inline-flex rounded-xl border border-slate-200 bg-white p-0.5 text-xs dark:border-slate-800 dark:bg-slate-900">
+          <div className="inline-flex rounded-xl border border-border bg-card p-0.5 text-xs">
             {(["ALL", "ACTIVE", "INACTIVE"] as const).map((mode) => (
               <button
                 key={mode}
                 onClick={() => setStatusFilter(mode)}
                 className={`rounded-lg px-3 py-1 font-semibold transition ${
                   statusFilter === mode
-                    ? "bg-indigo-600 text-white shadow-xs"
-                    : "text-slate-600 hover:text-slate-900 dark:text-slate-400"
+                    ? "bg-primary text-primary-foreground shadow-xs"
+                    : "text-muted-foreground hover:text-foreground"
                 }`}
               >
                 {mode === "ALL" ? "All Clubs" : mode === "ACTIVE" ? "Active" : "Inactive"}
@@ -344,7 +344,7 @@ export function ClubsWorkspace() {
         {canManage && (
           <button
             onClick={openCreate}
-            className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-indigo-700"
+            className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-xs font-bold text-primary-foreground shadow-sm transition hover:bg-primary/90"
           >
             <Plus className="size-4" />
             New Club
@@ -354,15 +354,15 @@ export function ClubsWorkspace() {
 
       {/* Clubs List / Grid */}
       {clubsQuery.isLoading ? (
-        <div className="flex items-center justify-center p-12 text-xs text-slate-500">
-          <LoaderCircle className="mr-2 size-5 animate-spin text-indigo-600" />
+        <div className="flex items-center justify-center p-12 text-xs text-muted-foreground">
+          <LoaderCircle className="mr-2 size-5 animate-spin text-primary" />
           Loading school clubs…
         </div>
       ) : filteredClubs.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-12 text-center dark:border-slate-800 dark:bg-slate-900">
-          <Sparkles className="mx-auto size-10 text-indigo-400" />
-          <h3 className="mt-3 text-sm font-bold text-slate-900 dark:text-white">No clubs found</h3>
-          <p className="mt-1 text-xs text-slate-500">
+        <div className="rounded-2xl border border-dashed border-border bg-card p-12 text-center">
+          <Sparkles className="mx-auto size-10 text-primary" />
+          <h3 className="mt-3 text-sm font-bold text-foreground">No clubs found</h3>
+          <p className="mt-1 text-xs text-muted-foreground">
             {searchFilter || statusFilter !== "ALL"
               ? "Try adjusting your search filters."
               : "Get started by adding your school's clubs and societies."}
@@ -370,7 +370,7 @@ export function ClubsWorkspace() {
           {canManage && !searchFilter && statusFilter === "ALL" && (
             <button
               onClick={openCreate}
-              className="mt-4 inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-indigo-700"
+              className="mt-4 inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-xs font-bold text-primary-foreground shadow-sm hover:bg-primary/90"
             >
               <Plus className="size-4" />
               Create First Club
@@ -389,21 +389,21 @@ export function ClubsWorkspace() {
             return (
               <div
                 key={club.id}
-                className="flex flex-col justify-between rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs transition hover:border-slate-300 dark:border-slate-800 dark:bg-slate-900"
+                className="flex flex-col justify-between rounded-2xl border border-border/80 bg-card p-5 shadow-xs transition hover:border-input"
               >
                 <div>
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-center gap-2.5">
-                      <span className="flex size-10 items-center justify-center rounded-xl bg-indigo-50 font-bold text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300">
+                      <span className="flex size-10 items-center justify-center rounded-xl bg-primary/10 font-bold text-primary">
                         <Sparkles className="size-5" />
                       </span>
                       <div>
-                        <h4 className="text-sm font-bold text-slate-900 dark:text-white">{club.name}</h4>
+                        <h4 className="text-sm font-bold text-foreground">{club.name}</h4>
                         <span
                           className={`inline-block rounded-md px-1.5 py-0.5 text-[9px] font-bold ${
                             club.isActive
-                              ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
-                              : "bg-slate-100 text-slate-600 dark:bg-slate-800"
+                              ? "bg-success/10 text-success"
+                              : "bg-muted text-muted-foreground"
                           }`}
                         >
                           {club.isActive ? "Active" : "Inactive"}
@@ -412,32 +412,32 @@ export function ClubsWorkspace() {
                     </div>
                   </div>
 
-                  <p className="mt-3 text-xs text-slate-600 dark:text-slate-300 line-clamp-2 leading-relaxed">
+                  <p className="mt-3 text-xs text-muted-foreground line-clamp-2 leading-relaxed">
                     {club.description || "No description provided for this club."}
                   </p>
 
-                  <div className="mt-4 space-y-1.5 border-t border-slate-100 pt-3 text-xs text-slate-500 dark:border-slate-800">
+                  <div className="mt-4 space-y-1.5 border-t border-border/60 pt-3 text-xs text-muted-foreground">
                     <div className="flex items-center justify-between">
-                      <span className="text-[11px] text-slate-400">Teacher Patron:</span>
-                      <span className="font-semibold text-slate-800 dark:text-slate-200 truncate max-w-44">
+                      <span className="text-[11px] text-muted-foreground/70">Teacher Patron:</span>
+                      <span className="font-semibold text-foreground truncate max-w-44">
                         {patronName}
                       </span>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span className="text-[11px] text-slate-400">Members Enrolled:</span>
-                      <span className="font-bold text-indigo-600 dark:text-indigo-400">
+                      <span className="text-[11px] text-muted-foreground/70">Members Enrolled:</span>
+                      <span className="font-bold text-primary">
                         {club._count?.members ?? 0} students
                       </span>
                     </div>
                   </div>
                 </div>
 
-                <div className="mt-5 flex items-center justify-between gap-2 border-t border-slate-100 pt-3 dark:border-slate-800">
+                <div className="mt-5 flex items-center justify-between gap-2 border-t border-border/60 pt-3">
                   <button
                     onClick={() => setSelectedClubForMembers(club)}
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-semibold text-foreground/80 hover:bg-muted/50"
                   >
-                    <UsersRound className="size-3.5 text-indigo-600" />
+                    <UsersRound className="size-3.5 text-primary" />
                     Members ({club._count?.members ?? 0})
                   </button>
 
@@ -446,7 +446,7 @@ export function ClubsWorkspace() {
                       <button
                         onClick={() => openEdit(club)}
                         aria-label="Edit club"
-                        className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800"
+                        className="rounded-lg p-1.5 text-muted-foreground/70 hover:bg-muted hover:text-foreground/80"
                       >
                         <Pencil className="size-3.5" />
                       </button>
@@ -457,7 +457,7 @@ export function ClubsWorkspace() {
                           }
                         }}
                         aria-label="Delete club"
-                        className="rounded-lg p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950/30"
+                        className="rounded-lg p-1.5 text-muted-foreground/70 hover:bg-destructive/10 hover:text-destructive"
                       >
                         <Trash2 className="size-3.5" />
                       </button>
@@ -472,15 +472,15 @@ export function ClubsWorkspace() {
 
       {/* CREATE / EDIT MODAL */}
       {showForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-xs">
-          <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl dark:border-slate-800 dark:bg-slate-900">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
-              <h3 className="text-base font-bold text-slate-900 dark:text-white">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/60 p-4 backdrop-blur-xs">
+          <div className="w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-2xl">
+            <div className="flex items-center justify-between pb-3 border-b border-border/60">
+              <h3 className="text-base font-bold text-foreground">
                 {editing ? "Edit Club" : "Create New Club"}
               </h3>
               <button
                 onClick={closeForm}
-                className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+                className="rounded-lg p-1 text-muted-foreground/70 hover:bg-muted"
               >
                 <X className="size-4" />
               </button>
@@ -494,7 +494,7 @@ export function ClubsWorkspace() {
               className="mt-4 space-y-4 text-xs"
             >
               <div>
-                <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
                   Club Name *
                 </label>
                 <input
@@ -508,7 +508,7 @@ export function ClubsWorkspace() {
               </div>
 
               <div>
-                <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
                   Description
                 </label>
                 <textarea
@@ -521,7 +521,7 @@ export function ClubsWorkspace() {
               </div>
 
               <div>
-                <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
                   Patron / Teacher in Charge
                 </label>
                 <select
@@ -544,32 +544,32 @@ export function ClubsWorkspace() {
                   id="clubActive"
                   checked={values.isActive}
                   onChange={(e) => setValues({ ...values, isActive: e.target.checked })}
-                  className="size-4 rounded-sm border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                  className="size-4 rounded-sm border-input text-primary focus:ring-primary"
                 />
-                <label htmlFor="clubActive" className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                <label htmlFor="clubActive" className="text-xs font-semibold text-foreground/80">
                   Club is currently active and accepting members
                 </label>
               </div>
 
               {saveMutation.isError && (
-                <p className="flex items-center gap-1.5 text-xs font-medium text-rose-600">
+                <p className="flex items-center gap-1.5 text-xs font-medium text-destructive">
                   <CircleAlert className="size-4 shrink-0" />
                   {saveMutation.error?.message || "Failed to save club"}
                 </p>
               )}
 
-              <div className="flex justify-end gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
+              <div className="flex justify-end gap-2 pt-3 border-t border-border/60">
                 <button
                   type="button"
                   onClick={closeForm}
-                  className="rounded-xl border border-slate-200 px-4 py-2 font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300"
+                  className="rounded-xl border border-border px-4 py-2 font-semibold text-foreground/80 hover:bg-muted/50"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={saveMutation.isPending}
-                  className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 font-bold text-white hover:bg-indigo-700 disabled:opacity-50"
+                  className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 font-bold text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
                 >
                   {saveMutation.isPending ? (
                     <LoaderCircle className="size-4 animate-spin" />
@@ -586,21 +586,21 @@ export function ClubsWorkspace() {
 
       {/* MANAGE MEMBERS MODAL */}
       {selectedClubForMembers && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-xs">
-          <div className="flex max-h-[85vh] w-full max-w-2xl flex-col rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl dark:border-slate-800 dark:bg-slate-900">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/60 p-4 backdrop-blur-xs">
+          <div className="flex max-h-[85vh] w-full max-w-2xl flex-col rounded-2xl border border-border bg-card p-6 shadow-2xl">
+            <div className="flex items-center justify-between pb-3 border-b border-border/60">
               <div>
-                <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                  <Sparkles className="size-4 text-indigo-600" />
+                <h3 className="text-base font-bold text-foreground flex items-center gap-2">
+                  <Sparkles className="size-4 text-primary" />
                   {selectedClubForMembers.name} — Members
                 </h3>
-                <p className="text-xs text-slate-500">
+                <p className="text-xs text-muted-foreground">
                   Manage student membership and executive roles
                 </p>
               </div>
               <button
                 onClick={() => setSelectedClubForMembers(null)}
-                className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+                className="rounded-lg p-1 text-muted-foreground/70 hover:bg-muted"
               >
                 <X className="size-4" />
               </button>
@@ -618,13 +618,13 @@ export function ClubsWorkspace() {
                     role: memberRole,
                   });
                 }}
-                className="mt-4 flex flex-wrap items-center gap-2 rounded-xl bg-slate-50 p-3 dark:bg-slate-800/40"
+                className="mt-4 flex flex-wrap items-center gap-2 rounded-xl bg-muted/50 p-3"
               >
                 <select
                   required
                   value={memberStudentId}
                   onChange={(e) => setMemberStudentId(e.target.value)}
-                  className="h-9 min-w-48 flex-1 rounded-lg border border-slate-200 bg-white px-2.5 text-xs text-slate-800 outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+                  className="h-9 min-w-48 flex-1 rounded-lg border border-border bg-card px-2.5 text-xs text-foreground outline-none"
                 >
                   <option value="">Select student to enroll...</option>
                   {(studentsQuery.data ?? []).map((s) => (
@@ -637,7 +637,7 @@ export function ClubsWorkspace() {
                 <select
                   value={memberRole}
                   onChange={(e) => setMemberRole(e.target.value)}
-                  className="h-9 w-32 rounded-lg border border-slate-200 bg-white px-2.5 text-xs text-slate-800 outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+                  className="h-9 w-32 rounded-lg border border-border bg-card px-2.5 text-xs text-foreground outline-none"
                 >
                   <option value="Member">Member</option>
                   <option value="President">President</option>
@@ -650,7 +650,7 @@ export function ClubsWorkspace() {
                 <button
                   type="submit"
                   disabled={!memberStudentId || addMemberMutation.isPending}
-                  className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-indigo-600 px-3.5 text-xs font-bold text-white hover:bg-indigo-700 disabled:opacity-50"
+                  className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary px-3.5 text-xs font-bold text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
                 >
                   {addMemberMutation.isPending ? (
                     <LoaderCircle className="size-3.5 animate-spin" />
@@ -663,7 +663,7 @@ export function ClubsWorkspace() {
             )}
 
             {addMemberMutation.isError && (
-              <p className="mt-2 text-xs font-medium text-rose-600">
+              <p className="mt-2 text-xs font-medium text-destructive">
                 {addMemberMutation.error?.message || "Failed to add member"}
               </p>
             )}
@@ -671,33 +671,33 @@ export function ClubsWorkspace() {
             {/* Members Table */}
             <div className="mt-4 flex-1 overflow-y-auto">
               {selectedClubForMembers.members?.length === 0 ? (
-                <div className="p-8 text-center text-xs text-slate-500">
+                <div className="p-8 text-center text-xs text-muted-foreground">
                   No students are enrolled in this club yet. Use the form above to add members.
                 </div>
               ) : (
-                <div className="divide-y divide-slate-100 rounded-xl border border-slate-200/80 dark:divide-slate-800 dark:border-slate-800">
+                <div className="divide-y divide-border/60 rounded-xl border border-border/80">
                   {selectedClubForMembers.members?.map((m) => (
                     <div
                       key={m.id}
                       className="flex items-center justify-between p-3 text-xs"
                     >
                       <div className="flex items-center gap-3">
-                        <div className="flex size-8 items-center justify-center rounded-lg bg-indigo-50 font-bold text-indigo-700 dark:bg-indigo-950/40">
+                        <div className="flex size-8 items-center justify-center rounded-lg bg-primary/10 font-bold text-primary">
                           {m.student.profile.firstName[0]}
                           {m.student.profile.lastName[0]}
                         </div>
                         <div>
-                          <p className="font-bold text-slate-900 dark:text-white">
+                          <p className="font-bold text-foreground">
                             {m.student.profile.firstName} {m.student.profile.lastName}
                           </p>
-                          <p className="text-[10px] text-slate-400">
+                          <p className="text-[10px] text-muted-foreground/70">
                             {m.student.admissionNumber || m.student.studentId} • {m.student.house?.name ?? "No House"}
                           </p>
                         </div>
                       </div>
 
                       <div className="flex items-center gap-3">
-                        <span className="rounded-md bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700 dark:bg-amber-950/40 dark:text-amber-300">
+                        <span className="rounded-md bg-warning/10 px-2 py-0.5 text-[10px] font-bold text-warning">
                           {m.role || "Member"}
                         </span>
                         {canManage && (
@@ -710,7 +710,7 @@ export function ClubsWorkspace() {
                                 });
                               }
                             }}
-                            className="rounded-lg p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950/30"
+                            className="rounded-lg p-1 text-muted-foreground/70 hover:bg-destructive/10 hover:text-destructive"
                           >
                             <Trash2 className="size-3.5" />
                           </button>
@@ -722,10 +722,10 @@ export function ClubsWorkspace() {
               )}
             </div>
 
-            <div className="mt-4 flex justify-end border-t border-slate-100 pt-3 dark:border-slate-800">
+            <div className="mt-4 flex justify-end border-t border-border/60 pt-3">
               <button
                 onClick={() => setSelectedClubForMembers(null)}
-                className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300"
+                className="rounded-xl border border-border px-4 py-2 text-xs font-semibold text-foreground/80 hover:bg-muted/50"
               >
                 Close
               </button>

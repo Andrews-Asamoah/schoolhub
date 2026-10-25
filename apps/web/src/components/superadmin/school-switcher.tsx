@@ -20,7 +20,7 @@ export function SchoolSwitcher() {
   if (schools.isPending || !schools.data?.length) {
     if (schools.error) {
       return (
-        <span role="alert" className="text-xs text-rose-700 dark:text-rose-300" title={schools.error.message}>
+        <span role="alert" className="text-xs text-destructive" title={schools.error.message}>
           Schools unavailable
         </span>
       );
@@ -29,8 +29,8 @@ export function SchoolSwitcher() {
   }
 
   return (
-    <label className="flex min-w-0 max-w-36 items-center gap-2 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 shadow-sm dark:border-white/10 dark:bg-slate-900 dark:text-slate-200 sm:max-w-52">
-      <Building2 className="size-4 shrink-0 text-indigo-600 dark:text-indigo-300" />
+    <label className="flex min-w-0 max-w-36 items-center gap-2 rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs font-semibold text-foreground/80 shadow-sm sm:max-w-52">
+      <Building2 className="size-4 shrink-0 text-primary" />
       <span className="sr-only">Switch school</span>
       <select
         aria-label="Switch school"

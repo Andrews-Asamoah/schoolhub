@@ -23,9 +23,9 @@ interface Row {
 }
 
 const box =
-  "h-9 w-full rounded-lg border border-slate-200 bg-white px-2.5 text-xs text-slate-800 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 disabled:bg-slate-50 disabled:text-slate-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:disabled:bg-slate-800/50";
-const label = "grid gap-1 text-[11px] font-medium text-slate-500";
-const heading = "text-[11px] font-semibold uppercase tracking-wide text-slate-400";
+  "h-9 w-full rounded-lg border border-border bg-card px-2.5 text-xs text-foreground outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/20 disabled:bg-muted/50 disabled:text-muted-foreground";
+const label = "grid gap-1 text-[11px] font-medium text-muted-foreground";
+const heading = "text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/70";
 
 let rowKey = 0;
 const rowFrom = (component: { id?: string; name: string; componentType: AssessmentTypeName; maxMarks: number; weight: number; isRequired: boolean; isRepeatable: boolean; expectedCount: number }): Row => ({
@@ -161,7 +161,7 @@ export function AssessmentTemplateDialog({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/50 p-4"
       onMouseDown={(event) => event.target === event.currentTarget && !save.isPending && onClose()}
     >
       <div
@@ -169,22 +169,22 @@ export function AssessmentTemplateDialog({
         role="dialog"
         aria-modal="true"
         aria-labelledby="assessment-title"
-        className="max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl sm:p-6 dark:border-white/10 dark:bg-slate-900"
+        className="max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-2xl border border-border bg-card p-5 shadow-2xl sm:p-6"
       >
         <div className="flex items-start justify-between gap-3">
           <div>
-            <h2 id="assessment-title" className="text-sm font-bold text-slate-900 dark:text-white">
+            <h2 id="assessment-title" className="text-sm font-bold text-foreground">
               {template ? "Edit assessment" : "New assessment"}
             </h2>
-            <p className="mt-0.5 text-xs text-slate-500">Set what teachers mark and how it adds up to a pupil&rsquo;s grade.</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">Set what teachers mark and how it adds up to a pupil&rsquo;s grade.</p>
           </div>
-          <button type="button" onClick={onClose} aria-label="Close" className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 dark:hover:bg-white/10">
+          <button type="button" onClick={onClose} aria-label="Close" className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted">
             <X className="size-4" />
           </button>
         </div>
 
         {structureLocked && (
-          <p className="mt-4 flex items-start gap-2 rounded-lg bg-slate-100 px-3 py-2 text-xs text-slate-700 dark:bg-slate-800 dark:text-slate-200">
+          <p className="mt-4 flex items-start gap-2 rounded-lg bg-muted px-3 py-2 text-xs text-foreground/80">
             <Lock className="mt-0.5 size-3.5 shrink-0" />
             Marks have already been entered ({template!.marksRecorded} pupil{template!.marksRecorded === 1 ? "" : "s"}). You can rename components, change the deadline, add classes or lock it, but marks, weights and the grading scale are fixed. Duplicate it to start a different version.
           </p>
@@ -215,7 +215,7 @@ export function AssessmentTemplateDialog({
                     type="button"
                     onClick={() => void createScale()}
                     disabled={creatingScale}
-                    className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border border-dashed border-indigo-300 px-3 text-xs font-semibold text-indigo-700 hover:bg-indigo-50 dark:border-indigo-400/40 dark:text-indigo-300 dark:hover:bg-indigo-400/10"
+                    className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border border-dashed border-primary/30 px-3 text-xs font-semibold text-primary hover:bg-primary/10"
                   >
                     {creatingScale ? <LoaderCircle className="size-3.5 animate-spin" /> : <Wand2 className="size-3.5" />}
                     Create the standard A to F scale
@@ -251,25 +251,25 @@ export function AssessmentTemplateDialog({
             </div>
             <fieldset className="space-y-2">
               <legend className={label}>Classes</legend>
-              <div className="flex gap-4 text-xs text-slate-700 dark:text-slate-200">
+              <div className="flex gap-4 text-xs text-foreground/80">
                 <label className="inline-flex items-center gap-2">
-                  <input type="radio" name="class-scope" checked={allClasses} onChange={() => setAllClasses(true)} className="accent-indigo-600" />
+                  <input type="radio" name="class-scope" checked={allClasses} onChange={() => setAllClasses(true)} className="accent-primary" />
                   All classes
                 </label>
                 <label className="inline-flex items-center gap-2">
-                  <input type="radio" name="class-scope" checked={!allClasses} onChange={() => setAllClasses(false)} className="accent-indigo-600" />
+                  <input type="radio" name="class-scope" checked={!allClasses} onChange={() => setAllClasses(false)} className="accent-primary" />
                   Only some classes
                 </label>
               </div>
               {!allClasses && (
-                <div className="space-y-3 rounded-xl border border-slate-200 p-3 dark:border-slate-700">
+                <div className="space-y-3 rounded-xl border border-border p-3">
                   {levels.map((level) => {
                     const inLevel = setup.classes.filter((klass) => klass.level === level);
                     const all = inLevel.every((klass) => classIds.includes(klass.id));
                     return (
                       <div key={level}>
                         <div className="mb-1.5 flex items-center justify-between">
-                          <span className="text-[11px] font-semibold text-slate-500">{level}</span>
+                          <span className="text-[11px] font-semibold text-muted-foreground">{level}</span>
                           <button
                             type="button"
                             onClick={() =>
@@ -277,19 +277,19 @@ export function AssessmentTemplateDialog({
                                 all ? current.filter((id) => !inLevel.some((klass) => klass.id === id)) : [...new Set([...current, ...inLevel.map((klass) => klass.id)])],
                               )
                             }
-                            className="text-[11px] font-semibold text-indigo-600 hover:underline"
+                            className="text-[11px] font-semibold text-primary hover:underline"
                           >
                             {all ? `Clear ${level}` : `Select all ${level}`}
                           </button>
                         </div>
                         <div className="flex flex-wrap gap-2">
                           {inLevel.map((klass) => (
-                            <label key={klass.id} className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800">
+                            <label key={klass.id} className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-border px-2.5 py-1.5 text-xs text-foreground/80 hover:bg-muted/50">
                               <input
                                 type="checkbox"
                                 checked={classIds.includes(klass.id)}
                                 onChange={(event) => setClassIds((current) => (event.target.checked ? [...current, klass.id] : current.filter((id) => id !== klass.id)))}
-                                className="accent-indigo-600"
+                                className="accent-primary"
                               />
                               {klass.name}
                             </label>
@@ -298,7 +298,7 @@ export function AssessmentTemplateDialog({
                       </div>
                     );
                   })}
-                  {setup.classes.length === 0 && <p className="text-xs text-slate-500">No classes have been created yet.</p>}
+                  {setup.classes.length === 0 && <p className="text-xs text-muted-foreground">No classes have been created yet.</p>}
                 </div>
               )}
             </fieldset>
@@ -309,18 +309,18 @@ export function AssessmentTemplateDialog({
               <h3 className={heading}>What is marked</h3>
               <p
                 role="status"
-                className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold ${weightOk ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-400/10 dark:text-emerald-300" : "bg-amber-50 text-amber-800 dark:bg-amber-400/10 dark:text-amber-300"}`}
+                className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold ${weightOk ? "bg-success/10 text-success" : "bg-warning/10 text-warning"}`}
               >
                 {weightOk ? <CircleCheck className="size-3.5" /> : <CircleAlert className="size-3.5" />}
                 Weights total {totalWeight}%{weightOk ? "" : ", needs to be 100%"}
               </p>
             </div>
-            <div className="hidden grid-cols-[1fr_8rem_4.5rem_4.5rem_auto] gap-2 px-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400 sm:grid" aria-hidden="true">
+            <div className="hidden grid-cols-[1fr_8rem_4.5rem_4.5rem_auto] gap-2 px-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70 sm:grid" aria-hidden="true">
               <span>Component</span><span>Type</span><span>Out of</span><span>Weight %</span><span />
             </div>
             <ul className="space-y-3">
               {rows.map((row, index) => (
-                <li key={row.key} className="rounded-xl border border-slate-200 p-3 dark:border-slate-700">
+                <li key={row.key} className="rounded-xl border border-border p-3">
                   <div className="grid gap-2 sm:grid-cols-[1fr_8rem_4.5rem_4.5rem_auto] sm:items-center">
                     <input className={box} aria-label={`Component ${index + 1} name`} value={row.name} onChange={(event) => update(row.key, { name: event.target.value })} placeholder="e.g. Class assessment" />
                     <select className={box} aria-label={`Component ${index + 1} type`} value={row.componentType} disabled={structureLocked} onChange={(event) => update(row.key, { componentType: event.target.value as AssessmentTypeName })}>
@@ -329,18 +329,18 @@ export function AssessmentTemplateDialog({
                     <input className={box} aria-label={`Component ${index + 1} maximum marks`} type="number" inputMode="decimal" min={1} step="any" value={row.maxMarks} disabled={structureLocked} onChange={(event) => update(row.key, { maxMarks: event.target.value })} />
                     <input className={box} aria-label={`Component ${index + 1} weight`} type="number" inputMode="decimal" min={0} max={100} step="any" value={row.weight} disabled={structureLocked} onChange={(event) => update(row.key, { weight: event.target.value })} />
                     <div className="flex items-center justify-end gap-0.5">
-                      <button type="button" aria-label={`Move ${row.name || `component ${index + 1}`} up`} disabled={index === 0} onClick={() => move(index, -1)} className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 disabled:opacity-30 dark:hover:bg-white/10"><ArrowUp className="size-3.5" /></button>
-                      <button type="button" aria-label={`Move ${row.name || `component ${index + 1}`} down`} disabled={index === rows.length - 1} onClick={() => move(index, 1)} className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 disabled:opacity-30 dark:hover:bg-white/10"><ArrowDown className="size-3.5" /></button>
-                      <button type="button" aria-label={`Remove ${row.name || `component ${index + 1}`}`} disabled={structureLocked || rows.length <= 1} onClick={() => setRows((current) => current.filter((item) => item.key !== row.key))} className="rounded-md p-1.5 text-rose-600 hover:bg-rose-50 disabled:opacity-30 dark:hover:bg-rose-400/10"><Trash2 className="size-3.5" /></button>
+                      <button type="button" aria-label={`Move ${row.name || `component ${index + 1}`} up`} disabled={index === 0} onClick={() => move(index, -1)} className="rounded-md p-1.5 text-muted-foreground hover:bg-muted disabled:opacity-30"><ArrowUp className="size-3.5" /></button>
+                      <button type="button" aria-label={`Move ${row.name || `component ${index + 1}`} down`} disabled={index === rows.length - 1} onClick={() => move(index, 1)} className="rounded-md p-1.5 text-muted-foreground hover:bg-muted disabled:opacity-30"><ArrowDown className="size-3.5" /></button>
+                      <button type="button" aria-label={`Remove ${row.name || `component ${index + 1}`}`} disabled={structureLocked || rows.length <= 1} onClick={() => setRows((current) => current.filter((item) => item.key !== row.key))} className="rounded-md p-1.5 text-destructive hover:bg-destructive/10 disabled:opacity-30"><Trash2 className="size-3.5" /></button>
                     </div>
                   </div>
-                  <div className="mt-2 flex flex-wrap items-center gap-x-5 gap-y-1 text-[11px] text-slate-600 dark:text-slate-300">
+                  <div className="mt-2 flex flex-wrap items-center gap-x-5 gap-y-1 text-[11px] text-muted-foreground">
                     <label className="inline-flex items-center gap-1.5">
-                      <input type="checkbox" checked={row.isRequired} disabled={structureLocked} onChange={(event) => update(row.key, { isRequired: event.target.checked })} className="accent-indigo-600" />
+                      <input type="checkbox" checked={row.isRequired} disabled={structureLocked} onChange={(event) => update(row.key, { isRequired: event.target.checked })} className="accent-primary" />
                       Needed for a grade
                     </label>
                     <label className="inline-flex items-center gap-1.5">
-                      <input type="checkbox" checked={row.isRepeatable} disabled={structureLocked} onChange={(event) => update(row.key, { isRepeatable: event.target.checked })} className="accent-indigo-600" />
+                      <input type="checkbox" checked={row.isRepeatable} disabled={structureLocked} onChange={(event) => update(row.key, { isRepeatable: event.target.checked })} className="accent-primary" />
                       Happens more than once (averaged)
                     </label>
                     {row.isRepeatable && (
@@ -359,11 +359,11 @@ export function AssessmentTemplateDialog({
                   type="button"
                   disabled={rows.length >= 12}
                   onClick={() => setRows((current) => [...current, rowFrom({ name: "", componentType: "CLASS_TEST", maxMarks: 100, weight: 0, isRequired: true, isRepeatable: false, expectedCount: 1 })])}
-                  className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-[11px] font-semibold text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-400/10"
+                  className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-[11px] font-semibold text-primary hover:bg-primary/10"
                 >
                   <Plus className="size-3.5" /> Add a component
                 </button>
-                <button type="button" onClick={() => setRows(STANDARD_COMPONENTS.map(rowFrom))} className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-[11px] font-semibold text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800">
+                <button type="button" onClick={() => setRows(STANDARD_COMPONENTS.map(rowFrom))} className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-[11px] font-semibold text-muted-foreground hover:bg-muted">
                   <Wand2 className="size-3.5" /> Class assessment 30 + exam 70
                 </button>
               </div>
@@ -377,33 +377,33 @@ export function AssessmentTemplateDialog({
                 Deadline for entering marks (optional)
                 <input type="date" className={box} value={deadline} onChange={(event) => setDeadline(event.target.value)} />
               </label>
-              <label className="flex items-start gap-2 text-xs text-slate-700 dark:text-slate-200">
-                <input type="checkbox" checked={isActive} onChange={(event) => setIsActive(event.target.checked)} className="mt-0.5 accent-indigo-600" />
-                <span><span className="font-semibold">Active</span><span className="block text-[11px] text-slate-500">Teachers can use it for the classes above.</span></span>
+              <label className="flex items-start gap-2 text-xs text-foreground/80">
+                <input type="checkbox" checked={isActive} onChange={(event) => setIsActive(event.target.checked)} className="mt-0.5 accent-primary" />
+                <span><span className="font-semibold">Active</span><span className="block text-[11px] text-muted-foreground">Teachers can use it for the classes above.</span></span>
               </label>
-              <label className="flex items-start gap-2 text-xs text-slate-700 dark:text-slate-200">
-                <input type="checkbox" checked={isLocked} onChange={(event) => setIsLocked(event.target.checked)} className="mt-0.5 accent-indigo-600" />
-                <span><span className="font-semibold">Lock marks</span><span className="block text-[11px] text-slate-500">Stops teachers changing marks, for example after moderation.</span></span>
+              <label className="flex items-start gap-2 text-xs text-foreground/80">
+                <input type="checkbox" checked={isLocked} onChange={(event) => setIsLocked(event.target.checked)} className="mt-0.5 accent-primary" />
+                <span><span className="font-semibold">Lock marks</span><span className="block text-[11px] text-muted-foreground">Stops teachers changing marks, for example after moderation.</span></span>
               </label>
             </div>
           </section>
 
           {attempted && problems.length > 0 && (
-            <ul role="alert" className="space-y-1 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-800">
+            <ul role="alert" className="space-y-1 rounded-lg border border-destructive/20 bg-destructive/10 px-3 py-2 text-xs text-destructive">
               {problems.map((problem) => <li key={problem}>{problem}</li>)}
             </ul>
           )}
           {save.error && (
-            <p role="alert" className="flex items-start gap-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-800">
+            <p role="alert" className="flex items-start gap-2 rounded-lg border border-destructive/20 bg-destructive/10 px-3 py-2 text-xs text-destructive">
               <CircleAlert className="mt-0.5 size-3.5 shrink-0" /> {save.error.message}
             </p>
           )}
 
           <div className="flex justify-end gap-2">
-            <button type="button" onClick={onClose} disabled={save.isPending} className="inline-flex h-9 items-center rounded-lg border border-slate-200 px-4 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-white/10 dark:text-slate-200 dark:hover:bg-white/5">
+            <button type="button" onClick={onClose} disabled={save.isPending} className="inline-flex h-9 items-center rounded-lg border border-border px-4 text-xs font-semibold text-foreground/80 hover:bg-muted/50">
               Cancel
             </button>
-            <button type="submit" disabled={save.isPending} className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-indigo-600 px-4 text-xs font-semibold text-white hover:bg-indigo-700 disabled:opacity-60">
+            <button type="submit" disabled={save.isPending} className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary px-4 text-xs font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-60">
               {save.isPending && <LoaderCircle className="size-3.5 animate-spin" />}
               {template ? "Save changes" : "Create assessment"}
             </button>

@@ -97,14 +97,14 @@ export function SchoolSettingsForm({ school }: { school: SchoolDetails }) {
     <div>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">School profile</h2>
-          <p className="mt-1 text-xs text-slate-500">Current details for your active school.</p>
+          <h2 className="text-sm font-semibold text-foreground">School profile</h2>
+          <p className="mt-1 text-xs text-muted-foreground">Current details for your active school.</p>
         </div>
         {canEdit && !editing && (
           <button
             type="button"
             onClick={startEditing}
-            className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 px-3 text-[11px] font-semibold text-slate-700 hover:bg-slate-50 dark:border-white/10 dark:text-slate-200 dark:hover:bg-white/5"
+            className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border px-3 text-[11px] font-semibold text-foreground/80 hover:bg-muted/50"
           >
             <Pencil className="size-3.5" /> Edit details
           </button>
@@ -112,7 +112,7 @@ export function SchoolSettingsForm({ school }: { school: SchoolDetails }) {
       </div>
 
       {saved && !editing && (
-        <p role="status" className="mt-3 text-xs text-emerald-700">School details saved.</p>
+        <p role="status" className="mt-3 text-xs text-success">School details saved.</p>
       )}
 
       {editing ? (
@@ -137,17 +137,17 @@ export function SchoolSettingsForm({ school }: { school: SchoolDetails }) {
               <FormInput id="school-motto" value={values.motto} onChange={set("motto")} maxLength={150} />
             </FormField>
           </div>
-          <p className="text-[11px] text-slate-500">
+          <p className="text-[11px] text-muted-foreground">
             The school code ({school.code}) and subdomain ({school.subdomain}) identify your school and cannot be changed here.
           </p>
           {save.error && (
-            <p role="alert" className="text-xs text-rose-700">{save.error.message}</p>
+            <p role="alert" className="text-xs text-destructive">{save.error.message}</p>
           )}
           <div className="flex gap-2">
             <button
               type="submit"
               disabled={save.isPending}
-              className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-blue-600 px-4 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-60"
+              className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary px-4 text-xs font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-60"
             >
               {save.isPending && <LoaderCircle className="size-3.5 animate-spin" />}
               Save changes
@@ -155,7 +155,7 @@ export function SchoolSettingsForm({ school }: { school: SchoolDetails }) {
             <button
               type="button"
               onClick={() => setEditing(false)}
-              className="inline-flex h-9 items-center rounded-lg border border-slate-200 px-4 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-white/10 dark:text-slate-200 dark:hover:bg-white/5"
+              className="inline-flex h-9 items-center rounded-lg border border-border px-4 text-xs font-semibold text-foreground/80 hover:bg-muted/50"
             >
               Cancel
             </button>
@@ -164,9 +164,9 @@ export function SchoolSettingsForm({ school }: { school: SchoolDetails }) {
       ) : (
         <dl className="mt-5 grid gap-x-8 sm:grid-cols-2">
           {readOnly.map(([label, value]) => (
-            <div key={label} className="border-b border-slate-100 py-3 first:pt-0 dark:border-white/10">
-              <dt className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">{label}</dt>
-              <dd className="mt-1 text-xs font-medium text-slate-700 dark:text-slate-200">{value}</dd>
+            <div key={label} className="border-b border-border/60 py-3 first:pt-0">
+              <dt className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70">{label}</dt>
+              <dd className="mt-1 text-xs font-medium text-foreground/80">{value}</dd>
             </div>
           ))}
         </dl>

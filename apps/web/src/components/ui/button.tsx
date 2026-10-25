@@ -24,17 +24,17 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default:
-          "bg-blue-600 text-white shadow-xs hover:bg-blue-700",
+          "bg-primary text-primary-foreground shadow-xs hover:bg-primary/90",
         destructive:
-          "bg-red-600 text-white shadow-xs hover:bg-red-700",
+          "bg-destructive text-destructive-foreground shadow-xs hover:bg-destructive/90",
         outline:
-          "border border-gray-300 bg-white shadow-xs hover:bg-gray-100",
+          "border border-input bg-card shadow-xs hover:bg-muted",
         secondary:
-          "bg-gray-100 text-gray-900 shadow-xs hover:bg-gray-200",
+          "bg-muted text-foreground shadow-xs hover:bg-muted-foreground/20",
         ghost:
-          "hover:bg-gray-100 hover:text-gray-900",
+          "hover:bg-muted hover:text-foreground",
         link:
-          "text-blue-600 underline-offset-4 hover:underline",
+          "text-primary underline-offset-4 hover:underline",
       },
       size: {
         default: "h-9 px-4 py-2",

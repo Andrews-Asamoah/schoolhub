@@ -27,9 +27,9 @@ const day = (value: string) => value.slice(0, 10);
 const show = (value: string) => new Date(value).toLocaleDateString();
 
 const smallButton =
-  "inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 text-[11px] font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50 dark:border-white/10 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-white/5";
+  "inline-flex h-8 items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 text-[11px] font-semibold text-foreground/80 transition hover:bg-muted/50 disabled:opacity-50";
 const primaryButton =
-  "inline-flex h-8 items-center gap-1.5 rounded-lg bg-indigo-600 px-3 text-[11px] font-semibold text-white transition hover:bg-indigo-700 disabled:opacity-50";
+  "inline-flex h-8 items-center gap-1.5 rounded-lg bg-primary px-3 text-[11px] font-semibold text-primary-foreground transition hover:bg-primary/90 disabled:opacity-50";
 
 /** One academic year with inline editing of the year, its terms, and adding terms later. */
 export function AcademicYearCard({ year }: { year: YearRecord }) {
@@ -76,7 +76,7 @@ export function AcademicYearCard({ year }: { year: YearRecord }) {
   const error = saveYear.error ?? saveTerm.error ?? addTerm.error;
 
   return (
-    <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-slate-900/70">
+    <article className="rounded-xl border border-border bg-card p-4 shadow-sm">
       {editingYear ? (
         <YearForm
           initial={{ name: year.name, startDate: day(year.startDate), endDate: day(year.endDate) }}
@@ -88,14 +88,14 @@ export function AcademicYearCard({ year }: { year: YearRecord }) {
       ) : (
         <div className="flex items-start justify-between gap-3">
           <div>
-            <h3 className="text-sm font-bold text-slate-900 dark:text-white">{year.name}</h3>
-            <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+            <h3 className="text-sm font-bold text-foreground">{year.name}</h3>
+            <p className="mt-1 text-[11px] text-muted-foreground">
               {show(year.startDate)} – {show(year.endDate)}
             </p>
           </div>
           <div className="flex items-center gap-2">
             {year.isCurrent ? (
-              <span className="rounded-full bg-emerald-50 px-2 py-1 text-[10px] font-semibold text-emerald-700 dark:bg-emerald-400/10 dark:text-emerald-200">
+              <span className="rounded-full bg-success/10 px-2 py-1 text-[10px] font-semibold text-success">
                 Current
               </span>
             ) : (
@@ -132,14 +132,14 @@ export function AcademicYearCard({ year }: { year: YearRecord }) {
           ) : (
             <li
               key={term.id}
-              className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-slate-50 px-3 py-2 text-[11px] dark:bg-white/[0.04]"
+              className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-muted/50 px-3 py-2 text-[11px]"
             >
               <span>
-                <span className="font-semibold text-slate-800 dark:text-slate-100">
+                <span className="font-semibold text-foreground">
                   {term.name}
                   {term.isCurrent ? " · Current" : ""}
                 </span>
-                <span className="ml-2 text-slate-500 dark:text-slate-400">
+                <span className="ml-2 text-muted-foreground">
                   {show(term.startDate)} – {show(term.endDate)}
                 </span>
               </span>
@@ -162,7 +162,7 @@ export function AcademicYearCard({ year }: { year: YearRecord }) {
           ),
         )}
         {year.terms.length === 0 && (
-          <li className="text-[11px] text-amber-700 dark:text-amber-300">No terms added yet</li>
+          <li className="text-[11px] text-warning">No terms added yet</li>
         )}
       </ul>
 
@@ -202,7 +202,7 @@ export function AcademicYearCard({ year }: { year: YearRecord }) {
       )}
 
       {error && (
-        <p role="alert" className="mt-3 flex items-start gap-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-[11px] text-rose-800 dark:border-rose-400/20 dark:bg-rose-400/10 dark:text-rose-200">
+        <p role="alert" className="mt-3 flex items-start gap-2 rounded-lg border border-destructive/20 bg-destructive/10 px-3 py-2 text-[11px] text-destructive">
           <CircleAlert className="mt-0.5 size-3.5 shrink-0" />
           {error.message}
         </p>
@@ -248,12 +248,12 @@ function YearForm({
         </FormField>
       </div>
       {!isCurrent && (
-        <label className="flex items-center gap-2 text-[11px] font-medium text-slate-700 dark:text-slate-300">
-          <input type="checkbox" checked={current} onChange={(e) => setCurrent(e.target.checked)} className="size-4 accent-indigo-600" />
+        <label className="flex items-center gap-2 text-[11px] font-medium text-foreground/80">
+          <input type="checkbox" checked={current} onChange={(e) => setCurrent(e.target.checked)} className="size-4 accent-primary" />
           Set as current year
         </label>
       )}
-      {problem && <p role="alert" className="text-[11px] text-rose-700">{problem}</p>}
+      {problem && <p role="alert" className="text-[11px] text-destructive">{problem}</p>}
       <div className="flex gap-2">
         <button type="submit" className={primaryButton} disabled={pending}>Save year</button>
         <button type="button" className={smallButton} onClick={onCancel}><X className="size-3" /> Cancel</button>
@@ -298,7 +298,7 @@ function TermForm({
     onSave({ ...values, ...(current !== isCurrent ? { isCurrent: current } : {}) });
   }
   return (
-    <form onSubmit={submit} className="space-y-3 rounded-lg border border-indigo-200 bg-indigo-50/40 p-3 dark:border-indigo-300/20 dark:bg-indigo-400/5" noValidate>
+    <form onSubmit={submit} className="space-y-3 rounded-lg border border-primary/20 bg-primary/10 p-3" noValidate>
       <div className="grid gap-3 sm:grid-cols-3">
         <FormField label="Term name" htmlFor="term-name">
           <FormInput id="term-name" value={values.name} onChange={(e) => setValues({ ...values, name: e.target.value })} />
@@ -311,12 +311,12 @@ function TermForm({
         </FormField>
       </div>
       {canBeCurrent && !isCurrent && (
-        <label className="flex items-center gap-2 text-[11px] font-medium text-slate-700 dark:text-slate-300">
-          <input type="checkbox" checked={current} onChange={(e) => setCurrent(e.target.checked)} className="size-4 accent-indigo-600" />
+        <label className="flex items-center gap-2 text-[11px] font-medium text-foreground/80">
+          <input type="checkbox" checked={current} onChange={(e) => setCurrent(e.target.checked)} className="size-4 accent-primary" />
           Make this the current term
         </label>
       )}
-      {problem && <p role="alert" className="text-[11px] text-rose-700">{problem}</p>}
+      {problem && <p role="alert" className="text-[11px] text-destructive">{problem}</p>}
       <div className="flex gap-2">
         <button type="submit" className={primaryButton} disabled={pending}>{submitLabel}</button>
         <button type="button" className={smallButton} onClick={onCancel}><X className="size-3" /> Cancel</button>

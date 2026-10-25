@@ -167,7 +167,7 @@ export function AcademicContextSwitcher() {
       <span
         role="alert"
         title={error?.message}
-        className="inline-flex items-center gap-1.5 rounded-md border border-rose-200 bg-rose-50 px-2.5 py-1 text-xs text-rose-700 dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-300"
+        className="inline-flex items-center gap-1.5 rounded-md border border-destructive/20 bg-destructive/10 px-2.5 py-1 text-xs text-destructive"
       >
         <CircleAlert className="size-3.5 shrink-0" />
         Academic period unavailable
@@ -179,8 +179,8 @@ export function AcademicContextSwitcher() {
 
   if (!current) {
     return (
-      <span className="hidden items-center gap-1.5 rounded-xl border border-slate-200/80 bg-white/90 px-3 py-1.5 text-xs font-medium text-slate-500 dark:border-slate-800 dark:bg-slate-900/90 dark:text-slate-400 sm:inline-flex">
-        <CalendarRange className="size-3.5 text-slate-400 dark:text-slate-500" />
+      <span className="hidden items-center gap-1.5 rounded-xl border border-border/80 bg-card/90 px-3 py-1.5 text-xs font-medium text-muted-foreground sm:inline-flex">
+        <CalendarRange className="size-3.5 text-muted-foreground/70" />
         {isAccountant
           ? "Waiting for the school to set a current period"
           : "Set up the current academic period"}
@@ -192,9 +192,9 @@ export function AcademicContextSwitcher() {
     return (
       <span
         title="The active academic period is set by a school administrator"
-        className="hidden items-center gap-2 rounded-xl border border-slate-200/80 bg-white/90 px-3.5 py-1.5 text-xs font-semibold text-slate-700 shadow-xs dark:border-slate-800 dark:bg-slate-900/90 dark:text-slate-200 sm:inline-flex"
+        className="hidden items-center gap-2 rounded-xl border border-border/80 bg-card/90 px-3.5 py-1.5 text-xs font-semibold text-foreground/80 shadow-xs sm:inline-flex"
       >
-        <CalendarRange className="size-4 shrink-0 text-indigo-600 dark:text-indigo-400" />
+        <CalendarRange className="size-4 shrink-0 text-primary" />
         <span>
           {current.academicYear.name} · {current.term.name}
         </span>
@@ -207,8 +207,8 @@ export function AcademicContextSwitcher() {
 
   return (
     <div className="flex items-center gap-2">
-      <div className="flex items-center gap-1.5 rounded-xl border border-slate-200/80 bg-white/90 p-1 shadow-xs dark:border-slate-800 dark:bg-slate-900/90">
-        <CalendarRange className="size-4 shrink-0 text-indigo-600 dark:text-indigo-400 ml-2" />
+      <div className="flex items-center gap-1.5 rounded-xl border border-border/80 bg-card/90 p-1 shadow-xs">
+        <CalendarRange className="size-4 shrink-0 text-primary ml-2" />
 
         {/* Academic Year Select */}
         <Select
@@ -237,7 +237,7 @@ export function AcademicContextSwitcher() {
           </SelectContent>
         </Select>
 
-        <span className="text-slate-300 dark:text-slate-700 font-bold">·</span>
+        <span className="text-muted-foreground/50 font-bold">·</span>
 
         {/* Term Select */}
         <Select
@@ -285,7 +285,7 @@ export function AcademicContextSwitcher() {
                 setHasPersonalOverride(!isSchoolCurrent);
                 void queryClient.invalidateQueries();
               }}
-              className="rounded-lg bg-indigo-600 px-2.5 py-1 text-xs font-semibold text-white transition-all hover:bg-indigo-500 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-indigo-500 dark:hover:bg-indigo-400"
+              className="rounded-lg bg-primary px-2.5 py-1 text-xs font-semibold text-primary-foreground transition-all hover:bg-primary active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
             >
               View
             </button>
@@ -300,7 +300,7 @@ export function AcademicContextSwitcher() {
                   setTermId(current.term.id);
                   void queryClient.invalidateQueries();
                 }}
-                className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100"
+                className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
               >
                 <RotateCcw className="size-3" />
                 Current
@@ -312,7 +312,7 @@ export function AcademicContextSwitcher() {
             type="button"
             disabled={mutation.isPending || !academicYearId || !termId || isCurrentSelection}
             onClick={() => mutation.mutate()}
-            className="ml-1 rounded-lg bg-indigo-600 px-2.5 py-1 text-xs font-semibold text-white transition-all hover:bg-indigo-500 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-indigo-500 dark:hover:bg-indigo-400"
+            className="ml-1 rounded-lg bg-primary px-2.5 py-1 text-xs font-semibold text-primary-foreground transition-all hover:bg-primary active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {mutation.isPending ? "Switching…" : "Apply"}
           </button>
@@ -322,7 +322,7 @@ export function AcademicContextSwitcher() {
       {mutation.error && (
         <span
           role="alert"
-          className="text-right text-[10px] text-rose-600 dark:text-rose-400"
+          className="text-right text-[10px] text-destructive"
         >
           Could not switch academic period: {mutation.error.message}
         </span>

@@ -50,7 +50,7 @@ export function PortalModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-slate-950/50 backdrop-blur-xs transition-opacity duration-200"
+        className="fixed inset-0 bg-foreground/50 backdrop-blur-xs transition-opacity duration-200"
         onClick={onClose}
         aria-hidden="true"
       />
@@ -61,21 +61,21 @@ export function PortalModal({
         aria-modal="true"
         aria-labelledby="portal-modal-title"
         className={cn(
-          "relative z-10 w-full overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-2xl transition-all duration-200 dark:border-slate-800 dark:bg-slate-900",
+          "relative z-10 w-full overflow-hidden rounded-2xl border border-border/80 bg-card shadow-2xl transition-all duration-200",
           maxWidthMap[maxWidth],
         )}
       >
         {/* Header */}
-        <div className="flex items-start justify-between border-b border-slate-100 p-5 dark:border-slate-800 sm:p-6">
+        <div className="flex items-start justify-between border-b border-border/60 p-5 sm:p-6">
           <div>
             <h2
               id="portal-modal-title"
-              className="text-lg font-bold tracking-tight text-slate-900 dark:text-white"
+              className="text-lg font-bold tracking-tight text-foreground"
             >
               {title}
             </h2>
             {description && (
-              <p className="mt-1 text-xs leading-relaxed text-slate-500 dark:text-slate-400">
+              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
                 {description}
               </p>
             )}
@@ -83,7 +83,7 @@ export function PortalModal({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+            className="rounded-lg p-1.5 text-muted-foreground/70 transition hover:bg-muted hover:text-foreground/80"
           >
             <X className="size-5" />
             <span className="sr-only">Close modal</span>
@@ -97,7 +97,7 @@ export function PortalModal({
 
         {/* Footer */}
         {footer && (
-          <div className="flex items-center justify-end gap-3 border-t border-slate-100 bg-slate-50/70 p-4 dark:border-slate-800 dark:bg-slate-900/60 sm:px-6">
+          <div className="flex items-center justify-end gap-3 border-t border-border/60 bg-muted/70 p-4 sm:px-6">
             {footer}
           </div>
         )}

@@ -65,7 +65,7 @@ export function SchoolYearCard({
         </div>
 
         {academicYear?.isCurrent && (
-          <span className="shrink-0 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-[10px] font-medium text-emerald-700 dark:text-emerald-400">
+          <span className="shrink-0 rounded-full border border-success/30 bg-success/10 px-2.5 py-1 text-[10px] font-medium text-success">
             Current
           </span>
         )}
@@ -115,7 +115,7 @@ export function SchoolYearCard({
                       className={cn(
                         "mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-lg",
                         term.isCurrent
-                          ? "bg-emerald-500/10 text-emerald-600"
+                          ? "bg-success/10 text-success"
                           : "bg-muted text-muted-foreground",
                       )}
                     >
@@ -132,7 +132,7 @@ export function SchoolYearCard({
                           {term.name}
                         </p>
                         {term.isCurrent && (
-                          <span className="text-[10px] font-medium text-emerald-600">
+                          <span className="text-[10px] font-medium text-success">
                             Current term
                           </span>
                         )}
@@ -216,10 +216,10 @@ export function RecentActivityCard({
 
             const iconClass =
               activity.type === "student"
-                ? "bg-blue-500/10 text-blue-600"
+                ? "bg-primary/10 text-primary"
                 : activity.type === "payment"
-                  ? "bg-emerald-500/10 text-emerald-600"
-                  : "bg-orange-500/10 text-orange-600";
+                  ? "bg-success/10 text-success"
+                  : "bg-warning/10 text-warning";
 
             return (
               <div

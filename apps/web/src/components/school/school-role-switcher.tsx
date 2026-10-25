@@ -100,7 +100,7 @@ export function SchoolRoleSwitcher() {
     return (
       <span
         role="alert"
-        className="inline-flex items-center gap-1.5 rounded-md border border-rose-200 bg-rose-50 px-2.5 py-1 text-xs text-rose-700 dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-300"
+        className="inline-flex items-center gap-1.5 rounded-md border border-destructive/20 bg-destructive/10 px-2.5 py-1 text-xs text-destructive"
       >
         <CircleAlert className="size-3.5 shrink-0" />
         Role unavailable: {error.message}
@@ -112,8 +112,8 @@ export function SchoolRoleSwitcher() {
   // Single role static badge
   if (roles.length <= 1) {
     return (
-      <div className="flex h-9 min-w-0 items-center gap-2 rounded-lg border border-slate-200/80 bg-white/90 px-3 text-xs font-semibold text-slate-700 shadow-xs dark:border-slate-800 dark:bg-slate-900/90 dark:text-slate-200">
-        <UserRoundCog className="size-4 shrink-0 text-indigo-600 dark:text-indigo-400" />
+      <div className="flex h-9 min-w-0 items-center gap-2 rounded-lg border border-border/80 bg-card/90 px-3 text-xs font-semibold text-foreground/80 shadow-xs">
+        <UserRoundCog className="size-4 shrink-0 text-primary" />
         <span className="truncate max-w-36 sm:max-w-44">
           {roleLabels[activeRole] ?? activeRole}
         </span>
@@ -124,7 +124,7 @@ export function SchoolRoleSwitcher() {
   return (
     <Select value={activeRole} onValueChange={(val) => void selectRole(val)}>
       <SelectTrigger className="group gap-2 max-w-44 cursor-pointer">
-        <UserRoundCog className="size-4 shrink-0 text-indigo-600 dark:text-indigo-400" />
+        <UserRoundCog className="size-4 shrink-0 text-primary" />
         <SelectValue>
           <span className="truncate max-w-32 sm:max-w-40 block text-left">
             {roleLabels[activeRole] ?? activeRole}

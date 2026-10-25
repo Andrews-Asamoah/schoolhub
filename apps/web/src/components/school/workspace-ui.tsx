@@ -38,8 +38,8 @@ export function WorkspacePageHeading({
 
 export function PreviewDataNotice({ children }: { children: ReactNode }) {
   return (
-    <div className="mb-5 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-relaxed text-amber-900">
-      <span className="mt-0.5 shrink-0 rounded-md bg-amber-100 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide">
+    <div className="mb-5 flex items-start gap-2 rounded-xl border border-warning/20 bg-warning/10 px-4 py-3 text-xs leading-relaxed text-warning">
+      <span className="mt-0.5 shrink-0 rounded-md bg-warning/15 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide">
         Preview
       </span>
       <p>{children}</p>

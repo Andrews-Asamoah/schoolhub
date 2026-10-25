@@ -48,7 +48,7 @@ const toValues = (profile: ProfileDetails): Record<Field, string> => ({
   emergencyRelationship: profile.emergencyRelationship ?? "",
 });
 
-const card = "rounded-2xl border border-slate-200/80 bg-white p-5 sm:p-6 dark:border-white/10 dark:bg-slate-900/70";
+const card = "rounded-2xl border border-border/80 bg-card p-5 sm:p-6";
 
 /** "My profile": every signed-in user's own photo and basic contact details. */
 export function ProfileWorkspace() {
@@ -58,8 +58,8 @@ export function ProfileWorkspace() {
     retry: false,
   });
 
-  if (query.isPending) return <p className="text-xs text-slate-500">Loading your profile…</p>;
-  if (query.error) return <p role="alert" className="text-xs text-rose-700">{query.error.message}</p>;
+  if (query.isPending) return <p className="text-xs text-muted-foreground">Loading your profile…</p>;
+  if (query.error) return <p role="alert" className="text-xs text-destructive">{query.error.message}</p>;
   return <ProfileForm data={query.data} />;
 }
 
@@ -109,8 +109,8 @@ function ProfileForm({ data }: { data: ProfileResponse }) {
   return (
     <div className="space-y-5">
       <section className={card} aria-labelledby="profile-photo-heading">
-        <h2 id="profile-photo-heading" className="text-sm font-semibold text-slate-900 dark:text-slate-100">Profile photo</h2>
-        <p className="mb-4 mt-1 text-xs text-slate-500">
+        <h2 id="profile-photo-heading" className="text-sm font-semibold text-foreground">Profile photo</h2>
+        <p className="mb-4 mt-1 text-xs text-muted-foreground">
           {data.user.name} · {schoolRoleLabel(activeRole)}
         </p>
         <ProfilePhotoControls avatarClassName="size-20 text-2xl" />
@@ -118,7 +118,7 @@ function ProfileForm({ data }: { data: ProfileResponse }) {
 
       <form onSubmit={submit} noValidate className="space-y-5">
         <section className={card} aria-labelledby="profile-details-heading">
-          <h2 id="profile-details-heading" className="text-sm font-semibold text-slate-900 dark:text-slate-100">Personal details</h2>
+          <h2 id="profile-details-heading" className="text-sm font-semibold text-foreground">Personal details</h2>
           <div className="mt-4 grid gap-4 sm:grid-cols-2">
             <FormField label="First name" htmlFor="me-first" error={errors.firstName} hint={nameHint}>
               <FormInput id="me-first" value={values.firstName} onChange={set("firstName")} disabled={!data.canEditName} />
@@ -133,14 +133,14 @@ function ProfileForm({ data }: { data: ProfileResponse }) {
               <FormField label="Username" htmlFor="me-username" hint="You sign in with this username. Ask the school office to change it.">
                 <div className="relative">
                   <FormInput id="me-username" value={data.username} readOnly disabled className="pr-9" />
-                  <Lock className="pointer-events-none absolute right-3 top-1/2 size-3.5 -translate-y-1/2 text-slate-400" />
+                  <Lock className="pointer-events-none absolute right-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground/70" />
                 </div>
               </FormField>
             ) : (
               <FormField label="Email" htmlFor="me-email" hint="Your sign-in email. Ask your school administrator to change it.">
                 <div className="relative">
                   <FormInput id="me-email" value={data.user.email} readOnly disabled className="pr-9" />
-                  <Lock className="pointer-events-none absolute right-3 top-1/2 size-3.5 -translate-y-1/2 text-slate-400" />
+                  <Lock className="pointer-events-none absolute right-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground/70" />
                 </div>
               </FormField>
             )}
@@ -163,7 +163,7 @@ function ProfileForm({ data }: { data: ProfileResponse }) {
         </section>
 
         <section className={card} aria-labelledby="profile-emergency-heading">
-          <h2 id="profile-emergency-heading" className="text-sm font-semibold text-slate-900 dark:text-slate-100">Emergency contact</h2>
+          <h2 id="profile-emergency-heading" className="text-sm font-semibold text-foreground">Emergency contact</h2>
           <div className="mt-4 grid gap-4 sm:grid-cols-3">
             <FormField label="Emergency contact name" htmlFor="me-ec-name" error={errors.emergencyContactName}>
               <FormInput id="me-ec-name" value={values.emergencyContactName} onChange={set("emergencyContactName")} />
@@ -181,21 +181,21 @@ function ProfileForm({ data }: { data: ProfileResponse }) {
           <button
             type="submit"
             disabled={save.isPending}
-            className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-blue-600 px-4 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-60"
+            className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary px-4 text-xs font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-60"
           >
             {save.isPending && <LoaderCircle className="size-3.5 animate-spin" />}
             Save changes
           </button>
-          {saved && <p role="status" className="text-xs text-emerald-700">Profile saved.</p>}
-          {save.error && <p role="alert" className="text-xs text-rose-700">{save.error.message}</p>}
+          {saved && <p role="status" className="text-xs text-success">Profile saved.</p>}
+          {save.error && <p role="alert" className="text-xs text-destructive">{save.error.message}</p>}
         </div>
       </form>
 
       {/* Students and guardians sign in with simple credentials; staff accounts can add a second step. */}
       {!["student", "guardian", "parent"].includes(activeRole ?? "") && (
         <section className={card} aria-labelledby="profile-security-heading">
-          <h2 id="profile-security-heading" className="text-sm font-semibold text-slate-900 dark:text-slate-100">Two-factor authentication</h2>
-          <p className="mb-4 mt-1 text-xs text-slate-500">
+          <h2 id="profile-security-heading" className="text-sm font-semibold text-foreground">Two-factor authentication</h2>
+          <p className="mb-4 mt-1 text-xs text-muted-foreground">
             Add a second step when you sign in: a 6-digit code from an authenticator app on your phone.
           </p>
           <TwoFactorPanel />

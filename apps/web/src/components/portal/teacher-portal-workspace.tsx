@@ -127,23 +127,23 @@ export function TeacherPortalWorkspace({ defaultTab = "overview" }: TeacherPorta
       {activeTab === "gradebook" && <AssessmentEntryWorkspace mode="teacher" initial={marksTarget} />}
       {activeTab === "attendance" &&
         (overview.isPending ? (
-          <p className="text-xs text-slate-500">Loading your classes…</p>
+          <p className="text-xs text-muted-foreground">Loading your classes…</p>
         ) : ownClasses.length === 0 || !registerClass ? (
-          <div className="rounded-2xl border border-dashed border-slate-300 p-8 text-center dark:border-slate-700">
-            <h2 className="text-sm font-semibold text-slate-900 dark:text-white">The register is marked by the class teacher</h2>
-            <p className="mx-auto mt-1 max-w-md text-xs text-slate-500">
+          <div className="rounded-2xl border border-dashed border-input p-8 text-center">
+            <h2 className="text-sm font-semibold text-foreground">The register is marked by the class teacher</h2>
+            <p className="mx-auto mt-1 max-w-md text-xs text-muted-foreground">
               You are not the class teacher of any class this year. If that is wrong, ask an administrator to assign you in Classes.
             </p>
           </div>
         ) : (
           <div className="space-y-4">
             {ownClasses.length > 1 && (
-              <label className="grid w-fit gap-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+              <label className="grid w-fit gap-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70">
                 Class
                 <select
                   value={registerClass.id}
                   onChange={(event) => setRegisterClassId(event.target.value)}
-                  className="h-9 min-w-44 rounded-lg border border-slate-200 bg-white px-3 text-xs font-medium normal-case tracking-normal text-slate-700 outline-none focus:border-indigo-400 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+                  className="h-9 min-w-44 rounded-lg border border-border bg-card px-3 text-xs font-medium normal-case tracking-normal text-foreground/80 outline-none focus:border-primary/50"
                 >
                   {ownClasses.map((klass) => <option key={klass.id} value={klass.id}>{klass.name}</option>)}
                 </select>
@@ -160,14 +160,14 @@ export function TeacherPortalWorkspace({ defaultTab = "overview" }: TeacherPorta
 
 function Overview({ onMarks, onRegister }: { onMarks: (classId: string, subjectId: string) => void; onRegister: (classId: string) => void }) {
   const overview = useTeachingOverview();
-  if (overview.isPending) return <p className="text-xs text-slate-500">Loading your classes…</p>;
-  if (overview.error) return <p role="alert" className="text-xs text-rose-700">Could not load your classes: {overview.error.message}</p>;
+  if (overview.isPending) return <p className="text-xs text-muted-foreground">Loading your classes…</p>;
+  if (overview.error) return <p role="alert" className="text-xs text-destructive">Could not load your classes: {overview.error.message}</p>;
   const classes = overview.data.classes;
   if (classes.length === 0) {
     return (
-      <div className="rounded-2xl border border-dashed border-slate-300 p-8 text-center dark:border-slate-700">
-        <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Nothing assigned yet</h2>
-        <p className="mx-auto mt-1 max-w-md text-xs text-slate-500">
+      <div className="rounded-2xl border border-dashed border-input p-8 text-center">
+        <h2 className="text-sm font-semibold text-foreground">Nothing assigned yet</h2>
+        <p className="mx-auto mt-1 max-w-md text-xs text-muted-foreground">
           Once an administrator assigns you a subject in a class, or makes you a class teacher, your work shows up here.
         </p>
       </div>
@@ -176,21 +176,21 @@ function Overview({ onMarks, onRegister }: { onMarks: (classId: string, subjectI
   return (
     <div className="grid gap-4 md:grid-cols-2">
       {classes.map((klass) => (
-        <article key={klass.id} className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs dark:border-slate-800 dark:bg-slate-900">
-          <h3 className="flex flex-wrap items-center gap-2 text-sm font-bold text-slate-900 dark:text-white">
+        <article key={klass.id} className="rounded-2xl border border-border/80 bg-card p-5 shadow-xs">
+          <h3 className="flex flex-wrap items-center gap-2 text-sm font-bold text-foreground">
             {klass.name}
-            {klass.isClassTeacher && <span className="rounded-full bg-indigo-600 px-2 py-0.5 text-[10px] font-semibold text-white">Class teacher</span>}
+            {klass.isClassTeacher && <span className="rounded-full bg-primary px-2 py-0.5 text-[10px] font-semibold text-primary-foreground">Class teacher</span>}
           </h3>
-          <p className="mt-0.5 text-xs text-slate-500">{klass.studentCount} pupil{klass.studentCount === 1 ? "" : "s"}</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">{klass.studentCount} pupil{klass.studentCount === 1 ? "" : "s"}</p>
           <div className="mt-3 flex flex-wrap gap-2">
             {klass.isClassTeacher && (
-              <button type="button" onClick={() => onRegister(klass.id)} className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700">
+              <button type="button" onClick={() => onRegister(klass.id)} className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary/90">
                 <ClipboardCheck className="size-3.5" /> Take register
               </button>
             )}
             {klass.subjects.map((subject) => (
-              <button key={subject.id} type="button" onClick={() => onMarks(klass.id, subject.id)} aria-label={`Enter ${subject.name} marks for ${klass.name}`} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800">
-                <FileSpreadsheet className="size-3.5 text-indigo-600" /> {subject.name} marks
+              <button key={subject.id} type="button" onClick={() => onMarks(klass.id, subject.id)} aria-label={`Enter ${subject.name} marks for ${klass.name}`} className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-foreground/80 hover:bg-muted/50">
+                <FileSpreadsheet className="size-3.5 text-primary" /> {subject.name} marks
               </button>
             ))}
           </div>

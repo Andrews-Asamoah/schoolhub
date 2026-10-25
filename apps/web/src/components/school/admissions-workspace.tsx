@@ -98,22 +98,22 @@ const primary = `${btn} bg-primary text-primary-foreground hover:opacity-90`;
 const ghost = `${btn} border border-border text-foreground hover:bg-muted`;
 
 const STATUS_STYLE: Record<string, string> = {
-  SUBMITTED: "bg-slate-500/10 text-slate-600 dark:text-slate-300",
-  UNDER_REVIEW: "bg-blue-500/10 text-blue-600 dark:text-blue-300",
-  EXAM_SCHEDULED: "bg-violet-500/10 text-violet-600 dark:text-violet-300",
-  EXAM_COMPLETED: "bg-amber-500/10 text-amber-700 dark:text-amber-300",
-  ACCEPTED: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
-  WAITLISTED: "bg-orange-500/10 text-orange-700 dark:text-orange-300",
-  REJECTED: "bg-rose-500/10 text-rose-700 dark:text-rose-300",
-  ADMITTED: "bg-green-600/15 text-green-700 dark:text-green-300",
-  WITHDRAWN: "bg-slate-500/10 text-slate-500",
-  NOT_REQUIRED: "bg-slate-500/10 text-slate-500",
-  PENDING_FEE: "bg-amber-500/10 text-amber-700 dark:text-amber-300",
-  PAID: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
-  EXEMPTED: "bg-sky-500/10 text-sky-700 dark:text-sky-300",
-  DRAFT: "bg-slate-500/10 text-slate-600",
-  OPEN: "bg-emerald-500/10 text-emerald-700",
-  CLOSED: "bg-rose-500/10 text-rose-700",
+  SUBMITTED: "bg-muted-foreground/10 text-muted-foreground",
+  UNDER_REVIEW: "bg-primary/10 text-primary",
+  EXAM_SCHEDULED: "bg-highlight/10 text-highlight",
+  EXAM_COMPLETED: "bg-warning/10 text-warning",
+  ACCEPTED: "bg-success/10 text-success",
+  WAITLISTED: "bg-warning/10 text-warning",
+  REJECTED: "bg-destructive/10 text-destructive",
+  ADMITTED: "bg-success/15 text-success",
+  WITHDRAWN: "bg-muted-foreground/10 text-muted-foreground",
+  NOT_REQUIRED: "bg-muted-foreground/10 text-muted-foreground",
+  PENDING_FEE: "bg-warning/10 text-warning",
+  PAID: "bg-success/10 text-success",
+  EXEMPTED: "bg-info/10 text-info",
+  DRAFT: "bg-muted-foreground/10 text-muted-foreground",
+  OPEN: "bg-success/10 text-success",
+  CLOSED: "bg-destructive/10 text-destructive",
 };
 const label = (value: string) => value.replaceAll("_", " ").toLowerCase().replace(/^\w/, (c) => c.toUpperCase());
 function Badge({ value }: { value: string }) {
@@ -381,7 +381,7 @@ function IntakeForm({ cycle, onDone }: { cycle: Cycle | null; onDone: () => void
         </div>
       </fieldset>
       {(formError || save.error) && (
-        <p role="alert" className="mt-3 text-xs text-rose-600">{formError ?? errorText(save.error)}</p>
+        <p role="alert" className="mt-3 text-xs text-destructive">{formError ?? errorText(save.error)}</p>
       )}
       <div className="mt-4 flex gap-2">
         <button type="button" className={primary} onClick={submit} disabled={save.isPending}>
@@ -486,7 +486,7 @@ function ApplicationsPanel({ cycles, canDecide }: { cycles: Cycle[]; canDecide: 
         </div>
       )}
       {receipt && (
-        <div role="status" className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-sm text-emerald-800 dark:text-emerald-200">
+        <div role="status" className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-success/30 bg-success/10 p-4 text-sm text-success">
           <span>
             Received {money(receipt.amount)} cash from <b>{receipt.name}</b>. Receipt <b>{receipt.receiptNumber}</b> — recorded as school income.
           </span>
@@ -538,7 +538,7 @@ function ApplicationsPanel({ cycles, canDecide }: { cycles: Cycle[]; canDecide: 
           </button>
         </div>
       )}
-      {act.error && <p role="alert" className="text-xs text-rose-600">{errorText(act.error)}</p>}
+      {act.error && <p role="alert" className="text-xs text-destructive">{errorText(act.error)}</p>}
 
       {query.isPending ? (
         <p className="text-sm text-muted-foreground">Loading applications…</p>
@@ -618,7 +618,7 @@ function ApplicationsPanel({ cycles, canDecide }: { cycles: Cycle[]; canDecide: 
         </div>
       )}
 
-      {withdraw.error && <p role="alert" className="text-xs text-rose-600">{errorText(withdraw.error)}</p>}
+      {withdraw.error && <p role="alert" className="text-xs text-destructive">{errorText(withdraw.error)}</p>}
       {receiving && (
         <ReceiveFeeDialog
           app={receiving}
@@ -698,7 +698,7 @@ function RowActions({
           <button type="button" className={ghost} onClick={() => onDecide("REJECTED")}>Withdraw offer</button>
         </>
       )}
-      {app.status === "ADMITTED" && <span className="text-xs text-emerald-600">Student record and portal created</span>}
+      {app.status === "ADMITTED" && <span className="text-xs text-success">Student record and portal created</span>}
     </div>
   );
 }
@@ -721,13 +721,13 @@ function DecisionDialog({
   const score = app.examScore === null ? null : Number(app.examScore);
   const belowPass = decision === "ACCEPTED" && (score === null || score < Number(app.cycle.passMark));
   return (
-    <div role="dialog" aria-modal="true" className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+    <div role="dialog" aria-modal="true" className="fixed inset-0 z-50 flex items-center justify-center bg-overlay p-4">
       <div className="w-full max-w-md rounded-2xl border border-border bg-card p-5 shadow-xl">
         <h3 className="text-sm font-bold text-foreground">
           {label(decision)}: {app.firstName} {app.lastName}
         </h3>
         {belowPass && (
-          <div className="mt-3 rounded-lg bg-amber-500/10 p-3 text-xs text-amber-800 dark:text-amber-200">
+          <div className="mt-3 rounded-lg bg-warning/10 p-3 text-xs text-warning">
             {score === null ? "No entrance exam score is recorded." : `Score ${score} is below the pass mark of ${Number(app.cycle.passMark)}.`}
             <label className="mt-2 flex items-center gap-2 font-semibold">
               <input type="checkbox" checked={override} onChange={(e) => setOverride(e.target.checked)} />
@@ -834,7 +834,7 @@ function ReceiveFeeDialog({
     onSuccess: (result) => onDone(result.receipt),
   });
   return (
-    <div role="dialog" aria-modal="true" className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+    <div role="dialog" aria-modal="true" className="fixed inset-0 z-50 flex items-center justify-center bg-overlay p-4">
       <div className="w-full max-w-md rounded-2xl border border-border bg-card p-5 shadow-xl">
         <h3 className="text-sm font-bold text-foreground">Receive admission fee: {app.firstName} {app.lastName}</h3>
         <p className="mt-1 text-xs text-muted-foreground">{app.applicationNumber} · {app.class.name}</p>
@@ -851,7 +851,7 @@ function ReceiveFeeDialog({
           <input type="checkbox" className="mt-0.5" checked={confirmed} onChange={(e) => setConfirmed(e.target.checked)} />
           I have received {money(app.feeDue)} in cash. It is recorded as school income and is not refundable, whatever the admission outcome.
         </label>
-        {receive.error && <p role="alert" className="mt-3 text-xs text-rose-600">{errorText(receive.error)}</p>}
+        {receive.error && <p role="alert" className="mt-3 text-xs text-destructive">{errorText(receive.error)}</p>}
         <div className="mt-4 flex justify-end gap-2">
           <button type="button" className={ghost} onClick={onClose}>Cancel</button>
           <button type="button" className={primary} disabled={!confirmed || receive.isPending} onClick={() => receive.mutate()}>
@@ -874,7 +874,7 @@ function ExemptFeeDialog({ app, onClose, onDone }: { app: Application; onClose: 
     onSuccess: onDone,
   });
   return (
-    <div role="dialog" aria-modal="true" className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+    <div role="dialog" aria-modal="true" className="fixed inset-0 z-50 flex items-center justify-center bg-overlay p-4">
       <div className="w-full max-w-md rounded-2xl border border-border bg-card p-5 shadow-xl">
         <h3 className="text-sm font-bold text-foreground">Exempt from admission fee: {app.firstName} {app.lastName}</h3>
         <p className="mt-1 text-xs text-muted-foreground">
@@ -884,7 +884,7 @@ function ExemptFeeDialog({ app, onClose, onDone }: { app: Application; onClose: 
           Reason for exemption (required)
           <textarea className={`${input} h-24 py-2`} value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. Child of a staff member, approved by the headteacher" />
         </label>
-        {exempt.error && <p role="alert" className="mt-3 text-xs text-rose-600">{errorText(exempt.error)}</p>}
+        {exempt.error && <p role="alert" className="mt-3 text-xs text-destructive">{errorText(exempt.error)}</p>}
         <div className="mt-4 flex justify-end gap-2">
           <button type="button" className={ghost} onClick={onClose}>Cancel</button>
           <button type="button" className={primary} disabled={reason.trim().length < 5 || exempt.isPending} onClick={() => exempt.mutate()}>

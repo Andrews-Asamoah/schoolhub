@@ -67,13 +67,13 @@ const priorityLabels: Record<TicketPriority, string> = {
 };
 
 const statusStyles: Record<TicketStatus, string> = {
-  OPEN: "support-status-open border-sky-200 bg-sky-50 dark:border-sky-400/20 dark:bg-sky-400/10",
+  OPEN: "support-status-open border-info/20 bg-info/10",
   IN_PROGRESS:
-    "support-status-progress border-amber-200 bg-amber-50 dark:border-amber-400/20 dark:bg-amber-400/10",
+    "support-status-progress border-warning/20 bg-warning/10",
   RESOLVED:
-    "support-status-resolved border-emerald-200 bg-emerald-50 dark:border-emerald-400/20 dark:bg-emerald-400/10",
+    "support-status-resolved border-success/20 bg-success/10",
   CLOSED:
-    "support-status-closed border-slate-200 bg-slate-100 dark:border-white/10 dark:bg-white/[0.06]",
+    "support-status-closed border-border bg-muted",
 };
 
 const priorityStyles: Record<TicketPriority, string> = {
@@ -198,15 +198,15 @@ export function TicketWorkspace({ mode }: TicketWorkspaceProps) {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <span className="support-text-success inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold dark:border-emerald-400/20 dark:bg-emerald-400/10">
-            <span className="size-2 animate-pulse rounded-full bg-emerald-500" />
+          <span className="support-text-success inline-flex items-center gap-2 rounded-full border border-success/20 bg-success/10 px-3 py-2 text-xs font-semibold">
+            <span className="size-2 animate-pulse rounded-full bg-success" />
             Auto-refresh · 3 sec
           </span>
           {mode === "school" && (
             <button
               type="button"
               onClick={() => setShowComposer((shown) => !shown)}
-              className="inline-flex h-10 items-center gap-2 rounded-xl bg-indigo-600 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-950"
+              className="inline-flex h-10 items-center gap-2 rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-sm transition hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 dark:focus-visible:ring-offset-foreground/10"
             >
               <Plus className="size-4" />
               New request
@@ -216,7 +216,7 @@ export function TicketWorkspace({ mode }: TicketWorkspaceProps) {
       </header>
 
       {createMutation.isSuccess && (
-        <p role="status" className="support-text-success rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium dark:border-emerald-400/20 dark:bg-emerald-400/10">
+        <p role="status" className="support-text-success rounded-xl border border-success/20 bg-success/10 px-4 py-3 text-sm font-medium">
           Your support request was submitted. Replies and status changes will appear in its timeline.
         </p>
       )}
@@ -240,9 +240,9 @@ export function TicketWorkspace({ mode }: TicketWorkspaceProps) {
         />
       )}
 
-      <section className="support-inbox-shell grid min-h-[560px] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-white/10 dark:bg-slate-900/70 lg:grid-cols-[minmax(260px,0.8fr)_minmax(0,1.6fr)]">
-        <aside className="support-inbox border-b border-slate-200 dark:border-white/10 lg:border-b-0 lg:border-r">
-          <div className="support-inbox-header flex items-center justify-between border-b border-slate-100 px-4 py-3 dark:border-white/10">
+      <section className="support-inbox-shell grid min-h-[560px] overflow-hidden rounded-2xl border border-border bg-card shadow-sm lg:grid-cols-[minmax(260px,0.8fr)_minmax(0,1.6fr)]">
+        <aside className="support-inbox border-b border-border lg:border-b-0 lg:border-r">
+          <div className="support-inbox-header flex items-center justify-between border-b border-border/60 px-4 py-3">
             <div>
               <h2 className="support-text-primary text-sm font-semibold">Request inbox</h2>
               <p className="support-text-muted mt-0.5 text-[11px]">{tickets.length} conversations</p>
@@ -252,7 +252,7 @@ export function TicketWorkspace({ mode }: TicketWorkspaceProps) {
               onClick={() => void refreshTickets()}
               aria-label="Refresh support requests"
               title="Refresh now"
-              className="support-refresh-button support-text-muted rounded-lg p-2 hover:bg-slate-100 dark:hover:bg-white/[0.06]"
+              className="support-refresh-button support-text-muted rounded-lg p-2 hover:bg-muted"
             >
               <RefreshCw className={`size-4 ${ticketsQuery.isFetching ? "animate-spin" : ""}`} />
             </button>
@@ -279,8 +279,8 @@ export function TicketWorkspace({ mode }: TicketWorkspaceProps) {
                   aria-current={selectedId === item.id ? "true" : undefined}
                   className={`support-ticket-row mb-1 w-full rounded-xl border p-3 text-left transition ${
                     selectedId === item.id
-                    ? "support-ticket-selected border-indigo-200 bg-indigo-50 shadow-sm dark:border-indigo-300/20 dark:bg-indigo-400/[0.08]"
-                      : "border-transparent hover:border-slate-200 hover:bg-slate-50 dark:hover:border-white/10 dark:hover:bg-white/[0.03]"
+                    ? "support-ticket-selected border-primary/20 bg-primary/10 shadow-sm"
+                      : "border-transparent hover:border-border hover:bg-muted/50"
                   }`}
                 >
                   <div className="flex items-start justify-between gap-2">
@@ -310,7 +310,7 @@ export function TicketWorkspace({ mode }: TicketWorkspaceProps) {
         <div className="support-conversation min-w-0">
           {!selectedId ? (
             <div className="flex min-h-[420px] flex-col items-center justify-center p-8 text-center">
-              <span className="support-text-accent mb-3 flex size-12 items-center justify-center rounded-2xl bg-indigo-50 dark:bg-indigo-400/10">
+              <span className="support-text-accent mb-3 flex size-12 items-center justify-center rounded-2xl bg-primary/10">
                 <MessageCircle className="size-5" />
               </span>
               <h2 className="support-text-primary text-sm font-semibold">Choose a conversation</h2>
@@ -322,7 +322,7 @@ export function TicketWorkspace({ mode }: TicketWorkspaceProps) {
             <InlineError message={`Conversation could not be loaded: ${getErrorMessage(detailQuery.error)}`} />
           ) : ticket ? (
             <div className="flex h-full min-h-[560px] flex-col">
-              <header className="support-conversation-header border-b border-slate-100 p-4 sm:p-5 dark:border-white/10">
+              <header className="support-conversation-header border-b border-border/60 p-4 sm:p-5">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0">
                     {mode === "platform" && ticket.school && (
@@ -364,10 +364,10 @@ export function TicketWorkspace({ mode }: TicketWorkspaceProps) {
                 )}
               </header>
 
-              <div className="support-timeline flex-1 space-y-4 overflow-y-auto bg-slate-50/70 p-4 sm:p-5 dark:bg-slate-950/30">
-                <article className="support-request-card rounded-xl border border-indigo-100 bg-white p-4 shadow-sm dark:border-indigo-300/10 dark:bg-slate-900">
+              <div className="support-timeline flex-1 space-y-4 overflow-y-auto bg-muted/70 p-4 sm:p-5">
+                <article className="support-request-card rounded-xl border border-primary/20 bg-card p-4 shadow-sm">
                   <div className="support-text-primary mb-2 flex items-center gap-2 text-xs font-semibold">
-                    <span className="support-text-accent flex size-7 items-center justify-center rounded-full bg-indigo-100 dark:bg-indigo-400/15">
+                    <span className="support-text-accent flex size-7 items-center justify-center rounded-full bg-primary/15">
                       {ticket.submittedBy.name.slice(0, 1).toUpperCase()}
                     </span>
                     Initial request
@@ -383,16 +383,16 @@ export function TicketWorkspace({ mode }: TicketWorkspaceProps) {
                       key={item.id}
                       className={`support-message max-w-[92%] rounded-xl border p-3.5 shadow-sm ${
                         isActivity
-                          ? "support-message-activity mx-auto border-slate-200 bg-slate-100/80 dark:border-white/10 dark:bg-white/[0.04]"
+                          ? "support-message-activity mx-auto border-border bg-muted/80"
                           : isPlatformReply
-                            ? "support-message-platform ml-auto border-indigo-100 bg-indigo-50/80 dark:border-indigo-300/10 dark:bg-indigo-400/[0.07]"
-                            : "support-message-school mr-auto border-slate-200 bg-white dark:border-white/10 dark:bg-slate-900"
+                            ? "support-message-platform ml-auto border-primary/20 bg-primary/10"
+                            : "support-message-school mr-auto border-border bg-card"
                       }`}
                     >
                       <div className="support-text-secondary mb-1.5 flex items-center gap-2 text-[11px] font-semibold">
                         {isActivity ? <ShieldCheck className="support-text-muted size-3.5" /> : <span>{item.author.name}</span>}
                         {isActivity && <span>Ticket activity · {item.author.name}</span>}
-                        {!isActivity && isPlatformReply && <span className="support-text-accent rounded-full bg-indigo-100 px-1.5 py-0.5 text-[9px] uppercase tracking-wide dark:bg-indigo-300/10">Support</span>}
+                        {!isActivity && isPlatformReply && <span className="support-text-accent rounded-full bg-primary/15 px-1.5 py-0.5 text-[9px] uppercase tracking-wide">Support</span>}
                         <time className="support-text-muted ml-auto flex items-center gap-1 text-[10px] font-normal">
                           <Clock3 className="size-3" /> {formatDate(item.createdAt)}
                         </time>
@@ -402,7 +402,7 @@ export function TicketWorkspace({ mode }: TicketWorkspaceProps) {
                   );
                 })}
                 {ticket.status === "CLOSED" && (
-                  <p className="support-closed-notice support-text-muted mx-auto flex max-w-max items-center gap-1.5 rounded-full bg-slate-200/70 px-3 py-1.5 text-[11px] dark:bg-white/[0.05]">
+                  <p className="support-closed-notice support-text-muted mx-auto flex max-w-max items-center gap-1.5 rounded-full bg-muted-foreground/20 px-3 py-1.5 text-[11px]">
                     <Check className="size-3.5" /> This conversation is closed
                   </p>
                 )}
@@ -454,8 +454,8 @@ function SummaryCard({
   icon: LucideIcon;
 }) {
   return (
-    <div className="support-summary-card flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm dark:border-white/10 dark:bg-slate-900/70">
-      <span className="support-text-accent flex size-9 items-center justify-center rounded-lg bg-indigo-50 dark:bg-indigo-400/10">
+    <div className="support-summary-card flex items-center gap-3 rounded-xl border border-border bg-card px-4 py-3 shadow-sm">
+      <span className="support-text-accent flex size-9 items-center justify-center rounded-lg bg-primary/10">
         <Icon className="size-4" />
       </span>
       <div>

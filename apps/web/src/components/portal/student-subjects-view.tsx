@@ -59,33 +59,33 @@ export function StudentSubjectsView() {
       {/* Header and Stats */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-xl font-black text-slate-900 dark:text-white">Enrolled Subjects</h2>
-          <p className="text-xs text-slate-500">
-            Registered courses for <span className="font-semibold text-indigo-600 dark:text-indigo-400">{className}</span> • Active Term
+          <h2 className="text-xl font-black text-foreground">Enrolled Subjects</h2>
+          <p className="text-xs text-muted-foreground">
+            Registered courses for <span className="font-semibold text-primary">{className}</span> • Active Term
           </p>
         </div>
 
         <div className="flex items-center gap-3">
-          <div className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs dark:border-slate-800 dark:bg-slate-900">
-            <span className="text-slate-400">Total Courses: </span>
-            <span className="font-black text-slate-800 dark:text-white">{subjectsList.length}</span>
+          <div className="rounded-xl border border-border bg-card px-3 py-1.5 text-xs">
+            <span className="text-muted-foreground/70">Total Courses: </span>
+            <span className="font-black text-foreground">{subjectsList.length}</span>
           </div>
-          <div className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs dark:border-slate-800 dark:bg-slate-900">
-            <span className="text-slate-400">Weekly Lessons: </span>
-            <span className="font-black text-indigo-600 dark:text-indigo-400">{totalPeriods} periods</span>
+          <div className="rounded-xl border border-border bg-card px-3 py-1.5 text-xs">
+            <span className="text-muted-foreground/70">Weekly Lessons: </span>
+            <span className="font-black text-primary">{totalPeriods} periods</span>
           </div>
         </div>
       </div>
 
       {/* Search Input */}
       <div className="relative max-w-sm">
-        <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+        <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground/70" />
         <input
           type="text"
           placeholder="Search subjects, codes, teachers..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="h-9 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 text-xs text-slate-800 outline-none transition focus:border-indigo-500 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200"
+          className="h-9 w-full rounded-xl border border-border bg-card pl-9 pr-3 text-xs text-foreground outline-none transition focus:border-primary"
         />
       </div>
 
@@ -99,37 +99,37 @@ export function StudentSubjectsView() {
           return (
             <div
               key={sub.id}
-              className="flex flex-col justify-between rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs transition hover:border-slate-300 dark:border-slate-800 dark:bg-slate-900"
+              className="flex flex-col justify-between rounded-2xl border border-border/80 bg-card p-5 shadow-xs transition hover:border-input"
             >
               <div>
                 <div className="flex items-center justify-between">
-                  <span className="rounded-lg bg-indigo-50 px-2 py-0.5 text-[10px] font-bold text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300">
+                  <span className="rounded-lg bg-primary/10 px-2 py-0.5 text-[10px] font-bold text-primary">
                     {sub.code}
                   </span>
-                  <span className="flex items-center gap-1 text-[11px] font-semibold text-slate-400">
+                  <span className="flex items-center gap-1 text-[11px] font-semibold text-muted-foreground/70">
                     <Clock className="size-3" />
                     {sub.periodsPerWeek} periods/wk
                   </span>
                 </div>
 
-                <h3 className="mt-2.5 text-sm font-bold text-slate-900 dark:text-white">
+                <h3 className="mt-2.5 text-sm font-bold text-foreground">
                   {sub.name}
                 </h3>
-                <p className="mt-1 text-xs text-slate-500 leading-relaxed line-clamp-2">
+                <p className="mt-1 text-xs text-muted-foreground leading-relaxed line-clamp-2">
                   {sub.description || "General course syllabus and periodic curriculum content."}
                 </p>
               </div>
 
-              <div className="mt-5 space-y-2 border-t border-slate-100 pt-3 text-xs text-slate-500 dark:border-slate-800">
+              <div className="mt-5 space-y-2 border-t border-border/60 pt-3 text-xs text-muted-foreground">
                 <div className="flex items-center gap-2">
-                  <User className="size-3.5 text-slate-400" />
-                  <span className="font-medium text-slate-700 dark:text-slate-300 truncate">
+                  <User className="size-3.5 text-muted-foreground/70" />
+                  <span className="font-medium text-foreground/80 truncate">
                     {teacherName}
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <MapPin className="size-3.5 text-slate-400" />
-                  <span className="text-[11px] text-slate-400">
+                  <MapPin className="size-3.5 text-muted-foreground/70" />
+                  <span className="text-[11px] text-muted-foreground/70">
                     {sub.room || "Regular Classroom"}
                   </span>
                 </div>

@@ -19,46 +19,46 @@ interface PortalStatCardProps {
 
 const variantStyles = {
   blue: {
-    bg: "bg-blue-50/60 dark:bg-blue-950/20",
-    border: "border-blue-100 dark:border-blue-900/30",
-    iconBg: "bg-blue-600 text-white shadow-sm shadow-blue-500/20",
-    accent: "text-blue-600 dark:text-blue-400",
+    bg: "bg-primary/10",
+    border: "border-primary/20",
+    iconBg: "bg-primary text-primary-foreground shadow-sm shadow-primary/20",
+    accent: "text-primary",
   },
   emerald: {
-    bg: "bg-emerald-50/60 dark:bg-emerald-950/20",
-    border: "border-emerald-100 dark:border-emerald-900/30",
-    iconBg: "bg-emerald-600 text-white shadow-sm shadow-emerald-500/20",
-    accent: "text-emerald-600 dark:text-emerald-400",
+    bg: "bg-success/10",
+    border: "border-success/20",
+    iconBg: "bg-success text-success-foreground shadow-sm shadow-success/20",
+    accent: "text-success",
   },
   amber: {
-    bg: "bg-amber-50/60 dark:bg-amber-950/20",
-    border: "border-amber-100 dark:border-amber-900/30",
-    iconBg: "bg-amber-600 text-white shadow-sm shadow-amber-500/20",
-    accent: "text-amber-600 dark:text-amber-400",
+    bg: "bg-warning/10",
+    border: "border-warning/20",
+    iconBg: "bg-warning text-warning-foreground shadow-sm shadow-warning/20",
+    accent: "text-warning",
   },
   rose: {
-    bg: "bg-rose-50/60 dark:bg-rose-950/20",
-    border: "border-rose-100 dark:border-rose-900/30",
-    iconBg: "bg-rose-600 text-white shadow-sm shadow-rose-500/20",
-    accent: "text-rose-600 dark:text-rose-400",
+    bg: "bg-destructive/10",
+    border: "border-destructive/20",
+    iconBg: "bg-destructive text-destructive-foreground shadow-sm shadow-destructive/20",
+    accent: "text-destructive",
   },
   purple: {
-    bg: "bg-purple-50/60 dark:bg-purple-950/20",
-    border: "border-purple-100 dark:border-purple-900/30",
-    iconBg: "bg-purple-600 text-white shadow-sm shadow-purple-500/20",
-    accent: "text-purple-600 dark:text-purple-400",
+    bg: "bg-highlight/10",
+    border: "border-highlight/20",
+    iconBg: "bg-highlight text-highlight-foreground shadow-sm shadow-highlight/20",
+    accent: "text-highlight",
   },
   indigo: {
-    bg: "bg-indigo-50/60 dark:bg-indigo-950/20",
-    border: "border-indigo-100 dark:border-indigo-900/30",
-    iconBg: "bg-indigo-600 text-white shadow-sm shadow-indigo-500/20",
-    accent: "text-indigo-600 dark:text-indigo-400",
+    bg: "bg-primary/10",
+    border: "border-primary/20",
+    iconBg: "bg-primary text-primary-foreground shadow-sm shadow-primary/20",
+    accent: "text-primary",
   },
   slate: {
-    bg: "bg-slate-50/70 dark:bg-slate-900/40",
-    border: "border-slate-200 dark:border-slate-800",
-    iconBg: "bg-slate-700 text-white shadow-sm shadow-slate-700/20",
-    accent: "text-slate-700 dark:text-slate-300",
+    bg: "bg-muted/70",
+    border: "border-border",
+    iconBg: "bg-foreground/80 text-background shadow-sm shadow-foreground/20",
+    accent: "text-foreground/80",
   },
 };
 
@@ -80,7 +80,7 @@ export function PortalStatCard({
       role={onClick ? "button" : undefined}
       tabIndex={onClick ? 0 : undefined}
       className={cn(
-        "group relative overflow-hidden rounded-2xl border bg-white p-5 shadow-[0_2px_10px_rgba(15,23,42,0.03)] transition-all duration-200 dark:bg-slate-900",
+        "group relative overflow-hidden rounded-2xl border bg-card p-5 shadow-[0_2px_10px_rgba(15,23,42,0.03)] transition-all duration-200",
         styles.border,
         onClick && "cursor-pointer hover:-translate-y-0.5 hover:shadow-md",
         className,
@@ -88,15 +88,15 @@ export function PortalStatCard({
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
             {label}
           </p>
           <div className="mt-2 flex items-baseline gap-2">
-            <span className="text-2xl font-black tracking-tight text-slate-900 dark:text-white sm:text-3xl">
+            <span className="text-2xl font-black tracking-tight text-foreground sm:text-3xl">
               {value}
             </span>
             {subValue && (
-              <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
+              <span className="text-xs font-medium text-muted-foreground">
                 {subValue}
               </span>
             )}
@@ -117,7 +117,7 @@ export function PortalStatCard({
           <span
             className={cn(
               "inline-flex items-center gap-0.5 font-bold",
-              trend.isPositive ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400",
+              trend.isPositive ? "text-success" : "text-destructive",
             )}
           >
             {trend.isPositive ? (
@@ -128,7 +128,7 @@ export function PortalStatCard({
             {trend.value}
           </span>
           {trend.label && (
-            <span className="text-slate-500 dark:text-slate-400">
+            <span className="text-muted-foreground">
               {trend.label}
             </span>
           )}

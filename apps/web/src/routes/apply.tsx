@@ -47,8 +47,8 @@ interface Tracked {
 }
 
 const field =
-  "mt-1.5 h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200";
-const lbl = "block text-xs font-semibold text-slate-700";
+  "mt-1.5 h-11 w-full rounded-lg border border-input bg-card px-3 text-sm text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/20";
+const lbl = "block text-xs font-semibold text-foreground/80";
 const errorText = (e: unknown) => (e instanceof Error ? e.message : "Something went wrong. Please try again.");
 
 const STATUS_MESSAGE: Record<string, string> = {
@@ -74,14 +74,14 @@ function ApplyPage() {
   });
 
   return (
-    <main className="min-h-screen bg-slate-50 px-4 py-10">
+    <main className="min-h-screen bg-background px-4 py-10">
       <div className="mx-auto max-w-2xl">
         <header className="mb-6 text-center">
           {intake.data?.school.logo && (
             <img src={intake.data.school.logo} alt="" className="mx-auto mb-3 size-16 rounded-xl object-cover" />
           )}
-          <h1 className="text-2xl font-bold text-slate-900">{intake.data?.school.name ?? "School admissions"}</h1>
-          {intake.data?.school.motto && <p className="mt-1 text-sm text-slate-500">{intake.data.school.motto}</p>}
+          <h1 className="text-2xl font-bold text-foreground">{intake.data?.school.name ?? "School admissions"}</h1>
+          {intake.data?.school.motto && <p className="mt-1 text-sm text-muted-foreground">{intake.data.school.motto}</p>}
         </header>
 
         {!subdomain ? (
@@ -92,13 +92,13 @@ function ApplyPage() {
           <Notice>{errorText(intake.error)}</Notice>
         ) : (
           <>
-            <div className="mb-4 inline-flex rounded-lg border border-slate-300 bg-white p-0.5">
+            <div className="mb-4 inline-flex rounded-lg border border-input bg-card p-0.5">
               {(["apply", "track"] as const).map((key) => (
                 <button
                   key={key}
                   type="button"
                   onClick={() => setMode(key)}
-                  className={`rounded-md px-4 py-2 text-xs font-semibold ${mode === key ? "bg-indigo-600 text-white" : "text-slate-600"}`}
+                  className={`rounded-md px-4 py-2 text-xs font-semibold ${mode === key ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}
                 >
                   {key === "apply" ? "Apply" : "Track application"}
                 </button>
@@ -122,7 +122,7 @@ function ApplyPage() {
 }
 
 function Notice({ children }: { children: React.ReactNode }) {
-  return <div className="rounded-2xl border border-slate-200 bg-white p-6 text-center text-sm text-slate-600">{children}</div>;
+  return <div className="rounded-2xl border border-border bg-card p-6 text-center text-sm text-muted-foreground">{children}</div>;
 }
 
 function ApplyForm({ subdomain, intake }: { subdomain: string; intake: PublicIntake }) {
@@ -142,13 +142,13 @@ function ApplyForm({ subdomain, intake }: { subdomain: string; intake: PublicInt
 
   if (done) {
     return (
-      <div className="rounded-2xl border border-emerald-200 bg-white p-6 text-center">
-        <h2 className="text-lg font-bold text-slate-900">Application received</h2>
-        <p className="mt-2 text-sm text-slate-600">Keep this reference number. You will need it, with your phone or email, to track progress.</p>
-        <p className="my-4 select-all rounded-lg bg-slate-100 py-3 font-mono text-xl font-bold tracking-wider text-slate-900">{done.applicationNumber}</p>
-        <p className="text-xs text-slate-500">Applied for {done.className} · {done.cycleName}</p>
+      <div className="rounded-2xl border border-success/20 bg-card p-6 text-center">
+        <h2 className="text-lg font-bold text-foreground">Application received</h2>
+        <p className="mt-2 text-sm text-muted-foreground">Keep this reference number. You will need it, with your phone or email, to track progress.</p>
+        <p className="my-4 select-all rounded-lg bg-muted py-3 font-mono text-xl font-bold tracking-wider text-foreground">{done.applicationNumber}</p>
+        <p className="text-xs text-muted-foreground">Applied for {done.className} · {done.cycleName}</p>
         {done.admissionFee > 0 && (
-          <p className="mt-4 rounded-lg bg-amber-50 p-3 text-xs text-amber-900">
+          <p className="mt-4 rounded-lg bg-warning/10 p-3 text-xs text-warning">
             Please bring <b>{money(done.admissionFee, done.currency)} in cash</b> on the day of the entrance exam. Fee is non-refundable.
           </p>
         )}
@@ -168,21 +168,21 @@ function ApplyForm({ subdomain, intake }: { subdomain: string; intake: PublicInt
   }
 
   return (
-    <form onSubmit={onSubmit} noValidate className="space-y-6 rounded-2xl border border-slate-200 bg-white p-6">
+    <form onSubmit={onSubmit} noValidate className="space-y-6 rounded-2xl border border-border bg-card p-6">
       <div>
-        <h2 className="text-base font-bold text-slate-900">Enrollment form</h2>
-        {cycle.instructions && <p className="mt-2 whitespace-pre-line rounded-lg bg-indigo-50 p-3 text-xs text-indigo-900">{cycle.instructions}</p>}
+        <h2 className="text-base font-bold text-foreground">Enrollment form</h2>
+        {cycle.instructions && <p className="mt-2 whitespace-pre-line rounded-lg bg-primary/10 p-3 text-xs text-primary">{cycle.instructions}</p>}
         {cycle.admissionFee > 0 && (
-          <p className="mt-2 rounded-lg bg-amber-50 p-3 text-xs text-amber-900">
+          <p className="mt-2 rounded-lg bg-warning/10 p-3 text-xs text-warning">
             <b>Entrance exam fee: {money(cycle.admissionFee, intake.school.currency)}</b>, paid in cash at the school when your child comes to write the
             exam. The fee is non-refundable and does not guarantee admission.
           </p>
         )}
-        <p className="mt-2 text-xs text-slate-500">Applications close on {cycle.closesAt.slice(0, 10)}. Admission follows an entrance examination.</p>
+        <p className="mt-2 text-xs text-muted-foreground">Applications close on {cycle.closesAt.slice(0, 10)}. Admission follows an entrance examination.</p>
       </div>
 
       <fieldset className="grid gap-4 sm:grid-cols-2">
-        <legend className="mb-2 text-sm font-semibold text-slate-900">Applicant</legend>
+        <legend className="mb-2 text-sm font-semibold text-foreground">Applicant</legend>
         {intake.cycles.length > 1 && (
           <label className={`${lbl} sm:col-span-2`}>
             Intake
@@ -216,7 +216,7 @@ function ApplyForm({ subdomain, intake }: { subdomain: string; intake: PublicInt
       </fieldset>
 
       <fieldset className="grid gap-4 sm:grid-cols-2">
-        <legend className="mb-2 text-sm font-semibold text-slate-900">Parent / guardian</legend>
+        <legend className="mb-2 text-sm font-semibold text-foreground">Parent / guardian</legend>
         <label className={lbl}>First name<input className={field} value={v.guardianFirstName ?? ""} onChange={set("guardianFirstName")} /></label>
         <label className={lbl}>Last name<input className={field} value={v.guardianLastName ?? ""} onChange={set("guardianLastName")} /></label>
         <label className={lbl}>Relationship
@@ -235,13 +235,13 @@ function ApplyForm({ subdomain, intake }: { subdomain: string; intake: PublicInt
         <label>Website<input tabIndex={-1} autoComplete="off" value={v.website ?? ""} onChange={set("website")} /></label>
       </div>
 
-      <label className="flex items-start gap-2 text-xs text-slate-700">
+      <label className="flex items-start gap-2 text-xs text-foreground/80">
         <input type="checkbox" className="mt-0.5" checked={declaration} onChange={(e) => setDeclaration(e.target.checked)} />
         I confirm the information above is correct and agree to the school processing it for admission purposes.
       </label>
 
-      {(formError || submit.error) && <p role="alert" className="text-sm text-rose-600">{formError ?? errorText(submit.error)}</p>}
-      <button type="submit" disabled={submit.isPending} className="h-11 w-full rounded-lg bg-indigo-600 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-60">
+      {(formError || submit.error) && <p role="alert" className="text-sm text-destructive">{formError ?? errorText(submit.error)}</p>}
+      <button type="submit" disabled={submit.isPending} className="h-11 w-full rounded-lg bg-primary text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-60">
         {submit.isPending ? "Submitting…" : "Submit application"}
       </button>
     </form>
@@ -260,24 +260,24 @@ function TrackForm({ subdomain }: { subdomain: string }) {
   });
   const result = track.data;
   return (
-    <div className="space-y-4 rounded-2xl border border-slate-200 bg-white p-6">
-      <h2 className="text-base font-bold text-slate-900">Track your application</h2>
+    <div className="space-y-4 rounded-2xl border border-border bg-card p-6">
+      <h2 className="text-base font-bold text-foreground">Track your application</h2>
       <label className={lbl}>Reference number<input className={field} value={applicationNumber} onChange={(e) => setNumber(e.target.value)} placeholder="ABC-A26-00001" /></label>
       <label className={lbl}>Phone number or email used to apply<input className={field} value={contact} onChange={(e) => setContact(e.target.value)} /></label>
-      <button type="button" className="h-11 w-full rounded-lg bg-indigo-600 text-sm font-semibold text-white disabled:opacity-60" disabled={track.isPending || applicationNumber.length < 5 || contact.length < 5} onClick={() => track.mutate()}>
+      <button type="button" className="h-11 w-full rounded-lg bg-primary text-sm font-semibold text-primary-foreground disabled:opacity-60" disabled={track.isPending || applicationNumber.length < 5 || contact.length < 5} onClick={() => track.mutate()}>
         {track.isPending ? "Checking…" : "Check status"}
       </button>
-      {track.error && <p role="alert" className="text-sm text-rose-600">{errorText(track.error)}</p>}
+      {track.error && <p role="alert" className="text-sm text-destructive">{errorText(track.error)}</p>}
       {result && (
-        <div className="rounded-xl bg-slate-50 p-4 text-sm text-slate-700">
-          <p className="font-semibold text-slate-900">{result.applicantName} · {result.className}</p>
-          <p className="mt-1 text-xs text-slate-500">{result.applicationNumber} · {result.cycleName}</p>
+        <div className="rounded-xl bg-muted/50 p-4 text-sm text-foreground/80">
+          <p className="font-semibold text-foreground">{result.applicantName} · {result.className}</p>
+          <p className="mt-1 text-xs text-muted-foreground">{result.applicationNumber} · {result.cycleName}</p>
           <p className="mt-3">{STATUS_MESSAGE[result.status] ?? result.status}</p>
           {result.feeStatus === "PENDING" && (
-            <p className="mt-2 text-amber-800">Entrance exam fee of {money(result.feeDue, result.currency)} is payable in cash on exam day.</p>
+            <p className="mt-2 text-warning">Entrance exam fee of {money(result.feeDue, result.currency)} is payable in cash on exam day.</p>
           )}
-          {result.feeStatus === "PAID" && <p className="mt-2 text-emerald-700">Entrance exam fee received. Thank you.</p>}
-          {result.feeStatus === "EXEMPTED" && <p className="mt-2 text-sky-700">Entrance exam fee waived by the school.</p>}
+          {result.feeStatus === "PAID" && <p className="mt-2 text-success">Entrance exam fee received. Thank you.</p>}
+          {result.feeStatus === "EXEMPTED" && <p className="mt-2 text-info">Entrance exam fee waived by the school.</p>}
           {result.examDate && <p className="mt-2 font-semibold">Exam: {new Date(result.examDate).toLocaleString()} at {result.examVenue}</p>}
           {result.decisionNote && <p className="mt-2 italic">“{result.decisionNote}”</p>}
         </div>

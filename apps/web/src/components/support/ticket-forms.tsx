@@ -84,17 +84,17 @@ export function CreateTicketForm({
         event.stopPropagation();
         void form.handleSubmit().catch(() => undefined);
       }}
-      className="support-create-form rounded-2xl border border-indigo-200 bg-indigo-50/50 p-5 shadow-sm dark:border-indigo-300/15 dark:bg-indigo-400/[0.05]"
+      className="support-create-form rounded-2xl border border-primary/20 bg-primary/10 p-5 shadow-sm"
     >
       <div className="mb-4 flex items-center gap-2">
-        <span className="flex size-9 items-center justify-center rounded-xl bg-indigo-100 text-indigo-700 dark:bg-indigo-400/15 dark:text-indigo-200">
+        <span className="flex size-9 items-center justify-center rounded-xl bg-primary/15 text-primary">
           <Send className="size-4" />
         </span>
         <div>
-          <h2 className="text-sm font-semibold text-slate-900 dark:text-white">
+          <h2 className="text-sm font-semibold text-foreground">
             Tell us what’s happening
           </h2>
-          <p className="text-xs text-slate-500 dark:text-slate-400">
+          <p className="text-xs text-muted-foreground">
             A support specialist will follow up in this thread.
           </p>
         </div>
@@ -226,7 +226,7 @@ export function ReplyForm({
         event.stopPropagation();
         void form.handleSubmit().catch(() => undefined);
       }}
-      className="support-reply-form border-t border-slate-100 bg-white p-3 sm:p-4 dark:border-white/10 dark:bg-slate-900"
+      className="support-reply-form border-t border-border/60 bg-card p-3 sm:p-4"
     >
       <div className="flex items-end gap-2">
         <form.Field name="message">
@@ -394,7 +394,7 @@ export function CloseTicketForm({
     >
       <FormSubmitButton
         isSubmitting={isSubmitting}
-        className="border border-emerald-200 bg-emerald-50 text-emerald-800 shadow-none hover:bg-emerald-100 dark:border-emerald-300/20 dark:bg-emerald-400/10 dark:text-emerald-200 dark:hover:bg-emerald-400/15"
+        className="border border-success/20 bg-success/10 text-success shadow-none hover:bg-success/15"
       >
         <Check className="size-3.5" />
         Confirm resolution and close
