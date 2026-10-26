@@ -64,6 +64,10 @@ import { StudentHouseClubsView } from "@/components/portal/student-house-clubs-v
 import { StudentAssignmentsView } from "@/components/portal/student-assignments-view";
 import { StudentAnnouncementsView } from "@/components/portal/student-announcements-view";
 import { AdminAnnouncementsWorkspace } from "@/components/portal/admin-announcements-workspace";
+import { DocumentsWorkspace } from "@/components/portal/documents-workspace";
+import { MessagesWorkspace } from "@/components/portal/messages-workspace";
+import { NotificationsHistoryWorkspace } from "@/components/portal/notifications-history-workspace";
+import { SchoolReportsWorkspace } from "@/components/school/reports-workspace";
 
 export const Route = createFileRoute("/$page")({
   component: WorkspaceRoute,
@@ -244,6 +248,9 @@ function WorkspaceContent({ pageId }: { pageId: string }) {
           {pageId === "payroll" && <PayrollManagementWorkspace />}
           {pageId === "fee-reminders" && <FeeReminderWorkspace />}
           {pageId === "inventory" && <InventoryManagementWorkspace />}
+          {pageId === "documents" && <DocumentsWorkspace />}
+          {pageId === "messages" && <MessagesWorkspace />}
+          {pageId === "notifications" && <NotificationsHistoryWorkspace />}
           {pageId === "timetable" && (
             activeRole === "student" ? <StudentPortalWorkspace page="timetable" /> : <TimetableWorkspace />
           )}
@@ -295,7 +302,7 @@ function WorkspaceContent({ pageId }: { pageId: string }) {
             )
           )}
           {pageId === "reports" && (
-            activeRole === "student" ? <StudentReportView /> : <PlannedWorkspace title={page.label} />
+            activeRole === "student" ? <StudentReportView /> : <SchoolReportsWorkspace />
           )}
           {pageId === "attendance" && (
             activeRole === "student" ? <StudentAttendanceView /> : <AttendanceWorkspace query={classesQuery} />
