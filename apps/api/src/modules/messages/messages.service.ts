@@ -7,13 +7,14 @@ import {
 import type { School } from "@prisma/client";
 import { PrismaService } from "../../prisma/prisma.service.js";
 import type { AuthenticatedUser } from "../../common/decorators/current-user.decorator.js";
+import { TeacherScopeService } from "../../common/scope/teacher-scope.service.js";
 
 const ALL_ROLES = ["owner", "admin", "headteacher", "teacher", "accountant", "staff", "student", "guardian"];
 const RECIPIENT_ROLES: Record<string, string[]> = {
   owner: ALL_ROLES,
   admin: ALL_ROLES,
   headteacher: ALL_ROLES,
-  teacher: ["owner", "admin", "headteacher", "teacher", "accountant", "staff", "student", "guardian"],
+  teacher: ["owner", "admin", "headteacher", "teacher", "accountant", "staff"],
   accountant: ["owner", "admin", "headteacher", "accountant", "staff", "guardian"],
   staff: ["owner", "admin", "headteacher", "teacher", "accountant", "staff"],
   guardian: ["owner", "admin", "headteacher", "teacher", "accountant", "staff"],
@@ -22,18 +23,27 @@ const RECIPIENT_ROLES: Record<string, string[]> = {
 
 @Injectable()
 export class MessagesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly teacherScope: TeacherScopeService,
+  ) {}
 
-  async listRecipients(organizationId: string, userId: string, role: string, search: string) {
+  async listRecipients(schoolId: string, organizationId: string, userId: string, role: string, search: string) {
     const allowedRoles = RECIPIENT_ROLES[role] ?? [];
     if (!allowedRoles.length) return [];
     const term = search.trim().slice(0, 100);
+    const teacherTargets = role === "teacher" ? await this.getTeacherStudentAndGuardianIds(schoolId, userId) : [];
+    const roleConditions = [
+      { role: { in: allowedRoles } },
+      { roles: { hasSome: allowedRoles } },
+      ...(teacherTargets.length ? [{ userId: { in: teacherTargets } }] : []),
+    ];
     const members = await this.prisma.client.member.findMany({
       where: {
         organizationId,
         banned: false,
         userId: { not: userId },
-        OR: [{ role: { in: allowedRoles } }, { roles: { hasSome: allowedRoles } }],
+        OR: roleConditions,
         ...(term ? {
           user: { OR: [
             { name: { contains: term, mode: "insensitive" } },
@@ -56,6 +66,51 @@ export class MessagesService {
       role: primaryRole,
       roles,
     }));
+  }
+
+  /**
+   * Teachers may message school leadership and colleagues, but personal
+   * student/guardian contacts are limited to current classes they teach.
+   */
+  private async getTeacherStudentAndGuardianIds(schoolId: string, userId: string) {
+    const classIds = await this.teacherScope.getTaughtClassIds(schoolId, userId);
+    if (!classIds.length) return [];
+    const students = await this.prisma.client.student.findMany({
+      where: {
+        schoolId,
+        deletedAt: null,
+        status: "ACTIVE",
+        OR: [
+          { classId: { in: classIds } },
+          { enrollments: { some: { classId: { in: classIds }, status: "ACTIVE" } } },
+        ],
+      },
+      select: {
+        profile: { select: { userId: true } },
+        guardians: {
+          where: {
+            guardian: {
+              schoolId,
+              isActive: true,
+              deletedAt: null,
+              canLogin: true,
+            },
+          },
+          select: {
+            guardian: { select: { profile: { select: { userId: true } } } },
+          },
+        },
+      },
+    });
+    const ids = new Set<string>();
+    for (const student of students) {
+      ids.add(student.profile.userId);
+      for (const link of student.guardians) {
+        const guardianUserId = link.guardian.profile?.userId;
+        if (guardianUserId) ids.add(guardianUserId);
+      }
+    }
+    return [...ids];
   }
 
   async listMessages(schoolId: string, userId: string, folder: "inbox" | "sent") {
@@ -101,12 +156,18 @@ export class MessagesService {
 
     const allowedRoles = RECIPIENT_ROLES[role] ?? [];
     if (!allowedRoles.length) throw new ForbiddenException("Your role cannot send messages.");
+    const teacherTargets = role === "teacher" ? await this.getTeacherStudentAndGuardianIds(school.id, sender.id) : [];
+    const membershipConditions = [
+      { role: { in: allowedRoles } },
+      { roles: { hasSome: allowedRoles } },
+      ...(teacherTargets.length ? [{ userId: { in: teacherTargets } }] : []),
+    ];
     const memberships = await this.prisma.client.member.findMany({
       where: {
         organizationId: school.organizationId,
         banned: false,
         userId: { in: recipientIds },
-        OR: [{ role: { in: allowedRoles } }, { roles: { hasSome: allowedRoles } }],
+        OR: membershipConditions,
       },
       select: { userId: true },
     });
