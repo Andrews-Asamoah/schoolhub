@@ -79,11 +79,38 @@ export function useSidebar() {
 
 export function Sidebar({ children, className, ...props }: HTMLAttributes<HTMLElement>) {
   const { collapsed, isMobile, mobileOpen, closeMobile } = useSidebar();
+  const asideRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (!isMobile || !mobileOpen) return;
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const focusable = () => Array.from(asideRef.current?.querySelectorAll<HTMLElement>(
+      'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])'
+    ) ?? []).filter(node => !node.hasAttribute("disabled"));
+    focusable()[0]?.focus();
+    const trap = (event: KeyboardEvent) => {
+      if (event.key !== "Tab") return;
+      const items = focusable();
+      if (!items.length) { event.preventDefault(); return; }
+      const first = items[0]!;
+      const last = items[items.length - 1]!;
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+    };
+    document.addEventListener("keydown", trap);
+    return () => {
+      document.removeEventListener("keydown", trap);
+      if (asideRef.current?.contains(document.activeElement)) previousFocus?.focus();
+    };
+  }, [isMobile, mobileOpen]);
   return (
     <>
       {mobileOpen && <button type="button" aria-label="Close navigation menu" className="fixed inset-0 z-40 bg-overlay backdrop-blur-xs md:hidden" onClick={closeMobile} />}
       <aside
+        ref={asideRef}
         data-collapsed={collapsed && !isMobile}
+        inert={isMobile && !mobileOpen}
+        role={isMobile ? "dialog" : undefined}
+        aria-modal={isMobile && mobileOpen ? true : undefined}
         aria-label="Workspace navigation"
         className={cn(
           "fixed inset-y-0 left-0 z-50 flex w-[min(17rem,86vw)] shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground transition-[width,transform] duration-200 md:sticky md:top-0 md:z-20 md:h-screen md:w-[15.75rem] md:translate-x-0",
@@ -92,13 +119,19 @@ export function Sidebar({ children, className, ...props }: HTMLAttributes<HTMLEl
           className,
         )}
         {...props}
-      >{children}</aside>
+      >
+        <button type="button" aria-label="Close navigation" onClick={closeMobile}
+          className="absolute right-2 top-4 z-10 inline-flex size-9 items-center justify-center rounded-lg text-sidebar-foreground hover:bg-sidebar-accent focus-visible:ring-2 focus-visible:ring-sidebar-ring md:hidden">
+          <PanelLeftClose className="size-4" />
+        </button>
+        {children}
+      </aside>
     </>
   );
 }
 
 export function SidebarHeader({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn("flex h-[4.5rem] shrink-0 items-center border-b border-sidebar-border px-3", className)} {...props} />;
+  return <div className={cn("flex h-[4.5rem] shrink-0 items-center border-b border-sidebar-border pl-3 pr-11 md:pr-3", className)} {...props} />;
 }
 export function SidebarContent({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
   return <div className={cn("min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-2 py-3 scrollbar-thin", className)} {...props} />;
