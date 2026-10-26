@@ -1,3 +1,4 @@
+import { DatePicker } from "@/components/ui/date-picker";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { CircleAlert, Pencil, Plus, X } from "lucide-react";
 import { useState, type FormEvent } from "react";
@@ -241,10 +242,10 @@ function YearForm({
           <FormInput id="year-name" value={values.name} onChange={(e) => setValues({ ...values, name: e.target.value })} />
         </FormField>
         <FormField label="Starts" htmlFor="year-start">
-          <FormInput id="year-start" type="date" value={values.startDate} onChange={(e) => setValues({ ...values, startDate: e.target.value })} />
+          <DatePicker id="year-start" value={values.startDate} onChange={(value) => setValues({ ...values, startDate: value })} />
         </FormField>
         <FormField label="Ends" htmlFor="year-end">
-          <FormInput id="year-end" type="date" value={values.endDate} onChange={(e) => setValues({ ...values, endDate: e.target.value })} />
+          <DatePicker id="year-end" value={values.endDate} onChange={(value) => setValues({ ...values, endDate: value })} />
         </FormField>
       </div>
       {!isCurrent && (
@@ -304,10 +305,10 @@ function TermForm({
           <FormInput id="term-name" value={values.name} onChange={(e) => setValues({ ...values, name: e.target.value })} />
         </FormField>
         <FormField label="Starts" htmlFor="term-start">
-          <FormInput id="term-start" type="date" value={values.startDate} onChange={(e) => setValues({ ...values, startDate: e.target.value })} />
+          <DatePicker id="term-start" value={values.startDate} onChange={(value) => setValues({ ...values, startDate: value })} />
         </FormField>
         <FormField label="Ends" htmlFor="term-end">
-          <FormInput id="term-end" type="date" value={values.endDate} onChange={(e) => setValues({ ...values, endDate: e.target.value })} />
+          <DatePicker id="term-end" value={values.endDate} onChange={(value) => setValues({ ...values, endDate: value })} />
         </FormField>
       </div>
       {canBeCurrent && !isCurrent && (
