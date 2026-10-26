@@ -1,0 +1,134 @@
+// Effective-dated finance configuration. Additive P0/P1 tables.
+// Never treat DRAFT payroll schedules as legal statutory rates.
+enum FinanceApprovalSubject {
+  MANUAL_JOURNAL
+  EXPENSE
+  SUPPLIER_PAYMENT
+  CREDIT_NOTE
+  WRITE_OFF
+  WAIVER
+  REFUND
+  PERIOD_CLOSE
+  PERIOD_REOPEN
+  ACCRUAL_CUTOVER
+  PAYROLL_RUN
+  BANK_RECONCILIATION
+  BUDGET_REVISION
+}
+
+enum FinanceApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum FinanceBudgetControlMode {
+  OFF
+  WARN
+  BLOCK
+}
+
+enum PayrollSettingStatus {
+  DRAFT
+  ACTIVE
+  RETIRED
+}
+
+enum PayrollContributionBase {
+  BASIC
+  GROSS
+  PENSIONABLE_ITEMS
+}
+
+model FinanceSettings {
+  schoolId String @id
+  baseCurrency String @default("GHS")
+  fiscalYearStartMonth Int @default(1)
+  allowSelfApproval Boolean @default(false)
+  budgetControlMode FinanceBudgetControlMode @default(OFF)
+  revenuePolicyApprovedAt DateTime?
+  revenuePolicyApprovedBy String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  school School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  @@map("finance_settings")
+}
+
+model FinanceApprovalPolicy {
+  id String @id @default(cuid())
+  schoolId String
+  subject FinanceApprovalSubject
+  minAmount Decimal @default(0) @db.Decimal(15, 2)
+  requiredApprovals Int @default(1)
+  approverPermission String
+  @@unique([schoolId, subject, minAmount])
+  @@map("finance_approval_policies")
+}
+
+model FinanceApprovalRequest {
+  id String @id @default(cuid())
+  schoolId String
+  subject FinanceApprovalSubject
+  entityType String
+  entityId String
+  amount Decimal? @db.Decimal(15, 2)
+  payloadHash String
+  status FinanceApprovalStatus @default(PENDING)
+  requestedById String
+  requestedAt DateTime @default(now())
+  decidedById String?
+  decidedAt DateTime?
+  decisionNote String?
+  @@index([schoolId, status, subject])
+  @@index([entityType, entityId])
+  @@map("finance_approval_requests")
+}
+
+model PayrollTaxSchedule {
+  id String @id @default(cuid())
+  schoolId String?
+  name String
+  effectiveFrom DateTime @db.Date
+  effectiveTo DateTime? @db.Date
+  nonResidentRate Decimal @db.Decimal(6, 3)
+  status PayrollSettingStatus @default(DRAFT)
+  approvedById String?
+  sourceNote String?
+  bands PayrollTaxBand[]
+  @@index([schoolId, effectiveFrom])
+  @@map("payroll_tax_schedules")
+}
+
+model PayrollTaxBand {
+  id String @id @default(cuid())
+  scheduleId String
+  position Int
+  width Decimal? @db.Decimal(15, 2)
+  rate Decimal @db.Decimal(6, 3)
+  schedule PayrollTaxSchedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+  @@unique([scheduleId, position])
+  @@map("payroll_tax_bands")
+}
+
+model PayrollContributionScheme {
+  id String @id @default(cuid())
+  schoolId String?
+  key String
+  label String
+  trustee String?
+  base PayrollContributionBase
+  employeeRate Decimal @db.Decimal(6, 3)
+  employerRate Decimal @db.Decimal(6, 3)
+  memoRate Decimal @default(0) @db.Decimal(6, 3)
+  insurableMin Decimal? @db.Decimal(15, 2)
+  insurableMax Decimal? @db.Decimal(15, 2)
+  employeeShareTaxDeductible Boolean @default(true)
+  effectiveFrom DateTime @db.Date
+  effectiveTo DateTime? @db.Date
+  status PayrollSettingStatus @default(DRAFT)
+  sourceNote String?
+  approvedById String?
+  @@index([schoolId, key, effectiveFrom])
+  @@map("payroll_contribution_schemes")
+}
