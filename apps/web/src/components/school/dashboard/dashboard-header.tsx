@@ -4,12 +4,7 @@ import { ThemeToggle } from "@/components/school/theme-toggle";
 import { SchoolRoleSwitcher } from "@/components/school/school-role-switcher";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 
-interface DashboardHeaderProps {
-  userName?: string | null;
-}
-
-export function DashboardHeader({
-}: DashboardHeaderProps) {
+export function DashboardHeader() {
   return (
     <header className="sticky top-0 z-10 grid grid-cols-[auto_1fr_auto] items-center gap-2 border-b border-border bg-card/90 px-3 py-2.5 backdrop-blur  sm:px-6 md:px-8 min-h-[4.5rem]">
       
@@ -31,11 +26,11 @@ export function DashboardHeader({
         </div>
       </div>
 
-      {/* 3. Right side: Theme toggle, Notifications, Role switcher & Search */}
+      {/* 3. Right side: Theme toggle, Notifications and Role switcher */}
       <div className="flex items-center gap-2 justify-end">
         
         {/* Role switcher: Hidden on smaller screens, shows up on large screens */}
-        <div className="hidden lg:block shrink-0">
+        <div className="min-w-0 shrink-0">
           <SchoolRoleSwitcher />
         </div>
 
