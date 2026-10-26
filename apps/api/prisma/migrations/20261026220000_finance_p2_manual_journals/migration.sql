@@ -61,6 +61,10 @@ CREATE FUNCTION finance_manual_journal_line_guard() RETURNS trigger AS $$
 DECLARE target_status "FinanceManualJournalStatus";
 DECLARE target_id TEXT;
 BEGIN
+  IF current_setting('app.finance_archive_purge', true) = 'on' THEN
+    IF TG_OP = 'DELETE' THEN RETURN OLD; END IF;
+    RETURN NEW;
+  END IF;
   IF TG_OP = 'DELETE' THEN target_id := OLD."journalId";
   ELSE target_id := NEW."journalId"; END IF;
   SELECT "status" INTO target_status FROM "finance_manual_journals"
