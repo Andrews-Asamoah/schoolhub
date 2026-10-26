@@ -28,6 +28,18 @@ interface FinanceSummary {
   byClass: { classId: string | null; className: string; billed: string; collected: string; outstanding: string; billCount: number }[];
   ageing: { days0To30: string; days31To60: string; days61To90: string; days90Plus: string; notDue: string };
 }
+interface HistoricalReceivables {
+  asOf: string;
+  complete: boolean;
+  warning: string | null;
+  billed: string;
+  collected: string;
+  outstanding: string;
+  ageing: { notDue: string; days0To30: string; days31To60: string; days61To90: string; days90Plus: string };
+  exceptions: { reference: string; issue: string }[];
+  students: { studentId: string; admissionNumber: string | null; balance: string; invoiceCount: number }[];
+  invoices: { billId: string; billNumber: string; studentId: string; admissionNumber: string | null; issuedAt: string; dueDate: string | null; billed: string; collected: string; outstanding: string; daysOverdue: number | null }[];
+}
 const money = (value: string | number) => new Intl.NumberFormat("en-GH", { style: "currency", currency: "GHS", maximumFractionDigits: 2 }).format(Number(value) || 0);
 const inputClass = "h-10 w-full rounded-xl border border-border bg-background px-3 text-sm text-foreground outline-none focus:ring-2 focus:ring-ring/30";
 const secondaryButton = "inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-border bg-card px-4 py-2 text-sm font-semibold text-foreground transition hover:bg-muted disabled:opacity-50";
@@ -36,6 +48,15 @@ export function AccountantFinanceReportingWorkspace() {
   const [yearId, setYearId] = useState("");
   const [termId, setTermId] = useState("");
   const [scope, setScope] = useState<"term" | "year" | "all">("term");
+  const [historyDate, setHistoryDate] = useState("");
+  const historicalQuery = useQuery({
+    queryKey: ["finance", "historical-receivables", historyDate],
+    queryFn: () => apiFetch<HistoricalReceivables>("/finance/receivables/history?asOf=" + encodeURIComponent(historyDate)),
+    enabled: Boolean(historyDate),
+    staleTime: 0,
+    retry: false,
+  });
+
   const yearsQuery = useQuery({
     queryKey: ["schools", "academic-years"],
     queryFn: () => apiFetch<AcademicYear[]>("/schools/academic-years"),
@@ -153,6 +174,37 @@ export function AccountantFinanceReportingWorkspace() {
         {scope === "term" ? <select className={inputClass} value={selectedTermId} onChange={(event) => setTermId(event.target.value)} aria-label="Academic term">{(selectedYear?.terms ?? []).map((term) => <option key={term.id} value={term.id}>{term.name}</option>)}</select> : <div />}
       </div>
     </div>
+    <section className="rounded-2xl border border-border bg-card p-5">
+      <h3 className="text-lg font-semibold text-foreground">Historical receivables ledger</h3>
+      <p className="mt-1 text-sm text-muted-foreground">Reconstruct invoice balances, payments and reversals as of a chosen date. This is distinct from today's open receivables.</p>
+      <div className="mt-3 flex flex-wrap items-center gap-3">
+        <label htmlFor="historical-as-of" className="text-sm text-muted-foreground">Balance as of</label>
+        <input id="historical-as-of" className={inputClass} style={{ maxWidth: 230 }} type="date" max={new Date().toISOString().slice(0, 10)} value={historyDate} onChange={(event) => setHistoryDate(event.target.value)} />
+      </div>
+      {historicalQuery.isPending && historyDate && <p role="status" className="mt-3 text-sm text-muted-foreground">Reconstructing historical ledger…</p>}
+      {historicalQuery.isError && <p role="alert" className="mt-3 text-sm text-destructive">{historicalQuery.error.message}</p>}
+      {historicalQuery.data && <div className="mt-4 space-y-4">
+        {!historicalQuery.data.complete && <div role="alert" className="rounded-xl border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+          <p className="font-semibold">Provisional historical totals — do not use for audited close-out</p>
+          <p>{historicalQuery.data.warning}</p>
+          <ul className="mt-2 list-disc pl-5">{historicalQuery.data.exceptions.slice(0, 15).map((row, index) => <li key={index}>{row.reference}: {row.issue}</li>)}</ul>
+          {historicalQuery.data.exceptions.length > 15 && <p>{historicalQuery.data.exceptions.length - 15} additional exceptions</p>}
+        </div>}
+        <div className="grid gap-3 sm:grid-cols-3">
+          {([["Historical billed",historicalQuery.data.billed],["Payments applied",historicalQuery.data.collected],["Historical outstanding",historicalQuery.data.outstanding]] as const).map(([label, value]) => <div key={label} className="rounded-xl bg-muted/40 p-4"><p className="text-sm text-muted-foreground">{label}</p><p className="mt-1 text-lg font-semibold tabular-nums">{money(value)}</p></div>)}
+        </div>
+        <p className="text-sm text-muted-foreground">As at {historicalQuery.data.asOf}. Not yet due: {money(historicalQuery.data.ageing.notDue)}; 1–30 days: {money(historicalQuery.data.ageing.days0To30)}; 31–60 days: {money(historicalQuery.data.ageing.days31To60)}; 61–90 days: {money(historicalQuery.data.ageing.days61To90)}; over 90 days: {money(historicalQuery.data.ageing.days90Plus)}.</p>
+        <DataTable rows={historicalQuery.data.invoices} columns={[
+          { id: "bill", header: "Invoice", cell: (row) => row.billNumber, value: (row) => row.billNumber },
+          { id: "student", header: "Student", cell: (row) => row.admissionNumber ?? row.studentId, value: (row) => row.admissionNumber ?? row.studentId },
+          { id: "issued", header: "Issued", cell: (row) => row.issuedAt, value: (row) => row.issuedAt },
+          { id: "due", header: "Due", cell: (row) => row.dueDate ?? "—", value: (row) => row.dueDate ?? "" },
+          { id: "billed", header: "Billed", cell: (row) => money(row.billed), value: (row) => Number(row.billed) },
+          { id: "collected", header: "Applied", cell: (row) => money(row.collected), value: (row) => Number(row.collected) },
+          { id: "balance", header: "Balance", cell: (row) => money(row.outstanding), value: (row) => Number(row.outstanding) },
+        ] satisfies DataTableColumn<HistoricalReceivables["invoices"][number]>[]} getRowId={(row) => row.billId} embedded exportTitle="Historical receivables" searchable={false} emptyTitle="No historical invoices" emptyDescription="There are no invoices on or before this date." />
+      </div>}
+    </section>
     {summaryQuery.isPending || yearsQuery.isPending ? <div role="status" className="flex items-center justify-center gap-2 rounded-xl border border-border bg-card py-12 text-sm text-muted-foreground"><LoaderCircle className="size-4 animate-spin" /> Calculating report from saved records…</div> : null}
     {summaryQuery.isError ? <div role="alert" className="rounded-xl border border-destructive/25 bg-destructive/5 p-4 text-sm text-destructive">The finance report could not be loaded. {summaryQuery.error.message}</div> : null}
     {summary && <div className="finance-report-print space-y-5">
