@@ -248,6 +248,27 @@ export class FinanceController {
     return this.financeService.updateFeeItemRegistry(school.id, itemId, body);
   }
 
+  @Get("ledger/accrual-cutover")
+  @Roles(...FINANCE_READ_ROLES)
+  getAccrualCutoverPreflight(@CurrentSchool() school: School) {
+    return this.financeService.getAccrualCutoverPreflight(school.id);
+  }
+
+  @Post("ledger/accrual-cutover")
+  @Roles(...FINANCE_WRITE_ROLES)
+  @FinanceSelfAudited()
+  activateAccrualCutover(
+    @CurrentSchool() school: School,
+    @CurrentUser() user: AuthenticatedUser,
+    @Body(new ZodValidationPipe(z.object({
+      approvalReference: z.string().trim().min(8).max(160),
+      expectedOpeningReceivables: z.string().regex(/^\\d+(?:\\.\\d{1,2})?$/),
+      confirmInvoiceRevenuePolicy: z.literal(true),
+    }))) body: { approvalReference: string; expectedOpeningReceivables: string; confirmInvoiceRevenuePolicy: true },
+  ) {
+    return this.financeService.activateAccrualCutover(school.id, user.id, body);
+  }
+
   @Get("ledger/close-readiness")
   @Roles(...FINANCE_READ_ROLES)
   getReceivablesCloseReadiness(@CurrentSchool() school: School) {
