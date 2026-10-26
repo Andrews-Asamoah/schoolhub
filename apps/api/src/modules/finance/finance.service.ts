@@ -1803,8 +1803,24 @@ export class FinanceService {
             referenceNumber: payment.paymentNumber,
           },
         });
-        await tx.chartAccount.update({ where: { id: original.debitAccountId }, data: { balance: { decrement: original.amount } } });
-        await tx.chartAccount.update({ where: { id: original.creditAccountId }, data: { balance: { decrement: original.amount } } });
+        const [originalDebit, originalCredit] = await Promise.all([
+          tx.chartAccount.findUniqueOrThrow({ where: { id: original.debitAccountId }, select: { accountType: true } }),
+          tx.chartAccount.findUniqueOrThrow({ where: { id: original.creditAccountId }, select: { accountType: true } }),
+        ]);
+        // Undo each side using the account's natural balance, not an assumption
+        // that the receipt's credit always represents revenue. Accrual receipts
+        // credit A/R (an asset), which must INCREASE when the receipt is reversed.
+        const debitInitiallyIncreased = originalDebit.accountType === "ASSET" || originalDebit.accountType === "EXPENSE";
+        const creditInitiallyIncreased = originalCredit.accountType === "LIABILITY" ||
+          originalCredit.accountType === "EQUITY" || originalCredit.accountType === "REVENUE";
+        await tx.chartAccount.update({
+          where: { id: original.debitAccountId },
+          data: { balance: debitInitiallyIncreased ? { decrement: original.amount } : { increment: original.amount } },
+        });
+        await tx.chartAccount.update({
+          where: { id: original.creditAccountId },
+          data: { balance: creditInitiallyIncreased ? { decrement: original.amount } : { increment: original.amount } },
+        });
         reversalTransactionId = reversal.id;
       }
 
