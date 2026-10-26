@@ -999,6 +999,12 @@ export class FinanceService {
       }
       const billableItems = feeStructure.items.filter((item) => !item.isOptional || optionalIds.has(item.id));
       if (billableItems.length === 0) throw new BadRequestException("Select at least one fee item to generate this bill.");
+      // P3 revenue schedules are not yet journal-backed. Refuse to issue a term-spanning
+      // invoice as immediately earned revenue simply because the old bill path lacks
+      // deferral handling. Existing AT_INVOICE billing remains unchanged.
+      if (billableItems.some(item => item.recognitionMethod !== "AT_INVOICE")) {
+        throw new ConflictException("Deferred-revenue fee items are not ready for billing until P3 recognition posting is activated and reconciled.");
+      }
       if (
         input.classId &&
         feeStructure.targetClasses.length > 0 &&

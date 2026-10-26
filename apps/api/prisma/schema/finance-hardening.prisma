@@ -49,6 +49,9 @@ model FinanceSettings {
   budgetControlMode FinanceBudgetControlMode @default(OFF)
   revenuePolicyApprovedAt DateTime?
   revenuePolicyApprovedBy String?
+  p3AdjustmentsEnabled Boolean @default(false)
+  p3CreditsEnabled Boolean @default(false)
+  p3DeferredRevenueEnabled Boolean @default(false)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   school School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
