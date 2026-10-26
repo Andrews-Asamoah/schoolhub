@@ -21,6 +21,7 @@ model ChartAccount {
   children           ChartAccount[] @relation("AccountHierarchy")
   creditTransactions Transaction[]  @relation("CreditAccount")
   debitTransactions  Transaction[]  @relation("DebitAccount")
+  financePurposeMappings FinanceAccountMapping[]
 
   @@unique([code, schoolId])
   @@index([schoolId, accountType])

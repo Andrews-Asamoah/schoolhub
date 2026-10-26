@@ -1,0 +1,38 @@
+// P2 account-purpose assignments. Monetary posting may use only an independently
+// verified, school-scoped, date-effective mapping for the required system purpose.
+enum FinanceAccountPurpose {
+  STUDENT_RECEIVABLE
+  FEE_REVENUE
+  BAD_DEBT_EXPENSE
+  CONCESSION_EXPENSE
+  DEFERRED_REVENUE
+  STUDENT_CREDIT_LIABILITY
+}
+
+enum FinanceAccountMappingStatus {
+  DRAFT
+  ACTIVE
+  RETIRED
+}
+
+model FinanceAccountMapping {
+  id           String @id @default(cuid())
+  schoolId     String
+  purpose      FinanceAccountPurpose
+  accountId    String
+  effectiveFrom DateTime @db.Date
+  effectiveTo  DateTime? @db.Date
+  status       FinanceAccountMappingStatus @default(DRAFT)
+  sourceNote   String
+  createdById  String
+  approvedById String?
+  approvedAt   DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  account ChartAccount @relation(fields: [accountId], references: [id], onDelete: Restrict)
+
+  @@unique([schoolId, purpose, effectiveFrom])
+  @@index([schoolId, purpose, status])
+  @@map("finance_account_mappings")
+}
