@@ -1491,6 +1491,25 @@ export class FinanceService {
         }
         if (billAmounts.size === 0 && payment.billId) billAmounts.set(payment.billId, payment.amount);
       }
+      // Reconcile the original receipt before touching any balance. A mismatch
+      // indicates corrupt/partial allocation history; never silently clamp it.
+      const appliedToBills = [...billAmounts.values()].reduce(
+        (total, value) => total.plus(value), new Prisma.Decimal(0),
+      );
+      if (billAmounts.size === 0 || !appliedToBills.eq(payment.amount)) {
+        throw new ConflictException("Receipt allocations do not reconcile to the payment amount. No reversal was applied.");
+      }
+      if (payment.paymentItems.length) {
+        const appliedToItems = payment.paymentItems.reduce(
+          (total, item) => total.plus(item.amount), new Prisma.Decimal(0),
+        );
+        if (!appliedToItems.eq(appliedToBills)) {
+          throw new ConflictException("Receipt item allocations do not match its bill allocations. No reversal was applied.");
+        }
+      }
+      if (payment.transaction && !payment.transaction.amount.eq(payment.amount)) {
+        throw new ConflictException("The receipt and its accounting entry have different amounts. No reversal was applied.");
+      }
       const billIds = [...billAmounts.keys()].sort();
       if (billIds.length) {
         await tx.$executeRaw`
@@ -1517,9 +1536,15 @@ export class FinanceService {
           where: { id: billItemId, bill: { schoolId, studentId: payment.studentId } },
         });
         if (!item) throw new ConflictException("The original bill-item allocation is missing. No reversal was applied.");
-        const nextPaid = Prisma.Decimal.max(0, item.paidAmount.minus(allocatedAmount));
+        if (item.paidAmount.lt(allocatedAmount)) {
+          throw new ConflictException("Bill item has less paid value than the receipt being reversed.");
+        }
+        const nextPaid = item.paidAmount.minus(allocatedAmount);
         const netTotal = item.totalAmount.minus(item.discountAmount);
-        const nextBalance = Prisma.Decimal.min(netTotal, item.balanceAmount.plus(allocatedAmount));
+        if (item.balanceAmount.plus(allocatedAmount).gt(netTotal)) {
+          throw new ConflictException("Reversal would exceed the bill item's net amount.");
+        }
+        const nextBalance = item.balanceAmount.plus(allocatedAmount);
         await tx.billItem.update({
           where: { id: item.id },
           data: {
@@ -1532,8 +1557,14 @@ export class FinanceService {
       for (const [billId, allocatedAmount] of billAmounts) {
         const bill = billsById.get(billId);
         if (!bill) throw new ConflictException("The original bill allocation is missing. No reversal was applied.");
-        const paid = Prisma.Decimal.max(0, bill.paidAmount.minus(allocatedAmount));
-        const balance = Prisma.Decimal.min(bill.totalAmount, bill.balanceAmount.plus(allocatedAmount));
+        if (bill.paidAmount.lt(allocatedAmount)) {
+          throw new ConflictException("Bill has less paid value than the receipt being reversed.");
+        }
+        const paid = bill.paidAmount.minus(allocatedAmount);
+        if (bill.balanceAmount.plus(allocatedAmount).gt(bill.totalAmount)) {
+          throw new ConflictException("Reversal would exceed the billed amount.");
+        }
+        const balance = bill.balanceAmount.plus(allocatedAmount);
         await tx.bill.update({
           where: { id: bill.id },
           data: {
