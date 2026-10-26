@@ -26,6 +26,8 @@ import { PeopleModule } from "./modules/people/people.module.js";
 import { AdmissionsModule } from "./modules/admissions/admissions.module.js";
 import { AnnouncementsModule } from "./modules/announcements/announcements.module.js";
 import { NotificationsModule } from "./modules/notifications/notifications.module.js";
+import { DocumentsModule } from "./modules/documents/documents.module.js";
+import { MessagesModule } from "./modules/messages/messages.module.js";
 import { InventoryModule } from "./modules/inventory/inventory.module.js";
 import { DashboardModule } from "./modules/dashboard/dashboard.module.js";
 
@@ -54,6 +56,8 @@ import { DashboardModule } from "./modules/dashboard/dashboard.module.js";
     AdmissionsModule,
     AnnouncementsModule,
     NotificationsModule,
+    DocumentsModule,
+    MessagesModule,
     InventoryModule,
     DashboardModule,
   ],
