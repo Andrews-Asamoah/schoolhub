@@ -27,13 +27,15 @@ interface SidebarContextValue {
 const SidebarContext = createContext<SidebarContextValue | null>(null);
 
 export function SidebarProvider({ children }: { children: ReactNode }) {
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(() => {
+    try { return typeof window !== "undefined" && window.localStorage.getItem(SIDEBAR_STORAGE_KEY) === "true"; }
+    catch { return false; }
+  });
   const [mobileOpen, setMobileOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [openFlyout, setOpenFlyout] = useState<string | null>(null);
 
   useEffect(() => {
-    try { setCollapsed(window.localStorage.getItem(SIDEBAR_STORAGE_KEY) === "true"); } catch { /* private browsing */ }
     const media = window.matchMedia("(max-width: 767px)");
     const update = () => {
       setIsMobile(media.matches);
