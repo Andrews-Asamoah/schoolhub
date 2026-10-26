@@ -486,6 +486,38 @@ describe.skipIf(!enabled)("finance (database)", { timeout: 60_000 }, () => {
     });
   });
 
+  describe("accounts receivable pre-close reconciliation", () => {
+    it("does not certify close readiness when billing receivables are not journalled", async () => {
+      const { student, bill } = await studentWithBill(500);
+      await pay(student.id, bill.id, 100);
+      const result = await service.getReceivablesCloseReadiness(schoolId);
+      expect(result.openInvoices).not.toBe("0.00");
+      expect(result.closeReady).toBe(false);
+      expect(result.reportingOnly).toBe(true);
+      expect(result.checks.find((check) => check.code === "STUDENT_TO_INVOICE")?.status).toBe("PASS");
+      expect(result.checks.find((check) => check.code === "AR_CONTROL_ACCOUNT")?.status).not.toBe("PASS");
+    });
+
+    it("flags a student balance mismatch without changing financial records", async () => {
+      const { student, bill } = await studentWithBill(250);
+      await prisma.student.update({
+        where: { id: student.id },
+        data: { outstandingBalance: new Prisma.Decimal("249.99") },
+      });
+      const result = await service.getReceivablesCloseReadiness(schoolId);
+      expect(result.checks.find((check) => check.code === "STUDENT_TO_INVOICE")?.status).toBe("FAIL");
+      expect(result.closeReady).toBe(false);
+      expect((await prisma.bill.findUniqueOrThrow({ where: { id: bill.id } })).balanceAmount.toFixed(2)).toBe("250.00");
+    });
+
+    it("does not disclose another school's accounts", async () => {
+      const other = await service.getReceivablesCloseReadiness("unrelated-school-id");
+      expect(other.openInvoiceCount).toBe(0);
+      expect(other.receivableAccounts).toHaveLength(0);
+      expect(other.openInvoices).toBe("0.00");
+    });
+  });
+
   describe("posted-journal trial balance", () => {
     it("balances debits and credits after receiving school fees, without claiming accrual completeness", async () => {
       const { student, bill } = await studentWithBill(100);
