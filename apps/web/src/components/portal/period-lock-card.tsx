@@ -1,3 +1,4 @@
+import { DatePicker } from "@/components/ui/date-picker";
 import { useState, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Lock } from "lucide-react";
@@ -72,7 +73,7 @@ export function PeriodLockCard() {
         <form onSubmit={submit} className="mt-4 grid gap-3 sm:grid-cols-[200px_1fr_auto] sm:items-end">
           <label className="text-sm font-medium">
             Close books through
-            <input type="date" required className={inputClass} value={date} max={new Date().toISOString().slice(0, 10)} onChange={(event) => setDate(event.target.value)} />
+            <DatePicker required buttonClassName={inputClass} value={date} max={new Date().toISOString().slice(0, 10)} onChange={(value) => setDate(value)} />
           </label>
           <label className="text-sm font-medium">
             Reason
