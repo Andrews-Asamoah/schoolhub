@@ -248,6 +248,12 @@ export class FinanceController {
     return this.financeService.updateFeeItemRegistry(school.id, itemId, body);
   }
 
+  @Get("ledger/close-readiness")
+  @Roles(...FINANCE_READ_ROLES)
+  getReceivablesCloseReadiness(@CurrentSchool() school: School) {
+    return this.financeService.getReceivablesCloseReadiness(school.id);
+  }
+
   @Get("ledger/trial-balance")
   @Roles(...FINANCE_READ_ROLES)
   getJournalTrialBalance(
