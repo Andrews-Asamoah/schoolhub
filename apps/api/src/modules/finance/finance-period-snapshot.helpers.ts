@@ -23,8 +23,8 @@ export function buildPeriodSnapshot(inputs: readonly PeriodMovementInput[], scop
   schoolId: string; startDate: string; endDate: string;
 }) {
   if (!scope.schoolId.trim() ||
-      !/^\\d{4}-\\d{2}-\\d{2}$/.test(scope.startDate) ||
-      !/^\\d{4}-\\d{2}-\\d{2}$/.test(scope.endDate) ||
+      !/^\d{4}-\d{2}-\d{2}$/.test(scope.startDate) ||
+      !/^\d{4}-\d{2}-\d{2}$/.test(scope.endDate) ||
       scope.startDate > scope.endDate) {
     throw new Error("A valid school and accounting-period scope are required to hash a snapshot.");
   }
