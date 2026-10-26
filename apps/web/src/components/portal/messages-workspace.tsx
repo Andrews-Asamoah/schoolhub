@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Inbox, LoaderCircle, Mail, MailOpen, MessageSquare, Plus, Reply, Search, Send, UserRound, X } from "lucide-react";
-import { useMemo, useState, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 import { PortalModal } from "./portal-modal";
 import { EmptyState, ErrorState } from "@/components/ui/empty-state";
 import { useSchoolRole } from "@/components/school/school-role-switcher";
@@ -50,7 +50,7 @@ export function MessagesWorkspace() {
   const inboxQuery = useQuery({
     queryKey: ["messages", "inbox"],
     queryFn: () => apiFetch<SchoolMessage[]>("/messages/inbox"),
-    enabled: folder === "inbox",
+    enabled: true,
     retry: false,
   });
   const sentQuery = useQuery({
@@ -96,7 +96,6 @@ export function MessagesWorkspace() {
   const selected = items.find((item) => item.id === selectedId) ?? items[0] ?? null;
   const contacts = contactsQuery.data ?? [];
   const unreadCount = (inboxQuery.data ?? []).filter((item) => item.recipients.some((receipt) => !receipt.isRead)).length;
-  const selectedContactNames = useMemo(() => selected?.recipients.map((receipt) => receipt.recipient?.name).filter((name): name is string => Boolean(name)).join(", ") ?? "", [selected]);
 
   function changeFolder(next: Folder) {
     setFolder(next);
@@ -149,7 +148,7 @@ export function MessagesWorkspace() {
           <div className="max-h-[620px] overflow-y-auto">
             {query.isPending ? <div className="flex items-center justify-center gap-2 p-10 text-xs text-muted-foreground"><LoaderCircle className="size-4 animate-spin" />Loading messages…</div>
             : items.length === 0 ? <EmptyState icon={Mail} title={folder === "inbox" ? "Your inbox is empty" : "No sent messages"} description={folder === "inbox" ? "Messages sent to you by school members will appear here." : "Messages you send will be listed here."} compact className="m-3" />
-            : items.map((item) => <button key={item.id} type="button" onClick={() => openMessage(item)} className={`block w-full border-b border-border px-4 py-3.5 text-left transition hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring ${selected?.id === item.id ? "bg-primary/5" : ""}`}><div className="flex items-start justify-between gap-2"><p className={`line-clamp-1 text-xs ${folder === "inbox" && item.recipients.some((receipt) => !receipt.isRead) ? "font-bold text-foreground" : "font-medium text-foreground"}`}>{folder === "inbox" ? item.sender.name : selectedContactNames && selected?.id === item.id ? selectedContactNames : item.recipients.map((receipt) => receipt.recipient?.name).filter(Boolean).join(", ") || "Recipients"}</p><time className="shrink-0 text-[10px] text-muted-foreground">{new Intl.DateTimeFormat("en-GH", { dateStyle: "short" }).format(new Date(item.createdAt))}</time></div><p className="mt-1 truncate text-sm font-semibold text-foreground">{item.subject}</p><p className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">{item.body}</p></button>)}
+            : items.map((item) => <button key={item.id} type="button" onClick={() => openMessage(item)} className={`block w-full border-b border-border px-4 py-3.5 text-left transition hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring ${selected?.id === item.id ? "bg-primary/5" : ""}`}><div className="flex items-start justify-between gap-2"><p className={`line-clamp-1 text-xs ${folder === "inbox" && item.recipients.some((receipt) => !receipt.isRead) ? "font-bold text-foreground" : "font-medium text-foreground"}`}>{folder === "inbox" ? item.sender.name : item.recipients.map((receipt) => receipt.recipient?.name).filter(Boolean).join(", ") || "Recipients"}</p><time className="shrink-0 text-[10px] text-muted-foreground">{new Intl.DateTimeFormat("en-GH", { dateStyle: "short" }).format(new Date(item.createdAt))}</time></div><p className="mt-1 truncate text-sm font-semibold text-foreground">{item.subject}</p><p className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">{item.body}</p></button>)}
           </div>
         </div>
 
