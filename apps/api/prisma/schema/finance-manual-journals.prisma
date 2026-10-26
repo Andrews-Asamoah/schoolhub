@@ -32,6 +32,8 @@ model FinanceManualJournal {
   reason         String?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
+  reversalOf     FinanceManualJournal? @relation("ManualJournalReversal", fields: [reversalOfId], references: [id], onDelete: Restrict)
+  reversal       FinanceManualJournal? @relation("ManualJournalReversal")
   lines          FinanceManualJournalLine[]
   postings       FinanceManualJournalPosting[]
 
