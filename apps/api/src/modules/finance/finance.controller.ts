@@ -16,6 +16,7 @@ import {
 } from "@nestjs/common";
 import type { Request, Response } from "express";
 import { FinanceService } from "./finance.service.js";
+import { FinanceLedgerIntegrityService } from "./finance-ledger-integrity.service.js";
 import { FinanceExportsService, type FinanceExportContext, type FinanceExportFile } from "./finance-exports.service.js";
 import { SchoolTenantGuard } from "../../common/guards/school-tenant.guard.js";
 import { RolesGuard } from "../../common/guards/roles.guard.js";
@@ -136,8 +137,15 @@ export class FinanceController {
   constructor(
     private readonly financeService: FinanceService,
     private readonly financeExports: FinanceExportsService,
+    private readonly ledgerIntegrity: FinanceLedgerIntegrityService,
   ) {}
 
+
+  @Get("ledger/integrity")
+  @Roles(...FINANCE_READ_ROLES)
+  getLedgerIntegrity(@CurrentSchool() school: School) {
+    return this.ledgerIntegrity.check(school.id);
+  }
 
   @Get("concessions")
   @Roles(...FINANCE_READ_ROLES)
