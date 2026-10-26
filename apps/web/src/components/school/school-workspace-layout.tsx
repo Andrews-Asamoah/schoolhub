@@ -5,6 +5,7 @@ import { useEffect, type ReactNode } from "react";
 import { apiFetch } from "@/lib/api";
 import { useSession } from "@/lib/auth-client";
 import { SchoolSidebar } from "@/components/school/school-sidebar";
+import { PageContainer } from "@/components/ui/page-container";
 import { AcademicContextSwitcher } from "@/components/school/academic-context-switcher";
 import {
   useSchoolOrganization,
@@ -146,7 +147,7 @@ export function SchoolWorkspaceLayout({
           </header>
 
           {/* Main Dashboard Workspace Body */}
-          <main className="mx-auto w-full max-w-[1500px] px-4 py-6 sm:px-6 sm:py-8 lg:px-8 lg:py-10">
+          <PageContainer>
             <TwoFactorNudge />
 
             {organizationLoading && (
@@ -198,7 +199,7 @@ export function SchoolWorkspaceLayout({
               organizations.length === 1 &&
               activeOrganization &&
               children}
-          </main>
+          </PageContainer>
         </div>
       </div>
     </SidebarProvider>
