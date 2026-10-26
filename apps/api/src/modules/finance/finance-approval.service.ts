@@ -49,8 +49,8 @@ export class FinanceApprovalService {
     return this.prisma.client.$transaction(async tx => {
       const approval = await tx.financeApprovalRequest.findFirst({ where: { id: requestId, schoolId, status: "PENDING" } });
       if (!approval) throw new NotFoundException("Pending approval not found.");
-      const settings = await tx.financeSettings.findUnique({ where: { schoolId } });
-      if (actorId === approval.requestedById && !settings?.allowSelfApproval) {
+      // Maker-checker is mandatory. Historical allowSelfApproval settings are ignored.
+      if (actorId === approval.requestedById) {
         throw new ForbiddenException("The requester cannot approve their own financial change.");
       }
       if (approval.payloadHash !== approvalPayloadHash(payload)) throw new ConflictException("The financial details changed since approval was requested.");
@@ -67,7 +67,9 @@ export class FinanceApprovalService {
     const approved = await this.prisma.client.financeApprovalRequest.findFirst({
       where: { schoolId, entityType, entityId, status: "APPROVED", payloadHash: approvalPayloadHash(payload) },
     });
-    if (!approved) throw new ForbiddenException("An independent approval is required.");
+    if (!approved || !approved.decidedById || approved.decidedById === approved.requestedById) {
+      throw new ForbiddenException("A distinct reviewer must approve this financial change.");
+    }
     return approved;
   }
 }
