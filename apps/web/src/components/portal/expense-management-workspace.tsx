@@ -62,6 +62,20 @@ const primaryButton = "inline-flex min-h-10 items-center justify-center gap-2 ro
 const secondaryButton = "inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-border bg-card px-4 py-2 text-sm font-semibold text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50";
 const freshDraft = (): ExpenseDraft => ({ date: today(), amount: "", description: "", payee: "", category: "OTHER", paymentMethod: "CASH", registryCategoryId: "", voucherNumber: "", checkNumber: "", referenceNumber: "" });
 
+function totalExpenseCents(rows: readonly ExpenseRecord[]): number {
+  const cents = rows.reduce((sum, row) => {
+    const raw = String(row.amount).trim();
+    const match = /^(-?)(\d+)(?:\.(\d{1,2}))?$/.exec(raw);
+    if (!match) throw new Error("Invalid expense amount returned by the server.");
+    const value = BigInt(match[2]!) * 100n + BigInt((match[3] ?? "").padEnd(2, "0"));
+    return sum + (match[1] ? -value : value);
+  }, 0n);
+  if (cents > BigInt(Number.MAX_SAFE_INTEGER) || cents < BigInt(-Number.MAX_SAFE_INTEGER)) {
+    throw new Error("Expense total exceeds safe display precision.");
+  }
+  return Number(cents) / 100;
+}
+
 export function ExpenseManagementWorkspace() {
   const { canWrite } = useFinanceAccess();
   const queryClient = useQueryClient();
@@ -243,7 +257,7 @@ export function ExpenseManagementWorkspace() {
 { id: "method", header: "Method", cell: (expense) => <><span className="rounded-full bg-muted px-2.5 py-1 text-[10px] font-semibold">{label(expense.paymentMethod)}</span>{expense.checkNumber && <p className="mt-1 text-[10px] text-muted-foreground">Cheque {expense.checkNumber}</p>}</>, value: (expense) => expense.paymentMethod },
 { id: "amount", header: "Amount", cell: (expense) => currency(Number(expense.amount)), value: (expense) => Number(expense.amount), className: "text-right font-semibold tabular-nums" },
 { id: "actions", header: "Actions", cell: (expense) => <button type="button" className="text-xs font-semibold text-primary hover:underline" onClick={() => setSelectedExpense(expense)}>Details / voucher</button>, sortable: false }
-] satisfies DataTableColumn<ExpenseRecord>[]} getRowId={(expense) => expense.id} emptyTitle="No expenses" emptyDescription="No expenses match these filters." exportTitle="Expenses" searchable={false} embedded /><p className="mt-3 text-right text-xs font-semibold text-muted-foreground">Filtered total: <span className="font-bold text-foreground">{currency(visibleExpenses.reduce((sum, expense) => sum + Number(expense.amount), 0))}</span></p></div> : <EmptyState title="No expenses found" description="Adjust the dates or filters, or record the first expense for this period." onAction={() => { setDraft(freshDraft()); setShowExpenseForm(true); }} />}
+] satisfies DataTableColumn<ExpenseRecord>[]} getRowId={(expense) => expense.id} emptyTitle="No expenses" emptyDescription="No expenses match these filters." exportTitle="Expenses" searchable={false} embedded /><p className="mt-3 text-right text-xs font-semibold text-muted-foreground">Filtered total: <span className="font-bold text-foreground">{currency(totalExpenseCents(visibleExpenses))}</span></p></div> : <EmptyState title="No expenses found" description="Adjust the dates or filters, or record the first expense for this period." onAction={() => { setDraft(freshDraft()); setShowExpenseForm(true); }} />}
         </div>
         <aside className="rounded-2xl border border-border bg-card p-4 shadow-sm sm:p-5"><h2 className="font-semibold text-foreground">Spending by category</h2><p className="mt-1 text-xs text-muted-foreground">Based on records in the selected dates.</p>{expensesQuery.isPending ? <LoadingState /> : groupedCategories.length ? <div className="mt-4 space-y-4">{groupedCategories.slice(0, 8).map(([name, total]) => <div key={name}><div className="flex items-start justify-between gap-3 text-sm"><span className="min-w-0 break-words text-foreground">{name}</span><span className="shrink-0 font-semibold tabular-nums text-foreground">{currency(total)}</span></div><div className="mt-1.5 h-2 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-primary" style={{ width: `${periodTotal > 0 ? Math.min(100, total / periodTotal * 100) : 0}%` }} /></div></div>)}</div> : <p className="mt-4 rounded-xl bg-muted/30 p-4 text-sm text-muted-foreground">Category totals will appear when expenses are recorded.</p>}</aside>
       </section>

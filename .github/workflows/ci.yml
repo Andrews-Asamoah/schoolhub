@@ -65,7 +65,12 @@ jobs:
           pnpm --filter @schoolhub/api exec prisma generate --config prisma.config.ts
       - name: Baseline typecheck
         if: ${{ always() && steps.prepare.outcome == 'success' }}
-        run: pnpm typecheck
+        # Run workspaces sequentially. The API typecheck rebuilds @schoolhub/shared;
+        # running web concurrently can read declaration files while they are cleaned.
+        run: |
+          pnpm --filter @schoolhub/shared typecheck
+          pnpm --filter @schoolhub/api typecheck
+          pnpm --filter @schoolhub/web typecheck
       - name: Baseline web build
         if: ${{ always() && steps.prepare.outcome == 'success' }}
         run: pnpm --filter @schoolhub/web build

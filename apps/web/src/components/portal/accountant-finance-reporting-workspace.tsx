@@ -40,6 +40,23 @@ interface HistoricalReceivables {
   students: { studentId: string; admissionNumber: string | null; balance: string; invoiceCount: number }[];
   invoices: { billId: string; billNumber: string; studentId: string; admissionNumber: string | null; issuedAt: string; dueDate: string | null; billed: string; collected: string; outstanding: string; daysOverdue: number | null }[];
 }
+interface TrialBalance {
+  asOf: string;
+  basis: "POSTED_JOURNAL_ONLY";
+  accrualComplete: false;
+  warning: string;
+  totalDebits: string;
+  totalCredits: string;
+  difference: string;
+  balanced: boolean;
+  cachedAccountMismatchCount: number | null;
+  orphanAccountCount: number;
+  accounts: Array<{
+    accountId: string; code: string; name: string; accountType: string;
+    debit: string; credit: string; postedBalance: string;
+    cachedBalance: string; discrepancy: string;
+  }>;
+}
 const money = (value: string | number) => new Intl.NumberFormat("en-GH", { style: "currency", currency: "GHS", maximumFractionDigits: 2 }).format(Number(value) || 0);
 const inputClass = "h-10 w-full rounded-xl border border-border bg-background px-3 text-sm text-foreground outline-none focus:ring-2 focus:ring-ring/30";
 const secondaryButton = "inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-border bg-card px-4 py-2 text-sm font-semibold text-foreground transition hover:bg-muted disabled:opacity-50";
@@ -48,6 +65,13 @@ export function AccountantFinanceReportingWorkspace() {
   const [yearId, setYearId] = useState("");
   const [termId, setTermId] = useState("");
   const [scope, setScope] = useState<"term" | "year" | "all">("term");
+  const [trialBalanceVisible, setTrialBalanceVisible] = useState(false);
+  const trialBalanceQuery = useQuery({
+    queryKey: ["finance", "journal-trial-balance"],
+    queryFn: () => apiFetch<TrialBalance>("/finance/ledger/trial-balance"),
+    enabled: trialBalanceVisible,
+    retry: false,
+  });
   const [historyDate, setHistoryDate] = useState("");
   const historicalQuery = useQuery({
     queryKey: ["finance", "historical-receivables", historyDate],
@@ -203,6 +227,27 @@ export function AccountantFinanceReportingWorkspace() {
           { id: "collected", header: "Applied", cell: (row) => money(row.collected), value: (row) => Number(row.collected) },
           { id: "balance", header: "Balance", cell: (row) => money(row.outstanding), value: (row) => Number(row.outstanding) },
         ] satisfies DataTableColumn<HistoricalReceivables["invoices"][number]>[]} getRowId={(row) => row.billId} embedded exportTitle="Historical receivables" searchable={false} emptyTitle="No historical invoices" emptyDescription="There are no invoices on or before this date." />
+      </div>}
+    </section>
+    <section className="rounded-2xl border border-border bg-card p-5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div><h3 className="text-lg font-semibold text-foreground">Posted-journal trial balance</h3>
+        <p className="mt-1 text-sm text-muted-foreground">Double-entry verification of saved journal transactions. This is not yet a complete accrual-basis trial balance.</p></div>
+        <button type="button" className={secondaryButton} onClick={() => setTrialBalanceVisible((visible) => !visible)}>{trialBalanceVisible ? "Hide trial balance" : "View trial balance"}</button>
+      </div>
+      {trialBalanceVisible && trialBalanceQuery.isPending && <p role="status" className="mt-3 text-sm text-muted-foreground">Reconciling posted transactions…</p>}
+      {trialBalanceVisible && trialBalanceQuery.isError && <p role="alert" className="mt-3 text-sm text-destructive">{trialBalanceQuery.error.message}</p>}
+      {trialBalanceVisible && trialBalanceQuery.data && <div className="mt-4 space-y-3">
+        <p className="text-sm text-muted-foreground">{trialBalanceQuery.data.warning}</p>
+        <p className="text-sm font-semibold">Debit: {money(trialBalanceQuery.data.totalDebits)} · Credit: {money(trialBalanceQuery.data.totalCredits)} · Difference: {money(trialBalanceQuery.data.difference)} · {trialBalanceQuery.data.balanced ? "Journal balances" : "Journal discrepancy"}</p>
+        {trialBalanceQuery.data.cachedAccountMismatchCount !== null && trialBalanceQuery.data.cachedAccountMismatchCount > 0 && <p role="alert" className="text-sm text-destructive">{trialBalanceQuery.data.cachedAccountMismatchCount} account balances differ from the journal movements. Investigate opening balances and prior postings.</p>}
+        <DataTable rows={trialBalanceQuery.data.accounts} columns={[
+          { id: "code", header: "Code", cell: (row) => row.code, value: (row) => row.code },
+          { id: "account", header: "Account", cell: (row) => row.name, value: (row) => row.name },
+          { id: "type", header: "Type", cell: (row) => row.accountType, value: (row) => row.accountType },
+          { id: "debit", header: "Debit", cell: (row) => money(row.debit), value: (row) => Number(row.debit) },
+          { id: "credit", header: "Credit", cell: (row) => money(row.credit), value: (row) => Number(row.credit) },
+        ] satisfies DataTableColumn<TrialBalance["accounts"][number]>[]} getRowId={(row) => row.accountId} embedded searchable={false} exportTitle="Posted journal trial balance" emptyTitle="No journal accounts" emptyDescription="No chart-of-accounts records exist yet."/>
       </div>}
     </section>
     {summaryQuery.isPending || yearsQuery.isPending ? <div role="status" className="flex items-center justify-center gap-2 rounded-xl border border-border bg-card py-12 text-sm text-muted-foreground"><LoaderCircle className="size-4 animate-spin" /> Calculating report from saved records…</div> : null}

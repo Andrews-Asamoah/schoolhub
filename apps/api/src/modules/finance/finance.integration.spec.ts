@@ -486,6 +486,31 @@ describe.skipIf(!enabled)("finance (database)", { timeout: 60_000 }, () => {
     });
   });
 
+  describe("posted-journal trial balance", () => {
+    it("balances debits and credits after receiving school fees, without claiming accrual completeness", async () => {
+      const { student, bill } = await studentWithBill(100);
+      await pay(student.id, bill.id, 50);
+      const report = await service.getJournalTrialBalance(schoolId);
+      expect(report.totalDebits).toBe(report.totalCredits);
+      expect(report.difference).toBe("0.00");
+      expect(report.balanced).toBe(true);
+      expect(report.accrualComplete).toBe(false);
+      expect(report.basis).toBe("POSTED_JOURNAL_ONLY");
+      const posted = report.accounts.filter((account) => account.postedBalance !== "0.00");
+      expect(posted.some((account) => account.accountType === "ASSET")).toBe(true);
+      expect(posted.some((account) => account.accountType === "REVENUE")).toBe(true);
+    });
+
+    it("rejects future dates and prevents cross-school account visibility", async () => {
+      await expect(service.getJournalTrialBalance(schoolId, day(3))).rejects.toThrow(/future/i);
+      const own = await service.getJournalTrialBalance(schoolId);
+      const other = await service.getJournalTrialBalance("nonexistent-school");
+      expect(other.accounts).toHaveLength(0);
+      expect(other.totalDebits).toBe("0.00");
+      expect(own.accounts.every((account) => account.accountId !== "nonexistent-school")).toBe(true);
+    });
+  });
+
   describe("historical receivables", () => {
     it("reconstructs the balance before and after a receipt reversal without using today's bill balance", async () => {
       const { student, bill } = await studentWithBill(500);
