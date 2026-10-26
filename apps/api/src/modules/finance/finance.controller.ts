@@ -62,7 +62,7 @@ const feeStructureStatusSchema = z.object({ isActive: z.boolean() });
 const expenditureCategorySchema = z.object({ name: z.string().trim().min(2, "Enter a category name").max(120), description: z.string().trim().max(500).optional() });
 const payrollDraftSchema = z.object({
   month: z.number().int().min(1).max(12),
-  year: z.literal(2026),
+  year: z.number().int().min(2000).max(2100),
   confirmResidentTaxTreatment: z.literal(true),
 });
 const payrollTransitionSchema = z.object({
