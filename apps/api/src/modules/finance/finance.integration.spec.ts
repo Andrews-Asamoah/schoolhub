@@ -311,6 +311,37 @@ describe.skipIf(!enabled)("finance (database)", { timeout: 60_000 }, () => {
       expect(await prisma.payment.findUnique({ where: { id: payment.id } })).not.toBeNull();
     });
 
+    it("refuses a reversal if persisted bill allocations differ from receipt amount", async () => {
+      const { student, bill } = await studentWithBill(500);
+      const payment = await pay(student.id, bill.id, 100);
+      const allocation = await prisma.paymentBillAllocation.findFirstOrThrow({
+        where: { paymentId: payment.id, schoolId },
+      });
+      const beforeBill = await prisma.bill.findUniqueOrThrow({ where: { id: bill.id } });
+      const beforeStudent = await prisma.student.findUniqueOrThrow({ where: { id: student.id } });
+      const beforeLedger = await balances();
+      await prisma.paymentBillAllocation.update({
+        where: { id: allocation.id },
+        data: { amount: new Prisma.Decimal("99.99") },
+      });
+      try {
+        await expect(
+          service.reversePayment(schoolId, userId, payment.id, { kind: "VOID", reason: "Attempt to reverse an inconsistent receipt" }),
+        ).rejects.toThrow(/do not reconcile/i);
+        const afterBill = await prisma.bill.findUniqueOrThrow({ where: { id: bill.id } });
+        const afterStudent = await prisma.student.findUniqueOrThrow({ where: { id: student.id } });
+        expect(afterBill.paidAmount.toFixed(2)).toBe(beforeBill.paidAmount.toFixed(2));
+        expect(afterStudent.outstandingBalance.toFixed(2)).toBe(beforeStudent.outstandingBalance.toFixed(2));
+        expect(await balances()).toEqual(beforeLedger);
+        expect((await prisma.payment.findUniqueOrThrow({ where: { id: payment.id } })).status).toBe("COMPLETED");
+      } finally {
+        await prisma.paymentBillAllocation.update({
+          where: { id: allocation.id },
+          data: { amount: allocation.amount },
+        });
+      }
+    });
+
     it("cannot be reversed twice", async () => {
       const { student, bill } = await studentWithBill(1000);
       const payment = await pay(student.id, bill.id, 100);
