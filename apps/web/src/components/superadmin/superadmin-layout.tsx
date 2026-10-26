@@ -3,6 +3,7 @@ import { ShieldCheck } from "lucide-react";
 import { ThemeToggle } from "@/components/school/theme-toggle";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { SuperAdminSidebar } from "./superadmin-sidebar";
+import { PageContainer } from "@/components/ui/page-container";
 import { SchoolSwitcher } from "./school-switcher";
 
 interface SuperAdminLayoutProps {
@@ -54,7 +55,7 @@ export function SuperAdminLayout({
             </div>
           </header>
           {/* Page content */}
-          <main className="superadmin-main mx-auto w-full max-w-[1440px] p-4 sm:p-6 lg:px-8 lg:py-8">{children}</main>
+          <PageContainer className="superadmin-main">{children}</PageContainer>
         </div>
       </div>
     </SidebarProvider>
