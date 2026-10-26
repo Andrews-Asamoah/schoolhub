@@ -39,6 +39,8 @@ model user {
   paymentsRecorded     Payment[]              @relation("PaymentRecordedBy")
   transcriptRequests   TranscriptRequest[]
   notifications        Notification[]
+  sentSchoolMessages    SchoolMessage[]             @relation("SchoolMessageSent")
+  receivedMessageItems  SchoolMessageRecipient[]    @relation("SchoolMessageRecipientUser")
   announcementsSent    Announcement[]         @relation("AnnouncementsSent")
   feeReminderSchedules FeeReminderSchedule[]  @relation("FeeReminderSchedules")
   expensesRecorded     Expense[]              @relation("ExpenseRecordedBy")
