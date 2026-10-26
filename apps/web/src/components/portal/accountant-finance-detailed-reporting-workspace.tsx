@@ -125,7 +125,7 @@ const amount = (value: number | string) => {
 // Conversion to JS numbers happens only for existing chart/table presentation.
 function moneyCents(value: string | number): bigint {
   const raw = String(value).trim();
-  const matched = /^(-?)(\\d+)(?:\\.(\\d{1,2}))?$/.exec(raw);
+  const matched = /^(-?)(\d+)(?:\.(\d{1,2}))?$/.exec(raw);
   if (!matched) throw new Error("Invalid money amount in financial report.");
   const cents = BigInt(matched[2]!) * 100n + BigInt((matched[3] ?? "").padEnd(2, "0"));
   return matched[1] ? -cents : cents;
@@ -427,8 +427,8 @@ export function AccountantFinanceDetailedReportingWorkspace({ classes }: Props) 
             )
             .reduce(
               (sum, bill) =>
-                sum + Math.max(0, amount(bill.balanceAmount)),
-              0,
+                sum + (moneyCents(bill.balanceAmount) > 0n ? moneyCents(bill.balanceAmount) : 0n),
+              0n,
             )
         : 0
       : bills
@@ -440,9 +440,11 @@ export function AccountantFinanceDetailedReportingWorkspace({ classes }: Props) 
           )
           .reduce(
             (sum, bill) =>
-              sum + Math.max(0, amount(bill.balanceAmount)),
-            0,
+              sum + (moneyCents(bill.balanceAmount) > 0n ? moneyCents(bill.balanceAmount) : 0n),
+            0n,
           );
+
+  const outstandingMoney = centsNumber(outstanding);
 
   const classSummary = useMemo(() => {
     const totals = new Map<
@@ -591,7 +593,7 @@ export function AccountantFinanceDetailedReportingWorkspace({ classes }: Props) 
         rows: [
           ...visibleBills.map((bill) => ["Invoice", bill.billNumber, dateText(bill.issuedAt), dateText(bill.dueDate), bill.class?.name ?? "", "", amount(bill.totalAmount), amount(bill.paidAmount), amount(bill.balanceAmount), bill.status]),
           ...visiblePayments.map((payment) => ["Receipt", payment.paymentNumber, dateText(payment.paymentDate), "", payment.bill?.billNumber ?? "Unallocated", payment.paymentMethod, amount(payment.amount), null, null, payment.status]),
-          ["Closing outstanding balance", "", "", "", "", "", null, null, outstanding, ""],
+          ["Closing outstanding balance", "", "", "", "", "", null, null, outstandingMoney, ""],
         ],
         reportInfo,
       };
@@ -801,7 +803,7 @@ export function AccountantFinanceDetailedReportingWorkspace({ classes }: Props) 
             Current outstanding
           </p>
           <p className="mt-1 text-xl font-bold tabular-nums text-foreground">
-            {money(outstanding)}
+            {money(outstandingMoney)}
           </p>
           <p className="mt-1 text-xs text-muted-foreground">
             Open bill balances, all dates
@@ -963,7 +965,7 @@ export function AccountantFinanceDetailedReportingWorkspace({ classes }: Props) 
             </div>
 
             <p className="border-t border-border pt-3 text-sm font-semibold text-foreground">
-              Current outstanding across all open bills: {money(outstanding)}
+              Current outstanding across all open bills: {money(outstandingMoney)}
             </p>
           </div>
         )}
