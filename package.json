@@ -9,7 +9,9 @@
     "dev": "turbo run dev",
     "typecheck": "turbo run typecheck",
     "db:migrate": "pnpm --filter @schoolhub/api migrate",
-    "db:studio": "pnpm --filter @schoolhub/api studio"
+    "db:studio": "pnpm --filter @schoolhub/api studio",
+    "db:status": "pnpm --filter @schoolhub/api exec prisma migrate status --config prisma.config.ts",
+    "db:prepare": "pnpm --filter @schoolhub/api exec prisma migrate deploy --config prisma.config.ts && pnpm --filter @schoolhub/api exec prisma generate --config prisma.config.ts"
   },
   "devDependencies": {
     "@types/node": "^26.6.5",
