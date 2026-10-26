@@ -52,6 +52,7 @@ export interface DatePickerProps {
   name?: string;
   id?: string;
   required?: boolean;
+  clearable?: boolean;
   onBlur?: () => void;
   maxDate?: string;
   minDate?: string;
@@ -75,6 +76,7 @@ export function DatePicker({
   name,
   id,
   required = false,
+  clearable = true,
   onBlur,
   maxDate,
   minDate,
@@ -140,14 +142,17 @@ export function DatePicker({
   const canMovePrevious = !min || new Date(year, month, 1) > new Date(min.getFullYear(), min.getMonth(), 1);
   const canMoveNext = !max || new Date(year, month + 1, 1) <= new Date(max.getFullYear(), max.getMonth(), 1);
 
-  const chooseDay = (day: number) => {
-    const next = new Date(year, month, day);
-    if ((min && next < min) || (max && next > max)) return;
-    const iso = toIso(next);
+  const commitDate = (iso: string) => {
     if (value === undefined) setInternalValue(iso);
     onChange?.(iso);
     setOpen(false);
     onBlur?.();
+    buttonRef.current?.focus();
+  };
+  const chooseDay = (day: number) => {
+    const next = new Date(year, month, day);
+    if ((min && next < min) || (max && next > max)) return;
+    commitDate(toIso(next));
   };
 
   return (
@@ -246,10 +251,17 @@ export function DatePicker({
             })}
           </div>
           <div className="mt-3 flex items-center justify-between border-t border-border pt-3">
-            <span className="flex items-center gap-2 text-xs text-muted-foreground"><span className="size-2 rounded-full bg-success" /> Attendance recorded</span>
+            <span className="flex items-center gap-2 text-xs text-muted-foreground">
+              {markedDates.length > 0 ? (
+                <><span className="size-2 rounded-full bg-success" /> Attendance recorded</>
+              ) : !required && clearable && actualValue ? (
+                <button type="button" className="rounded-lg px-2.5 py-1.5 hover:bg-muted hover:text-foreground"
+                  onClick={() => commitDate("")}>Clear date</button>
+              ) : "Select a date"}
+            </span>
             <button
               type="button"
-              onClick={() => { const today = toIso(new Date()); if ((!resolvedMin || today >= resolvedMin) && (!resolvedMax || today <= resolvedMax)) { if (value === undefined) setInternalValue(today); onChange?.(today); setOpen(false); onBlur?.(); } }}
+              onClick={() => { const today = toIso(new Date()); if ((!resolvedMin || today >= resolvedMin) && (!resolvedMax || today <= resolvedMax)) commitDate(today); }}
               disabled={Boolean((resolvedMin && toIso(new Date()) < resolvedMin) || (resolvedMax && toIso(new Date()) > resolvedMax))}
               className="rounded-lg px-2.5 py-1.5 text-xs font-semibold text-primary hover:bg-primary/10 disabled:opacity-40"
             >Today</button>
