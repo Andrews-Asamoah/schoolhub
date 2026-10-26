@@ -3,6 +3,7 @@ import type { RowData } from "@tanstack/react-table";
 import { ArrowUpRight } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Badge } from "@/components/ui/badge";
 import type { ReactNode } from "react";
 import { DataTable, type DataTableColumn } from "@/components/ui/data-table";
 import { useCanExportTables } from "@/lib/table-export-policy";
@@ -27,9 +28,7 @@ export function WorkspacePageHeading({
 export function PreviewDataNotice({ children }: { children: ReactNode }) {
   return (
     <div className="mb-5 flex items-start gap-2 rounded-xl border border-warning/20 bg-warning/10 px-4 py-3 text-xs leading-relaxed text-warning">
-      <span className="mt-0.5 shrink-0 rounded-md bg-warning/15 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide">
-        Preview
-      </span>
+      <Badge variant="warning" className="mt-0.5 shrink-0">Preview</Badge>
       <p>{children}</p>
     </div>
   );
