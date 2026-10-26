@@ -26,7 +26,7 @@ function fixture(overrides: { reserved?: string; itemBalance?: string; school?: 
       create: vi.fn(async (args: { data: unknown }) => args.data),
     },
   };
-  const db = { $transaction: vi.fn(async (callback: (tx: typeof tx) => Promise<unknown>) => callback(tx)) };
+  const db = { $transaction: vi.fn(async (callback: (client: unknown) => Promise<unknown>) => callback(tx)) };
   return { service: new FinanceRevenueAdjustmentsService({ client: db } as never), tx, db };
 }
 
