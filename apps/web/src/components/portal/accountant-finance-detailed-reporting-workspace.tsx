@@ -121,6 +121,24 @@ const amount = (value: number | string) => {
   return Number.isFinite(parsed) ? parsed : 0;
 };
 
+// Financial totals are accumulated in integer pesewas, never binary floats.
+// Conversion to JS numbers happens only for existing chart/table presentation.
+function moneyCents(value: string | number): bigint {
+  const raw = String(value).trim();
+  const matched = /^(-?)(\\d+)(?:\\.(\\d{1,2}))?$/.exec(raw);
+  if (!matched) throw new Error("Invalid money amount in financial report.");
+  const cents = BigInt(matched[2]!) * 100n + BigInt((matched[3] ?? "").padEnd(2, "0"));
+  return matched[1] ? -cents : cents;
+}
+function centsNumber(cents: bigint): number {
+  if (cents > BigInt(Number.MAX_SAFE_INTEGER) || cents < BigInt(-Number.MAX_SAFE_INTEGER)) {
+    throw new Error("Financial report amount exceeds safe display precision.");
+  }
+  return Number(cents) / 100;
+}
+function moneyTotal<T>(rows: readonly T[], select: (row: T) => string | number): number {
+  return centsNumber(rows.reduce((total, row) => total + moneyCents(select(row)), 0n));
+}
 const settled = (status: string) => status.toUpperCase() === "COMPLETED";
 
 const dateText = (value?: string | null) => {
@@ -380,21 +398,20 @@ export function AccountantFinanceDetailedReportingWorkspace({ classes }: Props) 
     settled(payment.status),
   );
 
-  const collected = completedPayments.reduce(
-    (sum, payment) => sum + (
-      reportType === "class" && classId !== "ALL"
-        ? paymentClassAllocations(payment, billsById).find((allocation) => allocation.classId === classId)?.amount ?? 0
-        : amount(payment.amount)
-    ),
-    0,
+  const collected = moneyTotal(completedPayments, (payment) =>
+    reportType === "class" && classId !== "ALL"
+      ? paymentClassAllocations(payment, billsById).find((allocation) => allocation.classId === classId)?.amount ?? 0
+      : payment.amount,
   );
 
-  const billed = visibleBills
+  const billedCents = visibleBills
     .filter(
       (bill) =>
         bill.status !== "CANCELLED" && bill.status !== "WAIVED",
     )
-    .reduce((sum, bill) => sum + amount(bill.totalAmount), 0);
+    .reduce((sum, bill) => sum + moneyCents(bill.totalAmount), 0n);
+
+  const billed = centsNumber(billedCents);
 
   // Outstanding is the current balance across all dates, not just the
   // selected reporting period or search-filtered rows.
@@ -483,13 +500,12 @@ export function AccountantFinanceDetailedReportingWorkspace({ classes }: Props) 
     );
   }, [billsById, visibleBills, completedPayments, reportType, classId]);
 
-  const periodCollected = scopedPayments
-    .filter((payment) => settled(payment.status))
-    .reduce((sum, payment) => sum + (
-      reportType === "class" && classId !== "ALL"
-        ? paymentClassAllocations(payment, billsById).find((allocation) => allocation.classId === classId)?.amount ?? 0
-        : amount(payment.amount)
-    ), 0);
+  const periodCollected = moneyTotal(
+    scopedPayments.filter((payment) => settled(payment.status)),
+    (payment) => reportType === "class" && classId !== "ALL"
+      ? paymentClassAllocations(payment, billsById).find((allocation) => allocation.classId === classId)?.amount ?? 0
+      : payment.amount,
+  );
 
   const previousPeriodCollected = useMemo(() => {
     if (
@@ -506,7 +522,7 @@ export function AccountantFinanceDetailedReportingWorkspace({ classes }: Props) 
     const previousStart = range.start.getTime() - duration;
     const previousEnd = range.start.getTime() - 1;
 
-    return payments
+    return centsNumber(payments
       .filter((payment) => {
         if (!settled(payment.status)) {
           return false;
@@ -532,11 +548,11 @@ export function AccountantFinanceDetailedReportingWorkspace({ classes }: Props) 
           timestamp <= previousEnd
         );
       })
-      .reduce((sum, payment) => sum + (
+      .reduce((sum, payment) => sum + moneyCents(
         reportType === "class" && classId !== "ALL"
           ? paymentClassAllocations(payment, billsById).find((allocation) => allocation.classId === classId)?.amount ?? 0
-          : amount(payment.amount)
-      ), 0);
+          : payment.amount
+      ), 0n));
   }, [
     payments,
     billsById,
