@@ -23,7 +23,7 @@ interface SetupSchool {
   id: string; name: string; email?: string | null; phone?: string | null; address?: string | null;
   academicYears: SetupYear[];
 }
-interface DashboardContentProps { today: string; greetingName: string; search: string; }
+interface DashboardContentProps { today: string; greetingName: string; }
 interface AccountantDashboardExpense {
   amount: number | string;
   date: string;
