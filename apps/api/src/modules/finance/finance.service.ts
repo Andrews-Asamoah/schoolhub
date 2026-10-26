@@ -6,6 +6,7 @@ import {
   ForbiddenException,
 } from "@nestjs/common";
 import { PrismaService } from "../../prisma/prisma.service.js";
+import { FinancePostingService } from "./finance-posting.service.js";
 import type { CreateExpenseInput, GenerateBillInput, RecordPaymentInput, StudentStatementResponse } from "@schoolhub/shared";
 import { calculatePayslip } from "./payroll/payroll-calculator.js";
 import { resolvePayrollSettings } from "./payroll-settings.js";
@@ -70,7 +71,7 @@ function moneyString(value: Prisma.Decimal | null | undefined): string {
 
 @Injectable()
 export class FinanceService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService, private readonly postingService: FinancePostingService) {}
 
   /** Rejects future dates and dates inside a closed period. Call inside the posting transaction. */
   private async assertPostingDate(
@@ -183,11 +184,9 @@ export class FinanceService {
   /**
    * Separation of duties: the person who prepared a payroll run cannot approve
    * it, and the approver cannot be the one who confirms it paid. A different
-   * accountant or a platform administrator completes the step. Single-person
-   * schools and local development can set FINANCE_ALLOW_SELF_APPROVAL=true.
+   * accountant or a platform administrator completes the step. Single-person schools require an independent authorised approver.
    */
   private assertSeparationOfDuties(actorId: string, earlierActorId: string | null | undefined, step: "approved" | "marked as paid") {
-    if (process.env.FINANCE_ALLOW_SELF_APPROVAL === "true") return;
     if (earlierActorId && earlierActorId === actorId) {
       throw new ForbiddenException(
         `A payroll run cannot be ${step} by the same person who ${step === "approved" ? "prepared" : "approved"} it. Ask another accountant or the platform administrator.`,
@@ -257,35 +256,13 @@ export class FinanceService {
     },
   ) {
     if (input.amount.lte(0)) return null;
-    const prefix = `TXN-${input.date.getUTCFullYear()}-`;
-    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${input.schoolId}), hashtext(${prefix}))`;
-    const last = await tx.transaction.findFirst({
-      where: { schoolId: input.schoolId, transactionNumber: { startsWith: prefix } },
-      orderBy: { transactionNumber: "desc" },
-      select: { transactionNumber: true },
+    return this.postingService.post(tx, {
+      schoolId: input.schoolId, amount: input.amount, date: input.date, description: input.description,
+      debitAccountId: input.debit.id, creditAccountId: input.credit.id,
+      transactionType: input.transactionType ?? "ADJUSTMENT", category: "SCHOOL_FEES",
+      referenceType: input.referenceType, referenceId: input.referenceId,
+      referenceNumber: input.referenceNumber,
     });
-    const seq = last ? Number(last.transactionNumber.slice(prefix.length)) + 1 : 1;
-    const entry = await tx.transaction.create({
-      data: {
-        schoolId: input.schoolId, transactionNumber: prefix + String(seq).padStart(5, "0"),
-        transactionDate: input.date, description: input.description, amount: input.amount,
-        debitAccountId: input.debit.id, creditAccountId: input.credit.id,
-        transactionType: input.transactionType ?? "ADJUSTMENT", category: "SCHOOL_FEES",
-        referenceType: input.referenceType, referenceId: input.referenceId,
-        referenceNumber: input.referenceNumber,
-      },
-    });
-    const debitIncreasing = input.debit.accountType === "ASSET" || input.debit.accountType === "EXPENSE";
-    const creditIncreasing = input.credit.accountType === "LIABILITY" || input.credit.accountType === "EQUITY" || input.credit.accountType === "REVENUE";
-    await tx.chartAccount.update({
-      where: { id: input.debit.id },
-      data: { balance: debitIncreasing ? { increment: input.amount } : { decrement: input.amount } },
-    });
-    await tx.chartAccount.update({
-      where: { id: input.credit.id },
-      data: { balance: creditIncreasing ? { increment: input.amount } : { decrement: input.amount } },
-    });
-    return entry;
   }
 
   /** Read-only migration gate; does not assume a zero legacy receivable balance. */
@@ -424,35 +401,12 @@ export class FinanceService {
       code: input.revenueAccount.code,
     });
 
-    const prefix = `TXN-${input.date.getUTCFullYear()}-`;
-    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${input.schoolId}), hashtext(${prefix}))`;
-    const last = await tx.transaction.findFirst({
-      where: { schoolId: input.schoolId, transactionNumber: { startsWith: prefix } },
-      orderBy: { transactionNumber: "desc" },
-      select: { transactionNumber: true },
+    return this.postingService.post(tx, {
+      schoolId: input.schoolId, amount: input.amount, date: input.date, description: input.description,
+      debitAccountId: cash.id, creditAccountId: revenue.id, transactionType: "INCOME",
+      category: input.category, referenceType: input.referenceType, referenceId: input.referenceId,
+      referenceNumber: input.referenceNumber, notes: input.notes,
     });
-    const seq = last ? Number(last.transactionNumber.slice(prefix.length)) + 1 : 1;
-
-    const transaction = await tx.transaction.create({
-      data: {
-        schoolId: input.schoolId,
-        transactionNumber: `${prefix}${String(seq).padStart(5, "0")}`,
-        transactionDate: input.date,
-        description: input.description,
-        amount: input.amount,
-        debitAccountId: cash.id,
-        creditAccountId: revenue.id,
-        transactionType: "INCOME",
-        category: input.category,
-        referenceType: input.referenceType,
-        referenceId: input.referenceId,
-        referenceNumber: input.referenceNumber,
-        notes: input.notes,
-      },
-    });
-    await tx.chartAccount.update({ where: { id: cash.id }, data: { balance: { increment: input.amount } } });
-    await tx.chartAccount.update({ where: { id: revenue.id }, data: { balance: { increment: input.amount } } });
-    return transaction;
   }
 
   /** Post an expense using double-entry bookkeeping. */
@@ -497,40 +451,14 @@ export class FinanceService {
       code: accountSpec.code,
     });
 
-    const prefix = "TXN-" + input.date.getUTCFullYear() + "-";
-    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${input.schoolId}), hashtext(${prefix}))`;
-    const last = await tx.transaction.findFirst({
-      where: { schoolId: input.schoolId, transactionNumber: { startsWith: prefix } },
-      orderBy: { transactionNumber: "desc" },
-      select: { transactionNumber: true },
+    return this.postingService.post(tx, {
+      schoolId: input.schoolId, amount: input.amount, date: input.date, description: input.description,
+      debitAccountId: expenseAccount.id, creditAccountId: paymentAccount.id,
+      transactionType: "EXPENSE", category: input.category,
+      referenceType: input.referenceType, referenceId: input.referenceId,
+      referenceNumber: input.referenceNumber,
+      notes: [input.notes, "Payment method: " + input.paymentMethod].filter(Boolean).join(" · "),
     });
-    const seq = last ? Number(last.transactionNumber.slice(prefix.length)) + 1 : 1;
-    const transaction = await tx.transaction.create({
-      data: {
-        schoolId: input.schoolId,
-        transactionNumber: prefix + String(seq).padStart(5, "0"),
-        transactionDate: input.date,
-        description: input.description,
-        amount: input.amount,
-        debitAccountId: expenseAccount.id,
-        creditAccountId: paymentAccount.id,
-        transactionType: "EXPENSE",
-        category: input.category,
-        referenceType: input.referenceType,
-        referenceId: input.referenceId,
-        referenceNumber: input.referenceNumber,
-        notes: [input.notes, "Payment method: " + input.paymentMethod].filter(Boolean).join(" · "),
-      },
-    });
-    await tx.chartAccount.update({
-      where: { id: expenseAccount.id },
-      data: { balance: { increment: input.amount } },
-    });
-    await tx.chartAccount.update({
-      where: { id: paymentAccount.id },
-      data: { balance: { decrement: input.amount } },
-    });
-    return transaction;
   }
 
   private async writeAudit(
