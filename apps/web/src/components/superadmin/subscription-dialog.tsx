@@ -1,3 +1,4 @@
+import { DatePicker } from "@/components/ui/date-picker";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { evaluateSubscriptionAccess, SUBSCRIPTION_GRACE_DAYS, type SubscriptionStatusValue } from "@schoolhub/shared";
 import { CircleAlert, LoaderCircle, ShieldAlert, ShieldCheck, X } from "lucide-react";
@@ -110,8 +111,8 @@ export function SubscriptionDialog({ school, onClose }: { school: SubscriptionTa
         <div className="mt-5">
           <label htmlFor="sub-expiry" className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Expires on</label>
           <div className="mt-2 flex flex-wrap items-center gap-2">
-            <input id="sub-expiry" type="date" value={expiry} onChange={(event) => setExpiry(event.target.value)}
-              className="rounded-lg border border-input bg-card px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-ring/30" />
+            <DatePicker id="sub-expiry" value={expiry} onChange={(value) => setExpiry(value)}
+              buttonClassName="rounded-lg border border-input bg-card px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-ring/30" />
             {PRESETS.map((preset) => (
               <button key={preset.label} type="button" onClick={() => setExpiry(addDays(preset.days, expiry && expiry > addDays(0) ? new Date(`${expiry}T00:00:00Z`) : new Date()))}
                 className="superadmin-button-secondary rounded-lg px-2.5 py-1.5 text-xs font-semibold">
