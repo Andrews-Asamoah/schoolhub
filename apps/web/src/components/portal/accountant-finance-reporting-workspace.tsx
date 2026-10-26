@@ -40,6 +40,20 @@ interface HistoricalReceivables {
   students: { studentId: string; admissionNumber: string | null; balance: string; invoiceCount: number }[];
   invoices: { billId: string; billNumber: string; studentId: string; admissionNumber: string | null; issuedAt: string; dueDate: string | null; billed: string; collected: string; outstanding: string; daysOverdue: number | null }[];
 }
+interface AccrualCutoverPreflight {
+  active: boolean;
+  activatedAt: string | null;
+  openingReceivables: string | null;
+  expectedOpeningReceivables: string;
+  studentBalance: string;
+  invoiceCount: number;
+  unallocatedReceiptCount: number;
+  existingReceivablePostings: number;
+  canActivate: boolean;
+  problems: string[];
+  policy: "INVOICE_REVENUE_RECOGNISED_AT_ISSUE";
+  warning: string;
+}
 interface CloseReadiness {
   asOf: string;
   basis: "CURRENT_UNCLOSED";
@@ -79,6 +93,14 @@ export function AccountantFinanceReportingWorkspace() {
   const [yearId, setYearId] = useState("");
   const [termId, setTermId] = useState("");
   const [scope, setScope] = useState<"term" | "year" | "all">("term");
+  const [cutoverVisible, setCutoverVisible] = useState(false);
+  const cutoverQuery = useQuery({
+    queryKey: ["finance", "accrual-cutover-preflight"],
+    queryFn: () => apiFetch<AccrualCutoverPreflight>("/finance/ledger/accrual-cutover"),
+    enabled: cutoverVisible,
+    staleTime: 0,
+    retry: false,
+  });
   const [closeReadinessVisible, setCloseReadinessVisible] = useState(false);
   const closeReadinessQuery = useQuery({
     queryKey: ["finance", "receivables-close-readiness"],
@@ -249,6 +271,32 @@ export function AccountantFinanceReportingWorkspace() {
           { id: "collected", header: "Applied", cell: (row) => money(row.collected), value: (row) => Number(row.collected) },
           { id: "balance", header: "Balance", cell: (row) => money(row.outstanding), value: (row) => Number(row.outstanding) },
         ] satisfies DataTableColumn<HistoricalReceivables["invoices"][number]>[]} getRowId={(row) => row.billId} embedded exportTitle="Historical receivables" searchable={false} emptyTitle="No historical invoices" emptyDescription="There are no invoices on or before this date." />
+      </div>}
+    </section>
+    <section className="rounded-2xl border border-border bg-card p-5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h3 className="text-lg font-semibold text-foreground">Accrual ledger migration preflight</h3>
+          <p className="mt-1 text-sm text-muted-foreground">Check the financial opening position before considering the one-way transition from cash-receipt income to invoice-based accounting.</p>
+        </div>
+        <button type="button" className={secondaryButton} onClick={() => setCutoverVisible((value) => !value)}>
+          {cutoverVisible ? "Hide preflight" : "Inspect migration"}
+        </button>
+      </div>
+      {cutoverVisible && cutoverQuery.isPending && <p role="status" className="mt-3 text-sm text-muted-foreground">Inspecting opening balances…</p>}
+      {cutoverVisible && cutoverQuery.isError && <p role="alert" className="mt-3 text-sm text-destructive">{cutoverQuery.error.message}</p>}
+      {cutoverVisible && cutoverQuery.data && <div className="mt-4 space-y-3 text-sm">
+        <p className="font-semibold">
+          {cutoverQuery.data.active ? "Accrual ledger is active" : cutoverQuery.data.canActivate ? "Preflight checks passed — accountant approval still required" : "Migration is blocked by unresolved exceptions"}
+        </p>
+        <p className="text-muted-foreground">{cutoverQuery.data.warning}</p>
+        <p>Opening unpaid invoices: <strong>{money(cutoverQuery.data.expectedOpeningReceivables)}</strong> · Student balances: <strong>{money(cutoverQuery.data.studentBalance)}</strong> · Invoices: {cutoverQuery.data.invoiceCount}</p>
+        <p>Unmatched receipts: {cutoverQuery.data.unallocatedReceiptCount} · Existing receivable postings: {cutoverQuery.data.existingReceivablePostings}</p>
+        {cutoverQuery.data.activatedAt && <p>Activated: {new Date(cutoverQuery.data.activatedAt).toLocaleString("en-GH")}</p>}
+        {cutoverQuery.data.problems.length > 0 && <ul role="alert" className="list-disc space-y-1 pl-5 text-destructive">
+          {cutoverQuery.data.problems.map((problem) => <li key={problem}>{problem}</li>)}
+        </ul>}
+        {!cutoverQuery.data.active && <p className="text-muted-foreground">Activation is restricted to an explicitly authorised accountant API action with an exact opening-balance acknowledgement. Do not activate for fees earned across a term until deferred-income treatment has been reviewed.</p>}
       </div>}
     </section>
     <section className="rounded-2xl border border-border bg-card p-5">
