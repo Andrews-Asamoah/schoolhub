@@ -470,6 +470,32 @@ describe.skipIf(!enabled)("finance (database)", { timeout: 60_000 }, () => {
     });
   });
 
+  describe("historical receivables", () => {
+    it("reconstructs the balance before and after a receipt reversal without using today's bill balance", async () => {
+      const { student, bill } = await studentWithBill(500);
+      const earlier = day(-2);
+      await prisma.bill.update({ where: { id: bill.id }, data: { issuedAt: new Date(earlier) } });
+      const payment = await pay(student.id, bill.id, 150, { paymentDate: day(-1) });
+      const beforePayment = await service.getHistoricalReceivables(schoolId, earlier);
+      const initial = beforePayment.invoices.find((row) => row.billId === bill.id);
+      expect(initial?.outstanding).toBe("500.00");
+      const paidDate = await service.getHistoricalReceivables(schoolId, day(0));
+      expect(paidDate.invoices.find((row) => row.billId === bill.id)?.outstanding).toBe("350.00");
+      await service.reversePayment(schoolId, userId, payment.id, { kind: "VOID", reason: "Historical ledger regression" });
+      const afterReverse = await service.getHistoricalReceivables(schoolId, day(0));
+      expect(afterReverse.invoices.find((row) => row.billId === bill.id)?.outstanding).toBe("500.00");
+      expect(afterReverse.ageing.notDue).toBeDefined();
+    });
+
+    it("flags legacy cancelled invoices instead of inventing a historical reversal date", async () => {
+      const { bill } = await studentWithBill(80);
+      await prisma.bill.update({ where: { id: bill.id }, data: { status: "CANCELLED" } });
+      const snapshot = await service.getHistoricalReceivables(schoolId, day(0));
+      expect(snapshot.complete).toBe(false);
+      expect(snapshot.exceptions.some((item) => item.reference === bill.billNumber)).toBe(true);
+    });
+  });
+
   describe("Phase 2 reporting and allocations", () => {
     it("returns independent page totals and accurate summary totals beyond 500 records", async () => {
       const dateRange = { from: day(-1), to: day(0) };
