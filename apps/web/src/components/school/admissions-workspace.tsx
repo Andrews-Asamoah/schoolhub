@@ -978,10 +978,10 @@ function ExamCell({ app, canEdit, onSaved }: { app: Application; canEdit: boolea
 
   if (editing) {
     return (
-      <form onSubmit={submit} noValidate buttonClassName="space-y-2.5" ariaLabel={`Edit exam for ${app.firstName} ${app.lastName}`}>
-        <label buttonClassName="block text-[11px] font-semibold text-foreground">
+      <form onSubmit={submit} noValidate className="space-y-2.5" aria-label={`Edit exam for ${app.firstName} ${app.lastName}`}>
+        <label className="block text-[11px] font-semibold text-foreground">
           Date and time
-          <input type="datetime-local" buttonClassName={`${input} !mt-1 !h-9 text-xs`} value={date} onChange={(value) => setDate(value)} />
+          <DateTimePicker buttonClassName={`${input} !mt-1 !h-9 text-xs`} value={date} onChange={setDate} />
         </label>
         <label className="block text-[11px] font-semibold text-foreground">
           Venue
