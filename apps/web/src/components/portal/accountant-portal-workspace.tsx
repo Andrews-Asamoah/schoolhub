@@ -502,7 +502,9 @@ export function AccountantPortalWorkspace({
       setSelectedBillId("");
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["finance", "payments"] }),
+        queryClient.invalidateQueries({ queryKey: ["finance", "complete-report-dataset"] }),
         queryClient.invalidateQueries({ queryKey: ["finance", "bills"] }),
+        queryClient.invalidateQueries({ queryKey: ["finance", "complete-report-dataset"] }),
         queryClient.invalidateQueries({ queryKey: ["students"] }),
       ]);
     },
@@ -530,7 +532,9 @@ export function AccountantPortalWorkspace({
       setReverseReason("");
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["finance", "payments"] }),
+        queryClient.invalidateQueries({ queryKey: ["finance", "complete-report-dataset"] }),
         queryClient.invalidateQueries({ queryKey: ["finance", "bills"] }),
+        queryClient.invalidateQueries({ queryKey: ["finance", "complete-report-dataset"] }),
         queryClient.invalidateQueries({ queryKey: ["students"] }),
       ]);
     },
@@ -555,6 +559,7 @@ export function AccountantPortalWorkspace({
       setSelectedClassId("");
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["finance", "bills"] }),
+        queryClient.invalidateQueries({ queryKey: ["finance", "complete-report-dataset"] }),
         queryClient.invalidateQueries({ queryKey: ["finance", "fee-structures"] }),
       ]);
     },

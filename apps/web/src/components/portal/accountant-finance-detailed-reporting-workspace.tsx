@@ -4,7 +4,7 @@ import type { ExportTable } from "@/lib/table-export";
 
 import { useCallback, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { apiFetch } from "@/lib/api";
+import { apiFetch, getClientSubdomain } from "@/lib/api";
 import { Search, Users, WalletCards } from "lucide-react";
 
 interface Student {
@@ -210,9 +210,22 @@ function defaultStart() {
 }
 
 export function AccountantFinanceDetailedReportingWorkspace({ classes }: Props) {
+  // Keep report data isolated across schools. An earlier school's React Query cache
+  // must not be reused after the accountant switches schools.
+  const schoolScope = getClientSubdomain();
+  const reportSchoolQuery = useQuery({
+    queryKey: ["finance", "report-school", schoolScope],
+    queryFn: () => apiFetch<{ id: string }>("/schools/current"),
+    staleTime: 0,
+    gcTime: 0,
+    refetchOnMount: "always",
+    retry: false,
+  });
   // Registers are paginated; never calculate a school-wide report from page one only.
   const completeFinanceQuery = useQuery({
-    queryKey: ["finance", "complete-report-dataset"],
+    queryKey: ["finance", "complete-report-dataset", reportSchoolQuery.data?.id], 
+    enabled: reportSchoolQuery.isSuccess && Boolean(reportSchoolQuery.data?.id),
+    gcTime: 0,
     queryFn: async () => {
       const [bills, payments] = await Promise.all([
         fetchAllFinancePages<FinanceBill>("/finance/bills"),
@@ -632,19 +645,19 @@ export function AccountantFinanceDetailedReportingWorkspace({ classes }: Props) 
         </div>
 
         <div className="finance-report-print-actions flex flex-wrap gap-2">
-          {completeFinanceQuery.isSuccess && !invalidRange && (reportType !== "student" || !!selectedStudent) && <TableExportMenu build={buildExportTable} note="Exports include the selected period and filters." />}
+          {reportSchoolQuery.isSuccess && completeFinanceQuery.isSuccess && !invalidRange && (reportType !== "student" || !!selectedStudent) && <TableExportMenu build={buildExportTable} note="Exports include the selected period and filters." />}
           {completeFinanceQuery.isSuccess && !invalidRange && reportType === "student" && selectedStudent && <ServerExportButton endpoint={"/finance/students/" + encodeURIComponent(selectedStudent.id) + "/statement.pdf?from=" + encodeURIComponent(from) + "&to=" + encodeURIComponent(to)} label="Official statement PDF" className={secondaryButton} />}
         </div>
         </div>
 
-      {completeFinanceQuery.isPending ? (
+      {reportSchoolQuery.isPending || completeFinanceQuery.isPending ? (
         <div role="status" className="rounded-xl border border-border bg-muted/30 p-4 text-sm text-muted-foreground">
           Loading all finance records for a complete report…
         </div>
-      ) : completeFinanceQuery.error ? (
+      ) : reportSchoolQuery.error || completeFinanceQuery.error ? (
         <div role="alert" className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
-          Unable to load the complete finance dataset. Report totals are unavailable; no partial totals are displayed. {completeFinanceQuery.error.message}
-          <button type="button" className="ml-2 font-semibold underline" onClick={() => void completeFinanceQuery.refetch()}>Retry</button>
+          Unable to load the complete finance dataset. Report totals are unavailable; no partial totals are displayed. {(reportSchoolQuery.error ?? completeFinanceQuery.error)?.message}
+          <button type="button" className="ml-2 font-semibold underline" onClick={() => { void reportSchoolQuery.refetch(); void completeFinanceQuery.refetch(); }}>Retry</button>
         </div>
       ) : (
       <>
