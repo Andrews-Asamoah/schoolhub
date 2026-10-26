@@ -1,6 +1,7 @@
-import { AlertTriangle, LoaderCircle } from "lucide-react";
+import { AlertTriangle } from "lucide-react";
 import { useEffect, useId, useRef } from "react";
 import { createPortal } from "react-dom";
+import { Button } from "@/components/ui/button";
 
 type ConfirmVariant = "primary" | "danger";
 
@@ -74,7 +75,7 @@ export function ConfirmDialog({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-foreground/55 p-4 backdrop-blur-[2px]"
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-overlay p-4 backdrop-blur-[2px]"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget && !loading) onCancel();
       }}
@@ -84,7 +85,7 @@ export function ConfirmDialog({
         aria-modal="true"
         aria-labelledby={titleId}
         aria-describedby={descriptionId}
-        className="w-full max-w-md overflow-hidden rounded-2xl border border-border bg-card text-card-foreground shadow-2xl"
+        className="w-full max-w-md overflow-hidden rounded-xl border border-border bg-card text-card-foreground shadow-2xl"
       >
         <div className="flex gap-4 p-5 sm:p-6">
           <span className={`flex size-10 shrink-0 items-center justify-center rounded-xl ${confirmVariant === "danger" ? "bg-destructive/10 text-destructive" : "bg-primary/10 text-primary"}`}>
@@ -96,24 +97,17 @@ export function ConfirmDialog({
           </div>
         </div>
         <div className="flex flex-col-reverse gap-2 border-t border-border bg-muted/30 px-5 py-4 sm:flex-row sm:justify-end sm:px-6">
-          <button
+          <Button
             ref={cancelRef}
             type="button"
+            variant="outline"
             disabled={loading}
             onClick={onCancel}
-            className="inline-flex h-10 items-center justify-center rounded-lg border border-border bg-background px-4 text-sm font-semibold text-foreground transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {cancelLabel}
-          </button>
-          <button
-            type="button"
-            disabled={loading}
-            onClick={onConfirm}
-            className={`inline-flex h-10 items-center justify-center gap-2 rounded-lg px-4 text-sm font-semibold text-destructive-foreground transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${confirmVariant === "danger" ? "bg-destructive hover:bg-destructive/90" : "bg-primary hover:opacity-90"}`}
-          >
-            {loading && <LoaderCircle className="size-4 animate-spin" aria-hidden="true" />}
+          >{cancelLabel}</Button>
+          <Button type="button" variant={confirmVariant === "danger" ? "destructive" : "default"}
+            loading={loading} disabled={loading} onClick={onConfirm}>
             {loading ? "Please wait…" : confirmLabel}
-          </button>
+          </Button>
         </div>
       </section>
     </div>,
