@@ -7,42 +7,13 @@ import {
 } from "@nestjs/common";
 import { PrismaService } from "../../prisma/prisma.service.js";
 import type { CreateExpenseInput, GenerateBillInput, RecordPaymentInput, StudentStatementResponse } from "@schoolhub/shared";
-import { calculatePayslip, type PayrollSettings } from "./payroll/payroll-calculator.js";
+import { calculatePayslip } from "./payroll/payroll-calculator.js";
+import { resolvePayrollSettings } from "./payroll-settings.js";
 import { Prisma, type AccountCategory, type AccountType, type AuditAction, type PaymentMethod, type TransactionCategory } from "@prisma/client";
 import { canManageAcademicContext } from "../../common/academic-context.js";
 import { createSequence, isIdempotencyRace, isSerializationFailure, postingDateProblem, withSerializableRetry } from "./finance.helpers.js";
 import { buildFinanceAuditWhere, categoryOf, clampPageSize, describeFinanceAudit, type FinanceAuditQuery } from "./finance-audit.helpers.js";
 import { buildRunningStatement, daysPastDue, type StatementEvent } from "./finance-reporting.helpers.js";
-
-// Transitional statutory profile: existing draft fields cannot yet hold individual
-// contributions or persist versioned settings. Do not silently apply it to later years.
-// Future school-specific settings must be effective-dated and snapshotted per run.
-const PAYROLL_PROFILE_2026: PayrollSettings = {
-  rounding: "HALF_UP",
-  taxSchedule: {
-    bands: [
-      { width: "588", rate: "0" },
-      { width: "80", rate: "5" },
-      { width: "100", rate: "10" },
-      { width: "2900", rate: "17.5" },
-      { width: "16000", rate: "25" },
-      { width: "30332", rate: "30" },
-      { width: null, rate: "35" },
-    ],
-    nonResidentRate: "25",
-  },
-  schemes: [{
-    key: "SSNIT_TIER1",
-    label: "SSNIT (existing payroll profile)",
-    base: "BASIC",
-    employeeRate: "5.5",
-    employerRate: "13",
-    memoRate: "0",
-    insurableMin: "587.80",
-    insurableMax: "69000",
-    employeeShareTaxDeductible: true,
-  }],
-};
 
 function roundMoney(value: number) {
   return Math.round((value + Number.EPSILON) * 100) / 100;
@@ -3672,14 +3643,13 @@ export class FinanceService {
     processedById: string,
     input: { month: number; year: number; confirmResidentTaxTreatment: true },
   ) {
-    // GRA's 2026 monthly resident bands took effect on 1 September 2026.
-    // Refuse to silently apply these rules to historical periods.
-    if (input.year !== 2026 || input.month < 9) {
-      throw new BadRequestException(
-        "Automatic draft generation currently supports September–December 2026 only. Configure the applicable historical tax rules before generating an earlier period.",
-      );
-    }
     const db = this.prisma.client;
+    const periodEnd = new Date(Date.UTC(input.year, input.month, 0));
+    const [taxSchedules, contributionSchemes] = await Promise.all([
+      db.payrollTaxSchedule.findMany({ where: { OR: [{ schoolId }, { schoolId: null }], status: "ACTIVE", effectiveFrom: { lte: periodEnd } }, include: { bands: true } }),
+      db.payrollContributionScheme.findMany({ where: { OR: [{ schoolId }, { schoolId: null }], status: "ACTIVE", effectiveFrom: { lte: periodEnd } } }),
+    ]);
+    const resolved = resolvePayrollSettings(schoolId, periodEnd, taxSchedules, contributionSchemes);
     const existing = await db.payrollRecord.findUnique({
       where: { schoolId_month_year: { schoolId, month: input.month, year: input.year } },
       select: { id: true },
@@ -3718,7 +3688,7 @@ export class FinanceService {
 
     const payslips = eligible.map((person) => {
       // SSNIT 2026 insurable earnings range: GHS 587.80–69,000.
-      const calculated = calculatePayslip(PAYROLL_PROFILE_2026, {
+      const calculated = calculatePayslip(resolved.settings, {
         residency: "RESIDENT",
         earnings: [{ code: "BASIC", description: "Basic salary", amount: person.basicSalary, taxable: true, pensionable: true, isBasic: true }],
         deductions: [],
@@ -3765,6 +3735,9 @@ export class FinanceService {
           totalTax: sum("incomeTax"),
           totalSSNIT: sum("ssnitEmployee").plus(sum("ssnitEmployer")),
           processedById,
+          taxScheduleId: resolved.taxScheduleId,
+          settingsSnapshot: JSON.parse(JSON.stringify({ ...resolved, calculatedFor: periodEnd.toISOString().slice(0, 10) })),
+          calculatedAt: new Date(),
           academicYearId: currentYear?.id ?? null,
           termId: currentYear?.terms[0]?.id ?? null,
           payslips: { create: payslips },
