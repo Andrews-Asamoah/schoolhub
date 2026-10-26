@@ -80,9 +80,7 @@ function DashboardPage() {
           userImage={session?.user?.image}
         />
         <div className="min-w-0 flex-1">
-          <DashboardHeader
-            userName={session?.user?.name}
-          />
+          <DashboardHeader />
           {organizationLoading ? (
             <div className="mx-auto mt-8 flex max-w-3xl items-center gap-2 rounded-2xl border border-border bg-card p-6 text-sm text-muted-foreground shadow-sm">
               <span className="size-2 animate-pulse rounded-full bg-primary" />
