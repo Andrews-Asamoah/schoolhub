@@ -7,6 +7,7 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { UserAvatar } from "@/components/ui/user-avatar";
+import { SidebarTooltip, useSidebar } from "@/components/ui/sidebar";
 import { useLogout } from "@/hooks/use-logout";
 import { cn } from "@/lib/utils";
 
@@ -27,7 +28,7 @@ export interface SidebarUserMenuProps {
   }) => ReactNode;
 }
 
-const PANEL_WIDTH = 290;
+const PANEL_WIDTH = 272;
 const GAP = 10;
 
 const itemBase =
@@ -35,6 +36,7 @@ const itemBase =
 
 export function SidebarUserMenu({ name, email, image, roleLabel, profileLink }: SidebarUserMenuProps) {
   const { error: signOutError, isSigningOut, logout } = useLogout();
+  const { collapsed, isMobile, closeMobile } = useSidebar();
   const [open, setOpen] = useState(false);
   const [position, setPosition] = useState<{ left: number; bottom: number } | null>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -46,16 +48,21 @@ export function SidebarUserMenu({ name, email, image, roleLabel, profileLink }: 
     const trigger = triggerRef.current;
     if (!trigger) return;
     const rect = trigger.getBoundingClientRect();
-    const beside = rect.width < 140;
+    const beside = collapsed && !isMobile;
     const width = Math.min(PANEL_WIDTH, window.innerWidth - GAP * 2);
     const left = beside ? rect.right + GAP : rect.left;
     setPosition({
       left: Math.max(GAP, Math.min(left, window.innerWidth - width - GAP)),
-      bottom: beside
-        ? Math.max(GAP, window.innerHeight - rect.bottom)
-        : window.innerHeight - rect.top + GAP,
+      bottom: Math.max(GAP, Math.min(window.innerHeight - 220, beside ? window.innerHeight - rect.bottom : window.innerHeight - rect.top + GAP)),
     });
   };
+
+  // The panel is rendered in a portal. Focus its first action on keyboard opening.
+  useEffect(() => {
+    if (open && position && document.activeElement === triggerRef.current) {
+      panelRef.current?.querySelector<HTMLElement>('[role="menuitem"]')?.focus();
+    }
+  }, [open, position]);
 
   const close = (returnFocus = false) => {
     setOpen(false);
@@ -97,23 +104,25 @@ export function SidebarUserMenu({ name, email, image, roleLabel, profileLink }: 
 
   return (
     <>
-      {/* Trigger Card Button */}
+      {/* The account trigger is compact in icon mode; the portal menu stays full width. */}
+      <SidebarTooltip label="Account & profile" disabled={open}>
       <button
         ref={triggerRef}
         type="button"
         aria-haspopup="menu"
         aria-expanded={open}
-        title={displayName}
+        aria-label={`Account menu for ${displayName}`}
         onClick={() => setOpen((value) => !value)}
         className={cn(
-          "group flex w-full min-w-0 items-center gap-2.5 rounded-xl border border-border/60 bg-card/60 p-2 text-left transition-all duration-200 backdrop-blur-md",
-          "hover:border-input hover:bg-card/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70",
-          "",
-          open && "border-input bg-card/90 shadow-sm",
+          "group flex w-full min-w-0 items-center gap-2 rounded-lg border border-sidebar-border bg-sidebar-accent/30 p-1.5 text-left transition-colors",
+          "hover:bg-sidebar-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring",
+          collapsed && !isMobile && "md:justify-center md:p-1.5",
+
+          open && "bg-sidebar-accent shadow-sm",
         )}
       >
         <span className="relative shrink-0">
-          <UserAvatar name={name} image={image} className="size-9" />
+          <UserAvatar name={name} image={image} className="size-8" />
           <span
             aria-hidden="true"
             className="absolute -right-0.5 -bottom-0.5 size-2.5 rounded-full bg-success ring-2 ring-background"
@@ -132,8 +141,9 @@ export function SidebarUserMenu({ name, email, image, roleLabel, profileLink }: 
           className="sidebar-expanded size-4 shrink-0 text-muted-foreground/70 transition group-hover:text-muted-foreground"
         />
       </button>
+      </SidebarTooltip>
 
-      {/* Glassmorphic Popover Card */}
+      {/* Accessible account dropdown anchored above or beside the trigger. */}
       {open &&
         position &&
         createPortal(
@@ -141,20 +151,28 @@ export function SidebarUserMenu({ name, email, image, roleLabel, profileLink }: 
             ref={panelRef}
             role="menu"
             aria-label="Account menu"
+            onKeyDown={(event) => {
+              const items = Array.from(panelRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"]:not([disabled])') ?? []);
+              if (!items.length) return;
+              const index = items.indexOf(document.activeElement as HTMLElement);
+              if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+                event.preventDefault();
+                const delta = event.key === "ArrowDown" ? 1 : -1;
+                items[(index + delta + items.length) % items.length]?.focus();
+              } else if (event.key === "Home" || event.key === "End") {
+                event.preventDefault();
+                items[event.key === "Home" ? 0 : items.length - 1]?.focus();
+              }
+            }}
             style={{
               left: position.left,
               bottom: position.bottom,
               width: Math.min(PANEL_WIDTH, window.innerWidth - GAP * 2),
             }}
-            className="user-menu-panel fixed z-[70] overflow-hidden rounded-2xl border border-border/60 bg-card/80 text-left shadow-2xl shadow-foreground/10 ring-1 ring-foreground/5 backdrop-blur-xl animate-in fade-in-0 zoom-in-95"
+            className="user-menu-panel fixed z-[70] overflow-hidden rounded-xl border border-border bg-popover text-left text-popover-foreground shadow-xl"
           >
-            {/* Header with Mesh Glass Glow */}
+            {/* Current account */}
             <div className="relative overflow-hidden px-4 pt-4.5 pb-3.5">
-              {/* Subtle ambient gradient mesh */}
-              <div
-                aria-hidden="true"
-                className="pointer-events-none absolute -inset-x-4 -top-10 h-32 bg-gradient-to-br from-primary/10 via-info/5 to-transparent blur-xl"
-              />
 
               <div className="relative flex items-center gap-3.5">
                 <UserAvatar
@@ -184,7 +202,7 @@ export function SidebarUserMenu({ name, email, image, roleLabel, profileLink }: 
             {/* Profile Action Link */}
             <div className="border-t border-border/50 p-1.5">
               {profileLink({
-                onClick: () => close(),
+                onClick: () => { close(); closeMobile(); },
                 className: cn(
                   itemBase,
                   "hover:bg-muted/70 focus-visible:bg-muted/70",
@@ -214,7 +232,7 @@ export function SidebarUserMenu({ name, email, image, roleLabel, profileLink }: 
                 type="button"
                 role="menuitem"
                 disabled={isSigningOut}
-                onClick={() => void logout()}
+                onClick={() => { closeMobile(); void logout(); }}
                 className={cn(
                   itemBase,
                   "hover:bg-destructive/10 focus-visible:bg-destructive/10 disabled:cursor-wait disabled:opacity-70",
