@@ -86,6 +86,8 @@ model FeeItem {
   category         FeeCategory?
   customCategoryId String?
   isOptional       Boolean      @default(false)
+  recognitionMethod FinanceRecognitionMethod @default(AT_INVOICE)
+  revenueAccountId String?
   createdAt        DateTime     @default(now())
   updatedAt        DateTime     @updatedAt
 
@@ -116,6 +118,8 @@ model Bill {
   discountAmount Decimal    @default(0) @db.Decimal(10, 2)
   carryForwardSnapshotCreated Boolean @default(false)
   paidAmount     Decimal    @default(0) @db.Decimal(10, 2)
+  creditedAmount Decimal @default(0) @db.Decimal(10, 2)
+  writtenOffAmount Decimal @default(0) @db.Decimal(10, 2)
   balanceAmount  Decimal    @db.Decimal(10, 2)
   status         BillStatus @default(PENDING)
   dueDate        DateTime?  @db.Date
