@@ -423,14 +423,24 @@ export class FinanceController {
   }
 
   @Get("payroll")
-  @Roles(...FINANCE_READ_ROLES)
-  listPayrollRecords(@CurrentSchool() school: School) {
+  @Roles(...FINANCE_PAYROLL_EXPORT_ROLES)
+  listPayrollRecords(
+    @CurrentSchool() school: School,
+    @CurrentUser() user: AuthenticatedUser,
+    @CurrentSchoolRole() schoolRole: string | undefined,
+  ) {
+    this.assertPayrollExportAllowed(user, schoolRole);
     return this.financeService.listPayrollRecords(school.id);
   }
 
   @Get("payroll/salaries")
-  @Roles(...FINANCE_READ_ROLES)
-  listPayrollSalaryRegister(@CurrentSchool() school: School) {
+  @Roles(...FINANCE_PAYROLL_EXPORT_ROLES)
+  listPayrollSalaryRegister(
+    @CurrentSchool() school: School,
+    @CurrentUser() user: AuthenticatedUser,
+    @CurrentSchoolRole() schoolRole: string | undefined,
+  ) {
+    this.assertPayrollExportAllowed(user, schoolRole);
     return this.financeService.listPayrollSalaryRegister(school.id);
   }
 
