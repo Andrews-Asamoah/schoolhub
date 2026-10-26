@@ -8,6 +8,7 @@ import { FinanceRevenueController } from "./finance-revenue.controller.js";
 import { FinancePeriodsController } from "./finance-periods.controller.js";
 import { FinancePeriodPreparationService } from "./finance-period-preparation.service.js";
 import { FinanceRevenueAdjustmentsService } from "./finance-revenue-adjustments.service.js";
+import { FinanceReceivableAdjustmentsService } from "./finance-receivable-adjustments.service.js";
 import { FinanceService } from "./finance.service.js";
 import { FinanceAuditInterceptor } from "./finance-audit.interceptor.js";
 import { FinanceExportsService } from "./finance-exports.service.js";
@@ -21,7 +22,7 @@ import { FinanceLedgerIntegrityService } from "./finance-ledger-integrity.servic
 
 @Module({
   controllers: [FinanceAccountPurposeController, FinanceController, FinanceRevenueController, FinancePeriodsController, FinanceManualJournalsController],
-  providers: [FinanceAccountPurposeService, FinanceManualJournalsService, FinancePeriodPreparationService, FinanceRevenueAdjustmentsService, FinanceService, FinanceExportsService, FinanceApprovalService, FinancePostingService, FinanceLedgerIntegrityService, FinanceAuditInterceptor,
+  providers: [FinanceReceivableAdjustmentsService, FinanceAccountPurposeService, FinanceManualJournalsService, FinancePeriodPreparationService, FinanceRevenueAdjustmentsService, FinanceService, FinanceExportsService, FinanceApprovalService, FinancePostingService, FinanceLedgerIntegrityService, FinanceAuditInterceptor,
     PayrollSettingsService, FinanceIntegrityJob, DatabaseFinanceRateLimitStore, { provide: FINANCE_RATE_LIMIT_STORE, useExisting: DatabaseFinanceRateLimitStore }],
   exports: [FinanceService, FinanceApprovalService],
 })

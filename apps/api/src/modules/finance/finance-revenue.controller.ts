@@ -6,11 +6,13 @@ import { RolesGuard } from "../../common/guards/roles.guard.js";
 import { Roles } from "../../common/decorators/roles.decorator.js";
 import { CurrentSchool } from "../../common/decorators/current-school.decorator.js";
 import { CurrentUser, type AuthenticatedUser } from "../../common/decorators/current-user.decorator.js";
+import { CurrentSchoolRole } from "../../common/decorators/current-school-role.decorator.js";
 import { ZodValidationPipe } from "../../common/pipes/zod-validation.pipe.js";
 import { FINANCE_READ_ROLES, FINANCE_WRITE_ROLES } from "./finance.permissions.js";
-import { FinanceAuditInterceptor } from "./finance-audit.interceptor.js";
+import { FinanceAuditInterceptor, FinanceSelfAudited } from "./finance-audit.interceptor.js";
 import { FinanceWriteRateLimitGuard, SuperAdminReasonGuard } from "./finance-safeguards.js";
 import { FinanceRevenueAdjustmentsService } from "./finance-revenue-adjustments.service.js";
+import { FinanceReceivableAdjustmentsService } from "./finance-receivable-adjustments.service.js";
 
 const adjustmentDraftSchema = z.object({
   billId: z.string().min(1),
@@ -24,13 +26,20 @@ const adjustmentDraftSchema = z.object({
   })).min(1).max(100),
 });
 const limitSchema = z.coerce.number().int().min(1).max(100).default(50);
+const decisionSchema = z.object({
+  decision: z.enum(["APPROVED", "REJECTED"]),
+  note: z.string().trim().min(10).max(1000),
+});
 
 /** P3 draft-only controller: no endpoint can post a financial adjustment. */
 @Controller("finance")
 @UseGuards(SchoolTenantGuard, RolesGuard, SuperAdminReasonGuard, FinanceWriteRateLimitGuard)
 @UseInterceptors(FinanceAuditInterceptor)
 export class FinanceRevenueController {
-  constructor(private readonly adjustments: FinanceRevenueAdjustmentsService) {}
+  constructor(
+    private readonly adjustments: FinanceRevenueAdjustmentsService,
+    private readonly approved: FinanceReceivableAdjustmentsService,
+  ) {}
 
   @Get("revenue/preflight")
   @Roles(...FINANCE_READ_ROLES)
@@ -52,6 +61,42 @@ export class FinanceRevenueController {
     @Body(new ZodValidationPipe(adjustmentDraftSchema)) input: z.infer<typeof adjustmentDraftSchema>,
   ) {
     return this.adjustments.createDraft(school.id, user.id, input);
+  }
+
+  @Post("adjustments/:id/submit")
+  @Roles(...FINANCE_WRITE_ROLES)
+  submit(
+    @CurrentSchool() school: School,
+    @CurrentUser() actor: AuthenticatedUser,
+    @Param("id") id: string,
+  ) {
+    return this.approved.submit(school.id, actor.id, id);
+  }
+
+  @Post("adjustments/:id/decide")
+  @Roles(...FINANCE_READ_ROLES)
+  decide(
+    @CurrentSchool() school: School,
+    @CurrentUser() actor: AuthenticatedUser,
+    @CurrentSchoolRole() schoolRole: string | undefined,
+    @Param("id") id: string,
+    @Body(new ZodValidationPipe(decisionSchema)) body: z.infer<typeof decisionSchema>,
+  ) {
+    return this.approved.decide(
+      school.id, actor.id, schoolRole, actor.role === "superAdmin",
+      id, body.decision, body.note,
+    );
+  }
+
+  @Post("adjustments/:id/post")
+  @Roles(...FINANCE_WRITE_ROLES)
+  @FinanceSelfAudited()
+  post(
+    @CurrentSchool() school: School,
+    @CurrentUser() actor: AuthenticatedUser,
+    @Param("id") id: string,
+  ) {
+    return this.approved.post(school.id, actor.id, id);
   }
 
   @Delete("adjustments/drafts/:id")
