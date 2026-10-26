@@ -22,7 +22,7 @@ import { PayrollSettingsService } from "./payroll-settings.service.js";
 import { FinanceExportsService, type FinanceExportContext, type FinanceExportFile } from "./finance-exports.service.js";
 import { SchoolTenantGuard } from "../../common/guards/school-tenant.guard.js";
 import { RolesGuard } from "../../common/guards/roles.guard.js";
-import { FINANCE_PAYROLL_EXPORT_ROLES, FINANCE_READ_ROLES, FINANCE_WRITE_ROLES, PAYROLL_SETTINGS_APPROVE_ROLES, canExportFinancePayroll } from "./finance.permissions.js";
+import { FINANCE_PAYROLL_EXPORT_ROLES, FINANCE_READ_ROLES, FINANCE_WRITE_ROLES, PAYROLL_SETTINGS_APPROVE_ROLES, FINANCE_PAYROLL_TRANSITION_ROLES, canExportFinancePayroll } from "./finance.permissions.js";
 import { FinanceAuditInterceptor, FinanceSelfAudited } from "./finance-audit.interceptor.js";
 import { FinanceWriteRateLimitGuard, SuperAdminReasonGuard } from "./finance-safeguards.js";
 import { Roles } from "../../common/decorators/roles.decorator.js";
@@ -67,12 +67,14 @@ const payrollDraftSchema = z.object({
   month: z.number().int().min(1).max(12),
   year: z.number().int().min(2000).max(2100),
   confirmResidentTaxTreatment: z.literal(true),
+  recalculateDraft: z.boolean().optional(),
 });
 const payrollTransitionSchema = z.object({
   status: z.enum(["APPROVED", "PAID", "CANCELLED"]),
   paymentMethod: z.enum(["CASH", "BANK_TRANSFER", "CHEQUE", "MOBILE_MONEY", "CARD", "ONLINE", "OTHER"]).optional(),
 });
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Format: YYYY-MM-DD");
+const payrollProfileBackfillSchema = z.object({ effectiveFrom: isoDate });
 const rate = z.string().regex(/^\d{1,3}(?:\.\d{1,3})?$/, "Enter a percentage with up to three decimals.");
 const money = z.string().regex(/^\d{1,13}(?:\.\d{1,2})?$/, "Enter an amount with up to two decimals.");
 const taxScheduleDraftSchema = z.object({
@@ -527,6 +529,17 @@ export class FinanceController {
     return this.financeService.updatePayrollSalary(school.id, kind, personId, body.monthlySalary, user.id);
   }
 
+  @Post("payroll/profiles/backfill")
+  @Roles(...FINANCE_WRITE_ROLES)
+  @FinanceSelfAudited()
+  backfillPayrollProfiles(
+    @CurrentSchool() school: School,
+    @CurrentUser() user: AuthenticatedUser,
+    @Body(new ZodValidationPipe(payrollProfileBackfillSchema)) body: z.infer<typeof payrollProfileBackfillSchema>,
+  ) {
+    return this.financeService.backfillPayrollProfiles(school.id, user.id, body.effectiveFrom);
+  }
+
   @Get("payroll/settings")
   @Roles(...FINANCE_READ_ROLES)
   listPayrollSettings(@CurrentSchool() school: School) {
@@ -594,14 +607,15 @@ export class FinanceController {
   }
 
   @Patch("payroll/:recordId/status")
-  @Roles(...FINANCE_WRITE_ROLES)
+  @Roles(...FINANCE_PAYROLL_TRANSITION_ROLES)
   transitionPayroll(
     @CurrentSchool() school: School,
     @CurrentUser() user: AuthenticatedUser,
     @Param("recordId") recordId: string,
     @Body(new ZodValidationPipe(payrollTransitionSchema)) body: z.infer<typeof payrollTransitionSchema>,
+    @CurrentSchoolRole() schoolRole: string | undefined,
   ) {
-    return this.financeService.transitionPayroll(school.id, recordId, body, user.id);
+    return this.financeService.transitionPayroll(school.id, recordId, body, user.id, schoolRole);
   }
 
   @Post("bills/generate")

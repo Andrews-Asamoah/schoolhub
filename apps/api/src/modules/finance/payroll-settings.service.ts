@@ -14,7 +14,20 @@ export type ContributionSchemeDraftInput = {
   effectiveFrom: string; effectiveTo?: string | null; sourceNote: string;
 };
 
-const date = (value: string) => new Date(`${value}T00:00:00.000Z`);
+const date = (value: string) => {
+  const parsed = new Date(value + "T00:00:00.000Z");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value) || Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== value) {
+    throw new BadRequestException("Enter a valid effective date in YYYY-MM-DD format.");
+  }
+  return parsed;
+};
+const rate = (value: string, label: string) => {
+  const parsed = new Prisma.Decimal(value);
+  if (!parsed.isFinite() || parsed.lt(0) || parsed.gt(100)) {
+    throw new BadRequestException(label + " must be a percentage between 0 and 100.");
+  }
+  return parsed;
+};
 const isExclusionViolation = (error: unknown) =>
   /exclusion constraint|23P01|no_overlap/i.test(JSON.stringify({ m: (error as { message?: string } | null)?.message, c: (error as { code?: string } | null)?.code, d: (error as { cause?: unknown } | null)?.cause }));
 
@@ -44,7 +57,7 @@ export class PayrollSettingsService {
       data: {
         schoolId, name: input.name, effectiveFrom: date(input.effectiveFrom),
         effectiveTo: input.effectiveTo ? date(input.effectiveTo) : null,
-        nonResidentRate: new Prisma.Decimal(input.nonResidentRate), status: "DRAFT", sourceNote: input.sourceNote,
+        nonResidentRate: rate(input.nonResidentRate, "Non-resident PAYE rate"), status: "DRAFT", sourceNote: input.sourceNote,
         bands: { create: bands.map(b => ({ position: b.position, width: b.width, rate: b.rate })) },
       },
       include: { bands: { orderBy: { position: "asc" } } },
@@ -59,8 +72,8 @@ export class PayrollSettingsService {
     return this.prisma.client.payrollContributionScheme.create({
       data: {
         schoolId, key: input.key, label: input.label, trustee: input.trustee ?? null, base: input.base,
-        employeeRate: new Prisma.Decimal(input.employeeRate), employerRate: new Prisma.Decimal(input.employerRate),
-        memoRate: new Prisma.Decimal(input.memoRate), insurableMin: min, insurableMax: max,
+        employeeRate: rate(input.employeeRate, "Employee contribution rate"), employerRate: rate(input.employerRate, "Employer contribution rate"),
+        memoRate: rate(input.memoRate, "Memo allocation rate"), insurableMin: min, insurableMax: max,
         employeeShareTaxDeductible: input.employeeShareTaxDeductible,
         effectiveFrom: date(input.effectiveFrom), effectiveTo: input.effectiveTo ? date(input.effectiveTo) : null,
         status: "DRAFT", sourceNote: input.sourceNote,
@@ -121,6 +134,7 @@ export class PayrollSettingsService {
   }
 
   private assertDates(from: string, to?: string | null) {
+    if (to) date(to);
     if (to && date(to) < date(from)) throw new BadRequestException("The end date cannot be before the effective start date.");
   }
 }

@@ -42,6 +42,18 @@ describe("PayrollSettingsService", () => {
     expect(create).not.toHaveBeenCalled();
   });
 
+  it("rejects impossible dates and out-of-range statutory percentages", async () => {
+    const create = vi.fn();
+    const service = new PayrollSettingsService({ client: { payrollTaxSchedule: { create }, payrollContributionScheme: { create } } } as never);
+    await expect(service.createTaxScheduleDraft("s1", { ...input, effectiveFrom: "2027-02-30" })).rejects.toThrow(/valid effective date/);
+    await expect(service.createTaxScheduleDraft("s1", { ...input, nonResidentRate: "101" })).rejects.toThrow(/between 0 and 100/);
+    await expect(service.createSchemeDraft("s1", {
+      key: "SSNIT_TIER1", label: "Pension", base: "BASIC", employeeRate: "101", employerRate: "13",
+      memoRate: "0", employeeShareTaxDeductible: true, effectiveFrom: "2027-01-01", sourceNote: "Verified notice",
+    })).rejects.toThrow(/between 0 and 100/);
+    expect(create).not.toHaveBeenCalled();
+  });
+
   it("activates only this school's own documented draft, recording the approver", async () => {
     const updateMany = vi.fn(async () => ({ count: 1 }));
     const findUniqueOrThrow = vi.fn(async () => ({ id: "t1" }));

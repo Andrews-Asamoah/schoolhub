@@ -31,6 +31,13 @@ describe("P1 approved payroll settings resolution", () => {
     expect(() => resolvePayrollSettings("school", new Date("2027-01-31T00:00:00Z"), [{ ...tax, status: "DRAFT" }], [tier])).toThrow();
     expect(() => resolvePayrollSettings("school", new Date("2027-01-31T00:00:00Z"), [tax], [{ ...tier, sourceNote: null }])).toThrow();
   });
+  it("ignores optional schemes that are draft, retired or outside the period", () => {
+    const tier3 = { ...tier, id: "draft-tier3", key: "SSNIT_TIER3", status: "DRAFT" };
+    const result = resolvePayrollSettings("school", new Date("2027-01-31T00:00:00Z"), [tax], [tier, tier3]);
+    expect(result.schemeIds).toEqual(["s"]);
+    expect(result.settings.schemes.map(s => s.key)).toEqual(["SSNIT_TIER1"]);
+  });
+
   it("blocks overlapping school-specific schedules", () => {
     const local = { ...tax, schoolId: "school" };
     expect(() => resolvePayrollSettings("school", new Date("2027-01-31T00:00:00Z"), [tax, local, { ...local, id: "dup" }], [tier])).toThrow(/overlapping/);

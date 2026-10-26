@@ -49,7 +49,12 @@ export function resolvePayrollSettings(
   }
   const tax = choose(taxRows, "PAYE tax schedule");
   const bands = assertValidTaxBands(tax.bands);
-  const keys = [...new Set(schemeRows.map(row => row.key))];
+  // Optional schemes still in DRAFT, RETIRED or outside this period must not
+  // prevent every employee from running the mandatory Tier 1 calculation.
+  // A staff member enrolled in an unavailable scheme is rejected by the calculator.
+  const keys = [...new Set(schemeRows
+    .filter(row => row.status === "ACTIVE" && !!row.approvedById && !!row.sourceNote && applies(row, periodEnd))
+    .map(row => row.key))];
   if (!keys.length) throw new BadRequestException("No payroll contribution schemes configured.");
   const selected = keys.map(key => choose(schemeRows.filter(row => row.key === key), `contribution scheme ${key}`));
   if (!selected.some(s => s.key === "SSNIT_TIER1")) throw new BadRequestException("Approved SSNIT_TIER1 contribution scheme is missing.");

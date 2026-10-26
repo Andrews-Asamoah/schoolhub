@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable } from "@nestjs/common";
 import { Prisma, type TransactionCategory } from "@prisma/client";
 import { PrismaService } from "../../prisma/prisma.service.js";
+import { postingDateProblem } from "./finance.helpers.js";
 
 export type PostingInput = {
   schoolId: string; date: Date; description: string; amount: Prisma.Decimal;
@@ -31,7 +32,8 @@ export class FinancePostingService {
       tx.financePeriodLock.findUnique({ where: { schoolId: input.schoolId } }),
     ]);
     if (!debit || !credit) throw new BadRequestException("Accounts must be active and belong to this school.");
-    if (lock && input.date <= lock.lockedThrough) throw new BadRequestException("Posting date is in a closed accounting period.");
+    const dateProblem = postingDateProblem(input.date, lock?.lockedThrough ?? null);
+    if (dateProblem) throw new BadRequestException(dateProblem);
     const prefix = `TXN-${input.date.getUTCFullYear()}-`;
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${input.schoolId}), hashtext(${prefix}))`;
     const previous = await tx.transaction.findFirst({
