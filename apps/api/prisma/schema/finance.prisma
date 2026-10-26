@@ -271,6 +271,7 @@ model Transaction {
   customCategory CustomTransactionCategory? @relation(fields: [customCategoryId], references: [id])
   payments       Payment[]
   financeJournal FinanceJournalEntry?
+  manualJournalPostings FinanceManualJournalPosting[]
   admissionApplication Application?
 
   @@unique([transactionNumber, schoolId])

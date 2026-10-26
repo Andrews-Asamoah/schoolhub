@@ -1,0 +1,67 @@
+// P2 manual/supplementary journals, distinct from the immutable Transaction mirror.
+// Each approved multi-line journal posts a set of balanced paired transactions via
+// FinancePostingService in a single serializable database transaction.
+enum FinanceManualJournalStatus {
+  DRAFT
+  PENDING_APPROVAL
+  APPROVED
+  POSTED
+  REJECTED
+  REVERSED
+  CANCELLED
+}
+
+model FinanceManualJournal {
+  id             String @id @default(cuid())
+  schoolId       String
+  journalNumber  String
+  idempotencyKey String?
+  description    String
+  postingDate    DateTime @db.Date
+  status         FinanceManualJournalStatus @default(DRAFT)
+  totalAmount    Decimal @db.Decimal(15,2)
+  createdById    String
+  submittedAt    DateTime?
+  approvalHash   String?
+  approvedById   String?
+  approvalNote   String?
+  approvedAt     DateTime?
+  postedById     String?
+  postedAt       DateTime?
+  reversalOfId   String? @unique
+  reason         String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  reversalOf     FinanceManualJournal? @relation("ManualJournalReversal", fields: [reversalOfId], references: [id], onDelete: Restrict)
+  reversal       FinanceManualJournal? @relation("ManualJournalReversal")
+  lines          FinanceManualJournalLine[]
+  postings       FinanceManualJournalPosting[]
+
+  @@unique([schoolId, journalNumber])
+  @@unique([schoolId, idempotencyKey])
+  @@index([schoolId, status, postingDate])
+  @@map("finance_manual_journals")
+}
+
+model FinanceManualJournalLine {
+  id        String @id @default(cuid())
+  journalId String
+  position  Int
+  accountId String
+  side      FinanceJournalSide
+  amount    Decimal @db.Decimal(15,2)
+  journal   FinanceManualJournal @relation(fields: [journalId], references: [id], onDelete: Restrict)
+
+  @@unique([journalId, position])
+  @@map("finance_manual_journal_lines")
+}
+
+model FinanceManualJournalPosting {
+  journalId     String
+  transactionId String @unique
+  journal       FinanceManualJournal @relation(fields: [journalId], references: [id], onDelete: Restrict)
+  transaction   Transaction @relation(fields: [transactionId], references: [id], onDelete: Restrict)
+
+  @@id([journalId, transactionId])
+  @@map("finance_manual_journal_postings")
+}

@@ -1,5 +1,7 @@
 import { Module } from "@nestjs/common";
 import { FinanceController } from "./finance.controller.js";
+import { FinanceManualJournalsController } from "./finance-manual-journals.controller.js";
+import { FinanceManualJournalsService } from "./finance-manual-journals.service.js";
 import { FinanceRevenueController } from "./finance-revenue.controller.js";
 import { FinancePeriodsController } from "./finance-periods.controller.js";
 import { FinancePeriodPreparationService } from "./finance-period-preparation.service.js";
@@ -16,8 +18,8 @@ import { PayrollSettingsService } from "./payroll-settings.service.js";
 import { FinanceLedgerIntegrityService } from "./finance-ledger-integrity.service.js";
 
 @Module({
-  controllers: [FinanceController, FinanceRevenueController, FinancePeriodsController],
-  providers: [FinancePeriodPreparationService, FinanceRevenueAdjustmentsService, FinanceService, FinanceExportsService, FinanceApprovalService, FinancePostingService, FinanceLedgerIntegrityService, FinanceAuditInterceptor,
+  controllers: [FinanceController, FinanceRevenueController, FinancePeriodsController, FinanceManualJournalsController],
+  providers: [FinanceManualJournalsService, FinancePeriodPreparationService, FinanceRevenueAdjustmentsService, FinanceService, FinanceExportsService, FinanceApprovalService, FinancePostingService, FinanceLedgerIntegrityService, FinanceAuditInterceptor,
     PayrollSettingsService, FinanceIntegrityJob, DatabaseFinanceRateLimitStore, { provide: FINANCE_RATE_LIMIT_STORE, useExisting: DatabaseFinanceRateLimitStore }],
   exports: [FinanceService, FinanceApprovalService],
 })
