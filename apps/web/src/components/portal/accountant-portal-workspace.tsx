@@ -1,3 +1,4 @@
+import { DatePicker } from "@/components/ui/date-picker";
 import { DataTable, TableExportMenu, type DataTableColumn } from "@/components/ui/data-table";
 import { ServerExportButton } from "@/components/portal/server-export-button";
 import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
@@ -1018,7 +1019,7 @@ export function AccountantPortalWorkspace({
                 {billTargetClasses.map((schoolClass) => <option key={schoolClass.id} value={schoolClass.id}>{schoolClass.name}{typeof schoolClass._count?.students === "number" ? ` · ${schoolClass._count.students} students` : ""}</option>)}
               </select>
             </Field>
-            <Field label="Due date (optional)"><input name="dueDate" type="date" className={inputClass} /></Field>
+            <Field label="Due date (optional)"><DatePicker name="dueDate" buttonClassName={inputClass} /></Field>
             <Field label="Notes (optional)"><textarea name="notes" className={cn(inputClass, "h-20 py-2")} placeholder="Optional note shown on generated bills" /></Field>
             <p className="text-xs leading-5 text-muted-foreground">The operation is performed by the server using the selected class roster and current term. Review the count and total in the confirmation message after generation.</p>
             <ModalActions onCancel={() => { setShowBillForm(false); setSelectedFeeStructureId(""); setSelectedClassId(""); }} busy={generateBills.isPending} submitLabel="Generate bills" />
@@ -1070,7 +1071,7 @@ export function AccountantPortalWorkspace({
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label="Movement type"><select name="type" required className={inputClass} defaultValue="IN"><option value="IN">Stock in — received</option><option value="OUT">Stock out — issued</option></select></Field>
               <Field label="Quantity"><input name="quantity" type="number" required min="1" step="1" className={inputClass} /></Field>
-              <Field label="Movement date"><input name="date" type="date" required defaultValue={new Date().toISOString().slice(0, 10)} className={inputClass} /></Field>
+              <Field label="Movement date"><DatePicker name="date" required defaultValue={new Date().toISOString().slice(0, 10)} buttonClassName={inputClass} /></Field>
               <Field label="Recipient (optional)"><input name="recipientName" maxLength={150} className={inputClass} placeholder="Staff member / department" /></Field>
             </div>
             <Field label="Description (optional)"><textarea name="description" maxLength={500} className={cn(inputClass, "h-20 py-2")} placeholder="Reason or reference" /></Field>
@@ -1084,7 +1085,7 @@ export function AccountantPortalWorkspace({
           <form onSubmit={submitExpense} className="space-y-4">
             {message?.kind === "error" && <QueryError message={message.text} />}
             <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Date"><input name="date" type="date" required defaultValue={new Date().toISOString().slice(0, 10)} className={inputClass} /></Field>
+              <Field label="Date"><DatePicker name="date" required defaultValue={new Date().toISOString().slice(0, 10)} buttonClassName={inputClass} /></Field>
               <Field label="Amount (GHS)"><input name="amount" type="number" required min="0.01" step="0.01" className={inputClass} placeholder="0.00" /></Field>
               <Field label="Payee (optional)"><input name="payee" className={inputClass} placeholder="Supplier or recipient" /></Field>
               <Field label="Category"><select name="category" required className={inputClass} defaultValue="OTHER">{["UTILITIES", "SUPPLIES", "MAINTENANCE", "TRANSPORT", "RENT", "INSURANCE", "TAXES", "SALARY", "OTHER"].map((category) => <option key={category} value={category}>{category.replaceAll("_", " ")}</option>)}</select></Field>

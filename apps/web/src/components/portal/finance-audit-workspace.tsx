@@ -1,3 +1,4 @@
+import { DatePicker } from "@/components/ui/date-picker";
 import { useState } from "react";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { ShieldCheck } from "lucide-react";
@@ -109,11 +110,11 @@ export function FinanceAuditWorkspace() {
           </label>
           <label className="text-sm font-medium">
             From
-            <input type="date" className={inputClass} value={from} onChange={(event) => setFrom(event.target.value)} />
+            <DatePicker buttonClassName={inputClass} value={from} onChange={(value) => setFrom(value)} />
           </label>
           <label className="text-sm font-medium">
             To
-            <input type="date" className={inputClass} value={to} onChange={(event) => setTo(event.target.value)} />
+            <DatePicker buttonClassName={inputClass} value={to} onChange={(value) => setTo(value)} />
           </label>
         </div>
         {rangeInvalid && <p role="alert" className="mt-3 text-sm text-destructive">The start date must be on or before the end date.</p>}

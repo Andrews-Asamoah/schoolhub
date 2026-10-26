@@ -1,3 +1,4 @@
+import { DatePicker } from "@/components/ui/date-picker";
 import { StudentProfileModal } from "@/components/school/student-profile-panel";
 import { useForm } from "@tanstack/react-form";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -1113,13 +1114,18 @@ function StudentTextField({
     <label className="text-xs font-semibold text-foreground">
       {label}
       {required ? " *" : ""}
-      <input
-        type={type}
-        required={required}
-        className={inputClasses}
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-      />
+      {type === "date" ? (
+        <DatePicker value={value} onChange={onChange} required={required}
+          ariaLabel={label} buttonClassName={inputClasses} />
+      ) : (
+        <input
+          type={type}
+          required={required}
+          className={inputClasses}
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+        />
+      )}
     </label>
   );
 }

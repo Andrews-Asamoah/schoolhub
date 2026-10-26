@@ -1,3 +1,4 @@
+import { DatePicker } from "@/components/ui/date-picker";
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import ExcelJS from "exceljs";
@@ -251,8 +252,8 @@ export function StudentStatementWorkspace() {
           ) : <div />}
         </div>
         <div className="mt-3 grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
-          <label className="block text-xs font-semibold text-muted-foreground">From (optional)<input className={cn(inputClass, "mt-1")} type="date" value={from} onChange={(event) => setFrom(event.target.value)} /></label>
-          <label className="block text-xs font-semibold text-muted-foreground">To (optional)<input className={cn(inputClass, "mt-1")} type="date" value={to} onChange={(event) => setTo(event.target.value)} /></label>
+          <label className="block text-xs font-semibold text-muted-foreground">From (optional)<DatePicker buttonClassName={cn(inputClass, "mt-1")} value={from} onChange={(value) => setFrom(value)} /></label>
+          <label className="block text-xs font-semibold text-muted-foreground">To (optional)<DatePicker buttonClassName={cn(inputClass, "mt-1")} value={to} onChange={(value) => setTo(value)} /></label>
           <button className={secondaryButton} type="button" onClick={() => { setFrom(""); setTo(""); }} disabled={!from && !to}>Clear dates</button>
         </div>
       </div>

@@ -1,3 +1,4 @@
+import { DatePicker } from "@/components/ui/date-picker";
 import { useForm } from "@tanstack/react-form";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -155,12 +156,11 @@ export function AcademicYearSetup({ years }: AcademicYearSetupProps) {
             <form.Field name="startDate">
               {(field) => (
                 <FormField label="Year starts" htmlFor={field.name} error={field.state.meta.errors}>
-                  <FormInput
+                  <DatePicker
                     id={field.name}
-                    type="date"
                     value={field.state.value}
                     onBlur={field.handleBlur}
-                    onChange={(event) => field.handleChange(event.target.value)}
+                    onChange={(value) => field.handleChange(value)}
                     aria-invalid={field.state.meta.errors.length > 0}
                   />
                 </FormField>
@@ -169,12 +169,11 @@ export function AcademicYearSetup({ years }: AcademicYearSetupProps) {
             <form.Field name="endDate">
               {(field) => (
                 <FormField label="Year ends" htmlFor={field.name} error={field.state.meta.errors}>
-                  <FormInput
+                  <DatePicker
                     id={field.name}
-                    type="date"
                     value={field.state.value}
                     onBlur={field.handleBlur}
-                    onChange={(event) => field.handleChange(event.target.value)}
+                    onChange={(value) => field.handleChange(value)}
                     aria-invalid={field.state.meta.errors.length > 0}
                   />
                 </FormField>
@@ -263,13 +262,12 @@ export function AcademicYearSetup({ years }: AcademicYearSetupProps) {
                         />
                       </FormField>
                       <FormField label="Starts" htmlFor={`term-${index}-start`}>
-                        <FormInput
+                        <DatePicker
                           id={`term-${index}-start`}
-                          type="date"
                           value={term.startDate}
                           onBlur={termsField.handleBlur}
-                          onChange={(event) => {
-                            const startDate = event.target.value;
+                          onChange={(value) => {
+                            const startDate = value;
                             termsField.handleChange((current) =>
                               (current ?? []).map((item, itemIndex) =>
                                 itemIndex === index ? { ...item, startDate } : item,
@@ -279,13 +277,12 @@ export function AcademicYearSetup({ years }: AcademicYearSetupProps) {
                         />
                       </FormField>
                       <FormField label="Ends" htmlFor={`term-${index}-end`}>
-                        <FormInput
+                        <DatePicker
                           id={`term-${index}-end`}
-                          type="date"
                           value={term.endDate}
                           onBlur={termsField.handleBlur}
-                          onChange={(event) => {
-                            const endDate = event.target.value;
+                          onChange={(value) => {
+                            const endDate = value;
                             termsField.handleChange((current) =>
                               (current ?? []).map((item, itemIndex) =>
                                 itemIndex === index ? { ...item, endDate } : item,

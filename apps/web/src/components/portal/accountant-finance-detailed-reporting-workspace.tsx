@@ -1,3 +1,4 @@
+import { DatePicker } from "@/components/ui/date-picker";
 import { DataTable, TableExportMenu, type DataTableColumn } from "@/components/ui/data-table";
 import { ServerExportButton } from "@/components/portal/server-export-button";
 import type { ExportTable } from "@/lib/table-export";
@@ -737,23 +738,21 @@ export function AccountantFinanceDetailedReportingWorkspace({ classes }: Props) 
 
         <label className="space-y-1 text-xs font-medium text-muted-foreground">
           From date
-          <input
-            className={inputClass + " mt-1"}
-            type="date"
+          <DatePicker
+            buttonClassName={inputClass + " mt-1"}
             value={from}
             max={to || undefined}
-            onChange={(event) => setFrom(event.target.value)}
+            onChange={(value) => setFrom(value)}
           />
         </label>
 
         <label className="space-y-1 text-xs font-medium text-muted-foreground">
           To date
-          <input
-            className={inputClass + " mt-1"}
-            type="date"
+          <DatePicker
+            buttonClassName={inputClass + " mt-1"}
             value={to}
             min={from || undefined}
-            onChange={(event) => setTo(event.target.value)}
+            onChange={(value) => setTo(value)}
           />
         </label>
       </div>

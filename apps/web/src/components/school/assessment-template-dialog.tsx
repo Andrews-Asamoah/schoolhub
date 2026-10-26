@@ -1,3 +1,4 @@
+import { DatePicker } from "@/components/ui/date-picker";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ASSESSMENT_TYPES, ASSESSMENT_TYPE_LABELS, saveAssessmentTemplateSchema, type AssessmentTypeName } from "@schoolhub/shared";
 import { ArrowDown, ArrowUp, CircleAlert, CircleCheck, Lock, LoaderCircle, Plus, Trash2, Wand2, X } from "lucide-react";
@@ -375,7 +376,7 @@ export function AssessmentTemplateDialog({
             <div className="grid gap-3 sm:grid-cols-3">
               <label className={label}>
                 Deadline for entering marks (optional)
-                <input type="date" className={box} value={deadline} onChange={(event) => setDeadline(event.target.value)} />
+                <DatePicker buttonClassName={box} value={deadline} onChange={(value) => setDeadline(value)} />
               </label>
               <label className="flex items-start gap-2 text-xs text-foreground/80">
                 <input type="checkbox" checked={isActive} onChange={(event) => setIsActive(event.target.checked)} className="mt-0.5 accent-primary" />
