@@ -33,3 +33,15 @@ export function canExportFinancePayroll(actorPlatformRole: string | null | undef
  * second-person decision: the accountant prepares drafts, the owner or headteacher approves.
  */
 export const PAYROLL_SETTINGS_APPROVE_ROLES = ["owner", "headteacher"] as const;
+
+/** P0 table-driven role mapping until named per-school permissions arrive in P9.
+ * An unrecognised policy permission is always denied, never treated as a write role.
+ */
+export function canApproveFinancePolicy(permission: string, schoolRole: string | null | undefined): boolean {
+  switch (permission) {
+    case "PAYROLL_APPROVE":
+      return schoolRole === "owner" || schoolRole === "headteacher" || schoolRole === "accountant";
+    default:
+      return false;
+  }
+}
