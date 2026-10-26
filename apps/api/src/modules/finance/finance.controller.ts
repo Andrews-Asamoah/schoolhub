@@ -262,7 +262,7 @@ export class FinanceController {
     @CurrentUser() user: AuthenticatedUser,
     @Body(new ZodValidationPipe(z.object({
       approvalReference: z.string().trim().min(8).max(160),
-      expectedOpeningReceivables: z.string().regex(/^\\d+(?:\\.\\d{1,2})?$/),
+      expectedOpeningReceivables: z.string().regex(/^\d+(?:\.\d{1,2})?$/),
       confirmInvoiceRevenuePolicy: z.literal(true),
     }))) body: { approvalReference: string; expectedOpeningReceivables: string; confirmInvoiceRevenuePolicy: true },
   ) {
