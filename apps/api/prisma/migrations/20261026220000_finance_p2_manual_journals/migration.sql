@@ -59,9 +59,12 @@ CREATE UNIQUE INDEX "finance_manual_journal_postings_transactionId_key"
 -- this immutable payload; line mutations are only permitted for DRAFT rows.
 CREATE FUNCTION finance_manual_journal_line_guard() RETURNS trigger AS $$
 DECLARE target_status "FinanceManualJournalStatus";
+DECLARE target_id TEXT;
 BEGIN
+  IF TG_OP = 'DELETE' THEN target_id := OLD."journalId";
+  ELSE target_id := NEW."journalId"; END IF;
   SELECT "status" INTO target_status FROM "finance_manual_journals"
-   WHERE "id" = COALESCE(NEW."journalId", OLD."journalId") FOR UPDATE;
+   WHERE "id" = target_id FOR UPDATE;
   IF target_status IS DISTINCT FROM 'DRAFT' THEN
     RAISE EXCEPTION 'Submitted journal lines cannot be changed';
   END IF;
