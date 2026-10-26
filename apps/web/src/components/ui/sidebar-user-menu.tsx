@@ -53,11 +53,16 @@ export function SidebarUserMenu({ name, email, image, roleLabel, profileLink }: 
     const left = beside ? rect.right + GAP : rect.left;
     setPosition({
       left: Math.max(GAP, Math.min(left, window.innerWidth - width - GAP)),
-      bottom: beside
-        ? Math.min(window.innerHeight - GAP - 200, Math.max(GAP, window.innerHeight - rect.bottom))
-        : Math.min(window.innerHeight - GAP - 200, window.innerHeight - rect.top + GAP),
+      bottom: Math.max(GAP, Math.min(window.innerHeight - 220, beside ? window.innerHeight - rect.bottom : window.innerHeight - rect.top + GAP)),
     });
   };
+
+  // The panel is rendered in a portal. Focus its first action on keyboard opening.
+  useEffect(() => {
+    if (open && position && document.activeElement === triggerRef.current) {
+      panelRef.current?.querySelector<HTMLElement>('[role="menuitem"]')?.focus();
+    }
+  }, [open, position]);
 
   const close = (returnFocus = false) => {
     setOpen(false);
@@ -107,7 +112,7 @@ export function SidebarUserMenu({ name, email, image, roleLabel, profileLink }: 
         aria-haspopup="menu"
         aria-expanded={open}
         aria-label={`Account menu for ${displayName}`}
-        onClick={() => { closeMobile(); setOpen((value) => !value); }}
+        onClick={() => setOpen((value) => !value)}
         className={cn(
           "group flex w-full min-w-0 items-center gap-2 rounded-lg border border-sidebar-border bg-sidebar-accent/30 p-1.5 text-left transition-colors",
           "hover:bg-sidebar-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring",
@@ -197,7 +202,7 @@ export function SidebarUserMenu({ name, email, image, roleLabel, profileLink }: 
             {/* Profile Action Link */}
             <div className="border-t border-border/50 p-1.5">
               {profileLink({
-                onClick: () => close(),
+                onClick: () => { close(); closeMobile(); },
                 className: cn(
                   itemBase,
                   "hover:bg-muted/70 focus-visible:bg-muted/70",
@@ -227,7 +232,7 @@ export function SidebarUserMenu({ name, email, image, roleLabel, profileLink }: 
                 type="button"
                 role="menuitem"
                 disabled={isSigningOut}
-                onClick={() => void logout()}
+                onClick={() => { closeMobile(); void logout(); }}
                 className={cn(
                   itemBase,
                   "hover:bg-destructive/10 focus-visible:bg-destructive/10 disabled:cursor-wait disabled:opacity-70",
