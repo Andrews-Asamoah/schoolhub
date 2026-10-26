@@ -1,5 +1,6 @@
 import { ChevronLeft, ChevronRight, CalendarDays } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { createPortal } from "react-dom";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const WEEKDAYS = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"];
@@ -97,6 +98,20 @@ export function DatePicker({
   const [view, setView] = useState(() => selected ?? ((maxDate ?? maxProp) ? parseIso((maxDate ?? maxProp)!) : null) ?? new Date());
   const rootRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
+  const [popoverPosition, setPopoverPosition] = useState({ top: 8, left: 8 });
+  const positionPopover = () => {
+    const rect = buttonRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const width = Math.min(304, window.innerWidth - 16);
+    const height = Math.min(popoverRef.current?.getBoundingClientRect().height ?? 450, window.innerHeight - 16);
+    const roomBelow = window.innerHeight - rect.bottom - 8;
+    const above = roomBelow < height && rect.top > roomBelow;
+    setPopoverPosition({
+      left: Math.max(8, Math.min(rect.right - width, window.innerWidth - width - 8)),
+      top: above ? Math.max(8, rect.top - height - 8) : Math.max(8, Math.min(rect.bottom + 8, window.innerHeight - height - 8)),
+    });
+  };
   const resolvedMax = maxDate ?? maxProp;
   const resolvedMin = minDate ?? minProp;
   const max = resolvedMax ? parseIso(resolvedMax) : null;
@@ -110,19 +125,26 @@ export function DatePicker({
     if (!open) return;
     const handlePointer = (event: MouseEvent) => {
       const target = event.target as HTMLElement;
-      if (rootRef.current && !rootRef.current.contains(target)
-        && !target.closest('[role="listbox"], [data-radix-popper-content-wrapper]')) {
-        setOpen(false);
-      }
+      if (rootRef.current?.contains(target) || popoverRef.current?.contains(target)
+        || target.closest('[role="listbox"], [data-radix-popper-content-wrapper]')) return;
+      setOpen(false);
     };
     const handleKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setOpen(false);
+      if (event.key === "Escape") {
+        setOpen(false);
+        buttonRef.current?.focus();
+      }
     };
+    positionPopover();
     document.addEventListener("mousedown", handlePointer);
     document.addEventListener("keydown", handleKey);
+    window.addEventListener("scroll", positionPopover, true);
+    window.addEventListener("resize", positionPopover);
     return () => {
       document.removeEventListener("mousedown", handlePointer);
       document.removeEventListener("keydown", handleKey);
+      window.removeEventListener("scroll", positionPopover, true);
+      window.removeEventListener("resize", positionPopover);
     };
   }, [open]);
 
@@ -183,11 +205,13 @@ export function DatePicker({
         <CalendarDays className="size-4 shrink-0 text-primary" />
       </button>
 
-      {open && (
+      {open && createPortal(
         <div
+          ref={popoverRef}
           role="dialog"
           aria-label="Choose a date"
-          className="absolute right-0 z-50 mt-2 w-[min(19rem,calc(100vw-2rem))] rounded-2xl border border-border bg-popover p-3 text-popover-foreground shadow-xl"
+          style={{ position: "fixed", top: popoverPosition.top, left: popoverPosition.left }}
+          className="z-50 max-h-[calc(100vh-1rem)] w-[min(19rem,calc(100vw-1rem))] overflow-y-auto rounded-2xl border border-border bg-popover p-3 text-popover-foreground shadow-xl"
         >
           <div className="mb-3 flex items-center gap-2">
             <button
@@ -266,8 +290,7 @@ export function DatePicker({
               className="rounded-lg px-2.5 py-1.5 text-xs font-semibold text-primary hover:bg-primary/10 disabled:opacity-40"
             >Today</button>
           </div>
-        </div>
-      )}
+        </div>, document.body)}
     </div>
   );
 }
