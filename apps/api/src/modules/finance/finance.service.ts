@@ -3667,6 +3667,33 @@ export class FinanceService {
     if (!payroll) throw new NotFoundException("Payroll run not found.");
     if (payroll.status === "DRAFT" && input.status === "APPROVED") {
       if (!payroll._count.payslips) throw new BadRequestException("A payroll run without payslips cannot be approved.");
+      // Approval freezes the run. Reconcile every payslip with the run's stored totals
+      // before authorising it; a draft can become stale after salary or payslip edits.
+      const approvalSlips = await db.payslip.findMany({
+        where: { schoolId, payrollRecordId: payroll.id },
+        select: {
+          grossSalary: true, netSalary: true, incomeTax: true,
+          ssnitEmployee: true, ssnitEmployer: true, otherDeductions: true,
+        },
+      });
+      if (approvalSlips.length !== payroll._count.payslips) {
+        throw new ConflictException("Payroll payslips changed during approval. Refresh and review the run.");
+      }
+      const approvalSum = (field: "grossSalary" | "netSalary" | "incomeTax" | "ssnitEmployee" | "ssnitEmployer" | "otherDeductions") =>
+        approvalSlips.reduce((total, slip) => total.plus(slip[field]), new Prisma.Decimal(0));
+      for (const slip of approvalSlips) {
+        if (slip.netSalary.lt(0) || !slip.grossSalary.eq(
+          slip.netSalary.plus(slip.incomeTax).plus(slip.ssnitEmployee).plus(slip.otherDeductions)
+        )) {
+          throw new BadRequestException("A payslip has negative net pay or does not balance. Correct the draft before approval.");
+        }
+      }
+      if (!payroll.totalGross.eq(approvalSum("grossSalary"))
+        || !payroll.totalNet.eq(approvalSum("netSalary"))
+        || !payroll.totalTax.eq(approvalSum("incomeTax"))
+        || !payroll.totalSSNIT.eq(approvalSum("ssnitEmployee").plus(approvalSum("ssnitEmployer")))) {
+        throw new BadRequestException("Payroll totals no longer match its payslips. Recalculate the draft before approval.");
+      }
       // Maker-checker through the approval engine: the preparer is the requester, so the
       // approver must be someone else unless the school's audited allowSelfApproval is set.
       const payload = {
