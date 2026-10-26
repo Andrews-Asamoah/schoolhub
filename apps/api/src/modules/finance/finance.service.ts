@@ -3576,6 +3576,44 @@ export class FinanceService {
     return { id: personId, type: kind, monthlySalary };
   }
 
+  /** Explicit, idempotent initial migration of the salary register to pay profiles.
+   * The effective date is provided by an authorised school accountant, never guessed.
+   */
+  async backfillPayrollProfiles(schoolId: string, actorId: string, effectiveFrom: string) {
+    const start = parseIsoDate(effectiveFrom, "pay-profile effective date");
+    if (!start || start > new Date()) {
+      throw new BadRequestException("The pay-profile effective date must be a real date not in the future.");
+    }
+    return this.prisma.client.$transaction(async tx => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${schoolId}), hashtext('payroll-profile-backfill'))`;
+      const [teachers, staff, existing] = await Promise.all([
+        tx.teacher.findMany({ where: { schoolId, isActive: true, deletedAt: null, monthlySalary: { gt: 0 } },
+          select: { id: true, monthlySalary: true } }),
+        tx.staff.findMany({ where: { schoolId, isActive: true, deletedAt: null, monthlySalary: { gt: 0 } },
+          select: { id: true, monthlySalary: true } }),
+        tx.staffPayProfile.findMany({ where: { schoolId }, select: { teacherId: true, staffId: true } }),
+      ]);
+      const identities = new Set(existing.map(p => p.teacherId ? "TEACHER:" + p.teacherId : "STAFF:" + p.staffId));
+      const inputs = [
+        ...teachers.filter(p => !identities.has("TEACHER:" + p.id)).map(p => ({
+          schoolId, teacherId: p.id, staffId: null, basicSalary: p.monthlySalary!,
+          effectiveFrom: start, createdById: actorId, schemeKeys: ["SSNIT_TIER1"],
+        })),
+        ...staff.filter(p => !identities.has("STAFF:" + p.id)).map(p => ({
+          schoolId, teacherId: null, staffId: p.id, basicSalary: p.monthlySalary!,
+          effectiveFrom: start, createdById: actorId, schemeKeys: ["SSNIT_TIER1"],
+        })),
+      ];
+      if (inputs.length) await tx.staffPayProfile.createMany({ data: inputs });
+      await this.writeAudit(tx, {
+        actorId, schoolId, action: "CREATE", entityType: "PAYROLL_PROFILE_BACKFILL",
+        entityId: schoolId, oldValues: null,
+        newValues: { effectiveFrom, created: inputs.length, alreadyProfiled: existing.length },
+      });
+      return { created: inputs.length, alreadyProfiled: existing.length, effectiveFrom };
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+  }
+
   async generatePayrollDraft(
     schoolId: string,
     processedById: string,
