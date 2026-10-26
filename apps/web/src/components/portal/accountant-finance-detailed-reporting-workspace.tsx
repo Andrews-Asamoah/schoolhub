@@ -121,6 +121,26 @@ const amount = (value: number | string) => {
   return Number.isFinite(parsed) ? parsed : 0;
 };
 
+// Financial totals are accumulated in integer pesewas, never binary floats.
+// Conversion to JS numbers happens only for existing chart/table presentation.
+function moneyCents(value: string | number): bigint {
+  // API money may arrive as a decimal string or an already-parsed JSON number.
+  // Normalise the latter to the database's two-decimal currency scale.
+  const raw = (typeof value === "number" ? value.toFixed(2) : value).trim();
+  const matched = /^(-?)(\d+)(?:\.(\d{1,2}))?$/.exec(raw);
+  if (!matched) throw new Error("Invalid money amount in financial report.");
+  const cents = BigInt(matched[2]!) * 100n + BigInt((matched[3] ?? "").padEnd(2, "0"));
+  return matched[1] ? -cents : cents;
+}
+function centsNumber(cents: bigint): number {
+  if (cents > BigInt(Number.MAX_SAFE_INTEGER) || cents < BigInt(-Number.MAX_SAFE_INTEGER)) {
+    throw new Error("Financial report amount exceeds safe display precision.");
+  }
+  return Number(cents) / 100;
+}
+function moneyTotal<T>(rows: readonly T[], select: (row: T) => string | number): number {
+  return centsNumber(rows.reduce((total, row) => total + moneyCents(select(row)), 0n));
+}
 const settled = (status: string) => status.toUpperCase() === "COMPLETED";
 
 const dateText = (value?: string | null) => {
@@ -380,21 +400,20 @@ export function AccountantFinanceDetailedReportingWorkspace({ classes }: Props) 
     settled(payment.status),
   );
 
-  const collected = completedPayments.reduce(
-    (sum, payment) => sum + (
-      reportType === "class" && classId !== "ALL"
-        ? paymentClassAllocations(payment, billsById).find((allocation) => allocation.classId === classId)?.amount ?? 0
-        : amount(payment.amount)
-    ),
-    0,
+  const collected = moneyTotal(completedPayments, (payment) =>
+    reportType === "class" && classId !== "ALL"
+      ? paymentClassAllocations(payment, billsById).find((allocation) => allocation.classId === classId)?.amount ?? 0
+      : payment.amount,
   );
 
-  const billed = visibleBills
+  const billedCents = visibleBills
     .filter(
       (bill) =>
         bill.status !== "CANCELLED" && bill.status !== "WAIVED",
     )
-    .reduce((sum, bill) => sum + amount(bill.totalAmount), 0);
+    .reduce((sum, bill) => sum + moneyCents(bill.totalAmount), 0n);
+
+  const billed = centsNumber(billedCents);
 
   // Outstanding is the current balance across all dates, not just the
   // selected reporting period or search-filtered rows.
@@ -410,10 +429,10 @@ export function AccountantFinanceDetailedReportingWorkspace({ classes }: Props) 
             )
             .reduce(
               (sum, bill) =>
-                sum + Math.max(0, amount(bill.balanceAmount)),
-              0,
+                sum + (moneyCents(bill.balanceAmount) > 0n ? moneyCents(bill.balanceAmount) : 0n),
+              0n,
             )
-        : 0
+        : 0n
       : bills
           .filter(
             (bill) =>
@@ -423,19 +442,21 @@ export function AccountantFinanceDetailedReportingWorkspace({ classes }: Props) 
           )
           .reduce(
             (sum, bill) =>
-              sum + Math.max(0, amount(bill.balanceAmount)),
-            0,
+              sum + (moneyCents(bill.balanceAmount) > 0n ? moneyCents(bill.balanceAmount) : 0n),
+            0n,
           );
+
+  const outstandingMoney = centsNumber(outstanding);
 
   const classSummary = useMemo(() => {
     const totals = new Map<
       string,
       {
         name: string;
-        collected: number;
+        collected: bigint;
         receipts: number;
-        billed: number;
-        outstanding: number;
+        billed: bigint;
+        outstanding: bigint;
       }
     >();
 
@@ -444,18 +465,18 @@ export function AccountantFinanceDetailedReportingWorkspace({ classes }: Props) 
 
       const entry = totals.get(key) ?? {
         name: bill.class?.name ?? "Class not recorded",
-        collected: 0,
+        collected: 0n,
         receipts: 0,
-        billed: 0,
-        outstanding: 0,
+        billed: 0n,
+        outstanding: 0n,
       };
 
       if (
         bill.status !== "CANCELLED" &&
         bill.status !== "WAIVED"
       ) {
-        entry.billed += amount(bill.totalAmount);
-        entry.outstanding += Math.max(0, amount(bill.balanceAmount));
+        entry.billed += moneyCents(bill.totalAmount);
+        entry.outstanding += moneyCents(bill.balanceAmount) > 0n ? moneyCents(bill.balanceAmount) : 0n;
       }
 
       totals.set(key, entry);
@@ -467,29 +488,33 @@ export function AccountantFinanceDetailedReportingWorkspace({ classes }: Props) 
         if (allocation.amount <= 0) continue;
         const entry = totals.get(allocation.classId) ?? {
           name: allocation.name,
-          collected: 0,
+          collected: 0n,
           receipts: 0,
-          billed: 0,
-          outstanding: 0,
+          billed: 0n,
+          outstanding: 0n,
         };
-        entry.collected += allocation.amount;
+        entry.collected += moneyCents(allocation.amount);
         entry.receipts += 1;
         totals.set(allocation.classId, entry);
       }
     }
 
-    return [...totals.values()].sort(
-      (a, b) => b.collected - a.collected,
-    );
+    return [...totals.values()].sort((a, b) =>
+      a.collected === b.collected ? a.name.localeCompare(b.name) : a.collected > b.collected ? -1 : 1,
+    ).map((row) => ({
+      ...row,
+      collected: centsNumber(row.collected),
+      billed: centsNumber(row.billed),
+      outstanding: centsNumber(row.outstanding),
+    }));
   }, [billsById, visibleBills, completedPayments, reportType, classId]);
 
-  const periodCollected = scopedPayments
-    .filter((payment) => settled(payment.status))
-    .reduce((sum, payment) => sum + (
-      reportType === "class" && classId !== "ALL"
-        ? paymentClassAllocations(payment, billsById).find((allocation) => allocation.classId === classId)?.amount ?? 0
-        : amount(payment.amount)
-    ), 0);
+  const periodCollected = moneyTotal(
+    scopedPayments.filter((payment) => settled(payment.status)),
+    (payment) => reportType === "class" && classId !== "ALL"
+      ? paymentClassAllocations(payment, billsById).find((allocation) => allocation.classId === classId)?.amount ?? 0
+      : payment.amount,
+  );
 
   const previousPeriodCollected = useMemo(() => {
     if (
@@ -506,7 +531,7 @@ export function AccountantFinanceDetailedReportingWorkspace({ classes }: Props) 
     const previousStart = range.start.getTime() - duration;
     const previousEnd = range.start.getTime() - 1;
 
-    return payments
+    return centsNumber(payments
       .filter((payment) => {
         if (!settled(payment.status)) {
           return false;
@@ -532,11 +557,11 @@ export function AccountantFinanceDetailedReportingWorkspace({ classes }: Props) 
           timestamp <= previousEnd
         );
       })
-      .reduce((sum, payment) => sum + (
+      .reduce((sum, payment) => sum + moneyCents(
         reportType === "class" && classId !== "ALL"
           ? paymentClassAllocations(payment, billsById).find((allocation) => allocation.classId === classId)?.amount ?? 0
-          : amount(payment.amount)
-      ), 0);
+          : payment.amount
+      ), 0n));
   }, [
     payments,
     billsById,
@@ -575,7 +600,7 @@ export function AccountantFinanceDetailedReportingWorkspace({ classes }: Props) 
         rows: [
           ...visibleBills.map((bill) => ["Invoice", bill.billNumber, dateText(bill.issuedAt), dateText(bill.dueDate), bill.class?.name ?? "", "", amount(bill.totalAmount), amount(bill.paidAmount), amount(bill.balanceAmount), bill.status]),
           ...visiblePayments.map((payment) => ["Receipt", payment.paymentNumber, dateText(payment.paymentDate), "", payment.bill?.billNumber ?? "Unallocated", payment.paymentMethod, amount(payment.amount), null, null, payment.status]),
-          ["Closing outstanding balance", "", "", "", "", "", null, null, outstanding, ""],
+          ["Closing outstanding balance", "", "", "", "", "", null, null, outstandingMoney, ""],
         ],
         reportInfo,
       };
@@ -785,7 +810,7 @@ export function AccountantFinanceDetailedReportingWorkspace({ classes }: Props) 
             Current outstanding
           </p>
           <p className="mt-1 text-xl font-bold tabular-nums text-foreground">
-            {money(outstanding)}
+            {money(outstandingMoney)}
           </p>
           <p className="mt-1 text-xs text-muted-foreground">
             Open bill balances, all dates
@@ -947,7 +972,7 @@ export function AccountantFinanceDetailedReportingWorkspace({ classes }: Props) 
             </div>
 
             <p className="border-t border-border pt-3 text-sm font-semibold text-foreground">
-              Current outstanding across all open bills: {money(outstanding)}
+              Current outstanding across all open bills: {money(outstandingMoney)}
             </p>
           </div>
         )}

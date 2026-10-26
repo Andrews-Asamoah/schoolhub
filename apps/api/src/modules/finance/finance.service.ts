@@ -7,21 +7,42 @@ import {
 } from "@nestjs/common";
 import { PrismaService } from "../../prisma/prisma.service.js";
 import type { CreateExpenseInput, GenerateBillInput, RecordPaymentInput, StudentStatementResponse } from "@schoolhub/shared";
+import { calculatePayslip, type PayrollSettings } from "./payroll/payroll-calculator.js";
 import { Prisma, type AccountCategory, type AccountType, type AuditAction, type PaymentMethod, type TransactionCategory } from "@prisma/client";
 import { canManageAcademicContext } from "../../common/academic-context.js";
 import { createSequence, isIdempotencyRace, isSerializationFailure, postingDateProblem, withSerializableRetry } from "./finance.helpers.js";
 import { buildFinanceAuditWhere, categoryOf, clampPageSize, describeFinanceAudit, type FinanceAuditQuery } from "./finance-audit.helpers.js";
 import { buildRunningStatement, daysPastDue, type StatementEvent } from "./finance-reporting.helpers.js";
 
-const PAYE_MONTHLY_BANDS_2026 = [
-  { limit: 588, rate: 0 },
-  { limit: 80, rate: 0.05 },
-  { limit: 100, rate: 0.10 },
-  { limit: 2_900, rate: 0.175 },
-  { limit: 16_000, rate: 0.25 },
-  { limit: 30_332, rate: 0.30 },
-  { limit: Number.POSITIVE_INFINITY, rate: 0.35 },
-] as const;
+// Transitional statutory profile: existing draft fields cannot yet hold individual
+// contributions or persist versioned settings. Do not silently apply it to later years.
+// Future school-specific settings must be effective-dated and snapshotted per run.
+const PAYROLL_PROFILE_2026: PayrollSettings = {
+  rounding: "HALF_UP",
+  taxSchedule: {
+    bands: [
+      { width: "588", rate: "0" },
+      { width: "80", rate: "5" },
+      { width: "100", rate: "10" },
+      { width: "2900", rate: "17.5" },
+      { width: "16000", rate: "25" },
+      { width: "30332", rate: "30" },
+      { width: null, rate: "35" },
+    ],
+    nonResidentRate: "25",
+  },
+  schemes: [{
+    key: "SSNIT_TIER1",
+    label: "SSNIT (existing payroll profile)",
+    base: "BASIC",
+    employeeRate: "5.5",
+    employerRate: "13",
+    memoRate: "0",
+    insurableMin: "587.80",
+    insurableMax: "69000",
+    employeeShareTaxDeductible: true,
+  }],
+};
 
 function roundMoney(value: number) {
   return Math.round((value + Number.EPSILON) * 100) / 100;
@@ -74,18 +95,6 @@ function addUtcDays(date: Date, days: number): Date {
 
 function moneyString(value: Prisma.Decimal | null | undefined): string {
   return (value ?? new Prisma.Decimal(0)).toFixed(2);
-}
-
-function calculateResidentPaye2026(chargeableIncome: number) {
-  let remaining = Math.max(0, chargeableIncome);
-  let tax = 0;
-  for (const band of PAYE_MONTHLY_BANDS_2026) {
-    if (remaining <= 0) break;
-    const taxableInBand = Math.min(remaining, band.limit);
-    tax += taxableInBand * band.rate;
-    remaining -= taxableInBand;
-  }
-  return roundMoney(tax);
 }
 
 @Injectable()
@@ -1482,6 +1491,25 @@ export class FinanceService {
         }
         if (billAmounts.size === 0 && payment.billId) billAmounts.set(payment.billId, payment.amount);
       }
+      // Reconcile the original receipt before touching any balance. A mismatch
+      // indicates corrupt/partial allocation history; never silently clamp it.
+      const appliedToBills = [...billAmounts.values()].reduce(
+        (total, value) => total.plus(value), new Prisma.Decimal(0),
+      );
+      if (billAmounts.size === 0 || !appliedToBills.eq(payment.amount)) {
+        throw new ConflictException("Receipt allocations do not reconcile to the payment amount. No reversal was applied.");
+      }
+      if (payment.paymentItems.length) {
+        const appliedToItems = payment.paymentItems.reduce(
+          (total, item) => total.plus(item.amount), new Prisma.Decimal(0),
+        );
+        if (!appliedToItems.eq(appliedToBills)) {
+          throw new ConflictException("Receipt item allocations do not match its bill allocations. No reversal was applied.");
+        }
+      }
+      if (payment.transaction && !payment.transaction.amount.eq(payment.amount)) {
+        throw new ConflictException("The receipt and its accounting entry have different amounts. No reversal was applied.");
+      }
       const billIds = [...billAmounts.keys()].sort();
       if (billIds.length) {
         await tx.$executeRaw`
@@ -1508,9 +1536,15 @@ export class FinanceService {
           where: { id: billItemId, bill: { schoolId, studentId: payment.studentId } },
         });
         if (!item) throw new ConflictException("The original bill-item allocation is missing. No reversal was applied.");
-        const nextPaid = Prisma.Decimal.max(0, item.paidAmount.minus(allocatedAmount));
+        if (item.paidAmount.lt(allocatedAmount)) {
+          throw new ConflictException("Bill item has less paid value than the receipt being reversed.");
+        }
+        const nextPaid = item.paidAmount.minus(allocatedAmount);
         const netTotal = item.totalAmount.minus(item.discountAmount);
-        const nextBalance = Prisma.Decimal.min(netTotal, item.balanceAmount.plus(allocatedAmount));
+        if (item.balanceAmount.plus(allocatedAmount).gt(netTotal)) {
+          throw new ConflictException("Reversal would exceed the bill item's net amount.");
+        }
+        const nextBalance = item.balanceAmount.plus(allocatedAmount);
         await tx.billItem.update({
           where: { id: item.id },
           data: {
@@ -1523,8 +1557,14 @@ export class FinanceService {
       for (const [billId, allocatedAmount] of billAmounts) {
         const bill = billsById.get(billId);
         if (!bill) throw new ConflictException("The original bill allocation is missing. No reversal was applied.");
-        const paid = Prisma.Decimal.max(0, bill.paidAmount.minus(allocatedAmount));
-        const balance = Prisma.Decimal.min(bill.totalAmount, bill.balanceAmount.plus(allocatedAmount));
+        if (bill.paidAmount.lt(allocatedAmount)) {
+          throw new ConflictException("Bill has less paid value than the receipt being reversed.");
+        }
+        const paid = bill.paidAmount.minus(allocatedAmount);
+        if (bill.balanceAmount.plus(allocatedAmount).gt(bill.totalAmount)) {
+          throw new ConflictException("Reversal would exceed the billed amount.");
+        }
+        const balance = bill.balanceAmount.plus(allocatedAmount);
         await tx.bill.update({
           where: { id: bill.id },
           data: {
@@ -3028,12 +3068,12 @@ export class FinanceService {
       ...teachers.filter((person) => Number(person.monthlySalary ?? 0) > 0).map((person) => ({
         teacherId: person.id,
         staffId: null as string | null,
-        basicSalary: Number(person.monthlySalary),
+        basicSalary: person.monthlySalary!.toFixed(2),
       })),
       ...staff.filter((person) => Number(person.monthlySalary ?? 0) > 0).map((person) => ({
         teacherId: null as string | null,
         staffId: person.id,
-        basicSalary: Number(person.monthlySalary),
+        basicSalary: person.monthlySalary!.toFixed(2),
       })),
     ];
     if (!eligible.length) {
@@ -3042,30 +3082,35 @@ export class FinanceService {
 
     const payslips = eligible.map((person) => {
       // SSNIT 2026 insurable earnings range: GHS 587.80–69,000.
-      const insurableSalary = Math.min(69_000, Math.max(587.80, person.basicSalary));
-      const ssnitEmployee = roundMoney(insurableSalary * 0.055);
-      const ssnitEmployer = roundMoney(insurableSalary * 0.13);
-      const grossSalary = roundMoney(person.basicSalary);
-      const incomeTax = calculateResidentPaye2026(Math.max(0, grossSalary - ssnitEmployee));
-      const netSalary = roundMoney(Math.max(0, grossSalary - ssnitEmployee - incomeTax));
+      const calculated = calculatePayslip(PAYROLL_PROFILE_2026, {
+        residency: "RESIDENT",
+        earnings: [{ code: "BASIC", description: "Basic salary", amount: person.basicSalary, taxable: true, pensionable: true, isBasic: true }],
+        deductions: [],
+        enrolments: [{ schemeKey: "SSNIT_TIER1", employerBearsEmployeeShare: false, employerShareTaxable: false }],
+      });
+      const ssnitEmployee = new Prisma.Decimal(calculated.schemes[0]!.employee);
+      const ssnitEmployer = new Prisma.Decimal(calculated.schemes[0]!.employer);
+      const grossSalary = new Prisma.Decimal(calculated.gross);
+      const incomeTax = new Prisma.Decimal(calculated.paye);
+      const netSalary = new Prisma.Decimal(calculated.net);
       return {
         schoolId,
         teacherId: person.teacherId,
         staffId: person.staffId,
-        basicSalary: new Prisma.Decimal(roundMoney(person.basicSalary)),
+        basicSalary: new Prisma.Decimal(person.basicSalary),
         allowances: new Prisma.Decimal(0),
-        grossSalary: new Prisma.Decimal(grossSalary),
-        ssnitEmployee: new Prisma.Decimal(ssnitEmployee),
-        ssnitEmployer: new Prisma.Decimal(ssnitEmployer),
-        incomeTax: new Prisma.Decimal(incomeTax),
+        grossSalary,
+        ssnitEmployee,
+        ssnitEmployer,
+        incomeTax,
         otherDeductions: new Prisma.Decimal(0),
-        netSalary: new Prisma.Decimal(netSalary),
+        netSalary,
         paymentMethod: "BANK_TRANSFER" as const,
         paymentStatus: "PENDING" as const,
       };
     });
     const sum = (key: "grossSalary" | "netSalary" | "incomeTax" | "ssnitEmployee" | "ssnitEmployer") =>
-      roundMoney(payslips.reduce((total, slip) => total + Number(slip[key]), 0));
+      payslips.reduce((total, slip) => total.plus(slip[key]), new Prisma.Decimal(0));
 
     const payrollRecord = await db.$transaction(async (tx) => {
       const duplicate = await tx.payrollRecord.findUnique({
@@ -3079,10 +3124,10 @@ export class FinanceService {
           month: input.month,
           year: input.year,
           status: "DRAFT",
-          totalGross: new Prisma.Decimal(sum("grossSalary")),
-          totalNet: new Prisma.Decimal(sum("netSalary")),
-          totalTax: new Prisma.Decimal(sum("incomeTax")),
-          totalSSNIT: new Prisma.Decimal(roundMoney(sum("ssnitEmployee") + sum("ssnitEmployer"))),
+          totalGross: sum("grossSalary"),
+          totalNet: sum("netSalary"),
+          totalTax: sum("incomeTax"),
+          totalSSNIT: sum("ssnitEmployee").plus(sum("ssnitEmployer")),
           processedById,
           academicYearId: currentYear?.id ?? null,
           termId: currentYear?.terms[0]?.id ?? null,
