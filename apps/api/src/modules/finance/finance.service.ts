@@ -1680,48 +1680,13 @@ export class FinanceService {
       if (payment.transaction) {
         const original = payment.transaction;
         const date = new Date();
-        const prefix = `TXN-${date.getUTCFullYear()}-`;
-        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${schoolId}), hashtext(${prefix}))`;
-        const issued = await tx.transaction.findMany({
-          where: { schoolId, transactionNumber: { startsWith: prefix } },
-          select: { transactionNumber: true },
-        });
-        const number = createSequence(issued.map((row) => row.transactionNumber), prefix).next();
-        const reversal = await tx.transaction.create({
-          data: {
-            schoolId,
-            transactionNumber: number,
-            transactionDate: date,
-            description: `${input.kind === "REFUND" ? "Refund" : "Void"} of receipt ${payment.paymentNumber}: ${input.reason}`,
-            amount: original.amount,
-            // Income postings debit cash/bank and credit revenue, and both
-            // balances rise. The reversal swaps the sides and lowers both.
-            debitAccountId: original.creditAccountId,
-            creditAccountId: original.debitAccountId,
-            transactionType: "ADJUSTMENT",
-            category: original.category,
-            referenceType: "PAYMENT_REVERSAL",
-            referenceId: payment.id,
-            referenceNumber: payment.paymentNumber,
-          },
-        });
-        const [originalDebit, originalCredit] = await Promise.all([
-          tx.chartAccount.findUniqueOrThrow({ where: { id: original.debitAccountId }, select: { accountType: true } }),
-          tx.chartAccount.findUniqueOrThrow({ where: { id: original.creditAccountId }, select: { accountType: true } }),
-        ]);
-        // Undo each side using the account's natural balance, not an assumption
-        // that the receipt's credit always represents revenue. Accrual receipts
-        // credit A/R (an asset), which must INCREASE when the receipt is reversed.
-        const debitInitiallyIncreased = originalDebit.accountType === "ASSET" || originalDebit.accountType === "EXPENSE";
-        const creditInitiallyIncreased = originalCredit.accountType === "LIABILITY" ||
-          originalCredit.accountType === "EQUITY" || originalCredit.accountType === "REVENUE";
-        await tx.chartAccount.update({
-          where: { id: original.debitAccountId },
-          data: { balance: debitInitiallyIncreased ? { decrement: original.amount } : { increment: original.amount } },
-        });
-        await tx.chartAccount.update({
-          where: { id: original.creditAccountId },
-          data: { balance: creditInitiallyIncreased ? { decrement: original.amount } : { increment: original.amount } },
+        const reversal = await this.postingService.post(tx, {
+          schoolId, date,
+          description: `${input.kind === "REFUND" ? "Refund" : "Void"} of receipt ${payment.paymentNumber}: ${input.reason}`,
+          amount: original.amount, debitAccountId: original.creditAccountId,
+          creditAccountId: original.debitAccountId, transactionType: "ADJUSTMENT",
+          category: original.category, referenceType: "PAYMENT_REVERSAL",
+          referenceId: payment.id, referenceNumber: payment.paymentNumber,
         });
         reversalTransactionId = reversal.id;
       }
@@ -3810,41 +3775,12 @@ export class FinanceService {
           notes: string,
         ) => {
           if (amountValue.lte(0)) return;
-          const decimalAmount = amountValue;
-          const prefix = `TXN-${paidAt.getUTCFullYear()}-`;
-          await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${schoolId}), hashtext(${prefix}))`;
-          const last = await tx.transaction.findFirst({
-            where: { schoolId, transactionNumber: { startsWith: prefix } },
-            orderBy: { transactionNumber: "desc" },
-            select: { transactionNumber: true },
-          });
-          const seq = last ? Number(last.transactionNumber.slice(prefix.length)) + 1 : 1;
-          await tx.transaction.create({
-            data: {
-              schoolId,
-              transactionNumber: prefix + String(seq).padStart(5, "0"),
-              transactionDate: paidAt,
-              description,
-              amount: decimalAmount,
-              debitAccountId: debitAccount.id,
-              creditAccountId: creditAccount.id,
-              transactionType,
-              category: "SALARY",
-              referenceType: "PAYROLL",
-              referenceId: current.id,
-              referenceNumber,
-              notes: `Payroll posting · ${notes} · Disbursement method: ${paymentMethod}`,
-            },
-          });
-          const debitNaturalBalanceIncreases = debitAccount.accountType === "ASSET" || debitAccount.accountType === "EXPENSE";
-          const creditNaturalBalanceIncreases = creditAccount.accountType === "LIABILITY" || creditAccount.accountType === "EQUITY" || creditAccount.accountType === "REVENUE";
-          await tx.chartAccount.update({
-            where: { id: debitAccount.id },
-            data: { balance: debitNaturalBalanceIncreases ? { increment: decimalAmount } : { decrement: decimalAmount } },
-          });
-          await tx.chartAccount.update({
-            where: { id: creditAccount.id },
-            data: { balance: creditNaturalBalanceIncreases ? { increment: decimalAmount } : { decrement: decimalAmount } },
+          await this.postingService.post(tx, {
+            schoolId, date: paidAt, description, amount: amountValue,
+            debitAccountId: debitAccount.id, creditAccountId: creditAccount.id,
+            transactionType, category: "SALARY", referenceType: "PAYROLL",
+            referenceId: current.id, referenceNumber,
+            notes: `Payroll posting · ${notes} · Disbursement method: ${paymentMethod}`,
           });
         };
 
