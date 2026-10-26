@@ -1,4 +1,3 @@
-import { Search } from "lucide-react";
 import { DashboardNotificationsMenu } from "@/components/school/dashboard/dashboard-notifications-menu";
 import { AcademicContextSwitcher } from "@/components/school/academic-context-switcher";
 import { ThemeToggle } from "@/components/school/theme-toggle";
@@ -7,13 +6,9 @@ import { SidebarTrigger } from "@/components/ui/sidebar";
 
 interface DashboardHeaderProps {
   userName?: string | null;
-  search: string;
-  onSearchChange: (value: string) => void;
 }
 
 export function DashboardHeader({
-  search,
-  onSearchChange,
 }: DashboardHeaderProps) {
   return (
     <header className="sticky top-0 z-10 grid grid-cols-[auto_1fr_auto] items-center gap-2 border-b border-border bg-card/90 px-3 py-2.5 backdrop-blur  sm:px-6 md:px-8 min-h-[4.5rem]">
@@ -43,18 +38,6 @@ export function DashboardHeader({
         <div className="hidden lg:block shrink-0">
           <SchoolRoleSwitcher />
         </div>
-
-        {/* Search input: Hidden on mobile/tablet, full on desktop */}
-        <label className="relative hidden xl:block shrink-0">
-          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-          <input
-            value={search}
-            onChange={(event) => onSearchChange(event.target.value)}
-            placeholder="Search overview"
-            aria-label="Search dashboard cards"
-            className="h-9 w-48 rounded-xl border border-input bg-muted/50 pl-9 pr-3 text-xs text-foreground outline-none transition placeholder:text-muted-foreground focus:border-ring focus:bg-card focus:ring-2 focus:ring-ring/20"
-          />
-        </label>
 
         {/* Theme Toggle Button */}
         <ThemeToggle />
