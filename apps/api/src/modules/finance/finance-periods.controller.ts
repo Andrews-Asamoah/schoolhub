@@ -38,6 +38,15 @@ export class FinancePeriodsController {
     return this.periods.readiness(school.id, query.year, query.month);
   }
 
+  @Get("periods/snapshot-preview")
+  @Roles(...FINANCE_READ_ROLES)
+  snapshotPreview(
+    @CurrentSchool() school: School,
+    @Query(new ZodValidationPipe(periodSchema)) query: z.infer<typeof periodSchema>,
+  ) {
+    return this.periods.snapshotPreview(school.id, query.year, query.month);
+  }
+
   @Post("periods/prepare")
   @Roles(...FINANCE_WRITE_ROLES)
   prepare(
