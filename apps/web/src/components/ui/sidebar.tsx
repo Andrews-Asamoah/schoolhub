@@ -256,6 +256,8 @@ export function SidebarNavSection({
   useEffect(() => {
     if (!flyoutOpen) return;
     measure();
+    // Portalled flyout items must receive focus on keyboard activation too.
+    panel.current?.querySelector<HTMLElement>('a[href], button:not([disabled])')?.focus();
     const outside = (event: PointerEvent) => {
       const target = event.target as Node;
       if (!panel.current?.contains(target) && !trigger.current?.contains(target)) setOpenFlyout(null);
@@ -292,8 +294,8 @@ export function SidebarNavSection({
           <ChevronDown aria-hidden="true" className={cn("sidebar-expanded size-3.5 shrink-0 transition-transform", expanded && "rotate-180")} />
         </button>
       </SidebarTooltip>
-      {!compact && expanded && (
-        <nav id={subId} aria-label={label} className="ml-[18px] mt-1 space-y-0.5 border-l border-sidebar-border pl-2">
+      {!compact && (
+        <nav id={subId} hidden={!expanded} aria-label={label} className="ml-[18px] mt-1 space-y-0.5 border-l border-sidebar-border pl-2">
           {renderItems(false)}
         </nav>
       )}
