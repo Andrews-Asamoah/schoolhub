@@ -835,6 +835,7 @@ export class SuperAdminService {
       pastDue: counts.PAST_DUE ?? 0,
       suspended: counts.SUSPENDED ?? 0,
       cancelled: counts.CANCELLED ?? 0,
+      subscriptionStatusCounts: counts,
       expiringSoon,
       lapsed,
     };
