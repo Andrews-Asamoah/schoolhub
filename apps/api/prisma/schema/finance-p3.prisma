@@ -1,0 +1,129 @@
+// Phase 3 expand-only data model. All posting operations remain disabled until
+// P2 immutable journals and revenue-policy approval are active for the school.
+enum FinanceAdjustmentKind {
+  CREDIT_NOTE
+  DEBIT_NOTE
+  WRITE_OFF
+  WAIVER
+  FEE_CORRECTION
+}
+
+enum FinanceAdjustmentStatus {
+  DRAFT
+  PENDING_APPROVAL
+  APPROVED
+  POSTED
+  REJECTED
+  VOIDED
+}
+
+enum FinanceCreditEntryKind {
+  OVERPAYMENT
+  ADVANCE_PAYMENT
+  APPLIED_TO_BILL
+  REFUND_PAID
+  TRANSFER
+  ADJUSTMENT
+}
+
+enum FinanceRecognitionMethod {
+  AT_INVOICE
+  STRAIGHT_LINE_TERM
+  STRAIGHT_LINE_DAYS
+}
+
+enum FinanceRecognitionLineStatus {
+  PLANNED
+  POSTED
+  CANCELLED
+}
+
+model FinanceBillAdjustment {
+  id                String @id @default(cuid())
+  schoolId          String
+  billId            String
+  studentId         String
+  adjustmentNumber  String
+  kind              FinanceAdjustmentKind
+  status            FinanceAdjustmentStatus @default(DRAFT)
+  amount            Decimal @db.Decimal(15, 2)
+  reasonCode        String
+  reason            String
+  effectiveDate     DateTime @db.Date
+  createdById       String
+  approvalRequestId String?
+  postedTransactionId String?
+  postedAt          DateTime?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  lines             FinanceBillAdjustmentLine[]
+
+  @@unique([schoolId, adjustmentNumber])
+  @@index([schoolId, billId, status])
+  @@index([schoolId, studentId, createdAt])
+  @@map("finance_bill_adjustments")
+}
+
+model FinanceBillAdjustmentLine {
+  id             String @id @default(cuid())
+  adjustmentId   String
+  billItemId     String
+  amount         Decimal @db.Decimal(15, 2)
+  adjustment     FinanceBillAdjustment @relation(fields: [adjustmentId], references: [id], onDelete: Cascade)
+
+  @@unique([adjustmentId, billItemId])
+  @@index([billItemId])
+  @@map("finance_bill_adjustment_lines")
+}
+
+model FinanceStudentCreditEntry {
+  id              String @id @default(cuid())
+  schoolId        String
+  studentId       String
+  kind            FinanceCreditEntryKind
+  amount          Decimal @db.Decimal(15, 2)
+  paymentId       String?
+  billId          String?
+  postedTransactionId String?
+  note            String?
+  createdById     String
+  createdAt       DateTime @default(now())
+
+  @@index([schoolId, studentId, createdAt])
+  @@index([schoolId, kind, createdAt])
+  @@map("finance_student_credit_entries")
+}
+
+model FinanceRevenueSchedule {
+  id           String @id @default(cuid())
+  schoolId     String
+  billId       String
+  billItemId   String @unique
+  termId       String?
+  method       FinanceRecognitionMethod
+  totalAmount  Decimal @db.Decimal(15, 2)
+  startDate    DateTime @db.Date
+  endDate      DateTime @db.Date
+  status       String @default("ACTIVE")
+  createdAt    DateTime @default(now())
+  lines        FinanceRevenueScheduleLine[]
+
+  @@index([schoolId, status])
+  @@map("finance_revenue_schedules")
+}
+
+model FinanceRevenueScheduleLine {
+  id              String @id @default(cuid())
+  scheduleId      String
+  periodStart     DateTime @db.Date
+  periodEnd       DateTime @db.Date
+  amount          Decimal @db.Decimal(15, 2)
+  status          FinanceRecognitionLineStatus @default(PLANNED)
+  postedTransactionId String?
+  postedAt        DateTime?
+  schedule        FinanceRevenueSchedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+
+  @@unique([scheduleId, periodStart])
+  @@index([status, periodEnd])
+  @@map("finance_revenue_schedule_lines")
+}
