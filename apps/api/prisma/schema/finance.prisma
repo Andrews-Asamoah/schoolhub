@@ -388,6 +388,9 @@ model ExpenditureCategoryRegistry {
 }
 
 model PayrollRecord {
+  taxScheduleId String?
+  settingsSnapshot Json?
+  calculatedAt DateTime?
   id            String        @id @default(cuid())
   schoolId      String
   month         Int
