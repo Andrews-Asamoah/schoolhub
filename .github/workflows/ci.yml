@@ -54,11 +54,20 @@ jobs:
       - name: Install baseline dependencies
         id: install
         run: pnpm install --frozen-lockfile
+      # The baseline checkout does not run workspace build scripts automatically.
+      # Build the shared package and generate Prisma's client before typechecking
+      # or running API tests; otherwise clean runners fail at module resolution.
+      - name: Prepare baseline workspace
+        id: prepare
+        if: ${{ steps.install.outcome == 'success' }}
+        run: |
+          pnpm --filter @schoolhub/shared build
+          pnpm --filter @schoolhub/api exec prisma generate --config prisma.config.ts
       - name: Baseline typecheck
-        if: ${{ always() && steps.install.outcome == 'success' }}
+        if: ${{ always() && steps.prepare.outcome == 'success' }}
         run: pnpm typecheck
       - name: Baseline web build
-        if: ${{ always() && steps.install.outcome == 'success' }}
+        if: ${{ always() && steps.prepare.outcome == 'success' }}
         run: pnpm --filter @schoolhub/web build
       - name: Baseline API lint
         if: ${{ always() && steps.install.outcome == 'success' }}
@@ -68,7 +77,7 @@ jobs:
         if: ${{ always() && steps.install.outcome == 'success' }}
         run: pnpm --filter @schoolhub/api exec prisma migrate deploy --config prisma.config.ts
       - name: Baseline API tests (including PostgreSQL integration)
-        if: ${{ always() && steps.migrate.outcome == 'success' }}
+        if: ${{ always() && steps.prepare.outcome == 'success' && steps.migrate.outcome == 'success' }}
         run: pnpm --filter @schoolhub/api test
       - name: Baseline web theme lint
         if: ${{ always() && steps.install.outcome == 'success' }}
