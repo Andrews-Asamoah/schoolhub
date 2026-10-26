@@ -11,6 +11,7 @@ import { FinanceApprovalService } from "./finance-approval.service.js";
 import type { CreateExpenseInput, GenerateBillInput, RecordPaymentInput, StudentStatementResponse } from "@schoolhub/shared";
 import { calculatePayslip } from "./payroll/payroll-calculator.js";
 import { resolvePayrollSettings } from "./payroll-settings.js";
+import { preparePayrollPayslip } from "./payroll-draft.helpers.js";
 import { Prisma, type AccountCategory, type AccountType, type AuditAction, type PaymentMethod, type TransactionCategory } from "@prisma/client";
 import { canManageAcademicContext } from "../../common/academic-context.js";
 import { createSequence, isIdempotencyRace, isSerializationFailure, postingDateProblem, withSerializableRetry } from "./finance.helpers.js";
@@ -3554,7 +3555,7 @@ export class FinanceService {
     });
     if (existing) throw new BadRequestException("A payroll run already exists for this month and year.");
 
-    const [teachers, staff, currentYear] = await Promise.all([
+    const [teachers, staff, currentYear, profiles, earningTypes, deductionTypes] = await Promise.all([
       db.teacher.findMany({
         where: { schoolId, isActive: true, deletedAt: null },
         select: { id: true, monthlySalary: true },
@@ -3567,52 +3568,33 @@ export class FinanceService {
         where: { schoolId, isCurrent: true },
         include: { terms: { where: { isCurrent: true }, take: 1 } },
       }),
+      db.staffPayProfile.findMany({
+        where: { schoolId, effectiveFrom: { lte: periodEnd },
+          OR: [{ effectiveTo: null }, { effectiveTo: { gte: periodEnd } }] },
+        include: { recurringItems: true, loans: true },
+      }),
+      db.payrollEarningType.findMany({ where: { schoolId } }),
+      db.payrollDeductionType.findMany({ where: { schoolId } }),
     ]);
-    const eligible = [
-      ...teachers.filter((person) => Number(person.monthlySalary ?? 0) > 0).map((person) => ({
-        teacherId: person.id,
-        staffId: null as string | null,
-        basicSalary: person.monthlySalary!.toFixed(2),
+    const profilesByPerson = new Map(profiles.map(p => [
+      (p.teacherId ? "TEACHER:" + p.teacherId : "STAFF:" + p.staffId), p,
+    ]));
+    const candidates = [
+      ...teachers.map(p => ({
+        teacherId: p.id, staffId: null,
+        legacySalary: p.monthlySalary, profile: profilesByPerson.get("TEACHER:" + p.id) ?? null,
       })),
-      ...staff.filter((person) => Number(person.monthlySalary ?? 0) > 0).map((person) => ({
-        teacherId: null as string | null,
-        staffId: person.id,
-        basicSalary: person.monthlySalary!.toFixed(2),
+      ...staff.map(p => ({
+        teacherId: null, staffId: p.id,
+        legacySalary: p.monthlySalary, profile: profilesByPerson.get("STAFF:" + p.id) ?? null,
       })),
     ];
-    if (!eligible.length) {
+    const payslips = candidates.map(person =>
+      preparePayrollPayslip(schoolId, person, resolved.settings, periodEnd, earningTypes, deductionTypes),
+    ).filter((slip): slip is NonNullable<typeof slip> => slip !== null);
+    if (!payslips.length) {
       throw new BadRequestException("No active teachers or staff have a positive monthly salary. Add salary details before generating payroll.");
     }
-
-    const payslips = eligible.map((person) => {
-      // SSNIT 2026 insurable earnings range: GHS 587.80–69,000.
-      const calculated = calculatePayslip(resolved.settings, {
-        residency: "RESIDENT",
-        earnings: [{ code: "BASIC", description: "Basic salary", amount: person.basicSalary, taxable: true, pensionable: true, isBasic: true }],
-        deductions: [],
-        enrolments: [{ schemeKey: "SSNIT_TIER1", employerBearsEmployeeShare: false, employerShareTaxable: false }],
-      });
-      const ssnitEmployee = new Prisma.Decimal(calculated.schemes[0]!.employee);
-      const ssnitEmployer = new Prisma.Decimal(calculated.schemes[0]!.employer);
-      const grossSalary = new Prisma.Decimal(calculated.gross);
-      const incomeTax = new Prisma.Decimal(calculated.paye);
-      const netSalary = new Prisma.Decimal(calculated.net);
-      return {
-        schoolId,
-        teacherId: person.teacherId,
-        staffId: person.staffId,
-        basicSalary: new Prisma.Decimal(person.basicSalary),
-        allowances: new Prisma.Decimal(0),
-        grossSalary,
-        ssnitEmployee,
-        ssnitEmployer,
-        incomeTax,
-        otherDeductions: new Prisma.Decimal(0),
-        netSalary,
-        paymentMethod: "BANK_TRANSFER" as const,
-        paymentStatus: "PENDING" as const,
-      };
-    });
     const sum = (key: "grossSalary" | "netSalary" | "incomeTax" | "ssnitEmployee" | "ssnitEmployer") =>
       payslips.reduce((total, slip) => total.plus(slip[key]), new Prisma.Decimal(0));
 
@@ -3648,8 +3630,8 @@ export class FinanceService {
 
     return {
       payrollRecord,
-      includedCount: eligible.length,
-      excludedCount: teachers.length + staff.length - eligible.length,
+      includedCount: payslips.length,
+      excludedCount: teachers.length + staff.length - payslips.length,
     };
   }
 
