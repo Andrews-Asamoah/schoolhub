@@ -2132,6 +2132,109 @@ export class FinanceService {
    * This is deliberately NOT labelled an accrual-basis set of accounts:
    * historical invoice receivables and opening balances have not been posted.
    */
+  /**
+   * Current-day pre-close reconciliation. This is intentionally read-only.
+   * Do not create an opening entry or declare a legacy ledger 'reconciled'
+   * without reviewed, source-backed migration.
+   */
+  async getReceivablesCloseReadiness(schoolId: string) {
+    const zero = new Prisma.Decimal(0);
+    const [bills, students, receivableAccounts, allocStats] = await Promise.all([
+      this.prisma.client.bill.aggregate({
+        where: { schoolId, status: { notIn: ["CANCELLED", "WAIVED"] } },
+        _sum: { balanceAmount: true },
+        _count: { id: true },
+      }),
+      this.prisma.client.student.aggregate({
+        where: { schoolId },
+        _sum: { outstandingBalance: true },
+      }),
+      this.prisma.client.chartAccount.findMany({
+        where: { schoolId, accountType: "ASSET", category: "ACCOUNTS_RECEIVABLE" },
+        select: { id: true, code: true, name: true, balance: true },
+      }),
+      this.prisma.client.$queryRaw<Array<{ unmatched: bigint; total: Prisma.Decimal }>>(Prisma.sql`
+        SELECT COUNT(*) FILTER (WHERE p.amount <> COALESCE(alloc.amount, 0))::bigint AS unmatched,
+               COALESCE(SUM(p.amount - COALESCE(alloc.amount, 0)), 0)::numeric AS total
+        FROM payments p
+        LEFT JOIN (
+          SELECT "paymentId", SUM(amount)::numeric AS amount
+          FROM payment_bill_allocations
+          GROUP BY "paymentId"
+        ) alloc ON alloc."paymentId" = p.id
+        WHERE p."schoolId" = ${schoolId} AND p.status = 'COMPLETED'
+      `),
+    ]);
+    const openInvoices = bills._sum.balanceAmount ?? zero;
+    const studentBalances = students._sum.outstandingBalance ?? zero;
+    const studentDifference = studentBalances.minus(openInvoices);
+    const receiptExceptionCount = Number(allocStats[0]?.unmatched ?? 0n);
+    const receiptDifference = allocStats[0]?.total ?? zero;
+    const receivableAccountIds = receivableAccounts.map((a) => a.id);
+    const journalRows = receivableAccountIds.length
+      ? await this.prisma.client.transaction.findMany({
+          where: {
+            schoolId,
+            OR: [
+              { debitAccountId: { in: receivableAccountIds } },
+              { creditAccountId: { in: receivableAccountIds } },
+            ],
+          },
+          select: { debitAccountId: true, creditAccountId: true, amount: true },
+        })
+      : [];
+    const receivableIds = new Set(receivableAccountIds);
+    const journalReceivables = journalRows.reduce((amount, entry) => {
+      const debit = receivableIds.has(entry.debitAccountId) ? entry.amount : zero;
+      const credit = receivableIds.has(entry.creditAccountId) ? entry.amount : zero;
+      return amount.plus(debit).minus(credit);
+    }, zero);
+    const ledgerDifference = journalReceivables.minus(openInvoices);
+    const cachedReceivables = receivableAccounts.reduce((total, account) => total.plus(account.balance), zero);
+    const cacheDifference = cachedReceivables.minus(journalReceivables);
+    const checks = [
+      {
+        code: "STUDENT_TO_INVOICE",
+        status: studentDifference.eq(0) ? "PASS" : "FAIL",
+        difference: studentDifference.toFixed(2),
+        details: "Cached student outstanding balances must equal the total of open invoice balances.",
+      },
+      {
+        code: "RECEIPT_ALLOCATIONS",
+        status: receiptExceptionCount === 0 ? "PASS" : "FAIL",
+        difference: receiptDifference.toFixed(2),
+        exceptionCount: receiptExceptionCount,
+        details: "Completed receipts must equal their recorded bill allocations. Legacy receipts without allocations require review.",
+      },
+      {
+        code: "AR_CONTROL_ACCOUNT",
+        status: receivableAccountIds.length === 0 ? "NOT_CONFIGURED" : ledgerDifference.eq(0) ? "PASS" : "FAIL",
+        difference: ledgerDifference.toFixed(2),
+        details: "The journal's accounts-receivable control balance must equal open invoices. This must not be inferred from cash receipts.",
+      },
+      {
+        code: "AR_ACCOUNT_CACHE",
+        status: receivableAccountIds.length === 0 ? "NOT_CONFIGURED" : cacheDifference.eq(0) ? "PASS" : "FAIL",
+        difference: cacheDifference.toFixed(2),
+        details: "The cached receivable account balance must agree with its posted journal movements.",
+      },
+    ] as const;
+    return {
+      asOf: new Date().toISOString().slice(0, 10),
+      basis: "CURRENT_UNCLOSED" as const,
+      closeReady: checks.every((check) => check.status === "PASS"),
+      reportingOnly: true,
+      warning: "Read-only pre-close validation. No historical balances are backfilled, no accounting entry is posted and no period is closed.",
+      openInvoiceCount: bills._count.id,
+      openInvoices: openInvoices.toFixed(2),
+      studentBalances: studentBalances.toFixed(2),
+      journalReceivables: journalReceivables.toFixed(2),
+      cachedReceivables: cachedReceivables.toFixed(2),
+      receivableAccounts: receivableAccounts.map(({ id, code, name }) => ({ id, code, name })),
+      checks,
+    };
+  }
+
   async getJournalTrialBalance(schoolId: string, asOfDate?: string) {
     const parsed = asOfDate ? parseIsoDate(asOfDate, "as-of date", true) : null;
     if (asOfDate && !parsed) throw new BadRequestException("Enter a valid as-of date.");

@@ -40,6 +40,20 @@ interface HistoricalReceivables {
   students: { studentId: string; admissionNumber: string | null; balance: string; invoiceCount: number }[];
   invoices: { billId: string; billNumber: string; studentId: string; admissionNumber: string | null; issuedAt: string; dueDate: string | null; billed: string; collected: string; outstanding: string; daysOverdue: number | null }[];
 }
+interface CloseReadiness {
+  asOf: string;
+  basis: "CURRENT_UNCLOSED";
+  closeReady: boolean;
+  reportingOnly: true;
+  warning: string;
+  openInvoiceCount: number;
+  openInvoices: string;
+  studentBalances: string;
+  journalReceivables: string;
+  cachedReceivables: string;
+  receivableAccounts: { id: string; code: string; name: string }[];
+  checks: { code: string; status: "PASS" | "FAIL" | "NOT_CONFIGURED"; difference: string; exceptionCount?: number; details: string }[];
+}
 interface TrialBalance {
   asOf: string;
   basis: "POSTED_JOURNAL_ONLY";
@@ -65,6 +79,14 @@ export function AccountantFinanceReportingWorkspace() {
   const [yearId, setYearId] = useState("");
   const [termId, setTermId] = useState("");
   const [scope, setScope] = useState<"term" | "year" | "all">("term");
+  const [closeReadinessVisible, setCloseReadinessVisible] = useState(false);
+  const closeReadinessQuery = useQuery({
+    queryKey: ["finance", "receivables-close-readiness"],
+    queryFn: () => apiFetch<CloseReadiness>("/finance/ledger/close-readiness"),
+    enabled: closeReadinessVisible,
+    staleTime: 0,
+    retry: false,
+  });
   const [trialBalanceVisible, setTrialBalanceVisible] = useState(false);
   const trialBalanceQuery = useQuery({
     queryKey: ["finance", "journal-trial-balance"],
@@ -227,6 +249,37 @@ export function AccountantFinanceReportingWorkspace() {
           { id: "collected", header: "Applied", cell: (row) => money(row.collected), value: (row) => Number(row.collected) },
           { id: "balance", header: "Balance", cell: (row) => money(row.outstanding), value: (row) => Number(row.outstanding) },
         ] satisfies DataTableColumn<HistoricalReceivables["invoices"][number]>[]} getRowId={(row) => row.billId} embedded exportTitle="Historical receivables" searchable={false} emptyTitle="No historical invoices" emptyDescription="There are no invoices on or before this date." />
+      </div>}
+    </section>
+    <section className="rounded-2xl border border-border bg-card p-5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h3 className="text-lg font-semibold text-foreground">Accounts receivable close-readiness</h3>
+          <p className="mt-1 text-sm text-muted-foreground">Verify school fee receivables, student balances, receipt allocations and general-ledger control totals before attempting financial period close.</p>
+        </div>
+        <button type="button" className={secondaryButton} onClick={() => setCloseReadinessVisible((visible) => !visible)}>
+          {closeReadinessVisible ? "Hide checks" : "Review discrepancies"}
+        </button>
+      </div>
+      {closeReadinessVisible && closeReadinessQuery.isPending && <p role="status" className="mt-3 text-sm text-muted-foreground">Checking accounting controls…</p>}
+      {closeReadinessVisible && closeReadinessQuery.isError && <p role="alert" className="mt-3 text-sm text-destructive">{closeReadinessQuery.error.message}</p>}
+      {closeReadinessVisible && closeReadinessQuery.data && <div className="mt-4 space-y-4">
+        <div role="status" className="text-sm font-semibold">{closeReadinessQuery.data.closeReady ? "All current receivables checks passed" : "Not ready for accounting close — review exceptions"}</div>
+        <p className="text-sm text-muted-foreground">{closeReadinessQuery.data.warning}</p>
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {([
+            ["Open invoices", closeReadinessQuery.data.openInvoices],
+            ["Student balances", closeReadinessQuery.data.studentBalances],
+            ["Posted receivables", closeReadinessQuery.data.journalReceivables],
+            ["Cached control account", closeReadinessQuery.data.cachedReceivables],
+          ] as const).map(([label, value]) => <div key={label} className="rounded-xl bg-muted/40 p-3"><p className="text-xs text-muted-foreground">{label}</p><p className="mt-1 font-semibold tabular-nums">{money(value)}</p></div>)}
+        </div>
+        <div className="space-y-2">
+          {closeReadinessQuery.data.checks.map((check) => <div key={check.code} className="rounded-lg border border-border p-3">
+            <p className="text-sm font-semibold">{check.code.replaceAll("_", " ")} — {check.status}</p>
+            <p className="text-xs text-muted-foreground">{check.details} Difference: {money(check.difference)}{check.exceptionCount === undefined ? "" : "; exceptions: " + check.exceptionCount}.</p>
+          </div>)}
+        </div>
       </div>}
     </section>
     <section className="rounded-2xl border border-border bg-card p-5">
