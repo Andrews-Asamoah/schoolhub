@@ -3616,7 +3616,7 @@ export class FinanceService {
   async generatePayrollDraft(
     schoolId: string,
     processedById: string,
-    input: { month: number; year: number; confirmResidentTaxTreatment: true },
+    input: { month: number; year: number; confirmResidentTaxTreatment: true; recalculateDraft?: boolean },
   ) {
     const db = this.prisma.client;
     const periodEnd = new Date(Date.UTC(input.year, input.month, 0));
@@ -3627,9 +3627,11 @@ export class FinanceService {
     const resolved = resolvePayrollSettings(schoolId, periodEnd, taxSchedules, contributionSchemes);
     const existing = await db.payrollRecord.findUnique({
       where: { schoolId_month_year_runNumber: { schoolId, month: input.month, year: input.year, runNumber: 1 } },
-      select: { id: true },
+      select: { id: true, status: true },
     });
-    if (existing) throw new BadRequestException("A payroll run already exists for this month and year.");
+    if (existing && (!input.recalculateDraft || existing.status !== "DRAFT")) {
+      throw new BadRequestException("Only a draft payroll run can be recalculated. Approved and paid payroll is immutable.");
+    }
 
     const [teachers, staff, currentYear, profiles, earningTypes, deductionTypes] = await Promise.all([
       db.teacher.findMany({
@@ -3679,7 +3681,26 @@ export class FinanceService {
         where: { schoolId_month_year_runNumber: { schoolId, month: input.month, year: input.year, runNumber: 1 } },
         select: { id: true },
       });
-      if (duplicate) throw new BadRequestException("A payroll run already exists for this month and year.");
+      if (duplicate) {
+        if (!input.recalculateDraft) throw new BadRequestException("This payroll run already exists.");
+        const claimed = await tx.payrollRecord.updateMany({
+          where: { id: duplicate.id, schoolId, status: "DRAFT" },
+          data: { calculatedAt: new Date() },
+        });
+        if (claimed.count !== 1) throw new ConflictException("Only a draft run can be recalculated.");
+        return tx.payrollRecord.update({
+          where: { id: duplicate.id },
+          data: {
+            totalGross: sum("grossSalary"), totalNet: sum("netSalary"), totalTax: sum("incomeTax"),
+            totalSSNIT: sum("ssnitEmployee").plus(sum("ssnitEmployer")),
+            taxScheduleId: resolved.taxScheduleId,
+            settingsSnapshot: JSON.parse(JSON.stringify({ ...resolved, calculatedFor: periodEnd.toISOString().slice(0, 10) })),
+            calculatedAt: new Date(),
+            payslips: { deleteMany: {}, create: payslips },
+          },
+          include: { _count: { select: { payslips: true } } },
+        });
+      }
       return tx.payrollRecord.create({
         data: {
           schoolId,
