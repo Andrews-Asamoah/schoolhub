@@ -160,7 +160,11 @@ function paymentClassAllocations(payment: FinancePayment, billsById: Map<string,
       if (!id) continue;
       allocatedByBill.set(id, (allocatedByBill.get(id) ?? 0) + amount(item.amount));
     }
-  } else if (payment.bill?.id) {
+  }
+  // Legacy records may expose item descriptions without their bill IDs.
+  // In that case fall back to the linked bill rather than treating a
+  // known payment as unallocated.
+  if (allocatedByBill.size === 0 && payment.bill?.id) {
     allocatedByBill.set(payment.bill.id, amount(payment.amount));
   }
 
