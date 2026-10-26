@@ -1,3 +1,4 @@
+import { DatePicker } from "@/components/ui/date-picker";
 import { useMutation, useQuery, useQueryClient, type UseQueryResult } from "@tanstack/react-query";
 import { useForm } from "@tanstack/react-form";
 import {
@@ -902,12 +903,11 @@ function ClassTeacherAssignmentsPanel({
         <form.Field name="effectiveFrom">
           {(field) => (
             <FormField label="Effective from" htmlFor={field.name} error={field.state.meta.errors}>
-              <FormInput
+              <DatePicker
                 id={field.name}
-                type="date"
                 value={field.state.value}
                 onBlur={field.handleBlur}
-                onChange={(event) => field.handleChange(event.target.value)}
+                onChange={(value) => field.handleChange(value)}
                 required
               />
             </FormField>
