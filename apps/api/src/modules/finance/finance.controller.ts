@@ -22,7 +22,7 @@ import { PayrollSettingsService } from "./payroll-settings.service.js";
 import { FinanceExportsService, type FinanceExportContext, type FinanceExportFile } from "./finance-exports.service.js";
 import { SchoolTenantGuard } from "../../common/guards/school-tenant.guard.js";
 import { RolesGuard } from "../../common/guards/roles.guard.js";
-import { FINANCE_PAYROLL_EXPORT_ROLES, FINANCE_READ_ROLES, FINANCE_WRITE_ROLES, PAYROLL_SETTINGS_APPROVE_ROLES, canExportFinancePayroll } from "./finance.permissions.js";
+import { FINANCE_PAYROLL_EXPORT_ROLES, FINANCE_READ_ROLES, FINANCE_WRITE_ROLES, PAYROLL_SETTINGS_APPROVE_ROLES, FINANCE_PAYROLL_TRANSITION_ROLES, canExportFinancePayroll } from "./finance.permissions.js";
 import { FinanceAuditInterceptor, FinanceSelfAudited } from "./finance-audit.interceptor.js";
 import { FinanceWriteRateLimitGuard, SuperAdminReasonGuard } from "./finance-safeguards.js";
 import { Roles } from "../../common/decorators/roles.decorator.js";
@@ -607,7 +607,7 @@ export class FinanceController {
   }
 
   @Patch("payroll/:recordId/status")
-  @Roles(...FINANCE_READ_ROLES)
+  @Roles(...FINANCE_PAYROLL_TRANSITION_ROLES)
   transitionPayroll(
     @CurrentSchool() school: School,
     @CurrentUser() user: AuthenticatedUser,
