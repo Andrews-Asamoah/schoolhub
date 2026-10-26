@@ -9,7 +9,6 @@ import { PrismaService } from "../../prisma/prisma.service.js";
 import { FinancePostingService } from "./finance-posting.service.js";
 import { FinanceApprovalService } from "./finance-approval.service.js";
 import type { CreateExpenseInput, GenerateBillInput, RecordPaymentInput, StudentStatementResponse } from "@schoolhub/shared";
-import { calculatePayslip } from "./payroll/payroll-calculator.js";
 import { resolvePayrollSettings } from "./payroll-settings.js";
 import { preparePayrollPayslip } from "./payroll-draft.helpers.js";
 import { Prisma, type AccountCategory, type AccountType, type AuditAction, type PaymentMethod, type TransactionCategory } from "@prisma/client";
