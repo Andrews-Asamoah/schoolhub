@@ -214,7 +214,7 @@ function WorkspaceContent({ pageId }: { pageId: string }) {
   return (
     <>
       {activeRole !== "student" &&
-        !["classes", "students", "teachers", "staff", "guardians", "teacher-portal", "accountant-portal", "fees", "concessions", "signatures", "payments", "invoices", "expenses", "payroll", "fee-reminders", "inventory", "outstanding", "finance-reports", "student-statements", "term-end-review", "guardian-portal", "guardian-attendance", "guardian-timetable", "guardian-reports", "guardian-notices", "guardian-fees", "student-portal", "clubs", "houses", "assignments", "classmates", "announcements"].includes(
+        !["classes", "students", "teachers", "staff", "guardians", "teacher-portal", "accountant-portal", "fees", "concessions", "signatures", "payments", "invoices", "expenses", "payroll", "fee-reminders", "inventory", "outstanding", "finance-reports", "student-statements", "term-end-review", "guardian-portal", "guardian-attendance", "guardian-timetable", "guardian-reports", "guardian-notices", "guardian-fees", "documents", "messages", "notifications", "student-portal", "clubs", "houses", "assignments", "classmates", "announcements"].includes(
           pageId,
         ) && (
         <WorkspacePageHeading
