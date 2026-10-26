@@ -742,3 +742,17 @@ model LateFeeAssessment {
   @@index([schoolId, targetBillId])
   @@map("late_fee_assessments")
 }
+
+/// Guarded school-level accrual cutover. Legacy schools require an explicit
+/// reconciled opening entry; no existing receipts are rewritten.
+model FinanceAccrualState {
+  schoolId             String   @id
+  activatedAt          DateTime
+  activatedById        String
+  approvalReference    String
+  openingReceivables   Decimal  @db.Decimal(15, 2)
+  openingTransactionId String?
+  school               School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@map("finance_accrual_states")
+}
