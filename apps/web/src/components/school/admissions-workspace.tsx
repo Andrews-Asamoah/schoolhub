@@ -1,3 +1,4 @@
+import { DatePicker, DateTimePicker } from "@/components/ui/date-picker";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Pencil } from "lucide-react";
 import { useState } from "react";
@@ -317,11 +318,11 @@ function IntakeForm({ cycle, onDone }: { cycle: Cycle | null; onDone: () => void
         </label>
         <label className="text-xs font-semibold">
           Applications open
-          <input type="date" className={input} value={opensAt} onChange={(e) => setOpensAt(e.target.value)} />
+          <DatePicker buttonClassName={input} value={opensAt} onChange={(value) => setOpensAt(value)} />
         </label>
         <label className="text-xs font-semibold">
           Applications close
-          <input type="date" className={input} value={closesAt} onChange={(e) => setClosesAt(e.target.value)} />
+          <DatePicker buttonClassName={input} value={closesAt} onChange={(value) => setClosesAt(value)} />
         </label>
         <label className="text-xs font-semibold">
           Exam maximum score
@@ -517,7 +518,7 @@ function ApplicationsPanel({ cycles, canDecide }: { cycles: Cycle[]; canDecide: 
         <div className="flex flex-wrap items-end gap-3 rounded-2xl border border-border bg-card p-4">
           <label className="text-xs font-semibold">
             Exam date and time
-            <input type="datetime-local" className={input} value={examDate} onChange={(e) => setExamDate(e.target.value)} />
+            <DateTimePicker buttonClassName={input} value={examDate} onChange={(value) => setExamDate(value)} />
           </label>
           <label className="text-xs font-semibold">
             Venue
@@ -841,7 +842,7 @@ function ReceiveFeeDialog({
         <p className="mt-4 rounded-lg bg-muted p-3 text-center text-2xl font-bold text-foreground">{money(app.feeDue)}</p>
         <label className="mt-3 block text-xs font-semibold">
           Date received
-          <input type="date" max={new Date().toISOString().slice(0, 10)} className={input} value={paymentDate} onChange={(e) => setPaymentDate(e.target.value)} />
+          <DatePicker max={new Date().toISOString().slice(0, 10)} buttonClassName={input} value={paymentDate} onChange={(value) => setPaymentDate(value)} />
         </label>
         <label className="mt-3 block text-xs font-semibold">
           Note (optional)
@@ -900,7 +901,7 @@ function ExemptFeeDialog({ app, onClose, onDone }: { app: Application; onClose: 
 
 const EDITABLE_EXAM_STATUSES = ["SUBMITTED", "UNDER_REVIEW", "EXAM_SCHEDULED", "EXAM_COMPLETED"];
 
-/** ISO timestamp -> value for <input type="datetime-local"> in the viewer's timezone. */
+/** ISO timestamp -> value for <DateTimePicker> in the viewer's timezone. */
 function toLocalInput(iso: string | null): string {
   if (!iso) return "";
   const d = new Date(iso);
@@ -977,10 +978,10 @@ function ExamCell({ app, canEdit, onSaved }: { app: Application; canEdit: boolea
 
   if (editing) {
     return (
-      <form onSubmit={submit} noValidate className="space-y-2.5" aria-label={`Edit exam for ${app.firstName} ${app.lastName}`}>
-        <label className="block text-[11px] font-semibold text-foreground">
+      <form onSubmit={submit} noValidate buttonClassName="space-y-2.5" ariaLabel={`Edit exam for ${app.firstName} ${app.lastName}`}>
+        <label buttonClassName="block text-[11px] font-semibold text-foreground">
           Date and time
-          <input type="datetime-local" className={`${input} !mt-1 !h-9 text-xs`} value={date} onChange={(e) => setDate(e.target.value)} />
+          <input type="datetime-local" buttonClassName={`${input} !mt-1 !h-9 text-xs`} value={date} onChange={(value) => setDate(value)} />
         </label>
         <label className="block text-[11px] font-semibold text-foreground">
           Venue
