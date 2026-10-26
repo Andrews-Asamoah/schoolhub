@@ -2127,6 +2127,81 @@ export class FinanceService {
     });
   }
 
+  /**
+   * Journal-only trial balance for the existing double-entry transaction table.
+   * This is deliberately NOT labelled an accrual-basis set of accounts:
+   * historical invoice receivables and opening balances have not been posted.
+   */
+  async getJournalTrialBalance(schoolId: string, asOfDate?: string) {
+    const parsed = asOfDate ? parseIsoDate(asOfDate, "as-of date", true) : null;
+    if (asOfDate && !parsed) throw new BadRequestException("Enter a valid as-of date.");
+    const today = new Date();
+    const cutoff = parsed ?? today;
+    if (cutoff.getTime() > today.getTime() && asOfDate !== today.toISOString().slice(0, 10)) {
+      throw new BadRequestException("Trial balance date cannot be in the future.");
+    }
+    const [accounts, postings] = await Promise.all([
+      this.prisma.client.chartAccount.findMany({
+        where: { schoolId },
+        select: { id: true, code: true, name: true, accountType: true, balance: true, isActive: true },
+        orderBy: [{ code: "asc" }, { id: "asc" }],
+      }),
+      this.prisma.client.$queryRaw<Array<{ accountId: string; debit: Prisma.Decimal; credit: Prisma.Decimal }>>(Prisma.sql`
+        SELECT movements."accountId",
+          COALESCE(SUM(movements.debit), 0)::numeric AS "debit",
+          COALESCE(SUM(movements.credit), 0)::numeric AS "credit"
+        FROM (
+          SELECT t."debitAccountId" AS "accountId", t.amount AS debit, 0::numeric AS credit
+          FROM transactions t WHERE t."schoolId" = ${schoolId} AND t."transactionDate" <= ${cutoff}
+          UNION ALL
+          SELECT t."creditAccountId" AS "accountId", 0::numeric AS debit, t.amount AS credit
+          FROM transactions t WHERE t."schoolId" = ${schoolId} AND t."transactionDate" <= ${cutoff}
+        ) movements GROUP BY movements."accountId"
+      `),
+    ]);
+    const zero = new Prisma.Decimal(0);
+    const postingMap = new Map(postings.map((row) => [row.accountId, row]));
+    let totalDebits = zero;
+    let totalCredits = zero;
+    const rows = accounts.map((account) => {
+      const posting = postingMap.get(account.id);
+      const debitMovement = posting?.debit ?? zero;
+      const creditMovement = posting?.credit ?? zero;
+      const net = debitMovement.minus(creditMovement);
+      const debit = Prisma.Decimal.max(net, zero);
+      const credit = Prisma.Decimal.max(net.negated(), zero);
+      const naturalBalance = ["ASSET", "EXPENSE"].includes(account.accountType)
+        ? net : net.negated();
+      const discrepancy = account.balance.minus(naturalBalance);
+      totalDebits = totalDebits.plus(debit);
+      totalCredits = totalCredits.plus(credit);
+      return {
+        accountId: account.id, code: account.code, name: account.name,
+        accountType: account.accountType, isActive: account.isActive,
+        debit: debit.toFixed(2), credit: credit.toFixed(2),
+        postedBalance: naturalBalance.toFixed(2),
+        cachedBalance: account.balance.toFixed(2),
+        discrepancy: discrepancy.toFixed(2),
+      };
+    });
+    const orphanAccounts = postings.filter((row) => !accounts.some((account) => account.id === row.accountId));
+    const differences = rows.filter((row) => row.discrepancy !== "0.00");
+    const journalDifference = totalDebits.minus(totalCredits);
+    return {
+      asOf: cutoff.toISOString().slice(0, 10),
+      basis: "POSTED_JOURNAL_ONLY" as const,
+      accrualComplete: false,
+      warning: "This trial balance covers posted journal transactions only. Legacy student receivables, deferred tuition income and opening balances have not been backfilled. Cached chart balances are present-day values, so differences against an earlier as-of date may be expected.",
+      totalDebits: totalDebits.toFixed(2),
+      totalCredits: totalCredits.toFixed(2),
+      difference: journalDifference.toFixed(2),
+      balanced: journalDifference.eq(0) && orphanAccounts.length === 0,
+      cachedAccountMismatchCount: asOfDate ? null : differences.length,
+      orphanAccountCount: orphanAccounts.length,
+      accounts: rows,
+    };
+  }
+
   async getFinanceSummary(
     schoolId: string,
     query: Pick<FinanceListQuery, "from" | "to" | "yearId" | "termId"> = {},
