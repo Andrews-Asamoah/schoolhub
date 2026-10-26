@@ -75,7 +75,7 @@ export function PortalStatCard({
   const styles = variantStyles[variant];
 
   const cardClassName = cn(
-        "group relative overflow-hidden rounded-xl border bg-card p-4 sm:p-5 shadow-[0_2px_10px_rgba(15,23,42,0.03)] transition-all duration-200",
+        "group relative min-w-0 overflow-hidden rounded-xl border bg-card p-4 shadow-sm transition-all duration-200 sm:p-5",
         styles.border,
         onClick && "cursor-pointer hover:-translate-y-0.5 hover:shadow-md",
         className,
