@@ -211,7 +211,7 @@ export function DatePicker({
           role="dialog"
           aria-label="Choose a date"
           style={{ position: "fixed", top: popoverPosition.top, left: popoverPosition.left }}
-          className="z-50 max-h-[calc(100vh-1rem)] w-[min(19rem,calc(100vw-1rem))] overflow-y-auto rounded-2xl border border-border bg-popover p-3 text-popover-foreground shadow-xl"
+          className="z-[130] max-h-[calc(100vh-1rem)] w-[min(19rem,calc(100vw-1rem))] overflow-y-auto rounded-xl border border-border bg-popover p-3 text-popover-foreground shadow-xl"
         >
           <div className="mb-3 flex items-center gap-2">
             <button
