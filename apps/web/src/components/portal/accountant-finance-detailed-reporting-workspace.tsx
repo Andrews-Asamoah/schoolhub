@@ -39,7 +39,7 @@ interface FinancePayment {
   status: string;
   referenceNumber?: string | null;
   billAllocations?: Array<{ billId: string; amount: number | string; bill?: { id: string } | null }>;
-  paymentItems?: Array<{ amount: number | string; billItem?: { billId: string } | null }>;
+  paymentItems?: Array<{ amount: number | string; billItem?: { billId?: string } | null }>;
 }
 
 interface FinanceClass {
