@@ -122,11 +122,11 @@ export function SchoolWorkspaceLayout({
               </div>
             </div>
 
-            {/* 3. Right side: Theme toggle, Notifications, Role switcher & Search */}
+            {/* 3. Right side: Theme toggle, Notifications and Role switcher */}
             <div className="flex items-center gap-2 justify-end">
               
               {/* Role switcher: Hidden on smaller screens, shows up on large screens */}
-              <div className="hidden lg:block shrink-0">
+              <div className="min-w-0 shrink-0">
                 <SchoolRoleSwitcher />
               </div>
 
