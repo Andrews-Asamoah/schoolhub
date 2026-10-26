@@ -282,6 +282,7 @@ export class FinanceService {
       debit: { id: string; accountType: AccountType };
       credit: { id: string; accountType: AccountType };
       referenceType: string; referenceId: string; referenceNumber?: string;
+      transactionType?: "INCOME" | "TRANSFER" | "ADJUSTMENT";
     },
   ) {
     if (input.amount.lte(0)) return null;
@@ -298,7 +299,7 @@ export class FinanceService {
         schoolId: input.schoolId, transactionNumber: prefix + String(seq).padStart(5, "0"),
         transactionDate: input.date, description: input.description, amount: input.amount,
         debitAccountId: input.debit.id, creditAccountId: input.credit.id,
-        transactionType: "ADJUSTMENT", category: "SCHOOL_FEES",
+        transactionType: input.transactionType ?? "ADJUSTMENT", category: "SCHOOL_FEES",
         referenceType: input.referenceType, referenceId: input.referenceId,
         referenceNumber: input.referenceNumber,
       },
@@ -317,16 +318,17 @@ export class FinanceService {
   }
 
   /** Read-only migration gate; does not assume a zero legacy receivable balance. */
-  async getAccrualCutoverPreflight(schoolId: string) {
+  async getAccrualCutoverPreflight(schoolId: string, tx?: Prisma.TransactionClient) {
+    const db = tx ?? this.prisma.client;
     const zero = new Prisma.Decimal(0);
     const [state, billTotals, studentTotals, postedReceivables, receipts] = await Promise.all([
-      this.prisma.client.financeAccrualState.findUnique({ where: { schoolId } }),
-      this.prisma.client.bill.aggregate({
+      db.financeAccrualState.findUnique({ where: { schoolId } }),
+      db.bill.aggregate({
         where: { schoolId, status: { notIn: ["CANCELLED", "WAIVED"] } },
         _sum: { balanceAmount: true }, _count: { id: true },
       }),
-      this.prisma.client.student.aggregate({ where: { schoolId }, _sum: { outstandingBalance: true } }),
-      this.prisma.client.transaction.count({
+      db.student.aggregate({ where: { schoolId }, _sum: { outstandingBalance: true } }),
+      db.transaction.count({
         where: {
           schoolId,
           OR: [
@@ -335,7 +337,7 @@ export class FinanceService {
           ],
         },
       }),
-      this.prisma.client.$queryRaw<Array<{ mismatched: bigint }>>(Prisma.sql`
+      db.$queryRaw<Array<{ mismatched: bigint }>>(Prisma.sql`
         SELECT COUNT(*)::bigint AS mismatched FROM payments p
         LEFT JOIN (SELECT "paymentId", SUM(amount) AS total FROM payment_bill_allocations GROUP BY "paymentId") a
           ON a."paymentId" = p.id
@@ -373,7 +375,7 @@ export class FinanceService {
       const existing = await this.lockAccrualTransition(tx, schoolId);
       if (existing) throw new ConflictException("Accrual accounting is already active for this school.");
       await this.assertPostingDate(tx, schoolId, new Date());
-      const preflight = await this.getAccrualCutoverPreflight(schoolId);
+      const preflight = await this.getAccrualCutoverPreflight(schoolId, tx);
       if (!preflight.canActivate) throw new ConflictException("Accrual cutover preflight failed: " + preflight.problems.join(" "));
       const amount = new Prisma.Decimal(input.expectedOpeningReceivables);
       if (!amount.isFinite() || amount.lt(0) || amount.decimalPlaces() > 2 ||
@@ -1316,6 +1318,7 @@ export class FinanceService {
             description: `Fees invoiced ${bill.billNumber}`,
             debit: receivables, credit: income,
             referenceType: "BILL", referenceId: bill.id, referenceNumber: bill.billNumber,
+            transactionType: "INCOME",
           });
         }
         results.push(bill);
@@ -1598,7 +1601,7 @@ export class FinanceService {
             return this.postAccrualEntry(tx, {
               schoolId, amount: paymentAmount, date: paymentDate,
               description: `School fees receipt ${paymentNumber} clears receivables`,
-              debit, credit, referenceType: "PAYMENT", referenceId: created.id,
+              debit, credit, transactionType: "TRANSFER", referenceType: "PAYMENT", referenceId: created.id,
               referenceNumber: paymentNumber,
             });
           })()
