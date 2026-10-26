@@ -1,5 +1,6 @@
 import { BadRequestException, ConflictException, Injectable } from "@nestjs/common";
-import { Prisma } from "@prisma/client";
+import { Prisma, type AccountType } from "@prisma/client";
+import { buildPeriodSnapshot } from "./finance-period-snapshot.helpers.js";
 import { PrismaService } from "../../prisma/prisma.service.js";
 import { FinanceLedgerIntegrityService } from "./finance-ledger-integrity.service.js";
 import { FinanceService } from "./finance.service.js";
@@ -38,6 +39,60 @@ export class FinancePeriodPreparationService {
       where: { schoolId }, orderBy: [{ startDate: "desc" }, { id: "desc" }],
       take: 36, include: { _count: { select: { closingRuns: true, snapshots: true } } },
     });
+  }
+
+  /**
+   * P4 read-only as-of period report. Uses immutable posted journal lines rather
+   * than cached balances, with all reads made in one repeatable-read snapshot.
+   * It is an audit preview, NOT an approved close or stored FinancePeriodSnapshot.
+   */
+  async snapshotPreview(schoolId: string, year: number, month: number) {
+    const { startDate, endDate } = this.monthDates(year, month);
+    const integrity = await this.ledger.check(schoolId);
+    if (integrity.I1.status !== "PASS" || integrity.I2.status !== "PASS" || integrity.I3.status !== "PASS") {
+      throw new ConflictException("The school ledger failed I1/I2/I3 reconciliation; resolve the exception before previewing a period.");
+    }
+    return this.prisma.client.$transaction(async tx => {
+      const [unmirrored] = await tx.$queryRaw<Array<{ count: bigint }>>`
+        SELECT COUNT(*)::bigint AS "count" FROM "transactions" t
+        LEFT JOIN "finance_journal_entries" j ON j."transactionId" = t."id" AND j."schoolId" = t."schoolId"
+        WHERE t."schoolId" = ${schoolId} AND j."id" IS NULL
+      `;
+      if (Number(unmirrored?.count ?? 0n) !== 0) {
+        throw new ConflictException("Unmirrored historical ledger rows prevent a reliable period preview.");
+      }
+      const rows = await tx.$queryRaw<Array<{
+        accountId: string; code: string; name: string; accountType: AccountType;
+        openingDebits: Prisma.Decimal; openingCredits: Prisma.Decimal;
+        periodDebits: Prisma.Decimal; periodCredits: Prisma.Decimal;
+      }>>`
+        SELECT
+          a."id" AS "accountId", a."code", a."name", a."accountType",
+          COALESCE(SUM(CASE WHEN e."postedDate" < ${startDate} AND l."side" = 'DEBIT'
+            THEN l."amount" ELSE 0 END), 0)::numeric AS "openingDebits",
+          COALESCE(SUM(CASE WHEN e."postedDate" < ${startDate} AND l."side" = 'CREDIT'
+            THEN l."amount" ELSE 0 END), 0)::numeric AS "openingCredits",
+          COALESCE(SUM(CASE WHEN e."postedDate" BETWEEN ${startDate} AND ${endDate}
+            AND l."side" = 'DEBIT' THEN l."amount" ELSE 0 END), 0)::numeric AS "periodDebits",
+          COALESCE(SUM(CASE WHEN e."postedDate" BETWEEN ${startDate} AND ${endDate}
+            AND l."side" = 'CREDIT' THEN l."amount" ELSE 0 END), 0)::numeric AS "periodCredits"
+        FROM "chart_accounts" a
+        LEFT JOIN "finance_journal_lines" l ON l."accountId" = a."id"
+        LEFT JOIN "finance_journal_entries" e
+          ON e."id" = l."entryId" AND e."schoolId" = a."schoolId"
+        WHERE a."schoolId" = ${schoolId}
+        GROUP BY a."id"
+        ORDER BY a."code", a."id"
+      `;
+      const snapshot = buildPeriodSnapshot(rows, {
+        schoolId, startDate: iso(startDate), endDate: iso(endDate),
+      });
+      return {
+        ...snapshot, isApprovedClose: false, isPersistedSnapshot: false,
+        source: "IMMUTABLE_JOURNAL_AS_OF_PERIOD",
+        warning: "Preview only: period reconciliation, P5 cash/bank approval, P6 statutory checks and independent close approval are still required.",
+      };
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead });
   }
 
   async readiness(schoolId: string, year: number, month: number) {
