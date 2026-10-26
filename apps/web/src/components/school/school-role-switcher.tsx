@@ -114,7 +114,7 @@ export function SchoolRoleSwitcher() {
     return (
       <div className="flex h-9 min-w-0 items-center gap-2 rounded-lg border border-border/80 bg-card/90 px-3 text-xs font-semibold text-foreground/80 shadow-xs">
         <UserRoundCog className="size-4 shrink-0 text-primary" />
-        <span className="truncate max-w-36 sm:max-w-44">
+        <span className="truncate max-w-[min(6.5rem,24vw)] sm:max-w-44">
           {roleLabels[activeRole] ?? activeRole}
         </span>
       </div>
@@ -123,10 +123,10 @@ export function SchoolRoleSwitcher() {
 
   return (
     <Select value={activeRole} onValueChange={(val) => void selectRole(val)}>
-      <SelectTrigger className="group gap-2 max-w-44 cursor-pointer">
+      <SelectTrigger aria-label="Switch school role" className="group h-9 max-w-[min(9rem,32vw)] gap-1.5 px-2 sm:max-w-44 sm:gap-2 sm:px-3 cursor-pointer">
         <UserRoundCog className="size-4 shrink-0 text-primary" />
         <SelectValue>
-          <span className="truncate max-w-32 sm:max-w-40 block text-left">
+          <span className="block max-w-[min(5.5rem,22vw)] truncate text-left sm:max-w-40">
             {roleLabels[activeRole] ?? activeRole}
           </span>
         </SelectValue>
