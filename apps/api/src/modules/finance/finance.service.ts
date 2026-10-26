@@ -268,6 +268,156 @@ export class FinanceService {
     );
   }
 
+  /** Shared serialisation for cutover, billing, receipts and reversals. */
+  private async lockAccrualTransition(tx: Prisma.TransactionClient, schoolId: string) {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${schoolId}), hashtext('accrual-transition'))`;
+    return tx.financeAccrualState.findUnique({ where: { schoolId } });
+  }
+
+  /** All journal entries and cached-account updates are atomic. */
+  private async postAccrualEntry(
+    tx: Prisma.TransactionClient,
+    input: {
+      schoolId: string; amount: Prisma.Decimal; date: Date; description: string;
+      debit: { id: string; accountType: AccountType };
+      credit: { id: string; accountType: AccountType };
+      referenceType: string; referenceId: string; referenceNumber?: string;
+    },
+  ) {
+    if (input.amount.lte(0)) return null;
+    const prefix = `TXN-${input.date.getUTCFullYear()}-`;
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${input.schoolId}), hashtext(${prefix}))`;
+    const last = await tx.transaction.findFirst({
+      where: { schoolId: input.schoolId, transactionNumber: { startsWith: prefix } },
+      orderBy: { transactionNumber: "desc" },
+      select: { transactionNumber: true },
+    });
+    const seq = last ? Number(last.transactionNumber.slice(prefix.length)) + 1 : 1;
+    const entry = await tx.transaction.create({
+      data: {
+        schoolId: input.schoolId, transactionNumber: prefix + String(seq).padStart(5, "0"),
+        transactionDate: input.date, description: input.description, amount: input.amount,
+        debitAccountId: input.debit.id, creditAccountId: input.credit.id,
+        transactionType: "ADJUSTMENT", category: "SCHOOL_FEES",
+        referenceType: input.referenceType, referenceId: input.referenceId,
+        referenceNumber: input.referenceNumber,
+      },
+    });
+    const debitIncreasing = input.debit.accountType === "ASSET" || input.debit.accountType === "EXPENSE";
+    const creditIncreasing = input.credit.accountType === "LIABILITY" || input.credit.accountType === "EQUITY" || input.credit.accountType === "REVENUE";
+    await tx.chartAccount.update({
+      where: { id: input.debit.id },
+      data: { balance: debitIncreasing ? { increment: input.amount } : { decrement: input.amount } },
+    });
+    await tx.chartAccount.update({
+      where: { id: input.credit.id },
+      data: { balance: creditIncreasing ? { increment: input.amount } : { decrement: input.amount } },
+    });
+    return entry;
+  }
+
+  /** Read-only migration gate; does not assume a zero legacy receivable balance. */
+  async getAccrualCutoverPreflight(schoolId: string) {
+    const zero = new Prisma.Decimal(0);
+    const [state, billTotals, studentTotals, postedReceivables, receipts] = await Promise.all([
+      this.prisma.client.financeAccrualState.findUnique({ where: { schoolId } }),
+      this.prisma.client.bill.aggregate({
+        where: { schoolId, status: { notIn: ["CANCELLED", "WAIVED"] } },
+        _sum: { balanceAmount: true }, _count: { id: true },
+      }),
+      this.prisma.client.student.aggregate({ where: { schoolId }, _sum: { outstandingBalance: true } }),
+      this.prisma.client.transaction.count({
+        where: {
+          schoolId,
+          OR: [
+            { debitAccount: { category: "ACCOUNTS_RECEIVABLE" } },
+            { creditAccount: { category: "ACCOUNTS_RECEIVABLE" } },
+          ],
+        },
+      }),
+      this.prisma.client.$queryRaw<Array<{ mismatched: bigint }>>(Prisma.sql`
+        SELECT COUNT(*)::bigint AS mismatched FROM payments p
+        LEFT JOIN (SELECT "paymentId", SUM(amount) AS total FROM payment_bill_allocations GROUP BY "paymentId") a
+          ON a."paymentId" = p.id
+        WHERE p."schoolId" = ${schoolId} AND p.status = 'COMPLETED'
+          AND p.amount <> COALESCE(a.total, 0)
+      `),
+    ]);
+    const outstanding = billTotals._sum.balanceAmount ?? zero;
+    const studentBalance = studentTotals._sum.outstandingBalance ?? zero;
+    const problems: string[] = [];
+    if (!studentBalance.eq(outstanding)) problems.push("Student outstanding balances do not match open invoice balances.");
+    if (Number(receipts[0]?.mismatched ?? 0n) > 0) problems.push("Completed receipts have unmatched bill allocations.");
+    if (postedReceivables > 0 && !state) problems.push("Receivable journal entries already exist; reconcile these postings before selecting an opening balance.");
+    return {
+      active: Boolean(state), activatedAt: state?.activatedAt ?? null,
+      openingReceivables: state?.openingReceivables.toFixed(2) ?? null,
+      expectedOpeningReceivables: outstanding.toFixed(2),
+      studentBalance: studentBalance.toFixed(2),
+      invoiceCount: billTotals._count.id,
+      unallocatedReceiptCount: Number(receipts[0]?.mismatched ?? 0n),
+      existingReceivablePostings: postedReceivables,
+      canActivate: !state && problems.length === 0,
+      problems,
+      policy: "INVOICE_REVENUE_RECOGNISED_AT_ISSUE",
+      warning: "Activation credits prior unpaid fees to a separately identified opening equity account; it does not restate historic revenues. Only activate after independent accounting review and confirmation that new invoiced fees are earned at issue. Term-spanning tuition may need deferred revenue instead.",
+    };
+  }
+
+  async activateAccrualCutover(
+    schoolId: string,
+    actorId: string,
+    input: { approvalReference: string; expectedOpeningReceivables: string; confirmInvoiceRevenuePolicy: true },
+  ) {
+    return withSerializableRetry(() => this.prisma.client.$transaction(async (tx) => {
+      const existing = await this.lockAccrualTransition(tx, schoolId);
+      if (existing) throw new ConflictException("Accrual accounting is already active for this school.");
+      await this.assertPostingDate(tx, schoolId, new Date());
+      const preflight = await this.getAccrualCutoverPreflight(schoolId);
+      if (!preflight.canActivate) throw new ConflictException("Accrual cutover preflight failed: " + preflight.problems.join(" "));
+      const amount = new Prisma.Decimal(input.expectedOpeningReceivables);
+      if (!amount.isFinite() || amount.lt(0) || amount.decimalPlaces() > 2 ||
+          !amount.eq(new Prisma.Decimal(preflight.expectedOpeningReceivables))) {
+        throw new ConflictException("Opening receivables changed or do not match the acknowledged amount. Run preflight again.");
+      }
+      const approvalReference = input.approvalReference.trim();
+      if (approvalReference.length < 8) throw new BadRequestException("Provide an independently authorised cutover approval reference.");
+      const activatedAt = new Date();
+      const state = await tx.financeAccrualState.create({
+        data: { schoolId, activatedAt, activatedById: actorId, approvalReference, openingReceivables: amount },
+      });
+      let openingTransactionId: string | null = null;
+      if (amount.gt(0)) {
+        const receivables = await this.ensureAccount(tx, schoolId, {
+          accountType: "ASSET", category: "ACCOUNTS_RECEIVABLE",
+          name: "Student Fees Receivable", code: "1200",
+        });
+        const equity = await this.ensureAccount(tx, schoolId, {
+          accountType: "EQUITY", category: "RETAINED_EARNINGS",
+          name: "Legacy Unpaid Fees Opening Equity - Review", code: "3200",
+        });
+        const posted = await this.postAccrualEntry(tx, {
+          schoolId, amount, date: activatedAt,
+          description: "Opening unpaid student fees at controlled accrual cutover",
+          debit: receivables, credit: equity, referenceType: "ACCRUAL_CUTOVER",
+          referenceId: schoolId, referenceNumber: approvalReference,
+        });
+        openingTransactionId = posted?.id ?? null;
+        await tx.financeAccrualState.update({
+          where: { schoolId }, data: { openingTransactionId },
+        });
+      }
+      await this.writeAudit(tx, {
+        actorId, schoolId, action: "UPDATE",
+        entityType: "FINANCE_ACCRUAL_CUTOVER", entityId: schoolId,
+        newValues: { activatedAt: activatedAt.toISOString(), approvalReference, openingReceivables: amount.toFixed(2), openingTransactionId },
+      });
+      return { ...state, openingTransactionId, openingReceivables: amount.toFixed(2) };
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }), {
+      onExhausted: () => new ConflictException("Concurrent accounting activity prevented cutover. Run preflight again."),
+    });
+  }
+
   /** Post cash received as school income using double-entry bookkeeping. */
   async postIncome(
     tx: Prisma.TransactionClient,
