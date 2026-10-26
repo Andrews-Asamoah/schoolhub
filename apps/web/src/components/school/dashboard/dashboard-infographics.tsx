@@ -26,7 +26,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-const GENDER_COLORS = ["#2563eb", "#db2777", "#8b5cf6", "#94a3b8"];
+const GENDER_COLORS = ["var(--chart-1)", "var(--chart-4)", "var(--chart-5)", "var(--chart-2)"];
 const chartTooltipStyle = {
   backgroundColor: "var(--popover)",
   border: "1px solid var(--border)",
@@ -145,8 +145,8 @@ export function DashboardInfographics({
                 <YAxis yAxisId="admissions" orientation="right" tickLine={false} axisLine={false} allowDecimals={false} width={30} tick={{ fill: "var(--muted-foreground)", fontSize: 10 }} />
                 <Tooltip contentStyle={chartTooltipStyle} formatter={(value, name) => [numberFormat.format(Number(value ?? 0)), name === "population" ? "Active population" : "New admissions"]} />
                 <Legend wrapperStyle={{ fontSize: 11, paddingTop: 8 }} formatter={(value) => value === "population" ? "Active population" : "New admissions"} />
-                <Line yAxisId="population" type="monotone" dataKey="population" name="population" stroke="#2563eb" strokeWidth={2.5} dot={{ r: 3 }} activeDot={{ r: 5 }} />
-                <Line yAxisId="admissions" type="monotone" dataKey="newAdmissions" name="newAdmissions" stroke="#10b981" strokeWidth={2} dot={{ r: 3 }} />
+                <Line yAxisId="population" type="monotone" dataKey="population" name="population" stroke="var(--chart-1)" strokeWidth={2.5} dot={{ r: 3 }} activeDot={{ r: 5 }} />
+                <Line yAxisId="admissions" type="monotone" dataKey="newAdmissions" name="newAdmissions" stroke="var(--chart-2)" strokeWidth={2} dot={{ r: 3 }} />
               </LineChart>
             </ResponsiveContainer>
           </div>
