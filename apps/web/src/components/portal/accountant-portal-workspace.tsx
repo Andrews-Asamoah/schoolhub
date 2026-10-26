@@ -253,6 +253,22 @@ const buttonPrimary =
 const buttonSecondary =
   "inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-border bg-card px-4 py-2 text-sm font-semibold text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50";
 
+/** Add GHS money amounts as integer pesewas, avoiding floating-point drift. */
+function sumCurrency<T>(rows: readonly T[], pick: (row: T) => string | number): number {
+  const cents = rows.reduce((total, row) => {
+    const value = pick(row);
+    const raw = typeof value === "number" ? value.toFixed(2) : String(value);
+    const parsed = /^(-?)(\d+)(?:\.(\d{1,2}))?$/.exec(raw);
+    if (!parsed) throw new Error("Invalid financial amount.");
+    const amount = BigInt(parsed[2]!) * 100n + BigInt((parsed[3] ?? "").padEnd(2, "0"));
+    return total + (parsed[1] ? -amount : amount);
+  }, 0n);
+  if (cents > BigInt(Number.MAX_SAFE_INTEGER) || cents < BigInt(-Number.MAX_SAFE_INTEGER)) {
+    throw new Error("Total is too large for safe display.");
+  }
+  return Number(cents) / 100;
+}
+
 export function AccountantPortalWorkspace({
   defaultTab = "overview",
 }: AccountantPortalWorkspaceProps) {
@@ -412,9 +428,9 @@ export function AccountantPortalWorkspace({
   // from a paginated page of receipt or bill rows.
   const collected = Number(summaryQuery.data?.collected ?? 0);
   const outstanding = Number(summaryQuery.data?.outstanding ?? 0);
-  const expenseTotal = expenses.reduce((sum, expense) => sum + Number(expense.amount), 0);
+  const expenseTotal = sumCurrency(expenses, (expense) => expense.amount);
   const paidPayroll = payroll.filter((run) => run.status === "PAID");
-  const payrollNet = paidPayroll.reduce((sum, run) => sum + Number(run.totalNet), 0);
+  const payrollNet = sumCurrency(paidPayroll, (run) => run.totalNet);
   const reportStartDate = useMemo(() => {
     if (reportPeriod === "all") return null;
     if (reportPeriod === "year" && currentYear?.startDate) return new Date(currentYear.startDate);
@@ -436,7 +452,7 @@ export function AccountantPortalWorkspace({
     () => expenses.filter((expense) => isInReportPeriod(expense.date)),
     [expenses, reportStartDate, reportEndDate],
   );
-  const reportExpenseTotal = reportExpenses.reduce((sum, expense) => sum + Number(expense.amount), 0);
+  const reportExpenseTotal = sumCurrency(reportExpenses, (expense) => expense.amount);
   const reportPayroll = useMemo(() => {
     if (!reportStartDate) return payroll;
     return payroll.filter((run) => {
@@ -445,7 +461,7 @@ export function AccountantPortalWorkspace({
     });
   }, [payroll, reportStartDate, reportEndDate]);
   const reportPayrollPaid = reportPayroll.filter((run) => run.status === "PAID");
-  const reportPayrollNet = reportPayrollPaid.reduce((sum, run) => sum + Number(run.totalNet), 0);
+  const reportPayrollNet = sumCurrency(reportPayrollPaid, (run) => run.totalNet);
   const todayStart = new Date();
   todayStart.setUTCHours(0, 0, 0, 0);
   const overdueBills = overdueBillsQuery.data?.items ?? [];
