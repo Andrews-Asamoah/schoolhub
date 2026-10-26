@@ -56,6 +56,7 @@ model School {
   notifications               Notification[]
   announcements               Announcement[]
   feeReminderSchedules        FeeReminderSchedule[]
+  financeSettings             FinanceSettings?
   financePeriodLock           FinancePeriodLock?
   financeAccrualState          FinanceAccrualState?
   billCarryForwards            BillCarryForward[]
