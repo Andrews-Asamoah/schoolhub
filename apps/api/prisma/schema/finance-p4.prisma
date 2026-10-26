@@ -1,0 +1,125 @@
+// P4 additive period-close model. Schema alone does not authorise financial closes.
+enum FinancePeriodType {
+  MONTH
+  TERM
+  YEAR
+}
+
+enum FinancePeriodStatus {
+  OPEN
+  SOFT_CLOSED
+  CLOSED
+}
+
+enum FinanceClosingCheckSeverity {
+  BLOCKING
+  WARNING
+}
+
+enum FinanceClosingCheckResult {
+  PASS
+  FAIL
+  WAIVED
+}
+
+model FinanceAccountingPeriod {
+  id             String @id @default(cuid())
+  schoolId       String
+  type           FinancePeriodType
+  name           String
+  startDate      DateTime @db.Date
+  endDate        DateTime @db.Date
+  academicYearId String?
+  termId         String?
+  status         FinancePeriodStatus @default(OPEN)
+  closedAt       DateTime?
+  closedById     String?
+  reopenCount    Int @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  closingRuns    FinancePeriodClosingRun[]
+  snapshots      FinancePeriodSnapshot[]
+  events         FinancePeriodEvent[]
+
+  @@unique([schoolId, type, startDate])
+  @@index([schoolId, status])
+  @@index([schoolId, type, endDate])
+  @@map("finance_accounting_periods")
+}
+
+model FinancePeriodClosingRun {
+  id                String @id @default(cuid())
+  periodId          String
+  startedById       String
+  startedAt         DateTime @default(now())
+  passed            Boolean @default(false)
+  approvalRequestId String?
+  period            FinanceAccountingPeriod @relation(fields: [periodId], references: [id], onDelete: Cascade)
+  checks            FinancePeriodClosingCheck[]
+
+  @@index([periodId, startedAt])
+  @@map("finance_period_closing_runs")
+}
+
+model FinancePeriodClosingCheck {
+  id           String @id @default(cuid())
+  runId        String
+  key          String
+  label        String
+  severity     FinanceClosingCheckSeverity
+  result       FinanceClosingCheckResult
+  detail       Json?
+  waivedById   String?
+  waiverReason String?
+  run          FinancePeriodClosingRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@unique([runId, key])
+  @@map("finance_period_closing_checks")
+}
+
+model FinancePeriodSnapshot {
+  id          String @id @default(cuid())
+  periodId    String
+  schoolId    String
+  version     Int
+  contentHash String
+  createdById String
+  createdAt   DateTime @default(now())
+  period      FinanceAccountingPeriod @relation(fields: [periodId], references: [id], onDelete: Restrict)
+  lines       FinancePeriodSnapshotLine[]
+
+  @@unique([periodId, version])
+  @@index([schoolId, periodId])
+  @@map("finance_period_snapshots")
+}
+
+model FinancePeriodSnapshotLine {
+  id          String @id @default(cuid())
+  snapshotId  String
+  accountId   String
+  code        String
+  name        String
+  accountType AccountType
+  opening     Decimal @db.Decimal(15,2)
+  debit       Decimal @db.Decimal(15,2)
+  credit      Decimal @db.Decimal(15,2)
+  closing     Decimal @db.Decimal(15,2)
+  snapshot    FinancePeriodSnapshot @relation(fields: [snapshotId], references: [id], onDelete: Restrict)
+
+  @@index([snapshotId, code])
+  @@map("finance_period_snapshot_lines")
+}
+
+model FinancePeriodEvent {
+  id                String @id @default(cuid())
+  periodId          String
+  kind              String
+  actorId           String
+  reason            String?
+  approvalRequestId String?
+  createdAt         DateTime @default(now())
+  period            FinanceAccountingPeriod @relation(fields: [periodId], references: [id], onDelete: Cascade)
+
+  @@index([periodId, createdAt])
+  @@map("finance_period_events")
+}
