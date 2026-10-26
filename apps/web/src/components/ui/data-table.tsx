@@ -17,6 +17,7 @@ import {
   type ColumnVisibilityState,
   type Row,
   type RowData,
+  type RowSelectionState,
   type SortingState,
 } from "@tanstack/react-table";
 import {
@@ -131,7 +132,7 @@ export function DataTable<T extends RowData>({
   const [globalFilter, setGlobalFilter] = useState("");
   const [columnFilters] = useState<ColumnFiltersState>([]);
   const [columnVisibility, setColumnVisibility] = useState<ColumnVisibilityState>({});
-  const [rowSelection, setRowSelection] = useState<Record<string, boolean>>({});
+  const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
   const searchId = useId();
 
   const defs = useMemo<ColumnDef<typeof dataTableFeatures, T>[]>(() => {
@@ -196,7 +197,7 @@ export function DataTable<T extends RowData>({
     globalFilterFn: "includesString",
     // For server-paginated parents the current rows are already the page.
     manualPagination: !paginate,
-    initialState: { pagination: { pageSize } },
+    initialState: { pagination: { pageIndex: 0, pageSize } },
   });
 
   // Drop selections for rows that disappeared (e.g. after a refetch).
@@ -220,7 +221,7 @@ export function DataTable<T extends RowData>({
     // Selected rows when any are ticked, otherwise everything matching the search, in the sorted order.
     const source: Row<typeof dataTableFeatures, T>[] = selectedCount
       ? table.getSortedRowModel().rows.filter((row) => row.getIsSelected())
-      : table.getPrePaginationRowModel().rows;
+      : table.getPrePaginatedRowModel().rows;
     return {
       title: exportTitle,
       headers: visible.map((column) => String(column.columnDef.header)),
@@ -229,7 +230,7 @@ export function DataTable<T extends RowData>({
   }
 
   const pageIndex = table.state.pagination.pageIndex;
-  const size = table.getState().pagination.pageSize;
+  const size = table.state.pagination.pageSize;
   const from = filteredCount === 0 ? 0 : pageIndex * size + 1;
   const to = Math.min(filteredCount, (pageIndex + 1) * size);
 
