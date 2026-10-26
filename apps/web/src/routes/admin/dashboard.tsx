@@ -17,18 +17,7 @@ import { StatCard } from "@/components/superadmin/stat-card";
 import { SubscriptionBadge } from "@/components/superadmin/subscription-badge";
 import { DataTable, type DataTableColumn } from "@/components/ui/data-table";
 import { Link, useNavigate } from "@tanstack/react-router";
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Cell,
-  Pie,
-  PieChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
+import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 
 export const Route = createFileRoute("/admin/dashboard")({
   component: AdminDashboard,
@@ -44,6 +33,8 @@ interface PlatformStats {
   suspended?: number;
   expiringSoon?: number;
   lapsed?: number;
+  cancelled?: number;
+  subscriptionStatusCounts?: Record<string, number>;
 }
 
 interface SchoolSummary {
@@ -224,39 +215,80 @@ function AdminDashboard() {
         </section>
       )}
 
-      <section aria-label="Platform analytics" className="grid gap-5 xl:grid-cols-[1.35fr_1fr]">
-        <article className="min-w-0 rounded-2xl border border-border/80 bg-card p-5 shadow-[0_4px_24px_rgba(15,23,42,0.035)] sm:p-6">
-          <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
-            <div><h2 className="text-sm font-semibold text-foreground sm:text-base">Platform footprint</h2><p className="mt-1 text-xs leading-5 text-muted-foreground">Current totals from platform statistics</p></div>
-            <span className="rounded-full border border-border bg-muted/50 px-2.5 py-1 text-[10px] font-semibold text-muted-foreground">Live data</span>
-          </div>
-          {statsLoading ? <div className="flex h-64 items-center justify-center text-sm text-muted-foreground/70">Loading platform metrics…</div> : statsError || !stats ? <div className="flex h-64 items-center justify-center rounded-xl border border-dashed border-border px-5 text-center text-sm text-muted-foreground">Platform statistics are unavailable. Chart data will appear when the API responds.</div> : (
-            <div role="img" aria-label={`Platform totals: ${stats.totalSchools} schools, ${stats.totalStudents} students, ${stats.totalTeachers} teachers, ${stats.activeSubscriptions} active subscriptions`} className="h-64 w-full min-w-0">
-              <ResponsiveContainer width="100%" height="100%" minWidth={0}>
-                <BarChart data={[{ label: "Schools", value: stats.totalSchools, fill: "var(--chart-1)" }, { label: "Students", value: stats.totalStudents, fill: "var(--chart-2)" }, { label: "Teachers", value: stats.totalTeachers, fill: "var(--chart-3)" }, { label: "Active plans", value: stats.activeSubscriptions, fill: "var(--chart-4)" }]} margin={{ top: 8, right: 8, left: -12, bottom: 0 }}>
-                  <CartesianGrid stroke="#e2e8f0" strokeDasharray="3 3" vertical={false} />
-                  <XAxis dataKey="label" tickLine={false} axisLine={false} tick={{ fill: "var(--chart-5)", fontSize: 11 }} />
-                  <YAxis allowDecimals={false} tickLine={false} axisLine={false} width={42} tick={{ fill: "var(--chart-5)", fontSize: 10 }} />
-                  <Tooltip contentStyle={{ borderRadius: 12, border: "1px solid #e2e8f0", fontSize: 12 }} formatter={(value) => [Number(value ?? 0).toLocaleString("en-GH"), "Total"]} />
-                  <Bar dataKey="value" radius={[7, 7, 0, 0]} maxBarSize={48}>{[{ fill: "var(--chart-1)" }, { fill: "var(--chart-2)" }, { fill: "var(--chart-3)" }, { fill: "var(--chart-4)" }].map((item, index) => <Cell key={index} fill={item.fill} />)}</Bar>
-                </BarChart>
-              </ResponsiveContainer>
+      <section aria-label="Subscription analytics" className="grid gap-5 xl:grid-cols-[1.25fr_1fr]">
+        <article className="min-w-0 rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-6">
+          <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h2 className="text-sm font-semibold text-foreground sm:text-base">Platform subscription distribution</h2>
+              <p className="mt-1 text-xs leading-5 text-muted-foreground">Current subscription status across every enrolled school, not only the newest records.</p>
             </div>
-          )}
-          <p className="mt-3 text-[10px] leading-4 text-muted-foreground/70">Counts use different units; compare each category over time, not against one another.</p>
-        </article>
-        <article className="min-w-0 rounded-2xl border border-border/80 bg-card p-5 shadow-[0_4px_24px_rgba(15,23,42,0.035)] sm:p-6">
-          <div className="mb-4"><h2 className="text-sm font-semibold text-foreground sm:text-base">Subscription mix</h2><p className="mt-1 text-xs leading-5 text-muted-foreground">Status of the five most recently enrolled schools shown below</p></div>
-          {schoolsLoading ? <div className="flex h-48 items-center justify-center text-sm text-muted-foreground/70">Loading school records…</div> : schoolsError || !schools?.data.length ? <div className="flex h-48 items-center justify-center rounded-xl border border-dashed border-border px-5 text-center text-sm text-muted-foreground">No school subscription data available yet.</div> : (() => {
-            const groups = schools.data.reduce<Record<string, number>>((acc, school) => { const status = school.organization.subscriptionStatus || "UNKNOWN"; acc[status] = (acc[status] ?? 0) + 1; return acc; }, {});
-            const palette = ["var(--chart-1)", "var(--chart-2)", "var(--chart-3)", "#e11d48", "var(--chart-4)"];
-            const data = Object.entries(groups).map(([name, value]) => ({ name: name.replaceAll("_", " "), value }));
-            return <><div role="img" aria-label={data.map((item) => `${item.name}: ${item.value} schools`).join(", ")} className="h-48 w-full min-w-0"><ResponsiveContainer width="100%" height="100%" minWidth={0}><PieChart><Pie data={data} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius="58%" outerRadius="82%" paddingAngle={3} stroke="none">{data.map((item, index) => <Cell key={item.name} fill={palette[index % palette.length]} />)}</Pie><Tooltip contentStyle={{ borderRadius: 12, border: "1px solid #e2e8f0", fontSize: 12 }} formatter={(value) => [`${value ?? 0} schools`, "Count"]} /></PieChart></ResponsiveContainer></div><div className="mt-3 space-y-2">{data.map((item, index) => <div key={item.name} className="flex items-center justify-between gap-3 text-xs"><span className="flex min-w-0 items-center gap-2 text-muted-foreground"><span className="size-2.5 shrink-0 rounded-sm" style={{ backgroundColor: palette[index % palette.length] }} />{item.name}</span><span className="font-semibold tabular-nums text-foreground">{item.value}</span></div>)}</div></>;
+            <span className="rounded-full border border-border bg-muted/50 px-2.5 py-1 text-[10px] font-semibold text-muted-foreground">Platform-wide</span>
+          </div>
+          {statsLoading ? (
+            <div className="flex h-56 items-center justify-center text-sm text-muted-foreground">Loading subscription data…</div>
+          ) : statsError || !stats ? (
+            <div className="flex h-56 items-center justify-center rounded-xl border border-dashed border-border px-5 text-center text-sm text-muted-foreground">Subscription data is unavailable. Try refreshing the dashboard.</div>
+          ) : (() => {
+            const palette: Record<string, string> = {
+              ACTIVE: "var(--success)",
+              TRIALING: "var(--chart-1)",
+              PAST_DUE: "var(--warning)",
+              SUSPENDED: "var(--destructive)",
+              CANCELLED: "var(--chart-4)",
+              CANCELED: "var(--chart-4)",
+              EXPIRED: "var(--muted-foreground)",
+              UNPAID: "var(--chart-5)",
+              INCOMPLETE: "var(--info)",
+              INCOMPLETE_EXPIRED: "var(--chart-3)",
+              UNKNOWN: "var(--border)",
+            };
+            const data = Object.entries(stats.subscriptionStatusCounts ?? {})
+              .filter(([, value]) => value > 0)
+              .sort(([left], [right]) => left.localeCompare(right))
+              .map(([status, value]) => ({ status, label: status.replaceAll("_", " "), value, fill: palette[status] ?? "var(--chart-2)" }));
+            if (!data.length) {
+              return <div className="flex h-56 items-center justify-center rounded-xl border border-dashed border-border px-5 text-center text-sm text-muted-foreground">No school subscription records are available yet.</div>;
+            }
+            return (
+              <div className="grid min-w-0 items-center gap-4 sm:grid-cols-[minmax(180px,0.8fr)_minmax(0,1fr)]">
+                <div role="img" aria-label={data.map((item) => `${item.label}: ${item.value} schools`).join(", ")} className="h-56 min-w-0">
+                  <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+                    <PieChart>
+                      <Pie data={data} dataKey="value" nameKey="label" cx="50%" cy="50%" innerRadius="57%" outerRadius="82%" paddingAngle={2} stroke="none">
+                        {data.map((item) => <Cell key={item.status} fill={item.fill} />)}
+                      </Pie>
+                      <Tooltip contentStyle={{ borderRadius: 12, border: "1px solid var(--border)", backgroundColor: "var(--popover)", color: "var(--popover-foreground)", fontSize: 12 }} formatter={(value) => [`${Number(value ?? 0).toLocaleString("en-GH")} schools`, "Schools"]} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+                <ul className="min-w-0 space-y-2">
+                  {data.map((item) => <li key={item.status} className="flex items-center justify-between gap-3 text-xs"><span className="flex min-w-0 items-center gap-2 text-muted-foreground"><span className="size-2.5 shrink-0 rounded-sm" style={{ backgroundColor: item.fill }} /><span className="truncate">{item.label}</span></span><span className="font-semibold tabular-nums text-foreground">{item.value.toLocaleString("en-GH")}</span></li>)}
+                </ul>
+              </div>
+            );
           })()}
+        </article>
+
+        <article className="min-w-0 rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-6">
+          <div className="mb-4">
+            <h2 className="text-sm font-semibold text-foreground sm:text-base">Subscription health</h2>
+            <p className="mt-1 text-xs leading-5 text-muted-foreground">Items that may need follow-up from the platform team.</p>
+          </div>
+          {statsLoading ? <div className="grid gap-3 sm:grid-cols-2"><div className="h-24 animate-pulse rounded-xl bg-muted" /><div className="h-24 animate-pulse rounded-xl bg-muted" /><div className="h-24 animate-pulse rounded-xl bg-muted" /><div className="h-24 animate-pulse rounded-xl bg-muted" /></div>
+          : statsError || !stats ? <div className="flex h-48 items-center justify-center rounded-xl border border-dashed border-border px-5 text-center text-sm text-muted-foreground">Subscription health is unavailable.</div>
+          : <div className="grid gap-3 sm:grid-cols-2">
+            {[
+              { label: "Expiring in 14 days", value: stats.expiringSoon ?? 0, tone: "warning" },
+              { label: "Past expiry", value: stats.lapsed ?? 0, tone: "destructive" },
+              { label: "Past due", value: stats.pastDue ?? 0, tone: "warning" },
+              { label: "Suspended", value: stats.suspended ?? 0, tone: "destructive" },
+            ].map((metric) => <div key={metric.label} className="rounded-xl border border-border p-3"><p className="text-xs text-muted-foreground">{metric.label}</p><p className={`mt-2 text-2xl font-bold tabular-nums ${metric.tone === "destructive" ? "text-destructive" : "text-warning"}`}>{metric.value.toLocaleString("en-GH")}</p></div>)}
+            <Link to="/admin/subscriptions" className="sm:col-span-2 inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-border px-3 text-xs font-semibold text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Review subscriptions <ArrowRight className="size-3.5" /></Link>
+          </div>}
         </article>
       </section>
 
-      <section className="overflow-hidden rounded-2xl border border-border/80 bg-card shadow-[0_4px_24px_rgba(15,23,42,0.035)]">
+      <section className="overflow-hidden rounded-2xl border border-border/80 bg-card shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/60 px-5 py-5 sm:px-6">
           <div className="flex items-center gap-3">
             <span className="flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
