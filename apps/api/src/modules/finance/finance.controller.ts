@@ -68,6 +68,7 @@ const payrollDraftSchema = z.object({
   year: z.number().int().min(2000).max(2100),
   confirmResidentTaxTreatment: z.literal(true),
 });
+const payrollProfileBackfillSchema = z.object({ effectiveFrom: z.string().regex(/^\\d{4}-\\d{2}-\\d{2}$/, "Format: YYYY-MM-DD") });
 const payrollTransitionSchema = z.object({
   status: z.enum(["APPROVED", "PAID", "CANCELLED"]),
   paymentMethod: z.enum(["CASH", "BANK_TRANSFER", "CHEQUE", "MOBILE_MONEY", "CARD", "ONLINE", "OTHER"]).optional(),
@@ -525,6 +526,17 @@ export class FinanceController {
     @Body(new ZodValidationPipe(updatePayrollSalarySchema)) body: UpdatePayrollSalaryInput,
   ) {
     return this.financeService.updatePayrollSalary(school.id, kind, personId, body.monthlySalary, user.id);
+  }
+
+  @Post("payroll/profiles/backfill")
+  @Roles(...FINANCE_WRITE_ROLES)
+  @FinanceSelfAudited()
+  backfillPayrollProfiles(
+    @CurrentSchool() school: School,
+    @CurrentUser() user: AuthenticatedUser,
+    @Body(new ZodValidationPipe(payrollProfileBackfillSchema)) body: z.infer<typeof payrollProfileBackfillSchema>,
+  ) {
+    return this.financeService.backfillPayrollProfiles(school.id, user.id, body.effectiveFrom);
   }
 
   @Get("payroll/settings")
