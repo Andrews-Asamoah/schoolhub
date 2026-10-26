@@ -75,16 +75,11 @@ export function preparePayrollPayslip(
       throw new BadRequestException("A recurring payroll item must have an earning or deduction type.");
     }
   }
-  const loanApplications: Array<{ id: string; amount: string }> = [];
-  for (const loan of profile?.loans ?? []) {
-    if (loan.status !== "ACTIVE" || loan.startDate > periodEnd || loan.balance.lte(0)) continue;
-    const amount = Prisma.Decimal.min(loan.instalment, loan.balance);
-    deductions.push({
-      code: "LOAN:" + loan.id, description: "Staff loan repayment",
-      amount: amount.toFixed(2), originalAmount: loan.principal.toFixed(2),
-      balance: loan.balance.minus(amount).toFixed(2),
-    });
-    loanApplications.push({ id: loan.id, amount: amount.toFixed(2) });
+  // A StaffLoan alone is not evidence that a receivable was posted.
+  // Do not quietly deduct it into the generic payroll-deductions payable account.
+  // Loan recovery is enabled only with a loan-origination and control-account workflow.
+  if ((profile?.loans ?? []).some(loan => loan.status === "ACTIVE" && loan.startDate <= periodEnd && loan.balance.gt(0))) {
+    throw new BadRequestException("Active staff loans require an approved loan receivable and recovery posting workflow before payroll generation.");
   }
   const keys = profile?.schemeKeys ?? ["SSNIT_TIER1"];
   if (!keys.includes("SSNIT_TIER1")) {
@@ -126,7 +121,6 @@ export function preparePayrollPayslip(
     result: calculated,
     source: profile ? "EFFECTIVE_DATED_PROFILE" : "LEGACY_SALARY_REGISTER_PENDING_BACKFILL",
     profileId: profile?.id ?? null,
-    loanApplications,
     periodEnd: periodEnd.toISOString().slice(0, 10),
   };
   return {
