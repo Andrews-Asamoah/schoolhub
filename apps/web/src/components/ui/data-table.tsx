@@ -169,7 +169,7 @@ export function DataTable<T extends RowData>({
         cell: ({ row }) => (
           <input
             type="checkbox"
-            aria-label="Select row"
+            aria-label={`Select row ${getRowId(row.original)}`}
             className="size-3.5 accent-primary"
             checked={row.getIsSelected()}
             onChange={(event) => row.toggleSelected(event.target.checked)}
@@ -301,7 +301,7 @@ export function DataTable<T extends RowData>({
                       <button
                         type="button"
                         onClick={header.column.getToggleSortingHandler()}
-                        className="-ml-1 inline-flex items-center gap-1 rounded px-1 py-0.5 uppercase tracking-wider hover:bg-muted hover:text-foreground"
+                        className="-ml-1 inline-flex items-center gap-1 rounded px-1 py-0.5 uppercase tracking-wider hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                       >
                         {flexRender(header.column.columnDef.header, header.getContext())}
                         {sorted === "asc" ? <ArrowUp className="size-3" /> : sorted === "desc" ? <ArrowDown className="size-3" /> : <ArrowUpDown className="size-3 opacity-50" />}
@@ -340,12 +340,12 @@ export function DataTable<T extends RowData>({
       </Table>
 
       {!compact && paginate && (
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-4 py-3 text-[11px] text-muted-foreground">
-          <span>
+        <div className="flex min-w-0 flex-wrap items-center justify-between gap-3 border-t border-border px-4 py-3 text-[11px] text-muted-foreground">
+          <span role="status" aria-live="polite" aria-atomic="true">
             {filteredCount === 0 ? "0 rows" : `${from}–${to} of ${filteredCount}`}
             {filteredCount !== rows.length && ` (filtered from ${rows.length})`}
           </span>
-          <div className="flex items-center gap-3">
+          <div className="flex min-w-0 flex-wrap items-center gap-3">
             <div className="flex items-center gap-2">
               <span id={`${searchId}-page-size-label`}>Rows per page</span>
               <Select value={String(size)} onValueChange={(value) => table.setPageSize(Number(value))}>
@@ -402,7 +402,7 @@ function PagerButton({ label, disabled, onClick, children }: { label: string; di
       aria-label={label}
       disabled={disabled}
       onClick={onClick}
-      className="inline-flex size-7 items-center justify-center rounded-md border border-border text-foreground hover:bg-muted disabled:opacity-40 disabled:hover:bg-transparent"
+      className="inline-flex size-7 items-center justify-center rounded-md border border-border text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-40 disabled:hover:bg-transparent"
     >
       {children}
     </button>
@@ -435,7 +435,7 @@ function Menu({ label, icon, children }: { label: string; icon: ReactNode; child
         aria-haspopup="menu"
         aria-expanded={open}
         onClick={() => setOpen((value) => !value)}
-        className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-border bg-background px-3 text-xs font-semibold text-foreground hover:bg-muted"
+        className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-border bg-background px-3 text-xs font-semibold text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
       >
         {icon} {label}
       </button>
