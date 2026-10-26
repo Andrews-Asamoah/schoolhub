@@ -3524,6 +3524,45 @@ export class FinanceService {
         previous = current.monthlySalary;
         await tx.staff.updateMany({ where: { id: personId, schoolId, deletedAt: null }, data: { monthlySalary: next } });
       }
+      // Salary history is effective-dated. The staff/teacher salary field is retained
+      // as a compatibility cache for screens that still read the legacy register.
+      const today = new Date(new Date().toISOString().slice(0, 10) + "T00:00:00.000Z");
+      const yesterday = new Date(today.getTime() - 86_400_000);
+      const identity = kind === "TEACHER" ? { teacherId: personId } : { staffId: personId };
+      const prior = await tx.staffPayProfile.findFirst({
+        where: { schoolId, ...identity },
+        include: { recurringItems: true, loans: true },
+        orderBy: { effectiveFrom: "desc" },
+      });
+      if (prior && prior.effectiveFrom >= today) {
+        // Never rewrite payroll history, nor silently override a future change.
+        if (prior.effectiveFrom.getTime() === today.getTime() && prior.basicSalary.eq(next)) {
+          return;
+        }
+        throw new ConflictException("This person already has a pay profile beginning today or later. Schedule a future-dated revision instead.");
+      }
+      if (prior && (!prior.effectiveTo || prior.effectiveTo >= today)) {
+        await tx.staffPayProfile.update({
+          where: { id: prior.id }, data: { effectiveTo: yesterday },
+        });
+      }
+      await tx.staffPayProfile.create({
+        data: {
+          schoolId, ...identity, basicSalary: next,
+          residency: prior?.residency ?? "RESIDENT",
+          tin: prior?.tin, ssnitNumber: prior?.ssnitNumber,
+          schemeKeys: prior?.schemeKeys ?? ["SSNIT_TIER1"],
+          effectiveFrom: today, createdById: actorId,
+          recurringItems: { create: (prior?.recurringItems ?? []).map(item => ({
+            earningTypeId: item.earningTypeId, deductionTypeId: item.deductionTypeId,
+            amount: item.amount, effectiveFrom: item.effectiveFrom, effectiveTo: item.effectiveTo,
+          })) },
+          loans: { create: (prior?.loans ?? []).map(loan => ({
+            schoolId, principal: loan.principal, instalment: loan.instalment,
+            balance: loan.balance, startDate: loan.startDate, status: loan.status,
+          })) },
+        },
+      });
       await this.writeAudit(tx, {
         actorId,
         schoolId,
