@@ -1,3 +1,4 @@
+import { DatePicker } from "@/components/ui/date-picker";
 import { TableExportMenu } from "@/components/ui/data-table";
 import { createFileRoute } from "@tanstack/react-router";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
@@ -154,8 +155,8 @@ function AuditLogPage() {
             <option value="">All schools</option>
             {options.data?.map((school) => <option key={school.id} value={school.id}>{school.name}</option>)}
           </select>
-          <input aria-label="From date" type="date" value={from} max={to || undefined} onChange={(event) => reset(setFrom)(event.target.value)} className={selectClass} />
-          <input aria-label="To date" type="date" value={to} min={from || undefined} onChange={(event) => reset(setTo)(event.target.value)} className={selectClass} />
+          <DatePicker ariaLabel="From date" value={from} max={to || undefined} onChange={(value) => reset(setFrom)(value)} buttonClassName={selectClass} />
+          <DatePicker ariaLabel="To date" value={to} min={from || undefined} onChange={(value) => reset(setTo)(value)} buttonClassName={selectClass} />
         </div>
         {filtersActive && (
           <div className="flex items-center justify-between border-b border-border bg-muted/40 px-4 py-2 text-xs text-muted-foreground">
