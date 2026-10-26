@@ -3,6 +3,8 @@ import { ShieldCheck } from "lucide-react";
 import { ThemeToggle } from "@/components/school/theme-toggle";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { SuperAdminSidebar } from "./superadmin-sidebar";
+import { PageContainer } from "@/components/ui/page-container";
+import { Badge } from "@/components/ui/badge";
 import { SchoolSwitcher } from "./school-switcher";
 
 interface SuperAdminLayoutProps {
@@ -46,15 +48,15 @@ export function SuperAdminLayout({
               {activePage === "dashboard" && <SchoolSwitcher />}
               <ThemeToggle className="superadmin-button-secondary" />
               <span className="hidden h-6 w-px bg-border sm:block" />
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-primary/25 bg-primary/10 px-2.5 py-1 text-[11px] font-semibold text-primary shadow-sm sm:text-xs">
+              <Badge variant="default" className="rounded-full px-2.5 py-1 text-[11px] sm:text-xs">
                 <span className="size-1.5 rounded-full bg-primary" />
                 <span className="hidden sm:inline">Super Admin</span>
                 <ShieldCheck className="size-3.5 sm:hidden" />
-              </span>
+              </Badge>
             </div>
           </header>
           {/* Page content */}
-          <main className="superadmin-main mx-auto w-full max-w-[1440px] p-4 sm:p-6 lg:px-8 lg:py-8">{children}</main>
+          <PageContainer className="superadmin-main">{children}</PageContainer>
         </div>
       </div>
     </SidebarProvider>

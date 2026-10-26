@@ -45,7 +45,7 @@ export function StatCard({ label, value, delta, icon: Icon, color = "primary", o
     </>
   );
   const classes = cn(
-    "group relative block w-full overflow-hidden rounded-2xl border bg-card p-5 shadow-sm transition duration-200 sm:p-6",
+    "group relative block w-full overflow-hidden rounded-xl border bg-card p-4 shadow-sm transition duration-200 sm:p-5",
     active ? "border-primary ring-2 ring-primary/20" : "border-border",
     onClick && "cursor-pointer hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
   );
