@@ -430,7 +430,7 @@ export function AccountantFinanceDetailedReportingWorkspace({ classes }: Props) 
                 sum + (moneyCents(bill.balanceAmount) > 0n ? moneyCents(bill.balanceAmount) : 0n),
               0n,
             )
-        : 0
+        : 0n
       : bills
           .filter(
             (bill) =>
@@ -451,10 +451,10 @@ export function AccountantFinanceDetailedReportingWorkspace({ classes }: Props) 
       string,
       {
         name: string;
-        collected: number;
+        collected: bigint;
         receipts: number;
-        billed: number;
-        outstanding: number;
+        billed: bigint;
+        outstanding: bigint;
       }
     >();
 
@@ -463,18 +463,18 @@ export function AccountantFinanceDetailedReportingWorkspace({ classes }: Props) 
 
       const entry = totals.get(key) ?? {
         name: bill.class?.name ?? "Class not recorded",
-        collected: 0,
+        collected: 0n,
         receipts: 0,
-        billed: 0,
-        outstanding: 0,
+        billed: 0n,
+        outstanding: 0n,
       };
 
       if (
         bill.status !== "CANCELLED" &&
         bill.status !== "WAIVED"
       ) {
-        entry.billed += amount(bill.totalAmount);
-        entry.outstanding += Math.max(0, amount(bill.balanceAmount));
+        entry.billed += moneyCents(bill.totalAmount);
+        entry.outstanding += moneyCents(bill.balanceAmount) > 0n ? moneyCents(bill.balanceAmount) : 0n;
       }
 
       totals.set(key, entry);
@@ -486,20 +486,25 @@ export function AccountantFinanceDetailedReportingWorkspace({ classes }: Props) 
         if (allocation.amount <= 0) continue;
         const entry = totals.get(allocation.classId) ?? {
           name: allocation.name,
-          collected: 0,
+          collected: 0n,
           receipts: 0,
-          billed: 0,
-          outstanding: 0,
+          billed: 0n,
+          outstanding: 0n,
         };
-        entry.collected += allocation.amount;
+        entry.collected += moneyCents(allocation.amount);
         entry.receipts += 1;
         totals.set(allocation.classId, entry);
       }
     }
 
-    return [...totals.values()].sort(
-      (a, b) => b.collected - a.collected,
-    );
+    return [...totals.values()].sort((a, b) =>
+      a.collected === b.collected ? a.name.localeCompare(b.name) : a.collected > b.collected ? -1 : 1,
+    ).map((row) => ({
+      ...row,
+      collected: centsNumber(row.collected),
+      billed: centsNumber(row.billed),
+      outstanding: centsNumber(row.outstanding),
+    }));
   }, [billsById, visibleBills, completedPayments, reportType, classId]);
 
   const periodCollected = moneyTotal(
