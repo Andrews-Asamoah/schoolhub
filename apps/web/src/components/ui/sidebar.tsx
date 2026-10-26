@@ -251,8 +251,8 @@ export function SidebarNavSection({
     const rect = trigger.current?.getBoundingClientRect();
     if (!rect) return;
     setPosition({
-      left: Math.min(window.innerWidth - 242, rect.right + 9),
-      top: Math.max(8, Math.min(rect.top, window.innerHeight - 270)),
+      left: Math.max(8, Math.min(window.innerWidth - 232, rect.right + 9)),
+      top: Math.max(8, Math.min(rect.top, window.innerHeight - Math.min(window.innerHeight * 0.7, 448) - 8)),
     });
   };
   useEffect(() => {
@@ -267,16 +267,23 @@ export function SidebarNavSection({
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") { setOpenFlyout(null); trigger.current?.focus(); }
     };
-    const onScroll = () => setOpenFlyout(null);
+    const onScroll = (event: Event) => {
+      // The popup scrolls independently of the sidebar. Scrolling inside it
+      // must never dismiss it (including wheel and touch scrolling).
+      if (panel.current?.contains(event.target as Node)) return;
+      // Scrolls in the background may move the anchor out of alignment.
+      setOpenFlyout(null);
+    };
+    const onResize = () => measure();
     document.addEventListener("pointerdown", outside);
     document.addEventListener("keydown", onKey);
     window.addEventListener("scroll", onScroll, true);
-    window.addEventListener("resize", onScroll);
+    window.addEventListener("resize", onResize);
     return () => {
       document.removeEventListener("pointerdown", outside);
       document.removeEventListener("keydown", onKey);
       window.removeEventListener("scroll", onScroll, true);
-      window.removeEventListener("resize", onScroll);
+      window.removeEventListener("resize", onResize);
     };
   }, [flyoutOpen, setOpenFlyout]);
 
