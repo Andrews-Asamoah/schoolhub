@@ -68,12 +68,12 @@ const payrollDraftSchema = z.object({
   year: z.number().int().min(2000).max(2100),
   confirmResidentTaxTreatment: z.literal(true),
 });
-const payrollProfileBackfillSchema = z.object({ effectiveFrom: z.string().regex(/^\\d{4}-\\d{2}-\\d{2}$/, "Format: YYYY-MM-DD") });
 const payrollTransitionSchema = z.object({
   status: z.enum(["APPROVED", "PAID", "CANCELLED"]),
   paymentMethod: z.enum(["CASH", "BANK_TRANSFER", "CHEQUE", "MOBILE_MONEY", "CARD", "ONLINE", "OTHER"]).optional(),
 });
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Format: YYYY-MM-DD");
+const payrollProfileBackfillSchema = z.object({ effectiveFrom: isoDate });
 const rate = z.string().regex(/^\d{1,3}(?:\.\d{1,3})?$/, "Enter a percentage with up to three decimals.");
 const money = z.string().regex(/^\d{1,13}(?:\.\d{1,2})?$/, "Enter an amount with up to two decimals.");
 const taxScheduleDraftSchema = z.object({
