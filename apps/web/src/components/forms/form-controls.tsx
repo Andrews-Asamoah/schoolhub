@@ -5,11 +5,11 @@ import type {
   SelectHTMLAttributes,
   TextareaHTMLAttributes,
 } from "react";
-import { LoaderCircle } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input, Textarea, inputClassName } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
-const controlClassName =
-  "w-full rounded-lg border border-border bg-card px-3 py-2.5 text-sm text-foreground outline-none transition placeholder:text-muted-foreground/70 focus:border-primary/50 focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-60";
+const controlClassName = inputClassName;
 
 export function FormField({
   label,
@@ -32,7 +32,7 @@ export function FormField({
     <div className={cn("space-y-1.5", className)}>
       <label
         htmlFor={htmlFor}
-        className="block text-xs font-medium text-foreground/80"
+        className="block text-xs font-semibold text-foreground"
       >
         {label}
       </label>
@@ -54,7 +54,7 @@ export function FormInput({
   className,
   ...props
 }: InputHTMLAttributes<HTMLInputElement>) {
-  return <input className={cn(controlClassName, className)} {...props} />;
+  return <Input className={className} {...props} />;
 }
 
 export function FormTextarea({
@@ -62,10 +62,7 @@ export function FormTextarea({
   ...props
 }: TextareaHTMLAttributes<HTMLTextAreaElement>) {
   return (
-    <textarea
-      className={cn(controlClassName, "resize-y", className)}
-      {...props}
-    />
+    <Textarea className={className} {...props} />
   );
 }
 
@@ -77,47 +74,17 @@ export function FormSelect({
 }
 
 export function FormSubmitButton({
-  children,
-  className,
-  isSubmitting = false,
-  disabled,
-  ...props
-}: ButtonHTMLAttributes<HTMLButtonElement> & {
-  isSubmitting?: boolean;
-}) {
+  children, className, isSubmitting = false, disabled, ...props
+}: ButtonHTMLAttributes<HTMLButtonElement> & { isSubmitting?: boolean }) {
   return (
-    <button
-      {...props}
-      type="submit"
-      className={cn(
-        "inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-sm transition hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 dark:focus-visible:ring-offset-foreground/10",
-        className,
-      )}
-      disabled={isSubmitting || disabled}
-    >
-      {isSubmitting ? (
-        <LoaderCircle className="size-4 animate-spin" />
-      ) : (
-        children
-      )}
-    </button>
+    <Button {...props} type="submit" loading={isSubmitting} disabled={disabled} className={className}>
+      {isSubmitting ? "Saving…" : children}
+    </Button>
   );
 }
 
-export function FormCancelButton({
-  className,
-  ...props
-}: ButtonHTMLAttributes<HTMLButtonElement>) {
-  return (
-    <button
-      type="button"
-      className={cn(
-        "inline-flex h-10 items-center justify-center rounded-lg px-3 text-sm font-medium text-muted-foreground transition hover:bg-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
-        className,
-      )}
-      {...props}
-    />
-  );
+export function FormCancelButton({ className, ...props }: ButtonHTMLAttributes<HTMLButtonElement>) {
+  return <Button {...props} type="button" variant="outline" className={className} />;
 }
 
 function getFormErrorMessage(error: unknown): string | undefined {
