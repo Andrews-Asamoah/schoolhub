@@ -33,6 +33,10 @@ export function canExportFinancePayroll(actorPlatformRole: string | null | undef
  * second-person decision: the accountant prepares drafts, the owner or headteacher approves.
  */
 export const PAYROLL_SETTINGS_APPROVE_ROLES = ["owner", "headteacher"] as const;
+/** Role gate for the shared payroll transition route; per-transition service checks
+ * still distinguish approval from payment/cancellation.
+ */
+export const FINANCE_PAYROLL_TRANSITION_ROLES = ["accountant", "owner", "headteacher"] as const;
 
 /** P0 table-driven role mapping until named per-school permissions arrive in P9.
  * An unrecognised policy permission is always denied, never treated as a write role.
