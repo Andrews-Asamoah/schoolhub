@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { SchoolSidebar } from "@/components/school/school-sidebar";
 import { DashboardContent } from "@/components/school/dashboard/dashboard-content";
 import { DashboardHeader } from "@/components/school/dashboard/dashboard-header";
@@ -42,7 +42,6 @@ function DashboardPage() {
       organizations.length === 1,
     retry: false,
   });
-  const [search, setSearch] = useState("");
   const today = new Intl.DateTimeFormat("en-US", {
     weekday: "long",
     month: "long",
@@ -83,8 +82,6 @@ function DashboardPage() {
         <div className="min-w-0 flex-1">
           <DashboardHeader
             userName={session?.user?.name}
-            search={search}
-            onSearchChange={setSearch}
           />
           {organizationLoading ? (
             <div className="mx-auto mt-8 flex max-w-3xl items-center gap-2 rounded-2xl border border-border bg-card p-6 text-sm text-muted-foreground shadow-sm">
@@ -118,7 +115,6 @@ function DashboardPage() {
             <DashboardContent
               today={today}
               greetingName={greetingName}
-              search={search}
             />
           )}
         </div>
