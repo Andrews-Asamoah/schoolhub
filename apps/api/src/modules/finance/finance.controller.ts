@@ -260,6 +260,15 @@ export class FinanceController {
     return this.financeService.getFinanceSummary(school.id, { from, to, yearId, termId });
   }
 
+  @Get("receivables/history")
+  @Roles(...FINANCE_READ_ROLES)
+  historicalReceivables(
+    @CurrentSchool() school: School,
+    @Query("asOf") asOf?: string,
+  ) {
+    return this.financeService.getHistoricalReceivables(school.id, asOf ?? "");
+  }
+
   @Get("term-end-review")
   @Roles(...FINANCE_READ_ROLES)
   getTermEndReview(
