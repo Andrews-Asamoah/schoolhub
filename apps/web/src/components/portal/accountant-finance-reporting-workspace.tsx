@@ -1,3 +1,4 @@
+import { DatePicker } from "@/components/ui/date-picker";
 import { DataTable, type DataTableColumn } from "@/components/ui/data-table";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -247,7 +248,7 @@ export function AccountantFinanceReportingWorkspace() {
       <p className="mt-1 text-sm text-muted-foreground">Reconstruct invoice balances, payments and reversals as of a chosen date. This is distinct from today's open receivables.</p>
       <div className="mt-3 flex flex-wrap items-center gap-3">
         <label htmlFor="historical-as-of" className="text-sm text-muted-foreground">Balance as of</label>
-        <input id="historical-as-of" className={inputClass} style={{ maxWidth: 230 }} type="date" max={new Date().toISOString().slice(0, 10)} value={historyDate} onChange={(event) => setHistoryDate(event.target.value)} />
+        <DatePicker id="historical-as-of" buttonClassName={inputClass} buttonStyle={{ maxWidth: 230 }} max={new Date().toISOString().slice(0, 10)} value={historyDate} onChange={(value) => setHistoryDate(value)} />
       </div>
       {historicalQuery.isPending && historyDate && <p role="status" className="mt-3 text-sm text-muted-foreground">Reconstructing historical ledger…</p>}
       {historicalQuery.isError && <p role="alert" className="mt-3 text-sm text-destructive">{historicalQuery.error.message}</p>}
