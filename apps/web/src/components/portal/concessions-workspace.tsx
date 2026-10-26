@@ -1,3 +1,4 @@
+import { DatePicker } from "@/components/ui/date-picker";
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { BadgeCheck, GraduationCap, HeartHandshake, LoaderCircle, Plus, ShieldCheck, ToggleLeft, ToggleRight } from "lucide-react";
@@ -167,8 +168,8 @@ export function ConcessionsWorkspace() {
             <label className="text-sm font-medium sm:col-span-2">Reason / approval note<input className={cn(field, "mt-1")} value={reason} onChange={(e) => setReason(e.target.value)} maxLength={500} placeholder="Optional note for the school's audit trail" /></label>
             <label className="text-sm font-medium">Academic year<select className={cn(field, "mt-1")} value={academicYearId} onChange={(e) => { setAcademicYearId(e.target.value); setTermId(""); }}><option value="">All years</option>{years.map((year) => <option key={year.id} value={year.id}>{year.name}{year.isCurrent ? " (Current)" : ""}</option>)}</select></label>
             <label className="text-sm font-medium">Term<select className={cn(field, "mt-1")} value={termId} onChange={(e) => setTermId(e.target.value)} disabled={!academicYearId}><option value="">All terms</option>{availableTerms.map((term) => <option key={term.id} value={term.id}>{term.name}{term.isCurrent ? " (Current)" : ""}</option>)}</select></label>
-            <label className="text-sm font-medium">Start date (optional)<input className={cn(field, "mt-1")} type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} /></label>
-            <label className="text-sm font-medium">End date (optional)<input className={cn(field, "mt-1")} type="date" min={startDate || undefined} value={endDate} onChange={(e) => setEndDate(e.target.value)} /></label>
+            <label className="text-sm font-medium">Start date (optional)<DatePicker buttonClassName={cn(field, "mt-1")} value={startDate} onChange={(value) => setStartDate(value)} /></label>
+            <label className="text-sm font-medium">End date (optional)<DatePicker buttonClassName={cn(field, "mt-1")} min={startDate || undefined} value={endDate} onChange={(value) => setEndDate(value)} /></label>
             <button className={cn(primary, "sm:col-span-2")} type="submit" disabled={createScholarship.isPending || !studentId}>{createScholarship.isPending ? <LoaderCircle className="size-4 animate-spin" /> : <Plus className="size-4" />} Save scholarship</button>
           </form>)}
         </section>
