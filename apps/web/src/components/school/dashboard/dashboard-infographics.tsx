@@ -170,8 +170,8 @@ export function DashboardInfographics({
                     <YAxis tickFormatter={(value: number) => value >= 1000 ? (value / 1000).toFixed(0) + "k" : String(value)} tickLine={false} axisLine={false} width={45} tick={{ fill: "var(--muted-foreground)", fontSize: 10 }} />
                     <Tooltip contentStyle={chartTooltipStyle} formatter={(value, name) => [money(Number(value ?? 0)), name === "revenue" ? "Revenue" : "Expenditures"]} />
                     <Legend wrapperStyle={{ fontSize: 11, paddingTop: 8 }} />
-                    <Bar dataKey="revenue" name="Revenue" fill="#0d9488" radius={[5, 5, 0, 0]} maxBarSize={30} />
-                    <Bar dataKey="expenditures" name="Expenditures" fill="#f97316" radius={[5, 5, 0, 0]} maxBarSize={30} />
+                    <Bar dataKey="revenue" name="Revenue" fill="var(--chart-2)" radius={[5, 5, 0, 0]} maxBarSize={30} />
+                    <Bar dataKey="expenditures" name="Expenditures" fill="var(--chart-5)" radius={[5, 5, 0, 0]} maxBarSize={30} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
