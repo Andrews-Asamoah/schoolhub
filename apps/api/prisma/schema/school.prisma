@@ -57,6 +57,7 @@ model School {
   announcements               Announcement[]
   feeReminderSchedules        FeeReminderSchedule[]
   financePeriodLock           FinancePeriodLock?
+  financeAccrualState          FinanceAccrualState?
   billCarryForwards            BillCarryForward[]
   paymentBillAllocations        PaymentBillAllocation[]
   lateFeeAssessments             LateFeeAssessment[]
