@@ -1629,7 +1629,7 @@ export class FinanceService {
           allocations: [...billAmounts.entries()].map(([billId, amount]) => ({ billId, amount: amount.toFixed(2) })),
           amount: paymentAmount.toFixed(2),
           paymentMethod: input.paymentMethod,
-          ledgerTransactionId: ledger.id,
+          ledgerTransactionId: ledger!.id,
         },
       });
       return payment;
