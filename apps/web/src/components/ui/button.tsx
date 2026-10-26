@@ -1,5 +1,6 @@
 import * as React from "react";
 import { Slot } from "@radix-ui/react-slot";
+import { LoaderCircle } from "lucide-react";
 import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
@@ -19,7 +20,7 @@ import { cn } from "@/lib/utils";
  */
 const buttonVariants = cva(
   // Base styles applied to every button
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-all disabled:pointer-events-none disabled:opacity-50",
+  "inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-lg text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50",
   {
     variants: {
       variant: {
@@ -28,7 +29,7 @@ const buttonVariants = cva(
         destructive:
           "bg-destructive text-destructive-foreground shadow-xs hover:bg-destructive/90",
         outline:
-          "border border-input bg-card shadow-xs hover:bg-muted",
+          "border border-input bg-card text-foreground shadow-xs hover:bg-muted",
         secondary:
           "bg-muted text-foreground shadow-xs hover:bg-muted-foreground/20",
         ghost:
@@ -37,10 +38,10 @@ const buttonVariants = cva(
           "text-primary underline-offset-4 hover:underline",
       },
       size: {
-        default: "h-9 px-4 py-2",
-        sm: "h-8 rounded-md px-3 text-xs",
-        lg: "h-10 rounded-md px-8",
-        icon: "h-9 w-9",
+        default: "h-10 px-4 py-2",
+        sm: "h-9 rounded-lg px-3 text-xs",
+        lg: "h-11 rounded-lg px-6",
+        icon: "size-10",
       },
     },
     defaultVariants: {
@@ -59,17 +60,23 @@ export interface ButtonProps
    *   <Button asChild><Link to="/dashboard">Dashboard</Link></Button>
    */
   asChild?: boolean;
+  loading?: boolean;
 }
 
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant, size, asChild = false, ...props }, ref) => {
+  ({ className, variant, size, asChild = false, loading = false, disabled, children, ...props }, ref) => {
     const Comp = asChild ? Slot : "button";
     return (
       <Comp
         className={cn(buttonVariants({ variant, size, className }))}
         ref={ref}
         {...props}
-      />
+        aria-busy={loading || undefined}
+        disabled={!asChild ? disabled || loading : undefined}
+      >
+        {loading && <LoaderCircle className="size-4 animate-spin" aria-hidden="true" />}
+        {children}
+      </Comp>
     );
   },
 );
