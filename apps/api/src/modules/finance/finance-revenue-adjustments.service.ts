@@ -43,21 +43,36 @@ export class FinanceRevenueAdjustmentsService {
   constructor(private readonly prisma: PrismaService) {}
 
   async preflight(schoolId: string) {
-    const [settings, accrual, pendingDrafts] = await Promise.all([
+    const [settings, accrual, pendingDrafts, approvedMappings] = await Promise.all([
       this.prisma.client.financeSettings.findUnique({ where: { schoolId } }),
       this.prisma.client.financeAccrualState.findUnique({ where: { schoolId } }),
       this.prisma.client.financeBillAdjustment.count({
         where: { schoolId, status: { in: ["DRAFT", "PENDING_APPROVAL", "APPROVED"] } },
+      }),
+      this.prisma.client.financeAccountMapping.findMany({
+        where: {
+          schoolId, status: "ACTIVE", effectiveFrom: { lte: new Date() },
+          OR: [{ effectiveTo: null }, { effectiveTo: { gte: new Date() } }],
+        },
+        select: { purpose: true },
       }),
     ]);
     const blockers = [
       "P2 immutable journal-entry, reversal and system-account controls are required before P3 posting.",
       "P3 journal-backed credits, refunds and deferred-revenue posting have not been activated.",
     ];
+    const requiredPurposes = ["STUDENT_RECEIVABLE", "FEE_REVENUE", "BAD_DEBT_EXPENSE",
+      "CONCESSION_EXPENSE", "DEFERRED_REVENUE", "STUDENT_CREDIT_LIABILITY"] as const;
+    const missingSystemPurposes = requiredPurposes.filter(
+      purpose => !approvedMappings.some(mapping => mapping.purpose === purpose)
+    );
+    if (missingSystemPurposes.length) {
+      blockers.push("Missing independently approved finance account-purpose mappings: " + missingSystemPurposes.join(", "));
+    }
     if (!accrual) blockers.push("School accrual cutover must reconcile before P3 posting.");
     if (!settings?.revenuePolicyApprovedAt) blockers.push("Accountant must approve the school revenue-recognition and adjustment policy.");
     return {
-      schoolId, pendingDrafts, canPost: false, blockers,
+      schoolId, pendingDrafts, missingSystemPurposes, canPost: false, blockers,
       configuredFlags: {
         adjustments: settings?.p3AdjustmentsEnabled ?? false,
         credits: settings?.p3CreditsEnabled ?? false,
