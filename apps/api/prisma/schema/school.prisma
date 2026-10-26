@@ -55,6 +55,7 @@ model School {
   reportCardSets              ReportCardSet[]
   notifications               Notification[]
   announcements               Announcement[]
+  messages                    SchoolMessage[]
   feeReminderSchedules        FeeReminderSchedule[]
   financeSettings             FinanceSettings?
   financePeriodLock           FinancePeriodLock?
