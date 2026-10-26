@@ -11,11 +11,20 @@ export class FinanceLedgerIntegrityService {
   constructor(private readonly prisma: PrismaService) {}
 
   async check(schoolId: string) {
-    const db = this.prisma.client;
-    const [accountRows, debitRows, creditRows] = await Promise.all([
+    // Every component of I1/I2 must reflect the same committed posting snapshot.
+    // Reading balances and postings on separate connections can falsely report failure
+    // while a concurrent posting transaction commits between reads.
+    return this.prisma.client.$transaction(async db => {
+    const [accountRows, debitRows, creditRows, invalidAmounts, selfPairRows] = await Promise.all([
       db.chartAccount.findMany({ where: { schoolId }, select: { id: true, accountType: true, balance: true } }),
       db.transaction.groupBy({ by: ["debitAccountId"], where: { schoolId }, _sum: { amount: true } }),
       db.transaction.groupBy({ by: ["creditAccountId"], where: { schoolId }, _sum: { amount: true } }),
+      // Paired debit/credit rows trivially sum to equal totals, even if a historic
+      // import contains a zero/negative amount or posts an account to itself.
+      db.transaction.count({ where: { schoolId, amount: { lte: zero } } }),
+      db.$queryRaw<Array<{ count: number }>>`
+        SELECT COUNT(*)::int AS "count" FROM "transactions"
+        WHERE "schoolId" = ${schoolId} AND "debitAccountId" = "creditAccountId"`,
     ]);
     const totals = new Map<string, { debit: Prisma.Decimal; credit: Prisma.Decimal }>();
     const add = (id: string, side: "debit" | "credit", amount: Prisma.Decimal) => {
@@ -37,11 +46,17 @@ export class FinanceLedgerIntegrityService {
     });
     const debits = debitRows.reduce((sum, r) => sum.plus(r._sum.amount ?? zero), zero);
     const credits = creditRows.reduce((sum, r) => sum.plus(r._sum.amount ?? zero), zero);
+    const selfPairedTransactions = selfPairRows[0]?.count ?? 0;
     return {
       schoolId, basis: "ALL_POSTED_PAIRED_TRANSACTIONS",
-      I1: { status: debits.eq(credits) && orphanAccounts.length === 0 ? "PASS" : "FAIL", debits: debits.toFixed(2), credits: credits.toFixed(2), orphanAccounts },
+      I1: {
+        status: debits.eq(credits) && orphanAccounts.length === 0 && invalidAmounts === 0 && selfPairedTransactions === 0 ? "PASS" : "FAIL",
+        debits: debits.toFixed(2), credits: credits.toFixed(2), orphanAccounts,
+        invalidAmounts, selfPairedTransactions,
+      },
       I2: { status: discrepancies.length === 0 && orphanAccounts.length === 0 ? "PASS" : "FAIL", discrepancies },
     };
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead });
   }
 
   /** Runs the suite for every school. A school that cannot be checked is reported, never skipped. */
