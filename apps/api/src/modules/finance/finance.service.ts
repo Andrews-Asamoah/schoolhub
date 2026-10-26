@@ -1976,15 +1976,45 @@ export class FinanceService {
     schoolId: string,
     query: Pick<FinanceListQuery, "from" | "to" | "yearId" | "termId"> = {},
   ) {
-    const fromDate = parseIsoDate(query.from, "start date");
-    const toStart = parseIsoDate(query.to, "end date");
-    const toDate = parseIsoDate(query.to, "end date", true) ?? new Date();
-    if (fromDate && toStart && fromDate > toStart) {
-      throw new BadRequestException("The start date must be on or before the end date.");
-    }
-    const asOfDayBase = toStart ?? new Date();
-    const asOf = new Date(`${asOfDayBase.toISOString().slice(0, 10)}T00:00:00.000Z`);
+    const today = new Date();
+    const todayDate = today.toISOString().slice(0, 10);
     const { yearId, termId } = await this.resolveAcademicFilter(schoolId, query.yearId, query.termId);
+    const academicYear = yearId
+      ? await this.prisma.client.academicYear.findFirst({
+          where: { id: yearId, schoolId },
+          select: { startDate: true, endDate: true },
+        })
+      : null;
+    const term = termId
+      ? await this.prisma.client.term.findFirst({
+          where: { id: termId, academicYear: { schoolId } },
+          select: { startDate: true, endDate: true },
+        })
+      : null;
+    const periodStart = term?.startDate ?? academicYear?.startDate ?? null;
+    const periodEnd = term?.endDate ?? academicYear?.endDate ?? null;
+    if ((yearId || termId) && (!periodStart || !periodEnd)) {
+      throw new BadRequestException("The selected academic period needs valid start and end dates before financial reporting.");
+    }
+    const fromDate = parseIsoDate(query.from, "start date") ?? periodStart ?? undefined;
+    const requestedTo = parseIsoDate(query.to, "end date", true);
+    const selectedEnd = periodEnd
+      ? new Date(Date.UTC(periodEnd.getUTCFullYear(), periodEnd.getUTCMonth(), periodEnd.getUTCDate(), 23, 59, 59, 999))
+      : null;
+    const toDate = new Date(Math.min(
+      requestedTo?.getTime() ?? Number.POSITIVE_INFINITY,
+      selectedEnd?.getTime() ?? Number.POSITIVE_INFINITY,
+      today.getTime(),
+    ));
+    if (Number.isNaN(toDate.getTime()) || (fromDate && fromDate > toDate)) {
+      throw new BadRequestException("The reporting period has no dates on or before today.");
+    }
+    // Receivables are stored as CURRENT balances. A prior report end cannot
+    // be presented as a historical balance snapshot without reconstructing
+    // invoice/payment/reversal events. Keep the balance date explicit.
+    const asOf = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()));
+    const effectiveFrom = fromDate?.toISOString().slice(0, 10) ?? null;
+    const effectiveTo = toDate.toISOString().slice(0, 10);
     const issuedAt: Prisma.DateTimeFilter = {};
     if (fromDate) issuedAt.gte = fromDate;
     issuedAt.lte = toDate;
@@ -2007,7 +2037,6 @@ export class FinanceService {
     const openWhere: Prisma.BillWhereInput = {
       ...activeBillFilter,
       balanceAmount: { gt: new Prisma.Decimal(0) },
-      issuedAt: { lte: toDate },
     };
     const overdueWhere: Prisma.BillWhereInput = {
       ...openWhere,
@@ -2177,7 +2206,9 @@ export class FinanceService {
 
     return {
       asOf: asOf.toISOString().slice(0, 10),
-      period: { from: query.from ?? null, to: query.to ?? asOf.toISOString().slice(0, 10), yearId: yearId ?? null, termId: termId ?? null },
+      period: { from: effectiveFrom, to: effectiveTo, yearId: yearId ?? null, termId: termId ?? null, basis: "ISSUE_AND_PAYMENT_DATE" },
+      balanceAsOf: asOf.toISOString().slice(0, 10),
+      balanceBasis: "CURRENT" as const,
       billed: moneyString(billed),
       billedCount: billedAgg._count._all,
       collected: moneyString(collected),
