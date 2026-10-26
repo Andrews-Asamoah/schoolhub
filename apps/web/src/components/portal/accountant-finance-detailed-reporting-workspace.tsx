@@ -124,7 +124,9 @@ const amount = (value: number | string) => {
 // Financial totals are accumulated in integer pesewas, never binary floats.
 // Conversion to JS numbers happens only for existing chart/table presentation.
 function moneyCents(value: string | number): bigint {
-  const raw = String(value).trim();
+  // API money may arrive as a decimal string or an already-parsed JSON number.
+  // Normalise the latter to the database's two-decimal currency scale.
+  const raw = (typeof value === "number" ? value.toFixed(2) : value).trim();
   const matched = /^(-?)(\d+)(?:\.(\d{1,2}))?$/.exec(raw);
   if (!matched) throw new Error("Invalid money amount in financial report.");
   const cents = BigInt(matched[2]!) * 100n + BigInt((matched[3] ?? "").padEnd(2, "0"));
