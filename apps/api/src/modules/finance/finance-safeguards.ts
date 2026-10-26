@@ -2,12 +2,13 @@ import {
   BadRequestException,
   HttpException,
   HttpStatus,
+  Inject,
   Injectable,
   type CanActivate,
   type ExecutionContext,
 } from "@nestjs/common";
 
-/** Fixed-size sliding window counter, keyed by caller. In-memory (per API instance). */
+/** Fixed-size sliding window counter, keyed by caller. In-memory (per process): see FinanceRateLimitStore for the shared version. */
 export class SlidingWindowLimiter {
   private readonly hits = new Map<string, number[]>();
 
@@ -39,17 +40,35 @@ export class SlidingWindowLimiter {
 
 const WRITE_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 export const FINANCE_WRITES_PER_MINUTE = 60;
-const limiter = new SlidingWindowLimiter(FINANCE_WRITES_PER_MINUTE, 60_000);
+export const FINANCE_RATE_LIMIT_WINDOW_MS = 60_000;
+const WINDOW_MS = FINANCE_RATE_LIMIT_WINDOW_MS;
+
+/** Counts a write for a caller and returns how many ms to wait (0 = allowed). */
+export interface FinanceRateLimitStore {
+  hit(key: string): Promise<number>;
+}
+export const FINANCE_RATE_LIMIT_STORE = Symbol("FINANCE_RATE_LIMIT_STORE");
+
+/** Single-process store. For unit tests and local tooling only; production uses the database store. */
+export class InMemoryFinanceRateLimitStore implements FinanceRateLimitStore {
+  private readonly limiter: SlidingWindowLimiter;
+  constructor(limit = FINANCE_WRITES_PER_MINUTE, windowMs = WINDOW_MS, now: () => number = Date.now) {
+    this.limiter = new SlidingWindowLimiter(limit, windowMs, now);
+  }
+  async hit(key: string): Promise<number> { return this.limiter.hit(key); }
+}
 
 /** Throttles finance writes per user and school, so a stuck client or abuse cannot flood the ledger. */
 @Injectable()
 export class FinanceWriteRateLimitGuard implements CanActivate {
-  canActivate(context: ExecutionContext): boolean {
+  constructor(@Inject(FINANCE_RATE_LIMIT_STORE) private readonly store: FinanceRateLimitStore) {}
+
+  async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest();
     if (!WRITE_METHODS.has(request.method)) return true;
     const userId = request.session?.user?.id ?? "anonymous";
     const key = `${userId}:${request.school?.id ?? "none"}`;
-    const waitMs = limiter.hit(key);
+    const waitMs = await this.store.hit(key);
     if (waitMs > 0) {
       throw new HttpException(
         `Too many financial changes in a short time. Please wait ${Math.ceil(waitMs / 1000)} seconds and try again.`,

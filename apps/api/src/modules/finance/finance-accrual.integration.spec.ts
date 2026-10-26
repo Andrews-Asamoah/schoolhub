@@ -31,8 +31,9 @@ describe.skipIf(!enabled)("accrual cutover (database)", { timeout: 60_000 }, () 
     const { prisma } = await import("../../prisma/prisma.client.js");
     const { FinanceService } = await import("./finance.service.js");
     const { FinancePostingService } = await import("./finance-posting.service.js");
+    const { FinanceApprovalService } = await import("./finance-approval.service.js");
     db = prisma;
-    finance = new FinanceService({ client: db } as never, new FinancePostingService({ client: db } as never));
+    finance = new FinanceService({ client: db } as never, new FinancePostingService({ client: db } as never), new FinanceApprovalService({ client: db } as never));
     const org = await db.organization.create({ data: { id: run + "-org", name: run, slug: run } });
     schoolId = (await db.school.create({ data: { organizationId: org.id, code: run.toUpperCase(), subdomain: run, name: run } })).id;
     userId = (await db.user.create({ data: { id: run + "-acc", name: "Cutover accountant", email: run + "-acc@example.test" } })).id;
@@ -60,6 +61,14 @@ describe.skipIf(!enabled)("accrual cutover (database)", { timeout: 60_000 }, () 
     structureId = (await db.feeStructure.create({
       data: { schoolId, name: "Current fees", items: { create: [{ name: "Tuition earned on invoice", amount: "50" }] } },
     })).id;
+  });
+
+  // Every finance integration spec ends by proving the ledger invariants still hold (I1, I2).
+  afterAll(async () => {
+    if (!db || !schoolId) return;
+    const { FinanceLedgerIntegrityService } = await import("./finance-ledger-integrity.service.js");
+    const { assertInvariants } = await import("./finance-invariants.helper.js");
+    await assertInvariants(new FinanceLedgerIntegrityService({ client: db } as never), schoolId);
   });
 
   afterAll(async () => {

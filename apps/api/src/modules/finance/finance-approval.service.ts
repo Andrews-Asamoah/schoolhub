@@ -21,10 +21,19 @@ export class FinanceApprovalService {
         where: { schoolId: input.schoolId, entityType: input.entityType, entityId: input.entityId, status: "PENDING" },
       });
       if (pending) throw new ConflictException("This item already has a pending approval.");
-      const policy = await tx.financeApprovalPolicy.findFirst({
+      let policy = await tx.financeApprovalPolicy.findFirst({
         where: { schoolId: input.schoolId, subject: input.subject, minAmount: { lte: input.amount ?? new Prisma.Decimal(0) } },
         orderBy: { minAmount: "desc" },
       });
+      // Payroll runs always have a one-approver, different-person policy; it is ordinary data
+      // the school can tighten later. Other subjects stay fail-closed until a policy exists.
+      if (!policy && input.subject === "PAYROLL_RUN") {
+        policy = await tx.financeApprovalPolicy.upsert({
+          where: { schoolId_subject_minAmount: { schoolId: input.schoolId, subject: "PAYROLL_RUN", minAmount: new Prisma.Decimal(0) } },
+          create: { schoolId: input.schoolId, subject: "PAYROLL_RUN", minAmount: new Prisma.Decimal(0), requiredApprovals: 1, approverPermission: "PAYROLL_APPROVE" },
+          update: {},
+        });
+      }
       if (!policy) throw new ConflictException("No school approval policy configured for this operation.");
       if (policy.requiredApprovals !== 1) throw new ConflictException("Multi-approver policy is not yet supported; activation blocked.");
       return tx.financeApprovalRequest.create({

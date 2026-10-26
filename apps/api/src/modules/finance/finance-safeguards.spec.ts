@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ExecutionContext } from "@nestjs/common";
-import { FinanceWriteRateLimitGuard, SlidingWindowLimiter, SuperAdminReasonGuard } from "./finance-safeguards.js";
+import { FinanceWriteRateLimitGuard, InMemoryFinanceRateLimitStore, SlidingWindowLimiter, SuperAdminReasonGuard } from "./finance-safeguards.js";
 
 function context(request: Record<string, unknown>) {
   return { switchToHttp: () => ({ getRequest: () => request }) } as unknown as ExecutionContext;
@@ -31,19 +31,19 @@ describe("SlidingWindowLimiter", () => {
 });
 
 describe("FinanceWriteRateLimitGuard", () => {
-  it("never limits reads", () => {
-    const guard = new FinanceWriteRateLimitGuard();
+  it("never limits reads", async () => {
+    const guard = new FinanceWriteRateLimitGuard(new InMemoryFinanceRateLimitStore());
     for (let i = 0; i < 500; i += 1) {
-      expect(guard.canActivate(context({ method: "GET", session: { user: { id: "read-user" } } }))).toBe(true);
+      expect(await guard.canActivate(context({ method: "GET", session: { user: { id: "read-user" } } }))).toBe(true);
     }
   });
-  it("returns 429 once a user exceeds the write limit", () => {
-    const guard = new FinanceWriteRateLimitGuard();
+  it("returns 429 once a user exceeds the write limit", async () => {
+    const guard = new FinanceWriteRateLimitGuard(new InMemoryFinanceRateLimitStore());
     const request = { method: "POST", session: { user: { id: "burst-user" } }, school: { id: "s1" } };
     let status: number | undefined;
     for (let i = 0; i < 61; i += 1) {
       try {
-        guard.canActivate(context(request));
+        await guard.canActivate(context(request));
       } catch (error) {
         status = (error as { getStatus: () => number }).getStatus();
       }

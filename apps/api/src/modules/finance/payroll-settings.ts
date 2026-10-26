@@ -18,6 +18,19 @@ const day = (value: Date) => value.toISOString().slice(0, 10);
 const applies = (r: { effectiveFrom: Date; effectiveTo: Date | null }, date: Date) =>
   day(r.effectiveFrom) <= day(date) && (r.effectiveTo === null || day(r.effectiveTo) >= day(date));
 
+/** Bands must be contiguous, every band but the last bounded, the last open-ended, rates 0-100. */
+export function assertValidTaxBands<T extends { position: number; width: Prisma.Decimal | null; rate: Prisma.Decimal }>(input: readonly T[]): T[] {
+  const bands = [...input].sort((a, b) => a.position - b.position);
+  const first = bands[0];
+  const invalid = !first || (first.position !== 0 && first.position !== 1)
+    || bands.some((band, i) =>
+      band.position !== first.position + i || band.rate.lt(0) || band.rate.gt(100)
+      || (i < bands.length - 1 && (band.width === null || band.width.lte(0))))
+    || bands[bands.length - 1]!.width !== null;
+  if (invalid) throw new BadRequestException("PAYE tax schedule has invalid bands: they must be contiguous, bounded except the last, with rates between 0 and 100.");
+  return bands;
+}
+
 /** Fails closed if a period lacks accountant-approved statutory data or has ambiguous overlaps. */
 export function resolvePayrollSettings(
   schoolId: string, periodEnd: Date, taxRows: readonly TaxScheduleRow[], schemeRows: readonly SchemeRow[],
@@ -35,13 +48,7 @@ export function resolvePayrollSettings(
     return selected[0]!;
   }
   const tax = choose(taxRows, "PAYE tax schedule");
-  const bands = [...tax.bands].sort((a, b) => a.position - b.position);
-  if (!bands.length || bands[0]!.position !== 0 && bands[0]!.position !== 1
-    || bands.some((band, i) => band.position !== bands[0]!.position + i
-      || band.rate.lt(0) || band.rate.gt(100)
-      || (i < bands.length - 1 && (band.width === null || band.width.lte(0))))
-    || bands[bands.length - 1]!.width !== null
-  ) throw new BadRequestException("Approved PAYE tax schedule has invalid bands.");
+  const bands = assertValidTaxBands(tax.bands);
   const keys = [...new Set(schemeRows.map(row => row.key))];
   if (!keys.length) throw new BadRequestException("No payroll contribution schemes configured.");
   const selected = keys.map(key => choose(schemeRows.filter(row => row.key === key), `contribution scheme ${key}`));

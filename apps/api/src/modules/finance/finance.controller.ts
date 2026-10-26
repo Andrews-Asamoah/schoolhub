@@ -1,6 +1,7 @@
 import {
   Controller,
   ForbiddenException,
+  Delete,
   Get,
   Post,
   Patch,
@@ -17,10 +18,11 @@ import {
 import type { Request, Response } from "express";
 import { FinanceService } from "./finance.service.js";
 import { FinanceLedgerIntegrityService } from "./finance-ledger-integrity.service.js";
+import { PayrollSettingsService } from "./payroll-settings.service.js";
 import { FinanceExportsService, type FinanceExportContext, type FinanceExportFile } from "./finance-exports.service.js";
 import { SchoolTenantGuard } from "../../common/guards/school-tenant.guard.js";
 import { RolesGuard } from "../../common/guards/roles.guard.js";
-import { FINANCE_PAYROLL_EXPORT_ROLES, FINANCE_READ_ROLES, FINANCE_WRITE_ROLES, canExportFinancePayroll } from "./finance.permissions.js";
+import { FINANCE_PAYROLL_EXPORT_ROLES, FINANCE_READ_ROLES, FINANCE_WRITE_ROLES, PAYROLL_SETTINGS_APPROVE_ROLES, canExportFinancePayroll } from "./finance.permissions.js";
 import { FinanceAuditInterceptor, FinanceSelfAudited } from "./finance-audit.interceptor.js";
 import { FinanceWriteRateLimitGuard, SuperAdminReasonGuard } from "./finance-safeguards.js";
 import { Roles } from "../../common/decorators/roles.decorator.js";
@@ -70,6 +72,30 @@ const payrollTransitionSchema = z.object({
   status: z.enum(["APPROVED", "PAID", "CANCELLED"]),
   paymentMethod: z.enum(["CASH", "BANK_TRANSFER", "CHEQUE", "MOBILE_MONEY", "CARD", "ONLINE", "OTHER"]).optional(),
 });
+const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Format: YYYY-MM-DD");
+const rate = z.string().regex(/^\d{1,3}(?:\.\d{1,3})?$/, "Enter a percentage with up to three decimals.");
+const money = z.string().regex(/^\d{1,13}(?:\.\d{1,2})?$/, "Enter an amount with up to two decimals.");
+const taxScheduleDraftSchema = z.object({
+  name: z.string().trim().min(2).max(120),
+  effectiveFrom: isoDate,
+  effectiveTo: isoDate.nullable().optional(),
+  nonResidentRate: rate,
+  sourceNote: z.string().trim().min(10, "Cite the official GRA notice for these bands.").max(500),
+  bands: z.array(z.object({ width: money.nullable(), rate })).min(1).max(20),
+});
+const contributionSchemeDraftSchema = z.object({
+  key: z.enum(["SSNIT_TIER1", "SSNIT_TIER2", "SSNIT_TIER3"]),
+  label: z.string().trim().min(2).max(120),
+  trustee: z.string().trim().max(120).nullable().optional(),
+  base: z.enum(["BASIC", "GROSS", "PENSIONABLE_ITEMS"]),
+  employeeRate: rate, employerRate: rate, memoRate: rate.default("0"),
+  insurableMin: money.nullable().optional(), insurableMax: money.nullable().optional(),
+  employeeShareTaxDeductible: z.boolean(),
+  effectiveFrom: isoDate, effectiveTo: isoDate.nullable().optional(),
+  sourceNote: z.string().trim().min(10, "Cite the official SSNIT or NPRA source.").max(500),
+});
+const settingKindSchema = z.enum(["tax", "scheme"]);
+const settingEndDateSchema = z.object({ effectiveTo: isoDate });
 const feeReminderCreateSchema = z.object({
   name: z.string().trim().min(2, "Enter a schedule name").max(120),
   description: z.string().trim().max(500).optional(),
@@ -138,6 +164,7 @@ export class FinanceController {
     private readonly financeService: FinanceService,
     private readonly financeExports: FinanceExportsService,
     private readonly ledgerIntegrity: FinanceLedgerIntegrityService,
+    private readonly payrollSettings: PayrollSettingsService,
   ) {}
 
 
@@ -498,6 +525,62 @@ export class FinanceController {
     @Body(new ZodValidationPipe(updatePayrollSalarySchema)) body: UpdatePayrollSalaryInput,
   ) {
     return this.financeService.updatePayrollSalary(school.id, kind, personId, body.monthlySalary, user.id);
+  }
+
+  @Get("payroll/settings")
+  @Roles(...FINANCE_READ_ROLES)
+  listPayrollSettings(@CurrentSchool() school: School) {
+    return this.payrollSettings.list(school.id);
+  }
+
+  @Post("payroll/settings/tax-schedules")
+  @Roles(...FINANCE_WRITE_ROLES)
+  createTaxScheduleDraft(
+    @CurrentSchool() school: School,
+    @Body(new ZodValidationPipe(taxScheduleDraftSchema)) body: z.infer<typeof taxScheduleDraftSchema>,
+  ) {
+    return this.payrollSettings.createTaxScheduleDraft(school.id, body);
+  }
+
+  @Post("payroll/settings/schemes")
+  @Roles(...FINANCE_WRITE_ROLES)
+  createContributionSchemeDraft(
+    @CurrentSchool() school: School,
+    @Body(new ZodValidationPipe(contributionSchemeDraftSchema)) body: z.infer<typeof contributionSchemeDraftSchema>,
+  ) {
+    return this.payrollSettings.createSchemeDraft(school.id, body);
+  }
+
+  @Delete("payroll/settings/:kind/:id")
+  @Roles(...FINANCE_WRITE_ROLES)
+  discardPayrollSettingDraft(
+    @CurrentSchool() school: School,
+    @Param("kind", new ZodValidationPipe(settingKindSchema)) kind: z.infer<typeof settingKindSchema>,
+    @Param("id") id: string,
+  ) {
+    return this.payrollSettings.deleteDraft(school.id, kind, id);
+  }
+
+  @Post("payroll/settings/:kind/:id/activate")
+  @Roles(...PAYROLL_SETTINGS_APPROVE_ROLES)
+  activatePayrollSetting(
+    @CurrentSchool() school: School,
+    @CurrentUser() user: AuthenticatedUser,
+    @Param("kind", new ZodValidationPipe(settingKindSchema)) kind: z.infer<typeof settingKindSchema>,
+    @Param("id") id: string,
+  ) {
+    return this.payrollSettings.activate(school.id, kind, id, user.id);
+  }
+
+  @Patch("payroll/settings/:kind/:id/end")
+  @Roles(...PAYROLL_SETTINGS_APPROVE_ROLES)
+  endPayrollSetting(
+    @CurrentSchool() school: School,
+    @Param("kind", new ZodValidationPipe(settingKindSchema)) kind: z.infer<typeof settingKindSchema>,
+    @Param("id") id: string,
+    @Body(new ZodValidationPipe(settingEndDateSchema)) body: z.infer<typeof settingEndDateSchema>,
+  ) {
+    return this.payrollSettings.setEndDate(school.id, kind, id, body.effectiveTo);
   }
 
   @Post("payroll")

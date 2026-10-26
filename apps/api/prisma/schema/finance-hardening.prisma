@@ -132,3 +132,117 @@ model PayrollContributionScheme {
   @@index([schoolId, key, effectiveFrom])
   @@map("payroll_contribution_schemes")
 }
+
+enum PayrollResidency {
+  RESIDENT
+  NON_RESIDENT
+}
+
+enum DeductionKind {
+  LOAN
+  ADVANCE
+  UNION
+  OTHER
+}
+
+enum PayslipLineKind {
+  EARNING
+  DEDUCTION
+  CONTRIBUTION
+  TAX
+}
+
+model PayrollEarningType {
+  id String @id @default(cuid())
+  schoolId String
+  code String
+  name String
+  taxable Boolean @default(true)
+  pensionable Boolean @default(false)
+  isOvertime Boolean @default(false)
+  isActive Boolean @default(true)
+  @@unique([schoolId, code])
+  @@map("payroll_earning_types")
+}
+
+model PayrollDeductionType {
+  id String @id @default(cuid())
+  schoolId String
+  code String
+  name String
+  kind DeductionKind @default(OTHER)
+  isActive Boolean @default(true)
+  @@unique([schoolId, code])
+  @@map("payroll_deduction_types")
+}
+
+/// Effective-dated pay profile. A pay change adds a row; it never overwrites one.
+/// The database also forbids overlapping dates for one person (exclusion constraint).
+model StaffPayProfile {
+  id String @id @default(cuid())
+  schoolId String
+  staffId String?
+  teacherId String?
+  basicSalary Decimal @db.Decimal(15, 2)
+  residency PayrollResidency @default(RESIDENT)
+  tin String?
+  ssnitNumber String?
+  schemeKeys String[] @default(["SSNIT_TIER1"])
+  effectiveFrom DateTime @db.Date
+  effectiveTo DateTime? @db.Date
+  createdById String?
+  createdAt DateTime @default(now())
+  recurringItems StaffRecurringItem[]
+  loans StaffLoan[]
+  @@index([schoolId, staffId, effectiveFrom])
+  @@index([schoolId, teacherId, effectiveFrom])
+  @@map("staff_pay_profiles")
+}
+
+model StaffRecurringItem {
+  id String @id @default(cuid())
+  profileId String
+  earningTypeId String?
+  deductionTypeId String?
+  amount Decimal @db.Decimal(15, 2)
+  effectiveFrom DateTime @db.Date
+  effectiveTo DateTime? @db.Date
+  profile StaffPayProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  @@index([profileId])
+  @@map("staff_recurring_items")
+}
+
+model StaffLoan {
+  id String @id @default(cuid())
+  schoolId String
+  profileId String
+  principal Decimal @db.Decimal(15, 2)
+  instalment Decimal @db.Decimal(15, 2)
+  balance Decimal @db.Decimal(15, 2)
+  startDate DateTime @db.Date
+  status String @default("ACTIVE")
+  profile StaffPayProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  @@index([schoolId, status])
+  @@map("staff_loans")
+}
+
+model PayslipLine {
+  id String @id @default(cuid())
+  payslipId String
+  kind PayslipLineKind
+  code String
+  label String
+  amount Decimal @db.Decimal(15, 2)
+  taxable Boolean?
+  payslip Payslip @relation(fields: [payslipId], references: [id], onDelete: Cascade)
+  @@index([payslipId])
+  @@map("payslip_lines")
+}
+
+/// Shared fixed-window counter for the finance write limiter (one row per user and school).
+model FinanceRateLimit {
+  key String @id
+  windowStart DateTime
+  hits Int
+  @@map("finance_rate_limits")
+}

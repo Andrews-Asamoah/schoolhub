@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import type { ExecutionContext } from "@nestjs/common";
 import { RolesGuard } from "../../common/guards/roles.guard.js";
-import { FINANCE_PAYROLL_EXPORT_ROLES, FINANCE_READ_ROLES, FINANCE_WRITE_ROLES, canExportFinancePayroll, isFinancePayrollExportRole } from "./finance.permissions.js";
+import { FINANCE_PAYROLL_EXPORT_ROLES, FINANCE_READ_ROLES, FINANCE_WRITE_ROLES, PAYROLL_SETTINGS_APPROVE_ROLES, canExportFinancePayroll, isFinancePayrollExportRole } from "./finance.permissions.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 // Normalise line endings so the checks behave the same on Windows (CRLF) checkouts.
@@ -85,9 +85,19 @@ describe("finance controller routes", () => {
     expect(controllerSource).not.toMatch(/@Roles\(\s*"/);
   });
   it("gives every write route (POST/PATCH/PUT/DELETE) the finance write roles", () => {
-    for (const route of routes.filter((r) => r.verb !== "Get")) {
+    const approvals = (r: { route: string }) => /payroll\/settings\/:kind\/:id\/(activate|end)/.test(r.route);
+    for (const route of routes.filter((r) => r.verb !== "Get" && !approvals(r))) {
       expect(route.decorators, `${route.verb} ${route.route}`).toContain("@Roles(...FINANCE_WRITE_ROLES)");
     }
+  });
+  it("gives statutory payroll setting approval to owner and headteacher only, never the preparer role", () => {
+    expect([...PAYROLL_SETTINGS_APPROVE_ROLES]).toEqual(["owner", "headteacher"]);
+    const approvals = routes.filter((r) => /payroll\/settings\/:kind\/:id\/(activate|end)/.test(r.route));
+    expect(approvals).toHaveLength(2);
+    for (const route of approvals) expect(route.decorators, route.route).toContain("@Roles(...PAYROLL_SETTINGS_APPROVE_ROLES)");
+    expect(check(PAYROLL_SETTINGS_APPROVE_ROLES, { role: "user" }, "accountant")).toThrow();
+    expect(check(PAYROLL_SETTINGS_APPROVE_ROLES, { role: "user" }, "owner")()).toBe(true);
+    expect(check(PAYROLL_SETTINGS_APPROVE_ROLES, { role: "user" }, "headteacher")()).toBe(true);
   });
   it("gives payroll and salary exports the stricter export roles", () => {
     for (const route of routes.filter((r) => r.verb === "Get" && (

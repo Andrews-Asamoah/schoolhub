@@ -94,8 +94,9 @@ describe.skipIf(!enabled)("finance (database)", { timeout: 60_000 }, () => {
     const { prisma: client } = await import("../../prisma/prisma.client.js");
     const { FinanceService } = await import("./finance.service.js");
     const { FinancePostingService } = await import("./finance-posting.service.js");
+    const { FinanceApprovalService } = await import("./finance-approval.service.js");
     prisma = client;
-    service = new FinanceService({ client } as never, new FinancePostingService({ client } as never));
+    service = new FinanceService({ client } as never, new FinancePostingService({ client } as never), new FinanceApprovalService({ client } as never));
 
     const org = await prisma.organization.create({ data: { id: `${run}-org`, name: `Test ${run}`, slug: `${run}-org` } });
     const school = await prisma.school.create({
@@ -109,6 +110,14 @@ describe.skipIf(!enabled)("finance (database)", { timeout: 60_000 }, () => {
       data: { schoolId, name: `${run} year`, startDate: new Date("2026-01-01"), endDate: new Date("2026-12-31"), isCurrent: true },
     });
     yearId = year.id;
+  });
+
+  // Every finance integration spec ends by proving the ledger invariants still hold (I1, I2).
+  afterAll(async () => {
+    if (!prisma || !schoolId) return;
+    const { FinanceLedgerIntegrityService } = await import("./finance-ledger-integrity.service.js");
+    const { assertInvariants } = await import("./finance-invariants.helper.js");
+    await assertInvariants(new FinanceLedgerIntegrityService({ client: prisma } as never), schoolId);
   });
 
   afterAll(async () => {

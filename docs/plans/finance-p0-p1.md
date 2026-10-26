@@ -21,3 +21,8 @@ This initial staged branch must not change live payroll calculations before cert
 ## Exit gates
 P0: I1/I2 pass for every school, only PostingService writes ledger rows, write limiter shared across instances, maker-checker audited.
 P1: January 2027 payroll uses approved effective-dated settings; correction run/snapshot and general-ledger reconciliation repeat exactly; accountant signs off official tax and contribution references.
+
+## Status after branch feat/finance-p0-p1-gaps
+Done: shared database write limiter; whole-tree "one posting door" test; assertInvariants helper called at the end of every finance integration spec; nightly all-schools I1/I2 job (advisory-locked, FINANCE_INTEGRITY_JOB=off disables); payroll approval through FinanceApprovalService; payroll settings API (accountant drafts, owner/headteacher activates, DB refuses overlapping ACTIVE rows); P1 schema (pay profiles, recurring items, loans, earning/deduction types, payslip lines, runNumber, snapshots).
+Not done (next): calculation from StaffPayProfile + PayslipLine/calculationSnapshot writes, Tier 2/3 and residency per person, StaffPayProfile backfill and effective-dated updatePayrollSalary, draft recalculation and freeze at approval, correction runs, recognition at approval (flagged), web UI for settings, ESLint/oxlint rule (the architecture spec is the enforcement today).
+Verify before merge: `prisma generate`, typecheck, full test run and the migration on a production copy have NOT been run for this branch.

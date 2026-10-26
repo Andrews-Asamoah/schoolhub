@@ -27,3 +27,9 @@ export function isFinancePayrollExportRole(role: string | null | undefined): boo
 export function canExportFinancePayroll(actorPlatformRole: string | null | undefined, activeSchoolRole: string | null | undefined): boolean {
   return actorPlatformRole !== "superAdmin" && isFinancePayrollExportRole(activeSchoolRole);
 }
+
+/**
+ * Activating or retiring statutory payroll settings (PAYE bands, SSNIT/tier rates) is a
+ * second-person decision: the accountant prepares drafts, the owner or headteacher approves.
+ */
+export const PAYROLL_SETTINGS_APPROVE_ROLES = ["owner", "headteacher"] as const;

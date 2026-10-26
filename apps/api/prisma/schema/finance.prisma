@@ -388,6 +388,9 @@ model ExpenditureCategoryRegistry {
 }
 
 model PayrollRecord {
+  /// 1 for the original run; supplementary or correction runs use 2, 3...
+  runNumber Int @default(1)
+  correctsRunId String?
   taxScheduleId String?
   settingsSnapshot Json?
   calculatedAt DateTime?
@@ -414,7 +417,7 @@ model PayrollRecord {
   processedBy  user?         @relation("PayrollProcessedBy", fields: [processedById], references: [id], onDelete: SetNull)
   payslips     Payslip[]
 
-  @@unique([schoolId, month, year])
+  @@unique([schoolId, month, year, runNumber])
   @@index([academicYearId])
   @@index([termId])
   @@map("payroll_records")
@@ -437,9 +440,13 @@ model Payslip {
   paymentMethod   PaymentMethod @default(BANK_TRANSFER)
   paymentStatus   PaymentStatus @default(PENDING)
   paidAt          DateTime?
+  /// Inputs and outputs per line, so a reprint always matches what was approved.
+  calculationSnapshot Json?
+  residency       PayrollResidency @default(RESIDENT)
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
 
+  lines         PayslipLine[]
   payrollRecord PayrollRecord @relation(fields: [payrollRecordId], references: [id], onDelete: Cascade)
   school        School        @relation(fields: [schoolId], references: [id], onDelete: Cascade)
   staff         Staff?        @relation(fields: [staffId], references: [id], onDelete: SetNull)

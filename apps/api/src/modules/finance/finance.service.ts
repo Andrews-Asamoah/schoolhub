@@ -7,6 +7,7 @@ import {
 } from "@nestjs/common";
 import { PrismaService } from "../../prisma/prisma.service.js";
 import { FinancePostingService } from "./finance-posting.service.js";
+import { FinanceApprovalService } from "./finance-approval.service.js";
 import type { CreateExpenseInput, GenerateBillInput, RecordPaymentInput, StudentStatementResponse } from "@schoolhub/shared";
 import { calculatePayslip } from "./payroll/payroll-calculator.js";
 import { resolvePayrollSettings } from "./payroll-settings.js";
@@ -71,7 +72,11 @@ function moneyString(value: Prisma.Decimal | null | undefined): string {
 
 @Injectable()
 export class FinanceService {
-  constructor(private readonly prisma: PrismaService, private readonly postingService: FinancePostingService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly postingService: FinancePostingService,
+    private readonly approvals: FinanceApprovalService,
+  ) {}
 
   /** Rejects future dates and dates inside a closed period. Call inside the posting transaction. */
   private async assertPostingDate(
@@ -3544,7 +3549,7 @@ export class FinanceService {
     ]);
     const resolved = resolvePayrollSettings(schoolId, periodEnd, taxSchedules, contributionSchemes);
     const existing = await db.payrollRecord.findUnique({
-      where: { schoolId_month_year: { schoolId, month: input.month, year: input.year } },
+      where: { schoolId_month_year_runNumber: { schoolId, month: input.month, year: input.year, runNumber: 1 } },
       select: { id: true },
     });
     if (existing) throw new BadRequestException("A payroll run already exists for this month and year.");
@@ -3613,7 +3618,7 @@ export class FinanceService {
 
     const payrollRecord = await db.$transaction(async (tx) => {
       const duplicate = await tx.payrollRecord.findUnique({
-        where: { schoolId_month_year: { schoolId, month: input.month, year: input.year } },
+        where: { schoolId_month_year_runNumber: { schoolId, month: input.month, year: input.year, runNumber: 1 } },
         select: { id: true },
       });
       if (duplicate) throw new BadRequestException("A payroll run already exists for this month and year.");
@@ -3662,7 +3667,19 @@ export class FinanceService {
     if (!payroll) throw new NotFoundException("Payroll run not found.");
     if (payroll.status === "DRAFT" && input.status === "APPROVED") {
       if (!payroll._count.payslips) throw new BadRequestException("A payroll run without payslips cannot be approved.");
-      this.assertSeparationOfDuties(actorId, payroll.processedById, "approved");
+      // Maker-checker through the approval engine: the preparer is the requester, so the
+      // approver must be someone else unless the school's audited allowSelfApproval is set.
+      const payload = {
+        payrollRecordId: payroll.id, runNumber: payroll.runNumber,
+        totalGross: payroll.totalGross.toFixed(2), totalNet: payroll.totalNet.toFixed(2),
+        totalTax: payroll.totalTax.toFixed(2), totalSSNIT: payroll.totalSSNIT.toFixed(2),
+        payslips: payroll._count.payslips,
+      };
+      const request = await this.approvals.request({
+        schoolId, subject: "PAYROLL_RUN", entityType: "PayrollRecord", entityId: payroll.id,
+        requestedById: payroll.processedById ?? actorId, payload, amount: payroll.totalGross,
+      });
+      await this.approvals.decide(schoolId, request.id, actorId, "APPROVED", payload, "Payroll run approved.");
       return db.payrollRecord.update({
         where: { id: payroll.id },
         data: { status: "APPROVED", approvedById: actorId },

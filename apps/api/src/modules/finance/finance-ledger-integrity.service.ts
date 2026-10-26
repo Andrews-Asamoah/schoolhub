@@ -43,4 +43,19 @@ export class FinanceLedgerIntegrityService {
       I2: { status: discrepancies.length === 0 && orphanAccounts.length === 0 ? "PASS" : "FAIL", discrepancies },
     };
   }
+
+  /** Runs the suite for every school. A school that cannot be checked is reported, never skipped. */
+  async checkAllSchools() {
+    const schools = await this.prisma.client.school.findMany({ select: { id: true }, orderBy: { id: "asc" } });
+    const failing: Array<{ schoolId: string; report?: Awaited<ReturnType<FinanceLedgerIntegrityService["check"]>>; error?: string }> = [];
+    for (const { id } of schools) {
+      try {
+        const report = await this.check(id);
+        if (report.I1.status !== "PASS" || report.I2.status !== "PASS") failing.push({ schoolId: id, report });
+      } catch (error) {
+        failing.push({ schoolId: id, error: error instanceof Error ? error.message : String(error) });
+      }
+    }
+    return { checkedAt: new Date().toISOString(), schoolsChecked: schools.length, failing };
+  }
 }
