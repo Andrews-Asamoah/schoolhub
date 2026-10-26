@@ -440,6 +440,36 @@ describe.skipIf(!enabled)("finance (database)", { timeout: 60_000 }, () => {
       expect(other.items).toHaveLength(0);
     });
   });
+  describe("reporting reconciliation", () => {
+    it("separates not-yet-due balances and reconciles every ageing bucket", async () => {
+      const { bill } = await studentWithBill(123.45);
+      await prisma.bill.update({
+        where: { id: bill.id },
+        data: { dueDate: new Date(day(7)) },
+      });
+      const result = await service.getFinanceSummary(schoolId);
+      const ageingSum = Object.values(result.ageing).reduce(
+        (sum, amount) => sum.plus(new Prisma.Decimal(amount)), new Prisma.Decimal(0),
+      );
+      expect(ageingSum.toFixed(2)).toBe(result.outstanding);
+      expect(result.reconciliation.ageingReconciled).toBe(true);
+      expect(result.reconciliation.ageingDifference).toBe("0.00");
+      expect(new Prisma.Decimal(result.ageing.notDue).gte("123.45")).toBe(true);
+      expect(result.balanceBasis).toBe("CURRENT");
+    });
+
+    it("flags a discrepancy between a student's cached balance and their invoices", async () => {
+      const { student } = await studentWithBill(210);
+      await prisma.student.update({
+        where: { id: student.id },
+        data: { outstandingBalance: new Prisma.Decimal("209.99") },
+      });
+      const report = await service.getFinanceSummary(schoolId);
+      expect(report.reconciliation.studentBalanceMismatchCount).toBeGreaterThan(0);
+      expect(report.reconciliation.status).toBe("DISCREPANCY");
+    });
+  });
+
   describe("Phase 2 reporting and allocations", () => {
     it("returns independent page totals and accurate summary totals beyond 500 records", async () => {
       const dateRange = { from: day(-1), to: day(0) };

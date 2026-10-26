@@ -11,7 +11,10 @@ interface AcademicTerm { id: string; name: string; isCurrent: boolean; }
 interface AcademicYear { id: string; name: string; isCurrent: boolean; terms: AcademicTerm[]; }
 interface FinanceSummary {
   asOf: string;
-  period: { from: string | null; to: string | null; yearId: string | null; termId: string | null };
+  balanceAsOf: string;
+  balanceBasis: "CURRENT";
+  reconciliation: { status: "RECONCILED" | "DISCREPANCY"; ageingTotal: string; ageingDifference: string; ageingReconciled: boolean; invoiceItemMismatchCount: number; studentBalanceMismatchCount: number; receiptAllocationMismatchCount: number; ledgerMismatchCount: number };
+  period: { from: string | null; to: string | null; yearId: string | null; termId: string | null; basis: string };
   billed: string;
   billedCount: number;
   collected: string;
@@ -62,7 +65,7 @@ export function AccountantFinanceReportingWorkspace() {
     pdf.text("School finance report", 14, 16);
     pdf.setFontSize(9);
     pdf.text(`Scope: ${scope === "all" ? "All available academic years" : `${selectedYear?.name ?? "Academic year"}${scope === "term" ? ` · ${selectedYear?.terms.find((term) => term.id === selectedTermId)?.name ?? "Term"}` : ""}`}`, 14, 23);
-    pdf.text(`As of ${summary.asOf}`, 14, 29);
+    pdf.text(`Activity: ${summary.period.from ?? "All time"} to ${summary.period.to}; balances: ${summary.balanceAsOf}`, 14, 29);
     autoTable(pdf, {
       startY: 35,
       head: [["Measure", "Amount / rate", "Count"]],
@@ -102,7 +105,9 @@ export function AccountantFinanceReportingWorkspace() {
       ["Scope", scope],
       ["Academic year", selectedYear?.name ?? "All academic years"],
       ["Term", scope === "term" ? selectedYear?.terms.find((term) => term.id === selectedTermId)?.name ?? "—" : "—"],
-      ["As of", summary.asOf],
+      ["Activity period", `${summary.period.from ?? "All time"} to ${summary.period.to}`],
+      ["Balances as of", summary.balanceAsOf],
+      ["Reconciliation status", summary.reconciliation.status],
       ["Billed (GHS)", Number(summary.billed)],
       ["Collected (GHS)", Number(summary.collected)],
       ["Outstanding (GHS)", Number(summary.outstanding)],
@@ -112,7 +117,7 @@ export function AccountantFinanceReportingWorkspace() {
     ]);
     info.getColumn(1).width = 24;
     info.getColumn(2).width = 38;
-    [6,7,8,9].forEach((row) => { info.getCell(row,2).numFmt = "#,##0.00"; });
+    [8,9,10,11].forEach((row) => { info.getCell(row,2).numFmt = "#,##0.00"; });
     const classes = workbook.addWorksheet("By class", { views: [{ state: "frozen", ySplit: 1 }] });
     classes.columns = [
       { header: "Class", key: "className", width: 28 },
@@ -151,6 +156,15 @@ export function AccountantFinanceReportingWorkspace() {
     {summaryQuery.isPending || yearsQuery.isPending ? <div role="status" className="flex items-center justify-center gap-2 rounded-xl border border-border bg-card py-12 text-sm text-muted-foreground"><LoaderCircle className="size-4 animate-spin" /> Calculating report from saved records…</div> : null}
     {summaryQuery.isError ? <div role="alert" className="rounded-xl border border-destructive/25 bg-destructive/5 p-4 text-sm text-destructive">The finance report could not be loaded. {summaryQuery.error.message}</div> : null}
     {summary && <div className="finance-report-print space-y-5">
+      <section className="rounded-2xl border border-border bg-card p-4 text-sm">
+        <p className="font-semibold text-foreground">Reporting basis</p>
+        <p className="mt-1 text-muted-foreground">Invoices and receipts: {summary.period.from ?? "All time"} to {summary.period.to}, using issue dates and receipt dates respectively. Outstanding balances and ageing: current open receivables as of {summary.balanceAsOf}, including unpaid invoices from earlier terms. These are not reconstructed historical closing balances.</p>
+      </section>
+      {summary.reconciliation.status === "DISCREPANCY" && <div role="alert" className="rounded-2xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
+        <p className="font-semibold">Finance reconciliation requires attention</p>
+        <p className="mt-1">Ageing difference: {money(summary.reconciliation.ageingDifference)}. Invoice/item mismatches: {summary.reconciliation.invoiceItemMismatchCount}; student balance mismatches: {summary.reconciliation.studentBalanceMismatchCount}; receipt allocation mismatches: {summary.reconciliation.receiptAllocationMismatchCount}; ledger mismatches: {summary.reconciliation.ledgerMismatchCount}. Investigate before relying on this report for close-out.</p>
+      </div>}
+      {summary.reconciliation.status === "RECONCILED" && <p className="text-sm text-muted-foreground">Current receivables, ageing, allocations and ledger summary checks reconcile.</p>}
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
         {[
           ["Billed", summary.billed, summary.billedCount + " invoices"],
