@@ -35,7 +35,7 @@ export function MetricCard({
   const TrendIcon = trend === "up" ? ArrowUpRight : ArrowDownRight;
 
   return (
-    <article className="rounded-2xl border border-border/80 bg-card p-5 shadow-[0_2px_12px_rgba(15,23,42,0.025)] transition hover:-translate-y-0.5 hover:shadow-[0_8px_24px_rgba(15,23,42,0.06)]">
+    <article className="min-w-0 rounded-2xl border border-border bg-card p-4 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:border-primary/20 hover:shadow-md sm:p-5">
       <div className="flex items-start justify-between">
         <div>
           <p className="text-xs font-medium text-muted-foreground">{label}</p>
@@ -70,7 +70,7 @@ export function MetricCard({
 
 export function AttendanceOverviewCard() {
   return (
-    <div className="rounded-2xl border border-border/80 bg-card p-5 shadow-[0_2px_12px_rgba(15,23,42,0.025)] sm:p-6">
+    <div className="min-w-0 rounded-2xl border border-border bg-card p-4 shadow-sm sm:p-5 lg:p-6">
       <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-sm font-semibold text-foreground">
