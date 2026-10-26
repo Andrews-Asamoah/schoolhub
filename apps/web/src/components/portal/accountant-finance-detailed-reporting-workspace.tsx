@@ -38,6 +38,8 @@ interface FinancePayment {
   paymentDate: string;
   status: string;
   referenceNumber?: string | null;
+  billAllocations?: Array<{ billId: string; amount: number | string; bill?: { id: string } | null }>;
+  paymentItems?: Array<{ amount: number | string; billItem?: { billId?: string; description?: string } | null }>;
 }
 
 interface FinanceClass {
@@ -138,6 +140,51 @@ const studentLabel = (student: Student) =>
     .trim() ||
   student.admissionNumber ||
   "Unknown student";
+
+type ClassAllocation = { classId: string; name: string; amount: number };
+
+/** Reconcile against bill-level allocations; use item rows for older receipts.
+ * Never charge a whole multi-bill receipt to its legacy primary bill.
+ */
+function paymentClassAllocations(payment: FinancePayment, billsById: Map<string, FinanceBill>): ClassAllocation[] {
+  const allocatedByBill = new Map<string, number>();
+  if (payment.billAllocations?.length) {
+    for (const allocation of payment.billAllocations) {
+      const id = allocation.billId ?? allocation.bill?.id;
+      if (!id) continue;
+      allocatedByBill.set(id, (allocatedByBill.get(id) ?? 0) + amount(allocation.amount));
+    }
+  } else if (payment.paymentItems?.length) {
+    for (const item of payment.paymentItems) {
+      const id = item.billItem?.billId;
+      if (!id) continue;
+      allocatedByBill.set(id, (allocatedByBill.get(id) ?? 0) + amount(item.amount));
+    }
+  }
+  // Legacy records may expose item descriptions without their bill IDs.
+  // In that case fall back to the linked bill rather than treating a
+  // known payment as unallocated.
+  if (allocatedByBill.size === 0 && payment.bill?.id) {
+    allocatedByBill.set(payment.bill.id, amount(payment.amount));
+  }
+
+  const byClass = new Map<string, ClassAllocation>();
+  let applied = 0;
+  for (const [billId, value] of allocatedByBill) {
+    const allocated = Math.max(0, value);
+    const bill = billsById.get(billId);
+    const classId = bill?.class?.id ?? "no-class";
+    const name = bill?.class?.name ?? "Class not recorded";
+    const current = byClass.get(classId);
+    byClass.set(classId, { classId, name, amount: (current?.amount ?? 0) + allocated });
+    applied += allocated;
+  }
+  const unapplied = Math.max(0, Math.round((amount(payment.amount) - applied) * 100) / 100);
+  if (unapplied > 0) {
+    byClass.set("unallocated", { classId: "unallocated", name: "Unallocated receipts", amount: unapplied });
+  }
+  return [...byClass.values()];
+}
 
 const inputClass =
   "h-10 w-full rounded-xl border border-border bg-background px-3 text-sm text-foreground outline-none focus:ring-2 focus:ring-ring/30";
@@ -269,14 +316,9 @@ export function AccountantFinanceDetailedReportingWorkspace({ classes }: Props) 
           return false;
         }
 
-        if (reportType === "class" && classId !== "ALL") {
-          const linkedBill = payment.bill?.id
-            ? billsById.get(payment.bill.id)
-            : undefined;
-
-          if (linkedBill?.class?.id !== classId) {
-            return false;
-          }
+        if (reportType === "class" && classId !== "ALL" &&
+            !paymentClassAllocations(payment, billsById).some((allocation) => allocation.classId === classId && allocation.amount > 0)) {
+          return false;
         }
 
         return inRange(payment.paymentDate);
@@ -326,7 +368,11 @@ export function AccountantFinanceDetailedReportingWorkspace({ classes }: Props) 
   );
 
   const collected = completedPayments.reduce(
-    (sum, payment) => sum + amount(payment.amount),
+    (sum, payment) => sum + (
+      reportType === "class" && classId !== "ALL"
+        ? paymentClassAllocations(payment, billsById).find((allocation) => allocation.classId === classId)?.amount ?? 0
+        : amount(payment.amount)
+    ),
     0,
   );
 
@@ -403,37 +449,34 @@ export function AccountantFinanceDetailedReportingWorkspace({ classes }: Props) 
     }
 
     for (const payment of completedPayments) {
-      const bill = payment.bill?.id
-        ? billsById.get(payment.bill.id)
-        : undefined;
-
-      const key = bill?.class?.id
-        ?? (payment.bill ? "no-class" : "unallocated");
-
-      const name = bill?.class?.name
-        ?? (payment.bill ? "Class not recorded" : "Unallocated receipts");
-
-      const entry = totals.get(key) ?? {
-        name,
-        collected: 0,
-        receipts: 0,
-        billed: 0,
-        outstanding: 0,
-      };
-
-      entry.collected += amount(payment.amount);
-      entry.receipts += 1;
-      totals.set(key, entry);
+      for (const allocation of paymentClassAllocations(payment, billsById)) {
+        if (reportType === "class" && classId !== "ALL" && allocation.classId !== classId) continue;
+        if (allocation.amount <= 0) continue;
+        const entry = totals.get(allocation.classId) ?? {
+          name: allocation.name,
+          collected: 0,
+          receipts: 0,
+          billed: 0,
+          outstanding: 0,
+        };
+        entry.collected += allocation.amount;
+        entry.receipts += 1;
+        totals.set(allocation.classId, entry);
+      }
     }
 
     return [...totals.values()].sort(
       (a, b) => b.collected - a.collected,
     );
-  }, [billsById, visibleBills, completedPayments]);
+  }, [billsById, visibleBills, completedPayments, reportType, classId]);
 
   const periodCollected = scopedPayments
     .filter((payment) => settled(payment.status))
-    .reduce((sum, payment) => sum + amount(payment.amount), 0);
+    .reduce((sum, payment) => sum + (
+      reportType === "class" && classId !== "ALL"
+        ? paymentClassAllocations(payment, billsById).find((allocation) => allocation.classId === classId)?.amount ?? 0
+        : amount(payment.amount)
+    ), 0);
 
   const previousPeriodCollected = useMemo(() => {
     if (
@@ -463,14 +506,9 @@ export function AccountantFinanceDetailedReportingWorkspace({ classes }: Props) 
           return false;
         }
 
-        if (reportType === "class" && classId !== "ALL") {
-          const linkedBill = payment.bill?.id
-            ? billsById.get(payment.bill.id)
-            : undefined;
-
-          if (linkedBill?.class?.id !== classId) {
-            return false;
-          }
+        if (reportType === "class" && classId !== "ALL" &&
+            !paymentClassAllocations(payment, billsById).some((allocation) => allocation.classId === classId && allocation.amount > 0)) {
+          return false;
         }
 
         const timestamp = new Date(payment.paymentDate).getTime();
@@ -481,7 +519,11 @@ export function AccountantFinanceDetailedReportingWorkspace({ classes }: Props) 
           timestamp <= previousEnd
         );
       })
-      .reduce((sum, payment) => sum + amount(payment.amount), 0);
+      .reduce((sum, payment) => sum + (
+        reportType === "class" && classId !== "ALL"
+          ? paymentClassAllocations(payment, billsById).find((allocation) => allocation.classId === classId)?.amount ?? 0
+          : amount(payment.amount)
+      ), 0);
   }, [
     payments,
     billsById,
@@ -555,7 +597,7 @@ export function AccountantFinanceDetailedReportingWorkspace({ classes }: Props) 
     { id: "date", header: "Date", cell: (row) => dateText(row.paymentDate), value: (row) => row.paymentDate },
     { id: "bill", header: "Bill", cell: (row) => row.bill?.billNumber ?? "Unallocated", value: (row) => row.bill?.billNumber ?? "" },
     { id: "method", header: "Method", cell: (row) => row.paymentMethod.replaceAll("_", " "), value: (row) => row.paymentMethod },
-    { id: "amount", header: "Amount", cell: (row) => money(amount(row.amount)), value: (row) => amount(row.amount), className: "text-right tabular-nums" },
+    { id: "amount", header: "Amount", cell: (row) => money(reportType === "class" && classId !== "ALL" ? paymentClassAllocations(row, billsById).find((allocation) => allocation.classId === classId)?.amount ?? 0 : amount(row.amount)), value: (row) => reportType === "class" && classId !== "ALL" ? paymentClassAllocations(row, billsById).find((allocation) => allocation.classId === classId)?.amount ?? 0 : amount(row.amount), className: "text-right tabular-nums" },
     { id: "status", header: "Status", cell: (row) => row.status, value: (row) => row.status },
   ];
 
