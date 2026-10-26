@@ -19,7 +19,15 @@ export type PeriodSnapshotLineData = {
  * A stable canonical hash permits I10 comparisons without relying on row order.
  * The caller must read the full ledger movement in one REPEATABLE READ snapshot.
  */
-export function buildPeriodSnapshot(inputs: readonly PeriodMovementInput[]) {
+export function buildPeriodSnapshot(inputs: readonly PeriodMovementInput[], scope: {
+  schoolId: string; startDate: string; endDate: string;
+}) {
+  if (!scope.schoolId.trim() ||
+      !/^\\d{4}-\\d{2}-\\d{2}$/.test(scope.startDate) ||
+      !/^\\d{4}-\\d{2}-\\d{2}$/.test(scope.endDate) ||
+      scope.startDate > scope.endDate) {
+    throw new Error("A valid school and accounting-period scope are required to hash a snapshot.");
+  }
   const ids = new Set<string>();
   const lines: PeriodSnapshotLineData[] = inputs.map(item => {
     if (ids.has(item.accountId)) throw new Error("A snapshot cannot contain duplicate chart accounts.");
@@ -43,9 +51,10 @@ export function buildPeriodSnapshot(inputs: readonly PeriodMovementInput[]) {
   const totalDebit = inputs.reduce((sum, entry) => sum.plus(entry.periodDebits), zero);
   const totalCredit = inputs.reduce((sum, entry) => sum.plus(entry.periodCredits), zero);
   if (!totalDebit.eq(totalCredit)) throw new Error("An unbalanced ledger cannot be snapshotted.");
-  const canonical = JSON.stringify({ schemaVersion: 1, lines });
+  const canonical = JSON.stringify({ schemaVersion: 2, scope, lines });
   return {
-    schemaVersion: 1 as const,
+    schemaVersion: 2 as const,
+    scope,
     lines,
     totalDebits: totalDebit.toFixed(2),
     totalCredits: totalCredit.toFixed(2),
