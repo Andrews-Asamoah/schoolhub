@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import type { ExecutionContext } from "@nestjs/common";
 import { RolesGuard } from "../../common/guards/roles.guard.js";
-import { FINANCE_PAYROLL_EXPORT_ROLES, FINANCE_READ_ROLES, FINANCE_WRITE_ROLES, PAYROLL_SETTINGS_APPROVE_ROLES, canExportFinancePayroll, isFinancePayrollExportRole } from "./finance.permissions.js";
+import { FINANCE_PAYROLL_EXPORT_ROLES, FINANCE_READ_ROLES, FINANCE_WRITE_ROLES, PAYROLL_SETTINGS_APPROVE_ROLES, FINANCE_PAYROLL_TRANSITION_ROLES, canExportFinancePayroll, isFinancePayrollExportRole } from "./finance.permissions.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 // Normalise line endings so the checks behave the same on Windows (CRLF) checkouts.
@@ -86,10 +86,21 @@ describe("finance controller routes", () => {
   });
   it("gives every write route (POST/PATCH/PUT/DELETE) the finance write roles", () => {
     const approvals = (r: { route: string }) => /payroll\/settings\/:kind\/:id\/(activate|end)/.test(r.route);
-    for (const route of routes.filter((r) => r.verb !== "Get" && !approvals(r))) {
+    const payrollTransitions = (r: { route: string }) => r.route === '"payroll/:recordId/status"';
+    for (const route of routes.filter((r) => r.verb !== "Get" && !approvals(r) && !payrollTransitions(r))) {
       expect(route.decorators, `${route.verb} ${route.route}`).toContain("@Roles(...FINANCE_WRITE_ROLES)");
     }
   });
+  it("limits payroll status writes to authorised roles and checks each transition again in the service", () => {
+    expect([...FINANCE_PAYROLL_TRANSITION_ROLES]).toEqual(["accountant", "owner", "headteacher"]);
+    const route = routes.find(r => r.route === '"payroll/:recordId/status"');
+    expect(route?.decorators).toContain("@Roles(...FINANCE_PAYROLL_TRANSITION_ROLES)");
+    expect(check(FINANCE_PAYROLL_TRANSITION_ROLES, { role: "user" }, "admin")).toThrow();
+    const service = readFileSync(join(here, "finance.service.ts"), "utf8");
+    expect(service).toContain('if (input.status === "APPROVED")');
+    expect(service).toContain('else if (schoolRole !== "accountant")');
+  });
+
   it("gives statutory payroll setting approval to owner and headteacher only, never the preparer role", () => {
     expect([...PAYROLL_SETTINGS_APPROVE_ROLES]).toEqual(["owner", "headteacher"]);
     const approvals = routes.filter((r) => /payroll\/settings\/:kind\/:id\/(activate|end)/.test(r.route));
