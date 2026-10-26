@@ -57,9 +57,11 @@ interface FinancePage<T> {
   total: number;
 }
 
-async function fetchAllFinancePages<T>(path: string): Promise<T[]> {
+async function fetchAllFinancePages<T extends { id: string }>(path: string): Promise<T[]> {
   const records: T[] = [];
   const seenCursors = new Set<string>();
+  const seenRecordIds = new Set<string>();
+  let expectedTotal: number | null = null;
   let cursor: string | null = null;
   let pageCount = 0;
 
@@ -70,7 +72,27 @@ async function fetchAllFinancePages<T>(path: string): Promise<T[]> {
     const params = new URLSearchParams({ limit: "100" });
     if (cursor) params.set("cursor", cursor);
     const page = await apiFetch<FinancePage<T>>(`${path}?${params.toString()}`);
-    records.push(...page.items);
+    if (!Array.isArray(page.items) || !Number.isSafeInteger(page.total) || page.total < 0 ||
+        (page.nextCursor !== null && typeof page.nextCursor !== "string")) {
+      throw new Error("Finance report received invalid pagination metadata. No incomplete report has been displayed.");
+    }
+    if (expectedTotal === null) expectedTotal = page.total;
+    if (page.total !== expectedTotal) {
+      throw new Error("Finance records changed while loading this report. Retry to load a consistent set.");
+    }
+    if (page.items.length === 0 && page.nextCursor) {
+      throw new Error("Finance report returned an empty page with a continuation cursor.");
+    }
+    for (const item of page.items) {
+      if (!item || typeof item.id !== "string" || !item.id || seenRecordIds.has(item.id)) {
+        throw new Error("Finance report returned an invalid or repeated record. No partial totals have been displayed.");
+      }
+      seenRecordIds.add(item.id);
+      records.push(item);
+    }
+    if (records.length > expectedTotal) {
+      throw new Error("Finance report received more records than the server reported.");
+    }
     cursor = page.nextCursor;
     pageCount += 1;
     if (cursor && seenCursors.has(cursor)) {
@@ -79,6 +101,9 @@ async function fetchAllFinancePages<T>(path: string): Promise<T[]> {
     if (cursor) seenCursors.add(cursor);
   } while (cursor);
 
+  if (records.length !== expectedTotal) {
+    throw new Error("Finance report pagination was incomplete. Retry before using financial totals.");
+  }
   return records;
 }
 
@@ -565,8 +590,8 @@ export function AccountantFinanceDetailedReportingWorkspace({ classes }: Props) 
         </div>
 
         <div className="finance-report-print-actions flex flex-wrap gap-2">
-          {!invalidRange && (reportType !== "student" || !!selectedStudent) && <TableExportMenu build={buildExportTable} note="Exports include the selected period and filters." />}
-          {!invalidRange && reportType === "student" && selectedStudent && <ServerExportButton endpoint={"/finance/students/" + encodeURIComponent(selectedStudent.id) + "/statement.pdf?from=" + encodeURIComponent(from) + "&to=" + encodeURIComponent(to)} label="Official statement PDF" className={secondaryButton} />}
+          {completeFinanceQuery.isSuccess && !invalidRange && (reportType !== "student" || !!selectedStudent) && <TableExportMenu build={buildExportTable} note="Exports include the selected period and filters." />}
+          {completeFinanceQuery.isSuccess && !invalidRange && reportType === "student" && selectedStudent && <ServerExportButton endpoint={"/finance/students/" + encodeURIComponent(selectedStudent.id) + "/statement.pdf?from=" + encodeURIComponent(from) + "&to=" + encodeURIComponent(to)} label="Official statement PDF" className={secondaryButton} />}
         </div>
         </div>
 
