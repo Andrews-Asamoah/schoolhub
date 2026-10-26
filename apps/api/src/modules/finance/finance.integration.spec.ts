@@ -342,6 +342,22 @@ describe.skipIf(!enabled)("finance (database)", { timeout: 60_000 }, () => {
       }
     });
 
+    it("refuses reversal postings while the current accounting period is closed", async () => {
+      await service.setPeriodLock(schoolId, userId, true, { lockedThrough: null, reason: "Open books for test receipt" });
+      const { student, bill } = await studentWithBill(500);
+      const receipt = await pay(student.id, bill.id, 100);
+      await service.setPeriodLock(schoolId, userId, false, { lockedThrough: day(0), reason: "Close current accounting period" });
+      try {
+        await expect(service.reversePayment(schoolId, userId, receipt.id, {
+          kind: "VOID", reason: "Must not reverse within closed books",
+        })).rejects.toThrow(/closed through/i);
+        expect((await prisma.payment.findUniqueOrThrow({ where: { id: receipt.id } })).status).toBe("COMPLETED");
+        expect((await prisma.bill.findUniqueOrThrow({ where: { id: bill.id } })).paidAmount.toFixed(2)).toBe("100.00");
+      } finally {
+        await service.setPeriodLock(schoolId, userId, true, { lockedThrough: null, reason: "Restore open period for remaining integration tests" });
+      }
+    });
+
     it("cannot be reversed twice", async () => {
       const { student, bill } = await studentWithBill(1000);
       const payment = await pay(student.id, bill.id, 100);
