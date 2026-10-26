@@ -1785,6 +1785,158 @@ export class FinanceService {
     });
   }
 
+  /**
+   * Reconstruct receivables as of a UTC calendar date from dated invoices,
+   * receipt allocations and dated voids/refunds. Never use today's bill.balanceAmount
+   * as a historical balance. Historical cancellation/waiver timing is not present
+   * in legacy records; exclude those invoices from authoritative totals and flag
+   * the report as incomplete instead of silently backdating adjustments.
+   */
+  async getHistoricalReceivables(schoolId: string, asOfDate: string) {
+    const start = parseIsoDate(asOfDate, "as-of date");
+    if (!start || start.toISOString().slice(0, 10) !== asOfDate) {
+      throw new BadRequestException("Provide a valid as-of date (YYYY-MM-DD).");
+    }
+    const today = new Date();
+    const todayEnd = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate(), 23, 59, 59, 999));
+    const end = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), start.getUTCDate(), 23, 59, 59, 999));
+    if (end > todayEnd) throw new BadRequestException("Historical receivables cannot be calculated for a future date.");
+
+    const [bills, payments] = await Promise.all([
+      this.prisma.client.bill.findMany({
+        where: { schoolId, issuedAt: { lte: end } },
+        orderBy: [{ studentId: "asc" }, { issuedAt: "asc" }, { id: "asc" }],
+        select: {
+          id: true, studentId: true, billNumber: true, issuedAt: true,
+          dueDate: true, totalAmount: true, discountAmount: true, status: true,
+          student: { select: { admissionNumber: true } },
+        },
+      }),
+      this.prisma.client.payment.findMany({
+        where: { schoolId, paymentDate: { lte: end } },
+        select: {
+          id: true, studentId: true, billId: true, paymentNumber: true,
+          paymentDate: true, reversedAt: true, status: true, amount: true,
+          billAllocations: { select: { billId: true, amount: true } },
+          paymentItems: { select: { amount: true, billItem: { select: { billId: true } } } },
+        },
+      }),
+    ]);
+
+    const zero = () => new Prisma.Decimal(0);
+    const byBill = new Map(bills.map((bill) => [bill.id, {
+      bill,
+      applied: zero(),
+    }]));
+    const exceptions: Array<{ reference: string; issue: string }> = [];
+    for (const bill of bills) {
+      if (bill.status === "CANCELLED" || bill.status === "WAIVED") {
+        exceptions.push({
+          reference: bill.billNumber,
+          issue: "The original cancellation/waiver effective date is not recorded; historical balance needs an adjustment posting.",
+        });
+      }
+    }
+
+    for (const payment of payments) {
+      // Reversal is a dated positive event; later reversals do not rewrite history.
+      const activeAtCutoff = payment.status === "COMPLETED" ||
+        (payment.reversedAt !== null && payment.reversedAt > end);
+      if (!activeAtCutoff) continue;
+      const allocated = new Map<string, Prisma.Decimal>();
+      if (payment.billAllocations.length) {
+        for (const row of payment.billAllocations) {
+          allocated.set(row.billId, (allocated.get(row.billId) ?? zero()).plus(row.amount));
+        }
+      } else if (payment.paymentItems.length) {
+        for (const row of payment.paymentItems) {
+          allocated.set(row.billItem.billId, (allocated.get(row.billItem.billId) ?? zero()).plus(row.amount));
+        }
+      } else if (payment.billId) {
+        allocated.set(payment.billId, payment.amount);
+      }
+      const allocatedTotal = [...allocated.values()].reduce((sum, value) => sum.plus(value), zero());
+      if (!allocatedTotal.eq(payment.amount)) {
+        exceptions.push({ reference: payment.paymentNumber, issue: "Receipt amount does not equal its saved invoice allocations." });
+        continue;
+      }
+      for (const [billId, value] of allocated) {
+        const entry = byBill.get(billId);
+        if (!entry || entry.bill.studentId !== payment.studentId) {
+          exceptions.push({ reference: payment.paymentNumber, issue: "Receipt allocation references an unavailable or different student's invoice." });
+          continue;
+        }
+        entry.applied = entry.applied.plus(value);
+      }
+    }
+
+    const asOfDay = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), start.getUTCDate()));
+    const ageing = { notDue: zero(), days0To30: zero(), days31To60: zero(), days61To90: zero(), days90Plus: zero() };
+    const byStudent = new Map<string, { studentId: string; admissionNumber: string | null; total: Prisma.Decimal; invoices: number }>();
+    const rows: Array<{ billId: string; billNumber: string; studentId: string; admissionNumber: string | null; issuedAt: string; dueDate: string | null; billed: string; collected: string; outstanding: string; daysOverdue: number | null }> = [];
+    let billedTotal = zero();
+    let appliedTotal = zero();
+    let outstanding = zero();
+    for (const { bill, applied } of byBill.values()) {
+      if (["CANCELLED", "WAIVED"].includes(bill.status)) continue;
+      const due = bill.dueDate ? daysPastDue(bill.dueDate, asOfDay) : null;
+      const balance = bill.totalAmount.minus(applied);
+      if (balance.lt(0)) {
+        exceptions.push({ reference: bill.billNumber, issue: "Historical allocations exceed the invoice's net amount." });
+        continue;
+      }
+      billedTotal = billedTotal.plus(bill.totalAmount);
+      appliedTotal = appliedTotal.plus(applied);
+      outstanding = outstanding.plus(balance);
+      if (balance.gt(0)) {
+        if (due === null || due <= 0) ageing.notDue = ageing.notDue.plus(balance);
+        else if (due <= 30) ageing.days0To30 = ageing.days0To30.plus(balance);
+        else if (due <= 60) ageing.days31To60 = ageing.days31To60.plus(balance);
+        else if (due <= 90) ageing.days61To90 = ageing.days61To90.plus(balance);
+        else ageing.days90Plus = ageing.days90Plus.plus(balance);
+      }
+      const student = byStudent.get(bill.studentId) ?? {
+        studentId: bill.studentId,
+        admissionNumber: bill.student.admissionNumber,
+        total: zero(),
+        invoices: 0,
+      };
+      student.total = student.total.plus(balance);
+      student.invoices += 1;
+      byStudent.set(bill.studentId, student);
+      rows.push({
+        billId: bill.id, billNumber: bill.billNumber, studentId: bill.studentId,
+        admissionNumber: bill.student.admissionNumber,
+        issuedAt: bill.issuedAt.toISOString().slice(0, 10),
+        dueDate: bill.dueDate?.toISOString().slice(0, 10) ?? null,
+        billed: bill.totalAmount.toFixed(2), collected: applied.toFixed(2),
+        outstanding: balance.toFixed(2), daysOverdue: due,
+      });
+    }
+    const bucketTotal = Object.values(ageing).reduce((sum, value) => sum.plus(value), zero());
+    if (!bucketTotal.eq(outstanding)) {
+      exceptions.push({ reference: "AGEING", issue: "Historical ageing buckets do not reconcile to outstanding invoices." });
+    }
+    return {
+      asOf: asOfDate,
+      basis: "DATED_INVOICE_RECEIPT_REVERSAL_EVENTS" as const,
+      complete: exceptions.length === 0,
+      warning: exceptions.length
+        ? "Historical totals are provisional because some source events cannot be reliably reconstructed. Do not use for audited closing balances."
+        : null,
+      billed: billedTotal.toFixed(2),
+      collected: appliedTotal.toFixed(2),
+      outstanding: outstanding.toFixed(2),
+      ageing: Object.fromEntries(Object.entries(ageing).map(([key, amount]) => [key, amount.toFixed(2)])),
+      exceptions,
+      students: [...byStudent.values()].map((entry) => ({
+        studentId: entry.studentId, admissionNumber: entry.admissionNumber,
+        balance: entry.total.toFixed(2), invoiceCount: entry.invoices,
+      })),
+      invoices: rows,
+    };
+  }
+
   async getTermEndReview(schoolId: string, yearId: string, termId: string) {
     if (!yearId || !termId) throw new BadRequestException("Choose an academic year and term for the term-end review.");
     const term = await this.prisma.client.term.findFirst({
