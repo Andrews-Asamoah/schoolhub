@@ -67,3 +67,7 @@ CREATE TABLE "payroll_contribution_schemes" (
   CHECK ("employeeRate" BETWEEN 0 AND 100 AND "employerRate" BETWEEN 0 AND 100 AND "memoRate" BETWEEN 0 AND 100)
 );
 CREATE INDEX "payroll_contribution_schemes_school_key_from_idx" ON "payroll_contribution_schemes" ("schoolId","key","effectiveFrom");
+
+ALTER TABLE "payroll_records" ADD COLUMN "taxScheduleId" TEXT;
+ALTER TABLE "payroll_records" ADD COLUMN "settingsSnapshot" JSONB;
+ALTER TABLE "payroll_records" ADD COLUMN "calculatedAt" TIMESTAMP(3);
