@@ -4,11 +4,12 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 
 export function EmptyState({
-  title, description, icon: Icon = Inbox, action, className, compact = false,
+  title, description, icon: Icon = Inbox, iconNode, action, className, compact = false,
 }: {
   title: string;
   description?: string;
   icon?: LucideIcon;
+  iconNode?: ReactNode;
   action?: ReactNode;
   className?: string;
   compact?: boolean;
@@ -20,7 +21,7 @@ export function EmptyState({
       className,
     )}>
       <span className="mb-3 flex size-11 items-center justify-center rounded-xl border border-border bg-muted text-muted-foreground">
-        <Icon className="size-5" aria-hidden="true" />
+        {iconNode ?? <Icon className="size-5" aria-hidden="true" />}
       </span>
       <h2 className="text-sm font-semibold text-foreground">{title}</h2>
       {description && <p className="mt-1 max-w-md text-sm leading-6 text-muted-foreground">{description}</p>}
