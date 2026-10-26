@@ -1073,6 +1073,8 @@ export class FinanceService {
 
     const year = new Date().getUTCFullYear();
     const billingResult = await withSerializableRetry(() => this.prisma.client.$transaction(async (tx) => {
+      const accrual = await this.lockAccrualTransition(tx, schoolId);
+      if (accrual) await this.assertPostingDate(tx, schoolId, new Date());
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${schoolId}), hashtext(${input.feeStructureId}))`;
       const feeStructure = await tx.feeStructure.findFirst({
         where: { id: input.feeStructureId, schoolId, isActive: true },
@@ -1300,6 +1302,22 @@ export class FinanceService {
           where: { id: studentId },
           data: { outstandingBalance: { increment: billTotal } },
         });
+        if (accrual && billTotal.gt(0)) {
+          const receivables = await this.ensureAccount(tx, schoolId, {
+            accountType: "ASSET", category: "ACCOUNTS_RECEIVABLE",
+            name: "Student Fees Receivable", code: "1200",
+          });
+          const income = await this.ensureAccount(tx, schoolId, {
+            accountType: "REVENUE", category: "SCHOOL_FEES",
+            name: "School Fees Income", code: "4000",
+          });
+          await this.postAccrualEntry(tx, {
+            schoolId, amount: billTotal, date: new Date(),
+            description: `Fees invoiced ${bill.billNumber}`,
+            debit: receivables, credit: income,
+            referenceType: "BILL", referenceId: bill.id, referenceNumber: bill.billNumber,
+          });
+        }
         results.push(bill);
       }
 
@@ -1359,6 +1377,10 @@ export class FinanceService {
     const year = paymentDate.getUTCFullYear();
 
     return withSerializableRetry(() => this.prisma.client.$transaction(async (tx) => {
+      const accrual = await this.lockAccrualTransition(tx, schoolId);
+      if (accrual && paymentDate.toISOString().slice(0, 10) < accrual.activatedAt.toISOString().slice(0, 10)) {
+        throw new BadRequestException("Do not backdate receipts before accrual cutover. Use a documented later-period adjustment.");
+      }
       await tx.$executeRaw`SELECT id FROM students WHERE id = ${input.studentId} AND "schoolId" = ${schoolId} FOR UPDATE`;
       // Lock all bills for the student in deterministic issue-date order. This
       // serialises two receipts which may spill across the same set of invoices.
@@ -1563,23 +1585,35 @@ export class FinanceService {
         data: { outstandingBalance: updatedStudentBalance._sum.balanceAmount ?? new Prisma.Decimal(0) },
       });
 
-      const ledger = await this.postIncome(tx, {
-        schoolId,
-        amount: paymentAmount,
-        date: paymentDate,
-        description: `School fees receipt ${paymentNumber}`,
-        category: "SCHOOL_FEES",
-        revenueAccount: { name: "School Fees Income", code: "4000" },
-        revenueCategory: "SCHOOL_FEES",
-        paymentMethod: input.paymentMethod,
-        referenceType: "PAYMENT",
-        referenceId: created.id,
-        referenceNumber: paymentNumber,
-        notes: input.notes,
-      });
+      const ledger = accrual
+        ? await (async () => {
+            const cashOrBank = ["BANK_TRANSFER", "CHEQUE", "MOBILE_MONEY", "CARD", "ONLINE"].includes(input.paymentMethod)
+              ? { accountType: "ASSET" as const, category: "BANK" as const, name: "Bank & Electronic Payments", code: "1010" }
+              : { accountType: "ASSET" as const, category: "CASH" as const, name: "Cash on Hand", code: "1000" };
+            const debit = await this.ensureAccount(tx, schoolId, cashOrBank);
+            const credit = await this.ensureAccount(tx, schoolId, {
+              accountType: "ASSET", category: "ACCOUNTS_RECEIVABLE",
+              name: "Student Fees Receivable", code: "1200",
+            });
+            return this.postAccrualEntry(tx, {
+              schoolId, amount: paymentAmount, date: paymentDate,
+              description: `School fees receipt ${paymentNumber} clears receivables`,
+              debit, credit, referenceType: "PAYMENT", referenceId: created.id,
+              referenceNumber: paymentNumber,
+            });
+          })()
+        : await this.postIncome(tx, {
+            schoolId, amount: paymentAmount, date: paymentDate,
+            description: `School fees receipt ${paymentNumber}`,
+            category: "SCHOOL_FEES",
+            revenueAccount: { name: "School Fees Income", code: "4000" },
+            revenueCategory: "SCHOOL_FEES",
+            paymentMethod: input.paymentMethod, referenceType: "PAYMENT",
+            referenceId: created.id, referenceNumber: paymentNumber, notes: input.notes,
+          });
       const payment = await tx.payment.update({
         where: { id: created.id },
-        data: { transactionId: ledger.id },
+        data: { transactionId: ledger!.id },
       });
 
       await this.writeAudit(tx, {
@@ -1617,6 +1651,7 @@ export class FinanceService {
     input: { kind: "VOID" | "REFUND"; reason: string },
   ) {
     return withSerializableRetry(() => this.prisma.client.$transaction(async (tx) => {
+      await this.lockAccrualTransition(tx, schoolId);
       await tx.$executeRaw`SELECT id FROM payments WHERE id = ${paymentId} AND "schoolId" = ${schoolId} FOR UPDATE`;
       const payment = await tx.payment.findFirst({
         where: { id: paymentId, schoolId },
