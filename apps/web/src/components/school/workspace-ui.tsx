@@ -1,4 +1,5 @@
 import type { LucideIcon } from "lucide-react";
+import type { RowData } from "@tanstack/react-table";
 import { ArrowUpRight, Inbox } from "lucide-react";
 import type { ReactNode } from "react";
 import { DataTable, type DataTableColumn } from "@/components/ui/data-table";
@@ -54,7 +55,7 @@ export type WorkspaceColumn<T> = DataTableColumn<T>;
  * pagination, column visibility, and Print / PDF / Excel export for the
  * roles allowed to export. Follows light and dark mode through theme tokens.
  */
-export function WorkspaceDataTable<T>({
+export function WorkspaceDataTable<T extends RowData>({
   rows,
   columns,
   getRowId,

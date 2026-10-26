@@ -1,15 +1,24 @@
 import {
+  columnFilteringFeature,
+  columnVisibilityFeature,
+  createFilteredRowModel,
+  createPaginatedRowModel,
+  createSortedRowModel,
+  filterFn_includesString,
   flexRender,
-  getCoreRowModel,
-  getFilteredRowModel,
-  getPaginationRowModel,
-  getSortedRowModel,
-  useReactTable,
+  globalFilteringFeature,
+  rowPaginationFeature,
+  rowSelectionFeature,
+  rowSortingFeature,
+  tableFeatures,
+  useTable,
   type ColumnDef,
   type ColumnFiltersState,
+  type ColumnVisibilityState,
   type Row,
+  type RowData,
+  type RowSelectionState,
   type SortingState,
-  type VisibilityState,
 } from "@tanstack/react-table";
 import {
   ArrowDown,
@@ -45,6 +54,20 @@ import {
 } from "@/lib/table-export";
 import { cn } from "@/lib/utils";
 
+/** Shared native TanStack Table v9 features. The core row model is automatic. */
+const dataTableFeatures = tableFeatures({
+  columnFilteringFeature,
+  globalFilteringFeature,
+  columnVisibilityFeature,
+  rowSelectionFeature,
+  rowSortingFeature,
+  rowPaginationFeature,
+  filteredRowModel: createFilteredRowModel(),
+  sortedRowModel: createSortedRowModel(),
+  paginatedRowModel: createPaginatedRowModel(),
+  filterFns: { includesString: filterFn_includesString },
+});
+
 export interface DataTableColumn<T> {
   id: string;
   header: string;
@@ -68,7 +91,7 @@ function compareValues(a: unknown, b: unknown) {
   return String(a ?? "").localeCompare(String(b ?? ""), undefined, { numeric: true, sensitivity: "base" });
 }
 
-export interface DataTableProps<T> {
+export interface DataTableProps<T extends RowData> {
   rows: T[];
   columns: DataTableColumn<T>[];
   getRowId: (row: T) => string;
@@ -90,7 +113,7 @@ export interface DataTableProps<T> {
   paginate?: boolean;
 }
 
-export function DataTable<T>({
+export function DataTable<T extends RowData>({
   rows,
   columns,
   getRowId,
@@ -108,12 +131,12 @@ export function DataTable<T>({
   const [sorting, setSorting] = useState<SortingState>([]);
   const [globalFilter, setGlobalFilter] = useState("");
   const [columnFilters] = useState<ColumnFiltersState>([]);
-  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
-  const [rowSelection, setRowSelection] = useState<Record<string, boolean>>({});
+  const [columnVisibility, setColumnVisibility] = useState<ColumnVisibilityState>({});
+  const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
   const searchId = useId();
 
-  const defs = useMemo<ColumnDef<T>[]>(() => {
-    const data: ColumnDef<T>[] = columns.map((column) => ({
+  const defs = useMemo<ColumnDef<typeof dataTableFeatures, T>[]>(() => {
+    const data: ColumnDef<typeof dataTableFeatures, T>[] = columns.map((column) => ({
       id: column.id,
       header: column.header,
       accessorFn: (row) => {
@@ -123,7 +146,7 @@ export function DataTable<T>({
       cell: ({ row }) => column.cell(row.original),
       enableSorting: column.sortable ?? !isActionColumn(column),
       enableGlobalFilter: !isActionColumn(column) || column.value !== undefined,
-      sortingFn: (a, b, id) => compareValues(a.getValue(id), b.getValue(id)),
+      sortFn: (a, b, id) => compareValues(a.getValue(id), b.getValue(id)),
       meta: { className: column.className, exportable: column.exportable ?? !isActionColumn(column) },
     }));
     if (!canExport) return data;
@@ -160,7 +183,8 @@ export function DataTable<T>({
     ];
   }, [columns, canExport]);
 
-  const table = useReactTable({
+  const table = useTable({
+    features: dataTableFeatures,
     data: rows,
     columns: defs,
     getRowId: (row) => getRowId(row),
@@ -171,11 +195,9 @@ export function DataTable<T>({
     onRowSelectionChange: setRowSelection,
     enableRowSelection: canExport,
     globalFilterFn: "includesString",
-    getCoreRowModel: getCoreRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
-    getSortedRowModel: getSortedRowModel(),
-    ...(paginate ? { getPaginationRowModel: getPaginationRowModel() } : {}),
-    initialState: { pagination: { pageSize } },
+    // For server-paginated parents the current rows are already the page.
+    manualPagination: !paginate,
+    initialState: { pagination: { pageIndex: 0, pageSize } },
   });
 
   // Drop selections for rows that disappeared (e.g. after a refetch).
@@ -190,16 +212,16 @@ export function DataTable<T>({
 
   if (rows.length === 0) return <DataTableEmpty title={emptyTitle} description={emptyDescription} />;
 
-  const filteredCount = table.getPrePaginationRowModel().rows.length;
+  const filteredCount = table.getPrePaginatedRowModel().rows.length;
   const selectedCount = table.getSelectedRowModel().rows.length;
   const showToolbar = !compact;
 
   function buildExport(): ExportTable {
     const visible = table.getVisibleLeafColumns().filter((column) => (column.columnDef.meta as { exportable?: boolean } | undefined)?.exportable);
     // Selected rows when any are ticked, otherwise everything matching the search, in the sorted order.
-    const source: Row<T>[] = selectedCount
+    const source: Row<typeof dataTableFeatures, T>[] = selectedCount
       ? table.getSortedRowModel().rows.filter((row) => row.getIsSelected())
-      : table.getPrePaginationRowModel().rows;
+      : table.getPrePaginatedRowModel().rows;
     return {
       title: exportTitle,
       headers: visible.map((column) => String(column.columnDef.header)),
@@ -207,8 +229,8 @@ export function DataTable<T>({
     };
   }
 
-  const pageIndex = table.getState().pagination.pageIndex;
-  const size = table.getState().pagination.pageSize;
+  const pageIndex = table.state.pagination.pageIndex;
+  const size = table.state.pagination.pageSize;
   const from = filteredCount === 0 ? 0 : pageIndex * size + 1;
   const to = Math.min(filteredCount, (pageIndex + 1) * size);
 
