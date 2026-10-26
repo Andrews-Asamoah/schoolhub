@@ -1,3 +1,4 @@
+import { DatePicker } from "@/components/ui/date-picker";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
@@ -206,7 +207,7 @@ function ApplyForm({ subdomain, intake }: { subdomain: string; intake: PublicInt
             <option value="MALE">Male</option><option value="FEMALE">Female</option><option value="OTHER">Other</option>
           </select>
         </label>
-        <label className={lbl}>Date of birth<input type="date" className={field} value={v.dateOfBirth ?? ""} onChange={set("dateOfBirth")} /></label>
+        <label className={lbl}>Date of birth<DatePicker buttonClassName={field} value={v.dateOfBirth ?? ""} onChange={(value) => setV((cur) => ({ ...cur, dateOfBirth: value }))} /></label>
         <label className={lbl}>Nationality<input className={field} value={v.nationality ?? ""} onChange={set("nationality")} /></label>
         <label className={lbl}>Previous school<input className={field} value={v.previousSchool ?? ""} onChange={set("previousSchool")} /></label>
         <label className={lbl}>Last class completed<input className={field} value={v.previousClass ?? ""} onChange={set("previousClass")} /></label>
