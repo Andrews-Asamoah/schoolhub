@@ -1,3 +1,4 @@
+import { DatePicker } from "@/components/ui/date-picker";
 import { useMemo, useState, type FormEvent } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api";
@@ -500,7 +501,7 @@ export function AccountantRecordPaymentDialog({
             </label>
             <label className="grid gap-1.5 text-sm font-medium text-foreground">
               <span>Payment date</span>
-              <input className={inputClass} type="date" required value={paymentDate} onChange={(event) => setPaymentDate(event.target.value)} />
+              <DatePicker buttonClassName={inputClass} required value={paymentDate} onChange={(value) => setPaymentDate(value)} />
             </label>
             <label className="grid gap-1.5 text-sm font-medium text-foreground sm:col-span-2">
               <span>Reference number {paymentMethod !== "CASH" && <span className="text-destructive">*</span>}</span>
