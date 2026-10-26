@@ -1,12 +1,12 @@
 import { BadRequestException, Injectable } from "@nestjs/common";
-import { Prisma, type AccountType } from "@prisma/client";
+import { Prisma, type TransactionCategory } from "@prisma/client";
 import type { PrismaService } from "../../prisma/prisma.service.js";
 
 export type PostingInput = {
   schoolId: string; date: Date; description: string; amount: Prisma.Decimal;
   debitAccountId: string; creditAccountId: string;
   transactionType: "INCOME" | "EXPENSE" | "TRANSFER" | "ADJUSTMENT";
-  category?: Prisma.TransactionCategory | null;
+  category?: TransactionCategory | null;
   referenceType?: string | null; referenceId?: string | null;
   referenceNumber?: string | null; notes?: string | null;
 };
