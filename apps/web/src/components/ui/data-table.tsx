@@ -53,6 +53,7 @@ import {
   type ExportTable,
 } from "@/lib/table-export";
 import { cn } from "@/lib/utils";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 /** Shared native TanStack Table v9 features. The core row model is automatic. */
 const dataTableFeatures = tableFeatures({
@@ -345,16 +346,17 @@ export function DataTable<T extends RowData>({
             {filteredCount !== rows.length && ` (filtered from ${rows.length})`}
           </span>
           <div className="flex items-center gap-3">
-            <label className="flex items-center gap-1.5">
-              Rows
-              <select
-                value={size}
-                onChange={(event) => table.setPageSize(Number(event.target.value))}
-                className="h-7 rounded-md border border-border bg-background px-1.5 text-xs text-foreground"
-              >
-                {[10, 25, 50, 100].map((option) => <option key={option} value={option}>{option}</option>)}
-              </select>
-            </label>
+            <div className="flex items-center gap-2">
+              <span id={`${searchId}-page-size-label`}>Rows per page</span>
+              <Select value={String(size)} onValueChange={(value) => table.setPageSize(Number(value))}>
+                <SelectTrigger aria-labelledby={`${searchId}-page-size-label`} className="h-8 w-[76px] px-2 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent align="end">
+                  {[10, 25, 50, 100].map((option) => <SelectItem key={option} value={String(option)}>{option}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
             <span>Page {pageIndex + 1} of {Math.max(1, table.getPageCount())}</span>
             <div className="flex gap-1">
               <PagerButton label="First page" disabled={!table.getCanPreviousPage()} onClick={() => table.setPageIndex(0)}><ChevronsLeft className="size-3.5" /></PagerButton>
