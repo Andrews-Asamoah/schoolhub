@@ -3716,7 +3716,15 @@ export class FinanceService {
     payrollRecordId: string,
     input: { status: "APPROVED" | "PAID" | "CANCELLED"; paymentMethod?: string },
     actorId: string,
+    schoolRole: string | undefined,
   ) {
+    if (input.status === "APPROVED") {
+      if (schoolRole !== "owner" && schoolRole !== "headteacher" && schoolRole !== "accountant") {
+        throw new ForbiddenException("You do not have payroll approval permission.");
+      }
+    } else if (schoolRole !== "accountant") {
+      throw new ForbiddenException("Only the school accountant may cancel or pay a payroll run.");
+    }
     const db = this.prisma.client;
     const payroll = await db.payrollRecord.findFirst({
       where: { id: payrollRecordId, schoolId },
@@ -3737,7 +3745,7 @@ export class FinanceService {
         schoolId, subject: "PAYROLL_RUN", entityType: "PayrollRecord", entityId: payroll.id,
         requestedById: payroll.processedById ?? actorId, payload, amount: payroll.totalGross,
       });
-      await this.approvals.decide(schoolId, request.id, actorId, "APPROVED", payload, "Payroll run approved.");
+      await this.approvals.decide(schoolId, request.id, actorId, "APPROVED", payload, "Payroll run approved.", schoolRole);
       return db.payrollRecord.update({
         where: { id: payroll.id },
         data: { status: "APPROVED", approvedById: actorId },
