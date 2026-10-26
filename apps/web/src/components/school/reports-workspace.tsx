@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { BarChart3, CalendarRange, GraduationCap, LoaderCircle, UsersRound } from "lucide-react";
+import { BarChart3, GraduationCap, LoaderCircle, UsersRound } from "lucide-react";
 import { useState } from "react";
 import { DashboardInfographics } from "@/components/school/dashboard/dashboard-infographics";
 import type { DashboardAnalytics } from "@/components/school/dashboard/dashboard-data";
@@ -21,7 +21,7 @@ export function SchoolReportsWorkspace() {
     <div className="space-y-5">
       <section className="flex flex-col gap-4 rounded-2xl border border-border bg-card p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between sm:p-5">
         <div className="flex items-start gap-3"><span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary"><BarChart3 className="size-5" /></span><div><h2 className="text-sm font-semibold text-foreground">School performance and trends</h2><p className="mt-1 max-w-2xl text-xs leading-5 text-muted-foreground">Explore live enrollment, attendance, demographics and financial trends for the active school. Financial values are included only when your role has access.</p></div></div>
-        <label className="flex items-center gap-2 text-xs font-medium text-muted-foreground"><CalendarRange className="size-4" />Reporting period<select value={months} onChange={(event) => setMonths(Number(event.target.value))} className="h-9 rounded-lg border border-input bg-background px-3 text-xs text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"><option value={3}>3 months</option><option value={6}>6 months</option><option value={12}>12 months</option></select></label>
+
       </section>
 
       {reportQuery.isPending ? <div className="flex min-h-48 items-center justify-center gap-2 rounded-xl border border-border bg-card text-sm text-muted-foreground"><LoaderCircle className="size-4 animate-spin" />Loading school reports…</div>
