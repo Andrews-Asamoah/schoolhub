@@ -1,6 +1,8 @@
 import type { LucideIcon } from "lucide-react";
 import type { RowData } from "@tanstack/react-table";
-import { ArrowUpRight, Inbox } from "lucide-react";
+import { ArrowUpRight } from "lucide-react";
+import { PageHeader } from "@/components/ui/page-header";
+import { EmptyState } from "@/components/ui/empty-state";
 import type { ReactNode } from "react";
 import { DataTable, type DataTableColumn } from "@/components/ui/data-table";
 import { useCanExportTables } from "@/lib/table-export-policy";
@@ -18,23 +20,8 @@ export function WorkspacePageHeading({
   icon: LucideIcon;
   action?: ReactNode;
 }) {
-  return (
-    <div className="mb-7 flex flex-wrap items-end justify-between gap-4">
-      <div>
-        <p className="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">{section}</p>
-        <div className="flex items-center gap-3">
-          <span className="flex size-11 items-center justify-center rounded-xl border border-primary/20 bg-primary/10 text-primary shadow-sm">
-            <Icon className="size-5" />
-          </span>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-[30px]">
-            {title}
-          </h1>
-        </div>
-        <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">{description}</p>
-      </div>
-      {action}
-    </div>
-  );
+  return <PageHeader eyebrow={section} title={title} description={description}
+    icon={Icon} actions={action} className="mb-7" />;
 }
 
 export function PreviewDataNotice({ children }: { children: ReactNode }) {
@@ -85,23 +72,9 @@ export function WorkspaceDataTable<T extends RowData>({
 }
 
 export function WorkspaceEmptyState({
-  title,
-  description,
-}: {
-  title: string;
-  description: string;
-}) {
-  return (
-    <div className="flex min-h-56 flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-card px-6 text-center">
-      <span className="mb-3 flex size-10 items-center justify-center rounded-xl bg-muted text-muted-foreground">
-        <Inbox className="size-5" />
-      </span>
-      <h2 className="text-sm font-semibold text-foreground">{title}</h2>
-      <p className="mt-1 max-w-md text-xs leading-relaxed text-muted-foreground">
-        {description}
-      </p>
-    </div>
-  );
+  title, description,
+}: { title: string; description: string }) {
+  return <EmptyState title={title} description={description} />;
 }
 
 export function WorkspaceStat({
@@ -116,7 +89,7 @@ export function WorkspaceStat({
   icon?: LucideIcon;
 }) {
   return (
-    <article className="group relative overflow-hidden rounded-2xl border border-border bg-card p-4 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-md sm:p-5">
+    <article className="group relative overflow-hidden rounded-xl border border-border bg-card p-4 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-md sm:p-5">
       <span aria-hidden="true" className="pointer-events-none absolute -right-6 -top-8 size-24 rounded-full bg-primary/5 blur-2xl transition group-hover:bg-primary/10" />
       <div className="relative flex items-start justify-between gap-3">
         <div>
