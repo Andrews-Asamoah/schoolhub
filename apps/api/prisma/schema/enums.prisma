@@ -155,6 +155,7 @@ enum FeeCategory {
 }
 
 enum BillStatus {
+  ADJUSTED
   PENDING
   PARTIALLY_PAID
   PAID
@@ -169,6 +170,7 @@ enum BillType {
 }
 
 enum BillItemStatus {
+  ADJUSTED
   UNPAID
   PARTIALLY_PAID
   FULLY_PAID
