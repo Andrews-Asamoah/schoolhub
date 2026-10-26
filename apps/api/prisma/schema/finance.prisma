@@ -270,6 +270,7 @@ model Transaction {
   creditAccount  ChartAccount               @relation("CreditAccount", fields: [creditAccountId], references: [id])
   customCategory CustomTransactionCategory? @relation(fields: [customCategoryId], references: [id])
   payments       Payment[]
+  financeJournal FinanceJournalEntry?
   admissionApplication Application?
 
   @@unique([transactionNumber, schoolId])

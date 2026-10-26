@@ -1,0 +1,37 @@
+// Phase 2 append-only journal mirror for the existing paired Transaction postings.
+// Each posted transaction has exactly one debit and one credit line, protected by
+// database triggers; later phases may introduce multi-line journals separately.
+enum FinanceJournalSide {
+  DEBIT
+  CREDIT
+}
+
+model FinanceJournalEntry {
+  id            String @id
+  schoolId      String
+  transactionId String @unique
+  postedDate    DateTime @db.Date
+  description   String
+  referenceType String?
+  referenceId   String?
+  legacyBackfill Boolean @default(false)
+  createdAt     DateTime @default(now())
+  transaction   Transaction @relation(fields: [transactionId], references: [id], onDelete: Restrict)
+  lines         FinanceJournalLine[]
+
+  @@index([schoolId, postedDate])
+  @@map("finance_journal_entries")
+}
+
+model FinanceJournalLine {
+  id        String @id
+  entryId   String
+  accountId String
+  side      FinanceJournalSide
+  amount    Decimal @db.Decimal(15, 2)
+  entry     FinanceJournalEntry @relation(fields: [entryId], references: [id], onDelete: Restrict)
+
+  @@unique([entryId, side])
+  @@index([accountId])
+  @@map("finance_journal_lines")
+}

@@ -47,6 +47,46 @@ export class FinanceLedgerIntegrityService {
     const debits = debitRows.reduce((sum, r) => sum.plus(r._sum.amount ?? zero), zero);
     const credits = creditRows.reduce((sum, r) => sum.plus(r._sum.amount ?? zero), zero);
     const selfPairedTransactions = selfPairRows[0]?.count ?? 0;
+    // I3: every paired source row must have precisely one journal header and
+    // the matching debit/credit lines. A historical invalid row remains
+    // unmirrored and fails this invariant until it is independently reviewed.
+    const [journalRow] = await db.$queryRaw<Array<{
+      sourceCount: bigint; journalCount: bigint; invalidCount: bigint;
+    }>>`
+      SELECT
+        (SELECT COUNT(*)::bigint FROM "transactions"
+          WHERE "schoolId" = ${schoolId}) AS "sourceCount",
+        (SELECT COUNT(*)::bigint FROM "finance_journal_entries"
+          WHERE "schoolId" = ${schoolId}) AS "journalCount",
+        (SELECT COUNT(*)::bigint
+           FROM "transactions" t
+           LEFT JOIN "finance_journal_entries" e
+             ON e."transactionId" = t."id" AND e."schoolId" = t."schoolId"
+           LEFT JOIN LATERAL (
+             SELECT
+               COUNT(*)::int AS line_count,
+               COUNT(*) FILTER (WHERE l."side" = 'DEBIT'
+                 AND l."accountId" = t."debitAccountId"
+                 AND l."amount" = t."amount")::int AS debit_matches,
+               COUNT(*) FILTER (WHERE l."side" = 'CREDIT'
+                 AND l."accountId" = t."creditAccountId"
+                 AND l."amount" = t."amount")::int AS credit_matches
+             FROM "finance_journal_lines" l
+             WHERE l."entryId" = e."id"
+           ) lines ON TRUE
+           WHERE t."schoolId" = ${schoolId}
+             AND (
+               e."id" IS NULL
+               OR e."postedDate" <> t."transactionDate"
+               OR lines.line_count <> 2
+               OR lines.debit_matches <> 1
+               OR lines.credit_matches <> 1
+             )
+        ) AS "invalidCount"
+    `;
+    const sourceCount = Number(journalRow?.sourceCount ?? 0n);
+    const journalCount = Number(journalRow?.journalCount ?? 0n);
+    const invalidJournalPairs = Number(journalRow?.invalidCount ?? 0n);
     return {
       schoolId, basis: "ALL_POSTED_PAIRED_TRANSACTIONS",
       I1: {
@@ -55,6 +95,10 @@ export class FinanceLedgerIntegrityService {
         invalidAmounts, selfPairedTransactions,
       },
       I2: { status: discrepancies.length === 0 && orphanAccounts.length === 0 ? "PASS" : "FAIL", discrepancies },
+      I3: {
+        status: sourceCount === journalCount && invalidJournalPairs === 0 ? "PASS" : "FAIL",
+        sourceCount, journalCount, invalidJournalPairs,
+      },
     };
     }, { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead });
   }
@@ -66,7 +110,7 @@ export class FinanceLedgerIntegrityService {
     for (const { id } of schools) {
       try {
         const report = await this.check(id);
-        if (report.I1.status !== "PASS" || report.I2.status !== "PASS") failing.push({ schoolId: id, report });
+        if (report.I1.status !== "PASS" || report.I2.status !== "PASS" || report.I3.status !== "PASS") failing.push({ schoolId: id, report });
       } catch (error) {
         failing.push({ schoolId: id, error: error instanceof Error ? error.message : String(error) });
       }

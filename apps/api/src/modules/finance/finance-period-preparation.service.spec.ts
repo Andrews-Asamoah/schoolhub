@@ -26,6 +26,7 @@ function makeService() {
   const ledger = { check: vi.fn(async () => ({
     I1: { status: "PASS", debits: "100.00", credits: "100.00" },
     I2: { status: "PASS", discrepancies: [] },
+    I3: { status: "PASS", sourceCount: 1, journalCount: 1, invalidJournalPairs: 0 },
   })) };
   const finance = { getReceivablesCloseReadiness: vi.fn(async () => ({
     closeReady: true, asOf: "2026-10-26", basis: "CURRENT_UNCLOSED", checks: [],
