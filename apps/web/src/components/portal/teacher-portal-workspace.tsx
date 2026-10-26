@@ -1,5 +1,6 @@
 import { BookOpen, Calendar, ClipboardCheck, FileSpreadsheet, GraduationCap, LayoutDashboard, Megaphone, UserCheck, Users } from "lucide-react";
 import { useState } from "react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AssessmentEntryWorkspace } from "@/components/school/assessment-entry-workspace";
 import { ClassRegister } from "@/components/school/class-register";
 import { TimetableWorkspace } from "@/components/school/timetable-workspace";
@@ -103,10 +104,29 @@ export function TeacherPortalWorkspace({ defaultTab = "overview" }: TeacherPorta
           return (
             <button
               key={tab.id}
+              id={`teacher-tab-${tab.id}`}
               type="button"
               role="tab"
               aria-selected={active}
+              aria-controls={`teacher-panel-${tab.id}`}
+              tabIndex={active ? 0 : -1}
               onClick={() => setActiveTab(tab.id)}
+              onKeyDown={(event) => {
+                const currentIndex = tabs.findIndex((item) => item.id === tab.id);
+                let nextIndex: number | null = null;
+                if (event.key === "ArrowRight") nextIndex = (currentIndex + 1) % tabs.length;
+                if (event.key === "ArrowLeft") nextIndex = (currentIndex - 1 + tabs.length) % tabs.length;
+                if (event.key === "Home") nextIndex = 0;
+                if (event.key === "End") nextIndex = tabs.length - 1;
+                if (nextIndex !== null) {
+                  event.preventDefault();
+                  const nextTab = tabs[nextIndex];
+                  if (nextTab) {
+                    setActiveTab(nextTab.id);
+                    document.getElementById(`teacher-tab-${nextTab.id}`)?.focus();
+                  }
+                }
+              }}
               className={cn(
                 "inline-flex shrink-0 items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-semibold transition",
                 active ? "bg-primary text-primary-foreground shadow-md" : "text-muted-foreground hover:bg-muted hover:text-foreground",
@@ -122,6 +142,7 @@ export function TeacherPortalWorkspace({ defaultTab = "overview" }: TeacherPorta
         })}
       </div>
 
+      <div role="tabpanel" id={`teacher-panel-${activeTab}`} aria-labelledby={`teacher-tab-${activeTab}`} tabIndex={0} className="min-w-0 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
       {activeTab === "overview" && <Overview onMarks={openMarks} onRegister={openRegister} />}
       {activeTab === "classes" && <TeacherClassesView onEnterMarks={openMarks} />}
       {activeTab === "gradebook" && <AssessmentEntryWorkspace mode="teacher" initial={marksTarget} />}
@@ -140,13 +161,14 @@ export function TeacherPortalWorkspace({ defaultTab = "overview" }: TeacherPorta
             {ownClasses.length > 1 && (
               <label className="grid w-fit gap-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70">
                 Class
-                <select
-                  value={registerClass.id}
-                  onChange={(event) => setRegisterClassId(event.target.value)}
-                  className="h-9 min-w-44 rounded-lg border border-border bg-card px-3 text-xs font-medium normal-case tracking-normal text-foreground/80 outline-none focus:border-primary/50"
-                >
-                  {ownClasses.map((klass) => <option key={klass.id} value={klass.id}>{klass.name}</option>)}
-                </select>
+                <Select value={registerClass.id} onValueChange={setRegisterClassId}>
+                  <SelectTrigger aria-label="Choose class register" className="h-9 min-w-44 normal-case tracking-normal">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ownClasses.map((klass) => <SelectItem key={klass.id} value={klass.id}>{klass.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
               </label>
             )}
             <ClassRegister key={registerClass.id} classId={registerClass.id} className={registerClass.name} canMark />
@@ -154,6 +176,7 @@ export function TeacherPortalWorkspace({ defaultTab = "overview" }: TeacherPorta
         ))}
       {activeTab === "timetable" && <TimetableWorkspace />}
       {activeTab === "announcements" && <AdminAnnouncementsWorkspace mode="teacher" />}
+      </div>
     </div>
   );
 }
