@@ -3606,7 +3606,7 @@ export class FinanceService {
       if (inputs.length) await tx.staffPayProfile.createMany({ data: inputs });
       await this.writeAudit(tx, {
         actorId, schoolId, action: "CREATE", entityType: "PAYROLL_PROFILE_BACKFILL",
-        entityId: schoolId, oldValues: null,
+        entityId: schoolId, oldValues: {},
         newValues: { effectiveFrom, created: inputs.length, alreadyProfiled: existing.length },
       });
       return { created: inputs.length, alreadyProfiled: existing.length, effectiveFrom };
