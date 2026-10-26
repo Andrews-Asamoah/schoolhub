@@ -1,3 +1,4 @@
+import { DatePicker } from "@/components/ui/date-picker";
 import { useForm } from "@tanstack/react-form";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -1411,14 +1412,19 @@ function TextField({
     <label className="text-xs font-semibold text-foreground">
       {label}
       {required ? " *" : ""}
-      <input
-        type={type}
-        value={value}
-        required={required}
-        min={type === "number" ? 0 : undefined}
-        onChange={(event) => onChange(event.target.value)}
-        className={inputClasses}
-      />
+      {type === "date" ? (
+        <DatePicker value={value} onChange={onChange} required={required}
+          ariaLabel={label} buttonClassName={inputClasses} />
+      ) : (
+        <input
+          type={type}
+          value={value}
+          required={required}
+          min={type === "number" ? 0 : undefined}
+          onChange={(event) => onChange(event.target.value)}
+          className={inputClasses}
+        />
+      )}
     </label>
   );
 }
