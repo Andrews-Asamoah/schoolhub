@@ -248,6 +248,15 @@ export class FinanceController {
     return this.financeService.updateFeeItemRegistry(school.id, itemId, body);
   }
 
+  @Get("ledger/trial-balance")
+  @Roles(...FINANCE_READ_ROLES)
+  getJournalTrialBalance(
+    @CurrentSchool() school: School,
+    @Query("asOf") asOf?: string,
+  ) {
+    return this.financeService.getJournalTrialBalance(school.id, asOf);
+  }
+
   @Get("summary")
   @Roles(...FINANCE_READ_ROLES)
   getFinanceSummary(
