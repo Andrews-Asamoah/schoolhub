@@ -2,6 +2,7 @@ import { ConflictException, ForbiddenException, Injectable, NotFoundException } 
 import { Prisma, type FinanceApprovalSubject } from "@prisma/client";
 import { createHash } from "node:crypto";
 import { PrismaService } from "../../prisma/prisma.service.js";
+import { canApproveFinancePolicy } from "./finance.permissions.js";
 
 export function approvalPayloadHash(payload: unknown): string {
   return createHash("sha256").update(JSON.stringify(payload)).digest("hex");
@@ -44,11 +45,18 @@ export class FinanceApprovalService {
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
   }
 
-  async decide(schoolId: string, requestId: string, actorId: string, status: "APPROVED" | "REJECTED", payload: unknown, note: string) {
+  async decide(schoolId: string, requestId: string, actorId: string, status: "APPROVED" | "REJECTED", payload: unknown, note: string, schoolRole: string | undefined) {
     if (!note.trim()) throw new ConflictException("An approval decision requires a note.");
     return this.prisma.client.$transaction(async tx => {
       const approval = await tx.financeApprovalRequest.findFirst({ where: { id: requestId, schoolId, status: "PENDING" } });
       if (!approval) throw new NotFoundException("Pending approval not found.");
+      const policy = await tx.financeApprovalPolicy.findFirst({
+        where: { schoolId, subject: approval.subject, minAmount: { lte: approval.amount ?? new Prisma.Decimal(0) } },
+        orderBy: { minAmount: "desc" },
+      });
+      if (!policy || !canApproveFinancePolicy(policy.approverPermission, schoolRole)) {
+        throw new ForbiddenException("This user lacks the configured permission to decide this finance approval.");
+      }
       const settings = await tx.financeSettings.findUnique({ where: { schoolId } });
       if (actorId === approval.requestedById && !settings?.allowSelfApproval) {
         throw new ForbiddenException("The requester cannot approve their own financial change.");
