@@ -1477,6 +1477,9 @@ export class FinanceService {
         throw new BadRequestException("This payment has already been reversed or is not a completed payment.");
       }
 
+      // Reversals are new postings, not backdated edits. Never post one into
+      // a closed accounting period, even when the original receipt predates it.
+      await this.assertPostingDate(tx, schoolId, new Date());
       await tx.$executeRaw`SELECT id FROM students WHERE id = ${payment.studentId} AND "schoolId" = ${schoolId} FOR UPDATE`;
       const billAmounts = new Map<string, Prisma.Decimal>();
       for (const allocation of payment.billAllocations) {
@@ -3457,18 +3460,18 @@ export class FinanceService {
         }
         if (!current.payslips.length) throw new BadRequestException("A payroll run without payslips cannot be marked paid.");
 
+        // Money must remain Decimal throughout payroll reconciliation and posting.
         const sum = (field: "grossSalary" | "netSalary" | "incomeTax" | "ssnitEmployee" | "ssnitEmployer" | "otherDeductions") =>
-          current.payslips.reduce((total, slip) => total + Number(slip[field]), 0);
-        const gross = roundMoney(sum("grossSalary"));
-        const net = roundMoney(sum("netSalary"));
-        const paye = roundMoney(sum("incomeTax"));
-        const employeeSsnit = roundMoney(sum("ssnitEmployee"));
-        const employerSsnit = roundMoney(sum("ssnitEmployer"));
-        const otherDeductions = roundMoney(sum("otherDeductions"));
-        const unreconciled = roundMoney(gross - net - paye - employeeSsnit - otherDeductions);
-        if (Math.abs(unreconciled) > 0.02) {
+          current.payslips.reduce((total, slip) => total.plus(slip[field]), new Prisma.Decimal(0));
+        const gross = sum("grossSalary");
+        const net = sum("netSalary");
+        const paye = sum("incomeTax");
+        const employeeSsnit = sum("ssnitEmployee");
+        const employerSsnit = sum("ssnitEmployer");
+        const otherDeductions = sum("otherDeductions");
+        if (!gross.eq(net.plus(paye).plus(employeeSsnit).plus(otherDeductions))) {
           throw new BadRequestException(
-            "This payroll does not reconcile: gross pay must equal net pay plus PAYE, employee SSNIT and other deductions. Review the payslips before confirming payment.",
+            "This payroll does not reconcile exactly: gross pay must equal net pay plus PAYE, employee SSNIT and other deductions. Review the payslips before confirming payment.",
           );
         }
 
@@ -3517,15 +3520,14 @@ export class FinanceService {
 
         const postLedgerEntry = async (
           description: string,
-          amountValue: number,
+          amountValue: Prisma.Decimal,
           debitAccount: { id: string; accountType: AccountType },
           creditAccount: { id: string; accountType: AccountType },
           transactionType: "EXPENSE" | "TRANSFER",
           notes: string,
         ) => {
-          const amount = roundMoney(amountValue);
-          if (amount <= 0) return;
-          const decimalAmount = new Prisma.Decimal(amount);
+          if (amountValue.lte(0)) return;
+          const decimalAmount = amountValue;
           const prefix = `TXN-${paidAt.getUTCFullYear()}-`;
           await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${schoolId}), hashtext(${prefix}))`;
           const last = await tx.transaction.findFirst({
