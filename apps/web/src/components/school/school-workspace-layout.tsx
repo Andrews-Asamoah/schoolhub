@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { Search, LoaderCircle } from "lucide-react";
+import { LoaderCircle } from "lucide-react";
 import { useEffect, type ReactNode } from "react";
 import { apiFetch } from "@/lib/api";
 import { useSession } from "@/lib/auth-client";
@@ -130,16 +130,6 @@ export function SchoolWorkspaceLayout({
                 <SchoolRoleSwitcher />
               </div>
 
-              {/* Search input: Hidden on mobile/tablet, full on desktop */}
-              <label className="relative hidden xl:block shrink-0">
-                <Search className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-                <input
-                  placeholder={`Search ${title.toLowerCase()}…`}
-                  aria-label={`Search ${title.toLowerCase()}`}
-                  className="h-9 w-48 rounded-xl border border-input bg-muted/60 pl-9 pr-3 text-xs text-foreground outline-none transition placeholder:text-muted-foreground/70 focus:border-ring focus:bg-card focus:ring-2 focus:ring-ring/20 "
-                />
-              </label>
-
               <ThemeToggle />
               
               <DashboardNotificationsMenu />
@@ -151,7 +141,7 @@ export function SchoolWorkspaceLayout({
             <TwoFactorNudge />
 
             {organizationLoading && (
-              <div className="mb-6 flex items-center gap-2.5 rounded-2xl border border-primary/20 bg-primary/10 px-4 py-3 text-xs font-medium text-primary shadow-sm dark:">
+              <div className="mb-6 flex items-center gap-2.5 rounded-2xl border border-primary/20 bg-primary/10 px-4 py-3 text-xs font-medium text-primary shadow-sm">
                 <LoaderCircle className="size-3.5 animate-spin text-primary" />
                 Loading your school workspace…
               </div>
