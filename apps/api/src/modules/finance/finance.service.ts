@@ -1996,7 +1996,10 @@ export class FinanceService {
     if ((yearId || termId) && (!periodStart || !periodEnd)) {
       throw new BadRequestException("The selected academic period needs valid start and end dates before financial reporting.");
     }
-    const fromDate = parseIsoDate(query.from, "start date") ?? periodStart ?? undefined;
+    const requestedFrom = parseIsoDate(query.from, "start date");
+    const fromDate = periodStart && requestedFrom
+      ? new Date(Math.max(periodStart.getTime(), requestedFrom.getTime()))
+      : requestedFrom ?? periodStart ?? undefined;
     const requestedTo = parseIsoDate(query.to, "end date", true);
     const selectedEnd = periodEnd
       ? new Date(Date.UTC(periodEnd.getUTCFullYear(), periodEnd.getUTCMonth(), periodEnd.getUTCDate(), 23, 59, 59, 999))
@@ -2135,6 +2138,56 @@ export class FinanceService {
       }),
     ]);
 
+    // Reconcile live invoice-level, student-level and allocation balances.
+    // All computations are performed as PostgreSQL numeric / Prisma.Decimal.
+    const [itemMismatchRows, studentMismatchRows, paymentMismatchRows, ledgerMismatchRows] = await Promise.all([
+      this.prisma.client.$queryRaw<Array<{ count: bigint }>>(Prisma.sql`
+        SELECT COUNT(*)::bigint AS "count"
+        FROM "bills" b
+        LEFT JOIN (
+          SELECT bi."billId", COALESCE(SUM(bi."balanceAmount"), 0) AS balance
+          FROM "bill_items" bi GROUP BY bi."billId"
+        ) items ON items."billId" = b.id
+        WHERE b."schoolId" = ${schoolId} AND b.status NOT IN ('CANCELLED', 'WAIVED')
+          AND b."balanceAmount" <> COALESCE(items.balance, 0)
+      `),
+      this.prisma.client.$queryRaw<Array<{ count: bigint }>>(Prisma.sql`
+        SELECT COUNT(*)::bigint AS "count"
+        FROM "students" st
+        LEFT JOIN (
+          SELECT "studentId", COALESCE(SUM("balanceAmount"), 0) AS balance
+          FROM "bills"
+          WHERE "schoolId" = ${schoolId} AND status NOT IN ('CANCELLED', 'WAIVED')
+          GROUP BY "studentId"
+        ) invoices ON invoices."studentId" = st.id
+        WHERE st."schoolId" = ${schoolId}
+          AND st."outstandingBalance" <> COALESCE(invoices.balance, 0)
+      `),
+      this.prisma.client.$queryRaw<Array<{ count: bigint }>>(Prisma.sql`
+        SELECT COUNT(*)::bigint AS "count"
+        FROM "payments" p
+        LEFT JOIN (
+          SELECT "paymentId", COALESCE(SUM(amount), 0) AS allocated
+          FROM "payment_bill_allocations" GROUP BY "paymentId"
+        ) allocations ON allocations."paymentId" = p.id
+        WHERE p."schoolId" = ${schoolId} AND p.status = 'COMPLETED'
+          AND p.amount <> COALESCE(allocations.allocated, 0)
+      `),
+      this.prisma.client.$queryRaw<Array<{ count: bigint }>>(Prisma.sql`
+        SELECT COUNT(*)::bigint AS "count"
+        FROM "payments" p
+        LEFT JOIN "transactions" t ON t.id = p."transactionId" AND t."schoolId" = p."schoolId"
+        WHERE p."schoolId" = ${schoolId} AND p.status = 'COMPLETED'
+          AND (p."transactionId" IS NULL OR t.id IS NULL OR t.amount <> p.amount)
+      `),
+    ]);
+    const reconciliation = {
+      invoiceItemMismatchCount: Number(itemMismatchRows[0]?.count ?? 0n),
+      studentBalanceMismatchCount: Number(studentMismatchRows[0]?.count ?? 0n),
+      receiptAllocationMismatchCount: Number(paymentMismatchRows[0]?.count ?? 0n),
+      ledgerMismatchCount: Number(ledgerMismatchRows[0]?.count ?? 0n),
+    };
+
     const classCollectionFilters: Prisma.Sql[] = [
       Prisma.sql`p."schoolId" = ${schoolId}`,
       Prisma.sql`b."schoolId" = ${schoolId}`,
@@ -2203,6 +2256,14 @@ export class FinanceService {
     const ageing: Record<string, string> = {};
     ageingRanges.forEach((range, index) => { ageing[range.key] = moneyString(ageingResults[index]?._sum.balanceAmount); });
     ageing.notDue = moneyString(notDueAgg._sum.balanceAmount);
+    const ageingTotal = Object.values(ageing).reduce(
+      (total, value) => total.plus(new Prisma.Decimal(value)),
+      new Prisma.Decimal(0),
+    );
+    const ageingDifference = outstanding.minus(ageingTotal);
+    const ageingReconciled = ageingDifference.eq(0);
+    const reconciliationStatus = ageingReconciled &&
+      Object.values(reconciliation).every((count) => count === 0) ? "RECONCILED" : "DISCREPANCY";
 
     return {
       asOf: asOf.toISOString().slice(0, 10),
@@ -2234,6 +2295,13 @@ export class FinanceService {
           billCount: row.billCount,
         })),
       ageing,
+      reconciliation: {
+        ...reconciliation,
+        ageingTotal: ageingTotal.toFixed(2),
+        ageingDifference: ageingDifference.toFixed(2),
+        ageingReconciled,
+        status: reconciliationStatus,
+      },
     };
   }
 
