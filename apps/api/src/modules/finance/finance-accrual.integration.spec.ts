@@ -30,8 +30,9 @@ describe.skipIf(!enabled)("accrual cutover (database)", { timeout: 60_000 }, () 
     process.env.DATABASE_URL = url;
     const { prisma } = await import("../../prisma/prisma.client.js");
     const { FinanceService } = await import("./finance.service.js");
+    const { FinancePostingService } = await import("./finance-posting.service.js");
     db = prisma;
-    finance = new FinanceService({ client: db } as never);
+    finance = new FinanceService({ client: db } as never, new FinancePostingService({ client: db } as never));
     const org = await db.organization.create({ data: { id: run + "-org", name: run, slug: run } });
     schoolId = (await db.school.create({ data: { organizationId: org.id, code: run.toUpperCase(), subdomain: run, name: run } })).id;
     userId = (await db.user.create({ data: { id: run + "-acc", name: "Cutover accountant", email: run + "-acc@example.test" } })).id;
