@@ -23,7 +23,7 @@ function stub(permission: string, allowSelfApproval = false) {
     financeSettings: { findUnique: vi.fn(async () => ({ allowSelfApproval })) },
   };
   const service = new FinanceApprovalService({
-    client: { $transaction: async (fn: (tx: typeof tx) => Promise<unknown>) => fn(tx) },
+    client: { $transaction: async (fn: (transaction: unknown) => Promise<unknown>) => fn(tx) },
   } as never);
   return { service, updateMany };
 }
