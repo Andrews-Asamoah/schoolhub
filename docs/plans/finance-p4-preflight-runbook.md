@@ -9,3 +9,10 @@
 7. After the upstream phases are implemented, test snapshot hashing, journal freeze, approval decisions, reopen ordering and second-snapshot version before enabling close actions.
 
 **Important:** P4 close and reopen are intentionally NOT exposed by this phase's API. `canClose` must remain `false` until the hard gates are satisfied. Existing legacy period lock is not a P4 accounting close.
+
+## As-of journal preview (P4 incremental capability)
+- `GET /finance/periods/snapshot-preview?year=2026&month=9` calculates posted journal opening balances, within-month debit/credit movements, closing balances and a deterministic SHA-256 hash.
+- Hash version 2 binds the **school ID**, period start/end, account identities and their amounts. Reordering input accounts does not change the hash.
+- Uses a PostgreSQL repeatable-read snapshot; will refuse to run if I1, I2 or I3 is failing. Requires a completed month.
+- The preview creates NO period close, snapshots, journal entries or period locks. It cannot substitute for cash/bank, student AR, payroll or deferred revenue period-specific reconciliations.
+- This is a journal-basis as-of view; close approval and persisted snapshots are separate, gated phases.
