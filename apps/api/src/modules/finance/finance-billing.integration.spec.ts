@@ -117,7 +117,16 @@ describe.skipIf(!enabled)("bill generation (database)", { timeout: 60_000 }, () 
     await quiet(prisma.auditLog.deleteMany({ where: { schoolId } }));
     await quiet(prisma.paymentBillAllocation.deleteMany({ where: { schoolId } }));
     await quiet(prisma.payment.deleteMany({ where: { schoolId } }));
-    await quiet(prisma.transaction.deleteMany({ where: { schoolId } }));
+    // P2 posted records are immutable: explicit archive context for isolated test fixtures.
+    await quiet(prisma.$transaction(async tx => {
+      await tx.$queryRaw`SELECT set_config('app.finance_archive_purge', 'on', true)`;
+      const entries = await tx.financeJournalEntry.findMany({
+        where: { schoolId }, select: { id: true },
+      });
+      await tx.financeJournalLine.deleteMany({ where: { entryId: { in: entries.map(e => e.id) } } });
+      await tx.financeJournalEntry.deleteMany({ where: { schoolId } });
+      await tx.transaction.deleteMany({ where: { schoolId } });
+    }));
     await quiet(prisma.billCarryForward.deleteMany({ where: { schoolId } }));
     await quiet(prisma.bill.deleteMany({ where: { schoolId } }));
     await quiet(prisma.enrollment.deleteMany({ where: { academicYearId: yearId } }));
