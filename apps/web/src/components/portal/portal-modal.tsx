@@ -38,6 +38,9 @@ export function PortalModal({
 
     const handleKeys = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
+        // Dismiss the nested calendar or Radix dropdown first, not the form.
+        if (event.defaultPrevented || document.querySelector('[role="dialog"][aria-label="Choose a date"]')
+          || document.querySelector('[data-radix-select-content]')) return;
         event.preventDefault();
         closeCallback.current();
         return;
