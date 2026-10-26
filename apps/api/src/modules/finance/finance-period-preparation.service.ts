@@ -65,6 +65,7 @@ export class FinancePeriodPreparationService {
     const checks = [
       block("I1", "Debits and credits reconcile and posting pairs are valid", ledger.I1.status === "PASS", ledger.I1),
       block("I2", "Cached balances reconcile to postings", ledger.I2.status === "PASS", ledger.I2),
+      block("I3", "Posted journal mirrors reconcile to the source ledger", ledger.I3.status === "PASS", ledger.I3),
       block("AR", "Receivables control and student balances reconcile", receivables.closeReady && periodAsOf === currentDate, {
         sourceBasis: receivables.basis,
         reportingDate: receivables.asOf,
