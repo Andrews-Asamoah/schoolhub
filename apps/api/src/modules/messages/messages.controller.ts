@@ -23,7 +23,7 @@ export class MessagesController {
     @CurrentSchoolRole() role: string | undefined,
     @Query("search") search?: string,
   ) {
-    return this.messages.listRecipients(school.organizationId, user.id, role ?? "", search ?? "");
+    return this.messages.listRecipients(school.id, school.organizationId, user.id, role ?? "", search ?? "");
   }
 
   @Get("inbox")
