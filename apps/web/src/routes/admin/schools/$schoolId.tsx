@@ -95,6 +95,7 @@ function SchoolDetailPage() {
   const [adminName, setAdminName] = useState("");
   const [adminEmail, setAdminEmail] = useState("");
   const [adminMessage, setAdminMessage] = useState("");
+  const [adminBanReason, setAdminBanReason] = useState("");
   const [issued, setIssued] = useState<CredentialEntry[]>([]);
   const [adminConfirmation, setAdminConfirmation] =
     useState<AdminConfirmation | null>(null);
@@ -129,6 +130,7 @@ function SchoolDetailPage() {
   }
 
   function openAdminConfirmation(confirmation: AdminConfirmation) {
+    if (confirmation.action === "ban") setAdminBanReason("");
     previousFocusRef.current =
       document.activeElement instanceof HTMLElement
         ? document.activeElement
@@ -192,9 +194,11 @@ function SchoolDetailPage() {
     mutationFn: ({
       userId,
       action,
+      reason,
     }: {
       userId: string;
       action: "ban" | "unban" | "remove";
+      reason?: string;
     }) =>
       apiFetch(
         `/super-admin/schools/${schoolId}/admins/${userId}`,
@@ -202,7 +206,10 @@ function SchoolDetailPage() {
           ? { method: "DELETE" }
           : {
               method: "PATCH",
-              body: JSON.stringify({ banned: action === "ban" }),
+              body: JSON.stringify({
+                banned: action === "ban",
+                ...(action === "ban" ? { reason } : {}),
+              }),
             },
       ),
     onSuccess: () => {
@@ -726,6 +733,28 @@ function SchoolDetailPage() {
                       </>
                     )}
                   </p>
+                  {adminConfirmation.action === "ban" && (
+                    <div className="mt-5">
+                      <label htmlFor="admin-suspension-reason" className="mb-2 block text-sm font-semibold text-foreground">
+                        Reason for suspension <span className="text-destructive">*</span>
+                      </label>
+                      <textarea
+                        id="admin-suspension-reason"
+                        value={adminBanReason}
+                        onChange={(event) => setAdminBanReason(event.target.value)}
+                        minLength={10}
+                        maxLength={500}
+                        rows={3}
+                        required
+                        disabled={adminActionMutation.isPending}
+                        placeholder="Explain why this administrator’s school access must be suspended…"
+                        className="w-full resize-y rounded-xl border border-border bg-background px-3 py-2.5 text-sm text-foreground outline-none transition placeholder:text-muted-foreground/70 focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60"
+                      />
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Use 10–500 characters. This reason will be stored with the membership and in the audit log.
+                      </p>
+                    </div>
+                  )}
                   {adminActionMutation.error && (
                     <p role="alert" className="mt-4 rounded-xl border border-destructive/20 bg-destructive/10 px-3 py-2.5 text-xs text-destructive">
                       {adminActionMutation.error.message}
@@ -743,11 +772,15 @@ function SchoolDetailPage() {
                     </button>
                     <button
                       type="button"
-                      disabled={adminActionMutation.isPending}
+                      disabled={
+                        adminActionMutation.isPending ||
+                        (adminConfirmation.action === "ban" && adminBanReason.trim().length < 10)
+                      }
                       onClick={() =>
                         adminActionMutation.mutate({
                           userId: adminConfirmation.userId,
                           action: adminConfirmation.action,
+                          ...(adminConfirmation.action === "ban" ? { reason: adminBanReason.trim() } : {}),
                         })
                       }
                       className={`inline-flex h-11 items-center justify-center gap-2 rounded-xl px-4 text-sm font-semibold text-destructive-foreground shadow-lg transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:cursor-wait disabled:opacity-60 ${

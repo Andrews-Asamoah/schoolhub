@@ -113,19 +113,32 @@ describe("school administrators", () => {
     return ctx;
   };
 
+  it("requires a meaningful reason before attempting an administrator suspension", async () => {
+    const { service, client } = arrange();
+    await expect(service.setSchoolAdminBanned("sch1", "u1", true, actor)).rejects.toThrow(BadRequestException);
+    await expect(service.setSchoolAdminBanned("sch1", "u1", true, actor, "   too short ")).rejects.toThrow(BadRequestException);
+    expect(client.member.findUnique).not.toHaveBeenCalled();
+    expect(client.member.update).not.toHaveBeenCalled();
+  });
+
   it("will not suspend the last active administrator", async () => {
     const { service, client } = arrange();
     client.member.findFirst.mockResolvedValue(null);
-    await expect(service.setSchoolAdminBanned("sch1", "u1", true, actor)).rejects.toThrow(BadRequestException);
+    await expect(service.setSchoolAdminBanned("sch1", "u1", true, actor, "Repeated policy violations")).rejects.toThrow(BadRequestException);
     expect(client.member.update).not.toHaveBeenCalled();
   });
 
   it("suspends an administrator, revokes their sessions and audits it", async () => {
     const { service, client } = arrange();
     client.member.findFirst.mockResolvedValue({ id: "other" });
-    await service.setSchoolAdminBanned("sch1", "u1", true, actor);
+    await service.setSchoolAdminBanned("sch1", "u1", true, actor, "Repeated policy violations");
     expect(client.session.deleteMany).toHaveBeenCalledWith({ where: { userId: "u1" } });
-    expect(client.auditLog.create.mock.calls[0]![0].data).toMatchObject({ action: "ACCESS_CHANGED", entityType: "super-admin.school-admin.ban" });
+    expect(client.member.update.mock.calls[0]![0].data.banReason).toBe("Repeated policy violations");
+    expect(client.auditLog.create.mock.calls[0]![0].data).toMatchObject({
+      action: "ACCESS_CHANGED",
+      entityType: "super-admin.school-admin.ban",
+      newValues: { banned: true, reason: "Repeated policy violations" },
+    });
   });
 
   it("will not remove the last active administrator", async () => {

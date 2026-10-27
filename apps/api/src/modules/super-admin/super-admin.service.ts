@@ -455,7 +455,12 @@ export class SuperAdminService {
     userId: string,
     banned: SetSchoolAdminBannedInput["banned"],
     actor: AuditActor,
+    reason?: string,
   ) {
+    const normalizedReason = reason?.trim();
+    if (banned && (!normalizedReason || normalizedReason.length < 10 || normalizedReason.length > 500)) {
+      throw new BadRequestException("A suspension reason of 10 to 500 characters is required");
+    }
     const member = await this.findSchoolAdminMembership(id, userId);
     await this.prisma.client.$transaction(
       async (transaction) => {
@@ -479,7 +484,7 @@ export class SuperAdminService {
           where: { id: member.id },
           data: {
             banned,
-            banReason: banned ? "Suspended by platform super admin" : null,
+            banReason: banned ? normalizedReason : null,
           },
         });
         if (banned) {
@@ -492,7 +497,7 @@ export class SuperAdminService {
           entityId: userId,
           schoolId: id,
           oldValues: { banned: member.banned },
-          newValues: { banned },
+          newValues: { banned, ...(banned ? { reason: normalizedReason } : {}) },
         });
       },
       { isolationLevel: "Serializable" },
