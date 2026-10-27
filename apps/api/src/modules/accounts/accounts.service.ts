@@ -44,7 +44,7 @@ export class AccountsService {
   // records in its verification table; a cookie without a live record is not
   // accepted on the next sign-in.
   // --------------------------------------------------------------------------
-  async listTrustedDevices(user: { id: string; role?: string; mustChangePassword?: boolean }) {
+  async listTrustedDevices(user: { id: string; role?: string; mustChangePassword?: boolean; banned?: boolean }) {
     this.assertSuperAdmin(user);
     const devices = await this.prisma.client.verification.findMany({
       where: {
@@ -59,7 +59,7 @@ export class AccountsService {
   }
 
   async revokeTrustedDevice(
-    user: { id: string; role?: string; mustChangePassword?: boolean },
+    user: { id: string; role?: string; mustChangePassword?: boolean; banned?: boolean },
     deviceId: string,
     actor: AuditActor,
   ) {
@@ -95,7 +95,7 @@ export class AccountsService {
     });
   }
 
-  async revokeAllTrustedDevices(user: { id: string; role?: string; mustChangePassword?: boolean }, actor: AuditActor) {
+  async revokeAllTrustedDevices(user: { id: string; role?: string; mustChangePassword?: boolean; banned?: boolean }, actor: AuditActor) {
     this.assertSuperAdmin(user);
     return this.prisma.client.$transaction(async (tx) => {
       const deleted = await tx.verification.deleteMany({
@@ -116,9 +116,12 @@ export class AccountsService {
     });
   }
 
-  private assertSuperAdmin(user: { id: string; role?: string; mustChangePassword?: boolean }) {
+  private assertSuperAdmin(user: { id: string; role?: string; mustChangePassword?: boolean; banned?: boolean }) {
     if (user.role !== "superAdmin") {
       throw new ForbiddenException("Trusted-device management is restricted to platform administrators.");
+    }
+    if (user.banned) {
+      throw new ForbiddenException("This account has been suspended.");
     }
     if (user.mustChangePassword) {
       throw new ForbiddenException("Change your temporary password before managing trusted devices.");
@@ -173,6 +176,10 @@ export class AccountsService {
       // Sign out every other device; keep the one making this request.
       await tx.session.deleteMany({
         where: { userId: user.id, token: { not: currentSessionToken } },
+      });
+      // Password changes revoke trusted-device tokens as well as other sessions.
+      await tx.verification.deleteMany({
+        where: { value: user.id, identifier: { startsWith: "trust-device-" } },
       });
       await this.credentials.audit(tx, {
         actorId: user.id,
