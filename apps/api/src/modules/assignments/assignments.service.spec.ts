@@ -15,45 +15,95 @@ const createInput: CreateSchoolAssignmentInput = {
   maxScore: 20,
 };
 
-function buildService(overrides: Record<string, unknown> = {}) {
-  const client: Record<string, any> = {
+type CurrentEnrollment = {
+  classId: string;
+  academicYearId: string;
+  termId: string;
+  class: { id: string; name: string; level: string };
+  academicYear: { id: string; name: string };
+  term: { id: string; name: string };
+} | null;
+
+type GradeAssignment = {
+  id: string;
+  classId: string;
+  subjectId: string;
+  maxScore: number;
+  title: string;
+  subject: { name: string };
+} | null;
+
+interface TestOptions {
+  classSubject?: { id: string } | null;
+  enrollment?: CurrentEnrollment;
+  gradeAssignment?: GradeAssignment;
+}
+
+function buildService(options: TestOptions = {}) {
+  const schoolAssignment = {
+    findMany: vi.fn(async () => []),
+    findFirst: vi.fn(async () => options.gradeAssignment ?? null),
+    create: vi.fn(async () => ({
+      id: "assignment-a",
+      title: createInput.title,
+      maxScore: 20,
+      subject: { name: "Mathematics" },
+      class: { name: "JHS 1" },
+    })),
+  };
+  const schoolAssignmentSubmission = {
+    findUnique: vi.fn(async () => null),
+    findFirst: vi.fn(async () => null),
+    upsert: vi.fn(async () => ({
+      id: "submission-a",
+      status: "SUBMITTED",
+      responseText: "Answer",
+      submittedAt: new Date(),
+    })),
+    update: vi.fn(async () => ({
+      id: "submission-a",
+      status: "GRADED",
+      score: 15,
+      feedback: null,
+      gradedAt: new Date(),
+    })),
+  };
+  const enrollment = {
+    findFirst: vi.fn(async () => options.enrollment ?? null),
+    findMany: vi.fn(async () => []),
+  };
+  const notification = {
+    create: vi.fn(async () => ({ id: "notification-a" })),
+    createMany: vi.fn(async () => ({ count: 1 })),
+  };
+  const tx = { schoolAssignment, schoolAssignmentSubmission, enrollment, notification };
+  const client = {
     academicYear: {
-      findFirst: vi.fn().mockResolvedValue({
+      findFirst: vi.fn(async () => ({
         id: "year-a",
         name: "2026/2027",
         terms: [{ id: "term-a", name: "Term 1" }],
-      }),
+      })),
     },
-    class: { findFirst: vi.fn().mockResolvedValue({ id: "class-a", name: "JHS 1" }) },
-    subject: { findFirst: vi.fn().mockResolvedValue({ id: "subject-a", name: "Mathematics" }) },
-    classSubject: { findFirst: vi.fn().mockResolvedValue({ id: "class-subject-a" }) },
-    student: { findFirst: vi.fn().mockResolvedValue({ id: "student-a" }) },
-    enrollment: { findFirst: vi.fn().mockResolvedValue(null), findMany: vi.fn().mockResolvedValue([]) },
-    schoolAssignment: {
-      findMany: vi.fn().mockResolvedValue([]),
-      findFirst: vi.fn().mockResolvedValue(null),
-      create: vi.fn().mockResolvedValue({ id: "assignment-a", title: createInput.title, maxScore: 20, subject: { name: "Mathematics" }, class: { name: "JHS 1" } }),
+    class: {
+      findFirst: vi.fn(async () => ({ id: "class-a", name: "JHS 1" })),
     },
-    schoolAssignmentSubmission: {
-      findUnique: vi.fn().mockResolvedValue(null),
-      findFirst: vi.fn().mockResolvedValue(null),
-      upsert: vi.fn().mockResolvedValue({ id: "submission-a", status: "SUBMITTED", responseText: "Answer", submittedAt: new Date() }),
-      update: vi.fn().mockResolvedValue({ id: "submission-a", status: "GRADED", score: 15, feedback: null, gradedAt: new Date() }),
+    subject: {
+      findFirst: vi.fn(async () => ({ id: "subject-a", name: "Mathematics" })),
     },
-    notification: { create: vi.fn().mockResolvedValue({ id: "notification-a" }), createMany: vi.fn().mockResolvedValue({ count: 1 }) },
-    $transaction: vi.fn(),
-    ...overrides,
+    classSubject: {
+      findFirst: vi.fn(async () => options.classSubject === undefined ? { id: "class-subject-a" } : options.classSubject),
+    },
+    student: { findFirst: vi.fn(async () => ({ id: "student-a" })) },
+    schoolAssignment,
+    schoolAssignmentSubmission,
+    enrollment,
+    notification,
+    $transaction: vi.fn(async (callback: (value: typeof tx) => unknown) => callback(tx)),
   };
-  const tx = {
-    schoolAssignment: client.schoolAssignment,
-    schoolAssignmentSubmission: client.schoolAssignmentSubmission,
-    enrollment: client.enrollment,
-    notification: client.notification,
-  };
-  client.$transaction.mockImplementation(async (callback: (value: typeof tx) => unknown) => callback(tx));
   const teacherScope = {
-    getAssignments: vi.fn().mockResolvedValue({ teacherId: "teacher-a", classTeacherClassIds: [], subjectAssignments: [] }),
-    getTaughtClassIds: vi.fn().mockResolvedValue(["class-a"]),
+    getAssignments: vi.fn(async () => ({ teacherId: "teacher-a", classTeacherClassIds: [], subjectAssignments: [] })),
+    getTaughtClassIds: vi.fn(async () => ["class-a"]),
   };
   return {
     client,
@@ -66,9 +116,7 @@ const school = { id: schoolId, organizationId: "org-a" } as School;
 
 describe("AssignmentsService authorization and validation", () => {
   it("rejects a class and subject combination that is not assigned to the class", async () => {
-    const { service, client } = buildService({
-      classSubject: { findFirst: vi.fn().mockResolvedValue(null) },
-    });
+    const { service, client } = buildService({ classSubject: null });
 
     await expect(service.create(schoolId, "admin-user", "admin", createInput))
       .rejects.toBeInstanceOf(BadRequestException);
@@ -94,9 +142,7 @@ describe("AssignmentsService authorization and validation", () => {
   });
 
   it("does not let a student access submission endpoints without a current active enrollment", async () => {
-    const { service, client } = buildService({
-      enrollment: { findFirst: vi.fn().mockResolvedValue(null), findMany: vi.fn().mockResolvedValue([]) },
-    });
+    const { service, client } = buildService({ enrollment: null });
 
     await expect(service.submit(schoolId, "student-user", "assignment-a", {
       responseText: "My response",
@@ -108,17 +154,13 @@ describe("AssignmentsService authorization and validation", () => {
 
   it("rejects grades above the published maximum before updating a submission", async () => {
     const { service, client } = buildService({
-      schoolAssignment: {
-        findMany: vi.fn().mockResolvedValue([]),
-        findFirst: vi.fn().mockResolvedValue({
-          id: "assignment-a",
-          classId: "class-a",
-          subjectId: "subject-a",
-          maxScore: { toString: () => "20", valueOf: () => 20 },
-          title: "Algebra practice",
-          subject: { name: "Mathematics" },
-        }),
-        create: vi.fn(),
+      gradeAssignment: {
+        id: "assignment-a",
+        classId: "class-a",
+        subjectId: "subject-a",
+        maxScore: 20,
+        title: "Algebra practice",
+        subject: { name: "Mathematics" },
       },
     });
 
