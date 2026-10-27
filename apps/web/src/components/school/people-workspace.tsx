@@ -697,7 +697,7 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
 
       {showBulkImport && canManage && (kind === "teachers" || kind === "staff") && (
         <StaffBulkImport
-          kind={kind}
+          kind={kind === "teachers" ? "teacher" : "staff"}
           onClose={() => setShowBulkImport(false)}
           onComplete={() => void queryClient.invalidateQueries({ queryKey: ["people", kind] })}
         />
