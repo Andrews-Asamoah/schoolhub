@@ -80,6 +80,8 @@ This roadmap tracks implementation and verification. A checkbox is complete only
 - [ ] Report unmatched subjects, absent candidates and incompatible grading scales.
 - [ ] Label generated PDFs as school-produced summaries, not official certificates.
 - [ ] Test imports, evidence permissions, mapping boundaries and reconciliation.
+- [ ] Enforce **staff-only BECE access** at every API and PDF/file endpoint. Teachers access authorised subject/cohort records; designated examination staff and headteachers have approved broader access. Students/guardians receive no BECE result, PDF or notification.
+- [ ] Add role-matrix, cross-tenant, indirect download and shared-link denial tests, including expired/revoked staff access.
 
 **Exit gate:** source facts are traceable and verified; comparisons are explainable; output cannot be mistaken for an official certificate.
 

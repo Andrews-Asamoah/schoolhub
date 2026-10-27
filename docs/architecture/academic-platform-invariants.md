@@ -116,6 +116,8 @@ Corrections create a new publication version and retain the prior version under 
 
 Store external examination facts separately from SchoolHub's interpretation or summary. Preserve the exam authority, examination year/session, candidate identifier, subject and original grade/status, source/evidence reference, import batch/row, verification status, verifier and timestamps, and any correction/supersession history.
 
+**BECE access policy (WIS decision):** External BECE candidate records, grades, evidence, analyses and school-produced summaries are staff-only. Subject teachers may access only their authorised subject/cohort scope, while headteachers and explicitly authorised examination staff may access broader school data. Students, guardians and parents must have no BECE API, route, notification, message attachment, PDF export, indirect report embed or signed-file download access. Enforce these boundaries in services and object storage, not by hiding navigation links. Add negative authorisation tests for every BECE endpoint and file-download path.
+
 A school-generated PDF must be labelled as a school-generated summary and must not imply that it is an official examination authority certificate. Mock-to-external comparisons must use explicit subject and grade mappings and report unmatched subjects, absent candidates, missing results and incompatible grading scales instead of silently excluding them.
 
 ## 9. Promotion and graduation decisions
