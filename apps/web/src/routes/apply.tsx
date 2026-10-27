@@ -1,4 +1,5 @@
 import { DatePicker } from "@/components/ui/date-picker";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
@@ -187,25 +188,34 @@ function ApplyForm({ subdomain, intake }: { subdomain: string; intake: PublicInt
         {intake.cycles.length > 1 && (
           <label className={`${lbl} sm:col-span-2`}>
             Intake
-            <select className={field} value={cycleId} onChange={(e) => { setCycleId(e.target.value); setV((c) => ({ ...c, classId: "" })); }}>
-              {intake.cycles.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
+            <Select value={cycleId || "__none__"} onValueChange={(value) => { setCycleId(value === "__none__" ? "" : value); setV((current) => ({ ...current, classId: "" })); }}>
+              <SelectTrigger aria-label="Admission intake" className={field}><SelectValue placeholder="Choose an intake" /></SelectTrigger>
+              <SelectContent>
+                {intake.cycles.length ? intake.cycles.map((cycle) => <SelectItem key={cycle.id} value={cycle.id}>{cycle.name}</SelectItem>) : <SelectItem value="__none__" disabled>No open intakes available</SelectItem>}
+              </SelectContent>
+            </Select>
           </label>
         )}
         <label className={`${lbl} sm:col-span-2`}>
           Class applying for
-          <select className={field} value={v.classId ?? ""} onChange={set("classId")}>
-            <option value="">Choose a class…</option>
-            {cycle.classes.map((c) => <option key={c.classId} value={c.classId}>{c.name}</option>)}
-          </select>
+          <Select value={v.classId || "__none__"} onValueChange={(value) => set("classId")(value === "__none__" ? "" : value)}>
+            <SelectTrigger aria-label="Class applying for" className={field}><SelectValue placeholder="Choose a class…" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__none__">Choose a class…</SelectItem>
+              {cycle.classes.map((schoolClass) => <SelectItem key={schoolClass.classId} value={schoolClass.classId}>{schoolClass.name}</SelectItem>)}
+            </SelectContent>
+          </Select>
         </label>
         <label className={lbl}>First name<input className={field} value={v.firstName ?? ""} onChange={set("firstName")} autoComplete="off" /></label>
         <label className={lbl}>Last name<input className={field} value={v.lastName ?? ""} onChange={set("lastName")} autoComplete="off" /></label>
         <label className={lbl}>Other names<input className={field} value={v.otherNames ?? ""} onChange={set("otherNames")} /></label>
         <label className={lbl}>Gender
-          <select className={field} value={v.gender} onChange={set("gender")}>
-            <option value="MALE">Male</option><option value="FEMALE">Female</option><option value="OTHER">Other</option>
-          </select>
+          <Select value={v.gender} onValueChange={set("gender")}>
+            <SelectTrigger aria-label="Student gender" className={field}><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="MALE">Male</SelectItem><SelectItem value="FEMALE">Female</SelectItem><SelectItem value="OTHER">Other</SelectItem>
+            </SelectContent>
+          </Select>
         </label>
         <label className={lbl}>Date of birth<DatePicker buttonClassName={field} value={v.dateOfBirth ?? ""} onChange={(value) => setV((cur) => ({ ...cur, dateOfBirth: value }))} /></label>
         <label className={lbl}>Nationality<input className={field} value={v.nationality ?? ""} onChange={set("nationality")} /></label>
@@ -221,9 +231,10 @@ function ApplyForm({ subdomain, intake }: { subdomain: string; intake: PublicInt
         <label className={lbl}>First name<input className={field} value={v.guardianFirstName ?? ""} onChange={set("guardianFirstName")} /></label>
         <label className={lbl}>Last name<input className={field} value={v.guardianLastName ?? ""} onChange={set("guardianLastName")} /></label>
         <label className={lbl}>Relationship
-          <select className={field} value={v.guardianRelationship} onChange={set("guardianRelationship")}>
-            {GUARDIAN_RELATIONSHIPS.map((r) => <option key={r} value={r}>{r.charAt(0) + r.slice(1).toLowerCase()}</option>)}
-          </select>
+          <Select value={v.guardianRelationship} onValueChange={set("guardianRelationship")}>
+            <SelectTrigger aria-label="Guardian relationship" className={field}><SelectValue /></SelectTrigger>
+            <SelectContent>{GUARDIAN_RELATIONSHIPS.map((relationship) => <SelectItem key={relationship} value={relationship}>{relationship.charAt(0) + relationship.slice(1).toLowerCase()}</SelectItem>)}</SelectContent>
+          </Select>
         </label>
         <label className={lbl}>Phone<input type="tel" className={field} value={v.guardianPhone ?? ""} onChange={set("guardianPhone")} /></label>
         <label className={`${lbl} sm:col-span-2`}>Email (recommended: used for the parent portal)
