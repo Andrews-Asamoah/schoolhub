@@ -17,7 +17,7 @@ import {
   UsersRound,
   X,
 } from "lucide-react";
-import { useDeferredValue, useState } from "react";
+import { Children, isValidElement, useDeferredValue, useState, type ReactNode } from "react";
 import type { IssuedCredentials } from "@schoolhub/shared";
 import {
   CredentialsDialog,
@@ -42,6 +42,7 @@ import {
 import { useSchoolRole } from "@/components/school/school-role-switcher";
 import { TeacherBiodataDialog } from "@/components/school/teacher-biodata-dialog";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { apiFetch } from "@/lib/api";
 
 type PeopleKind = "teachers" | "staff" | "guardians";
@@ -1150,18 +1151,17 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
         )}
         <label className={isGuardianPage ? "w-full sm:w-52" : ""}>
           <span className="sr-only">Filter by status</span>
-          <select
-            value={activeFilter}
-            onChange={(event) => {
-              setActiveFilter(event.target.value);
-              setPage(1);
-            }}
-            className={`${inputClasses} mt-0 ${isGuardianPage ? "sm:h-11 sm:px-3" : ""}`}
-          >
-            <option value="">All statuses</option>
-            <option value="true">Active</option>
-            <option value="false">Inactive</option>
-          </select>
+          <Select value={activeFilter || "__all__"} onValueChange={(value) => {
+            setActiveFilter(value === "__all__" ? "" : value);
+            setPage(1);
+          }}>
+            <SelectTrigger aria-label="Filter by status" className={`${inputClasses} mt-0 ${isGuardianPage ? "sm:h-11 sm:px-3" : ""}`}><SelectValue placeholder="All statuses" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__all__">All statuses</SelectItem>
+              <SelectItem value="true">Active</SelectItem>
+              <SelectItem value="false">Inactive</SelectItem>
+            </SelectContent>
+          </Select>
         </label>
       </section>
 
@@ -1438,22 +1438,39 @@ function SelectField({
 }: {
   label: string;
   required?: boolean;
-  children: React.ReactNode;
+  children: ReactNode;
   value: string;
   onChange: (value: string) => void;
 }) {
+  const options = Children.toArray(children)
+    .filter(isValidElement)
+    .map((child, index) => {
+      const option = child as React.ReactElement<{
+        value?: string;
+        disabled?: boolean;
+        children?: ReactNode;
+      }>;
+      const rawValue = String(option.props.value ?? "");
+      return {
+        key: `${rawValue || "empty"}-${index}`,
+        value: rawValue || "__none__",
+        label: option.props.children,
+        disabled: option.props.disabled ?? false,
+      };
+    });
+
   return (
     <label className="text-xs font-semibold text-foreground">
       {label}
       {required ? " *" : ""}
-      <select
-        value={value}
-        required={required}
-        onChange={(event) => onChange(event.target.value)}
-        className={inputClasses}
-      >
-        {children}
-      </select>
+      <Select value={value || "__none__"} onValueChange={(nextValue) => onChange(nextValue === "__none__" ? "" : nextValue)} required={required}>
+        <SelectTrigger aria-label={label} className={inputClasses}><SelectValue placeholder={label} /></SelectTrigger>
+        <SelectContent>
+          {options.map((option) => (
+            <SelectItem key={option.key} value={option.value} disabled={option.disabled}>{option.label}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
     </label>
   );
 }
@@ -1529,21 +1546,15 @@ function StudentSearchPicker({
           />
         </span>
         <span className="relative">
-          <select
-            value={classId}
-            onChange={(event) => setClassId(event.target.value)}
-            aria-label="Filter students by class"
-            className={`${inputClasses} mt-0`}
-          >
-            <option value="">All current classes</option>
-            {classes
-              .filter((schoolClass) => schoolClass.isActive)
-              .map((schoolClass) => (
-                <option key={schoolClass.id} value={schoolClass.id}>
-                  {schoolClass.name}
-                </option>
+          <Select value={classId || "__all__"} onValueChange={(value) => setClassId(value === "__all__" ? "" : value)}>
+            <SelectTrigger aria-label="Filter students by class" className={`${inputClasses} mt-0`}><SelectValue placeholder="All current classes" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__all__">All current classes</SelectItem>
+              {classes.filter((schoolClass) => schoolClass.isActive).map((schoolClass) => (
+                <SelectItem key={schoolClass.id} value={schoolClass.id}>{schoolClass.name}</SelectItem>
               ))}
-          </select>
+            </SelectContent>
+          </Select>
         </span>
       </div>
       {selected.length > 0 && (
