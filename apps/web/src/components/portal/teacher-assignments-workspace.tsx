@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CalendarClock, ClipboardList, LoaderCircle, Plus, Send, Users, X } from "lucide-react";
+import { CalendarClock, ClipboardList, LoaderCircle, Plus, Send } from "lucide-react";
 import { useMemo, useState, type FormEvent } from "react";
 import { DatePicker } from "@/components/ui/date-picker";
 import { EmptyState, ErrorState } from "@/components/ui/empty-state";
@@ -246,8 +246,17 @@ export function TeacherAssignmentsWorkspace() {
 
       {referenceLoading ? (
         <div role="status" className="flex min-h-40 items-center justify-center gap-2 rounded-xl border border-border bg-card text-sm text-muted-foreground"><LoaderCircle className="size-4 animate-spin" />Loading your teaching assignments…</div>
-      ) : teaching.error ? (
-        <ErrorState message={`Your teaching assignments could not be loaded: ${teaching.error.message}`} onRetry={() => void teaching.refetch()} />
+      ) : referenceError ? (
+        <ErrorState
+          message={`Class and subject assignments could not be loaded: ${referenceError.message}`}
+          onRetry={() => {
+            if (teacherMode) void teaching.refetch();
+            else {
+              void managerClassesQuery.refetch();
+              void managerSubjectsQuery.refetch();
+            }
+          }}
+        />
       ) : classes.length === 0 ? (
         <EmptyState icon={ClipboardList} title="No assigned classes or subjects" description="Ask a school administrator to assign you to a class and subject before publishing coursework." />
       ) : query.isPending ? (
