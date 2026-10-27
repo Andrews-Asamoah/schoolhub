@@ -20,7 +20,8 @@ describe("SuperAdminService operations health", () => {
     expect(result.dependencies.notifications.status).toBe("not_instrumented");
     expect(result.dependencies.backgroundJobs.status).toBe("not_instrumented");
     expect(result.checkedAt).toEqual(expect.any(String));
-    expect(queryRaw).toHaveBeenCalledOnce();
+    // One query verifies database connectivity; the second checks Prisma migration status.
+    expect(queryRaw).toHaveBeenCalledTimes(2);
   });
 
   it("degrades the overall status when the database check fails", async () => {
