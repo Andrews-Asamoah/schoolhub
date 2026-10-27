@@ -11,6 +11,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { CreateEnrollmentInput } from "@schoolhub/shared";
 import { useSchoolRole } from "@/components/school/school-role-switcher";
 import { DataTable, type DataTableColumn } from "@/components/ui/data-table";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { canExportTables } from "@/lib/table-export-policy";
 import { apiFetch } from "@/lib/api";
 
@@ -242,57 +243,39 @@ export function EnrollmentWorkspace({
         <div className="grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-3 sm:p-6">
           <label className="space-y-1.5">
             <span className="text-xs font-semibold text-secondary-foreground">Academic year</span>
-            <select
-              className={controlClasses}
-              value={academicYearId}
-              onChange={(event) => {
-                setAcademicYearId(event.target.value);
-                setSelectedStudentIds([]);
-              }}
-              disabled={yearsQuery.isPending || !years.length}
-            >
-              <option value="">Select academic year</option>
-              {years.map((year) => (
-                <option key={year.id} value={year.id}>
-                  {year.name}{year.isCurrent ? " (Current)" : ""}
-                </option>
-              ))}
-            </select>
+            <Select value={academicYearId || "__none__"} onValueChange={(value) => {
+              setAcademicYearId(value === "__none__" ? "" : value);
+              setSelectedStudentIds([]);
+            }} disabled={yearsQuery.isPending || !years.length}>
+              <SelectTrigger aria-label="Academic year" className={controlClasses}><SelectValue placeholder="Select academic year" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__">Select academic year</SelectItem>
+                {years.map((year) => <SelectItem key={year.id} value={year.id}>{year.name}{year.isCurrent ? " (Current)" : ""}</SelectItem>)}
+              </SelectContent>
+            </Select>
           </label>
           <label className="space-y-1.5">
             <span className="text-xs font-semibold text-secondary-foreground">Term</span>
-            <select
-              className={controlClasses}
-              value={termId}
-              onChange={(event) => {
-                setTermId(event.target.value);
-                setSelectedStudentIds([]);
-              }}
-              disabled={!terms.length}
-            >
-              <option value="">Select term</option>
-              {terms.map((term) => (
-                <option key={term.id} value={term.id}>
-                  {term.name}{term.isCurrent ? " (Current)" : ""}
-                </option>
-              ))}
-            </select>
+            <Select value={termId || "__none__"} onValueChange={(value) => {
+              setTermId(value === "__none__" ? "" : value);
+              setSelectedStudentIds([]);
+            }} disabled={!terms.length}>
+              <SelectTrigger aria-label="Term" className={controlClasses}><SelectValue placeholder="Select term" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__">Select term</SelectItem>
+                {terms.map((term) => <SelectItem key={term.id} value={term.id}>{term.name}{term.isCurrent ? " (Current)" : ""}</SelectItem>)}
+              </SelectContent>
+            </Select>
           </label>
           <label className="space-y-1.5">
             <span className="text-xs font-semibold text-secondary-foreground">Class roster</span>
-            <select
-              className={controlClasses}
-              value={classId}
-              onChange={(event) => setClassId(event.target.value)}
-              disabled={classesQuery.isPending}
-            >
-              <option value="">All classes</option>
-              {classes.map((schoolClass) => (
-                <option key={schoolClass.id} value={schoolClass.id}>
-                  {schoolClass.name} · {schoolClass.level}
-                </option>
-              ))}
-            </select>
+            <Select value={classId || "__all__"} onValueChange={(value) => setClassId(value === "__all__" ? "" : value)} disabled={classesQuery.isPending}>
+              <SelectTrigger aria-label="Class roster" className={controlClasses}><SelectValue placeholder="All classes" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__all__">All classes</SelectItem>
+                {classes.map((schoolClass) => <SelectItem key={schoolClass.id} value={schoolClass.id}>{schoolClass.name} · {schoolClass.level}</SelectItem>)}
+              </SelectContent>
+            </Select>
           </label>
         </div>
         {(yearsQuery.error || classesQuery.error) && (
