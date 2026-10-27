@@ -1,277 +1,235 @@
-import { useState } from "react";
-import {
-  BookOpen,
-  Calendar,
-  Check,
-  CheckCircle2,
-  Clock,
-  Download,
-  FileCheck,
-  FileText,
-  Search,
-  Upload,
-  X,
-} from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { BookOpen, CalendarClock, CheckCircle2, ClipboardList, Clock, LoaderCircle, Send } from "lucide-react";
+import { useMemo, useState, type FormEvent } from "react";
 import { PortalModal } from "./portal-modal";
-import { cn } from "@/lib/utils";
+import { EmptyState, ErrorState } from "@/components/ui/empty-state";
+import { PageHeader } from "@/components/ui/page-header";
+import { apiFetch } from "@/lib/api";
 
-export interface StudentAssignment {
+interface StudentAssignmentSubmission {
+  id: string;
+  responseText: string;
+  status: "SUBMITTED" | "GRADED";
+  score: number | null;
+  feedback: string | null;
+  submittedAt: string;
+  gradedAt: string | null;
+}
+interface StudentAssignment {
   id: string;
   title: string;
-  subject: string;
-  dueDate: string;
-  maxScore: number;
-  status: "PENDING" | "SUBMITTED" | "GRADED";
-  score?: number;
   instructions: string;
-  teacherRemarks?: string;
+  dueAt: string | null;
+  maxScore: number;
+  status: "PUBLISHED";
+  createdAt: string;
+  subject: { id: string; name: string; code: string };
+  teacher: { id: string; name: string };
+  submission: StudentAssignmentSubmission | null;
+}
+interface StudentAssignmentsResponse {
+  class: { id: string; name: string; level: string } | null;
+  academicYear: { id: string; name: string } | null;
+  term: { id: string; name: string } | null;
+  assignments: StudentAssignment[];
+}
+type Filter = "ALL" | "TODO" | "SUBMITTED" | "GRADED";
+
+const dateTime = (value: string) =>
+  new Intl.DateTimeFormat("en-GH", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
+
+function isOverdue(assignment: StudentAssignment) {
+  return !assignment.submission && !!assignment.dueAt && new Date(assignment.dueAt).getTime() < Date.now();
 }
 
-const mockAssignments: StudentAssignment[] = [
-  {
-    id: "asg-1",
-    title: "Newton's Laws of Motion Lab Report",
-    subject: "Integrated Science",
-    dueDate: "Tomorrow at 11:59 PM",
-    maxScore: 30,
-    status: "PENDING",
-    instructions: "Write a 2-page laboratory observation on our pendulum experiments. Include force diagram calculations.",
-  },
-  {
-    id: "asg-2",
-    title: "Quadratic Equations Problem Set 4",
-    subject: "Core Mathematics",
-    dueDate: "In 3 days",
-    maxScore: 20,
-    status: "PENDING",
-    instructions: "Complete exercises 4.1 to 4.5 in your textbook. Show all step-by-step working clearly.",
-  },
-  {
-    id: "asg-3",
-    title: "Expository Essay: The Impact of AI on Education",
-    subject: "English Language",
-    dueDate: "Submitted Oct 12",
-    maxScore: 30,
-    score: 28,
-    status: "GRADED",
-    instructions: "Write a 500-word expository essay arguing the advantages and ethics of AI tools for junior high learners.",
-    teacherRemarks: "Well-structured essay with excellent thesis and rich vocabulary. Excellent arguments!",
-  },
-  {
-    id: "asg-4",
-    title: "Ghanaian Pre-Colonial Trade Routes Map",
-    subject: "Social Studies",
-    dueDate: "Submitted Oct 14",
-    maxScore: 25,
-    status: "SUBMITTED",
-    instructions: "Draw and label the trans-Saharan trade commodities connecting ancient Ghana to the coast.",
-  },
-  {
-    id: "asg-5",
-    title: "HTML5 & CSS Personal Portfolio Skeleton",
-    subject: "Information Technology",
-    dueDate: "Submitted Oct 8",
-    maxScore: 20,
-    score: 20,
-    status: "GRADED",
-    instructions: "Build a semantic two-column HTML5 web page styling your bio and favorite hobbies.",
-    teacherRemarks: "Clean HTML structure and beautiful use of CSS flexbox. 100% full marks!",
-  },
-];
+function statusLabel(assignment: StudentAssignment) {
+  if (assignment.submission?.status === "GRADED") return "Graded";
+  if (assignment.submission?.status === "SUBMITTED") return "Submitted";
+  return isOverdue(assignment) ? "Overdue" : "To do";
+}
 
 export function StudentAssignmentsView() {
-  const [filter, setFilter] = useState<"ALL" | "PENDING" | "SUBMITTED" | "GRADED">("ALL");
-  const [assignments, setAssignments] = useState<StudentAssignment[]>(mockAssignments);
-  const [activeAssignmentToSubmit, setActiveAssignmentToSubmit] = useState<StudentAssignment | null>(null);
-  const [submissionNotes, setSubmissionNotes] = useState("");
-  const [notice, setNotice] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+  const [filter, setFilter] = useState<Filter>("ALL");
+  const [activeAssignment, setActiveAssignment] = useState<StudentAssignment | null>(null);
+  const [responseText, setResponseText] = useState("");
+  const [notice, setNotice] = useState<{ ok: boolean; text: string } | null>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!activeAssignmentToSubmit) return;
+  const query = useQuery({
+    queryKey: ["assignments", "student"],
+    queryFn: () => apiFetch<StudentAssignmentsResponse>("/assignments"),
+    retry: false,
+  });
 
-    setAssignments((prev) =>
-      prev.map((a) =>
-        a.id === activeAssignmentToSubmit.id
-          ? { ...a, status: "SUBMITTED" }
-          : a,
-      ),
-    );
+  const submitMutation = useMutation({
+    mutationFn: (input: { assignmentId: string; responseText: string }) =>
+      apiFetch<StudentAssignmentSubmission>(`/assignments/${input.assignmentId}/submission`, {
+        method: "POST",
+        body: JSON.stringify({ responseText: input.responseText }),
+      }),
+    onSuccess: async () => {
+      setActiveAssignment(null);
+      setResponseText("");
+      setNotice({ ok: true, text: "Your response has been saved and the teacher has been notified." });
+      await queryClient.invalidateQueries({ queryKey: ["assignments"] });
+      await queryClient.invalidateQueries({ queryKey: ["notifications"] });
+    },
+    onError: (error: Error) => setNotice({ ok: false, text: error.message }),
+  });
 
-    setNotice(`Assignment "${activeAssignmentToSubmit.title}" submitted successfully!`);
-    setTimeout(() => setNotice(null), 4000);
-    setActiveAssignmentToSubmit(null);
-    setSubmissionNotes("");
-  };
-
-  const filtered = assignments.filter((a) => {
-    if (filter === "PENDING") return a.status === "PENDING";
-    if (filter === "SUBMITTED") return a.status === "SUBMITTED";
-    if (filter === "GRADED") return a.status === "GRADED";
+  const assignments = query.data?.assignments ?? [];
+  const counts = useMemo(() => ({
+    todo: assignments.filter((assignment) => !assignment.submission).length,
+    submitted: assignments.filter((assignment) => assignment.submission?.status === "SUBMITTED").length,
+    graded: assignments.filter((assignment) => assignment.submission?.status === "GRADED").length,
+  }), [assignments]);
+  const filtered = assignments.filter((assignment) => {
+    if (filter === "TODO") return !assignment.submission;
+    if (filter === "SUBMITTED") return assignment.submission?.status === "SUBMITTED";
+    if (filter === "GRADED") return assignment.submission?.status === "GRADED";
     return true;
   });
 
-  const pendingCount = assignments.filter((a) => a.status === "PENDING").length;
+  function openSubmission(assignment: StudentAssignment) {
+    setActiveAssignment(assignment);
+    setResponseText(assignment.submission?.responseText ?? "");
+    setNotice(null);
+  }
+
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!activeAssignment) return;
+    setNotice(null);
+    submitMutation.mutate({
+      assignmentId: activeAssignment.id,
+      responseText: responseText.trim(),
+    });
+  }
+
+  if (query.isPending) {
+    return <div role="status" className="flex min-h-48 items-center justify-center gap-2 rounded-2xl border border-border bg-card text-sm text-muted-foreground"><LoaderCircle className="size-4 animate-spin text-primary" />Loading published assignments…</div>;
+  }
+
+  if (query.isError) {
+    return <ErrorState message={`Assignments could not be loaded: ${query.error.message}`} onRetry={() => void query.refetch()} />;
+  }
 
   return (
-    <div className="space-y-6">
-      {/* Header & Filter Controls */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h2 className="text-xl font-black text-foreground">Assignments & Coursework</h2>
-          <p className="text-xs text-muted-foreground">
-            Submit homework tasks, upload lab write-ups, and review teacher scores
-          </p>
-        </div>
+    <div className="space-y-5">
+      <PageHeader
+        eyebrow="Student portal"
+        title="Assignments & coursework"
+        description="Review published work, submit your written responses, and check grades or teacher feedback."
+        icon={ClipboardList}
+      />
 
-        <div className="inline-flex rounded-xl border border-border bg-card p-1 text-xs">
-          {(["ALL", "PENDING", "SUBMITTED", "GRADED"] as const).map((mode) => (
-            <button
-              key={mode}
-              onClick={() => setFilter(mode)}
-              className={cn(
-                "rounded-lg px-3 py-1 font-bold transition",
-                filter === mode
-                  ? "bg-primary text-primary-foreground shadow-xs"
-                  : "text-muted-foreground hover:text-foreground",
-              )}
-            >
-              {mode === "ALL"
-                ? "All Tasks"
-                : mode === "PENDING"
-                  ? `Pending (${pendingCount})`
-                  : mode === "SUBMITTED"
-                    ? "Submitted"
-                    : "Graded"}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {notice && (
-        <div className="flex items-center gap-2 rounded-xl border border-success/20 bg-success/10 px-4 py-3 text-xs font-semibold text-success">
-          <Check className="size-4 text-success" />
-          {notice}
-        </div>
-      )}
-
-      {/* Grid of Assignments */}
-      <div className="grid gap-4 sm:grid-cols-2">
-        {filtered.map((asg) => (
-          <div
-            key={asg.id}
-            className="flex flex-col justify-between rounded-2xl border border-border/80 bg-card p-5 shadow-xs"
-          >
-            <div>
-              <div className="flex items-center justify-between text-xs">
-                <span className="rounded-md bg-primary/10 px-2.5 py-0.5 text-[10px] font-bold text-primary">
-                  {asg.subject}
-                </span>
-                <span
-                  className={cn(
-                    "rounded-full px-2 py-0.5 text-[10px] font-bold",
-                    asg.status === "GRADED" && "bg-success/10 text-success",
-                    asg.status === "SUBMITTED" && "bg-primary/10 text-primary",
-                    asg.status === "PENDING" && "bg-warning/10 text-warning",
-                  )}
-                >
-                  {asg.status}
-                </span>
-              </div>
-
-              <h3 className="mt-2 text-sm font-bold text-foreground">{asg.title}</h3>
-              <p className="mt-1 text-xs text-muted-foreground leading-relaxed">{asg.instructions}</p>
-
-              {asg.teacherRemarks && (
-                <div className="mt-3 rounded-xl bg-muted/50 p-2.5 text-[11px] text-foreground/80">
-                  <span className="font-bold text-primary">Teacher Remarks: </span>
-                  {asg.teacherRemarks}
-                </div>
-              )}
-            </div>
-
-            <div className="mt-4 flex items-center justify-between border-t border-border/60 pt-3 text-xs">
-              <span className="text-[11px] font-semibold text-muted-foreground/70">{asg.dueDate}</span>
-
-              {asg.status === "PENDING" ? (
-                <button
-                  onClick={() => setActiveAssignmentToSubmit(asg)}
-                  className="rounded-xl bg-primary px-3.5 py-1.5 font-bold text-primary-foreground shadow-xs hover:bg-primary/90"
-                >
-                  Submit Solution →
-                </button>
-              ) : asg.status === "GRADED" ? (
-                <span className="font-black text-success">
-                  {asg.score} / {asg.maxScore} marks
-                </span>
-              ) : (
-                <span className="flex items-center gap-1 font-semibold text-primary">
-                  <Check className="size-3.5" /> Awaiting Teacher Review
-                </span>
-              )}
-            </div>
+      <section className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between sm:p-5">
+        <div className="flex min-w-0 items-start gap-3">
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary"><BookOpen className="size-5" /></span>
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-foreground">{query.data?.class?.name ?? "Current class not assigned"}</p>
+            <p className="mt-1 text-xs text-muted-foreground">{[query.data?.academicYear?.name, query.data?.term?.name].filter(Boolean).join(" · ") || "Current academic term"}</p>
           </div>
+        </div>
+        <div className="grid grid-cols-3 gap-2 sm:min-w-80">
+          <Summary label="To do" value={counts.todo} />
+          <Summary label="Submitted" value={counts.submitted} />
+          <Summary label="Graded" value={counts.graded} />
+        </div>
+      </section>
+
+      {notice && <p role={notice.ok ? "status" : "alert"} className={`rounded-xl border px-4 py-3 text-sm ${notice.ok ? "border-success/20 bg-success/10 text-success" : "border-destructive/20 bg-destructive/10 text-destructive"}`}>{notice.text}</p>}
+
+      <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Filter assignments">
+        {([
+          ["ALL", "All assignments", assignments.length],
+          ["TODO", "To do", counts.todo],
+          ["SUBMITTED", "Submitted", counts.submitted],
+          ["GRADED", "Graded", counts.graded],
+        ] as const).map(([value, label, count]) => (
+          <button key={value} type="button" aria-pressed={filter === value} onClick={() => setFilter(value)} className={`inline-flex h-9 items-center gap-2 rounded-lg border px-3 text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${filter === value ? "border-primary bg-primary text-primary-foreground" : "border-border bg-card text-muted-foreground hover:bg-muted hover:text-foreground"}`}>
+            {label}<span className={`rounded-full px-1.5 py-0.5 text-[10px] tabular-nums ${filter === value ? "bg-primary-foreground/15" : "bg-muted"}`}>{count}</span>
+          </button>
         ))}
       </div>
 
-      {/* Submission Modal */}
+      {filtered.length === 0 ? (
+        <EmptyState
+          icon={ClipboardList}
+          title={assignments.length === 0 ? "No published assignments" : "No assignments in this filter"}
+          description={assignments.length === 0
+            ? query.data?.class
+              ? "Your teachers' published assignments for the current term will appear here. New work will also create a notification."
+              : "Ask the school office to confirm your current class enrollment if this looks incorrect."
+            : "Choose another filter to see your current assignments."}
+        />
+      ) : (
+        <section aria-label="Published assignments" className="grid min-w-0 gap-3 xl:grid-cols-2">
+          {filtered.map((assignment) => {
+            const status = statusLabel(assignment);
+            const statusClass = assignment.submission?.status === "GRADED"
+              ? "bg-success/10 text-success"
+              : assignment.submission?.status === "SUBMITTED"
+                ? "bg-primary/10 text-primary"
+                : isOverdue(assignment)
+                  ? "bg-destructive/10 text-destructive"
+                  : "bg-warning/10 text-warning";
+            return (
+              <article key={assignment.id} className="flex min-w-0 flex-col rounded-2xl border border-border bg-card p-4 shadow-sm sm:p-5">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-semibold uppercase tracking-wider text-primary">{assignment.subject.code} · {assignment.subject.name}</p>
+                    <h2 className="mt-1.5 break-words text-base font-bold text-foreground">{assignment.title}</h2>
+                  </div>
+                  <span className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-bold ${statusClass}`}>{status}</span>
+                </div>
+                <p className="mt-3 whitespace-pre-wrap break-words text-sm leading-6 text-muted-foreground">{assignment.instructions}</p>
+                <div className="mt-4 grid gap-2 rounded-xl bg-muted/30 p-3 text-xs sm:grid-cols-2">
+                  <div className="flex min-w-0 items-start gap-2 text-muted-foreground"><CalendarClock className="mt-0.5 size-4 shrink-0" /><span>{assignment.dueAt ? `Due ${dateTime(assignment.dueAt)}` : "No due date specified"}</span></div>
+                  <div className="flex min-w-0 items-start gap-2 text-muted-foreground"><Clock className="mt-0.5 size-4 shrink-0" /><span>Maximum score: {assignment.maxScore}</span></div>
+                </div>
+                {assignment.submission?.status === "GRADED" && (
+                  <section className="mt-3 rounded-xl border border-success/20 bg-success/5 p-3">
+                    <div className="flex items-start justify-between gap-3"><p className="text-xs font-semibold text-foreground">Teacher feedback</p><p className="shrink-0 text-sm font-bold tabular-nums text-success">{assignment.submission.score ?? "—"} / {assignment.maxScore}</p></div>
+                    <p className="mt-1 whitespace-pre-wrap break-words text-sm leading-6 text-muted-foreground">{assignment.submission.feedback || "No written feedback was added."}</p>
+                  </section>
+                )}
+                {assignment.submission?.status === "SUBMITTED" && <p className="mt-3 text-xs text-muted-foreground">Submitted {dateTime(assignment.submission.submittedAt)} · Awaiting teacher review.</p>}
+                <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-3">
+                  <p className="text-[11px] text-muted-foreground">Set by {assignment.teacher.name}</p>
+                  {assignment.submission?.status === "GRADED" ? (
+                    <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-success"><CheckCircle2 className="size-4" />Graded</span>
+                  ) : (
+                    <button type="button" onClick={() => openSubmission(assignment)} className="inline-flex h-9 items-center gap-2 rounded-lg bg-primary px-3.5 text-xs font-semibold text-primary-foreground hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                      <Send className="size-3.5" />{assignment.submission ? "Edit response" : "Submit response"}
+                    </button>
+                  )}
+                </div>
+              </article>
+            );
+          })}
+        </section>
+      )}
+
       <PortalModal
-        isOpen={!!activeAssignmentToSubmit}
-        onClose={() => setActiveAssignmentToSubmit(null)}
-        title={activeAssignmentToSubmit ? `Submit: ${activeAssignmentToSubmit.title}` : "Submit Assignment"}
-        description={`Course: ${activeAssignmentToSubmit?.subject}`}
-        maxWidth="md"
+        isOpen={!!activeAssignment}
+        onClose={() => { setActiveAssignment(null); setNotice(null); }}
+        title={activeAssignment ? `Submit: ${activeAssignment.title}` : "Submit assignment"}
+        description={activeAssignment ? `${activeAssignment.subject.name} · ${activeAssignment.maxScore} marks maximum` : undefined}
+        maxWidth="2xl"
+        footer={<><button type="button" onClick={() => setActiveAssignment(null)} disabled={submitMutation.isPending} className="h-10 rounded-lg border border-border px-4 text-xs font-semibold text-foreground hover:bg-muted disabled:opacity-50">Cancel</button><button type="submit" form="student-assignment-response" disabled={submitMutation.isPending || !responseText.trim()} className="inline-flex h-10 items-center gap-2 rounded-lg bg-primary px-4 text-xs font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-50">{submitMutation.isPending ? <LoaderCircle className="size-4 animate-spin" /> : <Send className="size-4" />}{submitMutation.isPending ? "Saving…" : "Save response"}</button></>}
       >
-        <form onSubmit={handleSubmit} className="space-y-4 text-xs">
-          <div>
-            <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-              Assignment Instructions
-            </label>
-            <p className="mt-1 text-muted-foreground">
-              {activeAssignmentToSubmit?.instructions}
-            </p>
-          </div>
-
-          <div className="rounded-xl border border-dashed border-primary/20 bg-primary/10 p-6 text-center">
-            <Upload className="mx-auto size-8 text-primary" />
-            <p className="mt-2 font-bold text-foreground">
-              Upload assignment PDF or Doc file
-            </p>
-            <p className="text-[10px] text-muted-foreground/70 mt-0.5">
-              Drag and drop file here, or click to browse
-            </p>
-          </div>
-
-          <div>
-            <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-              Student Submission Notes
-            </label>
-            <textarea
-              rows={3}
-              placeholder="Add any comments or notes for your teacher..."
-              value={submissionNotes}
-              onChange={(e) => setSubmissionNotes(e.target.value)}
-              className="mt-1 w-full rounded-lg border border-border p-2 text-xs outline-none focus:border-primary dark:bg-muted dark:text-foreground"
-            />
-          </div>
-
-          <div className="flex justify-end gap-2 pt-2 border-t border-border/60">
-            <button
-              type="button"
-              onClick={() => setActiveAssignmentToSubmit(null)}
-              className="rounded-xl border border-border px-4 py-2 text-xs font-semibold text-foreground/80"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="rounded-xl bg-primary px-4 py-2 text-xs font-bold text-primary-foreground hover:bg-primary/90"
-            >
-              Confirm Submission
-            </button>
-          </div>
+        <form id="student-assignment-response" onSubmit={submit} className="space-y-4">
+          {notice && !notice.ok && <p role="alert" className="rounded-lg border border-destructive/20 bg-destructive/10 px-3 py-2 text-xs text-destructive">{notice.text}</p>}
+          <div className="rounded-xl border border-border bg-muted/30 p-3"><h3 className="text-xs font-semibold text-foreground">Instructions</h3><p className="mt-1 whitespace-pre-wrap text-sm leading-6 text-muted-foreground">{activeAssignment?.instructions}</p></div>
+          <label className="grid gap-1.5 text-xs font-semibold text-foreground">Your response<textarea value={responseText} onChange={(event) => setResponseText(event.target.value)} required maxLength={20_000} rows={8} placeholder="Write your answer here…" className="min-h-44 resize-y rounded-lg border border-input bg-background px-3 py-2.5 text-sm font-normal leading-6 outline-none focus-visible:ring-2 focus-visible:ring-ring" /><span className="text-right text-[10px] font-normal text-muted-foreground">{responseText.length.toLocaleString()} / 20,000 characters · Text responses only</span></label>
+          <p className="text-[11px] leading-5 text-muted-foreground">Your saved response is visible to your subject teacher. After it has been graded, it can no longer be edited.</p>
         </form>
       </PortalModal>
     </div>
   );
+}
+
+function Summary({ label, value }: { label: string; value: number }) {
+  return <div className="rounded-xl border border-border bg-background px-3 py-2"><p className="text-[10px] text-muted-foreground">{label}</p><p className="mt-1 text-lg font-bold tabular-nums text-foreground">{value}</p></div>;
 }

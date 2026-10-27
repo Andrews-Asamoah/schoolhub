@@ -1,4 +1,4 @@
-import { BookOpen, Calendar, ClipboardCheck, FileSpreadsheet, GraduationCap, LayoutDashboard, Megaphone, UserCheck, Users } from "lucide-react";
+import { BookOpen, Calendar, ClipboardCheck, ClipboardList, FileSpreadsheet, GraduationCap, LayoutDashboard, Megaphone, UserCheck, Users } from "lucide-react";
 import { useState } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AssessmentEntryWorkspace } from "@/components/school/assessment-entry-workspace";
@@ -9,8 +9,9 @@ import { cn } from "@/lib/utils";
 import { PortalStatCard } from "./portal-stat-card";
 import { TeacherClassesView } from "./teacher-classes-view";
 import { AdminAnnouncementsWorkspace } from "./admin-announcements-workspace";
+import { TeacherAssignmentsWorkspace } from "./teacher-assignments-workspace";
 
-type Tab = "overview" | "classes" | "gradebook" | "attendance" | "timetable" | "announcements";
+type Tab = "overview" | "classes" | "gradebook" | "attendance" | "timetable" | "assignments" | "announcements";
 
 interface TeacherPortalWorkspaceProps {
   defaultTab?: Tab;
@@ -48,6 +49,7 @@ export function TeacherPortalWorkspace({ defaultTab = "overview" }: TeacherPorta
     { id: "gradebook", label: "Gradebook & Marks", icon: FileSpreadsheet },
     { id: "attendance", label: "Attendance Register", icon: ClipboardCheck },
     { id: "timetable", label: "Weekly Timetable", icon: Calendar },
+    { id: "assignments", label: "Assignments", icon: ClipboardList },
     { id: "announcements", label: "Announcements", icon: Megaphone },
   ];
 
@@ -175,6 +177,7 @@ export function TeacherPortalWorkspace({ defaultTab = "overview" }: TeacherPorta
           </div>
         ))}
       {activeTab === "timetable" && <TimetableWorkspace />}
+      {activeTab === "assignments" && <TeacherAssignmentsWorkspace />}
       {activeTab === "announcements" && <AdminAnnouncementsWorkspace mode="teacher" />}
       </div>
     </div>

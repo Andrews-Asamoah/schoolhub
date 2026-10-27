@@ -28,6 +28,7 @@ import { AnnouncementsModule } from "./modules/announcements/announcements.modul
 import { NotificationsModule } from "./modules/notifications/notifications.module.js";
 import { DocumentsModule } from "./modules/documents/documents.module.js";
 import { MessagesModule } from "./modules/messages/messages.module.js";
+import { AssignmentsModule } from "./modules/assignments/assignments.module.js";
 import { InventoryModule } from "./modules/inventory/inventory.module.js";
 import { DashboardModule } from "./modules/dashboard/dashboard.module.js";
 
@@ -58,6 +59,7 @@ import { DashboardModule } from "./modules/dashboard/dashboard.module.js";
     NotificationsModule,
     DocumentsModule,
     MessagesModule,
+    AssignmentsModule,
     InventoryModule,
     DashboardModule,
   ],

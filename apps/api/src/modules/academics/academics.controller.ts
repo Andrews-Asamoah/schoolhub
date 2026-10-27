@@ -64,7 +64,7 @@ export class AcademicsController {
   }
 
   @Get('classes')
-  @Roles('owner', 'admin', 'teacher', 'staff', 'accountant')
+  @Roles('owner', 'admin', 'headteacher', 'teacher', 'staff', 'accountant')
   async listClasses(
     @CurrentSchool() school: School,
     @CurrentSchoolRole() role: string | undefined,

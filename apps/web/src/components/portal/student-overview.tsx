@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { ArrowRight, BookOpen, CalendarCheck, ClipboardList, FileText, GraduationCap, Megaphone, UserRound } from "lucide-react";
+import { ArrowRight, Bell, BookOpen, CalendarCheck, ClipboardList, FileText, GraduationCap, Megaphone, MessageSquare, UserRound } from "lucide-react";
 import { MyProfilePanel } from "@/components/school/student-profile-panel";
 import { apiFetch } from "@/lib/api";
 import { useSession } from "@/lib/auth-client";
@@ -21,6 +21,8 @@ const quickLinks = [
   { title: "Academic reports", description: "View reports published by school", page: "assessments", icon: FileText },
   { title: "School notices", description: "Read official school announcements", page: "announcements", icon: Megaphone },
   { title: "Classmates", description: "View classmates in your class", page: "classmates", icon: UserRound },
+  { title: "Messages", description: "Open private school messages", page: "messages", icon: MessageSquare },
+  { title: "Notification history", description: "Review alerts and school updates", page: "notifications", icon: Bell },
 ] as const;
 
 export function StudentOverview() {
@@ -30,7 +32,7 @@ export function StudentOverview() {
     queryFn: () => apiFetch<StudentProfileResponse>("/students/me"),
     retry: false,
   });
-  const firstName = profile?.profile?.firstName || session?.user?.name?.trim().split(/\\s+/)[0] || "Student";
+  const firstName = profile?.profile?.firstName || session?.user?.name?.trim().split(/\s+/)[0] || "Student";
 
   return (
     <div className="space-y-6">
