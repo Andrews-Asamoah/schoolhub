@@ -117,7 +117,7 @@ export class SuperAdminController {
     body: SetSchoolAdminBannedInput,
     @AuditActorParam() actor: AuditActor,
   ) {
-    return this.superAdminService.setSchoolAdminBanned(id, userId, body.banned, actor);
+    return this.superAdminService.setSchoolAdminBanned(id, userId, body.banned, actor, body.reason);
   }
 
   @Post("schools/:id/admins/:userId/reset-two-factor")
