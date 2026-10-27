@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, CircleAlert, Eye, EyeOff, KeyRound, Laptop, LoaderCircle, LogOut, Mail, ShieldCheck, Smartphone, UserCircle, X } from "lucide-react";
+import { Check, CircleAlert, Eye, EyeOff, KeyRound, Laptop, LoaderCircle, LogOut, Mail, ShieldCheck, Smartphone, Trash2, UserCircle, X } from "lucide-react";
 import { useMemo, useState, type FormEvent } from "react";
 import { PASSWORD_MIN_LENGTH, changePasswordSchema } from "@schoolhub/shared";
 import { ApiError, apiFetch } from "@/lib/api";
@@ -170,6 +170,83 @@ function SessionsCard({ currentToken }: { currentToken?: string }) {
   );
 }
 
+
+function TrustedDevicesCard() {
+  const queryClient = useQueryClient();
+  const devices = useQuery({
+    queryKey: ["superadmin", "trusted-devices"],
+    queryFn: () => apiFetch<{ data: { id: string; createdAt: string; expiresAt: string }[] }>(
+      "/account/security/trusted-devices",
+      { method: "GET" },
+    ),
+    retry: false,
+  });
+  const revokeOne = useMutation({
+    mutationFn: (id: string) => apiFetch(
+      `/account/security/trusted-devices/${encodeURIComponent(id)}`,
+      { method: "DELETE" },
+    ),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["superadmin", "trusted-devices"] }),
+  });
+  const revokeAll = useMutation({
+    mutationFn: () => apiFetch<{ success: boolean; revoked: number }>(
+      "/account/security/trusted-devices/revoke-all",
+      { method: "DELETE" },
+    ),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["superadmin", "trusted-devices"] }),
+  });
+  const rows = devices.data?.data ?? [];
+
+  return (
+    <Card title="Trusted devices" description="Browsers you explicitly trusted after a successful 2FA check. Trust expires after 30 days and can be revoked here.">
+      {devices.isPending ? <LoadingPanel label="Loading trusted devices…" /> : devices.error ? (
+        <ErrorPanel message={devices.error.message} onRetry={() => void devices.refetch()} />
+      ) : rows.length === 0 ? (
+        <div className="rounded-xl border border-dashed border-border px-4 py-6 text-center">
+          <ShieldCheck className="mx-auto size-6 text-muted-foreground" />
+          <p className="mt-2 text-sm font-semibold text-foreground">No trusted devices</p>
+          <p className="mt-1 text-xs text-muted-foreground">At your next sign-in, select “Trust this device for 30 days” on a private device you control.</p>
+        </div>
+      ) : (
+        <>
+          <ul className="divide-y divide-border">
+            {rows.map((device) => (
+              <li key={device.id} className="flex items-center gap-3 py-3.5 first:pt-0 last:pb-0">
+                <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-muted text-muted-foreground"><Laptop className="size-5" /></span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-foreground">Trusted browser</p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">Added {formatDateTime(device.createdAt)} · expires {formatDateTime(device.expiresAt)}</p>
+                </div>
+                <button
+                  type="button"
+                  disabled={revokeOne.isPending || revokeAll.isPending}
+                  onClick={() => revokeOne.mutate(device.id)}
+                  className="superadmin-button-secondary inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold"
+                >
+                  <Trash2 className="size-3.5" /> Revoke
+                </button>
+              </li>
+            ))}
+          </ul>
+          <button
+            type="button"
+            disabled={revokeAll.isPending || revokeOne.isPending}
+            onClick={() => revokeAll.mutate()}
+            className="superadmin-button-danger mt-5 inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold"
+          >
+            <LogOut className="size-4" /> Revoke all trusted devices
+          </button>
+        </>
+      )}
+      {(revokeOne.error || revokeAll.error) && (
+        <p role="alert" className="mt-3 text-xs font-medium text-destructive">
+          {(revokeOne.error ?? revokeAll.error)?.message ?? "Could not revoke the trusted device."}
+        </p>
+      )}
+    </Card>
+  );
+}
+
 function AccountSecurityPage() {
   const { data: session } = useSession();
   const user = session?.user;
@@ -203,6 +280,8 @@ function AccountSecurityPage() {
       </Card>
 
       <SessionsCard currentToken={session?.session?.token} />
+
+      <TrustedDevicesCard />
 
       <Card title="Two-factor authentication" description="Required for platform administrators. Signing in needs your password and a code from your authenticator app.">
         <TwoFactorPanel required />
