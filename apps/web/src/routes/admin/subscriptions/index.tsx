@@ -24,6 +24,7 @@ interface SchoolSubscription extends SubscriptionTarget {
   subdomain: string;
   createdAt: string;
   _count: { students: number; teachers: number };
+  subscription?: { planId: string | null; planName: string; amount: string | number | null; currency: string; billingCycle: "MONTHLY" | "YEARLY" | null; maxStudents: number | null; maxTeachers: number | null; maxGuardians: number | null; maxStaff: number | null } | null;
 }
 
 interface SchoolsResponse {
@@ -120,10 +121,11 @@ function SubscriptionsPage() {
         ) : (
           <>
             <div className={cn("overflow-x-auto transition-opacity", schools.isPlaceholderData && "opacity-60")}>
-              <table className="w-full min-w-[720px] text-left text-sm">
+              <table className="w-full min-w-[860px] text-left text-sm">
                 <thead>
                   <tr className="border-b border-border bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground">
                     <th scope="col" className="px-5 py-3 font-semibold">School</th>
+                    <th scope="col" className="px-5 py-3 font-semibold">Plan</th>
                     <th scope="col" className="px-5 py-3 font-semibold">Status</th>
                     <th scope="col" className="px-5 py-3 font-semibold">Expires</th>
                     <th scope="col" className="hidden px-5 py-3 font-semibold md:table-cell">Students</th>
@@ -136,6 +138,10 @@ function SubscriptionsPage() {
                       <td className="px-5 py-3.5">
                         <p className="font-semibold text-foreground">{school.name}</p>
                         <p className="mt-0.5 text-xs text-muted-foreground">{school.code} · {school.subdomain}</p>
+                      </td>
+                      <td className="px-5 py-3.5">
+                        <p className="font-semibold text-foreground">{school.subscription?.planName ?? "Unassigned"}</p>
+                        <p className="mt-0.5 text-xs text-muted-foreground">{school.subscription?.amount !== null && school.subscription?.amount !== undefined ? `${school.subscription.currency} ${Number(school.subscription.amount).toFixed(2)} / ${school.subscription.billingCycle?.toLowerCase() ?? "cycle"}` : "No price configured"}</p>
                       </td>
                       <td className="px-5 py-3.5">
                         <SubscriptionBadge status={school.organization.subscriptionStatus} expiresAt={school.organization.expiresAt} />
