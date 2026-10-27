@@ -907,6 +907,50 @@ export class SuperAdminService {
     return this.getSchool(id);
   }
 
+  async assignSubscriptionPlan(
+    schoolId: string,
+    input: { planId: string; billingCycle: "MONTHLY" | "YEARLY" },
+    actor: AuditActor,
+  ) {
+    const [school, plan] = await Promise.all([
+      this.prisma.client.school.findUnique({ where: { id: schoolId }, select: { id: true, name: true } }),
+      this.prisma.client.subscriptionPlan.findUnique({ where: { id: input.planId } }),
+    ]);
+    if (!school) throw new NotFoundException("School not found");
+    if (!plan || !plan.isActive) throw new BadRequestException("Choose an active subscription plan");
+    const price = input.billingCycle === "YEARLY" ? plan.yearlyPrice : plan.monthlyPrice;
+    const legacyPlanType = ["FREE", "BASIC", "STANDARD", "PREMIUM", "ENTERPRISE"].includes(plan.code)
+      ? plan.code as "FREE" | "BASIC" | "STANDARD" | "PREMIUM" | "ENTERPRISE"
+      : "BASIC";
+    const updated = await this.prisma.client.$transaction(async (tx) => {
+      const subscription = await tx.subscription.upsert({
+        where: { schoolId },
+        update: {
+          planId: plan.id, planName: plan.name, planType: legacyPlanType,
+          billingCycle: input.billingCycle, amount: price, currency: plan.currency,
+          maxStudents: plan.maxStudents, maxTeachers: plan.maxTeachers,
+          maxGuardians: plan.maxGuardians, maxStaff: plan.maxStaff,
+        },
+        create: {
+          schoolId, planId: plan.id, planName: plan.name, planType: legacyPlanType,
+          billingCycle: input.billingCycle, amount: price, currency: plan.currency,
+          maxStudents: plan.maxStudents, maxTeachers: plan.maxTeachers,
+          maxGuardians: plan.maxGuardians, maxStaff: plan.maxStaff,
+        },
+      });
+      await writeAudit(tx, actor, {
+        action: "SUBSCRIPTION_CHANGED", entityType: "super-admin.subscription-plan.assign",
+        entityId: subscription.id, schoolId,
+        newValues: { planId: plan.id, planCode: plan.code, planName: plan.name,
+          billingCycle: input.billingCycle, amount: price.toString(), currency: plan.currency,
+          limits: { students: plan.maxStudents, teachers: plan.maxTeachers,
+            guardians: plan.maxGuardians, staff: plan.maxStaff, storageMb: plan.maxStorageMb } },
+      });
+      return subscription;
+    });
+    return { schoolId, schoolName: school.name, subscription: updated };
+  }
+
   /** Platform-owned plan catalogue. Nullable limits intentionally mean unlimited. */
   async listSubscriptionPlans() {
     return this.prisma.client.subscriptionPlan.findMany({
