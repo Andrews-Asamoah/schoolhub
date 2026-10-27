@@ -1,6 +1,8 @@
 import {
   Body,
   Controller,
+  Delete,
+  Get,
   Header,
   HttpCode,
   Param,
@@ -24,6 +26,8 @@ import { RolesGuard } from "../../common/guards/roles.guard.js";
 import { SchoolTenantGuard } from "../../common/guards/school-tenant.guard.js";
 import { ZodValidationPipe } from "../../common/pipes/zod-validation.pipe.js";
 import { AccountsService } from "./accounts.service.js";
+import { AuditActorParam } from "../../common/audit/audit-actor.decorator.js";
+import type { AuditActor } from "../../common/audit/audit.js";
 
 /**
  * Deliberately NOT behind SchoolTenantGuard: a user whose password is still
@@ -33,6 +37,40 @@ import { AccountsService } from "./accounts.service.js";
 @Controller("account")
 export class AccountController {
   constructor(private readonly accounts: AccountsService) {}
+
+  @Get("security/trusted-devices")
+  @Header("Cache-Control", "no-store")
+  listTrustedDevices(@Session() session: UserSession) {
+    return this.accounts.listTrustedDevices(session.user as { id: string; role?: string });
+  }
+
+  @Delete("security/trusted-devices/revoke-all")
+  @HttpCode(200)
+  @Header("Cache-Control", "no-store")
+  revokeAllTrustedDevices(
+    @Session() session: UserSession,
+    @AuditActorParam() actor: AuditActor,
+  ) {
+    return this.accounts.revokeAllTrustedDevices(
+      session.user as { id: string; role?: string },
+      actor,
+    );
+  }
+
+  @Delete("security/trusted-devices/:deviceId")
+  @HttpCode(200)
+  @Header("Cache-Control", "no-store")
+  revokeTrustedDevice(
+    @Session() session: UserSession,
+    @Param("deviceId") deviceId: string,
+    @AuditActorParam() actor: AuditActor,
+  ) {
+    return this.accounts.revokeTrustedDevice(
+      session.user as { id: string; role?: string },
+      deviceId,
+      actor,
+    );
+  }
 
   @Post("change-password")
   @HttpCode(200)
