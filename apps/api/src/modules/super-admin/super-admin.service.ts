@@ -97,7 +97,12 @@ export class SuperAdminService {
           organization: {
             select: { subscriptionStatus: true, expiresAt: true, metadata: true },
           },
-          _count: { select: { students: true, teachers: true } },
+          _count: {
+          select: {
+            students: { where: { deletedAt: null } },
+            teachers: { where: { deletedAt: null } },
+          },
+        },
         },
         orderBy: { createdAt: "desc" },
         skip: (page - 1) * limit,
@@ -326,7 +331,12 @@ export class SuperAdminService {
             },
           },
         },
-        _count: { select: { students: true, teachers: true } },
+        _count: {
+            select: {
+              students: { where: { deletedAt: null } },
+              teachers: { where: { deletedAt: null } },
+            },
+          },
         academicYears: {
           where: { isCurrent: true },
           take: 1,
@@ -985,8 +995,8 @@ export class SuperAdminService {
     const [totalSchools, totalStudents, totalTeachers, byStatus, expiringSoon, lapsed] =
       await Promise.all([
         this.prisma.client.school.count(),
-        this.prisma.client.student.count(),
-        this.prisma.client.teacher.count(),
+        this.prisma.client.student.count({ where: { deletedAt: null } }),
+        this.prisma.client.teacher.count({ where: { deletedAt: null } }),
         this.prisma.client.organization.groupBy({
           by: ["subscriptionStatus"],
           where: { school: { isNot: null } },

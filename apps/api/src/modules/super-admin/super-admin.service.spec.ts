@@ -9,11 +9,13 @@ const DAY = 86_400_000;
 
 function makeService(overrides: Record<string, any> = {}) {
   const client: Record<string, any> = {
-    school: { findUnique: vi.fn(), findFirst: vi.fn(async () => null), update: vi.fn(), create: vi.fn(async (a: any) => ({ id: "sch1", ...a.data })), count: vi.fn() },
-    organization: { update: vi.fn(), create: vi.fn() },
+    school: { findUnique: vi.fn(), findFirst: vi.fn(async () => null), findMany: vi.fn(async () => []), update: vi.fn(), create: vi.fn(async (a: any) => ({ id: "sch1", ...a.data })), count: vi.fn(async () => 0) },
+    organization: { update: vi.fn(), create: vi.fn(), groupBy: vi.fn(async () => []), count: vi.fn(async () => 0) },
     subscription: { upsert: vi.fn(), create: vi.fn() },
     user: { findUnique: vi.fn(async () => null), create: vi.fn(async (a: any) => ({ ...a.data })) },
     account: { create: vi.fn() },
+    student: { count: vi.fn(async () => 0) },
+    teacher: { count: vi.fn(async () => 0) },
     member: { findUnique: vi.fn(), findFirst: vi.fn(), create: vi.fn(), update: vi.fn(), delete: vi.fn() },
     session: { deleteMany: vi.fn() },
     auditLog: { create: vi.fn(), findMany: vi.fn(async () => []), count: vi.fn(async () => 0) },
@@ -59,6 +61,66 @@ describe("getOperationsHealth", () => {
       unfinishedCount: null,
     });
     expect(JSON.stringify(result)).not.toContain("internal database detail");
+  });
+});
+
+describe("platform summary counts", () => {
+  it("excludes soft-deleted students and teachers from platform totals", async () => {
+    const { service, client } = makeService();
+    client.school.count.mockResolvedValue(4);
+    client.student.count.mockResolvedValue(120);
+    client.teacher.count.mockResolvedValue(18);
+    client.organization.groupBy.mockResolvedValue([
+      { subscriptionStatus: "ACTIVE", _count: { _all: 3 } },
+      { subscriptionStatus: "TRIALING", _count: { _all: 1 } },
+    ]);
+
+    const result = await service.getPlatformStats();
+
+    expect(client.student.count).toHaveBeenCalledWith({ where: { deletedAt: null } });
+    expect(client.teacher.count).toHaveBeenCalledWith({ where: { deletedAt: null } });
+    expect(result).toMatchObject({
+      totalSchools: 4,
+      totalStudents: 120,
+      totalTeachers: 18,
+      activeSubscriptions: 3,
+      trialing: 1,
+    });
+  });
+
+  it("excludes soft-deleted records from school-directory counts", async () => {
+    const { service, client } = makeService();
+
+    await service.listSchools({ page: 1, limit: 20 } as never);
+
+    expect(client.school.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      select: expect.objectContaining({
+        _count: {
+          select: {
+            students: { where: { deletedAt: null } },
+            teachers: { where: { deletedAt: null } },
+          },
+        },
+      }),
+    }));
+  });
+
+  it("excludes soft-deleted records from school-detail counts", async () => {
+    const { service, client } = makeService();
+    client.school.findUnique.mockResolvedValue({ id: "sch1" });
+
+    await service.getSchool("sch1");
+
+    expect(client.school.findUnique).toHaveBeenCalledWith(expect.objectContaining({
+      include: expect.objectContaining({
+        _count: {
+          select: {
+            students: { where: { deletedAt: null } },
+            teachers: { where: { deletedAt: null } },
+          },
+        },
+      }),
+    }));
   });
 });
 
