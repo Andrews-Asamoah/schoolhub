@@ -217,6 +217,102 @@ export class SuperAdminService {
     return { data: rows, meta: paginate(total, page, limit) };
   }
 
+  /**
+   * Derive onboarding readiness from persisted school configuration. This is a
+   * snapshot, not a client-maintained checklist: each item is backed by current
+   * database records and remains incomplete until its prerequisites exist.
+   */
+  async getSchoolOnboardingStatus(id: string) {
+    const school = await this.prisma.client.school.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        email: true,
+        phone: true,
+        address: true,
+        academicYears: {
+          where: { isCurrent: true },
+          select: { id: true, name: true, terms: { select: { id: true } } },
+        },
+        financeSettings: { select: { schoolId: true } },
+        _count: {
+          select: {
+            classes: { where: { isActive: true, deletedAt: null } },
+            subjects: { where: { isActive: true, deletedAt: null } },
+            teachers: { where: { isActive: true, deletedAt: null } },
+            feeStructures: { where: { isActive: true } },
+            assessmentTemplates: true,
+            reportCardTemplates: true,
+          },
+        },
+      },
+    });
+
+    if (!school) throw new NotFoundException(`School with id "${id}" not found`);
+
+    const currentYear = school.academicYears[0] ?? null;
+    const counts = school._count;
+    const steps = [
+      {
+        id: "school-profile",
+        label: "School contact profile",
+        complete: Boolean(school.email?.trim() && school.phone?.trim() && school.address?.trim()),
+        detail: school.email?.trim() && school.phone?.trim() && school.address?.trim()
+          ? "Email, phone, and address are recorded."
+          : "Add the school's email, phone, and address.",
+      },
+      {
+        id: "academic-calendar",
+        label: "Academic year and term",
+        complete: Boolean(currentYear && currentYear.terms.length > 0),
+        detail: currentYear
+          ? `${currentYear.name} is current; ${currentYear.terms.length} term(s) configured.`
+          : "Set a current academic year and add at least one term.",
+      },
+      {
+        id: "classes",
+        label: "Classes",
+        complete: counts.classes > 0,
+        detail: `${counts.classes} class record(s) found.`,
+      },
+      {
+        id: "subjects",
+        label: "Subjects",
+        complete: counts.subjects > 0,
+        detail: `${counts.subjects} subject record(s) found.`,
+      },
+      {
+        id: "teachers",
+        label: "Teaching staff",
+        complete: counts.teachers > 0,
+        detail: `${counts.teachers} teacher record(s) found.`,
+      },
+      {
+        id: "finance",
+        label: "Finance setup",
+        complete: Boolean(school.financeSettings && counts.feeStructures > 0),
+        detail: school.financeSettings && counts.feeStructures > 0
+          ? `${counts.feeStructures} fee structure(s) and finance settings are configured.`
+          : "Configure finance settings and at least one fee structure.",
+      },
+      {
+        id: "assessment",
+        label: "Assessment and report cards",
+        complete: counts.assessmentTemplates > 0 && counts.reportCardTemplates > 0,
+        detail: `${counts.assessmentTemplates} assessment template(s); ${counts.reportCardTemplates} report-card template(s).`,
+      },
+    ];
+    const completed = steps.filter((step) => step.complete).length;
+    return {
+      schoolId: school.id,
+      completed,
+      total: steps.length,
+      percentage: Math.round((completed / steps.length) * 100),
+      steps,
+      generatedAt: new Date().toISOString(),
+    };
+  }
+
   async getSchool(id: string) {
     const school = await this.prisma.client.school.findUnique({
       where: { id },
