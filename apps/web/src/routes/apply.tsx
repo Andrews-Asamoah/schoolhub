@@ -135,6 +135,7 @@ function ApplyForm({ subdomain, intake }: { subdomain: string; intake: PublicInt
   const [done, setDone] = useState<Submitted | null>(null);
   const cycle = intake.cycles.find((c) => c.id === cycleId)!;
   const set = (key: string) => (e: { target: { value: string } }) => setV((cur) => ({ ...cur, [key]: e.target.value }));
+  const setSelection = (key: string) => (value: string) => setV((current) => ({ ...current, [key]: value }));
 
   const submit = useMutation({
     mutationFn: (body: unknown) =>
@@ -198,7 +199,7 @@ function ApplyForm({ subdomain, intake }: { subdomain: string; intake: PublicInt
         )}
         <label className={`${lbl} sm:col-span-2`}>
           Class applying for
-          <Select value={v.classId || "__none__"} onValueChange={(value) => set("classId")(value === "__none__" ? "" : value)}>
+          <Select value={v.classId || "__none__"} onValueChange={(value) => setSelection("classId")(value === "__none__" ? "" : value)}>
             <SelectTrigger aria-label="Class applying for" className={field}><SelectValue placeholder="Choose a class…" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="__none__">Choose a class…</SelectItem>
@@ -210,7 +211,7 @@ function ApplyForm({ subdomain, intake }: { subdomain: string; intake: PublicInt
         <label className={lbl}>Last name<input className={field} value={v.lastName ?? ""} onChange={set("lastName")} autoComplete="off" /></label>
         <label className={lbl}>Other names<input className={field} value={v.otherNames ?? ""} onChange={set("otherNames")} /></label>
         <label className={lbl}>Gender
-          <Select value={v.gender} onValueChange={set("gender")}>
+          <Select value={v.gender} onValueChange={setSelection("gender")}>
             <SelectTrigger aria-label="Student gender" className={field}><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="MALE">Male</SelectItem><SelectItem value="FEMALE">Female</SelectItem><SelectItem value="OTHER">Other</SelectItem>
@@ -231,7 +232,7 @@ function ApplyForm({ subdomain, intake }: { subdomain: string; intake: PublicInt
         <label className={lbl}>First name<input className={field} value={v.guardianFirstName ?? ""} onChange={set("guardianFirstName")} /></label>
         <label className={lbl}>Last name<input className={field} value={v.guardianLastName ?? ""} onChange={set("guardianLastName")} /></label>
         <label className={lbl}>Relationship
-          <Select value={v.guardianRelationship} onValueChange={set("guardianRelationship")}>
+          <Select value={v.guardianRelationship} onValueChange={setSelection("guardianRelationship")}>
             <SelectTrigger aria-label="Guardian relationship" className={field}><SelectValue /></SelectTrigger>
             <SelectContent>{GUARDIAN_RELATIONSHIPS.map((relationship) => <SelectItem key={relationship} value={relationship}>{relationship.charAt(0) + relationship.slice(1).toLowerCase()}</SelectItem>)}</SelectContent>
           </Select>
