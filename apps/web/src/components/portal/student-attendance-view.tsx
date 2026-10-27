@@ -27,7 +27,11 @@ interface StudentAttendanceResponse {
     PERMISSION?: number;
   };
   totalDays: number;
-  attendanceRate: number;
+  attendanceRate: number | null;
+  possibleDays?: number;
+  unmarkedDays?: number;
+  coverageRate?: number | null;
+  eligibilityWarning?: string | null;
   recentRecords?: AttendanceRecord[];
 }
 
@@ -40,7 +44,7 @@ export function StudentAttendanceView() {
 
   const summary = data?.summary ?? {};
   const totalDays = data?.totalDays ?? 0;
-  const attendanceRate = data?.attendanceRate ?? 0;
+  const attendanceRate = data?.attendanceRate;
   const records = data?.recentRecords ?? [];
 
   return (
@@ -62,8 +66,8 @@ export function StudentAttendanceView() {
               <UserCheck className="size-4" />
             </span>
           </div>
-          <p className="mt-2 text-2xl font-black text-success">{attendanceRate}%</p>
-          <p className="mt-0.5 text-xs text-muted-foreground/70">Based on recorded attendance this term</p>
+          <p className="mt-2 text-2xl font-black text-success">{attendanceRate === null || attendanceRate === undefined ? "Incomplete" : `${attendanceRate}%`}</p>
+          <p className="mt-0.5 text-xs text-muted-foreground/70">Based on eligible school days; incomplete registers are not absences</p>
         </div>
 
         <div className="rounded-2xl border border-border/80 bg-card p-5 shadow-xs">

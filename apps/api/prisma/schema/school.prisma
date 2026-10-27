@@ -26,6 +26,8 @@ model School {
 
   organization                organization                @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   academicYears               AcademicYear[]
+  calendarDays                AcademicCalendarDay[]
+  attendanceExclusions        StudentAttendanceExclusion[]
   assessmentTemplates         AssessmentTemplate[]
   bills                       Bill[]
   siblingDiscountPolicies     SiblingDiscountPolicy[]
@@ -171,6 +173,7 @@ model Student {
   house            House?              @relation(fields: [houseId], references: [id])
   assessmentScores AssessmentScore[]
   attendances      Attendance[]
+  attendanceExclusions StudentAttendanceExclusion[]
   bills            Bill[]
   scholarships     StudentScholarship[]
   documents        Document[]
