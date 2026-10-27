@@ -275,13 +275,21 @@ export class AttendanceCalendarService {
     if (!policy.attendancePolicyActiveFrom) {
       throw new BadRequestException("Calendar-based attendance has not been activated.");
     }
-    const outcome = calculateAttendanceRollout({
-      start, end, asOf, weekdays: term.instructionalWeekdays,
-      activeFrom: policy.attendancePolicyActiveFrom,
-      overrides: days.map(row => ({ date: dateString(row.date), isInstructional: row.isInstructional })),
-      excludedDates: exclusions.map(row => dateString(row.date)),
-      records: rows.map(row => ({ date: dateString(row.date), status: row.status as AttendanceStatus })),
-    });
+    let outcome: ReturnType<typeof calculateAttendanceRollout>;
+    try {
+      outcome = calculateAttendanceRollout({
+        start, end, asOf, weekdays: term.instructionalWeekdays,
+        activeFrom: policy.attendancePolicyActiveFrom,
+        overrides: days.map(row => ({ date: dateString(row.date), isInstructional: row.isInstructional })),
+        excludedDates: exclusions.map(row => dateString(row.date)),
+        records: rows.map(row => ({ date: dateString(row.date), status: row.status as AttendanceStatus })),
+      });
+    } catch (error) {
+      if (error instanceof Error && /invalid|exceeds|duplicate|instructional weekdays/i.test(error.message)) {
+        throw new BadRequestException("The academic calendar requires correction before attendance can be calculated: " + error.message);
+      }
+      throw error;
+    }
     const incompleteEligibility = ["WITHDRAWN","TRANSFERRED","SUSPENDED"].includes(enrollment.status) && !enrollment.effectiveTo;
     return {
       ...outcome, attendanceRate: incompleteEligibility ? null : outcome.attendanceRate,

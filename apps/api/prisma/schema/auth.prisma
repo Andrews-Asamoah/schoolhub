@@ -32,6 +32,8 @@ model user {
   invitations          invitation[]
   members              member[]
   attendancesMarked    Attendance[]           @relation("AttendanceMarkedBy")
+  calendarDaysCreated  AcademicCalendarDay[]  @relation("AcademicCalendarDayCreator")
+  attendanceExclusionsApproved StudentAttendanceExclusion[] @relation("AttendanceExclusionApprover")
   auditLogs            AuditLog[]
   componentScores      ComponentScore[]
   documents            Document[]
