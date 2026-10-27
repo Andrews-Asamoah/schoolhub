@@ -32,7 +32,7 @@ export class SubjectsController {
   constructor(private readonly subjects: SubjectsService) {}
 
   @Get()
-  @Roles("owner", "admin", "teacher", "staff")
+  @Roles("owner", "admin", "headteacher", "teacher", "staff")
   list(@CurrentSchool() school: School, @Query("includeInactive") includeInactive?: string) {
     return this.subjects.list(school.id, includeInactive === "true");
   }
