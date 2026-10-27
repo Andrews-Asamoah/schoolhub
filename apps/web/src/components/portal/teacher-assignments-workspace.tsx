@@ -235,9 +235,11 @@ export function TeacherAssignmentsWorkspace() {
   return (
     <div className="space-y-5">
       <PageHeader
-        eyebrow="Teacher workspace"
-        title="Assignments & submissions"
-        description="Publish coursework for your assigned subjects, review student responses, and record marks with feedback."
+        eyebrow={teacherMode ? "Teacher workspace" : "School academics"}
+        title={teacherMode ? "Assignments & submissions" : "Assignment management"}
+        description={teacherMode
+          ? "Publish coursework for your assigned subjects, review student responses, and record marks with feedback."
+          : "Publish and review coursework across the school's active classes and subjects. Teacher access remains limited to assigned subjects."}
         icon={ClipboardList}
         actions={<button type="button" onClick={() => { setCreateError(null); setCreateOpen(true); }} disabled={!canPublish || referenceLoading || classes.length === 0} className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-xs font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-50"><Plus className="size-4" />Publish assignment</button>}
       />
