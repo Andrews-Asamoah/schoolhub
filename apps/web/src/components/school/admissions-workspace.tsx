@@ -512,7 +512,7 @@ function ApplicationsPanel({ cycles, canDecide }: { cycles: Cycle[]; canDecide: 
             {cycles.map((cycle) => <SelectItem key={cycle.id} value={cycle.id}>{cycle.name}</SelectItem>)}
           </SelectContent>
         </Select>
-        <Select value={status || "__all__"} onValueChange={setStatus}>
+        <Select value={status || "__all__"} onValueChange={(value) => setStatus(value === "__all__" ? "" : value)}>
           <SelectTrigger aria-label="Status" className={input}><SelectValue placeholder="All statuses" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="__all__">All statuses</SelectItem>
