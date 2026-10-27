@@ -215,7 +215,7 @@ function TrustedDevicesCard() {
                 <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-muted text-muted-foreground"><Laptop className="size-5" /></span>
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-semibold text-foreground">Trusted browser</p>
-                  <p className="mt-0.5 text-xs text-muted-foreground">Added {formatDateTime(device.createdAt)} · expires {formatDateTime(device.expiresAt)}</p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">Last confirmed {formatDateTime(device.createdAt)} · expires {formatDateTime(device.expiresAt)}</p>
                 </div>
                 <button
                   type="button"
