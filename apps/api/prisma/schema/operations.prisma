@@ -353,3 +353,41 @@ model EmailLog {
   @@index([category])
   @@map("email_logs")
 }
+
+
+// Direct, school-scoped messaging. Recipient receipts are separate so each
+// recipient has an independent read state without exposing other inboxes.
+model SchoolMessage {
+  id        String   @id @default(cuid())
+  schoolId  String
+  senderId  String
+  subject   String   @db.VarChar(160)
+  body      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  school     School                   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  sender     user                     @relation("SchoolMessageSent", fields: [senderId], references: [id], onDelete: Cascade)
+  recipients SchoolMessageRecipient[]
+
+  @@index([schoolId, createdAt(sort: Desc)])
+  @@index([senderId, createdAt(sort: Desc)])
+  @@map("school_messages")
+}
+
+model SchoolMessageRecipient {
+  id          String    @id @default(cuid())
+  messageId   String
+  recipientId String
+  isRead      Boolean   @default(false)
+  readAt      DateTime?
+  createdAt   DateTime  @default(now())
+
+  message   SchoolMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  recipient user          @relation("SchoolMessageRecipientUser", fields: [recipientId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, recipientId])
+  @@index([recipientId, isRead])
+  @@index([messageId])
+  @@map("school_message_recipients")
+}

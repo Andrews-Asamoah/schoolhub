@@ -1,4 +1,4 @@
-import { Controller, Get, Patch, Param, UseGuards } from "@nestjs/common";
+import { Controller, Get, Patch, Param, Query, UseGuards } from "@nestjs/common";
 import type { School } from "@prisma/client";
 import { CurrentSchool } from "../../common/decorators/current-school.decorator.js";
 import { CurrentUser, type AuthenticatedUser } from "../../common/decorators/current-user.decorator.js";
@@ -13,6 +13,19 @@ const roles = ["owner", "admin", "headteacher", "teacher", "accountant", "staff"
 @UseGuards(SchoolTenantGuard, RolesGuard)
 export class NotificationsController {
   constructor(private readonly notificationsService: NotificationsService) {}
+
+  @Get("history")
+  @Roles(...roles)
+  history(
+    @CurrentSchool() school: School,
+    @CurrentUser() user: AuthenticatedUser,
+    @Query("search") search?: string,
+    @Query("status") status?: string,
+    @Query("page") page?: string,
+    @Query("limit") limit?: string,
+  ) {
+    return this.notificationsService.listHistory(school.id, user.id, { search, status, page, limit });
+  }
 
   @Get()
   @Roles(...roles)

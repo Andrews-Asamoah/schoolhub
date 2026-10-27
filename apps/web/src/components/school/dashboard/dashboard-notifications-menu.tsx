@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Bell, CheckCheck, LoaderCircle, RefreshCw } from "lucide-react";
+import { Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -184,8 +185,9 @@ export function DashboardNotificationsMenu() {
               </ul>
             )}
           </div>
-          <footer className="border-t border-border bg-muted/30 px-4 py-2">
-            <p className="text-[10px] text-muted-foreground">Updates automatically refresh every 30 seconds.</p>
+          <footer className="flex items-center justify-between gap-3 border-t border-border bg-muted/30 px-4 py-2.5">
+            <p className="text-[10px] text-muted-foreground">Refreshes every 30 seconds.</p>
+            <Link to="/$page" params={{ page: "notifications" }} onClick={() => setOpen(false)} className="text-[10px] font-semibold text-primary hover:underline">View history</Link>
           </footer>
         </section>
       )}

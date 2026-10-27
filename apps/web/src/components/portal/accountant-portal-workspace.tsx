@@ -1,6 +1,7 @@
 import { DatePicker } from "@/components/ui/date-picker";
 import { DataTable, TableExportMenu, type DataTableColumn } from "@/components/ui/data-table";
 import { ServerExportButton } from "@/components/portal/server-export-button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -741,9 +742,10 @@ export function AccountantPortalWorkspace({
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div><h2 className="text-lg font-semibold text-foreground">Financial performance</h2><p className="mt-1 text-sm text-muted-foreground">A live summary of saved records. Select a card to review its supporting records.</p></div>
             <label className="flex items-center gap-2 text-xs font-medium text-muted-foreground">Reporting period
-              <select className={cn(inputClass, "w-auto min-w-40")} value={reportPeriod} onChange={(event) => setReportPeriod(event.target.value as typeof reportPeriod)} aria-label="Dashboard reporting period">
-                <option value="term">Current term</option><option value="year">Current academic year</option><option value="all">All available records</option>
-              </select>
+              <Select value={reportPeriod} onValueChange={(value) => setReportPeriod(value as typeof reportPeriod)}>
+                <SelectTrigger aria-label="Dashboard reporting period" className={cn(inputClass, "w-auto min-w-40")}><SelectValue /></SelectTrigger>
+                <SelectContent><SelectItem value="term">Current term</SelectItem><SelectItem value="year">Current academic year</SelectItem><SelectItem value="all">All available records</SelectItem></SelectContent>
+              </Select>
             </label>
           </div>
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
@@ -784,7 +786,7 @@ export function AccountantPortalWorkspace({
             </div>
             <div className="my-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_220px]">
               <div className="relative"><Search className="absolute left-3 top-3 size-4 text-muted-foreground" /><input className={cn(inputClass, "pl-9")} value={overdueSearch} onChange={(event) => setOverdueSearch(event.target.value)} placeholder="Search student, admission no., bill or class" aria-label="Search overdue bills" /></div>
-              <select className={inputClass} value={overdueClassFilter} onChange={(event) => setOverdueClassFilter(event.target.value)} aria-label="Filter overdue bills by class"><option value="ALL">All classes</option>{classes.map((schoolClass) => <option key={schoolClass.id} value={schoolClass.id}>{schoolClass.name}</option>)}</select>
+              <Select value={overdueClassFilter} onValueChange={setOverdueClassFilter}><SelectTrigger aria-label="Filter overdue bills by class" className={inputClass}><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ALL">All classes</SelectItem>{classes.map((schoolClass) => <SelectItem key={schoolClass.id} value={schoolClass.id}>{schoolClass.name}</SelectItem>)}</SelectContent></Select>
             </div>
             {overdueBillsQuery.error ? <QueryError message={overdueBillsQuery.error.message} /> : visibleOverdueBills.length ? (
               <div className="overflow-x-auto"><DataTable rows={visibleOverdueBills} columns={[{ id: "student", header: "Student / bill", cell: (bill) => <><button type="button" className="text-left font-semibold text-primary hover:underline" onClick={() => openStudentStatement(bill.studentId)}>{studentName(bill.student)}</button><p className="text-xs text-muted-foreground">{bill.billNumber} · {bill.student?.admissionNumber ?? "No admission number"}</p></>, value: (bill) => studentName(bill.student) },
@@ -985,10 +987,7 @@ export function AccountantPortalWorkspace({
               }}
             >
               <Field label="Reason for reversal">
-                <select className={inputClass} value={reverseKind} onChange={(event) => setReverseKind(event.target.value as "VOID" | "REFUND")}>
-                  <option value="VOID">Recorded in error (void)</option>
-                  <option value="REFUND">Money returned to the payer (refund)</option>
-                </select>
+                <Select value={reverseKind} onValueChange={(value) => setReverseKind(value as "VOID" | "REFUND")}><SelectTrigger aria-label="Reversal type" className={inputClass}><SelectValue /></SelectTrigger><SelectContent><SelectItem value="VOID">Recorded in error (void)</SelectItem><SelectItem value="REFUND">Money returned to the payer (refund)</SelectItem></SelectContent></Select>
               </Field>
               <Field label="Explain what happened (kept in the audit trail)">
                 <textarea className={inputClass} rows={3} minLength={10} maxLength={500} required value={reverseReason} onChange={(event) => setReverseReason(event.target.value)} />
@@ -1007,17 +1006,17 @@ export function AccountantPortalWorkspace({
             {classesQuery.error && <QueryError message={classesQuery.error.message} />}
             {!currentYear || !currentTerm ? <div role="alert" className="rounded-xl border border-warning/30 bg-warning/5 p-3 text-sm text-foreground">A current academic year and term must be selected in School Settings before billing.</div> : <p className="rounded-xl bg-muted p-3 text-sm text-muted-foreground">Billing period: <span className="font-semibold text-foreground">{currentYear.name} · {currentTerm.name}</span></p>}
             <Field label="Fee structure">
-              <select name="feeStructureId" required className={inputClass} value={selectedFeeStructureId} onChange={(event) => { setSelectedFeeStructureId(event.target.value); setSelectedClassId(""); setSelectedOptionalItemIds([]); }}>
-                <option value="" disabled>Select a fee structure…</option>
-                {feeStructures.map((fee) => <option key={fee.id} value={fee.id}>{fee.name} · {currency(fee.items.filter((item) => !item.isOptional).reduce((sum, item) => sum + Number(item.amount), 0))}{fee.items.some((item) => item.isOptional) ? " + optional items" : ""}</option>)}
-              </select>
+              <Select name="feeStructureId" required value={selectedFeeStructureId} onValueChange={(value) => { setSelectedFeeStructureId(value); setSelectedClassId(""); setSelectedOptionalItemIds([]); }}>
+                <SelectTrigger aria-label="Fee structure" className={inputClass}><SelectValue placeholder="Select a fee structure…" /></SelectTrigger>
+                <SelectContent>{feeStructures.map((fee) => <SelectItem key={fee.id} value={fee.id}>{fee.name} · {currency(fee.items.filter((item) => !item.isOptional).reduce((sum, item) => sum + Number(item.amount), 0))}{fee.items.some((item) => item.isOptional) ? " + optional items" : ""}</SelectItem>)}</SelectContent>
+              </Select>
             </Field>
             {selectedFeeStructure?.items.some((item) => item.isOptional) && <fieldset className="space-y-2 rounded-xl border border-border p-3"><legend className="px-1 text-sm font-semibold text-foreground">Optional fee items</legend><p className="text-xs text-muted-foreground">Optional items are excluded unless you select them. They will be included on every bill in this batch.</p>{selectedFeeStructure.items.filter((item) => item.isOptional).map((item) => <label key={item.id} className="flex cursor-pointer items-start gap-3 rounded-lg p-2 hover:bg-muted/50"><input type="checkbox" className="mt-1 size-4 accent-primary" checked={selectedOptionalItemIds.includes(item.id)} onChange={(event) => setSelectedOptionalItemIds((current) => event.target.checked ? [...current, item.id] : current.filter((id) => id !== item.id))} /><span className="flex-1 text-sm text-foreground">{item.name}</span><span className="text-sm font-semibold tabular-nums">{currency(item.amount)}</span></label>)}</fieldset>}
             <Field label="Class">
-              <select name="classId" required className={inputClass} value={selectedClassId} onChange={(event) => setSelectedClassId(event.target.value)}>
-                <option value="" disabled>Select a class…</option>
-                {billTargetClasses.map((schoolClass) => <option key={schoolClass.id} value={schoolClass.id}>{schoolClass.name}{typeof schoolClass._count?.students === "number" ? ` · ${schoolClass._count.students} students` : ""}</option>)}
-              </select>
+              <Select name="classId" required value={selectedClassId} onValueChange={setSelectedClassId}>
+                <SelectTrigger aria-label="Class to bill" className={inputClass}><SelectValue placeholder="Select a class…" /></SelectTrigger>
+                <SelectContent>{billTargetClasses.map((schoolClass) => <SelectItem key={schoolClass.id} value={schoolClass.id}>{schoolClass.name}{typeof schoolClass._count?.students === "number" ? ` · ${schoolClass._count.students} students` : ""}</SelectItem>)}</SelectContent>
+              </Select>
             </Field>
             <Field label="Due date (optional)"><DatePicker name="dueDate" buttonClassName={inputClass} /></Field>
             <Field label="Notes (optional)"><textarea name="notes" className={cn(inputClass, "h-20 py-2")} placeholder="Optional note shown on generated bills" /></Field>
@@ -1069,7 +1068,7 @@ export function AccountantPortalWorkspace({
           <form onSubmit={submitStockMovement} className="space-y-4">
             {message?.kind === "error" && <QueryError message={message.text} />}
             <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Movement type"><select name="type" required className={inputClass} defaultValue="IN"><option value="IN">Stock in — received</option><option value="OUT">Stock out — issued</option></select></Field>
+              <Field label="Movement type"><Select name="type" required defaultValue="IN"><SelectTrigger aria-label="Movement type" className={inputClass}><SelectValue /></SelectTrigger><SelectContent><SelectItem value="IN">Stock in — received</SelectItem><SelectItem value="OUT">Stock out — issued</SelectItem></SelectContent></Select></Field>
               <Field label="Quantity"><input name="quantity" type="number" required min="1" step="1" className={inputClass} /></Field>
               <Field label="Movement date"><DatePicker name="date" required defaultValue={new Date().toISOString().slice(0, 10)} buttonClassName={inputClass} /></Field>
               <Field label="Recipient (optional)"><input name="recipientName" maxLength={150} className={inputClass} placeholder="Staff member / department" /></Field>
@@ -1088,8 +1087,8 @@ export function AccountantPortalWorkspace({
               <Field label="Date"><DatePicker name="date" required defaultValue={new Date().toISOString().slice(0, 10)} buttonClassName={inputClass} /></Field>
               <Field label="Amount (GHS)"><input name="amount" type="number" required min="0.01" step="0.01" className={inputClass} placeholder="0.00" /></Field>
               <Field label="Payee (optional)"><input name="payee" className={inputClass} placeholder="Supplier or recipient" /></Field>
-              <Field label="Category"><select name="category" required className={inputClass} defaultValue="OTHER">{["UTILITIES", "SUPPLIES", "MAINTENANCE", "TRANSPORT", "RENT", "INSURANCE", "TAXES", "SALARY", "OTHER"].map((category) => <option key={category} value={category}>{category.replaceAll("_", " ")}</option>)}</select></Field>
-              <Field label="Payment method"><select name="paymentMethod" required className={inputClass} defaultValue="BANK_TRANSFER">{["BANK_TRANSFER", "CASH", "CHEQUE", "MOBILE_MONEY", "CARD", "ONLINE", "OTHER"].map((method) => <option key={method} value={method}>{method.replaceAll("_", " ")}</option>)}</select></Field>
+              <Field label="Category"><Select name="category" required defaultValue="OTHER"><SelectTrigger aria-label="Expense category" className={inputClass}><SelectValue /></SelectTrigger><SelectContent>{["UTILITIES", "SUPPLIES", "MAINTENANCE", "TRANSPORT", "RENT", "INSURANCE", "TAXES", "SALARY", "OTHER"].map((category) => <SelectItem key={category} value={category}>{category.replaceAll("_", " ")}</SelectItem>)}</SelectContent></Select></Field>
+              <Field label="Payment method"><Select name="paymentMethod" required defaultValue="BANK_TRANSFER"><SelectTrigger aria-label="Payment method" className={inputClass}><SelectValue /></SelectTrigger><SelectContent>{["BANK_TRANSFER", "CASH", "CHEQUE", "MOBILE_MONEY", "CARD", "ONLINE", "OTHER"].map((method) => <SelectItem key={method} value={method}>{method.replaceAll("_", " ")}</SelectItem>)}</SelectContent></Select></Field>
               <Field label="Reference number (optional)"><input name="referenceNumber" className={inputClass} placeholder="Voucher / transaction reference" /></Field>
             </div>
             <Field label="Description"><textarea name="description" required minLength={3} className={cn(inputClass, "h-20 py-2")} placeholder="What was purchased or paid for?" /></Field>
@@ -1118,7 +1117,7 @@ function SectionHeader({ title, description, action }: { title: string; descript
 }
 
 function SearchFilters({ search, setSearch, statusFilter, setStatusFilter, statuses }: { search: string; setSearch: (value: string) => void; statusFilter: string; setStatusFilter: (value: string) => void; statuses: string[] }) {
-  return <div className="my-4 flex flex-wrap gap-3"><div className="relative min-w-56 flex-1"><Search className="absolute left-3 top-3 size-4 text-muted-foreground" /><input className={cn(inputClass, "pl-9")} value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search bill, student, or class" /></div><select className={cn(inputClass, "w-auto min-w-40")} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="ALL">All statuses</option>{statuses.map((status) => <option key={status} value={status}>{status.replaceAll("_", " ")}</option>)}</select></div>;
+  return <div className="my-4 flex flex-wrap gap-3"><div className="relative min-w-56 flex-1"><Search className="absolute left-3 top-3 size-4 text-muted-foreground" /><input className={cn(inputClass, "pl-9")} value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search bill, student, or class" /></div><Select value={statusFilter} onValueChange={setStatusFilter}><SelectTrigger aria-label="Filter bills by status" className={cn(inputClass, "w-auto min-w-40")}><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ALL">All statuses</SelectItem>{statuses.map((status) => <SelectItem key={status} value={status}>{status.replaceAll("_", " ")}</SelectItem>)}</SelectContent></Select></div>;
 }
 
 function openStudentStatement(studentId: string) {
