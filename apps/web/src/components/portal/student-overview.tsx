@@ -32,7 +32,7 @@ export function StudentOverview() {
     queryFn: () => apiFetch<StudentProfileResponse>("/students/me"),
     retry: false,
   });
-  const firstName = profile?.profile?.firstName || session?.user?.name?.trim().split(/\\s+/)[0] || "Student";
+  const firstName = profile?.profile?.firstName || session?.user?.name?.trim().split(/\s+/)[0] || "Student";
 
   return (
     <div className="space-y-6">
