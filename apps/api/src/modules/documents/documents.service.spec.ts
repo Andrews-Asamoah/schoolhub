@@ -1,6 +1,11 @@
 import { BadRequestException, NotFoundException } from "@nestjs/common";
 import type { School } from "@prisma/client";
 import { describe, expect, it, vi } from "vitest";
+
+// R2Service validates deployment environment at import time. Unit tests inject
+// a storage fake, so mock the class token before importing DocumentsService.
+vi.mock("../storage/r2.service.js", () => ({ R2Service: class R2Service {} }));
+
 import { DocumentsService } from "./documents.service.js";
 
 function buildService() {
