@@ -206,6 +206,34 @@ describe("school administrators", () => {
     return ctx;
   };
 
+  it("refuses to mutate a school administrator from a different school's organization", async () => {
+    const { service, client } = arrange();
+    client.school.findUnique.mockResolvedValue({ organizationId: "org-other" });
+    client.member.findUnique.mockResolvedValue(null);
+
+    await expect(
+      service.setSchoolAdminBanned("sch1", "u1", true, actor, "Repeated policy violations"),
+    ).rejects.toThrow("School administrator membership not found");
+
+    expect(client.$transaction).not.toHaveBeenCalled();
+    expect(client.member.update).not.toHaveBeenCalled();
+    expect(client.session.deleteMany).not.toHaveBeenCalled();
+    expect(client.auditLog.create).not.toHaveBeenCalled();
+  });
+
+  it("does not reset 2FA or revoke sessions when the target is not a member of the requested school", async () => {
+    const { service, client } = arrange();
+    client.school.findUnique.mockResolvedValue({ organizationId: "org-other" });
+    client.member.findUnique.mockResolvedValue(null);
+
+    await expect(service.resetSchoolAdminTwoFactor("sch1", "u1", actor))
+      .rejects.toThrow("School administrator membership not found");
+
+    expect(client.$transaction).not.toHaveBeenCalled();
+    expect(client.session.deleteMany).not.toHaveBeenCalled();
+    expect(client.auditLog.create).not.toHaveBeenCalled();
+  });
+
   it("requires a meaningful reason before attempting an administrator suspension", async () => {
     const { service, client } = arrange();
     await expect(service.setSchoolAdminBanned("sch1", "u1", true, actor)).rejects.toThrow(BadRequestException);
