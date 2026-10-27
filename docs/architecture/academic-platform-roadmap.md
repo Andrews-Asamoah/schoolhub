@@ -1,6 +1,6 @@
 # Academic Platform Roadmap — Phase Gates
 
-This roadmap tracks implementation and verification. A checkbox is complete only when the code exists on the reviewed branch and the linked CI/test evidence is available. The roadmap itself is not evidence that a capability has shipped.
+This roadmap tracks implementation and verification. A checkbox is complete only when the code exists on the reviewed branch and the linked CI/test evidence is available. The roadmap itself is not evidence that a capability has shipped. See the [current-state inventory](./academic-platform-current-state.md) for the initial source review and the CI baseline observed on `main`.
 
 ## Phase 0 — baseline and domain contract
 
