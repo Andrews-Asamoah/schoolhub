@@ -44,6 +44,12 @@ const WRITE_LIMIT = { default: { limit: 30, ttl: 60_000 } };
 export class SuperAdminController {
   constructor(private readonly superAdminService: SuperAdminService) {}
 
+  @Get("operations/health")
+  @Header("Cache-Control", "no-store")
+  getOperationsHealth() {
+    return this.superAdminService.getOperationsHealth();
+  }
+
   @Get("stats")
   getPlatformStats() {
     return this.superAdminService.getPlatformStats();
