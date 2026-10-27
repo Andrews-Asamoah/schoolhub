@@ -19,24 +19,31 @@ function AdminLayout() {
   const navigate = useNavigate();
   const routerState = useRouterState();
 
+  // Bootstrap credentials must be replaced before the portal can render.
+  // The API independently blocks business endpoints until the password is changed.
+  const needsPasswordChange =
+    session?.user?.role === "superAdmin" && Boolean(session.user.mustChangePassword);
+
   // Platform administrators must use two-factor authentication. This is only
   // the friendly redirect: the API refuses every /super-admin request without it.
   const needsTwoFactor =
-    session?.user?.role === "superAdmin" && !session.user.mustChangePassword && !session.user.twoFactorEnabled;
+    session?.user?.role === "superAdmin" && !needsPasswordChange && !session.user.twoFactorEnabled;
 
   useEffect(() => {
     if (isPending) return;
     if (!session?.user || session.user.role !== "superAdmin") {
       void navigate({ to: "/login", replace: true });
+    } else if (needsPasswordChange) {
+      void navigate({ to: "/change-password", replace: true });
     } else if (needsTwoFactor) {
       void navigate({ to: "/two-factor-setup", search: { audience: "super-admin" }, replace: true });
     }
-  }, [session, isPending, navigate, needsTwoFactor]);
+  }, [session, isPending, navigate, needsPasswordChange, needsTwoFactor]);
 
   if (isPending) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-foreground">
-        <div className="flex items-center gap-3 text-sm text-muted-foreground/70">
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <div className="flex items-center gap-3 text-sm text-muted-foreground">
           <span className="size-2 animate-pulse rounded-full bg-primary" />
           Loading…
         </div>
@@ -45,7 +52,12 @@ function AdminLayout() {
   }
 
   // While navigating away (unauthenticated), render nothing to avoid flash
-  if (!session?.user || session.user.role !== "superAdmin" || needsTwoFactor) {
+  if (
+    !session?.user ||
+    session.user.role !== "superAdmin" ||
+    needsPasswordChange ||
+    needsTwoFactor
+  ) {
     return null;
   }
 
