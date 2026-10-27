@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { SuperAdminService } from "./super-admin.service.js";
 import type { PrismaService } from "../../prisma/prisma.service.js";
 import type { CredentialsService } from "../accounts/credentials.service.js";
+import type { R2Service } from "../storage/r2.service.js";
 
 describe("SuperAdminService operations health", () => {
   afterEach(() => {
@@ -46,6 +47,50 @@ describe("SuperAdminService operations health", () => {
       latestApplied: "20261026090000_init",
       unfinishedCount: 0,
     });
+  });
+
+  it("reports a reachable R2 bucket and includes storage latency", async () => {
+    vi.stubEnv("EXPECTED_MIGRATION_NAME", "20261026090000_init");
+    const queryRaw = vi.fn()
+      .mockResolvedValueOnce([{ "?column?": 1 }])
+      .mockResolvedValueOnce([{ latest_migration: "20261026090000_init", unfinished_count: 0 }]);
+    const storage = {
+      checkHealth: vi.fn().mockResolvedValue({ status: "healthy", latencyMs: 12 }),
+    } as unknown as R2Service;
+    const service = new SuperAdminService(
+      { client: { $queryRaw: queryRaw } } as unknown as PrismaService,
+      {} as CredentialsService,
+      storage,
+    );
+
+    const result = await service.getOperationsHealth();
+
+    expect(result.status).toBe("healthy");
+    expect(result.dependencies.storage).toEqual({ status: "healthy", latencyMs: 12 });
+    expect(storage.checkHealth).toHaveBeenCalledOnce();
+  });
+
+  it.each([
+    { status: "unavailable", latencyMs: null },
+    { status: "not_configured", latencyMs: null },
+  ] as const)("degrades health when R2 storage is $status", async (storageStatus) => {
+    vi.stubEnv("EXPECTED_MIGRATION_NAME", "20261026090000_init");
+    const queryRaw = vi.fn()
+      .mockResolvedValueOnce([{ "?column?": 1 }])
+      .mockResolvedValueOnce([{ latest_migration: "20261026090000_init", unfinished_count: 0 }]);
+    const storage = {
+      checkHealth: vi.fn().mockResolvedValue(storageStatus),
+    } as unknown as R2Service;
+    const service = new SuperAdminService(
+      { client: { $queryRaw: queryRaw } } as unknown as PrismaService,
+      {} as CredentialsService,
+      storage,
+    );
+
+    const result = await service.getOperationsHealth();
+
+    expect(result.status).toBe("degraded");
+    expect(result.dependencies.storage).toEqual(storageStatus);
   });
 
   it("degrades the overall status when the expected migration does not match", async () => {

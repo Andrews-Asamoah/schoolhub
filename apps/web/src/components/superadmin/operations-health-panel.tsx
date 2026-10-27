@@ -32,7 +32,7 @@ interface OperationsHealth {
   };
   dependencies: {
     database: { status: "healthy" | "unavailable"; latencyMs: number | null };
-    storage: { status: CheckStatus };
+    storage: { status: CheckStatus; latencyMs?: number | null };
     notifications: { status: CheckStatus };
     backgroundJobs: { status: CheckStatus };
   };
@@ -42,6 +42,7 @@ const STATUS_COPY: Record<CheckStatus, string> = {
   healthy: "Operational",
   unavailable: "Unavailable",
   degraded: "Degraded",
+  not_configured: "Not configured",
   not_instrumented: "Not monitored",
 };
 
@@ -52,12 +53,15 @@ function statusClasses(status: CheckStatus) {
   if (status === "unavailable" || status === "degraded") {
     return "border-destructive/25 bg-destructive/10 text-destructive";
   }
+  if (status === "not_configured") {
+    return "border-warning/25 bg-warning/10 text-warning";
+  }
   return "border-border bg-muted/60 text-muted-foreground";
 }
 
 function StatusIcon({ status }: { status: CheckStatus }) {
   if (status === "healthy") return <CheckCircle2 className="size-4" aria-hidden="true" />;
-  if (status === "unavailable" || status === "degraded") {
+  if (status === "unavailable" || status === "degraded" || status === "not_configured") {
     return <AlertTriangle className="size-4" aria-hidden="true" />;
   }
   return <CircleHelp className="size-4" aria-hidden="true" />;
@@ -109,7 +113,15 @@ export function OperationsHealthPanel() {
           label: "File storage",
           icon: HardDrive,
           status: health.dependencies.storage.status,
-          detail: "Provider health check not configured",
+          detail:
+            health.dependencies.storage.status === "healthy" &&
+            health.dependencies.storage.latencyMs != null
+              ? `${health.dependencies.storage.latencyMs} ms response time`
+              : health.dependencies.storage.status === "not_configured"
+                ? "R2 credentials, bucket name, or public URL are not configured"
+                : health.dependencies.storage.status === "unavailable"
+                  ? "The configured object-storage bucket could not be reached"
+                  : "Provider health check not configured",
         },
         {
           key: "notifications",

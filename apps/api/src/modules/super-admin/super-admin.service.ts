@@ -1,5 +1,6 @@
 import {
   Injectable,
+  Optional,
   ConflictException,
   BadRequestException,
   NotFoundException,
@@ -8,6 +9,7 @@ import { PrismaService } from "../../prisma/prisma.service.js";
 import { generateId } from "better-auth";
 import { Prisma } from "@prisma/client";
 import { CredentialsService, toIssuedCredentials } from "../accounts/credentials.service.js";
+import { R2Service } from "../storage/r2.service.js";
 import { writeAudit, type AuditActor } from "../../common/audit/audit.js";
 import {
   evaluateSubscriptionAccess,
@@ -58,6 +60,7 @@ export class SuperAdminService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly credentials: CredentialsService,
+    @Optional() private readonly storage?: R2Service,
   ) {}
 
   async listSchools(query: SuperAdminSchoolsQuery) {
@@ -958,8 +961,16 @@ export class SuperAdminService {
 
     // A missing expected migration is an unverified deployment, not a healthy one.
     const migrationDegraded = ["mismatch", "incomplete", "not_configured", "unavailable"].includes(migrations.status);
+    const storage = this.storage
+      ? await this.storage.checkHealth()
+      : { status: "not_instrumented" as const, latencyMs: null };
+    const storageDegraded = storage.status === "not_configured" || storage.status === "unavailable";
+
     return {
-      status: database.status === "healthy" && !migrationDegraded ? "healthy" : "degraded",
+      status:
+        database.status === "healthy" && !migrationDegraded && !storageDegraded
+          ? "healthy"
+          : "degraded",
       checkedAt,
       application: {
         status: "healthy",
@@ -970,9 +981,9 @@ export class SuperAdminService {
       migrations,
       dependencies: {
         database,
-        // These remain explicitly uninstrumented until a real provider/worker
-        // health contract exists; never display them as healthy by default.
-        storage: { status: "not_instrumented" },
+        storage,
+        // Notification delivery and background workers have no provider/heartbeat
+        // contract in this deployment yet, so they remain explicitly unmonitored.
         notifications: { status: "not_instrumented" },
         backgroundJobs: { status: "not_instrumented" },
       },

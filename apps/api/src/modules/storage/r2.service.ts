@@ -1,5 +1,6 @@
 import {
   DeleteObjectCommand,
+  HeadBucketCommand,
   PutObjectCommand,
   S3Client,
 } from "@aws-sdk/client-s3";
@@ -47,6 +48,31 @@ export class R2Service {
       },
     });
     return this.client;
+  }
+
+  /**
+   * Checks the configured bucket without reading or changing user objects.
+   * Bound the request so a slow provider cannot hold the health endpoint open.
+   */
+  async checkHealth(): Promise<
+    | { status: "healthy"; latencyMs: number }
+    | { status: "not_configured" | "unavailable"; latencyMs: null }
+  > {
+    if (!this.isConfigured) {
+      return { status: "not_configured", latencyMs: null };
+    }
+
+    const startedAt = Date.now();
+    try {
+      await this.getClient().send(
+        new HeadBucketCommand({ Bucket: env.R2_BUCKET_NAME }),
+        { abortSignal: AbortSignal.timeout(3_000) },
+      );
+      return { status: "healthy", latencyMs: Date.now() - startedAt };
+    } catch {
+      // Do not expose provider credentials, endpoint details, or raw SDK errors.
+      return { status: "unavailable", latencyMs: null };
+    }
   }
 
   /** Key prefixes. A random id per upload means a URL never changes content. */
