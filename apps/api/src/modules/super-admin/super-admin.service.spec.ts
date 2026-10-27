@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { BadRequestException, ConflictException } from "@nestjs/common";
+import { BadRequestException, ConflictException, NotFoundException } from "@nestjs/common";
 import { SUBSCRIPTION_TRIAL_DAYS } from "@schoolhub/shared";
 import { CredentialsService, DEFAULT_PASSWORDS } from "../accounts/credentials.service.js";
 import { SuperAdminService } from "./super-admin.service.js";
@@ -25,6 +25,67 @@ function makeService(overrides: Record<string, any> = {}) {
 }
 
 const org = (status: string, expiresAt: Date | null) => ({ id: "org1", subscriptionStatus: status, expiresAt });
+
+describe("getSchoolOnboardingStatus", () => {
+  it("derives completion from persisted school setup and returns incomplete steps honestly", async () => {
+    const { service, client } = makeService();
+    client.school.findUnique.mockResolvedValue({
+      id: "sch1",
+      email: "office@school.test",
+      phone: "+233200000000",
+      address: "Accra",
+      academicYears: [{ id: "year1", name: "2026/2027", terms: [{ id: "term1" }] }],
+      financeSettings: { schoolId: "sch1" },
+      _count: {
+        classes: 8,
+        subjects: 12,
+        teachers: 15,
+        feeStructures: 3,
+        assessmentTemplates: 2,
+        reportCardTemplates: 1,
+      },
+    });
+
+    const result = await service.getSchoolOnboardingStatus("sch1");
+
+    expect(result).toMatchObject({ schoolId: "sch1", completed: 7, total: 7, percentage: 100 });
+    expect(result.steps.every((step) => step.complete)).toBe(true);
+    expect(client.school.findUnique).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: "sch1" },
+      select: expect.objectContaining({
+        academicYears: expect.any(Object),
+        _count: expect.any(Object),
+      }),
+    }));
+  });
+
+  it("reports missing setup and does not treat a missing school as an empty checklist", async () => {
+    const { service, client } = makeService();
+    client.school.findUnique.mockResolvedValue({
+      id: "sch1",
+      email: null,
+      phone: null,
+      address: null,
+      academicYears: [],
+      financeSettings: null,
+      _count: {
+        classes: 0,
+        subjects: 0,
+        teachers: 0,
+        feeStructures: 0,
+        assessmentTemplates: 0,
+        reportCardTemplates: 0,
+      },
+    });
+    const result = await service.getSchoolOnboardingStatus("sch1");
+    expect(result.completed).toBe(0);
+    expect(result.percentage).toBe(0);
+    expect(result.steps.every((step) => !step.complete)).toBe(true);
+
+    client.school.findUnique.mockResolvedValue(null);
+    await expect(service.getSchoolOnboardingStatus("missing")).rejects.toThrow(NotFoundException);
+  });
+});
 
 describe("updateSubscription", () => {
   const school = (status = "TRIALING", expiresAt: Date | null = new Date(Date.now() + 5 * DAY)) => ({ id: "sch1", organizationId: "org1", organization: org(status, expiresAt) });
