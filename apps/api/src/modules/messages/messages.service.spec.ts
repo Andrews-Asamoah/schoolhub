@@ -21,9 +21,10 @@ function buildService() {
     },
     schoolMessageRecipient: { updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
     notification: { createMany: vi.fn().mockResolvedValue({ count: 1 }) },
+    $transaction: vi.fn(),
   };
   const tx = { schoolMessage: client.schoolMessage, notification: client.notification };
-  client.$transaction = vi.fn(async (callback: (transaction: typeof tx) => unknown) => callback(tx)) as never;
+  client.$transaction.mockImplementation(async (callback: (transaction: typeof tx) => unknown) => callback(tx));
   const teacherScope = {
     getTaughtClassIds: vi.fn().mockResolvedValue(["class-a"]),
   };
