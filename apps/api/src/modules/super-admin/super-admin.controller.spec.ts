@@ -16,6 +16,7 @@ describe("SuperAdminController (HTTP)", () => {
     listAuditLogs: vi.fn(async () => ({ data: [], meta: {} })),
     updateSubscription: vi.fn(async () => ({ ok: true })),
     getPlatformStats: vi.fn(async () => ({ totalSchools: 0 })),
+    getOperationsHealth: vi.fn(async () => ({ status: "degraded", migrations: { status: "not_configured" } })),
   };
 
   beforeAll(async () => {
@@ -48,6 +49,19 @@ describe("SuperAdminController (HTTP)", () => {
     await request(app.getHttpServer()).get("/super-admin/audit-logs").expect(403);
     expect(service.getPlatformStats).not.toHaveBeenCalled();
     expect(service.listAuditLogs).not.toHaveBeenCalled();
+  });
+
+  it("blocks banned super admins and accounts that must change temporary passwords", async () => {
+    const http = request(app.getHttpServer());
+
+    sessionUser = { id: "sa1", role: "superAdmin", twoFactorEnabled: true, banned: true };
+    const banned = await http.get("/super-admin/stats").expect(403);
+    expect(banned.body.message).toContain("suspended");
+
+    sessionUser = { id: "sa1", role: "superAdmin", twoFactorEnabled: true, mustChangePassword: true };
+    const passwordChange = await http.get("/super-admin/stats").expect(403);
+    expect(passwordChange.body.error).toBe("PASSWORD_CHANGE_REQUIRED");
+    expect(service.getPlatformStats).not.toHaveBeenCalled();
   });
 
   it("rejects a super admin who has not enrolled in two-factor, on every route", async () => {
@@ -93,6 +107,14 @@ describe("SuperAdminController (HTTP)", () => {
     expect(service.updateSubscription).toHaveBeenCalledTimes(1);
     const [, , actor] = service.updateSubscription.mock.calls[0] as unknown as [string, unknown, { id: string }];
     expect(actor.id).toBe("sa1");
+  });
+
+  it("never lets operational health responses be cached", async () => {
+    asSuperAdmin();
+    const res = await request(app.getHttpServer()).get("/super-admin/operations/health").expect(200);
+    expect(res.headers["cache-control"]).toBe("no-store");
+    expect(res.body.status).toBe("degraded");
+    expect(service.getOperationsHealth).toHaveBeenCalledTimes(1);
   });
 
   it("never lets the audit log response be cached", async () => {

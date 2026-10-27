@@ -956,7 +956,8 @@ export class SuperAdminService {
       }
     }
 
-    const migrationDegraded = ["mismatch", "incomplete", "unavailable"].includes(migrations.status);
+    // A missing expected migration is an unverified deployment, not a healthy one.
+    const migrationDegraded = ["mismatch", "incomplete", "not_configured", "unavailable"].includes(migrations.status);
     return {
       status: database.status === "healthy" && !migrationDegraded ? "healthy" : "degraded",
       checkedAt,
