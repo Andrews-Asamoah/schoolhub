@@ -52,11 +52,17 @@ export class ReportPublicationService {
   async getMyPublishedReports(schoolId: string, userId: string) {
     const student = await this.prisma.client.student.findFirst({ where: { schoolId, deletedAt: null, profile: { userId } }, select: { id: true } });
     if (!student) throw new NotFoundException("Student record not found.");
-    return this.prisma.client.reportCard.findMany({
+    const reports = await this.prisma.client.reportCard.findMany({
       where: { studentId: student.id, publishedAt: { not: null }, set: { schoolId, status: "PUBLISHED" } },
       orderBy: { publishedAt: "desc" },
-      select: { id: true, data: true, publishedAt: true, student: { select: { admissionNumber: true, profile: { select: { firstName: true, lastName: true } } } }, set: { select: { name: true, academicYear: { select: { name: true } }, term: { select: { name: true, termNumber: true } }, template: { select: { name: true, layout: true } }, school: { select: { name: true, code: true, email: true, phone: true, address: true, logo: true, motto: true, website: true, primaryColor: true, secondaryColor: true } } } } },
+      select: { id: true, setId: true, studentId: true, data: true, publishedAt: true, student: { select: { admissionNumber: true, profile: { select: { firstName: true, lastName: true } } } }, set: { select: { name: true, academicYear: { select: { name: true } }, term: { select: { name: true, termNumber: true } }, template: { select: { name: true, layout: true } }, school: { select: { name: true, code: true, email: true, phone: true, address: true, logo: true, motto: true, website: true, primaryColor: true, secondaryColor: true } } } } },
     });
+    const published = await this.prisma.client.reportCardVersion.findMany({
+      where: { schoolId, studentId: student.id, stage: "PUBLISHED", publishedAt: { not: null } },
+      select: { setId: true },
+    });
+    const available = new Set(published.map(v => v.setId));
+    return reports.map(report => ({ ...report, pdfAvailable: available.has(report.setId) }));
   }
 
   async getGuardianPublishedReports(schoolId: string, userId: string) {
@@ -70,9 +76,16 @@ export class ReportPublicationService {
     const reports = await this.prisma.client.reportCard.findMany({
       where: { studentId: { in: studentIds }, publishedAt: { not: null }, set: { schoolId, status: "PUBLISHED" } },
       orderBy: { publishedAt: "desc" },
-      select: { id: true, studentId: true, data: true, publishedAt: true, student: { select: { admissionNumber: true, profile: { select: { firstName: true, lastName: true } } } }, set: { select: { name: true, academicYear: { select: { name: true } }, term: { select: { name: true, termNumber: true } }, template: { select: { name: true, layout: true } }, school: { select: { name: true, code: true, email: true, phone: true, address: true, logo: true, motto: true, website: true, primaryColor: true, secondaryColor: true } } } } },
+      select: { id: true, setId: true, studentId: true, data: true, publishedAt: true, student: { select: { admissionNumber: true, profile: { select: { firstName: true, lastName: true } } } }, set: { select: { name: true, academicYear: { select: { name: true } }, term: { select: { name: true, termNumber: true } }, template: { select: { name: true, layout: true } }, school: { select: { name: true, code: true, email: true, phone: true, address: true, logo: true, motto: true, website: true, primaryColor: true, secondaryColor: true } } } } },
     });
-    return reports;
+    const published = await this.prisma.client.reportCardVersion.findMany({
+      where: { schoolId, studentId: { in: studentIds }, stage: "PUBLISHED",
+        publishedAt: { not: null } },
+      select: { setId: true, studentId: true },
+    });
+    const available = new Set(published.map(v => v.setId + ":" + v.studentId));
+    return reports.map(report => ({ ...report,
+      pdfAvailable: available.has(report.setId + ":" + report.studentId) }));
   }
 
   async createSet(schoolId: string, actorId: string, input: { name: string; templateId: string; academicYearId: string; termId: string; classIds: string[]; publishAt: string | null }) {
