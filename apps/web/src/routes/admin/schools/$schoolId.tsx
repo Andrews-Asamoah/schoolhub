@@ -19,7 +19,7 @@ import {
   ShieldAlert,
   X,
 } from "lucide-react";
-import { apiFetch } from "@/lib/api";
+import { ApiError, apiFetch } from "@/lib/api";
 import type { IssuedCredentials } from "@schoolhub/shared";
 import {
   CredentialsDialog,
@@ -28,6 +28,7 @@ import {
 import { SubscriptionBadge } from "@/components/superadmin/subscription-badge";
 import { SubscriptionDialog } from "@/components/superadmin/subscription-dialog";
 import { ResetTwoFactorButton } from "@/components/superadmin/reset-two-factor-button";
+import { ErrorPanel } from "@/components/superadmin/state-panels";
 
 export const Route = createFileRoute("/admin/schools/$schoolId")({
   component: SchoolDetailPage,
@@ -101,9 +102,10 @@ function SchoolDetailPage() {
   const previousFocusRef = useRef<HTMLElement | null>(null);
   const queryClient = useQueryClient();
 
-  const { data: school, isPending } = useQuery({
+  const { data: school, isPending, error, refetch } = useQuery({
     queryKey: ["superadmin", "school", schoolId],
     queryFn: () => apiFetch<SchoolDetail>(`/super-admin/schools/${schoolId}`),
+    retry: false,
   });
 
   useEffect(() => {
@@ -244,10 +246,31 @@ function SchoolDetailPage() {
     );
   }
 
+  if (error) {
+    if (error instanceof ApiError && error.status === 404) {
+      return (
+        <div className="flex flex-col items-center justify-center py-24 text-center">
+          <p className="text-sm font-semibold text-foreground">School not found</p>
+          <p className="mt-1 max-w-md text-sm text-muted-foreground">The school may have been removed or the link may be incorrect.</p>
+          <Link to="/admin/schools" className="mt-3 text-xs text-primary hover:underline">
+            Back to schools
+          </Link>
+        </div>
+      );
+    }
+
+    return (
+      <ErrorPanel
+        message={`School details could not be loaded: ${error.message}`}
+        onRetry={() => void refetch()}
+      />
+    );
+  }
+
   if (!school) {
     return (
       <div className="flex flex-col items-center justify-center py-24 text-center">
-        <p className="text-sm text-muted-foreground">School not found</p>
+        <p className="text-sm font-semibold text-foreground">School details are unavailable</p>
         <Link to="/admin/schools" className="mt-3 text-xs text-primary hover:underline">
           Back to schools
         </Link>
@@ -286,7 +309,7 @@ function SchoolDetailPage() {
               <span className="rounded-full border border-primary/20 bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">
                 {school.subdomain}
               </span>
-              <SubscriptionBadge status={school.organization.subscriptionStatus} />
+              <SubscriptionBadge status={school.organization.subscriptionStatus} expiresAt={school.organization.expiresAt} />
             </div>
           </div>
           <div className="flex gap-4 text-center">
@@ -576,7 +599,7 @@ function SchoolDetailPage() {
             <div>
               <p className="text-xs font-medium text-muted-foreground">Current Status</p>
               <div className="mt-1">
-                <SubscriptionBadge status={school.organization.subscriptionStatus} />
+                <SubscriptionBadge status={school.organization.subscriptionStatus} expiresAt={school.organization.expiresAt} />
               </div>
             </div>
             <div>
