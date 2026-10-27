@@ -33,6 +33,7 @@ import {
 } from "@/components/forms/form-controls";
 import { useSchoolRole } from "@/components/school/school-role-switcher";
 import { DataTable, type DataTableColumn } from "@/components/ui/data-table";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { canExportTables } from "@/lib/table-export-policy";
 import { apiFetch } from "@/lib/api";
 
@@ -572,17 +573,13 @@ export function ClassesWorkspace({
                 className={`${controlClasses} w-full pl-9`}
               />
             </label>
-            <select
-              value={departmentFilter}
-              onChange={(event) => setDepartmentFilter(event.target.value)}
-              aria-label="Filter by department"
-              className={`${controlClasses} min-w-40`}
-            >
-              <option value="all">All departments</option>
-              {availableDepartments.map((department) => (
-                <option key={department.id} value={department.id}>{department.name}</option>
-              ))}
-            </select>
+            <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
+              <SelectTrigger aria-label="Filter by department" className={`${controlClasses} min-w-40`}><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All departments</SelectItem>
+                {availableDepartments.map((department) => <SelectItem key={department.id} value={department.id}>{department.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
           </div>
         </div>
 
