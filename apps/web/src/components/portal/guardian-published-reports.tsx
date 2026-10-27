@@ -13,7 +13,7 @@ function accessibleAccentForeground(color: string): string {
   const linear = channels.map((channel) => channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4);
   const luminance = 0.2126 * linear[0]! + 0.7152 * linear[1]! + 0.0722 * linear[2]!;
   const contrastWithWhite = 1.05 / (luminance + 0.05);
-  const contrastWithDark = (luminance + 0.05) / (0.005); // near-black text (#0b0b0b)
+  const contrastWithDark = (luminance + 0.05) / 0.0535; // near-black text (#0b0b0b)
   return contrastWithWhite >= contrastWithDark ? "#ffffff" : "#0b0b0b";
 }
 
