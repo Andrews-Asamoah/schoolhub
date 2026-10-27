@@ -144,6 +144,8 @@ jobs:
         run: pnpm --filter @schoolhub/api test
       - name: Web theme lint
         run: pnpm --filter @schoolhub/web lint:theme
+      - name: Web unit tests
+        run: pnpm --filter @schoolhub/web test
       # Real sign-in flow (password + authenticator code, backup codes, lockout,
       # super-admin and school-admin enforcement) against the migrated database.
       - name: Two-factor authentication end-to-end (PostgreSQL)
