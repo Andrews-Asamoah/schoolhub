@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
-import { Check, CircleAlert, CreditCard, Edit3, Infinity as InfinityIcon, Layers3, Plus, Save, ShieldCheck, Users, X } from "lucide-react";
+import { useState, type ReactNode } from "react";
+import { Check, CircleAlert, CreditCard, Edit3, Layers3, Plus, Save, ShieldCheck, Users, X, type LucideIcon } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { PageHeader } from "@/components/superadmin/page-header";
 import { EmptyPanel, ErrorPanel, LoadingPanel } from "@/components/superadmin/state-panels";
@@ -73,7 +73,7 @@ function SubscriptionPlansPage() {
       <section role="dialog" aria-modal="true" aria-labelledby="plan-editor-title" className="max-h-[94vh] w-full max-w-3xl overflow-y-auto rounded-t-3xl border border-border bg-card p-5 shadow-2xl sm:rounded-3xl sm:p-7">
         <div className="flex items-start justify-between gap-4"><div><p className="text-xs font-bold uppercase tracking-widest text-primary">Plan configuration</p><h2 id="plan-editor-title" className="mt-1 text-xl font-bold text-foreground">{draft.id ? "Edit subscription plan" : "Create subscription plan"}</h2><p className="mt-1 text-sm text-muted-foreground">Use explicit caps to protect performance and keep pricing predictable.</p></div><button type="button" onClick={() => setDraft(null)} disabled={save.isPending} aria-label="Close editor" className="rounded-lg p-2 hover:bg-muted"><X className="size-4" /></button></div>
         <div className="mt-6 grid gap-4 sm:grid-cols-2">
-          <Field label="Plan code" hint="Stable internal identifier"><input value={draft.code} onChange={e => set("code", e.target.value.toUpperCase().replace(/[^A-Z0-9_-]/g, ""))} disabled={Boolean(draft.id)} maxLength={32} required placeholder="e.g. GROWTH" className="field" /></Field>
+          <Field label="Plan code" hint="Stable internal identifier"><input value={draft.code} onChange={e => set("code", e.target.value.toUpperCase().replace(/[^A-Z0-9_-]/g, ""))} disabled={Boolean(draft.id)} maxLength={32} required placeholder="e.g. GROWTH" className="mt-2 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring" /></Field>
           <Field label="Display name"><input value={draft.name} onChange={e => set("name", e.target.value)} maxLength={80} required placeholder="Growth" className="field" /></Field>
           <Field label="Description"><input value={draft.description ?? ""} onChange={e => set("description", e.target.value)} maxLength={500} placeholder="For growing basic and secondary schools" className="field" /></Field>
           <Field label="Currency"><select value={draft.currency} onChange={e => set("currency", e.target.value)} className="field"><option value="GHS">GHS — Ghana cedi</option><option value="USD">USD — US dollar</option></select></Field>
@@ -95,11 +95,11 @@ function SubscriptionPlansPage() {
   </div>;
 }
 
-function Summary({ label, value, icon: Icon }: { label: string; value: string | number; icon: typeof Layers3 }) { return <div className="rounded-2xl border border-border bg-card p-4 shadow-sm"><div className="flex items-center justify-between gap-2"><span className="text-sm text-muted-foreground">{label}</span><Icon className="size-4 text-primary" /></div><p className="mt-3 text-2xl font-bold tabular-nums text-foreground">{value}</p></div>; }
+function Summary({ label, value, icon: Icon }: { label: string; value: string | number; icon: LucideIcon }) { return <div className="rounded-2xl border border-border bg-card p-4 shadow-sm"><div className="flex items-center justify-between gap-2"><span className="text-sm text-muted-foreground">{label}</span><Icon className="size-4 text-primary" /></div><p className="mt-3 text-2xl font-bold tabular-nums text-foreground">{value}</p></div>; }
 function Price({ label, value }: { label: string; value: string }) { return <div className="rounded-xl bg-muted/50 p-3"><p className="text-xs text-muted-foreground">{label}</p><p className="mt-1 text-base font-bold text-foreground">{value}</p></div>; }
 function Limit({ label, value }: { label: string; value: string }) { return <div><p className="text-xs text-muted-foreground">{label}</p><p className="mt-1 text-sm font-semibold text-foreground">{value}</p></div>; }
 function StateTag({ active, label }: { active: boolean; label: string }) { return <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${active ? "bg-success/10 text-success" : "bg-muted text-muted-foreground"}`}>{label}</span>; }
-function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) { return <label className="block min-w-0"><span className="block text-sm font-semibold text-foreground">{label}</span>{hint && <span className="mt-0.5 block text-xs text-muted-foreground">{hint}</span>}{children}</label>; }
+function Field({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) { return <label className="block min-w-0"><span className="block text-sm font-semibold text-foreground">{label}</span>{hint && <span className="mt-0.5 block text-xs text-muted-foreground">{hint}</span>}{children}</label>; }
 function LimitField({ label, value, onChange }: { label: string; value: number | null; onChange: (value: number | null) => void }) { return <Field label={label} hint="Leave blank for unlimited"><input type="number" min="0" step="1" value={value ?? ""} onChange={e => onChange(e.target.value === "" ? null : Math.max(0, Math.floor(Number(e.target.value))))} className="field" /></Field>; }
 function Toggle({ label, checked, onChange }: { label: string; checked: boolean; onChange: (value: boolean) => void }) { return <label className="flex items-center justify-between gap-3 text-sm text-foreground"><span>{label}</span><input type="checkbox" checked={checked} onChange={e => onChange(e.target.checked)} className="size-4 accent-primary" /></label>; }
 
