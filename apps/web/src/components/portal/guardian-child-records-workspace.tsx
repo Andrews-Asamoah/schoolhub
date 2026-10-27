@@ -15,7 +15,9 @@ interface AttendanceRecord {
 interface AttendanceData {
   summary: Record<string, number>;
   totalDays: number;
-  attendanceRate: number | null; unmarkedDays?: number; eligibilityWarning?: string | null;
+  attendanceRate: number | null; unmarkedDays?: number | null; coverageRate?: number | null;
+  provisionalRate?: number | null; policyMode?: "LEGACY_RECORDED" | "TRANSITION" | "CALENDAR";
+  eligibilityWarning?: string | null;
   recentRecords: AttendanceRecord[];
 }
 interface Lesson {
@@ -90,7 +92,8 @@ function AttendancePanel({ query }: { query: UseQueryResult<AttendanceData, Erro
   if (query.isError) return <RetryState message="Attendance records could not be loaded." onRetry={() => void query.refetch()} fetching={query.isFetching} />;
   const summary = data?.summary ?? {};
   const stats = [
-    { label: "Attendance rate", value: data?.attendanceRate == null ? "Incomplete" : `${data.attendanceRate}%`, icon: CheckCircle2 },
+    { label: "Attendance rate", value: data?.attendanceRate != null ? `${data.attendanceRate}%` :
+        data?.provisionalRate != null ? `${data.provisionalRate}% (provisional)` : "Incomplete", icon: CheckCircle2 },
     { label: "Days present", value: String((summary.PRESENT ?? 0) + (summary.LATE ?? 0)), icon: CheckCircle2 },
     { label: "Late arrivals", value: String(summary.LATE ?? 0), icon: Clock3 },
     { label: "Absences", value: String(summary.ABSENT ?? 0), icon: XCircle },

@@ -1,7 +1,38 @@
 import { describe, expect, it } from "vitest";
-import { calculateDailyAttendance, eligibleInstructionalDates, requireWeekdays } from "./attendance-calendar.js";
+import { calculateAttendanceRollout, calculateDailyAttendance, eligibleInstructionalDates, requireWeekdays } from "./attendance-calendar.js";
 
 const params = { start: "2026-10-26", end: "2026-10-30", asOf: "2026-10-30", weekdays: [1,2,3,4,5] };
+
+describe("safe attendance rollout", () => {
+  it("does not manufacture absences before a mid-term activation date", () => {
+    const result = calculateAttendanceRollout({
+      start:"2026-10-26", end:"2026-10-30", asOf:"2026-10-30",
+      activeFrom:"2026-10-28", weekdays:[1,2,3,4,5], records:[
+        {date:"2026-10-26",status:"PRESENT"}, // no 27th register, historical
+        {date:"2026-10-28",status:"LATE"},{date:"2026-10-29",status:"ABSENT"},
+      ],
+    });
+    expect(result.possibleDays).toBe(4);
+    expect(result.recordedDays).toBe(3);
+    expect(result.unmarkedDays).toBe(1);
+    expect(result.summary.ABSENT).toBe(1);
+    expect(result.attendanceRate).toBeNull();
+    expect(result.provisionalRate).toBe(67);
+    expect(result.coverageRate).toBe(75);
+    expect(result.policyMode).toBe("TRANSITION");
+  });
+  it("calculates a final rate when every day since activation is marked", () => {
+    const result = calculateAttendanceRollout({
+      start:"2026-10-26", end:"2026-10-28", asOf:"2026-10-28",
+      activeFrom:"2026-10-26", weekdays:[1,2,3,4,5],
+      records:[{date:"2026-10-26",status:"PRESENT"},{date:"2026-10-27",status:"LATE"},{date:"2026-10-28",status:"EXCUSED"}],
+    });
+    expect(result.attendanceRate).toBe(67);
+    expect(result.provisionalRate).toBe(67);
+    expect(result.coverageRate).toBe(100);
+    expect(result.policyMode).toBe("CALENDAR");
+  });
+});
 
 describe("instructional calendar and daily attendance", () => {
   it("rejects duplicate or invalid weekday policies", () => {

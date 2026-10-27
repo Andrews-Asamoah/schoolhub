@@ -2,7 +2,7 @@ import { BadRequestException, ConflictException, Injectable, NotFoundException }
 import type { AttendanceStatus } from "@prisma/client";
 import { Prisma } from "@prisma/client";
 import { PrismaService } from "../../prisma/prisma.service.js";
-import { calculateDailyAttendance, dateString, eligibleInstructionalDates, isoDay, requireWeekdays } from "./attendance-calendar.js";
+import { calculateAttendanceRollout, dateString, eligibleInstructionalDates, isoDay, requireWeekdays } from "./attendance-calendar.js";
 
 export type CalendarConfiguration = {
   weekdays: number[];
@@ -14,6 +14,49 @@ export type CalendarConfiguration = {
 @Injectable()
 export class AttendanceCalendarService {
   constructor(private readonly prisma: PrismaService) {}
+
+
+  async getPolicy(schoolId: string) {
+    const school = await this.prisma.client.school.findUnique({
+      where: { id: schoolId }, select: { attendancePolicyActiveFrom: true },
+    });
+    if (!school) throw new NotFoundException("School not found.");
+    return { attendancePolicyActiveFrom: school.attendancePolicyActiveFrom
+      ? dateString(school.attendancePolicyActiveFrom) : null };
+  }
+
+  async setPolicy(schoolId: string, actorId: string, input: {
+    attendancePolicyActiveFrom: string | null; reason: string;
+  }) {
+    if (input.attendancePolicyActiveFrom) {
+      try { isoDay(input.attendancePolicyActiveFrom); }
+      catch { throw new BadRequestException("Enter a valid activation date."); }
+      if (input.attendancePolicyActiveFrom < dateString(new Date())) {
+        throw new BadRequestException("Choose today or a future activation date; historical adoption requires a reviewed migration.");
+      }
+    }
+    return this.prisma.client.$transaction(async tx => {
+      const school = await tx.school.findUnique({
+        where: { id: schoolId }, select: { attendancePolicyActiveFrom: true },
+      });
+      if (!school) throw new NotFoundException("School not found.");
+      const oldDate = school.attendancePolicyActiveFrom ? dateString(school.attendancePolicyActiveFrom) : null;
+      if (oldDate === input.attendancePolicyActiveFrom) {
+        return { attendancePolicyActiveFrom: oldDate, changed: false };
+      }
+      const newValue = input.attendancePolicyActiveFrom
+        ? new Date(input.attendancePolicyActiveFrom + "T00:00:00.000Z") : null;
+      await tx.school.update({ where: { id: schoolId },
+        data: { attendancePolicyActiveFrom: newValue } });
+      await tx.auditLog.create({ data: { schoolId, userId: actorId, action: "UPDATE",
+        entityType: "ATTENDANCE_POLICY", entityId: schoolId,
+        oldValues: { activeFrom: oldDate ?? "DISABLED" },
+        newValues: { activeFrom: input.attendancePolicyActiveFrom ?? "DISABLED",
+          reason: input.reason.trim() } },
+      });
+      return { attendancePolicyActiveFrom: input.attendancePolicyActiveFrom, changed: true };
+    });
+  }
 
   private async requireTerm(schoolId: string, termId: string) {
     const term = await this.prisma.client.term.findFirst({
@@ -228,8 +271,13 @@ export class AttendanceCalendarService {
         select: { date: true, status: true },
       }),
     ]);
-    const outcome = calculateDailyAttendance({
+    const policy = await this.getPolicy(schoolId);
+    if (!policy.attendancePolicyActiveFrom) {
+      throw new BadRequestException("Calendar-based attendance has not been activated.");
+    }
+    const outcome = calculateAttendanceRollout({
       start, end, asOf, weekdays: term.instructionalWeekdays,
+      activeFrom: policy.attendancePolicyActiveFrom,
       overrides: days.map(row => ({ date: dateString(row.date), isInstructional: row.isInstructional })),
       excludedDates: exclusions.map(row => dateString(row.date)),
       records: rows.map(row => ({ date: dateString(row.date), status: row.status as AttendanceStatus })),
@@ -237,6 +285,7 @@ export class AttendanceCalendarService {
     const incompleteEligibility = ["WITHDRAWN","TRANSFERRED","SUSPENDED"].includes(enrollment.status) && !enrollment.effectiveTo;
     return {
       ...outcome, attendanceRate: incompleteEligibility ? null : outcome.attendanceRate,
+      policyActiveFrom: policy.attendancePolicyActiveFrom,
       calendarRevision: term.calendarRevision,
       enrollmentStart: start, enrollmentEnd: end, asOf,
       approvedExclusions: exclusions.length,

@@ -192,6 +192,33 @@ export class AttendanceService {
       termId,
       role,
     );
+    // Feature disabled by default: preserve the original recorded-register calculation.
+    // The legacy denominator is only the number of saved entries, never inferred school days.
+    const policy = await this.calendarService.getPolicy(schoolId);
+    if (!policy.attendancePolicyActiveFrom ||
+        policy.attendancePolicyActiveFrom > new Date().toISOString().slice(0, 10) ||
+        policy.attendancePolicyActiveFrom > term.endDate.toISOString().slice(0, 10)) {
+      const rows = await this.prisma.client.attendance.groupBy({
+        by: ["status"],
+        where: { studentId, student: { schoolId,
+          enrollments: { some: { academicYearId: academicYear.id, termId: term.id,
+            status: "ACTIVE" } } },
+          date: { gte: term.startDate, lte: term.endDate } },
+        _count: true,
+      });
+      const summary: Record<string, number> = {
+        PRESENT: 0, ABSENT: 0, LATE: 0, EXCUSED: 0, SICK: 0, PERMISSION: 0,
+      };
+      rows.forEach(row => { summary[row.status] = row._count; });
+      const totalDays = Object.values(summary).reduce((sum, n) => sum + n, 0);
+      const attended = summary.PRESENT! + summary.LATE!;
+      const rate = totalDays ? Math.round((attended / totalDays) * 100) : 0;
+      return { summary, totalDays, recordedDays: totalDays,
+        possibleDays: null, unmarkedDays: null, missingDates: [],
+        attendanceRate: rate, provisionalRate: totalDays ? rate : null,
+        coverageRate: null, policyMode: "LEGACY_RECORDED" as const,
+        policyActiveFrom: policy.attendancePolicyActiveFrom, isComplete: false };
+    }
     return this.calendarService.studentSummary(schoolId, studentId, academicYear.id, term);
 
   }
