@@ -805,6 +805,15 @@ export type AddSchoolAdminInput = z.infer<typeof addSchoolAdminSchema>;
 
 export const setSchoolAdminBannedSchema = z.object({
   banned: z.boolean(),
+  reason: z.string().trim().min(10, "Enter a reason of at least 10 characters").max(500).optional(),
+}).superRefine((value, ctx) => {
+  if (value.banned && !value.reason) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["reason"],
+      message: "A reason is required when suspending a school administrator",
+    });
+  }
 });
 export type SetSchoolAdminBannedInput = z.infer<
   typeof setSchoolAdminBannedSchema
