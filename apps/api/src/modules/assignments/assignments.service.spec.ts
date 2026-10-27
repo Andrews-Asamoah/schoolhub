@@ -1,6 +1,5 @@
 import { BadRequestException, ForbiddenException } from "@nestjs/common";
 import { describe, expect, it, vi } from "vitest";
-import type { School } from "@prisma/client";
 import type { CreateSchoolAssignmentInput } from "./assignments.schemas.js";
 import { AssignmentsService } from "./assignments.service.js";
 
@@ -112,7 +111,6 @@ function buildService(options: TestOptions = {}) {
   };
 }
 
-const school = { id: schoolId, organizationId: "org-a" } as School;
 
 describe("AssignmentsService authorization and validation", () => {
   it("rejects a class and subject combination that is not assigned to the class", async () => {
