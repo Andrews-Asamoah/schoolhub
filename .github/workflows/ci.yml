@@ -121,8 +121,19 @@ jobs:
           cache: pnpm
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+      # Match the baseline job: prepare generated workspace outputs first, then
+      # typecheck packages sequentially so API typecheck cannot clean shared
+      # declaration files while the web typecheck is resolving them.
+      - name: Prepare workspace
+        id: prepare
+        run: |
+          pnpm --filter @schoolhub/shared build
+          pnpm --filter @schoolhub/api exec prisma generate --config prisma.config.ts
       - name: Typecheck
-        run: pnpm typecheck
+        run: |
+          pnpm --filter @schoolhub/shared typecheck
+          pnpm --filter @schoolhub/api typecheck
+          pnpm --filter @schoolhub/web typecheck
       - name: Web build
         run: pnpm --filter @schoolhub/web build
       - name: API lint

@@ -913,14 +913,60 @@ export class SuperAdminService {
       database = { status: "unavailable", latencyMs: null };
     }
 
+    const expectedMigration = process.env.EXPECTED_MIGRATION_NAME?.trim();
+    let migrations: {
+      status: "current" | "mismatch" | "incomplete" | "not_configured" | "unavailable";
+      latestApplied: string | null;
+      unfinishedCount: number | null;
+    } = { status: "unavailable", latestApplied: null, unfinishedCount: null };
+    if (database.status === "healthy") {
+      try {
+        const rows = await this.prisma.client.$queryRaw<Array<{
+          latest_migration: string | null;
+          unfinished_count: bigint | number;
+        }>>`
+          SELECT
+            (
+              SELECT migration_name
+              FROM "_prisma_migrations"
+              WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL
+              ORDER BY started_at DESC
+              LIMIT 1
+            ) AS latest_migration,
+            COUNT(*) FILTER (
+              WHERE finished_at IS NULL AND rolled_back_at IS NULL
+            ) AS unfinished_count
+          FROM "_prisma_migrations"
+        `;
+        const latestApplied = rows[0]?.latest_migration ?? null;
+        const unfinishedCount = Number(rows[0]?.unfinished_count ?? 0);
+        migrations = {
+          status: unfinishedCount > 0
+            ? "incomplete"
+            : expectedMigration
+              ? latestApplied === expectedMigration ? "current" : "mismatch"
+              : "not_configured",
+          latestApplied,
+          unfinishedCount,
+        };
+      } catch {
+        // Do not leak SQL/schema details. A missing migration table is not
+        // evidence that migrations are current; report it as unverified.
+        migrations = { status: "unavailable", latestApplied: null, unfinishedCount: null };
+      }
+    }
+
+    const migrationDegraded = ["mismatch", "incomplete", "unavailable"].includes(migrations.status);
     return {
-      status: database.status === "healthy" ? "healthy" : "degraded",
+      status: database.status === "healthy" && !migrationDegraded ? "healthy" : "degraded",
       checkedAt,
       application: {
         status: "healthy",
         version: process.env.npm_package_version ?? "unknown",
         environment: process.env.NODE_ENV ?? "unknown",
+        commitSha: process.env.BUILD_SHA ?? process.env.GIT_SHA ?? process.env.SOURCE_VERSION ?? "unknown",
       },
+      migrations,
       dependencies: {
         database,
         // These remain explicitly uninstrumented until a real provider/worker

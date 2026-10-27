@@ -17,6 +17,7 @@ function makeService(overrides: Record<string, any> = {}) {
     member: { findUnique: vi.fn(), findFirst: vi.fn(), create: vi.fn(), update: vi.fn(), delete: vi.fn() },
     session: { deleteMany: vi.fn() },
     auditLog: { create: vi.fn(), findMany: vi.fn(async () => []), count: vi.fn(async () => 0) },
+    $queryRaw: vi.fn(async () => [{ latest_migration: "20261027010000_late_schema_reconciliation", unfinished_count: 0 }]),
     ...overrides,
   };
   client.$transaction = vi.fn(async (fn: (tx: unknown) => unknown) => fn(client));
@@ -25,6 +26,102 @@ function makeService(overrides: Record<string, any> = {}) {
 }
 
 const org = (status: string, expiresAt: Date | null) => ({ id: "org1", subscriptionStatus: status, expiresAt });
+
+describe("getOperationsHealth", () => {
+  it("reports the deployment commit and does not claim migration currency without expected build metadata", async () => {
+    vi.stubEnv("EXPECTED_MIGRATION_NAME", "");
+    vi.stubEnv("BUILD_SHA", "test-build-sha");
+    try {
+      const { service } = makeService();
+      const result = await service.getOperationsHealth();
+      expect(result.application.commitSha).toBe("test-build-sha");
+      expect(result.migrations).toMatchObject({
+        status: "not_configured",
+        latestApplied: "20261027010000_late_schema_reconciliation",
+        unfinishedCount: 0,
+      });
+      expect(result.status).toBe("healthy");
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it("reports migration metadata as unverified and degrades health if the migration table cannot be read", async () => {
+    const { service, client } = makeService();
+    client.$queryRaw
+      .mockResolvedValueOnce([])
+      .mockRejectedValueOnce(new Error("internal database detail"));
+    const result = await service.getOperationsHealth();
+    expect(result.status).toBe("degraded");
+    expect(result.migrations).toEqual({
+      status: "unavailable",
+      latestApplied: null,
+      unfinishedCount: null,
+    });
+    expect(JSON.stringify(result)).not.toContain("internal database detail");
+  });
+});
+
+describe("getSchoolOnboardingStatus", () => {
+  it("derives completion from persisted school setup and returns incomplete steps honestly", async () => {
+    const { service, client } = makeService();
+    client.school.findUnique.mockResolvedValue({
+      id: "sch1",
+      email: "office@school.test",
+      phone: "+233200000000",
+      address: "Accra",
+      academicYears: [{ id: "year1", name: "2026/2027", terms: [{ id: "term1" }] }],
+      financeSettings: { schoolId: "sch1" },
+      _count: {
+        classes: 8,
+        subjects: 12,
+        teachers: 15,
+        feeStructures: 3,
+        assessmentTemplates: 2,
+        reportCardTemplates: 1,
+      },
+    });
+
+    const result = await service.getSchoolOnboardingStatus("sch1");
+
+    expect(result).toMatchObject({ schoolId: "sch1", completed: 7, total: 7, percentage: 100 });
+    expect(result.steps.every((step) => step.complete)).toBe(true);
+    expect(client.school.findUnique).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: "sch1" },
+      select: expect.objectContaining({
+        academicYears: expect.any(Object),
+        _count: expect.any(Object),
+      }),
+    }));
+  });
+
+  it("reports missing setup and does not treat a missing school as an empty checklist", async () => {
+    const { service, client } = makeService();
+    client.school.findUnique.mockResolvedValue({
+      id: "sch1",
+      email: null,
+      phone: null,
+      address: null,
+      academicYears: [],
+      financeSettings: null,
+      _count: {
+        classes: 0,
+        subjects: 0,
+        teachers: 0,
+        feeStructures: 0,
+        assessmentTemplates: 0,
+        reportCardTemplates: 0,
+      },
+    });
+    const result = await service.getSchoolOnboardingStatus("sch1");
+    expect(result.completed).toBe(0);
+    expect(result.percentage).toBe(0);
+    expect(result.steps.every((step) => !step.complete)).toBe(true);
+
+    client.school.findUnique.mockResolvedValue(null);
+    await expect(service.getSchoolOnboardingStatus("missing")).rejects.toThrow(NotFoundException);
+  });
+});
 
 describe("getSchoolOnboardingStatus", () => {
   it("derives completion from persisted school setup and returns incomplete steps honestly", async () => {
