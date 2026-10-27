@@ -32,6 +32,7 @@ function toSchoolCode(value: string) {
 export function EnrollSchoolForm() {
   const navigate = useNavigate();
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const [errors, setErrors] = useState<FormErrors>({});
 
   const [form, setForm] = useState<EnrollSchoolInput>({
@@ -54,6 +55,7 @@ export function EnrollSchoolForm() {
         body: JSON.stringify(data),
       }),
     onSuccess: (result) => {
+      setSubmitError(null);
       setSuccessMsg("School enrolled successfully!");
       // Navigation waits until the one-time credentials have been saved.
       setIssued([
@@ -64,7 +66,7 @@ export function EnrollSchoolForm() {
       ]);
     },
     onError: (err: Error) => {
-      setErrors({ schoolName: err.message });
+      setSubmitError(err.message || "Please check the details and try again.");
     },
   });
 
@@ -83,6 +85,7 @@ export function EnrollSchoolForm() {
       return next;
     });
     setErrors((e) => ({ ...e, [field]: undefined }));
+    setSubmitError(null);
   }
 
   function validate(): boolean {
@@ -99,6 +102,7 @@ export function EnrollSchoolForm() {
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    setSubmitError(null);
     if (!validate()) return;
     // Strip empty optional strings
     const payload: EnrollSchoolInput = {
@@ -121,8 +125,14 @@ export function EnrollSchoolForm() {
         }}
       />
       {successMsg && (
-        <div className="rounded-xl border border-success/20 bg-success/10 p-4 text-sm font-medium text-success">
+        <div role="status" className="rounded-xl border border-success/20 bg-success/10 p-4 text-sm font-medium text-success">
           {successMsg}
+        </div>
+      )}
+      {submitError && (
+        <div role="alert" className="rounded-xl border border-destructive/20 bg-destructive/10 p-4 text-sm text-destructive">
+          <span className="font-semibold">School enrollment failed.</span>{" "}
+          {submitError}
         </div>
       )}
 
