@@ -86,9 +86,7 @@ export function OperationsHealthPanel() {
   const migrationStatus: CheckStatus = health
     ? health.migrations.status === "current"
       ? "healthy"
-      : health.migrations.status === "not_configured"
-        ? "not_instrumented"
-        : "degraded"
+      : "degraded"
     : "unavailable";
   const migrationStatusCopy: Record<OperationsHealth["migrations"]["status"], string> = {
     current: "Matches expected build",
@@ -148,7 +146,7 @@ export function OperationsHealthPanel() {
               Operations health
             </h2>
             <p className="mt-0.5 text-xs text-muted-foreground">
-              Live checks for platform services and dependencies
+              Verified checks are separated from dependencies that are not yet monitored
             </p>
           </div>
         </div>
@@ -191,7 +189,7 @@ export function OperationsHealthPanel() {
       ) : health ? (
         <>
           <div className="flex flex-wrap items-center gap-3 px-5 pt-5 sm:px-6">
-            <span className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold ${statusClasses(overallStatus)}`}>
+            <span role="status" aria-live="polite" className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold ${statusClasses(overallStatus)}`}>
               <StatusIcon status={overallStatus} />
               {overallStatus === "healthy" ? "Core services operational" : "Service degradation detected"}
             </span>
