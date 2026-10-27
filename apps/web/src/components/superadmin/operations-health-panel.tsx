@@ -22,6 +22,12 @@ interface OperationsHealth {
     status: "healthy" | "degraded";
     version: string;
     environment: string;
+    commitSha: string;
+  };
+  migrations: {
+    status: "current" | "mismatch" | "incomplete" | "not_configured" | "unavailable";
+    latestApplied: string | null;
+    unfinishedCount: number | null;
   };
   dependencies: {
     database: { status: "healthy" | "unavailable"; latencyMs: number | null };
@@ -77,6 +83,20 @@ export function OperationsHealthPanel() {
 
   const health = healthQuery.data;
   const overallStatus: CheckStatus = health?.status ?? "unavailable";
+  const migrationStatus: CheckStatus = health
+    ? health.migrations.status === "current"
+      ? "healthy"
+      : health.migrations.status === "not_configured"
+        ? "not_instrumented"
+        : "degraded"
+    : "unavailable";
+  const migrationStatusCopy: Record<OperationsHealth["migrations"]["status"], string> = {
+    current: "Matches expected build",
+    mismatch: "Expected version mismatch",
+    incomplete: "Incomplete migration detected",
+    not_configured: "Expected version not configured",
+    unavailable: "Migration status unavailable",
+  };
   const checks = health
     ? [
         {
@@ -200,6 +220,33 @@ export function OperationsHealthPanel() {
               );
             })}
           </div>
+          <section className="mx-5 mb-5 rounded-xl border border-border p-4 sm:mx-6">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="min-w-0">
+                <h3 className="text-sm font-semibold text-foreground">Deployment &amp; database migrations</h3>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Build: <span className="font-mono text-foreground">{health.application.commitSha}</span>
+                </p>
+              </div>
+              <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-semibold ${statusClasses(migrationStatus)}`}>
+                <StatusIcon status={migrationStatus} />
+                {migrationStatusCopy[health.migrations.status]}
+              </span>
+            </div>
+            <p className="mt-2 text-xs leading-5 text-muted-foreground">
+              {health.migrations.latestApplied
+                ? `Latest successful migration: ${health.migrations.latestApplied}.`
+                : "No successful migration could be identified."}
+              {health.migrations.unfinishedCount !== null
+                ? ` ${health.migrations.unfinishedCount} unfinished migration(s).`
+                : ""}
+            </p>
+            {health.migrations.status === "not_configured" && (
+              <p className="mt-2 text-xs leading-5 text-muted-foreground">
+                Configure EXPECTED_MIGRATION_NAME in trusted deployment metadata to compare the deployed database with the release's expected migration.
+              </p>
+            )}
+          </section>
           <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border bg-muted/30 px-5 py-3 text-xs text-muted-foreground sm:px-6">
             <span>
               App version: <span className="font-medium text-foreground">{health.application.version}</span>
