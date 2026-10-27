@@ -294,9 +294,12 @@ describe.skipIf(!DB)("two-factor authentication (real database)", () => {
     it("disabling requires the password and is audited; the console then locks again", async () => {
       const a = agent();
       await signIn(a, emails.admin, nextIp());
-      await post(a, "/auth/two-factor/verify-totp", { code: totp(secret) }, nextIp());
+      await post(a, "/auth/two-factor/verify-totp", { code: totp(secret), trustDevice: true }, nextIp());
       expect((await post(a, "/auth/two-factor/disable", { password: "wrong-password" })).status).toBe(400);
       expect((await post(a, "/auth/two-factor/disable", { password: PASSWORD })).status).toBe(200);
+      expect(await prisma.verification.count({
+        where: { value: ids.admin, identifier: { startsWith: "trust-device-" } },
+      })).toBe(0);
       const entry = await prisma.auditLog.findFirst({ where: { userId: ids.admin, entityType: "auth.two-factor.disabled" } });
       expect(entry).toBeTruthy();
       const res = await get(a, "/super-admin/stats");
