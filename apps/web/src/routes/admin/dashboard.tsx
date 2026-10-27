@@ -11,6 +11,7 @@ import {
   CircleAlert,
   Plus,
   Sparkles,
+  RefreshCw,
 } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { StatCard } from "@/components/superadmin/stat-card";
@@ -59,22 +60,36 @@ function AdminDashboard() {
     data: stats,
     isPending: statsLoading,
     error: statsError,
+    refetch: refetchStats,
+    isFetching: statsFetching,
+    dataUpdatedAt: statsUpdatedAt,
   } = useQuery({
     queryKey: ["superadmin", "stats"],
     queryFn: () => apiFetch<PlatformStats>("/super-admin/stats"),
     retry: false,
+    staleTime: 15_000,
+    refetchInterval: 60_000,
+    refetchOnWindowFocus: true,
   });
 
   const {
     data: schools,
     isPending: schoolsLoading,
     error: schoolsError,
+    refetch: refetchSchools,
+    isFetching: schoolsFetching,
+    dataUpdatedAt: schoolsUpdatedAt,
   } = useQuery({
     queryKey: ["superadmin", "schools", 1],
     queryFn: () => apiFetch<SchoolsListResponse>("/super-admin/schools?page=1&limit=5"),
     retry: false,
+    staleTime: 15_000,
+    refetchInterval: 60_000,
+    refetchOnWindowFocus: true,
   });
 
+  const isRefreshing = statsFetching || schoolsFetching;
+  const lastUpdatedAt = Math.max(statsUpdatedAt, schoolsUpdatedAt);
   const regionOf = (metadata: string | null | undefined) => {
     try {
       return (metadata ? (JSON.parse(metadata) as { region?: string }) : null)?.region ?? "";
@@ -145,18 +160,35 @@ function AdminDashboard() {
               Platform overview
             </h1>
             <p className="mt-2 max-w-xl text-sm leading-6 text-brand-foreground/80">
-              A real-time snapshot of schools, learners, educators, and subscriptions across your platform.
+              Platform-wide school, learner, educator, and subscription data. Automatically refreshes every minute.
             </p>
           </div>
-          <button
-            type="button"
-            onClick={() => void navigate({ to: "/admin/schools/new" })}
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="text-right text-xs text-brand-foreground/75" aria-live="polite">
+              <p>{isRefreshing ? "Refreshing platform data…" : "Platform data"}</p>
+              {lastUpdatedAt > 0 && !isRefreshing && (
+                <p className="mt-1">Updated {new Date(lastUpdatedAt).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}</p>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={() => void Promise.all([refetchStats(), refetchSchools()])}
+              disabled={isRefreshing}
+              className="inline-flex h-11 items-center gap-2 rounded-xl border border-brand-foreground/25 bg-brand-foreground/10 px-4 text-xs font-bold text-brand-foreground transition hover:bg-brand-foreground/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-foreground disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <RefreshCw className={`size-3.5 ${isRefreshing ? "animate-spin" : ""}`} aria-hidden="true" />
+              {isRefreshing ? "Refreshing…" : "Refresh data"}
+            </button>
+            <button
+              type="button"
+              onClick={() => void navigate({ to: "/admin/schools/new" })}
             className="superadmin-button-secondary inline-flex h-11 items-center gap-2 rounded-xl border border-border/70 bg-card px-4 text-xs font-bold text-primary shadow-lg shadow-primary/15 transition hover:-translate-y-0.5 hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-background focus-visible:ring-offset-2 focus-visible:ring-offset-primary"
           >
             <Plus className="size-4" />
             Enroll a school
             <ArrowRight className="size-3.5" />
-          </button>
+            </button>
+          </div>
         </div>
       </section>
 
