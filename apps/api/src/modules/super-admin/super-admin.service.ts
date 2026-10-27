@@ -986,9 +986,6 @@ export class SuperAdminService {
   }, actor: AuditActor) {
     const code = input.code.trim().toUpperCase().replace(/[^A-Z0-9_-]/g, "");
     if (!code) throw new BadRequestException("Plan code must contain letters or numbers");
-    if (input.yearlyPrice > input.monthlyPrice * 12 && input.monthlyPrice > 0) {
-      throw new BadRequestException("Yearly price cannot exceed twelve monthly payments without an explicit pricing review");
-    }
     try {
       const plan = await this.prisma.client.$transaction(async (tx) => {
         const created = await tx.subscriptionPlan.create({
