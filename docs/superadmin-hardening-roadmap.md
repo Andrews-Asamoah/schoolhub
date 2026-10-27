@@ -17,7 +17,7 @@ This work is delivered in small, reviewable increments. Do not represent a depen
 - [x] Explicitly mark storage, notification delivery, and background jobs as not instrumented rather than reporting false green status.
 - [ ] Add provider/worker-specific health contracts for storage, notifications, and jobs.
 - [x] Add a theme-token-based UI panel with refresh, timestamps, database latency, explicit unmonitored states, and error/retry handling.
-- [ ] Expose deployment version and migration status from trusted build/deployment metadata.
+- [x] Expose deployment commit SHA and Prisma migration status; compare with `EXPECTED_MIGRATION_NAME` when deployment metadata provides it, otherwise report the comparison as not configured.
 
 ## Phase 3 — School onboarding and lifecycle
 
