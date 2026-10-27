@@ -115,6 +115,24 @@ export class AttendanceCalendarService {
       if (JSON.stringify([...termNow.instructionalWeekdays].sort()) === JSON.stringify(weekdays) && normal(before) === normal([...input.overrides])) {
         return { changed: false, calendarRevision: termNow.calendarRevision };
       }
+      const removedDays = new Set(eligibleInstructionalDates({
+        start: min, end: max, asOf: max,
+        weekdays: termNow.instructionalWeekdays,
+        overrides: before.map(day => ({ date: day.date, isInstructional: day.isInstructional })),
+      }));
+      for (const day of eligibleInstructionalDates({
+        start: min, end: max, asOf: max, weekdays,
+        overrides: input.overrides.map(row => ({ date: row.date, isInstructional: row.isInstructional })),
+      })) removedDays.delete(day);
+      if (removedDays.size) {
+        const marked = await tx.attendance.count({ where: {
+          date: { in: [...removedDays].map(day => new Date(day + "T00:00:00.000Z")) },
+          student: { schoolId },
+        } });
+        if (marked) throw new ConflictException(
+          "Attendance has already been entered on a date now proposed as non-instructional. Review those records before closing the day.",
+        );
+      }
       await tx.academicCalendarDay.deleteMany({ where: { schoolId, termId } });
       if (input.overrides.length) await tx.academicCalendarDay.createMany({
         data: input.overrides.map(row => ({ schoolId, termId, date: new Date(row.date+"T00:00:00.000Z"),
@@ -130,6 +148,101 @@ export class AttendanceCalendarService {
       } });
       return { changed: true, calendarRevision: updated.calendarRevision };
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+  }
+
+  /** Admin-only school-wide closure; it must never erase marked class attendance. */
+  async declareSchoolClosure(schoolId: string, actorId: string, termId: string, input: {
+    date: string; label: string; reason: string; expectedRevision: number;
+  }) {
+    const term = await this.requireTerm(schoolId, termId);
+    const iso = input.date;
+    try { isoDay(iso); }
+    catch { throw new BadRequestException("Use a valid ISO school calendar date."); }
+    if (iso < dateString(term.startDate) || iso > dateString(term.endDate)) {
+      throw new BadRequestException("Closure date must fall within the academic term.");
+    }
+    if (input.label.trim().length < 2 || input.reason.trim().length < 8) {
+      throw new BadRequestException("Provide a closure label and a meaningful reason.");
+    }
+    return this.prisma.client.$transaction(async tx => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${schoolId}), hashtext(${termId}))`;
+      const current = await tx.term.findFirst({
+        where: { id: termId, academicYear: { schoolId } },
+        select: { instructionalWeekdays: true, calendarRevision: true },
+      });
+      if (!current) throw new NotFoundException("Academic term not found.");
+      if (current.calendarRevision !== input.expectedRevision) {
+        throw new ConflictException("The calendar changed. Refresh the register review before declaring a closure.");
+      }
+      const published = await tx.reportCardSet.count({
+        where: { schoolId, termId, status: { in: ["PUBLISHED", "ARCHIVED"] } },
+      });
+      if (published) throw new ConflictException("Reports have been published; calendar amendments require a controlled correction.");
+      const day = new Date(iso + "T00:00:00.000Z");
+      const existing = await tx.academicCalendarDay.findUnique({
+        where: { schoolId_termId_date: { schoolId, termId, date: day } },
+        select: { isInstructional: true, label: true },
+      });
+      if (!eligibleInstructionalDates({
+        start: iso, end: iso, asOf: iso,
+        weekdays: current.instructionalWeekdays,
+        overrides: existing ? [{ date: iso, isInstructional: existing.isInstructional }] : [],
+      }).length) throw new ConflictException("This date is already non-instructional.");
+      const marked = await tx.attendance.count({
+        where: { date: day, student: { schoolId } },
+      });
+      if (marked) throw new ConflictException(
+        "One or more classes have saved attendance for this day. Review the registers before declaring a school-wide closure.",
+      );
+      const saved = await tx.academicCalendarDay.upsert({
+        where: { schoolId_termId_date: { schoolId, termId, date: day } },
+        create: { schoolId, termId, date: day, isInstructional: false,
+          label: input.label.trim(), createdById: actorId },
+        update: { isInstructional: false, label: input.label.trim(), createdById: actorId },
+      });
+      const updated = await tx.term.update({
+        where: { id: termId }, data: { calendarRevision: { increment: 1 } },
+        select: { calendarRevision: true },
+      });
+      await tx.auditLog.create({ data: {
+        schoolId, userId: actorId, action: "UPDATE",
+        entityType: "ACADEMIC_CALENDAR", entityId: saved.id,
+        oldValues: { termId, date: iso, previous: existing?.label ?? "Weekly instructional day" },
+        newValues: { termId, date: iso, label: input.label.trim(),
+          isInstructional: false, reason: input.reason.trim(),
+          revision: updated.calendarRevision },
+      } });
+      return { date: iso, schoolWide: true, calendarRevision: updated.calendarRevision };
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+  }
+
+  async listClassExclusions(schoolId: string, termId: string, classId: string) {
+    const term = await this.requireTerm(schoolId, termId);
+    if (!classId?.trim()) throw new BadRequestException("Choose a class.");
+    const classroom = await this.prisma.client.class.findFirst({
+      where: { id: classId, schoolId, deletedAt: null,
+        OR: [{ academicYearId: term.academicYearId }, { academicYearId: null }] },
+      select: { id: true },
+    });
+    if (!classroom) throw new NotFoundException("Class not found in this school and academic year.");
+    const enrollments = await this.prisma.client.enrollment.findMany({
+      where: { classId, academicYearId: term.academicYearId, termId,
+        student: { schoolId, deletedAt: null } },
+      select: { studentId: true },
+    });
+    if (!enrollments.length) return [];
+    const rows = await this.prisma.client.studentAttendanceExclusion.findMany({
+      where: { schoolId, termId, studentId: { in: enrollments.map(row => row.studentId) } },
+      include: { student: { select: { profile: {
+        select: { firstName: true, lastName: true },
+      } } } },
+      orderBy: { date: "desc" },
+      take: 500,
+    });
+    return rows.map(({ student, date, ...row }) => ({
+      ...row, date: dateString(date),
+      studentName: [student.profile.firstName, student.profile.lastName].filter(Boolean).join(" "),
+    }));
   }
 
   async listExclusions(schoolId: string, termId: string, studentId: string) {
@@ -151,10 +264,19 @@ export class AttendanceCalendarService {
       throw new BadRequestException("Excluded date must be within the selected term.");
     }
     const enrollment = await this.prisma.client.enrollment.findFirst({ where: {
-      studentId: input.studentId, termId: input.termId, student: { schoolId, deletedAt: null } },
-      select: { id: true },
+      studentId: input.studentId, termId: input.termId, status: "ACTIVE",
+      student: { schoolId, deletedAt: null } },
+      select: { id: true, effectiveFrom: true, effectiveTo: true,
+        student: { select: { admissionDate: true } } },
     });
-    if (!enrollment) throw new NotFoundException("Student is not enrolled in this school for the term.");
+    if (!enrollment) throw new NotFoundException("Student is not actively enrolled in this school for the term.");
+    const eligibleFrom = [dateString(term.startDate), dateString(enrollment.student.admissionDate),
+      ...(enrollment.effectiveFrom ? [dateString(enrollment.effectiveFrom)] : [])].sort().at(-1)!;
+    const eligibleTo = [dateString(term.endDate),
+      ...(enrollment.effectiveTo ? [dateString(enrollment.effectiveTo)] : [])].sort()[0]!;
+    if (input.date < eligibleFrom || input.date > eligibleTo) {
+      throw new BadRequestException("Student was not eligible to attend on the selected date.");
+    }
     const [calendarDays, daysOfTerm, existingMark] = await Promise.all([
       this.prisma.client.academicCalendarDay.findMany({ where: { schoolId, termId: input.termId },
         select: { date: true, isInstructional: true } }),
