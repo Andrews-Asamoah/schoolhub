@@ -2,6 +2,8 @@ import {
   Controller,
   Get,
   Post,
+  Put,
+  Delete,
   Param,
   Query,
   Headers,
@@ -9,6 +11,9 @@ import {
   UseGuards,
 } from "@nestjs/common";
 import { AttendanceService } from "./attendance.service.js";
+import { AttendanceCalendarService } from "./attendance-calendar.service.js";
+import { calendarConfigurationSchema, attendanceExclusionSchema, revokeExclusionSchema } from "./attendance-calendar.schemas.js";
+import { z } from "zod";
 import { SchoolTenantGuard } from "../../common/guards/school-tenant.guard.js";
 import { RolesGuard } from "../../common/guards/roles.guard.js";
 import { Roles } from "../../common/decorators/roles.decorator.js";
@@ -25,7 +30,46 @@ import type { School } from "@prisma/client";
 @Controller("attendance")
 @UseGuards(SchoolTenantGuard, RolesGuard)
 export class AttendanceController {
-  constructor(private readonly attendanceService: AttendanceService) {}
+  constructor(
+    private readonly attendanceService: AttendanceService,
+    private readonly calendarService: AttendanceCalendarService,
+  ) {}
+
+  @Get("calendar/:termId")
+  @Roles("owner", "admin", "headteacher", "teacher", "staff", "accountant")
+  calendar(@CurrentSchool() school: School, @Param("termId") termId: string) {
+    return this.calendarService.getCalendar(school.id, termId);
+  }
+
+  @Put("calendar/:termId")
+  @Roles("owner", "admin", "headteacher")
+  updateCalendar(@CurrentSchool() school: School, @CurrentUser() actor: AuthenticatedUser,
+    @Param("termId") termId: string,
+    @Body(new ZodValidationPipe(calendarConfigurationSchema)) body: z.infer<typeof calendarConfigurationSchema>) {
+    return this.calendarService.replaceCalendar(school.id, actor.id, termId, body);
+  }
+
+  @Get("calendar/:termId/exclusions/:studentId")
+  @Roles("owner", "admin", "headteacher")
+  exclusions(@CurrentSchool() school: School, @Param("termId") termId: string, @Param("studentId") studentId: string) {
+    return this.calendarService.listExclusions(school.id, termId, studentId);
+  }
+
+  @Post("calendar/exclusions")
+  @Roles("owner", "admin", "headteacher")
+  approveExclusion(@CurrentSchool() school: School, @CurrentUser() actor: AuthenticatedUser,
+    @Body(new ZodValidationPipe(attendanceExclusionSchema)) body: z.infer<typeof attendanceExclusionSchema>) {
+    return this.calendarService.approveExclusion(school.id, actor.id, body);
+  }
+
+  @Delete("calendar/exclusions/:id")
+  @Roles("owner", "admin", "headteacher")
+  revokeExclusion(@CurrentSchool() school: School, @CurrentUser() actor: AuthenticatedUser,
+    @Param("id") id: string,
+    @Body(new ZodValidationPipe(revokeExclusionSchema)) body: z.infer<typeof revokeExclusionSchema>) {
+    return this.calendarService.revokeExclusion(school.id, actor.id, id, body.reason);
+  }
+
 
   @Post("batch")
   @Roles("teacher")

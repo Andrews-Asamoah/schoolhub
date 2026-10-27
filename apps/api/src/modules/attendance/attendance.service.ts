@@ -4,12 +4,14 @@ import type { BatchAttendanceInput } from "@schoolhub/shared";
 import { canManageAcademicContext } from "../../common/academic-context.js";
 import { canMarkRegister } from "../../common/scope/teacher-access.js";
 import { TeacherScopeService } from "../../common/scope/teacher-scope.service.js";
+import { AttendanceCalendarService } from "./attendance-calendar.service.js";
 
 @Injectable()
 export class AttendanceService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly teacherScope: TeacherScopeService,
+    private readonly calendarService: AttendanceCalendarService,
   ) {}
 
   async batchRecordAttendance(
@@ -25,6 +27,7 @@ export class AttendanceService {
     const { academicYear, term } =
       await this.resolveAcademicContext(schoolId);
     this.assertCurrentTermDate(input.date, term.startDate, term.endDate);
+    await this.calendarService.assertInstructionalDate(schoolId, term.id, input.date, input.records.map(r => r.studentId));
     const studentIds = input.records.map((record) => record.studentId);
     const placements = await this.prisma.client.enrollment.findMany({
       where: {
@@ -185,49 +188,8 @@ export class AttendanceService {
       termId,
       role,
     );
-    const records = await this.prisma.client.attendance.groupBy({
-      by: ["status"],
-      where: {
-        studentId,
-        student: {
-          schoolId,
-          enrollments: {
-            some: {
-              academicYearId: academicYear.id,
-              termId: term.id,
-              status: "ACTIVE",
-            },
-          },
-        },
-        date: { gte: term.startDate, lte: term.endDate },
-      },
-      _count: true,
-    });
+    return this.calendarService.studentSummary(schoolId, studentId, academicYear.id, term);
 
-    const summary: Record<string, number> = {
-      PRESENT: 0,
-      ABSENT: 0,
-      LATE: 0,
-      EXCUSED: 0,
-      SICK: 0,
-      PERMISSION: 0,
-    };
-
-    records.forEach((r) => {
-      summary[r.status] = r._count;
-    });
-
-    const totalDays = Object.values(summary).reduce((a, b) => a + b, 0);
-    const attendanceRate =
-      totalDays > 0
-        ? Math.round(((summary.PRESENT! + summary.LATE!) / totalDays) * 100)
-        : 0;
-
-    return {
-      summary,
-      totalDays,
-      attendanceRate,
-    };
   }
 
   async getMyAttendanceSummary(
