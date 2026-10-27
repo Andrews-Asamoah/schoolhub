@@ -22,6 +22,7 @@ import {
 } from "@schoolhub/shared";
 import { useSchoolRole } from "@/components/school/school-role-switcher";
 import { apiFetch } from "@/lib/api";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface ClubMemberRecord {
   id: string;
@@ -524,18 +525,13 @@ export function ClubsWorkspace() {
                 <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
                   Patron / Teacher in Charge
                 </label>
-                <select
-                  value={values.teacherInChargeId}
-                  onChange={(e) => setValues({ ...values, teacherInChargeId: e.target.value })}
-                  className={inputClasses}
-                >
-                  <option value="">No patron assigned</option>
-                  {(teachersQuery.data ?? []).map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.firstName} {t.lastName}
-                    </option>
-                  ))}
-                </select>
+                <Select value={values.teacherInChargeId || "__none__"} onValueChange={(value) => setValues({ ...values, teacherInChargeId: value === "__none__" ? "" : value })}>
+                  <SelectTrigger aria-label="Patron / teacher in charge" className={inputClasses}><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">No patron assigned</SelectItem>
+                    {(teachersQuery.data ?? []).map((teacher) => <SelectItem key={teacher.id} value={teacher.id}>{teacher.firstName} {teacher.lastName}</SelectItem>)}
+                  </SelectContent>
+                </Select>
               </div>
 
               <div className="flex items-center gap-2 pt-2">
@@ -620,32 +616,25 @@ export function ClubsWorkspace() {
                 }}
                 className="mt-4 flex flex-wrap items-center gap-2 rounded-xl bg-muted/50 p-3"
               >
-                <select
-                  required
-                  value={memberStudentId}
-                  onChange={(e) => setMemberStudentId(e.target.value)}
-                  className="h-9 min-w-48 flex-1 rounded-lg border border-border bg-card px-2.5 text-xs text-foreground outline-none"
-                >
-                  <option value="">Select student to enroll...</option>
-                  {(studentsQuery.data ?? []).map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.firstName} {s.lastName} ({s.admissionNumber || s.studentId})
-                    </option>
-                  ))}
-                </select>
+                <Select value={memberStudentId || "__none__"} onValueChange={(value) => setMemberStudentId(value === "__none__" ? "" : value)}>
+                  <SelectTrigger aria-label="Select student to enroll" className="h-9 min-w-48 flex-1"><SelectValue placeholder="Select student to enroll..." /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">Select student to enroll...</SelectItem>
+                    {(studentsQuery.data ?? []).map((student) => <SelectItem key={student.id} value={student.id}>{student.firstName} {student.lastName} ({student.admissionNumber || student.studentId})</SelectItem>)}
+                  </SelectContent>
+                </Select>
 
-                <select
-                  value={memberRole}
-                  onChange={(e) => setMemberRole(e.target.value)}
-                  className="h-9 w-32 rounded-lg border border-border bg-card px-2.5 text-xs text-foreground outline-none"
-                >
-                  <option value="Member">Member</option>
-                  <option value="President">President</option>
-                  <option value="Vice President">Vice President</option>
-                  <option value="Secretary">Secretary</option>
-                  <option value="Treasurer">Treasurer</option>
-                  <option value="Organizer">Organizer</option>
-                </select>
+                <Select value={memberRole} onValueChange={setMemberRole}>
+                  <SelectTrigger aria-label="Club member role" className="h-9 w-40"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Member">Member</SelectItem>
+                    <SelectItem value="President">President</SelectItem>
+                    <SelectItem value="Vice President">Vice President</SelectItem>
+                    <SelectItem value="Secretary">Secretary</SelectItem>
+                    <SelectItem value="Treasurer">Treasurer</SelectItem>
+                    <SelectItem value="Organizer">Organizer</SelectItem>
+                  </SelectContent>
+                </Select>
 
                 <button
                   type="submit"

@@ -1,4 +1,5 @@
 import { DatePicker } from "@/components/ui/date-picker";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ASSESSMENT_TYPES, ASSESSMENT_TYPE_LABELS, saveAssessmentTemplateSchema, type AssessmentTypeName } from "@schoolhub/shared";
 import { ArrowDown, ArrowUp, CircleAlert, CircleCheck, Lock, LoaderCircle, Plus, Trash2, Wand2, X } from "lucide-react";
@@ -201,13 +202,12 @@ export function AssessmentTemplateDialog({
               {setup.gradingSystems.length > 0 ? (
                 <label className={label}>
                   Grading scale
-                  <select className={box} value={gradingSystemId} disabled={structureLocked} onChange={(event) => setGradingSystemId(event.target.value)}>
-                    {setup.gradingSystems.map((system) => (
-                      <option key={system.id} value={system.id}>
-                        {system.name}{system.shared ? " (shared)" : ""}
-                      </option>
-                    ))}
-                  </select>
+                  <Select value={gradingSystemId} onValueChange={setGradingSystemId} disabled={structureLocked}>
+                    <SelectTrigger aria-label="Grading scale" className={box}><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {setup.gradingSystems.map((system) => <SelectItem key={system.id} value={system.id}>{system.name}{system.shared ? " (shared)" : ""}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
                 </label>
               ) : (
                 <div className={label}>
@@ -235,19 +235,23 @@ export function AssessmentTemplateDialog({
             <div className="grid gap-3 sm:grid-cols-2">
               <label className={label}>
                 Subject
-                <select className={box} value={subjectCode} onChange={(event) => setSubjectCode(event.target.value)}>
-                  <option value="">All subjects</option>
-                  {setup.subjects.map((subject) => (
-                    <option key={subject.id} value={subject.code}>{subject.name}</option>
-                  ))}
-                </select>
+                <Select value={subjectCode || "__all__"} onValueChange={(value) => setSubjectCode(value === "__all__" ? "" : value)}>
+                  <SelectTrigger aria-label="Apply to subject" className={box}><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__all__">All subjects</SelectItem>
+                    {setup.subjects.map((subject) => <SelectItem key={subject.id} value={subject.code}>{subject.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
               </label>
               <label className={label}>
                 Term
-                <select className={box} value={termNumber} onChange={(event) => setTermNumber(event.target.value)}>
-                  <option value="">Every term</option>
-                  {[1, 2, 3].map((number) => <option key={number} value={number}>Term {number} only</option>)}
-                </select>
+                <Select value={termNumber || "__all__"} onValueChange={(value) => setTermNumber(value === "__all__" ? "" : value)}>
+                  <SelectTrigger aria-label="Apply to term" className={box}><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__all__">Every term</SelectItem>
+                    {[1, 2, 3].map((number) => <SelectItem key={number} value={String(number)}>Term {number} only</SelectItem>)}
+                  </SelectContent>
+                </Select>
               </label>
             </div>
             <fieldset className="space-y-2">
@@ -324,9 +328,10 @@ export function AssessmentTemplateDialog({
                 <li key={row.key} className="rounded-xl border border-border p-3">
                   <div className="grid gap-2 sm:grid-cols-[1fr_8rem_4.5rem_4.5rem_auto] sm:items-center">
                     <input className={box} aria-label={`Component ${index + 1} name`} value={row.name} onChange={(event) => update(row.key, { name: event.target.value })} placeholder="e.g. Class assessment" />
-                    <select className={box} aria-label={`Component ${index + 1} type`} value={row.componentType} disabled={structureLocked} onChange={(event) => update(row.key, { componentType: event.target.value as AssessmentTypeName })}>
-                      {ASSESSMENT_TYPES.map((type) => <option key={type} value={type}>{ASSESSMENT_TYPE_LABELS[type]}</option>)}
-                    </select>
+                    <Select value={row.componentType} onValueChange={(value) => update(row.key, { componentType: value as AssessmentTypeName })} disabled={structureLocked}>
+                      <SelectTrigger aria-label={`Component ${index + 1} type`} className={box}><SelectValue /></SelectTrigger>
+                      <SelectContent>{ASSESSMENT_TYPES.map((type) => <SelectItem key={type} value={type}>{ASSESSMENT_TYPE_LABELS[type]}</SelectItem>)}</SelectContent>
+                    </Select>
                     <input className={box} aria-label={`Component ${index + 1} maximum marks`} type="number" inputMode="decimal" min={1} step="any" value={row.maxMarks} disabled={structureLocked} onChange={(event) => update(row.key, { maxMarks: event.target.value })} />
                     <input className={box} aria-label={`Component ${index + 1} weight`} type="number" inputMode="decimal" min={0} max={100} step="any" value={row.weight} disabled={structureLocked} onChange={(event) => update(row.key, { weight: event.target.value })} />
                     <div className="flex items-center justify-end gap-0.5">
