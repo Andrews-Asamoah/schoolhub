@@ -1,7 +1,7 @@
 import { BadRequestException, HttpException, Injectable, Logger } from "@nestjs/common";
 import { Prisma, type School } from "@prisma/client";
 import { createStaffSchema, createTeacherSchema, STUDENT_IMPORT_LIMITS } from "@schoolhub/shared";
-import type { PeopleService } from "./people.service.js";
+import { PeopleService } from "./people.service.js";
 import { PrismaService } from "../../prisma/prisma.service.js";
 import { parseUpload } from "../students/import/import-parse.js";
 
