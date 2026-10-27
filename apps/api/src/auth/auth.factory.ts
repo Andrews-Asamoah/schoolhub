@@ -80,6 +80,10 @@ export function createAuth(prisma: PrismaLike) {
   ];
 
   const cookieDomain = process.env.COOKIE_DOMAIN?.trim();
+  const pendingTrustedDeviceAudits = new WeakMap<
+    object,
+    { userId: string; identifiers: Set<string> }
+  >();
 
   return betterAuth({
     database: prismaAdapter(prisma, { provider: "postgresql" }),
@@ -121,15 +125,61 @@ export function createAuth(prisma: PrismaLike) {
         if (DISABLED_TWO_FACTOR_PATHS.has(ctx.path)) {
           throw new APIError("NOT_FOUND", { message: "Not found" });
         }
-        // "Trust this device" skips the second factor for 30 days, which is
-        // exactly what we don't want for administrator accounts. Refuse it
-        // server-side so a modified client cannot opt in.
+        // Trusted-device bypass is deliberately limited to platform SuperAdmins.
+        // Resolve the pending 2FA challenge from Better Auth's signed cookie: a
+        // password-only login has no authenticated session yet at this point.
         if (
           ctx.path.startsWith("/two-factor/verify") &&
-          (ctx.body as { trustDevice?: unknown } | undefined)?.trustDevice
+          (ctx.body as { trustDevice?: unknown } | undefined)?.trustDevice === true
         ) {
-          throw new APIError("BAD_REQUEST", {
-            message: "Trusting a device is not allowed on SchoolHub.",
+          const sessionUser = ctx.context.session?.user as
+            | { id: string; role?: string }
+            | undefined;
+          let userId = sessionUser?.id;
+          if (!userId) {
+            const challengeCookie = ctx.context.createAuthCookie("two_factor");
+            const challengeToken = await ctx.getSignedCookie(
+              challengeCookie.name,
+              ctx.context.secret,
+            );
+            if (challengeToken) {
+              const challenge = await ctx.context.internalAdapter.findVerificationValue(
+                challengeToken,
+              );
+              if (challenge && challenge.expiresAt > new Date()) userId = challenge.value;
+            }
+          }
+
+          const account = userId
+            ? await (prisma as unknown as {
+                user: {
+                  findUnique: (args: unknown) => Promise<{ role: string } | null>;
+                };
+              }).user.findUnique({
+                where: { id: userId },
+                select: { role: true },
+              })
+            : null;
+          if (account?.role !== "superAdmin") {
+            throw new APIError("FORBIDDEN", {
+              message: "Trusted devices are available only to platform administrators.",
+            });
+          }
+          const verificationDb = prisma as unknown as {
+            verification: {
+              findMany: (args: unknown) => Promise<{ identifier: string }[]>;
+            };
+          };
+          const existingRecords = await verificationDb.verification.findMany({
+            where: {
+              value: userId,
+              identifier: { startsWith: "trust-device-" },
+            },
+            select: { identifier: true },
+          });
+          pendingTrustedDeviceAudits.set(ctx.context, {
+            userId: userId!,
+            identifiers: new Set(existingRecords.map((record) => record.identifier)),
           });
         }
         if (!PASSWORD_SETTING_PATHS.has(ctx.path)) return;
@@ -144,7 +194,37 @@ export function createAuth(prisma: PrismaLike) {
       // Leave a trail whenever a second factor is switched on, off or reset.
       after: createAuthMiddleware(async (ctx) => {
         const returned = ctx.context.returned;
+        const pendingTrust = pendingTrustedDeviceAudits.get(ctx.context);
+        pendingTrustedDeviceAudits.delete(ctx.context);
         if (returned instanceof Error) return; // the request failed; nothing changed
+
+        if (pendingTrust && ctx.path.startsWith("/two-factor/verify")) {
+          try {
+            const verificationDb = prisma as unknown as {
+              verification: {
+                findMany: (args: unknown) => Promise<{ identifier: string }[]>;
+              };
+            };
+            const trustedRecords = await verificationDb.verification.findMany({
+              where: {
+                value: pendingTrust.userId,
+                identifier: { startsWith: "trust-device-" },
+              },
+              select: { identifier: true },
+            });
+            if (trustedRecords.some((record) => !pendingTrust.identifiers.has(record.identifier))) {
+              await recordAuthAudit(prisma as unknown as AuditDb, {
+                userId: pendingTrust.userId,
+                entityType: "auth.two-factor.device-trusted",
+                ip: ctx.request?.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null,
+                userAgent: ctx.request?.headers.get("user-agent") ?? null,
+              });
+            }
+          } catch (error) {
+            // Trust must remain usable even if an audit write fails.
+            console.error("Trusted-device audit write failed:", (error as Error).message);
+          }
+        }
 
         let entityType = TWO_FACTOR_AUDITED[ctx.path];
         const sessionUser = ctx.context.session?.user as
@@ -242,6 +322,9 @@ export function createAuth(prisma: PrismaLike) {
         accountLockout: { enabled: true, maxFailedAttempts: 5, durationSeconds: 15 * 60 },
         // The password step must be completed again if the code isn't entered within 5 minutes.
         twoFactorCookieMaxAge: 5 * 60,
+        // Trust is explicit opt-in and expires after 30 days. The server hook
+        // above restricts the option to platform SuperAdmins.
+        trustDeviceMaxAge: 30 * 24 * 60 * 60,
       }),
     ],
   });
