@@ -7,6 +7,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PortalModal } from "@/components/portal/portal-modal";
 import { useTeachingOverview } from "@/lib/teaching";
+import { useSchoolRole } from "@/components/school/school-role-switcher";
 import { apiFetch } from "@/lib/api";
 
 interface Submission {
@@ -38,6 +39,7 @@ interface ManagedAssignment {
   subject: { id: string; name: string; code: string };
   createdBy: { id: string; name: string };
   submissions: Submission[];
+  notifiedStudents?: number;
 }
 interface ManagedAssignmentsResponse {
   academicYear: { id: string; name: string };
@@ -47,11 +49,45 @@ interface ManagedAssignmentsResponse {
 
 const dateTime = (value: string) =>
   new Intl.DateTimeFormat("en-GH", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
-const dateOnly = (value: string | null) => value ? value.slice(0, 10) : "";
+interface AssignmentClassOption {
+  id: string;
+  name: string;
+  level: string;
+  subjects: { id: string; name: string; code: string }[];
+}
+interface ManagerClass {
+  id: string;
+  name: string;
+  level: string;
+  isActive: boolean;
+}
+interface ManagerSubject {
+  id: string;
+  name: string;
+  code: string;
+  isActive: boolean;
+  classes: { classId: string; className: string }[];
+}
 
 export function TeacherAssignmentsWorkspace() {
   const queryClient = useQueryClient();
-  const teaching = useTeachingOverview();
+  const { activeRole } = useSchoolRole();
+  const teacherMode = activeRole === "teacher";
+  const managerMode = ["owner", "admin", "headteacher"].includes(activeRole ?? "");
+  const canPublish = teacherMode || managerMode;
+  const teaching = useTeachingOverview(teacherMode);
+  const managerClassesQuery = useQuery({
+    queryKey: ["academics", "classes", "assignments"],
+    queryFn: () => apiFetch<ManagerClass[]>("/academics/classes"),
+    enabled: managerMode,
+    retry: false,
+  });
+  const managerSubjectsQuery = useQuery({
+    queryKey: ["subjects", "assignments"],
+    queryFn: () => apiFetch<ManagerSubject[]>("/subjects?includeInactive=true"),
+    enabled: managerMode,
+    retry: false,
+  });
   const [createOpen, setCreateOpen] = useState(false);
   const [classId, setClassId] = useState("");
   const [subjectId, setSubjectId] = useState("");
@@ -72,10 +108,40 @@ export function TeacherAssignmentsWorkspace() {
     retry: false,
   });
 
-  const classes = teaching.data?.classes ?? [];
+  const classes = useMemo<AssignmentClassOption[]>(() => {
+    if (teacherMode) {
+      return (teaching.data?.classes ?? []).map((item) => ({
+        id: item.id,
+        name: item.name,
+        level: item.level,
+        subjects: item.subjects,
+      }));
+    }
+    if (managerMode) {
+      const subjects = (managerSubjectsQuery.data ?? []).filter((subject) => subject.isActive);
+      return (managerClassesQuery.data ?? [])
+        .filter((schoolClass) => schoolClass.isActive)
+        .map((schoolClass) => ({
+          id: schoolClass.id,
+          name: schoolClass.name,
+          level: schoolClass.level,
+          subjects: subjects
+            .filter((subject) => subject.classes.some((row) => row.classId === schoolClass.id))
+            .map(({ id, name, code }) => ({ id, name, code })),
+        }));
+    }
+    return [];
+  }, [teacherMode, managerMode, teaching.data, managerClassesQuery.data, managerSubjectsQuery.data]);
   const selectedClass = classes.find((item) => item.id === classId) ?? null;
   const subjects = selectedClass?.subjects ?? [];
-  const selectedSubject = subjects.find((item) => item.id === subjectId) ?? null;
+  const referenceLoading = teacherMode
+    ? teaching.isPending
+    : managerMode && (managerClassesQuery.isPending || managerSubjectsQuery.isPending);
+  const referenceError = teacherMode
+    ? teaching.error
+    : managerMode
+      ? managerClassesQuery.error ?? managerSubjectsQuery.error
+      : null;
 
   const createMutation = useMutation({
     mutationFn: () => {
@@ -173,12 +239,12 @@ export function TeacherAssignmentsWorkspace() {
         title="Assignments & submissions"
         description="Publish coursework for your assigned subjects, review student responses, and record marks with feedback."
         icon={ClipboardList}
-        actions={<button type="button" onClick={() => { setCreateError(null); setCreateOpen(true); }} disabled={teaching.isPending || classes.length === 0} className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-xs font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-50"><Plus className="size-4" />Publish assignment</button>}
+        actions={<button type="button" onClick={() => { setCreateError(null); setCreateOpen(true); }} disabled={!canPublish || referenceLoading || classes.length === 0} className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-xs font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-50"><Plus className="size-4" />Publish assignment</button>}
       />
 
       {notice && <div role={notice.ok ? "status" : "alert"} className={`rounded-xl border px-4 py-3 text-sm ${notice.ok ? "border-success/20 bg-success/10 text-success" : "border-destructive/20 bg-destructive/10 text-destructive"}`}>{notice.text}</div>}
 
-      {teaching.isPending ? (
+      {referenceLoading ? (
         <div role="status" className="flex min-h-40 items-center justify-center gap-2 rounded-xl border border-border bg-card text-sm text-muted-foreground"><LoaderCircle className="size-4 animate-spin" />Loading your teaching assignments…</div>
       ) : teaching.error ? (
         <ErrorState message={`Your teaching assignments could not be loaded: ${teaching.error.message}`} onRetry={() => void teaching.refetch()} />
@@ -197,7 +263,7 @@ export function TeacherAssignmentsWorkspace() {
           </section>
 
           <section className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-card px-4 py-3">
-            <div className="min-w-0"><p className="text-xs font-semibold text-foreground">{query.data?.academicYear.name} · {query.data?.term.name}</p><p className="mt-1 text-[11px] text-muted-foreground">Only published records and submissions from the active school are shown.</p></div>
+            <div className="min-w-0"><p className="text-xs font-semibold text-foreground">{query.data?.academicYear.name} · {query.data?.term.name}</p><p className="mt-1 text-[11px] text-muted-foreground">Only records from the active school and academic term are shown.</p></div>
             <button type="button" onClick={() => void query.refetch()} disabled={query.isFetching} className="inline-flex h-9 items-center gap-2 rounded-lg border border-border px-3 text-xs font-semibold text-foreground hover:bg-muted disabled:opacity-50"><LoaderCircle className={`size-3.5 ${query.isFetching ? "animate-spin" : "hidden"}`} />Refresh</button>
           </section>
 
@@ -243,7 +309,7 @@ export function TeacherAssignmentsWorkspace() {
         </>
       )}
 
-      <PortalModal isOpen={createOpen} onClose={() => setCreateOpen(false)} title="Publish assignment" description="New work is immediately visible to active students enrolled in the selected class for the current term." maxWidth="2xl" footer={<><button type="button" onClick={() => setCreateOpen(false)} disabled={createMutation.isPending} className="h-10 rounded-lg border border-border px-4 text-xs font-semibold text-foreground hover:bg-muted disabled:opacity-50">Cancel</button><button type="submit" form="teacher-create-assignment" disabled={createMutation.isPending || !classId || !subjectId} className="inline-flex h-10 items-center gap-2 rounded-lg bg-primary px-4 text-xs font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-50">{createMutation.isPending ? <LoaderCircle className="size-4 animate-spin" /> : <Send className="size-4" />}{createMutation.isPending ? "Publishing…" : "Publish assignment"}</button></>}>
+      <PortalModal isOpen={createOpen} onClose={() => setCreateOpen(false)} title="Publish assignment" description="New work is published to active students enrolled in the selected class for the current term." maxWidth="2xl" footer={<><button type="button" onClick={() => setCreateOpen(false)} disabled={createMutation.isPending} className="h-10 rounded-lg border border-border px-4 text-xs font-semibold text-foreground hover:bg-muted disabled:opacity-50">Cancel</button><button type="submit" form="teacher-create-assignment" disabled={createMutation.isPending || !classId || !subjectId} className="inline-flex h-10 items-center gap-2 rounded-lg bg-primary px-4 text-xs font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-50">{createMutation.isPending ? <LoaderCircle className="size-4 animate-spin" /> : <Send className="size-4" />}{createMutation.isPending ? "Publishing…" : "Publish assignment"}</button></>}>
         <form id="teacher-create-assignment" onSubmit={submitCreate} className="space-y-4">
           {createError && <p role="alert" className="rounded-lg border border-destructive/20 bg-destructive/10 px-3 py-2 text-xs text-destructive">{createError}</p>}
           <label className="grid gap-1.5 text-xs font-semibold text-foreground">Class
