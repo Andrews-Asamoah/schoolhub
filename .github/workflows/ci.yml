@@ -136,6 +136,21 @@ jobs:
           pnpm --filter @schoolhub/web typecheck
       - name: Web build
         run: pnpm --filter @schoolhub/web build
+      - name: SuperAdmin dashboard browser E2E
+        env:
+          SCHOOLHUB_WEB_URL: http://127.0.0.1:5173
+        run: |
+          pnpm --filter @schoolhub/web dev -- --host 127.0.0.1 > /tmp/schoolhub-web.log 2>&1 &
+          WEB_PID=$!
+          trap 'kill "$WEB_PID" 2>/dev/null || true' EXIT
+          for attempt in $(seq 1 40); do
+            if curl --fail --silent "$SCHOOLHUB_WEB_URL" > /dev/null; then
+              break
+            fi
+            sleep 1
+          done
+          curl --fail --silent "$SCHOOLHUB_WEB_URL" > /dev/null
+          pnpm dlx --package=playwright@1.56.1 -c 'export PLAYWRIGHT_PACKAGE_ENTRY="$(realpath "$(command -v playwright)")"; playwright install --with-deps chromium; node apps/web/e2e/superadmin-dashboard.browser.mjs'
       - name: API lint
         run: pnpm --filter @schoolhub/api lint
       - name: Apply database migrations
