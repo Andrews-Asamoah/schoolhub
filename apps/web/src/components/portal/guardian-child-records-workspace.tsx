@@ -99,6 +99,13 @@ function AttendancePanel({ query }: { query: UseQueryResult<AttendanceData, Erro
     { label: "Absences", value: String(summary.ABSENT ?? 0), icon: XCircle },
   ];
   return <div className="space-y-5">
+    {data?.attendanceRate == null && data?.provisionalRate != null && (
+      <p className="rounded-xl border border-border bg-muted/40 p-3 text-xs text-muted-foreground" role="status">
+        Provisional attendance only: {data.unmarkedDays ?? 0} eligible day(s) have no register entry.
+        {data.coverageRate != null ? ` Register coverage: ${data.coverageRate}%.` : ""}
+        Unmarked days have not been recorded as absences.
+      </p>
+    )}
     <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{stats.map(({ label, value, icon: Icon }) => <div key={label} className="rounded-2xl border border-border bg-card p-4 shadow-sm"><div className="flex items-center justify-between gap-3"><p className="text-xs font-semibold text-muted-foreground">{label}</p><Icon className="size-4 text-primary" /></div><p className="mt-3 text-2xl font-bold text-foreground">{value}</p></div>)}</div>
     <section className="rounded-2xl border border-border bg-card p-5 shadow-sm"><div className="mb-4"><h3 className="font-semibold text-foreground">Recent register entries</h3><p className="mt-1 text-xs text-muted-foreground">Current term · latest recorded entries</p></div>
       {!data?.recentRecords?.length ? <p className="py-8 text-center text-sm text-muted-foreground">No attendance records have been recorded for the current term.</p> : <div className="divide-y divide-border">{data.recentRecords.map((record) => <div key={record.id} className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-sm font-semibold text-foreground">{new Date(record.date).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", year: "numeric", timeZone: "UTC" })}</p>{record.remarks && <p className="mt-1 text-xs text-muted-foreground">{record.remarks}</p>}</div><span className={`w-fit rounded-full px-2.5 py-1 text-[11px] font-bold ${statusStyles[record.status] ?? "bg-muted text-muted-foreground"}`}>{record.status.toLowerCase()}</span></div>)}</div>}
