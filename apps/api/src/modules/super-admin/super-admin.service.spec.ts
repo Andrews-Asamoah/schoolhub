@@ -16,7 +16,8 @@ function makeService(overrides: Record<string, any> = {}) {
     account: { create: vi.fn() },
     member: { findUnique: vi.fn(), findFirst: vi.fn(), create: vi.fn(), update: vi.fn(), delete: vi.fn() },
     session: { deleteMany: vi.fn() },
-    auditLog: { create: vi.fn() },
+    auditLog: { create: vi.fn(), findMany: vi.fn(async () => []), count: vi.fn(async () => 0) },
+    $queryRaw: vi.fn(async () => [{ latest_migration: "20261027010000_late_schema_reconciliation", unfinished_count: 0 }]),
     ...overrides,
   };
   client.$transaction = vi.fn(async (fn: (tx: unknown) => unknown) => fn(client));
@@ -25,6 +26,41 @@ function makeService(overrides: Record<string, any> = {}) {
 }
 
 const org = (status: string, expiresAt: Date | null) => ({ id: "org1", subscriptionStatus: status, expiresAt });
+
+describe("getOperationsHealth", () => {
+  it("reports the deployment commit and does not claim migration currency without expected build metadata", async () => {
+    vi.stubEnv("EXPECTED_MIGRATION_NAME", "");
+    vi.stubEnv("BUILD_SHA", "test-build-sha");
+    try {
+      const { service } = makeService();
+      const result = await service.getOperationsHealth();
+      expect(result.application.commitSha).toBe("test-build-sha");
+      expect(result.migrations).toMatchObject({
+        status: "not_configured",
+        latestApplied: "20261027010000_late_schema_reconciliation",
+        unfinishedCount: 0,
+      });
+      expect(result.status).toBe("healthy");
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it("reports migration metadata as unverified and degrades health if the migration table cannot be read", async () => {
+    const { service, client } = makeService();
+    client.$queryRaw
+      .mockResolvedValueOnce([])
+      .mockRejectedValueOnce(new Error("internal database detail"));
+    const result = await service.getOperationsHealth();
+    expect(result.status).toBe("degraded");
+    expect(result.migrations).toEqual({
+      status: "unavailable",
+      latestApplied: null,
+      unfinishedCount: null,
+    });
+    expect(JSON.stringify(result)).not.toContain("internal database detail");
+  });
+});
 
 describe("updateSubscription", () => {
   const school = (status = "TRIALING", expiresAt: Date | null = new Date(Date.now() + 5 * DAY)) => ({ id: "sch1", organizationId: "org1", organization: org(status, expiresAt) });
