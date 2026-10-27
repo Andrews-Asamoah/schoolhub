@@ -7,6 +7,7 @@ import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import { FileSpreadsheet, FileText, LoaderCircle, Printer } from "lucide-react";
 import { apiFetch } from "@/lib/api";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface AcademicTerm { id: string; name: string; isCurrent: boolean; }
 interface AcademicYear { id: string; name: string; isCurrent: boolean; terms: AcademicTerm[]; }
@@ -238,9 +239,18 @@ export function AccountantFinanceReportingWorkspace() {
     <div className="rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-6">
       <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-xs font-bold uppercase tracking-[0.14em] text-primary">Finance</p><h2 className="mt-1 text-2xl font-bold tracking-tight text-foreground">Finance reports</h2><p className="mt-2 text-sm text-muted-foreground">Reports are calculated on the server using all matching school records, not the currently displayed page.</p></div><div className="flex gap-2"><button type="button" className={secondaryButton} onClick={() => window.print()}><Printer className="size-4" /> Print</button><button type="button" className={secondaryButton} onClick={exportPdf} disabled={!summary}><FileText className="size-4" /> PDF</button><button type="button" className={secondaryButton} onClick={() => void exportExcel()} disabled={!summary}><FileSpreadsheet className="size-4" /> Excel</button></div></div>
       <div className="mt-5 grid gap-3 md:grid-cols-[190px_1fr_1fr]">
-        <select className={inputClass} value={scope} onChange={(event) => setScope(event.target.value as typeof scope)} aria-label="Report scope"><option value="term">Academic term</option><option value="year">Academic year</option><option value="all">All time</option></select>
-        {scope !== "all" ? <select className={inputClass} value={selectedYearId} onChange={(event) => { setYearId(event.target.value); setTermId(""); }} aria-label="Academic year">{years.map((year) => <option key={year.id} value={year.id}>{year.name}</option>)}</select> : <div />}
-        {scope === "term" ? <select className={inputClass} value={selectedTermId} onChange={(event) => setTermId(event.target.value)} aria-label="Academic term">{(selectedYear?.terms ?? []).map((term) => <option key={term.id} value={term.id}>{term.name}</option>)}</select> : <div />}
+        <Select value={scope} onValueChange={(value) => setScope(value as typeof scope)}>
+          <SelectTrigger aria-label="Report scope" className={inputClass}><SelectValue /></SelectTrigger>
+          <SelectContent><SelectItem value="term">Academic term</SelectItem><SelectItem value="year">Academic year</SelectItem><SelectItem value="all">All time</SelectItem></SelectContent>
+        </Select>
+        {scope !== "all" ? <Select value={selectedYearId || "__none__"} onValueChange={(value) => { setYearId(value === "__none__" ? "" : value); setTermId(""); }}>
+          <SelectTrigger aria-label="Academic year" className={inputClass}><SelectValue placeholder="Select year" /></SelectTrigger>
+          <SelectContent>{years.length ? years.map((year) => <SelectItem key={year.id} value={year.id}>{year.name}</SelectItem>) : <SelectItem value="__none__" disabled>No academic years</SelectItem>}</SelectContent>
+        </Select> : <div />}
+        {scope === "term" ? <Select value={selectedTermId || "__none__"} onValueChange={(value) => setTermId(value === "__none__" ? "" : value)}>
+          <SelectTrigger aria-label="Academic term" className={inputClass}><SelectValue placeholder="Select term" /></SelectTrigger>
+          <SelectContent>{(selectedYear?.terms ?? []).length ? (selectedYear?.terms ?? []).map((term) => <SelectItem key={term.id} value={term.id}>{term.name}</SelectItem>) : <SelectItem value="__none__" disabled>No terms available</SelectItem>}</SelectContent>
+        </Select> : <div />}
       </div>
     </div>
     <section className="rounded-2xl border border-border bg-card p-5">
