@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { BadRequestException, ConflictException } from "@nestjs/common";
+import { BadRequestException, ConflictException, NotFoundException } from "@nestjs/common";
 import { SUBSCRIPTION_TRIAL_DAYS } from "@schoolhub/shared";
 import { CredentialsService, DEFAULT_PASSWORDS } from "../accounts/credentials.service.js";
 import { SuperAdminService } from "./super-admin.service.js";
@@ -62,6 +62,67 @@ describe("getOperationsHealth", () => {
   });
 });
 
+describe("getSchoolOnboardingStatus", () => {
+  it("derives completion from persisted school setup and returns incomplete steps honestly", async () => {
+    const { service, client } = makeService();
+    client.school.findUnique.mockResolvedValue({
+      id: "sch1",
+      email: "office@school.test",
+      phone: "+233200000000",
+      address: "Accra",
+      academicYears: [{ id: "year1", name: "2026/2027", terms: [{ id: "term1" }] }],
+      financeSettings: { schoolId: "sch1" },
+      _count: {
+        classes: 8,
+        subjects: 12,
+        teachers: 15,
+        feeStructures: 3,
+        assessmentTemplates: 2,
+        reportCardTemplates: 1,
+      },
+    });
+
+    const result = await service.getSchoolOnboardingStatus("sch1");
+
+    expect(result).toMatchObject({ schoolId: "sch1", completed: 7, total: 7, percentage: 100 });
+    expect(result.steps.every((step) => step.complete)).toBe(true);
+    expect(client.school.findUnique).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: "sch1" },
+      select: expect.objectContaining({
+        academicYears: expect.any(Object),
+        _count: expect.any(Object),
+      }),
+    }));
+  });
+
+  it("reports missing setup and does not treat a missing school as an empty checklist", async () => {
+    const { service, client } = makeService();
+    client.school.findUnique.mockResolvedValue({
+      id: "sch1",
+      email: null,
+      phone: null,
+      address: null,
+      academicYears: [],
+      financeSettings: null,
+      _count: {
+        classes: 0,
+        subjects: 0,
+        teachers: 0,
+        feeStructures: 0,
+        assessmentTemplates: 0,
+        reportCardTemplates: 0,
+      },
+    });
+    const result = await service.getSchoolOnboardingStatus("sch1");
+    expect(result.completed).toBe(0);
+    expect(result.percentage).toBe(0);
+    expect(result.steps.every((step) => !step.complete)).toBe(true);
+
+    client.school.findUnique.mockResolvedValue(null);
+    await expect(service.getSchoolOnboardingStatus("missing")).rejects.toThrow(NotFoundException);
+  });
+});
+
 describe("updateSubscription", () => {
   const school = (status = "TRIALING", expiresAt: Date | null = new Date(Date.now() + 5 * DAY)) => ({ id: "sch1", organizationId: "org1", organization: org(status, expiresAt) });
 
@@ -113,6 +174,38 @@ describe("updateSubscription", () => {
   });
 });
 
+describe("listAuditLogs", () => {
+  it("rejects invalid dates and inverted ranges before querying audit records", async () => {
+    const { service, client } = makeService();
+    await expect(service.listAuditLogs({ page: 1, limit: 20, from: "not-a-date" } as never))
+      .rejects.toThrow(BadRequestException);
+    await expect(service.listAuditLogs({ page: 1, limit: 20, from: "2026-10-20", to: "2026-10-19" } as never))
+      .rejects.toThrow(BadRequestException);
+    expect(client.auditLog.findMany).not.toHaveBeenCalled();
+    expect(client.auditLog.count).not.toHaveBeenCalled();
+  });
+
+  it("applies the validated filter and bounded pagination to the audit query", async () => {
+    const { service, client } = makeService();
+    await service.listAuditLogs({
+      page: 2, limit: 25, action: "ACCESS_CHANGED", schoolId: "sch1",
+      actorId: "sa1", from: "2026-10-01", to: "2026-10-31", q: "school",
+    });
+    expect(client.auditLog.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        action: "ACCESS_CHANGED",
+        schoolId: "sch1",
+        userId: "sa1",
+        entityType: { contains: "school", mode: "insensitive" },
+        createdAt: { gte: new Date("2026-10-01"), lte: new Date("2026-10-31T23:59:59.999Z") },
+      }),
+      skip: 25,
+      take: 25,
+      orderBy: { createdAt: "desc" },
+    }));
+  });
+});
+
 describe("updateSchool", () => {
   it("blocks a subdomain change once students exist, because their login emails derive from it", async () => {
     const { service, client } = makeService();
@@ -148,6 +241,34 @@ describe("school administrators", () => {
     ctx.client.member.findUnique.mockResolvedValue(member);
     return ctx;
   };
+
+  it("refuses to mutate a school administrator from a different school's organization", async () => {
+    const { service, client } = arrange();
+    client.school.findUnique.mockResolvedValue({ organizationId: "org-other" });
+    client.member.findUnique.mockResolvedValue(null);
+
+    await expect(
+      service.setSchoolAdminBanned("sch1", "u1", true, actor, "Repeated policy violations"),
+    ).rejects.toThrow("School administrator membership not found");
+
+    expect(client.$transaction).not.toHaveBeenCalled();
+    expect(client.member.update).not.toHaveBeenCalled();
+    expect(client.session.deleteMany).not.toHaveBeenCalled();
+    expect(client.auditLog.create).not.toHaveBeenCalled();
+  });
+
+  it("does not reset 2FA or revoke sessions when the target is not a member of the requested school", async () => {
+    const { service, client } = arrange();
+    client.school.findUnique.mockResolvedValue({ organizationId: "org-other" });
+    client.member.findUnique.mockResolvedValue(null);
+
+    await expect(service.resetSchoolAdminTwoFactor("sch1", "u1", actor))
+      .rejects.toThrow("School administrator membership not found");
+
+    expect(client.$transaction).not.toHaveBeenCalled();
+    expect(client.session.deleteMany).not.toHaveBeenCalled();
+    expect(client.auditLog.create).not.toHaveBeenCalled();
+  });
 
   it("requires a meaningful reason before attempting an administrator suspension", async () => {
     const { service, client } = arrange();
