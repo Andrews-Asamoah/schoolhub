@@ -24,7 +24,7 @@ This is a source-level inventory, not a complete security audit. A model existin
 ## Existing service entry points observed
 
 - `apps/api/src/modules/attendance/attendance.service.ts`: attendance write path resolves current academic context, checks date bounds and enrollment, and restricts register marking to an assigned class teacher.
-- `apps/api/src/modules/assessments/assessments.service.ts`: assessment score write path uses a transaction, resolves current term, checks student/subject/template/enrollment and uses teacher scope.
+- `apps/api/src/modules/assessments/assessments.service.ts`: assessment score write path uses a transaction, resolves current term, checks student/subject/template/enrollment and uses teacher scope.\n- `apps/api/src/modules/assessments/report-publication.controller.ts` and `report-publication.service.ts`: existing report-card set creation, generation, review and publish flow, with school-scoped workspace/set lookup and student/guardian published-report retrieval.\n- `apps/api/src/modules/assessments/assessment-entry.ts` and `assessment-entry.spec.ts`: pure calculation/validation helpers and unit tests already exist.
 - `apps/api/src/common/academic-context.ts`: shared academic context helper.
 - `apps/api/src/common/scope/teacher-access.ts` and `teacher-scope.service.ts`: existing assignment-based authorization helpers.
 
@@ -47,7 +47,7 @@ This records the repository CI result for that commit only. It is not a new run 
 1. **Calendar semantics:** instructional-day and closure records are not represented by the observed `AcademicYear`/`Term` fields alone.
 2. **Attendance completeness:** a missing register must be distinguishable from a completed register containing absences.
 3. **Historical policy:** templates and grading scales need a deliberate immutable/versioned policy strategy if they can be edited after scores are recorded.
-4. **Publication integrity:** verify whether existing report cards store immutable data snapshots, PDF checksum, approval history, version/supersession and publication metadata before designing additions.
+4. **Publication integrity:** a report-card review/publication workflow exists, so inspect its state transitions and persistence in detail. Verify whether report cards store immutable data snapshots, PDF checksum, approval history, version/supersession and publication metadata before designing additions.
 5. **Promotion explainability:** verify the existing promotion workflow and whether each decision records the exact rule version, input snapshot and exception rationale.
 6. **External exam provenance:** do not reuse ordinary school marks as if they were verified external exam facts; identify existing source/evidence models before adding new ones.
 7. **Residency:** inspect student/boarding-related models across the full schema before proposing a new residency table.
