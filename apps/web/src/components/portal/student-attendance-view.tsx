@@ -27,7 +27,11 @@ interface StudentAttendanceResponse {
     PERMISSION?: number;
   };
   totalDays: number;
-  attendanceRate: number;
+  attendanceRate: number | null;
+  possibleDays?: number;
+  unmarkedDays?: number;
+  coverageRate?: number | null;
+  eligibilityWarning?: string | null;
   recentRecords?: AttendanceRecord[];
 }
 
