@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { StatCard } from "@/components/superadmin/stat-card";
+import { OperationsHealthPanel } from "@/components/superadmin/operations-health-panel";
 import { SubscriptionBadge } from "@/components/superadmin/subscription-badge";
 import { DataTable, type DataTableColumn } from "@/components/ui/data-table";
 import { Link, useNavigate } from "@tanstack/react-router";
@@ -158,6 +159,8 @@ function AdminDashboard() {
           </button>
         </div>
       </section>
+
+      <OperationsHealthPanel />
 
       {statsError && (
         <div role="alert" className="flex items-start gap-3 rounded-xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive">
