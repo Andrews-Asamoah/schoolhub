@@ -140,7 +140,7 @@ function AuditLogPage() {
       <PageHeader
         eyebrow="Security"
         title="Audit log"
-        description="A tamper-evident record of who did what across the platform: enrolments, subscription changes, access changes and school-data access."
+        description="A searchable record of platform activity: school enrolments, subscription changes, access changes and school-data access."
         actions={
           logs.data?.data.length ? <TableExportMenu build={() => ({ title: "Platform audit log page " + page, headers: ["When", "Event", "Action", "Actor", "Actor email", "School", "Record", "IP address", "Details"], columnTypes: ["date","text","text","text","text","text","text","text","text"], rows: logs.data!.data.map(entry => [entry.createdAt, eventLabel(entry), entry.action, entry.user.name, entry.user.email, entry.school?.name ?? "Platform", entry.entityId, entry.ipAddress ?? "", JSON.stringify({ before: entry.oldValues, after: entry.newValues })]), reportInfo: { filters: { page, action, schoolId, from, to, search: q } } })} note="Exports the current filtered page only." /> : undefined}
       />

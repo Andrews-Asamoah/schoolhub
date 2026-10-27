@@ -276,7 +276,13 @@ export function DataTable<T extends RowData>({
             {canExport && (
               <TableExportMenu
                 build={buildExport}
-                note={selectedCount ? `${selectedCount} selected row${selectedCount === 1 ? "" : "s"}` : `All ${filteredCount} matching row${filteredCount === 1 ? "" : "s"}`}
+                note={
+                  selectedCount
+                    ? `${selectedCount} selected row${selectedCount === 1 ? "" : "s"}`
+                    : paginate
+                      ? `All ${filteredCount} matching row${filteredCount === 1 ? "" : "s"}`
+                      : `Current page only · ${filteredCount} row${filteredCount === 1 ? "" : "s"}`
+                }
               />
             )}
           </div>
