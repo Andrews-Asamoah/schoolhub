@@ -1,6 +1,6 @@
 # Academic Platform — Current-State Inventory
 
-Baseline branch inspected: `main` at `4363eabc68629a4b63036d20dc0d82b112e9f4f2` (2026-10-27).
+Baseline branch inspected: `dev` at `e7584cc2104ac35f859cb1d2ad50c6731c59d02b` (2026-10-27). All feature PRs target `dev`.
 
 This is a source-level inventory, not a complete security audit. A model existing in Prisma does not prove the workflow is complete or safe; service/controller behaviour and tests still need review.
 
@@ -30,17 +30,13 @@ This is a source-level inventory, not a complete security audit. A model existin
 
 These checks are useful foundations. They do not eliminate the need for targeted negative tests, cross-tenant tests, transaction/concurrency tests and historical-report tests.
 
-## CI baseline observed
+## CI baseline on dev
 
-The latest successful CI run returned for `main` during this inventory was:
+The `dev` branch was inspected at commit `e7584cc2104ac35f859cb1d2ad50c6731c59d02b`.
 
-- Workflow: `CI`
-- Run: [#380](https://github.com/Andrews-Asamoah/schoolhub/actions/runs/40484554246)
-- Commit: `4363eabc68629a4b63036d20dc0d82b112e9f4f2`
-- Conclusion: `success`
-- Completed: 2026-10-27
+At the time of this update the existing CI workflow only matched pull requests and pushes for `main`, so **no passing CI result has been established for a dev-targeted academic feature PR**. The dev CI trigger must be enabled, and the resulting checks must pass, before a feature PR can be merged.
 
-This records the repository CI result for that commit only. It is not a new run on the academic foundation branch and does not prove the future feature code.
+The earlier successful workflow on a different branch is not accepted as proof of the dev base or feature changes.
 
 ## Gaps to verify before schema expansion
 
