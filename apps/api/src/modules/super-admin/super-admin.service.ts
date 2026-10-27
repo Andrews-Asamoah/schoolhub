@@ -231,7 +231,7 @@ export class SuperAdminService {
           where: { isCurrent: true },
           select: { id: true, name: true, terms: { select: { id: true } } },
         },
-        financeSettings: { select: { id: true } },
+        financeSettings: { select: { schoolId: true } },
         _count: {
           select: {
             classes: true,
