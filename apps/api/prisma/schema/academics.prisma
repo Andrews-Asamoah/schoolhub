@@ -54,10 +54,6 @@ model AcademicYear {
   payrollRecords        PayrollRecord[]
   feeReminderSchedules  FeeReminderSchedule[]
   schoolAssignments     SchoolAssignment[]
-  calendarDays          AcademicCalendarDay[]
-  attendanceExclusions StudentAttendanceExclusion[]
-  calendarDays          AcademicCalendarDay[]
-  attendanceExclusions StudentAttendanceExclusion[]
 
   @@unique([name, schoolId])
   @@index([schoolId, isCurrent])
@@ -93,6 +89,8 @@ model Term {
   payrollRecords        PayrollRecord[]
   feeReminderSchedules  FeeReminderSchedule[]
   schoolAssignments     SchoolAssignment[]
+  calendarDays          AcademicCalendarDay[]
+  attendanceExclusions StudentAttendanceExclusion[]
 
   @@unique([academicYearId, termNumber])
   @@index([academicYearId])
