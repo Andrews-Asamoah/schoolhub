@@ -98,11 +98,11 @@ export class SuperAdminService {
             select: { subscriptionStatus: true, expiresAt: true, metadata: true },
           },
           _count: {
-            select: {
-              students: { where: { deletedAt: null } },
-              teachers: { where: { deletedAt: null } },
-            },
+          select: {
+            students: { where: { deletedAt: null } },
+            teachers: { where: { deletedAt: null } },
           },
+        },
         },
         orderBy: { createdAt: "desc" },
         skip: (page - 1) * limit,
