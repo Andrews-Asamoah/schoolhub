@@ -53,6 +53,7 @@ model School {
   transactions                Transaction[]
   reportCardTemplates         ReportCardTemplate[]
   reportCardSets              ReportCardSet[]
+  schoolAssignments           SchoolAssignment[]
   notifications               Notification[]
   announcements               Announcement[]
   messages                    SchoolMessage[]
@@ -179,6 +180,7 @@ model Student {
   remarks          Remark[]
   transcripts      TranscriptRequest[]
   reportCards      ReportCard[]
+  assignmentSubmissions SchoolAssignmentSubmission[]
   clubMembers      ClubMember[]
   promotionRecords PromotionRecord[]
   application      Application?
