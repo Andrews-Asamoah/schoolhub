@@ -233,7 +233,7 @@ export function StudentHouseClubsView({ view }: { view: "HOUSE" | "CLUBS" }) {
                     mine ? "border-primary/20" : "border-border/80")}>
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex items-center gap-2">
-                        <span aria-label="House colour" className="size-3 shrink-0 rounded-full" style={{ backgroundColor: house.color || "#64748b" }} />
+                        <span aria-label="House colour" className="size-3 shrink-0 rounded-full" style={{ backgroundColor: house.color || "var(--muted-foreground)" }} />
                         <h4 className="text-sm font-bold text-foreground">{house.name}</h4>
                       </div>
                       {mine && <span className="rounded-md bg-primary px-2 py-0.5 text-[9px] font-bold uppercase text-primary-foreground">Your house</span>}
