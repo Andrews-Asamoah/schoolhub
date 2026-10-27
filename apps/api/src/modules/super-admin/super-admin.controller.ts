@@ -16,6 +16,7 @@ import { SuperAdminGuard } from "../../common/guards/super-admin.guard.js";
 import { ZodValidationPipe } from "../../common/pipes/zod-validation.pipe.js";
 import { AuditActorParam } from "../../common/audit/audit-actor.decorator.js";
 import type { AuditActor } from "../../common/audit/audit.js";
+import { z } from "zod";
 import {
   enrollSchoolSchema,
   updateSchoolSchema,
@@ -35,6 +36,30 @@ import {
   type SuperAdminAuditQuery,
 } from "@schoolhub/shared";
 
+
+const optionalLimit = z.number().int().min(0).max(10_000_000).nullable();
+const subscriptionPlanFields = z.object({
+  code: z.string().trim().min(2).max(32).regex(/^[a-zA-Z0-9_-]+$/),
+  name: z.string().trim().min(2).max(80),
+  description: z.string().trim().max(500).nullable().optional(),
+  monthlyPrice: z.number().finite().min(0).max(1_000_000),
+  yearlyPrice: z.number().finite().min(0).max(10_000_000),
+  currency: z.string().trim().length(3).transform((value) => value.toUpperCase()).default("GHS"),
+  maxStudents: optionalLimit.default(500),
+  maxTeachers: optionalLimit.default(30),
+  maxGuardians: optionalLimit.default(1000),
+  maxStaff: optionalLimit.default(50),
+  maxStorageMb: optionalLimit.default(5120),
+  features: z.array(z.string().trim().min(1).max(80)).max(40).default([]),
+  isPublic: z.boolean().default(true),
+  isActive: z.boolean().default(true),
+  sortOrder: z.number().int().min(0).max(100_000).default(0),
+});
+const createSubscriptionPlanSchema = subscriptionPlanFields;
+const updateSubscriptionPlanSchema = subscriptionPlanFields.partial();
+type CreateSubscriptionPlanInput = z.infer<typeof createSubscriptionPlanSchema>;
+type UpdateSubscriptionPlanInput = z.infer<typeof updateSubscriptionPlanSchema>;
+
 /** Writes are far rarer than reads, so they get a much tighter budget per client. */
 const WRITE_LIMIT = { default: { limit: 30, ttl: 60_000 } };
 
@@ -43,6 +68,34 @@ const WRITE_LIMIT = { default: { limit: 30, ttl: 60_000 } };
 @UseGuards(ThrottlerGuard, SuperAdminGuard)
 export class SuperAdminController {
   constructor(private readonly superAdminService: SuperAdminService) {}
+
+
+  @Get("subscription-plans")
+  @Header("Cache-Control", "no-store")
+  listSubscriptionPlans() {
+    return this.superAdminService.listSubscriptionPlans();
+  }
+
+  @Post("subscription-plans")
+  @Throttle(WRITE_LIMIT)
+  @Header("Cache-Control", "no-store")
+  createSubscriptionPlan(
+    @Body(new ZodValidationPipe(createSubscriptionPlanSchema)) body: CreateSubscriptionPlanInput,
+    @AuditActorParam() actor: AuditActor,
+  ) {
+    return this.superAdminService.createSubscriptionPlan(body as Parameters<SuperAdminService["createSubscriptionPlan"]>[0], actor);
+  }
+
+  @Patch("subscription-plans/:id")
+  @Throttle(WRITE_LIMIT)
+  @Header("Cache-Control", "no-store")
+  updateSubscriptionPlan(
+    @Param("id") id: string,
+    @Body(new ZodValidationPipe(updateSubscriptionPlanSchema)) body: UpdateSubscriptionPlanInput,
+    @AuditActorParam() actor: AuditActor,
+  ) {
+    return this.superAdminService.updateSubscriptionPlan(id, body as Parameters<SuperAdminService["updateSubscriptionPlan"]>[1], actor);
+  }
 
   @Get("operations/health")
   @Header("Cache-Control", "no-store")
