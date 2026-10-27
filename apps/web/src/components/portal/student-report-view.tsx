@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { CheckCircle2, FileText, GraduationCap, LoaderCircle, Printer, Sparkles } from "lucide-react";
 import { useState } from "react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { apiFetch } from "@/lib/api";
 
 interface ReportSubject {
@@ -26,6 +27,19 @@ interface PublishedReport {
   set: { name: string; academicYear: { name: string }; term: { name: string; termNumber: number }; template: { name: string; layout: TemplateLayout | null }; school: { name: string; code: string; email: string | null; phone: string | null; address: string | null; logo: string | null; motto: string | null; website: string | null; primaryColor: string; secondaryColor: string } };
 }
 
+
+function accessibleAccentForeground(color: string): string {
+  const hex = color.trim().replace(/^#/, "");
+  if (!/^(?:[\da-f]{3}|[\da-f]{6})$/i.test(hex)) return "#ffffff";
+  const fullHex = hex.length === 3 ? hex.split("").map((part) => part + part).join("") : hex;
+  const channels = [0, 2, 4].map((offset) => Number.parseInt(fullHex.slice(offset, offset + 2), 16) / 255);
+  const linear = channels.map((channel) => channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4);
+  const luminance = 0.2126 * linear[0]! + 0.7152 * linear[1]! + 0.0722 * linear[2]!;
+  const contrastWithWhite = 1.05 / (luminance + 0.05);
+  const contrastWithDark = (luminance + 0.05) / 0.0535;
+  return contrastWithWhite >= contrastWithDark ? "#ffffff" : "#0b0b0b";
+}
+
 export function StudentReportView() {
   const [selectedId, setSelectedId] = useState("");
   const reports = useQuery({
@@ -38,6 +52,7 @@ export function StudentReportView() {
   const subjects = active?.data.subjects ?? [];
   const layout = active?.set.template.layout;
   const accent = layout?.accentColor ?? active?.set.school.primaryColor ?? "#4f46e5";
+  const accentForeground = accessibleAccentForeground(accent);
   const templateType = layout?.type ?? "modern";
   const reportLabel = templateType === "primary" ? "Primary terminal report" : templateType === "jhs" ? "JHS performance report" : templateType === "classic" ? "Classic academic report" : "Student academic report";
   const showPosition = layout?.showPosition !== false;
@@ -53,7 +68,7 @@ export function StudentReportView() {
   return <div className="space-y-5">
     <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between print:hidden">
       <div><div className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.16em] text-primary"><Sparkles className="size-4" />Academic records</div><h2 className="text-2xl font-black tracking-tight text-foreground">Your reports</h2><p className="mt-1 text-sm text-muted-foreground">Official reports released by your school appear here.</p></div>
-      {rows.length > 0 && <div className="flex flex-wrap gap-2"><select aria-label="Select report" value={active?.id ?? ""} onChange={(event) => setSelectedId(event.target.value)} className="h-10 rounded-xl border border-input bg-background px-3 text-sm">{rows.map((report) => <option key={report.id} value={report.id}>{report.set.academicYear.name} · {report.set.term.name}</option>)}</select><button type="button" onClick={() => window.print()} className="inline-flex h-10 items-center gap-2 rounded-xl px-4 text-sm font-bold text-white shadow-sm transition hover:opacity-90" style={{ backgroundColor: accent }}><Printer className="size-4" />Print report</button></div>}
+      {rows.length > 0 && <div className="flex flex-col gap-2 sm:flex-row"><Select value={active?.id ?? rows[0]?.id ?? "__none__"} onValueChange={setSelectedId}><SelectTrigger aria-label="Select report" className="h-10 min-w-0 sm:max-w-72"><SelectValue placeholder="Choose a report" /></SelectTrigger><SelectContent>{rows.map((report) => <SelectItem key={report.id} value={report.id}>{report.set.academicYear.name} · {report.set.term.name}</SelectItem>)}</Select><button type="button" onClick={() => window.print()} className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-xl px-4 text-sm font-bold shadow-sm transition hover:opacity-90" style={{ backgroundColor: accent, color: accentForeground }}><Printer className="size-4" />Print report</button></div>}
     </div>
     {!active ? <div className="rounded-3xl border border-dashed border-border bg-card p-10 text-center"><span className="mx-auto flex size-14 items-center justify-center rounded-2xl bg-primary/10 text-primary"><FileText className="size-7" /></span><h3 className="mt-4 font-bold">No published reports yet</h3><p className="mx-auto mt-1 max-w-md text-sm leading-6 text-muted-foreground">Your school has not released a report for your account yet. Check again after the school announces publication.</p></div> :
     <article className="report-print-area overflow-hidden rounded-3xl border border-border bg-card shadow-sm print:rounded-none print:border-0 print:shadow-none" style={{ fontFamily: templateType === "classic" ? "Georgia, Times New Roman, serif" : undefined }}>
@@ -75,7 +90,7 @@ export function StudentReportView() {
 
         <section>
           <div className="mb-3 flex flex-wrap items-end justify-between gap-2"><div><p className="text-[10px] font-bold uppercase tracking-[0.18em]" style={{ color: accent }}>01 · Academic results</p><h2 className="mt-1 text-lg font-black">Subject performance</h2></div><p className="text-xs text-muted-foreground">{gradedCount} of {subjects.length} subject(s) have a recorded grade</p></div>
-          {subjects.length ? <div className="overflow-x-auto rounded-xl border border-border"><table className="w-full min-w-[620px] border-collapse text-left text-sm"><thead><tr style={{ backgroundColor: accent }} className="text-white"><th className="p-3 font-semibold">Subject</th><th className="p-3 text-right font-semibold">Score</th><th className="p-3 text-right font-semibold">Percentage</th><th className="p-3 text-center font-semibold">Grade</th>{showPosition && <th className="p-3 text-center font-semibold">Position</th>}</tr></thead><tbody>{subjects.map((row, index) => <tr key={row.subject.id} className={index % 2 ? "border-t border-border bg-muted/20" : "border-t border-border"}><td className="p-3"><span className="font-semibold">{row.subject.name}</span><span className="mt-0.5 block text-[11px] text-muted-foreground">{row.subject.code}</span></td><td className="p-3 text-right font-medium tabular-nums">{row.totalScore.toFixed(1)}</td><td className="p-3 text-right tabular-nums">{row.percentage.toFixed(1)}%</td><td className="p-3 text-center"><span className="inline-flex min-w-9 justify-center rounded-lg px-2 py-1 text-xs font-black" style={{ color: accent, backgroundColor: `${accent}14` }}>{row.grade ?? "—"}</span></td>{showPosition && <td className="p-3 text-center tabular-nums">{row.position ?? "—"}</td>}</tr>)}</tbody></table></div> : <div className="rounded-xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">No finalized subject results were included in this report.</div>}
+          {subjects.length ? <div className="overflow-x-auto rounded-xl border border-border"><table className="w-full min-w-[620px] border-collapse text-left text-sm"><thead><tr style={{ backgroundColor: accent, color: accentForeground }}><th className="p-3 font-semibold">Subject</th><th className="p-3 text-right font-semibold">Score</th><th className="p-3 text-right font-semibold">Percentage</th><th className="p-3 text-center font-semibold">Grade</th>{showPosition && <th className="p-3 text-center font-semibold">Position</th>}</tr></thead><tbody>{subjects.map((row, index) => <tr key={row.subject.id} className={index % 2 ? "border-t border-border bg-muted/20" : "border-t border-border"}><td className="p-3"><span className="font-semibold">{row.subject.name}</span><span className="mt-0.5 block text-[11px] text-muted-foreground">{row.subject.code}</span></td><td className="p-3 text-right font-medium tabular-nums">{row.totalScore.toFixed(1)}</td><td className="p-3 text-right tabular-nums">{row.percentage.toFixed(1)}%</td><td className="p-3 text-center"><span className="inline-flex min-w-9 justify-center rounded-lg px-2 py-1 text-xs font-black" style={{ color: accent, backgroundColor: `${accent}14` }}>{row.grade ?? "—"}</span></td>{showPosition && <td className="p-3 text-center tabular-nums">{row.position ?? "—"}</td>}</tr>)}</tbody></table></div> : <div className="rounded-xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">No finalized subject results were included in this report.</div>}
         </section>
 
         {showBreakdown && subjects.some((row) => (row.components?.length ?? 0) > 0) && <section><p className="text-[10px] font-bold uppercase tracking-[0.18em]" style={{ color: accent }}>02 · How the marks add up</p><h2 className="mt-1 text-lg font-black">Assessment breakdown</h2><div className="mt-3 grid gap-3 sm:grid-cols-2">{subjects.filter((row) => (row.components?.length ?? 0) > 0).map((row) => <div key={row.subject.id} className="rounded-2xl border border-border p-4"><h3 className="text-sm font-bold">{row.subject.name}</h3><div className="mt-3 space-y-2">{(row.components ?? []).map((component, index) => <div key={component.name + index}><div className="flex items-center justify-between gap-3 text-xs"><span className="text-muted-foreground">{component.name}</span><span className="font-semibold tabular-nums">{component.marksObtained} / {component.maxMarks}</span></div><div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full" style={{ width: `${Math.max(0, Math.min(100, component.percentage))}%`, backgroundColor: accent }} /></div></div>)}</div></div>)}</div></section>}
