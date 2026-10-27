@@ -53,6 +53,7 @@ model AcademicYear {
   inventoryTransactions InventoryTransaction[]
   payrollRecords        PayrollRecord[]
   feeReminderSchedules  FeeReminderSchedule[]
+  schoolAssignments     SchoolAssignment[]
 
   @@unique([name, schoolId])
   @@index([schoolId, isCurrent])
@@ -84,6 +85,7 @@ model Term {
   inventoryTransactions InventoryTransaction[]
   payrollRecords        PayrollRecord[]
   feeReminderSchedules  FeeReminderSchedule[]
+  schoolAssignments     SchoolAssignment[]
 
   @@unique([academicYearId, termNumber])
   @@index([academicYearId])
@@ -139,6 +141,7 @@ model Class {
   school                    School                    @relation(fields: [schoolId], references: [id], onDelete: Cascade)
   academicYear              AcademicYear?             @relation(fields: [academicYearId], references: [id], onDelete: SetNull)
   subjects                  ClassSubject[]
+  schoolAssignments         SchoolAssignment[]
   classTeacherAssignments   ClassTeacherAssignment[]
   enrollments               Enrollment[]
   students                  Student[]
@@ -239,6 +242,7 @@ model Subject {
   departments      Department[]      @relation("DepartmentSubjects")
   assessmentScores AssessmentScore[]
   classSubjects    ClassSubject[]
+  schoolAssignments SchoolAssignment[]
   teachers         SubjectTeacher[]
   timetableEntries TimetableEntry[]
 
