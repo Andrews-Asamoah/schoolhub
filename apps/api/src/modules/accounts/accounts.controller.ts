@@ -41,7 +41,7 @@ export class AccountController {
   @Get("security/trusted-devices")
   @Header("Cache-Control", "no-store")
   listTrustedDevices(@Session() session: UserSession) {
-    return this.accounts.listTrustedDevices(session.user as { id: string; role?: string; mustChangePassword?: boolean });
+    return this.accounts.listTrustedDevices(session.user as { id: string; role?: string; mustChangePassword?: boolean; banned?: boolean });
   }
 
   @Delete("security/trusted-devices/revoke-all")
@@ -52,7 +52,7 @@ export class AccountController {
     @AuditActorParam() actor: AuditActor,
   ) {
     return this.accounts.revokeAllTrustedDevices(
-      session.user as { id: string; role?: string; mustChangePassword?: boolean },
+      session.user as { id: string; role?: string; mustChangePassword?: boolean; banned?: boolean },
       actor,
     );
   }
@@ -66,7 +66,7 @@ export class AccountController {
     @AuditActorParam() actor: AuditActor,
   ) {
     return this.accounts.revokeTrustedDevice(
-      session.user as { id: string; role?: string; mustChangePassword?: boolean },
+      session.user as { id: string; role?: string; mustChangePassword?: boolean; banned?: boolean },
       deviceId,
       actor,
     );
