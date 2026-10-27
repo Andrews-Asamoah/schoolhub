@@ -16,6 +16,7 @@ import {
 } from "@schoolhub/shared";
 import { useSchoolRole } from "@/components/school/school-role-switcher";
 import { apiFetch } from "@/lib/api";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface HouseRecord {
   id: string;
@@ -297,27 +298,15 @@ export function HousesWorkspace() {
               </label>
               <label className="text-xs font-semibold text-foreground">
                 Lead teacher
-                <select
-                  className={inputClasses}
-                  value={values.houseTeacherId}
-                  onChange={(event) =>
-                    setValues({ ...values, houseTeacherId: event.target.value })
-                  }
-                >
-                  <option value="">No lead teacher assigned</option>
-                  {teachers
-                    .filter(
-                      (teacher) =>
-                        teacher.isActive ||
-                        teacher.id === values.houseTeacherId,
-                    )
-                    .map((teacher) => (
-                      <option key={teacher.id} value={teacher.id}>
-                        {teacher.firstName} {teacher.lastName}
-                        {!teacher.isActive ? " (inactive)" : ""}
-                      </option>
+                <Select value={values.houseTeacherId || "__none__"} onValueChange={(value) => setValues({ ...values, houseTeacherId: value === "__none__" ? "" : value })}>
+                  <SelectTrigger aria-label="Lead teacher" className={inputClasses}><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">No lead teacher assigned</SelectItem>
+                    {teachers.filter((teacher) => teacher.isActive || teacher.id === values.houseTeacherId).map((teacher) => (
+                      <SelectItem key={teacher.id} value={teacher.id}>{teacher.firstName} {teacher.lastName}{!teacher.isActive ? " (inactive)" : ""}</SelectItem>
                     ))}
-                </select>
+                  </SelectContent>
+                </Select>
               </label>
               <label className="text-xs font-semibold text-foreground sm:col-span-2">
                 Motto
