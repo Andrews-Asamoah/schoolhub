@@ -201,11 +201,35 @@ describe.skipIf(!DB)("two-factor authentication (real database)", () => {
       expect((await get(a, "/super-admin/stats")).status).toBe(200);
     });
 
-    it("refuses 'trust this device' so the second factor cannot be skipped for 30 days", async () => {
+    it("lets a SuperAdmin trust a device for 30 days and revoke that trust server-side", async () => {
       const a = agent();
       await signIn(a, emails.admin);
-      const res = await post(a, "/auth/two-factor/verify-totp", { code: totp(secret), trustDevice: true });
-      expect(res.status).toBe(400);
+      const verified = await post(a, "/auth/two-factor/verify-totp", {
+        code: totp(secret),
+        trustDevice: true,
+      });
+      expect(verified.status).toBe(200);
+      expect((await get(a, "/super-admin/stats")).status).toBe(200);
+
+      const listed = await get(a, "/account/security/trusted-devices");
+      expect(listed.status).toBe(200);
+      expect(listed.body.data.length).toBeGreaterThan(0);
+
+      await post(a, "/auth/sign-out", {});
+      const trustedSignIn = await signIn(a, emails.admin);
+      expect(trustedSignIn.body.twoFactorRedirect).toBeUndefined();
+      expect((await get(a, "/super-admin/stats")).status).toBe(200);
+
+      const revoked = await a
+        .delete("/api/account/security/trusted-devices/revoke-all")
+        .set("Origin", ORIGIN)
+        .set("X-Forwarded-For", nextIp());
+      expect(revoked.status).toBe(200);
+      expect(revoked.body.revoked).toBeGreaterThan(0);
+
+      await post(a, "/auth/sign-out", {});
+      const signInAfterRevocation = await signIn(a, emails.admin);
+      expect(signInAfterRevocation.body.twoFactorRedirect).toBe(true);
       expect((await get(a, "/super-admin/stats")).status).toBe(401);
     });
 
@@ -327,6 +351,11 @@ describe.skipIf(!DB)("two-factor authentication (real database)", () => {
         const a = agent();
         const first = await signIn(a, emails.owner);
         expect(first.body.twoFactorRedirect).toBe(true);
+        const refusedTrust = await post(a, "/auth/two-factor/verify-totp", {
+          code: totp(secret),
+          trustDevice: true,
+        });
+        expect(refusedTrust.status).toBe(403);
         expect((await post(a, "/auth/two-factor/verify-totp", { code: totp(secret) })).status).toBe(200);
         expect((await get(a, profilePath, tenant())).status).not.toBe(403);
       } finally {
