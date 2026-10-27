@@ -212,3 +212,30 @@ export async function apiDownload(path: string, fallbackFileName?: string): Prom
   link.remove();
   window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
+
+/** Authenticated, private PDF download; no public file URL is created. */
+export async function downloadAcademicReport(path: string, filename: string): Promise<void> {
+  const headers = new Headers();
+  const school = getClientSubdomain();
+  if (school) headers.set("x-school-subdomain", school);
+  const role = typeof window !== "undefined" ?
+    window.localStorage.getItem("schoolhub-active-role") : null;
+  if (role) headers.set("x-school-role", role);
+  const result = await fetch(`${API_BASE}${path}`,{
+    method:"GET",credentials:"include",headers,cache:"no-store",
+  });
+  if (!result.ok) {
+    const detail = await result.json().catch(()=>({message:"Report download was rejected."}));
+    throw new ApiError(result.status,
+      (detail as {message?:string}).message ?? "Report download was rejected.",detail);
+  }
+  if (!result.headers.get("content-type")?.includes("application/pdf")) {
+    throw new Error("The server did not return a valid PDF.");
+  }
+  const file = await result.blob();
+  const url = URL.createObjectURL(file);
+  try {
+    const a = document.createElement("a"); a.href=url;a.download=filename;
+    document.body.appendChild(a);a.click();a.remove();
+  } finally { URL.revokeObjectURL(url); }
+}
