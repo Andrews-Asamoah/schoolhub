@@ -6,6 +6,7 @@ import type { ExportTable } from "@/lib/table-export";
 import { useCallback, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { apiFetch, getClientSubdomain } from "@/lib/api";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Search, Users, WalletCards } from "lucide-react";
 
 interface Student {
@@ -690,49 +691,36 @@ export function AccountantFinanceDetailedReportingWorkspace({ classes }: Props) 
       <div className="finance-report-print-actions grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         <label className="space-y-1 text-xs font-medium text-muted-foreground">
           Report type
-          <select
-            className={inputClass + " mt-1"}
-            value={reportType}
-            onChange={(event) =>
-              setReportType(event.target.value as "class" | "student")
-            }
-          >
-            <option value="class">Class collections</option>
-            <option value="student">Student account statement</option>
-          </select>
+          <Select value={reportType} onValueChange={(value) => setReportType(value as "class" | "student")}>
+            <SelectTrigger aria-label="Report type" className={inputClass + " mt-1"}><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="class">Class collections</SelectItem>
+              <SelectItem value="student">Student account statement</SelectItem>
+            </SelectContent>
+          </Select>
         </label>
 
         {reportType === "class" ? (
           <label className="space-y-1 text-xs font-medium text-muted-foreground">
             Class
-            <select
-              className={inputClass + " mt-1"}
-              value={classId}
-              onChange={(event) => setClassId(event.target.value)}
-            >
-              <option value="ALL">All classes</option>
-              {classes.map((schoolClass) => (
-                <option key={schoolClass.id} value={schoolClass.id}>
-                  {schoolClass.name}
-                </option>
-              ))}
-            </select>
+            <Select value={classId} onValueChange={setClassId}>
+              <SelectTrigger aria-label="Class" className={inputClass + " mt-1"}><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">All classes</SelectItem>
+                {classes.map((schoolClass) => <SelectItem key={schoolClass.id} value={schoolClass.id}>{schoolClass.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
           </label>
         ) : (
           <label className="space-y-1 text-xs font-medium text-muted-foreground">
             Student
-            <select
-              className={inputClass + " mt-1"}
-              value={studentId}
-              onChange={(event) => setStudentId(event.target.value)}
-            >
-              <option value="">Select a student...</option>
-              {students.map((student) => (
-                <option key={student.id} value={student.id}>
-                  {studentLabel(student)} | {student.admissionNumber}
-                </option>
-              ))}
-            </select>
+            <Select value={studentId || "__none__"} onValueChange={(value) => setStudentId(value === "__none__" ? "" : value)}>
+              <SelectTrigger aria-label="Student" className={inputClass + " mt-1"}><SelectValue placeholder="Select a student..." /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__">Select a student...</SelectItem>
+                {students.map((student) => <SelectItem key={student.id} value={student.id}>{studentLabel(student)} | {student.admissionNumber}</SelectItem>)}
+              </SelectContent>
+            </Select>
           </label>
         )}
 
