@@ -55,7 +55,7 @@ export function StaffBulkImport({ kind, onClose, onComplete }: { kind: Kind; onC
       setError(e instanceof Error ? e.message : "Import stopped. Upload the same file again; existing accounts will be flagged as duplicates.");
     } finally { setLoading(false); setProgress(""); }
   };
-  return <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true" aria-labelledby="staff-import-title">
+  return <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay p-4" role="dialog" aria-modal="true" aria-labelledby="staff-import-title">
     <section className="max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-2xl border border-border bg-card p-5 text-foreground shadow-xl sm:p-6">
       <div className="flex items-start justify-between gap-3">
         <div><h2 id="staff-import-title" className="text-lg font-bold">Bulk upload {title.toLowerCase()}</h2><p className="mt-1 text-sm text-muted-foreground">Upload CSV or Excel, review every row, then create accounts. Existing email or staff identifiers are flagged before import.</p></div>
