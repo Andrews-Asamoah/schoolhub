@@ -44,6 +44,7 @@ import { TeacherBiodataDialog } from "@/components/school/teacher-biodata-dialog
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { apiFetch } from "@/lib/api";
+import { StaffBulkImport } from "@/components/school/staff-bulk-import";
 
 type PeopleKind = "teachers" | "staff" | "guardians";
 type Values = {
@@ -251,6 +252,7 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
   const [activeFilter, setActiveFilter] = useState("");
   const [page, setPage] = useState(1);
   const [showForm, setShowForm] = useState(false);
+  const [showBulkImport, setShowBulkImport] = useState(false);
   const [editing, setEditing] = useState<{ id: string; name: string } | null>(null);
   const [viewing, setViewing] = useState<{ id: string; name: string } | null>(null);
   const [confirmingLogin, setConfirmingLogin] = useState<{ id: string; name: string; hasLogin: boolean } | null>(null);
@@ -667,24 +669,39 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
             </div>
           </div>
           {canManage && (
-            <button
-              type="button"
-              onClick={() => {
-                createMutation.reset();
-                const blank = initialValues();
-                setFormDefaults(blank);
-                form.reset(blank);
-                setEditing(null);
-                setShowForm((value) => !value);
-              }}
-              className="inline-flex h-10 items-center gap-2 rounded-lg bg-primary px-4 text-xs font-semibold text-primary-foreground shadow-sm transition hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-            >
-              <Plus className="size-4" />
-              Add {resourceName}
-            </button>
+            <div className="flex flex-wrap gap-2">
+              {(kind === "teachers" || kind === "staff") && (
+                <button type="button" onClick={() => setShowBulkImport(true)} className="inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-card px-4 text-xs font-semibold text-foreground hover:bg-muted">
+                  <UsersRound className="size-4" /> Bulk upload
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => {
+                  createMutation.reset();
+                  const blank = initialValues();
+                  setFormDefaults(blank);
+                  form.reset(blank);
+                  setEditing(null);
+                  setShowForm((value) => !value);
+                }}
+                className="inline-flex h-10 items-center gap-2 rounded-lg bg-primary px-4 text-xs font-semibold text-primary-foreground shadow-sm transition hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              >
+                <Plus className="size-4" />
+                Add {resourceName}
+              </button>
+            </div>
           )}
         </div>
       </section>
+
+      {showBulkImport && canManage && (kind === "teachers" || kind === "staff") && (
+        <StaffBulkImport
+          kind={kind}
+          onClose={() => setShowBulkImport(false)}
+          onComplete={() => void queryClient.invalidateQueries({ queryKey: ["people", kind] })}
+        />
+      )}
 
       {showForm && canManage && (
         <section className="rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-6">
