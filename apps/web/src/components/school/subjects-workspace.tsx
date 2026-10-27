@@ -13,6 +13,7 @@ import {
   type WorkspaceColumn,
 } from "@/components/school/workspace-ui";
 import { apiFetch } from "@/lib/api";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface SubjectRow {
   id: string;
@@ -488,23 +489,19 @@ function ClassAssignmentPanel({
                 </label>
                 {row && (
                   <>
-                    <select
-                      aria-label={`Teacher for ${schoolClass.name}`}
-                      value={row.teacherId}
-                      onChange={(e) => patch(schoolClass.id, { teacherId: e.target.value })}
-                      className="h-8 rounded-lg border border-border bg-card px-2 text-xs"
-                    >
-                      <option value="">No teacher yet</option>
-                      {subjectTeachers.map((teacher) => (
-                        <option key={teacher.id} value={teacher.id}>{teacher.firstName} {teacher.lastName}</option>
-                      ))}
-                      {/* Keep an older assignment visible so it is not silently dropped. */}
-                      {row.teacherId && !assignedIds.has(row.teacherId) && (
-                        <option value={row.teacherId}>
-                          {subject.classes.find((item) => item.classId === schoolClass.id)?.teacherName ?? "Current teacher"} (not assigned to this subject)
-                        </option>
-                      )}
-                    </select>
+                    <Select value={row.teacherId || "__none__"} onValueChange={(value) => patch(schoolClass.id, { teacherId: value === "__none__" ? "" : value })}>
+                      <SelectTrigger aria-label={`Teacher for ${schoolClass.name}`} className="h-8 min-w-40 rounded-lg border border-border bg-card px-2 text-xs"><SelectValue placeholder="No teacher yet" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">No teacher yet</SelectItem>
+                        {subjectTeachers.map((teacher) => <SelectItem key={teacher.id} value={teacher.id}>{teacher.firstName} {teacher.lastName}</SelectItem>)}
+                        {/* Keep an older assignment visible so it is not silently dropped. */}
+                        {row.teacherId && !assignedIds.has(row.teacherId) && (
+                          <SelectItem value={row.teacherId}>
+                            {subject.classes.find((item) => item.classId === schoolClass.id)?.teacherName ?? "Current teacher"} (not assigned to this subject)
+                          </SelectItem>
+                        )}
+                      </SelectContent>
+                    </Select>
                     <label className="flex items-center gap-1.5 text-muted-foreground">
                       <input type="checkbox" className="size-3.5 accent-primary" checked={row.isCompulsory} onChange={(e) => patch(schoolClass.id, { isCompulsory: e.target.checked })} />
                       Compulsory
