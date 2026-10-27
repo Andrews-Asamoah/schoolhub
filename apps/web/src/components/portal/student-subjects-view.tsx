@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
-import { BookOpen, Calendar, Clock, GraduationCap, MapPin, Search, User } from "lucide-react";
+import { BookOpen, Clock, MapPin, Search, User } from "lucide-react";
 import { useState } from "react";
+import { EmptyState, ErrorState } from "@/components/ui/empty-state";
 import { apiFetch } from "@/lib/api";
 
 interface EnrolledSubject {
@@ -14,7 +15,7 @@ interface EnrolledSubject {
     firstName: string;
     lastName: string;
   } | null;
-  room?: string;
+  room?: string | null;
 }
 
 interface StudentSubjectsResponse {
@@ -22,122 +23,123 @@ interface StudentSubjectsResponse {
   subjects: EnrolledSubject[];
 }
 
-const mockSubjects: EnrolledSubject[] = [
-  { id: "s1", name: "Integrated Science", code: "SCI-09", description: "Biology, Chemistry, and Physics core foundational concepts.", periodsPerWeek: 5, teacher: { id: "t1", firstName: "Grace", lastName: "Appiah" }, room: "Science Lab 1" },
-  { id: "s2", name: "Core Mathematics", code: "MTH-09", description: "Algebra, Geometry, Trigonometry, and Statistics.", periodsPerWeek: 5, teacher: { id: "t2", firstName: "Kwabena", lastName: "Darko" }, room: "Room 102" },
-  { id: "s3", name: "English Language", code: "ENG-09", description: "Grammar, Essay Writing, Oral English, and Comprehension.", periodsPerWeek: 4, teacher: { id: "t3", firstName: "Veronica", lastName: "Kusi" }, room: "Room 102" },
-  { id: "s4", name: "Social Studies", code: "SOC-09", description: "Environment, Culture, Governance, and National Development.", periodsPerWeek: 4, teacher: { id: "t4", firstName: "Kofi", lastName: "Antwi" }, room: "Room 102" },
-  { id: "s5", name: "Information Technology", code: "ICT-09", description: "Computer software, Algorithms, Web skills, and Practical lab.", periodsPerWeek: 4, teacher: { id: "t5", firstName: "Ebenezer", lastName: "Osei" }, room: "Computer Lab" },
-  { id: "s6", name: "French Language", code: "FRN-09", description: "Introductory French conversation, vocabulary, and composition.", periodsPerWeek: 3, teacher: { id: "t6", firstName: "Claire", lastName: "Mensah" }, room: "Language Room" },
-  { id: "s7", name: "Religious & Moral Education", code: "RME-09", description: "Ethics, world religions, and personal character development.", periodsPerWeek: 3, teacher: { id: "t7", firstName: "Samuel", lastName: "Acheampong" }, room: "Room 102" },
-  { id: "s8", name: "Physical & Health Education", code: "PHE-09", description: "Sports development, health habits, and athletics training.", periodsPerWeek: 2, teacher: { id: "t8", firstName: "Francis", lastName: "Boakye" }, room: "School Sports Field" },
-];
-
 export function StudentSubjectsView() {
   const [search, setSearch] = useState("");
 
-  const { data, isLoading } = useQuery({
+  const query = useQuery({
     queryKey: ["students", "me", "subjects"],
     queryFn: () => apiFetch<StudentSubjectsResponse>("/students/me/subjects"),
     retry: false,
   });
 
-  const subjectsList = data?.subjects && data.subjects.length > 0 ? data.subjects : mockSubjects;
-  const className = data?.class?.name ?? "JHS 3 Emerald";
+  const subjects = query.data?.subjects ?? [];
+  const normalizedSearch = search.trim().toLocaleLowerCase();
+  const filtered = subjects.filter((subject) => {
+    const teacherName = subject.teacher
+      ? `${subject.teacher.firstName} ${subject.teacher.lastName}`
+      : "";
+    return [subject.name, subject.code, teacherName]
+      .some((value) => value.toLocaleLowerCase().includes(normalizedSearch));
+  });
+  const totalPeriods = subjects.reduce((total, subject) => total + Math.max(0, subject.periodsPerWeek || 0), 0);
 
-  const filtered = subjectsList.filter(
-    (s) =>
-      s.name.toLowerCase().includes(search.toLowerCase()) ||
-      s.code.toLowerCase().includes(search.toLowerCase()) ||
-      (s.teacher && `${s.teacher.firstName} ${s.teacher.lastName}`.toLowerCase().includes(search.toLowerCase())),
-  );
+  if (query.isPending) {
+    return (
+      <section role="status" className="flex min-h-48 items-center justify-center gap-2 rounded-2xl border border-border bg-card text-sm text-muted-foreground">
+        <BookOpen className="size-4 animate-pulse text-primary" />
+        Loading your enrolled subjects…
+      </section>
+    );
+  }
 
-  const totalPeriods = subjectsList.reduce((acc, s) => acc + (s.periodsPerWeek || 0), 0);
+  if (query.isError) {
+    return <ErrorState message={`Your subjects could not be loaded: ${query.error.message}`} onRetry={() => void query.refetch()} />;
+  }
 
   return (
-    <div className="space-y-6">
-      {/* Header and Stats */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h2 className="text-xl font-black text-foreground">Enrolled Subjects</h2>
-          <p className="text-xs text-muted-foreground">
-            Registered courses for <span className="font-semibold text-primary">{className}</span> • Active Term
-          </p>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <div className="rounded-xl border border-border bg-card px-3 py-1.5 text-xs">
-            <span className="text-muted-foreground/70">Total Courses: </span>
-            <span className="font-black text-foreground">{subjectsList.length}</span>
-          </div>
-          <div className="rounded-xl border border-border bg-card px-3 py-1.5 text-xs">
-            <span className="text-muted-foreground/70">Weekly Lessons: </span>
-            <span className="font-black text-primary">{totalPeriods} periods</span>
+    <div className="space-y-5">
+      <section className="flex flex-col gap-4 rounded-2xl border border-border bg-card p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between sm:p-5">
+        <div className="flex items-start gap-3">
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary"><BookOpen className="size-5" /></span>
+          <div className="min-w-0">
+            <h2 className="text-lg font-bold tracking-tight text-foreground">Enrolled subjects</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {query.data?.class
+                ? `Subjects registered to ${query.data.class.name} in the current academic term.`
+                : "Your current class enrollment and assigned subjects will appear here when they are available."}
+            </p>
           </div>
         </div>
-      </div>
+        <div className="flex flex-wrap gap-2">
+          <div className="rounded-xl border border-border bg-background px-3 py-2 text-xs">
+            <span className="text-muted-foreground">Subjects </span>
+            <span className="font-bold tabular-nums text-foreground">{subjects.length}</span>
+          </div>
+          <div className="rounded-xl border border-border bg-background px-3 py-2 text-xs">
+            <span className="text-muted-foreground">Weekly periods </span>
+            <span className="font-bold tabular-nums text-primary">{totalPeriods}</span>
+          </div>
+        </div>
+      </section>
 
-      {/* Search Input */}
-      <div className="relative max-w-sm">
-        <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground/70" />
-        <input
-          type="text"
-          placeholder="Search subjects, codes, teachers..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="h-9 w-full rounded-xl border border-border bg-card pl-9 pr-3 text-xs text-foreground outline-none transition focus:border-primary"
+      {subjects.length > 0 && (
+        <label className="relative block w-full max-w-sm">
+          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+          <input
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            type="search"
+            placeholder="Search subjects, codes or teachers…"
+            aria-label="Search enrolled subjects"
+            className="h-10 w-full rounded-xl border border-input bg-card pl-9 pr-3 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          />
+        </label>
+      )}
+
+      {filtered.length === 0 ? (
+        <EmptyState
+          icon={BookOpen}
+          title={search ? "No matching subjects" : query.data?.class ? "No subjects assigned yet" : "No current class enrollment"}
+          description={search
+            ? "Try a different subject name, course code or teacher."
+            : query.data?.class
+              ? "Subjects assigned to your current class will appear here once your school has set them up."
+              : "Your school has not returned a class enrollment for the current academic term. Contact the school office if you think this is incorrect."}
+          className="min-h-56"
         />
-      </div>
-
-      {/* Grid of Subjects */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {filtered.map((sub) => {
-          const teacherName = sub.teacher
-            ? `${sub.teacher.firstName} ${sub.teacher.lastName}`
-            : "Assigned Subject Teacher";
-
-          return (
-            <div
-              key={sub.id}
-              className="flex flex-col justify-between rounded-2xl border border-border/80 bg-card p-5 shadow-xs transition hover:border-input"
-            >
-              <div>
-                <div className="flex items-center justify-between">
-                  <span className="rounded-lg bg-primary/10 px-2 py-0.5 text-[10px] font-bold text-primary">
-                    {sub.code}
-                  </span>
-                  <span className="flex items-center gap-1 text-[11px] font-semibold text-muted-foreground/70">
-                    <Clock className="size-3" />
-                    {sub.periodsPerWeek} periods/wk
-                  </span>
+      ) : (
+        <section aria-label="Enrolled subjects" className="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          {filtered.map((subject) => {
+            const teacherName = subject.teacher
+              ? `${subject.teacher.firstName} ${subject.teacher.lastName}`.trim()
+              : null;
+            return (
+              <article key={subject.id} className="flex min-w-0 flex-col justify-between rounded-2xl border border-border bg-card p-4 shadow-sm transition hover:border-primary/30 sm:p-5">
+                <div>
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="max-w-full truncate rounded-lg bg-primary/10 px-2.5 py-1 text-[10px] font-bold text-primary">{subject.code}</span>
+                    <span className="inline-flex shrink-0 items-center gap-1 text-[11px] font-medium text-muted-foreground">
+                      <Clock className="size-3.5" /> {subject.periodsPerWeek} period{subject.periodsPerWeek === 1 ? "" : "s"}/week
+                    </span>
+                  </div>
+                  <h3 className="mt-3 break-words text-sm font-bold text-foreground">{subject.name}</h3>
+                  {subject.description && <p className="mt-1.5 line-clamp-3 text-xs leading-5 text-muted-foreground">{subject.description}</p>}
                 </div>
-
-                <h3 className="mt-2.5 text-sm font-bold text-foreground">
-                  {sub.name}
-                </h3>
-                <p className="mt-1 text-xs text-muted-foreground leading-relaxed line-clamp-2">
-                  {sub.description || "General course syllabus and periodic curriculum content."}
-                </p>
-              </div>
-
-              <div className="mt-5 space-y-2 border-t border-border/60 pt-3 text-xs text-muted-foreground">
-                <div className="flex items-center gap-2">
-                  <User className="size-3.5 text-muted-foreground/70" />
-                  <span className="font-medium text-foreground/80 truncate">
-                    {teacherName}
-                  </span>
+                <div className="mt-4 space-y-2 border-t border-border pt-3 text-xs">
+                  <div className="flex min-w-0 items-start gap-2 text-muted-foreground">
+                    <User className="mt-0.5 size-3.5 shrink-0" />
+                    <span className="min-w-0 break-words">{teacherName ?? "No subject teacher recorded"}</span>
+                  </div>
+                  <div className="flex min-w-0 items-start gap-2 text-muted-foreground">
+                    <MapPin className="mt-0.5 size-3.5 shrink-0" />
+                    <span className="min-w-0 break-words">{subject.room?.trim() || "No classroom recorded"}</span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <MapPin className="size-3.5 text-muted-foreground/70" />
-                  <span className="text-[11px] text-muted-foreground/70">
-                    {sub.room || "Regular Classroom"}
-                  </span>
-                </div>
-              </div>
-            </div>
-          );
-        })}
-      </div>
+              </article>
+            );
+          })}
+        </section>
+      )}
     </div>
   );
 }
