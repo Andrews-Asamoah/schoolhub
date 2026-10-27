@@ -35,6 +35,7 @@ import { SchoolLogoUploader } from "@/components/school/school-logo-uploader";
 import { AssessmentEntryWorkspace } from "@/components/school/assessment-entry-workspace";
 import { AssessmentsAdmin } from "@/components/school/assessments-admin";
 import { ClassRegister } from "@/components/school/class-register";
+import { AttendanceReviewWorkspace } from "@/components/school/attendance-review-workspace";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SchoolSettingsForm } from "@/components/school/school-settings-form";
 import { ProfileWorkspace } from "@/components/school/profile-workspace";
@@ -431,6 +432,8 @@ function AttendanceWorkspace({
         className={className}
         canMark={canMark}
       />
+      <AttendanceReviewWorkspace key={classId} classId={classId}
+        canManage={["owner","admin","headteacher"].includes(attendanceRole ?? "")} />
     </div>
   );
 }
