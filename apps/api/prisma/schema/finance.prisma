@@ -492,12 +492,15 @@ model Subscription {
   canceledAt               DateTime?
   maxStudents              Int?
   maxTeachers              Int?
+  maxGuardians             Int?
   maxStaff                 Int?
+  planId                   String?
   settings                 Json?
   createdAt                DateTime           @default(now())
   updatedAt                DateTime           @updatedAt
 
   school   School          @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  plan     SubscriptionPlan? @relation(fields: [planId], references: [id], onDelete: SetNull)
   invoices InvoiceRecord[]
 
   @@index([schoolId])
@@ -505,6 +508,7 @@ model Subscription {
   @@index([planType])
   @@index([stripeCustomerId])
   @@index([stripeSubscriptionId])
+  @@index([planId])
   @@map("subscriptions")
 }
 
@@ -774,4 +778,33 @@ model FinanceAccrualState {
   school               School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
 
   @@map("finance_accrual_states")
+}
+
+/// Platform-defined subscription catalogue. Plans are deactivated, never hard-deleted,
+/// so historical invoices and subscriptions retain a stable plan reference/snapshot.
+model SubscriptionPlan {
+  id             String   @id @default(cuid())
+  code           String   @unique
+  name           String
+  description    String?
+  monthlyPrice   Decimal  @default(0) @db.Decimal(10, 2)
+  yearlyPrice    Decimal  @default(0) @db.Decimal(10, 2)
+  currency       String   @default("GHS")
+  maxStudents    Int?
+  maxTeachers    Int?
+  maxGuardians   Int?
+  maxStaff       Int?
+  maxStorageMb   Int?
+  features       Json     @default("{}")
+  isPublic       Boolean  @default(true)
+  isActive       Boolean  @default(true)
+  sortOrder      Int      @default(0)
+  version        Int      @default(1)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([isActive, sortOrder])
+  @@index([currency])
+  subscriptions Subscription[]
+  @@map("subscription_plans")
 }

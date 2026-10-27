@@ -1,5 +1,5 @@
 import { DatePicker } from "@/components/ui/date-picker";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { evaluateSubscriptionAccess, SUBSCRIPTION_GRACE_DAYS, type SubscriptionStatusValue } from "@schoolhub/shared";
 import { CircleAlert, LoaderCircle, ShieldAlert, ShieldCheck, X } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
@@ -13,6 +13,7 @@ export interface SubscriptionTarget {
   id: string;
   name: string;
   organization: { subscriptionStatus: string; expiresAt: string | null };
+  subscription?: { planId: string | null; planName: string; amount: string | number | null; currency: string; billingCycle: "MONTHLY" | "YEARLY" | null } | null;
 }
 
 const STATUS_OPTIONS: { value: SubscriptionStatusValue; label: string; hint: string }[] = [
@@ -39,6 +40,10 @@ export function SubscriptionDialog({ school, onClose }: { school: SubscriptionTa
   const [status, setStatus] = useState<string>(school.organization.subscriptionStatus);
   const [expiry, setExpiry] = useState(initialDate);
   const [note, setNote] = useState("");
+  const [planId, setPlanId] = useState(school.subscription?.planId ?? "");
+  const [billingCycle, setBillingCycle] = useState<"MONTHLY" | "YEARLY">(school.subscription?.billingCycle ?? "MONTHLY");
+  const plans = useQuery({ queryKey: ["superadmin", "subscription-plans"], queryFn: () => apiFetch<Array<{ id: string; name: string; code: string; monthlyPrice: string | number; yearlyPrice: string | number; currency: string; isActive: boolean }>>("/super-admin/subscription-plans") });
+  const planMutation = useMutation({ mutationFn: () => apiFetch(`/super-admin/schools/${school.id}/plan`, { method: "PATCH", body: JSON.stringify({ planId, billingCycle }) }), onSuccess: async () => { await queryClient.invalidateQueries({ queryKey: ["superadmin"] }); } });
   const firstRef = useRef<HTMLButtonElement>(null);
 
   const mutation = useMutation({
@@ -93,6 +98,29 @@ export function SubscriptionDialog({ school, onClose }: { school: SubscriptionTa
           <span>· expires {describeExpiry(school.organization.expiresAt)}</span>
         </div>
 
+
+        <section className="mt-5 rounded-xl border border-border p-4">
+          <h3 className="text-sm font-semibold text-foreground">Subscription plan &amp; capacity</h3>
+          <p className="mt-1 text-xs text-muted-foreground">Assigning a plan snapshots its price and capacity limits to this school.</p>
+          {school.subscription?.planName && <p className="mt-2 text-xs text-muted-foreground">Current plan: <span className="font-semibold text-foreground">{school.subscription.planName}</span>{school.subscription.amount !== null && school.subscription.amount !== undefined ? " · " + school.subscription.currency + " " + Number(school.subscription.amount).toFixed(2) + " / " + (school.subscription.billingCycle?.toLowerCase() ?? "cycle") : ""}</p>}
+          <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_140px_auto]">
+            <label className="text-xs font-semibold text-muted-foreground">Plan
+              <select value={planId} onChange={e => setPlanId(e.target.value)} className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground">
+                <option value="">Choose a plan…</option>
+                {(plans.data ?? []).filter(p => p.isActive).map(p => <option key={p.id} value={p.id}>{p.name} · {p.code}</option>)}
+              </select>
+            </label>
+            <label className="text-xs font-semibold text-muted-foreground">Billing cycle
+              <select value={billingCycle} onChange={e => setBillingCycle(e.target.value as "MONTHLY" | "YEARLY")} className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground">
+                <option value="MONTHLY">Monthly</option><option value="YEARLY">Yearly</option>
+              </select>
+            </label>
+            <button type="button" disabled={!planId || planMutation.isPending || plans.isPending} onClick={() => planMutation.mutate()} className="self-end rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground disabled:opacity-50">{planMutation.isPending ? "Assigning…" : "Assign plan"}</button>
+          </div>
+          {planMutation.error && <p role="alert" className="mt-2 text-xs text-destructive">{planMutation.error.message}</p>}
+          {planMutation.isSuccess && <p role="status" className="mt-2 text-xs text-success">Plan assignment saved.</p>}
+          {plans.error && <p role="alert" className="mt-2 text-xs text-destructive">Plans could not be loaded: {plans.error.message}</p>}
+        </section>
         <fieldset className="mt-5">
           <legend className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Status</legend>
           <div className="mt-2 grid gap-2 sm:grid-cols-2">

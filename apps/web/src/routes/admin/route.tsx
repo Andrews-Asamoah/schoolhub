@@ -67,6 +67,7 @@ function AdminLayout() {
   if (pathname.includes("/admin/schools")) activePage = "schools";
   else if (pathname.startsWith("/admin/users")) activePage = "users";
   else if (pathname.startsWith("/admin/subscriptions")) activePage = "subscriptions";
+  else if (pathname.startsWith("/admin/plans")) activePage = "plans";
   else if (pathname.startsWith("/admin/support")) activePage = "support";
   else if (pathname.startsWith("/admin/audit")) activePage = "audit";
   else if (pathname.startsWith("/admin/profile")) activePage = "profile";
@@ -75,6 +76,7 @@ function AdminLayout() {
     schools: "Schools",
     users: "System users",
     subscriptions: "Subscriptions",
+    plans: "Subscription plans",
     support: "Support desk",
     audit: "Audit log",
     profile: "Account & security",

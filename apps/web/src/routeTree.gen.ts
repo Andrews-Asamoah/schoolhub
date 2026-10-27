@@ -27,6 +27,7 @@ import { Route as AdminSchoolsIndexRouteImport } from './routes/admin/schools/in
 import { Route as AdminSchoolsSchoolIdRouteImport } from './routes/admin/schools/$schoolId'
 import { Route as AdminSchoolsNewRouteImport } from './routes/admin/schools/new'
 import { Route as AdminSubscriptionsIndexRouteImport } from './routes/admin/subscriptions/index'
+import { Route as AdminPlansIndexRouteImport } from './routes/admin/plans/index'
 import { Route as AdminUsersIndexRouteImport } from './routes/admin/users/index'
 
 const IndexRoute = IndexRouteImport.update({
@@ -119,6 +120,11 @@ const AdminSubscriptionsIndexRoute = AdminSubscriptionsIndexRouteImport.update({
   path: '/subscriptions/',
   getParentRoute: () => AdminRouteRoute,
 } as any)
+const AdminPlansIndexRoute = AdminPlansIndexRouteImport.update({
+  id: '/plans/',
+  path: '/plans/',
+  getParentRoute: () => AdminRouteRoute,
+} as any)
 const AdminUsersIndexRoute = AdminUsersIndexRouteImport.update({
   id: '/users/',
   path: '/users/',
@@ -144,6 +150,7 @@ export interface FileRoutesByFullPath {
   '/admin/audit/': typeof AdminAuditIndexRoute
   '/admin/schools/': typeof AdminSchoolsIndexRoute
   '/admin/subscriptions/': typeof AdminSubscriptionsIndexRoute
+  '/admin/plans/': typeof AdminPlansIndexRoute
   '/admin/users/': typeof AdminUsersIndexRoute
 }
 export interface FileRoutesByTo {
@@ -164,6 +171,7 @@ export interface FileRoutesByTo {
   '/admin/audit': typeof AdminAuditIndexRoute
   '/admin/schools': typeof AdminSchoolsIndexRoute
   '/admin/subscriptions': typeof AdminSubscriptionsIndexRoute
+  '/admin/plans': typeof AdminPlansIndexRoute
   '/admin/users': typeof AdminUsersIndexRoute
 }
 export interface FileRoutesById {
@@ -186,6 +194,7 @@ export interface FileRoutesById {
   '/admin/audit/': typeof AdminAuditIndexRoute
   '/admin/schools/': typeof AdminSchoolsIndexRoute
   '/admin/subscriptions/': typeof AdminSubscriptionsIndexRoute
+  '/admin/plans/': typeof AdminPlansIndexRoute
   '/admin/users/': typeof AdminUsersIndexRoute
 }
 export interface FileRouteTypes {
@@ -209,6 +218,7 @@ export interface FileRouteTypes {
     | '/admin/audit/'
     | '/admin/schools/'
     | '/admin/subscriptions/'
+    | '/admin/plans/'
     | '/admin/users/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -229,6 +239,7 @@ export interface FileRouteTypes {
     | '/admin/audit'
     | '/admin/schools'
     | '/admin/subscriptions'
+    | '/admin/plans'
     | '/admin/users'
   id:
     | '__root__'
@@ -250,6 +261,7 @@ export interface FileRouteTypes {
     | '/admin/audit/'
     | '/admin/schools/'
     | '/admin/subscriptions/'
+    | '/admin/plans/'
     | '/admin/users/'
   fileRoutesById: FileRoutesById
 }
@@ -393,6 +405,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminSubscriptionsIndexRouteImport
       parentRoute: typeof AdminRouteRoute
     }
+    '/admin/plans/': {
+      id: '/admin/plans/'
+      path: '/plans'
+      fullPath: '/admin/plans/'
+      preLoaderRoute: typeof AdminPlansIndexRouteImport
+      parentRoute: typeof AdminRouteRoute
+    }
     '/admin/users/': {
       id: '/admin/users/'
       path: '/users'
@@ -413,6 +432,7 @@ interface AdminRouteRouteChildren {
   AdminAuditIndexRoute: typeof AdminAuditIndexRoute
   AdminSchoolsIndexRoute: typeof AdminSchoolsIndexRoute
   AdminSubscriptionsIndexRoute: typeof AdminSubscriptionsIndexRoute
+  AdminPlansIndexRoute: typeof AdminPlansIndexRoute
   AdminUsersIndexRoute: typeof AdminUsersIndexRoute
 }
 
@@ -426,6 +446,7 @@ const AdminRouteRouteChildren: AdminRouteRouteChildren = {
   AdminAuditIndexRoute: AdminAuditIndexRoute,
   AdminSchoolsIndexRoute: AdminSchoolsIndexRoute,
   AdminSubscriptionsIndexRoute: AdminSubscriptionsIndexRoute,
+  AdminPlansIndexRoute: AdminPlansIndexRoute,
   AdminUsersIndexRoute: AdminUsersIndexRoute,
 }
 

@@ -20,6 +20,7 @@ import {
 import { Prisma, type School, type StudentStatus } from '@prisma/client';
 import { canManageAcademicContext } from '../../common/academic-context.js';
 import { FinanceService } from '../finance/finance.service.js';
+import { assertSubscriptionCapacity } from '../../common/subscription-capacity.js';
 import {
   CredentialsService,
   toIssuedCredentials,
@@ -403,6 +404,7 @@ export class StudentsService {
     const studentCredential = await this.credentials.prepare('student');
 
     const created = await this.prisma.client.$transaction(async (tx) => {
+      await assertSubscriptionCapacity(tx, schoolId, 'students');
       const schoolRow = await tx.school.findUnique({
         where: { id: schoolId },
         select: { code: true, email: true },
@@ -651,6 +653,7 @@ export class StudentsService {
             accountLinked = login.linked;
           }
         } else {
+          await assertSubscriptionCapacity(tx, schoolId, 'guardians');
           const record = await tx.guardian.create({
             data: {
               schoolId,

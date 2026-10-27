@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import {
   LayoutDashboard, School, Shield, ShieldCheck, Users, CreditCard,
-  UserCircle, LifeBuoy, ScrollText, type LucideIcon,
+  UserCircle, LifeBuoy, ScrollText, Layers3, type LucideIcon,
 } from "lucide-react";
 import { SidebarUserMenu } from "@/components/ui/sidebar-user-menu";
 import {
@@ -20,12 +20,13 @@ const navSections: Array<{
   title: string; icon: LucideIcon;
   items: Array<{ id: string; label: string; icon: LucideIcon; to:
     "/admin/dashboard" | "/admin/schools" | "/admin/users" |
-    "/admin/subscriptions" | "/admin/support" | "/admin/audit" | "/admin/profile" }>;
+    "/admin/subscriptions" | "/admin/plans" | "/admin/support" | "/admin/audit" | "/admin/profile" }>;
 }> = [
   { title: "Platform management", icon: School, items: [
     { id: "schools", label: "Schools directory", icon: School, to: "/admin/schools" },
     { id: "users", label: "System users", icon: Users, to: "/admin/users" },
     { id: "subscriptions", label: "Subscriptions", icon: CreditCard, to: "/admin/subscriptions" },
+    { id: "plans", label: "Subscription plans", icon: Layers3, to: "/admin/plans" },
     { id: "support", label: "Support desk", icon: LifeBuoy, to: "/admin/support" },
   ] },
   { title: "Security", icon: ShieldCheck, items: [

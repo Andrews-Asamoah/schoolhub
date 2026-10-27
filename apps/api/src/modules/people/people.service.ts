@@ -16,6 +16,7 @@ import { roleForStaffType } from '../accounts/staff-roles.js';
 import { toTeacherBiodata } from './teacher-biodata.js';
 import type { Prisma } from '@prisma/client';
 import { guardianEmailDomain } from '@schoolhub/shared';
+import { assertSubscriptionCapacity } from '../../common/subscription-capacity.js';
 import type {
   UpdateGuardianInput,
   UpdateStaffInput,
@@ -123,6 +124,7 @@ export class PeopleService {
     const teacherId = newPublicId('TCH');
 
     const teacher = await this.prisma.client.$transaction(async (tx) => {
+      await assertSubscriptionCapacity(tx, school.id, 'teachers');
       const login = await this.credentials.createOrLinkLogin(tx, {
         name: `${input.firstName} ${input.lastName}`.trim(),
         email: input.email,
@@ -308,6 +310,7 @@ export class PeopleService {
     const credential = await this.credentials.prepare(role);
 
     const result = await this.prisma.client.$transaction(async (tx) => {
+      await assertSubscriptionCapacity(tx, school.id, 'staff');
       const login = await this.credentials.createOrLinkLogin(tx, {
         name: `${input.firstName} ${input.lastName}`.trim(),
         email: input.email,
@@ -448,6 +451,7 @@ export class PeopleService {
       throw new BadRequestException('Each student can only be linked once.');
     }
     return this.prisma.client.$transaction(async (tx) => {
+      await assertSubscriptionCapacity(tx, schoolId, 'guardians');
       const existingPrimaryStudentIds = new Set<string>();
       if (uniqueStudentIds.length) {
         const students = await tx.student.findMany({
