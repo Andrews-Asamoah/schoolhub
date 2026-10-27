@@ -218,6 +218,7 @@ export class AttendanceCalendarService {
 
   async listClassExclusions(schoolId: string, termId: string, classId: string) {
     const term = await this.requireTerm(schoolId, termId);
+    if (!classId?.trim()) throw new BadRequestException("Choose a class.");
     const classroom = await this.prisma.client.class.findFirst({
       where: { id: classId, schoolId, deletedAt: null,
         OR: [{ academicYearId: term.academicYearId }, { academicYearId: null }] },
@@ -263,10 +264,19 @@ export class AttendanceCalendarService {
       throw new BadRequestException("Excluded date must be within the selected term.");
     }
     const enrollment = await this.prisma.client.enrollment.findFirst({ where: {
-      studentId: input.studentId, termId: input.termId, student: { schoolId, deletedAt: null } },
-      select: { id: true },
+      studentId: input.studentId, termId: input.termId, status: "ACTIVE",
+      student: { schoolId, deletedAt: null } },
+      select: { id: true, effectiveFrom: true, effectiveTo: true,
+        student: { select: { admissionDate: true } } },
     });
-    if (!enrollment) throw new NotFoundException("Student is not enrolled in this school for the term.");
+    if (!enrollment) throw new NotFoundException("Student is not actively enrolled in this school for the term.");
+    const eligibleFrom = [dateString(term.startDate), dateString(enrollment.student.admissionDate),
+      ...(enrollment.effectiveFrom ? [dateString(enrollment.effectiveFrom)] : [])].sort().at(-1)!;
+    const eligibleTo = [dateString(term.endDate),
+      ...(enrollment.effectiveTo ? [dateString(enrollment.effectiveTo)] : [])].sort()[0]!;
+    if (input.date < eligibleFrom || input.date > eligibleTo) {
+      throw new BadRequestException("Student was not eligible to attend on the selected date.");
+    }
     const [calendarDays, daysOfTerm, existingMark] = await Promise.all([
       this.prisma.client.academicCalendarDay.findMany({ where: { schoolId, termId: input.termId },
         select: { date: true, isInstructional: true } }),
