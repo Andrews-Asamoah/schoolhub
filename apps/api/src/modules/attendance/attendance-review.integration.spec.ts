@@ -40,6 +40,12 @@ describe.skipIf(!enabled)("attendance register review / concurrency (PostgreSQL)
       code:(tag+"A").toUpperCase(),subdomain:tag+"a"}})).id;
     schoolB=(await db.school.create({data:{organizationId:orgB,name:tag+" B",
       code:(tag+"B").toUpperCase(),subdomain:tag+"b"}})).id;
+    // School B needs its own active term so denial exercises class tenant scoping,
+    // rather than short-circuiting on a missing academic context.
+    const otherYear=await db.academicYear.create({data:{schoolId:schoolB,
+      name:tag+" Other Year",startDate:shift(-15),endDate:shift(20),isCurrent:true}});
+    await db.term.create({data:{academicYearId:otherYear.id,name:"Term 1",termNumber:1,
+      startDate:shift(-2),endDate:shift(7),isCurrent:true,instructionalWeekdays:[1,2,3,4,5,6,7]}});
     await db.user.create({data:{id:userAdmin,name:"Synthetic Admin",email:userAdmin+"@example.test"}});
     await db.user.create({data:{id:teacherUser,name:"Synthetic Teacher",email:teacherUser+"@example.test"}});
     await db.user.create({data:{id:userStudent,name:"Synthetic Pupil",email:userStudent+"@example.test"}});
