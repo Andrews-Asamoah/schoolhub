@@ -3,6 +3,7 @@ import { CircleAlert, Crown, LoaderCircle, Lock, ShieldCheck, UserRoundCog, X } 
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { ROLES, updateSchoolMemberRolesSchema, type Role } from "@schoolhub/shared";
 import { DataTable, type DataTableColumn } from "@/components/ui/data-table";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { schoolRoleLabel, useSchoolRole } from "@/components/school/school-role-switcher";
 import { useSession } from "@/lib/auth-client";
 import { useCanExportTables } from "@/lib/table-export-policy";
@@ -171,14 +172,15 @@ export function TeamRoleWorkspace() {
       <div className="flex flex-wrap items-center gap-2">
         <label className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
           Show
-          <select className={inputClass} value={filter} onChange={(event) => setFilter(event.target.value as Role | "all")}>
-            <option value="all">Everyone ({members.data?.length ?? 0})</option>
-            {ROLES.filter((role) => counts.has(role)).map((role) => (
-              <option key={role} value={role}>
-                {schoolRoleLabel(role)} ({counts.get(role)})
-              </option>
-            ))}
-          </select>
+          <Select value={filter} onValueChange={(value) => setFilter(value as Role | "all")}>
+            <SelectTrigger aria-label="Filter team by role" className={inputClass}><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Everyone ({members.data?.length ?? 0})</SelectItem>
+              {ROLES.filter((role) => counts.has(role)).map((role) => (
+                <SelectItem key={role} value={role}>{schoolRoleLabel(role)} ({counts.get(role)})</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </label>
       </div>
 
@@ -364,29 +366,24 @@ function RoleDialog({
             <div className="mt-4 rounded-xl border border-primary/20 bg-primary/10 p-3">
               <label className="block text-xs font-semibold text-foreground">
                 Teacher&apos;s department
-                <select
-                  value={teacherDepartmentId}
-                  onChange={(event) => {
-                    setProblem(null);
-                    setTeacherDepartmentId(event.target.value);
-                  }}
-                  className={`${inputClass} mt-1.5 w-full`}
-                >
-                  <option value="">
-                    {departments.isPending
-                      ? "Loading departments…"
-                      : (departments.data ?? []).length
-                        ? "Select a department"
-                        : "No departments yet"}
-                  </option>
-                  {(departments.data ?? [])
-                    .filter((department) => department.isActive)
-                    .map((department) => (
-                      <option key={department.id} value={department.id}>
-                        {department.name}
-                      </option>
+                <Select value={teacherDepartmentId || "__none__"} onValueChange={(value) => {
+                  setProblem(null);
+                  setTeacherDepartmentId(value === "__none__" ? "" : value);
+                }}>
+                  <SelectTrigger aria-label="Teacher's department" className={`${inputClass} mt-1.5 w-full`}><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">
+                      {departments.isPending
+                        ? "Loading departments…"
+                        : (departments.data ?? []).length
+                          ? "Select a department"
+                          : "No departments yet"}
+                    </SelectItem>
+                    {(departments.data ?? []).filter((department) => department.isActive).map((department) => (
+                      <SelectItem key={department.id} value={department.id}>{department.name}</SelectItem>
                     ))}
-                </select>
+                  </SelectContent>
+                </Select>
               </label>
               <p className="mt-1.5 text-[11px] text-muted-foreground">
                 A teacher record is created so this person can be assigned to classes, subjects and the timetable.
