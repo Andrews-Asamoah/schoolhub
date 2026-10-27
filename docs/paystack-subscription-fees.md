@@ -48,9 +48,8 @@ when a school has no subscription record or the corresponding limit is null.
 with the repository's `pnpm --filter @schoolhub/api prisma:generate` command. Configure plans
 and explicitly assign them to schools; existing schools are not silently moved to a new plan.
 Storage caps and feature entitlements are catalogue fields in this phase and must not be treated
-as enforced until each relevant upload/feature API is wired to those entitlements. Nested guardian
-creation during student enrollment also needs to be covered by the same guardian-cap check before
-the implementation is considered complete.
+as enforced until each relevant upload/feature API is wired to those entitlements. Guardian records
+created as part of student enrollment are checked inside the same transaction as well.
 
 The Paystack checkout/verification/webhook lifecycle remains a separate follow-on phase; fee
 calculation helpers alone do not constitute a payment integration.
