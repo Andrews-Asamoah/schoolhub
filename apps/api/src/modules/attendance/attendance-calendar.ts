@@ -84,7 +84,7 @@ export function calculateAttendanceRollout(input: {
     provisionalRate: recordedDays ? Math.round((daysAttended / recordedDays)*100) : null,
     coverageRate: possibleDays ? Math.round((recordedDays / possibleDays)*100) : null,
     isComplete: complete,
-    policyMode: historicalDays ? "TRANSITION" as const : "CALENDAR" as const,
+    policyMode: input.start < input.activeFrom ? "TRANSITION" as const : "CALENDAR" as const,
     historicalRecordedDays: historicalDays,
   };
 }
