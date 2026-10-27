@@ -922,6 +922,21 @@ export class SuperAdminService {
     ]);
     if (!school) throw new NotFoundException("School not found");
     if (!plan || !plan.isActive) throw new BadRequestException("Choose an active subscription plan");
+    const [students, teachers, guardians, staff] = await Promise.all([
+      this.prisma.client.student.count({ where: { schoolId, deletedAt: null } }),
+      this.prisma.client.teacher.count({ where: { schoolId, deletedAt: null } }),
+      this.prisma.client.guardian.count({ where: { schoolId, deletedAt: null } }),
+      this.prisma.client.staff.count({ where: { schoolId, deletedAt: null } }),
+    ]);
+    const overLimit = [
+      ["students", students, plan.maxStudents],
+      ["teachers", teachers, plan.maxTeachers],
+      ["guardians", guardians, plan.maxGuardians],
+      ["staff", staff, plan.maxStaff],
+    ].find(([, used, limit]) => limit !== null && limit !== undefined && Number(used) > Number(limit));
+    if (overLimit) {
+      throw new BadRequestException(`Cannot assign this plan: current ${overLimit[0]} usage (${overLimit[1]}) exceeds its limit (${overLimit[2]}). Existing records are preserved; choose a plan that accommodates current usage.`);
+    }
     const price = input.billingCycle === "YEARLY" ? plan.yearlyPrice : plan.monthlyPrice;
     const legacyPlanType = ["FREE", "BASIC", "STANDARD", "PREMIUM", "ENTERPRISE"].includes(plan.code)
       ? plan.code as "FREE" | "BASIC" | "STANDARD" | "PREMIUM" | "ENTERPRISE"
