@@ -174,17 +174,13 @@ async function runDashboardHappyPath() {
   const statsBeforeRefresh = calls.stats;
   const schoolsBeforeRefresh = calls.schools;
   await page.getByRole("button", { name: "Refresh data" }).click();
-  await page.waitForFunction(
-    ({ statsBeforeRefresh, schoolsBeforeRefresh }) =>
-      window.__schoolhubBrowserTestCalls?.stats > statsBeforeRefresh &&
-      window.__schoolhubBrowserTestCalls?.schools > schoolsBeforeRefresh,
-    { statsBeforeRefresh, schoolsBeforeRefresh },
-    { timeout: 10_000 },
-  ).catch(async () => {
-    // The app route handlers update the closure; verify those counters below
-    // without exposing test state to the application window.
-    await page.getByRole("button", { name: "Refresh data" }).waitFor({ state: "visible" });
-  });
+  const refreshDeadline = Date.now() + 10_000;
+  while (
+    (calls.stats <= statsBeforeRefresh || calls.schools <= schoolsBeforeRefresh) &&
+    Date.now() < refreshDeadline
+  ) {
+    await page.waitForTimeout(50);
+  }
 
   assert.ok(calls.stats > statsBeforeRefresh, "manual refresh should refetch stats");
   assert.ok(calls.schools > schoolsBeforeRefresh, "manual refresh should refetch schools");
