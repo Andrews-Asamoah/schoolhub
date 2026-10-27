@@ -793,6 +793,41 @@ export class SuperAdminService {
     return this.getSchool(id);
   }
 
+  /**
+   * Operational health is intentionally limited to checks we can verify here.
+   * Unknown dependencies are not reported as healthy without instrumentation.
+   */
+  async getOperationsHealth() {
+    const checkedAt = new Date().toISOString();
+    let database: { status: "healthy" | "unavailable"; latencyMs: number | null };
+    const startedAt = Date.now();
+
+    try {
+      await this.prisma.client.$queryRaw\`SELECT 1\`;
+      database = { status: "healthy", latencyMs: Date.now() - startedAt };
+    } catch {
+      database = { status: "unavailable", latencyMs: null };
+    }
+
+    return {
+      status: database.status === "healthy" ? "healthy" : "degraded",
+      checkedAt,
+      application: {
+        status: "healthy",
+        version: process.env.npm_package_version ?? "unknown",
+        environment: process.env.NODE_ENV ?? "unknown",
+      },
+      dependencies: {
+        database,
+        // These remain explicitly uninstrumented until a real provider/worker
+        // health contract exists; never display them as healthy by default.
+        storage: { status: "not_instrumented" },
+        notifications: { status: "not_instrumented" },
+        backgroundJobs: { status: "not_instrumented" },
+      },
+    } as const;
+  }
+
   async getPlatformStats() {
     const now = new Date();
     const soon = new Date(now.getTime() + EXPIRING_SOON_DAYS * DAY_MS);
