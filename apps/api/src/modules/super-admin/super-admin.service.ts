@@ -1,5 +1,6 @@
 import {
   Injectable,
+  Inject,
   Optional,
   ConflictException,
   BadRequestException,
@@ -9,7 +10,7 @@ import { PrismaService } from "../../prisma/prisma.service.js";
 import { generateId } from "better-auth";
 import { Prisma } from "@prisma/client";
 import { CredentialsService, toIssuedCredentials } from "../accounts/credentials.service.js";
-import { R2Service } from "../storage/r2.service.js";
+import { STORAGE_HEALTH_PROBE, type StorageHealthProbe } from "../storage/storage-health.js";
 import { writeAudit, type AuditActor } from "../../common/audit/audit.js";
 import {
   evaluateSubscriptionAccess,
@@ -60,7 +61,7 @@ export class SuperAdminService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly credentials: CredentialsService,
-    @Optional() private readonly storage?: R2Service,
+    @Optional() @Inject(STORAGE_HEALTH_PROBE) private readonly storage?: StorageHealthProbe,
   ) {}
 
   async listSchools(query: SuperAdminSchoolsQuery) {
