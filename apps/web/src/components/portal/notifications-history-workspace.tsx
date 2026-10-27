@@ -48,13 +48,17 @@ export function NotificationsHistoryWorkspace() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["notifications"] }),
   });
 
-  function openNotification(item: NotificationItem) {
-    const finish = () => {
-      if (item.link && item.link.startsWith("/") && !item.link.startsWith("//")) window.location.assign(item.link);
-    };
+  async function openNotification(item: NotificationItem) {
     if (!item.isRead) {
-      markRead.mutate(item.id, { onSuccess: finish });
-    } else finish();
+      try {
+        await markRead.mutateAsync(item.id);
+      } catch {
+        // Navigation should still work if the read-state update fails.
+      }
+    }
+    if (item.link && item.link.startsWith("/") && !item.link.startsWith("//")) {
+      window.location.assign(item.link);
+    }
   }
 
   const data = historyQuery.data;
@@ -76,7 +80,7 @@ export function NotificationsHistoryWorkspace() {
         : historyQuery.isError ? <div className="p-4"><ErrorState message={historyQuery.error.message} onRetry={() => void historyQuery.refetch()} /></div>
         : !data?.items.length ? <EmptyState icon={Bell} title={search || filter !== "ALL" ? "No matching notifications" : "No notifications yet"} description={search || filter !== "ALL" ? "Try changing your search or read-status filter." : "Updates from your school will appear here when they are created."} className="m-4" />
         : <ul className="divide-y divide-border">
-          {data.items.map((item) => <li key={item.id}><div className={`flex items-start gap-3 p-4 sm:px-5 ${item.isRead ? "" : "bg-primary/[0.035]"}`}><span className={`mt-1.5 size-2 shrink-0 rounded-full ${item.isRead ? "bg-muted-foreground/30" : "bg-primary"}`} aria-hidden="true" /><div className="min-w-0 flex-1"><div className="flex flex-wrap items-start justify-between gap-2"><p className={`text-sm ${item.isRead ? "font-medium" : "font-bold"} text-foreground`}>{item.title}</p><time className="shrink-0 text-[10px] text-muted-foreground">{formatDate(item.createdAt)}</time></div><p className="mt-1 whitespace-pre-wrap break-words text-xs leading-5 text-muted-foreground">{item.message}</p><p className="mt-2 text-[10px] uppercase tracking-wide text-muted-foreground">{item.type.replaceAll("_", " ")}</p></div><div className="flex shrink-0 items-center gap-1"><button type="button" disabled={markRead.isPending || item.isRead} onClick={() => markRead.mutate(item.id)} aria-label={item.isRead ? "Already read" : `Mark ${item.title} as read`} title="Mark as read" className="inline-flex size-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-30"><CircleCheck className="size-4" /></button>{item.link && <button type="button" onClick={() => openNotification(item)} aria-label={`Open ${item.title}`} title="Open notification" className="inline-flex size-8 items-center justify-center rounded-lg text-primary hover:bg-primary/10"><ExternalLink className="size-4" /></button>}</div></div></li>)}
+          {data.items.map((item) => <li key={item.id}><div className={`flex items-start gap-3 p-4 sm:px-5 ${item.isRead ? "" : "bg-primary/[0.035]"}`}><span className={`mt-1.5 size-2 shrink-0 rounded-full ${item.isRead ? "bg-muted-foreground/30" : "bg-primary"}`} aria-hidden="true" /><div className="min-w-0 flex-1"><div className="flex flex-wrap items-start justify-between gap-2"><p className={`text-sm ${item.isRead ? "font-medium" : "font-bold"} text-foreground`}>{item.title}</p><time className="shrink-0 text-[10px] text-muted-foreground">{formatDate(item.createdAt)}</time></div><p className="mt-1 whitespace-pre-wrap break-words text-xs leading-5 text-muted-foreground">{item.message}</p><p className="mt-2 text-[10px] uppercase tracking-wide text-muted-foreground">{item.type.replaceAll("_", " ")}</p></div><div className="flex shrink-0 items-center gap-1"><button type="button" disabled={markRead.isPending || item.isRead} onClick={() => markRead.mutate(item.id)} aria-label={item.isRead ? "Already read" : `Mark ${item.title} as read`} title="Mark as read" className="inline-flex size-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-30"><CircleCheck className="size-4" /></button>{item.link && <button type="button" onClick={() => void openNotification(item)} aria-label={`Open ${item.title}`} title="Open notification" className="inline-flex size-8 items-center justify-center rounded-lg text-primary hover:bg-primary/10"><ExternalLink className="size-4" /></button>}</div></div></li>)}
         </ul>}
         {data && data.totalPages > 1 && <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-4 py-3"><span className="text-xs text-muted-foreground">Page {data.page} of {data.totalPages}</span><div className="flex gap-2"><button type="button" disabled={page <= 1} onClick={() => setPage((current) => current - 1)} className="h-8 rounded-lg border border-border px-3 text-xs font-semibold text-foreground hover:bg-muted disabled:opacity-40">Previous</button><button type="button" disabled={page >= data.totalPages} onClick={() => setPage((current) => current + 1)} className="h-8 rounded-lg border border-border px-3 text-xs font-semibold text-foreground hover:bg-muted disabled:opacity-40">Next</button></div></footer>}
       </section>
