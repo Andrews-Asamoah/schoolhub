@@ -27,7 +27,7 @@ export class AttendanceCalendarService {
 
   private async assertCanAmend(schoolId: string, termId: string) {
     const published = await this.prisma.client.reportCardSet.count({
-      where: { schoolId, termId, status: "PUBLISHED" },
+      where: { schoolId, termId, status: { in: ["PUBLISHED", "ARCHIVED"] } },
     });
     if (published) throw new ConflictException("This term already has published reports. Supersede reports through a controlled amendment workflow before changing the calendar.");
   }
@@ -63,7 +63,7 @@ export class AttendanceCalendarService {
         select: { instructionalWeekdays: true, calendarRevision: true },
       });
       if (!termNow) throw new NotFoundException("Term not found.");
-      const published = await tx.reportCardSet.count({ where: { schoolId, termId, status: "PUBLISHED" } });
+      const published = await tx.reportCardSet.count({ where: { schoolId, termId, status: { in: ["PUBLISHED", "ARCHIVED"] } } });
       if (published) throw new ConflictException("A report has been published since calendar editing began.");
       const existing = await tx.academicCalendarDay.findMany({ where: { schoolId, termId },
         select: { date: true, label: true, isInstructional: true } });
@@ -129,12 +129,24 @@ export class AttendanceCalendarService {
     if (!dates.length) throw new BadRequestException("An exclusion must be on an instructional day.");
     return this.prisma.client.$transaction(async tx => {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${schoolId}), hashtext(${input.termId}))`;
-      if (await tx.reportCardSet.count({ where: { schoolId, termId: input.termId, status: "PUBLISHED" } })) {
+      if (await tx.reportCardSet.count({ where: { schoolId, termId: input.termId, status: { in: ["PUBLISHED", "ARCHIVED"] } } })) {
         throw new ConflictException("Reports are published for this term.");
       }
       const mark = await tx.attendance.findFirst({ where: { studentId: input.studentId,
         date: new Date(input.date+"T00:00:00.000Z") }, select: { id: true } });
       if (mark) throw new ConflictException("An attendance mark already exists on the excluded date.");
+      // Recheck instructional status after obtaining the calendar lock.
+      const [currentTerm, currentOverride] = await Promise.all([
+        tx.term.findFirst({ where: { id: input.termId, academicYear: { schoolId } },
+          select: { instructionalWeekdays: true } }),
+        tx.academicCalendarDay.findFirst({ where: { schoolId, termId: input.termId,
+          date: new Date(input.date+"T00:00:00.000Z") }, select: { isInstructional: true } }),
+      ]);
+      if (!currentTerm || !eligibleInstructionalDates({
+        start: input.date, end: input.date, asOf: input.date,
+        weekdays: currentTerm.instructionalWeekdays,
+        overrides: currentOverride ? [{ date: input.date, isInstructional: currentOverride.isInstructional }] : [],
+      }).length) throw new ConflictException("The calendar has changed; this date is no longer instructional.");
       const existing = await tx.studentAttendanceExclusion.findUnique({
         where: { schoolId_studentId_termId_date: { schoolId, studentId: input.studentId,
           termId: input.termId, date: new Date(input.date+"T00:00:00.000Z") } },
@@ -159,7 +171,7 @@ export class AttendanceCalendarService {
     await this.assertCanAmend(schoolId, item.termId);
     return this.prisma.client.$transaction(async tx => {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${schoolId}), hashtext(${item.termId}))`;
-      if (await tx.reportCardSet.count({ where: { schoolId, termId: item.termId, status: "PUBLISHED" } })) {
+      if (await tx.reportCardSet.count({ where: { schoolId, termId: item.termId, status: { in: ["PUBLISHED", "ARCHIVED"] } } })) {
         throw new ConflictException("Reports are published for this term.");
       }
       const deleted = await tx.studentAttendanceExclusion.deleteMany({ where: { id: exclusionId, schoolId } });

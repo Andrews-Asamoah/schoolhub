@@ -5,6 +5,7 @@ import { canManageAcademicContext } from "../../common/academic-context.js";
 import { canMarkRegister } from "../../common/scope/teacher-access.js";
 import { TeacherScopeService } from "../../common/scope/teacher-scope.service.js";
 import { AttendanceCalendarService } from "./attendance-calendar.service.js";
+import { dateString, eligibleInstructionalDates } from "./attendance-calendar.js";
 
 @Injectable()
 export class AttendanceService {
@@ -50,32 +51,35 @@ export class AttendanceService {
       throw new ForbiddenException("Only the class teacher can mark this class's register.");
     }
 
-    const operations = input.records.map((record) =>
-      this.prisma.client.attendance.upsert({
-        where: {
-          studentId_date: {
-            studentId: record.studentId,
-            date: attendanceDate,
-          },
-        },
-        update: {
-          status: record.status,
-          remarks: record.remarks,
-          markedById,
-          markedAt: new Date(),
-        },
-        create: {
-          studentId: record.studentId,
-          date: attendanceDate,
-          status: record.status,
-          remarks: record.remarks,
-          markedById,
-          markedAt: new Date(),
-        },
-      }),
-    );
-
-    const results = await this.prisma.client.$transaction(operations);
+    // Calendar writes and attendance writes acquire the same scoped advisory lock.
+    // Repeat the eligibility checks under the lock so an exclusion cannot race a register save.
+    const results = await this.prisma.client.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${schoolId}), hashtext(${term.id}))`;
+      const [latestTerm, overrides, excluded] = await Promise.all([
+        tx.term.findFirst({ where: { id: term.id, academicYear: { schoolId } },
+          select: { instructionalWeekdays: true } }),
+        tx.academicCalendarDay.findMany({ where: { schoolId, termId: term.id },
+          select: { date: true, isInstructional: true } }),
+        tx.studentAttendanceExclusion.findMany({ where: { schoolId, termId: term.id,
+          studentId: { in: studentIds }, date: attendanceDate }, select: { studentId: true } }),
+      ]);
+      if (!latestTerm || !eligibleInstructionalDates({
+        start: input.date, end: input.date, asOf: input.date,
+        weekdays: latestTerm.instructionalWeekdays,
+        overrides: overrides.map(row => ({ date: dateString(row.date), isInstructional: row.isInstructional })),
+      }).length) throw new BadRequestException("The school is closed or this is not an instructional day.");
+      if (excluded.length) throw new BadRequestException("Remove students with an approved exclusion from this register.");
+      const saved = [];
+      for (const record of input.records) {
+        saved.push(await tx.attendance.upsert({
+          where: { studentId_date: { studentId: record.studentId, date: attendanceDate } },
+          update: { status: record.status, remarks: record.remarks, markedById, markedAt: new Date() },
+          create: { studentId: record.studentId, date: attendanceDate,
+            status: record.status, remarks: record.remarks, markedById, markedAt: new Date() },
+        }));
+      }
+      return saved;
+    });
 
     return {
       success: true,
