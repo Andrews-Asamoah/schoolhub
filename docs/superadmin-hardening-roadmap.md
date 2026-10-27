@@ -23,7 +23,7 @@ This work is delivered in small, reviewable increments. Do not represent a depen
 
 - [ ] Model onboarding progress from persisted school setup data, not a client-only checklist.
 - [ ] Add secure owner invitations and recovery flows with expiry, single-use tokens, and rate limits.
-- [ ] Implement suspension/restoration with required reason, audit trail, and safeguards against disabling the final platform administrator.
+- [x] Require a meaningful reason for school-administrator suspension; persist it on the membership and include it in the audit entry while retaining final-admin safeguards.
 - [ ] Add lifecycle and authorization integration tests.
 
 ## Phase 4 — Billing and business analytics
