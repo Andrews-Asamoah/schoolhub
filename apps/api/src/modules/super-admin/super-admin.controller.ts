@@ -82,6 +82,12 @@ export class SuperAdminController {
     return this.superAdminService.listAuditLogs(query);
   }
 
+  @Get("schools/:id/onboarding")
+  @Header("Cache-Control", "no-store")
+  getSchoolOnboardingStatus(@Param("id") id: string) {
+    return this.superAdminService.getSchoolOnboardingStatus(id);
+  }
+
   @Get("schools/:id")
   getSchool(@Param("id") id: string) {
     return this.superAdminService.getSchool(id);

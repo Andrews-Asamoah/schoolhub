@@ -41,6 +41,15 @@ interface Member {
   user: { id: string; name: string; email: string; banned?: boolean; twoFactorEnabled?: boolean };
 }
 
+interface SchoolOnboardingStatus {
+  schoolId: string;
+  completed: number;
+  total: number;
+  percentage: number;
+  generatedAt: string;
+  steps: { id: string; label: string; complete: boolean; detail: string }[];
+}
+
 interface SchoolDetail {
   id: string;
   name: string;
@@ -106,6 +115,17 @@ function SchoolDetailPage() {
   const { data: school, isPending, error, refetch } = useQuery({
     queryKey: ["superadmin", "school", schoolId],
     queryFn: () => apiFetch<SchoolDetail>(`/super-admin/schools/${schoolId}`),
+    retry: false,
+  });
+
+  const {
+    data: onboarding,
+    isPending: onboardingPending,
+    error: onboardingError,
+    refetch: refetchOnboarding,
+  } = useQuery({
+    queryKey: ["superadmin", "school-onboarding", schoolId],
+    queryFn: () => apiFetch<SchoolOnboardingStatus>(`/super-admin/schools/${schoolId}/onboarding`),
     retry: false,
   });
 
@@ -410,6 +430,62 @@ function SchoolDetailPage() {
               </ProfileField>
             </div>
           </form>
+          <section className="superadmin-surface rounded-2xl border border-border bg-card p-6 shadow-sm">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h2 className="flex items-center gap-2 text-base font-semibold text-foreground">
+                  <Check className="size-4 text-primary" />
+                  Setup readiness
+                </h2>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Calculated from saved school configuration and records, not a manually checked list.
+                </p>
+              </div>
+              {onboarding && (
+                <span className="rounded-full bg-muted px-3 py-1 text-xs font-semibold text-foreground">
+                  {onboarding.completed} of {onboarding.total} complete
+                </span>
+              )}
+            </div>
+            {onboardingPending ? (
+              <p className="mt-4 text-sm text-muted-foreground">Checking persisted setup…</p>
+            ) : onboardingError ? (
+              <div className="mt-4">
+                <ErrorPanel message={onboardingError.message} onRetry={() => void refetchOnboarding()} />
+              </div>
+            ) : onboarding ? (
+              <>
+                <div
+                  className="mt-4 h-2 overflow-hidden rounded-full bg-muted"
+                  role="progressbar"
+                  aria-label="School setup completion"
+                  aria-valuemin={0}
+                  aria-valuemax={onboarding.total}
+                  aria-valuenow={onboarding.completed}
+                >
+                  <div className="h-full rounded-full bg-primary transition-[width]" style={{ width: `${onboarding.percentage}%` }} />
+                </div>
+                <p className="mt-2 text-xs text-muted-foreground">
+                  {onboarding.percentage}% readiness · checked {new Date(onboarding.generatedAt).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}
+                </p>
+                <ul className="mt-4 grid gap-3 sm:grid-cols-2">
+                  {onboarding.steps.map((step) => (
+                    <li key={step.id} className="flex items-start gap-2.5 rounded-xl border border-border/70 p-3">
+                      {step.complete ? (
+                        <Check className="mt-0.5 size-4 shrink-0 text-success" aria-label="Complete" />
+                      ) : (
+                        <CircleAlert className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-label="Needs setup" />
+                      )}
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-foreground">{step.label}</p>
+                        <p className="mt-1 text-xs leading-5 text-muted-foreground">{step.detail}</p>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            ) : null}
+          </section>
           <div className="grid gap-5 sm:grid-cols-2">
           <InfoCard
             icon={Mail}
