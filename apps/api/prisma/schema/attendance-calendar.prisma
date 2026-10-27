@@ -7,15 +7,17 @@ model AcademicCalendarDay {
   date            DateTime @db.Date
   isInstructional Boolean
   label           String   @db.VarChar(160)
-  createdById     String
+  createdById     String?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
   school School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
   term   Term   @relation(fields: [termId], references: [id], onDelete: Cascade)
+  creator user? @relation("AcademicCalendarDayCreator", fields: [createdById], references: [id], onDelete: SetNull)
 
   @@unique([schoolId, termId, date])
   @@index([schoolId, termId])
+  @@index([createdById])
   @@map("academic_calendar_days")
 }
 
@@ -26,16 +28,18 @@ model StudentAttendanceExclusion {
   termId       String
   date         DateTime @db.Date
   reason       String   @db.VarChar(400)
-  approvedById String
+  approvedById String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
   school  School  @relation(fields: [schoolId], references: [id], onDelete: Cascade)
   student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
   term    Term    @relation(fields: [termId], references: [id], onDelete: Cascade)
+  approver user? @relation("AttendanceExclusionApprover", fields: [approvedById], references: [id], onDelete: SetNull)
 
   @@unique([schoolId, studentId, termId, date])
   @@index([schoolId, termId, date])
   @@index([studentId, termId])
+  @@index([approvedById])
   @@map("student_attendance_exclusions")
 }
