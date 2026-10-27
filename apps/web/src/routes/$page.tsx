@@ -70,6 +70,7 @@ import { DocumentsWorkspace } from "@/components/portal/documents-workspace";
 import { MessagesWorkspace } from "@/components/portal/messages-workspace";
 import { NotificationsHistoryWorkspace } from "@/components/portal/notifications-history-workspace";
 import { SchoolReportsWorkspace } from "@/components/school/reports-workspace";
+import { TeacherReportReviewWorkspace } from "@/components/school/teacher-report-review-workspace";
 
 export const Route = createFileRoute("/$page")({
   component: WorkspaceRoute,
@@ -298,7 +299,7 @@ function WorkspaceContent({ pageId }: { pageId: string }) {
             activeRole === "student" ? (
               <StudentReportView />
             ) : activeRole === "teacher" ? (
-              <AssessmentEntryWorkspace mode="teacher" />
+              <><AssessmentEntryWorkspace mode="teacher" /><TeacherReportReviewWorkspace /></>
             ) : (
               <AssessmentsAdmin />
             )
