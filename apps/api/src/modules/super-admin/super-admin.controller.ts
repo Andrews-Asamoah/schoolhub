@@ -55,6 +55,7 @@ const subscriptionPlanFields = z.object({
   isActive: z.boolean().default(true),
   sortOrder: z.number().int().min(0).max(100_000).default(0),
 });
+const assignSubscriptionPlanSchema = z.object({ planId: z.string().min(1).max(128), billingCycle: z.enum(["MONTHLY", "YEARLY"]) });
 const createSubscriptionPlanSchema = subscriptionPlanFields;
 const updateSubscriptionPlanSchema = subscriptionPlanFields.partial();
 type CreateSubscriptionPlanInput = z.infer<typeof createSubscriptionPlanSchema>;
@@ -69,6 +70,17 @@ const WRITE_LIMIT = { default: { limit: 30, ttl: 60_000 } };
 export class SuperAdminController {
   constructor(private readonly superAdminService: SuperAdminService) {}
 
+
+  @Patch("schools/:id/plan")
+  @Throttle(WRITE_LIMIT)
+  @Header("Cache-Control", "no-store")
+  assignSubscriptionPlan(
+    @Param("id") id: string,
+    @Body(new ZodValidationPipe(assignSubscriptionPlanSchema)) body: { planId: string; billingCycle: "MONTHLY" | "YEARLY" },
+    @AuditActorParam() actor: AuditActor,
+  ) {
+    return this.superAdminService.assignSubscriptionPlan(id, body, actor);
+  }
 
   @Get("subscription-plans")
   @Header("Cache-Control", "no-store")
