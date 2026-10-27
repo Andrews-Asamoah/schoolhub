@@ -234,10 +234,10 @@ export class SuperAdminService {
         financeSettings: { select: { schoolId: true } },
         _count: {
           select: {
-            classes: true,
-            subjects: true,
-            teachers: true,
-            feeStructures: true,
+            classes: { where: { isActive: true, deletedAt: null } },
+            subjects: { where: { isActive: true, deletedAt: null } },
+            teachers: { where: { isActive: true, deletedAt: null } },
+            feeStructures: { where: { isActive: true } },
             assessmentTemplates: true,
             reportCardTemplates: true,
           },
