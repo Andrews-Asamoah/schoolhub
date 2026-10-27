@@ -62,6 +62,7 @@ import { StudentReportView } from "@/components/portal/student-report-view";
 import { StudentClassmatesView } from "@/components/portal/student-classmates-view";
 import { StudentHouseClubsView } from "@/components/portal/student-house-clubs-view";
 import { StudentAssignmentsView } from "@/components/portal/student-assignments-view";
+import { TeacherAssignmentsWorkspace } from "@/components/portal/teacher-assignments-workspace";
 import { StudentAnnouncementsView } from "@/components/portal/student-announcements-view";
 import { AdminAnnouncementsWorkspace } from "@/components/portal/admin-announcements-workspace";
 import { DocumentsWorkspace } from "@/components/portal/documents-workspace";
@@ -266,7 +267,7 @@ function WorkspaceContent({ pageId }: { pageId: string }) {
             activeRole === "student" ? <StudentHouseClubsView view="CLUBS" /> : <ClubsWorkspace />
           )}
           {pageId === "classmates" && <StudentClassmatesView />}
-          {pageId === "assignments" && <StudentAssignmentsView />}
+          {pageId === "assignments" && (activeRole === "student" ? <StudentAssignmentsView /> : <TeacherAssignmentsWorkspace />)}
           {pageId === "announcements" && (
             activeRole === "student" ? <StudentAnnouncementsView />
               : activeRole === "teacher" ? <AdminAnnouncementsWorkspace mode="teacher" />
