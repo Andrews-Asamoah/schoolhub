@@ -1,4 +1,5 @@
 import { DatePicker } from "@/components/ui/date-picker";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useMemo, useState, type FormEvent } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api";
@@ -318,12 +319,13 @@ export function AccountantRecordPaymentDialog({
           <div className="grid gap-4 sm:grid-cols-2">
             <label className="grid gap-1.5 text-sm font-medium text-foreground">
               <span className="flex items-center gap-2"><School className="size-4 text-muted-foreground" />Class</span>
-              <select className={inputClass} value={classId} onChange={(event) => changeClass(event.target.value)}>
-                <option value="ALL">All classes</option>
-                {classes.filter((schoolClass) => schoolClass.isActive).map((schoolClass) => (
-                  <option key={schoolClass.id} value={schoolClass.id}>{schoolClass.name}</option>
-                ))}
-              </select>
+              <Select value={classId} onValueChange={changeClass}>
+                <SelectTrigger aria-label="Class" className={inputClass}><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">All classes</SelectItem>
+                  {classes.filter((schoolClass) => schoolClass.isActive).map((schoolClass) => <SelectItem key={schoolClass.id} value={schoolClass.id}>{schoolClass.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
             </label>
 
             <div className="relative grid gap-1.5 text-sm font-medium text-foreground">
@@ -400,20 +402,13 @@ export function AccountantRecordPaymentDialog({
 
           <label className="grid gap-1.5 text-sm font-medium text-foreground">
             <span>Bill to pay</span>
-            <select
-              className={inputClass}
-              value={billId}
-              disabled={!studentId || studentBillsQuery.isPending || !selectedStudentBills.length}
-              onChange={(event) => chooseBill(event.target.value)}
-              required
-            >
-              <option value="" disabled>{studentBillsQuery.isPending ? "Loading outstanding bills…" : "Select an outstanding bill…"}</option>
-              {selectedStudentBills.map((bill) => (
-                <option key={bill.id} value={bill.id}>
-                  {bill.feeStructure?.name || bill.billNumber} ({bill.billNumber}) · Balance {money(amount(bill.balanceAmount))}
-                </option>
-              ))}
-            </select>
+            <Select value={billId || "__none__"} onValueChange={(value) => chooseBill(value === "__none__" ? "" : value)} disabled={!studentId || studentBillsQuery.isPending || !selectedStudentBills.length} required>
+              <SelectTrigger aria-label="Bill to pay" className={inputClass}><SelectValue placeholder={studentBillsQuery.isPending ? "Loading outstanding bills…" : "Select an outstanding bill…"} /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__" disabled>{studentBillsQuery.isPending ? "Loading outstanding bills…" : "Select an outstanding bill…"}</SelectItem>
+                {selectedStudentBills.map((bill) => <SelectItem key={bill.id} value={bill.id}>{bill.feeStructure?.name || bill.billNumber} ({bill.billNumber}) · Balance {money(amount(bill.balanceAmount))}</SelectItem>)}
+              </SelectContent>
+            </Select>
           </label>
           {studentBillsQuery.error && (
             <p role="alert" className="text-sm text-destructive">
@@ -489,15 +484,10 @@ export function AccountantRecordPaymentDialog({
           <div className="grid gap-4 sm:grid-cols-2">
             <label className="grid gap-1.5 text-sm font-medium text-foreground">
               <span>Payment method</span>
-              <select
-                className={inputClass}
-                value={paymentMethod}
-                onChange={(event) => setPaymentMethod(event.target.value as RecordPaymentInput["paymentMethod"])}
-              >
-                {["CASH", "BANK_TRANSFER", "MOBILE_MONEY", "CHEQUE", "CARD", "ONLINE", "OTHER"].map((method) => (
-                  <option key={method} value={method}>{method.replaceAll("_", " ")}</option>
-                ))}
-              </select>
+              <Select value={paymentMethod} onValueChange={(value) => setPaymentMethod(value as RecordPaymentInput["paymentMethod"])}>
+                <SelectTrigger aria-label="Payment method" className={inputClass}><SelectValue /></SelectTrigger>
+                <SelectContent>{["CASH", "BANK_TRANSFER", "MOBILE_MONEY", "CHEQUE", "CARD", "ONLINE", "OTHER"].map((method) => <SelectItem key={method} value={method}>{method.replaceAll("_", " ")}</SelectItem>)}</SelectContent>
+              </Select>
             </label>
             <label className="grid gap-1.5 text-sm font-medium text-foreground">
               <span>Payment date</span>

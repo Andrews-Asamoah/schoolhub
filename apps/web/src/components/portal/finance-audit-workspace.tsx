@@ -1,4 +1,5 @@
 import { DatePicker } from "@/components/ui/date-picker";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useState } from "react";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { ShieldCheck } from "lucide-react";
@@ -101,12 +102,13 @@ export function FinanceAuditWorkspace() {
         <div className="mt-4 grid gap-3 sm:grid-cols-3">
           <label className="text-sm font-medium">
             Type of change
-            <select className={inputClass} value={category} onChange={(event) => setCategory(event.target.value)}>
-              <option value="">All finance changes</option>
-              {Object.entries(CATEGORY_LABELS).map(([value, label]) => (
-                <option key={value} value={value}>{label}</option>
-              ))}
-            </select>
+            <Select value={category || "__all__"} onValueChange={(value) => setCategory(value === "__all__" ? "" : value)}>
+              <SelectTrigger aria-label="Type of finance change" className={inputClass}><SelectValue placeholder="All finance changes" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__all__">All finance changes</SelectItem>
+                {Object.entries(CATEGORY_LABELS).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}
+              </SelectContent>
+            </Select>
           </label>
           <label className="text-sm font-medium">
             From

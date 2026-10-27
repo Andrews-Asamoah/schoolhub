@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle, CheckCircle2, LoaderCircle, Users, WalletCards } from "lucide-react";
 import { apiFetch } from "@/lib/api";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface AcademicTerm { id: string; name: string; isCurrent: boolean; }
 interface AcademicYear { id: string; name: string; isCurrent: boolean; terms: AcademicTerm[]; }
@@ -66,8 +67,8 @@ export function TermEndReviewWorkspace() {
         <button type="button" className={view==="former"?primary:button} onClick={()=>{setView("former");setSelectedIds([]);}}><Users className="size-4"/> Former students with balances</button>
       </div>
       {view==="review"&&<div className="mt-4 grid gap-3 sm:grid-cols-2">
-        <label className="text-xs font-semibold text-muted-foreground">Target academic year<select className={control+" mt-1"} value={selectedYearId} onChange={(event)=>{setYearId(event.target.value);setTermId("");setSelectedIds([]);}}>{years.map((year)=><option key={year.id} value={year.id}>{year.name}{year.isCurrent?" (current)":""}</option>)}</select></label>
-        <label className="text-xs font-semibold text-muted-foreground">Target term<select className={control+" mt-1"} value={selectedTermId} onChange={(event)=>{setTermId(event.target.value);setSelectedIds([]);}}>{(selectedYear?.terms??[]).map((term)=><option key={term.id} value={term.id}>{term.name}{term.isCurrent?" (current)":""}</option>)}</select></label>
+        <label className="text-xs font-semibold text-muted-foreground">Target academic year<Select value={selectedYearId || "__none__"} onValueChange={(value)=>{setYearId(value === "__none__" ? "" : value);setTermId("");setSelectedIds([]);}}><SelectTrigger aria-label="Target academic year" className={control+" mt-1"}><SelectValue /></SelectTrigger><SelectContent>{years.length ? years.map((year)=><SelectItem key={year.id} value={year.id}>{year.name}{year.isCurrent?" (current)":""}</SelectItem>) : <SelectItem value="__none__" disabled>No academic years</SelectItem>}</SelectContent></Select></label>
+        <label className="text-xs font-semibold text-muted-foreground">Target term<Select value={selectedTermId || "__none__"} onValueChange={(value)=>{setTermId(value === "__none__" ? "" : value);setSelectedIds([]);}}><SelectTrigger aria-label="Target term" className={control+" mt-1"}><SelectValue /></SelectTrigger><SelectContent>{(selectedYear?.terms??[]).length ? (selectedYear?.terms??[]).map((term)=><SelectItem key={term.id} value={term.id}>{term.name}{term.isCurrent?" (current)":""}</SelectItem>) : <SelectItem value="__none__" disabled>No terms available</SelectItem>}</SelectContent></Select></label>
       </div>}
     </div>
 

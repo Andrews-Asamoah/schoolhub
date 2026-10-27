@@ -7,6 +7,7 @@ import autoTable from "jspdf-autotable";
 import { Download, FileSpreadsheet, FileText, LoaderCircle, Printer, Search, UserRound } from "lucide-react";
 import type { StudentStatementResponse } from "@schoolhub/shared";
 import { apiFetch } from "@/lib/api";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 
 interface StudentOption {
@@ -237,18 +238,21 @@ export function StudentStatementWorkspace() {
             ) : null}
             {studentsQuery.isError && <p role="alert" className="mt-1 text-xs text-destructive">{studentsQuery.error.message}</p>}
           </div>
-          <select className={inputClass} value={scope} onChange={(event) => setScope(event.target.value as Scope)} aria-label="Statement scope">
-            <option value="term">Current / selected term</option><option value="year">Academic year</option><option value="all">All time</option>
-          </select>
+          <Select value={scope} onValueChange={(value) => setScope(value as Scope)}>
+            <SelectTrigger aria-label="Statement scope" className={inputClass}><SelectValue /></SelectTrigger>
+            <SelectContent><SelectItem value="term">Current / selected term</SelectItem><SelectItem value="year">Academic year</SelectItem><SelectItem value="all">All time</SelectItem></SelectContent>
+          </Select>
           {scope !== "all" ? (
-            <select className={inputClass} value={selectedYearId} onChange={(event) => { setYearId(event.target.value); setTermId(""); }} aria-label="Academic year">
-              {years.map((year) => <option key={year.id} value={year.id}>{year.name}{year.isCurrent ? " (current)" : ""}</option>)}
-            </select>
+            <Select value={selectedYearId || "__none__"} onValueChange={(value) => { setYearId(value === "__none__" ? "" : value); setTermId(""); }}>
+              <SelectTrigger aria-label="Academic year" className={inputClass}><SelectValue placeholder="Select year" /></SelectTrigger>
+              <SelectContent>{years.length ? years.map((year) => <SelectItem key={year.id} value={year.id}>{year.name}{year.isCurrent ? " (current)" : ""}</SelectItem>) : <SelectItem value="__none__" disabled>No academic years</SelectItem>}</SelectContent>
+            </Select>
           ) : <div />}
           {scope === "term" ? (
-            <select className={inputClass} value={selectedTermId} onChange={(event) => setTermId(event.target.value)} aria-label="Academic term">
-              {(selectedYear?.terms ?? []).map((term) => <option key={term.id} value={term.id}>{term.name}{term.isCurrent ? " (current)" : ""}</option>)}
-            </select>
+            <Select value={selectedTermId || "__none__"} onValueChange={(value) => setTermId(value === "__none__" ? "" : value)}>
+              <SelectTrigger aria-label="Academic term" className={inputClass}><SelectValue placeholder="Select term" /></SelectTrigger>
+              <SelectContent>{(selectedYear?.terms ?? []).length ? (selectedYear?.terms ?? []).map((term) => <SelectItem key={term.id} value={term.id}>{term.name}{term.isCurrent ? " (current)" : ""}</SelectItem>) : <SelectItem value="__none__" disabled>No terms available</SelectItem>}</SelectContent>
+            </Select>
           ) : <div />}
         </div>
         <div className="mt-3 grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
