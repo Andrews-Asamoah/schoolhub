@@ -41,6 +41,9 @@ model user {
   notifications        Notification[]
   sentSchoolMessages    SchoolMessage[]             @relation("SchoolMessageSent")
   receivedMessageItems  SchoolMessageRecipient[]    @relation("SchoolMessageRecipientUser")
+  createdSchoolAssignments SchoolAssignment[] @relation("SchoolAssignmentCreator")
+  submittedSchoolAssignmentSubmissions SchoolAssignmentSubmission[] @relation("SchoolAssignmentSubmitter")
+  gradedSchoolAssignmentSubmissions SchoolAssignmentSubmission[] @relation("SchoolAssignmentGrader")
   announcementsSent    Announcement[]         @relation("AnnouncementsSent")
   feeReminderSchedules FeeReminderSchedule[]  @relation("FeeReminderSchedules")
   expensesRecorded     Expense[]              @relation("ExpenseRecordedBy")
