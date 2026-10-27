@@ -198,6 +198,27 @@ export function createAuth(prisma: PrismaLike) {
         pendingTrustedDeviceAudits.delete(ctx.context);
         if (returned instanceof Error) return; // the request failed; nothing changed
 
+        // Turning off 2FA must invalidate every trusted-device record, not only
+        // the cookie on the browser performing the change. Otherwise an older
+        // device cookie could bypass 2FA if the account later re-enables it.
+        if (ctx.path === "/two-factor/disable") {
+          const sessionUser = ctx.context.session?.user as { id: string } | undefined;
+          if (sessionUser?.id) {
+            try {
+              await (prisma as unknown as {
+                verification: { deleteMany: (args: unknown) => Promise<unknown> };
+              }).verification.deleteMany({
+                where: {
+                  value: sessionUser.id,
+                  identifier: { startsWith: "trust-device-" },
+                },
+              });
+            } catch (error) {
+              console.error("Trusted-device revocation after 2FA disable failed:", (error as Error).message);
+            }
+          }
+        }
+
         if (pendingTrust && ctx.path.startsWith("/two-factor/verify")) {
           try {
             const verificationDb = prisma as unknown as {
