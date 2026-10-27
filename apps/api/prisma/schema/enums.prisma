@@ -395,3 +395,15 @@ enum ConcessionType {
   SIBLING_DISCOUNT
   SCHOLARSHIP
 }
+
+
+enum SchoolAssignmentStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum SchoolAssignmentSubmissionStatus {
+  SUBMITTED
+  GRADED
+}
