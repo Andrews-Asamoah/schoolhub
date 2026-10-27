@@ -283,7 +283,7 @@ function AccountSecurityPage() {
 
       <TrustedDevicesCard />
 
-      <Card title="Two-factor authentication" description="Required for platform administrators. Signing in needs your password and a code from your authenticator app.">
+      <Card title="Two-factor authentication" description="Required for platform administrators. New or untrusted devices need your password and an authenticator code; trusted devices can skip routine codes for up to 30 days.">
         <TwoFactorPanel required />
       </Card>
     </div>
