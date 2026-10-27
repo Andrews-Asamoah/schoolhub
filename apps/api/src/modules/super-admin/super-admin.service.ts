@@ -97,6 +97,10 @@ export class SuperAdminService {
           organization: {
             select: { subscriptionStatus: true, expiresAt: true, metadata: true },
           },
+          subscription: {
+            select: { planId: true, planName: true, amount: true, currency: true, billingCycle: true,
+              maxStudents: true, maxTeachers: true, maxGuardians: true, maxStaff: true },
+          },
           _count: {
           select: {
             students: { where: { deletedAt: null } },
