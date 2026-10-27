@@ -54,6 +54,10 @@ model AcademicYear {
   payrollRecords        PayrollRecord[]
   feeReminderSchedules  FeeReminderSchedule[]
   schoolAssignments     SchoolAssignment[]
+  calendarDays          AcademicCalendarDay[]
+  attendanceExclusions StudentAttendanceExclusion[]
+  calendarDays          AcademicCalendarDay[]
+  attendanceExclusions StudentAttendanceExclusion[]
 
   @@unique([name, schoolId])
   @@index([schoolId, isCurrent])
@@ -69,6 +73,9 @@ model Term {
   startDate      DateTime @db.Date
   endDate        DateTime @db.Date
   isCurrent      Boolean  @default(false)
+  /// ISO weekdays: 1=Monday ... 7=Sunday. Every edit increments calendarRevision.
+  instructionalWeekdays Int[] @default([1, 2, 3, 4, 5])
+  calendarRevision Int @default(1)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
@@ -294,6 +301,9 @@ model Enrollment {
   termId         String
   status         EnrollmentStatus @default(ACTIVE)
   enrolledAt     DateTime         @default(now())
+  /// Actual eligibility dates, independent of record creation timestamps.
+  effectiveFrom  DateTime?        @db.Date
+  effectiveTo    DateTime?        @db.Date
   completedAt    DateTime?
   createdAt      DateTime         @default(now())
   updatedAt      DateTime         @updatedAt

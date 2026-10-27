@@ -1,0 +1,41 @@
+// School-owned instructional calendar overrides and formally authorised student exclusions.
+// Keep days separate from attendance records: a missing register never means absence.
+model AcademicCalendarDay {
+  id              String   @id @default(cuid())
+  schoolId        String
+  termId          String
+  date            DateTime @db.Date
+  isInstructional Boolean
+  label           String   @db.VarChar(160)
+  createdById     String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  school School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  term   Term   @relation(fields: [termId], references: [id], onDelete: Cascade)
+
+  @@unique([schoolId, termId, date])
+  @@index([schoolId, termId])
+  @@map("academic_calendar_days")
+}
+
+model StudentAttendanceExclusion {
+  id           String   @id @default(cuid())
+  schoolId     String
+  studentId    String
+  termId       String
+  date         DateTime @db.Date
+  reason       String   @db.VarChar(400)
+  approvedById String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  school  School  @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  term    Term    @relation(fields: [termId], references: [id], onDelete: Cascade)
+
+  @@unique([schoolId, studentId, termId, date])
+  @@index([schoolId, termId, date])
+  @@index([studentId, termId])
+  @@map("student_attendance_exclusions")
+}
