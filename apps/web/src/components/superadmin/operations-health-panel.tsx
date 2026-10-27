@@ -12,8 +12,9 @@ import {
   ShieldAlert,
 } from "lucide-react";
 import { apiFetch } from "@/lib/api";
+import { getMigrationCheckStatus, type HealthCheckStatus } from "./operations-health-status";
 
-type CheckStatus = "healthy" | "unavailable" | "not_instrumented" | "degraded";
+type CheckStatus = HealthCheckStatus;
 
 interface OperationsHealth {
   status: "healthy" | "degraded";
@@ -83,11 +84,7 @@ export function OperationsHealthPanel() {
 
   const health = healthQuery.data;
   const overallStatus: CheckStatus = health?.status ?? "unavailable";
-  const migrationStatus: CheckStatus = health
-    ? health.migrations.status === "current"
-      ? "healthy"
-      : "degraded"
-    : "unavailable";
+  const migrationStatus = getMigrationCheckStatus(health?.migrations.status);
   const migrationStatusCopy: Record<OperationsHealth["migrations"]["status"], string> = {
     current: "Matches expected build",
     mismatch: "Expected version mismatch",
