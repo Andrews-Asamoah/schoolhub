@@ -40,7 +40,7 @@ describe("getOperationsHealth", () => {
         latestApplied: "20261027010000_late_schema_reconciliation",
         unfinishedCount: 0,
       });
-      expect(result.status).toBe("healthy");
+      expect(result.status).toBe("degraded");
     } finally {
       vi.unstubAllEnvs();
     }
