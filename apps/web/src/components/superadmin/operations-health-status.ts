@@ -1,5 +1,5 @@
 export type MigrationHealthStatus = "current" | "mismatch" | "incomplete" | "not_configured" | "unavailable";
-export type HealthCheckStatus = "healthy" | "unavailable" | "not_instrumented" | "degraded";
+export type HealthCheckStatus = "healthy" | "unavailable" | "not_configured" | "not_instrumented" | "degraded";
 
 /**
  * A migration baseline is healthy only when it is configured and verified.
