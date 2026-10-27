@@ -171,6 +171,7 @@ export interface FileRoutesByTo {
   '/admin/audit': typeof AdminAuditIndexRoute
   '/admin/schools': typeof AdminSchoolsIndexRoute
   '/admin/subscriptions': typeof AdminSubscriptionsIndexRoute
+  '/admin/plans': typeof AdminPlansIndexRoute
   '/admin/users': typeof AdminUsersIndexRoute
 }
 export interface FileRoutesById {
@@ -193,6 +194,7 @@ export interface FileRoutesById {
   '/admin/audit/': typeof AdminAuditIndexRoute
   '/admin/schools/': typeof AdminSchoolsIndexRoute
   '/admin/subscriptions/': typeof AdminSubscriptionsIndexRoute
+  '/admin/plans/': typeof AdminPlansIndexRoute
   '/admin/users/': typeof AdminUsersIndexRoute
 }
 export interface FileRouteTypes {
@@ -216,6 +218,7 @@ export interface FileRouteTypes {
     | '/admin/audit/'
     | '/admin/schools/'
     | '/admin/subscriptions/'
+    | '/admin/plans/'
     | '/admin/users/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -236,6 +239,7 @@ export interface FileRouteTypes {
     | '/admin/audit'
     | '/admin/schools'
     | '/admin/subscriptions'
+    | '/admin/plans'
     | '/admin/users'
   id:
     | '__root__'
@@ -257,6 +261,7 @@ export interface FileRouteTypes {
     | '/admin/audit/'
     | '/admin/schools/'
     | '/admin/subscriptions/'
+    | '/admin/plans/'
     | '/admin/users/'
   fileRoutesById: FileRoutesById
 }
