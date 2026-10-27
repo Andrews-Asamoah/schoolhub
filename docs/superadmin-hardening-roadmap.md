@@ -16,7 +16,7 @@ This work is delivered in small, reviewable increments. Do not represent a depen
 - [x] Return a degraded state when the database check fails; do not expose connection errors.
 - [x] Explicitly mark storage, notification delivery, and background jobs as not instrumented rather than reporting false green status.
 - [ ] Add provider/worker-specific health contracts for storage, notifications, and jobs.
-- [ ] Add a theme-token-based UI panel with refresh, timestamps, latency, and actionable states.
+- [x] Add a theme-token-based UI panel with refresh, timestamps, database latency, explicit unmonitored states, and error/retry handling.
 - [ ] Expose deployment version and migration status from trusted build/deployment metadata.
 
 ## Phase 3 — School onboarding and lifecycle
