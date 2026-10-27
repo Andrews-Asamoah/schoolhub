@@ -294,6 +294,7 @@ model ReportCardSet {
   term         Term               @relation(fields: [termId], references: [id])
   class        Class?             @relation(fields: [classId], references: [id])
   reportCards  ReportCard[]
+  versions      ReportCardVersion[]
 
   @@index([schoolId])
   @@index([academicYearId])
@@ -405,4 +406,40 @@ model SchoolAssignmentSubmission {
   @@index([assignmentId, status])
   @@index([gradedById])
   @@map("school_assignment_submissions")
+}
+
+// Immutable assessment/template/school snapshot per student and generation.
+// Sign-off fields are append-only via status transitions; historical versions are retained.
+model ReportCardVersion {
+  id                String   @id @default(cuid())
+  schoolId          String
+  setId             String
+  studentId         String
+  classId           String
+  version           Int
+  stage             String   @default("GENERATED") @db.VarChar(32)
+  snapshot          Json
+  snapshotHash      String   @db.VarChar(64)
+  teacherActorId    String?
+  teacherName       String?  @db.VarChar(160)
+  teacherRemark     String?  @db.VarChar(2000)
+  teacherApprovedAt DateTime?
+  headActorId       String?
+  headName          String?  @db.VarChar(160)
+  headRemark        String?  @db.VarChar(2000)
+  headApprovedAt    DateTime?
+  publishedAt       DateTime?
+  createdAt         DateTime @default(now())
+
+  school    School        @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  set       ReportCardSet @relation(fields: [setId], references: [id], onDelete: Cascade)
+  student   Student       @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  teacher   user?         @relation("ReportVersionTeacher", fields: [teacherActorId], references: [id], onDelete: SetNull)
+  head      user?         @relation("ReportVersionHead", fields: [headActorId], references: [id], onDelete: SetNull)
+
+  @@unique([setId, studentId, version])
+  @@index([schoolId, setId, stage])
+  @@index([schoolId, classId, stage])
+  @@index([studentId, publishedAt])
+  @@map("report_card_versions")
 }

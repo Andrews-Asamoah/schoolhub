@@ -31,6 +31,7 @@ model School {
   calendarDays                AcademicCalendarDay[]
   attendanceExclusions        StudentAttendanceExclusion[]
   assessmentTemplates         AssessmentTemplate[]
+  reportCardVersions          ReportCardVersion[]
   bills                       Bill[]
   siblingDiscountPolicies     SiblingDiscountPolicy[]
   studentScholarships         StudentScholarship[]
@@ -200,6 +201,7 @@ model Student {
   @@index([profileId])
   @@index([schoolId, deletedAt])
   @@map("students")
+  reportCardVersions ReportCardVersion[]
 }
 
 model Teacher {
