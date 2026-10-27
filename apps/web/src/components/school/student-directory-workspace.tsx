@@ -1,5 +1,6 @@
 import { DatePicker } from "@/components/ui/date-picker";
 import { StudentProfileModal } from "@/components/school/student-profile-panel";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useForm } from "@tanstack/react-form";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -476,39 +477,29 @@ export function StudentDirectoryWorkspace() {
           </label>
           <label>
             <span className="sr-only">Filter by status</span>
-            <select
-              value={status}
-              onChange={(event) => {
-                setStatus(event.target.value);
-                setPage(1);
-              }}
-              className={`${inputClasses} mt-0`}
-            >
-              <option value="">All statuses</option>
-              {statuses.map((value) => (
-                <option key={value} value={value}>
-                  {formatStatus(value)}
-                </option>
-              ))}
-            </select>
+            <Select value={status || "__all__"} onValueChange={(value) => {
+              setStatus(value === "__all__" ? "" : value);
+              setPage(1);
+            }}>
+              <SelectTrigger aria-label="Filter by status" className={`${inputClasses} mt-0`}><SelectValue placeholder="All statuses" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__all__">All statuses</SelectItem>
+                {statuses.map((value) => <SelectItem key={value} value={value}>{formatStatus(value)}</SelectItem>)}
+              </SelectContent>
+            </Select>
           </label>
           <label>
             <span className="sr-only">Filter by current class</span>
-            <select
-              value={classId}
-              onChange={(event) => {
-                setClassId(event.target.value);
-                setPage(1);
-              }}
-              className={`${inputClasses} mt-0`}
-            >
-              <option value="">All current classes</option>
-              {(classesQuery.data ?? []).map((schoolClass) => (
-                <option key={schoolClass.id} value={schoolClass.id}>
-                  {schoolClass.name}
-                </option>
-              ))}
-            </select>
+            <Select value={classId || "__all__"} onValueChange={(value) => {
+              setClassId(value === "__all__" ? "" : value);
+              setPage(1);
+            }}>
+              <SelectTrigger aria-label="Filter by current class" className={`${inputClasses} mt-0`}><SelectValue placeholder="All current classes" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__all__">All current classes</SelectItem>
+                {(classesQuery.data ?? []).map((schoolClass) => <SelectItem key={schoolClass.id} value={schoolClass.id}>{schoolClass.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
           </label>
         </div>
       </section>
@@ -721,19 +712,14 @@ function StudentEditor({
             {(field) => (
               <label className="text-xs font-semibold text-foreground">
                 Gender
-                <select
-                  className={inputClasses}
-                  value={field.state.value}
-                  onChange={(event) =>
-                    field.handleChange(
-                      event.target.value as CreateStudentInput["gender"],
-                    )
-                  }
-                >
-                  <option value="MALE">Male</option>
-                  <option value="FEMALE">Female</option>
-                  <option value="OTHER">Other</option>
-                </select>
+                <Select value={field.state.value} onValueChange={(value) => field.handleChange(value as CreateStudentInput["gender"])}>
+                  <SelectTrigger aria-label="Gender" className={inputClasses}><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="MALE">Male</SelectItem>
+                    <SelectItem value="FEMALE">Female</SelectItem>
+                    <SelectItem value="OTHER">Other</SelectItem>
+                  </SelectContent>
+                </Select>
               </label>
             )}
           </form.Field>
@@ -842,31 +828,21 @@ function StudentEditor({
             {(field) => (
               <label className="text-xs font-semibold text-foreground">
                 Department
-                <select
-                  className={inputClasses}
-                  value={field.state.value ?? ""}
-                  onChange={(event) => {
-                    field.handleChange(event.target.value);
-                    // A class that sits in another department no longer applies.
-                    const chosen = classes.find(
-                      (c) => c.id === form.getFieldValue("classId"),
-                    );
-                    if (
-                      chosen?.departmentId &&
-                      event.target.value &&
-                      chosen.departmentId !== event.target.value
-                    ) {
-                      form.setFieldValue("classId", "");
-                    }
-                  }}
-                >
-                  <option value="">No department</option>
-                  {departments.map((department) => (
-                    <option key={department.id} value={department.id}>
-                      {department.name}
-                    </option>
-                  ))}
-                </select>
+                <Select value={field.state.value || "__none__"} onValueChange={(value) => {
+                  const nextDepartmentId = value === "__none__" ? "" : value;
+                  field.handleChange(nextDepartmentId);
+                  // A class that sits in another department no longer applies.
+                  const chosen = classes.find((item) => item.id === form.getFieldValue("classId"));
+                  if (chosen?.departmentId && nextDepartmentId && chosen.departmentId !== nextDepartmentId) {
+                    form.setFieldValue("classId", "");
+                  }
+                }}>
+                  <SelectTrigger aria-label="Department" className={inputClasses}><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">No department</SelectItem>
+                    {departments.map((department) => <SelectItem key={department.id} value={department.id}>{department.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
               </label>
             )}
           </form.Field>
@@ -885,38 +861,26 @@ function StudentEditor({
                     return (
                       <label className="text-xs font-semibold text-foreground">
                         Class (current term)
-                        <select
-                          className={inputClasses}
-                          value={field.state.value ?? ""}
-                          onChange={(event) => {
-                            field.handleChange(event.target.value);
-                            const picked = classes.find(
-                              (c) => c.id === event.target.value,
-                            );
-                            // Picking a class fills in its department.
-                            if (picked?.departmentId && !departmentId) {
-                              form.setFieldValue(
-                                "departmentId",
-                                picked.departmentId,
-                              );
-                            }
-                          }}
-                        >
-                          <option value="">Place in a class later</option>
-                          {options.map((c) => {
-                            const full =
-                              c.capacity != null &&
-                              (c._count?.students ?? 0) >= c.capacity;
-                            return (
-                              <option key={c.id} value={c.id} disabled={full}>
-                                {c.name}
-                                {c.capacity != null
-                                  ? ` (${c._count?.students ?? 0}/${c.capacity}${full ? ", full" : ""})`
-                                  : ""}
-                              </option>
-                            );
-                          })}
-                        </select>
+                        <Select value={field.state.value || "__none__"} onValueChange={(value) => {
+                          const nextClassId = value === "__none__" ? "" : value;
+                          field.handleChange(nextClassId);
+                          const picked = classes.find((item) => item.id === nextClassId);
+                          // Picking a class fills in its department.
+                          if (picked?.departmentId && !departmentId) {
+                            form.setFieldValue("departmentId", picked.departmentId);
+                          }
+                        }}>
+                          <SelectTrigger aria-label="Class (current term)" className={inputClasses}><SelectValue placeholder="Place in a class later" /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="__none__">Place in a class later</SelectItem>
+                            {options.map((schoolClass) => {
+                              const full = schoolClass.capacity != null && (schoolClass._count?.students ?? 0) >= schoolClass.capacity;
+                              return <SelectItem key={schoolClass.id} value={schoolClass.id} disabled={full}>
+                                {schoolClass.name}{schoolClass.capacity != null ? ` (${schoolClass._count?.students ?? 0}/${schoolClass.capacity}${full ? ", full" : ""})` : ""}
+                              </SelectItem>;
+                            })}
+                          </SelectContent>
+                        </Select>
                       </label>
                     );
                   }}
@@ -928,48 +892,26 @@ function StudentEditor({
             {(field) => (
               <label className="text-xs font-semibold text-foreground">
                 House (optional)
-                <select
-                  className={inputClasses}
-                  value={field.state.value ?? ""}
-                  onChange={(event) => field.handleChange(event.target.value)}
-                >
-                  <option value="">No house assigned</option>
-                  {houses
-                    .filter(
-                      (house) =>
-                        house.isActive || house.id === student?.house?.id,
-                    )
-                    .map((house) => (
-                      <option key={house.id} value={house.id}>
-                        {house.name}
-                      </option>
-                    ))}
-                </select>
+                <Select value={field.state.value || "__none__"} onValueChange={(value) => field.handleChange(value === "__none__" ? "" : value)}>
+                  <SelectTrigger aria-label="House (optional)" className={inputClasses}><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">No house assigned</SelectItem>
+                    {houses.filter((house) => house.isActive || house.id === student?.house?.id).map((house) => <SelectItem key={house.id} value={house.id}>{house.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
               </label>
             )}
           </form.Field>
           {student && (
             <label className="text-xs font-semibold text-foreground">
               Student status
-              <select
-                className={inputClasses}
-                value={
-                  (form.getFieldValue("status" as never) as string) ??
-                  student.status
-                }
-                onChange={(event) =>
-                  form.setFieldValue(
-                    "status" as never,
-                    event.target.value as never,
-                  )
-                }
+              <Select
+                value={(form.getFieldValue("status" as never) as string) ?? student.status}
+                onValueChange={(value) => form.setFieldValue("status" as never, value as never)}
               >
-                {statuses.map((value) => (
-                  <option key={value} value={value}>
-                    {formatStatus(value)}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger aria-label="Student status" className={inputClasses}><SelectValue /></SelectTrigger>
+                <SelectContent>{statuses.map((value) => <SelectItem key={value} value={value}>{formatStatus(value)}</SelectItem>)}</SelectContent>
+              </Select>
             </label>
           )}
         </div>
@@ -1220,26 +1162,19 @@ function GuardianDraftEditor({
         />
         <label className="text-xs font-semibold text-foreground">
           Relationship *
-          <select
-            required
-            value={guardian.relationshipType}
-            onChange={(event) =>
-              update(
-                "relationshipType",
-                event.target.value as StudentGuardianInput["relationshipType"],
-              )
-            }
-            className={inputClasses}
-          >
-            <option value="FATHER">Father</option>
-            <option value="MOTHER">Mother</option>
-            <option value="GUARDIAN">Guardian</option>
-            <option value="GRANDFATHER">Grandfather</option>
-            <option value="GRANDMOTHER">Grandmother</option>
-            <option value="SIBLING">Sibling</option>
-            <option value="RELATIVE">Relative</option>
-            <option value="OTHER">Other</option>
-          </select>
+          <Select value={guardian.relationshipType} onValueChange={(value) => update("relationshipType", value as StudentGuardianInput["relationshipType"])}>
+            <SelectTrigger aria-label="Relationship" className={inputClasses}><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="FATHER">Father</SelectItem>
+              <SelectItem value="MOTHER">Mother</SelectItem>
+              <SelectItem value="GUARDIAN">Guardian</SelectItem>
+              <SelectItem value="GRANDFATHER">Grandfather</SelectItem>
+              <SelectItem value="GRANDMOTHER">Grandmother</SelectItem>
+              <SelectItem value="SIBLING">Sibling</SelectItem>
+              <SelectItem value="RELATIVE">Relative</SelectItem>
+              <SelectItem value="OTHER">Other</SelectItem>
+            </SelectContent>
+          </Select>
         </label>
         <StudentTextField
           label="Phone"
