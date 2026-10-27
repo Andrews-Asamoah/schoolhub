@@ -4,6 +4,7 @@ import { useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle, History, LoaderCircle, Package, Pencil, Plus, Search, Warehouse, X } from "lucide-react";
 import { apiFetch } from "@/lib/api";
+import { PortalModal } from "@/components/portal/portal-modal";
 import { cn } from "@/lib/utils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
@@ -230,7 +231,9 @@ export function InventoryManagementWorkspace() {
 
 function Metric({ label, value, detail, icon: Icon }: { label: string; value: string; detail: string; icon: typeof Package }) { return <div className="rounded-2xl border border-border bg-card p-4 shadow-sm"><div className="flex items-center justify-between gap-3"><p className="text-xs font-semibold text-muted-foreground">{label}</p><Icon className="size-4 text-primary"/></div><p className="mt-3 text-2xl font-bold tracking-tight text-foreground">{value}</p><p className="mt-1 text-xs text-muted-foreground">{detail}</p></div>; }
 function Field({ label, children }: { label: string; children: ReactNode }) { return <label className="grid min-w-0 gap-1.5 text-sm font-medium text-foreground"><span>{label}</span>{children}</label>; }
-function Modal({ title, description, onClose, children }: { title: string; description: string; onClose: () => void; children: ReactNode }) { return <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay/70 p-3 sm:p-6" role="presentation" onMouseDown={event=>{if(event.target===event.currentTarget)onClose();}}><section role="dialog" aria-modal="true" aria-label={title} className="max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-2xl border border-border bg-card p-5 text-foreground shadow-2xl sm:p-6"><div className="mb-5 flex items-start justify-between gap-4"><div><h2 className="text-lg font-semibold">{title}</h2><p className="mt-1 text-sm text-muted-foreground">{description}</p></div><button type="button" aria-label="Close dialog" className="rounded-lg p-2 text-muted-foreground hover:bg-muted" onClick={onClose}><X className="size-4"/></button></div>{children}</section></div>; }
+function Modal({ title, description, onClose, children }: { title: string; description: string; onClose: () => void; children: ReactNode }) {
+  return <PortalModal isOpen onClose={onClose} title={title} description={description} maxWidth="3xl">{children}</PortalModal>;
+}
 function ErrorState({ message }: { message: string }) { return <div role="alert" className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">{message}</div>; }
 function LoadingState() { return <div className="flex min-h-36 items-center justify-center gap-2 text-sm text-muted-foreground"><LoaderCircle className="size-4 animate-spin"/>Loading inventory…</div>; }
 function EmptyState({ title, description, onAction }: { title: string; description: string; onAction?: () => void }) { return <div className="flex min-h-52 flex-col items-center justify-center px-5 py-10 text-center"><span className="rounded-2xl bg-muted p-3"><Package className="size-6 text-muted-foreground"/></span><h3 className="mt-4 font-semibold text-foreground">{title}</h3><p className="mt-2 max-w-lg text-sm leading-6 text-muted-foreground">{description}</p>{onAction && <button type="button" className={primaryButton+" mt-4"} onClick={onAction}><Plus className="size-4"/>Add inventory item</button>}</div>; }
