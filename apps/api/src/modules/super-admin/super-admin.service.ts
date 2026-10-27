@@ -803,7 +803,7 @@ export class SuperAdminService {
     const startedAt = Date.now();
 
     try {
-      await this.prisma.client.$queryRaw\`SELECT 1\`;
+      await this.prisma.client.$queryRaw`SELECT 1`;
       database = { status: "healthy", latencyMs: Date.now() - startedAt };
     } catch {
       database = { status: "unavailable", latencyMs: null };
