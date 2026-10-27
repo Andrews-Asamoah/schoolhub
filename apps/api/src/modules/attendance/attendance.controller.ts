@@ -13,7 +13,8 @@ import {
 } from "@nestjs/common";
 import { AttendanceService } from "./attendance.service.js";
 import { AttendanceCalendarService } from "./attendance-calendar.service.js";
-import { calendarConfigurationSchema, attendanceExclusionSchema, revokeExclusionSchema, attendanceRolloutPolicySchema } from "./attendance-calendar.schemas.js";
+import { AttendanceReviewService } from "./attendance-review.service.js";
+import { calendarConfigurationSchema, attendanceExclusionSchema, revokeExclusionSchema, attendanceRolloutPolicySchema, schoolClosureSchema } from "./attendance-calendar.schemas.js";
 import { z } from "zod";
 import { SchoolTenantGuard } from "../../common/guards/school-tenant.guard.js";
 import { RolesGuard } from "../../common/guards/roles.guard.js";
@@ -34,6 +35,7 @@ export class AttendanceController {
   constructor(
     private readonly attendanceService: AttendanceService,
     private readonly calendarService: AttendanceCalendarService,
+    private readonly reviewService: AttendanceReviewService,
   ) {}
 
   @Get("policy")
@@ -89,6 +91,38 @@ export class AttendanceController {
   }
 
 
+  @Post("calendar/:termId/closures")
+  @Roles("owner", "admin", "headteacher")
+  declareSchoolClosure(
+    @CurrentSchool() school: School,
+    @CurrentUser() actor: AuthenticatedUser,
+    @Param("termId") termId: string,
+    @Body(new ZodValidationPipe(schoolClosureSchema)) body: z.infer<typeof schoolClosureSchema>,
+  ) {
+    return this.calendarService.declareSchoolClosure(school.id, actor.id, termId, body);
+  }
+
+  @Get("calendar/:termId/exclusions")
+  @Roles("owner", "admin", "headteacher")
+  getClassExclusions(
+    @CurrentSchool() school: School,
+    @Param("termId") termId: string,
+    @Query("classId") classId: string,
+  ) {
+    return this.calendarService.listClassExclusions(school.id, termId, classId);
+  }
+
+  @Get("class/:classId/gaps")
+  @Roles("owner", "admin", "headteacher", "teacher", "staff")
+  getClassRegisterGaps(
+    @CurrentSchool() school: School,
+    @Param("classId") classId: string,
+    @CurrentSchoolRole() role: string | undefined,
+    @CurrentUser() actor: AuthenticatedUser,
+  ) {
+    return this.reviewService.classGaps(school.id, classId, role, actor.id);
+  }
+
   @Post("batch")
   @Roles("teacher")
   batchRecordAttendance(
@@ -107,7 +141,7 @@ export class AttendanceController {
   }
 
   @Get("class/:classId/dates")
-  @Roles("owner", "admin", "teacher", "staff", "accountant")
+  @Roles("owner", "admin", "headteacher", "teacher", "staff", "accountant")
   getClassAttendanceDates(
     @CurrentSchool() school: School,
     @CurrentUser() user: AuthenticatedUser,
@@ -122,7 +156,7 @@ export class AttendanceController {
   }
 
   @Get("class/:classId")
-  @Roles("owner", "admin", "teacher", "staff", "accountant")
+  @Roles("owner", "admin", "headteacher", "teacher", "staff", "accountant")
   getClassAttendance(
     @CurrentSchool() school: School,
     @CurrentUser() user: AuthenticatedUser,
@@ -160,7 +194,7 @@ export class AttendanceController {
   }
 
   @Get("student/:studentId")
-  @Roles("owner", "admin", "teacher", "staff", "accountant")
+  @Roles("owner", "admin", "headteacher", "teacher", "staff", "accountant")
   getStudentAttendance(
     @CurrentSchool() school: School,
     @Param("studentId") studentId: string,

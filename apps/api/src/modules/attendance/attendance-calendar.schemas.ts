@@ -20,3 +20,10 @@ export const attendanceRolloutPolicySchema = z.object({
 export const revokeExclusionSchema = z.object({
   reason: z.string().trim().min(8).max(400),
 }).strict();
+
+export const schoolClosureSchema = z.object({
+  date: isoDate,
+  label: z.string().trim().min(2).max(160),
+  reason: z.string().trim().min(8).max(400),
+  expectedRevision: z.number().int().positive(),
+}).strict();
