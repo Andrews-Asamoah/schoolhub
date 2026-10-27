@@ -653,6 +653,7 @@ export class StudentsService {
             accountLinked = login.linked;
           }
         } else {
+          await assertSubscriptionCapacity(tx, schoolId, 'guardians');
           const record = await tx.guardian.create({
             data: {
               schoolId,
