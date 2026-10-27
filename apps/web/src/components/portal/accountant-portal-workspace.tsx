@@ -37,6 +37,7 @@ import { AccountantFinanceReportingWorkspace } from "./accountant-finance-report
 import { AccountantFinanceDetailedReportingWorkspace } from "./accountant-finance-detailed-reporting-workspace";
 import { AccountantRecordPaymentDialog } from "./accountant-record-payment-dialog";
 import { apiFetch } from "@/lib/api";
+import { PortalModal } from "@/components/portal/portal-modal";
 import { cn } from "@/lib/utils";
 import { useFinanceAccess } from "@/components/portal/finance-access";
 
@@ -1176,7 +1177,7 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
 }
 
 function Modal({ title, description, onClose, children }: { title: string; description: string; onClose: () => void; children: ReactNode }) {
-  return <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay/70 p-4" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}><section role="dialog" aria-modal="true" aria-labelledby="accountant-modal-title" className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-border bg-card p-5 text-foreground shadow-2xl sm:p-6"><div className="mb-5 flex items-start justify-between gap-4"><div><h2 id="accountant-modal-title" className="text-lg font-semibold">{title}</h2><p className="mt-1 text-sm text-muted-foreground">{description}</p></div><button type="button" onClick={onClose} aria-label="Close dialog" className="rounded-lg px-2 py-1 text-muted-foreground hover:bg-muted">✕</button></div>{children}</section></div>;
+  return <PortalModal isOpen onClose={onClose} title={title} description={description} maxWidth="2xl">{children}</PortalModal>;
 }
 
 function ModalActions({ onCancel, busy, submitLabel }: { onCancel: () => void; busy: boolean; submitLabel: string }) {
