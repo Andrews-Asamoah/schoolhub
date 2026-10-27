@@ -13,6 +13,7 @@ import { Pagination } from "@/components/superadmin/pagination";
 import { SearchInput } from "@/components/superadmin/search-input";
 import { EmptyPanel, ErrorPanel, LoadingPanel } from "@/components/superadmin/state-panels";
 import { useDebouncedValue } from "@/components/superadmin/use-debounced-value";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export const Route = createFileRoute("/admin/audit/")({
   component: AuditLogPage,
@@ -147,14 +148,20 @@ function AuditLogPage() {
       <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
         <div className="grid gap-3 border-b border-border p-4 sm:grid-cols-2 xl:grid-cols-[1.4fr_1fr_1fr_auto_auto]">
           <SearchInput label="Search events" placeholder="Search events (e.g. subscription)…" value={search} onChange={reset(setSearch)} />
-          <select aria-label="Filter by action" value={action} onChange={(event) => reset(setAction)(event.target.value)} className={selectClass}>
-            <option value="">All actions</option>
-            {SUPER_ADMIN_AUDIT_ACTIONS.map((value) => <option key={value} value={value}>{prettyAction(value)}</option>)}
-          </select>
-          <select aria-label="Filter by school" value={schoolId} onChange={(event) => reset(setSchoolId)(event.target.value)} className={selectClass}>
-            <option value="">All schools</option>
-            {options.data?.map((school) => <option key={school.id} value={school.id}>{school.name}</option>)}
-          </select>
+          <Select value={action || "__all__"} onValueChange={(value) => reset(setAction)(value === "__all__" ? "" : value)}>
+            <SelectTrigger aria-label="Filter by action" className={selectClass}><SelectValue placeholder="All actions" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__all__">All actions</SelectItem>
+              {SUPER_ADMIN_AUDIT_ACTIONS.map((value) => <SelectItem key={value} value={value}>{prettyAction(value)}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <Select value={schoolId || "__all__"} onValueChange={(value) => reset(setSchoolId)(value === "__all__" ? "" : value)}>
+            <SelectTrigger aria-label="Filter by school" className={selectClass}><SelectValue placeholder="All schools" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__all__">All schools</SelectItem>
+              {options.data?.map((school) => <SelectItem key={school.id} value={school.id}>{school.name}</SelectItem>)}
+            </SelectContent>
+          </Select>
           <DatePicker ariaLabel="From date" value={from} max={to || undefined} onChange={(value) => reset(setFrom)(value)} buttonClassName={selectClass} />
           <DatePicker ariaLabel="To date" value={to} min={from || undefined} onChange={(value) => reset(setTo)(value)} buttonClassName={selectClass} />
         </div>

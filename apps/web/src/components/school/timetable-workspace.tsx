@@ -12,6 +12,7 @@ import {
 } from "@schoolhub/shared";
 import { FormField, FormInput } from "@/components/forms/form-controls";
 import { TableExportMenu } from "@/components/ui/data-table";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCanExportTables } from "@/lib/table-export-policy";
 import type { ExportTable } from "@/lib/table-export";
 import { useSchoolRole } from "@/components/school/school-role-switcher";
@@ -192,17 +193,20 @@ export function TimetableWorkspace() {
             <label htmlFor="tt-target" className="mb-1 block text-[11px] font-medium text-muted-foreground">
               {view === "class" ? "Class" : view === "teacher" ? "Teacher" : "Room"}
             </label>
-            <select id="tt-target" className={selectClass} value={targetId} onChange={(e) => setTargetId(e.target.value)}>
-              {options.length === 0 && <option value="">None available</option>}
-              {options.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}
-            </select>
+            <Select value={targetId || "__none__"} onValueChange={(value) => setTargetId(value === "__none__" ? "" : value)}>
+              <SelectTrigger id="tt-target" className={selectClass}><SelectValue placeholder="Choose a target" /></SelectTrigger>
+              <SelectContent>
+                {options.length === 0 ? <SelectItem value="__none__" disabled>None available</SelectItem> : options.map((option) => <SelectItem key={option.id} value={option.id}>{option.label}</SelectItem>)}
+              </SelectContent>
+            </Select>
           </div>
           {setup.academicYears.length > 1 && (
             <div className="min-w-[150px]">
               <label htmlFor="tt-year" className="mb-1 block text-[11px] font-medium text-muted-foreground">Academic year</label>
-              <select id="tt-year" className={selectClass} value={setup.academicYear.id} onChange={(e) => setYearId(e.target.value)}>
-                {setup.academicYears.map((year) => <option key={year.id} value={year.id}>{year.name}{year.isCurrent ? " (current)" : ""}</option>)}
-              </select>
+              <Select value={setup.academicYear.id} onValueChange={setYearId}>
+                <SelectTrigger id="tt-year" className={selectClass}><SelectValue /></SelectTrigger>
+                <SelectContent>{setup.academicYears.map((year) => <SelectItem key={year.id} value={year.id}>{year.name}{year.isCurrent ? " (current)" : ""}</SelectItem>)}</SelectContent>
+              </Select>
             </div>
           )}
           {(canEdit || canExport) && (
@@ -430,43 +434,51 @@ function EntryEditor({
       <form onSubmit={submit} className="space-y-4" noValidate>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <FormField label="Type" htmlFor="entry-type">
-            <select id="entry-type" className={selectClass} value={type} onChange={(e) => setType(e.target.value as Entry["type"])}>
-              <option value="LESSON">Lesson</option>
-              <option value="BREAK">Break</option>
-              <option value="ACTIVITY">Activity</option>
-            </select>
+            <Select value={type} onValueChange={(value) => setType(value as Entry["type"])}>
+              <SelectTrigger id="entry-type" className={selectClass}><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="LESSON">Lesson</SelectItem>
+                <SelectItem value="BREAK">Break</SelectItem>
+                <SelectItem value="ACTIVITY">Activity</SelectItem>
+              </SelectContent>
+            </Select>
           </FormField>
           {type !== "BREAK" && (
             <FormField label={type === "LESSON" ? "Subject" : "Subject (optional)"} htmlFor="entry-subject">
-              <select
-                id="entry-subject"
-                className={selectClass}
-                value={subjectId}
-                onChange={(e) => {
-                  setSubjectId(e.target.value);
-                  const suggestion = classSubjectIds.find((row) => row.subjectId === e.target.value)?.teacherId;
-                  if (suggestion && !teacherId) setTeacherId(suggestion);
-                }}
-              >
-                <option value="">Choose…</option>
-                {subjectChoices.map((subject) => <option key={subject.id} value={subject.id}>{subject.name}</option>)}
-              </select>
+              <Select value={subjectId || "__none__"} onValueChange={(value) => {
+                const nextSubjectId = value === "__none__" ? "" : value;
+                setSubjectId(nextSubjectId);
+                const suggestion = classSubjectIds.find((row) => row.subjectId === nextSubjectId)?.teacherId;
+                if (suggestion && !teacherId) setTeacherId(suggestion);
+              }}>
+                <SelectTrigger id="entry-subject" className={selectClass}><SelectValue placeholder="Choose…" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">Choose…</SelectItem>
+                  {subjectChoices.map((subject) => <SelectItem key={subject.id} value={subject.id}>{subject.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
             </FormField>
           )}
           {type === "LESSON" && (
             <FormField label="Teacher" htmlFor="entry-teacher" hint={suggestedTeacher ? "Assigned teacher pre-selected" : "Leave blank to use the assigned teacher"}>
-              <select id="entry-teacher" className={selectClass} value={teacherId} onChange={(e) => setTeacherId(e.target.value)}>
-                <option value="">Automatic</option>
-                {setup.teachers.map((teacher) => <option key={teacher.id} value={teacher.id}>{teacher.name}</option>)}
-              </select>
+              <Select value={teacherId || "__automatic__"} onValueChange={(value) => setTeacherId(value === "__automatic__" ? "" : value)}>
+                <SelectTrigger id="entry-teacher" className={selectClass}><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__automatic__">Automatic</SelectItem>
+                  {setup.teachers.map((teacher) => <SelectItem key={teacher.id} value={teacher.id}>{teacher.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
             </FormField>
           )}
           {type !== "BREAK" && (
             <FormField label="Room" htmlFor="entry-room">
-              <select id="entry-room" className={selectClass} value={classroomId} onChange={(e) => setClassroomId(e.target.value)}>
-                <option value="">No room</option>
-                {setup.classrooms.map((room) => <option key={room.id} value={room.id}>{room.name}</option>)}
-              </select>
+              <Select value={classroomId || "__no_room__"} onValueChange={(value) => setClassroomId(value === "__no_room__" ? "" : value)}>
+                <SelectTrigger id="entry-room" className={selectClass}><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__no_room__">No room</SelectItem>
+                  {setup.classrooms.map((room) => <SelectItem key={room.id} value={room.id}>{room.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
             </FormField>
           )}
           {type !== "LESSON" && (
@@ -614,10 +626,13 @@ function PeriodManager({
     >
       <div className="mb-4 max-w-xs">
         <label htmlFor="period-department" className="mb-1 block text-[11px] font-medium text-muted-foreground">Department</label>
-        <select id="period-department" className={selectClass} value={departmentId} onChange={(e) => chooseDepartment(e.target.value)}>
-          {showDefault && <option value="">Default (no department)</option>}
-          {departments.map((department) => <option key={department.id} value={department.id}>{department.name}</option>)}
-        </select>
+        <Select value={departmentId || "__default__"} onValueChange={(value) => chooseDepartment(value === "__default__" ? "" : value)}>
+          <SelectTrigger id="period-department" className={selectClass}><SelectValue /></SelectTrigger>
+          <SelectContent>
+            {showDefault && <SelectItem value="__default__">Default (no department)</SelectItem>}
+            {departments.map((department) => <SelectItem key={department.id} value={department.id}>{department.name}</SelectItem>)}
+          </SelectContent>
+        </Select>
       </div>
       <ul className="mb-4 divide-y divide-border/60 rounded-xl border border-border">
         {periods.map((period) => (

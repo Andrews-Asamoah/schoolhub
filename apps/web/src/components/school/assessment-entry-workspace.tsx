@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CircleAlert, CircleCheck, Lock, LoaderCircle } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { apiFetch } from "@/lib/api";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useTeachingOverview } from "@/lib/teaching";
 
 interface Component {
@@ -192,34 +193,28 @@ export function AssessmentEntryWorkspace({
       <div className="flex flex-wrap items-end gap-3 rounded-2xl border border-border/80 bg-card p-4">
         <label className="grid gap-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70">
           Class
-          <select
-            className={`${field} min-w-40`}
-            value={effectiveClassId}
-            onChange={(event) => guard(() => { setClassId(event.target.value); setSubjectId(""); setTemplateId(""); })}
-          >
-            {catalogue.map((entry) => <option key={entry.id} value={entry.id}>{entry.name}</option>)}
-          </select>
+          <Select value={effectiveClassId} onValueChange={(value) => guard(() => { setClassId(value); setSubjectId(""); setTemplateId(""); })}>
+            <SelectTrigger aria-label="Class" className={`${field} min-w-40`}><SelectValue /></SelectTrigger>
+            <SelectContent>{catalogue.map((entry) => <SelectItem key={entry.id} value={entry.id}>{entry.name}</SelectItem>)}</SelectContent>
+          </Select>
         </label>
         <label className="grid gap-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70">
           Subject
-          <select
-            className={`${field} min-w-44`}
-            value={effectiveSubjectId}
-            onChange={(event) => guard(() => { setSubjectId(event.target.value); setTemplateId(""); })}
-          >
-            {activeClass?.subjects.map((entry) => <option key={entry.id} value={entry.id}>{entry.name}</option>)}
-          </select>
+          <Select value={effectiveSubjectId || "__none__"} onValueChange={(value) => guard(() => { setSubjectId(value === "__none__" ? "" : value); setTemplateId(""); })}>
+            <SelectTrigger aria-label="Subject" className={`${field} min-w-44`}><SelectValue placeholder="No subjects" /></SelectTrigger>
+            <SelectContent>
+              {!activeClass?.subjects.length && <SelectItem value="__none__" disabled>No subjects</SelectItem>}
+              {activeClass?.subjects.map((entry) => <SelectItem key={entry.id} value={entry.id}>{entry.name}</SelectItem>)}
+            </SelectContent>
+          </Select>
         </label>
         {sheet && sheet.templates.length > 1 && (
           <label className="grid gap-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70">
             Assessment
-            <select
-              className={`${field} min-w-44`}
-              value={sheet.template?.id ?? ""}
-              onChange={(event) => guard(() => setTemplateId(event.target.value))}
-            >
-              {sheet.templates.map((entry) => <option key={entry.id} value={entry.id}>{entry.name}</option>)}
-            </select>
+            <Select value={templateId || sheet.template?.id || sheet.templates[0]?.id || "__none__"} onValueChange={(value) => guard(() => setTemplateId(value))}>
+              <SelectTrigger aria-label="Assessment template" className={`${field} min-w-44`}><SelectValue /></SelectTrigger>
+              <SelectContent>{sheet.templates.map((entry) => <SelectItem key={entry.id} value={entry.id}>{entry.name}</SelectItem>)}</SelectContent>
+            </Select>
           </label>
         )}
         {sheet && <p className="ml-auto text-xs text-muted-foreground">{sheet.term.name}</p>}

@@ -10,6 +10,7 @@ import { SearchInput } from "@/components/superadmin/search-input";
 import { EmptyPanel, ErrorPanel, LoadingPanel } from "@/components/superadmin/state-panels";
 import { useDebouncedValue } from "@/components/superadmin/use-debounced-value";
 import { cn } from "@/lib/utils";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export const Route = createFileRoute("/admin/users/")({
   component: SystemUsersPage,
@@ -164,16 +165,22 @@ function SystemUsersPage() {
       <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
         <div className="grid gap-3 border-b border-border p-4 md:grid-cols-[1.5fr_1fr_1fr]">
           <SearchInput label="Search users" placeholder="Search every user by name or email…" value={search} onChange={(value) => { setSearch(value); setPage(1); }} />
-          <select aria-label="Filter by school" value={schoolId} onChange={(event) => { setSchoolId(event.target.value); setPage(1); }} className={selectClass}>
-            <option value="">All schools</option>
-            {schools.data?.map((school) => <option key={school.id} value={school.id}>{school.name}</option>)}
-          </select>
-          <select aria-label="Filter by school role" value={role} onChange={(event) => { setRole(event.target.value); setPage(1); }} className={selectClass}>
-            <option value="">All roles</option>
-            {["owner", "admin", "headteacher", "teacher", "accountant", "student", "guardian"].map((value) => (
-              <option key={value} value={value} className="capitalize">{value}</option>
-            ))}
-          </select>
+          <Select value={schoolId || "__all__"} onValueChange={(value) => { setSchoolId(value === "__all__" ? "" : value); setPage(1); }}>
+            <SelectTrigger aria-label="Filter by school" className={selectClass}><SelectValue placeholder="All schools" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__all__">All schools</SelectItem>
+              {schools.data?.map((school) => <SelectItem key={school.id} value={school.id}>{school.name}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <Select value={role || "__all__"} onValueChange={(value) => { setRole(value === "__all__" ? "" : value); setPage(1); }}>
+            <SelectTrigger aria-label="Filter by school role" className={selectClass}><SelectValue placeholder="All roles" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__all__">All roles</SelectItem>
+              {["owner", "admin", "headteacher", "teacher", "accountant", "student", "guardian"].map((value) => (
+                <SelectItem key={value} value={value} className="capitalize">{value}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         {isPending ? (
