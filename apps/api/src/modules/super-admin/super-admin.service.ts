@@ -907,6 +907,96 @@ export class SuperAdminService {
     return this.getSchool(id);
   }
 
+  /** Platform-owned plan catalogue. Nullable limits intentionally mean unlimited. */
+  async listSubscriptionPlans() {
+    return this.prisma.client.subscriptionPlan.findMany({
+      orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+    });
+  }
+
+  async createSubscriptionPlan(input: {
+    code: string; name: string; description?: string | null;
+    monthlyPrice: number; yearlyPrice: number; currency: string;
+    maxStudents: number | null; maxTeachers: number | null;
+    maxGuardians: number | null; maxStaff: number | null; maxStorageMb: number | null;
+    features: string[]; isPublic: boolean; isActive: boolean; sortOrder: number;
+  }, actor: AuditActor) {
+    const code = input.code.trim().toUpperCase().replace(/[^A-Z0-9_-]/g, "");
+    if (!code) throw new BadRequestException("Plan code must contain letters or numbers");
+    if (input.yearlyPrice > input.monthlyPrice * 12 && input.monthlyPrice > 0) {
+      throw new BadRequestException("Yearly price cannot exceed twelve monthly payments without an explicit pricing review");
+    }
+    try {
+      const plan = await this.prisma.client.$transaction(async (tx) => {
+        const created = await tx.subscriptionPlan.create({
+          data: {
+            ...input, code, name: input.name.trim(),
+            description: input.description?.trim() || null,
+            monthlyPrice: new Prisma.Decimal(input.monthlyPrice),
+            yearlyPrice: new Prisma.Decimal(input.yearlyPrice),
+            features: input.features as Prisma.InputJsonValue,
+          },
+        });
+        await writeAudit(tx, actor, {
+          action: "CREATE", entityType: "super-admin.subscription-plan.create",
+          entityId: created.id,
+          newValues: { code: created.code, name: created.name, monthlyPrice: created.monthlyPrice.toString(),
+            yearlyPrice: created.yearlyPrice.toString(), currency: created.currency,
+            limits: { students: created.maxStudents, teachers: created.maxTeachers,
+              guardians: created.maxGuardians, staff: created.maxStaff, storageMb: created.maxStorageMb },
+            isActive: created.isActive, isPublic: created.isPublic },
+        });
+        return created;
+      });
+      return plan;
+    } catch (error) {
+      if (isUniqueViolation(error)) throw new ConflictException("A subscription plan with this code already exists");
+      throw error;
+    }
+  }
+
+  async updateSubscriptionPlan(id: string, input: {
+    code?: string; name?: string; description?: string | null;
+    monthlyPrice?: number; yearlyPrice?: number; currency?: string;
+    maxStudents?: number | null; maxTeachers?: number | null;
+    maxGuardians?: number | null; maxStaff?: number | null; maxStorageMb?: number | null;
+    features?: string[]; isPublic?: boolean; isActive?: boolean; sortOrder?: number;
+  }, actor: AuditActor) {
+    const existing = await this.prisma.client.subscriptionPlan.findUnique({ where: { id } });
+    if (!existing) throw new NotFoundException("Subscription plan not found");
+    const data: Prisma.SubscriptionPlanUpdateInput = {
+      ...(input.code !== undefined ? { code: input.code.trim().toUpperCase().replace(/[^A-Z0-9_-]/g, "") } : {}),
+      ...(input.name !== undefined ? { name: input.name.trim() } : {}),
+      ...(input.description !== undefined ? { description: input.description?.trim() || null } : {}),
+      ...(input.monthlyPrice !== undefined ? { monthlyPrice: new Prisma.Decimal(input.monthlyPrice) } : {}),
+      ...(input.yearlyPrice !== undefined ? { yearlyPrice: new Prisma.Decimal(input.yearlyPrice) } : {}),
+      ...(input.currency !== undefined ? { currency: input.currency } : {}),
+      ...(input.maxStudents !== undefined ? { maxStudents: input.maxStudents } : {}),
+      ...(input.maxTeachers !== undefined ? { maxTeachers: input.maxTeachers } : {}),
+      ...(input.maxGuardians !== undefined ? { maxGuardians: input.maxGuardians } : {}),
+      ...(input.maxStaff !== undefined ? { maxStaff: input.maxStaff } : {}),
+      ...(input.maxStorageMb !== undefined ? { maxStorageMb: input.maxStorageMb } : {}),
+      ...(input.features !== undefined ? { features: input.features as Prisma.InputJsonValue } : {}),
+      ...(input.isPublic !== undefined ? { isPublic: input.isPublic } : {}),
+      ...(input.isActive !== undefined ? { isActive: input.isActive } : {}),
+      ...(input.sortOrder !== undefined ? { sortOrder: input.sortOrder } : {}),
+      version: { increment: 1 },
+    };
+    if (input.code !== undefined && !data.code) throw new BadRequestException("Invalid plan code");
+    const updated = await this.prisma.client.$transaction(async (tx) => {
+      const plan = await tx.subscriptionPlan.update({ where: { id }, data });
+      await writeAudit(tx, actor, {
+        action: "UPDATE", entityType: "super-admin.subscription-plan.update", entityId: id,
+        oldValues: { version: existing.version, isActive: existing.isActive },
+        newValues: { version: plan.version, isActive: plan.isActive, isPublic: plan.isPublic,
+          limits: { students: plan.maxStudents, teachers: plan.maxTeachers,
+            guardians: plan.maxGuardians, staff: plan.maxStaff, storageMb: plan.maxStorageMb } },
+      });
+      return plan;
+    });
+    return updated;
+  }
+
   /**
    * Operational health is intentionally limited to checks we can verify here.
    * Unknown dependencies are not reported as healthy without instrumentation.
