@@ -47,6 +47,48 @@ export function eligibleInstructionalDates(input: {
   return dates;
 }
 
+/** Only the post-activation instructional dates require complete registers.
+ * Earlier attendance marks keep the old recorded-days basis in an activation term.
+ * A date-boundary transition does not fabricate historical attendance or absences. */
+export function calculateAttendanceRollout(input: {
+  start: string; end: string; asOf: string; weekdays: readonly number[];
+  overrides?: readonly CalendarOverride[]; excludedDates?: readonly string[];
+  records: readonly DailyMark[]; activeFrom: string;
+}) {
+  isoDay(input.activeFrom);
+  const postStart = input.start > input.activeFrom ? input.start : input.activeFrom;
+  const before = input.records.filter(row =>
+    row.date >= input.start && row.date < input.activeFrom &&
+    row.date <= input.end && row.date <= input.asOf);
+  const historical = new Map<string, AttendanceMark>();
+  for (const row of before) {
+    isoDay(row.date);
+    if (historical.has(row.date)) throw new Error("Duplicate historical attendance entry");
+    historical.set(row.date, row.status);
+  }
+  const post = calculateDailyAttendance({
+    ...input, start: postStart,
+    records: input.records.filter(row => row.date >= input.activeFrom),
+  });
+  const summary = { ...post.summary };
+  for (const status of historical.values()) summary[status]++;
+  const historicalDays = historical.size;
+  const possibleDays = historicalDays + post.possibleDays;
+  const recordedDays = historicalDays + post.recordedDays;
+  const daysAttended = summary.PRESENT + summary.LATE;
+  const complete = post.unmarkedDays === 0 && possibleDays > 0;
+  return {
+    ...post, summary, totalDays: possibleDays, possibleDays, recordedDays,
+    daysAttended, unmarkedDays: post.unmarkedDays,
+    attendanceRate: complete ? Math.round((daysAttended / possibleDays)*100) : null,
+    provisionalRate: recordedDays ? Math.round((daysAttended / recordedDays)*100) : null,
+    coverageRate: possibleDays ? Math.round((recordedDays / possibleDays)*100) : null,
+    isComplete: complete,
+    policyMode: input.start < input.activeFrom ? "TRANSITION" as const : "CALENDAR" as const,
+    historicalRecordedDays: historicalDays,
+  };
+}
+
 export function calculateDailyAttendance(input: {
   start: string; end: string; asOf: string; weekdays: readonly number[];
   overrides?: readonly CalendarOverride[]; excludedDates?: readonly string[];
@@ -75,6 +117,7 @@ export function calculateDailyAttendance(input: {
   return {
     summary, possibleDays, totalDays: possibleDays, recordedDays,
     daysAttended, unmarkedDays: missingDates.length,
+    provisionalRate: recordedDays ? Math.round((daysAttended / recordedDays)*100) : null,
     missingDates, ignoredRecords,
     attendanceRate: possibleDays > 0 && missingDates.length === 0
       ? Math.round((daysAttended / possibleDays) * 100) : null,

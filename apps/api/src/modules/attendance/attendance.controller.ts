@@ -4,6 +4,7 @@ import {
   Post,
   Put,
   Delete,
+  Patch,
   Param,
   Query,
   Headers,
@@ -12,7 +13,7 @@ import {
 } from "@nestjs/common";
 import { AttendanceService } from "./attendance.service.js";
 import { AttendanceCalendarService } from "./attendance-calendar.service.js";
-import { calendarConfigurationSchema, attendanceExclusionSchema, revokeExclusionSchema } from "./attendance-calendar.schemas.js";
+import { calendarConfigurationSchema, attendanceExclusionSchema, revokeExclusionSchema, attendanceRolloutPolicySchema } from "./attendance-calendar.schemas.js";
 import { z } from "zod";
 import { SchoolTenantGuard } from "../../common/guards/school-tenant.guard.js";
 import { RolesGuard } from "../../common/guards/roles.guard.js";
@@ -34,6 +35,23 @@ export class AttendanceController {
     private readonly attendanceService: AttendanceService,
     private readonly calendarService: AttendanceCalendarService,
   ) {}
+
+  @Get("policy")
+  @Roles("owner", "admin", "headteacher")
+  getAttendancePolicy(@CurrentSchool() school: School) {
+    return this.calendarService.getPolicy(school.id);
+  }
+
+  @Patch("policy")
+  @Roles("owner", "admin", "headteacher")
+  updateAttendancePolicy(
+    @CurrentSchool() school: School,
+    @CurrentUser() actor: AuthenticatedUser,
+    @Body(new ZodValidationPipe(attendanceRolloutPolicySchema))
+    input: z.infer<typeof attendanceRolloutPolicySchema>,
+  ) {
+    return this.calendarService.setPolicy(school.id, actor.id, input);
+  }
 
   @Get("calendar/:termId")
   @Roles("owner", "admin", "headteacher", "teacher", "staff", "accountant")

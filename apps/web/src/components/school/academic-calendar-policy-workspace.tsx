@@ -11,6 +11,78 @@ type Calendar = {
   term: { id: string; calendarRevision: number; startDate: string; endDate: string; instructionalWeekdays: number[] };
   days: Override[];
 };
+const today = new Date().toISOString().slice(0,10);
+
+function AttendanceRolloutPolicy() {
+  const client = useQueryClient();
+  const policy = useQuery({
+    queryKey: ["attendance", "policy"],
+    queryFn: () => apiFetch<{ attendancePolicyActiveFrom: string | null }>("/attendance/policy"),
+    retry: false,
+  });
+  const [date, setDate] = useState("");
+  const [reason, setReason] = useState("");
+  const [enabled, setEnabled] = useState(false);
+  useEffect(() => {
+    if (!policy.data) return;
+    setDate(policy.data.attendancePolicyActiveFrom ?? "");
+    setEnabled(Boolean(policy.data.attendancePolicyActiveFrom));
+    setReason("");
+  }, [policy.data]);
+  const save = useMutation({
+    mutationFn: () => apiFetch("/attendance/policy", {
+      method: "PATCH", body: JSON.stringify({
+        attendancePolicyActiveFrom: enabled ? date : null, reason: reason.trim(),
+      }),
+    }),
+    onSuccess: async () => {
+      await client.invalidateQueries({ queryKey: ["attendance", "policy"] });
+      await client.invalidateQueries({ queryKey: ["attendance", "me"] });
+      await client.invalidateQueries({ queryKey: ["guardian", "attendance"] });
+    },
+  });
+  return <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+    <h3 className="text-base font-bold">Attendance calculation rollout</h3>
+    <p className="mt-1 max-w-3xl text-xs leading-5 text-muted-foreground">
+      Existing schools retain the recorded-days method until an administrator activates the
+      instructional-calendar policy. Set today or a future activation date. Older attendance
+      registers are not automatically treated as absent. Incomplete new registers produce a
+      clearly labelled provisional percentage rather than a misleading final rate.
+    </p>
+    {policy.isPending ? <p className="mt-3 text-xs text-muted-foreground">Loading attendance policy…</p>
+      : policy.isError ? <p role="alert" className="mt-3 text-xs text-destructive">{policy.error.message}</p>
+      : <div className="mt-4 grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+        <label className="flex items-center gap-2 text-sm font-semibold">
+          <input type="checkbox" checked={enabled} onChange={e=>setEnabled(e.target.checked)}
+            className="size-4 accent-primary"/> Enable calendar-based attendance
+        </label>
+        <div><label className="mb-1 block text-xs font-semibold">Activation date</label>
+          <DatePicker value={date} disabled={!enabled} minDate={today}
+            onChange={setDate} ariaLabel="Attendance policy activation date"/>
+        </div>
+        <div className="md:col-span-2">
+          <label htmlFor="attendance-rollout-reason" className="mb-1 block text-xs font-semibold">Reason for change</label>
+          <textarea id="attendance-rollout-reason" rows={2} maxLength={400}
+            value={reason} onChange={event=>setReason(event.target.value)}
+            className="w-full rounded-lg border border-input bg-background p-3 text-sm"
+            placeholder="Explain the decision to activate or disable calendar-based attendance"/>
+        </div>
+        {save.isError && <p role="alert" className="text-xs text-destructive md:col-span-2">{save.error.message}</p>}
+        {save.isSuccess && <p role="status" className="text-xs text-success md:col-span-2">Attendance policy saved and audited.</p>}
+        <div className="flex items-center justify-between gap-3 md:col-span-2">
+          <p className="text-xs text-muted-foreground">Status: {policy.data?.attendancePolicyActiveFrom
+            ? `Scheduled/active from ${policy.data.attendancePolicyActiveFrom}` : "Inactive — legacy calculation"}</p>
+          <button type="button" onClick={()=>save.mutate()}
+            disabled={save.isPending || reason.trim().length<8 || (enabled && (!date || date < today))
+              || (enabled ? date : null) === (policy.data?.attendancePolicyActiveFrom ?? null)}
+            className="rounded-lg bg-primary px-4 py-2 text-xs font-bold text-primary-foreground disabled:opacity-40">
+            {save.isPending ? "Saving…" : "Save policy"}
+          </button>
+        </div>
+      </div>}
+  </section>;
+}
+
 const DAYS = [
   { id: 1, label: "Mon" }, { id: 2, label: "Tue" }, { id: 3, label: "Wed" },
   { id: 4, label: "Thu" }, { id: 5, label: "Fri" }, { id: 6, label: "Sat" }, { id: 7, label: "Sun" },
@@ -64,7 +136,9 @@ export function AcademicCalendarPolicyWorkspace({ years }: { years: Year[] }) {
       overrides:overrides.map(item=>({ ...item,label:item.label.trim() })), reason:reason.trim() });
   };
   const buttonClass = "inline-flex items-center justify-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-xs font-semibold hover:bg-muted disabled:opacity-40";
-  return <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+  return <>
+    <AttendanceRolloutPolicy />
+    <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
     <div className="mb-4 flex items-start gap-3">
       <span className="rounded-lg bg-primary/10 p-2 text-primary"><CalendarDays className="size-5"/></span>
       <div><h3 className="text-base font-bold">Instructional days, holidays & make-up days</h3>
@@ -119,5 +193,5 @@ export function AcademicCalendarPolicyWorkspace({ years }: { years: Year[] }) {
           <Save className="size-4"/>{mutation.isPending?"Saving…":"Save instructional calendar"}</button></div>
         <p className="text-xs text-muted-foreground">Approved reports lock this term against direct calendar changes. Individual pupil exclusions are handled by the authorised attendance administration workflow.</p>
       </div>}
-  </section>;
+  </section></>;
 }

@@ -497,6 +497,11 @@ export class SchoolsService {
   }
 
   async createAcademicYear(schoolId: string, input: CreateAcademicYearInput) {
+    // Nested term creation must honour the same constraints as the standalone term endpoints.
+    for (const term of input.terms ?? []) {
+      const problem = termProblemWithinYear(input, term);
+      if (problem) throw new BadRequestException(problem);
+    }
     return this.prisma.client.$transaction(async (transaction) => {
       const hasCurrentTerm = input.terms?.some((term) => term.isCurrent) ?? false;
       const isCurrent = input.isCurrent || hasCurrentTerm;

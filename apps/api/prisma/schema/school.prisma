@@ -20,6 +20,8 @@ model School {
   primaryColor   String   @default("#3B82F6")
   secondaryColor String   @default("#10B981")
   settings       Json?
+  /// Null disables calendar-based attendance calculations for existing schools.
+  attendancePolicyActiveFrom DateTime? @db.Date
   features       Json?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt

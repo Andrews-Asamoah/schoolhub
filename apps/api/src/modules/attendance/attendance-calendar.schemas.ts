@@ -12,6 +12,11 @@ export const attendanceExclusionSchema = z.object({
   studentId: z.string().min(1), termId: z.string().min(1), date: isoDate,
   reason: z.string().trim().min(8).max(400),
 }).strict();
+export const attendanceRolloutPolicySchema = z.object({
+  attendancePolicyActiveFrom: isoDate.nullable(),
+  reason: z.string().trim().min(8).max(400),
+}).strict();
+
 export const revokeExclusionSchema = z.object({
   reason: z.string().trim().min(8).max(400),
 }).strict();
