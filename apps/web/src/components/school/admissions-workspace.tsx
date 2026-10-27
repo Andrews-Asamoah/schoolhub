@@ -1,4 +1,5 @@
 import { DatePicker, DateTimePicker } from "@/components/ui/date-picker";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Pencil } from "lucide-react";
 import { useState } from "react";
@@ -304,17 +305,23 @@ function IntakeForm({ cycle, onDone }: { cycle: Cycle | null; onDone: () => void
         </label>
         <label className="text-xs font-semibold">
           Academic year
-          <select className={input} value={academicYearId} onChange={(e) => { setAcademicYearId(e.target.value); setTermId(""); }}>
-            <option value="">Choose…</option>
-            {years.map((y) => <option key={y.id} value={y.id}>{y.name}</option>)}
-          </select>
+          <Select value={academicYearId || "__none__"} onValueChange={(value) => { setAcademicYearId(value === "__none__" ? "" : value); setTermId(""); }}>
+            <SelectTrigger aria-label="Academic year" className={input}><SelectValue placeholder="Choose…" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__none__">Choose…</SelectItem>
+              {years.map((year) => <SelectItem key={year.id} value={year.id}>{year.name}</SelectItem>)}
+            </SelectContent>
+          </Select>
         </label>
         <label className="text-xs font-semibold">
           Term students join (optional)
-          <select className={input} value={termId} onChange={(e) => setTermId(e.target.value)} disabled={!academicYearId}>
-            <option value="">Current term at admission</option>
-            {terms.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-          </select>
+          <Select value={termId || "__current__"} onValueChange={(value) => setTermId(value === "__current__" ? "" : value)} disabled={!academicYearId}>
+            <SelectTrigger aria-label="Term students join" className={input}><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__current__">Current term at admission</SelectItem>
+              {terms.map((term) => <SelectItem key={term.id} value={term.id}>{term.name}</SelectItem>)}
+            </SelectContent>
+          </Select>
         </label>
         <label className="text-xs font-semibold">
           Applications open
@@ -341,11 +348,14 @@ function IntakeForm({ cycle, onDone }: { cycle: Cycle | null; onDone: () => void
         </label>
         <label className="text-xs font-semibold">
           Status
-          <select className={input} value={status} onChange={(e) => setStatus(e.target.value as Cycle["status"])}>
-            <option value="DRAFT">Draft (not public)</option>
-            <option value="OPEN">Open (accepting applications)</option>
-            <option value="CLOSED">Closed</option>
-          </select>
+          <Select value={status} onValueChange={(value) => setStatus(value as Cycle["status"])}>
+            <SelectTrigger aria-label="Intake publication status" className={input}><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="DRAFT">Draft (not public)</SelectItem>
+              <SelectItem value="OPEN">Open (accepting applications)</SelectItem>
+              <SelectItem value="CLOSED">Closed</SelectItem>
+            </SelectContent>
+          </Select>
         </label>
         <label className="text-xs font-semibold sm:col-span-2">
           Instructions shown on the form (documents to bring, exam details…)
@@ -495,22 +505,29 @@ function ApplicationsPanel({ cycles, canDecide }: { cycles: Cycle[]; canDecide: 
         </div>
       )}
       <div className="grid gap-3 rounded-2xl border border-border bg-card p-4 sm:grid-cols-4">
-        <select className={input} value={cycleId} onChange={(e) => setCycleId(e.target.value)} aria-label="Intake">
-          <option value="">All intakes</option>
-          {cycles.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-        </select>
-        <select className={input} value={status} onChange={(e) => setStatus(e.target.value)} aria-label="Status">
-          <option value="">All statuses</option>
-          {["SUBMITTED", "UNDER_REVIEW", "EXAM_SCHEDULED", "EXAM_COMPLETED", "ACCEPTED", "WAITLISTED", "REJECTED", "ADMITTED"].map((s) => (
-            <option key={s} value={s}>{label(s)}</option>
-          ))}
-        </select>
-        <select className={input} value={feeStatus} onChange={(e) => setFeeStatus(e.target.value)} aria-label="Fee status">
-          <option value="">Any fee status</option>
-          <option value="PENDING">Fee unpaid</option>
-          <option value="PAID">Fee paid</option>
-          <option value="EXEMPTED">Fee exempted</option>
-        </select>
+        <Select value={cycleId || "__all__"} onValueChange={(value) => setCycleId(value === "__all__" ? "" : value)}>
+          <SelectTrigger aria-label="Intake" className={input}><SelectValue placeholder="All intakes" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__all__">All intakes</SelectItem>
+            {cycles.map((cycle) => <SelectItem key={cycle.id} value={cycle.id}>{cycle.name}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        <Select value={status || "__all__"} onValueChange={setStatus}>
+          <SelectTrigger aria-label="Status" className={input}><SelectValue placeholder="All statuses" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__all__">All statuses</SelectItem>
+            {["SUBMITTED", "UNDER_REVIEW", "EXAM_SCHEDULED", "EXAM_COMPLETED", "ACCEPTED", "WAITLISTED", "REJECTED", "ADMITTED"].map((value) => <SelectItem key={value} value={value}>{label(value)}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        <Select value={feeStatus || "__all__"} onValueChange={(value) => setFeeStatus(value === "__all__" ? "" : value)}>
+          <SelectTrigger aria-label="Fee status" className={input}><SelectValue placeholder="Any fee status" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__all__">Any fee status</SelectItem>
+            <SelectItem value="PENDING">Fee unpaid</SelectItem>
+            <SelectItem value="PAID">Fee paid</SelectItem>
+            <SelectItem value="EXEMPTED">Fee exempted</SelectItem>
+          </SelectContent>
+        </Select>
         <input className={input} placeholder="Search name, number or phone" value={search} onChange={(e) => setSearch(e.target.value)} />
       </div>
 
