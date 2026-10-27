@@ -971,15 +971,34 @@ export const SUPER_ADMIN_AUDIT_ACTIONS = [
   "SCHOOL_ACCESSED",
 ] as const;
 
+const auditDateQuery = z.string().trim().min(1).max(40).refine(
+  (value) => !Number.isNaN(new Date(value).getTime()),
+  "Enter a valid date",
+);
+
 export const superAdminAuditQuerySchema = z.object({
   page: pageQuery,
   limit: limitQuery,
-  action: z.string().trim().max(40).optional(),
+  action: z.enum(SUPER_ADMIN_AUDIT_ACTIONS).optional(),
   schoolId: z.string().trim().max(64).optional(),
   actorId: z.string().trim().max(64).optional(),
-  from: z.string().trim().optional(),
-  to: z.string().trim().optional(),
+  from: auditDateQuery.optional(),
+  to: auditDateQuery.optional(),
   q: searchQuery,
+}).superRefine((query, ctx) => {
+  if (!query.from || !query.to) return;
+  const from = new Date(query.from);
+  const to = new Date(query.to);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(query.to)) {
+    to.setUTCHours(23, 59, 59, 999);
+  }
+  if (from.getTime() > to.getTime()) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["to"],
+      message: "The end date must be on or after the start date",
+    });
+  }
 });
 export type SuperAdminAuditQuery = z.infer<typeof superAdminAuditQuerySchema>;
 

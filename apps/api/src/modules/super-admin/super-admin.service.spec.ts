@@ -16,7 +16,7 @@ function makeService(overrides: Record<string, any> = {}) {
     account: { create: vi.fn() },
     member: { findUnique: vi.fn(), findFirst: vi.fn(), create: vi.fn(), update: vi.fn(), delete: vi.fn() },
     session: { deleteMany: vi.fn() },
-    auditLog: { create: vi.fn() },
+    auditLog: { create: vi.fn(), findMany: vi.fn(async () => []), count: vi.fn(async () => 0) },
     ...overrides,
   };
   client.$transaction = vi.fn(async (fn: (tx: unknown) => unknown) => fn(client));
@@ -74,6 +74,38 @@ describe("updateSubscription", () => {
     await expect(service.updateSubscription("sch1", { status: "SUSPENDED" }, actor)).resolves.toBeDefined();
     await expect(service.updateSubscription("sch1", { status: "ACTIVE", expiresAt: null }, actor)).resolves.toBeDefined();
     expect(client.organization.update.mock.calls[1]![0].data.expiresAt).toBeNull();
+  });
+});
+
+describe("listAuditLogs", () => {
+  it("rejects invalid dates and inverted ranges before querying audit records", async () => {
+    const { service, client } = makeService();
+    await expect(service.listAuditLogs({ page: 1, limit: 20, from: "not-a-date" } as never))
+      .rejects.toThrow(BadRequestException);
+    await expect(service.listAuditLogs({ page: 1, limit: 20, from: "2026-10-20", to: "2026-10-19" } as never))
+      .rejects.toThrow(BadRequestException);
+    expect(client.auditLog.findMany).not.toHaveBeenCalled();
+    expect(client.auditLog.count).not.toHaveBeenCalled();
+  });
+
+  it("applies the validated filter and bounded pagination to the audit query", async () => {
+    const { service, client } = makeService();
+    await service.listAuditLogs({
+      page: 2, limit: 25, action: "ACCESS_CHANGED", schoolId: "sch1",
+      actorId: "sa1", from: "2026-10-01", to: "2026-10-31", q: "school",
+    });
+    expect(client.auditLog.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        action: "ACCESS_CHANGED",
+        schoolId: "sch1",
+        userId: "sa1",
+        entityType: { contains: "school", mode: "insensitive" },
+        createdAt: { gte: new Date("2026-10-01"), lte: new Date("2026-10-31T23:59:59.999Z") },
+      }),
+      skip: 25,
+      take: 25,
+      orderBy: { createdAt: "desc" },
+    }));
   });
 });
 

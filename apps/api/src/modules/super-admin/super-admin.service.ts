@@ -177,6 +177,9 @@ export class SuperAdminService {
       throw new BadRequestException("Enter valid from/to dates");
     }
     if (toDate && /^\d{4}-\d{2}-\d{2}$/.test(to!)) toDate.setUTCHours(23, 59, 59, 999);
+    if (fromDate && toDate && fromDate.getTime() > toDate.getTime()) {
+      throw new BadRequestException("The end date must be on or after the start date");
+    }
 
     const where: Prisma.AuditLogWhereInput = {
       ...(action ? { action: action as Prisma.AuditLogWhereInput["action"] } : {}),
