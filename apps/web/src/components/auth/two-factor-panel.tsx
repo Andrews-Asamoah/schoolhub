@@ -231,7 +231,7 @@ export function TwoFactorPanel({ required = false, onEnabled }: TwoFactorPanelPr
       <div className="space-y-4">
         <p role="status" className="flex items-start gap-2.5 rounded-xl border border-success/25 bg-success/10 px-4 py-3 text-sm text-success">
           <ShieldCheck className="mt-0.5 size-4 shrink-0" />
-          <span><strong>Two-factor authentication is on.</strong> Signing in needs your password and a code from your authenticator app.</span>
+          <span><strong>Two-factor authentication is on.</strong> Sign-ins on new or untrusted devices require a code from your authenticator app.</span>
         </p>
         <div className="flex flex-wrap gap-2">
           <button type="button" onClick={() => { setError(null); setStep("codes-password"); }} className={secondary}><KeyRound className="size-4" /> New backup codes</button>

@@ -23,6 +23,7 @@ This work is delivered in small, reviewable increments. Do not represent a depen
 
 - [ ] Model onboarding progress from persisted school setup data, not a client-only checklist.
 - [ ] Add secure owner invitations and recovery flows with expiry, single-use tokens, and rate limits.
+- [x] Add opt-in 30-day trusted-device login for SuperAdmins with server-side revocation, audit events, and role enforcement.
 - [x] Require a meaningful reason for school-administrator suspension; persist it on the membership and include it in the audit entry while retaining final-admin safeguards.
 - [ ] Add lifecycle and authorization integration tests.
 

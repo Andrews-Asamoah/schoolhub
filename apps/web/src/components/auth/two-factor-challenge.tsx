@@ -11,14 +11,16 @@ interface SignedInUser {
 interface TwoFactorChallengeProps {
   onVerified: (user: SignedInUser | undefined) => void | Promise<void>;
   onCancel: () => void;
+  allowTrustDevice?: boolean;
 }
 
 /**
  * Second step of sign-in. The password has already been accepted, but the
  * server withholds the session until a valid code (or backup code) arrives.
  */
-export function TwoFactorChallenge({ onVerified, onCancel }: TwoFactorChallengeProps) {
+export function TwoFactorChallenge({ onVerified, onCancel, allowTrustDevice = false }: TwoFactorChallengeProps) {
   const [useBackup, setUseBackup] = useState(false);
+  const [trustDevice, setTrustDevice] = useState(false);
   const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -33,9 +35,10 @@ export function TwoFactorChallenge({ onVerified, onCancel }: TwoFactorChallengeP
     setBusy(true);
     setError(null);
     try {
+      const trustOption = allowTrustDevice && trustDevice ? { trustDevice: true as const } : {};
       const result = useBackup
-        ? await authClient.twoFactor.verifyBackupCode({ code: cleaned })
-        : await authClient.twoFactor.verifyTotp({ code: cleaned });
+        ? await authClient.twoFactor.verifyBackupCode({ code: cleaned, ...trustOption })
+        : await authClient.twoFactor.verifyTotp({ code: cleaned, ...trustOption });
       if (result.error) {
         const tooMany = result.error.status === 429;
         setError(
@@ -101,6 +104,23 @@ export function TwoFactorChallenge({ onVerified, onCancel }: TwoFactorChallengeP
           <p id="two-factor-error" role="alert" className="flex items-start gap-2 text-sm font-medium text-destructive">
             <CircleAlert className="mt-0.5 size-4 shrink-0" /> {error}
           </p>
+        )}
+        {allowTrustDevice && (
+          <label className="flex cursor-pointer items-start gap-2.5 rounded-xl border border-border bg-muted/40 px-3.5 py-3 text-sm text-foreground">
+            <input
+              type="checkbox"
+              checked={trustDevice}
+              onChange={(event) => setTrustDevice(event.target.checked)}
+              disabled={busy}
+              className="mt-0.5 size-4 shrink-0 rounded border-input accent-primary"
+            />
+            <span>
+              <span className="block font-semibold">Trust this device for 30 days</span>
+              <span className="mt-0.5 block text-xs leading-5 text-muted-foreground">
+                Only select this on a private device you control. You can revoke trusted devices from Account &amp; security.
+              </span>
+            </span>
+          </label>
         )}
         <button type="submit" disabled={!ready || busy} className="superadmin-button-primary flex h-12 w-full items-center justify-center gap-2 rounded-xl text-sm font-semibold disabled:opacity-60">
           {busy && <LoaderCircle className="size-4 animate-spin" />} {busy ? "Verifying…" : "Verify and sign in"}

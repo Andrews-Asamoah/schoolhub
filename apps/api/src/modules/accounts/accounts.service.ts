@@ -16,6 +16,7 @@ import {
   type IssuedCredentials,
 } from "@schoolhub/shared";
 import { PrismaService } from "../../prisma/prisma.service.js";
+import { writeAudit, type AuditActor } from "../../common/audit/audit.js";
 import {
   CredentialsService,
   newGuardianLoginEmail,
@@ -37,6 +38,95 @@ export class AccountsService {
     private readonly prisma: PrismaService,
     private readonly credentials: CredentialsService,
   ) {}
+
+  // --------------------------------------------------------------------------
+  // SuperAdmin trusted-device management. Better Auth stores revocable trust
+  // records in its verification table; a cookie without a live record is not
+  // accepted on the next sign-in.
+  // --------------------------------------------------------------------------
+  async listTrustedDevices(user: { id: string; role?: string; mustChangePassword?: boolean; banned?: boolean }) {
+    this.assertSuperAdmin(user);
+    const devices = await this.prisma.client.verification.findMany({
+      where: {
+        value: user.id,
+        identifier: { startsWith: "trust-device-" },
+        expiresAt: { gt: new Date() },
+      },
+      select: { id: true, createdAt: true, expiresAt: true },
+      orderBy: { createdAt: "desc" },
+    });
+    return { data: devices };
+  }
+
+  async revokeTrustedDevice(
+    user: { id: string; role?: string; mustChangePassword?: boolean; banned?: boolean },
+    deviceId: string,
+    actor: AuditActor,
+  ) {
+    this.assertSuperAdmin(user);
+    return this.prisma.client.$transaction(async (tx) => {
+      const device = await tx.verification.findFirst({
+        where: {
+          id: deviceId,
+          value: user.id,
+          identifier: { startsWith: "trust-device-" },
+        },
+        select: { id: true, createdAt: true, expiresAt: true },
+      });
+      if (!device) throw new NotFoundException("Trusted device not found or already revoked.");
+
+      const deleted = await tx.verification.deleteMany({
+        where: {
+          id: deviceId,
+          value: user.id,
+          identifier: { startsWith: "trust-device-" },
+        },
+      });
+      if (!deleted.count) throw new NotFoundException("Trusted device not found or already revoked.");
+
+      await writeAudit(tx, actor, {
+        action: "ACCESS_CHANGED",
+        entityType: "auth.two-factor.device-trust-revoked",
+        entityId: device.id,
+        oldValues: { createdAt: device.createdAt, expiresAt: device.expiresAt },
+        newValues: { revoked: true },
+      });
+      return { success: true };
+    });
+  }
+
+  async revokeAllTrustedDevices(user: { id: string; role?: string; mustChangePassword?: boolean; banned?: boolean }, actor: AuditActor) {
+    this.assertSuperAdmin(user);
+    return this.prisma.client.$transaction(async (tx) => {
+      const deleted = await tx.verification.deleteMany({
+        where: {
+          value: user.id,
+          identifier: { startsWith: "trust-device-" },
+        },
+      });
+      if (deleted.count) {
+        await writeAudit(tx, actor, {
+          action: "ACCESS_CHANGED",
+          entityType: "auth.two-factor.device-trust-revoked-all",
+          entityId: user.id,
+          newValues: { revokedCount: deleted.count },
+        });
+      }
+      return { success: true, revoked: deleted.count };
+    });
+  }
+
+  private assertSuperAdmin(user: { id: string; role?: string; mustChangePassword?: boolean; banned?: boolean }) {
+    if (user.role !== "superAdmin") {
+      throw new ForbiddenException("Trusted-device management is restricted to platform administrators.");
+    }
+    if (user.banned) {
+      throw new ForbiddenException("This account has been suspended.");
+    }
+    if (user.mustChangePassword) {
+      throw new ForbiddenException("Change your temporary password before managing trusted devices.");
+    }
+  }
 
   // --------------------------------------------------------------------------
   // Self-service: the account owner replaces a temporary / old password.
@@ -86,6 +176,10 @@ export class AccountsService {
       // Sign out every other device; keep the one making this request.
       await tx.session.deleteMany({
         where: { userId: user.id, token: { not: currentSessionToken } },
+      });
+      // Password changes revoke trusted-device tokens as well as other sessions.
+      await tx.verification.deleteMany({
+        where: { value: user.id, identifier: { startsWith: "trust-device-" } },
       });
       await this.credentials.audit(tx, {
         actorId: user.id,

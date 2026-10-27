@@ -270,6 +270,7 @@ function LoginPage() {
           {needsTwoFactor ? (
             <TwoFactorChallenge
               onVerified={finishSignIn}
+              allowTrustDevice={!subdomain}
               onCancel={() => { setNeedsTwoFactor(false); setError(null); }}
             />
           ) : (
