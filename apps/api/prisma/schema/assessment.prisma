@@ -345,3 +345,64 @@ model BehavioralRemark {
   @@index([reportCardId])
   @@map("behavioral_remarks")
 }
+
+
+// Teacher-published coursework for one class, subject, academic year and term.
+// Submissions are text-only until private, authenticated file storage is available.
+model SchoolAssignment {
+  id             String                @id @default(cuid())
+  schoolId       String
+  classId        String
+  subjectId      String
+  academicYearId String
+  termId         String
+  createdById    String
+  title          String                @db.VarChar(160)
+  instructions   String
+  dueAt          DateTime?
+  maxScore       Decimal               @db.Decimal(7, 2)
+  status         SchoolAssignmentStatus @default(PUBLISHED)
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+
+  school       School       @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  class        Class        @relation(fields: [classId], references: [id], onDelete: Cascade)
+  subject      Subject      @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  academicYear AcademicYear @relation(fields: [academicYearId], references: [id], onDelete: Cascade)
+  term         Term         @relation(fields: [termId], references: [id], onDelete: Cascade)
+  createdBy    user         @relation("SchoolAssignmentCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  submissions  SchoolAssignmentSubmission[]
+
+  @@index([schoolId, classId, status, dueAt])
+  @@index([schoolId, academicYearId, termId])
+  @@index([subjectId])
+  @@index([createdById, createdAt])
+  @@map("school_assignments")
+}
+
+model SchoolAssignmentSubmission {
+  id          String                           @id @default(cuid())
+  assignmentId String
+  studentId   String
+  submittedById String
+  responseText String
+  status      SchoolAssignmentSubmissionStatus @default(SUBMITTED)
+  score       Decimal?                         @db.Decimal(7, 2)
+  feedback    String?                          @db.VarChar(2000)
+  submittedAt DateTime                         @default(now())
+  gradedAt    DateTime?
+  gradedById  String?
+  createdAt   DateTime                         @default(now())
+  updatedAt   DateTime                         @updatedAt
+
+  assignment SchoolAssignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  student    Student          @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  submittedBy user            @relation("SchoolAssignmentSubmitter", fields: [submittedById], references: [id], onDelete: Cascade)
+  gradedBy   user?            @relation("SchoolAssignmentGrader", fields: [gradedById], references: [id], onDelete: SetNull)
+
+  @@unique([assignmentId, studentId])
+  @@index([studentId, submittedAt])
+  @@index([assignmentId, status])
+  @@index([gradedById])
+  @@map("school_assignment_submissions")
+}
