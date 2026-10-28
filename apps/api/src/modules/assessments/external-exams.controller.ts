@@ -1,4 +1,8 @@
-import {Body,Controller,Get,Param,Patch,Post,Put,UseGuards} from "@nestjs/common";
+import {BadRequestException,Body,Controller,Get,Header,Param,Patch,Post,Put,Res,UploadedFile,UseGuards,UseInterceptors} from "@nestjs/common";
+import {FileInterceptor} from "@nestjs/platform-express";
+import type {Response} from "express";
+import {BECE_IMPORT_MAX_BYTES} from "./external-bece-import.xlsx.js";
+import {ExternalBeceImportService} from "./external-bece-import.service.js";
 import type {School} from "@prisma/client";
 import type {z} from "zod";
 import {SchoolTenantGuard} from "../../common/guards/school-tenant.guard.js";
@@ -16,7 +20,51 @@ import {ExternalExamsService} from "./external-exams.service.js";
 @Controller("external-exams")
 @UseGuards(SchoolTenantGuard,RolesGuard)
 export class ExternalExamsController {
-  constructor(private readonly exams:ExternalExamsService){}
+  constructor(private readonly exams:ExternalExamsService,
+    private readonly imports:ExternalBeceImportService){}
+
+  @Get(":id/import/template/:paperId")
+  @Roles("owner","admin")
+  async downloadTemplate(@CurrentSchool() school:School,
+    @CurrentSchoolRole() role:string|undefined,
+    @Param("id") id:string,@Param("paperId") paperId:string,@Res() res:Response){
+    const file=await this.imports.template(school.id,role,id,paperId);
+    res.setHeader("Content-Type","application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    res.setHeader("Cache-Control","private, no-store");
+    res.setHeader("X-Content-Type-Options","nosniff");
+    res.setHeader("Content-Disposition",'attachment; filename="bece-results-template.xlsx"');
+    res.setHeader("Content-Length",file.length);
+    res.end(file);
+  }
+
+  @Post(":id/import/preview")
+  @Header("Cache-Control","no-store")
+  @Roles("owner","admin")
+  @UseInterceptors(FileInterceptor("file",{limits:{fileSize:BECE_IMPORT_MAX_BYTES,files:1}}))
+  previewImport(@CurrentSchool() school:School,@CurrentSchoolRole() role:string|undefined,
+    @Param("id") id:string,@UploadedFile() file:Express.Multer.File|undefined){
+    if(!file)throw new BadRequestException("Choose an Excel .xlsx workbook to preview.");
+    return this.imports.preview(school.id,role,id,file);
+  }
+
+  @Post(":id/import/commit")
+  @Header("Cache-Control","no-store")
+  @Roles("owner","admin")
+  @UseInterceptors(FileInterceptor("file",{limits:{fileSize:BECE_IMPORT_MAX_BYTES,files:1}}))
+  commitImport(@CurrentSchool() school:School,@CurrentUser() user:AuthenticatedUser,
+    @CurrentSchoolRole() role:string|undefined,@Param("id") id:string,
+    @UploadedFile() file:Express.Multer.File|undefined,@Body("sha256") sha256:string|undefined){
+    if(!file)throw new BadRequestException("Re-upload the same Excel .xlsx workbook used in the preview.");
+    if(!sha256)throw new BadRequestException("Preview checksum is required before committing.");
+    return this.imports.commit(school.id,user.id,role,id,file,sha256);
+  }
+
+  @Get(":id/import/history")
+  @Roles("owner","admin")
+  getImportHistory(@CurrentSchool() school:School,@CurrentSchoolRole() role:string|undefined,
+    @Param("id") id:string){
+    return this.imports.history(school.id,role,id);
+  }
 
   @Get()
   @Roles("owner","admin","headteacher","teacher")
