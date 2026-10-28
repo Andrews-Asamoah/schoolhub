@@ -36,6 +36,8 @@ model user {
   internalExamSessionsCreated InternalExamSession[] @relation("InternalExamSessionCreator")
   internalMockTeacherSignoffs InternalMockReport[] @relation("MockReportTeacher")
   internalMockHeadSignoffs InternalMockReport[] @relation("MockReportHead")
+  requestedMockCorrections InternalMockCorrection[] @relation("MockCorrectionRequester")
+  reviewedMockCorrections InternalMockCorrection[] @relation("MockCorrectionReviewer")
   teacherReportApprovals ReportCardVersion[] @relation("ReportVersionTeacher")
   headReportApprovals ReportCardVersion[] @relation("ReportVersionHead")
   calendarDaysCreated  AcademicCalendarDay[]  @relation("AcademicCalendarDayCreator")
