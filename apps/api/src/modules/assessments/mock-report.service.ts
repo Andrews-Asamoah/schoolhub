@@ -151,11 +151,12 @@ export class MockReportService {
         teacherApprovedAt:true,headRemark:true,headName:true,headApprovedAt:true,
         publishedAt:true},
     });
+    const current=rows.filter((r,i)=>rows.findIndex(x=>x.candidateId===r.candidateId)===i);
     return {session:{id:session.id,name:session.name,status:session.status},
-      expected:session.candidates.length,generated:rows.length,
+      expected:session.candidates.length,generated:current.length,
+      historicalVersions:rows.length-current.length,
       papers:session.papers.length,
-      reports:rows.filter((r,i)=>rows.findIndex(x=>x.candidateId===r.candidateId)===i)
-        .map(r=>({...r,integrityOk:snapshotHash(r.snapshot)===r.snapshotHash}))};
+      reports:current.map(r=>({...r,integrityOk:snapshotHash(r.snapshot)===r.snapshotHash}))};
   }
 
   async recommend(schoolId:string,actorId:string,role:string|undefined,reportId:string,remark:string){
