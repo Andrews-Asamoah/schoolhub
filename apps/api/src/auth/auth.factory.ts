@@ -2,6 +2,7 @@ import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { bearer, organization, twoFactor } from "better-auth/plugins";
 import { APIError, createAuthMiddleware } from "better-auth/api";
+import { isTemporaryPasswordExpired } from "../common/guards/password-change.js";
 import {
   PASSWORD_MAX_LENGTH,
   PASSWORD_MIN_LENGTH,
@@ -124,6 +125,30 @@ export function createAuth(prisma: PrismaLike) {
       before: createAuthMiddleware(async (ctx) => {
         if (DISABLED_TWO_FACTOR_PATHS.has(ctx.path)) {
           throw new APIError("NOT_FOUND", { message: "Not found" });
+        }
+        // An unused temporary password stops working after its expiry. Refuse
+        // the sign-in itself so an expired credential can never open a session.
+        if (ctx.path === "/sign-in/email") {
+          const email = (ctx.body as { email?: unknown } | undefined)?.email;
+          if (typeof email === "string") {
+            const pending = await (prisma as unknown as {
+              user: {
+                findUnique: (args: unknown) => Promise<{
+                  mustChangePassword: boolean;
+                  temporaryPasswordExpiresAt: Date | null;
+                } | null>;
+              };
+            }).user.findUnique({
+              where: { email: email.trim().toLowerCase() },
+              select: { mustChangePassword: true, temporaryPasswordExpiresAt: true },
+            });
+            if (pending && isTemporaryPasswordExpired(pending)) {
+              throw new APIError("FORBIDDEN", {
+                message:
+                  "Your temporary password has expired. Ask your school administrator to issue a new one.",
+              });
+            }
+          }
         }
         // Trusted-device bypass is deliberately limited to platform SuperAdmins.
         // Resolve the pending 2FA challenge from Better Auth's signed cookie: a
@@ -285,6 +310,13 @@ export function createAuth(prisma: PrismaLike) {
           type: "boolean",
           required: false,
           defaultValue: false,
+          input: false,
+        },
+        // Unused administrator-issued passwords expire; guards and the sign-in
+        // hook read this.
+        temporaryPasswordExpiresAt: {
+          type: "date",
+          required: false,
           input: false,
         },
         // Exposed on the session so guards can refuse a banned account.

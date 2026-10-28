@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { BadRequestException, ConflictException, NotFoundException } from "@nestjs/common";
 import { SUBSCRIPTION_TRIAL_DAYS } from "@schoolhub/shared";
-import { CredentialsService, DEFAULT_PASSWORDS } from "../accounts/credentials.service.js";
+import { CredentialsService } from "../accounts/credentials.service.js";
 import { SuperAdminService } from "./super-admin.service.js";
 
 const actor = { id: "sa1", ipAddress: "10.0.0.1", userAgent: "vitest" };
@@ -448,7 +448,7 @@ describe("enrollSchool", () => {
     const { service, client } = makeService();
     const result = await service.enrollSchool(input as never, actor);
 
-    expect(Object.values(DEFAULT_PASSWORDS)).not.toContain(result.credentials.temporaryPassword);
+    expect(result.credentials.temporaryPassword).toMatch(/^[\w@#$%&*+=?]{16}$/);
     expect(result.credentials.temporaryPassword).toHaveLength(16);
     expect(result.credentials.mustChangePassword).toBe(true);
 

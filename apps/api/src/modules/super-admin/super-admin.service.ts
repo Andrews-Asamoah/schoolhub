@@ -1,3 +1,4 @@
+import { temporaryPasswordExpiry } from "../../common/guards/password-change.js";
 import {
   Injectable,
   Inject,
@@ -513,6 +514,7 @@ export class SuperAdminService {
               emailVerified: false,
               role: "user",
               mustChangePassword: true,
+              temporaryPasswordExpiresAt: temporaryPasswordExpiry(now),
               createdAt: now,
               updatedAt: now,
             },
@@ -759,6 +761,7 @@ export class SuperAdminService {
             emailVerified: false,
             role: "owner",
             mustChangePassword: true,
+              temporaryPasswordExpiresAt: temporaryPasswordExpiry(now),
             createdAt: now,
             updatedAt: now,
           },

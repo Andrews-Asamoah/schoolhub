@@ -21,6 +21,8 @@ model user {
   // the owner of the account picks a new one.
   mustChangePassword Boolean   @default(false)
   passwordChangedAt  DateTime?
+  // An unused administrator-issued password stops working at this time.
+  temporaryPasswordExpiresAt DateTime?
   // Two-factor authentication (Better Auth twoFactor plugin). True only after
   // the user has proved they can generate a code from their authenticator.
   twoFactorEnabled   Boolean   @default(false)
