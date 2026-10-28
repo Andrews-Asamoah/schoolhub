@@ -1,5 +1,6 @@
 -- Internal mock examinations: separate from term assessment and external BECE records.
 CREATE TYPE "InternalExamStatus" AS ENUM ('DRAFT', 'OPEN', 'LOCKED');
+CREATE TYPE "InternalExamMarkStatus" AS ENUM ('MARKED', 'ABSENT');
 CREATE TABLE "internal_exam_sessions" (
   "id" TEXT NOT NULL PRIMARY KEY,
   "schoolId" TEXT NOT NULL,
@@ -58,7 +59,8 @@ CREATE TABLE "internal_exam_marks" (
   "id" TEXT NOT NULL PRIMARY KEY,
   "candidateId" TEXT NOT NULL,
   "paperId" TEXT NOT NULL,
-  "marks" DECIMAL(6,2) NOT NULL,
+  "marks" DECIMAL(6,2),
+  "status" "InternalExamMarkStatus" NOT NULL DEFAULT 'MARKED',
   "version" INTEGER NOT NULL DEFAULT 1,
   "recordedById" TEXT,
   "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -66,7 +68,8 @@ CREATE TABLE "internal_exam_marks" (
   CONSTRAINT "internal_exam_marks_candidateId_fkey" FOREIGN KEY ("candidateId") REFERENCES "internal_exam_candidates"("id") ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT "internal_exam_marks_paperId_fkey" FOREIGN KEY ("paperId") REFERENCES "internal_exam_papers"("id") ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT "internal_exam_marks_recordedById_fkey" FOREIGN KEY ("recordedById") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE,
-  CONSTRAINT "internal_exam_marks_positive_check" CHECK ("marks" >= 0),
+  CONSTRAINT "internal_exam_marks_positive_check" CHECK ("marks" IS NULL OR "marks" >= 0),
+  CONSTRAINT "internal_exam_marks_status_check" CHECK (("status"='MARKED' AND "marks" IS NOT NULL) OR ("status"='ABSENT' AND "marks" IS NULL)),
   CONSTRAINT "internal_exam_marks_version_check" CHECK ("version" > 0)
 );
 CREATE UNIQUE INDEX "internal_exam_marks_candidateId_paperId_key" ON "internal_exam_marks"("candidateId","paperId");
@@ -88,7 +91,8 @@ BEGIN
   IF exam_state <> 'OPEN' OR paper_final IS NOT NULL THEN
     RAISE EXCEPTION 'Mock paper is not open for entry';
   END IF;
-  IF NEW."marks" < 0 OR NEW."marks" > max_score THEN
+  IF (NEW."status" = 'MARKED' AND (NEW."marks" IS NULL OR NEW."marks" < 0 OR NEW."marks" > max_score)) OR
+     (NEW."status" = 'ABSENT' AND NEW."marks" IS NOT NULL) THEN
     RAISE EXCEPTION 'Mock mark exceeds its subject paper maximum';
   END IF;
   RETURN NEW;

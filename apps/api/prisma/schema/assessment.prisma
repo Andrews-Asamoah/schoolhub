@@ -452,6 +452,11 @@ enum InternalExamStatus {
   LOCKED
 }
 
+enum InternalExamMarkStatus {
+  MARKED
+  ABSENT
+}
+
 model InternalExamSession {
   id             String             @id @default(cuid())
   schoolId       String
@@ -521,7 +526,8 @@ model InternalExamMark {
   id String @id @default(cuid())
   candidateId String
   paperId String
-  marks Decimal @db.Decimal(6, 2)
+  marks Decimal? @db.Decimal(6, 2)
+  status InternalExamMarkStatus @default(MARKED)
   version Int @default(1)
   recordedById String?
   createdAt DateTime @default(now())
