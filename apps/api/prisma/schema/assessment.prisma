@@ -586,7 +586,11 @@ model InternalMockReport {
   @@map("internal_mock_reports")
 }
 
-enum MockCorrectionStatus { PENDING APPLIED REJECTED }
+enum MockCorrectionStatus {
+  PENDING
+  APPLIED
+  REJECTED
+}
 
 /** Immutable request evidence; approved changes produce new report versions. */
 model InternalMockCorrection {
