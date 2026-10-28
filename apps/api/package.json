@@ -23,6 +23,7 @@
     "test:e2e": "vitest run --config ./vitest.config.e2e.ts",
     "dev": "pnpm --filter @schoolhub/shared build && pnpm prisma:generate && nest start --watch",
     "migrate": "prisma migrate dev",
+    "migrate:deploy": "prisma migrate deploy --config prisma.config.ts",
     "studio": "prisma studio",
     "seed": "node --import tsx/esm prisma/seed.ts",
     "finance:reset-payments": "node --import tsx/esm scripts/reset-dev-payments.ts",

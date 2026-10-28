@@ -9,7 +9,8 @@
     "dev": "turbo run dev",
     "typecheck": "turbo run typecheck",
     "db:migrate": "pnpm --filter @schoolhub/api migrate",
-    "db:studio": "pnpm --filter @schoolhub/api studio"
+    "db:studio": "pnpm --filter @schoolhub/api studio",
+    "db:deploy": "pnpm --filter @schoolhub/api migrate:deploy"
   },
   "devDependencies": {
     "@types/node": "^26.6.5",
