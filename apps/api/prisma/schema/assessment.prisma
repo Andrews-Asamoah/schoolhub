@@ -479,6 +479,7 @@ model InternalExamSession {
   createdBy user? @relation("InternalExamSessionCreator", fields: [createdById], references: [id], onDelete: SetNull)
   candidates InternalExamCandidate[]
   papers InternalExamPaper[]
+  reports InternalMockReport[]
 
   @@unique([schoolId, academicYearId, classId, mockNumber])
   @@index([schoolId, status, createdAt])
@@ -499,6 +500,7 @@ model InternalExamCandidate {
   marks InternalExamMark[]
 
   @@unique([sessionId, studentId])
+  reports InternalMockReport[]
   @@index([studentId])
   @@map("internal_exam_candidates")
 }
@@ -541,4 +543,42 @@ model InternalExamMark {
   @@index([paperId])
   @@index([recordedById])
   @@map("internal_exam_marks")
+}
+
+/**
+ * One immutable result snapshot per generation; sign-offs cannot modify frozen marks.
+ * Versions support controlled future reissue without overwriting an older release.
+ */
+model InternalMockReport {
+  id String @id @default(cuid())
+  schoolId String
+  sessionId String
+  candidateId String
+  studentId String
+  version Int @default(1)
+  stage String @default("GENERATED") @db.VarChar(32)
+  snapshot Json
+  snapshotHash String @db.VarChar(64)
+  teacherActorId String?
+  teacherName String? @db.VarChar(160)
+  teacherRemark String? @db.VarChar(2000)
+  teacherApprovedAt DateTime?
+  headActorId String?
+  headName String? @db.VarChar(160)
+  headRemark String? @db.VarChar(2000)
+  headApprovedAt DateTime?
+  publishedAt DateTime?
+  createdAt DateTime @default(now())
+
+  school School @relation(fields: [schoolId], references: [id], onDelete: Restrict)
+  session InternalExamSession @relation(fields: [sessionId], references: [id], onDelete: Restrict)
+  candidate InternalExamCandidate @relation(fields: [candidateId], references: [id], onDelete: Restrict)
+  student Student @relation(fields: [studentId], references: [id], onDelete: Restrict)
+  teacher user? @relation("MockReportTeacher", fields: [teacherActorId], references: [id], onDelete: SetNull)
+  head user? @relation("MockReportHead", fields: [headActorId], references: [id], onDelete: SetNull)
+
+  @@unique([candidateId, version])
+  @@index([schoolId, sessionId, stage])
+  @@index([schoolId, studentId, publishedAt])
+  @@map("internal_mock_reports")
 }
