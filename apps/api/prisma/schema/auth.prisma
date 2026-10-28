@@ -35,6 +35,10 @@ model user {
   members              member[]
   attendancesMarked    Attendance[]           @relation("AttendanceMarkedBy")
   internalExamMarksRecorded InternalExamMark[] @relation("InternalExamMarkRecorder")
+  externalExamResultsRecorded ExternalExamResult[] @relation("ExternalExamResultRecorder")
+  externalExamSessionsCreated ExternalExamSession[] @relation("ExternalExamCreator")
+  externalExamSessionsLocked ExternalExamSession[] @relation("ExternalExamLocker")
+  externalExamImportsCreated ExternalExamImport[] @relation("ExternalExamImportActor")
   internalExamSessionsCreated InternalExamSession[] @relation("InternalExamSessionCreator")
   internalMockTeacherSignoffs InternalMockReport[] @relation("MockReportTeacher")
   internalMockHeadSignoffs InternalMockReport[] @relation("MockReportHead")

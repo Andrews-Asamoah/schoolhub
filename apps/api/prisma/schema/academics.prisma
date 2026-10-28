@@ -43,6 +43,7 @@ model AcademicYear {
   admissionCycles  AdmissionCycle[]
   reportCardSets   ReportCardSet[]
   internalExamSessions InternalExamSession[]
+  externalExamSessions ExternalExamSession[]
   timetableEntries TimetableEntry[]
 
   teacherAssignments    TeacherAssignment[]
@@ -161,6 +162,7 @@ model Class {
   reportCardSets            ReportCardSet[]
   reportCardSetClasses      ReportCardSetClass[]
   internalExamSessions      InternalExamSession[]
+  externalExamSessions      ExternalExamSession[]
   assessmentExtensions      AssessmentExtension[]
   timetableEntries          TimetableEntry[]
 
@@ -250,6 +252,7 @@ model Subject {
   departments      Department[]      @relation("DepartmentSubjects")
   assessmentScores AssessmentScore[]
   internalExamPapers InternalExamPaper[]
+  externalExamPapers ExternalExamPaper[]
   classSubjects    ClassSubject[]
   schoolAssignments SchoolAssignment[]
   teachers         SubjectTeacher[]
