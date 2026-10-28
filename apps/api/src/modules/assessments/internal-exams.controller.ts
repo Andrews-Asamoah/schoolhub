@@ -7,10 +7,12 @@ import { Roles } from "../../common/decorators/roles.decorator.js";
 import { CurrentSchool } from "../../common/decorators/current-school.decorator.js";
 import { CurrentSchoolRole } from "../../common/decorators/current-school-role.decorator.js";
 import { CurrentUser, type AuthenticatedUser } from "../../common/decorators/current-user.decorator.js";
-import { ZodValidationPipe } from "../../common/pipes/zod-validation.pipe.js";
 import { createMockSchema, mockMarkSchema } from "./internal-exams.schemas.js";
 import { InternalExamsService } from "./internal-exams.service.js";
 import { MockReportService } from "./mock-report.service.js";
+import { MockCorrectionService } from "./mock-correction.service.js";
+import { mockCorrectionRequestSchema,mockCorrectionDecisionSchema } from "./internal-exams.schemas.js";
+import { ZodValidationPipe } from "../../common/pipes/zod-validation.pipe.js";
 import type { Response } from "express";
 
 /** Internal mock examinations only. External WAEC/BECE results never use these endpoints. */
@@ -18,7 +20,8 @@ import type { Response } from "express";
 @UseGuards(SchoolTenantGuard,RolesGuard)
 export class InternalExamsController {
   constructor(private readonly exams:InternalExamsService,
-    private readonly mockReports:MockReportService){}
+    private readonly mockReports:MockReportService,
+    private readonly corrections:MockCorrectionService){}
 
   private recommendation(body:unknown){
     const remark=body&&typeof body==="object"&&"remark" in body
@@ -27,6 +30,38 @@ export class InternalExamsController {
       throw new BadRequestException("Write 10–2000 characters of recommendation.");
     }
     return remark.trim();
+  }
+
+
+  @Get(":id/corrections")
+  @Roles("owner","admin","headteacher","teacher")
+  listCorrections(@CurrentSchool() school:School,@CurrentUser() user:AuthenticatedUser,
+    @CurrentSchoolRole() role:string|undefined,@Param("id") id:string){
+    return this.corrections.list(school.id,user.id,role,id);
+  }
+
+  @Post(":id/corrections")
+  @Roles("owner","admin","headteacher","teacher")
+  requestCorrection(@CurrentSchool() school:School,@CurrentUser() user:AuthenticatedUser,
+    @CurrentSchoolRole() role:string|undefined,@Param("id") id:string,
+    @Body(new ZodValidationPipe(mockCorrectionRequestSchema)) input:z.infer<typeof mockCorrectionRequestSchema>){
+    return this.corrections.request(school.id,user.id,role,id,input);
+  }
+
+  @Post("corrections/:id/approve")
+  @Roles("headteacher")
+  approveCorrection(@CurrentSchool() school:School,@CurrentUser() user:AuthenticatedUser,
+    @CurrentSchoolRole() role:string|undefined,@Param("id") id:string,
+    @Body(new ZodValidationPipe(mockCorrectionDecisionSchema)) input:z.infer<typeof mockCorrectionDecisionSchema>){
+    return this.corrections.decide(school.id,user.id,role,id,true,input.reason);
+  }
+
+  @Post("corrections/:id/reject")
+  @Roles("headteacher")
+  rejectCorrection(@CurrentSchool() school:School,@CurrentUser() user:AuthenticatedUser,
+    @CurrentSchoolRole() role:string|undefined,@Param("id") id:string,
+    @Body(new ZodValidationPipe(mockCorrectionDecisionSchema)) input:z.infer<typeof mockCorrectionDecisionSchema>){
+    return this.corrections.decide(school.id,user.id,role,id,false,input.reason);
   }
 
   @Get("grading-systems")
