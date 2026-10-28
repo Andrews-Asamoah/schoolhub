@@ -33,6 +33,7 @@ model School {
   assessmentTemplates         AssessmentTemplate[]
   reportCardVersions          ReportCardVersion[]
   internalExamSessions       InternalExamSession[]
+  externalExamSessions ExternalExamSession[]
   internalMockReports        InternalMockReport[]
   internalMockCorrections    InternalMockCorrection[]
   bills                       Bill[]
@@ -206,6 +207,7 @@ model Student {
   @@map("students")
   reportCardVersions ReportCardVersion[]
   internalExamCandidates InternalExamCandidate[]
+  externalExamCandidates ExternalExamCandidate[]
   internalMockReports InternalMockReport[]
 }
 
