@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { BookOpenCheck, CheckCheck, ClipboardList, LockKeyhole, Plus } from "lucide-react";
 import { apiFetch } from "@/lib/api";
+import { MockReportReviewWorkspace } from "./mock-report-review-workspace";
 import { useSchoolRole } from "@/components/school/school-role-switcher";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
@@ -224,8 +225,10 @@ export function InternalExaminationsWorkspace() {
       {updateSession.isError&&<p role="alert" className="text-xs text-destructive">{failure(updateSession.error)}</p>}
       {notice&&<p role="status" className="rounded-lg bg-muted p-3 text-xs">{notice}</p>}
     </section>
-    <p className="text-xs text-muted-foreground">This phase records and locks mock scores.
-      Publishing signed Mock 1/Mock 2 reports requires the separate report-approval and release workflow;
-      locked marks are not automatically visible to pupils or guardians.</p>
+    {current && (manager || activeRole==="teacher") &&
+      <MockReportReviewWorkspace key={current.id} sessionId={current.id} status={current.status} />}
+    <p className="text-xs text-muted-foreground">Internal mock examination marks are recorded separately and locked before report generation.
+      Mock 1/Mock 2 reports require independent teacher and headteacher recommendations and
+      explicit publication; locked marks alone are never visible to pupils or guardians.</p>
   </div>;
 }

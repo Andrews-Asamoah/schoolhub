@@ -3,6 +3,7 @@ import { CheckCircle2, FileText, GraduationCap, LoaderCircle, Printer, Sparkles 
 import { useState } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { apiFetch, downloadAcademicReport } from "@/lib/api";
+import { MockPublishedReportCards } from "@/components/portal/mock-published-report-cards";
 
 interface ReportSubject {
   subject: { id: string; name: string; code: string };
@@ -109,6 +110,7 @@ export function StudentReportView() {
         <footer className="flex flex-col gap-2 border-t border-border pt-4 text-[11px] leading-5 text-muted-foreground sm:flex-row sm:items-center sm:justify-between"><p>This report was made available securely through SchoolHub.</p><p>{active.set.template.name} · {active.set.term.name}</p></footer>
       </div>
     </article>}
+    <MockPublishedReportCards audience="student" />
     <style>{`@media print { body * { visibility: hidden; } .report-print-area, .report-print-area * { visibility: visible; } .report-print-area { position: absolute; inset: 0; width: 100%; border: 0; box-shadow: none; padding: 0; background: white !important; color: black !important; } .report-print-area section { break-inside: avoid; } @page { size: A4; margin: 12mm; } }`}</style>
   </div>;
 }
