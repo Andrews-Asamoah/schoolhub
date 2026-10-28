@@ -19,3 +19,19 @@ export const mockMarkSchema = z.object({
     });
   }),
 }).strict();
+
+export const mockCorrectionRequestSchema = z.object({
+  candidateId:z.string().min(1),
+  paperId:z.string().min(1),
+  status:z.enum(["MARKED","ABSENT"]),
+  marks:z.number().finite().min(0).max(9999).multipleOf(0.01).nullable(),
+  expectedVersion:z.number().int().positive(),
+  reason:z.string().trim().min(10).max(2000),
+}).strict().superRefine((v,ctx)=>{
+  if((v.status==="MARKED")!==(v.marks!==null))ctx.addIssue({
+    code:"custom",path:["marks"],message:"Absent means no marks; marked pupils require numeric marks.",
+  });
+});
+export const mockCorrectionDecisionSchema = z.object({
+  reason:z.string().trim().min(10).max(2000),
+}).strict();

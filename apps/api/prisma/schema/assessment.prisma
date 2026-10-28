@@ -480,6 +480,7 @@ model InternalExamSession {
   candidates InternalExamCandidate[]
   papers InternalExamPaper[]
   reports InternalMockReport[]
+  correctionRequests InternalMockCorrection[]
 
   @@unique([schoolId, academicYearId, classId, mockNumber])
   @@index([schoolId, status, createdAt])
@@ -499,6 +500,7 @@ model InternalExamCandidate {
   student Student @relation(fields: [studentId], references: [id])
   marks InternalExamMark[]
 
+  correctionRequests InternalMockCorrection[]
   @@unique([sessionId, studentId])
   reports InternalMockReport[]
   @@index([studentId])
@@ -518,6 +520,7 @@ model InternalExamPaper {
   session InternalExamSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
   subject Subject @relation(fields: [subjectId], references: [id])
   marks InternalExamMark[]
+  correctionRequests InternalMockCorrection[]
 
   @@unique([sessionId, subjectId])
   @@index([subjectId])
@@ -581,4 +584,40 @@ model InternalMockReport {
   @@index([schoolId, sessionId, stage])
   @@index([schoolId, studentId, publishedAt])
   @@map("internal_mock_reports")
+}
+
+enum MockCorrectionStatus {
+  PENDING
+  APPLIED
+  REJECTED
+}
+
+/** Immutable request evidence; approved changes produce new report versions. */
+model InternalMockCorrection {
+  id String @id @default(cuid())
+  schoolId String
+  sessionId String
+  candidateId String
+  paperId String
+  baseVersion Int
+  previousStatus InternalExamMarkStatus
+  previousMarks Decimal? @db.Decimal(6,2)
+  requestedStatus InternalExamMarkStatus
+  requestedMarks Decimal? @db.Decimal(6,2)
+  reason String @db.VarChar(2000)
+  status MockCorrectionStatus @default(PENDING)
+  requestedById String?
+  requestedAt DateTime @default(now())
+  reviewedById String?
+  reviewedAt DateTime?
+  reviewReason String? @db.VarChar(2000)
+  school School @relation(fields: [schoolId], references: [id], onDelete: Restrict)
+  session InternalExamSession @relation(fields: [sessionId], references: [id], onDelete: Restrict)
+  candidate InternalExamCandidate @relation(fields: [candidateId], references: [id], onDelete: Restrict)
+  paper InternalExamPaper @relation(fields: [paperId], references: [id], onDelete: Restrict)
+  requester user? @relation("MockCorrectionRequester", fields: [requestedById], references: [id], onDelete: SetNull)
+  reviewer user? @relation("MockCorrectionReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  @@index([schoolId, sessionId, status, requestedAt])
+  @@index([candidateId, paperId])
+  @@map("internal_mock_corrections")
 }

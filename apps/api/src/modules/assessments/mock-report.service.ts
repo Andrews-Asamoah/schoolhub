@@ -145,16 +145,18 @@ export class MockReportService {
     if(!session)throw new NotFoundException("Mock examination not found.");
     await this.canReview(schoolId,userId,role,session.classId);
     const rows=await this.prisma.client.internalMockReport.findMany({
-      where:{schoolId,sessionId},orderBy:{createdAt:"asc"},
+      where:{schoolId,sessionId},orderBy:[{version:"desc"},{createdAt:"asc"}],
       select:{id:true,candidateId:true,studentId:true,version:true,stage:true,
         snapshot:true,snapshotHash:true,teacherRemark:true,teacherName:true,
         teacherApprovedAt:true,headRemark:true,headName:true,headApprovedAt:true,
         publishedAt:true},
     });
+    const current=rows.filter((r,i)=>rows.findIndex(x=>x.candidateId===r.candidateId)===i);
     return {session:{id:session.id,name:session.name,status:session.status},
-      expected:session.candidates.length,generated:rows.length,
+      expected:session.candidates.length,generated:current.length,
+      historicalVersions:rows.length-current.length,
       papers:session.papers.length,
-      reports:rows.map(r=>({...r,integrityOk:snapshotHash(r.snapshot)===r.snapshotHash}))};
+      reports:current.map(r=>({...r,integrityOk:snapshotHash(r.snapshot)===r.snapshotHash}))};
   }
 
   async recommend(schoolId:string,actorId:string,role:string|undefined,reportId:string,remark:string){
@@ -173,6 +175,11 @@ export class MockReportService {
         where:{id:reportId,schoolId,stage:"GENERATED"},select:{id:true,snapshot:true,snapshotHash:true},
       });
       if(!current)throw new ConflictException("Mock report has already been reviewed or released.");
+      const newest=await tx.internalMockReport.findFirst({
+        where:{schoolId,sessionId:report.sessionId,candidateId:(await tx.internalMockReport.findUniqueOrThrow({where:{id:reportId},select:{candidateId:true}})).candidateId},
+        orderBy:{version:"desc"},select:{id:true},
+      });
+      if(newest?.id!==reportId)throw new ConflictException("A newer correction version must be reviewed.");
       if(snapshotHash(current.snapshot)!==current.snapshotHash)throw new ConflictException("Mock source integrity check failed.");
       await tx.internalMockReport.update({where:{id:reportId},data:{
         stage:"TEACHER_REVIEWED",teacherActorId:actor.id,teacherName:actor.name.slice(0,160),
@@ -197,11 +204,16 @@ export class MockReportService {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${schoolId}),hashtext(${report.sessionId}))`;
       const row=await tx.internalMockReport.findFirst({
         where:{id:reportId,schoolId,stage:"TEACHER_REVIEWED"},
-        select:{teacherActorId:true,teacherApprovedAt:true,snapshot:true,snapshotHash:true},
+        select:{candidateId:true,teacherActorId:true,teacherApprovedAt:true,snapshot:true,snapshotHash:true},
       });
       if(!row||!row.teacherActorId||!row.teacherApprovedAt){
         throw new ConflictException("Class-teacher recommendation is required first.");
       }
+      const newest=await tx.internalMockReport.findFirst({
+        where:{schoolId,sessionId:report.sessionId,candidateId:row.candidateId},
+        orderBy:{version:"desc"},select:{id:true},
+      });
+      if(newest?.id!==reportId)throw new ConflictException("A newer correction version must be approved.");
       if(row.teacherActorId===actorId){
         throw new ForbiddenException("One person cannot sign both approval stages.");
       }
@@ -227,37 +239,48 @@ export class MockReportService {
       });
       if(!session)throw new ConflictException("The entire mock examination must be locked before publication.");
       const rows=await tx.internalMockReport.findMany({
-        where:{schoolId,sessionId},select:{id:true,candidateId:true,stage:true,
+        where:{schoolId,sessionId},orderBy:{version:"desc"},select:{id:true,candidateId:true,stage:true,
           teacherActorId:true,headActorId:true,teacherApprovedAt:true,headApprovedAt:true,
           teacherName:true,headName:true,snapshot:true,snapshotHash:true},
       });
-      if(!rows.length||rows.length!==session.candidates.length||
-        new Set(rows.map(r=>r.candidateId)).size!==rows.length||
-        rows.some(r=>r.stage!=="APPROVED"||!r.teacherActorId||!r.headActorId||
+      const latest=rows.filter((r,i)=>rows.findIndex(x=>x.candidateId===r.candidateId)===i);
+      if(!latest.length||latest.length!==session.candidates.length||
+        latest.some(r=>r.stage!=="APPROVED"||!r.teacherActorId||!r.headActorId||
         r.teacherActorId===r.headActorId||!r.teacherApprovedAt||!r.headApprovedAt||
         !r.teacherName||!r.headName||snapshotHash(r.snapshot)!==r.snapshotHash)){
         throw new ConflictException("Every pupil requires a verified class-teacher and distinct headteacher approval.");
       }
       const now=new Date();
-      await tx.internalMockReport.updateMany({where:{schoolId,sessionId,stage:"APPROVED"},
+      await tx.internalMockReport.updateMany({where:{schoolId,sessionId,
+          id:{in:latest.map(r=>r.id)},stage:"APPROVED"},
         data:{stage:"PUBLISHED",publishedAt:now}});
       await tx.auditLog.create({data:{schoolId,userId,action:"UPDATE",
         entityType:"INTERNAL_MOCK_REPORT_BATCH",entityId:sessionId,
-        newValues:{stage:"PUBLISHED",count:rows.length,at:now.toISOString()}}});
-      return {sessionId,published:rows.length,publishedAt:now};
+        newValues:{stage:"PUBLISHED",count:latest.length,at:now.toISOString()}}});
+      return {sessionId,published:latest.length,publishedAt:now};
     });
   }
 
+  /** Families see only the latest released report per pupil and mock session.
+   * Historical published originals remain immutable for authorised staff audit.
+   */
   async published(schoolId:string,userId:string,audience:"student"|"guardian"){
     const db=this.prisma.client;
+    const latest=<T extends {sessionId:string;studentId:string}>(rows:T[]):T[]=>{
+      const seen=new Set<string>();
+      return rows.filter(r=>{const key=r.sessionId+":"+r.studentId;
+        if(seen.has(key))return false;
+        seen.add(key);return true;});
+    };
     if(audience==="student"){
       const student=await db.student.findFirst({where:{schoolId,deletedAt:null,profile:{userId}},
         select:{id:true}});
       if(!student)return [];
-      return db.internalMockReport.findMany({
+      return latest(await db.internalMockReport.findMany({
         where:{schoolId,studentId:student.id,stage:"PUBLISHED",publishedAt:{not:null}},
-        orderBy:{publishedAt:"desc"},select:{id:true,snapshot:true,publishedAt:true,version:true},
-      });
+        orderBy:[{version:"desc"},{publishedAt:"desc"}],select:{id:true,sessionId:true,studentId:true,
+          snapshot:true,publishedAt:true,version:true},
+      }));
     }
     const guardian=await db.guardian.findFirst({
       where:{schoolId,deletedAt:null,isActive:true,profile:{userId}},
@@ -265,12 +288,12 @@ export class MockReportService {
         select:{studentId:true}}},
     });
     if(!guardian)return [];
-    return db.internalMockReport.findMany({
+    return latest(await db.internalMockReport.findMany({
       where:{schoolId,studentId:{in:guardian.students.map(x=>x.studentId)},
         stage:"PUBLISHED",publishedAt:{not:null}},
-      orderBy:{publishedAt:"desc"},
-      select:{id:true,snapshot:true,publishedAt:true,version:true},
-    });
+      orderBy:[{version:"desc"},{publishedAt:"desc"}],
+      select:{id:true,sessionId:true,studentId:true,snapshot:true,publishedAt:true,version:true},
+    }));
   }
 
   async pdf(schoolId:string,userId:string,reportId:string,audience:"student"|"guardian"){
@@ -287,6 +310,12 @@ export class MockReportService {
             student:{schoolId,deletedAt:null}}}},select:{id:true},
       });
     if(!valid)throw new NotFoundException("Published mock report not found.");
+    const newestPublished=await this.prisma.client.internalMockReport.findFirst({
+      where:{schoolId,sessionId:report.sessionId,studentId:report.studentId,
+        stage:"PUBLISHED",publishedAt:{not:null}},
+      orderBy:{version:"desc"},select:{id:true},
+    });
+    if(newestPublished?.id!==reportId)throw new NotFoundException("Report has been replaced by a newer approved version.");
     if(snapshotHash(report.snapshot)!==report.snapshotHash||!report.publishedAt||
       !report.teacherName||!report.teacherRemark||!report.teacherApprovedAt||
       !report.headName||!report.headRemark||!report.headApprovedAt||

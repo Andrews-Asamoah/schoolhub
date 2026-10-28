@@ -1,14 +1,15 @@
 import { useState } from "react";
 import { useMutation,useQuery,useQueryClient } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api";
+import { MockCorrectionWorkspace } from "./mock-correction-workspace";
 import { useSchoolRole } from "@/components/school/school-role-switcher";
 import { Select,SelectContent,SelectItem,SelectTrigger,SelectValue } from "@/components/ui/select";
 type GradeSystem={id:string;name:string;isSchoolDefault:boolean;isSystemDefault:boolean;
   gradeScales:{grade:string;min:number;max:number;description:string}[]};
 type Snapshot={name:string;pupil:{name:string;admissionNumber:string|null};
-  papers:{name:string;code:string;status:string;mark:number|null;percentage:number|null;grade:string|null}[];
+  papers:{id:string;name:string;code:string;status:"MARKED"|"ABSENT";mark:number|null;maxMarks:number;percentage:number|null;grade:string|null}[];
   average:number|null;position:number|null;grading:{name:string}};
-type Report={id:string;stage:string;version:number;integrityOk:boolean;
+type Report={id:string;candidateId:string;stage:string;version:number;integrityOk:boolean;
   snapshot:Snapshot;teacherName:string|null;teacherRemark:string|null;headName:string|null;
   headRemark:string|null};
 type Review={session:{id:string;name:string;status:string};expected:number;
@@ -122,6 +123,7 @@ export function MockReportReviewWorkspace({sessionId,status}:{sessionId:string;s
         </article>;
       })}</div>
     </>}
+    {review.data && <MockCorrectionWorkspace sessionId={sessionId} reports={rows} />}
     {(generation.isError||approve.isError||publish.isError)&&
       <p role="alert" className="text-xs text-destructive">
         {(generation.error??approve.error??publish.error)?.message}</p>}

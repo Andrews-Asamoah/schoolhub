@@ -10,11 +10,12 @@ import { ReportVersionService } from "./report-version.service.js";
 import { InternalExamsController } from "./internal-exams.controller.js";
 import { InternalExamsService } from "./internal-exams.service.js";
 import { MockReportService } from "./mock-report.service.js";
+import { MockCorrectionService } from "./mock-correction.service.js";
 import { ReportTemplatePresetsService } from "./report-template-presets.service.js";
 
 @Module({
   controllers: [AssessmentsController, AssessmentSetupController, ReportPublicationController, InternalExamsController],
-  providers: [AssessmentsService, AssessmentEntryService, AssessmentSetupService, ReportPublicationService, ReportVersionService, InternalExamsService, MockReportService, ReportTemplatePresetsService],
+  providers: [AssessmentsService, AssessmentEntryService, AssessmentSetupService, ReportPublicationService, ReportVersionService, InternalExamsService, MockReportService, MockCorrectionService, ReportTemplatePresetsService],
   exports: [AssessmentsService],
 })
 export class AssessmentsModule {}

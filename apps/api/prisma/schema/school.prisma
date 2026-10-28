@@ -34,6 +34,7 @@ model School {
   reportCardVersions          ReportCardVersion[]
   internalExamSessions       InternalExamSession[]
   internalMockReports        InternalMockReport[]
+  internalMockCorrections    InternalMockCorrection[]
   bills                       Bill[]
   siblingDiscountPolicies     SiblingDiscountPolicy[]
   studentScholarships         StudentScholarship[]

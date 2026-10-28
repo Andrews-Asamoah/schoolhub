@@ -13,6 +13,7 @@ export interface MockSnapshot {
   grading:{name:string;bands:GradeBand[];scoreRounding:"NEAREST_WHOLE_PERCENT"};
   average:number|null; position:number|null; positionMethod:"COMPETITION";
   capturedAt:string;
+  correction?:{requestId:string;baseVersion:number;approvedAt:string};
 }
 export function validateBands(bands:readonly GradeBand[]) {
   if(!bands.length)throw new Error("Configure a grading system before generating mock reports.");
@@ -73,6 +74,7 @@ export function mockSnapshotPdf(snapshot:MockSnapshot, approval:{
   y+=4;write("HEADTEACHER RECOMMENDATION",11,true);
   write(approval.headRemark);write("Electronic approval: "+approval.headName+" · "+approval.headAt.toISOString(),9);
   y+=7;write("Published "+approval.publishedAt.toISOString()+" · Report v"+approval.version,9);
+  if(snapshot.correction)write("CORRECTED REISSUE · replaces version "+snapshot.correction.baseVersion+" · correction "+snapshot.correction.requestId,8);
   write("Snapshot SHA-256: "+approval.hash,8);
   write("Electronic workflow sign-offs; not certificate-based digital signatures.",8);
   doc.setProperties({title:snapshot.name+" · "+snapshot.pupil.name,subject:"School internal mock examination result"});
