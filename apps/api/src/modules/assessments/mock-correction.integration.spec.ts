@@ -147,4 +147,27 @@ describe.skipIf(!enabled)("controlled published mock corrections (PostgreSQL)",{
     const events=await db.auditLog.count({where:{schoolId,entityType:"INTERNAL_MOCK_CORRECTION"}});
     expect(events).toBe(2);
   });
+  it("requires fresh independent signoffs and releases only latest corrected PDFs to families",async()=>{
+    const current=await reports.review(schoolId,manager,"admin",sessionId);
+    expect(current.reports).toHaveLength(1);
+    expect(current.generated).toBe(1);
+    expect(current.historicalVersions).toBe(1);
+    const updated=current.reports[0]!;
+    expect(updated.stage).toBe("GENERATED");
+    await expect(reports.publish(schoolId,manager,"admin",sessionId)).rejects.toThrow(/every pupil/i);
+    await reports.recommend(schoolId,teacher,"teacher",updated.id,
+      "After the verified correction, the pupil performed excellently.");
+    await reports.headApprove(schoolId,head,"headteacher",updated.id,
+      "The corrected marks are confirmed and approved for release.");
+    const result=await reports.publish(schoolId,manager,"admin",sessionId);
+    expect(result.published).toBe(1);
+    expect((await reports.published(schoolId,pupil,"student")).map(x=>x.id)).toEqual([updated.id]);
+    await expect(reports.pdf(schoolId,pupil,originalId,"student")).rejects.toThrow(/replaced/i);
+    const file=await reports.pdf(schoolId,pupil,updated.id,"student");
+    expect(file.content.subarray(0,4).toString()).toBe("%PDF");
+    await expect(reports.pdf(schoolId,outsider,updated.id,"student")).rejects.toThrow(/not found/i);
+    await expect(db.internalMockReport.update({
+      where:{id:updated.id},data:{headRemark:"Secret modification"},
+    })).rejects.toThrow();
+  });
 });
