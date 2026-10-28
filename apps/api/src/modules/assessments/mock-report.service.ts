@@ -131,7 +131,8 @@ export class MockReportService {
       await tx.auditLog.create({data:{schoolId,userId:actor.id,action:"CREATE",
         entityType:"INTERNAL_MOCK_REPORT_BATCH",entityId:sessionId,
         newValues:{count:completed.length,gradingSystemId,
-          gradeBands:bands,capturedAt,positionMethod:"COMPETITION"}}});
+          gradeBands:bands.map(b=>({grade:b.grade,min:b.min,max:b.max,description:b.description})),
+          capturedAt,positionMethod:"COMPETITION"}}});
       return {sessionId,generated:completed.length,gradingSystem:gradeSystem.name};
     },{isolationLevel:Prisma.TransactionIsolationLevel.Serializable,timeout:30000});
   }
