@@ -85,7 +85,6 @@ model Term {
   admissionCycles       AdmissionCycle[]
   reportCardSets        ReportCardSet[]
   internalExamSessions InternalExamSession[]
-  externalExamSessions ExternalExamSession[]
   notifications         Notification[]
   announcements         Announcement[]
   expenses              Expense[]
