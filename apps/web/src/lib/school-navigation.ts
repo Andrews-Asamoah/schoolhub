@@ -159,6 +159,17 @@ export const schoolNavGroups: SchoolNavGroup[] = [
     ],
   },
   {
+    label: "Examinations",
+    items: [
+      { id: "internal-exams", label: "Internal", icon: BookOpenCheck,
+        description: "Numbered JHS 3 mock examinations, subjects and staff mark entry.",
+        section: "Examinations", apiStatus: "available" },
+      { id: "external-exams", label: "External", icon: ClipboardCheck,
+        description: "BECE results — authorised staff only (planned).",
+        section: "Examinations", apiStatus: "planned" },
+    ],
+  },
+  {
     label: "Family",
     items: [
       {
@@ -500,6 +511,7 @@ export const schoolNavItems = schoolNavGroups.flatMap((group) => group.items);
 
 const rolePages: Record<string, string[]> = {
   teacher: [
+    "internal-exams",
     "students",
     "classes",
     "subjects",

@@ -70,6 +70,7 @@ import { DocumentsWorkspace } from "@/components/portal/documents-workspace";
 import { MessagesWorkspace } from "@/components/portal/messages-workspace";
 import { NotificationsHistoryWorkspace } from "@/components/portal/notifications-history-workspace";
 import { SchoolReportsWorkspace } from "@/components/school/reports-workspace";
+import { InternalExaminationsWorkspace } from "@/components/school/internal-examinations-workspace";
 import { TeacherReportReviewWorkspace } from "@/components/school/teacher-report-review-workspace";
 
 export const Route = createFileRoute("/$page")({
@@ -295,6 +296,11 @@ function WorkspaceContent({ pageId }: { pageId: string }) {
             activeRole === "student" ? <StudentSubjectsView /> : <SubjectsWorkspace />
           )}
           {pageId === "academic-years" && <AcademicYears query={yearsQuery} />}
+          {pageId === "internal-exams" && <InternalExaminationsWorkspace />}
+          {pageId === "external-exams" && (
+            <WorkspaceEmptyState title="External examinations"
+              description="BECE results are restricted to authorised teachers and school examination staff. The staff-only external results workspace is not yet released." />
+          )}
           {pageId === "assessments" && (
             activeRole === "student" ? (
               <StudentReportView />

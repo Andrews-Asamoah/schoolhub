@@ -32,6 +32,7 @@ model School {
   attendanceExclusions        StudentAttendanceExclusion[]
   assessmentTemplates         AssessmentTemplate[]
   reportCardVersions          ReportCardVersion[]
+  internalExamSessions       InternalExamSession[]
   bills                       Bill[]
   siblingDiscountPolicies     SiblingDiscountPolicy[]
   studentScholarships         StudentScholarship[]
@@ -202,6 +203,7 @@ model Student {
   @@index([schoolId, deletedAt])
   @@map("students")
   reportCardVersions ReportCardVersion[]
+  internalExamCandidates InternalExamCandidate[]
 }
 
 model Teacher {

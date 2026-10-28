@@ -443,3 +443,102 @@ model ReportCardVersion {
   @@index([studentId, publishedAt])
   @@map("report_card_versions")
 }
+
+// An internal mock is deliberately independent of termly SBA and WAEC external results.
+// Identifiers/rosters/subject names are frozen at session creation.
+enum InternalExamStatus {
+  DRAFT
+  OPEN
+  LOCKED
+}
+
+enum InternalExamMarkStatus {
+  MARKED
+  ABSENT
+}
+
+model InternalExamSession {
+  id             String             @id @default(cuid())
+  schoolId       String
+  academicYearId String
+  termId         String
+  classId        String
+  mockNumber     Int
+  name           String             @db.VarChar(120)
+  status         InternalExamStatus @default(DRAFT)
+  createdById    String?
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+  openedAt       DateTime?
+  lockedAt       DateTime?
+
+  school School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  academicYear AcademicYear @relation(fields: [academicYearId], references: [id])
+  term Term @relation(fields: [termId], references: [id])
+  class Class @relation(fields: [classId], references: [id])
+  createdBy user? @relation("InternalExamSessionCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  candidates InternalExamCandidate[]
+  papers InternalExamPaper[]
+
+  @@unique([schoolId, academicYearId, classId, mockNumber])
+  @@index([schoolId, status, createdAt])
+  @@index([classId, academicYearId])
+  @@map("internal_exam_sessions")
+}
+
+model InternalExamCandidate {
+  id String @id @default(cuid())
+  sessionId String
+  studentId String
+  nameSnapshot String @db.VarChar(200)
+  admissionNumberSnapshot String? @db.VarChar(100)
+  createdAt DateTime @default(now())
+
+  session InternalExamSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  student Student @relation(fields: [studentId], references: [id])
+  marks InternalExamMark[]
+
+  @@unique([sessionId, studentId])
+  @@index([studentId])
+  @@map("internal_exam_candidates")
+}
+
+model InternalExamPaper {
+  id String @id @default(cuid())
+  sessionId String
+  subjectId String
+  nameSnapshot String @db.VarChar(160)
+  codeSnapshot String @db.VarChar(40)
+  maxMarks Decimal @default(100) @db.Decimal(6, 2)
+  finalizedAt DateTime?
+  createdAt DateTime @default(now())
+
+  session InternalExamSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  subject Subject @relation(fields: [subjectId], references: [id])
+  marks InternalExamMark[]
+
+  @@unique([sessionId, subjectId])
+  @@index([subjectId])
+  @@map("internal_exam_papers")
+}
+
+model InternalExamMark {
+  id String @id @default(cuid())
+  candidateId String
+  paperId String
+  marks Decimal? @db.Decimal(6, 2)
+  status InternalExamMarkStatus @default(MARKED)
+  version Int @default(1)
+  recordedById String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  candidate InternalExamCandidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  paper InternalExamPaper @relation(fields: [paperId], references: [id], onDelete: Cascade)
+  recordedBy user? @relation("InternalExamMarkRecorder", fields: [recordedById], references: [id], onDelete: SetNull)
+
+  @@unique([candidateId, paperId])
+  @@index([paperId])
+  @@index([recordedById])
+  @@map("internal_exam_marks")
+}

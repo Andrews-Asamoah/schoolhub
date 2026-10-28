@@ -42,6 +42,7 @@ model AcademicYear {
   terms            Term[]
   admissionCycles  AdmissionCycle[]
   reportCardSets   ReportCardSet[]
+  internalExamSessions InternalExamSession[]
   timetableEntries TimetableEntry[]
 
   teacherAssignments    TeacherAssignment[]
@@ -82,6 +83,7 @@ model Term {
   remarks               Remark[]
   admissionCycles       AdmissionCycle[]
   reportCardSets        ReportCardSet[]
+  internalExamSessions InternalExamSession[]
   notifications         Notification[]
   announcements         Announcement[]
   expenses              Expense[]
@@ -158,6 +160,7 @@ model Class {
   assessmentTemplateClasses AssessmentTemplateClass[]
   reportCardSets            ReportCardSet[]
   reportCardSetClasses      ReportCardSetClass[]
+  internalExamSessions      InternalExamSession[]
   assessmentExtensions      AssessmentExtension[]
   timetableEntries          TimetableEntry[]
 
@@ -246,6 +249,7 @@ model Subject {
   school           School            @relation(fields: [schoolId], references: [id], onDelete: Cascade)
   departments      Department[]      @relation("DepartmentSubjects")
   assessmentScores AssessmentScore[]
+  internalExamPapers InternalExamPaper[]
   classSubjects    ClassSubject[]
   schoolAssignments SchoolAssignment[]
   teachers         SubjectTeacher[]
