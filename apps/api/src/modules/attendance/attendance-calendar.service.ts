@@ -101,6 +101,7 @@ export class AttendanceCalendarService {
     }
     return this.prisma.client.$transaction(async (tx) => {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${schoolId}), hashtext(${termId}))`;
+      await tx.$queryRaw`SELECT "id" FROM "terms" WHERE "id" = ${termId} FOR UPDATE`;
       const termNow = await tx.term.findFirst({
         where: { id: termId, academicYear: { schoolId } },
         select: { instructionalWeekdays: true, calendarRevision: true },
@@ -166,6 +167,7 @@ export class AttendanceCalendarService {
     }
     return this.prisma.client.$transaction(async tx => {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${schoolId}), hashtext(${termId}))`;
+      await tx.$queryRaw`SELECT "id" FROM "terms" WHERE "id" = ${termId} FOR UPDATE`;
       const current = await tx.term.findFirst({
         where: { id: termId, academicYear: { schoolId } },
         select: { instructionalWeekdays: true, calendarRevision: true },
@@ -294,6 +296,7 @@ export class AttendanceCalendarService {
     if (!dates.length) throw new BadRequestException("An exclusion must be on an instructional day.");
     return this.prisma.client.$transaction(async tx => {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${schoolId}), hashtext(${input.termId}))`;
+      await tx.$queryRaw`SELECT "id" FROM "terms" WHERE "id" = ${input.termId} FOR UPDATE`;
       if (await tx.reportCardSet.count({ where: { schoolId, termId: input.termId, status: { in: ["PUBLISHED", "ARCHIVED"] } } })) {
         throw new ConflictException("Reports are published for this term.");
       }
@@ -336,6 +339,7 @@ export class AttendanceCalendarService {
     await this.assertCanAmend(schoolId, item.termId);
     return this.prisma.client.$transaction(async tx => {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${schoolId}), hashtext(${item.termId}))`;
+      await tx.$queryRaw`SELECT "id" FROM "terms" WHERE "id" = ${item.termId} FOR UPDATE`;
       if (await tx.reportCardSet.count({ where: { schoolId, termId: item.termId, status: { in: ["PUBLISHED", "ARCHIVED"] } } })) {
         throw new ConflictException("Reports are published for this term.");
       }

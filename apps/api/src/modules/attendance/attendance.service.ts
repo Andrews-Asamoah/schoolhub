@@ -55,6 +55,7 @@ export class AttendanceService {
     // Repeat the eligibility checks under the lock so an exclusion cannot race a register save.
     const results = await this.prisma.client.$transaction(async (tx) => {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${schoolId}), hashtext(${term.id}))`;
+      await tx.$queryRaw`SELECT "id" FROM "terms" WHERE "id" = ${term.id} FOR UPDATE`;
       const [latestTerm, overrides, excluded] = await Promise.all([
         tx.term.findFirst({ where: { id: term.id, academicYear: { schoolId } },
           select: { instructionalWeekdays: true } }),
