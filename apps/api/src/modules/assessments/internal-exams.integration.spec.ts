@@ -50,6 +50,9 @@ describe.skipIf(!enabled)("numbered mock exams: PostgreSQL tenancy, subjects and
     if(!db)return;
     try{
       await db.auditLog.deleteMany({where:{schoolId}});
+      // Paper references deliberately RESTRICT subject deletion. Remove the
+      // synthetic exam first, then its school and subject catalogue.
+      if(schoolId)await db.internalExamSession.deleteMany({where:{schoolId}});
       if(schoolId)await db.school.delete({where:{id:schoolId}}).catch(()=>undefined);
       if(schoolB)await db.school.delete({where:{id:schoolB}}).catch(()=>undefined);
       await db.organization.deleteMany({where:{id:{in:[orgA,orgB]}}});
