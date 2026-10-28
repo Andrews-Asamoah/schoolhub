@@ -36,6 +36,7 @@ model user {
   externalExamResultsRecorded ExternalExamResult[] @relation("ExternalExamResultRecorder")
   externalExamSessionsCreated ExternalExamSession[] @relation("ExternalExamCreator")
   externalExamSessionsLocked ExternalExamSession[] @relation("ExternalExamLocker")
+  externalExamImportsCreated ExternalExamImport[] @relation("ExternalExamImportActor")
   internalExamSessionsCreated InternalExamSession[] @relation("InternalExamSessionCreator")
   internalMockTeacherSignoffs InternalMockReport[] @relation("MockReportTeacher")
   internalMockHeadSignoffs InternalMockReport[] @relation("MockReportHead")

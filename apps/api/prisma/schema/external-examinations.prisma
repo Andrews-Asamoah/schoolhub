@@ -33,6 +33,7 @@ model ExternalExamSession {
   lockedBy user? @relation("ExternalExamLocker",fields:[lockedById],references:[id],onDelete:SetNull)
   candidates ExternalExamCandidate[]
   papers ExternalExamPaper[]
+  imports ExternalExamImport[]
 
   @@unique([schoolId,examYear,classId])
   @@index([schoolId,status,createdAt])
@@ -91,4 +92,27 @@ model ExternalExamResult {
   @@unique([candidateId,paperId])
   @@index([paperId,status])
   @@map("external_exam_results")
+}
+
+/**
+ * One successful XLSX batch: file bytes are NOT retained.
+ * A single digest can be committed once per school examination session.
+ */
+model ExternalExamImport {
+  id String @id @default(cuid())
+  schoolId String
+  sessionId String
+  sha256 String @db.VarChar(64)
+  originalFilename String @db.VarChar(160)
+  rowsCommitted Int
+  importedById String?
+  importedAt DateTime @default(now())
+
+  school School @relation(fields:[schoolId],references:[id],onDelete:Restrict)
+  session ExternalExamSession @relation(fields:[sessionId],references:[id],onDelete:Restrict)
+  importedBy user? @relation("ExternalExamImportActor",fields:[importedById],references:[id],onDelete:SetNull)
+
+  @@unique([sessionId,sha256])
+  @@index([schoolId,importedAt])
+  @@map("external_exam_imports")
 }
