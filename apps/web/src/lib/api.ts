@@ -239,3 +239,31 @@ export async function downloadAcademicReport(path: string, filename: string): Pr
     document.body.appendChild(a);a.click();a.remove();
   } finally { URL.revokeObjectURL(url); }
 }
+
+/** Authenticated Excel downloads. The file is never exposed on a public URL. */
+export async function downloadPrivateExcel(path:string,filename:string):Promise<void>{
+  const headers=new Headers();
+  const school=getClientSubdomain();
+  if(school)headers.set("x-school-subdomain",school);
+  if(typeof window!=="undefined"){
+    const role=window.localStorage.getItem("schoolhub-active-role");
+    if(role)headers.set("x-school-role",role);
+  }
+  const response=await fetch(`${API_BASE}${path}`,{
+    credentials:"include",headers,cache:"no-store",
+  });
+  if(!response.ok){
+    const detail=await response.json().catch(()=>({message:"Excel download rejected."}));
+    throw new ApiError(response.status,
+      (detail as {message?:string}).message??"Excel download rejected.",detail);
+  }
+  const type=response.headers.get("content-type")??"";
+  if(!type.includes("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")){
+    throw new Error("Server did not return a valid Excel workbook.");
+  }
+  const url=URL.createObjectURL(await response.blob());
+  try{
+    const a=document.createElement("a");
+    a.href=url;a.download=filename;document.body.appendChild(a);a.click();a.remove();
+  }finally{URL.revokeObjectURL(url);}
+}

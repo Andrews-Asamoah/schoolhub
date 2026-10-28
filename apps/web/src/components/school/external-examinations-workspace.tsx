@@ -2,6 +2,7 @@ import {useEffect,useMemo,useState} from "react";
 import {useMutation,useQuery,useQueryClient} from "@tanstack/react-query";
 import {BookOpenCheck,LockKeyhole,ShieldCheck} from "lucide-react";
 import {apiFetch} from "@/lib/api";
+import {ExternalBeceImportWorkspace} from "./external-bece-import-workspace";
 import {useSchoolRole} from "@/components/school/school-role-switcher";
 import {Select,SelectContent,SelectItem,SelectTrigger,SelectValue} from "@/components/ui/select";
 
@@ -220,6 +221,8 @@ export function ExternalExaminationsWorkspace(){
           </p>
         </div>}
 
+        {manager && paper && <ExternalBeceImportWorkspace key={current.id} sessionId={current.id}
+          paperId={paper.id} status={current.status}/>}
         {sheet.isPending&&paper&&<p className="text-xs text-muted-foreground">Loading candidate sheet…</p>}
         {sheet.isError&&<p role="alert" className="text-xs text-destructive">{label(sheet.error)}</p>}
         {sheet.data&&<div className="space-y-3">
