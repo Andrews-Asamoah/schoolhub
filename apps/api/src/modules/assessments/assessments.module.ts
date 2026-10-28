@@ -7,11 +7,13 @@ import { AssessmentsService } from "./assessments.service.js";
 import { ReportPublicationController } from "./report-publication.controller.js";
 import { ReportPublicationService } from "./report-publication.service.js";
 import { ReportVersionService } from "./report-version.service.js";
+import { InternalExamsController } from "./internal-exams.controller.js";
+import { InternalExamsService } from "./internal-exams.service.js";
 import { ReportTemplatePresetsService } from "./report-template-presets.service.js";
 
 @Module({
-  controllers: [AssessmentsController, AssessmentSetupController, ReportPublicationController],
-  providers: [AssessmentsService, AssessmentEntryService, AssessmentSetupService, ReportPublicationService, ReportVersionService, ReportTemplatePresetsService],
+  controllers: [AssessmentsController, AssessmentSetupController, ReportPublicationController, InternalExamsController],
+  providers: [AssessmentsService, AssessmentEntryService, AssessmentSetupService, ReportPublicationService, ReportVersionService, InternalExamsService, ReportTemplatePresetsService],
   exports: [AssessmentsService],
 })
 export class AssessmentsModule {}
