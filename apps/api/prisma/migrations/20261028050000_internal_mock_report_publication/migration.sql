@@ -35,7 +35,12 @@ CREATE INDEX "internal_mock_reports_schoolId_studentId_publishedAt_idx" ON "inte
 -- Frozen results and signed records cannot be silently revised or deleted.
 CREATE OR REPLACE FUNCTION schoolhub_mock_report_immutable() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
- IF TG_OP = 'DELETE' THEN RAISE EXCEPTION 'Mock report versions must be retained'; END IF;
+ IF TG_OP = 'DELETE' THEN
+   IF OLD."stage" = 'PUBLISHED' THEN
+     RAISE EXCEPTION 'Published mock report versions must be retained';
+   END IF;
+   RETURN OLD;
+ END IF;
  IF NEW."snapshot" IS DISTINCT FROM OLD."snapshot"
     OR NEW."snapshotHash" IS DISTINCT FROM OLD."snapshotHash"
     OR NEW."studentId" IS DISTINCT FROM OLD."studentId"
