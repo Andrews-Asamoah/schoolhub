@@ -1,5 +1,5 @@
 import {afterAll,beforeAll,describe,expect,it} from "vitest";
-import type {PrismaClient} from "@prisma/client";
+import {Prisma,type PrismaClient} from "@prisma/client";
 import {snapshotHash,type MockSnapshot} from "./mock-report.js";
 import type {MockCorrectionService as CorrectionType} from "./mock-correction.service.js";
 import type {MockReportService as ReportsType} from "./mock-report.service.js";
@@ -58,7 +58,7 @@ describe.skipIf(!enabled)("controlled published mock corrections (PostgreSQL)",{
       average:84,position:1,positionMethod:"COMPETITION",capturedAt:"2026-10-28T00:00:00Z"};
     originalId=(await db.internalMockReport.create({data:{
       schoolId,sessionId,candidateId,studentId:student.id,version:1,stage:"PUBLISHED",
-      snapshot:source,snapshotHash:snapshotHash(source),
+      snapshot:source as unknown as Prisma.InputJsonValue,snapshotHash:snapshotHash(source),
       teacherActorId:teacher,teacherName:"Class Teacher",
       teacherRemark:"Excellent effort in the examinations.",teacherApprovedAt:new Date(),
       headActorId:head,headName:"Headteacher",
