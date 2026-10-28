@@ -99,6 +99,10 @@ export class AttendanceCalendarService {
       if (dates.has(entry.date)) throw new BadRequestException("Duplicate calendar override date.");
       dates.add(entry.date);
     }
+    // Under SERIALIZABLE, a transaction that waits on an advisory/row lock can
+    // keep an older snapshot and miss attendance saved by the lock holder.
+    // READ COMMITTED plus the shared term-row lock makes every post-lock
+    // eligibility query see newly committed registers and closures.
     return this.prisma.client.$transaction(async (tx) => {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${schoolId}), hashtext(${termId}))`;
       await tx.$queryRaw`SELECT "id" FROM "terms" WHERE "id" = ${termId} FOR UPDATE`;
@@ -148,7 +152,7 @@ export class AttendanceCalendarService {
         newValues: { weekdays, overrides: input.overrides, reason: input.reason.trim(), revision: updated.calendarRevision } as Prisma.InputJsonValue,
       } });
       return { changed: true, calendarRevision: updated.calendarRevision };
-    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted });
   }
 
   /** Admin-only school-wide closure; it must never erase marked class attendance. */
@@ -215,7 +219,7 @@ export class AttendanceCalendarService {
           revision: updated.calendarRevision },
       } });
       return { date: iso, schoolWide: true, calendarRevision: updated.calendarRevision };
-    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted });
   }
 
   async listClassExclusions(schoolId: string, termId: string, classId: string) {
@@ -330,7 +334,7 @@ export class AttendanceCalendarService {
         newValues: { studentId: input.studentId, termId: input.termId, date: input.date, reason: input.reason } },
       });
       return row;
-    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted });
   }
 
   async revokeExclusion(schoolId: string, actorId: string, exclusionId: string, reason: string) {

@@ -112,27 +112,32 @@ describe.skipIf(!enabled)("attendance register review / concurrency (PostgreSQL)
     expect(await db.attendance.count({where:{studentId,date:new Date(dateEarlier+"T00:00:00.000Z")}})).toBe(1);
   });
 
-  it("serialises a class teacher mark against school-wide closure (at most one succeeds)",async()=>{
-    const policy=await calendar.getCalendar(schoolA,termId);
-    const result=await Promise.allSettled([
-      attendance.batchRecordAttendance(schoolA,teacherUser,
-        {date:dateToday,records:[{studentId,status:"PRESENT"}]},"teacher"),
-      calendar.declareSchoolClosure(schoolA,userAdmin,termId,{
-        date:dateToday,label:"Unexpected school closure",
-        reason:"Cancelled lessons for all school classes",
-        expectedRevision:policy.term.calendarRevision,
-      }),
-    ]);
-    const won=result.filter(x=>x.status==="fulfilled");
-    expect(won).toHaveLength(1);
-    const mark=await db.attendance.findUnique({
-      where:{studentId_date:{studentId,date:new Date(dateToday+"T00:00:00.000Z")}},
-    });
-    const closure=await db.academicCalendarDay.findUnique({
-      where:{schoolId_termId_date:{schoolId:schoolA,termId,date:new Date(dateToday+"T00:00:00.000Z")}},
-    });
-    expect(Boolean(mark)).not.toBe(Boolean(closure && !closure.isInstructional));
-    expect((await calendar.getCalendar(schoolA,termId)).term.calendarRevision)
-      .toBe(policy.term.calendarRevision+(closure?1:0));
+  it("serialises teachers marking against closures on two school dates (at most one succeeds)",async()=>{
+    // Two dates make the failure reproducible across both lock orderings.
+    // A SERIALIZABLE calendar transaction can otherwise read a stale snapshot
+    // after waiting on the same advisory lock as the attendance writer.
+    for(const date of [dateToday,datePrior]){
+      const policy=await calendar.getCalendar(schoolA,termId);
+      const result=await Promise.allSettled([
+        attendance.batchRecordAttendance(schoolA,teacherUser,
+          {date,records:[{studentId,status:"PRESENT"}]},"teacher"),
+        calendar.declareSchoolClosure(schoolA,userAdmin,termId,{
+          date,label:"Unexpected school closure",
+          reason:"Cancelled lessons for all school classes",
+          expectedRevision:policy.term.calendarRevision,
+        }),
+      ]);
+      const won=result.filter(x=>x.status==="fulfilled");
+      expect(won).toHaveLength(1);
+      const mark=await db.attendance.findUnique({
+        where:{studentId_date:{studentId,date:new Date(date+"T00:00:00.000Z")}},
+      });
+      const closure=await db.academicCalendarDay.findUnique({
+        where:{schoolId_termId_date:{schoolId:schoolA,termId,date:new Date(date+"T00:00:00.000Z")}},
+      });
+      expect(Boolean(mark)).not.toBe(Boolean(closure && !closure.isInstructional));
+      expect((await calendar.getCalendar(schoolA,termId)).term.calendarRevision)
+        .toBe(policy.term.calendarRevision+(closure?1:0));
+    }
   });
 });
