@@ -12,7 +12,7 @@ if [ "$COMPONENT" = api ]; then
     sleep 1
   done
   export DATABASE_URL=postgresql://postgres:smoke@smoke-db:5432/schoolhub_smoke
-  docker run --rm --network schoolhub-smoke --env DATABASE_URL "$IMAGE" pnpm exec prisma migrate deploy --config prisma.config.ts
+  docker run --rm --network schoolhub-smoke --env DATABASE_URL "$IMAGE" node node_modules/prisma/build/index.js migrate deploy --config prisma.config.ts
   docker run -d --name smoke-api --network schoolhub-smoke -p 127.0.0.1:3001:3001 --env DATABASE_URL \
     -e BETTER_AUTH_SECRET=smoke-only-secret-0000000000000000000000 -e BETTER_AUTH_URL=https://api.school.test \
     -e WEB_ORIGIN=https://app.school.test -e FINANCE_INTEGRITY_JOB=off "$IMAGE"

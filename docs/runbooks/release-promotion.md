@@ -8,7 +8,7 @@ Feature PRs target `dev`. A release is a full commit SHA plus immutable API/web 
 2. Container image publication waits for successful **push CI on the exact commit**, in this repository on `dev` or `main`. A timeout/failure blocks publication. A manually dispatched image run has the same check.
 3. Published digests are smoke-tested. Only when both components succeed is `release-manifest-<full SHA>` uploaded. The manifest binds repository, SHA, originating run, API/web digests and expected migration.
 4. Database migrations accept only the full release SHA, successful Container images run ID, target environment and operator-verified backup reference. The workflow verifies the run, artifact, digest repositories and image revision before it exposes DATABASE_URL to the migration step.
-5. Migrations run **inside the approved API image**, followed by migration status verification. They do not install or execute arbitrary caller-selected repository refs.
+5. Migrations invoke the packaged Prisma CLI directly **inside the approved API image** (without runtime package-manager installs or root privileges), followed by migration status verification. They do not install or execute arbitrary caller-selected repository refs.
 6. The workflow records an environment-specific migration receipt, including failure/not-run outcomes. The backup reference is an operator attestation; it does not independently prove a backup exists or is restorable.
 
 ## Operator steps

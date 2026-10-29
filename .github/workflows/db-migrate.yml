@@ -93,8 +93,8 @@ jobs:
         run: |
           set -euo pipefail
           test -n "$DATABASE_URL"
-          docker run --rm --env DATABASE_URL --env EXPECTED_MIGRATION_NAME "$API_IMAGE" pnpm exec prisma migrate deploy --config prisma.config.ts
-          docker run --rm --env DATABASE_URL "$API_IMAGE" pnpm exec prisma migrate status --config prisma.config.ts
+          docker run --rm --env DATABASE_URL --env EXPECTED_MIGRATION_NAME "$API_IMAGE" node node_modules/prisma/build/index.js migrate deploy --config prisma.config.ts
+          docker run --rm --env DATABASE_URL "$API_IMAGE" node node_modules/prisma/build/index.js migrate status --config prisma.config.ts
       - name: Record environment, backup reference and release digests
         if: always() && steps.source.outcome == 'success'
         uses: actions/github-script@v7
