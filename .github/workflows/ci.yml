@@ -188,6 +188,12 @@ jobs:
           docker run --rm --network host -e PGPASSWORD=postgres postgres:16 psql -h 127.0.0.1 -U postgres -d postgres -c 'CREATE DATABASE schoolhub_restore'
           docker run --rm -i --network host -e PGPASSWORD=postgres postgres:16 pg_restore -h 127.0.0.1 -U postgres -d schoolhub_restore --no-owner < /tmp/schoolhub-restore.dump
           pnpm --filter @schoolhub/api exec tsx scripts/verify-restored-database.ts
+          docker run --rm --network host -e PGPASSWORD=postgres postgres:16 psql -h 127.0.0.1 -U postgres -d schoolhub_restore -v ON_ERROR_STOP=1 -c "UPDATE chart_accounts SET name='Changed synthetic recovery account' WHERE code='1000'"
+          if pnpm --filter @schoolhub/api exec tsx scripts/verify-restored-database.ts > /tmp/restore-negative.log 2>&1; then
+            echo "Restore verification incorrectly accepted changed data"
+            exit 1
+          fi
+          grep -q '"status": "FAIL"' /tmp/restore-negative.log
       - name: Web theme lint
         run: pnpm --filter @schoolhub/web lint:theme
       - name: Web unit tests
