@@ -164,6 +164,8 @@ jobs:
           pnpm dlx --package=playwright@1.56.1 -c 'export PLAYWRIGHT_PACKAGE_ENTRY="$(realpath "$(dirname "$(command -v playwright)")/../playwright/cli.js")"; playwright install --with-deps chromium; node apps/web/e2e/superadmin-dashboard.browser.mjs && node apps/web/e2e/subscription-plan-editor.browser.mjs'
       - name: Check controller route inventory
         run: node apps/api/scripts/route-inventory.mjs --check
+      - name: Validate release manifest contracts
+        run: node --test scripts/release-manifest.test.mjs
       - name: API lint
         run: pnpm --filter @schoolhub/api lint
       - name: Apply database migrations
@@ -183,3 +185,23 @@ jobs:
         run: pnpm --filter @schoolhub/api build
       - name: Build web
         run: pnpm --filter @schoolhub/web build
+
+  container-smoke:
+    name: Container smoke (${{ matrix.component }})
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        component: [api, web]
+    steps:
+      - uses: actions/checkout@v7
+      - name: Build the runtime image
+        env:
+          COMPONENT: ${{ matrix.component }}
+        run: docker build -f "apps/$COMPONENT/Dockerfile" --build-arg "BUILD_SHA=$GITHUB_SHA" -t "schoolhub-smoke:$COMPONENT" .
+      - name: Boot and probe the runtime image
+        env:
+          COMPONENT: ${{ matrix.component }}
+        run: bash .github/scripts/smoke-image.sh "schoolhub-smoke:$COMPONENT" "$COMPONENT"
