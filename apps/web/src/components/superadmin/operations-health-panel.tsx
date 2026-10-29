@@ -32,9 +32,10 @@ interface OperationsHealth {
   };
   dependencies: {
     database: { status: "healthy" | "unavailable"; latencyMs: number | null };
+    privateStorage?: { status: CheckStatus; latencyMs?: number | null };
     storage: { status: CheckStatus; latencyMs?: number | null };
     notifications: { status: CheckStatus };
-    backgroundJobs: { status: CheckStatus };
+    backgroundJobs: { status: CheckStatus; dead?: number; overdue?: number; expired?: number };
   };
 }
 
@@ -123,6 +124,8 @@ export function OperationsHealthPanel() {
                   ? "The configured object-storage bucket could not be reached"
                   : "Provider health check not configured",
         },
+        ...(health.dependencies.privateStorage ? [{ key: "private-storage", label: "Private file storage", icon: HardDrive,
+          status: health.dependencies.privateStorage.status, detail: health.dependencies.privateStorage.status === "healthy" ? "Private bucket reachable; public-access policy requires operator verification" : "Configure and verify the separate private bucket" }] : []),
         {
           key: "notifications",
           label: "Notifications",
@@ -135,7 +138,9 @@ export function OperationsHealthPanel() {
           label: "Background jobs",
           icon: ServerCog,
           status: health.dependencies.backgroundJobs.status,
-          detail: "Worker heartbeat not configured",
+          detail: health.dependencies.backgroundJobs.dead !== undefined
+            ? `${health.dependencies.backgroundJobs.dead} dead jobs · ${health.dependencies.backgroundJobs.overdue ?? 0} overdue · ${health.dependencies.backgroundJobs.expired ?? 0} expired leases`
+            : "Worker heartbeat not configured",
         },
       ]
     : [];

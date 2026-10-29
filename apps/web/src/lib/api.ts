@@ -152,7 +152,7 @@ export async function apiFetch<T>(
  * the tenant and active-role headers used by apiFetch and honors the server's
  * Content-Disposition filename.
  */
-export async function apiDownload(path: string, fallbackFileName?: string): Promise<void> {
+async function apiBinary(path: string): Promise<Response> {
   const headers = new Headers();
   const subdomain = getClientSubdomain();
   if (subdomain) headers.set("x-school-subdomain", subdomain);
@@ -198,6 +198,15 @@ export async function apiDownload(path: string, fallbackFileName?: string): Prom
     throw new ApiError(response.status, (body as { message?: string }).message ?? response.statusText, body);
   }
 
+  return response;
+}
+
+export async function apiBlob(path: string): Promise<Blob> {
+  return (await apiBinary(path)).blob();
+}
+
+export async function apiDownload(path: string, fallbackFileName?: string): Promise<void> {
+  const response = await apiBinary(path);
   const disposition = response.headers.get("content-disposition") ?? "";
   const encodedName = /filename\*=UTF-8''([^;]+)/i.exec(disposition)?.[1];
   const plainName = /filename="?([^";]+)"?/i.exec(disposition)?.[1];

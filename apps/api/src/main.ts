@@ -4,6 +4,7 @@ import type { NestExpressApplication } from "@nestjs/platform-express";
 import helmet from "helmet";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 import { AppModule } from "./app.module.js";
+import { originPolicy } from "./common/origin-policy.js";
 import { env } from "./env.js";
 
 async function bootstrap() {
@@ -58,28 +59,15 @@ async function bootstrap() {
     SwaggerModule.setup("api/docs", app, document);
   }
 
-  const allowedOrigins = [
-    env.WEB_ORIGIN,
-    "http://localhost:5173",
-    "http://localhost:3000",
-    "http://tauri.localhost",
-    "tauri://localhost",
-  ];
-
-  const subdomainPattern =
-    /^https?:\/\/([a-z0-9-]+\.)*(localhost|schoolhub\.(gh|app|com))(:\d+)?$/i;
+  const origins = originPolicy(process.env);
+  app.enableShutdownHooks();
 
   app.enableCors({
     origin: (
       origin: string | undefined,
       callback: (err: Error | null, allow?: boolean) => void,
     ) => {
-      // Allow requests with no origin (mobile native apps, desktop requests) or allowed origins/subdomains
-      if (
-        !origin ||
-        allowedOrigins.includes(origin) ||
-        subdomainPattern.test(origin)
-      ) {
+      if (origins.allows(origin)) {
         return callback(null, true);
       }
       return callback(new Error(`CORS blocked for origin: ${origin}`));

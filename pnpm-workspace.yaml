@@ -9,4 +9,5 @@ allowBuilds:
   core-js: false
   esbuild: true
   prisma: true
+  sharp: true
   workerd: false

@@ -1,117 +1,68 @@
-import { BadRequestException, NotFoundException } from "@nestjs/common";
+import { BadRequestException, NotFoundException, ServiceUnavailableException } from "@nestjs/common";
 import type { School } from "@prisma/client";
 import { describe, expect, it, vi } from "vitest";
-
-// R2Service validates deployment environment at import time. Unit tests inject
-// a storage fake, so mock the class token before importing DocumentsService.
-vi.mock("../storage/r2.service.js", () => ({ R2Service: class R2Service {} }));
-
+vi.mock("../../env.js", () => ({ env: { NODE_ENV: "test" } }));
 import { DocumentsService } from "./documents.service.js";
-
-function buildService() {
-  const client = {
-    document: {
-      findMany: vi.fn().mockResolvedValue([]),
-      findFirst: vi.fn().mockResolvedValue(null),
-      create: vi.fn().mockResolvedValue({
-        id: "document-1",
-        schoolId: "school-a",
-        title: "School handbook",
-        description: null,
-        fileUrl: "https://files.example.test/schools/school-a/files/documents/handbook.pdf",
-        fileType: "application/pdf",
-        fileSize: 16,
-        entityType: "SCHOOL",
-        entityId: "school-a",
-        uploadedById: "user-a",
-      }),
-      delete: vi.fn().mockResolvedValue({ id: "document-1" }),
-    },
-  };
-  const r2 = {
-    keys: {
-      document: vi.fn().mockReturnValue("schools/school-a/files/documents/handbook.pdf"),
-      schoolPrefix: vi.fn().mockReturnValue("schools/school-a/"),
-    },
-    upload: vi.fn().mockResolvedValue("https://files.example.test/schools/school-a/files/documents/handbook.pdf"),
-    delete: vi.fn().mockResolvedValue(undefined),
-    keyFromUrl: vi.fn().mockReturnValue("schools/school-a/files/documents/handbook.pdf"),
-  };
-  return { service: new DocumentsService({ client } as never, r2 as never), client, r2 };
+const school = { id: "school-a" } as School;
+const actor = { id: "user-a", ipAddress: null, userAgent: null };
+const file = { buffer: Buffer.from("pdf"), size: 3 } as Express.Multer.File;
+function build() {
+  const document = { findMany: vi.fn().mockResolvedValue([]), count: vi.fn().mockResolvedValue(0), findFirst: vi.fn(),
+    create: vi.fn().mockImplementation(({ data }) => Promise.resolve(data)), delete: vi.fn() };
+  const client = { document, auditLog: { create: vi.fn() }, $transaction: vi.fn() };
+  client.$transaction.mockImplementation(fn => fn(client));
+  const storage = { upload: vi.fn(), read: vi.fn().mockResolvedValue(Buffer.from("contents")) };
+  const validation = { document: vi.fn().mockResolvedValue({ buffer: file.buffer, mime: "application/pdf", ext: "pdf" }) };
+  const cleanup = { enqueue: vi.fn(), reserve: vi.fn().mockResolvedValue("reserved"), keep: vi.fn() };
+  return { service: new DocumentsService({ client } as never, storage as never, validation as never, cleanup as never), client, storage, validation, cleanup };
 }
-
-const school = { id: "school-a", name: "School A" } as School;
-const pdfBuffer = Buffer.from("%PDF-1.7\nTest document", "ascii");
-const pdfFile = { buffer: pdfBuffer, size: pdfBuffer.length, originalname: "handbook.pdf", mimetype: "application/pdf" } as Express.Multer.File;
-
-describe("DocumentsService school scope and validation", () => {
-  it("lists only school-wide documents for the active school", async () => {
-    const { service, client } = buildService();
-
-    await service.listSchoolDocuments("school-a");
-
-    expect(client.document.findMany).toHaveBeenCalledWith(expect.objectContaining({
-      where: { schoolId: "school-a", entityType: "SCHOOL", entityId: "school-a" },
-      orderBy: { createdAt: "desc" },
-      take: 500,
-    }));
+describe("private school documents", () => {
+  it("paginates and filters audience without exposing storage keys or legacy public URLs", async () => {
+    const { service, client } = build();
+    client.document.findMany.mockResolvedValue([{ id: "one", fileUrl: "https://public/old", storageKey: "private/key" }]);
+    const result = await service.listSchoolDocuments("school-a", "teacher", 3, 25, "policy");
+    expect(client.document.findMany).toHaveBeenCalledWith(expect.objectContaining({ skip: 50, take: 25,
+      where: expect.objectContaining({ schoolId: "school-a", entityType: "SCHOOL", entityId: "school-a", audience: "STAFF" }) }));
+    expect(result.data[0]).toEqual({ id: "one", fileUrl: "/api/documents/one/download", storageReady: true });
   });
-
-  it("rejects unsupported file bytes before uploading to storage", async () => {
-    const { service, client, r2 } = buildService();
-    const invalidFile = {
-      buffer: Buffer.from("<script>alert(1)</script>", "ascii"),
-      size: 25,
-      originalname: "handbook.pdf",
-      mimetype: "application/pdf",
-    } as Express.Multer.File;
-
-    await expect(service.uploadSchoolDocument(school, "user-a", invalidFile, "School handbook"))
-      .rejects.toBeInstanceOf(BadRequestException);
-
-    expect(r2.upload).not.toHaveBeenCalled();
-    expect(client.document.create).not.toHaveBeenCalled();
+  it("uploads only validated bytes to private storage and commits metadata with audit", async () => {
+    const { service, client, storage } = build();
+    const result = await service.uploadSchoolDocument(school, actor, file, "Policy", "Current", "LEADERSHIP");
+    expect(storage.upload).toHaveBeenCalledWith("school-a", expect.stringMatching(/^schools\/school-a\/files\/documents\//), file.buffer, "application/pdf");
+    expect(client.auditLog.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ userId: "user-a", entityType: "document.upload" }) }));
+    expect(result).not.toHaveProperty("storageKey");
+    expect(result.audience).toBe("LEADERSHIP");
   });
-
-  it("stores a validated PDF with the school-scoped object key and metadata", async () => {
-    const { service, client, r2 } = buildService();
-
-    await service.uploadSchoolDocument(school, "user-a", pdfFile, "School handbook", "Current policies");
-
-    expect(r2.keys.document).toHaveBeenCalledWith("school-a", "documents", "pdf");
-    expect(r2.upload).toHaveBeenCalledWith(
-      "schools/school-a/files/documents/handbook.pdf",
-      pdfBuffer,
-      "application/pdf",
-    );
-    expect(client.document.create).toHaveBeenCalledWith(expect.objectContaining({
-      data: expect.objectContaining({
-        schoolId: "school-a",
-        entityType: "SCHOOL",
-        entityId: "school-a",
-        uploadedById: "user-a",
-        title: "School handbook",
-        description: "Current policies",
-        fileType: "application/pdf",
-      }),
-    }));
+  it("rejects invalid audience before uploading", async () => {
+    const { service, storage } = build();
+    await expect(service.uploadSchoolDocument(school, actor, file, "Policy", "", "PUBLIC")).rejects.toBeInstanceOf(BadRequestException);
+    expect(storage.upload).not.toHaveBeenCalled();
   });
-
-  it("does not delete a document outside the active school's document library", async () => {
-    const { service, client, r2 } = buildService();
-
-    await expect(service.removeSchoolDocument(school, "document-from-another-school"))
-      .rejects.toBeInstanceOf(NotFoundException);
-
-    expect(client.document.findFirst).toHaveBeenCalledWith(expect.objectContaining({
-      where: {
-        id: "document-from-another-school",
-        schoolId: "school-a",
-        entityType: "SCHOOL",
-        entityId: "school-a",
-      },
-    }));
-    expect(client.document.delete).not.toHaveBeenCalled();
-    expect(r2.delete).not.toHaveBeenCalled();
+  it("never uploads rejected or unscanned content", async () => {
+    const { service, storage, validation } = build(); validation.document.mockRejectedValue(new BadRequestException());
+    await expect(service.uploadSchoolDocument(school, actor, file, "Policy")).rejects.toBeInstanceOf(BadRequestException);
+    expect(storage.upload).not.toHaveBeenCalled();
+  });
+  it("denies another school's or leadership-only document before reading storage", async () => {
+    const { service, client, storage } = build();
+    await expect(service.download("school-a", "other", "teacher", actor)).rejects.toBeInstanceOf(NotFoundException);
+    expect(client.document.findFirst).toHaveBeenCalledWith({ where: { id: "other", schoolId: "school-a", entityType: "SCHOOL", entityId: "school-a", audience: "STAFF" } });
+    expect(storage.read).not.toHaveBeenCalled();
+  });
+  it("fails closed for unmigrated public documents", async () => {
+    const { service, client, storage } = build(); client.document.findFirst.mockResolvedValue({ storageKey: null, fileUrl: "https://public/legacy" });
+    await expect(service.download("school-a", "old", "owner", actor)).rejects.toBeInstanceOf(ServiceUnavailableException);
+    expect(storage.read).not.toHaveBeenCalled();
+  });
+  it("keeps cleanup work durable when database writes fail", async () => {
+    const { service, client, cleanup } = build(); client.document.create.mockRejectedValue(new Error("Database write failed"));
+    await expect(service.uploadSchoolDocument(school, actor, file, "Policy")).rejects.toThrow("Database write failed");
+    expect(cleanup.enqueue).toHaveBeenCalledWith("school-a", expect.stringMatching(/^schools\/school-a\//));
+  });
+  it("commits deletion and cleanup enqueue in the same transaction", async () => {
+    const { service, client, cleanup } = build(); client.document.findFirst.mockResolvedValue({ id: "one", storageKey: "schools/school-a/one" });
+    await service.removeSchoolDocument(school, "one", actor);
+    expect(cleanup.enqueue).toHaveBeenCalledWith("school-a", "schools/school-a/one", client);
+    expect(client.auditLog.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ entityType: "document.delete" }) }));
   });
 });

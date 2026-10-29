@@ -20,6 +20,8 @@ RUN pnpm install --frozen-lockfile --filter @schoolhub/api...
 
 COPY packages ./packages
 COPY apps/api ./apps/api
+# COPY preserves the repository mode (0644); the runtime entrypoint must execute.
+COPY --chmod=755 apps/api/docker-entrypoint.sh ./apps/api/docker-entrypoint.sh
 
 RUN pnpm --filter @schoolhub/shared build \
  && pnpm --filter @schoolhub/api exec prisma generate --config prisma.config.ts \

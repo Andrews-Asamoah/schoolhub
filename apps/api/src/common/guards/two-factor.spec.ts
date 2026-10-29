@@ -1,9 +1,9 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { ForbiddenException } from "@nestjs/common";
 import { assertTwoFactorEnabled, hasSchoolAdminRole, schoolAdminTwoFactorRequired } from "./two-factor.js";
 
 describe("two-factor policy helpers", () => {
-  afterEach(() => { delete process.env.REQUIRE_2FA_SCHOOL_ADMINS; });
+  afterEach(() => { delete process.env.REQUIRE_2FA_SCHOOL_ADMINS; vi.unstubAllEnvs(); });
 
   it("only an explicit boolean true counts as enrolled (fails closed)", () => {
     expect(() => assertTwoFactorEnabled({ twoFactorEnabled: true }, "super-admin")).not.toThrow();
@@ -25,6 +25,13 @@ describe("two-factor policy helpers", () => {
     expect(schoolAdminTwoFactorRequired()).toBe(false);
     process.env.REQUIRE_2FA_SCHOOL_ADMINS = "true";
     expect(schoolAdminTwoFactorRequired()).toBe(true);
+  });
+
+  it("requires school-admin two-factor authentication by default in production", () => {
+    vi.stubEnv("NODE_ENV", "production");
+    expect(schoolAdminTwoFactorRequired()).toBe(true);
+    process.env.REQUIRE_2FA_SCHOOL_ADMINS = "false";
+    expect(schoolAdminTwoFactorRequired()).toBe(false);
   });
 
   it("recognises owners and admins, including as a secondary role", () => {
