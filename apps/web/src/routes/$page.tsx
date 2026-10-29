@@ -35,6 +35,7 @@ import { SchoolLogoUploader } from "@/components/school/school-logo-uploader";
 import { AssessmentEntryWorkspace } from "@/components/school/assessment-entry-workspace";
 import { AssessmentsAdmin } from "@/components/school/assessments-admin";
 import { ClassRegister } from "@/components/school/class-register";
+import { AttendanceReviewWorkspace } from "@/components/school/attendance-review-workspace";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SchoolSettingsForm } from "@/components/school/school-settings-form";
 import { ProfileWorkspace } from "@/components/school/profile-workspace";
@@ -69,6 +70,9 @@ import { DocumentsWorkspace } from "@/components/portal/documents-workspace";
 import { MessagesWorkspace } from "@/components/portal/messages-workspace";
 import { NotificationsHistoryWorkspace } from "@/components/portal/notifications-history-workspace";
 import { SchoolReportsWorkspace } from "@/components/school/reports-workspace";
+import { InternalExaminationsWorkspace } from "@/components/school/internal-examinations-workspace";
+import { ExternalExaminationsWorkspace } from "@/components/school/external-examinations-workspace";
+import { TeacherReportReviewWorkspace } from "@/components/school/teacher-report-review-workspace";
 
 export const Route = createFileRoute("/$page")({
   component: WorkspaceRoute,
@@ -293,11 +297,13 @@ function WorkspaceContent({ pageId }: { pageId: string }) {
             activeRole === "student" ? <StudentSubjectsView /> : <SubjectsWorkspace />
           )}
           {pageId === "academic-years" && <AcademicYears query={yearsQuery} />}
+          {pageId === "internal-exams" && <InternalExaminationsWorkspace />}
+          {pageId === "external-exams" && <ExternalExaminationsWorkspace />}
           {pageId === "assessments" && (
             activeRole === "student" ? (
               <StudentReportView />
             ) : activeRole === "teacher" ? (
-              <AssessmentEntryWorkspace mode="teacher" />
+              <><AssessmentEntryWorkspace mode="teacher" /><TeacherReportReviewWorkspace /></>
             ) : (
               <AssessmentsAdmin />
             )
@@ -431,6 +437,8 @@ function AttendanceWorkspace({
         className={className}
         canMark={canMark}
       />
+      <AttendanceReviewWorkspace key={classId} classId={classId}
+        canManage={["owner","admin","headteacher"].includes(attendanceRole ?? "")} />
     </div>
   );
 }

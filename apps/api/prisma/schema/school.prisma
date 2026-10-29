@@ -20,13 +20,23 @@ model School {
   primaryColor   String   @default("#3B82F6")
   secondaryColor String   @default("#10B981")
   settings       Json?
+  /// Null disables calendar-based attendance calculations for existing schools.
+  attendancePolicyActiveFrom DateTime? @db.Date
   features       Json?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
   organization                organization                @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   academicYears               AcademicYear[]
+  calendarDays                AcademicCalendarDay[]
+  attendanceExclusions        StudentAttendanceExclusion[]
   assessmentTemplates         AssessmentTemplate[]
+  reportCardVersions          ReportCardVersion[]
+  internalExamSessions       InternalExamSession[]
+  externalExamSessions ExternalExamSession[]
+  externalExamImports ExternalExamImport[]
+  internalMockReports        InternalMockReport[]
+  internalMockCorrections    InternalMockCorrection[]
   bills                       Bill[]
   siblingDiscountPolicies     SiblingDiscountPolicy[]
   studentScholarships         StudentScholarship[]
@@ -124,6 +134,7 @@ model UserProfile {
   emergencyContactPhone String?
   emergencyRelationship String?
   signatureUrl          String?
+  signatureStorageKey   String?
   isActive              Boolean   @default(true)
   lastLoginAt           DateTime?
   createdAt             DateTime  @default(now())
@@ -171,6 +182,7 @@ model Student {
   house            House?              @relation(fields: [houseId], references: [id])
   assessmentScores AssessmentScore[]
   attendances      Attendance[]
+  attendanceExclusions StudentAttendanceExclusion[]
   bills            Bill[]
   scholarships     StudentScholarship[]
   documents        Document[]
@@ -195,6 +207,10 @@ model Student {
   @@index([profileId])
   @@index([schoolId, deletedAt])
   @@map("students")
+  reportCardVersions ReportCardVersion[]
+  internalExamCandidates InternalExamCandidate[]
+  externalExamCandidates ExternalExamCandidate[]
+  internalMockReports InternalMockReport[]
 }
 
 model Teacher {

@@ -1,0 +1,24 @@
+/// Durable work records. Payloads are internal and must never be returned to clients.
+model BackgroundJob {
+  id           String   @id
+  kind         String
+  schoolId     String?
+  status       String   @default("PENDING")
+  payload      Json
+  attempts     Int      @default(0)
+  nextAttempt  DateTime @default(now())
+  leaseToken   String?
+  leaseUntil   DateTime?
+  heartbeatAt  DateTime?
+  completedAt  DateTime?
+  lastError    String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([kind, status, nextAttempt])
+  @@index([schoolId, createdAt])
+  @@index([status, nextAttempt])
+  @@index([status, leaseUntil])
+  @@index([kind, status, completedAt])
+  @@map("background_jobs")
+}

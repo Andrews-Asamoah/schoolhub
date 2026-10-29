@@ -2,6 +2,9 @@ import {
   Controller,
   Get,
   Post,
+  Put,
+  Delete,
+  Patch,
   Param,
   Query,
   Headers,
@@ -9,6 +12,10 @@ import {
   UseGuards,
 } from "@nestjs/common";
 import { AttendanceService } from "./attendance.service.js";
+import { AttendanceCalendarService } from "./attendance-calendar.service.js";
+import { AttendanceReviewService } from "./attendance-review.service.js";
+import { calendarConfigurationSchema, attendanceExclusionSchema, revokeExclusionSchema, attendanceRolloutPolicySchema, schoolClosureSchema } from "./attendance-calendar.schemas.js";
+import { z } from "zod";
 import { SchoolTenantGuard } from "../../common/guards/school-tenant.guard.js";
 import { RolesGuard } from "../../common/guards/roles.guard.js";
 import { Roles } from "../../common/decorators/roles.decorator.js";
@@ -25,7 +32,96 @@ import type { School } from "@prisma/client";
 @Controller("attendance")
 @UseGuards(SchoolTenantGuard, RolesGuard)
 export class AttendanceController {
-  constructor(private readonly attendanceService: AttendanceService) {}
+  constructor(
+    private readonly attendanceService: AttendanceService,
+    private readonly calendarService: AttendanceCalendarService,
+    private readonly reviewService: AttendanceReviewService,
+  ) {}
+
+  @Get("policy")
+  @Roles("owner", "admin", "headteacher")
+  getAttendancePolicy(@CurrentSchool() school: School) {
+    return this.calendarService.getPolicy(school.id);
+  }
+
+  @Patch("policy")
+  @Roles("owner", "admin", "headteacher")
+  updateAttendancePolicy(
+    @CurrentSchool() school: School,
+    @CurrentUser() actor: AuthenticatedUser,
+    @Body(new ZodValidationPipe(attendanceRolloutPolicySchema))
+    input: z.infer<typeof attendanceRolloutPolicySchema>,
+  ) {
+    return this.calendarService.setPolicy(school.id, actor.id, input);
+  }
+
+  @Get("calendar/:termId")
+  @Roles("owner", "admin", "headteacher", "teacher", "staff", "accountant")
+  calendar(@CurrentSchool() school: School, @Param("termId") termId: string) {
+    return this.calendarService.getCalendar(school.id, termId);
+  }
+
+  @Put("calendar/:termId")
+  @Roles("owner", "admin", "headteacher")
+  updateCalendar(@CurrentSchool() school: School, @CurrentUser() actor: AuthenticatedUser,
+    @Param("termId") termId: string,
+    @Body(new ZodValidationPipe(calendarConfigurationSchema)) body: z.infer<typeof calendarConfigurationSchema>) {
+    return this.calendarService.replaceCalendar(school.id, actor.id, termId, body);
+  }
+
+  @Get("calendar/:termId/exclusions/:studentId")
+  @Roles("owner", "admin", "headteacher")
+  exclusions(@CurrentSchool() school: School, @Param("termId") termId: string, @Param("studentId") studentId: string) {
+    return this.calendarService.listExclusions(school.id, termId, studentId);
+  }
+
+  @Post("calendar/exclusions")
+  @Roles("owner", "admin", "headteacher")
+  approveExclusion(@CurrentSchool() school: School, @CurrentUser() actor: AuthenticatedUser,
+    @Body(new ZodValidationPipe(attendanceExclusionSchema)) body: z.infer<typeof attendanceExclusionSchema>) {
+    return this.calendarService.approveExclusion(school.id, actor.id, body);
+  }
+
+  @Delete("calendar/exclusions/:id")
+  @Roles("owner", "admin", "headteacher")
+  revokeExclusion(@CurrentSchool() school: School, @CurrentUser() actor: AuthenticatedUser,
+    @Param("id") id: string,
+    @Body(new ZodValidationPipe(revokeExclusionSchema)) body: z.infer<typeof revokeExclusionSchema>) {
+    return this.calendarService.revokeExclusion(school.id, actor.id, id, body.reason);
+  }
+
+
+  @Post("calendar/:termId/closures")
+  @Roles("owner", "admin", "headteacher")
+  declareSchoolClosure(
+    @CurrentSchool() school: School,
+    @CurrentUser() actor: AuthenticatedUser,
+    @Param("termId") termId: string,
+    @Body(new ZodValidationPipe(schoolClosureSchema)) body: z.infer<typeof schoolClosureSchema>,
+  ) {
+    return this.calendarService.declareSchoolClosure(school.id, actor.id, termId, body);
+  }
+
+  @Get("calendar/:termId/exclusions")
+  @Roles("owner", "admin", "headteacher")
+  getClassExclusions(
+    @CurrentSchool() school: School,
+    @Param("termId") termId: string,
+    @Query("classId") classId: string,
+  ) {
+    return this.calendarService.listClassExclusions(school.id, termId, classId);
+  }
+
+  @Get("class/:classId/gaps")
+  @Roles("owner", "admin", "headteacher", "teacher", "staff")
+  getClassRegisterGaps(
+    @CurrentSchool() school: School,
+    @Param("classId") classId: string,
+    @CurrentSchoolRole() role: string | undefined,
+    @CurrentUser() actor: AuthenticatedUser,
+  ) {
+    return this.reviewService.classGaps(school.id, classId, role, actor.id);
+  }
 
   @Post("batch")
   @Roles("teacher")
@@ -45,7 +141,7 @@ export class AttendanceController {
   }
 
   @Get("class/:classId/dates")
-  @Roles("owner", "admin", "teacher", "staff", "accountant")
+  @Roles("owner", "admin", "headteacher", "teacher", "staff", "accountant")
   getClassAttendanceDates(
     @CurrentSchool() school: School,
     @CurrentUser() user: AuthenticatedUser,
@@ -60,7 +156,7 @@ export class AttendanceController {
   }
 
   @Get("class/:classId")
-  @Roles("owner", "admin", "teacher", "staff", "accountant")
+  @Roles("owner", "admin", "headteacher", "teacher", "staff", "accountant")
   getClassAttendance(
     @CurrentSchool() school: School,
     @CurrentUser() user: AuthenticatedUser,
@@ -98,7 +194,7 @@ export class AttendanceController {
   }
 
   @Get("student/:studentId")
-  @Roles("owner", "admin", "teacher", "staff", "accountant")
+  @Roles("owner", "admin", "headteacher", "teacher", "staff", "accountant")
   getStudentAttendance(
     @CurrentSchool() school: School,
     @Param("studentId") studentId: string,

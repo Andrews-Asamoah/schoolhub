@@ -23,11 +23,11 @@ import { Route as AdminDashboardRouteImport } from './routes/admin/dashboard'
 import { Route as AdminProfileRouteImport } from './routes/admin/profile'
 import { Route as AdminSupportRouteImport } from './routes/admin/support'
 import { Route as AdminAuditIndexRouteImport } from './routes/admin/audit/index'
+import { Route as AdminPlansIndexRouteImport } from './routes/admin/plans/index'
 import { Route as AdminSchoolsIndexRouteImport } from './routes/admin/schools/index'
 import { Route as AdminSchoolsSchoolIdRouteImport } from './routes/admin/schools/$schoolId'
 import { Route as AdminSchoolsNewRouteImport } from './routes/admin/schools/new'
 import { Route as AdminSubscriptionsIndexRouteImport } from './routes/admin/subscriptions/index'
-import { Route as AdminPlansIndexRouteImport } from './routes/admin/plans/index'
 import { Route as AdminUsersIndexRouteImport } from './routes/admin/users/index'
 
 const IndexRoute = IndexRouteImport.update({
@@ -100,6 +100,11 @@ const AdminAuditIndexRoute = AdminAuditIndexRouteImport.update({
   path: '/audit/',
   getParentRoute: () => AdminRouteRoute,
 } as any)
+const AdminPlansIndexRoute = AdminPlansIndexRouteImport.update({
+  id: '/plans/',
+  path: '/plans/',
+  getParentRoute: () => AdminRouteRoute,
+} as any)
 const AdminSchoolsIndexRoute = AdminSchoolsIndexRouteImport.update({
   id: '/schools/',
   path: '/schools/',
@@ -118,11 +123,6 @@ const AdminSchoolsNewRoute = AdminSchoolsNewRouteImport.update({
 const AdminSubscriptionsIndexRoute = AdminSubscriptionsIndexRouteImport.update({
   id: '/subscriptions/',
   path: '/subscriptions/',
-  getParentRoute: () => AdminRouteRoute,
-} as any)
-const AdminPlansIndexRoute = AdminPlansIndexRouteImport.update({
-  id: '/plans/',
-  path: '/plans/',
   getParentRoute: () => AdminRouteRoute,
 } as any)
 const AdminUsersIndexRoute = AdminUsersIndexRouteImport.update({
@@ -148,9 +148,9 @@ export interface FileRoutesByFullPath {
   '/admin/schools/$schoolId': typeof AdminSchoolsSchoolIdRoute
   '/admin/schools/new': typeof AdminSchoolsNewRoute
   '/admin/audit/': typeof AdminAuditIndexRoute
+  '/admin/plans/': typeof AdminPlansIndexRoute
   '/admin/schools/': typeof AdminSchoolsIndexRoute
   '/admin/subscriptions/': typeof AdminSubscriptionsIndexRoute
-  '/admin/plans/': typeof AdminPlansIndexRoute
   '/admin/users/': typeof AdminUsersIndexRoute
 }
 export interface FileRoutesByTo {
@@ -169,9 +169,9 @@ export interface FileRoutesByTo {
   '/admin/schools/$schoolId': typeof AdminSchoolsSchoolIdRoute
   '/admin/schools/new': typeof AdminSchoolsNewRoute
   '/admin/audit': typeof AdminAuditIndexRoute
+  '/admin/plans': typeof AdminPlansIndexRoute
   '/admin/schools': typeof AdminSchoolsIndexRoute
   '/admin/subscriptions': typeof AdminSubscriptionsIndexRoute
-  '/admin/plans': typeof AdminPlansIndexRoute
   '/admin/users': typeof AdminUsersIndexRoute
 }
 export interface FileRoutesById {
@@ -192,9 +192,9 @@ export interface FileRoutesById {
   '/admin/schools/$schoolId': typeof AdminSchoolsSchoolIdRoute
   '/admin/schools/new': typeof AdminSchoolsNewRoute
   '/admin/audit/': typeof AdminAuditIndexRoute
+  '/admin/plans/': typeof AdminPlansIndexRoute
   '/admin/schools/': typeof AdminSchoolsIndexRoute
   '/admin/subscriptions/': typeof AdminSubscriptionsIndexRoute
-  '/admin/plans/': typeof AdminPlansIndexRoute
   '/admin/users/': typeof AdminUsersIndexRoute
 }
 export interface FileRouteTypes {
@@ -216,9 +216,9 @@ export interface FileRouteTypes {
     | '/admin/schools/$schoolId'
     | '/admin/schools/new'
     | '/admin/audit/'
+    | '/admin/plans/'
     | '/admin/schools/'
     | '/admin/subscriptions/'
-    | '/admin/plans/'
     | '/admin/users/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -237,9 +237,9 @@ export interface FileRouteTypes {
     | '/admin/schools/$schoolId'
     | '/admin/schools/new'
     | '/admin/audit'
+    | '/admin/plans'
     | '/admin/schools'
     | '/admin/subscriptions'
-    | '/admin/plans'
     | '/admin/users'
   id:
     | '__root__'
@@ -259,9 +259,9 @@ export interface FileRouteTypes {
     | '/admin/schools/$schoolId'
     | '/admin/schools/new'
     | '/admin/audit/'
+    | '/admin/plans/'
     | '/admin/schools/'
     | '/admin/subscriptions/'
-    | '/admin/plans/'
     | '/admin/users/'
   fileRoutesById: FileRoutesById
 }
@@ -377,6 +377,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminAuditIndexRouteImport
       parentRoute: typeof AdminRouteRoute
     }
+    '/admin/plans/': {
+      id: '/admin/plans/'
+      path: '/plans'
+      fullPath: '/admin/plans/'
+      preLoaderRoute: typeof AdminPlansIndexRouteImport
+      parentRoute: typeof AdminRouteRoute
+    }
     '/admin/schools/': {
       id: '/admin/schools/'
       path: '/schools'
@@ -405,13 +412,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminSubscriptionsIndexRouteImport
       parentRoute: typeof AdminRouteRoute
     }
-    '/admin/plans/': {
-      id: '/admin/plans/'
-      path: '/plans'
-      fullPath: '/admin/plans/'
-      preLoaderRoute: typeof AdminPlansIndexRouteImport
-      parentRoute: typeof AdminRouteRoute
-    }
     '/admin/users/': {
       id: '/admin/users/'
       path: '/users'
@@ -430,9 +430,9 @@ interface AdminRouteRouteChildren {
   AdminSchoolsSchoolIdRoute: typeof AdminSchoolsSchoolIdRoute
   AdminSchoolsNewRoute: typeof AdminSchoolsNewRoute
   AdminAuditIndexRoute: typeof AdminAuditIndexRoute
+  AdminPlansIndexRoute: typeof AdminPlansIndexRoute
   AdminSchoolsIndexRoute: typeof AdminSchoolsIndexRoute
   AdminSubscriptionsIndexRoute: typeof AdminSubscriptionsIndexRoute
-  AdminPlansIndexRoute: typeof AdminPlansIndexRoute
   AdminUsersIndexRoute: typeof AdminUsersIndexRoute
 }
 
@@ -444,9 +444,9 @@ const AdminRouteRouteChildren: AdminRouteRouteChildren = {
   AdminSchoolsSchoolIdRoute: AdminSchoolsSchoolIdRoute,
   AdminSchoolsNewRoute: AdminSchoolsNewRoute,
   AdminAuditIndexRoute: AdminAuditIndexRoute,
+  AdminPlansIndexRoute: AdminPlansIndexRoute,
   AdminSchoolsIndexRoute: AdminSchoolsIndexRoute,
   AdminSubscriptionsIndexRoute: AdminSubscriptionsIndexRoute,
-  AdminPlansIndexRoute: AdminPlansIndexRoute,
   AdminUsersIndexRoute: AdminUsersIndexRoute,
 }
 

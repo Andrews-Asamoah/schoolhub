@@ -171,7 +171,12 @@ export class AccountsService {
       });
       await tx.user.update({
         where: { id: user.id },
-        data: { mustChangePassword: false, passwordChangedAt: now, updatedAt: now },
+        data: {
+          mustChangePassword: false,
+          passwordChangedAt: now,
+          temporaryPasswordExpiresAt: null,
+          updatedAt: now,
+        },
       });
       // Sign out every other device; keep the one making this request.
       await tx.session.deleteMany({

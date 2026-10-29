@@ -109,6 +109,17 @@ describe("SuperAdminService operations health", () => {
     expect(result.migrations.status).toBe("mismatch");
   });
 
+  it("degrades health for dead/overdue durable jobs without exposing payloads", async () => {
+    vi.stubEnv("EXPECTED_MIGRATION_NAME", "20261026090000_init");
+    const client = { $queryRaw: vi.fn().mockResolvedValueOnce([{ ok: 1 }]).mockResolvedValueOnce([{ latest_migration: "20261026090000_init", unfinished_count: 0 }]),
+      backgroundJob: { count: vi.fn().mockResolvedValueOnce(2).mockResolvedValueOnce(1).mockResolvedValueOnce(0), findFirst: vi.fn().mockResolvedValue({ completedAt: new Date() }) } };
+    const service = new SuperAdminService({ client } as never, {} as CredentialsService);
+    const result = await service.getOperationsHealth();
+    expect(result.status).toBe("degraded");
+    expect(result.dependencies.backgroundJobs).toMatchObject({ status: "degraded", dead: 2, overdue: 1, expired: 0 });
+    expect(result.dependencies.backgroundJobs).not.toHaveProperty("payload");
+  });
+
   it("degrades the overall status when the database check fails", async () => {
     const queryRaw = vi.fn().mockRejectedValue(new Error("database unavailable"));
     const service = new SuperAdminService(

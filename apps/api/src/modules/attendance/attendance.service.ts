@@ -4,12 +4,15 @@ import type { BatchAttendanceInput } from "@schoolhub/shared";
 import { canManageAcademicContext } from "../../common/academic-context.js";
 import { canMarkRegister } from "../../common/scope/teacher-access.js";
 import { TeacherScopeService } from "../../common/scope/teacher-scope.service.js";
+import { AttendanceCalendarService } from "./attendance-calendar.service.js";
+import { dateString, eligibleInstructionalDates } from "./attendance-calendar.js";
 
 @Injectable()
 export class AttendanceService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly teacherScope: TeacherScopeService,
+    private readonly calendarService: AttendanceCalendarService,
   ) {}
 
   async batchRecordAttendance(
@@ -25,6 +28,7 @@ export class AttendanceService {
     const { academicYear, term } =
       await this.resolveAcademicContext(schoolId);
     this.assertCurrentTermDate(input.date, term.startDate, term.endDate);
+    await this.calendarService.assertInstructionalDate(schoolId, term.id, input.date, input.records.map(r => r.studentId));
     const studentIds = input.records.map((record) => record.studentId);
     const placements = await this.prisma.client.enrollment.findMany({
       where: {
@@ -47,32 +51,36 @@ export class AttendanceService {
       throw new ForbiddenException("Only the class teacher can mark this class's register.");
     }
 
-    const operations = input.records.map((record) =>
-      this.prisma.client.attendance.upsert({
-        where: {
-          studentId_date: {
-            studentId: record.studentId,
-            date: attendanceDate,
-          },
-        },
-        update: {
-          status: record.status,
-          remarks: record.remarks,
-          markedById,
-          markedAt: new Date(),
-        },
-        create: {
-          studentId: record.studentId,
-          date: attendanceDate,
-          status: record.status,
-          remarks: record.remarks,
-          markedById,
-          markedAt: new Date(),
-        },
-      }),
-    );
-
-    const results = await this.prisma.client.$transaction(operations);
+    // Calendar writes and attendance writes acquire the same scoped advisory lock.
+    // Repeat the eligibility checks under the lock so an exclusion cannot race a register save.
+    const results = await this.prisma.client.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${schoolId}), hashtext(${term.id}))`;
+      await tx.$queryRaw`SELECT "id" FROM "terms" WHERE "id" = ${term.id} FOR UPDATE`;
+      const [latestTerm, overrides, excluded] = await Promise.all([
+        tx.term.findFirst({ where: { id: term.id, academicYear: { schoolId } },
+          select: { instructionalWeekdays: true } }),
+        tx.academicCalendarDay.findMany({ where: { schoolId, termId: term.id },
+          select: { date: true, isInstructional: true } }),
+        tx.studentAttendanceExclusion.findMany({ where: { schoolId, termId: term.id,
+          studentId: { in: studentIds }, date: attendanceDate }, select: { studentId: true } }),
+      ]);
+      if (!latestTerm || !eligibleInstructionalDates({
+        start: input.date, end: input.date, asOf: input.date,
+        weekdays: latestTerm.instructionalWeekdays,
+        overrides: overrides.map(row => ({ date: dateString(row.date), isInstructional: row.isInstructional })),
+      }).length) throw new BadRequestException("The school is closed or this is not an instructional day.");
+      if (excluded.length) throw new BadRequestException("Remove students with an approved exclusion from this register.");
+      const saved = [];
+      for (const record of input.records) {
+        saved.push(await tx.attendance.upsert({
+          where: { studentId_date: { studentId: record.studentId, date: attendanceDate } },
+          update: { status: record.status, remarks: record.remarks, markedById, markedAt: new Date() },
+          create: { studentId: record.studentId, date: attendanceDate,
+            status: record.status, remarks: record.remarks, markedById, markedAt: new Date() },
+        }));
+      }
+      return saved;
+    });
 
     return {
       success: true,
@@ -185,49 +193,35 @@ export class AttendanceService {
       termId,
       role,
     );
-    const records = await this.prisma.client.attendance.groupBy({
-      by: ["status"],
-      where: {
-        studentId,
-        student: {
-          schoolId,
-          enrollments: {
-            some: {
-              academicYearId: academicYear.id,
-              termId: term.id,
-              status: "ACTIVE",
-            },
-          },
-        },
-        date: { gte: term.startDate, lte: term.endDate },
-      },
-      _count: true,
-    });
+    // Feature disabled by default: preserve the original recorded-register calculation.
+    // The legacy denominator is only the number of saved entries, never inferred school days.
+    const policy = await this.calendarService.getPolicy(schoolId);
+    if (!policy.attendancePolicyActiveFrom ||
+        policy.attendancePolicyActiveFrom > new Date().toISOString().slice(0, 10) ||
+        policy.attendancePolicyActiveFrom > term.endDate.toISOString().slice(0, 10)) {
+      const rows = await this.prisma.client.attendance.groupBy({
+        by: ["status"],
+        where: { studentId, student: { schoolId,
+          enrollments: { some: { academicYearId: academicYear.id, termId: term.id,
+            status: "ACTIVE" } } },
+          date: { gte: term.startDate, lte: term.endDate } },
+        _count: true,
+      });
+      const summary: Record<string, number> = {
+        PRESENT: 0, ABSENT: 0, LATE: 0, EXCUSED: 0, SICK: 0, PERMISSION: 0,
+      };
+      rows.forEach(row => { summary[row.status] = row._count; });
+      const totalDays = Object.values(summary).reduce((sum, n) => sum + n, 0);
+      const attended = summary.PRESENT! + summary.LATE!;
+      const rate = totalDays ? Math.round((attended / totalDays) * 100) : 0;
+      return { summary, totalDays, recordedDays: totalDays,
+        possibleDays: null, unmarkedDays: null, missingDates: [],
+        attendanceRate: rate, provisionalRate: totalDays ? rate : null,
+        coverageRate: null, policyMode: "LEGACY_RECORDED" as const,
+        policyActiveFrom: policy.attendancePolicyActiveFrom, isComplete: false };
+    }
+    return this.calendarService.studentSummary(schoolId, studentId, academicYear.id, term);
 
-    const summary: Record<string, number> = {
-      PRESENT: 0,
-      ABSENT: 0,
-      LATE: 0,
-      EXCUSED: 0,
-      SICK: 0,
-      PERMISSION: 0,
-    };
-
-    records.forEach((r) => {
-      summary[r.status] = r._count;
-    });
-
-    const totalDays = Object.values(summary).reduce((a, b) => a + b, 0);
-    const attendanceRate =
-      totalDays > 0
-        ? Math.round(((summary.PRESENT! + summary.LATE!) / totalDays) * 100)
-        : 0;
-
-    return {
-      summary,
-      totalDays,
-      attendanceRate,
-    };
   }
 
   async getMyAttendanceSummary(

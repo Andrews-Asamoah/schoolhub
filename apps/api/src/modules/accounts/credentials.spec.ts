@@ -1,35 +1,78 @@
 import { describe, expect, it } from "vitest";
 import { verifyPassword } from "better-auth/crypto";
 import { changePasswordSchema, guardianEmailDomain, passwordSchema, studentLoginEmail } from "@schoolhub/shared";
-import { CredentialsService, DEFAULT_PASSWORDS, newGuardianLoginEmail } from "./credentials.service.js";
+import { CredentialsService, generateTemporaryPassword, newGuardianLoginEmail } from "./credentials.service.js";
+import {
+  assertPasswordChangeNotPending,
+  isTemporaryPasswordExpired,
+  temporaryPasswordExpiry,
+} from "../../common/guards/password-change.js";
 import { roleForStaffType } from "./staff-roles.js";
 
-describe("default passwords", () => {
-  it("uses the documented default for each role", () => {
-    expect(DEFAULT_PASSWORDS.student).toBe("Student@123");
-    expect(DEFAULT_PASSWORDS.guardian).toBe("Guardian@123");
-    expect(DEFAULT_PASSWORDS.teacher).toBe("Teacher@123");
-    expect(DEFAULT_PASSWORDS.accountant).toBe("Accountant@123");
-    expect(DEFAULT_PASSWORDS.headteacher).toBe("Headteacher@123");
-    expect(DEFAULT_PASSWORDS.admin).toBe("Admin@123");
-  });
+describe("temporary passwords", () => {
+  const roles = ["owner", "admin", "headteacher", "teacher", "accountant", "staff", "student", "guardian"] as const;
 
-  it("hashes with a fresh salt and verifies against the role default", async () => {
+  it.each(roles)("issues a random, policy-compliant password for %s", async (role) => {
     const service = new CredentialsService();
-    const a = await service.prepare("student");
-    const b = await service.prepare("student");
+    const a = await service.prepare(role);
+    const b = await service.prepare(role);
+    expect(a.temporaryPassword).not.toBe(b.temporaryPassword);
     expect(a.passwordHash).not.toBe(b.passwordHash);
-    expect(a.passwordHash).not.toContain("Student@123");
-    expect(await verifyPassword({ hash: a.passwordHash, password: "Student@123" })).toBe(true);
-    expect(await verifyPassword({ hash: a.passwordHash, password: "Guardian@123" })).toBe(false);
+    expect(passwordSchema.safeParse(a.temporaryPassword).success).toBe(true);
+    expect(a.passwordHash).not.toContain(a.temporaryPassword);
+    expect(await verifyPassword({ hash: a.passwordHash, password: a.temporaryPassword })).toBe(true);
+    expect(await verifyPassword({ hash: a.passwordHash, password: b.temporaryPassword })).toBe(false);
   });
 
-  it("never lets a default be kept as the new password", () => {
-    const result = changePasswordSchema.safeParse({
-      currentPassword: "Student@123",
-      newPassword: "Student@123",
-    });
+  it("never reproduces a role-based default like Student@123", async () => {
+    const service = new CredentialsService();
+    for (const role of roles) {
+      const { temporaryPassword } = await service.prepare(role);
+      const label = role.charAt(0).toUpperCase() + role.slice(1);
+      expect(temporaryPassword).not.toBe(`${label}@123`);
+    }
+  });
+
+  it("gives students and guardians 12 easy-to-copy letters and digits", () => {
+    for (let i = 0; i < 50; i += 1) {
+      expect(generateTemporaryPassword(12, { symbols: false })).toMatch(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)[A-Za-z0-9]{12}$/);
+    }
+  });
+
+  it("keeps ambiguous characters out of generated passwords", () => {
+    for (let i = 0; i < 50; i += 1) expect(generateTemporaryPassword()).not.toMatch(/[lIO01]/);
+  });
+
+  it("never lets a temporary password be kept as the new password", async () => {
+    const { temporaryPassword } = await new CredentialsService().prepare("student");
+    const result = changePasswordSchema.safeParse({ currentPassword: temporaryPassword, newPassword: temporaryPassword });
     expect(result.success).toBe(false);
+  });
+});
+
+describe("temporary password expiry", () => {
+  const now = new Date("2026-10-28T10:00:00Z");
+
+  it("expires seven days after issue", () => {
+    expect(temporaryPasswordExpiry(now).toISOString()).toBe("2026-11-04T10:00:00.000Z");
+  });
+
+  it("blocks an expired, unused temporary password with a distinct error", () => {
+    const user = { mustChangePassword: true, temporaryPasswordExpiresAt: new Date("2026-10-28T09:59:59Z") };
+    expect(() => assertPasswordChangeNotPending(user, now)).toThrow(/expired/i);
+    expect(isTemporaryPasswordExpired(user, now)).toBe(true);
+  });
+
+  it("still asks for a change while the password is valid", () => {
+    const user = { mustChangePassword: true, temporaryPasswordExpiresAt: temporaryPasswordExpiry(now) };
+    expect(() => assertPasswordChangeNotPending(user, now)).toThrow(/change your temporary password/i);
+    expect(isTemporaryPasswordExpired(user, now)).toBe(false);
+  });
+
+  it("ignores expiry once the owner has chosen their own password", () => {
+    const user = { mustChangePassword: false, temporaryPasswordExpiresAt: new Date("2020-01-01") };
+    expect(isTemporaryPasswordExpired(user, now)).toBe(false);
+    expect(() => assertPasswordChangeNotPending(user, now)).not.toThrow();
   });
 });
 
@@ -79,7 +122,6 @@ describe("random temporary passwords (privileged accounts)", () => {
       const password = generateTemporaryPassword();
       expect(passwordSchema.safeParse(password).success).toBe(true);
       expect(password).toHaveLength(16);
-      expect(Object.values(DEFAULT_PASSWORDS)).not.toContain(password);
       seen.add(password);
     }
     expect(seen.size).toBe(200);
@@ -91,6 +133,6 @@ describe("random temporary passwords (privileged accounts)", () => {
     const b = await service.prepareRandom();
     expect(a.temporaryPassword).not.toBe(b.temporaryPassword);
     expect(await verifyPassword({ hash: a.passwordHash, password: a.temporaryPassword })).toBe(true);
-    expect(await verifyPassword({ hash: a.passwordHash, password: DEFAULT_PASSWORDS.admin })).toBe(false);
+    expect(await verifyPassword({ hash: a.passwordHash, password: "Admin@123" })).toBe(false);
   });
 });

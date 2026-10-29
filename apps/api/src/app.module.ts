@@ -7,6 +7,8 @@ import { HealthController } from "./health.controller.js";
 import { PrismaModule } from "./prisma/prisma.module.js";
 import { GlobalExceptionFilter } from "./common/filters/global-exception.filter.js";
 
+import { JobsModule } from "./common/jobs/jobs.module.js";
+
 // Domain Modules
 import { StorageModule } from "./modules/storage/storage.module.js";
 import { SchoolsModule } from "./modules/schools/schools.module.js";
@@ -38,6 +40,7 @@ import { DashboardModule } from "./modules/dashboard/dashboard.module.js";
     // Deliberately NOT a global guard: many pupils share one school IP address.
     ThrottlerModule.forRoot([{ name: "default", ttl: 60_000, limit: 120 }]),
     PrismaModule,
+    JobsModule,
     StorageModule,
     AuthModule.forRoot({ auth }),
     SchoolsModule,

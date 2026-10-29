@@ -10,6 +10,12 @@ describe("termProblemWithinYear", () => {
   it("rejects a term that ends before it starts", () => {
     expect(termProblemWithinYear(year, { startDate: "2026-12-18", endDate: "2026-09-08" })).toMatch(/end after/);
   });
+  it("rejects a term spanning more than 241 calendar days", () => {
+    expect(termProblemWithinYear(
+      { startDate:"2026-01-01", endDate:"2026-12-31" },
+      { startDate:"2026-01-01", endDate:"2026-12-31" },
+    )).toMatch(/cannot exceed/);
+  });
   it("rejects a term outside the year", () => {
     expect(termProblemWithinYear(year, { startDate: "2026-08-20", endDate: "2026-12-18" })).toMatch(/inside the academic year/);
   });

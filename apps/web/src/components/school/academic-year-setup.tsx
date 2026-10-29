@@ -20,6 +20,7 @@ import {
 } from "@/components/forms/form-controls";
 import { apiFetch } from "@/lib/api";
 import { AcademicYearCard } from "@/components/school/academic-year-card";
+import { AcademicCalendarPolicyWorkspace } from "@/components/school/academic-calendar-policy-workspace";
 
 type YearValues = Omit<CreateAcademicYearInput, "isCurrent" | "terms"> & {
   isCurrent?: boolean;
@@ -363,6 +364,7 @@ export function AcademicYearSetup({ years }: AcademicYearSetupProps) {
           <AcademicYearCard key={year.id} year={year} />
         ))}
       </section>
+      {years.some(year => year.terms.length > 0) && <AcademicCalendarPolicyWorkspace years={years} />}
       {!years.length && (
         <p className="rounded-xl border border-dashed border-input bg-card p-5 text-center text-xs text-muted-foreground">
           No academic calendars have been configured for this school.

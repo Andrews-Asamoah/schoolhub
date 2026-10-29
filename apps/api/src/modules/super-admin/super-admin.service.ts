@@ -1,3 +1,4 @@
+import { temporaryPasswordExpiry } from "../../common/guards/password-change.js";
 import {
   Injectable,
   Inject,
@@ -10,7 +11,7 @@ import { PrismaService } from "../../prisma/prisma.service.js";
 import { generateId } from "better-auth";
 import { Prisma } from "@prisma/client";
 import { CredentialsService, toIssuedCredentials } from "../accounts/credentials.service.js";
-import { STORAGE_HEALTH_PROBE, type StorageHealthProbe } from "../storage/storage-health.js";
+import { PRIVATE_STORAGE_HEALTH_PROBE, STORAGE_HEALTH_PROBE, type StorageHealthProbe } from "../storage/storage-health.js";
 import { writeAudit, type AuditActor } from "../../common/audit/audit.js";
 import {
   evaluateSubscriptionAccess,
@@ -62,6 +63,7 @@ export class SuperAdminService {
     private readonly prisma: PrismaService,
     private readonly credentials: CredentialsService,
     @Optional() @Inject(STORAGE_HEALTH_PROBE) private readonly storage?: StorageHealthProbe,
+    @Optional() @Inject(PRIVATE_STORAGE_HEALTH_PROBE) private readonly privateStorage?: StorageHealthProbe,
   ) {}
 
   async listSchools(query: SuperAdminSchoolsQuery) {
@@ -513,6 +515,7 @@ export class SuperAdminService {
               emailVerified: false,
               role: "user",
               mustChangePassword: true,
+              temporaryPasswordExpiresAt: temporaryPasswordExpiry(now),
               createdAt: now,
               updatedAt: now,
             },
@@ -759,6 +762,7 @@ export class SuperAdminService {
             emailVerified: false,
             role: "owner",
             mustChangePassword: true,
+              temporaryPasswordExpiresAt: temporaryPasswordExpiry(now),
             createdAt: now,
             updatedAt: now,
           },
@@ -1125,11 +1129,13 @@ export class SuperAdminService {
     const storage = this.storage
       ? await this.storage.checkHealth()
       : { status: "not_instrumented" as const, latencyMs: null };
-    const storageDegraded = storage.status === "not_configured" || storage.status === "unavailable";
+    const privateStorage = this.privateStorage ? await this.privateStorage.checkHealth() : { status: "not_instrumented" as const, latencyMs: null };
+    const storageDegraded = [storage.status, privateStorage.status].some(status => status === "not_configured" || status === "unavailable");
+    const backgroundJobs = await this.backgroundJobHealth();
 
     return {
       status:
-        database.status === "healthy" && !migrationDegraded && !storageDegraded
+        database.status === "healthy" && !migrationDegraded && !storageDegraded && !["degraded", "unavailable"].includes(backgroundJobs.status)
           ? "healthy"
           : "degraded",
       checkedAt,
@@ -1143,12 +1149,29 @@ export class SuperAdminService {
       dependencies: {
         database,
         storage,
+        privateStorage,
         // Notification delivery and background workers have no provider/heartbeat
         // contract in this deployment yet, so they remain explicitly unmonitored.
         notifications: { status: "not_instrumented" },
-        backgroundJobs: { status: "not_instrumented" },
+        backgroundJobs,
       },
     } as const;
+  }
+
+  private async backgroundJobHealth() {
+    if (!this.prisma.client.backgroundJob) return { status: "not_instrumented" as const };
+    try {
+      const now = new Date();
+      const [dead, overdue, expired, lastSuccess] = await Promise.all([
+        this.prisma.client.backgroundJob.count({ where: { status: "DEAD" } }),
+        this.prisma.client.backgroundJob.count({ where: { status: "PENDING", nextAttempt: { lt: new Date(now.getTime() - 15 * 60_000) } } }),
+        this.prisma.client.backgroundJob.count({ where: { status: "RUNNING", leaseUntil: { lt: now } } }),
+        this.prisma.client.backgroundJob.findFirst({ where: { kind: "finance-integrity", status: "SUCCEEDED" }, orderBy: { completedAt: "desc" }, select: { completedAt: true } }),
+      ]);
+      const stale = lastSuccess?.completedAt ? now.getTime() - lastSuccess.completedAt.getTime() > 26 * 3600_000 : false;
+      return { status: dead || overdue || expired || stale ? "degraded" as const : lastSuccess ? "healthy" as const : "not_instrumented" as const,
+        dead, overdue, expired, lastFinanceSuccessAt: lastSuccess?.completedAt?.toISOString() ?? null };
+    } catch { return { status: "unavailable" as const }; }
   }
 
   async getPlatformStats() {

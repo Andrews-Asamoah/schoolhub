@@ -152,7 +152,7 @@ export async function apiFetch<T>(
  * the tenant and active-role headers used by apiFetch and honors the server's
  * Content-Disposition filename.
  */
-export async function apiDownload(path: string, fallbackFileName?: string): Promise<void> {
+async function apiBinary(path: string): Promise<Response> {
   const headers = new Headers();
   const subdomain = getClientSubdomain();
   if (subdomain) headers.set("x-school-subdomain", subdomain);
@@ -198,6 +198,15 @@ export async function apiDownload(path: string, fallbackFileName?: string): Prom
     throw new ApiError(response.status, (body as { message?: string }).message ?? response.statusText, body);
   }
 
+  return response;
+}
+
+export async function apiBlob(path: string): Promise<Blob> {
+  return (await apiBinary(path)).blob();
+}
+
+export async function apiDownload(path: string, fallbackFileName?: string): Promise<void> {
+  const response = await apiBinary(path);
   const disposition = response.headers.get("content-disposition") ?? "";
   const encodedName = /filename\*=UTF-8''([^;]+)/i.exec(disposition)?.[1];
   const plainName = /filename="?([^";]+)"?/i.exec(disposition)?.[1];
@@ -211,4 +220,59 @@ export async function apiDownload(path: string, fallbackFileName?: string): Prom
   link.click();
   link.remove();
   window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+/** Authenticated, private PDF download; no public file URL is created. */
+export async function downloadAcademicReport(path: string, filename: string): Promise<void> {
+  const headers = new Headers();
+  const school = getClientSubdomain();
+  if (school) headers.set("x-school-subdomain", school);
+  const role = typeof window !== "undefined" ?
+    window.localStorage.getItem("schoolhub-active-role") : null;
+  if (role) headers.set("x-school-role", role);
+  const result = await fetch(`${API_BASE}${path}`,{
+    method:"GET",credentials:"include",headers,cache:"no-store",
+  });
+  if (!result.ok) {
+    const detail = await result.json().catch(()=>({message:"Report download was rejected."}));
+    throw new ApiError(result.status,
+      (detail as {message?:string}).message ?? "Report download was rejected.",detail);
+  }
+  if (!result.headers.get("content-type")?.includes("application/pdf")) {
+    throw new Error("The server did not return a valid PDF.");
+  }
+  const file = await result.blob();
+  const url = URL.createObjectURL(file);
+  try {
+    const a = document.createElement("a"); a.href=url;a.download=filename;
+    document.body.appendChild(a);a.click();a.remove();
+  } finally { URL.revokeObjectURL(url); }
+}
+
+/** Authenticated Excel downloads. The file is never exposed on a public URL. */
+export async function downloadPrivateExcel(path:string,filename:string):Promise<void>{
+  const headers=new Headers();
+  const school=getClientSubdomain();
+  if(school)headers.set("x-school-subdomain",school);
+  if(typeof window!=="undefined"){
+    const role=window.localStorage.getItem("schoolhub-active-role");
+    if(role)headers.set("x-school-role",role);
+  }
+  const response=await fetch(`${API_BASE}${path}`,{
+    credentials:"include",headers,cache:"no-store",
+  });
+  if(!response.ok){
+    const detail=await response.json().catch(()=>({message:"Excel download rejected."}));
+    throw new ApiError(response.status,
+      (detail as {message?:string}).message??"Excel download rejected.",detail);
+  }
+  const type=response.headers.get("content-type")??"";
+  if(!type.includes("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")){
+    throw new Error("Server did not return a valid Excel workbook.");
+  }
+  const url=URL.createObjectURL(await response.blob());
+  try{
+    const a=document.createElement("a");
+    a.href=url;a.download=filename;document.body.appendChild(a);a.click();a.remove();
+  }finally{URL.revokeObjectURL(url);}
 }

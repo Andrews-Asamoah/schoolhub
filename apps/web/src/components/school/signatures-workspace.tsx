@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CheckCircle2, ImagePlus, LoaderCircle, Trash2, UploadCloud, UserRoundPen } from "lucide-react";
-import { apiFetch } from "@/lib/api";
+import { apiBlob, apiFetch } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
 type Person = {
@@ -111,7 +111,7 @@ export function SignaturesWorkspace() {
         const isUploading = uploadingKeys.has(signatureKey(kind, person.id));
         return <article key={person.id} className="flex min-w-0 flex-col rounded-2xl border border-border bg-card p-4 shadow-sm">
           <div className="flex items-start gap-3"><div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground"><UserRoundPen className="size-5" /></div><div className="min-w-0 flex-1"><h3 className="truncate font-semibold">{personName(person)}</h3><p className="truncate text-xs text-muted-foreground">{person.profile?.user?.email || person.staffType || person.staffNumber || person.teacherId || (kind === "teacher" ? "Teacher" : "Staff member")}</p></div>{signatureUrl && <CheckCircle2 className="size-5 shrink-0 text-success" aria-label="Signature uploaded" />}</div>
-          <div className="mt-4 flex h-32 items-center justify-center overflow-hidden rounded-xl border border-dashed border-border bg-muted/30 p-3">{signatureUrl ? <img src={signatureUrl} alt={"Signature of " + personName(person)} className="max-h-full max-w-full object-contain" /> : <div className="text-center text-muted-foreground"><ImagePlus className="mx-auto size-6" /><p className="mt-2 text-xs">No signature uploaded</p></div>}</div>
+          <div className="mt-4 flex h-32 items-center justify-center overflow-hidden rounded-xl border border-dashed border-border bg-muted/30 p-3">{signatureUrl ? <PrivateSignature key={signatureUrl + person.id} path={"/schools/current/signatures/" + kind + "/" + person.id} name={personName(person)} version={kind === "teacher" ? teachersQuery.dataUpdatedAt : staffQuery.dataUpdatedAt} /> : <div className="text-center text-muted-foreground"><ImagePlus className="mx-auto size-6" /><p className="mt-2 text-xs">No signature uploaded</p></div>}</div>
           <div className="mt-4 flex flex-wrap gap-2">
             <label htmlFor={inputId} className={cn(button, "cursor-pointer")}>{isUploading ? <LoaderCircle className="size-4 animate-spin" /> : <UploadCloud className="size-4" />}{isUploading ? "Uploading…" : signatureUrl ? "Replace signature" : "Upload signature"}</label>
             <input id={inputId} type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" disabled={isUploading} onChange={(event) => { const file = event.currentTarget.files?.[0]; event.currentTarget.value = ""; if (!file) return; if (file.size > 2 * 1024 * 1024) { setFeedback({ kind: "error", text: "Choose an image no larger than 2 MB." }); return; } setFeedback(null); upload.mutate({ person, file, personKind: kind }); }} />
@@ -123,4 +123,20 @@ export function SignaturesWorkspace() {
       <p className="text-xs leading-5 text-muted-foreground">Signatures are stored under this school's isolated Cloudflare R2 prefix. Uploading a signature makes it available on the person's profile; individual forms and printouts must explicitly render that profile signature when they support it.</p>
     </div>
   );
+}
+
+function PrivateSignature({ path, name, version }: { path: string; name: string; version: number }) {
+  const [image, setImage] = useState<string | null>(null);
+  const [error, setError] = useState("");
+  useEffect(() => {
+    let cancelled = false;
+    let url: string | null = null;
+    setImage(null); setError("");
+    void apiBlob(path).then(blob => {
+      if (cancelled) return;
+      url = URL.createObjectURL(blob); setImage(url);
+    }).catch((error: Error) => { if (!cancelled) setError(error.message); });
+    return () => { cancelled = true; if (url) URL.revokeObjectURL(url); };
+  }, [path, version]);
+  return error ? <p role="alert" className="text-xs text-destructive">{error}</p> : image ? <img src={image} alt={"Signature of " + name} className="max-h-full max-w-full object-contain" /> : <LoaderCircle className="size-5 animate-spin text-muted-foreground" aria-label="Loading signature" />;
 }

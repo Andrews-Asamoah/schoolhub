@@ -2,6 +2,7 @@ import { ConflictException, Injectable } from "@nestjs/common";
 import { generateId } from "better-auth";
 import { randomInt } from "node:crypto";
 import { hashPassword } from "better-auth/crypto";
+import { temporaryPasswordExpiry } from "../../common/guards/password-change.js";
 import type { AuditAction, Prisma } from "@prisma/client";
 import type { IssuedCredentials, Role } from "@schoolhub/shared";
 
@@ -32,23 +33,6 @@ export interface PreparedCredential {
   passwordHash: string;
 }
 
-/**
- * Role-based default passwords. They are intentionally predictable so staff
- * can hand them over easily, which is exactly why every account created with
- * one is flagged `mustChangePassword`: the API refuses all other requests
- * until the owner replaces it (see password-change.ts).
- */
-export const DEFAULT_PASSWORDS: Record<ProvisionableRole | "owner", string> = {
-  owner: "Owner@123",
-  admin: "Admin@123",
-  headteacher: "Headteacher@123",
-  teacher: "Teacher@123",
-  accountant: "Accountant@123",
-  staff: "Staff@123",
-  student: "Student@123",
-  guardian: "Guardian@123",
-};
-
 const LOWER = "abcdefghijkmnopqrstuvwxyz"; // no l
 const UPPER = "ABCDEFGHJKLMNPQRSTUVWXYZ"; // no I, O
 const DIGITS = "23456789"; // no 0, 1
@@ -58,10 +42,12 @@ const SYMBOLS = "@#$%&*+=?";
  * Cryptographically random one-time password that always satisfies the shared
  * password policy and avoids look-alike characters (easy to read out loud).
  */
-export function generateTemporaryPassword(length = 16): string {
+export function generateTemporaryPassword(length = 16, options: { symbols?: boolean } = {}): string {
+  const useSymbols = options.symbols !== false;
   const pick = (alphabet: string) => alphabet[randomInt(0, alphabet.length)]!;
-  const all = LOWER + UPPER + DIGITS + SYMBOLS;
-  const chars = [pick(LOWER), pick(UPPER), pick(DIGITS), pick(SYMBOLS)];
+  const all = LOWER + UPPER + DIGITS + (useSymbols ? SYMBOLS : "");
+  const chars = [pick(LOWER), pick(UPPER), pick(DIGITS)];
+  if (useSymbols) chars.push(pick(SYMBOLS));
   while (chars.length < length) chars.push(pick(all));
   for (let i = chars.length - 1; i > 0; i -= 1) {
     const j = randomInt(0, i + 1);
@@ -104,21 +90,23 @@ interface ResetLoginInput {
 @Injectable()
 export class CredentialsService {
   /**
-   * Look up the role's default password and hash it (fresh random salt each
-   * time). Done *before* opening a database transaction because scrypt is
-   * deliberately slow and would otherwise hold the transaction open.
+   * Random one-time password, unique to this issuance. There are no role
+   * defaults: a deterministic password would let anyone who knows a login
+   * name (student usernames are predictable by design) take over the account
+   * before its owner first signs in. Students and guardians get 12 letters
+   * and digits (no symbols) so the password is easy to copy from a printed
+   * slip; staff get 16 characters including symbols. Hashing happens before a
+   * database transaction opens because scrypt is deliberately slow.
    */
   async prepare(role: Role): Promise<PreparedCredential> {
-    const temporaryPassword = DEFAULT_PASSWORDS[role];
+    const temporaryPassword =
+      role === "student" || role === "guardian"
+        ? generateTemporaryPassword(12, { symbols: false })
+        : generateTemporaryPassword();
     return { temporaryPassword, passwordHash: await hashPassword(temporaryPassword) };
   }
 
-  /**
-   * Like {@link prepare}, but the temporary password is random and unique to
-   * this issuance instead of the guessable role default. Use for privileged
-   * accounts (school owners and admins) where a predictable password would
-   * leave a window for account takeover before the first sign-in.
-   */
+  /** Staff-strength random password, regardless of role (owners and admins). */
   async prepareRandom(): Promise<PreparedCredential> {
     const temporaryPassword = generateTemporaryPassword();
     return { temporaryPassword, passwordHash: await hashPassword(temporaryPassword) };
@@ -144,6 +132,7 @@ export class CredentialsService {
         emailVerified: false,
         role: "user", // platform-level role; school access comes from `member`
         mustChangePassword: true,
+        temporaryPasswordExpiresAt: temporaryPasswordExpiry(now),
         createdAt: now,
         updatedAt: now,
       },
@@ -272,7 +261,12 @@ export class CredentialsService {
 
     await tx.user.update({
       where: { id: input.userId },
-      data: { mustChangePassword: true, passwordChangedAt: null, updatedAt: now },
+      data: {
+        mustChangePassword: true,
+        passwordChangedAt: null,
+        temporaryPasswordExpiresAt: temporaryPasswordExpiry(now),
+        updatedAt: now,
+      },
     });
     await tx.session.deleteMany({ where: { userId: input.userId } });
   }

@@ -27,7 +27,13 @@ interface StudentAttendanceResponse {
     PERMISSION?: number;
   };
   totalDays: number;
-  attendanceRate: number;
+  attendanceRate: number | null;
+  possibleDays?: number;
+  unmarkedDays?: number | null;
+  coverageRate?: number | null;
+  provisionalRate?: number | null;
+  policyMode?: "LEGACY_RECORDED" | "TRANSITION" | "CALENDAR";
+  eligibilityWarning?: string | null;
   recentRecords?: AttendanceRecord[];
 }
 
@@ -40,7 +46,11 @@ export function StudentAttendanceView() {
 
   const summary = data?.summary ?? {};
   const totalDays = data?.totalDays ?? 0;
-  const attendanceRate = data?.attendanceRate ?? 0;
+  const attendanceRate = data?.attendanceRate;
+  const displayedRate = attendanceRate == null && data?.provisionalRate != null
+    ? `${data.provisionalRate}% (provisional)` : attendanceRate == null ? "Incomplete" : `${attendanceRate}%`;
+  const coverage = data?.coverageRate;
+  const missing = data?.unmarkedDays;
   const records = data?.recentRecords ?? [];
 
   return (
@@ -62,8 +72,10 @@ export function StudentAttendanceView() {
               <UserCheck className="size-4" />
             </span>
           </div>
-          <p className="mt-2 text-2xl font-black text-success">{attendanceRate}%</p>
-          <p className="mt-0.5 text-xs text-muted-foreground/70">Based on recorded attendance this term</p>
+          <p className="mt-2 text-2xl font-black text-success">{displayedRate}</p>
+          <p className="mt-0.5 text-xs text-muted-foreground/70">{data?.policyMode === "LEGACY_RECORDED" ? "Based on previously recorded days (calendar policy inactive)"
+            : missing ? `${missing} eligible days unmarked · ${coverage ?? "—"}% register coverage`
+            : "Based on eligible instructional days"}</p>
         </div>
 
         <div className="rounded-2xl border border-border/80 bg-card p-5 shadow-xs">

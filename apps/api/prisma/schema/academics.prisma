@@ -42,6 +42,8 @@ model AcademicYear {
   terms            Term[]
   admissionCycles  AdmissionCycle[]
   reportCardSets   ReportCardSet[]
+  internalExamSessions InternalExamSession[]
+  externalExamSessions ExternalExamSession[]
   timetableEntries TimetableEntry[]
 
   teacherAssignments    TeacherAssignment[]
@@ -69,6 +71,9 @@ model Term {
   startDate      DateTime @db.Date
   endDate        DateTime @db.Date
   isCurrent      Boolean  @default(false)
+  /// ISO weekdays: 1=Monday ... 7=Sunday. Every edit increments calendarRevision.
+  instructionalWeekdays Int[] @default([1, 2, 3, 4, 5])
+  calendarRevision Int @default(1)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
@@ -79,6 +84,7 @@ model Term {
   remarks               Remark[]
   admissionCycles       AdmissionCycle[]
   reportCardSets        ReportCardSet[]
+  internalExamSessions InternalExamSession[]
   notifications         Notification[]
   announcements         Announcement[]
   expenses              Expense[]
@@ -86,6 +92,8 @@ model Term {
   payrollRecords        PayrollRecord[]
   feeReminderSchedules  FeeReminderSchedule[]
   schoolAssignments     SchoolAssignment[]
+  calendarDays          AcademicCalendarDay[]
+  attendanceExclusions StudentAttendanceExclusion[]
 
   @@unique([academicYearId, termNumber])
   @@index([academicYearId])
@@ -153,6 +161,8 @@ model Class {
   assessmentTemplateClasses AssessmentTemplateClass[]
   reportCardSets            ReportCardSet[]
   reportCardSetClasses      ReportCardSetClass[]
+  internalExamSessions      InternalExamSession[]
+  externalExamSessions      ExternalExamSession[]
   assessmentExtensions      AssessmentExtension[]
   timetableEntries          TimetableEntry[]
 
@@ -241,6 +251,8 @@ model Subject {
   school           School            @relation(fields: [schoolId], references: [id], onDelete: Cascade)
   departments      Department[]      @relation("DepartmentSubjects")
   assessmentScores AssessmentScore[]
+  internalExamPapers InternalExamPaper[]
+  externalExamPapers ExternalExamPaper[]
   classSubjects    ClassSubject[]
   schoolAssignments SchoolAssignment[]
   teachers         SubjectTeacher[]
@@ -294,6 +306,9 @@ model Enrollment {
   termId         String
   status         EnrollmentStatus @default(ACTIVE)
   enrolledAt     DateTime         @default(now())
+  /// Actual eligibility dates, independent of record creation timestamps.
+  effectiveFrom  DateTime?        @db.Date
+  effectiveTo    DateTime?        @db.Date
   completedAt    DateTime?
   createdAt      DateTime         @default(now())
   updatedAt      DateTime         @updatedAt

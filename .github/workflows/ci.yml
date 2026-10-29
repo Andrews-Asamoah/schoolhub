@@ -2,9 +2,9 @@ name: CI
 
 on:
   pull_request:
-    branches: [main]
+    branches: [main, dev]
   push:
-    branches: [main]
+    branches: [main, dev]
   workflow_dispatch:
 
 permissions:
@@ -161,7 +161,9 @@ jobs:
             cat /tmp/schoolhub-web.log
             exit 1
           fi
-          pnpm dlx --package=playwright@1.56.1 -c 'export PLAYWRIGHT_PACKAGE_ENTRY="$(realpath "$(dirname "$(command -v playwright)")/../playwright/cli.js")"; playwright install --with-deps chromium; node apps/web/e2e/superadmin-dashboard.browser.mjs'
+          pnpm dlx --package=playwright@1.56.1 -c 'export PLAYWRIGHT_PACKAGE_ENTRY="$(realpath "$(dirname "$(command -v playwright)")/../playwright/cli.js")"; playwright install --with-deps chromium; node apps/web/e2e/superadmin-dashboard.browser.mjs && node apps/web/e2e/subscription-plan-editor.browser.mjs'
+      - name: Check controller route inventory
+        run: node apps/api/scripts/route-inventory.mjs --check
       - name: API lint
         run: pnpm --filter @schoolhub/api lint
       - name: Apply database migrations

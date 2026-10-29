@@ -1,0 +1,51 @@
+name: Database migrations
+
+# Manual, per-environment. Applies committed migrations with `prisma migrate
+# deploy` (never `migrate dev`). Configure a GitHub Environment per target
+# (staging, production) holding a DATABASE_URL secret; add required reviewers
+# to the production environment so a person approves each run.
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Target environment
+        type: choice
+        options: [staging, production]
+        required: true
+      ref:
+        description: Git ref (tag or commit) whose migrations to apply
+        required: true
+        default: main
+
+permissions:
+  contents: read
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: ${{ inputs.environment }}
+    concurrency:
+      group: migrate-${{ inputs.environment }}
+      cancel-in-progress: false
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref }}
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 12.4.1
+          run_install: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile --filter @schoolhub/api...
+      - name: Show migration status before
+        run: pnpm --filter @schoolhub/api exec prisma migrate status --config prisma.config.ts || true
+      - name: Apply migrations
+        run: pnpm db:deploy
+      - name: Show migration status after
+        run: pnpm --filter @schoolhub/api exec prisma migrate status --config prisma.config.ts
