@@ -124,6 +124,8 @@ jobs:
       # Match the baseline job: prepare generated workspace outputs first, then
       # typecheck packages sequentially so API typecheck cannot clean shared
       # declaration files while the web typecheck is resolving them.
+      - name: Audit production dependencies
+        run: pnpm audit --prod --audit-level high
       - name: Prepare workspace
         id: prepare
         run: |
