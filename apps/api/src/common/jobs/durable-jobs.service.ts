@@ -13,7 +13,10 @@ export class DurableJobsService {
 
   async enqueue(id: string, kind: string, schoolId: string | null, payload: Prisma.InputJsonValue,
     db: Pick<Prisma.TransactionClient, "backgroundJob"> = this.prisma.client) {
-    return db.backgroundJob.upsert({ where: { id }, create: { id, kind, schoolId, payload }, update: {} });
+    // Empty-update upserts can be emulated as SELECT + INSERT by Prisma.
+    // PostgreSQL ON CONFLICT DO NOTHING makes concurrent scheduling atomic.
+    await db.backgroundJob.createMany({ data: [{ id, kind, schoolId, payload }], skipDuplicates: true });
+    return db.backgroundJob.findUniqueOrThrow({ where: { id } });
   }
 
   async run(id: string, handler: (payload: Prisma.JsonValue) => Promise<void>, now = new Date()) {
