@@ -71,6 +71,7 @@ jobs:
             const release = validateManifest(JSON.parse(fs.readFileSync('approved-release/release-manifest.json', 'utf8')), context.payload.repository.full_name, process.env.RELEASE_SHA);
             if (release.sourceRunId !== process.env.IMAGE_RUN_ID || release.expectedMigration !== expectedMigration(process.env.GITHUB_WORKSPACE)) throw new Error('Release manifest migration baseline or originating run does not match.');
             core.exportVariable('API_IMAGE', release.images.api);
+            core.exportVariable('WEB_IMAGE', release.images.web);
             core.exportVariable('EXPECTED_MIGRATION_NAME', release.expectedMigration);
       - uses: docker/login-action@v3
         with:
@@ -105,7 +106,7 @@ jobs:
         with:
           script: |
             const fs = require('node:fs');
-            const record = {environment: process.env.TARGET_ENVIRONMENT, commit: process.env.RELEASE_SHA, apiImage: process.env.API_IMAGE ?? null,
+            const record = {environment: process.env.TARGET_ENVIRONMENT, commit: process.env.RELEASE_SHA, apiImage: process.env.API_IMAGE ?? null, webImage: process.env.WEB_IMAGE ?? null,
               expectedMigration: process.env.EXPECTED_MIGRATION_NAME ?? null, backupReference: process.env.BACKUP_REFERENCE,
               outcome: process.env.MIGRATION_OUTCOME || 'not-run', recordedAt: new Date().toISOString(), actor: context.actor};
             fs.writeFileSync('migration-record.json', JSON.stringify(record, null, 2));

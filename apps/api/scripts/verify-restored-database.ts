@@ -25,10 +25,17 @@ let right: PoolClient | undefined;
 try {
   left = await source.connect();
   right = await restored.connect();
+  const identityQuery = "SELECT current_database() AS name, pg_postmaster_start_time()::text AS started";
+  const [sourceIdentity, targetIdentity] = await Promise.all([left.query(identityQuery), right.query(identityQuery)]);
+  if (JSON.stringify(sourceIdentity.rows) === JSON.stringify(targetIdentity.rows)) throw new Error("Source and restored database resolve to the same instance");
   for (const connection of [left, right]) {
     await connection.query("BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY");
     await connection.query("SET LOCAL statement_timeout = '60s'");
     await connection.query("SET LOCAL timezone = 'UTC'");
+  }
+  for (const connection of [left, right]) {
+    const unfinished = await connection.query('SELECT COUNT(*)::int AS count FROM "_prisma_migrations" WHERE finished_at IS NULL AND rolled_back_at IS NULL');
+    if (unfinished.rows[0]?.count) mismatches.push({ table: "_prisma_migrations", reason: "Unfinished migration present" });
   }
   const sourceMigrations = await left.query('SELECT migration_name, checksum FROM "_prisma_migrations" WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL ORDER BY migration_name');
   const targetMigrations = await right.query('SELECT migration_name, checksum FROM "_prisma_migrations" WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL ORDER BY migration_name');
