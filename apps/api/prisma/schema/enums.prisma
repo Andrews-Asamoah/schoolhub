@@ -229,6 +229,7 @@ enum TranscriptRequestType {
 }
 
 enum AuditAction {
+  FILE_DOWNLOADED
   CREATE
   UPDATE
   DELETE

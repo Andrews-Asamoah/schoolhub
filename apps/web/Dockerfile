@@ -18,7 +18,8 @@ RUN pnpm --filter @schoolhub/shared build && pnpm --filter @schoolhub/web build
 
 FROM nginx:1.27-alpine
 # nginx renders templates in this folder at start-up, substituting env vars.
-ENV API_UPSTREAM=http://api:3001
+ENV API_UPSTREAM=http://api:3001 \
+    PUBLIC_SCHEME=auto
 COPY apps/web/nginx.conf.template /etc/nginx/templates/default.conf.template
 COPY --from=build /repo/apps/web/dist /usr/share/nginx/html
 EXPOSE 80

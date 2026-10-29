@@ -1,3 +1,4 @@
+import { originPolicy } from "../common/origin-policy.js";
 import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { bearer, organization, twoFactor } from "better-auth/plugins";
@@ -66,19 +67,7 @@ async function recordAuthAudit(
 }
 
 export function createAuth(prisma: PrismaLike) {
-  const trustedOrigins = [
-    process.env.WEB_ORIGIN ?? "http://localhost:5173",
-    "http://localhost:5173",
-    "http://*.localhost:5173",
-    "http://localhost:3000",
-    "http://*.localhost:3000",
-    "http://tauri.localhost",
-    "tauri://localhost",
-    "https://*.schoolhub.gh",
-    "https://*.schoolhub.app",
-    "https://*.schoolhub.com",
-    "https://schoolhub.gh",
-  ];
+  const { trustedOrigins } = originPolicy(process.env);
 
   const cookieDomain = process.env.COOKIE_DOMAIN?.trim();
   const pendingTrustedDeviceAudits = new WeakMap<

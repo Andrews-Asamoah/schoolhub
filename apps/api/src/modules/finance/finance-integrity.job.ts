@@ -1,49 +1,56 @@
 import { Injectable, Logger, type OnApplicationBootstrap, type OnApplicationShutdown } from "@nestjs/common";
 import { PrismaService } from "../../prisma/prisma.service.js";
+import { DurableJobsService } from "../../common/jobs/durable-jobs.service.js";
 import { FinanceLedgerIntegrityService } from "./finance-ledger-integrity.service.js";
 
-const HOUR_MS = 3_600_000;
-const RUN_HOUR_UTC = 2; // 02:00 UTC, before Ghana's working day (GMT)
+/** Most recent scheduled check at 02:00 UTC; startup catches up even after that hour. */
+export function financeIntegrityDueDay(now: Date) {
+  return new Date(now.getTime() - 2 * 3600_000).toISOString().slice(0, 10);
+}
 
-/**
- * Nightly I1/I2 check across all schools. A Postgres advisory lock makes it safe on several
- * API instances: only one instance runs a given pass. Disable with FINANCE_INTEGRITY_JOB=off.
- * Failures are logged at error level so existing log alerting picks them up; they are also
- * available on demand from GET /finance/ledger/integrity.
- */
 @Injectable()
 export class FinanceIntegrityJob implements OnApplicationBootstrap, OnApplicationShutdown {
   private readonly logger = new Logger(FinanceIntegrityJob.name);
   private timer?: NodeJS.Timeout;
-  private lastRunDay = "";
-
-  constructor(private readonly prisma: PrismaService, private readonly integrity: FinanceLedgerIntegrityService) {}
+  private running = false;
+  constructor(private readonly prisma: PrismaService, private readonly integrity: FinanceLedgerIntegrityService,
+    private readonly jobs: DurableJobsService) {}
 
   onApplicationBootstrap() {
     if (process.env.NODE_ENV === "test" || process.env.FINANCE_INTEGRITY_JOB === "off") return;
-    this.timer = setInterval(() => { void this.tick(); }, HOUR_MS);
-    this.timer.unref();
+    const poll = () => { void this.tick().catch(() => this.logger.error(JSON.stringify({ event: "finance.integrity.poll.failed" }))); };
+    this.timer = setInterval(poll, 60_000); this.timer.unref(); poll();
   }
-
   onApplicationShutdown() { if (this.timer) clearInterval(this.timer); }
 
-  private async tick(now = new Date()) {
-    const day = now.toISOString().slice(0, 10);
-    if (now.getUTCHours() !== RUN_HOUR_UTC || this.lastRunDay === day) return;
-    this.lastRunDay = day;
-    await this.runOnce();
-  }
-
-  async runOnce() {
-    // Transaction-scoped advisory lock: released automatically even if this process dies,
-    // and not tied to a pooled connection that could differ between lock and unlock.
-    return this.prisma.client.$transaction(async tx => {
-      const [lock] = await tx.$queryRaw<Array<{ locked: boolean }>>`SELECT pg_try_advisory_xact_lock(hashtext('finance_integrity_job')) AS locked`;
-      if (!lock?.locked) return null;
-      const result = await this.integrity.checkAllSchools();
-      if (result.failing.length) this.logger.error(`Ledger integrity FAILED for ${result.failing.length} of ${result.schoolsChecked} schools: ${JSON.stringify(result.failing)}`);
-      else this.logger.log(`Ledger integrity passed for ${result.schoolsChecked} schools.`);
-      return result;
-    }, { timeout: 15 * 60_000, maxWait: 5_000 });
+  async tick(now = new Date()) {
+    if (this.running) return;
+    this.running = true;
+    try {
+      const day = financeIntegrityDueDay(now);
+      let after: string | undefined;
+      while (true) {
+        const schools = await this.prisma.client.school.findMany({ where: { createdAt: { lte: now }, ...(after ? { id: { gt: after } } : {}) },
+          select: { id: true }, orderBy: { id: "asc" }, take: 100 });
+        for (const school of schools) await this.jobs.enqueue(`finance-integrity:${school.id}:${day}`, "finance-integrity", school.id, { schoolId: school.id, scheduledDay: day });
+        if (schools.length < 100) break;
+        after = schools[schools.length - 1]!.id;
+      }
+      const pending = await this.prisma.client.backgroundJob.findMany({ where: { kind: "finance-integrity", nextAttempt: { lte: now },
+        OR: [{ status: "PENDING" }, { status: "RUNNING", leaseUntil: { lt: now } }] },
+        select: { id: true }, orderBy: [{ nextAttempt: "asc" }, { id: "asc" }], take: 25 });
+      for (const job of pending) await this.jobs.run(job.id, async payload => {
+        const data = payload as { schoolId?: unknown; scheduledDay?: unknown };
+        if (typeof data.schoolId !== "string") throw new Error("Invalid integrity job");
+        if (!await this.prisma.client.school.findUnique({ where: { id: data.schoolId }, select: { id: true } })) return;
+        const report = await this.integrity.check(data.schoolId);
+        if ([report.I1.status, report.I2.status, report.I3.status].some(status => status !== "PASS")) {
+          this.logger.error(JSON.stringify({ event: "finance.integrity.failed", schoolId: data.schoolId, scheduledDay: data.scheduledDay,
+            checkedAt: new Date().toISOString(), I1: report.I1.status, I2: report.I2.status, I3: report.I3.status }));
+          throw new Error("Ledger integrity check failed");
+        }
+        this.logger.log(JSON.stringify({ event: "finance.integrity.passed", schoolId: data.schoolId, scheduledDay: data.scheduledDay, checkedAt: new Date().toISOString() }));
+      }, now);
+    } finally { this.running = false; }
   }
 }
