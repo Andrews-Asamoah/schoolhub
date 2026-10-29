@@ -5,6 +5,8 @@ Implementation base: `dev` commit `00aa448819f729f0c57ea87124725c691a4feb93`.
 
 A code implementation is not a production acceptance sign-off. Use the exact PR head CI results for validation; do not copy a previous commit's green status.
 
+Foundation merged via PR #149 after full CI. Release controls and restore verification are tracked separately in PR #150; use its exact-head CI evidence.
+
 ## Delivery status
 
 | Workstream | Implemented in this change | Still required before production acceptance |
@@ -15,10 +17,10 @@ A code implementation is not a production acceptance sign-off. Use the exact PR 
 | Cleanup | Durable pre-upload cleanup reservations and transactional cancellation; retries and dead letters | Exercise storage outage and process-kill recovery against staging R2 |
 | Finance scheduling | Durable per-school daily runs, startup catch-up, atomic claims, lease heartbeats, retry/backoff, dead letters | Exercise live operational alerts and obtain accountant acceptance |
 | Origins/proxy | Shared explicit HTTPS origin policy; production school-admin 2FA default; shutdown hooks; preserved nginx headers and explicit external scheme | Set owned domain roots, trusted proxy hops and external scheme; verify the real TLS chain |
-| Deployment | API entrypoint executable in container | Digest/CI-gated image promotion, migration gating, container smoke tests |
+| Deployment | Executable API entrypoint; CI-gated immutable image digests and release manifest; migration provenance checks; API/web runtime smoke tests | Configure protected environments/required checks; exercise a staging release and host rollout/rollback |
 | School operations | Existing academic, attendance, BECE and finance implementation retained | Full term/year journeys, policy-versioned promotion, migration reconciliation |
 | Notifications | Existing in-app records retained; durable job infrastructure available | Provider delivery contracts, transactional outbox, receipt validation and cost limits |
-| Recovery | Existing runbook retained | Actual encrypted backup/PITR setup, object copies, measured restore, operator ownership |
+| Recovery | Read-only restored-database verifier; synthetic CI dump/restore round trip with a balanced ledger fixture | Actual encrypted backup/PITR setup, private object copies, measured production-like restore, operator ownership |
 
 ## Route inventory
 

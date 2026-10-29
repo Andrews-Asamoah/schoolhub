@@ -1,6 +1,6 @@
 /** Read-only recovery comparison. Freeze source writes at the backup boundary first. */
 import "../src/load-env.js";
-import { Pool } from "pg";
+import { Pool, type PoolClient } from "pg";
 import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { FinanceLedgerIntegrityService } from "../src/modules/finance/finance-ledger-integrity.service.js";
@@ -20,10 +20,11 @@ const schoolTables = ["students", "payments", "bills", "transactions", "chart_ac
 const globalTables = ["schools", "users", "user_profiles", "finance_journal_lines", "bill_items", "payment_items"];
 const mismatches: Array<{ table: string; reason: string }> = [];
 const started = Date.now();
-let left: Awaited<ReturnType<Pool["connect"]>> | undefined;
-let right: Awaited<ReturnType<Pool["connect"]>> | undefined;
+let left: PoolClient | undefined;
+let right: PoolClient | undefined;
 try {
-  [left, right] = await Promise.all([source.connect(), restored.connect()]);
+  left = await source.connect();
+  right = await restored.connect();
   for (const connection of [left, right]) {
     await connection.query("BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY");
     await connection.query("SET LOCAL statement_timeout = '60s'");
