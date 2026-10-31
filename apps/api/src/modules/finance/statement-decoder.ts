@@ -35,7 +35,7 @@ export async function decodeStatement(buffer: Buffer, filename: string, mapping:
       records.push(cells);
     });
   }
-  if (records.length < 2 || records.length > 5001) throw new BadRequestException("Statements require 1 to 5000 data rows.");
+  if (records.length < 1 || records.length > 5001) throw new BadRequestException("Statements require a header and at most 5000 data rows.");
   const headers = records.shift()!.map(cell => cell.trim());
   if (headers.length > 60 || new Set(headers).size !== headers.length) throw new BadRequestException("Statement headers must be unique, with at most 60 columns.");
   if (Boolean(mapping.amount) === Boolean(mapping.debit || mapping.credit) || (!mapping.amount && (!mapping.debit || !mapping.credit))) throw new BadRequestException("Map either a signed amount or both debit and credit columns.");

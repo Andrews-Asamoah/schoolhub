@@ -138,6 +138,16 @@ jobs:
           pnpm --filter @schoolhub/web typecheck
       - name: Web build
         run: pnpm --filter @schoolhub/web build
+      - name: Check controller route inventory
+        run: node apps/api/scripts/route-inventory.mjs --check
+      - name: Validate release manifest contracts
+        run: node --test scripts/release-manifest.test.mjs
+      - name: API lint
+        run: pnpm --filter @schoolhub/api lint
+      - name: Apply database migrations
+        run: pnpm --filter @schoolhub/api exec prisma migrate deploy --config prisma.config.ts
+      - name: API tests (including PostgreSQL integration)
+        run: pnpm --filter @schoolhub/api test
       - name: SuperAdmin dashboard browser E2E
         env:
           SCHOOLHUB_WEB_URL: http://127.0.0.1:5173
@@ -164,16 +174,6 @@ jobs:
             exit 1
           fi
           pnpm dlx --package=playwright@1.56.1 -c 'export PLAYWRIGHT_PACKAGE_ENTRY="$(realpath "$(dirname "$(command -v playwright)")/../playwright/cli.js")"; playwright install --with-deps chromium; node apps/web/e2e/superadmin-dashboard.browser.mjs && node apps/web/e2e/subscription-plan-editor.browser.mjs && node apps/web/e2e/financial-controls.browser.mjs'
-      - name: Check controller route inventory
-        run: node apps/api/scripts/route-inventory.mjs --check
-      - name: Validate release manifest contracts
-        run: node --test scripts/release-manifest.test.mjs
-      - name: API lint
-        run: pnpm --filter @schoolhub/api lint
-      - name: Apply database migrations
-        run: pnpm --filter @schoolhub/api exec prisma migrate deploy --config prisma.config.ts
-      - name: API tests (including PostgreSQL integration)
-        run: pnpm --filter @schoolhub/api test
       - name: Verify a synthetic database backup/restore round trip
         env:
           RESTORE_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/schoolhub_restore?schema=public

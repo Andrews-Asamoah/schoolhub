@@ -1,3 +1,4 @@
+import { withSerializableRetry } from "./finance.helpers.js";
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
 import { createHash } from "node:crypto";
@@ -9,6 +10,9 @@ const hash = (value: unknown) => createHash("sha256").update(JSON.stringify(valu
 @Injectable()
 export class FinanceBankReconciliationService {
   constructor(private readonly prisma: PrismaService) {}
+  private transact<T>(work: (tx: Prisma.TransactionClient) => Promise<T>, _options?: { isolationLevel: Prisma.TransactionIsolationLevel }) {
+    return withSerializableRetry(() => this.prisma.client.$transaction(work, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, timeout: 60000 }));
+  }
   private async account(tx: Prisma.TransactionClient, schoolId: string, id: string) {
     const account = await tx.chartAccount.findFirst({ where: { id, schoolId, isActive: true, accountType: "ASSET", category: { in: ["BANK", "CASH"] } } });
     if (!account) throw new NotFoundException("Active school cash/bank account not found.");
@@ -30,7 +34,7 @@ export class FinanceBankReconciliationService {
   async import(schoolId: string, actorId: string, file: Express.Multer.File, input: Parameters<FinanceBankReconciliationService["preview"]>[2] & { duplicateReviewReason?: string }) {
     const preview = await this.preview(schoolId, file, input);
     if (preview.requiresDuplicateReview && (input.duplicateReviewReason?.trim().length ?? 0) < 10) throw new BadRequestException("Explain the reviewed duplicate statement lines before importing.");
-    return this.prisma.client.$transaction(async tx => {
+    return this.transact(async tx => {
       await this.lock(tx, schoolId); await this.account(tx, schoolId, input.accountId);
       const existing = await tx.financeBankStatement.findFirst({ where: { schoolId, accountId: input.accountId, OR: [{ fileHash: preview.fileHash }, { startDate: { lte: date(input.endDate) }, endDate: { gte: date(input.startDate) } }] } });
       if (existing) throw new ConflictException("An identical or overlapping statement already exists for this account.");
@@ -56,7 +60,7 @@ export class FinanceBankReconciliationService {
     return this.prisma.client.financeBankStatement.findUniqueOrThrow({ where: { id: record.statementId }, select: { sourceBytes: true, fileName: true } });
   }
   async amend(schoolId: string, actorId: string, id: string) {
-    return this.prisma.client.$transaction(async tx => {
+    return this.transact(async tx => {
       await this.lock(tx, schoolId); const record = await this.record(tx, schoolId, id);
       if (record.status !== "APPROVED" || await tx.financeBankReconciliation.count({ where: { supersedesId: id } })) throw new ConflictException("Only the latest approved reconciliation may be amended.");
       const lock = await tx.financePeriodLock.findUnique({ where: { schoolId } });
@@ -68,7 +72,7 @@ export class FinanceBankReconciliationService {
     });
   }
   async revise(schoolId: string, actorId: string, id: string) {
-    return this.prisma.client.$transaction(async tx => {
+    return this.transact(async tx => {
       await this.lock(tx, schoolId); const record = await this.record(tx, schoolId, id);
       if (record.status !== "REJECTED" || record.createdById !== actorId) throw new ForbiddenException("Only the preparer may revise a rejected reconciliation.");
       await tx.auditLog.create({ data: { schoolId, userId: actorId, action: "UPDATE", entityType: "BANK_RECONCILIATION_REVISION", entityId: id,
@@ -77,7 +81,7 @@ export class FinanceBankReconciliationService {
     });
   }
   async unmatch(schoolId: string, actorId: string, id: string, matchId: string) {
-    return this.prisma.client.$transaction(async tx => {
+    return this.transact(async tx => {
       await this.lock(tx, schoolId); const record = await this.record(tx, schoolId, id);
       if (record.status !== "DRAFT") throw new ConflictException("Only draft matches can be removed.");
       const match = await tx.financeBankMatch.findFirst({ where: { id: matchId, schoolId, reconciliationId: id, statementLine: { statementId: record.statementId } } });
@@ -95,7 +99,7 @@ export class FinanceBankReconciliationService {
     return record;
   }
   async detail(schoolId: string, id: string) {
-    return this.prisma.client.$transaction(async tx => {
+    return this.transact(async tx => {
       const record = await this.record(tx, schoolId, id);
       const statement = await tx.financeBankStatement.findUniqueOrThrow({ where: { id: record.statementId }, include: { lines: { include: { matches: { where: { reconciliationId: id } } }, orderBy: { rowNumber: "asc" } } } });
       const { sourceBytes: _source, ...evidence } = statement;
@@ -105,7 +109,7 @@ export class FinanceBankReconciliationService {
   async match(schoolId: string, actorId: string, id: string, input: { statementLineId: string; transactionId: string; amount: string }) {
     const amount = new Prisma.Decimal(input.amount);
     if (!amount.isFinite() || amount.lte(0) || amount.decimalPlaces() > 2) throw new BadRequestException("Enter a positive two-decimal match amount.");
-    return this.prisma.client.$transaction(async tx => {
+    return this.transact(async tx => {
       await this.lock(tx, schoolId);
       const record = await this.record(tx, schoolId, id);
       if (record.status !== "DRAFT") throw new ConflictException("Only draft reconciliations can be matched.");
@@ -146,7 +150,7 @@ export class FinanceBankReconciliationService {
     return { statementId: statement.id, fileHash: statement.fileHash, periodEnd: record.periodEnd.toISOString().slice(0, 10), bookBalance: book.toFixed(2), statementBalance: statement.closingBalance.toFixed(2), outstandingItems: items, difference: difference.toFixed(2), matches: matches.map(match => ({ id: match.id, amount: match.amount.toFixed(2) })).sort((a,b) => a.id.localeCompare(b.id)) };
   }
   async submit(schoolId: string, actorId: string, id: string) {
-    return this.prisma.client.$transaction(async tx => {
+    return this.transact(async tx => {
       await this.lock(tx, schoolId); const record = await this.record(tx, schoolId, id);
       if (record.status !== "DRAFT" || record.createdById !== actorId) throw new ForbiddenException("Only the preparer can submit a draft.");
       const snapshot = await this.closeEvidence(tx, schoolId, id);
@@ -157,7 +161,7 @@ export class FinanceBankReconciliationService {
   async decide(schoolId: string, actorId: string, role: string | undefined, id: string, approve: boolean, note: string) {
     if (!["owner", "headteacher"].includes(role ?? "")) throw new ForbiddenException("An owner or headteacher must review reconciliations.");
     if (note.trim().length < 10) throw new BadRequestException("Provide a decision reason of at least 10 characters.");
-    return this.prisma.client.$transaction(async tx => {
+    return this.transact(async tx => {
       await this.lock(tx, schoolId); const record = await this.record(tx, schoolId, id);
       if (record.status !== "PENDING") throw new ConflictException("Reconciliation is not pending approval.");
       if (record.createdById === actorId) throw new ForbiddenException("The preparer cannot approve their own reconciliation.");

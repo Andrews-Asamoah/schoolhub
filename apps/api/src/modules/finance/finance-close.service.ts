@@ -21,8 +21,9 @@ export class FinanceCloseService {
     const receivables = new Set(accounts.filter(account=>account.category==='ACCOUNTS_RECEIVABLE').map(account=>account.id));
     const ar = snapshot.lines.filter(line=>receivables.has(line.accountId)).reduce((total,line)=>total.plus(line.closing),new Prisma.Decimal(0));
     const failed: string[] = [];
+    if (snapshot.scope.endDate >= new Date().toISOString().slice(0,10)) failed.push("Wait until the final accounting day has ended before requesting a close.");
     if (!currentAR.closeReady || !historical.complete || receivables.size===0 || !ar.eq(historical.outstanding)) failed.push("Historical/current receivables do not reconcile to the journal control account.");
-    const accountsToReconcile = accounts.filter(account=>account.isActive&&account.accountType==='ASSET'&&['BANK','CASH'].includes(account.category));
+    const accountsToReconcile = accounts.filter(account=>account.accountType==='ASSET'&&['BANK','CASH'].includes(account.category)&&(account.isActive||snapshot.lines.some(line=>line.accountId===account.id&&[line.opening,line.debit,line.credit,line.closing].some(value=>!new Prisma.Decimal(value).isZero()))));
     const reconciliations: { id: string; contentHash: string | null }[] = [];
     for (const account of accountsToReconcile) {
       const record = await tx.financeBankReconciliation.findFirst({ where: { schoolId, accountId: account.id, periodEnd: new Date(snapshot.scope.endDate), status: 'APPROVED', supersededBy: null } });
@@ -35,8 +36,10 @@ export class FinanceCloseService {
     if (unresolved) failed.push("Unresolved financial adjustments exist.");
     const schedules = await tx.financeRevenueScheduleLine.count({ where: { schedule: { schoolId }, periodEnd: { lte: new Date(snapshot.scope.endDate) }, OR: [{ postedTransactionId: null }, { postedAt: null }] } });
     if (schedules) failed.push("Revenue schedule recognition is outstanding.");
-    const drafts = await tx.payrollRecord.count({ where: { schoolId, year, month, status: 'DRAFT' } });
+    const drafts = await tx.payrollRecord.count({ where: { schoolId, OR: [{year:{lt:year}},{year,month:{lte:month}}], status: 'DRAFT' } });
     if (drafts) failed.push("Unapproved payroll drafts exist.");
+    const journals=await tx.financeManualJournal.count({where:{schoolId,postingDate:{lte:new Date(snapshot.scope.endDate)},status:{in:['DRAFT','PENDING_APPROVAL','APPROVED']}}});
+    if(journals)failed.push('Unresolved manual journals exist at or before period end.');
     // Until liability schedules/remittance evidence exist, non-zero accrued/deferred balances fail closed.
     const restricted = new Set(accounts.filter(account=>account.category==='ACCRUED_EXPENSES'||account.category==='ACCOUNTS_PAYABLE').map(account=>account.id));
     if (snapshot.lines.some(line=>restricted.has(line.accountId)&&!new Prisma.Decimal(line.closing).isZero())) failed.push("Outstanding payable/accrued liabilities require supported settlement evidence before close.");

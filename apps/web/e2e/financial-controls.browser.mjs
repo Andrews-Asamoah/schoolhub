@@ -31,7 +31,7 @@ try{
    return route.fulfill({json:[]});
   });
   await page.goto(base+'/finance-reports?school=test-school');
-  await page.getByRole('heading',{name:'Bank and cash reconciliation',exact:true}).waitFor();
+  try { await page.getByRole('heading',{name:'Bank and cash reconciliation',exact:true}).waitFor(); } catch(error) { console.log('Browser page state', {role,url:page.url(),errors,text:(await page.locator('body').innerText()).slice(0,5000)}); throw error; }
   await page.getByLabel('Reconciliation',{exact:true}).selectOption('recon');
   await page.getByText('Status: '+record.status+' · Version 1',{exact:true}).waitFor();
   if(role==='accountant'){

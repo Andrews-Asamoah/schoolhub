@@ -28,13 +28,16 @@ describe.skipIf(!enabled)('bank reconciliation workflow (PostgreSQL)',{timeout:6
   recordId=(await service.import(schoolId,maker,file(),input())).id;
   await expect(service.import(schoolId,maker,file(),input())).rejects.toThrow(/overlapping/);
   expect((await service.detail(schoolId,recordId)).statement.lines).toHaveLength(1);
+  expect(Buffer.from((await service.source(schoolId,maker,recordId)).sourceBytes)).toEqual(file().buffer);
   await expect(service.detail('other-school',recordId)).rejects.toThrow(/not found/);
  });
  it('enforces partial allocation caps and preserves evidence',async()=>{
   const line=(await service.detail(schoolId,recordId)).statement.lines[0]!;
   await expect(service.submit(schoolId,maker,recordId)).rejects.toThrow(/fully matched/);
   await expect(service.match(schoolId,maker,recordId,{statementLineId:line.id,transactionId:postingId,amount:'10.01'})).rejects.toThrow(/exceeds/);
-  await service.match(schoolId,maker,recordId,{statementLineId:line.id,transactionId:postingId,amount:'10.00'});
+  const concurrent=await Promise.allSettled([1,2].map(()=>service.match(schoolId,maker,recordId,{statementLineId:line.id,transactionId:postingId,amount:'10.00'})));
+  expect(concurrent.filter(result=>result.status==='fulfilled')).toHaveLength(1);
+  expect(concurrent.filter(result=>result.status==='rejected')).toHaveLength(1);
   await expect(db.financeBankStatementLine.update({where:{id:line.id},data:{description:'tampered'}})).rejects.toThrow(/immutable|append-only/);
  });
  it('requires independent approval and freezes approved evidence',async()=>{
@@ -67,6 +70,11 @@ describe.skipIf(!enabled)('bank reconciliation workflow (PostgreSQL)',{timeout:6
   await close.decide(schoolId,reviewer,'owner',reopen.id,true,'Approved reopening for review');
   expect((await db.financeAccountingPeriod.findUniqueOrThrow({where:{id:period.id}})).reopenCount).toBe(1);
   expect((await db.financePeriodLock.findUniqueOrThrow({where:{schoolId}})).lockedThrough.toISOString().slice(0,10)).toBe('2026-08-31');
+  const amendment=await service.amend(schoolId,maker,recordId);
+  expect(amendment.version).toBe(2);
+  expect((await service.detail(schoolId,recordId)).status).toBe('APPROVED');
+  await service.submit(schoolId,maker,amendment.id);
+  await service.decide(schoolId,reviewer,'owner',amendment.id,true,'Reviewed amended bank reconciliation');
   const again=await close.request(schoolId,maker,2026,9,'Reviewed accounts after reopening');
   await close.decide(schoolId,reviewer,'owner',again.id,true,'Approved second closing snapshot');
   expect(await db.financePeriodSnapshot.count({where:{periodId:period.id}})).toBe(2);

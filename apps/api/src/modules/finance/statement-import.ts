@@ -19,7 +19,7 @@ export function previewStatement(input: {
   if (!source.length || source.length > 5 * 1024 * 1024) throw new BadRequestException("Statement files must be between 1 byte and 5 MB.");
   try { dateDistanceDays(input.startDate, input.endDate); } catch { throw new BadRequestException("Invalid statement dates."); }
   if (input.startDate > input.endDate) throw new BadRequestException("Statement dates are reversed.");
-  if (!input.rows.length || input.rows.length > 5000) throw new BadRequestException("Statements require between 1 and 5000 movements.");
+  if (input.rows.length > 5000) throw new BadRequestException("Statements cannot exceed 5000 movements.");
   const balance = (value: string) => {
     if (!/^-?\d{1,13}(?:\.\d{1,2})?$/.test(value)) throw new BadRequestException("Invalid statement balance.");
     return new Prisma.Decimal(value);
