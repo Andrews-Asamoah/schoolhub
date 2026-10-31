@@ -1,3 +1,4 @@
+import { Throttle, ThrottlerGuard } from "@nestjs/throttler";
 import { Body, Controller, Get, Param, Post, Query, UseGuards } from "@nestjs/common";
 import type { School } from "@prisma/client";
 import { z } from "zod";
@@ -12,7 +13,8 @@ import { rolloverPlanSchema, type RolloverPlan } from "./rollover-policy.js";
 const decision=z.object({approve:z.boolean(),note:z.string().trim().min(10).max(1000)});
 const reason=z.object({reason:z.string().trim().min(10).max(1000)});
 @Controller('academics/rollovers')
-@UseGuards(SchoolTenantGuard,RolesGuard)
+@UseGuards(SchoolTenantGuard,RolesGuard,ThrottlerGuard)
+@Throttle({default:{limit:20,ttl:60000}})
 @Roles('owner','admin','headteacher')
 export class AcademicRolloverController{
  constructor(private readonly service:AcademicRolloverService){}
