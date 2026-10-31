@@ -81,7 +81,8 @@ describe.skipIf(!url)(
       db = (await import('../src/prisma/prisma.client.js')).prisma;
       const { hashPassword } = await import('better-auth/crypto');
       await db.user.create({
-        data: { id: run, name: 'Recovery test', email, emailVerified: true },
+        // Trusted-device shortcuts are restricted to platform administrators.
+        data: { id: run, name: 'Recovery test', email, emailVerified: true, role: 'superAdmin' },
       });
       await db.account.create({
         data: {
