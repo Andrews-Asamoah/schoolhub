@@ -53,6 +53,7 @@ export function EnrollSchoolForm() {
   const [sms, setSms] = useState(emptySchoolSms);
   const [issued, setIssued] = useState<CredentialEntry[]>([]);
   const mutation = useMutation({
+    gcTime: 0,
     mutationFn: (data: EnrollSchoolInput) =>
       apiFetch<{ school: { id: string }; credentials: IssuedCredentials }>("/super-admin/schools", {
         method: "POST",

@@ -42,6 +42,7 @@ export function SchoolSmsAccountPanel({
     ]);
   };
   const save = useMutation({
+    gcTime: 0,
     mutationFn: (input: SchoolHubtelConnectionInput) =>
       apiFetch<SmsStatus>(endpoint, {
         method: "PUT",

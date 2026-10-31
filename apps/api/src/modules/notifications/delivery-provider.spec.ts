@@ -10,9 +10,10 @@ const config = {
   RESEND_API_KEY: 'test-only',
   RESEND_FROM_EMAIL: 'alerts@example.test',
   RESEND_WEBHOOK_SECRET: 'test-only',
-  HUBTEL_CLIENT_ID: 'test-id',
-  HUBTEL_CLIENT_SECRET: 'test-secret',
-  HUBTEL_SENDER_ID: 'SchoolHub',
+  HUBTEL_CLIENT_ID: 'platform-id',
+  HUBTEL_CLIENT_SECRET: 'platform-secret',
+  HUBTEL_SENDER_ID: 'Platform',
+  HUBTEL_SMS_BASE_URL: 'https://sms.hubtel.com/v1/messages',
 };
 const schoolSms = {
   clientId: 'test-id',

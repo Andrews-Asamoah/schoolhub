@@ -1,3 +1,4 @@
+import { useId } from "react";
 import type { SchoolHubtelConnectionInput } from "@schoolhub/shared";
 export const emptySchoolSms = (): SchoolHubtelConnectionInput => ({
   senderId: "",
@@ -16,11 +17,14 @@ export function SchoolSmsFields({
   onChange: (value: SchoolHubtelConnectionInput) => void;
   disabled?: boolean;
 }) {
+  const fieldId = useId();
   return (
     <fieldset disabled={disabled} className="grid min-w-0 gap-4 sm:grid-cols-2">
       <label className="grid min-w-0 gap-1 text-xs font-medium text-foreground">
         Approved Hubtel sender ID
         <input
+          aria-label="Approved Hubtel sender ID"
+          aria-describedby={fieldId + "-sender-help"}
           className={input}
           required
           maxLength={11}
@@ -31,13 +35,18 @@ export function SchoolSmsFields({
           }
           autoComplete="off"
         />
-        <span className="font-normal text-muted-foreground">
+        <span
+          id={fieldId + "-sender-help"}
+          className="font-normal text-muted-foreground"
+        >
           1–11 letters/numbers. Approval is managed in Hubtel.
         </span>
       </label>
       <label className="grid min-w-0 gap-1 text-xs font-medium text-foreground">
         Hubtel API endpoint
         <select
+          aria-label="Hubtel API endpoint"
+          aria-describedby={fieldId + "-endpoint-help"}
           className={input}
           value={value.apiBaseUrl}
           onChange={(event) =>
@@ -55,7 +64,10 @@ export function SchoolSmsFields({
             smsc.hubtel.com
           </option>
         </select>
-        <span className="font-normal text-muted-foreground">
+        <span
+          id={fieldId + "-endpoint-help"}
+          className="font-normal text-muted-foreground"
+        >
           Choose the host shown in the school's Hubtel API details.
         </span>
       </label>
