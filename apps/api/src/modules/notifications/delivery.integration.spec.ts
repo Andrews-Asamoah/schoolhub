@@ -6,10 +6,14 @@ import { Test } from '@nestjs/testing';
 import type { INestApplication } from '@nestjs/common';
 import { ThrottlerModule } from '@nestjs/throttler';
 import request from 'supertest';
-import { NotificationDeliveryController } from './delivery.controller.js';
+import {
+  NotificationDeliveryAdminGuard,
+  NotificationDeliveryController,
+} from './delivery.controller.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { SchoolTenantGuard } from '../../common/guards/school-tenant.guard.js';
 import { RolesGuard } from '../../common/guards/roles.guard.js';
+import { AnnouncementsService } from '../announcements/announcements.service.js';
 import { NotificationDeliveryService } from './delivery.service.js';
 import { DurableJobsService } from '../../common/jobs/durable-jobs.service.js';
 vi.mock('../../env.js', () => ({ env: { NODE_ENV: 'test' } }));
@@ -108,6 +112,7 @@ describe.skipIf(!enabled)(
         ],
         controllers: [NotificationDeliveryController],
         providers: [
+          NotificationDeliveryAdminGuard,
           SchoolTenantGuard,
           RolesGuard,
           { provide: PrismaService, useValue: { client: db } },
@@ -168,6 +173,14 @@ describe.skipIf(!enabled)(
         .set('x-test-user', 'yes')
         .send({ reason: 'Test retry permissions' })
         .expect(403);
+      await db.member.update({
+        where: { id: run },
+        data: { role: 'headteacher' },
+      });
+      await request(app.getHttpServer())
+        .get('/api/notifications/delivery/settings')
+        .set('x-test-user', 'yes')
+        .expect(403);
       await db.member.update({ where: { id: run }, data: { role: 'owner' } });
     });
     it('does not backfill historical notifications or enqueue without both levels of consent', async () => {
@@ -198,6 +211,85 @@ describe.skipIf(!enabled)(
       expect(
         await db.notificationDelivery.count({
           where: { notificationId: note.id },
+        }),
+      ).toBe(0);
+    });
+    it('commits announcement publication and its audience atomically, including outbox rollback', async () => {
+      const authorId = run + '-author';
+      await db.user.create({
+        data: {
+          id: authorId,
+          name: 'Author',
+          email: authorId + '@example.test',
+          emailVerified: true,
+        },
+      });
+      await db.member.create({
+        data: {
+          id: authorId,
+          userId: authorId,
+          organizationId: run,
+          role: 'admin',
+        },
+      });
+      const input = {
+        title: 'Atomic announcement',
+        content: 'Details inside portal',
+        target: 'SCHOOL_COMMUNITY' as const,
+        category: 'GENERAL' as const,
+        classIds: [],
+        isPinned: false,
+        status: 'PUBLISHED' as const,
+      };
+      const publisher = new AnnouncementsService(
+        { client: db } as never,
+        {} as never,
+      );
+      const published = await publisher.create(
+        schoolId,
+        authorId,
+        'admin',
+        input,
+      );
+      const notification = await db.notification.findFirstOrThrow({
+        where: {
+          schoolId,
+          link: '/announcements?announcementId=' + published.id,
+        },
+      });
+      expect(
+        await db.notificationDelivery.count({
+          where: { notificationId: notification.id },
+        }),
+      ).toBe(2);
+      const failing = new AnnouncementsService(
+        {
+          client: {
+            $transaction: (fn: any) =>
+              db.$transaction((tx) =>
+                fn({
+                  ...tx,
+                  notification: {
+                    ...tx.notification,
+                    createMany: () => {
+                      throw new Error('Synthetic notification write failure');
+                    },
+                  },
+                }),
+              ),
+          },
+        } as never,
+        {} as never,
+      );
+      await expect(
+        failing.create(schoolId, authorId, 'admin', {
+          ...input,
+          title: 'Must roll back',
+        }),
+      ).rejects.toThrow('Synthetic notification write failure');
+      expect(
+        await db.announcement.count({
+          where: { schoolId, title: 'Must roll back' },
         }),
       ).toBe(0);
     });
@@ -568,7 +660,7 @@ describe.skipIf(!enabled)(
         await tx.auditLog.deleteMany({ where: { schoolId } });
         await tx.notification.deleteMany({ where: { schoolId } });
         await tx.organization.delete({ where: { id: run } });
-        await tx.user.delete({ where: { id: userId } });
+        await tx.user.deleteMany({ where: { id: { startsWith: run } } });
       });
       await db.$disconnect();
     });

@@ -1,5 +1,9 @@
 import {
   Body,
+  Injectable,
+  ForbiddenException,
+  type CanActivate,
+  type ExecutionContext,
   Controller,
   Get,
   Patch,
@@ -35,6 +39,24 @@ const settings = preferences.extend({
 const paging = z.object({
   page: z.coerce.number().int().min(1).max(100000).default(1),
 });
+// The shared RolesGuard deliberately lets headteachers inherit admin permissions.
+// Delivery spending controls and school-wide history require an explicit owner/admin role.
+@Injectable()
+export class NotificationDeliveryAdminGuard implements CanActivate {
+  canActivate(context: ExecutionContext) {
+    const request = context.switchToHttp().getRequest();
+    if (
+      request.session?.user?.role === 'superAdmin' ||
+      ['owner', 'admin'].includes(
+        request.schoolRole ?? request.membership?.role,
+      )
+    )
+      return true;
+    throw new ForbiddenException(
+      'School owner or administrator access required.',
+    );
+  }
+}
 @Controller('notifications/delivery')
 @UseGuards(SchoolTenantGuard, RolesGuard, ThrottlerGuard)
 @Roles(
@@ -72,13 +94,17 @@ export class NotificationDeliveryController {
   ) {
     return this.delivery.history(school.id, user.id, input.page);
   }
-  @Get('school-history') @Roles('owner', 'admin') schoolHistory(
+  @Get('school-history')
+  @UseGuards(NotificationDeliveryAdminGuard)
+  @Roles('owner', 'admin')
+  schoolHistory(
     @CurrentSchool() school: School,
     @Query(new ZodValidationPipe(paging)) input: z.infer<typeof paging>,
   ) {
     return this.delivery.history(school.id, undefined, input.page);
   }
   @Post(':id/retry')
+  @UseGuards(NotificationDeliveryAdminGuard)
   @Roles('owner', 'admin')
   @Throttle({ default: { limit: 5, ttl: 60000 } })
   retry(
@@ -94,12 +120,14 @@ export class NotificationDeliveryController {
   ) {
     return this.delivery.retryEmail(school.id, user.id, id, input.reason);
   }
-  @Get('settings') @Roles('owner', 'admin') settings(
-    @CurrentSchool() school: School,
-  ) {
+  @Get('settings')
+  @UseGuards(NotificationDeliveryAdminGuard)
+  @Roles('owner', 'admin')
+  settings(@CurrentSchool() school: School) {
     return this.delivery.settings(school.id);
   }
   @Patch('settings')
+  @UseGuards(NotificationDeliveryAdminGuard)
   @Roles('owner', 'admin')
   @Throttle({ default: { limit: 10, ttl: 60000 } })
   setSettings(

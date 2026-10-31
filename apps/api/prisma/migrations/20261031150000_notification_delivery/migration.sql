@@ -13,9 +13,10 @@ CREATE TABLE notification_deliveries (
  "userId" TEXT NOT NULL REFERENCES users(id), channel TEXT NOT NULL CHECK(channel IN ('EMAIL','SMS')),
  provider TEXT NOT NULL CHECK(provider IN ('RESEND','HUBTEL')), recipient TEXT NOT NULL, "recipientHash" TEXT, payload JSONB,
  status TEXT NOT NULL DEFAULT 'PENDING' CHECK(status IN ('PENDING','SENDING','ACCEPTED','DELAYED','DELIVERED','FAILED','BOUNCED','COMPLAINED','SUPPRESSED','UNKNOWN','DEAD','EXPIRED')),
- "providerMessageId" TEXT, attempts INTEGER NOT NULL DEFAULT 0, reason TEXT, "quotaDay" DATE,
+ "providerMessageId" TEXT, attempts INTEGER NOT NULL DEFAULT 0 CHECK(attempts>=0), reason TEXT, "quotaDay" DATE,
  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, "updatedAt" TIMESTAMP(3) NOT NULL,
  "expiresAt" TIMESTAMP(3) NOT NULL, "acceptedAt" TIMESTAMP(3), "deliveredAt" TIMESTAMP(3), "nextPollAt" TIMESTAMP(3),
+ CHECK((channel='EMAIL' AND provider='RESEND') OR (channel='SMS' AND provider='HUBTEL')),
  UNIQUE("notificationId",channel), UNIQUE(provider,"providerMessageId")
 );
 CREATE INDEX notification_delivery_school_date ON notification_deliveries("schoolId","createdAt");

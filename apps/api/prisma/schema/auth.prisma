@@ -4,6 +4,8 @@
 // ============================================================================
 
 model user {
+  notificationPreferences NotificationPreference[]
+  notificationDeliveries NotificationDelivery[]
   id            String    @id
   name          String
   email         String    @unique

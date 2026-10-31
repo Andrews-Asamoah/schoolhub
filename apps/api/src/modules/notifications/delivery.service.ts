@@ -337,10 +337,11 @@ export class NotificationDeliveryService
       throw new BadRequestException('Invalid webhook payload.');
     let event: unknown;
     try {
-      event = new Webhook(process.env.RESEND_WEBHOOK_SECRET).verify(
+      new Webhook(process.env.RESEND_WEBHOOK_SECRET).verify(
         raw.toString('utf8'),
         headers as Record<string, string>,
       );
+      event = JSON.parse(raw.toString('utf8'));
     } catch {
       throw new BadRequestException('Invalid webhook signature or timestamp.');
     }

@@ -5,6 +5,7 @@ model SchoolNotificationSettings {
  emailDailyLimit Int @default(0)
  smsDailyLimit Int @default(0)
  updatedAt DateTime @updatedAt
+ school School @relation(fields:[schoolId],references:[id],onDelete:NoAction,onUpdate:NoAction)
  @@map("school_notification_settings")
 }
 model NotificationPreference {
@@ -16,6 +17,8 @@ model NotificationPreference {
  consentAt DateTime @default(now())
  updatedAt DateTime @updatedAt
  @@unique([schoolId,userId])
+ school School @relation(fields:[schoolId],references:[id],onDelete:NoAction,onUpdate:NoAction)
+ user user @relation(fields:[userId],references:[id],onDelete:NoAction,onUpdate:NoAction)
  @@map("notification_preferences")
 }
 model NotificationDelivery {
@@ -41,8 +44,11 @@ model NotificationDelivery {
  nextPollAt DateTime?
  @@unique([notificationId,channel])
  @@unique([provider,providerMessageId])
- @@index([schoolId,createdAt])
- @@index([status,nextPollAt])
+ @@index([schoolId,createdAt],map:"notification_delivery_school_date")
+ @@index([status,nextPollAt],map:"notification_delivery_poll")
+ school School @relation(fields:[schoolId],references:[id],onDelete:NoAction,onUpdate:NoAction)
+ user user @relation(fields:[userId],references:[id],onDelete:NoAction,onUpdate:NoAction)
+ notification Notification @relation(fields:[notificationId],references:[id],onDelete:NoAction,onUpdate:NoAction)
  @@map("notification_deliveries")
 }
 model NotificationDailyUsage {
@@ -52,6 +58,7 @@ model NotificationDailyUsage {
  channel String
  used Int @default(0)
  @@unique([schoolId,day,channel])
+ school School @relation(fields:[schoolId],references:[id],onDelete:NoAction,onUpdate:NoAction)
  @@map("notification_daily_usage")
 }
 model NotificationSuppression {
@@ -71,6 +78,6 @@ model NotificationProviderEvent {
  eventAt DateTime
  processedAt DateTime?
  createdAt DateTime @default(now())
- @@index([provider,messageId,processedAt])
+ @@index([provider,messageId,processedAt],map:"notification_event_processing")
  @@map("notification_provider_events")
 }
