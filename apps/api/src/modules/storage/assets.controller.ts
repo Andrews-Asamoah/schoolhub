@@ -82,6 +82,15 @@ export class AssetsController {
     return this.assets.removePersonSignature(school, kind, personId, actor);
   }
 
+  @Put("photos/:kind/:personId")
+  @Roles("owner", "admin", "headteacher")
+  @UseInterceptors(imageUpload("avatar"))
+  uploadPersonAvatar(@CurrentSchool() school: School, @Param("kind") kind: string,
+    @Param("personId") personId: string, @UploadedFile() file: Express.Multer.File | undefined,
+    @AuditActorParam() actor: AuditActor) {
+    return this.assets.setPersonAvatar(school, kind, personId, file, actor);
+  }
+
   @Put("me/avatar")
   @UseInterceptors(imageUpload("avatar"))
   uploadAvatar(

@@ -1,3 +1,4 @@
+import { PersonPhotoPicker, uploadPersonPhoto } from "./person-photo-picker";
 import { DatePicker } from "@/components/ui/date-picker";
 import { useForm } from "@tanstack/react-form";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -251,6 +252,7 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
   const [search, setSearch] = useState("");
   const [activeFilter, setActiveFilter] = useState("");
   const [page, setPage] = useState(1);
+  const [photo, setPhoto] = useState<File | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [showBulkImport, setShowBulkImport] = useState(false);
   const [editing, setEditing] = useState<{ id: string; name: string } | null>(null);
@@ -361,7 +363,7 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
   const createMutation = useMutation({
     mutationFn: (values: Values) => {
       if (editing) {
-        return apiFetch<{ credentials?: IssuedCredentials | null; linkedExistingAccount?: boolean }>(
+        return apiFetch<{ id: string; credentials?: IssuedCredentials | null; linkedExistingAccount?: boolean }>(
           `/people/${kind}/${editing.id}`,
           {
             method: "PATCH",
@@ -370,7 +372,7 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
         );
       }
       const body = makePayload(kind, values);
-      return apiFetch<{ credentials?: IssuedCredentials | null; linkedExistingAccount?: boolean }>(`/people/${kind}`, {
+      return apiFetch<{ id: string; credentials?: IssuedCredentials | null; linkedExistingAccount?: boolean }>(`/people/${kind}`, {
         method: "POST",
         body: JSON.stringify(body),
       });
@@ -381,6 +383,11 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
           ? `${values.firstName} ${values.lastName} already has an account at this school. It now also has this role, and they keep signing in with their own password. No new password was created.`
           : null,
       );
+      if (kind === "teachers" && photo) {
+        try { await uploadPersonPhoto("teacher", editing?.id ?? created.id, photo); }
+        catch { setNotice("Teacher saved, but the image upload failed. Edit the teacher to try uploading the image again."); }
+      }
+      setPhoto(null);
       if (!editing && created.credentials) {
         setIssued([
           {
@@ -554,6 +561,7 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
                     const personValues = valuesFromPerson(person);
                     setFormDefaults(personValues);
                     form.reset(personValues);
+                    setPhoto(null);
                     setEditing({ id: row.id, name: row.name });
                     setShowForm(true);
                     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -682,6 +690,7 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
                   const blank = initialValues();
                   setFormDefaults(blank);
                   form.reset(blank);
+                  setPhoto(null);
                   setEditing(null);
                   setShowForm((value) => !value);
                 }}
@@ -726,6 +735,7 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
             }}
             className="space-y-4"
           >
+            {kind === "teachers" && <PersonPhotoPicker file={photo} onChange={setPhoto} />}
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               <form.Field name="firstName">
                 {(field) => (
@@ -1097,6 +1107,7 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
                 type="button"
                 onClick={() => {
                   setShowForm(false);
+                  setPhoto(null);
                   setEditing(null);
                 }}
                 className="h-9 rounded-lg border border-border px-4 text-xs font-semibold text-foreground hover:bg-muted"
