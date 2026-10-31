@@ -136,10 +136,12 @@ export class FinanceBankReconciliationService {
     }
     const postings = await tx.transaction.findMany({ where: { schoolId, transactionDate: { lte: record.periodEnd }, OR: [{ debitAccountId: record.accountId }, { creditAccountId: record.accountId }] }, orderBy: { id: "asc" } });
     const matches = await tx.financeBankMatch.findMany({ where: { schoolId, accountId: record.accountId, reconciliation: { supersededBy: null }, statementLine: { statement: { endDate: { lte: record.periodEnd } } } } });
+    const allocatedByPosting = new Map<string, Prisma.Decimal>();
+    for (const match of matches) allocatedByPosting.set(match.transactionId, (allocatedByPosting.get(match.transactionId) ?? new Prisma.Decimal(0)).plus(match.amount));
     let book = new Prisma.Decimal(0), outstanding = new Prisma.Decimal(0);
     const items = postings.map(posting => {
       const sign = posting.debitAccountId === record.accountId ? 1 : -1;
-      const allocated = matches.filter(match => match.transactionId === posting.id).reduce((sum, match) => sum.plus(match.amount), new Prisma.Decimal(0));
+      const allocated = allocatedByPosting.get(posting.id) ?? new Prisma.Decimal(0);
       if (allocated.gt(posting.amount)) throw new ConflictException("Ledger entry is overallocated.");
       const remaining = posting.amount.minus(allocated).times(sign);
       book = book.plus(posting.amount.times(sign)); outstanding = outstanding.plus(remaining);
