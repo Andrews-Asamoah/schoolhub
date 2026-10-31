@@ -25,7 +25,7 @@ export class AssetsService {
     private readonly cleanup: StorageCleanupService,
   ) {}
 
-  private async readImage(file: Express.Multer.File | undefined, profilePhoto = false) {
+  private async readImage(file: Express.Multer.File | undefined, purpose: "document" | "profile" | "logo" = "document") {
     if (!file?.buffer?.length) {
       throw new BadRequestException("No image file was provided.");
     }
@@ -33,7 +33,7 @@ export class AssetsService {
     if (!image) {
       throw new BadRequestException("Only JPEG, PNG and WebP images are allowed.");
     }
-    return this.validation.image(file.buffer, profilePhoto);
+    return this.validation.image(file.buffer, purpose);
   }
 
   /** Only ever delete objects inside this school's own prefix. */
@@ -45,7 +45,7 @@ export class AssetsService {
   }
 
   async setSchoolLogo(school: School, file: Express.Multer.File | undefined) {
-    const image = await this.readImage(file);
+    const image = await this.readImage(file, "logo");
     const url = await this.r2
       .upload(this.r2.keys.logo(school.id, image.ext), image.buffer, image.mime)
       .catch((error: unknown) => {
@@ -79,7 +79,7 @@ export class AssetsService {
   }
 
   async setAvatar(school: School, userId: string, file: Express.Multer.File | undefined) {
-    const image = await this.readImage(file, true);
+    const image = await this.readImage(file, "profile");
     const previous = await this.prisma.client.user.findUnique({
       where: { id: userId },
       select: { image: true },
