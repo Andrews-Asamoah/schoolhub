@@ -8,7 +8,7 @@ export async function sendAccountVerification(
   url: string,
   transport = new DeliveryProvider(),
 ) {
-  if (!transport.configured('EMAIL'))
+  if (!transport.emailConfigured())
     throw new APIError('SERVICE_UNAVAILABLE', {
       message:
         'Email verification delivery is not configured. Contact school support.',

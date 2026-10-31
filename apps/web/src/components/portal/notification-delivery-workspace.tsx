@@ -154,6 +154,15 @@ export function NotificationDeliveryWorkspace() {
         );
     },
   });
+  const checkVerification = useMutation({
+    mutationFn: async () => {
+      const result = await authClient.getSession({ query: { disableCookieCache: true } });
+      if (result.error) throw new Error(result.error.message ?? "Unable to check email verification.");
+      if (!result.data?.user.emailVerified) throw new Error("Your email is not verified yet. Open the link in your verification email, then check again.");
+      await session.refetch();
+      await client.invalidateQueries({ queryKey: ["notification-delivery"] });
+    },
+  });
   const invalidate = () =>
     client.invalidateQueries({ queryKey: ["notification-delivery"] });
   const savePreferences = useMutation({
@@ -193,8 +202,7 @@ export function NotificationDeliveryWorkspace() {
     history.error ||
     savePreferences.error ||
     saveSettings.error ||
-    retry.error ||
-    verifyEmail.error;
+    retry.error;
   return (
     <div className="space-y-4">
       <section className={panelStyle}>
@@ -209,7 +217,7 @@ export function NotificationDeliveryWorkspace() {
           <div className="space-y-2 rounded-lg border border-border p-3">
             <p className="text-xs text-muted-foreground">
               Verify your account email before email alerts can be delivered.
-              Open the link in the verification email, then refresh this page.
+              Open the link in the verification email, then check its status here.
             </p>
             <button
               type="button"
@@ -221,13 +229,22 @@ export function NotificationDeliveryWorkspace() {
                 ? "Sending verification…"
                 : "Verify my email"}
             </button>
+            {verifyEmail.error && (
+              <p role="alert" className="text-xs text-destructive">{verifyEmail.error.message}</p>
+            )}
             {verifyEmail.isSuccess && (
               <p role="status" className="text-xs">
                 Verification email requested. Check your inbox and spam folder.
               </p>
             )}
+            <button type="button" className={buttonStyle} disabled={checkVerification.isPending}
+              onClick={() => checkVerification.mutate()}>
+              {checkVerification.isPending ? "Checking verification…" : "Check email verification status"}
+            </button>
+            {checkVerification.error && <p role="alert" className="text-xs text-destructive">{checkVerification.error.message}</p>}
           </div>
         )}
+        {session.data?.user.emailVerified === true && <p role="status" className="text-xs text-success">Your account email is verified.</p>}
         {preferences.data ? (
           <ChannelForm
             key={JSON.stringify(preferences.data)}

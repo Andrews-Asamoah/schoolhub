@@ -396,10 +396,10 @@ describe.skipIf(!DB)("two-factor authentication (real database)", () => {
     });
   });
   it("verifies a provisioned account email through a requested Resend link without granting school alert consent", async () => {
-    vi.stubEnv("NOTIFICATION_DELIVERY_ENABLED", "true");
+    vi.stubEnv("NOTIFICATION_DELIVERY_ENABLED", "false");
     vi.stubEnv("RESEND_API_KEY", "test-only-not-a-real-key");
     vi.stubEnv("RESEND_FROM_EMAIL", "alerts@example.test");
-    vi.stubEnv("RESEND_WEBHOOK_SECRET", "test-only-signing-config");
+    vi.stubEnv("RESEND_WEBHOOK_SECRET", "");
     const send = vi.fn().mockResolvedValue(new Response(JSON.stringify({id:"test-verification"}), {status:200}));
     vi.stubGlobal("fetch", send);
     try {

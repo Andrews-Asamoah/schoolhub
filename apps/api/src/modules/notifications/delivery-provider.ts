@@ -40,12 +40,15 @@ export class DeliveryProvider {
     private readonly request: typeof fetch = fetch,
     private readonly config: NodeJS.ProcessEnv = process.env,
   ) {}
+  /** Requested account-security mail does not depend on school broadcast controls or receipts. */
+  emailConfigured() {
+    return Boolean(this.config.RESEND_API_KEY?.trim() && z.email().safeParse(this.config.RESEND_FROM_EMAIL).success);
+  }
   configured(channel: string, sms?: HubtelSmsCredentials) {
     if (this.config.NOTIFICATION_DELIVERY_ENABLED !== 'true') return false;
     if (channel === 'EMAIL')
       return Boolean(
-        this.config.RESEND_API_KEY &&
-        z.email().safeParse(this.config.RESEND_FROM_EMAIL).success &&
+        this.emailConfigured() &&
         this.config.RESEND_WEBHOOK_SECRET,
       );
     if (channel !== 'SMS' || !sms) return false;
