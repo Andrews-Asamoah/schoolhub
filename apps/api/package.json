@@ -29,7 +29,8 @@
     "finance:reset-payments": "node --import tsx/esm scripts/reset-dev-payments.ts",
     "test:e2e:2fa": "vitest run --config vitest.config.e2e.ts test/two-factor.e2e-spec.ts",
     "reset-2fa": "node --import tsx/esm prisma/reset-two-factor.ts",
-    "prisma:generate": "prisma generate --config prisma.config.ts"
+    "prisma:generate": "prisma generate --config prisma.config.ts",
+    "test:e2e:recovery": "vitest run --config vitest.config.e2e.ts test/password-recovery.e2e-spec.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1152.0",

@@ -12,7 +12,7 @@ function RootLayout() {
   const { data: session, isPending } = useSession();
   const pathname = useRouterState({ select: (state) => state.location.pathname });
   // One place guards every screen: a temporary password must be replaced first.
-  const onChangePasswordPage = pathname === "/change-password";
+  const onChangePasswordPage = ["/change-password", "/forgot-password", "/reset-password"].includes(pathname);
   usePasswordChangeGate(
     onChangePasswordPage ? null : session?.user,
     isPending,

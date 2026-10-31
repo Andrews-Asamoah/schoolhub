@@ -1,6 +1,6 @@
 # Resend email and Hubtel SMS
 
-School notifications can create external reminders through Resend and Hubtel. Announcements, assignments, fee reminders, messages and other existing in-app notification producers share the same PostgreSQL outbox trigger. This is school alert delivery, not bulk marketing or password-reset/OTP delivery. A separate, authenticated account email verification action uses Resend so provisioned users can establish email ownership before receiving school email alerts. Messages contain a generic sign-in reminder; pupil names, message contents, grades and balances stay in the portal.
+School notifications can create external reminders through Resend and Hubtel. Announcements, assignments, fee reminders, messages and other existing in-app notification producers share the same PostgreSQL outbox trigger. This is school alert delivery, not bulk marketing or OTP delivery. Password reset is covered by the separate [password recovery workflow](password-recovery.md). A separate, authenticated account email verification action uses Resend so provisioned users can establish email ownership before receiving school email alerts. Messages contain a generic sign-in reminder; pupil names, message contents, grades and balances stay in the portal.
 
 ## Configure and enable
 
