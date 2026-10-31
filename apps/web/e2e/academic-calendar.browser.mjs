@@ -45,7 +45,7 @@ try{for(const role of ['admin','owner'])for(const viewport of [{width:1440,heigh
  const summary=page.getByRole('alert').filter({hasText:'Correct the following:'});
  await summary.waitFor();assert.match(await summary.innerText(),/Term 1 start date/);assert.match(await summary.innerText(),/Term 1 end date/);
  await page.waitForFunction(()=>document.activeElement?.getAttribute('role')==='alert');assert.equal(writes.length,0);
- await summary.getByRole('button').filter({hasText:'Term 1 start date'}).click();assert.equal(await page.evaluate(()=>document.activeElement?.id),'term-0-start');
+ await summary.getByRole('button').filter({hasText:'Term 1 start date'}).first().click();assert.equal(await page.evaluate(()=>document.activeElement?.id),'term-0-start');
  await pick('Term 1 starts','2026-09-01');await pick('Term 1 ends','2026-12-15');
  await page.getByRole('button',{name:'Add term',exact:true}).click();
  await pick('Term 2 starts','2026-12-01');await pick('Term 2 ends','2027-04-15');await save.click();
