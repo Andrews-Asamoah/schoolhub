@@ -4,6 +4,7 @@
 // ============================================================================
 
 model user {
+  passwordRecoveryRequests PasswordRecoveryRequest[]
   notificationPreferences NotificationPreference[]
   notificationDeliveries NotificationDelivery[]
   id            String    @id

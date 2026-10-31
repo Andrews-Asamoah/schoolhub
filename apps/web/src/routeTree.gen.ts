@@ -15,7 +15,9 @@ import { Route as AdminRouteRouteImport } from './routes/admin/route'
 import { Route as ApplyRouteImport } from './routes/apply'
 import { Route as ChangePasswordRouteImport } from './routes/change-password'
 import { Route as DashboardRouteImport } from './routes/dashboard'
+import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as SubscriptionInactiveRouteImport } from './routes/subscription-inactive'
 import { Route as TwoFactorSetupRouteImport } from './routes/two-factor-setup'
 import { Route as AdminIndexRouteImport } from './routes/admin/index'
@@ -60,9 +62,19 @@ const DashboardRoute = DashboardRouteImport.update({
   path: '/dashboard',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ForgotPasswordRoute = ForgotPasswordRouteImport.update({
+  id: '/forgot-password',
+  path: '/forgot-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ResetPasswordRoute = ResetPasswordRouteImport.update({
+  id: '/reset-password',
+  path: '/reset-password',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SubscriptionInactiveRoute = SubscriptionInactiveRouteImport.update({
@@ -138,7 +150,9 @@ export interface FileRoutesByFullPath {
   '/apply': typeof ApplyRoute
   '/change-password': typeof ChangePasswordRoute
   '/dashboard': typeof DashboardRoute
+  '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/subscription-inactive': typeof SubscriptionInactiveRoute
   '/two-factor-setup': typeof TwoFactorSetupRoute
   '/admin/dashboard': typeof AdminDashboardRoute
@@ -159,7 +173,9 @@ export interface FileRoutesByTo {
   '/apply': typeof ApplyRoute
   '/change-password': typeof ChangePasswordRoute
   '/dashboard': typeof DashboardRoute
+  '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/subscription-inactive': typeof SubscriptionInactiveRoute
   '/two-factor-setup': typeof TwoFactorSetupRoute
   '/admin/dashboard': typeof AdminDashboardRoute
@@ -182,7 +198,9 @@ export interface FileRoutesById {
   '/apply': typeof ApplyRoute
   '/change-password': typeof ChangePasswordRoute
   '/dashboard': typeof DashboardRoute
+  '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/subscription-inactive': typeof SubscriptionInactiveRoute
   '/two-factor-setup': typeof TwoFactorSetupRoute
   '/admin/dashboard': typeof AdminDashboardRoute
@@ -206,7 +224,9 @@ export interface FileRouteTypes {
     | '/apply'
     | '/change-password'
     | '/dashboard'
+    | '/forgot-password'
     | '/login'
+    | '/reset-password'
     | '/subscription-inactive'
     | '/two-factor-setup'
     | '/admin/dashboard'
@@ -227,7 +247,9 @@ export interface FileRouteTypes {
     | '/apply'
     | '/change-password'
     | '/dashboard'
+    | '/forgot-password'
     | '/login'
+    | '/reset-password'
     | '/subscription-inactive'
     | '/two-factor-setup'
     | '/admin/dashboard'
@@ -249,7 +271,9 @@ export interface FileRouteTypes {
     | '/apply'
     | '/change-password'
     | '/dashboard'
+    | '/forgot-password'
     | '/login'
+    | '/reset-password'
     | '/subscription-inactive'
     | '/two-factor-setup'
     | '/admin/dashboard'
@@ -272,7 +296,9 @@ export interface RootRouteChildren {
   ApplyRoute: typeof ApplyRoute
   ChangePasswordRoute: typeof ChangePasswordRoute
   DashboardRoute: typeof DashboardRoute
+  ForgotPasswordRoute: typeof ForgotPasswordRoute
   LoginRoute: typeof LoginRoute
+  ResetPasswordRoute: typeof ResetPasswordRoute
   SubscriptionInactiveRoute: typeof SubscriptionInactiveRoute
   TwoFactorSetupRoute: typeof TwoFactorSetupRoute
 }
@@ -321,11 +347,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/forgot-password': {
+      id: '/forgot-password'
+      path: '/forgot-password'
+      fullPath: '/forgot-password'
+      preLoaderRoute: typeof ForgotPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/login': {
       id: '/login'
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reset-password': {
+      id: '/reset-password'
+      path: '/reset-password'
+      fullPath: '/reset-password'
+      preLoaderRoute: typeof ResetPasswordRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/subscription-inactive': {
@@ -461,7 +501,9 @@ const rootRouteChildren: RootRouteChildren = {
   ApplyRoute: ApplyRoute,
   ChangePasswordRoute: ChangePasswordRoute,
   DashboardRoute: DashboardRoute,
+  ForgotPasswordRoute: ForgotPasswordRoute,
   LoginRoute: LoginRoute,
+  ResetPasswordRoute: ResetPasswordRoute,
   SubscriptionInactiveRoute: SubscriptionInactiveRoute,
   TwoFactorSetupRoute: TwoFactorSetupRoute,
 }

@@ -127,6 +127,11 @@ export function createAuth(prisma: PrismaLike) {
             throw new APIError("UNAUTHORIZED", { message: "Sign in to verify your own email address." });
           }
         }
+        // The application recovery flow owns atomic token consumption, credential
+        // lifecycle, session revocation and auditing. Do not expose a parallel reset path.
+        if (ctx.path === "/request-password-reset" || ctx.path === "/reset-password" || ctx.path.startsWith("/reset-password/")) {
+          throw new APIError("NOT_FOUND", { message: "Not found" });
+        }
         if (DISABLED_TWO_FACTOR_PATHS.has(ctx.path)) {
           throw new APIError("NOT_FOUND", { message: "Not found" });
         }

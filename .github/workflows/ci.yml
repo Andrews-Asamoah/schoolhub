@@ -173,7 +173,7 @@ jobs:
             cat /tmp/schoolhub-web.log
             exit 1
           fi
-          pnpm dlx --package=playwright@1.56.1 -c 'export PLAYWRIGHT_PACKAGE_ENTRY="$(realpath "$(dirname "$(command -v playwright)")/../playwright/cli.js")"; playwright install --with-deps chromium; node apps/web/e2e/superadmin-dashboard.browser.mjs && node apps/web/e2e/subscription-plan-editor.browser.mjs && node apps/web/e2e/financial-controls.browser.mjs && node apps/web/e2e/academic-rollover.browser.mjs && node apps/web/e2e/notification-delivery.browser.mjs'
+          pnpm dlx --package=playwright@1.56.1 -c 'export PLAYWRIGHT_PACKAGE_ENTRY="$(realpath "$(dirname "$(command -v playwright)")/../playwright/cli.js")"; playwright install --with-deps chromium; node apps/web/e2e/superadmin-dashboard.browser.mjs && node apps/web/e2e/subscription-plan-editor.browser.mjs && node apps/web/e2e/financial-controls.browser.mjs && node apps/web/e2e/academic-rollover.browser.mjs && node apps/web/e2e/notification-delivery.browser.mjs && node apps/web/e2e/password-recovery.browser.mjs'
       - name: Verify a synthetic database backup/restore round trip
         env:
           RESTORE_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/schoolhub_restore?schema=public
@@ -204,6 +204,8 @@ jobs:
       # super-admin and school-admin enforcement) against the migrated database.
       - name: Two-factor authentication end-to-end (PostgreSQL)
         run: pnpm --filter @schoolhub/api test:e2e:2fa
+      - name: Password recovery end-to-end (PostgreSQL)
+        run: pnpm --filter @schoolhub/api test:e2e:recovery
       # Catch anything that type-checks but cannot be built for deployment.
       - name: Build API
         run: pnpm --filter @schoolhub/api build
