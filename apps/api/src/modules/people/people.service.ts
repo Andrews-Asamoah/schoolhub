@@ -109,7 +109,7 @@ export class PeopleService {
       this.prisma.client.teacher.count({ where }),
     ]);
     return {
-      data,
+      data: data.map(person => ({ ...person, profile: person.profile ? { ...person.profile, signatureUrl: person.profile.signatureUrl ? `/api/schools/current/signatures/teacher/${person.id}` : null } : null })),
       meta: { page, limit, total, totalPages: Math.ceil(total / limit) },
     };
   }
@@ -286,7 +286,10 @@ export class PeopleService {
       this.prisma.client.staff.count({ where }),
     ]);
     return {
-      data,
+      data: data.map(person => {
+        const { signatureStorageKey: _key, ...profile } = person.profile;
+        return { ...person, profile: { ...profile, signatureUrl: profile.signatureUrl ? `/api/schools/current/signatures/staff/${person.id}` : null } };
+      }),
       meta: { page, limit, total, totalPages: Math.ceil(total / limit) },
     };
   }

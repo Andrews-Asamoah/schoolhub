@@ -73,6 +73,8 @@ model Document {
   title        String
   description  String?
   fileUrl      String
+  storageKey   String?
+  audience     String     @default("STAFF")
   fileType     String
   fileSize     Int
   entityType   EntityType

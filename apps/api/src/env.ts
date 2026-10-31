@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+const optionalUrl = z.preprocess(value => value === "" ? undefined : value, z.url().optional());
+
 export const env = z
   .object({
     DATABASE_URL: z.string().min(1),
@@ -24,8 +26,12 @@ export const env = z
     R2_ACCESS_KEY_ID: z.string().optional(),
     R2_SECRET_ACCESS_KEY: z.string().optional(),
     R2_BUCKET_NAME: z.string().optional(),
-    R2_ENDPOINT: z.url().optional(),
+    // Separate bucket with public access disabled. Never fall back to the public bucket.
+    R2_PRIVATE_BUCKET_NAME: z.string().optional(),
+    CLAMAV_HOST: z.string().optional(),
+    CLAMAV_PORT: z.coerce.number().int().min(1).max(65535).default(3310),
+    R2_ENDPOINT: optionalUrl,
     // Public base URL of the bucket (r2.dev or a custom domain, e.g. https://files.schoolhub.com)
-    R2_PUBLIC_URL: z.url().optional(),
+    R2_PUBLIC_URL: optionalUrl,
   })
   .parse(process.env);

@@ -134,6 +134,7 @@ model UserProfile {
   emergencyContactPhone String?
   emergencyRelationship String?
   signatureUrl          String?
+  signatureStorageKey   String?
   isActive              Boolean   @default(true)
   lastLoginAt           DateTime?
   createdAt             DateTime  @default(now())

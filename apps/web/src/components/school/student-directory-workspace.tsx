@@ -1,3 +1,4 @@
+import { PersonPhotoPicker, uploadPersonPhoto } from "./person-photo-picker";
 import { DatePicker } from "@/components/ui/date-picker";
 import { StudentProfileModal } from "@/components/school/student-profile-panel";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -574,6 +575,7 @@ function StudentEditor({
   onSaved: () => Promise<void>;
 }) {
   const queryClient = useQueryClient();
+  const [photo, setPhoto] = useState<File | null>(null);
   const [guardians, setGuardians] = useState<GuardianDraft[]>([]);
   const mutation = useMutation({
     mutationFn: async (values: StudentFormValues) => {
@@ -605,6 +607,10 @@ function StudentEditor({
           ? `${linked.map((g) => g.name).join(", ")} already ${linked.length === 1 ? "has" : "have"} an account at this school. ${linked.length === 1 ? "It now also has" : "They now also have"} the parent role and sign in with the existing password, so no new parent password was created.`
           : null,
       );
+      if (photo) {
+        try { await uploadPersonPhoto("student", saved.id, photo); }
+        catch { onNotice("Student saved, but the image upload failed. Edit the student to try uploading the image again."); }
+      }
       if (saved.credentials) {
         const name = `${saved.profile.firstName} ${saved.profile.lastName}`;
         onIssued([
@@ -678,6 +684,7 @@ function StudentEditor({
           void form.handleSubmit();
         }}
       >
+        <PersonPhotoPicker file={photo} onChange={setPhoto} />
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <form.Field name="firstName">
             {(field) => (

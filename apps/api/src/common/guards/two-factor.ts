@@ -8,12 +8,14 @@ export const SCHOOL_ADMIN_ROLES = ["owner", "admin"] as const;
 
 /**
  * Platform super-admins must always use two-factor authentication. School
- * owners/admins are encouraged to by default; set REQUIRE_2FA_SCHOOL_ADMINS=true
- * to make it mandatory for them too. Read at call time so it can be changed
+ * owners/admins require it in production by default. An explicit
+ * REQUIRE_2FA_SCHOOL_ADMINS value overrides that deployment policy. Read at call time so it can be changed
  * (and tested) without re-importing modules.
  */
 export function schoolAdminTwoFactorRequired(): boolean {
-  return process.env.REQUIRE_2FA_SCHOOL_ADMINS === "true";
+  return process.env.REQUIRE_2FA_SCHOOL_ADMINS === undefined
+    ? process.env.NODE_ENV === "production"
+    : process.env.REQUIRE_2FA_SCHOOL_ADMINS === "true";
 }
 
 export function hasSchoolAdminRole(roles: Iterable<string>): boolean {
