@@ -17,7 +17,7 @@ export class FinanceCloseService {
     const snapshot = await this.preparation.snapshotPreview(schoolId, year, month);
     const historical = await this.finance.getHistoricalReceivables(schoolId, snapshot.scope.endDate);
     const currentAR = await this.finance.getReceivablesCloseReadiness(schoolId);
-    const accounts = await tx.chartAccount.findMany({ where: { schoolId } });
+    const accounts = await tx.chartAccount.findMany({ where: { schoolId }, orderBy: [{ code: "asc" }, { id: "asc" }] });
     const receivables = new Set(accounts.filter(account=>account.category==='ACCOUNTS_RECEIVABLE').map(account=>account.id));
     const ar = snapshot.lines.filter(line=>receivables.has(line.accountId)).reduce((total,line)=>total.plus(line.closing),new Prisma.Decimal(0));
     const failed: string[] = [];
