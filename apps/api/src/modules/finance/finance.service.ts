@@ -159,8 +159,14 @@ export class FinanceService {
       }
     }
     await this.prisma.client.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${schoolId}), hashtext('finance-posting-boundary'))`;
       const current = await tx.financePeriodLock.findUnique({ where: { schoolId } });
       const reopening = !!current && (!next || next.getTime() < current.lockedThrough.getTime());
+      const approvedClosed = await tx.financeAccountingPeriod.findFirst({ where: { schoolId, status: "CLOSED" }, orderBy: { endDate: "desc" } });
+      if (approvedClosed && (!next || next < approvedClosed.endDate)) {
+        throw new ForbiddenException("Use the independent period-reopening approval workflow to change an approved close.");
+      }
+
       if (reopening && !actorIsSuperAdmin) {
         throw new ForbiddenException("Only a platform administrator can reopen a closed period.");
       }

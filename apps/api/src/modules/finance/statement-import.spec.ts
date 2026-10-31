@@ -3,6 +3,10 @@ import { previewStatement } from "./statement-import.js";
 const input = { schoolId: "s", accountId: "a", startDate: "2026-09-01", endDate: "2026-09-30", openingBalance: "100", closingBalance: "110", rows: [{ date: "2026-09-02", amount: "10", description: "Receipt" }] };
 const bytes = new TextEncoder().encode("statement");
 describe("statement import validation", () => {
+  it("accepts no-movement statements only when opening and closing balances agree", () => {
+    expect(previewStatement({ ...input, rows: [], closingBalance: input.openingBalance }, bytes).rows).toEqual([]);
+    expect(() => previewStatement({ ...input, rows: [] }, bytes)).toThrow(/closing balance/);
+  });
   it("verifies the statement balance bridge with decimal arithmetic", () => {
     expect(previewStatement(input, bytes)).toMatchObject({ movement: "10.00", closingBalance: "110.00", requiresDuplicateReview: false });
     expect(() => previewStatement({ ...input, closingBalance: "110.01" }, bytes)).toThrow(/closing balance/);
