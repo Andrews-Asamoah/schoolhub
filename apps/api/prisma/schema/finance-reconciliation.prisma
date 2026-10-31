@@ -1,0 +1,76 @@
+model FinanceBankStatement {
+  id String @id @default(cuid())
+  schoolId String
+  accountId String
+  sourceBytes Bytes
+  fileName String
+  fileHash String
+  startDate DateTime @db.Date
+  endDate DateTime @db.Date
+  openingBalance Decimal @db.Decimal(15,2)
+  closingBalance Decimal @db.Decimal(15,2)
+  mapping Json
+  duplicateReviewReason String?
+  createdById String
+  createdAt DateTime @default(now())
+  lines FinanceBankStatementLine[]
+  @@unique([schoolId, accountId, fileHash])
+  @@index([schoolId, accountId, startDate, endDate])
+  @@map("finance_bank_statements")
+}
+
+model FinanceBankStatementLine {
+  id String @id @default(cuid())
+  statementId String
+  rowNumber Int
+  date DateTime @db.Date
+  amount Decimal @db.Decimal(15,2)
+  reference String?
+  description String
+  statement FinanceBankStatement @relation(fields: [statementId], references: [id], onDelete: Restrict)
+  matches FinanceBankMatch[]
+  @@unique([statementId, rowNumber])
+  @@map("finance_bank_statement_lines")
+}
+
+model FinanceBankMatch {
+  id String @id @default(cuid())
+  schoolId String
+  accountId String
+  reconciliationId String
+  reconciliation FinanceBankReconciliation @relation(fields: [reconciliationId], references: [id], onDelete: Restrict)
+  statementLineId String
+  transactionId String
+  amount Decimal @db.Decimal(15,2)
+  createdById String
+  createdAt DateTime @default(now())
+  statementLine FinanceBankStatementLine @relation(fields: [statementLineId], references: [id], onDelete: Restrict)
+  @@unique([reconciliationId, statementLineId, transactionId])
+  @@index([schoolId, accountId, transactionId])
+  @@map("finance_bank_matches")
+}
+
+model FinanceBankReconciliation {
+  id String @id @default(cuid())
+  schoolId String
+  accountId String
+  statementId String
+  version Int @default(1)
+  supersedesId String? @unique
+  supersedes FinanceBankReconciliation? @relation("BankRevision", fields: [supersedesId], references: [id], onDelete: Restrict)
+  supersededBy FinanceBankReconciliation? @relation("BankRevision")
+  matches FinanceBankMatch[]
+  @@unique([statementId, version])
+  periodEnd DateTime @db.Date
+  status String @default("DRAFT")
+  createdById String
+  submittedAt DateTime?
+  decidedById String?
+  decidedAt DateTime?
+  decisionNote String?
+  snapshot Json?
+  contentHash String?
+  createdAt DateTime @default(now())
+  @@index([schoolId, accountId, periodEnd, status])
+  @@map("finance_bank_reconciliations")
+}
