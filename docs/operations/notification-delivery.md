@@ -32,3 +32,15 @@ School-funded SMS setup and account isolation are covered in [school-funded SMS]
 Provider tests use fake HTTP transports. PostgreSQL tests cover transactional rollback, real trigger/job insertion, membership/consent/contact withdrawal, immutable payloads, concurrent quota reservations, crash recovery, signed/replayed/early webhook events, suppression, expiry, replay audit and authorization. Full application E2E verifies exact raw-body signature handling through the production Better Auth parser. Desktop/mobile browser tests cover recipient preferences, school quotas, retry and role isolation.
 
 Primary contracts: [Resend idempotency](https://resend.com/docs/dashboard/emails/idempotency-keys), [Resend webhook verification](https://resend.com/docs/webhooks/verify-webhooks-requests), [Hubtel developer portal](https://developers.hubtel.com/). Verify your Hubtel account endpoint in its dashboard; do not substitute credentials from another application.
+
+## Verification email troubleshooting
+
+Verification mail does not require a webhook signing secret. If sending fails, the Notifications page displays an actionable category and the API logs `account.verification.delivery_failed` with the provider HTTP status and an allowlisted provider code. Provider response messages, recipient addresses, email content, credentials and verification URLs are excluded.
+
+- HTTP 401: check that the API key is active in the same Resend account/team as the sender, then restart the API after updating its environment.
+- HTTP 403: inspect Resend Logs for the exact rejection. Check sender-domain verification, key permissions and testing-recipient restrictions. A Sending access key is sufficient for sending; Full access is not required.
+- HTTP 400/422: inspect the key and sender/recipient format in Resend Logs.
+- HTTP 429 or daily/monthly quota codes: inspect the account sending limits and retry after capacity is available.
+- Network/timeout or HTTP 5xx: check the inbox before retrying, since acceptance can be uncertain. Check API-server outbound connectivity to `https://api.resend.com`; if no request appears in Resend Logs, check local DNS, firewall and proxy configuration.
+
+Use the Resend dashboard's failed `POST /emails` entry to obtain the exact provider error. Share only the status and error message when investigating; do not share request headers, body or verification links. See [Resend errors](https://resend.com/docs/api-reference/errors).
