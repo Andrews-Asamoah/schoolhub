@@ -25,7 +25,7 @@ export class AssetsService {
     private readonly cleanup: StorageCleanupService,
   ) {}
 
-  private async readImage(file: Express.Multer.File | undefined) {
+  private async readImage(file: Express.Multer.File | undefined, profilePhoto = false) {
     if (!file?.buffer?.length) {
       throw new BadRequestException("No image file was provided.");
     }
@@ -33,7 +33,7 @@ export class AssetsService {
     if (!image) {
       throw new BadRequestException("Only JPEG, PNG and WebP images are allowed.");
     }
-    return this.validation.image(file.buffer);
+    return this.validation.image(file.buffer, profilePhoto);
   }
 
   /** Only ever delete objects inside this school's own prefix. */
@@ -79,7 +79,7 @@ export class AssetsService {
   }
 
   async setAvatar(school: School, userId: string, file: Express.Multer.File | undefined) {
-    const image = await this.readImage(file);
+    const image = await this.readImage(file, true);
     const previous = await this.prisma.client.user.findUnique({
       where: { id: userId },
       select: { image: true },

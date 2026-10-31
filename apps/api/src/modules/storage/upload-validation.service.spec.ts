@@ -20,6 +20,21 @@ describe("upload validation before private storage", () => {
     expect(result.buffer.includes(Buffer.from("untrusted trailing data"))).toBe(false);
     expect((await sharp(result.buffer).metadata()).width).toBe(2);
   });
+  it.each(["jpeg", "png", "webp"] as const)("normalizes %s profile photos to bounded WebP without metadata", async format => {
+    const input = await sharp({ create: { width: 1200, height: 600, channels: 4, background: { r: 40, g: 80, b: 120, alpha: 0.5 } } })
+      .withMetadata({ exif: { IFD0: { Artist: "private metadata" } } }).toFormat(format).toBuffer();
+    const result = await new UploadValidationService().image(input, true);
+    const metadata = await sharp(result.buffer).metadata();
+    expect(result).toMatchObject({ mime: "image/webp", ext: "webp" });
+    expect(metadata).toMatchObject({ format: "webp", width: 512, height: 256 });
+    expect(metadata.exif).toBeUndefined();
+    expect(metadata.icc).toBeUndefined();
+  });
+  it("does not enlarge small profile photos", async () => {
+    const input = await sharp({ create: { width: 32, height: 16, channels: 4, background: "transparent" } }).png().toBuffer();
+    const result = await new UploadValidationService().image(input, true);
+    expect(await sharp(result.buffer).metadata()).toMatchObject({ width: 32, height: 16, hasAlpha: true });
+  });
   it("rejects PDF scripts even when their dictionary is indirect", async () => {
     const pdf = await PDFDocument.create(); pdf.addPage();
     pdf.catalog.set(PDFName.of("OpenAction"), pdf.context.register(pdf.context.obj({ S: PDFName.of("JavaScript"), JS: "alert(1)" })));
