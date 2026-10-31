@@ -23,6 +23,8 @@ try{for(const role of ['admin','owner'])for(const viewport of [{width:1440,heigh
   if(path.endsWith('/schools/academic-context'))return route.fulfill({json:null});
   if(path.includes('/schools/public/')||path.endsWith('/schools/current'))return route.fulfill({json:school});
   if(path.endsWith('/schools/academic-years'))return route.fulfill({json:years});
+  if(path.endsWith('/attendance/policy'))return route.fulfill({json:{attendancePolicyActiveFrom:null}});
+  if(path.includes('/attendance/calendar/')){const term=years.flatMap(year=>year.terms).find(term=>path.endsWith('/'+term.id));return route.fulfill({json:{term:{...term,calendarRevision:0,instructionalWeekdays:[1,2,3,4,5]},days:[]}});}
   return route.fulfill({json:[]});
  });
  async function pick(label,iso){
