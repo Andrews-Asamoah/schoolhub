@@ -1,3 +1,4 @@
+import { NotificationDeliveryWorkspace } from "./notification-delivery-workspace";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Bell, CheckCheck, CircleCheck, ExternalLink, LoaderCircle, Search, X } from "lucide-react";
 import { useState } from "react";
@@ -65,6 +66,7 @@ export function NotificationsHistoryWorkspace() {
 
   return (
     <div className="space-y-4">
+      <NotificationDeliveryWorkspace />
       <section className="flex flex-col gap-4 rounded-2xl border border-border bg-card p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between sm:p-5">
         <div className="flex items-start gap-3"><span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary"><Bell className="size-5" /></span><div><h2 className="text-sm font-semibold text-foreground">Notification history</h2><p className="mt-1 max-w-2xl text-xs leading-5 text-muted-foreground">Review your in-app alerts, find older updates and mark notifications as read. This history is private to your account in the active school.</p></div></div>
         <button type="button" onClick={() => markAllRead.mutate()} disabled={!data?.unreadCount || markAllRead.isPending} className="inline-flex h-9 shrink-0 items-center justify-center gap-2 rounded-lg border border-border px-3 text-xs font-semibold text-foreground hover:bg-muted disabled:opacity-50"><CheckCheck className="size-4" />{markAllRead.isPending ? "Updating…" : "Mark all as read"}</button>

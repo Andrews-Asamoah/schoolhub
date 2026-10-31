@@ -1,0 +1,219 @@
+import { z } from 'zod';
+export type DeliveryPayload = {
+  from: string;
+  to: string;
+  subject?: string;
+  text: string;
+};
+export type ProviderResult =
+  | { state: 'ACCEPTED'; messageId: string }
+  | { state: 'RETRY' | 'FAILED' | 'UNKNOWN'; reason: string };
+export function ghanaPhone(value: string): string | null {
+  let phone = value.replace(/[\s()-]/g, '');
+  if (/^0[25]\d{8}$/.test(phone)) phone = '+233' + phone.slice(1);
+  if (/^233[25]\d{8}$/.test(phone)) phone = '+' + phone;
+  return /^\+233[25]\d{8}$/.test(phone) ? phone : null;
+}
+export function deliveryPayload(
+  channel: string,
+  to: string,
+  from: string,
+  origin: string,
+): DeliveryPayload {
+  if (channel === 'EMAIL')
+    return {
+      from,
+      to,
+      subject: 'New SchoolHub notification',
+      text: `A new school notification is available. Sign in securely to view it: ${new URL('/notifications', origin).href}`,
+    };
+  return {
+    from,
+    to,
+    text: 'SchoolHub: A school update is available. Sign in to view it.',
+  };
+}
+export class DeliveryProvider {
+  constructor(
+    private readonly request: typeof fetch = fetch,
+    private readonly config: NodeJS.ProcessEnv = process.env,
+  ) {}
+  configured(channel: string) {
+    if (this.config.NOTIFICATION_DELIVERY_ENABLED !== 'true') return false;
+    if (channel === 'EMAIL')
+      return Boolean(
+        this.config.RESEND_API_KEY &&
+        z.email().safeParse(this.config.RESEND_FROM_EMAIL).success &&
+        this.config.RESEND_WEBHOOK_SECRET,
+      );
+    if (channel !== 'SMS') return false;
+    try {
+      this.hubtelBase();
+      return Boolean(
+        this.config.HUBTEL_CLIENT_ID &&
+        this.config.HUBTEL_CLIENT_SECRET &&
+        this.config.HUBTEL_SENDER_ID &&
+        /^[a-zA-Z0-9]{1,11}$/.test(this.config.HUBTEL_SENDER_ID),
+      );
+    } catch {
+      return false;
+    }
+  }
+  private hubtelBase() {
+    const url = new URL(
+      this.config.HUBTEL_SMS_BASE_URL ?? 'https://smsc.hubtel.com/v1/messages',
+    );
+    if (
+      url.protocol !== 'https:' ||
+      !/^([a-z0-9-]+\.)?hubtel\.com$/.test(url.hostname) ||
+      url.username ||
+      url.password ||
+      url.search ||
+      url.hash ||
+      url.pathname.replace(/\/$/, '') !== '/v1/messages'
+    )
+      throw new Error('Invalid Hubtel endpoint configuration');
+    return url.href.replace(/\/$/, '');
+  }
+  async send(
+    channel: string,
+    id: string,
+    payload: DeliveryPayload,
+  ): Promise<ProviderResult> {
+    const email = channel === 'EMAIL';
+    try {
+      const response = await this.request(
+        email ? 'https://api.resend.com/emails' : this.hubtelBase() + '/send',
+        {
+          method: 'POST',
+          redirect: 'error',
+          signal: AbortSignal.timeout(15000),
+          headers: email
+            ? {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${this.config.RESEND_API_KEY}`,
+                'Idempotency-Key': 'schoolhub/' + id,
+              }
+            : {
+                'Content-Type': 'application/json',
+                Authorization:
+                  'Basic ' +
+                  Buffer.from(
+                    `${this.config.HUBTEL_CLIENT_ID}:${this.config.HUBTEL_CLIENT_SECRET}`,
+                  ).toString('base64'),
+              },
+          body: JSON.stringify(
+            email
+              ? {
+                  from: payload.from,
+                  to: [payload.to],
+                  subject: payload.subject,
+                  text: payload.text,
+                  tags: [{ name: 'delivery_id', value: id }],
+                }
+              : { from: payload.from, to: payload.to, content: payload.text },
+          ),
+        },
+      );
+      if (response.status === 429)
+        return { state: 'RETRY', reason: 'PROVIDER_RATE_LIMIT' };
+      if (!response.ok)
+        return {
+          state:
+            response.status >= 500 ? (email ? 'RETRY' : 'UNKNOWN') : 'FAILED',
+          reason:
+            response.status >= 500 ? 'PROVIDER_UNCERTAIN' : 'PROVIDER_REJECTED',
+        };
+      const data = (await response.json()) as {
+        id?: unknown;
+        data?: { messageId?: unknown };
+      };
+      const messageId = email ? data.id : data.data?.messageId;
+      if (
+        typeof messageId !== 'string' ||
+        messageId.length < 1 ||
+        messageId.length > 200
+      )
+        return {
+          state: email ? 'RETRY' : 'UNKNOWN',
+          reason: 'INVALID_PROVIDER_RESPONSE',
+        };
+      return { state: 'ACCEPTED', messageId };
+    } catch {
+      return {
+        state: email ? 'RETRY' : 'UNKNOWN',
+        reason: 'PROVIDER_OUTCOME_UNKNOWN',
+      };
+    }
+  }
+  async smsStatus(
+    messageId: string,
+  ): Promise<'DELIVERED' | 'FAILED' | 'ACCEPTED' | 'UNKNOWN'> {
+    try {
+      const response = await this.request(
+        this.hubtelBase() + '/' + encodeURIComponent(messageId),
+        {
+          redirect: 'error',
+          signal: AbortSignal.timeout(10000),
+          headers: {
+            Authorization:
+              'Basic ' +
+              Buffer.from(
+                `${this.config.HUBTEL_CLIENT_ID}:${this.config.HUBTEL_CLIENT_SECRET}`,
+              ).toString('base64'),
+          },
+        },
+      );
+      if (!response.ok) return 'UNKNOWN';
+      const body = (await response.json()) as {
+        data?: { messageId?: string; status?: string };
+      };
+      if (body.data?.messageId !== messageId) return 'UNKNOWN';
+      const status = body.data.status?.toUpperCase();
+      return status === 'DELIVERED'
+        ? 'DELIVERED'
+        : ['UNDELIVERED', 'FAILED', 'REJECTED', 'EXPIRED'].includes(
+              status ?? '',
+            )
+          ? 'FAILED'
+          : [
+                'SENT',
+                'ACCEPTED',
+                'PENDING',
+                'ACKNOWLEDGED',
+                'SCHEDULED',
+                'SUBMITTED',
+              ].includes(status ?? '')
+            ? 'ACCEPTED'
+            : 'UNKNOWN';
+    } catch {
+      return 'UNKNOWN';
+    }
+  }
+}
+export const deliveryStateForEvent: Record<string, string> = {
+  'email.sent': 'ACCEPTED',
+  'email.delivered': 'DELIVERED',
+  'email.delivery_delayed': 'DELAYED',
+  'email.bounced': 'BOUNCED',
+  'email.complained': 'COMPLAINED',
+  'email.failed': 'FAILED',
+  'email.suppressed': 'SUPPRESSED',
+};
+export function advancesDelivery(current: string, next: string) {
+  const rank: Record<string, number> = {
+    PENDING: 0,
+    SENDING: 0,
+    UNKNOWN: 0,
+    DEAD: 0,
+    EXPIRED: 0,
+    ACCEPTED: 1,
+    DELAYED: 2,
+    DELIVERED: 3,
+    FAILED: 4,
+    SUPPRESSED: 4,
+    BOUNCED: 5,
+    COMPLAINED: 6,
+  };
+  return (rank[next] ?? -1) > (rank[current] ?? 0);
+}

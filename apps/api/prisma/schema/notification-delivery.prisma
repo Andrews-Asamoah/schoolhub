@@ -1,0 +1,83 @@
+model SchoolNotificationSettings {
+ schoolId String @id
+ emailEnabled Boolean @default(false)
+ smsEnabled Boolean @default(false)
+ emailDailyLimit Int @default(0)
+ smsDailyLimit Int @default(0)
+ updatedAt DateTime @updatedAt
+ school School @relation(fields:[schoolId],references:[id],onDelete:NoAction,onUpdate:NoAction)
+ @@map("school_notification_settings")
+}
+model NotificationPreference {
+ id String @id @default(cuid())
+ schoolId String
+ userId String
+ emailEnabled Boolean @default(false)
+ smsEnabled Boolean @default(false)
+ consentAt DateTime @default(now())
+ updatedAt DateTime @updatedAt
+ @@unique([schoolId,userId])
+ school School @relation(fields:[schoolId],references:[id],onDelete:NoAction,onUpdate:NoAction)
+ user user @relation(fields:[userId],references:[id],onDelete:NoAction,onUpdate:NoAction)
+ @@map("notification_preferences")
+}
+model NotificationDelivery {
+ id String @id
+ notificationId String
+ schoolId String
+ userId String
+ channel String
+ provider String
+ recipient String
+ recipientHash String?
+ payload Json?
+ status String @default("PENDING")
+ providerMessageId String?
+ attempts Int @default(0)
+ reason String?
+ quotaDay DateTime? @db.Date
+ createdAt DateTime @default(now())
+ updatedAt DateTime @updatedAt
+ expiresAt DateTime
+ acceptedAt DateTime?
+ deliveredAt DateTime?
+ nextPollAt DateTime?
+ @@unique([notificationId,channel])
+ @@unique([provider,providerMessageId])
+ @@index([schoolId,createdAt],map:"notification_delivery_school_date")
+ @@index([status,nextPollAt],map:"notification_delivery_poll")
+ school School @relation(fields:[schoolId],references:[id],onDelete:NoAction,onUpdate:NoAction)
+ user user @relation(fields:[userId],references:[id],onDelete:NoAction,onUpdate:NoAction)
+ notification Notification @relation(fields:[notificationId],references:[id],onDelete:NoAction,onUpdate:NoAction)
+ @@map("notification_deliveries")
+}
+model NotificationDailyUsage {
+ id String @id @default(cuid())
+ schoolId String
+ day DateTime @db.Date
+ channel String
+ used Int @default(0)
+ @@unique([schoolId,day,channel])
+ school School @relation(fields:[schoolId],references:[id],onDelete:NoAction,onUpdate:NoAction)
+ @@map("notification_daily_usage")
+}
+model NotificationSuppression {
+ id String @id @default(cuid())
+ channel String
+ recipientHash String
+ reason String
+ createdAt DateTime @default(now())
+ @@unique([channel,recipientHash])
+ @@map("notification_suppressions")
+}
+model NotificationProviderEvent {
+ id String @id
+ provider String
+ messageId String
+ kind String
+ eventAt DateTime
+ processedAt DateTime?
+ createdAt DateTime @default(now())
+ @@index([provider,messageId,processedAt],map:"notification_event_processing")
+ @@map("notification_provider_events")
+}

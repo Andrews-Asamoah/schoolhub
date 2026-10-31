@@ -239,6 +239,7 @@ model PromotionRecord {
 }
 
 model Notification {
+  deliveries NotificationDelivery[]
   id             String           @id @default(cuid())
   schoolId       String
   userId         String

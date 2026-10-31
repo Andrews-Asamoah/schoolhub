@@ -84,7 +84,8 @@ export class AnnouncementsService {
   async create(schoolId: string, authorId: string, role: string, input: CreateAnnouncementInput) {
     this.assertCreatePermission(role, input);
     await this.validateClassTargets(schoolId, authorId, role, input);
-    const announcement = await this.prisma.client.announcement.create({
+    return this.prisma.client.$transaction(async (tx) => {
+    const announcement = await tx.announcement.create({
       data: {
         schoolId,
         authorId,
@@ -100,9 +101,10 @@ export class AnnouncementsService {
       include: { author: { select: { id: true, name: true } } },
     });
     if (announcement.status === "PUBLISHED") {
-      await this.notifyAudience(schoolId, authorId, announcement.id, announcement.title, announcement.content, announcement.target, announcement.targetClassIds);
+      await this.notifyAudience(schoolId, authorId, announcement.id, announcement.title, announcement.content, announcement.target, announcement.targetClassIds, tx);
     }
     return announcement;
+    }, { timeout: 30000 });
   }
 
   async updatePin(schoolId: string, id: string, input: UpdateAnnouncementPinInput) {
@@ -115,20 +117,23 @@ export class AnnouncementsService {
   }
 
   async updateStatus(schoolId: string, id: string, input: UpdateAnnouncementStatusInput) {
-    const existing = await this.prisma.client.announcement.findFirst({
+    return this.prisma.client.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${schoolId}), hashtext(${id}))`;
+    const existing = await tx.announcement.findFirst({
       where: { id, schoolId },
       select: { id: true, authorId: true, title: true, content: true, target: true, targetClassIds: true, status: true },
     });
     if (!existing) throw new NotFoundException("Announcement not found");
-    const updated = await this.prisma.client.announcement.update({
+    const updated = await tx.announcement.update({
       where: { id: existing.id },
       data: { status: input.status },
       include: { author: { select: { id: true, name: true } } },
     });
     if (existing.status !== "PUBLISHED" && updated.status === "PUBLISHED") {
-      await this.notifyAudience(schoolId, existing.authorId, existing.id, existing.title, existing.content, existing.target, existing.targetClassIds);
+      await this.notifyAudience(schoolId, existing.authorId, existing.id, existing.title, existing.content, existing.target, existing.targetClassIds, tx);
     }
     return updated;
+    }, { timeout: 30000 });
   }
 
   async remove(schoolId: string, id: string) {
@@ -253,19 +258,20 @@ export class AnnouncementsService {
     content: string,
     target: string,
     targetClassIds: string[],
+    db: Prisma.TransactionClient,
   ) {
-    const recipientIds = [...new Set(await this.getRecipientUserIds(schoolId, target, targetClassIds))]
+    const recipientIds = [...new Set(await this.getRecipientUserIds(schoolId, target, targetClassIds, db))]
       .filter((id) => Boolean(id) && id !== authorId);
     if (!recipientIds.length) return;
     const link = "/announcements?announcementId=" + announcementId;
-    const existing = await this.prisma.client.notification.findMany({
+    const existing = await db.notification.findMany({
       where: { schoolId, type: "ANNOUNCEMENT", link },
       select: { userId: true },
     });
     const alreadyNotified = new Set(existing.map((item) => item.userId));
     const newIds = recipientIds.filter((id) => !alreadyNotified.has(id));
     if (!newIds.length) return;
-    await this.prisma.client.notification.createMany({
+    await db.notification.createMany({
       data: newIds.map((userId) => ({
         schoolId,
         userId,
@@ -277,8 +283,7 @@ export class AnnouncementsService {
     });
   }
 
-  private async getRecipientUserIds(schoolId: string, target: string, targetClassIds: string[]) {
-    const db = this.prisma.client;
+  private async getRecipientUserIds(schoolId: string, target: string, targetClassIds: string[], db: Prisma.TransactionClient) {
     const normalized = target.trim().toUpperCase();
     if (normalized === "SCHOOL_COMMUNITY" || normalized === "ALL") {
       const school = await db.school.findUnique({ where: { id: schoolId }, select: { organizationId: true } });

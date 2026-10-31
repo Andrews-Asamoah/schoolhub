@@ -1,8 +1,9 @@
+import { sendAccountVerification } from "./verification-mail.js";
 import { originPolicy } from "../common/origin-policy.js";
 import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { bearer, organization, twoFactor } from "better-auth/plugins";
-import { APIError, createAuthMiddleware } from "better-auth/api";
+import { APIError, createAuthMiddleware, getSessionFromCtx } from "better-auth/api";
 import { isTemporaryPasswordExpired } from "../common/guards/password-change.js";
 import {
   PASSWORD_MAX_LENGTH,
@@ -86,6 +87,13 @@ export function createAuth(prisma: PrismaLike) {
       maxPasswordLength: PASSWORD_MAX_LENGTH,
       revokeSessionsOnPasswordReset: true,
     },
+    emailVerification: {
+      sendVerificationEmail: async ({ user, url }) => sendAccountVerification(user.email, url),
+      expiresIn: 3600,
+      autoSignInAfterVerification: false,
+      sendOnSignUp: false,
+      sendOnSignIn: false,
+    },
     session: {
       expiresIn: 60 * 60 * 24 * 7, // 7 days
       updateAge: 60 * 60 * 24, // refresh once a day
@@ -98,6 +106,7 @@ export function createAuth(prisma: PrismaLike) {
       window: 60,
       max: 100,
       customRules: {
+        "/send-verification-email": { window: 3600, max: 3 },
         "/sign-in/email": { window: 60, max: 5 },
         "/change-password": { window: 60, max: 5 },
         // Guessing a 6-digit code must be slow. (A per-account lockout in the
@@ -112,6 +121,12 @@ export function createAuth(prisma: PrismaLike) {
     // Enforce the same complexity rules on any endpoint that sets a password.
     hooks: {
       before: createAuthMiddleware(async (ctx) => {
+        if (ctx.path === "/send-verification-email") {
+          const session = await getSessionFromCtx(ctx);
+          if (!session || (session.user as { banned?: boolean }).banned) {
+            throw new APIError("UNAUTHORIZED", { message: "Sign in to verify your own email address." });
+          }
+        }
         if (DISABLED_TWO_FACTOR_PATHS.has(ctx.path)) {
           throw new APIError("NOT_FOUND", { message: "Not found" });
         }
