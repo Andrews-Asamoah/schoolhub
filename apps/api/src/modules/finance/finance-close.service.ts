@@ -36,12 +36,12 @@ export class FinanceCloseService {
     if (unresolved) failed.push("Unresolved financial adjustments exist.");
     const schedules = await tx.financeRevenueScheduleLine.count({ where: { schedule: { schoolId }, periodEnd: { lte: new Date(snapshot.scope.endDate) }, OR: [{ postedTransactionId: null }, { postedAt: null }] } });
     if (schedules) failed.push("Revenue schedule recognition is outstanding.");
-    const drafts = await tx.payrollRecord.count({ where: { schoolId, OR: [{year:{lt:year}},{year,month:{lte:month}}], status: 'DRAFT' } });
-    if (drafts) failed.push("Unapproved payroll drafts exist.");
+    const drafts = await tx.payrollRecord.count({ where: { schoolId, OR: [{year:{lt:year}},{year,month:{lte:month}}], status: { in: ['DRAFT','APPROVED'] } } });
+    if (drafts) failed.push("Unapproved or unpaid payroll runs exist.");
     const journals=await tx.financeManualJournal.count({where:{schoolId,postingDate:{lte:new Date(snapshot.scope.endDate)},status:{in:['DRAFT','PENDING_APPROVAL','APPROVED']}}});
     if(journals)failed.push('Unresolved manual journals exist at or before period end.');
     // Until liability schedules/remittance evidence exist, non-zero accrued/deferred balances fail closed.
-    const restricted = new Set(accounts.filter(account=>account.category==='ACCRUED_EXPENSES'||account.category==='ACCOUNTS_PAYABLE').map(account=>account.id));
+    const restricted = new Set(accounts.filter(account=>account.accountType==='LIABILITY'&&['ACCRUED_EXPENSES','ACCOUNTS_PAYABLE','TAXES'].includes(account.category)).map(account=>account.id));
     if (snapshot.lines.some(line=>restricted.has(line.accountId)&&!new Prisma.Decimal(line.closing).isZero())) failed.push("Outstanding payable/accrued liabilities require supported settlement evidence before close.");
     const deferred = await tx.financeAccountMapping.findMany({ where: { schoolId, status: 'ACTIVE', purpose: { in: ['DEFERRED_REVENUE','STUDENT_CREDIT_LIABILITY'] } } });
     if (snapshot.lines.some(line=>deferred.some(mapping=>mapping.accountId===line.accountId)&&!new Prisma.Decimal(line.closing).isZero())) failed.push("Deferred revenue/student-credit liabilities require completed subledger reconciliation.");

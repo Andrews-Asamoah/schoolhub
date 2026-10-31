@@ -6,7 +6,7 @@ const browser=await chromium.launch({headless:true});
 const base=process.env.SCHOOLHUB_WEB_URL??'http://127.0.0.1:5173';
 try{
  for(const role of ['accountant','owner'])for(const viewport of [{width:1440,height:1000},{width:390,height:844}]){
-  const page=await browser.newPage({viewport});const errors=[],writes=[];
+  const page=await browser.newPage({viewport,locale:"en-GB"});const errors=[],writes=[];
   page.on('pageerror',error=>errors.push(error.message));
   const now=new Date().toISOString(),org={id:'org',name:'Test school',slug:'test-school',createdAt:now};
   const session={user:{id:role,name:role,email:`${role}@example.test`,role:'user',mustChangePassword:false,twoFactorEnabled:true,createdAt:now,updatedAt:now},session:{id:'session',token:'token',userId:role,activeOrganizationId:'org',expiresAt:new Date(Date.now()+3600000).toISOString(),createdAt:now,updatedAt:now}};
@@ -19,6 +19,7 @@ try{
    if(path.includes('/auth/organization/list'))return route.fulfill({json:[org]});
    if(path.includes('/auth/organization/get-full-organization'))return route.fulfill({json:{...org,members:[],invitations:[]}});
    if(path.includes('/schools/public/')||path.endsWith('/schools/current'))return route.fulfill({json:school});
+   if(path.endsWith('/schools/academic-context'))return route.fulfill({json:null});
    if(path.endsWith('/schools/roles'))return route.fulfill({json:{primaryRole:role,roles:[role]}});
    if(path.endsWith('/reconciliations/accounts')||path.endsWith('/reconciliations/journal-accounts'))return route.fulfill({json:[{id:'bank',code:'1000',name:'School bank'},{id:'expense',code:'5000',name:'Bank charges'}]});
    if(path.endsWith('/reconciliations/recon/candidates'))return route.fulfill({json:[{id:'posting',transactionNumber:'TXN-1',description:'Fees',amount:'10.00',debitAccountId:'bank'}]});
@@ -32,6 +33,16 @@ try{
   });
   await page.goto(base+'/finance-reports?school=test-school');
   try { await page.getByRole('heading',{name:'Bank and cash reconciliation',exact:true}).waitFor(); } catch(error) { console.log('Browser page state', {role,url:page.url(),errors,text:(await page.locator('body').innerText()).slice(0,5000)}); throw error; }
+  if(role==='accountant'){
+   await page.getByText('Import a statement',{exact:true}).click();
+   await page.getByLabel('Account',{exact:true}).selectOption('bank');
+   await page.getByLabel('CSV/XLSX file',{exact:true}).setInputFiles({name:'bank.csv',mimeType:'text/csv',buffer:Buffer.from('Date,Description,Amount\n2026-09-02,Fees,10.00')});
+   await page.getByLabel('Statement start',{exact:true}).fill('2026-09-01');await page.getByLabel('Statement end',{exact:true}).fill('2026-09-30');
+   await page.getByLabel('Opening balance',{exact:true}).fill('0.00');await page.getByLabel('Closing balance',{exact:true}).fill('10.00');
+   await page.getByRole('button',{name:'Preview',exact:true}).click();await page.getByRole('button',{name:'Confirm import',exact:true}).waitFor();await Promise.all([page.waitForResponse(response=>new URL(response.url()).pathname.endsWith('/import')),page.getByRole('button',{name:'Confirm import',exact:true}).click()]);
+   await page.getByText('Import a statement',{exact:true}).click();
+   assert(writes.some(write=>write.path.endsWith('/import')));
+  }
   await page.getByLabel('Reconciliation',{exact:true}).selectOption('recon');
   await page.getByText('Status: '+record.status+' · Version 1',{exact:true}).waitFor();
   if(role==='accountant'){
@@ -41,12 +52,12 @@ try{
    await page.getByText('Status: PENDING · Version 1',{exact:true}).waitFor();
    await page.getByLabel('Accounting month',{exact:true}).fill('2026-09');await page.getByRole('button',{name:'Check close readiness',exact:true}).click();
    await page.getByText('Checks passed; an independent approval is still required.',{exact:true}).waitFor();
-   await page.getByLabel('Request or decision reason',{exact:true}).fill('Reviewed September accounts');await page.getByRole('button',{name:'Request independent close approval',exact:true}).click();
+   await page.getByLabel('Request or decision reason',{exact:true}).fill('Reviewed September accounts');await Promise.all([page.waitForResponse(response=>new URL(response.url()).pathname.endsWith('/request-close')),page.getByRole('button',{name:'Request independent close approval',exact:true}).click()]);
    assert(writes.some(write=>write.path.endsWith('/matches')));assert(writes.some(write=>write.path.endsWith('/request-close')));
   }else{
    await page.getByLabel('Decision reason',{exact:true}).fill('Independently reviewed bank evidence');await page.getByRole('button',{name:'Approve',exact:true}).first().click();
    await page.getByText('Status: APPROVED · Version 1',{exact:true}).waitFor();
-   await page.getByLabel('Request or decision reason',{exact:true}).fill('Independently reviewed period evidence');await page.getByRole('button',{name:'Approve',exact:true}).click();
+   await page.getByLabel('Request or decision reason',{exact:true}).fill('Independently reviewed period evidence');await Promise.all([page.waitForResponse(response=>new URL(response.url()).pathname.endsWith('/close-request/decide')),page.getByRole('button',{name:'Approve',exact:true}).click()]);
    assert(writes.some(write=>write.path.endsWith('/close-request/decide')));
   }
   assert.deepEqual(errors,[]);await page.close();

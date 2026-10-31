@@ -38,7 +38,7 @@ CREATE FUNCTION protect_bank_reconciliation() RETURNS trigger LANGUAGE plpgsql A
 BEGIN
  IF OLD.status = 'APPROVED' THEN RAISE EXCEPTION 'Approved reconciliation is immutable'; END IF;
  IF TG_OP = 'DELETE' THEN RAISE EXCEPTION 'Reconciliation history cannot be deleted'; END IF;
- IF NEW."schoolId" <> OLD."schoolId" OR NEW."accountId" <> OLD."accountId" OR NEW."statementId" <> OLD."statementId" OR NEW."createdById" <> OLD."createdById" THEN RAISE EXCEPTION 'Reconciliation scope cannot change'; END IF;
+ IF NEW."schoolId" <> OLD."schoolId" OR NEW."accountId" <> OLD."accountId" OR NEW."statementId" <> OLD."statementId" OR NEW."createdById" <> OLD."createdById" OR NEW.version <> OLD.version OR NEW."supersedesId" IS DISTINCT FROM OLD."supersedesId" THEN RAISE EXCEPTION 'Reconciliation scope cannot change'; END IF;
  RETURN NEW;
 END $$;
 CREATE TRIGGER protect_bank_reconciliation BEFORE UPDATE OR DELETE ON finance_bank_reconciliations FOR EACH ROW EXECUTE FUNCTION protect_bank_reconciliation();
@@ -52,6 +52,14 @@ BEGIN
  ELSIF TG_TABLE_NAME = 'finance_bank_reconciliations' THEN
    SELECT * INTO STRICT stmt FROM finance_bank_statements WHERE id=NEW."statementId";
    IF stmt."schoolId"<>NEW."schoolId" OR stmt."accountId"<>NEW."accountId" OR stmt."endDate"<>NEW."periodEnd" THEN RAISE EXCEPTION 'Invalid statement scope'; END IF;
+   IF NEW."supersedesId" IS NULL THEN
+     IF NEW.version<>1 THEN RAISE EXCEPTION 'Initial reconciliation version must be one'; END IF;
+   ELSE
+     SELECT * INTO STRICT recon FROM finance_bank_reconciliations WHERE id=NEW."supersedesId";
+     IF recon.status<>'APPROVED' OR recon."schoolId"<>NEW."schoolId" OR recon."accountId"<>NEW."accountId" OR recon."statementId"<>NEW."statementId" OR recon.version+1<>NEW.version THEN RAISE EXCEPTION 'Invalid reconciliation amendment scope'; END IF;
+   END IF;
+   IF stmt."openingBalance"+(SELECT COALESCE(SUM(amount),0) FROM finance_bank_statement_lines WHERE "statementId"=stmt.id)<>stmt."closingBalance" THEN RAISE EXCEPTION 'Statement movements do not reconcile to closing balance'; END IF;
+
  ELSE
    SELECT * INTO STRICT line FROM finance_bank_statement_lines WHERE id=NEW."statementLineId";
    SELECT * INTO STRICT stmt FROM finance_bank_statements WHERE id=line."statementId";
@@ -94,3 +102,13 @@ BEGIN RAISE EXCEPTION 'Period snapshot history is immutable'; END $$;
 CREATE TRIGGER immutable_period_snapshot BEFORE UPDATE OR DELETE ON finance_period_snapshots FOR EACH ROW EXECUTE FUNCTION immutable_close_snapshot();
 CREATE TRIGGER immutable_period_snapshot_line BEFORE UPDATE OR DELETE ON finance_period_snapshot_lines FOR EACH ROW EXECUTE FUNCTION immutable_close_snapshot();
 CREATE TRIGGER immutable_period_event BEFORE UPDATE OR DELETE ON finance_period_events FOR EACH ROW EXECUTE FUNCTION immutable_close_snapshot();
+
+CREATE FUNCTION validate_bank_line_insert() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE stmt finance_bank_statements;
+BEGIN
+ SELECT * INTO STRICT stmt FROM finance_bank_statements WHERE id=NEW."statementId";
+ IF EXISTS(SELECT 1 FROM finance_bank_reconciliations WHERE "statementId"=stmt.id) OR NEW.date<stmt."startDate" OR NEW.date>stmt."endDate" THEN RAISE EXCEPTION 'Statement evidence cannot be extended after import or outside its period'; END IF;
+ RETURN NEW;
+END $$;
+CREATE TRIGGER validate_bank_line_insert BEFORE INSERT ON finance_bank_statement_lines FOR EACH ROW EXECUTE FUNCTION validate_bank_line_insert();
+ALTER TABLE finance_bank_reconciliations ADD CONSTRAINT approved_bank_evidence_required CHECK(status<>'APPROVED' OR (snapshot IS NOT NULL AND "contentHash" IS NOT NULL AND "decidedAt" IS NOT NULL AND "decidedById" IS NOT NULL));
