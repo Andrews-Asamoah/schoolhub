@@ -42,7 +42,8 @@ import { DashboardModule } from "./modules/dashboard/dashboard.module.js";
     PrismaModule,
     JobsModule,
     StorageModule,
-    AuthModule.forRoot({ auth }),
+    // Bounded payloads for reviewed rollover batches (up to 2,000 decisions).
+    AuthModule.forRoot({ auth, bodyParser: { json: { limit: "4mb" } } }),
     SchoolsModule,
     StudentsModule,
     AcademicsModule,

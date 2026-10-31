@@ -1,0 +1,27 @@
+model AcademicRolloverBatch {
+  id String @id @default(cuid())
+  schoolId String
+  fromYearId String
+  fromTermId String
+  toYearId String
+  toTermId String
+  status String @default("PENDING")
+  createdById String
+  approvedById String?
+  approvedAt DateTime?
+  approvalNote String?
+  reviewSnapshot Json
+  plan Json
+  evidenceHash String
+  beforeState Json?
+  afterHash String?
+  appliedAt DateTime?
+  appliedById String?
+  rollbackRequestedById String?
+  rollbackReason String?
+  rolledBackAt DateTime?
+  rolledBackById String?
+  createdAt DateTime @default(now())
+  @@index([schoolId, status, createdAt])
+  @@map("academic_rollover_batches")
+}
