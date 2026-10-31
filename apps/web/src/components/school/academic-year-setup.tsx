@@ -1,3 +1,4 @@
+import { useRef } from "react";
 import { DatePicker } from "@/components/ui/date-picker";
 import { useForm } from "@tanstack/react-form";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -69,6 +70,7 @@ function blankTerm(termNumber: number) {
 
 export function AcademicYearSetup({ years }: AcademicYearSetupProps) {
   const queryClient = useQueryClient();
+  const validationSummary = useRef<HTMLDivElement>(null);
   const mutation = useMutation({
     mutationFn: (input: CreateAcademicYearInput) =>
       apiFetch("/schools/academic-years", {
@@ -80,6 +82,8 @@ export function AcademicYearSetup({ years }: AcademicYearSetupProps) {
         queryClient.invalidateQueries({ queryKey: ["schools", "academic-years"] }),
         queryClient.invalidateQueries({ queryKey: ["school", "current"] }),
         queryClient.invalidateQueries({ queryKey: ["academics"] }),
+        queryClient.invalidateQueries({ queryKey: ["schools", "academic-context"] }),
+        queryClient.invalidateQueries({ queryKey: ["dashboard"] }),
       ]);
     },
   });
@@ -94,6 +98,10 @@ export function AcademicYearSetup({ years }: AcademicYearSetupProps) {
     } as YearValues,
     validators: {
       onSubmit: createAcademicYearSchema,
+    },
+    onSubmitInvalid: () => {
+      mutation.reset();
+      requestAnimationFrame(() => validationSummary.current?.focus());
     },
     onSubmit: async ({ value }) => {
       mutation.reset();
@@ -159,6 +167,7 @@ export function AcademicYearSetup({ years }: AcademicYearSetupProps) {
                 <FormField label="Year starts" htmlFor={field.name} error={field.state.meta.errors}>
                   <DatePicker
                     id={field.name}
+                    ariaLabel="Year starts"
                     value={field.state.value}
                     onBlur={field.handleBlur}
                     onChange={(value) => field.handleChange(value)}
@@ -172,6 +181,7 @@ export function AcademicYearSetup({ years }: AcademicYearSetupProps) {
                 <FormField label="Year ends" htmlFor={field.name} error={field.state.meta.errors}>
                   <DatePicker
                     id={field.name}
+                    ariaLabel="Year ends"
                     value={field.state.value}
                     onBlur={field.handleBlur}
                     onChange={(value) => field.handleChange(value)}
@@ -246,52 +256,32 @@ export function AcademicYearSetup({ years }: AcademicYearSetupProps) {
                       key={`${index}-${term.termNumber}`}
                       className="grid gap-3 rounded-xl border border-border bg-card p-3 sm:grid-cols-2 xl:grid-cols-[1.1fr_0.65fr_0.65fr_auto_auto]"
                     >
-                      <FormField label={`Term ${index + 1} name`} htmlFor={`term-${index}-name`}>
-                        <FormInput
-                          id={`term-${index}-name`}
-                          value={term.name}
-                          onBlur={termsField.handleBlur}
-                          onChange={(event) => {
-                            const name = event.target.value;
-                            termsField.handleChange((current) =>
-                              (current ?? []).map((item, itemIndex) =>
-                                itemIndex === index ? { ...item, name } : item,
-                              ),
-                            );
-                          }}
-                          placeholder={`Term ${index + 1}`}
-                        />
-                      </FormField>
-                      <FormField label="Starts" htmlFor={`term-${index}-start`}>
-                        <DatePicker
-                          id={`term-${index}-start`}
-                          value={term.startDate}
-                          onBlur={termsField.handleBlur}
-                          onChange={(value) => {
-                            const startDate = value;
-                            termsField.handleChange((current) =>
-                              (current ?? []).map((item, itemIndex) =>
-                                itemIndex === index ? { ...item, startDate } : item,
-                              ),
-                            );
-                          }}
-                        />
-                      </FormField>
-                      <FormField label="Ends" htmlFor={`term-${index}-end`}>
-                        <DatePicker
-                          id={`term-${index}-end`}
-                          value={term.endDate}
-                          onBlur={termsField.handleBlur}
-                          onChange={(value) => {
-                            const endDate = value;
-                            termsField.handleChange((current) =>
-                              (current ?? []).map((item, itemIndex) =>
-                                itemIndex === index ? { ...item, endDate } : item,
-                              ),
-                            );
-                          }}
-                        />
-                      </FormField>
+                      <form.Field name={`terms[${index}].name`}>
+                        {(field) => (
+                          <FormField label={`Term ${index + 1} name`} htmlFor={`term-${index}-name`} error={field.state.meta.errors}>
+                            <FormInput id={`term-${index}-name`} value={field.state.value}
+                              onBlur={field.handleBlur} onChange={(event) => field.handleChange(event.target.value)}
+                              aria-invalid={field.state.meta.errors.length > 0}
+                              aria-describedby={field.state.meta.errors.length ? `term-${index}-name-error` : undefined} />
+                          </FormField>
+                        )}
+                      </form.Field>
+                      <form.Field name={`terms[${index}].startDate`}>
+                        {(field) => (
+                          <FormField label="Starts" htmlFor={`term-${index}-start`} error={field.state.meta.errors}>
+                            <DatePicker id={`term-${index}-start`} ariaLabel={`Term ${index + 1} starts`}
+                              value={field.state.value} onBlur={field.handleBlur} onChange={field.handleChange} />
+                          </FormField>
+                        )}
+                      </form.Field>
+                      <form.Field name={`terms[${index}].endDate`}>
+                        {(field) => (
+                          <FormField label="Ends" htmlFor={`term-${index}-end`} error={field.state.meta.errors}>
+                            <DatePicker id={`term-${index}-end`} ariaLabel={`Term ${index + 1} ends`}
+                              value={field.state.value} onBlur={field.handleBlur} onChange={field.handleChange} />
+                          </FormField>
+                        )}
+                      </form.Field>
                       <label className="flex items-center gap-2 self-end rounded-lg px-2 py-2 text-xs font-medium text-foreground/80">
                         <input
                           type="checkbox"
@@ -323,16 +313,37 @@ export function AcademicYearSetup({ years }: AcademicYearSetupProps) {
                       </button>
                     </div>
                   ))}
-                  {termsField.state.meta.errors.length > 0 && (
-                    <p role="alert" className="flex items-center gap-1.5 text-xs text-destructive">
-                      <CircleAlert className="size-3.5" />
-                      {String(termsField.state.meta.errors[0])}
-                    </p>
-                  )}
                 </div>
               )}
             </form.Field>
           </div>
+
+          <form.Subscribe selector={(state) => [state.submissionAttempts, state.values] as const}>
+            {([attempts, values]) => {
+              const result = createAcademicYearSchema.safeParse(values);
+              if (!attempts || result.success) return null;
+              return (
+                <div ref={validationSummary} tabIndex={-1} role="alert"
+                  className="space-y-2 rounded-lg border border-destructive/20 bg-destructive/10 px-3 py-2.5 text-xs text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                  <p className="font-semibold">Could not save the academic calendar. Correct the following:</p>
+                  <ul className="list-disc space-y-1 pl-4">
+                    {result.error.issues.map((issue, index) => {
+                      const termIndex = issue.path[0] === "terms" && typeof issue.path[1] === "number" ? issue.path[1] : undefined;
+                      const field = String(issue.path.at(-1) ?? "");
+                      const label = field === "startDate" ? "start date" : field === "endDate" ? "end date" : field === "name" ? "name" : "terms";
+                      const target = termIndex === undefined ? field : `term-${termIndex}-${field === "startDate" ? "start" : field === "endDate" ? "end" : "name"}`;
+                      return <li key={index}>
+                        <button type="button" className="text-left underline underline-offset-2"
+                          onClick={() => document.getElementById(target)?.focus()}>
+                          {termIndex === undefined ? `Academic year ${label}` : `Term ${termIndex + 1} ${label}`}: {issue.message}
+                        </button>
+                      </li>;
+                    })}
+                  </ul>
+                </div>
+              );
+            }}
+          </form.Subscribe>
 
           {mutation.error && (
             <p role="alert" className="flex items-center gap-2 rounded-lg border border-destructive/20 bg-destructive/10 px-3 py-2.5 text-xs text-destructive">
