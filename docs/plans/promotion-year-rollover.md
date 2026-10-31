@@ -5,7 +5,7 @@ Target: dev. This is a reviewed student-progression workflow, not an automatic g
 ## Workflow
 
 1. Create the next academic year, its first term and destination classes using existing setup screens. Keep the source year current. Year-specific destination classes must belong to the target year; shared classes are allowed.
-2. Open Enrolments → Promotion and year rollover. The final source term and first target term are used. Every active final-term enrolment receives one explicit PROMOTED, REPEATED, GRADUATED or SKIPPED decision and a meaningful reason.
+2. Open Enrolments → Promotion and year rollover. The final source term and first target term are used. Every active student with an active or completed final-term placement receives one explicit PROMOTED, REPEATED, GRADUATED or SKIPPED decision and a meaningful reason.
 3. Record the school policy name/version and evidence basis. Published final-term reports are required by default; a school may explicitly declare a manually reviewed alternative. No pass mark or progression rule is guessed from class names. Graduates must come from a graduating class; repetitions preserve academic level; configured class order constrains promotion/skipping.
 4. Preview validates school ownership, complete cohort coverage, current placements, target dates/classes, prior target placements, published reports and destination capacities. It performs no student writes.
 5. Submit the immutable decisions and evidence fingerprint. A different owner/headteacher must review them. Changes to placements, reports, capacities or academic context invalidate approval. Unapplied stale batches can be cancelled and replaced.

@@ -29,7 +29,10 @@ describe.skipIf(!enabled)('promotion and year rollover (PostgreSQL)',{timeout:60
   await expect(service.preview('other-school',plan())).rejects.toThrow();
   await expect(service.preview(schoolId,{...plan(),policy:{...plan().policy,requiresPublishedReport:true}})).rejects.toThrow(/published final-term report/);
   await db.class.update({where:{id:nextClass},data:{capacity:0}});await expect(service.preview(schoolId,plan())).rejects.toThrow(/capacity/);await db.class.update({where:{id:nextClass},data:{capacity:2}});
-  expect((await service.preview(schoolId,plan())).studentCount).toBe(3);expect(await db.promotionRecord.count({where:{schoolId}})).toBe(0);
+  expect((await service.preview(schoolId,plan())).studentCount).toBe(3);
+  await db.enrollment.updateMany({where:{academicYearId:oldYear},data:{status:'COMPLETED'}});
+  expect((await service.preview(schoolId,plan())).studentCount).toBe(3);
+  await db.enrollment.updateMany({where:{academicYearId:oldYear},data:{status:'ACTIVE'}});expect(await db.promotionRecord.count({where:{schoolId}})).toBe(0);
  });
  it('rejects stale reviews and self-approval and supports cancelling stale batches',async()=>{
   const batch=await service.submit(schoolId,maker,plan());

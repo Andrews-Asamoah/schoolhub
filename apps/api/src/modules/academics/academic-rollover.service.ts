@@ -17,7 +17,7 @@ export class AcademicRolloverService{
  }
  async cohort(schoolId:string,yearId:string,termId:string){
   const term=await this.prisma.client.term.findFirst({where:{id:termId,academicYearId:yearId,academicYear:{schoolId}}});if(!term)throw new NotFoundException('Source term not found.');
-  return this.prisma.client.enrollment.findMany({where:{academicYearId:yearId,termId,status:'ACTIVE',class:{schoolId},student:{schoolId,status:'ACTIVE',deletedAt:null}},select:{id:true,studentId:true,classId:true,student:{select:{admissionNumber:true,profile:{select:{firstName:true,lastName:true}}}},class:{select:{name:true,level:true,isGraduatingClass:true,nextPromotionClassId:true}}},orderBy:{studentId:'asc'},take:2001});
+  return this.prisma.client.enrollment.findMany({where:{academicYearId:yearId,termId,status:{in:['ACTIVE','COMPLETED']},class:{schoolId},student:{schoolId,status:'ACTIVE',deletedAt:null}},select:{id:true,studentId:true,classId:true,student:{select:{admissionNumber:true,profile:{select:{firstName:true,lastName:true}}}},class:{select:{name:true,level:true,isGraduatingClass:true,nextPromotionClassId:true}}},orderBy:{studentId:'asc'},take:2001});
  }
  private async evidence(tx:Prisma.TransactionClient,schoolId:string,plan:RolloverPlan){
   const years=await tx.academicYear.findMany({where:{schoolId},include:{terms:{orderBy:{startDate:'asc'}}},orderBy:{id:'asc'}});
@@ -26,7 +26,7 @@ export class AcademicRolloverService{
   if(years.some(year=>year.startDate>source.startDate&&year.startDate<target.startDate))throw new ConflictException('Do not skip an intervening academic year.');
   if(source.terms.at(-1)?.id!==plan.fromTermId||target.terms[0]?.id!==plan.toTermId)throw new BadRequestException('Use the final source term and the first target term.');
   if(!source.isCurrent||target.isCurrent)throw new ConflictException('The source year must still be current; the target must not be current.');
-  const cohort=await tx.enrollment.findMany({where:{academicYearId:source.id,termId:plan.fromTermId,status:'ACTIVE',student:{schoolId,status:'ACTIVE',deletedAt:null}},include:{student:{include:{profile:{select:{firstName:true,lastName:true}}}},class:true},orderBy:{studentId:'asc'}});
+  const cohort=await tx.enrollment.findMany({where:{academicYearId:source.id,termId:plan.fromTermId,status:{in:['ACTIVE','COMPLETED']},student:{schoolId,status:'ACTIVE',deletedAt:null}},include:{student:{include:{profile:{select:{firstName:true,lastName:true}}}},class:true},orderBy:{studentId:'asc'}});
   if(cohort.length>2000||cohort.length!==plan.decisions.length||cohort.some(enrollment=>!plan.decisions.some(row=>row.studentId===enrollment.studentId)))throw new ConflictException('Provide one reviewed decision for every active final-term enrolment (maximum 2000 per rollover).');
   if(cohort.some(row=>row.class.schoolId!==schoolId||(row.class.academicYearId&&row.class.academicYearId!==source.id)))throw new ConflictException('Source class ownership or academic-year scope is inconsistent.');
   const ids=cohort.map(row=>row.studentId);
