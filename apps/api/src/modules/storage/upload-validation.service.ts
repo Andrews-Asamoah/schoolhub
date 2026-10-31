@@ -10,13 +10,19 @@ const FORBIDDEN_PDF_KEYS = new Set(["JS", "JavaScript", "OpenAction", "AA", "Emb
 
 @Injectable()
 export class UploadValidationService {
-  async image(buffer: Buffer) {
+  async image(buffer: Buffer, purpose: "document" | "profile" | "logo" = "document") {
     if (!buffer.length || buffer.length > MAX_BYTES || !sniffImage(buffer)) throw new BadRequestException("Choose a JPEG, PNG or WebP image within the upload limit.");
     try {
       // Decode actual pixels; remove trailing payloads, animation and metadata.
-      const output = await sharp(buffer, { limitInputPixels: 16_000_000, animated: false, failOn: "warning" }).rotate().png().toBuffer();
+      const decoded = sharp(buffer, { limitInputPixels: 16_000_000, animated: false, failOn: "warning" }).rotate();
+      const isWebp = purpose !== "document";
+      const size = purpose === "logo" ? 1024 : 512;
+      const output = await (isWebp
+        ? decoded.resize({ width: size, height: size, fit: "inside", withoutEnlargement: true })
+          .webp(purpose === "logo" ? { lossless: true, effort: 4 } : { quality: 82, effort: 4 })
+        : decoded.png()).toBuffer();
       if (output.length > MAX_BYTES) throw new Error("Image too large");
-      return { buffer: output, mime: "image/png", ext: "png" };
+      return { buffer: output, mime: isWebp ? "image/webp" : "image/png", ext: isWebp ? "webp" : "png" };
     } catch {
       throw new BadRequestException("The image is invalid or exceeds the image size limit.");
     }
