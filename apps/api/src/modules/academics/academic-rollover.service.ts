@@ -1,10 +1,9 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
-import { createHash } from "node:crypto";
+import { rolloverHash as hash } from "./rollover-hash.js";
 import { PrismaService } from "../../prisma/prisma.service.js";
 import { withSerializableRetry } from "../finance/finance.helpers.js";
 import type { RolloverPlan } from "./rollover-policy.js";
-const hash=(data:unknown)=>createHash('sha256').update(JSON.stringify(data)).digest('hex');
 const day=(date:Date)=>date.toISOString().slice(0,10);
 const json=(value:unknown)=>JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue;
 @Injectable()
@@ -72,7 +71,7 @@ export class AcademicRolloverService{
   if(await this.used(tx,schoolId,plan,result.cohort.map(row=>row.studentId)))throw new ConflictException('Target-term student records already exist. Resolve them before rollover.');
   const before=json(result.evidence);
   for(const decision of plan.decisions){const old=result.cohort.find(row=>row.studentId===decision.studentId)!;
-   await tx.enrollment.updateMany({where:{studentId:old.studentId,academicYearId:plan.fromYearId,status:'ACTIVE'},data:{status:'COMPLETED',completedAt:new Date(),effectiveTo:result.source.endDate}});
+   for(const placement of result.evidence.sourceEnrollments.filter(item=>item.studentId===old.studentId&&item.status==='ACTIVE'))await tx.enrollment.update({where:{id:placement.id},data:{status:'COMPLETED',completedAt:new Date(),effectiveTo:placement.effectiveTo??result.source.terms.find(term=>term.id===placement.termId)?.endDate??result.source.endDate}});
    if(decision.action==='GRADUATED')await tx.student.update({where:{id:old.studentId},data:{status:'GRADUATED',classId:null,graduationDate:result.source.endDate}});
    else{const destination=result.classes.find(item=>item.id===decision.toClassId)!;await tx.enrollment.create({data:{studentId:old.studentId,classId:destination.id,academicYearId:plan.toYearId,termId:plan.toTermId,status:'ACTIVE',effectiveFrom:effective}});await tx.student.update({where:{id:old.studentId},data:{classId:destination.id,departmentId:destination.departmentId}});}
    await tx.promotionRecord.create({data:{schoolId,studentId:old.studentId,fromClassId:old.classId,toClassId:decision.toClassId,fromYearId:plan.fromYearId,toYearId:decision.action==='GRADUATED'?null:plan.toYearId,promotionType:decision.action,promotedById:actorId,reason:decision.reason,notes:`${plan.policy.name} (${plan.policy.version})`,rolloverBatchId:id}});
