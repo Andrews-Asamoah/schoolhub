@@ -1,3 +1,4 @@
+import { SchoolSmsAccountPanel } from "@/components/school/school-sms-account-panel";
 import { authClient, useSession } from "@/lib/auth-client";
 import { useState, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -7,6 +8,7 @@ import { apiFetch } from "@/lib/api";
 
 type Preferences = { emailEnabled: boolean; smsEnabled: boolean };
 type Settings = Preferences & {
+  smsConnectionId?: string | null;
   emailDailyLimit: number;
   smsDailyLimit: number;
   providers?: { resend: boolean; hubtel: boolean };
@@ -65,7 +67,7 @@ function ChannelForm({
           {school ? "Enable school email" : "Email me school alerts"}
         </label>
         <label className="flex items-center gap-2 text-sm">
-          <input type="checkbox" name="sms" defaultChecked={value.smsEnabled} />
+          <input type="checkbox" name="sms" defaultChecked={value.smsEnabled} disabled={!!school && "smsConnectionId" in value && !value.smsConnectionId} />
           {school ? "Enable school SMS" : "Text me school alerts"}
         </label>
       </div>
@@ -242,6 +244,7 @@ export function NotificationDeliveryWorkspace() {
           </p>
         )}
       </section>
+      {admin && <SchoolSmsAccountPanel scopeKey={activeOrganization?.id??""} />}
       {admin && (
         <section className={panelStyle}>
           <h2 className="text-sm font-semibold">School delivery controls</h2>

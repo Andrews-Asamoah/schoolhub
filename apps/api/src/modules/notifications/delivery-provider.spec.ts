@@ -14,6 +14,12 @@ const config = {
   HUBTEL_CLIENT_SECRET: 'test-secret',
   HUBTEL_SENDER_ID: 'SchoolHub',
 };
+const schoolSms = {
+  clientId: 'test-id',
+  clientSecret: 'test-secret',
+  senderId: 'SchoolHub',
+  apiBaseUrl: 'https://smsc.hubtel.com/v1/messages' as const,
+};
 const email = deliveryPayload(
   'EMAIL',
   'user@example.test',
@@ -42,6 +48,29 @@ describe('notification provider contracts', () => {
         HUBTEL_SENDER_ID: 'Unapproved sender',
       }).configured('SMS'),
     ).toBe(false);
+  });
+  it('does not use platform environment credentials for school SMS', async () => {
+    const request = vi.fn();
+    const provider = new DeliveryProvider(request, config);
+    expect(provider.configured('SMS')).toBe(false);
+    expect(await provider.send('SMS', 'unscoped', sms)).toEqual({
+      state: 'FAILED',
+      reason: 'SCHOOL_SMS_ACCOUNT_REQUIRED',
+    });
+    expect(request).not.toHaveBeenCalled();
+  });
+  it('rejects a sender from another school before contacting Hubtel', async () => {
+    const request = vi.fn();
+    const provider = new DeliveryProvider(request, config);
+    expect(
+      (
+        await provider.send('SMS', 'mismatch', sms, {
+          ...schoolSms,
+          senderId: 'OtherSchool',
+        })
+      ).state,
+    ).toBe('FAILED');
+    expect(request).not.toHaveBeenCalled();
   });
   it('normalizes Ghana mobile numbers and rejects short, foreign and injected contacts', () => {
     expect(ghanaPhone('024 123 4567')).toBe('+233241234567');
@@ -103,7 +132,7 @@ describe('notification provider contracts', () => {
         ),
       );
     const provider = new DeliveryProvider(request, config);
-    expect(await provider.send('SMS', 'delivery-1', sms)).toEqual({
+    expect(await provider.send('SMS', 'delivery-1', sms, schoolSms)).toEqual({
       state: 'ACCEPTED',
       messageId: 'sms-1',
     });
@@ -115,8 +144,8 @@ describe('notification provider contracts', () => {
       to: '+233241234567',
       content: sms.text,
     });
-    expect(await provider.smsStatus('sms-1')).toBe('DELIVERED');
-    expect(await provider.smsStatus('sms-1')).toBe('UNKNOWN');
+    expect(await provider.smsStatus('sms-1', schoolSms)).toBe('DELIVERED');
+    expect(await provider.smsStatus('sms-1', schoolSms)).toBe('UNKNOWN');
     expect(request.mock.calls[1][1].headers.Authorization).toBe(
       'Basic ' + Buffer.from('test-id:test-secret').toString('base64'),
     );
@@ -126,7 +155,9 @@ describe('notification provider contracts', () => {
     async (status) => {
       const request = vi.fn().mockResolvedValue(new Response('{}', { status }));
       const provider = new DeliveryProvider(request, config);
-      expect((await provider.send('SMS', 'd', sms)).state).toBe('UNKNOWN');
+      expect((await provider.send('SMS', 'd', sms, schoolSms)).state).toBe(
+        'UNKNOWN',
+      );
       expect((await provider.send('EMAIL', 'd', email)).state).toBe('RETRY');
     },
   );
@@ -138,13 +169,21 @@ describe('notification provider contracts', () => {
     ] as const) {
       const request = vi.fn().mockResolvedValue(new Response('{}', { status }));
       expect(
-        (await new DeliveryProvider(request, config).send('SMS', 'd', sms))
-          .state,
+        (
+          await new DeliveryProvider(request, config).send(
+            'SMS',
+            'd',
+            sms,
+            schoolSms,
+          )
+        ).state,
       ).toBe(state);
     }
     const request = vi.fn().mockRejectedValue(new Error('timeout'));
     const provider = new DeliveryProvider(request, config);
-    expect((await provider.send('SMS', 'd', sms)).state).toBe('UNKNOWN');
+    expect((await provider.send('SMS', 'd', sms, schoolSms)).state).toBe(
+      'UNKNOWN',
+    );
     expect((await provider.send('EMAIL', 'd', email)).state).toBe('RETRY');
   });
   it('rejects arbitrary endpoint overrides without making a request', async () => {
@@ -153,7 +192,14 @@ describe('notification provider contracts', () => {
       ...config,
       HUBTEL_SMS_BASE_URL: 'https://evil.example/v1/messages',
     });
-    expect((await provider.send('SMS', 'd', sms)).state).toBe('UNKNOWN');
+    expect(
+      (
+        await provider.send('SMS', 'd', sms, {
+          ...schoolSms,
+          apiBaseUrl: 'https://evil.example/v1/messages',
+        } as never)
+      ).state,
+    ).toBe('UNKNOWN');
     expect(provider.configured('SMS')).toBe(false);
     expect(request).not.toHaveBeenCalled();
   });

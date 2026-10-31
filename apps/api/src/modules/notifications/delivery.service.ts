@@ -1,3 +1,4 @@
+import { SchoolSmsService } from './school-sms.service.js';
 import { evaluateSubscriptionAccess } from '@schoolhub/shared';
 import {
   BadRequestException,
@@ -40,13 +41,10 @@ export class NotificationDeliveryService
     private readonly prisma: PrismaService,
     private readonly jobs: DurableJobsService,
     private readonly transport: NotificationTransport,
+    private readonly sms: SchoolSmsService,
   ) {}
   onApplicationBootstrap() {
-    if (
-      process.env.NODE_ENV === 'test' ||
-      process.env.NOTIFICATION_DELIVERY_ENABLED !== 'true'
-    )
-      return;
+    if (process.env.NODE_ENV === 'test') return;
     const poll = () => {
       void this.tick().catch(() =>
         this.logger.error('notification.delivery.poll.failed'),
@@ -60,12 +58,17 @@ export class NotificationDeliveryService
     if (this.timer) clearInterval(this.timer);
   }
   async tick(now = new Date()) {
-    if (this.running || process.env.NOTIFICATION_DELIVERY_ENABLED !== 'true')
-      return;
+    if (this.running) return;
     this.running = true;
     try {
+      await this.sms.eraseRetired(now);
+      if (process.env.NOTIFICATION_DELIVERY_ENABLED !== 'true') return;
+      await this.prisma.client
+        .$executeRaw`UPDATE background_jobs j SET status='SUCCEEDED',"completedAt"=CURRENT_TIMESTAMP,"updatedAt"=CURRENT_TIMESTAMP FROM notification_deliveries d WHERE d.id=j.id AND j.kind='notification-delivery' AND j.status='PENDING' AND d.status NOT IN ('PENDING','SENDING')`;
       const channels = ['EMAIL', 'SMS'].filter((channel) =>
-        this.transport.configured(channel),
+        channel === 'SMS'
+          ? this.sms.encryptionReady()
+          : this.transport.configured(channel),
       );
       const pending = channels.length
         ? await this.prisma.client.$queryRaw<
@@ -78,7 +81,11 @@ export class NotificationDeliveryService
             where: { id: job.id },
             select: { channel: true },
           });
-        if (!delivery || !this.transport.configured(delivery.channel)) continue;
+        if (
+          !delivery ||
+          (delivery.channel === 'EMAIL' && !this.transport.configured('EMAIL'))
+        )
+          continue;
         await this.jobs.run(job.id, async () => this.dispatch(job.id), now);
       }
       const dead = await this.prisma.client.$queryRaw<
@@ -95,7 +102,7 @@ export class NotificationDeliveryService
         });
       }
       await this.processEvents();
-      if (this.transport.configured('SMS')) {
+      if (this.sms.encryptionReady()) {
         const accepted = await this.prisma.client.notificationDelivery.findMany(
           {
             where: {
@@ -123,7 +130,16 @@ export class NotificationDeliveryService
             });
             continue;
           }
-          const state = await this.transport.smsStatus(row.providerMessageId!);
+          const credentials = await this.sms.resolve(
+            row.schoolId,
+            row.smsConnectionId,
+          );
+          const state = credentials
+            ? await this.transport.smsStatus(
+                row.providerMessageId!,
+                credentials,
+              )
+            : 'UNKNOWN';
           await this.prisma.client.notificationDelivery.updateMany({
             where: { id: row.id, status: 'ACCEPTED' },
             data: {
@@ -245,7 +261,23 @@ export class NotificationDeliveryService
         });
         return null;
       }
-      if (!this.transport.configured(row.channel))
+      const smsCredentials = email
+        ? undefined
+        : await this.sms.resolve(row.schoolId, row.smsConnectionId, tx);
+      if (
+        !email &&
+        (!smsCredentials || row.smsConnectionId !== settings?.smsConnectionId)
+      ) {
+        await tx.notificationDelivery.update({
+          where: { id },
+          data: {
+            status: 'SUPPRESSED',
+            reason: 'SMS_ACCOUNT_MISSING_OR_CHANGED',
+          },
+        });
+        return null;
+      }
+      if (!this.transport.configured(row.channel, smsCredentials ?? undefined))
         throw new Error('Provider not configured');
       const today = new Date(new Date().toISOString().slice(0, 10));
       if (!row.quotaDay || row.quotaDay.getTime() !== today.getTime()) {
@@ -279,11 +311,11 @@ export class NotificationDeliveryService
         deliveryPayload(
           row.channel,
           recipient!,
-          email
-            ? process.env.RESEND_FROM_EMAIL!
-            : process.env.HUBTEL_SENDER_ID!,
+          email ? process.env.RESEND_FROM_EMAIL! : smsCredentials!.senderId,
           process.env.WEB_ORIGIN!,
         );
+      if (!email && !row.payload)
+        payload.text = `${smsCredentials!.senderId}: A school update is available. Sign in to view it.`;
       await tx.notificationDelivery.update({
         where: { id },
         data: {
@@ -295,13 +327,14 @@ export class NotificationDeliveryService
           reason: null,
         },
       });
-      return { channel: row.channel, payload };
+      return { channel: row.channel, payload, smsCredentials };
     });
     if (!prepared) return;
     const result = await this.transport.send(
       prepared.channel,
       id,
       prepared.payload,
+      prepared.smsCredentials ?? undefined,
     );
     if (result.state === 'ACCEPTED') {
       await this.prisma.client.notificationDelivery.updateMany({
@@ -384,8 +417,9 @@ export class NotificationDeliveryService
         if (fresh.processedAt) return;
         const delivery = await tx.notificationDelivery.findUnique({
           where: {
-            provider_providerMessageId: {
+            provider_providerScope_providerMessageId: {
               provider: 'RESEND',
+              providerScope: 'platform',
               providerMessageId: event.messageId,
             },
           },
@@ -459,12 +493,24 @@ export class NotificationDeliveryService
       })) ?? {
         emailEnabled: false,
         smsEnabled: false,
+        smsConnectionId: null,
         emailDailyLimit: 0,
         smsDailyLimit: 0,
       }),
       providers: {
         resend: this.transport.configured('EMAIL'),
-        hubtel: this.transport.configured('SMS'),
+        hubtel: this.transport.configured(
+          'SMS',
+          (await this.sms.resolve(
+            schoolId,
+            (
+              await this.prisma.client.schoolNotificationSettings.findUnique({
+                where: { schoolId },
+                select: { smsConnectionId: true },
+              })
+            )?.smsConnectionId,
+          )) ?? undefined,
+        ),
       },
     };
   }
@@ -479,6 +525,17 @@ export class NotificationDeliveryService
     },
   ) {
     return this.prisma.client.$transaction(async (tx) => {
+      if (input.smsEnabled) {
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('school-sms'),hashtext(${schoolId}))`;
+        const current = await tx.schoolNotificationSettings.findUnique({
+          where: { schoolId },
+          select: { smsConnectionId: true },
+        });
+        if (!(await this.sms.resolve(schoolId, current?.smsConnectionId, tx)))
+          throw new BadRequestException(
+            "Connect this school's Hubtel account before enabling SMS.",
+          );
+      }
       const settings = await tx.schoolNotificationSettings.upsert({
         where: { schoolId },
         create: { schoolId, ...input },

@@ -1,3 +1,5 @@
+import { SchoolSmsFields, emptySchoolSms } from "@/components/school/school-sms-fields";
+import { schoolHubtelConnectionSchema } from "@schoolhub/shared";
 import { useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { useMutation } from "@tanstack/react-query";
@@ -47,6 +49,8 @@ export function EnrollSchoolForm() {
     adminEmail: "",
   });
 
+  const [includeSms, setIncludeSms] = useState(false);
+  const [sms, setSms] = useState(emptySchoolSms);
   const [issued, setIssued] = useState<CredentialEntry[]>([]);
   const mutation = useMutation({
     mutationFn: (data: EnrollSchoolInput) =>
@@ -55,6 +59,9 @@ export function EnrollSchoolForm() {
         body: JSON.stringify(data),
       }),
     onSuccess: (result) => {
+      setSms(emptySchoolSms());
+      setIncludeSms(false);
+      mutation.reset();
       setSubmitError(null);
       setSuccessMsg("School enrolled successfully!");
       // Navigation waits until the one-time credentials have been saved.
@@ -96,6 +103,7 @@ export function EnrollSchoolForm() {
     if (form.schoolEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.schoolEmail)) errs.schoolEmail = "Invalid email";
     if (!form.adminName || form.adminName.length < 2) errs.adminName = "Admin name must be at least 2 characters";
     if (!form.adminEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.adminEmail)) errs.adminEmail = "Valid email required";
+    if (includeSms) { const parsed = schoolHubtelConnectionSchema.safeParse(sms); if (!parsed.success) errs.smsConnection = parsed.error.issues[0]?.message; }
     setErrors(errs);
     return Object.keys(errs).length === 0;
   }
@@ -111,6 +119,7 @@ export function EnrollSchoolForm() {
       schoolPhone: form.schoolPhone || undefined,
       schoolAddress: form.schoolAddress || undefined,
       region: form.region || undefined,
+      smsConnection: includeSms ? sms : undefined,
     };
     mutation.mutate(payload);
   }
@@ -265,6 +274,7 @@ export function EnrollSchoolForm() {
         </p>
       </section>
 
+      <section className="space-y-4 rounded-2xl border border-border bg-card p-6 shadow-sm"><h2 className="text-base font-semibold text-foreground">School-funded SMS (optional)</h2><p className="text-xs leading-5 text-muted-foreground">Connect this school's Hubtel account and approved sender name. The school tops up its own Programmable SMS credit in Hubtel. SMS starts disabled; the owner enables it with a daily limit after enrollment. Details can also be added later.</p><label className="flex items-center gap-2 text-sm text-foreground"><input type="checkbox" checked={includeSms} onChange={event=>setIncludeSms(event.target.checked)} />Configure this school's Hubtel account now</label>{includeSms&&<SchoolSmsFields value={sms} onChange={setSms} disabled={mutation.isPending}/>} {errors.smsConnection&&<p role="alert" className="text-xs text-destructive">{errors.smsConnection}</p>}</section>
       {/* Actions */}
       <div className="flex items-center justify-end gap-3">
         <button

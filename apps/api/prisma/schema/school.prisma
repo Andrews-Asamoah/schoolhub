@@ -3,6 +3,7 @@
 // ============================================================================
 
 model School {
+  smsConnections SchoolSmsConnection[]
   notificationSettings SchoolNotificationSettings?
   notificationPreferences NotificationPreference[]
   notificationDeliveries NotificationDelivery[]

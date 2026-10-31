@@ -1,0 +1,33 @@
+# School-funded Hubtel SMS
+
+Each school connects a Hubtel Programmable SMS account and approved sender ID. Messages use that school's credentials and consume credit from the Hubtel account associated with those keys. A sender name alone does not create a separate credit balance. Schools that need separate funding must use keys linked to their own funded SMS account. Resend email and password recovery retain their existing platform email configuration.
+
+## Operator setup
+
+1. Apply `pnpm --filter @schoolhub/api migrate:deploy` before starting the new API. This adds versioned school SMS connections, account-scoped provider IDs and tenant foreign-key controls. SMS on existing schools is disabled until their own account is connected. Pending legacy/unscoped SMS is suppressed; uncertain or previously accepted legacy SMS stays unknown and is never resent using a different account.
+2. Generate a random 32-byte key using `openssl rand -base64 32`. Store it as `SCHOOL_SMS_ENCRYPTION_KEY` in the API's deployment secret manager, never in Git or web/Vite variables. Keep an encrypted, separate backup of this key; restoring the database alone cannot decrypt provider credentials. The application remains usable without this key, but new school SMS credentials cannot be saved and SMS fails closed.
+3. Keep `NOTIFICATION_DELIVERY_ENABLED=false` during initial setup. Platform `HUBTEL_CLIENT_ID`, `HUBTEL_CLIENT_SECRET`, `HUBTEL_SENDER_ID` and `HUBTEL_SMS_BASE_URL` are no longer used for school SMS. There is no shared-wallet fallback. Even if those environment variables are set, an unscoped send cannot use them.
+4. To rotate encryption keys, configure the new current key and retain the old key as `SCHOOL_SMS_PREVIOUS_ENCRYPTION_KEY`. Schools replace their connections to encrypt them with the new key. Retain the previous key until all active connections using it have been replaced and retired receipt-tracking versions have drained. Each encrypted envelope carries a key fingerprint; do not remove a required key blindly. Provider key rotation is separate from server encryption-key rotation.
+
+## School setup and funding
+
+- The SuperAdmin can optionally enter the school's Hubtel details while enrolling a school, or manage them under **School details → Overview → School-funded SMS**. School owners/admins can manage their own connection under **Notifications → School-funded SMS**. Headteachers, accountants, teachers, guardians and students cannot read or change provider settings unless they have an explicit owner/admin role.
+- Enter the approved sender ID (1–11 letters/numbers), Client ID and Client secret from **SMS API Keys**, and choose the endpoint host shown in Hubtel. Supported live bases are `https://sms.hubtel.com/v1/messages` and `https://smsc.hubtel.com/v1/messages`. Enter individual fields; never paste a full URL containing credentials.
+- Open **Top up in Hubtel** and fund the school's Programmable SMS credit/API account in Hubtel. A merchant wallet balance alone may not fund SMS. SchoolHub does not collect or hold the school's SMS money, initiate top-ups, display an unverified balance, or automatically charge platform credit. Hubtel manages purchases, balance and provider billing.
+- Saving validates format and securely stores configuration; it does not verify ownership/approval with Hubtel or send a message. The full Client ID and secret are never returned by the API; only the sender, a masked Client ID hint, endpoint and readiness metadata are shown. Existing secrets must be re-entered when replacing a connection.
+- Saving always leaves school SMS disabled. An owner/admin then sets a nonzero **Daily SMS limit (UTC)** and enables school SMS. The server global delivery switch must also be enabled, and recipients must opt in to SMS. Quotas count send reservations; they are not Hubtel credit balances. Top-up does not reset the SchoolHub daily limit.
+- After configuration, publish a new notification to consenting test recipients and verify the sender, credit debit and receipt in the correct Hubtel account before production acceptance. Automated tests never send live SMS or use customer secrets.
+
+## Isolation, rotation and disconnect
+
+Every new SMS outbox row is pinned to the school's current immutable connection version in the notification transaction. Composite foreign keys prevent a school or delivery from referencing another school's connection. Provider IDs are scoped to the connection, so the same provider message ID in two accounts cannot collide or confirm the wrong delivery.
+
+Credentials use AES-256-GCM authenticated encryption bound to school ID and connection version. Decryption happens only on the server. Plaintext credentials are not stored in notification payloads, job payloads, audit records or API responses. Audit records identify the actor, school, sender, endpoint and connection change without storing secrets. Do not enable body logging or form/session replay capture for credential-entry endpoints and screens.
+
+Replacing a connection creates a new version, disables school SMS, and keeps earlier versions only for outstanding receipt tracking. Pending messages from an older version are suppressed rather than moved to another account or sender. Messages already in flight may complete using the original account. Accepted messages are polled with their original account's credentials, including after replacement. The server stops receipt polling after seven days and erases retired secrets after eight days. Retired-secret cleanup continues while external delivery is switched off; keep an API instance running for cleanup. Non-secret version metadata remains linked to delivery/audit history.
+
+Disconnecting disables SMS, clears the active pointer and erases all saved credential versions for that school immediately. Queued messages are suppressed; in-flight/accepted messages without final receipts become unknown and are not resent. Receipt polling stops. This does not revoke API keys inside Hubtel; revoke exposed or compromised provider keys in Hubtel as well. Another school's connection remains unchanged.
+
+If encryption keys or provider credentials are unavailable, no other school's or platform credentials are substituted. Restore the correct key or save replacement credentials, then explicitly enable SMS. Expired/suppressed historical notifications are not backfilled automatically.
+
+Primary references: [Hubtel SMS API](https://docs-developers.hubtel.com/), [Hubtel SMS account funding](https://news.hubtel.com/tag/product-information/). Menus can change; use the current SMS API key details and Programmable SMS balance shown in the school's Hubtel dashboard.

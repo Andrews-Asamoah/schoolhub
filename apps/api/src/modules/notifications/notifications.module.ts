@@ -1,3 +1,4 @@
+import { SchoolSmsModule } from "./school-sms.module.js";
 import { NotificationDeliveryAdminGuard, NotificationDeliveryController, ResendWebhookController } from "./delivery.controller.js";
 import { NotificationDeliveryService, NotificationTransport } from "./delivery.service.js";
 import { Module } from "@nestjs/common";
@@ -8,7 +9,7 @@ import { NotificationsController } from "./notifications.controller.js";
 import { NotificationsService } from "./notifications.service.js";
 
 @Module({
-  imports: [PrismaModule],
+  imports: [PrismaModule, SchoolSmsModule],
   controllers: [NotificationDeliveryController, ResendWebhookController, NotificationsController],
   providers: [NotificationDeliveryAdminGuard, NotificationDeliveryService, NotificationTransport, NotificationsService, SchoolTenantGuard, RolesGuard],
 })
