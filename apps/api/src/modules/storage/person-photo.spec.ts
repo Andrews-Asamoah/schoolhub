@@ -1,4 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
+vi.mock("../../env.js", () => ({ env: {} }));
+
 import { AssetsService } from "./assets.service.js";
 
 describe("managed person photos", () => {
