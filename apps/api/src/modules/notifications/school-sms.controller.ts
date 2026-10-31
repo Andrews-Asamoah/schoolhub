@@ -6,6 +6,8 @@ import {
   Header,
   Param,
   Put,
+  Query,
+  ForbiddenException,
   UseGuards,
 } from '@nestjs/common';
 import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
@@ -37,21 +39,36 @@ export class SchoolSmsController {
   constructor(private readonly sms: SchoolSmsService) {}
   @Get() @Header('Cache-Control', 'no-store') status(
     @CurrentSchool() school: School,
+    @Query('organizationId') expectedOrganization: string | undefined,
   ) {
+    if (expectedOrganization !== school.organizationId)
+      throw new ForbiddenException(
+        'School SMS context changed. Reload the selected school and try again.',
+      );
     return this.sms.status(school.id);
   }
   @Put() @Header('Cache-Control', 'no-store') save(
     @CurrentSchool() school: School,
+    @Query('organizationId') expectedOrganization: string | undefined,
     @AuditActorParam() actor: AuditActor,
     @Body(new ZodValidationPipe(schoolHubtelConnectionSchema))
     input: SchoolHubtelConnectionInput,
   ) {
+    if (expectedOrganization !== school.organizationId)
+      throw new ForbiddenException(
+        'School SMS context changed. Reload the selected school and try again.',
+      );
     return this.sms.save(school.id, actor, input);
   }
   @Delete() @Header('Cache-Control', 'no-store') disconnect(
     @CurrentSchool() school: School,
+    @Query('organizationId') expectedOrganization: string | undefined,
     @AuditActorParam() actor: AuditActor,
   ) {
+    if (expectedOrganization !== school.organizationId)
+      throw new ForbiddenException(
+        'School SMS context changed. Reload the selected school and try again.',
+      );
     return this.sms.disconnect(school.id, actor);
   }
 }

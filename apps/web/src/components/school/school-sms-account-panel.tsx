@@ -24,6 +24,25 @@ export function SchoolSmsAccountPanel({
   endpoint?: string;
   scopeKey: string;
 }) {
+  return (
+    <SchoolSmsAccountWorkspace
+      key={scopeKey + ":" + endpoint}
+      endpoint={endpoint}
+      scopeKey={scopeKey}
+    />
+  );
+}
+function SchoolSmsAccountWorkspace({
+  endpoint = "/notifications/delivery/sms-account",
+  scopeKey,
+}: {
+  endpoint?: string;
+  scopeKey: string;
+}) {
+  const scopedEndpoint =
+    endpoint === "/notifications/delivery/sms-account"
+      ? endpoint + "?organizationId=" + encodeURIComponent(scopeKey)
+      : endpoint;
   const client = useQueryClient(),
     [editing, setEditing] = useState(false),
     [confirmDisconnect, setConfirmDisconnect] = useState(false),
@@ -32,8 +51,9 @@ export function SchoolSmsAccountPanel({
     [validation, setValidation] = useState("");
   const query = useQuery({
     queryKey: ["school-sms-account", scopeKey, endpoint],
-    queryFn: () => apiFetch<SmsStatus>(endpoint),
+    queryFn: () => apiFetch<SmsStatus>(scopedEndpoint),
     retry: false,
+    enabled: !!scopeKey,
   });
   const refresh = async () => {
     await Promise.all([
@@ -44,7 +64,7 @@ export function SchoolSmsAccountPanel({
   const save = useMutation({
     gcTime: 0,
     mutationFn: (input: SchoolHubtelConnectionInput) =>
-      apiFetch<SmsStatus>(endpoint, {
+      apiFetch<SmsStatus>(scopedEndpoint, {
         method: "PUT",
         body: JSON.stringify(input),
       }),
@@ -59,7 +79,7 @@ export function SchoolSmsAccountPanel({
     },
   });
   const remove = useMutation({
-    mutationFn: () => apiFetch(endpoint, { method: "DELETE" }),
+    mutationFn: () => apiFetch(scopedEndpoint, { method: "DELETE" }),
     onSuccess: async () => {
       setConfirmDisconnect(false);
       setEditing(false);

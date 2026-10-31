@@ -64,12 +64,10 @@ describe.skipIf(!enabled)(
       configured: vi.fn(
         (channel: string, auth?: unknown) => channel === 'EMAIL' || !!auth,
       ),
-      send: vi
-        .fn()
-        .mockImplementation(async () => ({
-          state: 'ACCEPTED',
-          messageId: 'sms-' + ++seq,
-        })),
+      send: vi.fn().mockImplementation(async () => ({
+        state: 'ACCEPTED',
+        messageId: 'sms-' + ++seq,
+      })),
       smsStatus: vi.fn().mockResolvedValue('DELIVERED'),
     };
     const actor = (id: string) => ({ id, ipAddress: null, userAgent: null });
@@ -195,7 +193,11 @@ describe.skipIf(!enabled)(
     });
     it('stores encrypted school keys and returns only masked metadata, with audited connection changes', async () => {
       const response = await request(app.getHttpServer())
-        .put('/api/notifications/delivery/sms-account')
+        .put(
+          '/api/notifications/delivery/sms-account?organizationId=' +
+            run +
+            '-a',
+        )
         .set('x-test-user', ownerA)
         .send(configA)
         .expect(200);
@@ -243,19 +245,35 @@ describe.skipIf(!enabled)(
     });
     it('blocks cross-school, unauthenticated, headteacher and forged administrative access', async () => {
       await request(app.getHttpServer())
-        .get('/api/notifications/delivery/sms-account')
+        .get(
+          '/api/notifications/delivery/sms-account?organizationId=' +
+            run +
+            '-a',
+        )
         .expect(401);
       await request(app.getHttpServer())
-        .get('/api/notifications/delivery/sms-account')
+        .get(
+          '/api/notifications/delivery/sms-account?organizationId=' +
+            run +
+            '-a',
+        )
         .set('x-test-user', reader)
         .expect(403);
       await request(app.getHttpServer())
-        .put('/api/notifications/delivery/sms-account')
+        .put(
+          '/api/notifications/delivery/sms-account?organizationId=' +
+            run +
+            '-a',
+        )
         .set('x-test-user', reader)
         .send(configA)
         .expect(403);
       await request(app.getHttpServer())
-        .get('/api/notifications/delivery/sms-account')
+        .get(
+          '/api/notifications/delivery/sms-account?organizationId=' +
+            run +
+            '-a',
+        )
         .set('x-test-user', ownerA)
         .set('x-school-subdomain', run + '-b')
         .expect(403);
@@ -274,8 +292,52 @@ describe.skipIf(!enabled)(
         .get('/api/super-admin/schools/missing/sms')
         .set('x-test-user', platform)
         .expect(404);
-      await request(app.getHttpServer()).get('/api/notifications/delivery/sms-account').set('x-test-user',reader).set('x-school-role','admin').expect(403);
-
+      await request(app.getHttpServer())
+        .get(
+          '/api/notifications/delivery/sms-account?organizationId=' +
+            run +
+            '-a',
+        )
+        .set('x-test-user', reader)
+        .set('x-school-role', 'admin')
+        .expect(403);
+    });
+    it('rejects stale account forms even when the same user owns both schools', async () => {
+      const member = run + '-multi';
+      await db.member.create({
+        data: {
+          id: member,
+          userId: ownerA,
+          organizationId: run + '-b',
+          role: 'owner',
+        },
+      });
+      try {
+        for (const method of ['get', 'put', 'delete'] as const) {
+          let req = request(app.getHttpServer())
+            [method](
+              '/api/notifications/delivery/sms-account?organizationId=' +
+                run +
+                '-a',
+            )
+            .set('x-test-user', ownerA)
+            .set('x-school-subdomain', run + '-b');
+          if (method === 'put') req = req.send(configA);
+          await req.expect(403);
+        }
+        const response = await request(app.getHttpServer())
+          .get(
+            '/api/notifications/delivery/sms-account?organizationId=' +
+              run +
+              '-b',
+          )
+          .set('x-test-user', ownerA)
+          .set('x-school-subdomain', run + '-b')
+          .expect(200);
+        expect(response.body.senderId).toBe('CampusB');
+      } finally {
+        await db.member.delete({ where: { id: member } });
+      }
     });
     it('pins each delivery to its school account, brands the sender and permits account-local provider IDs', async () => {
       const a = (await notification(schoolA, ownerA))!,
@@ -368,7 +430,11 @@ describe.skipIf(!enabled)(
     it('disconnects only the selected school, erases its versions and stops pending sends', async () => {
       const queued = (await notification(schoolB, ownerB))!;
       await request(app.getHttpServer())
-        .delete('/api/notifications/delivery/sms-account')
+        .delete(
+          '/api/notifications/delivery/sms-account?organizationId=' +
+            run +
+            '-b',
+        )
         .set('x-test-user', ownerB)
         .expect(200);
       expect((await sms.status(schoolB)).configured).toBe(false);
