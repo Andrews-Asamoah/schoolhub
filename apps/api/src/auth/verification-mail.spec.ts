@@ -1,8 +1,9 @@
+import { Logger } from '@nestjs/common';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { DeliveryProvider } from '../modules/notifications/delivery-provider.js';
 import { sendAccountVerification } from './verification-mail.js';
 describe('account verification delivery', () => {
-  afterEach(() => vi.unstubAllEnvs());
+  afterEach(() => { vi.unstubAllEnvs(); vi.restoreAllMocks(); });
   it('refuses missing configuration and exposes no credentials or provider errors', async () => {
     const transport = { emailConfigured: () => false, send: vi.fn() };
     await expect(
@@ -22,6 +23,24 @@ describe('account verification delivery', () => {
     await sendAccountVerification('user@example.test', 'https://api.example.test/api/auth/verify-email?token=synthetic-only', transport);
     expect(request).toHaveBeenCalledTimes(1);
     expect(request.mock.calls[0][0]).toBe('https://api.resend.com/emails');
+  });
+  it.each([
+    [401, 'validation_error', /API key/],
+    [403, 'validation_error', /verified sender domain/],
+    [422, 'validation_error', /sender and recipient addresses/],
+    [429, 'rate_limit_exceeded', /sending limit/],
+    [403, 'daily_quota_exceeded', /sending limit/],
+    [500, 'application_error', /temporarily unable/],
+  ] as const)('reports actionable verification failure for HTTP %s and %s', async (status, code, expected) => {
+    vi.stubEnv('RESEND_FROM_EMAIL', 'alerts@example.test');
+    const log = vi.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+    const request = vi.fn().mockResolvedValue(new Response(JSON.stringify({ name: code, message: 'private@example.test secret-token secret-key' }), { status }));
+    const transport = new DeliveryProvider(request, { RESEND_API_KEY: 'secret-key', RESEND_FROM_EMAIL: 'alerts@example.test' });
+    let message = '';
+    try { await sendAccountVerification('private@example.test', 'https://api.example.test/verify?token=secret-token', transport); } catch (error) { message = (error as Error).message; }
+    expect(message).toMatch(expected);
+    expect(JSON.stringify(log.mock.calls)).toContain('account.verification.delivery_failed');
+    expect(message + JSON.stringify(log.mock.calls)).not.toMatch(/private@example|secret-token|secret-key/);
   });
   it('sends an expiring verification link with a deterministic key and reports provider rejection', async () => {
     vi.stubEnv('RESEND_FROM_EMAIL', 'alerts@example.test');

@@ -9,7 +9,8 @@ export type DeliveryPayload = {
 };
 export type ProviderResult =
   | { state: 'ACCEPTED'; messageId: string }
-  | { state: 'RETRY' | 'FAILED' | 'UNKNOWN'; reason: string };
+  | { state: 'RETRY' | 'FAILED' | 'UNKNOWN'; reason: string; providerStatus?: number; providerCode?: string };
+const resendErrorCodes = new Set(['missing_api_key', 'invalid_api_key', 'restricted_api_key', 'authentication_error', 'authorization_error', 'validation_error', 'invalid_parameter', 'invalid_access', 'invalid_from_address', 'unprocessable_entity', 'rate_limit_exceeded', 'daily_quota_exceeded', 'monthly_quota_exceeded', 'invalid_idempotency_key', 'invalid_idempotent_request', 'concurrent_idempotent_requests', 'application_error', 'internal_server_error', 'invalid_permission', 'suspended_api_key', 'service_unavailable']);
 export function ghanaPhone(value: string): string | null {
   let phone = value.replace(/[\s()-]/g, '');
   if (/^0[25]\d{8}$/.test(phone)) phone = '+233' + phone.slice(1);
@@ -125,15 +126,22 @@ export class DeliveryProvider {
           ),
         },
       );
-      if (response.status === 429)
-        return { state: 'RETRY', reason: 'PROVIDER_RATE_LIMIT' };
-      if (!response.ok)
+      if (!response.ok) {
+        // Retain only a known provider code and numeric status. Never expose/log the
+        // response message, which can contain recipients or echoed request data.
+        let providerCode: string | undefined;
+        if (email) {
+          try {
+            const body = await response.json() as { name?: unknown };
+            if (typeof body?.name === 'string' && resendErrorCodes.has(body.name)) providerCode = body.name;
+          } catch { /* Non-JSON rejection still has a useful HTTP status. */ }
+        }
         return {
-          state:
-            response.status >= 500 ? (email ? 'RETRY' : 'UNKNOWN') : 'FAILED',
-          reason:
-            response.status >= 500 ? 'PROVIDER_UNCERTAIN' : 'PROVIDER_REJECTED',
+          state: response.status === 429 ? 'RETRY' : response.status >= 500 ? (email ? 'RETRY' : 'UNKNOWN') : 'FAILED',
+          reason: response.status === 429 ? 'PROVIDER_RATE_LIMIT' : response.status >= 500 ? 'PROVIDER_UNCERTAIN' : 'PROVIDER_REJECTED',
+          ...(email ? { providerStatus: response.status, ...(providerCode ? { providerCode } : {}) } : {}),
         };
+      }
       const data = (await response.json()) as {
         id?: unknown;
         data?: { messageId?: unknown };

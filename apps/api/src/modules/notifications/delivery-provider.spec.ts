@@ -204,6 +204,18 @@ describe('notification provider contracts', () => {
     expect(provider.configured('SMS')).toBe(false);
     expect(request).not.toHaveBeenCalled();
   });
+  it.each([401, 403, 422, 429, 500])('retains safe Resend rejection metadata for HTTP %s without returning provider text', async (status) => {
+    const request = vi.fn().mockResolvedValue(new Response(JSON.stringify({ name: 'validation_error', message: 'private-recipient@example.test https://private.test/verify?token=secret', detail: 'secret-key' }), { status }));
+    const result = await new DeliveryProvider(request, config).send('EMAIL', 'verification', email);
+    expect(result).toMatchObject({ providerStatus: status, providerCode: 'validation_error' });
+    expect(JSON.stringify(result)).not.toMatch(/private|secret/);
+  });
+  it('discards unrecognized error codes and handles non-JSON Resend rejections', async () => {
+    const request = vi.fn().mockResolvedValueOnce(new Response(JSON.stringify({ name: 'secret-token', message: 'secret-body' }), { status: 403 })).mockResolvedValueOnce(new Response('<html>secret-body</html>', { status: 502 }));
+    const provider = new DeliveryProvider(request, config);
+    expect(await provider.send('EMAIL', 'verification', email)).toEqual({ state: 'FAILED', reason: 'PROVIDER_REJECTED', providerStatus: 403 });
+    expect(await provider.send('EMAIL', 'verification', email)).toEqual({ state: 'RETRY', reason: 'PROVIDER_UNCERTAIN', providerStatus: 502 });
+  });
   it('does not downgrade delivery receipts on delayed or replayed events', () => {
     expect(advancesDelivery('DELIVERED', 'ACCEPTED')).toBe(false);
     expect(advancesDelivery('DELIVERED', 'DELAYED')).toBe(false);
