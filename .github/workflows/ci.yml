@@ -164,12 +164,36 @@ jobs:
           pnpm dlx --package=playwright@1.56.1 -c 'export PLAYWRIGHT_PACKAGE_ENTRY="$(realpath "$(dirname "$(command -v playwright)")/../playwright/cli.js")"; playwright install --with-deps chromium; node apps/web/e2e/superadmin-dashboard.browser.mjs && node apps/web/e2e/subscription-plan-editor.browser.mjs'
       - name: Check controller route inventory
         run: node apps/api/scripts/route-inventory.mjs --check
+      - name: Validate release manifest contracts
+        run: node --test scripts/release-manifest.test.mjs
       - name: API lint
         run: pnpm --filter @schoolhub/api lint
       - name: Apply database migrations
         run: pnpm --filter @schoolhub/api exec prisma migrate deploy --config prisma.config.ts
       - name: API tests (including PostgreSQL integration)
         run: pnpm --filter @schoolhub/api test
+      - name: Verify a synthetic database backup/restore round trip
+        env:
+          RESTORE_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/schoolhub_restore?schema=public
+        run: |
+          set -euo pipefail
+          cleanup() {
+            docker run --rm --network host -e PGPASSWORD=postgres postgres:16 psql -h 127.0.0.1 -U postgres -d postgres -c 'DROP DATABASE IF EXISTS schoolhub_restore WITH (FORCE)' || true
+            pnpm --filter @schoolhub/api exec tsx scripts/recovery-smoke-fixture.ts --cleanup || true
+            rm -f /tmp/schoolhub-restore.dump
+          }
+          trap cleanup EXIT
+          pnpm --filter @schoolhub/api exec tsx scripts/recovery-smoke-fixture.ts --seed
+          docker run --rm --network host -e PGPASSWORD=postgres postgres:16 pg_dump -h 127.0.0.1 -U postgres -d schoolhub_test --format=custom --no-owner > /tmp/schoolhub-restore.dump
+          docker run --rm --network host -e PGPASSWORD=postgres postgres:16 psql -h 127.0.0.1 -U postgres -d postgres -c 'CREATE DATABASE schoolhub_restore'
+          docker run --rm -i --network host -e PGPASSWORD=postgres postgres:16 pg_restore -h 127.0.0.1 -U postgres -d schoolhub_restore --no-owner < /tmp/schoolhub-restore.dump
+          pnpm --filter @schoolhub/api exec tsx scripts/verify-restored-database.ts
+          docker run --rm --network host -e PGPASSWORD=postgres postgres:16 psql -h 127.0.0.1 -U postgres -d schoolhub_restore -v ON_ERROR_STOP=1 -c "UPDATE chart_accounts SET name='Changed synthetic recovery account' WHERE code='1000'"
+          if pnpm --filter @schoolhub/api exec tsx scripts/verify-restored-database.ts > /tmp/restore-negative.log 2>&1; then
+            echo "Restore verification incorrectly accepted changed data"
+            exit 1
+          fi
+          grep -q '"status": "FAIL"' /tmp/restore-negative.log
       - name: Web theme lint
         run: pnpm --filter @schoolhub/web lint:theme
       - name: Web unit tests
@@ -183,3 +207,23 @@ jobs:
         run: pnpm --filter @schoolhub/api build
       - name: Build web
         run: pnpm --filter @schoolhub/web build
+
+  container-smoke:
+    name: Container smoke (${{ matrix.component }})
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        component: [api, web]
+    steps:
+      - uses: actions/checkout@v7
+      - name: Build the runtime image
+        env:
+          COMPONENT: ${{ matrix.component }}
+        run: docker build -f "apps/$COMPONENT/Dockerfile" --build-arg "BUILD_SHA=$GITHUB_SHA" -t "schoolhub-smoke:$COMPONENT" .
+      - name: Boot and probe the runtime image
+        env:
+          COMPONENT: ${{ matrix.component }}
+        run: bash .github/scripts/smoke-image.sh "schoolhub-smoke:$COMPONENT" "$COMPONENT"

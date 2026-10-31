@@ -30,7 +30,7 @@ for (const file of controllers.sort()) {
         const guards = [...classDecorators, ...local].filter(item => item.name === "UseGuards").flatMap(item => item.args);
         const roles = (local.find(item => item.name === "Roles") ?? classDecorators.find(item => item.name === "Roles"))?.args ?? [];
         routes.push({ method: verb.name.toUpperCase(), path: "/api/" + [controller.args[0], verb.args[0]].filter(Boolean).join("/"),
-          handler: `${item.name?.text}.${method.name.getText()}`, file: path.relative(root, file),
+          handler: `${item.name?.text}.${method.name.getText()}`, file: path.relative(root, file).split(path.sep).join("/"),
           tenantGuard: guards.includes("SchoolTenantGuard"), platformGuard: guards.includes("SuperAdminGuard"), guards, roles,
           resourceScope: "REQUIRES_SERVICE_REVIEW", audit: "REQUIRES_SERVICE_REVIEW",
           annotations: local.filter(item => ["AllowAnonymous", "AllowInactiveSubscription"].includes(item.name)).map(item => item.name) });

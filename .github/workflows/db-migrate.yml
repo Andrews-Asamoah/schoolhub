@@ -1,9 +1,4 @@
 name: Database migrations
-
-# Manual, per-environment. Applies committed migrations with `prisma migrate
-# deploy` (never `migrate dev`). Configure a GitHub Environment per target
-# (staging, production) holding a DATABASE_URL secret; add required reviewers
-# to the production environment so a person approves each run.
 on:
   workflow_dispatch:
     inputs:
@@ -12,40 +7,112 @@ on:
         type: choice
         options: [staging, production]
         required: true
-      ref:
-        description: Git ref (tag or commit) whose migrations to apply
+      release_sha:
+        description: Full commit SHA from a successful Container images release
         required: true
-        default: main
-
+      image_run_id:
+        description: Successful Container images workflow run ID
+        required: true
+      backup_reference:
+        description: Verified pre-migration backup/PITR recovery reference
+        required: true
 permissions:
   contents: read
-
+  actions: read
+  packages: read
 jobs:
   migrate:
+    if: github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     environment: ${{ inputs.environment }}
     concurrency:
-      group: migrate-${{ inputs.environment }}
+      group: release-${{ inputs.environment }}
       cancel-in-progress: false
-    env:
-      DATABASE_URL: ${{ secrets.DATABASE_URL }}
     steps:
+      - name: Validate release provenance before accessing the database
+        id: source
+        uses: actions/github-script@v7
+        env:
+          RELEASE_SHA: ${{ inputs.release_sha }}
+          IMAGE_RUN_ID: ${{ inputs.image_run_id }}
+          BACKUP_REFERENCE: ${{ inputs.backup_reference }}
+        with:
+          script: |
+            const sha = process.env.RELEASE_SHA;
+            const runId = process.env.IMAGE_RUN_ID;
+            if (!/^[a-f0-9]{40}$/.test(sha) || !/^[1-9][0-9]*$/.test(runId)) throw new Error('Use a full commit SHA and numeric image workflow run ID.');
+            if (!process.env.BACKUP_REFERENCE?.trim() || process.env.BACKUP_REFERENCE.length > 256 || /[\r\n]/.test(process.env.BACKUP_REFERENCE)) throw new Error('A verified pre-migration backup reference is required.');
+            const {data: run} = await github.rest.actions.getWorkflowRun({owner: context.repo.owner, repo: context.repo.repo, run_id: runId});
+            const {data: workflow} = await github.rest.actions.getWorkflow({owner: context.repo.owner, repo: context.repo.repo, workflow_id: 'images.yml'});
+            if (run.workflow_id !== workflow.id || run.head_sha !== sha || run.conclusion !== 'success' || run.status !== 'completed' ||
+              !['push','workflow_dispatch'].includes(run.event) || !['main','dev'].includes(run.head_branch) || run.head_repository?.full_name !== context.payload.repository.full_name) throw new Error('The requested image release is not an approved same-repository release.');
+            const {data} = await github.rest.actions.listWorkflowRunArtifacts({owner: context.repo.owner, repo: context.repo.repo, run_id: runId, per_page: 100});
+            const artifact = data.artifacts.find(item => item.name === `release-manifest-${sha}` && !item.expired);
+            if (!artifact) throw new Error('No verified release manifest is available.');
       - uses: actions/checkout@v7
         with:
-          ref: ${{ inputs.ref }}
-      - uses: pnpm/action-setup@v4
+          ref: ${{ inputs.release_sha }}
+      - uses: actions/download-artifact@v4
         with:
-          version: 12.4.1
-          run_install: false
-      - uses: actions/setup-node@v7
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ inputs.image_run_id }}
+          name: release-manifest-${{ inputs.release_sha }}
+          path: approved-release
+      - name: Validate the manifest and pin the migration image
+        uses: actions/github-script@v7
+        env:
+          RELEASE_SHA: ${{ inputs.release_sha }}
+          IMAGE_RUN_ID: ${{ inputs.image_run_id }}
         with:
-          node-version: 22
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile --filter @schoolhub/api...
-      - name: Show migration status before
-        run: pnpm --filter @schoolhub/api exec prisma migrate status --config prisma.config.ts || true
-      - name: Apply migrations
-        run: pnpm db:deploy
-      - name: Show migration status after
-        run: pnpm --filter @schoolhub/api exec prisma migrate status --config prisma.config.ts
+          script: |
+            const fs = require('node:fs');
+            const {validateManifest, expectedMigration} = await import(`${process.env.GITHUB_WORKSPACE}/scripts/release-manifest.mjs`);
+            const release = validateManifest(JSON.parse(fs.readFileSync('approved-release/release-manifest.json', 'utf8')), context.payload.repository.full_name, process.env.RELEASE_SHA);
+            if (release.sourceRunId !== process.env.IMAGE_RUN_ID || release.expectedMigration !== expectedMigration(process.env.GITHUB_WORKSPACE)) throw new Error('Release manifest migration baseline or originating run does not match.');
+            core.exportVariable('API_IMAGE', release.images.api);
+            core.exportVariable('WEB_IMAGE', release.images.web);
+            core.exportVariable('EXPECTED_MIGRATION_NAME', release.expectedMigration);
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Verify immutable image revision
+        env:
+          RELEASE_SHA: ${{ inputs.release_sha }}
+        run: |
+          set -euo pipefail
+          docker pull "$API_IMAGE"
+          REVISION=$(docker inspect --format '{{index .Config.Labels "org.opencontainers.image.revision"}}' "$API_IMAGE")
+          test "$REVISION" = "$RELEASE_SHA"
+      - name: Apply migrations from the approved image
+        id: migration
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          set -euo pipefail
+          test -n "$DATABASE_URL"
+          docker run --rm --env DATABASE_URL --env EXPECTED_MIGRATION_NAME "$API_IMAGE" node node_modules/prisma/build/index.js migrate deploy --config prisma.config.ts
+          docker run --rm --env DATABASE_URL "$API_IMAGE" node node_modules/prisma/build/index.js migrate status --config prisma.config.ts
+      - name: Record environment, backup reference and release digests
+        if: always() && steps.source.outcome == 'success'
+        uses: actions/github-script@v7
+        env:
+          RELEASE_SHA: ${{ inputs.release_sha }}
+          TARGET_ENVIRONMENT: ${{ inputs.environment }}
+          BACKUP_REFERENCE: ${{ inputs.backup_reference }}
+          MIGRATION_OUTCOME: ${{ steps.migration.outcome }}
+        with:
+          script: |
+            const fs = require('node:fs');
+            const record = {environment: process.env.TARGET_ENVIRONMENT, commit: process.env.RELEASE_SHA, apiImage: process.env.API_IMAGE ?? null, webImage: process.env.WEB_IMAGE ?? null,
+              expectedMigration: process.env.EXPECTED_MIGRATION_NAME ?? null, backupReference: process.env.BACKUP_REFERENCE,
+              outcome: process.env.MIGRATION_OUTCOME || 'not-run', recordedAt: new Date().toISOString(), actor: context.actor};
+            fs.writeFileSync('migration-record.json', JSON.stringify(record, null, 2));
+      - uses: actions/upload-artifact@v4
+        if: always() && steps.source.outcome == 'success'
+        with:
+          name: migration-record-${{ inputs.environment }}-${{ github.run_id }}
+          path: migration-record.json
+          retention-days: 90
