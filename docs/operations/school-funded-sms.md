@@ -20,7 +20,7 @@ Each school connects a Hubtel Programmable SMS account and approved sender ID. M
 
 ## Isolation, rotation and disconnect
 
-School-owner credential requests include the expected organization ID. The API rejects stale requests after a school switch, even for users who own both schools. Credential forms remount and clear their local state when the school changes. SuperAdmin requests use an explicit school ID in their URL.
+School-owner credential requests include the expected organization ID. The API rejects stale requests after a school switch, including platform administrators who can access multiple schools. Credential forms remount and clear their local state when the school changes. SuperAdmin requests use an explicit school ID in their URL.
 
 Every new SMS outbox row is pinned to the school's current immutable connection version in the notification transaction. Composite foreign keys prevent a school or delivery from referencing another school's connection. Provider IDs are scoped to the connection, so the same provider message ID in two accounts cannot collide or confirm the wrong delivery.
 

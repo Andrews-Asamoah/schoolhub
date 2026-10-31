@@ -302,42 +302,29 @@ describe.skipIf(!enabled)(
         .set('x-school-role', 'admin')
         .expect(403);
     });
-    it('rejects stale account forms even when the same user owns both schools', async () => {
-      const member = run + '-multi';
-      await db.member.create({
-        data: {
-          id: member,
-          userId: ownerA,
-          organizationId: run + '-b',
-          role: 'owner',
-        },
-      });
-      try {
-        for (const method of ['get', 'put', 'delete'] as const) {
-          let req = request(app.getHttpServer())
-            [method](
-              '/api/notifications/delivery/sms-account?organizationId=' +
-                run +
-                '-a',
-            )
-            .set('x-test-user', ownerA)
-            .set('x-school-subdomain', run + '-b');
-          if (method === 'put') req = req.send(configA);
-          await req.expect(403);
-        }
-        const response = await request(app.getHttpServer())
-          .get(
+    it('rejects stale account forms for platform administrators switching schools', async () => {
+      for (const method of ['get', 'put', 'delete'] as const) {
+        let req = request(app.getHttpServer())
+          [method](
             '/api/notifications/delivery/sms-account?organizationId=' +
               run +
-              '-b',
+              '-a',
           )
-          .set('x-test-user', ownerA)
-          .set('x-school-subdomain', run + '-b')
-          .expect(200);
-        expect(response.body.senderId).toBe('CampusB');
-      } finally {
-        await db.member.delete({ where: { id: member } });
+          .set('x-test-user', platform)
+          .set('x-school-subdomain', run + '-b');
+        if (method === 'put') req = req.send(configA);
+        await req.expect(403);
       }
+      const response = await request(app.getHttpServer())
+        .get(
+          '/api/notifications/delivery/sms-account?organizationId=' +
+            run +
+            '-b',
+        )
+        .set('x-test-user', platform)
+        .set('x-school-subdomain', run + '-b')
+        .expect(200);
+      expect(response.body.senderId).toBe('CampusB');
     });
     it('pins each delivery to its school account, brands the sender and permits account-local provider IDs', async () => {
       const a = (await notification(schoolA, ownerA))!,
