@@ -1,3 +1,4 @@
+import { authClient, useSession } from "@/lib/auth-client";
 import { useState, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSchoolRole } from "@/components/school/school-role-switcher";
@@ -109,6 +110,7 @@ function ChannelForm({
 
 export function NotificationDeliveryWorkspace() {
   const { activeRole } = useSchoolRole();
+  const session = useSession();
   const { activeOrganization } = useSchoolOrganization(false);
   const admin = activeRole === "owner" || activeRole === "admin";
   const client = useQueryClient();
@@ -135,6 +137,20 @@ export function NotificationDeliveryWorkspace() {
       ),
     retry: false,
     refetchInterval: 30000,
+  });
+  const verifyEmail = useMutation({
+    mutationFn: async () => {
+      const email = session.data?.user.email;
+      if (!email) throw new Error("Sign in to verify your email.");
+      const result = await authClient.sendVerificationEmail({
+        email,
+        callbackURL: window.location.href,
+      });
+      if (result.error)
+        throw new Error(
+          result.error.message ?? "Unable to send verification email.",
+        );
+    },
   });
   const invalidate = () =>
     client.invalidateQueries({ queryKey: ["notification-delivery"] });
@@ -175,7 +191,8 @@ export function NotificationDeliveryWorkspace() {
     history.error ||
     savePreferences.error ||
     saveSettings.error ||
-    retry.error;
+    retry.error ||
+    verifyEmail.error;
   return (
     <div className="space-y-4">
       <section className={panelStyle}>
@@ -186,6 +203,29 @@ export function NotificationDeliveryWorkspace() {
           general sign-in reminder is sent. You can withdraw consent here at any
           time. School availability and daily limits apply.
         </p>
+        {session.data?.user.emailVerified === false && (
+          <div className="space-y-2 rounded-lg border border-border p-3">
+            <p className="text-xs text-muted-foreground">
+              Verify your account email before email alerts can be delivered.
+              Open the link in the verification email, then refresh this page.
+            </p>
+            <button
+              type="button"
+              className={buttonStyle}
+              disabled={verifyEmail.isPending || verifyEmail.isSuccess}
+              onClick={() => verifyEmail.mutate()}
+            >
+              {verifyEmail.isPending
+                ? "Sending verification…"
+                : "Verify my email"}
+            </button>
+            {verifyEmail.isSuccess && (
+              <p role="status" className="text-xs">
+                Verification email requested. Check your inbox and spam folder.
+              </p>
+            )}
+          </div>
+        )}
         {preferences.data ? (
           <ChannelForm
             key={JSON.stringify(preferences.data)}

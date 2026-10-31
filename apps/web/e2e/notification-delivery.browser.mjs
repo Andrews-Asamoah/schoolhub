@@ -6,7 +6,7 @@ const browser=await chromium.launch({headless:true}),base=process.env.SCHOOLHUB_
 try{for(const role of ['owner','guardian'])for(const viewport of [{width:1440,height:1000},{width:390,height:844}]){
  const page=await browser.newPage({viewport,locale:'en-GB'}),errors=[],writes=[],reads=[];page.on('pageerror',error=>errors.push(error.message));
  const now=new Date().toISOString(),org={id:'org',name:'Test school',slug:'test-school',createdAt:now},school={id:'school',organizationId:'org',name:'Test school',code:'TEST',subdomain:'test-school'};
- const session={user:{id:role,name:role,email:role+'@example.test',role:'user',mustChangePassword:false,twoFactorEnabled:true,createdAt:now,updatedAt:now},session:{id:'session',token:'token',userId:role,activeOrganizationId:'org',expiresAt:new Date(Date.now()+3600000).toISOString(),createdAt:now,updatedAt:now}};
+ const session={user:{id:role,name:role,email:role+'@example.test',emailVerified:role==='owner',role:'user',mustChangePassword:false,twoFactorEnabled:true,createdAt:now,updatedAt:now},session:{id:'session',token:'token',userId:role,activeOrganizationId:'org',expiresAt:new Date(Date.now()+3600000).toISOString(),createdAt:now,updatedAt:now}};
  let preferences={emailEnabled:false,smsEnabled:false},settings={emailEnabled:false,smsEnabled:false,emailDailyLimit:0,smsDailyLimit:0,providers:{resend:true,hubtel:false}},delivery={id:'delivery-1',channel:'EMAIL',status:'FAILED',attempts:1,reason:'PROVIDER_REJECTED',createdAt:now};
  await page.route('**/api/**',async route=>{const request=route.request(),path=new URL(request.url()).pathname;
   if(request.method()!=='GET'){
@@ -33,6 +33,7 @@ try{for(const role of ['owner','guardian'])for(const viewport of [{width:1440,he
  await page.goto(base+'/notifications?school=test-school');await page.getByRole('heading',{name:'Email & SMS preferences',exact:true}).waitFor();
  await page.getByLabel('Email me school alerts',{exact:true}).check();await page.getByLabel('Text me school alerts',{exact:true}).check();await page.getByRole('button',{name:'Save my delivery preferences',exact:true}).click();await page.getByText('Delivery preferences saved.',{exact:true}).waitFor();
  assert.deepEqual(writes.find(item=>item.path.endsWith('/preferences')).body,{emailEnabled:true,smsEnabled:true});
+ if(role==='guardian'){await page.getByRole('button',{name:'Verify my email',exact:true}).click();await page.getByText('Verification email requested. Check your inbox and spam folder.',{exact:true}).waitFor();assert(writes.some(item=>item.path.endsWith('/auth/send-verification-email')));}
  if(role==='owner'){
   await page.getByLabel('Enable school email',{exact:true}).check();await page.getByLabel('Daily email limit (UTC)',{exact:true}).fill('500');await page.getByLabel('Daily SMS limit (UTC)',{exact:true}).fill('100');
   await page.getByRole('button',{name:'Save school delivery settings',exact:true}).click();await page.getByText('School delivery settings saved.',{exact:true}).waitFor();
