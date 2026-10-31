@@ -205,6 +205,10 @@ model ClubMember {
 }
 
 model PromotionRecord {
+  rolloverBatchId String?
+  reversedAt DateTime?
+  reversedById String?
+  @@unique([rolloverBatchId, studentId])
   id            String        @id @default(cuid())
   schoolId      String
   studentId     String

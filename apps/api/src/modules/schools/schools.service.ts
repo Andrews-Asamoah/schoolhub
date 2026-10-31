@@ -174,12 +174,21 @@ export class SchoolsService {
     return { academicYear, term };
   }
 
+  private async requireSafeYearSwitch(tx: Prisma.TransactionClient, schoolId: string, nextYearId: string | null) {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${schoolId}),hashtext('academic-rollover'))`;
+    const current = await tx.academicYear.findFirst({ where: { schoolId, isCurrent: true, ...(nextYearId ? { id: { not: nextYearId } } : {}) }, select: { id: true } });
+    if (current && await tx.enrollment.count({ where: { academicYearId: current.id } })) {
+      throw new BadRequestException("Use the approved promotion/year-rollover workflow to change the current year once enrolments exist. Use historical viewing controls to review old years.");
+    }
+  }
+
   async setCurrentAcademicContext(
     schoolId: string,
     actorId: string,
     input: SetAcademicContextInput,
   ) {
     return this.prisma.client.$transaction(async (transaction) => {
+      await this.requireSafeYearSwitch(transaction, schoolId, input.academicYearId);
       const previousYear = await transaction.academicYear.findFirst({
         where: { schoolId, isCurrent: true },
         include: { terms: { where: { isCurrent: true }, take: 1 } },
@@ -514,6 +523,7 @@ export class SchoolsService {
         ?.termNumber ?? (input.isCurrent ? input.terms?.[0]?.termNumber : undefined);
 
       if (isCurrent) {
+        await this.requireSafeYearSwitch(transaction, schoolId, null);
         await transaction.academicYear.updateMany({
           where: { schoolId, isCurrent: true },
           data: { isCurrent: false },
@@ -594,6 +604,7 @@ export class SchoolsService {
     try {
       return await this.prisma.client.$transaction(async (tx) => {
         if (input.isCurrent === true) {
+          await this.requireSafeYearSwitch(tx, schoolId, id);
           await tx.academicYear.updateMany({
             where: { schoolId, isCurrent: true, NOT: { id } },
             data: { isCurrent: false },
@@ -610,6 +621,7 @@ export class SchoolsService {
             });
           }
         }
+        if (input.isCurrent === false && year.isCurrent) await this.requireSafeYearSwitch(tx, schoolId, null);
         if (input.isCurrent === false) {
           await tx.term.updateMany({ where: { academicYearId: id }, data: { isCurrent: false } });
         }
