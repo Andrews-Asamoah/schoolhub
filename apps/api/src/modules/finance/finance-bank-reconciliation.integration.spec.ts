@@ -62,6 +62,7 @@ describe.skipIf(!enabled)('bank reconciliation workflow (PostgreSQL)',{timeout:6
   await close.decide(schoolId,reviewer,'owner',request.id,true,'Independent month close review');
   const period=await db.financeAccountingPeriod.findFirstOrThrow({where:{schoolId,status:'CLOSED'}});
   expect(await db.financePeriodSnapshot.count({where:{periodId:period.id}})).toBe(1);
+  expect((await close.readiness(schoolId,2026,9)).canRequest).toBe(false);
   const snapshot=await db.financePeriodSnapshot.findFirstOrThrow({where:{periodId:period.id}});
   await expect(db.financePeriodSnapshot.update({where:{id:snapshot.id},data:{contentHash:'changed'}})).rejects.toThrow(/immutable|append-only/);
   const {FinancePostingService}=await import('./finance-posting.service.js');

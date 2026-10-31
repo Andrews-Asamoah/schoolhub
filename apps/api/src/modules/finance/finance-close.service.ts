@@ -48,7 +48,12 @@ export class FinanceCloseService {
     return { snapshot, reconciliations, failed };
   }
   async readiness(schoolId: string, year: number, month: number) {
-    return this.prisma.client.$transaction(async tx=>{ await this.lock(tx,schoolId); const evidence=await this.evidence(tx,schoolId,year,month); return { ...evidence, canRequest: evidence.failed.length===0 }; }, { timeout: 60000 });
+    return this.prisma.client.$transaction(async tx=>{ await this.lock(tx,schoolId); const evidence=await this.evidence(tx,schoolId,year,month);
+      const period=await tx.financeAccountingPeriod.findUnique({where:{schoolId_type_startDate:{schoolId,type:'MONTH',startDate:new Date(evidence.snapshot.scope.startDate)}}});
+      const failed=[...evidence.failed];
+      if(period?.status==='CLOSED')failed.push('This accounting month is already closed.');
+      if(period&&await tx.financeApprovalRequest.count({where:{schoolId,entityId:period.id,subject:'PERIOD_CLOSE',status:'PENDING'}}))failed.push('A close request is already awaiting independent review.');
+      return { ...evidence, failed, canRequest: failed.length===0 }; }, { timeout: 60000 });
   }
   async request(schoolId: string, actorId: string, year: number, month: number, reason: string) {
     if(reason.trim().length<10) throw new BadRequestException('A meaningful closing reason is required.');
