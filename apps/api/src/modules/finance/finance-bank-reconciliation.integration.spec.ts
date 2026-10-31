@@ -35,7 +35,7 @@ describe.skipIf(!enabled)('bank reconciliation workflow (PostgreSQL)',{timeout:6
   await expect(service.submit(schoolId,maker,recordId)).rejects.toThrow(/fully matched/);
   await expect(service.match(schoolId,maker,recordId,{statementLineId:line.id,transactionId:postingId,amount:'10.01'})).rejects.toThrow(/exceeds/);
   await service.match(schoolId,maker,recordId,{statementLineId:line.id,transactionId:postingId,amount:'10.00'});
-  await expect(db.financeBankStatementLine.update({where:{id:line.id},data:{description:'tampered'}})).rejects.toThrow(/immutable/);
+  await expect(db.financeBankStatementLine.update({where:{id:line.id},data:{description:'tampered'}})).rejects.toThrow(/immutable|append-only/);
  });
  it('requires independent approval and freezes approved evidence',async()=>{
   await service.submit(schoolId,maker,recordId);
@@ -43,7 +43,7 @@ describe.skipIf(!enabled)('bank reconciliation workflow (PostgreSQL)',{timeout:6
   await expect(service.decide(schoolId,reviewer,'accountant',recordId,true,'Reviewed statement evidence')).rejects.toThrow(/owner or headteacher/);
   const result=await service.decide(schoolId,reviewer,'owner',recordId,true,'Reviewed statement evidence');
   expect(result.status).toBe('APPROVED');expect(result.contentHash).toHaveLength(64);
-  await expect(db.financeBankReconciliation.update({where:{id:recordId},data:{status:'DRAFT'}})).rejects.toThrow(/immutable/);
+  await expect(db.financeBankReconciliation.update({where:{id:recordId},data:{status:'DRAFT'}})).rejects.toThrow(/immutable|append-only/);
  });
  it('closes and reopens with distinct approval and preserves versioned snapshots', async()=>{
   const {FinanceCloseService}=await import('./finance-close.service.js');
@@ -53,18 +53,20 @@ describe.skipIf(!enabled)('bank reconciliation workflow (PostgreSQL)',{timeout:6
   const finance={getHistoricalReceivables:async()=>({complete:true,outstanding:'0.00'}),getReceivablesCloseReadiness:async()=>({closeReady:true})};
   const preparation=new FinancePeriodPreparationService({client:db} as never,new FinanceLedgerIntegrityService({client:db} as never),finance as never);
   const close=new FinanceCloseService({client:db} as never,preparation,finance as never,service);
+  await db.financePeriodLock.create({data:{schoolId,lockedThrough:new Date('2026-08-31'),updatedById:maker,reason:'Earlier manual close boundary'}});
   const request=await close.request(schoolId,maker,2026,9,'September accounts reviewed');
   await expect(close.decide(schoolId,maker,'owner',request.id,true,'Self approval attempted')).rejects.toThrow(/own period/);
   await close.decide(schoolId,reviewer,'owner',request.id,true,'Independent month close review');
   const period=await db.financeAccountingPeriod.findFirstOrThrow({where:{schoolId,status:'CLOSED'}});
   expect(await db.financePeriodSnapshot.count({where:{periodId:period.id}})).toBe(1);
   const snapshot=await db.financePeriodSnapshot.findFirstOrThrow({where:{periodId:period.id}});
-  await expect(db.financePeriodSnapshot.update({where:{id:snapshot.id},data:{contentHash:'changed'}})).rejects.toThrow(/immutable/);
+  await expect(db.financePeriodSnapshot.update({where:{id:snapshot.id},data:{contentHash:'changed'}})).rejects.toThrow(/immutable|append-only/);
   const {FinancePostingService}=await import('./finance-posting.service.js');
   await expect(db.$transaction(tx=>new FinancePostingService({client:db} as never).post(tx,{schoolId,date:new Date('2026-09-03'),description:'Blocked closed-period posting',amount:new Prisma.Decimal(1),debitAccountId:bankId,creditAccountId:revenueId,transactionType:'INCOME'}))).rejects.toThrow(/closed/);
   const reopen=await close.reopen(schoolId,maker,period.id,'Correction review requested');
   await close.decide(schoolId,reviewer,'owner',reopen.id,true,'Approved reopening for review');
   expect((await db.financeAccountingPeriod.findUniqueOrThrow({where:{id:period.id}})).reopenCount).toBe(1);
+  expect((await db.financePeriodLock.findUniqueOrThrow({where:{schoolId}})).lockedThrough.toISOString().slice(0,10)).toBe('2026-08-31');
   const again=await close.request(schoolId,maker,2026,9,'Reviewed accounts after reopening');
   await close.decide(schoolId,reviewer,'owner',again.id,true,'Approved second closing snapshot');
   expect(await db.financePeriodSnapshot.count({where:{periodId:period.id}})).toBe(2);

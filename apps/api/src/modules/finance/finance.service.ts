@@ -159,6 +159,7 @@ export class FinanceService {
       }
     }
     await this.prisma.client.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${schoolId}), hashtext('finance-posting-boundary'))`;
       const current = await tx.financePeriodLock.findUnique({ where: { schoolId } });
       const reopening = !!current && (!next || next.getTime() < current.lockedThrough.getTime());
       const approvedClosed = await tx.financeAccountingPeriod.findFirst({ where: { schoolId, status: "CLOSED" }, orderBy: { endDate: "desc" } });

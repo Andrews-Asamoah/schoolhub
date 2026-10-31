@@ -26,6 +26,8 @@ export class FinanceBankReconciliationController {
   constructor(private readonly service: FinanceBankReconciliationService) {}
   @Get() @Roles(...FINANCE_READ_ROLES)
   list(@CurrentSchool() school: School) { return this.service.list(school.id); }
+  @Get("journal-accounts") @Roles(...FINANCE_READ_ROLES)
+  journalAccounts(@CurrentSchool() school: School) { return this.service.journalAccounts(school.id); }
   @Get("accounts") @Roles(...FINANCE_READ_ROLES)
   accounts(@CurrentSchool() school: School) { return this.service.accounts(school.id); }
   @Get(":id/candidates") @Roles(...FINANCE_READ_ROLES)

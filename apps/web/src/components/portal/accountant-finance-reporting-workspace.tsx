@@ -1,3 +1,4 @@
+import { ReconciliationJournalsWorkspace } from "./reconciliation-journals-workspace";
 import { PeriodCloseWorkspace } from "./period-close-workspace";
 import { BankReconciliationWorkspace } from "./bank-reconciliation-workspace";
 import { DatePicker } from "@/components/ui/date-picker";
@@ -239,6 +240,7 @@ export function AccountantFinanceReportingWorkspace() {
 
   return <section className="space-y-5">
     <BankReconciliationWorkspace />
+    <ReconciliationJournalsWorkspace />
     <PeriodCloseWorkspace />
     <div className="rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-6">
       <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-xs font-bold uppercase tracking-[0.14em] text-primary">Finance</p><h2 className="mt-1 text-2xl font-bold tracking-tight text-foreground">Finance reports</h2><p className="mt-2 text-sm text-muted-foreground">Reports are calculated on the server using all matching school records, not the currently displayed page.</p></div><div className="flex gap-2"><button type="button" className={secondaryButton} onClick={() => window.print()}><Printer className="size-4" /> Print</button><button type="button" className={secondaryButton} onClick={exportPdf} disabled={!summary}><FileText className="size-4" /> PDF</button><button type="button" className={secondaryButton} onClick={() => void exportExcel()} disabled={!summary}><FileSpreadsheet className="size-4" /> Excel</button></div></div>

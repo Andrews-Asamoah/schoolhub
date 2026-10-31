@@ -71,9 +71,11 @@ export class FinanceCloseService {
       if(!request)throw new ConflictException('Pending period request not found.');
       if(request.requestedById===actorId)throw new ForbiddenException('The requester cannot approve their own period change.');
       const period=await tx.financeAccountingPeriod.findFirstOrThrow({where:{id:request.entityId,schoolId}});
+      const priorLock=await tx.financePeriodLock.findUnique({where:{schoolId}});
       if(approve&&request.subject==='PERIOD_CLOSE'){
         const evidence=await this.evidence(tx,schoolId,period.startDate.getUTCFullYear(),period.startDate.getUTCMonth()+1);
         if(period.status!=='OPEN'||evidence.failed.length||digest(evidence)!==request.payloadHash)throw new ConflictException('Close evidence changed or checks failed; reject and request again.');
+        if(priorLock&&priorLock.lockedThrough>period.endDate)throw new ConflictException('A later legacy lock must be resolved before closing this month.');
         const latest=await tx.financeAccountingPeriod.findFirst({where:{schoolId,status:'CLOSED'},orderBy:{endDate:'desc'}});
         if(latest&&latest.endDate>=period.startDate)throw new ConflictException('Periods must close in chronological order.');
         if(latest&&new Date(latest.endDate.getTime()+86400000).getTime()!==period.startDate.getTime())throw new ConflictException('Close the preceding accounting month first.');
@@ -87,11 +89,15 @@ export class FinanceCloseService {
         if(latest?.id!==period.id||digest({periodId:period.id,reopenCount:period.reopenCount})!==request.payloadHash)throw new ConflictException('Only the latest unchanged closed period may reopen.');
         await tx.financeAccountingPeriod.update({where:{id:period.id},data:{status:'OPEN',reopenCount:{increment:1},closedAt:null,closedById:null}});
         const previous=await tx.financeAccountingPeriod.findFirst({where:{schoolId,status:'CLOSED'},orderBy:{endDate:'desc'}});
-        if(previous)await tx.financePeriodLock.update({where:{schoolId},data:{lockedThrough:previous.endDate,updatedById:actorId,reason:note}});
+        const lastClose=await tx.financePeriodEvent.findFirst({where:{periodId:period.id,kind:'PERIOD_CLOSE'},orderBy:{createdAt:'desc'}});
+        let priorBoundary: Date | null=null;
+        try { const saved=JSON.parse(lastClose?.reason??'{}').priorLockedThrough; if(typeof saved==='string')priorBoundary=new Date(saved); } catch { throw new ConflictException('The prior close boundary needs operator review.'); }
+        const boundary=previous&&(!priorBoundary||previous.endDate>priorBoundary)?previous.endDate:priorBoundary;
+        if(boundary)await tx.financePeriodLock.update({where:{schoolId},data:{lockedThrough:boundary,updatedById:actorId,reason:note}});
         else await tx.financePeriodLock.deleteMany({where:{schoolId}});
       }
       await tx.financeApprovalRequest.update({where:{id:request.id},data:{status:approve?'APPROVED':'REJECTED',decidedById:actorId,decidedAt:new Date(),decisionNote:note}});
-      await tx.financePeriodEvent.create({data:{periodId:period.id,kind:approve?request.subject:request.subject+'_REJECTED',actorId,reason:note,approvalRequestId:request.id}});
+      await tx.financePeriodEvent.create({data:{periodId:period.id,kind:approve?request.subject:request.subject+'_REJECTED',actorId,reason:JSON.stringify({note,priorLockedThrough:priorLock?.lockedThrough.toISOString().slice(0,10)??null}),approvalRequestId:request.id}});
       return {periodId:period.id,approved:approve};
     },{timeout:60000});
   }

@@ -40,6 +40,9 @@ export class FinanceBankReconciliationService {
       await this.audit(tx, schoolId, actorId, reconciliation.id, "IMPORTED"); return reconciliation;
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
   }
+  async journalAccounts(schoolId: string) {
+    return this.prisma.client.chartAccount.findMany({ where: { schoolId, isActive: true }, select: { id: true, code: true, name: true }, orderBy: { code: "asc" }, take: 1000 });
+  }
   async accounts(schoolId: string) {
     return this.prisma.client.chartAccount.findMany({ where: { schoolId, isActive: true, accountType: "ASSET", category: { in: ["BANK", "CASH"] } }, select: { id: true, code: true, name: true }, orderBy: { code: "asc" } });
   }
