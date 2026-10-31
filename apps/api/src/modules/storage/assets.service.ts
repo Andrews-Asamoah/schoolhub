@@ -95,6 +95,19 @@ export class AssetsService {
   }
 
 
+  async setPersonAvatar(school: School, kind: string, personId: string, file: Express.Multer.File | undefined, actor: AuditActor) {
+    if (kind !== "teacher" && kind !== "student") throw new BadRequestException("Invalid photo target.");
+    const where = { id: personId, schoolId: school.id, deletedAt: null };
+    const person = kind === "teacher"
+      ? await this.prisma.client.teacher.findFirst({ where, select: { profileId: true } })
+      : await this.prisma.client.student.findFirst({ where, select: { profileId: true } });
+    if (!person?.profileId) throw new NotFoundException("Person not found.");
+    const profile = await this.prisma.client.userProfile.findUniqueOrThrow({ where: { id: person.profileId }, select: { userId: true } });
+    const result = await this.setAvatar(school, profile.userId, file);
+    await writeAudit(this.prisma.client, actor, { action: "UPDATE", entityType: "person.photo", entityId: personId, schoolId: school.id });
+    return result;
+  }
+
   private async signatureProfile(school: School, kind: string, personId: string) {
     if (kind !== "teacher" && kind !== "staff") throw new BadRequestException("Signature target must be a teacher or staff member.");
     const person = kind === "teacher"
