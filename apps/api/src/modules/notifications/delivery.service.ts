@@ -1,3 +1,4 @@
+import { evaluateSubscriptionAccess } from '@schoolhub/shared';
 import {
   BadRequestException,
   NotFoundException,
@@ -207,11 +208,10 @@ export class NotificationDeliveryService
         !user ||
         user.banned ||
         !membership ||
-        !['ACTIVE', 'TRIALING'].includes(
+        !evaluateSubscriptionAccess(
           school.organization.subscriptionStatus,
-        ) ||
-        (school.organization.expiresAt &&
-          school.organization.expiresAt < new Date())
+          school.organization.expiresAt,
+        ).allowed
       )
         reason = 'MEMBERSHIP_OR_SCHOOL_INACTIVE';
       else if (

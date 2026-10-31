@@ -154,6 +154,7 @@ describe('notification provider contracts', () => {
       HUBTEL_SMS_BASE_URL: 'https://evil.example/v1/messages',
     });
     expect((await provider.send('SMS', 'd', sms)).state).toBe('UNKNOWN');
+    expect(provider.configured('SMS')).toBe(false);
     expect(request).not.toHaveBeenCalled();
   });
   it('does not downgrade delivery receipts on delayed or replayed events', () => {

@@ -416,6 +416,44 @@ describe.skipIf(!enabled)(
         });
       }
     });
+    it('uses the platform subscription grace policy and blocks suspended schools', async () => {
+      await db.organization.update({
+        where: { id: run },
+        data: {
+          subscriptionStatus: 'PAST_DUE',
+          expiresAt: new Date(Date.now() - 3600000),
+        },
+      });
+      const grace = await delivery();
+      accept();
+      await service.dispatch(grace.id);
+      expect(
+        (
+          await db.notificationDelivery.findUniqueOrThrow({
+            where: { id: grace.id },
+          })
+        ).status,
+      ).toBe('ACCEPTED');
+      await db.organization.update({
+        where: { id: run },
+        data: { subscriptionStatus: 'SUSPENDED' },
+      });
+      const blocked = await delivery();
+      transport.send.mockClear();
+      await service.dispatch(blocked.id);
+      expect(transport.send).not.toHaveBeenCalled();
+      expect(
+        (
+          await db.notificationDelivery.findUniqueOrThrow({
+            where: { id: blocked.id },
+          })
+        ).reason,
+      ).toBe('MEMBERSHIP_OR_SCHOOL_INACTIVE');
+      await db.organization.update({
+        where: { id: run },
+        data: { subscriptionStatus: 'ACTIVE', expiresAt: null },
+      });
+    });
     it('enforces hard daily quotas under concurrent reservations', async () => {
       const day = new Date(new Date().toISOString().slice(0, 10));
       const used = (

@@ -39,21 +39,25 @@ export class DeliveryProvider {
     private readonly config: NodeJS.ProcessEnv = process.env,
   ) {}
   configured(channel: string) {
-    return (
-      this.config.NOTIFICATION_DELIVERY_ENABLED === 'true' &&
-      (channel === 'EMAIL'
-        ? Boolean(
-            this.config.RESEND_API_KEY &&
-            z.email().safeParse(this.config.RESEND_FROM_EMAIL).success &&
-            this.config.RESEND_WEBHOOK_SECRET,
-          )
-        : Boolean(
-            this.config.HUBTEL_CLIENT_ID &&
-            this.config.HUBTEL_CLIENT_SECRET &&
-            this.config.HUBTEL_SENDER_ID &&
-            /^[a-zA-Z0-9]{1,11}$/.test(this.config.HUBTEL_SENDER_ID),
-          ))
-    );
+    if (this.config.NOTIFICATION_DELIVERY_ENABLED !== 'true') return false;
+    if (channel === 'EMAIL')
+      return Boolean(
+        this.config.RESEND_API_KEY &&
+        z.email().safeParse(this.config.RESEND_FROM_EMAIL).success &&
+        this.config.RESEND_WEBHOOK_SECRET,
+      );
+    if (channel !== 'SMS') return false;
+    try {
+      this.hubtelBase();
+      return Boolean(
+        this.config.HUBTEL_CLIENT_ID &&
+        this.config.HUBTEL_CLIENT_SECRET &&
+        this.config.HUBTEL_SENDER_ID &&
+        /^[a-zA-Z0-9]{1,11}$/.test(this.config.HUBTEL_SENDER_ID),
+      );
+    } catch {
+      return false;
+    }
   }
   private hubtelBase() {
     const url = new URL(
