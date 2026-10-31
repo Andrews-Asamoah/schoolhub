@@ -1,5 +1,7 @@
 model SchoolNotificationSettings {
  schoolId String @id
+ smsConnectionId String?
+ smsConnection SchoolSmsConnection? @relation(fields:[smsConnectionId,schoolId],references:[id,schoolId],onDelete:NoAction,onUpdate:NoAction,map:"school_notification_settings_sms_account_fkey")
  emailEnabled Boolean @default(false)
  smsEnabled Boolean @default(false)
  emailDailyLimit Int @default(0)
@@ -28,6 +30,9 @@ model NotificationDelivery {
  userId String
  channel String
  provider String
+ providerScope String @default("platform")
+ smsConnectionId String?
+ smsConnection SchoolSmsConnection? @relation(fields:[smsConnectionId,schoolId],references:[id,schoolId],onDelete:NoAction,onUpdate:NoAction,map:"notification_deliveries_sms_account_fkey")
  recipient String
  recipientHash String?
  payload Json?
@@ -43,7 +48,7 @@ model NotificationDelivery {
  deliveredAt DateTime?
  nextPollAt DateTime?
  @@unique([notificationId,channel])
- @@unique([provider,providerMessageId])
+ @@unique([provider,providerScope,providerMessageId],map:"notification_delivery_provider_scope_id")
  @@index([schoolId,createdAt],map:"notification_delivery_school_date")
  @@index([status,nextPollAt],map:"notification_delivery_poll")
  school School @relation(fields:[schoolId],references:[id],onDelete:NoAction,onUpdate:NoAction)
@@ -80,4 +85,23 @@ model NotificationProviderEvent {
  createdAt DateTime @default(now())
  @@index([provider,messageId,processedAt],map:"notification_event_processing")
  @@map("notification_provider_events")
+}
+
+model SchoolSmsConnection {
+ id String @id
+ schoolId String
+ senderId String
+ clientIdHint String
+ apiBaseUrl String
+ encryptedCredentials String?
+ createdAt DateTime @default(now())
+ retiredAt DateTime?
+ revokedAt DateTime?
+ school School @relation(fields:[schoolId],references:[id],onDelete:NoAction,onUpdate:NoAction)
+ settings SchoolNotificationSettings[]
+ deliveries NotificationDelivery[]
+ @@unique([id,schoolId])
+ @@index([schoolId,createdAt],map:"school_sms_connection_school_date")
+ @@index([retiredAt],map:"school_sms_connection_retention")
+ @@map("school_sms_connections")
 }

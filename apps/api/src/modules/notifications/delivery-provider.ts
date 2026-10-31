@@ -1,3 +1,5 @@
+import type { SchoolHubtelConnectionInput } from '@schoolhub/shared';
+export type HubtelSmsCredentials = SchoolHubtelConnectionInput;
 import { z } from 'zod';
 export type DeliveryPayload = {
   from: string;
@@ -38,7 +40,7 @@ export class DeliveryProvider {
     private readonly request: typeof fetch = fetch,
     private readonly config: NodeJS.ProcessEnv = process.env,
   ) {}
-  configured(channel: string) {
+  configured(channel: string, sms?: HubtelSmsCredentials) {
     if (this.config.NOTIFICATION_DELIVERY_ENABLED !== 'true') return false;
     if (channel === 'EMAIL')
       return Boolean(
@@ -46,23 +48,21 @@ export class DeliveryProvider {
         z.email().safeParse(this.config.RESEND_FROM_EMAIL).success &&
         this.config.RESEND_WEBHOOK_SECRET,
       );
-    if (channel !== 'SMS') return false;
+    if (channel !== 'SMS' || !sms) return false;
     try {
-      this.hubtelBase();
+      this.hubtelBase(sms);
       return Boolean(
-        this.config.HUBTEL_CLIENT_ID &&
-        this.config.HUBTEL_CLIENT_SECRET &&
-        this.config.HUBTEL_SENDER_ID &&
-        /^[a-zA-Z0-9]{1,11}$/.test(this.config.HUBTEL_SENDER_ID),
+        sms.clientId &&
+        sms.clientSecret &&
+        sms.senderId &&
+        /^[a-zA-Z0-9]{1,11}$/.test(sms.senderId),
       );
     } catch {
       return false;
     }
   }
-  private hubtelBase() {
-    const url = new URL(
-      this.config.HUBTEL_SMS_BASE_URL ?? 'https://smsc.hubtel.com/v1/messages',
-    );
+  private hubtelBase(sms: HubtelSmsCredentials) {
+    const url = new URL(sms.apiBaseUrl);
     if (
       url.protocol !== 'https:' ||
       !/^([a-z0-9-]+\.)?hubtel\.com$/.test(url.hostname) ||
@@ -79,11 +79,18 @@ export class DeliveryProvider {
     channel: string,
     id: string,
     payload: DeliveryPayload,
+    sms?: HubtelSmsCredentials,
   ): Promise<ProviderResult> {
     const email = channel === 'EMAIL';
+    if (!email && !sms)
+      return { state: 'FAILED', reason: 'SCHOOL_SMS_ACCOUNT_REQUIRED' };
+    if (!email && sms && payload.from !== sms.senderId)
+      return { state: 'FAILED', reason: 'SMS_SENDER_ACCOUNT_MISMATCH' };
     try {
       const response = await this.request(
-        email ? 'https://api.resend.com/emails' : this.hubtelBase() + '/send',
+        email
+          ? 'https://api.resend.com/emails'
+          : this.hubtelBase(sms!) + '/send',
         {
           method: 'POST',
           redirect: 'error',
@@ -98,9 +105,9 @@ export class DeliveryProvider {
                 'Content-Type': 'application/json',
                 Authorization:
                   'Basic ' +
-                  Buffer.from(
-                    `${this.config.HUBTEL_CLIENT_ID}:${this.config.HUBTEL_CLIENT_SECRET}`,
-                  ).toString('base64'),
+                  Buffer.from(`${sms!.clientId}:${sms!.clientSecret}`).toString(
+                    'base64',
+                  ),
               },
           body: JSON.stringify(
             email
@@ -148,19 +155,21 @@ export class DeliveryProvider {
   }
   async smsStatus(
     messageId: string,
+    sms?: HubtelSmsCredentials,
   ): Promise<'DELIVERED' | 'FAILED' | 'ACCEPTED' | 'UNKNOWN'> {
+    if (!sms) return 'UNKNOWN';
     try {
       const response = await this.request(
-        this.hubtelBase() + '/' + encodeURIComponent(messageId),
+        this.hubtelBase(sms) + '/' + encodeURIComponent(messageId),
         {
           redirect: 'error',
           signal: AbortSignal.timeout(10000),
           headers: {
             Authorization:
               'Basic ' +
-              Buffer.from(
-                `${this.config.HUBTEL_CLIENT_ID}:${this.config.HUBTEL_CLIENT_SECRET}`,
-              ).toString('base64'),
+              Buffer.from(`${sms!.clientId}:${sms!.clientSecret}`).toString(
+                'base64',
+              ),
           },
         },
       );

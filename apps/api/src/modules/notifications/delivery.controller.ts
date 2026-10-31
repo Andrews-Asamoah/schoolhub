@@ -1,9 +1,5 @@
 import {
   Body,
-  Injectable,
-  ForbiddenException,
-  type CanActivate,
-  type ExecutionContext,
   Controller,
   Get,
   Patch,
@@ -39,24 +35,8 @@ const settings = preferences.extend({
 const paging = z.object({
   page: z.coerce.number().int().min(1).max(100000).default(1),
 });
-// The shared RolesGuard deliberately lets headteachers inherit admin permissions.
-// Delivery spending controls and school-wide history require an explicit owner/admin role.
-@Injectable()
-export class NotificationDeliveryAdminGuard implements CanActivate {
-  canActivate(context: ExecutionContext) {
-    const request = context.switchToHttp().getRequest();
-    if (
-      request.session?.user?.role === 'superAdmin' ||
-      ['owner', 'admin'].includes(
-        request.schoolRole ?? request.membership?.role,
-      )
-    )
-      return true;
-    throw new ForbiddenException(
-      'School owner or administrator access required.',
-    );
-  }
-}
+export { NotificationDeliveryAdminGuard } from './delivery-admin.guard.js';
+import { NotificationDeliveryAdminGuard } from './delivery-admin.guard.js';
 @Controller('notifications/delivery')
 @UseGuards(SchoolTenantGuard, RolesGuard, ThrottlerGuard)
 @Roles(

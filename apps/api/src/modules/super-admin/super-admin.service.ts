@@ -1,3 +1,4 @@
+import { storeSchoolSmsConnection } from "../notifications/school-sms.service.js";
 import { temporaryPasswordExpiry } from "../../common/guards/password-change.js";
 import {
   Injectable,
@@ -799,6 +800,7 @@ export class SuperAdminService {
             address: input.schoolAddress,
           },
         });
+        if (input.smsConnection) await storeSchoolSmsConnection(tx, school.id, actor, input.smsConnection);
         await tx.subscription.create({
           data: {
             schoolId: school.id,

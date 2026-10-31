@@ -1,3 +1,4 @@
+import { SchoolSmsService } from './school-sms.service.js';
 import 'reflect-metadata';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import type { PrismaClient } from '@prisma/client';
@@ -67,6 +68,7 @@ describe.skipIf(!enabled)(
       process.env.DATABASE_URL = url;
       vi.stubEnv('WEB_ORIGIN', 'https://portal.example.test');
       vi.stubEnv('RESEND_FROM_EMAIL', 'alerts@example.test');
+      vi.stubEnv('SCHOOL_SMS_ENCRYPTION_KEY', Buffer.alloc(32,7).toString('base64'));
       vi.stubEnv('HUBTEL_SENDER_ID', 'SchoolHub');
       vi.stubEnv('RESEND_WEBHOOK_SECRET', secret);
       db = (await import('../../prisma/prisma.client.js')).prisma;
@@ -103,7 +105,9 @@ describe.skipIf(!enabled)(
         prisma,
         new DurableJobsService(prisma),
         transport as never,
+        new SchoolSmsService(prisma),
       );
+      await new SchoolSmsService(prisma).save(schoolId,{id:userId,ipAddress:null,userAgent:null},{senderId:'SchoolHub',clientId:'test-id',clientSecret:'test-secret',apiBaseUrl:'https://sms.hubtel.com/v1/messages'});
       const module = await Test.createTestingModule({
         imports: [
           ThrottlerModule.forRoot([
@@ -694,6 +698,8 @@ describe.skipIf(!enabled)(
         await tx.notificationDelivery.deleteMany({ where: { schoolId } });
         await tx.notificationDailyUsage.deleteMany({ where: { schoolId } });
         await tx.notificationPreference.deleteMany({ where: { schoolId } });
+        await tx.schoolNotificationSettings.updateMany({where:{schoolId},data:{smsConnectionId:null}});
+        await tx.schoolSmsConnection.deleteMany({where:{schoolId}});
         await tx.schoolNotificationSettings.deleteMany({ where: { schoolId } });
         await tx.auditLog.deleteMany({ where: { schoolId } });
         await tx.notification.deleteMany({ where: { schoolId } });

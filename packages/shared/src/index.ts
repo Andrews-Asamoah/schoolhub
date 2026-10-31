@@ -763,6 +763,15 @@ export const subdomainSchema = z
   .regex(/^[a-z0-9]([a-z0-9-]*[a-z0-9])$/, "Lowercase letters, numbers and hyphens; cannot start or end with a hyphen")
   .refine((value) => !(RESERVED_SUBDOMAINS as readonly string[]).includes(value), "This subdomain is reserved");
 
+// Schools fund their own Hubtel Programmable SMS account. Never use query-string credentials.
+export const schoolHubtelConnectionSchema = z.object({
+  senderId: z.string().trim().min(1).max(11).regex(/^[A-Za-z0-9]+$/, "Use 1–11 letters/numbers from your approved Hubtel sender ID"),
+  clientId: z.string().trim().min(1).max(128).regex(/^[^\s:]+$/, "Invalid Hubtel Client ID"),
+  clientSecret: z.string().trim().min(1).max(256).regex(/^[^\s]+$/, "Invalid Hubtel Client secret"),
+  apiBaseUrl: z.enum(["https://sms.hubtel.com/v1/messages", "https://smsc.hubtel.com/v1/messages"]).default("https://sms.hubtel.com/v1/messages"),
+});
+export type SchoolHubtelConnectionInput = z.infer<typeof schoolHubtelConnectionSchema>;
+
 export const enrollSchoolSchema = z.object({
   // School details
   schoolName: z.string().min(2),
@@ -776,6 +785,9 @@ export const enrollSchoolSchema = z.object({
   schoolAddress: z.string().optional(),
   subdomain: subdomainSchema,
   region: z.string().optional(),
+
+  // Optional: encrypted school-funded SMS connection. Channels start disabled.
+  smsConnection: schoolHubtelConnectionSchema.optional(),
 
   // Admin account
   adminName: z.string().min(2),
