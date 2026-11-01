@@ -1,6 +1,6 @@
 import { Redirect } from "expo-router";
 
-/** Phase 0 placeholder. Phase 1 replaces this with the session gate (/school, /login, tabs). */
+/** UI prototype entry point; a real session gate can replace this later. */
 export default function Index() {
-  return <Redirect href="/dev-gallery" />;
+  return <Redirect href="/(tabs)" />;
 }
