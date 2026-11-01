@@ -9,13 +9,12 @@ import { DashboardInfographics } from "@/components/school/dashboard/dashboard-i
 import { RecentActivityCard, SchoolYearCard } from "@/components/school/dashboard/dashboard-activity";
 import type { DashboardAnalytics } from "@/components/school/dashboard/dashboard-data";
 import { apiFetch } from "@/lib/api";
-import { schoolRoleLabel, useSchoolRole } from "@/components/school/school-role-switcher";
-import { getSchoolNavGroupsForRole } from "@/lib/school-navigation";
+import { useSchoolRole } from "@/components/school/school-role-switcher";
 import { StudentOverview } from "@/components/portal/student-overview";
 import { TeacherOverview } from "@/components/portal/teacher-overview";
+import { AccountantOverview } from "@/components/portal/accountant-overview";
 import { StaffOverview } from "@/components/portal/staff-overview";
 import { GuardianPortalWorkspace } from "@/components/portal/guardian-portal-workspace";
-import { AccountantFinanceCharts } from "@/components/portal/accountant-finance-charts";
 import { useSchoolOrganization } from "@/components/school/school-organization";
 
 interface SetupYear {
@@ -27,24 +26,6 @@ interface SetupSchool {
   academicYears: SetupYear[];
 }
 interface DashboardContentProps { today: string; greetingName: string; }
-interface AccountantDashboardExpense {
-  amount: number | string;
-  date: string;
-  category?: string | null;
-  customCategory?: { name: string } | null;
-  registryCategory?: { name: string } | null;
-}
-interface AccountantFinanceSummary {
-  asOf: string;
-  billed: string;
-  collected: string;
-  outstanding: string;
-  overdue: string;
-  collectionRate: string | null;
-  byMethod: { method: string; amount: string; receiptCount: number }[];
-  byClass: { classId: string | null; className: string; billed: string; collected: string; outstanding: string; billCount: number }[];
-  ageing: { days0To30: string; days31To60: string; days61To90: string; days90Plus: string; notDue: string };
-}
 interface Metric { label: string; value: string; detail: string; icon: LucideIcon; className: string; }
 const numberFormat = new Intl.NumberFormat("en-GH");
 const moneyFormat = new Intl.NumberFormat("en-GH", { style: "currency", currency: "GHS", maximumFractionDigits: 2 });
@@ -66,7 +47,7 @@ function Metrics({ data, isLoading, isError }: { data?: DashboardAnalytics; isLo
     metrics.push({ label: "Revenue this month", value: moneyFormat.format(data.metrics.revenueThisMonth ?? 0), detail: "Completed payments recorded", icon: WalletCards, className: "bg-success/10 text-success" });
     metrics.push({ label: "Expenditures this month", value: moneyFormat.format(data.metrics.expendituresThisMonth ?? 0), detail: "Recorded school expenses", icon: WalletCards, className: "bg-warning/10 text-warning" });
   }
-  return <section aria-label="Live school statistics" className={`grid gap-3 sm:grid-cols-2 ${data.canViewFinance ? "xl:grid-cols-5" : "xl:grid-cols-3"}`}>{metrics.map((metric) => <MetricTile key={metric.label} metric={metric} />)}</section>;
+  return <section aria-label="Live school statistics" className={`grid gap-3 sm:grid-cols-2 ${data.canViewFinance ? "xl:grid-cols-3 2xl:grid-cols-5" : "xl:grid-cols-3"}`}>{metrics.map((metric) => <MetricTile key={metric.label} metric={metric} />)}</section>;
 }
 
 export function DashboardContent({ today, greetingName }: DashboardContentProps) {
@@ -74,41 +55,13 @@ export function DashboardContent({ today, greetingName }: DashboardContentProps)
   const { activeOrganization } = useSchoolOrganization();
   const [selectedMonths, setSelectedMonths] = useState(6);
   const isManagementRole = ["owner", "admin", "headteacher"].includes(activeRole ?? "");
-  // School-wide analytics are for leadership and finance only. Teachers, staff, guardians and
+  // School-wide analytics are for leadership only (finance has its own overview). Teachers, staff, guardians and
   // students have their own overviews and must not load whole-school data (the API refuses them).
-  const canSeeAnalytics = isManagementRole || activeRole === "accountant";
+  const canSeeAnalytics = isManagementRole;
   const analyticsQuery = useQuery({
     queryKey: ["dashboard", "analytics", selectedMonths, activeOrganization?.id],
     queryFn: () => apiFetch<DashboardAnalytics>(`/dashboard/analytics?months=${selectedMonths}`),
     enabled: canSeeAnalytics && Boolean(activeOrganization),
-    retry: false,
-    refetchInterval: 60_000,
-  });
-  const accountantYearsQuery = useQuery({
-    queryKey: ["dashboard", "accountant-finance", "academic-years", activeOrganization?.id],
-    queryFn: () => apiFetch<SetupYear[]>("/schools/academic-years"),
-    enabled: activeRole === "accountant" && Boolean(activeOrganization),
-    retry: false,
-    staleTime: 60_000,
-  });
-  const accountantCurrentYear = accountantYearsQuery.data?.find((year) => year.isCurrent);
-  const accountantCurrentTerm = accountantCurrentYear?.terms.find((term) => term.isCurrent);
-  const accountantSummaryQuery = useQuery({
-    queryKey: ["dashboard", "accountant-finance", "summary", activeOrganization?.id, accountantCurrentYear?.id, accountantCurrentTerm?.id],
-    queryFn: () => {
-      const params = new URLSearchParams();
-      if (accountantCurrentYear) params.set("yearId", accountantCurrentYear.id);
-      if (accountantCurrentTerm) params.set("termId", accountantCurrentTerm.id);
-      return apiFetch<AccountantFinanceSummary>(`/finance/summary${params.size ? `?${params.toString()}` : ""}`);
-    },
-    enabled: activeRole === "accountant" && Boolean(activeOrganization),
-    retry: false,
-    refetchInterval: 60_000,
-  });
-  const accountantExpensesQuery = useQuery({
-    queryKey: ["dashboard", "accountant-finance", "expenses", activeOrganization?.id],
-    queryFn: () => apiFetch<AccountantDashboardExpense[]>("/finance/expenses"),
-    enabled: activeRole === "accountant" && Boolean(activeOrganization),
     retry: false,
     refetchInterval: 60_000,
   });
@@ -141,12 +94,12 @@ export function DashboardContent({ today, greetingName }: DashboardContentProps)
   const completedSteps = setupItems.filter((item) => item.complete).length;
   const setupLoading = schoolQuery.isPending || classesQuery.isPending || subjectsQuery.isPending;
   const setupHasError = schoolQuery.isError || classesQuery.isError || subjectsQuery.isError;
-  const roleLinks = getSchoolNavGroupsForRole(activeRole ?? undefined).flatMap((group) => group.items).slice(0, 6);
   const data = analyticsQuery.data;
 
   if (activeRole === "student") return <main className="mx-auto max-w-[1440px] px-4 py-7 sm:px-6 lg:px-9 lg:py-9"><StudentOverview /></main>;
   if (activeRole === "guardian") return <main className="mx-auto max-w-[1440px] px-4 py-7 sm:px-6 lg:px-9 lg:py-9"><GuardianPortalWorkspace showSectionNav={false} /></main>;
   if (activeRole === "teacher") return <TeacherOverview today={today} greetingName={greetingName} />;
+  if (activeRole === "accountant") return <AccountantOverview today={today} greetingName={greetingName} />;
   if (activeRole === "staff") return <StaffOverview today={today} greetingName={greetingName} />;
 
   return (
@@ -166,33 +119,8 @@ export function DashboardContent({ today, greetingName }: DashboardContentProps)
         <div className="grid gap-px bg-border sm:grid-cols-2 xl:grid-cols-4">{setupItems.map(({ title, detail, complete, icon: Icon, page }) => <Link key={page} to="/$page" params={{ page }} className="group flex min-h-24 items-start gap-3 bg-card p-4 transition hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary"><span className={`mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg ${complete ? "bg-success/10 text-success" : "bg-primary/10 text-primary"}`}>{complete ? <CircleCheck className="size-4" /> : <Icon className="size-4" />}</span><span className="min-w-0 flex-1"><span className="block text-xs font-semibold text-foreground">{title}</span><span className="mt-1 block text-[10px] leading-4 text-muted-foreground">{complete ? "Complete" : detail}</span></span></Link>)}</div>
       </section>}
 
-      {!isManagementRole && <section className="mb-5 rounded-2xl border border-border bg-card p-5"><p className="text-xs font-semibold uppercase tracking-wide text-primary">{schoolRoleLabel(activeRole)}</p><p className="mt-1 text-sm text-muted-foreground">Quick links for your workspace</p><div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{roleLinks.map((item) => <Link key={item.id} to="/$page" params={{ page: item.id }} className="flex items-center gap-3 rounded-xl border border-border p-3 transition hover:bg-muted/50"><span className="flex size-9 items-center justify-center rounded-lg bg-primary/10 text-primary"><item.icon className="size-4" /></span><span><span className="block text-sm font-semibold text-foreground">{item.label}</span><span className="mt-0.5 block text-xs text-muted-foreground">{item.description}</span></span></Link>)}</div></section>}
-
       <Metrics data={data} isLoading={analyticsQuery.isPending} isError={analyticsQuery.isError} />
       <DashboardInfographics data={data} isLoading={analyticsQuery.isPending} isError={analyticsQuery.isError} selectedMonths={selectedMonths} onMonthsChange={setSelectedMonths} />
-      {activeRole === "accountant" && (
-        <section className="mt-6 space-y-3" aria-label="Accountant finance dashboard">
-          <div>
-            <h2 className="text-lg font-semibold tracking-tight text-foreground">Finance overview</h2>
-            <p className="mt-1 text-sm text-muted-foreground">Live collections, expenses and breakdowns from saved finance records.</p>
-          </div>
-          {(accountantSummaryQuery.isPending || accountantExpensesQuery.isPending || accountantYearsQuery.isPending) ? (
-            <div className="grid gap-5 xl:grid-cols-2" aria-label="Loading finance analytics">
-              <div className="h-80 animate-pulse rounded-2xl bg-muted/60" />
-              <div className="h-80 animate-pulse rounded-2xl bg-muted/60" />
-            </div>
-          ) : accountantSummaryQuery.isError || accountantExpensesQuery.isError ? (
-            <p role="alert" className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
-              Finance charts could not load. Check your accountant finance permissions and API connection, then refresh this dashboard.
-            </p>
-          ) : (
-            <AccountantFinanceCharts
-              summary={accountantSummaryQuery.data ?? null}
-              expenses={accountantExpensesQuery.data ?? []}
-            />
-          )}
-        </section>
-      )}
       <section className={`mt-5 grid gap-5 ${isManagementRole ? "xl:grid-cols-2" : "xl:grid-cols-1"}`}>
         <RecentActivityCard activities={data?.recentActivities ?? []} isLoading={analyticsQuery.isPending} isError={analyticsQuery.isError} canViewFinance={Boolean(data?.canViewFinance)} />
         {isManagementRole && <SchoolYearCard academicYear={activeYear} />}
