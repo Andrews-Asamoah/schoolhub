@@ -2,13 +2,12 @@ import { BookOpen, CalendarClock, CheckCircle2, FileText } from "lucide-react-na
 import { Text } from "react-native";
 import { GlassCard } from "@/components/GlassCard";
 import { ListRow } from "@/components/ListRow";
-import { Screen } from "@/components/Screen";
-import { TAB_BAR_CLEARANCE } from "@/components/GlassTabBar";
+import { WorkspaceScreen } from "@/components/WorkspaceScreen";
 import { type, useTheme } from "@/theme/theme";
 
 export default function LearningScreen() {
   const { colors, accent } = useTheme();
-  return <Screen title="My learning" subtitle="Assignments, resources and progress" bottomInset={TAB_BAR_CLEARANCE}>
+  return <WorkspaceScreen title="My learning" subtitle="Assignments, resources and progress">
     <GlassCard padding={16} style={{ marginBottom: 18 }}>
       <Text style={[type.caption, { color: colors.mutedForeground }]}>Learning progress · Sample student</Text>
       <Text style={{ color: colors.foreground, fontSize: 28, fontFamily: "Inter_700Bold", marginTop: 5 }}>7 of 10</Text>
@@ -28,5 +27,5 @@ export default function LearningScreen() {
       <ListRow leading={<CalendarClock size={20} color={accent} />} title="Science practical preparation" subtitle="Integrated Science · Study guide" trailing={<Text style={{ color: colors.mutedForeground, fontSize: 11 }}>8 min</Text>} />
     </GlassCard>
     <Text style={[type.caption, { color: colors.mutedForeground, marginTop: 14 }]}>Sample learning content only. Submissions, downloads and grading are not active.</Text>
-  </Screen>;
+  </WorkspaceScreen>;
 }
