@@ -15,13 +15,13 @@ const records = [
   { name: "Akosua Owusu", id: "SH-2026-0117", className: "JHS 3A", status: "Pending" },
   { name: "Kojo Addo", id: "SH-2026-0108", className: "JHS 1A", status: "Active" },
 ];
-const filters = [{ value: "All", label: "All" }, { value: "JHS 1A", label: "JHS 1" }, { value: "JHS 2A", label: "JHS 2" }, { value: "JHS 3A", label: "JHS 3" }] as const;
+const filters = [{ value: "All", label: "All" }, { value: "JHS 1", label: "JHS 1" }, { value: "JHS 2", label: "JHS 2" }, { value: "JHS 3", label: "JHS 3" }] as const;
 
 export default function StudentsScreen() {
   const { colors, accent } = useTheme();
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<string>("All");
-  const visible = useMemo(() => records.filter((r) => (filter === "All" || r.className === filter) && (r.name.toLowerCase().includes(query.toLowerCase()) || r.id.toLowerCase().includes(query.toLowerCase()))), [filter, query]);
+  const visible = useMemo(() => records.filter((r) => (filter === "All" || r.className.startsWith(filter)) && (r.name.toLowerCase().includes(query.toLowerCase()) || r.id.toLowerCase().includes(query.toLowerCase()))), [filter, query]);
   return <WorkspaceScreen title="Students" subtitle="Directory · 1,248 enrolled">
     <GlassCard padding={12} style={{ marginBottom: 14 }}>
       <View style={{ flexDirection: "row", alignItems: "center", gap: 9 }}>
