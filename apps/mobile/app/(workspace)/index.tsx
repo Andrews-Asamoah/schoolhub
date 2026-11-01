@@ -28,7 +28,7 @@ export default function WorkspaceHome() {
         const Icon = item.icon;
         return <Pressable key={item.title} onPress={() => router.push(item.route)} accessibilityRole="button" accessibilityLabel={item.title} style={{ width: "48%" }}>
           <GlassCard padding={15} style={{ minHeight: 142 }}>
-            <View style={{ width: 40, height: 40, borderRadius: 13, backgroundColor: colors.accentSoft, alignItems: "center", justifyContent: "center" }}>
+            <View style={{ width: 40, height: 40, borderRadius: 13, backgroundColor: colors.accent, alignItems: "center", justifyContent: "center" }}>
               <Icon size={20} color={accent} />
             </View>
             <Text style={[type.bodyStrong, { color: colors.foreground, marginTop: 13 }]}>{item.title}</Text>
