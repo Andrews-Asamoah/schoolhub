@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import {
   BookOpen, ChartNoAxesCombined, GraduationCap, HeartHandshake,
-  Megaphone, Settings2, Sparkles, UsersRound, WalletCards, Building2,
+  Megaphone, Settings2, UsersRound, WalletCards, Building2,
   type LucideIcon,
 } from "lucide-react";
 import { SidebarUserMenu } from "@/components/ui/sidebar-user-menu";
@@ -69,7 +69,7 @@ export function SchoolSidebar({
               <span className="sidebar-expanded flex-1">Overview</span>
             </Link>
           </SidebarMenuButton>
-          {ownPortal && ownPortal.id !== "student-portal" && ownPortal.id !== "accountant-portal" && (
+          {ownPortal && (
             <SidebarMenuButton asChild active={activePage === ownPortal.id} tooltip={ownPortal.label} className="school-sidebar-nav-item">
               <Link to="/$page" params={{ page: ownPortal.id }}>
                 <ownPortal.icon className="size-[18px] shrink-0" aria-hidden="true" />
@@ -99,13 +99,6 @@ export function SchoolSidebar({
       </SidebarContent>
 
       <SidebarFooter>
-        <div className="sidebar-expanded mb-2 rounded-lg bg-sidebar-accent/50 p-2.5">
-          <div className="mb-1 flex items-center gap-2 text-sidebar-accent-foreground">
-            <Sparkles className="size-3.5" />
-            <span className="text-xs font-semibold">SchoolHub workspace</span>
-          </div>
-          <p className="text-[11px] leading-relaxed text-muted-foreground">Your school's daily operations, together in one place.</p>
-        </div>
         <SidebarUserMenu name={userName ?? "School admin"} email={userEmail} image={userImage}
           roleLabel={schoolRoleLabel(activeRole)}
           profileLink={({ className, onClick, children }) => (
