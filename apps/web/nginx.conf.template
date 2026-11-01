@@ -25,6 +25,24 @@ server {
     return 200 "ok";
   }
 
+  # Email verification URLs carry a short-lived token. Keep the full request
+  # out of access logs and ordinary upstream-error logs, including on a 502.
+  location = /api/auth/verify-email {
+    access_log off;
+    error_log /dev/stderr crit;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-Frame-Options "DENY" always;
+    add_header Referrer-Policy "no-referrer" always;
+    add_header Cache-Control "no-store" always;
+    proxy_pass ${API_UPSTREAM};
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-Host $host;
+    proxy_set_header X-Forwarded-Proto $schoolhub_forwarded_proto;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_read_timeout 60s;
+  }
+
   # The API reads the school from the Host header (<school>.<root-domain>), so
   # the original host must reach it unchanged.
   location /api/ {

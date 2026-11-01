@@ -1,0 +1,107 @@
+model SchoolNotificationSettings {
+ schoolId String @id
+ smsConnectionId String?
+ smsConnection SchoolSmsConnection? @relation(fields:[smsConnectionId,schoolId],references:[id,schoolId],onDelete:NoAction,onUpdate:NoAction,map:"school_notification_settings_sms_account_fkey")
+ emailEnabled Boolean @default(false)
+ smsEnabled Boolean @default(false)
+ emailDailyLimit Int @default(0)
+ smsDailyLimit Int @default(0)
+ updatedAt DateTime @updatedAt
+ school School @relation(fields:[schoolId],references:[id],onDelete:NoAction,onUpdate:NoAction)
+ @@map("school_notification_settings")
+}
+model NotificationPreference {
+ id String @id @default(cuid())
+ schoolId String
+ userId String
+ emailEnabled Boolean @default(false)
+ smsEnabled Boolean @default(false)
+ consentAt DateTime @default(now())
+ updatedAt DateTime @updatedAt
+ @@unique([schoolId,userId])
+ school School @relation(fields:[schoolId],references:[id],onDelete:NoAction,onUpdate:NoAction)
+ user user @relation(fields:[userId],references:[id],onDelete:NoAction,onUpdate:NoAction)
+ @@map("notification_preferences")
+}
+model NotificationDelivery {
+ id String @id
+ notificationId String
+ schoolId String
+ userId String
+ channel String
+ provider String
+ providerScope String @default("platform")
+ smsConnectionId String?
+ smsConnection SchoolSmsConnection? @relation(fields:[smsConnectionId,schoolId],references:[id,schoolId],onDelete:NoAction,onUpdate:NoAction,map:"notification_deliveries_sms_account_fkey")
+ recipient String
+ recipientHash String?
+ payload Json?
+ status String @default("PENDING")
+ providerMessageId String?
+ attempts Int @default(0)
+ reason String?
+ quotaDay DateTime? @db.Date
+ createdAt DateTime @default(now())
+ updatedAt DateTime @updatedAt
+ expiresAt DateTime
+ acceptedAt DateTime?
+ deliveredAt DateTime?
+ nextPollAt DateTime?
+ @@unique([notificationId,channel])
+ @@unique([provider,providerScope,providerMessageId],map:"notification_delivery_provider_scope_id")
+ @@index([schoolId,createdAt],map:"notification_delivery_school_date")
+ @@index([status,nextPollAt],map:"notification_delivery_poll")
+ school School @relation(fields:[schoolId],references:[id],onDelete:NoAction,onUpdate:NoAction)
+ user user @relation(fields:[userId],references:[id],onDelete:NoAction,onUpdate:NoAction)
+ notification Notification @relation(fields:[notificationId],references:[id],onDelete:NoAction,onUpdate:NoAction)
+ @@map("notification_deliveries")
+}
+model NotificationDailyUsage {
+ id String @id @default(cuid())
+ schoolId String
+ day DateTime @db.Date
+ channel String
+ used Int @default(0)
+ @@unique([schoolId,day,channel])
+ school School @relation(fields:[schoolId],references:[id],onDelete:NoAction,onUpdate:NoAction)
+ @@map("notification_daily_usage")
+}
+model NotificationSuppression {
+ id String @id @default(cuid())
+ channel String
+ recipientHash String
+ reason String
+ createdAt DateTime @default(now())
+ @@unique([channel,recipientHash])
+ @@map("notification_suppressions")
+}
+model NotificationProviderEvent {
+ id String @id
+ provider String
+ messageId String
+ kind String
+ eventAt DateTime
+ processedAt DateTime?
+ createdAt DateTime @default(now())
+ @@index([provider,messageId,processedAt],map:"notification_event_processing")
+ @@map("notification_provider_events")
+}
+
+model SchoolSmsConnection {
+ id String @id
+ schoolId String
+ senderId String
+ clientIdHint String
+ apiBaseUrl String
+ encryptedCredentials String?
+ createdAt DateTime @default(now())
+ retiredAt DateTime?
+ revokedAt DateTime?
+ school School @relation(fields:[schoolId],references:[id],onDelete:NoAction,onUpdate:NoAction)
+ settings SchoolNotificationSettings[]
+ deliveries NotificationDelivery[]
+ @@unique([id,schoolId])
+ @@index([schoolId,createdAt],map:"school_sms_connection_school_date")
+ @@index([retiredAt],map:"school_sms_connection_retention")
+ @@map("school_sms_connections")
+}

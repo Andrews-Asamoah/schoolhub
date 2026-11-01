@@ -3,6 +3,11 @@
 // ============================================================================
 
 model School {
+  smsConnections SchoolSmsConnection[]
+  notificationSettings SchoolNotificationSettings?
+  notificationPreferences NotificationPreference[]
+  notificationDeliveries NotificationDelivery[]
+  notificationDailyUsage NotificationDailyUsage[]
   id             String   @id @default(cuid())
   organizationId String   @unique
   name           String

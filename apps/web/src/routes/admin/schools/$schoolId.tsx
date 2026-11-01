@@ -1,3 +1,4 @@
+import { SchoolSmsAccountPanel } from "@/components/school/school-sms-account-panel";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState, type ReactNode } from "react";
@@ -378,6 +379,7 @@ function SchoolDetailPage() {
       {/* Tab content */}
       {activeTab === "overview" && (
         <div className="space-y-5">
+          <SchoolSmsAccountPanel endpoint={`/super-admin/schools/${schoolId}/sms`} scopeKey={schoolId} />
           <form
             onSubmit={(event) => {
               event.preventDefault();

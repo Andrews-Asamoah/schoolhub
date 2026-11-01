@@ -1,3 +1,4 @@
+import { PasswordRecoveryModule } from "./modules/accounts/password-recovery/password-recovery.module.js";
 import { Module } from "@nestjs/common";
 import { APP_FILTER } from "@nestjs/core";
 import { ThrottlerModule } from "@nestjs/throttler";
@@ -43,7 +44,7 @@ import { DashboardModule } from "./modules/dashboard/dashboard.module.js";
     JobsModule,
     StorageModule,
     // Bounded payloads for reviewed rollover batches (up to 2,000 decisions).
-    AuthModule.forRoot({ auth, bodyParser: { json: { limit: "4mb" } } }),
+    AuthModule.forRoot({ auth, bodyParser: { rawBody: true, json: { limit: "4mb" } } }),
     SchoolsModule,
     StudentsModule,
     AcademicsModule,
@@ -55,6 +56,7 @@ import { DashboardModule } from "./modules/dashboard/dashboard.module.js";
     SupportModule,
     PeopleModule,
     AccountsModule,
+    PasswordRecoveryModule,
     TeacherScopeModule,
     SubjectsModule,
     TimetableModule,
