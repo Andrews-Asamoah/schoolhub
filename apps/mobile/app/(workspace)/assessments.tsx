@@ -5,7 +5,7 @@ import { ListRow } from "@/components/ListRow";
 import { Screen } from "@/components/Screen";
 import { StatTile } from "@/components/StatTile";
 import { TAB_BAR_CLEARANCE } from "@/components/GlassTabBar";
-import { type, useTheme, withAlpha } from "@/theme/theme";
+import { type, useTheme } from "@/theme/theme";
 
 const subjects = [{ name: "Mathematics", average: "78.4%", progress: 0.78 }, { name: "Integrated Science", average: "82.1%", progress: 0.82 }, { name: "English Language", average: "74.8%", progress: 0.75 }, { name: "Computing", average: "88.2%", progress: 0.88 }];
 export default function AssessmentsScreen() {
