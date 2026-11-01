@@ -19,6 +19,8 @@ import {
   UsersRound,
   WalletCards,
 } from "lucide-react";
+import { GuardianChildRecordsWorkspace } from "@/components/portal/guardian-child-records-workspace";
+import { GuardianFeesWorkspace } from "@/components/portal/guardian-fees-workspace";
 import { GuardianPublishedReports } from "@/components/portal/guardian-published-reports";
 import {
   announcementCategoryLabel,
@@ -136,7 +138,7 @@ export function GuardianPortalWorkspace({ defaultTab = "overview", showSectionNa
       {activeTab === "overview" && (
         <div className="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-3">
           <Metric label="Linked children" value={wardsQuery.isPending ? "—" : String(wards.length)} detail="Children currently linked to this guardian account" icon={UsersRound} />
-          <Metric label="Published reports" value="View reports" detail="Official report cards released by the school" icon={GraduationCap} />
+          <Link to="/$page" params={{ page: "guardian-reports" }} className="block rounded-2xl transition hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"><Metric label="Report cards" value="Open" detail="Official report cards released by the school" icon={GraduationCap} /></Link>
           <Metric label="School updates" value={announcementsQuery.isPending || announcementsQuery.isError ? "—" : String(announcements.length)} detail={announcementsQuery.isError ? "School updates could not be loaded" : "Current notices available to your account"} icon={BellRing} />
         </div>
       )}
@@ -182,11 +184,11 @@ export function GuardianPortalWorkspace({ defaultTab = "overview", showSectionNa
 
       {activeTab === "academics" && <GuardianPublishedReports />}
 
-      {activeTab === "attendance" && <EmptyFeature icon={CalendarDays} title="Attendance records" description="Attendance is not yet connected to the guardian-facing live records in this portal. Once the school publishes attendance data for linked children, daily status, absence history and term attendance summaries will appear here." />}
+      {activeTab === "attendance" && <GuardianChildRecordsWorkspace view="attendance" />}
 
-      {activeTab === "fees" && <EmptyFeature icon={WalletCards} title="Fees and payment history" description="Fee balances and payment history must come from the school's official billing records. This page does not accept or simulate payments. Contact the school accounts office for a current statement until secure payment processing is connected." />}
+      {activeTab === "fees" && <GuardianFeesWorkspace />}
 
-      {activeTab === "timetable" && <EmptyFeature icon={Clock3} title="Class timetable" description="A child's timetable will appear here when the school has published a timetable linked to their current class. Please confirm class placement with the school office if you believe a timetable should be available." />}
+      {activeTab === "timetable" && <GuardianChildRecordsWorkspace view="timetable" />}
 
       {activeTab === "notices" && (
         <section className="rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-6">

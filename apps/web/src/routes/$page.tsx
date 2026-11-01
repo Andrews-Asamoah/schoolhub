@@ -69,6 +69,7 @@ import { AdminAnnouncementsWorkspace } from "@/components/portal/admin-announcem
 import { DocumentsWorkspace } from "@/components/portal/documents-workspace";
 import { MessagesWorkspace } from "@/components/portal/messages-workspace";
 import { NotificationsHistoryWorkspace } from "@/components/portal/notifications-history-workspace";
+import { ReportsRestrictedNotice } from "@/components/school/reports-restricted-notice";
 import { SchoolReportsWorkspace } from "@/components/school/reports-workspace";
 import { InternalExaminationsWorkspace } from "@/components/school/internal-examinations-workspace";
 import { ExternalExaminationsWorkspace } from "@/components/school/external-examinations-workspace";
@@ -239,7 +240,6 @@ function WorkspaceContent({ pageId }: { pageId: string }) {
         <>
           {pageId === "teacher-portal" && <TeacherPortalWorkspace />}
           {pageId === "accountant-portal" && <AccountantPortalWorkspace />}
-          {pageId === "dashboard" && activeRole === "guardian" && <GuardianPortalWorkspace showSectionNav={false} />}
           {pageId === "guardian-attendance" && <GuardianChildRecordsWorkspace view="attendance" />}
           {pageId === "guardian-timetable" && <GuardianChildRecordsWorkspace view="timetable" />}
           {pageId === "guardian-reports" && <GuardianPortalWorkspace defaultTab="academics" showSectionNav={false} />}
@@ -309,7 +309,9 @@ function WorkspaceContent({ pageId }: { pageId: string }) {
             )
           )}
           {pageId === "reports" && (
-            activeRole === "student" ? <StudentReportView /> : <SchoolReportsWorkspace />
+            activeRole === "student" ? <StudentReportView />
+              : ["owner", "admin", "headteacher", "accountant"].includes(activeRole ?? "") ? <SchoolReportsWorkspace />
+                : <ReportsRestrictedNotice />
           )}
           {pageId === "attendance" && (
             activeRole === "student" ? <StudentAttendanceView /> : <AttendanceWorkspace query={classesQuery} />

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import {
-  ArrowRight, BookOpen, Building2, CalendarDays, CircleAlert, GraduationCap,
+  CircleCheck, BookOpen, Building2, CalendarDays, CircleAlert, GraduationCap,
   UsersRound, WalletCards, UserRoundPlus, type LucideIcon,
 } from "lucide-react";
 import { DashboardInfographics } from "@/components/school/dashboard/dashboard-infographics";
@@ -12,6 +12,9 @@ import { apiFetch } from "@/lib/api";
 import { schoolRoleLabel, useSchoolRole } from "@/components/school/school-role-switcher";
 import { getSchoolNavGroupsForRole } from "@/lib/school-navigation";
 import { StudentOverview } from "@/components/portal/student-overview";
+import { TeacherOverview } from "@/components/portal/teacher-overview";
+import { StaffOverview } from "@/components/portal/staff-overview";
+import { GuardianPortalWorkspace } from "@/components/portal/guardian-portal-workspace";
 import { AccountantFinanceCharts } from "@/components/portal/accountant-finance-charts";
 import { useSchoolOrganization } from "@/components/school/school-organization";
 
@@ -71,10 +74,13 @@ export function DashboardContent({ today, greetingName }: DashboardContentProps)
   const { activeOrganization } = useSchoolOrganization();
   const [selectedMonths, setSelectedMonths] = useState(6);
   const isManagementRole = ["owner", "admin", "headteacher"].includes(activeRole ?? "");
+  // School-wide analytics are for leadership and finance only. Teachers, staff, guardians and
+  // students have their own overviews and must not load whole-school data (the API refuses them).
+  const canSeeAnalytics = isManagementRole || activeRole === "accountant";
   const analyticsQuery = useQuery({
     queryKey: ["dashboard", "analytics", selectedMonths, activeOrganization?.id],
     queryFn: () => apiFetch<DashboardAnalytics>(`/dashboard/analytics?months=${selectedMonths}`),
-    enabled: Boolean(activeRole && activeRole !== "student" && activeOrganization),
+    enabled: canSeeAnalytics && Boolean(activeOrganization),
     retry: false,
     refetchInterval: 60_000,
   });
@@ -133,11 +139,15 @@ export function DashboardContent({ today, greetingName }: DashboardContentProps)
     { title: "Create classes", detail: "Organize learners under the current academic year.", complete: (classesQuery.data?.length ?? 0) > 0, icon: UsersRound, page: "classes" },
   ];
   const completedSteps = setupItems.filter((item) => item.complete).length;
+  const setupLoading = schoolQuery.isPending || classesQuery.isPending || subjectsQuery.isPending;
   const setupHasError = schoolQuery.isError || classesQuery.isError || subjectsQuery.isError;
   const roleLinks = getSchoolNavGroupsForRole(activeRole ?? undefined).flatMap((group) => group.items).slice(0, 6);
   const data = analyticsQuery.data;
 
   if (activeRole === "student") return <main className="mx-auto max-w-[1440px] px-4 py-7 sm:px-6 lg:px-9 lg:py-9"><StudentOverview /></main>;
+  if (activeRole === "guardian") return <main className="mx-auto max-w-[1440px] px-4 py-7 sm:px-6 lg:px-9 lg:py-9"><GuardianPortalWorkspace showSectionNav={false} /></main>;
+  if (activeRole === "teacher") return <TeacherOverview today={today} greetingName={greetingName} />;
+  if (activeRole === "staff") return <StaffOverview today={today} greetingName={greetingName} />;
 
   return (
     <main className="mx-auto max-w-[1440px] px-4 py-7 sm:px-6 lg:px-9 lg:py-9">
@@ -147,13 +157,13 @@ export function DashboardContent({ today, greetingName }: DashboardContentProps)
         <p className="mt-1.5 text-sm text-muted-foreground">A live overview of your school&apos;s records and activity.</p>
       </div>
 
-      {isManagementRole && <section className="mb-6 overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+      {isManagementRole && !setupLoading && !(completedSteps === setupItems.length && !setupHasError) && <section className="mb-6 overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
         <div className="flex flex-wrap items-start justify-between gap-4 border-b border-border bg-muted/30 px-5 py-5 sm:px-6">
           <div><p className="text-[10px] font-bold uppercase tracking-[0.16em] text-primary">Getting started</p><h2 className="mt-1 text-lg font-bold tracking-tight text-foreground">Prepare your school to run</h2><p className="mt-1 max-w-2xl text-xs leading-5 text-muted-foreground">These checks reflect your current school configuration.</p></div>
           <div className="min-w-32 rounded-xl border border-border bg-card px-4 py-3"><p className="text-lg font-bold text-foreground">{completedSteps}<span className="text-muted-foreground">/{setupItems.length}</span></p><p className="text-[10px] font-medium text-muted-foreground">setup steps complete</p><div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-primary transition-all" style={{ width: `${(completedSteps / setupItems.length) * 100}%` }} /></div></div>
         </div>
         {setupHasError && <p role="alert" className="flex items-center gap-2 border-b border-destructive/20 bg-destructive/5 px-5 py-2.5 text-xs text-destructive"><CircleAlert className="size-4 shrink-0" />Some setup checks could not load. Retry after the API connection is restored.</p>}
-        <div className="grid gap-px bg-border sm:grid-cols-2 xl:grid-cols-4">{setupItems.map(({ title, detail, complete, icon: Icon, page }) => <Link key={page} to="/$page" params={{ page }} className="group flex min-h-24 items-start gap-3 bg-card p-4 transition hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary"><span className={`mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg ${complete ? "bg-success/10 text-success" : "bg-primary/10 text-primary"}`}>{complete ? <ArrowRight className="size-4" /> : <Icon className="size-4" />}</span><span className="min-w-0 flex-1"><span className="block text-xs font-semibold text-foreground">{title}</span><span className="mt-1 block text-[10px] leading-4 text-muted-foreground">{complete ? "Complete" : detail}</span></span></Link>)}</div>
+        <div className="grid gap-px bg-border sm:grid-cols-2 xl:grid-cols-4">{setupItems.map(({ title, detail, complete, icon: Icon, page }) => <Link key={page} to="/$page" params={{ page }} className="group flex min-h-24 items-start gap-3 bg-card p-4 transition hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary"><span className={`mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg ${complete ? "bg-success/10 text-success" : "bg-primary/10 text-primary"}`}>{complete ? <CircleCheck className="size-4" /> : <Icon className="size-4" />}</span><span className="min-w-0 flex-1"><span className="block text-xs font-semibold text-foreground">{title}</span><span className="mt-1 block text-[10px] leading-4 text-muted-foreground">{complete ? "Complete" : detail}</span></span></Link>)}</div>
       </section>}
 
       {!isManagementRole && <section className="mb-5 rounded-2xl border border-border bg-card p-5"><p className="text-xs font-semibold uppercase tracking-wide text-primary">{schoolRoleLabel(activeRole)}</p><p className="mt-1 text-sm text-muted-foreground">Quick links for your workspace</p><div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{roleLinks.map((item) => <Link key={item.id} to="/$page" params={{ page: item.id }} className="flex items-center gap-3 rounded-xl border border-border p-3 transition hover:bg-muted/50"><span className="flex size-9 items-center justify-center rounded-lg bg-primary/10 text-primary"><item.icon className="size-4" /></span><span><span className="block text-sm font-semibold text-foreground">{item.label}</span><span className="mt-0.5 block text-xs text-muted-foreground">{item.description}</span></span></Link>)}</div></section>}

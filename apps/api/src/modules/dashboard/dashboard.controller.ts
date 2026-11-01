@@ -13,7 +13,8 @@ export class DashboardController {
   constructor(private readonly dashboardService: DashboardService) {}
 
   @Get("analytics")
-  @Roles("owner", "admin", "headteacher", "accountant", "teacher", "staff")
+  // School-wide analytics: leadership and finance only. Teachers and staff get scoped overviews.
+  @Roles("owner", "admin", "headteacher", "accountant")
   getAnalytics(
     @CurrentSchool() school: School,
     @CurrentSchoolRole() role: string | undefined,
