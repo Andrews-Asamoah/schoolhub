@@ -13,9 +13,9 @@
     "db:deploy": "pnpm --filter @schoolhub/api migrate:deploy"
   },
   "devDependencies": {
-    "@types/node": "^26.6.5",
+    "@types/node": "^26.6.6",
     "prettier": "^3.9.10",
-    "turbo": "^2.11.9",
+    "turbo": "^2.11.10",
     "typescript": "^7.0.2"
   }
 }
