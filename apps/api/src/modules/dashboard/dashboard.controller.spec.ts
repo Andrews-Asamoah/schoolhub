@@ -10,11 +10,11 @@ const analyticsRoles = /@Get\("analytics"\)[\s\S]*?@Roles\(([^)]*)\)/.exec(sourc
 const roles = [...analyticsRoles.matchAll(/"([^"]+)"/g)].map((match) => match[1]);
 
 describe("DashboardController analytics roles", () => {
-  it("allows leadership and finance", () => {
-    expect(roles).toEqual(expect.arrayContaining(["owner", "admin", "headteacher", "accountant"]));
+  it("allows leadership", () => {
+    expect(roles).toEqual(expect.arrayContaining(["owner", "admin", "headteacher"]));
   });
 
   it("refuses roles that must not see whole-school data", () => {
-    for (const role of ["teacher", "staff", "guardian", "student"]) expect(roles).not.toContain(role);
+    for (const role of ["accountant", "teacher", "staff", "guardian", "student"]) expect(roles).not.toContain(role);
   });
 });

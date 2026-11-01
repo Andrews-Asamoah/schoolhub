@@ -310,7 +310,7 @@ function WorkspaceContent({ pageId }: { pageId: string }) {
           )}
           {pageId === "reports" && (
             activeRole === "student" ? <StudentReportView />
-              : ["owner", "admin", "headteacher", "accountant"].includes(activeRole ?? "") ? <SchoolReportsWorkspace />
+              : ["owner", "admin", "headteacher"].includes(activeRole ?? "") ? <SchoolReportsWorkspace />
                 : <ReportsRestrictedNotice />
           )}
           {pageId === "attendance" && (
