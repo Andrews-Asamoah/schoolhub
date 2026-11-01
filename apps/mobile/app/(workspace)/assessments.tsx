@@ -2,15 +2,14 @@ import { BookOpenCheck, ChartNoAxesColumnIncreasing, FileText } from "lucide-rea
 import { Text, View } from "react-native";
 import { GlassCard } from "@/components/GlassCard";
 import { ListRow } from "@/components/ListRow";
-import { Screen } from "@/components/Screen";
+import { WorkspaceScreen } from "@/components/WorkspaceScreen";
 import { StatTile } from "@/components/StatTile";
-import { TAB_BAR_CLEARANCE } from "@/components/GlassTabBar";
 import { type, useTheme } from "@/theme/theme";
 
 const subjects = [{ name: "Mathematics", average: "78.4%", progress: 0.78 }, { name: "Integrated Science", average: "82.1%", progress: 0.82 }, { name: "English Language", average: "74.8%", progress: 0.75 }, { name: "Computing", average: "88.2%", progress: 0.88 }];
 export default function AssessmentsScreen() {
   const { colors, accent } = useTheme();
-  return <Screen title="Assessments" subtitle="Academic progress at a glance" bottomInset={TAB_BAR_CLEARANCE}>
+  return <WorkspaceScreen title="Assessments" subtitle="Academic progress at a glance">
     <View style={{ flexDirection: "row", gap: 10, marginBottom: 20 }}>
       <View style={{ flex: 1 }}><StatTile label="Class average" value="80.6%" hint="Current term" icon={<ChartNoAxesColumnIncreasing size={18} color={accent} />} tone="neutral" /></View>
       <View style={{ flex: 1 }}><StatTile label="Published" value="8 / 10" hint="Assessment items" icon={<BookOpenCheck size={18} color={colors.success} />} tone="success" /></View>
@@ -33,5 +32,5 @@ export default function AssessmentsScreen() {
       <ListRow leading={<FileText size={20} color={accent} />} title="Practical science task" subtitle="JHS 2A · Integrated Science · 30 October" trailing={<Text style={{ color: colors.warning, fontSize: 11 }}>Review</Text>} />
     </GlassCard>
     <Text style={[type.caption, { color: colors.mutedForeground, marginTop: 14 }]}>Sample academic data only. Official scores and report cards must come from the school system.</Text>
-  </Screen>;
+  </WorkspaceScreen>;
 }
