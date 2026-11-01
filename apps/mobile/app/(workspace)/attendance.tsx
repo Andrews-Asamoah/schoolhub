@@ -2,9 +2,8 @@ import { CalendarDays, CheckCircle2, Clock3, UserX } from "lucide-react-native";
 import { Text, View } from "react-native";
 import { GlassCard } from "@/components/GlassCard";
 import { ListRow } from "@/components/ListRow";
-import { Screen } from "@/components/Screen";
+import { WorkspaceScreen } from "@/components/WorkspaceScreen";
 import { StatTile } from "@/components/StatTile";
-import { TAB_BAR_CLEARANCE } from "@/components/GlassTabBar";
 import { type, useTheme } from "@/theme/theme";
 
 const classes = [
@@ -16,7 +15,7 @@ const classes = [
 ];
 export default function AttendanceScreen() {
   const { colors } = useTheme();
-  return <Screen title="Attendance" subtitle="Monday · Daily register overview" bottomInset={TAB_BAR_CLEARANCE}>
+  return <WorkspaceScreen title="Attendance" subtitle="Monday · Daily register overview">
     <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10, marginBottom: 20 }}>
       <View style={{ width: "48%" }}><StatTile label="Present" value="94.8%" hint="Across submitted classes" icon={<CheckCircle2 size={18} color={colors.success} />} tone="success" /></View>
       <View style={{ width: "48%" }}><StatTile label="Absent" value="4.1%" hint="Today's sample" icon={<UserX size={18} color={colors.warning} />} tone="warning" /></View>
@@ -28,5 +27,5 @@ export default function AttendanceScreen() {
       {classes.map((c, i) => <ListRow key={c.name} title={c.name} subtitle={c.present + " present · " + c.note} trailing={<Text style={{ color: c.state === "Submitted" ? colors.success : colors.warning, fontSize: 11 }}>{c.state}</Text>} divider={i !== classes.length - 1} />)}
     </GlassCard>
     <Text style={[type.caption, { color: colors.mutedForeground, marginTop: 14 }]}>Illustrative attendance data. Register submission and corrections are not enabled in this UI phase.</Text>
-  </Screen>;
+  </WorkspaceScreen>;
 }
