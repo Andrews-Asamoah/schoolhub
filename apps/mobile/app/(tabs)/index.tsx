@@ -39,6 +39,17 @@ export default function HomeScreen() {
         <Pressable onPress={()=>router.push("/(tabs)/schedule")} style={{ flex:1 }}><GlassCard padding={16}><CalendarDays size={22} color={accent}/><Text style={[type.bodyStrong,{color:colors.foreground,marginTop:12}]}>My schedule</Text><Text style={[type.caption,{color:colors.mutedForeground}]}>Classes and events</Text><ArrowUpRight size={15} color={colors.mutedForeground} style={{position:"absolute",right:12,top:12}}/></GlassCard></Pressable>
         <Pressable onPress={()=>router.push("/(tabs)/notifications")} style={{ flex:1 }}><GlassCard padding={16}><Bell size={22} color={accent}/><Text style={[type.bodyStrong,{color:colors.foreground,marginTop:12}]}>Updates</Text><Text style={[type.caption,{color:colors.mutedForeground}]}>Notices and alerts</Text><ArrowUpRight size={15} color={colors.mutedForeground} style={{position:"absolute",right:12,top:12}}/></GlassCard></Pressable>
       </View>
+      <Pressable onPress={() => router.push("/(workspace)")} accessibilityRole="button" style={{ marginBottom: 18 }}>
+        <GlassCard padding={16}>
+          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+            <View style={{ flex: 1 }}>
+              <Text style={[type.bodyStrong, { color: colors.foreground }]}>Explore school modules</Text>
+              <Text style={[type.caption, { color: colors.mutedForeground, marginTop: 3 }]}>Students, staff, attendance, fees and learning</Text>
+            </View>
+            <ArrowUpRight size={19} color={accent} />
+          </View>
+        </GlassCard>
+      </Pressable>
       <Text style={[type.caption,{color:colors.mutedForeground,textAlign:"center"}]}>Illustrative sample content · Not live school data</Text>
     </Screen>
   );
