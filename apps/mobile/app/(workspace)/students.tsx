@@ -1,13 +1,13 @@
 import { useMemo, useState } from "react";
 import { Search, SlidersHorizontal } from "lucide-react-native";
-import { Pressable, Text, TextInput, View } from "react-native";
+import { Text, TextInput, View } from "react-native";
 import { Avatar } from "@/components/Avatar";
 import { GlassCard } from "@/components/GlassCard";
 import { ListRow } from "@/components/ListRow";
 import { Screen } from "@/components/Screen";
 import { SegmentedControl } from "@/components/SegmentedControl";
 import { TAB_BAR_CLEARANCE } from "@/components/GlassTabBar";
-import { type, useTheme, withAlpha } from "@/theme/theme";
+import { type, useTheme } from "@/theme/theme";
 
 const records = [
   { name: "Kofi Mensah", id: "SH-2026-0142", className: "JHS 2A", status: "Active" },
