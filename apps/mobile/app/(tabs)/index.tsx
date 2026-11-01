@@ -9,7 +9,7 @@ import { Screen } from "@/components/Screen";
 import { SegmentedControl } from "@/components/SegmentedControl";
 import { StatTile } from "@/components/StatTile";
 import { TAB_BAR_CLEARANCE } from "@/components/GlassTabBar";
-import { fonts, radius, spacing, type, useTheme, withAlpha } from "@/theme/theme";
+import { fonts, radius, type, useTheme, withAlpha } from "@/theme/theme";
 
 type Role = "Admin" | "Teacher" | "Parent" | "Student" | "Accountant";
 const roles = [{ value: "Admin", label: "Admin" }, { value: "Teacher", label: "Teacher" }, { value: "Parent", label: "Parent" }, { value: "Student", label: "Student" }, { value: "Accountant", label: "Finance" }] as const;
