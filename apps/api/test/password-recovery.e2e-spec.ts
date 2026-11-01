@@ -42,8 +42,8 @@ describe.skipIf(!url)(
       trusted: ReturnType<typeof request.agent>;
     let ip = 10;
     const send = vi
-      .fn()
-      .mockResolvedValue({ state: 'ACCEPTED', messageId: run + '-email' });
+      .fn<typeof fetch>()
+      .mockImplementation(async () => new Response(JSON.stringify({ id: run + '-email' }), { status: 200 }));
     const post = (
       agent: ReturnType<typeof request.agent>,
       path: string,
@@ -62,15 +62,15 @@ describe.skipIf(!url)(
       process.env.WEB_ORIGIN = origin;
       process.env.NODE_ENV = 'test';
       process.env.RESEND_FROM_EMAIL = 'alerts@example.test';
+      vi.stubEnv('RESEND_API_KEY', 'synthetic-recovery-key');
+      vi.stubEnv('NOTIFICATION_DELIVERY_ENABLED', 'false');
+      vi.stubEnv('RESEND_WEBHOOK_SECRET', '');
+      vi.stubGlobal('fetch', send);
       const { Test } = await import('@nestjs/testing'),
         { AppModule } = await import('../src/app.module.js'),
-        { RecoveryTransport } =
-          await import('../src/modules/accounts/password-recovery/recovery-transport.js'),
         { PasswordRecoveryWorker } =
           await import('../src/modules/accounts/password-recovery/password-recovery.worker.js');
       const module = await Test.createTestingModule({ imports: [AppModule] })
-        .overrideProvider(RecoveryTransport)
-        .useValue({ configured: () => true, send })
         .compile();
       app = module.createNestApplication({ bodyParser: false });
       app.setGlobalPrefix('api');
@@ -132,7 +132,7 @@ describe.skipIf(!url)(
         { email: 'not-an-email' },
       ).expect(400);
     });
-    it('queues and dispatches a generic encrypted reset email while retaining active and pending 2FA for the reset test', async () => {
+    it('queues and sends through the real transport with broadcasts off and no webhook secret, retaining active and pending 2FA for reset', async () => {
       trusted = request.agent(app.getHttpServer());
       await post(trusted, '/auth/sign-in/email', {
         email,
@@ -181,9 +181,14 @@ describe.skipIf(!url)(
         where: { userId: run },
       });
       expect(row.encryptedPayload).not.toContain(email);
-      await worker.dispatch(row.id);
+      await worker.tick();
+      expect(await db.backgroundJob.findUniqueOrThrow({ where: { id: row.id } })).toMatchObject({ status: "SUCCEEDED" });
+      expect(await db.passwordRecoveryRequest.findUniqueOrThrow({ where: { id: row.id } })).toMatchObject({ status: "ACCEPTED", encryptedPayload: null });
       expect(send).toHaveBeenCalledTimes(1);
-      const payload = send.mock.calls[0]![2],
+      expect(send.mock.calls[0]![0]).toBe('https://api.resend.com/emails');
+      const init = send.mock.calls[0]![1] as RequestInit;
+      expect(init.headers).toMatchObject({ 'Idempotency-Key': 'schoolhub/' + row.id });
+      const payload = JSON.parse(init.body as string),
         link = new URL(payload.text.match(/https?:\/\/\S+/)[0]);
       token = new URLSearchParams(link.hash.slice(1)).get('token')!;
       expect(link.origin).toBe(origin);
@@ -290,6 +295,8 @@ describe.skipIf(!url)(
     });
     afterAll(async () => {
       await app?.close();
+      vi.unstubAllGlobals();
+      vi.unstubAllEnvs();
       if (!db) return;
       const rows = await db.passwordRecoveryRequest.findMany({
         where: { userId: run },

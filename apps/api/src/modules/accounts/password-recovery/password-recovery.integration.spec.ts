@@ -1,4 +1,5 @@
 import 'reflect-metadata';
+import { Logger } from '@nestjs/common';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import type { PrismaClient } from '@prisma/client';
 import { hashPassword, verifyPassword } from 'better-auth/crypto';
@@ -375,6 +376,21 @@ describe.skipIf(!enabled)(
       const item=await fresh();await db.account.update({where:{id:item.id},data:{password:await hashPassword('ChangedPassw0rd!42')}});
       await expect(service.complete(item.token,password)).rejects.toThrow(/invalid or expired/);transport.send.mockClear();await worker.dispatch(item.row.id);expect(transport.send).not.toHaveBeenCalled();
       expect((await db.passwordRecoveryRequest.findUniqueOrThrow({where:{id:item.row.id}})).status).toBe('SUPPRESSED');
+    });
+    it('records safe delivery diagnostics and erases rejected recovery payloads', async () => {
+      const item = await fresh();
+      const log = vi.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+      try {
+        transport.send.mockResolvedValueOnce({ state: 'FAILED', reason: 'PROVIDER_REJECTED', providerStatus: 403, providerCode: 'validation_error' });
+        await worker.dispatch(item.row.id);
+        expect(await db.passwordRecoveryRequest.findUniqueOrThrow({ where: { id: item.row.id } })).toMatchObject({ status: 'DEAD', encryptedPayload: null });
+        const entry = JSON.stringify(log.mock.calls);
+        expect(entry).toContain('password.recovery.delivery_failed');
+        expect(entry).toContain('validation_error');
+        expect(entry).not.toContain(item.token);
+        expect(entry).not.toContain(item.payload.to);
+        expect(entry).not.toContain(item.payload.text);
+      } finally { log.mockRestore(); }
     });
     it('expires links and wipes payloads while delivery is disabled, with immutable token scope', async () => {
       const item = await fresh();
