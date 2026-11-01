@@ -1,5 +1,5 @@
 import { BookOpen, CalendarClock, CheckCircle2, FileText } from "lucide-react-native";
-import { Text, View } from "react-native";
+import { Text } from "react-native";
 import { GlassCard } from "@/components/GlassCard";
 import { ListRow } from "@/components/ListRow";
 import { Screen } from "@/components/Screen";
