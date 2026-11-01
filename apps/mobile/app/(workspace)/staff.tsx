@@ -4,9 +4,8 @@ import { Text, TextInput, View } from "react-native";
 import { Avatar } from "@/components/Avatar";
 import { GlassCard } from "@/components/GlassCard";
 import { ListRow } from "@/components/ListRow";
-import { Screen } from "@/components/Screen";
+import { WorkspaceScreen } from "@/components/WorkspaceScreen";
 import { SegmentedControl } from "@/components/SegmentedControl";
-import { TAB_BAR_CLEARANCE } from "@/components/GlassTabBar";
 import { type, useTheme } from "@/theme/theme";
 
 const people = [
@@ -23,7 +22,7 @@ export default function StaffScreen() {
   const [filter, setFilter] = useState("All");
   const [query, setQuery] = useState("");
   const visible = useMemo(() => people.filter((p) => (filter === "All" || p.role === filter) && p.name.toLowerCase().includes(query.toLowerCase())), [filter, query]);
-  return <Screen title="Staff directory" subtitle="People who make your school run" bottomInset={TAB_BAR_CLEARANCE}>
+  return <WorkspaceScreen title="Staff directory" subtitle="People who make your school run">
     <GlassCard padding={12} style={{ marginBottom: 14 }}>
       <View style={{ flexDirection: "row", alignItems: "center", gap: 9 }}>
         <Search size={18} color={colors.mutedForeground} />
@@ -37,5 +36,5 @@ export default function StaffScreen() {
       {visible.length === 0 ? <Text style={[type.caption, { color: colors.mutedForeground, padding: 14 }]}>No matching sample staff.</Text> : null}
     </GlassCard>
     <Text style={[type.caption, { color: colors.mutedForeground, marginTop: 14 }]}>Sample directory only. Employment records and permissions are not connected.</Text>
-  </Screen>;
+  </WorkspaceScreen>;
 }
