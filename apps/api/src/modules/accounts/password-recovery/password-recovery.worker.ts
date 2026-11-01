@@ -147,6 +147,8 @@ export class PasswordRecoveryWorker
       });
       return;
     }
+    this.logger.warn(JSON.stringify({ event: 'password.recovery.delivery_failed', requestId: id,
+      reason: result.reason, providerStatus: result.providerStatus ?? null, providerCode: result.providerCode ?? null }));
     // Resend has a stable payload/key; ambiguous outcomes retry only inside the token window.
     if (result.state === 'RETRY')
       throw new Error('Retryable recovery delivery failure');
