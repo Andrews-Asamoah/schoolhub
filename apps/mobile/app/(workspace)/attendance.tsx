@@ -17,9 +17,9 @@ export default function AttendanceScreen() {
   const { colors } = useTheme();
   return <WorkspaceScreen title="Attendance" subtitle="Monday · Daily register overview">
     <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10, marginBottom: 20 }}>
-      <View style={{ width: "48%" }}><StatTile label="Present" value="94.8%" hint="Across submitted classes" icon={<CheckCircle2 size={18} color={colors.success} />} tone="success" /></View>
-      <View style={{ width: "48%" }}><StatTile label="Absent" value="4.1%" hint="Today's sample" icon={<UserX size={18} color={colors.warning} />} tone="warning" /></View>
-      <View style={{ width: "48%" }}><StatTile label="Pending" value="3" hint="Registers outstanding" icon={<Clock3 size={18} color={colors.info} />} tone="neutral" /></View>
+      <View style={{ width: "48%" }}><StatTile label="Present" value="97.4%" hint="Across submitted classes" icon={<CheckCircle2 size={18} color={colors.success} />} tone="success" /></View>
+      <View style={{ width: "48%" }}><StatTile label="Absent" value="2.6%" hint="Today's sample" icon={<UserX size={18} color={colors.warning} />} tone="warning" /></View>
+      <View style={{ width: "48%" }}><StatTile label="Pending" value="1" hint="Registers outstanding" icon={<Clock3 size={18} color={colors.info} />} tone="neutral" /></View>
       <View style={{ width: "48%" }}><StatTile label="School day" value="Mon" hint="2 November 2026" icon={<CalendarDays size={18} color={colors.primary} />} tone="neutral" /></View>
     </View>
     <Text style={[type.headline, { color: colors.foreground, marginBottom: 12 }]}>Class registers</Text>
