@@ -3,13 +3,12 @@ import { Text, View } from "react-native";
 import { Avatar } from "@/components/Avatar";
 import { GlassCard } from "@/components/GlassCard";
 import { ListRow } from "@/components/ListRow";
-import { Screen } from "@/components/Screen";
-import { TAB_BAR_CLEARANCE } from "@/components/GlassTabBar";
+import { WorkspaceScreen } from "@/components/WorkspaceScreen";
 import { type, useTheme } from "@/theme/theme";
 
 export default function ChildrenScreen() {
   const { colors } = useTheme();
-  return <Screen title="My children" subtitle="Parent and guardian overview" bottomInset={TAB_BAR_CLEARANCE}>
+  return <WorkspaceScreen title="My children" subtitle="Parent and guardian overview">
     <GlassCard padding={16} style={{ marginBottom: 18 }}>
       <Text style={[type.bodyStrong, { color: colors.foreground }]}>Linked learner profiles</Text>
       <Text style={[type.caption, { color: colors.mutedForeground, marginTop: 4 }]}>A parent view should only show children explicitly linked to the signed-in guardian account.</Text>
@@ -41,5 +40,5 @@ export default function ChildrenScreen() {
       </View>
     </GlassCard>
     <Text style={[type.caption, { color: colors.mutedForeground, marginTop: 14 }]}>Illustrative child profiles only. No guardian-to-student relationship is being read or changed.</Text>
-  </Screen>;
+  </WorkspaceScreen>;
 }
