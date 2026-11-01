@@ -2,14 +2,13 @@ import { ArrowDownLeft, ArrowUpRight, Receipt, Wallet } from "lucide-react-nativ
 import { Text, View } from "react-native";
 import { GlassCard } from "@/components/GlassCard";
 import { ListRow } from "@/components/ListRow";
-import { Screen } from "@/components/Screen";
+import { WorkspaceScreen } from "@/components/WorkspaceScreen";
 import { StatTile } from "@/components/StatTile";
-import { TAB_BAR_CLEARANCE } from "@/components/GlassTabBar";
 import { type, useTheme } from "@/theme/theme";
 
 export default function FeesScreen() {
   const { colors, accent } = useTheme();
-  return <Screen title="Fees & payments" subtitle="A clear view of fee accounts" bottomInset={TAB_BAR_CLEARANCE}>
+  return <WorkspaceScreen title="Fees & payments" subtitle="A clear view of fee accounts">
     <GlassCard padding={18} strong style={{ marginBottom: 14 }}>
       <Text style={[type.caption, { color: colors.mutedForeground }]}>Outstanding balance · Sample account</Text>
       <Text style={{ color: colors.foreground, fontSize: 30, fontFamily: "Inter_700Bold", marginTop: 5 }}>GH₵ 450.00</Text>
@@ -26,5 +25,5 @@ export default function FeesScreen() {
       <ListRow leading={<Wallet size={20} color={accent} />} title="Transport charge" subtitle="Due 15 November" trailing={<Text style={{ color: colors.warning, fontSize: 12 }}>GH₵ 450</Text>} />
     </GlassCard>
     <Text style={[type.caption, { color: colors.mutedForeground, marginTop: 14 }]}>No payments can be initiated or recorded in this UI-only phase. Figures are examples, not a real statement.</Text>
-  </Screen>;
+  </WorkspaceScreen>;
 }
