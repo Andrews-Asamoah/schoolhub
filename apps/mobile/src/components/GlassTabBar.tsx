@@ -21,7 +21,7 @@ const SIDE_MARGIN = 16;
  */
 export const TAB_BAR_CLEARANCE = BAR_HEIGHT + 28;
 
-export function GlassTabBar({ state, descriptors, emitter, navigateToTab }: TabBarProps) {
+export function GlassTabBar({ state, descriptors, navigation }: TabBarProps) {
   const { colors, accent } = useTheme();
   const insets = useSafeAreaInsets();
   const [width, setWidth] = useState(0);
@@ -58,10 +58,10 @@ export function GlassTabBar({ state, descriptors, emitter, navigateToTab }: TabB
                   accessibilityState={{ selected: focused }}
                   accessibilityLabel={label}
                   onPress={() => {
-                    const event = emitter.emit({ type: "tabPress", target: route.key, canPreventDefault: true });
+                    const event = navigation.emit({ type: "tabPress", target: route.key, canPreventDefault: true });
                     if (!focused && !event.defaultPrevented) {
                       void Haptics.selectionAsync();
-                      navigateToTab(route.key);
+                      navigation.navigate(route.name, route.params);
                     }
                   }}
                   style={styles.item}
