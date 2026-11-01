@@ -2,8 +2,7 @@ import { router } from "expo-router";
 import { BookOpen, ClipboardCheck, CreditCard, GraduationCap, Users, UserRound, Wallet } from "lucide-react-native";
 import { Pressable, Text, View } from "react-native";
 import { GlassCard } from "@/components/GlassCard";
-import { Screen } from "@/components/Screen";
-import { TAB_BAR_CLEARANCE } from "@/components/GlassTabBar";
+import { WorkspaceScreen } from "@/components/WorkspaceScreen";
 import { type, useTheme } from "@/theme/theme";
 
 const modules = [
@@ -18,7 +17,7 @@ const modules = [
 
 export default function WorkspaceHome() {
   const { colors, accent } = useTheme();
-  return <Screen title="School modules" subtitle="Explore the SchoolHub mobile experience" bottomInset={TAB_BAR_CLEARANCE}>
+  return <WorkspaceScreen title="School modules" subtitle="Explore the SchoolHub mobile experience">
     <GlassCard padding={16} style={{ marginBottom: 18 }}>
       <Text style={[type.bodyStrong, { color: colors.foreground }]}>Designed around your school day</Text>
       <Text style={[type.caption, { color: colors.mutedForeground, marginTop: 5 }]}>Choose a module to preview its mobile layout. Content is illustrative and not connected to a school account.</Text>
@@ -38,5 +37,5 @@ export default function WorkspaceHome() {
       })}
     </View>
     <Text style={[type.caption, { color: colors.mutedForeground, textAlign: "center", marginTop: 18 }]}>UI preview only · Sample records</Text>
-  </Screen>;
+  </WorkspaceScreen>;
 }
