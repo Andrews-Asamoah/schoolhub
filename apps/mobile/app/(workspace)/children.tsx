@@ -1,4 +1,4 @@
-import { ChevronRight, GraduationCap } from "lucide-react-native";
+import { ChevronRight } from "lucide-react-native";
 import { Text, View } from "react-native";
 import { Avatar } from "@/components/Avatar";
 import { GlassCard } from "@/components/GlassCard";
@@ -8,7 +8,7 @@ import { TAB_BAR_CLEARANCE } from "@/components/GlassTabBar";
 import { type, useTheme } from "@/theme/theme";
 
 export default function ChildrenScreen() {
-  const { colors, accent } = useTheme();
+  const { colors } = useTheme();
   return <Screen title="My children" subtitle="Parent and guardian overview" bottomInset={TAB_BAR_CLEARANCE}>
     <GlassCard padding={16} style={{ marginBottom: 18 }}>
       <Text style={[type.bodyStrong, { color: colors.foreground }]}>Linked learner profiles</Text>
