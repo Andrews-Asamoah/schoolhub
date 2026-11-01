@@ -20,7 +20,7 @@ export function SchoolReportsWorkspace() {
   return (
     <div className="space-y-5">
       <section className="flex flex-col gap-4 rounded-2xl border border-border bg-card p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between sm:p-5">
-        <div className="flex items-start gap-3"><span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary"><BarChart3 className="size-5" /></span><div><h2 className="text-sm font-semibold text-foreground">School performance and trends</h2><p className="mt-1 max-w-2xl text-xs leading-5 text-muted-foreground">Explore live enrollment, attendance, demographics and financial trends for the active school. Financial values are included only when your role has access.</p></div></div>
+        <div className="flex items-start gap-3"><span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary"><BarChart3 className="size-5" /></span><div><h2 className="text-sm font-semibold text-foreground">School performance and trends</h2><p className="mt-1 max-w-2xl text-xs leading-5 text-muted-foreground">Explore live enrollment, demographics and financial trends for the active school. Financial values are included only when your role has access.</p></div></div>
 
       </section>
 

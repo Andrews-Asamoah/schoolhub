@@ -9,11 +9,9 @@ import { CircleAlert, LoaderCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 import { SchoolWorkspaceLayout } from "@/components/school/school-workspace-layout";
 import {
-  PreviewDataNotice,
   WorkspaceDataTable,
   WorkspaceEmptyState,
   WorkspacePageHeading,
-  WorkspaceStat,
   type WorkspaceColumn,
 } from "@/components/school/workspace-ui";
 import { apiFetch, ApiError } from "@/lib/api";
@@ -41,7 +39,7 @@ import { SchoolSettingsForm } from "@/components/school/school-settings-form";
 import { ProfileWorkspace } from "@/components/school/profile-workspace";
 import { HousesWorkspace } from "@/components/school/houses-workspace";
 import { ClubsWorkspace } from "@/components/school/clubs-workspace";
-import { TeacherPortalWorkspace } from "@/components/portal/teacher-portal-workspace";
+import { StudentPortalWorkspace } from "@/components/portal/student-portal-workspace";
 import { AccountantPortalWorkspace } from "@/components/portal/accountant-portal-workspace";
 import { ExpenseManagementWorkspace } from "@/components/portal/expense-management-workspace";
 import { PayrollManagementWorkspace } from "@/components/portal/payroll-management-workspace";
@@ -56,7 +54,6 @@ import { SignaturesWorkspace } from "@/components/school/signatures-workspace";
 import { GuardianPortalWorkspace } from "@/components/portal/guardian-portal-workspace";
 import { GuardianChildRecordsWorkspace } from "@/components/portal/guardian-child-records-workspace";
 import { GuardianFeesWorkspace } from "@/components/portal/guardian-fees-workspace";
-import { StudentPortalWorkspace } from "@/components/portal/student-portal-workspace";
 import { StudentSubjectsView } from "@/components/portal/student-subjects-view";
 import { StudentAttendanceView } from "@/components/portal/student-attendance-view";
 import { StudentReportView } from "@/components/portal/student-report-view";
@@ -220,7 +217,7 @@ function WorkspaceContent({ pageId }: { pageId: string }) {
   return (
     <>
       {activeRole !== "student" &&
-        !["classes", "students", "teachers", "staff", "guardians", "teacher-portal", "accountant-portal", "fees", "concessions", "signatures", "payments", "invoices", "expenses", "payroll", "fee-reminders", "inventory", "outstanding", "finance-reports", "student-statements", "term-end-review", "guardian-portal", "guardian-attendance", "guardian-timetable", "guardian-reports", "guardian-notices", "guardian-fees", "documents", "messages", "notifications", "student-portal", "clubs", "houses", "assignments", "classmates", "announcements"].includes(
+        !["classes", "students", "teachers", "staff", "guardians", "fees", "concessions", "signatures", "payments", "invoices", "expenses", "payroll", "fee-reminders", "inventory", "outstanding", "finance-reports", "student-statements", "term-end-review", "guardian-attendance", "guardian-timetable", "guardian-reports", "guardian-notices", "guardian-fees", "documents", "messages", "notifications", "clubs", "houses", "assignments", "classmates", "announcements"].includes(
           pageId,
         ) && (
         <WorkspacePageHeading
@@ -238,14 +235,11 @@ function WorkspaceContent({ pageId }: { pageId: string }) {
         />
       ) : (
         <>
-          {pageId === "teacher-portal" && <TeacherPortalWorkspace />}
-          {pageId === "accountant-portal" && <AccountantPortalWorkspace />}
           {pageId === "guardian-attendance" && <GuardianChildRecordsWorkspace view="attendance" />}
           {pageId === "guardian-timetable" && <GuardianChildRecordsWorkspace view="timetable" />}
           {pageId === "guardian-reports" && <GuardianPortalWorkspace defaultTab="academics" showSectionNav={false} />}
           {pageId === "guardian-notices" && <GuardianPortalWorkspace defaultTab="notices" showSectionNav={false} />}
           {pageId === "guardian-fees" && <GuardianFeesWorkspace />}
-          {pageId === "student-portal" && <StudentPortalWorkspace />}
           {pageId === "invoices" && <AccountantPortalWorkspace defaultTab="invoices" />}
           {pageId === "outstanding" && <AccountantPortalWorkspace defaultTab="debtors" />}
           {pageId === "finance-reports" && <AccountantPortalWorkspace defaultTab="reports" />}
@@ -336,9 +330,6 @@ function WorkspaceContent({ pageId }: { pageId: string }) {
           {pageId === "profile" && <ProfileWorkspace />}
           {pageId === "team" && <TeamRoleWorkspace />}
           {pageId === "support" && <TicketWorkspace mode="school" />}
-          {page.apiStatus === "planned" && (
-            <PlannedWorkspace title={page.label} />
-          )}
         </>
       )}
     </>
@@ -456,42 +447,6 @@ function SchoolSettings({ query }: { query: UseQueryResult<School, Error> }) {
       <SchoolLogoUploader logo={school.logo} />
       <SchoolSettingsForm school={school} />
     </div>
-  );
-}
-
-function PlannedWorkspace({ title }: { title: string }) {
-  return (
-    <>
-      <PreviewDataNotice>
-        This section is part of the school workspace roadmap. Its menu entry and
-        page are ready, but the API does not yet provide these records.
-      </PreviewDataNotice>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <WorkspaceStat label="Workspace area" value={title} detail="planned" />
-        <WorkspaceStat
-          label="Backend data"
-          value="Not connected"
-          detail="feature API"
-        />
-      </div>
-      <div className="mt-5 rounded-2xl border border-border/80 bg-card p-5 sm:p-6">
-        <div className="flex items-start gap-3">
-          <span className="mt-0.5 flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
-            <CircleAlert className="size-4" />
-          </span>
-          <div>
-            <h2 className="text-sm font-semibold text-foreground">
-              This page is ready for its feature data
-            </h2>
-            <p className="mt-1 max-w-2xl text-xs leading-relaxed text-muted-foreground">
-              The reference SMS includes this workflow. The data model and
-              endpoints need to be connected before SchoolHub can show live
-              records here. No sample records are presented as real school data.
-            </p>
-          </div>
-        </div>
-      </div>
-    </>
   );
 }
 

@@ -38,7 +38,7 @@ export interface SchoolNavItem {
   icon: LucideIcon;
   description: string;
   section: string;
-  apiStatus: "available" | "planned";
+  apiStatus: "available";
 }
 
 export interface SchoolNavGroup {
@@ -376,7 +376,7 @@ export const schoolNavGroups: SchoolNavGroup[] = [
         id: "reports",
         label: "Reports",
         icon: FileBarChart,
-        description: "School performance, enrollment, and attendance insights.",
+        description: "School performance and enrollment insights.",
         section: "Insights",
         apiStatus: "available",
       },
@@ -407,47 +407,6 @@ export const schoolNavGroups: SchoolNavGroup[] = [
         icon: Bell,
         description: "Search, filter, and review your in-app notification history.",
         section: "Communication",
-        apiStatus: "available",
-      },
-    ],
-  },
-  {
-    label: "Portals",
-    items: [
-      {
-        id: "teacher-portal",
-        label: "Teacher portal",
-        icon: GraduationCap,
-        description:
-          "Teacher workspace for classes, attendance, grading, remarks, and schedule.",
-        section: "Portals",
-        apiStatus: "available",
-      },
-      {
-        id: "accountant-portal",
-        label: "Accountant portal",
-        icon: BadgeDollarSign,
-        description:
-          "Financial hub for revenue, invoicing, fee collections, expenses, and payroll.",
-        section: "Portals",
-        apiStatus: "available",
-      },
-      {
-        id: "guardian-portal",
-        label: "Parent / Guardian portal",
-        icon: HeartHandshake,
-        description:
-          "Family hub for monitoring children's academic progress, attendance, and fee payments.",
-        section: "Portals",
-        apiStatus: "available",
-      },
-      {
-        id: "student-portal",
-        label: "Student portal",
-        icon: School,
-        description:
-          "Student learning dashboard for timetable, coursework, grades, classmates, and clubs.",
-        section: "Portals",
         apiStatus: "available",
       },
     ],
@@ -527,7 +486,6 @@ const rolePages: Record<string, string[]> = {
     "clubs",
   ],
   accountant: [
-    "accountant-portal",
     "concessions",
     "finance-reports",
     "student-statements",
@@ -580,19 +538,13 @@ const rolePages: Record<string, string[]> = {
 };
 
 /**
- * The portal page that is a role's own home screen. Teachers have none: their
- * Overview and the Students, Classes, Subjects and Timetable pages are their workspace.
+ * The portal page that is a role's own home screen. Only guardians use one; every
+ * other role's home is its Overview.
  */
 const ownPortalByRole: Record<string, string> = {
-  accountant: "accountant-portal",
   guardian: "dashboard",
 };
 
-/**
- * The "Portals" directory is not shown in anyone's sidebar. Administrators
- * and general staff do not need it, and portal users reach their own portal
- * through {@link getOwnPortalItem} instead of a list of every portal.
- */
 /**
  * Pages made for students only. Roles with no page list of their own (owner,
  * administrator, headteacher) see everything else, so these are left out of
@@ -600,12 +552,18 @@ const ownPortalByRole: Record<string, string> = {
  */
 const studentOnlyPages = ["classmates"];
 
+/**
+ * Leadership already sees these figures on the Overview, so the duplicate Reports
+ * page stays out of their sidebar (it remains reachable by URL).
+ */
+const leadershipHiddenPages = [...studentOnlyPages, "reports"];
+
 export function getSchoolNavGroupsForRole(role?: string) {
   const allowedPages = rolePages[role ?? ""];
   const groups = schoolNavGroups.filter((group) => group.label !== "Portals" && group.label !== "Account");
   if (!allowedPages) {
     return groups
-      .map((group) => ({ ...group, items: group.items.filter((item) => !studentOnlyPages.includes(item.id)) }))
+      .map((group) => ({ ...group, items: group.items.filter((item) => !leadershipHiddenPages.includes(item.id)) }))
       .filter((group) => group.items.length > 0);
   }
 
