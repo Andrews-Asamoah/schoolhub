@@ -4,9 +4,8 @@ import { Text, TextInput, View } from "react-native";
 import { Avatar } from "@/components/Avatar";
 import { GlassCard } from "@/components/GlassCard";
 import { ListRow } from "@/components/ListRow";
-import { Screen } from "@/components/Screen";
+import { WorkspaceScreen } from "@/components/WorkspaceScreen";
 import { SegmentedControl } from "@/components/SegmentedControl";
-import { TAB_BAR_CLEARANCE } from "@/components/GlassTabBar";
 import { type, useTheme } from "@/theme/theme";
 
 const records = [
@@ -23,7 +22,7 @@ export default function StudentsScreen() {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<string>("All");
   const visible = useMemo(() => records.filter((r) => (filter === "All" || r.className === filter) && (r.name.toLowerCase().includes(query.toLowerCase()) || r.id.toLowerCase().includes(query.toLowerCase()))), [filter, query]);
-  return <Screen title="Students" subtitle="Directory · 1,248 enrolled" bottomInset={TAB_BAR_CLEARANCE}>
+  return <WorkspaceScreen title="Students" subtitle="Directory · 1,248 enrolled">
     <GlassCard padding={12} style={{ marginBottom: 14 }}>
       <View style={{ flexDirection: "row", alignItems: "center", gap: 9 }}>
         <Search size={18} color={colors.mutedForeground} />
@@ -41,5 +40,5 @@ export default function StudentsScreen() {
       {visible.length === 0 ? <Text style={[type.caption, { color: colors.mutedForeground, padding: 14 }]}>No matching sample students.</Text> : null}
     </GlassCard>
     <Text style={[type.caption, { color: colors.mutedForeground, marginTop: 14 }]}>Directory preview · Search and class filters work locally on sample records.</Text>
-  </Screen>;
+  </WorkspaceScreen>;
 }
