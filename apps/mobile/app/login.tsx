@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { router } from 'expo-router';
+import { router, type Href } from 'expo-router';
 import { LockKeyhole, ShieldCheck, Mail, KeyRound } from 'lucide-react-native';
 import { KeyboardAvoidingView, Platform, Text, View } from 'react-native';
 import { authClient } from '@/lib/auth-client';
@@ -33,7 +33,7 @@ export default function SuperAdminLoginScreen() {
     }
     await setSubdomain(null);
     await setActiveRole(null);
-    router.replace('/(superadmin)');
+    router.replace('/(superadmin)' as Href);
   }
 
   async function submit() {
