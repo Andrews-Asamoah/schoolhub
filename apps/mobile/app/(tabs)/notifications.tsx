@@ -5,7 +5,7 @@ import {
   Megaphone,
 } from "lucide-react-native";
 import { Text, View } from "react-native";
-import { GlassCard } from "@/components/GlassCard";
+import { Card } from "@/components/Surface";
 import { ListRow } from "@/components/ListRow";
 import { Screen } from "@/components/Screen";
 import { TAB_BAR_CLEARANCE } from "@/components/GlassTabBar";
@@ -38,7 +38,7 @@ export default function NotificationsScreen() {
       subtitle="Announcements and reminders"
       bottomInset={TAB_BAR_CLEARANCE}
     >
-      <GlassCard padding={spacing.lg} style={{ marginBottom: spacing.xl }}>
+      <Card padding={spacing.lg} style={{ marginBottom: spacing.xl }}>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
           <View
             style={{
@@ -61,7 +61,7 @@ export default function NotificationsScreen() {
             </Text>
           </View>
         </View>
-      </GlassCard>
+      </Card>
       <Text
         style={[
           type.overline,
@@ -70,7 +70,7 @@ export default function NotificationsScreen() {
       >
         RECENT
       </Text>
-      <GlassCard padding={spacing.md}>
+      <Card padding={spacing.md}>
         {items.map(([title, subtitle, Icon, fresh], i) => (
           <ListRow
             key={title}
@@ -105,7 +105,7 @@ export default function NotificationsScreen() {
             }
           />
         ))}
-      </GlassCard>
+      </Card>
     </Screen>
   );
 }

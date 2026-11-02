@@ -8,7 +8,7 @@ import {
   Wallet,
 } from "lucide-react-native";
 import { Pressable, Text, View } from "react-native";
-import { GlassCard } from "@/components/GlassCard";
+import { Card } from "@/components/Surface";
 import { WorkspaceScreen } from "@/components/WorkspaceScreen";
 import { type, useTheme } from "@/theme/theme";
 
@@ -58,7 +58,7 @@ export default function WorkspaceHome() {
       title="School modules"
       subtitle="Explore the SchoolHub mobile experience"
     >
-      <GlassCard padding={16} style={{ marginBottom: 18 }}>
+      <Card padding={16} style={{ marginBottom: 18 }}>
         <Text style={[type.bodyStrong, { color: colors.foreground }]}>
           Designed around your school day
         </Text>
@@ -71,7 +71,7 @@ export default function WorkspaceHome() {
           Choose a module to preview its mobile layout. Content is illustrative
           and not connected to a school account.
         </Text>
-      </GlassCard>
+      </Card>
       <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 12 }}>
         {modules.map((item) => {
           const Icon = item.icon;
@@ -83,7 +83,7 @@ export default function WorkspaceHome() {
               accessibilityLabel={item.title}
               style={{ width: "48%" }}
             >
-              <GlassCard padding={15} style={{ minHeight: 142 }}>
+              <Card padding={15} style={{ minHeight: 142 }}>
                 <View
                   style={{
                     width: 40,
@@ -112,7 +112,7 @@ export default function WorkspaceHome() {
                 >
                   {item.detail}
                 </Text>
-              </GlassCard>
+              </Card>
             </Pressable>
           );
         })}

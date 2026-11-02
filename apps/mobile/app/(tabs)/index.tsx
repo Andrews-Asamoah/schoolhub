@@ -12,7 +12,7 @@ import {
 } from "lucide-react-native";
 import { Pressable, Text, View } from "react-native";
 import { Avatar } from "@/components/Avatar";
-import { GlassCard } from "@/components/GlassCard";
+import { Card } from "@/components/Surface";
 import { ListRow } from "@/components/ListRow";
 import { Screen } from "@/components/Screen";
 import { SegmentedControl } from "@/components/SegmentedControl";
@@ -137,7 +137,7 @@ export default function HomeScreen() {
         </View>
         <GraduationCap color={accent} size={23} />
       </View>
-      <GlassCard padding={12} style={{ marginBottom: 20 }}>
+      <Card padding={12} style={{ marginBottom: 20 }}>
         <Text
           style={[
             type.overline,
@@ -160,7 +160,7 @@ export default function HomeScreen() {
         >
           Sample UI preview only. This does not change account permissions.
         </Text>
-      </GlassCard>
+      </Card>
       <Text
         style={[type.body, { color: colors.mutedForeground, marginBottom: 14 }]}
       >
@@ -221,7 +221,7 @@ export default function HomeScreen() {
           View all
         </Text>
       </View>
-      <GlassCard padding={12} style={{ marginBottom: 24 }}>
+      <Card padding={12} style={{ marginBottom: 24 }}>
         {data.activity.map(([title, subtitle, tag], i) => (
           <ListRow
             key={title}
@@ -240,7 +240,7 @@ export default function HomeScreen() {
                 <Text
                   style={{
                     color: accent,
-                    fontSize: 10,
+                    fontSize: 12,
                     fontFamily: fonts.semibold,
                   }}
                 >
@@ -250,7 +250,7 @@ export default function HomeScreen() {
             }
           />
         ))}
-      </GlassCard>
+      </Card>
       <Text
         style={[type.headline, { color: colors.foreground, marginBottom: 12 }]}
       >
@@ -261,7 +261,7 @@ export default function HomeScreen() {
           onPress={() => router.push("/(tabs)/schedule")}
           style={{ flex: 1 }}
         >
-          <GlassCard padding={16}>
+          <Card padding={16}>
             <CalendarDays size={22} color={accent} />
             <Text
               style={[
@@ -279,13 +279,13 @@ export default function HomeScreen() {
               color={colors.mutedForeground}
               style={{ position: "absolute", right: 12, top: 12 }}
             />
-          </GlassCard>
+          </Card>
         </Pressable>
         <Pressable
           onPress={() => router.push("/(tabs)/notifications")}
           style={{ flex: 1 }}
         >
-          <GlassCard padding={16}>
+          <Card padding={16}>
             <Bell size={22} color={accent} />
             <Text
               style={[
@@ -303,7 +303,7 @@ export default function HomeScreen() {
               color={colors.mutedForeground}
               style={{ position: "absolute", right: 12, top: 12 }}
             />
-          </GlassCard>
+          </Card>
         </Pressable>
       </View>
       <Pressable
@@ -311,7 +311,7 @@ export default function HomeScreen() {
         accessibilityRole="button"
         style={{ marginBottom: 18 }}
       >
-        <GlassCard padding={16}>
+        <Card padding={16}>
           <View
             style={{
               flexDirection: "row",
@@ -334,7 +334,7 @@ export default function HomeScreen() {
             </View>
             <ArrowUpRight size={19} color={accent} />
           </View>
-        </GlassCard>
+        </Card>
       </Pressable>
       <Text
         style={[

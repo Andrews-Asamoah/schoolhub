@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { Search, SlidersHorizontal } from "lucide-react-native";
 import { Text, TextInput, View } from "react-native";
 import { Avatar } from "@/components/Avatar";
-import { GlassCard } from "@/components/GlassCard";
+import { Card } from "@/components/Surface";
 import { ListRow } from "@/components/ListRow";
 import { WorkspaceScreen } from "@/components/WorkspaceScreen";
 import { SegmentedControl } from "@/components/SegmentedControl";
@@ -63,7 +63,7 @@ export default function StudentsScreen() {
   );
   return (
     <WorkspaceScreen title="Students" subtitle="Directory · 1,248 enrolled">
-      <GlassCard padding={12} style={{ marginBottom: 14 }}>
+      <Card padding={12} style={{ marginBottom: 14 }}>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 9 }}>
           <Search size={18} color={colors.mutedForeground} />
           <TextInput
@@ -81,7 +81,7 @@ export default function StudentsScreen() {
           />
           <SlidersHorizontal size={18} color={accent} />
         </View>
-      </GlassCard>
+      </Card>
       <SegmentedControl
         value={filter}
         onChange={setFilter}
@@ -102,7 +102,7 @@ export default function StudentsScreen() {
           Updated just now
         </Text>
       </View>
-      <GlassCard padding={12}>
+      <Card padding={12}>
         {visible.map((item, index) => (
           <ListRow
             key={item.id}
@@ -114,7 +114,7 @@ export default function StudentsScreen() {
                 style={{
                   color:
                     item.status === "Active" ? colors.success : colors.warning,
-                  fontSize: 11,
+                  fontSize: 12,
                 }}
               >
                 {item.status}
@@ -133,7 +133,7 @@ export default function StudentsScreen() {
             No matching sample students.
           </Text>
         ) : null}
-      </GlassCard>
+      </Card>
       <Text
         style={[type.caption, { color: colors.mutedForeground, marginTop: 14 }]}
       >

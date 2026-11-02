@@ -7,7 +7,7 @@ import {
 } from "lucide-react-native";
 import { Text, View } from "react-native";
 import { Avatar } from "@/components/Avatar";
-import { GlassCard } from "@/components/GlassCard";
+import { Card } from "@/components/Surface";
 import { ListRow } from "@/components/ListRow";
 import { Screen } from "@/components/Screen";
 import { SegmentedControl } from "@/components/SegmentedControl";
@@ -28,7 +28,7 @@ export default function ProfileScreen() {
       subtitle="Your account and preferences"
       bottomInset={TAB_BAR_CLEARANCE}
     >
-      <GlassCard padding={spacing.xl} style={{ marginBottom: spacing.xl }}>
+      <Card padding={spacing.xl} style={{ marginBottom: spacing.xl }}>
         <View style={{ alignItems: "center", gap: 12, paddingVertical: 12 }}>
           <Avatar name="Andrews Asamoah" size={76} />
           <View style={{ alignItems: "center", gap: 3 }}>
@@ -47,18 +47,24 @@ export default function ProfileScreen() {
               paddingVertical: 6,
             }}
           >
-            <Text style={{ color: accent, fontSize: 11, fontWeight: "600" }}>
+            <Text
+              style={{
+                color: accent,
+                fontSize: 12,
+                fontFamily: "Inter_600SemiBold",
+              }}
+            >
               Profile preview
             </Text>
           </View>
         </View>
-      </GlassCard>
+      </Card>
       <Text
         style={[type.headline, { color: colors.foreground, marginBottom: 12 }]}
       >
         Appearance
       </Text>
-      <GlassCard padding={spacing.lg} style={{ marginBottom: spacing.xl }}>
+      <Card padding={spacing.lg} style={{ marginBottom: spacing.xl }}>
         <View
           style={{
             flexDirection: "row",
@@ -82,13 +88,13 @@ export default function ProfileScreen() {
             { value: "dark", label: "Dark" },
           ]}
         />
-      </GlassCard>
+      </Card>
       <Text
         style={[type.headline, { color: colors.foreground, marginBottom: 12 }]}
       >
         Preferences
       </Text>
-      <GlassCard padding={spacing.md} style={{ marginBottom: spacing.xl }}>
+      <Card padding={spacing.md} style={{ marginBottom: spacing.xl }}>
         <ListRow
           title="Account details"
           subtitle="Personal and school information"
@@ -116,7 +122,7 @@ export default function ProfileScreen() {
           leading={<CircleHelp color={accent} size={19} />}
           chevron
         />
-      </GlassCard>
+      </Card>
       <Text
         style={[
           type.caption,

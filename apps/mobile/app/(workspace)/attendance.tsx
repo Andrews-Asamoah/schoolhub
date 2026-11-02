@@ -1,6 +1,6 @@
 import { CalendarDays, CheckCircle2, Clock3, UserX } from "lucide-react-native";
 import { Text, View } from "react-native";
-import { GlassCard } from "@/components/GlassCard";
+import { Card } from "@/components/Surface";
 import { ListRow } from "@/components/ListRow";
 import { WorkspaceScreen } from "@/components/WorkspaceScreen";
 import { StatTile } from "@/components/StatTile";
@@ -80,7 +80,7 @@ export default function AttendanceScreen() {
       >
         Class registers
       </Text>
-      <GlassCard padding={12}>
+      <Card padding={12}>
         {classes.map((c, i) => (
           <ListRow
             key={c.name}
@@ -91,7 +91,7 @@ export default function AttendanceScreen() {
                 style={{
                   color:
                     c.state === "Submitted" ? colors.success : colors.warning,
-                  fontSize: 11,
+                  fontSize: 12,
                 }}
               >
                 {c.state}
@@ -100,7 +100,7 @@ export default function AttendanceScreen() {
             divider={i !== classes.length - 1}
           />
         ))}
-      </GlassCard>
+      </Card>
       <Text
         style={[type.caption, { color: colors.mutedForeground, marginTop: 14 }]}
       >

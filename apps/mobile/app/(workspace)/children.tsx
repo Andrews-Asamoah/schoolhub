@@ -1,7 +1,7 @@
 import { ChevronRight } from "lucide-react-native";
 import { Text, View } from "react-native";
 import { Avatar } from "@/components/Avatar";
-import { GlassCard } from "@/components/GlassCard";
+import { Card } from "@/components/Surface";
 import { ListRow } from "@/components/ListRow";
 import { WorkspaceScreen } from "@/components/WorkspaceScreen";
 import { type, useTheme } from "@/theme/theme";
@@ -13,7 +13,7 @@ export default function ChildrenScreen() {
       title="My children"
       subtitle="Parent and guardian overview"
     >
-      <GlassCard padding={16} style={{ marginBottom: 18 }}>
+      <Card padding={16} style={{ marginBottom: 18 }}>
         <Text style={[type.bodyStrong, { color: colors.foreground }]}>
           Linked learner profiles
         </Text>
@@ -26,8 +26,8 @@ export default function ChildrenScreen() {
           A parent view should only show children explicitly linked to the
           signed-in guardian account.
         </Text>
-      </GlassCard>
-      <GlassCard padding={12} style={{ marginBottom: 14 }}>
+      </Card>
+      <Card padding={12} style={{ marginBottom: 14 }}>
         <ListRow
           leading={<Avatar name="Kofi Mensah" size={48} />}
           title="Kofi Mensah"
@@ -61,8 +61,8 @@ export default function ChildrenScreen() {
             </Text>
           </View>
         </View>
-      </GlassCard>
-      <GlassCard padding={12}>
+      </Card>
+      <Card padding={12}>
         <ListRow
           leading={<Avatar name="Ama Mensah" size={48} />}
           title="Ama Mensah"
@@ -95,7 +95,7 @@ export default function ChildrenScreen() {
             </Text>
           </View>
         </View>
-      </GlassCard>
+      </Card>
       <Text
         style={[type.caption, { color: colors.mutedForeground, marginTop: 14 }]}
       >

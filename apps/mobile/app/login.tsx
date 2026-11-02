@@ -2,7 +2,7 @@ import { router } from "expo-router";
 import { GraduationCap } from "lucide-react-native";
 import { Text, View } from "react-native";
 import { Button } from "@/components/Button";
-import { GlassCard } from "@/components/GlassCard";
+import { Card } from "@/components/Surface";
 import { Screen } from "@/components/Screen";
 import { spacing, type, useTheme } from "@/theme/theme";
 
@@ -12,7 +12,7 @@ export default function SchoolAccessScreen() {
   const { colors } = useTheme();
   return (
     <Screen title="SchoolHub" subtitle="For teachers, students and guardians">
-      <GlassCard padding={spacing.xxl}>
+      <Card padding={spacing.xxl}>
         <View style={{ gap: spacing.lg }}>
           <GraduationCap
             size={44}
@@ -35,7 +35,7 @@ export default function SchoolAccessScreen() {
             />
           ) : null}
         </View>
-      </GlassCard>
+      </Card>
     </Screen>
   );
 }

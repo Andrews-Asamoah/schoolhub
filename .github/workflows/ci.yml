@@ -243,6 +243,8 @@ jobs:
         run: pnpm --filter @schoolhub/mobile lint
       - name: Mobile formatting
         run: pnpm --filter @schoolhub/mobile format:check
+      - name: Audit mobile contrast
+        run: pnpm --filter @schoolhub/mobile audit:contrast
       - name: Mobile unit and component tests
         run: pnpm --filter @schoolhub/mobile test
       - name: Verify mobile endpoint inventory and roles

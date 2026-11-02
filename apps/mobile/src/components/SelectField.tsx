@@ -40,6 +40,7 @@ export function SelectField({
           minHeight: 52,
           justifyContent: "center",
           padding: 12,
+          backgroundColor: colors.card,
           borderWidth: 1,
           borderColor: error ? colors.destructive : colors.border,
           borderRadius: 14,

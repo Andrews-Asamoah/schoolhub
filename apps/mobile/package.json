@@ -15,7 +15,8 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "jest --runInBand",
-    "verify:endpoints": "node scripts/verify-endpoints.mjs"
+    "verify:endpoints": "node scripts/verify-endpoints.mjs",
+    "audit:contrast": "node scripts/audit-contrast.mjs"
   },
   "dependencies": {
     "@better-auth/expo": "^1.7.14",

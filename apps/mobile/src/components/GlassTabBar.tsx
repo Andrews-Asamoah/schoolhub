@@ -118,7 +118,7 @@ export function GlassTabBar({
                     numberOfLines={1}
                     style={{
                       fontFamily: focused ? fonts.semibold : fonts.medium,
-                      fontSize: 11,
+                      fontSize: 12,
                       color,
                     }}
                   >

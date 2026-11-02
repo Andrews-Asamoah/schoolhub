@@ -1,6 +1,6 @@
 import * as Haptics from "expo-haptics";
 import { Pressable, StyleSheet, Text, View } from "react-native";
-import { fonts, radius, useTheme, withAlpha } from "@/theme/theme";
+import { fonts, radius, useTheme } from "@/theme/theme";
 
 type Props<T extends string> = {
   options: readonly { value: T; label: string }[];
@@ -15,14 +15,14 @@ export function SegmentedControl<T extends string>({
   onChange,
   accessibilityLabel,
 }: Props<T>) {
-  const { colors, glass, accent } = useTheme();
+  const { colors } = useTheme();
   return (
     <View
       accessibilityRole="tablist"
       accessibilityLabel={accessibilityLabel}
       style={[
         styles.track,
-        { backgroundColor: glass.surfaceStrong, borderColor: glass.border },
+        { backgroundColor: colors.card, borderColor: colors.border },
       ]}
     >
       {options.map((o) => {
@@ -31,6 +31,7 @@ export function SegmentedControl<T extends string>({
           <Pressable
             key={o.value}
             accessibilityRole="tab"
+            accessibilityLabel={o.label}
             accessibilityState={{ selected }}
             onPress={() => {
               if (!selected) {
@@ -40,14 +41,16 @@ export function SegmentedControl<T extends string>({
             }}
             style={[
               styles.item,
-              selected && { backgroundColor: withAlpha(accent, 0.16) },
+              selected && { backgroundColor: colors.accent },
             ]}
           >
             <Text
               style={{
                 fontFamily: selected ? fonts.semibold : fonts.medium,
                 fontSize: 14,
-                color: selected ? accent : colors.mutedForeground,
+                color: selected
+                  ? colors.accentForeground
+                  : colors.mutedForeground,
               }}
             >
               {o.label}
@@ -68,7 +71,7 @@ const styles = StyleSheet.create({
   },
   item: {
     flex: 1,
-    minHeight: 40,
+    minHeight: 44,
     borderRadius: radius.sm,
     alignItems: "center",
     justifyContent: "center",

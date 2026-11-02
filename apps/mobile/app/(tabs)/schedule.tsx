@@ -1,6 +1,6 @@
 import { CalendarDays, MapPin } from "lucide-react-native";
 import { Text, View } from "react-native";
-import { GlassCard } from "@/components/GlassCard";
+import { Card } from "@/components/Surface";
 import { Screen } from "@/components/Screen";
 import { TAB_BAR_CLEARANCE } from "@/components/GlassTabBar";
 import {
@@ -39,7 +39,7 @@ export default function ScheduleScreen() {
       subtitle="Monday, 2 November"
       bottomInset={TAB_BAR_CLEARANCE}
     >
-      <GlassCard padding={spacing.lg} style={{ marginBottom: spacing.xl }}>
+      <Card padding={spacing.lg} style={{ marginBottom: spacing.xl }}>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
           <View
             style={{
@@ -71,7 +71,7 @@ export default function ScheduleScreen() {
             Today
           </Text>
         </View>
-      </GlassCard>
+      </Card>
       <Text
         style={[
           type.headline,
@@ -98,7 +98,7 @@ export default function ScheduleScreen() {
             <Text
               style={{
                 color: colors.mutedForeground,
-                fontSize: 11,
+                fontSize: 12,
                 marginTop: 3,
               }}
             >
@@ -116,7 +116,7 @@ export default function ScheduleScreen() {
               />
             ) : null}
           </View>
-          <GlassCard
+          <Card
             padding={14}
             style={{ flex: 1, borderLeftWidth: 3, borderLeftColor: tint }}
           >
@@ -134,7 +134,7 @@ export default function ScheduleScreen() {
               </Text>
               <Text
                 style={{
-                  fontSize: 10,
+                  fontSize: 12,
                   fontFamily: fonts.semibold,
                   color:
                     state === "Completed"
@@ -167,7 +167,7 @@ export default function ScheduleScreen() {
                 {detail}
               </Text>
             </View>
-          </GlassCard>
+          </Card>
         </View>
       ))}
       <Text
