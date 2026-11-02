@@ -2,14 +2,17 @@ import * as Haptics from "expo-haptics";
 import type { Tabs } from "expo-router";
 import type React from "react";
 import { useEffect, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, View, useWindowDimensions } from "react-native";
+import { Text } from "@/components/Typography";
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withSpring,
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { fonts, radius, useTheme, withAlpha } from "@/theme/theme";
+import { fonts, radius, useTheme } from "@/theme/theme";
+import { modulePalette, type Hue } from "@/theme/palette";
+import { useSetTabBarInset } from "./TabBarInset";
 import { GlassSurface } from "./GlassSurface";
 
 /** Props React Navigation hands to a custom `tabBar` renderer. */
@@ -20,21 +23,21 @@ export type TabBarProps = Parameters<
 const BAR_HEIGHT = 64;
 const SIDE_MARGIN = 16;
 
-/**
- * Floating, rounded glass tab bar with a sliding active pill. Use it as
- * <Tabs tabBar={(p) => <GlassTabBar {...p} />}>. Screens should add
- * `bottomInset={TAB_BAR_CLEARANCE}` (see Screen) so content clears the bar.
- */
-export const TAB_BAR_CLEARANCE = BAR_HEIGHT + 28;
-
+/** Floating chrome. Clearance is measured and shared through TabBarInsetProvider. */
 export function GlassTabBar({
   state,
   descriptors,
   emitter,
   navigateToTab,
-}: TabBarProps) {
-  const { colors, accent } = useTheme();
+  hues = {},
+}: TabBarProps & { hues?: Readonly<Record<string, Hue>> }) {
+  const { colors, scheme, reduceMotion } = useTheme();
   const insets = useSafeAreaInsets();
+  const { fontScale } = useWindowDimensions();
+  const setInset = useSetTabBarInset();
+  const activeRoute = state.routes[state.index];
+  const height = Math.max(BAR_HEIGHT, 40 + 18 * fontScale);
+  useEffect(() => () => setInset(0), [setInset]);
   const [width, setWidth] = useState(0);
 
   // Expo Router 58 normalises `href: null` to `hidden: true`.
@@ -52,19 +55,25 @@ export function GlassTabBar({
   const x = useSharedValue(0);
   useEffect(() => {
     x.set(
-      withSpring(activeVisibleIndex * itemWidth, {
-        damping: 20,
-        stiffness: 240,
-      }),
+      reduceMotion
+        ? activeVisibleIndex * itemWidth
+        : withSpring(activeVisibleIndex * itemWidth, {
+            damping: 20,
+            stiffness: 240,
+          }),
     );
-  }, [activeVisibleIndex, itemWidth, x]);
+  }, [activeVisibleIndex, itemWidth, reduceMotion, x]);
   const pill = useAnimatedStyle(() => ({
     transform: [{ translateX: x.value }],
   }));
 
   return (
     <View
+      testID="floating-tab-bar"
       style={[styles.wrap, { bottom: Math.max(insets.bottom, 12) }]}
+      onLayout={(e) =>
+        setInset(e.nativeEvent.layout.height + Math.max(insets.bottom, 12))
+      }
       pointerEvents="box-none"
     >
       <GlassSurface
@@ -73,14 +82,20 @@ export function GlassTabBar({
         style={{ marginHorizontal: SIDE_MARGIN }}
       >
         <View
-          style={{ height: BAR_HEIGHT, padding: 6 }}
+          style={{ minHeight: height, padding: 6 }}
           onLayout={(e) => setWidth(e.nativeEvent.layout.width - 12)}
         >
           {itemWidth > 0 ? (
             <Animated.View
               style={[
                 styles.pill,
-                { width: itemWidth, backgroundColor: withAlpha(accent, 0.16) },
+                {
+                  width: itemWidth,
+                  backgroundColor: modulePalette(
+                    hues[activeRoute?.name ?? ""] ?? "indigo",
+                    scheme,
+                  ).tint,
+                },
                 pill,
               ]}
             />
@@ -93,13 +108,22 @@ export function GlassTabBar({
                 typeof options?.tabBarLabel === "string"
                   ? options.tabBarLabel
                   : (options?.title ?? route.name);
-              const color = focused ? accent : colors.mutedForeground;
+              const color = focused
+                ? modulePalette(hues[route.name] ?? "indigo", scheme).ink
+                : colors.mutedForeground;
               return (
                 <Pressable
                   key={route.key}
                   accessibilityRole="tab"
                   accessibilityState={{ selected: focused }}
-                  accessibilityLabel={label}
+                  accessibilityLabel={
+                    options?.tabBarBadge
+                      ? `${label}, ${options.tabBarBadge} unread`
+                      : label
+                  }
+                  onLongPress={() =>
+                    emitter.emit({ type: "tabLongPress", target: route.key })
+                  }
                   onPress={() => {
                     const event = emitter.emit({
                       type: "tabPress",
@@ -114,11 +138,33 @@ export function GlassTabBar({
                   style={styles.item}
                 >
                   {options?.tabBarIcon?.({ focused, color, size: 22 })}
+                  {options?.tabBarBadge != null ? (
+                    <View
+                      style={{
+                        position: "absolute",
+                        top: 0,
+                        right: 4,
+                        paddingHorizontal: 5,
+                        borderRadius: 12,
+                        backgroundColor: colors.destructive,
+                      }}
+                    >
+                      <Text
+                        style={{
+                          fontFamily: fonts.bold,
+                          fontSize: 12,
+                          color: colors.destructiveForeground,
+                        }}
+                      >
+                        {options.tabBarBadge}
+                      </Text>
+                    </View>
+                  ) : null}
                   <Text
-                    numberOfLines={1}
                     style={{
                       fontFamily: focused ? fonts.semibold : fonts.medium,
-                      fontSize: 11,
+                      fontSize: 12,
+                      textAlign: "center",
                       color,
                     }}
                   >
@@ -137,15 +183,17 @@ export function GlassTabBar({
 const styles = StyleSheet.create({
   wrap: { position: "absolute", left: 0, right: 0 },
   row: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
     flexDirection: "row",
-    margin: 6,
   },
-  item: { flex: 1, alignItems: "center", justifyContent: "center", gap: 3 },
+  item: {
+    minHeight: 44,
+    minWidth: 44,
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 3,
+    paddingVertical: 8,
+  },
   pill: {
     position: "absolute",
     top: 6,

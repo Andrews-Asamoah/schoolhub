@@ -1,6 +1,9 @@
+import type { Hue } from "@/theme/palette";
+import { StatusPill } from "./ModulePrimitives";
 import { ChevronRight } from "lucide-react-native";
 import type { ReactNode } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
+import { Text } from "@/components/Typography";
 import { spacing, type, useTheme } from "@/theme/theme";
 
 type Props = {
@@ -11,6 +14,8 @@ type Props = {
   onPress?: () => void;
   chevron?: boolean;
   divider?: boolean;
+  status?: string;
+  hue?: Hue;
 };
 
 export function ListRow({
@@ -21,8 +26,10 @@ export function ListRow({
   onPress,
   chevron,
   divider,
+  status,
+  hue,
 }: Props) {
-  const { colors, glass } = useTheme();
+  const { colors } = useTheme();
   return (
     <Pressable
       accessibilityRole={onPress ? "button" : undefined}
@@ -32,7 +39,7 @@ export function ListRow({
       style={({ pressed }) => [
         styles.row,
         divider && {
-          borderBottomColor: glass.border,
+          borderBottomColor: colors.border,
           borderBottomWidth: StyleSheet.hairlineWidth,
         },
         pressed && { opacity: 0.6 },
@@ -40,22 +47,22 @@ export function ListRow({
     >
       {leading}
       <View style={{ flex: 1 }}>
-        <Text
-          numberOfLines={1}
-          style={[type.bodyStrong, { color: colors.foreground }]}
-        >
+        <Text style={[type.bodyStrong, { color: colors.foreground }]}>
           {title}
         </Text>
         {subtitle ? (
-          <Text
-            numberOfLines={2}
-            style={[type.caption, { color: colors.mutedForeground }]}
-          >
+          <Text style={[type.caption, { color: colors.mutedForeground }]}>
             {subtitle}
           </Text>
         ) : null}
       </View>
-      {trailing}
+      {status ? (
+        <View style={{ maxWidth: "40%" }}>
+          <StatusPill label={status} hue={hue} />
+        </View>
+      ) : (
+        trailing
+      )}
       {chevron ? (
         <ChevronRight size={18} color={colors.mutedForeground} />
       ) : null}

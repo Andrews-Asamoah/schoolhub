@@ -4,8 +4,9 @@ import {
   Receipt,
   Wallet,
 } from "lucide-react-native";
-import { Text, View } from "react-native";
-import { GlassCard } from "@/components/GlassCard";
+import { View } from "react-native";
+import { Text } from "@/components/Typography";
+import { Card } from "@/components/Surface";
 import { ListRow } from "@/components/ListRow";
 import { WorkspaceScreen } from "@/components/WorkspaceScreen";
 import { StatTile } from "@/components/StatTile";
@@ -18,7 +19,7 @@ export default function FeesScreen() {
       title="Fees & payments"
       subtitle="A clear view of fee accounts"
     >
-      <GlassCard padding={18} strong style={{ marginBottom: 14 }}>
+      <Card padding={18} style={{ marginBottom: 14 }}>
         <Text style={[type.caption, { color: colors.mutedForeground }]}>
           Outstanding balance · Sample account
         </Text>
@@ -40,7 +41,7 @@ export default function FeesScreen() {
         >
           Current academic term
         </Text>
-      </GlassCard>
+      </Card>
       <View style={{ flexDirection: "row", gap: 10, marginBottom: 20 }}>
         <View style={{ flex: 1 }}>
           <StatTile
@@ -66,7 +67,7 @@ export default function FeesScreen() {
       >
         Recent transactions
       </Text>
-      <GlassCard padding={12}>
+      <Card padding={12}>
         <ListRow
           leading={<Receipt size={20} color={accent} />}
           title="Tuition payment"
@@ -97,7 +98,7 @@ export default function FeesScreen() {
             <Text style={{ color: colors.warning, fontSize: 12 }}>GH₵ 450</Text>
           }
         />
-      </GlassCard>
+      </Card>
       <Text
         style={[type.caption, { color: colors.mutedForeground, marginTop: 14 }]}
       >

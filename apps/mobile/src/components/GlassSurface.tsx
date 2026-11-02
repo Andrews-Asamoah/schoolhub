@@ -1,6 +1,6 @@
 import { BlurView } from "expo-blur";
 import { LinearGradient } from "expo-linear-gradient";
-import type { ReactNode } from "react";
+import { createContext, useContext, type ReactNode } from "react";
 import {
   Platform,
   StyleSheet,
@@ -9,6 +9,8 @@ import {
   type ViewStyle,
 } from "react-native";
 import { radius as radii, useTheme } from "@/theme/theme";
+
+const GlassDepth = createContext(0);
 
 type Props = {
   children?: ReactNode;
@@ -35,54 +37,61 @@ export function GlassSurface({
   style,
   contentStyle,
 }: Props) {
-  const { glass, isDark, blurEnabled } = useTheme();
-  const fill = blurEnabled
+  const { colors, glass, isDark, blurEnabled } = useTheme();
+  const depth = useContext(GlassDepth);
+  const renderBlur = blurEnabled && depth < 2;
+  const fill = renderBlur
     ? strong
       ? glass.surfaceStrong
       : glass.surface
-    : glass.fallbackSurface;
+    : depth >= 2
+      ? colors.card
+      : glass.fallbackSurface;
 
   return (
-    <View
-      style={[
-        { borderRadius: radius },
-        !flat &&
-          Platform.OS === "ios" && {
-            shadowColor: glass.shadow,
-            shadowOpacity: 1,
-            shadowRadius: 24,
-            shadowOffset: { width: 0, height: 10 },
-          },
-        style,
-      ]}
-    >
+    <GlassDepth.Provider value={depth + 1}>
       <View
         style={[
-          styles.clip,
-          { borderRadius: radius, borderColor: glass.border },
+          { borderRadius: radius },
+          !flat &&
+            Platform.OS === "ios" && {
+              shadowColor: glass.shadow,
+              shadowOpacity: 1,
+              shadowRadius: 24,
+              shadowOffset: { width: 0, height: 10 },
+            },
+          style,
         ]}
       >
-        {blurEnabled ? (
-          <BlurView
-            intensity={glass.blur}
-            tint={isDark ? "dark" : "light"}
-            style={StyleSheet.absoluteFill}
-          />
-        ) : null}
         <View
-          style={[StyleSheet.absoluteFill, { backgroundColor: fill }]}
-          pointerEvents="none"
-        />
-        <LinearGradient
-          colors={[glass.highlight, "transparent"]}
-          start={{ x: 0.5, y: 0 }}
-          end={{ x: 0.5, y: 1 }}
-          style={styles.highlight}
-          pointerEvents="none"
-        />
-        <View style={contentStyle}>{children}</View>
+          style={[
+            styles.clip,
+            { borderRadius: radius, borderColor: glass.border },
+          ]}
+        >
+          {renderBlur ? (
+            <BlurView
+              testID="glass-blur"
+              intensity={glass.blur}
+              tint={isDark ? "dark" : "light"}
+              style={StyleSheet.absoluteFill}
+            />
+          ) : null}
+          <View
+            style={[StyleSheet.absoluteFill, { backgroundColor: fill }]}
+            pointerEvents="none"
+          />
+          <LinearGradient
+            colors={[glass.highlight, "transparent"]}
+            start={{ x: 0.5, y: 0 }}
+            end={{ x: 0.5, y: 1 }}
+            style={styles.highlight}
+            pointerEvents="none"
+          />
+          <View style={contentStyle}>{children}</View>
+        </View>
       </View>
-    </View>
+    </GlassDepth.Provider>
   );
 }
 

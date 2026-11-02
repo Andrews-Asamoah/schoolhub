@@ -3,11 +3,11 @@ import { forwardRef, useState, type ComponentRef, type ReactNode } from "react";
 import {
   Pressable,
   StyleSheet,
-  Text,
   TextInput,
   View,
   type TextInputProps,
 } from "react-native";
+import { Text, usePreviewTextStyle } from "./Typography";
 import { fonts, radius, spacing, type, useTheme } from "@/theme/theme";
 
 type Props = Omit<TextInputProps, "style"> & {
@@ -25,14 +25,15 @@ export const TextField = forwardRef<TextFieldHandle, Props>(function TextField(
   { label, error, hint, icon, secret, onFocus, onBlur, ...input },
   ref,
 ) {
-  const { colors, glass, accent } = useTheme();
+  const inputStyle = usePreviewTextStyle(styles.input);
+  const { colors, accent } = useTheme();
   const [focused, setFocused] = useState(false);
   const [revealed, setRevealed] = useState(false);
   const borderColor = error
     ? colors.destructive
     : focused
       ? accent
-      : glass.border;
+      : colors.input;
 
   return (
     <View style={{ gap: spacing.xs }}>
@@ -48,7 +49,7 @@ export const TextField = forwardRef<TextFieldHandle, Props>(function TextField(
         style={[
           styles.box,
           {
-            backgroundColor: glass.surfaceStrong,
+            backgroundColor: colors.card,
             borderColor,
             borderWidth: focused || error ? 1.5 : StyleSheet.hairlineWidth,
           },
@@ -73,7 +74,7 @@ export const TextField = forwardRef<TextFieldHandle, Props>(function TextField(
             onBlur?.(e);
           }}
           style={[
-            styles.input,
+            inputStyle,
             { color: colors.foreground, fontFamily: fonts.regular },
           ]}
         />
@@ -81,7 +82,12 @@ export const TextField = forwardRef<TextFieldHandle, Props>(function TextField(
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={revealed ? "Hide password" : "Show password"}
-            hitSlop={12}
+            style={{
+              minWidth: 44,
+              minHeight: 44,
+              alignItems: "center",
+              justifyContent: "center",
+            }}
             onPress={() => setRevealed((v) => !v)}
           >
             {revealed ? (

@@ -1,111 +1,83 @@
-import {
-  Bell,
-  CalendarDays,
-  MessageCircle,
-  Megaphone,
-} from "lucide-react-native";
-import { Text, View } from "react-native";
-import { GlassCard } from "@/components/GlassCard";
-import { ListRow } from "@/components/ListRow";
+import { Bell, CalendarDays, MessageCircle } from "lucide-react-native";
+import { View } from "react-native";
+import { Card } from "@/components/Surface";
 import { Screen } from "@/components/Screen";
-import { TAB_BAR_CLEARANCE } from "@/components/GlassTabBar";
-import { spacing, type, useTheme, withAlpha } from "@/theme/theme";
-const items = [
-  [
-    "Assessment deadline reminder",
-    "Score submission closes this Friday · 20 min ago",
-    CalendarDays,
-    true,
-  ],
-  [
-    "New school announcement",
-    "Updated arrangements for the end-of-term event · 2 hours ago",
-    Megaphone,
-    true,
-  ],
-  [
-    "Parent–teacher meeting",
-    "Meeting schedule has been published · Yesterday",
-    MessageCircle,
-    false,
-  ],
+import { ListRow } from "@/components/ListRow";
+import {
+  IconChip,
+  SectionHeader,
+  StatusPill,
+} from "@/components/ModulePrimitives";
+import { modulePalette } from "@/theme/palette";
+import { useTheme } from "@/theme/theme";
+const groups = [
+  {
+    day: "Today",
+    items: [
+      {
+        title: "Assessment deadline reminder",
+        detail: "Score submission closes Friday · 20 min ago",
+        icon: CalendarDays,
+        hue: "amber",
+        unread: true,
+      },
+      {
+        title: "School announcement",
+        detail: "End-of-term arrangements · 2 hours ago",
+        icon: Bell,
+        hue: "rose",
+        unread: true,
+      },
+    ],
+  },
+  {
+    day: "Yesterday",
+    items: [
+      {
+        title: "Family meeting",
+        detail: "Meeting schedule published",
+        icon: MessageCircle,
+        hue: "sky",
+        unread: false,
+      },
+    ],
+  },
 ] as const;
 export default function NotificationsScreen() {
-  const { colors, accent } = useTheme();
+  const { scheme } = useTheme();
   return (
-    <Screen
-      title="Updates"
-      subtitle="Announcements and reminders"
-      bottomInset={TAB_BAR_CLEARANCE}
-    >
-      <GlassCard padding={spacing.lg} style={{ marginBottom: spacing.xl }}>
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
-          <View
-            style={{
-              width: 46,
-              height: 46,
-              borderRadius: 15,
-              backgroundColor: withAlpha(accent, 0.12),
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <Bell size={21} color={accent} />
+    <Screen title="Updates" subtitle="Development notice fixtures">
+      <View style={{ gap: 20 }}>
+        <StatusPill label="2 unread" hue="rose" />
+        {groups.map((group) => (
+          <View key={group.day} style={{ gap: 12 }}>
+            <SectionHeader title={group.day} />
+            <Card>
+              {group.items.map((item, i) => {
+                const Icon = item.icon;
+                return (
+                  <ListRow
+                    key={item.title}
+                    title={item.title}
+                    subtitle={item.detail}
+                    divider={i < group.items.length - 1}
+                    leading={
+                      <IconChip hue={item.hue}>
+                        <Icon
+                          size={22}
+                          color={modulePalette(item.hue, scheme).ink}
+                        />
+                      </IconChip>
+                    }
+                    status={item.unread ? "Unread" : "Read"}
+                    hue={item.hue}
+                  />
+                );
+              })}
+            </Card>
           </View>
-          <View style={{ flex: 1 }}>
-            <Text style={[type.headline, { color: colors.foreground }]}>
-              Your updates
-            </Text>
-            <Text style={[type.caption, { color: colors.mutedForeground }]}>
-              3 sample notices in this preview
-            </Text>
-          </View>
-        </View>
-      </GlassCard>
-      <Text
-        style={[
-          type.overline,
-          { color: colors.mutedForeground, marginBottom: spacing.md },
-        ]}
-      >
-        RECENT
-      </Text>
-      <GlassCard padding={spacing.md}>
-        {items.map(([title, subtitle, Icon, fresh], i) => (
-          <ListRow
-            key={title}
-            title={title}
-            subtitle={subtitle}
-            divider={i !== items.length - 1}
-            leading={
-              <View
-                style={{
-                  width: 40,
-                  height: 40,
-                  borderRadius: 13,
-                  backgroundColor: withAlpha(accent, 0.12),
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
-                <Icon size={19} color={accent} />
-              </View>
-            }
-            trailing={
-              fresh ? (
-                <View
-                  style={{
-                    width: 7,
-                    height: 7,
-                    borderRadius: 4,
-                    backgroundColor: accent,
-                  }}
-                />
-              ) : null
-            }
-          />
         ))}
-      </GlassCard>
+      </View>
     </Screen>
   );
 }

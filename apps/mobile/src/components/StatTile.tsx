@@ -1,66 +1,65 @@
 import type { ReactNode } from "react";
-import { Text, View } from "react-native";
-import { spacing, type, useTheme, withAlpha } from "@/theme/theme";
-import { GlassCard } from "./GlassCard";
-
+import {} from "react-native";
+import { Text } from "./Typography";
+import Animated, { FadeIn } from "react-native-reanimated";
+import type { Hue } from "@/theme/palette";
+import { type, useTheme } from "@/theme/theme";
+import { Card } from "./Surface";
+import { IconChip, StatusPill } from "./ModulePrimitives";
+const AnimatedText = Animated.createAnimatedComponent(Text);
 type Tone = "neutral" | "success" | "warning" | "destructive" | "info";
-
-type Props = {
-  label: string;
-  value: string;
-  hint?: string;
-  icon?: ReactNode;
-  tone?: Tone;
+const tones: Record<Tone, Hue> = {
+  neutral: "indigo",
+  success: "emerald",
+  warning: "amber",
+  destructive: "rose",
+  info: "sky",
 };
-
 export function StatTile({
   label,
   value,
   hint,
   icon,
   tone = "neutral",
-}: Props) {
-  const { colors, accent } = useTheme();
-  const toneColor = tone === "neutral" ? accent : colors[tone];
+  hue,
+  delta,
+  sparkline,
+}: {
+  label: string;
+  value: string;
+  hint?: string;
+  icon?: ReactNode;
+  tone?: Tone;
+  hue?: Hue;
+  delta?: string;
+  sparkline?: ReactNode;
+}) {
+  const { colors, reduceMotion } = useTheme();
+  const colour = hue ?? tones[tone];
   return (
-    <GlassCard padding={spacing.lg} style={{ flex: 1 }}>
-      <View style={{ gap: spacing.sm }}>
-        {icon ? (
-          <View
-            style={{
-              width: 36,
-              height: 36,
-              borderRadius: 12,
-              alignItems: "center",
-              justifyContent: "center",
-              backgroundColor: withAlpha(toneColor, 0.14),
-            }}
-          >
-            {icon}
-          </View>
-        ) : null}
-        <Text style={[type.overline, { color: colors.mutedForeground }]}>
-          {label.toUpperCase()}
+    <Card style={{ flex: 1, gap: 12 }}>
+      {icon ? <IconChip hue={colour}>{icon}</IconChip> : null}
+      <Text style={[type.caption, { color: colors.mutedForeground }]}>
+        {label}
+      </Text>
+      <AnimatedText
+        key={value}
+        entering={reduceMotion ? undefined : FadeIn.duration(200)}
+        accessibilityLabel={`${label}: ${value}`}
+        style={[
+          type.display,
+          { color: colors.foreground, fontVariant: ["tabular-nums"] },
+        ]}
+      >
+        {value}
+      </AnimatedText>
+      {delta ? <StatusPill label={delta} hue={colour} /> : null}
+      {hint ? (
+        <Text style={[type.caption, { color: colors.mutedForeground }]}>
+          {hint}
         </Text>
-        <Text
-          accessibilityLabel={`${label}: ${value}`}
-          style={[type.title, { color: colors.foreground }]}
-        >
-          {value}
-        </Text>
-        {hint ? (
-          <Text
-            style={[
-              type.caption,
-              {
-                color: tone === "neutral" ? colors.mutedForeground : toneColor,
-              },
-            ]}
-          >
-            {hint}
-          </Text>
-        ) : null}
-      </View>
-    </GlassCard>
+      ) : null}
+      {sparkline}
+    </Card>
   );
 }

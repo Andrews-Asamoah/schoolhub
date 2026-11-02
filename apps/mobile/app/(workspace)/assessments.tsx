@@ -3,8 +3,9 @@ import {
   ChartNoAxesColumnIncreasing,
   FileText,
 } from "lucide-react-native";
-import { Text, View } from "react-native";
-import { GlassCard } from "@/components/GlassCard";
+import { View } from "react-native";
+import { Text } from "@/components/Typography";
+import { Card } from "@/components/Surface";
 import { ListRow } from "@/components/ListRow";
 import { WorkspaceScreen } from "@/components/WorkspaceScreen";
 import { StatTile } from "@/components/StatTile";
@@ -48,7 +49,7 @@ export default function AssessmentsScreen() {
       >
         Subject performance
       </Text>
-      <GlassCard padding={16} style={{ marginBottom: 20 }}>
+      <Card padding={16} style={{ marginBottom: 20 }}>
         {subjects.map((s, i) => (
           <View
             key={s.name}
@@ -87,19 +88,19 @@ export default function AssessmentsScreen() {
             </View>
           </View>
         ))}
-      </GlassCard>
+      </Card>
       <Text
         style={[type.headline, { color: colors.foreground, marginBottom: 12 }]}
       >
         Recent assessment activity
       </Text>
-      <GlassCard padding={12}>
+      <Card padding={12}>
         <ListRow
           leading={<FileText size={20} color={accent} />}
           title="End of unit assessment"
           subtitle="JHS 2A · Mathematics · 28 October"
           trailing={
-            <Text style={{ color: colors.success, fontSize: 11 }}>
+            <Text style={{ color: colors.success, fontSize: 12 }}>
               Published
             </Text>
           }
@@ -110,10 +111,10 @@ export default function AssessmentsScreen() {
           title="Practical science task"
           subtitle="JHS 2A · Integrated Science · 30 October"
           trailing={
-            <Text style={{ color: colors.warning, fontSize: 11 }}>Review</Text>
+            <Text style={{ color: colors.warning, fontSize: 12 }}>Review</Text>
           }
         />
-      </GlassCard>
+      </Card>
       <Text
         style={[type.caption, { color: colors.mutedForeground, marginTop: 14 }]}
       >

@@ -10,6 +10,13 @@ import {
   type ReactNode,
 } from "react";
 import { AccessibilityInfo, Platform, useColorScheme } from "react-native";
+import {
+  brandPalette,
+  contrast,
+  neutrals,
+  safeHex,
+  shouldBlur,
+} from "./palette";
 import { darkTokens, lightTokens, type ColorTokens } from "./tokens.generated";
 
 export type SchemePreference = "system" | "light" | "dark";
@@ -44,10 +51,11 @@ export const fonts = {
 } as const;
 
 export const type = {
+  display: { fontFamily: fonts.bold, fontSize: 34, lineHeight: 40 },
   largeTitle: {
     fontFamily: fonts.bold,
-    fontSize: 32,
-    lineHeight: 38,
+    fontSize: 28,
+    lineHeight: 34,
     letterSpacing: -0.6,
   },
   title: {
@@ -57,13 +65,13 @@ export const type = {
     letterSpacing: -0.3,
   },
   headline: { fontFamily: fonts.semibold, fontSize: 17, lineHeight: 22 },
-  body: { fontFamily: fonts.regular, fontSize: 15, lineHeight: 21 },
-  bodyStrong: { fontFamily: fonts.medium, fontSize: 15, lineHeight: 21 },
+  body: { fontFamily: fonts.regular, fontSize: 15, lineHeight: 22 },
+  bodyStrong: { fontFamily: fonts.medium, fontSize: 15, lineHeight: 22 },
   caption: { fontFamily: fonts.regular, fontSize: 13, lineHeight: 18 },
   overline: {
     fontFamily: fonts.semibold,
-    fontSize: 11,
-    lineHeight: 14,
+    fontSize: 12,
+    lineHeight: 16,
     letterSpacing: 0.8,
   },
 } as const;
@@ -85,8 +93,8 @@ export type GlassTokens = {
 };
 
 const glassLight: GlassTokens = {
-  surface: "rgba(255, 255, 255, 0.55)",
-  surfaceStrong: "rgba(255, 255, 255, 0.78)",
+  surface: "rgba(255, 255, 255, 0.94)",
+  surfaceStrong: "rgba(255, 255, 255, 0.97)",
   border: "rgba(255, 255, 255, 0.7)",
   highlight: "rgba(255, 255, 255, 0.9)",
   blur: 40,
@@ -95,8 +103,8 @@ const glassLight: GlassTokens = {
 };
 
 const glassDark: GlassTokens = {
-  surface: "rgba(28, 34, 56, 0.5)",
-  surfaceStrong: "rgba(28, 34, 56, 0.74)",
+  surface: "rgba(20, 27, 49, 0.94)",
+  surfaceStrong: "rgba(20, 27, 49, 0.97)",
   border: "rgba(255, 255, 255, 0.14)",
   highlight: "rgba(255, 255, 255, 0.22)",
   blur: 50,
@@ -119,6 +127,7 @@ type ThemeValue = {
   /** Brand accent: the school's primary colour when set, otherwise the platform primary. */
   accent: string;
   accentSecondary: string;
+  heroGradient: readonly [string, string];
   tenant: TenantBranding | null;
   schemePreference: SchemePreference;
   blurPreference: BlurPreference;
@@ -134,24 +143,7 @@ const ThemeContext = createContext<ThemeValue | null>(null);
 
 const SCHEME_KEY = "schoolhub:scheme-preference";
 const BLUR_KEY = "schoolhub:blur-preference";
-const LOW_END_MEMORY_BYTES = 3 * 1024 * 1024 * 1024;
-
-/** Android devices with little RAM struggle with live blur; treat them as low-end. */
-function isLowEndDevice(): boolean {
-  if (Platform.OS !== "android") return false;
-  const memory = Device.totalMemory;
-  return (
-    typeof memory === "number" && memory > 0 && memory < LOW_END_MEMORY_BYTES
-  );
-}
-
-const HEX = /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i;
-export function safeColor(
-  value: string | null | undefined,
-  fallback: string,
-): string {
-  return value && HEX.test(value.trim()) ? value.trim() : fallback;
-}
+export const safeColor = safeHex;
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const system = useColorScheme();
@@ -209,13 +201,27 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<ThemeValue>(() => {
     const base = scheme === "dark" ? darkTokens : lightTokens;
-    const colors: ColorTokens = { ...base };
-    const accent = safeColor(tenant?.primaryColor, colors.primary);
-    const accentSecondary = safeColor(tenant?.secondaryColor, colors.highlight);
-    const blurEnabled =
-      !reduceTransparency &&
-      (blurPreference === "on" ||
-        (blurPreference === "auto" && !isLowEndDevice()));
+    const mobile = neutrals[scheme];
+    const colors: ColorTokens = {
+      ...base,
+      ...mobile,
+      cardForeground: mobile.foreground,
+      popover: mobile.elevated,
+      popoverForeground: mobile.foreground,
+    };
+    const brand = brandPalette(
+      tenant?.primaryColor,
+      tenant?.secondaryColor,
+      scheme,
+    );
+    const accent = brand.focus;
+    const accentSecondary = brand.gradient[1];
+    const blurEnabled = shouldBlur(
+      Platform.OS,
+      Device.totalMemory,
+      blurPreference,
+      reduceTransparency,
+    );
     return {
       scheme,
       isDark: scheme === "dark",
@@ -223,6 +229,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       glass: scheme === "dark" ? glassDark : glassLight,
       accent,
       accentSecondary,
+      heroGradient: brand.gradient,
       tenant,
       schemePreference,
       blurPreference,
@@ -296,21 +303,9 @@ export function withAlpha(hex: string, alpha: number): string {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
-/** Picks a legible foreground (white or near-black) for text on `hex`. */
+/** Chooses the higher-contrast black/white foreground, including mid-grey. */
 export function readableOn(hex: string): string {
-  const h = hex.replace("#", "");
-  const full =
-    h.length === 3
-      ? h
-          .split("")
-          .map((c) => c + c)
-          .join("")
-      : h;
-  const channel = (i: number) => {
-    const v = parseInt(full.slice(i, i + 2), 16) / 255;
-    return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
-  };
-  const luminance =
-    0.2126 * channel(0) + 0.7152 * channel(2) + 0.0722 * channel(4);
-  return luminance > 0.38 ? "#0b1020" : "#ffffff";
+  return contrast(hex, "#000000") >= contrast(hex, "#FFFFFF")
+    ? "#000000"
+    : "#FFFFFF";
 }

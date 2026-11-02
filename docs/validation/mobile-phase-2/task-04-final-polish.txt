@@ -1,0 +1,37 @@
+
+$ pnpm --filter @schoolhub/mobile typecheck
+$ tsc --noEmit
+
+exit: 0
+
+$ pnpm --filter @schoolhub/mobile lint
+$ expo lint --max-warnings 0
+
+exit: 0
+
+$ pnpm --filter @schoolhub/mobile format:check
+$ prettier --check .
+Checking formatting...
+All matched files use Prettier code style!
+
+exit: 0
+
+$ pnpm --filter @schoolhub/mobile test
+$ jest --runInBand
+
+Test Suites: 13 passed, 13 total
+Tests:       73 passed, 73 total
+Snapshots:   0 total
+Time:        2.928 s, estimated 4 s
+Ran all test suites.
+Jest did not exit one second after the test run has completed.
+
+'This usually means that there are asynchronous operations that weren't stopped in your tests. Consider running Jest with `--detectOpenHandles` to troubleshoot this issue.
+
+exit: 0
+
+$ pnpm --filter @schoolhub/mobile audit:contrast
+$ node scripts/audit-contrast.mjs
+PASS: 1624 text, icon, gradient and composited chrome contrast pairs across light/dark themes.
+
+exit: 0
