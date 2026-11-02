@@ -731,6 +731,12 @@ export const updateInventoryItemSchema = z.object({
 });
 export type UpdateInventoryItemInput = z.infer<typeof updateInventoryItemSchema>;
 
+export const createInventoryCategorySchema = z.object({
+  name: z.string().trim().min(2, "Category name must contain at least 2 characters").max(100),
+  description: z.string().trim().max(300).optional(),
+});
+export type CreateInventoryCategoryInput = z.infer<typeof createInventoryCategorySchema>;
+
 export const inventoryStockMovementSchema = z.object({
   type: z.enum(["IN", "OUT"]),
   quantity: z.number().int().positive("Quantity must be a positive whole number"),

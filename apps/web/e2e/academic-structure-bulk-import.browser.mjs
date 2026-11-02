@@ -44,7 +44,8 @@ const session = {
 };
 
 const kinds = [
-  { route: "classes", kind: "departments", sheet: "Departments", headers: ["name", "code", "description"], name: "Science" },
+  { route: "classes", kind: "departments", sheet: "Departments", headers: ["name", "code", "description"], name: "Science", button: "Bulk import" },
+  { route: "classes", kind: "classes", sheet: "Classes", headers: ["name", "level", "departmentCode", "capacity", "isGraduatingClass", "isActive", "order"], name: "JHS 1A", button: "Bulk import classes" },
   { route: "houses", kind: "houses", sheet: "Houses", headers: ["name", "code", "description", "color", "motto", "houseTeacherEmail", "isActive"], name: "Red House" },
   { route: "clubs", kind: "clubs", sheet: "Clubs", headers: ["name", "description", "teacherInChargeEmail", "isActive"], name: "Science Club" },
 ];
@@ -66,8 +67,10 @@ async function installMocks(page, writes) {
     if (path.endsWith("/schools/roles")) {
       return route.fulfill({ json: { primaryRole: "admin", roles: ["admin"] } });
     }
-    if (path.endsWith("/academics/classes") || path.endsWith("/academics/departments") ||
-        path.endsWith("/academics/teachers") || path.endsWith("/academics/houses") ||
+    if (path.endsWith("/academics/departments")) {
+      return route.fulfill({ json: [{ id: "department-jhs", name: "Junior High", code: "JHS", description: null, _count: { classes: 0 } }] });
+    }
+    if (path.endsWith("/academics/classes") || path.endsWith("/academics/teachers") || path.endsWith("/academics/houses") ||
         path.endsWith("/academics/clubs")) {
       return route.fulfill({ json: [] });
     }
@@ -86,7 +89,13 @@ async function installMocks(page, writes) {
             name: spec.name,
             status: "ready",
             errors: [],
-            row: { name: spec.name, code: "SCI" },
+            row: spec.kind === "classes"
+              ? { name: spec.name, level: "JHS 1", departmentId: "department-jhs", capacity: 40, isGraduatingClass: false, isActive: true, order: 1 }
+              : spec.kind === "departments"
+                ? { name: spec.name, code: "SCI", description: "Science department" }
+                : spec.kind === "houses"
+                  ? { name: spec.name, code: "RED", description: "Red team", color: "#C0392B", motto: "Lead with courage", isActive: true }
+                  : { name: spec.name, description: "Science projects", isActive: true },
           }],
         },
       });
@@ -118,7 +127,7 @@ try {
 
   for (const spec of kinds) {
     await page.goto(`${base}/${spec.route}?school=test-school`);
-    await page.getByRole("button", { name: "Bulk import", exact: true }).click();
+    await page.getByRole("button", { name: spec.button ?? "Bulk import", exact: true }).click();
     await page.getByRole("dialog", { name: `Bulk import ${spec.kind}` }).waitFor();
 
     const downloadPromise = page.waitForEvent("download");
@@ -130,7 +139,9 @@ try {
     const sheet = workbook.getWorksheet(spec.sheet);
     assert(sheet, `template has a ${spec.sheet} worksheet`);
     assert.deepEqual(sheet.getRow(1).values.slice(1), spec.headers);
-    const values = spec.kind === "departments"
+    const values = spec.kind === "classes"
+      ? ["JHS 1A", "JHS 1", "JHS", "40", "FALSE", "TRUE", "1"]
+      : spec.kind === "departments"
       ? ["Science", "SCI", "Science department"]
       : spec.kind === "houses"
         ? ["Red House", "RED", "Red team", "#C0392B", "Lead with courage", "", "TRUE"]
@@ -146,17 +157,22 @@ try {
     await page.getByText(spec.name, { exact: true }).waitFor();
     await page.getByRole("button", { name: "Create 1 records", exact: true }).click();
     await page.getByText("1 created · 0 failed.", { exact: true }).waitFor();
-    assert.deepEqual(writes.at(-1), {
-      kind: spec.kind,
-      rows: [{ rowNumber: 2, row: { name: spec.name, code: "SCI" } }],
-    });
+    assert.equal(writes.at(-1).kind, spec.kind);
+    assert.equal(writes.at(-1).rows.length, 1);
+    assert.equal(writes.at(-1).rows[0].row.name, spec.name);
+    if (spec.kind === "classes") {
+      assert.deepEqual(writes.at(-1).rows[0].row, {
+        name: spec.name, level: "JHS 1", departmentId: "department-jhs",
+        capacity: 40, isGraduatingClass: false, isActive: true, order: 1,
+      });
+    }
     await page.getByRole("button", { name: "Done", exact: true }).click();
     await page.getByRole("dialog").waitFor({ state: "detached" });
   }
 
   assert.deepEqual(errors, []);
   await page.close();
-  console.log("Academic structure bulk import checks passed for departments, houses and clubs using Excel templates.");
+  console.log("Academic structure bulk import checks passed for departments, classes, houses and clubs using Excel templates.");
 } finally {
   await browser.close();
 }

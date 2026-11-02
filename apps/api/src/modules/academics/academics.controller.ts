@@ -75,7 +75,7 @@ export class AcademicsController {
     @Query('kind') kind: string,
   ) {
     if (!file) throw new BadRequestException('Choose a CSV or XLSX file.');
-    if ((kind === 'departments' || kind === 'houses') && role !== 'owner' && role !== 'admin') {
+    if (kind !== 'clubs' && role !== 'owner' && role !== 'admin') {
       throw new ForbiddenException(`Only school owners and administrators can import ${kind}.`);
     }
     return this.structureImports.preview(school, file, kind);
@@ -91,6 +91,9 @@ export class AcademicsController {
   ) {
     if (!body.kind) throw new BadRequestException('kind is required.');
     if (!Array.isArray(body.rows)) throw new BadRequestException('rows must be an array.');
+    if (body.kind !== 'clubs' && role !== 'owner' && role !== 'admin') {
+      throw new ForbiddenException(`Only school owners and administrators can import ${body.kind}.`);
+    }
     return this.structureImports.importBatch(school, role, body.kind, body.rows);
   }
 

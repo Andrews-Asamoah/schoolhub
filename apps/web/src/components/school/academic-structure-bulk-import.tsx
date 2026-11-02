@@ -4,7 +4,7 @@ import { Download, FileSpreadsheet, FileUp, LoaderCircle, X } from "lucide-react
 import { apiFetch } from "@/lib/api";
 import { download } from "@/lib/table-export";
 
-type Kind = "departments" | "houses" | "clubs";
+type Kind = "departments" | "houses" | "clubs" | "classes";
 type PreviewRow = {
   rowNumber: number;
   name: string;
@@ -55,6 +55,14 @@ const definitions: Record<Kind, {
     example: ["Science Club", "Explore science through projects", "", "TRUE"],
     required: "name",
     description: "Club names must be unique. Optional teacherInChargeEmail must match an active teacher's invitation email.",
+  },
+  classes: {
+    title: "classes",
+    sheet: "Classes",
+    headers: ["name", "level", "departmentCode", "capacity", "isGraduatingClass", "isActive", "order"],
+    example: ["JHS 1A", "JHS 1", "JHS", "40", "FALSE", "TRUE", "1"],
+    required: "name, level, departmentCode",
+    description: "Class names must be unique. departmentCode must match a department in this school. Capacity and order must be positive/whole numbers when provided; class flags accept TRUE or FALSE.",
   },
 };
 
@@ -122,7 +130,7 @@ export function AcademicStructureBulkImport({
       instructions.addRow(["Do not rename the worksheet or change the column headings."]);
       instructions.addRow(["Required columns", definition.required]);
       instructions.addRow(["Validation", definition.description]);
-      instructions.addRow(["Optional status", "isActive accepts TRUE or FALSE; blank defaults to active."]);
+      instructions.addRow(["Optional status", "isActive and isGraduatingClass accept TRUE or FALSE; blank uses the school default."]);
 
       const sheet = workbook.addWorksheet(definition.sheet, { views: [{ state: "frozen", ySplit: 1 }] });
       sheet.addRow(definition.headers);

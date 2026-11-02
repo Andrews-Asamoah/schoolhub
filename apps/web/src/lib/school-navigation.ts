@@ -509,7 +509,26 @@ schoolNavGroups.push({
 
 export const schoolNavItems = schoolNavGroups.flatMap((group) => group.items);
 
+const adminRestrictedFinancePages = new Set([
+  "accountant-portal",
+  "concessions",
+  "fees",
+  "payments",
+  "invoices",
+  "expenses",
+  "payroll",
+  "fee-reminders",
+  "outstanding",
+  "finance-audit",
+  "student-statements",
+  "term-end-review",
+  "finance-reports",
+]);
+
 const rolePages: Record<string, string[]> = {
+  admin: schoolNavItems
+    .filter((item) => !adminRestrictedFinancePages.has(item.id))
+    .map((item) => item.id),
   teacher: [
     "external-exams",
     "internal-exams",

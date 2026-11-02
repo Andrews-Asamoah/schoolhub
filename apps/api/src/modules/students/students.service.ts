@@ -163,7 +163,7 @@ export class StudentsService {
         take: limit,
         orderBy: { createdAt: 'desc' },
         include: {
-          profile: true,
+          profile: { include: { user: { select: { image: true } } } },
           class: { select: { id: true, name: true, level: true } },
           house: { select: { id: true, name: true, color: true } },
           guardians: {

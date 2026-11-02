@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import {
   ArrowRight, BookOpen, Building2, CalendarDays, CircleAlert, GraduationCap,
-  UsersRound, WalletCards, UserRoundPlus, type LucideIcon,
+  Lock, UsersRound, WalletCards, UserRoundPlus, type LucideIcon,
 } from "lucide-react";
 import { DashboardInfographics } from "@/components/school/dashboard/dashboard-infographics";
 import { RecentActivityCard, SchoolYearCard } from "@/components/school/dashboard/dashboard-activity";
@@ -159,6 +159,12 @@ export function DashboardContent({ today, greetingName }: DashboardContentProps)
       {!isManagementRole && <section className="mb-5 rounded-2xl border border-border bg-card p-5"><p className="text-xs font-semibold uppercase tracking-wide text-primary">{schoolRoleLabel(activeRole)}</p><p className="mt-1 text-sm text-muted-foreground">Quick links for your workspace</p><div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{roleLinks.map((item) => <Link key={item.id} to="/$page" params={{ page: item.id }} className="flex items-center gap-3 rounded-xl border border-border p-3 transition hover:bg-muted/50"><span className="flex size-9 items-center justify-center rounded-lg bg-primary/10 text-primary"><item.icon className="size-4" /></span><span><span className="block text-sm font-semibold text-foreground">{item.label}</span><span className="mt-0.5 block text-xs text-muted-foreground">{item.description}</span></span></Link>)}</div></section>}
 
       <Metrics data={data} isLoading={analyticsQuery.isPending} isError={analyticsQuery.isError} />
+      {activeRole === "admin" && data?.canViewFinance && (
+        <div role="note" className="mt-4 flex items-start gap-3 rounded-xl border border-border bg-muted/40 p-3 text-sm text-muted-foreground">
+          <Lock className="mt-0.5 size-4 shrink-0" />
+          <span><strong className="font-semibold text-foreground">Read-only finance overview.</strong> This dashboard shows school-wide totals and trends only. Detailed payment, expense, student-account and payroll records are restricted to authorized finance roles.</span>
+        </div>
+      )}
       <DashboardInfographics data={data} isLoading={analyticsQuery.isPending} isError={analyticsQuery.isError} selectedMonths={selectedMonths} onMonthsChange={setSelectedMonths} />
       {activeRole === "accountant" && (
         <section className="mt-6 space-y-3" aria-label="Accountant finance dashboard">

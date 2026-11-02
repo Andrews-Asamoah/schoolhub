@@ -5,12 +5,14 @@ import {
   StreamableFile,
   Delete,
   Put,
+  Post,
   Param,
   UploadedFile,
+  UploadedFiles,
   UseGuards,
   UseInterceptors,
 } from "@nestjs/common";
-import { FileInterceptor } from "@nestjs/platform-express";
+import { FileInterceptor, FilesInterceptor } from "@nestjs/platform-express";
 import type { School } from "@prisma/client";
 import { CurrentSchool } from "../../common/decorators/current-school.decorator.js";
 import { CurrentUser } from "../../common/decorators/current-user.decorator.js";
@@ -91,7 +93,20 @@ export class AssetsController {
     return this.assets.setPersonAvatar(school, kind, personId, file, actor);
   }
 
+  @Post("photos/students/bulk")
+  @Roles("owner", "admin", "headteacher")
+  @Header("Cache-Control", "no-store")
+  @UseInterceptors(FilesInterceptor("photos", 25, { limits: { fileSize: MAX_IMAGE_BYTES, files: 25 } }))
+  uploadStudentAvatars(
+    @CurrentSchool() school: School,
+    @UploadedFiles() files: Express.Multer.File[] | undefined,
+    @AuditActorParam() actor: AuditActor,
+  ) {
+    return this.assets.setStudentAvatars(school, files ?? [], actor);
+  }
+
   @Put("me/avatar")
+  @Roles("owner", "admin", "headteacher", "teacher", "accountant", "staff", "guardian")
   @UseInterceptors(imageUpload("avatar"))
   uploadAvatar(
     @CurrentSchool() school: School,
@@ -102,6 +117,7 @@ export class AssetsController {
   }
 
   @Delete("me/avatar")
+  @Roles("owner", "admin", "headteacher", "teacher", "accountant", "staff", "guardian")
   removeAvatar(
     @CurrentSchool() school: School,
     @CurrentUser() user: { id: string },

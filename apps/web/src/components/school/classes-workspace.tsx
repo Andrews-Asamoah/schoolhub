@@ -104,6 +104,7 @@ export function ClassesWorkspace({
   const [search, setSearch] = useState("");
   const [departmentFilter, setDepartmentFilter] = useState("all");
   const [showClassForm, setShowClassForm] = useState(false);
+  const [showClassImport, setShowClassImport] = useState(false);
   const [editingClass, setEditingClass] = useState<ClassRecord | null>(null);
   const [managingTeacherClass, setManagingTeacherClass] = useState<ClassRecord | null>(null);
   const [showDepartmentForm, setShowDepartmentForm] = useState(false);
@@ -322,6 +323,16 @@ export function ClassesWorkspace({
           }}
         />
       )}
+      {showClassImport && (
+        <AcademicStructureBulkImport
+          kind="classes"
+          onClose={() => setShowClassImport(false)}
+          onComplete={() => {
+            void queryClient.invalidateQueries({ queryKey: ["academics", "classes"] });
+            void queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+          }}
+        />
+      )}
       <section className="overflow-hidden rounded-3xl border border-border bg-card shadow-sm">
         <div className="relative isolate overflow-hidden border-b border-border bg-gradient-to-br from-primary/10 via-card to-info/5 px-5 py-6 sm:px-7 sm:py-8">
           <div className="pointer-events-none absolute -right-10 -top-16 -z-10 size-64 rounded-full bg-primary/10 blur-3xl" />
@@ -340,16 +351,28 @@ export function ClassesWorkspace({
               </p>
             </div>
             {canManage && (
-              <button
-                type="button"
-                onClick={openClassForm}
-                disabled={!availableDepartments.length}
-                title={!availableDepartments.length ? "Create a department first" : undefined}
-                className="inline-flex h-11 items-center gap-2 rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-sm transition hover:brightness-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <Plus className="size-4" />
-                Create class
-              </button>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowClassImport(true)}
+                  disabled={!availableDepartments.length}
+                  title={!availableDepartments.length ? "Create a department first" : undefined}
+                  className="inline-flex h-11 items-center gap-2 rounded-xl border border-border bg-card px-4 text-sm font-semibold text-foreground shadow-sm transition hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <FileSpreadsheet className="size-4" />
+                  Bulk import classes
+                </button>
+                <button
+                  type="button"
+                  onClick={openClassForm}
+                  disabled={!availableDepartments.length}
+                  title={!availableDepartments.length ? "Create a department first" : undefined}
+                  className="inline-flex h-11 items-center gap-2 rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-sm transition hover:brightness-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <Plus className="size-4" />
+                  Create class
+                </button>
+              </div>
             )}
           </div>
           <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">

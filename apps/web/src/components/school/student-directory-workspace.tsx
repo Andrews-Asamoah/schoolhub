@@ -1,6 +1,7 @@
 import { PersonPhotoPicker, uploadPersonPhoto } from "./person-photo-picker";
 import { DatePicker } from "@/components/ui/date-picker";
 import { StudentProfileModal } from "@/components/school/student-profile-panel";
+import { UserAvatar } from "@/components/ui/user-avatar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useForm } from "@tanstack/react-form";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -33,6 +34,7 @@ import {
 } from "@/components/school/workspace-ui";
 import { useSchoolRole } from "@/components/school/school-role-switcher";
 import { StudentImportWizard } from "@/components/school/student-import-wizard";
+import { StudentPhotoBulkUpload } from "@/components/school/student-photo-bulk-upload";
 import { apiFetch } from "@/lib/api";
 import {
   CredentialsDialog,
@@ -51,6 +53,7 @@ interface Student {
     gender: string;
     dateOfBirth: string;
     phone: string | null;
+    user?: { image: string | null };
   };
   class: { id: string; name: string; level: string } | null;
   department?: { id: string; name: string } | null;
@@ -152,6 +155,7 @@ export function StudentDirectoryWorkspace() {
   );
   const canImport = ["owner", "admin", "headteacher"].includes(activeRole ?? "");
   const [showImport, setShowImport] = useState(false);
+  const [showPhotoBulkUpload, setShowPhotoBulkUpload] = useState(false);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
   const [classId, setClassId] = useState("");
@@ -241,10 +245,11 @@ export function StudentDirectoryWorkspace() {
         `${student.profile.firstName} ${student.profile.lastName}${student.profile.otherNames ? ` ${student.profile.otherNames}` : ""} (${student.studentId})`,
       cell: (student) => (
         <div className="flex items-center gap-3">
-          <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
-            {student.profile.firstName.slice(0, 1)}
-            {student.profile.lastName.slice(0, 1)}
-          </span>
+          <UserAvatar
+            name={`${student.profile.firstName} ${student.profile.lastName}`}
+            image={student.profile.user?.image}
+            className="size-9 text-xs"
+          />
           <span className="min-w-0">
             <span className="block font-semibold text-foreground">
               {student.profile.firstName} {student.profile.lastName}
@@ -399,6 +404,16 @@ export function StudentDirectoryWorkspace() {
                   Import students
                 </button>
               )}
+              {canImport && (
+                <button
+                  type="button"
+                  onClick={() => setShowPhotoBulkUpload(true)}
+                  className="inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-card px-4 text-xs font-semibold text-foreground shadow-sm hover:bg-muted"
+                >
+                  <UserRound className="size-4" />
+                  Bulk photos
+                </button>
+              )}
               <button
                 type="button"
                 onClick={openCreate}
@@ -419,6 +434,9 @@ export function StudentDirectoryWorkspace() {
           onClose={() => setShowImport(false)}
         />
       )}
+      {showPhotoBulkUpload && canImport && (
+        <StudentPhotoBulkUpload onClose={() => setShowPhotoBulkUpload(false)} />
+      )}
 
       {viewingId && <StudentProfileModal studentId={viewingId} onClose={() => setViewingId(null)} />}
 
@@ -429,6 +447,7 @@ export function StudentDirectoryWorkspace() {
           classes={classesQuery.data ?? []}
           departments={departmentsQuery.data ?? []}
           houses={housesQuery.data ?? []}
+          canManagePhotos={canImport}
           onIssued={setIssued}
           onNotice={setNotice}
           onCancel={() => {
@@ -560,6 +579,7 @@ function StudentEditor({
   classes,
   departments,
   houses,
+  canManagePhotos,
   onCancel,
   onSaved,
   onIssued,
@@ -569,6 +589,7 @@ function StudentEditor({
   classes: SchoolClass[];
   departments: DepartmentOption[];
   houses: HouseOption[];
+  canManagePhotos: boolean;
   onIssued: (entries: CredentialEntry[]) => void;
   onNotice: (text: string | null) => void;
   onCancel: () => void;
@@ -607,9 +628,12 @@ function StudentEditor({
           ? `${linked.map((g) => g.name).join(", ")} already ${linked.length === 1 ? "has" : "have"} an account at this school. ${linked.length === 1 ? "It now also has" : "They now also have"} the parent role and sign in with the existing password, so no new parent password was created.`
           : null,
       );
-      if (photo) {
-        try { await uploadPersonPhoto("student", saved.id, photo); }
-        catch { onNotice("Student saved, but the image upload failed. Edit the student to try uploading the image again."); }
+      if (photo && canManagePhotos) {
+        try {
+          await uploadPersonPhoto("student", saved.id, photo);
+        } catch (error) {
+          onNotice(`Student saved, but the photo upload failed: ${error instanceof Error ? error.message : "unknown error"}. Edit the student to try again.`);
+        }
       }
       if (saved.credentials) {
         const name = `${saved.profile.firstName} ${saved.profile.lastName}`;
@@ -684,7 +708,13 @@ function StudentEditor({
           void form.handleSubmit();
         }}
       >
-        <PersonPhotoPicker file={photo} onChange={setPhoto} />
+        {canManagePhotos ? (
+          <PersonPhotoPicker file={photo} onChange={setPhoto} />
+        ) : (
+          <p role="note" className="mb-4 rounded-lg border border-border bg-muted/40 p-3 text-xs text-muted-foreground">
+            Only school owners, administrators, and headteachers can add or change a student photo.
+          </p>
+        )}
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <form.Field name="firstName">
             {(field) => (

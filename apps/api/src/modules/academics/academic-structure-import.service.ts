@@ -1,10 +1,12 @@
 import { BadRequestException, ForbiddenException, HttpException, Injectable, Logger } from "@nestjs/common";
 import {
   createClubSchema,
+  createClassSchema,
   createDepartmentSchema,
   createHouseSchema,
   STUDENT_IMPORT_LIMITS,
   type CreateClubInput,
+  type CreateClassInput,
   type CreateDepartmentInput,
   type CreateHouseInput,
 } from "@schoolhub/shared";
@@ -13,8 +15,8 @@ import { AcademicsService } from "./academics.service.js";
 import { PrismaService } from "../../prisma/prisma.service.js";
 import { parseUpload } from "../students/import/import-parse.js";
 
-export type AcademicStructureKind = "departments" | "houses" | "clubs";
-type RecordInput = CreateDepartmentInput | CreateHouseInput | CreateClubInput;
+export type AcademicStructureKind = "departments" | "houses" | "clubs" | "classes";
+type RecordInput = CreateDepartmentInput | CreateHouseInput | CreateClubInput | CreateClassInput;
 type PreviewStatus = "ready" | "duplicate" | "error";
 type PreviewRow = {
   rowNumber: number;
@@ -46,22 +48,33 @@ const fieldAliases: Record<AcademicStructureKind, Record<string, string[]>> = {
     teacherInChargeEmail: ["teacherinchargeemail", "patronemail", "teacheremail"],
     isActive: ["isactive", "active", "status"],
   },
+  classes: {
+    name: ["name", "classname", "class"],
+    level: ["level", "grade", "classlevel"],
+    departmentCode: ["departmentcode", "deptcode", "department"],
+    capacity: ["capacity", "classcapacity"],
+    isGraduatingClass: ["isgraduatingclass", "graduatingclass", "graduating"],
+    isActive: ["isactive", "active", "status"],
+    order: ["order", "sortorder", "displayorder"],
+  },
 };
 
 const requiredFields: Record<AcademicStructureKind, string[]> = {
   departments: ["name", "code"],
   houses: ["name", "code"],
   clubs: ["name"],
+  classes: ["name", "level", "departmentCode"],
 };
 
 const kindNames: Record<AcademicStructureKind, string> = {
   departments: "department",
   houses: "house",
   clubs: "club",
+  classes: "class",
 };
 
 function isKind(value: string): value is AcademicStructureKind {
-  return value === "departments" || value === "houses" || value === "clubs";
+  return value === "departments" || value === "houses" || value === "clubs" || value === "classes";
 }
 
 function parseActive(value: string): boolean | undefined {
@@ -69,6 +82,13 @@ function parseActive(value: string): boolean | undefined {
   if (/^(true|yes|1|active)$/i.test(value)) return true;
   if (/^(false|no|0|inactive)$/i.test(value)) return false;
   throw new Error("isActive must be TRUE or FALSE.");
+}
+
+function parseBoolean(value: string, field: string): boolean | undefined {
+  if (!value) return undefined;
+  if (/^(true|yes|1)$/i.test(value)) return true;
+  if (/^(false|no|0)$/i.test(value)) return false;
+  throw new Error(`${field} must be TRUE or FALSE.`);
 }
 
 function responseMessage(error: HttpException): string {
@@ -96,7 +116,7 @@ export class AcademicStructureImportService {
     file: { buffer: Buffer; originalname: string },
     rawKind: string,
   ) {
-    if (!isKind(rawKind)) throw new BadRequestException("kind must be departments, houses or clubs.");
+    if (!isKind(rawKind)) throw new BadRequestException("kind must be departments, houses, clubs or classes.");
     const kind = rawKind;
     const { format, sheet } = await parseUpload(file.buffer, file.originalname);
     const fieldByHeader = new Map(
@@ -115,12 +135,18 @@ export class AcademicStructureImportService {
       throw new BadRequestException(`Missing required columns: ${missing.join(", ")}. Download the template and keep its headings.`);
     }
 
-    const [existing, teachers] = await Promise.all([
+    const [existing, teachers, departments] = await Promise.all([
       this.loadExisting(school.id, kind),
       kind === "houses" || kind === "clubs"
         ? this.prisma.client.teacher.findMany({
             where: { schoolId: school.id, isActive: true, deletedAt: null },
             select: { id: true, invitationEmail: true },
+          })
+        : Promise.resolve([]),
+      kind === "classes"
+        ? this.prisma.client.department.findMany({
+            where: { schoolId: school.id },
+            select: { id: true, name: true, code: true },
           })
         : Promise.resolve([]),
     ]);
@@ -139,7 +165,7 @@ export class AcademicStructureImportService {
       const displayName = raw.name || "(no name)";
       const input: Record<string, unknown> = {
         name: raw.name,
-        ...(kind !== "clubs" ? { code: raw.code } : {}),
+        ...(kind === "departments" || kind === "houses" ? { code: raw.code } : {}),
         ...(raw.description ? { description: raw.description } : {}),
         ...(kind === "houses" ? {
           ...(raw.color ? { color: raw.color } : {}),
@@ -148,11 +174,35 @@ export class AcademicStructureImportService {
       };
       const errors: string[] = [];
 
-      try {
-        const active = parseActive(raw.isActive ?? "");
-        if (active !== undefined && kind !== "departments") input.isActive = active;
-      } catch (error) {
-        errors.push(error instanceof Error ? error.message : "isActive must be TRUE or FALSE.");
+      if (kind === "classes") {
+        const department = departments.find((candidate) =>
+          candidate.code.trim().toLowerCase() === raw.departmentCode?.trim().toLowerCase(),
+        );
+        if (!department) {
+          errors.push(`No department with code "${raw.departmentCode || "(blank)"}" exists in this school.`);
+        } else {
+          input.departmentId = department.id;
+        }
+        input.level = raw.level;
+        try {
+          const graduating = parseBoolean(raw.isGraduatingClass ?? "", "isGraduatingClass");
+          if (graduating !== undefined) input.isGraduatingClass = graduating;
+          const active = parseActive(raw.isActive ?? "");
+          if (active !== undefined) input.isActive = active;
+        } catch (error) {
+          errors.push(error instanceof Error ? error.message : "Class flags must be TRUE or FALSE.");
+        }
+        if (raw.capacity) input.capacity = Number(raw.capacity);
+        if (raw.order) input.order = Number(raw.order);
+      }
+
+      if (kind !== "classes") {
+        try {
+          const active = parseActive(raw.isActive ?? "");
+          if (active !== undefined && kind !== "departments") input.isActive = active;
+        } catch (error) {
+          errors.push(error instanceof Error ? error.message : "isActive must be TRUE or FALSE.");
+        }
       }
 
       const teacherEmailField = kind === "houses" ? "houseTeacherEmail" : "teacherInChargeEmail";
@@ -166,20 +216,24 @@ export class AcademicStructureImportService {
         ? createDepartmentSchema
         : kind === "houses"
           ? createHouseSchema
-          : createClubSchema;
+          : kind === "clubs"
+            ? createClubSchema
+            : createClassSchema;
       const checked = schema.safeParse(input);
       if (!checked.success) errors.push(...checked.error.issues.map((issue) => issue.message));
       if (errors.length) return { rowNumber: record.rowNumber, name: displayName, status: "error", errors, row: null };
 
       const data = checked.data as RecordInput;
-      const duplicateKeys = kind === "clubs"
+      const duplicateKeys = kind === "classes"
+        ? [normalize(data.name)]
+        : kind === "clubs"
         ? [normalize(data.name)]
         : kind === "houses"
           ? [normalize(data.name), normalize((data as CreateHouseInput).code)]
           : [normalize((data as CreateDepartmentInput).code)];
       const duplicate = this.isDuplicate(kind, data, existing) || duplicateKeys.some((key) => seen.has(key));
       if (duplicate) {
-        const identifier = kind === "clubs" ? "name" : kind === "houses" ? "name or code" : "code";
+        const identifier = kind === "classes" || kind === "clubs" ? "name" : kind === "houses" ? "name or code" : "code";
         return {
           rowNumber: record.rowNumber,
           name: displayName,
@@ -206,9 +260,9 @@ export class AcademicStructureImportService {
     rawKind: string,
     values: { rowNumber: number; row: Record<string, unknown> }[],
   ) {
-    if (!isKind(rawKind)) throw new BadRequestException("kind must be departments, houses or clubs.");
+    if (!isKind(rawKind)) throw new BadRequestException("kind must be departments, houses, clubs or classes.");
     const kind = rawKind;
-    if ((kind === "departments" || kind === "houses") && role !== "owner" && role !== "admin") {
+    if (kind !== "clubs" && role !== "owner" && role !== "admin") {
       throw new ForbiddenException(`Only school owners and administrators can import ${kind}.`);
     }
     if (!Array.isArray(values) || values.length < 1 || values.length > STUDENT_IMPORT_LIMITS.batchSize) {
@@ -232,7 +286,9 @@ export class AcademicStructureImportService {
           ? createDepartmentSchema
           : kind === "houses"
             ? createHouseSchema
-            : createClubSchema;
+            : kind === "clubs"
+              ? createClubSchema
+              : createClassSchema;
         const checked = schema.safeParse(item.row);
         if (!checked.success) {
           results.push({
@@ -245,7 +301,8 @@ export class AcademicStructureImportService {
         }
         if (kind === "departments") await this.academics.createDepartment(school.id, checked.data as CreateDepartmentInput);
         else if (kind === "houses") await this.academics.createHouse(school.id, checked.data as CreateHouseInput);
-        else await this.academics.createClub(school.id, checked.data as CreateClubInput);
+        else if (kind === "clubs") await this.academics.createClub(school.id, checked.data as CreateClubInput);
+        else await this.academics.createClass(school.id, checked.data as CreateClassInput);
         results.push({ rowNumber, name, status: "created" });
       } catch (error) {
         if (error instanceof HttpException) {
@@ -262,6 +319,12 @@ export class AcademicStructureImportService {
   }
 
   private async loadExisting(schoolId: string, kind: AcademicStructureKind) {
+    if (kind === "classes") {
+      return this.prisma.client.class.findMany({
+        where: { schoolId, deletedAt: null },
+        select: { name: true },
+      });
+    }
     if (kind === "departments") {
       return this.prisma.client.department.findMany({ where: { schoolId }, select: { name: true, code: true } });
     }
@@ -272,7 +335,7 @@ export class AcademicStructureImportService {
   }
 
   private isDuplicate(kind: AcademicStructureKind, data: RecordInput, existing: { name: string; code?: string }[]) {
-    if (kind === "clubs") return existing.some((item) => normalize(item.name) === normalize(data.name));
+    if (kind === "clubs" || kind === "classes") return existing.some((item) => normalize(item.name) === normalize(data.name));
     if (kind === "houses") {
       const house = data as CreateHouseInput;
       return existing.some((item) =>

@@ -7,7 +7,14 @@ import { AcademicStructureImportService } from "./academic-structure-import.serv
 function createService(existing: { name: string; code?: string }[] = []) {
   const prisma = {
     client: {
-      department: { findMany: vi.fn().mockResolvedValue(existing) },
+      department: {
+        findMany: vi.fn().mockImplementation((args: { select?: { id?: boolean } }) =>
+          args.select?.id
+            ? [{ id: "department-1", name: "Junior High", code: "JHS" }]
+            : existing,
+        ),
+      },
+      class: { findMany: vi.fn().mockResolvedValue(existing.map(({ name }) => ({ name }))) },
       house: { findMany: vi.fn().mockResolvedValue(existing) },
       club: { findMany: vi.fn().mockResolvedValue(existing.map(({ name }) => ({ name }))) },
       teacher: {
@@ -16,12 +23,14 @@ function createService(existing: { name: string; code?: string }[] = []) {
     },
   } as unknown as PrismaService;
   const createDepartment = vi.fn().mockResolvedValue({ id: "department-1" });
+  const createClass = vi.fn().mockResolvedValue({ id: "class-1" });
   const academics = {
     createDepartment,
+    createClass,
     createHouse: vi.fn().mockResolvedValue({ id: "house-1" }),
     createClub: vi.fn().mockResolvedValue({ id: "club-1" }),
   } as unknown as AcademicsService;
-  return { service: new AcademicStructureImportService(prisma, academics), academics, createDepartment };
+  return { service: new AcademicStructureImportService(prisma, academics), academics, createDepartment, createClass };
 }
 
 describe("AcademicStructureImportService preview", () => {
@@ -57,6 +66,43 @@ describe("AcademicStructureImportService preview", () => {
     );
     expect(result.summary).toEqual({ total: 2, ready: 1, duplicate: 1, error: 0 });
     expect(result.rows[1]?.row).toMatchObject({ name: "Drama Club", isActive: false });
+  });
+
+  it("resolves class departments and validates optional class settings", async () => {
+    const { service } = createService();
+    const result = await service.preview(
+      { id: "school-1" },
+      {
+        buffer: Buffer.from("name,level,departmentCode,capacity,isGraduatingClass,isActive,order\nJHS 1A,JHS 1,JHS,40,FALSE,TRUE,1"),
+        originalname: "classes.csv",
+      },
+      "classes",
+    );
+    expect(result.summary).toEqual({ total: 1, ready: 1, duplicate: 0, error: 0 });
+    expect(result.rows[0]?.row).toMatchObject({
+      name: "JHS 1A",
+      level: "JHS 1",
+      departmentId: "department-1",
+      capacity: 40,
+      isGraduatingClass: false,
+      isActive: true,
+      order: 1,
+    });
+  });
+
+  it("reports invalid department references and duplicate class names", async () => {
+    const { service } = createService([{ name: "Existing Class" }]);
+    const result = await service.preview(
+      { id: "school-1" },
+      {
+        buffer: Buffer.from("name,level,departmentCode\nExisting Class,JHS 1,JHS\nNew Class,JHS 1,UNKNOWN"),
+        originalname: "classes.csv",
+      },
+      "classes",
+    );
+    expect(result.summary).toEqual({ total: 2, ready: 0, duplicate: 1, error: 1 });
+    expect(result.rows[0]?.status).toBe("duplicate");
+    expect(result.rows[1]?.errors[0]).toContain("No department with code");
   });
 
   it("reads the named Excel data sheet while skipping instructions and examples", async () => {
@@ -112,6 +158,22 @@ describe("AcademicStructureImportService import", () => {
       "departments",
       [{ rowNumber: 2, row: { name: "Science", code: "SCI" } }],
     )).rejects.toThrow(/Only school owners/);
+  });
+
+  it("creates validated classes for owners and administrators only", async () => {
+    const { service, createClass } = createService();
+    const rows = [{
+      rowNumber: 2,
+      row: { name: "JHS 1A", level: "JHS 1", departmentId: "department-1" },
+    }];
+    const result = await service.importBatch({ id: "school-1" }, "admin", "classes", rows);
+    expect(result.results).toEqual([{ rowNumber: 2, name: "JHS 1A", status: "created" }]);
+    expect(createClass).toHaveBeenCalledWith("school-1", expect.objectContaining({
+      name: "JHS 1A",
+      departmentId: "department-1",
+    }));
+    await expect(service.importBatch({ id: "school-1" }, "headteacher", "classes", rows))
+      .rejects.toThrow(/Only school owners/);
   });
 
   it("returns per-row validation failures without aborting the batch", async () => {
