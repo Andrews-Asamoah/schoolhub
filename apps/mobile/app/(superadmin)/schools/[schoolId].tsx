@@ -5,7 +5,6 @@ import { ArrowLeft, Building2, CalendarDays, CheckCircle2, Circle, Globe, Mail, 
 import { apiFetch, ApiError } from '@/lib/api';
 import { Screen } from '@/components/Screen';
 import { GlassCard } from '@/components/GlassCard';
-import { Button } from '@/components/Button';
 import { ListRow } from '@/components/ListRow';
 import { ErrorState } from '@/components/States';
 import { spacing, type, useTheme, withAlpha } from '@/theme/theme';
@@ -24,13 +23,12 @@ export default function SuperAdminSchoolDetailScreen() {
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    setError(null);
     try {
       const [detail, setup] = await Promise.all([
         apiFetch<School>(`/super-admin/schools/${encodeURIComponent(schoolId)}`),
         apiFetch<Onboarding>(`/super-admin/schools/${encodeURIComponent(schoolId)}/onboarding`),
       ]);
-      setSchool(detail); setOnboarding(setup);
+      setSchool(detail); setOnboarding(setup); setError(null);
     } catch (e) {
       if (e instanceof ApiError && e.status === 401) router.replace('/login' as Href);
       else setError(e instanceof Error ? e.message : 'School details could not be loaded.');
@@ -40,7 +38,7 @@ export default function SuperAdminSchoolDetailScreen() {
   useEffect(() => { void load(); }, [load]);
 
   if (loading && !school) return <Screen title="School details"><ActivityIndicator color={accent} style={{ marginTop: 48 }} /></Screen>;
-  if (error && !school) return <Screen title="School details" left={<Pressable onPress={() => router.back()} accessibilityRole="button"><ArrowLeft color={colors.foreground} /></Pressable>}><ErrorState title="School details unavailable" message={error} actionLabel="Retry" onAction={() => { setLoading(true); void load(); }} /></Screen>;
+  if (error && !school) return <Screen title="School details" left={<Pressable onPress={() => router.back()} accessibilityRole="button"><ArrowLeft color={colors.foreground} /></Pressable>}><ErrorState title="School details unavailable" message={error} actionLabel="Retry" onAction={() => { setLoading(true); setError(null); void load(); }} /></Screen>;
   if (!school) return <Screen title="School details"><ErrorState title="School not found" message="This school may have been removed or is no longer available." actionLabel="Back to schools" onAction={() => router.replace('/(superadmin)/schools' as Href)} /></Screen>;
 
   const info = [
