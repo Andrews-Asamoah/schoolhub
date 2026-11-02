@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { router } from 'expo-router';
+import { router, type Href } from 'expo-router';
 import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 import { Building2, GraduationCap, Users, CreditCard, ShieldCheck, RefreshCw, LogOut, ChevronRight, Activity } from 'lucide-react-native';
 import { authClient } from '@/lib/auth-client';
@@ -53,7 +53,7 @@ export default function SuperAdminDashboard() {
     } catch (e) {
       if (e instanceof ApiError && e.status === 401) {
         await clearSession();
-        router.replace('/login');
+        router.replace('/login' as Href);
         return;
       }
       if (e instanceof ApiError && e.status === 403) {
