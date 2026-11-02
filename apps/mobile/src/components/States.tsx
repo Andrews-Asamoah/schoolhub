@@ -1,7 +1,8 @@
 import { StateIllustration } from "./StateIllustration";
 import type { Hue } from "@/theme/palette";
 import type { ReactNode } from "react";
-import { Text, View } from "react-native";
+import { View } from "react-native";
+import { Text } from "@/components/Typography";
 import { spacing, type, useTheme } from "@/theme/theme";
 import { Button } from "./Button";
 

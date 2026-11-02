@@ -1,10 +1,12 @@
 import type { ReactNode } from "react";
-import { Text } from "react-native";
+import {} from "react-native";
+import { Text } from "./Typography";
 import Animated, { FadeIn } from "react-native-reanimated";
 import type { Hue } from "@/theme/palette";
 import { type, useTheme } from "@/theme/theme";
 import { Card } from "./Surface";
 import { IconChip, StatusPill } from "./ModulePrimitives";
+const AnimatedText = Animated.createAnimatedComponent(Text);
 type Tone = "neutral" | "success" | "warning" | "destructive" | "info";
 const tones: Record<Tone, Hue> = {
   neutral: "indigo",
@@ -40,7 +42,7 @@ export function StatTile({
       <Text style={[type.caption, { color: colors.mutedForeground }]}>
         {label}
       </Text>
-      <Animated.Text
+      <AnimatedText
         key={value}
         entering={reduceMotion ? undefined : FadeIn.duration(200)}
         accessibilityLabel={`${label}: ${value}`}
@@ -50,7 +52,7 @@ export function StatTile({
         ]}
       >
         {value}
-      </Animated.Text>
+      </AnimatedText>
       {delta ? <StatusPill label={delta} hue={colour} /> : null}
       {hint ? (
         <Text style={[type.caption, { color: colors.mutedForeground }]}>

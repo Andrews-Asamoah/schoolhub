@@ -1,7 +1,8 @@
 import type { ReactNode } from "react";
 import { LinearGradient } from "expo-linear-gradient";
 import { Image } from "expo-image";
-import { Text, View } from "react-native";
+import { View } from "react-native";
+import { Text } from "@/components/Typography";
 import { type, useTheme } from "@/theme/theme";
 export function HeroCard({
   greeting,

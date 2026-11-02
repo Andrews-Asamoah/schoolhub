@@ -2,7 +2,8 @@ import type { Hue } from "@/theme/palette";
 import { StatusPill } from "./ModulePrimitives";
 import { ChevronRight } from "lucide-react-native";
 import type { ReactNode } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
+import { Text } from "@/components/Typography";
 import { spacing, type, useTheme } from "@/theme/theme";
 
 type Props = {

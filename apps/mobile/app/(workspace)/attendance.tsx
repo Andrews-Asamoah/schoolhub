@@ -1,5 +1,6 @@
 import { CalendarDays, CheckCircle2, Clock3, UserX } from "lucide-react-native";
-import { Text, View } from "react-native";
+import { View } from "react-native";
+import { Text } from "@/components/Typography";
 import { Card } from "@/components/Surface";
 import { ListRow } from "@/components/ListRow";
 import { WorkspaceScreen } from "@/components/WorkspaceScreen";

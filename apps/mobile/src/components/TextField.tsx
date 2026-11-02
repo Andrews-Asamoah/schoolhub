@@ -3,11 +3,11 @@ import { forwardRef, useState, type ComponentRef, type ReactNode } from "react";
 import {
   Pressable,
   StyleSheet,
-  Text,
   TextInput,
   View,
   type TextInputProps,
 } from "react-native";
+import { Text, usePreviewTextStyle } from "./Typography";
 import { fonts, radius, spacing, type, useTheme } from "@/theme/theme";
 
 type Props = Omit<TextInputProps, "style"> & {
@@ -25,6 +25,7 @@ export const TextField = forwardRef<TextFieldHandle, Props>(function TextField(
   { label, error, hint, icon, secret, onFocus, onBlur, ...input },
   ref,
 ) {
+  const inputStyle = usePreviewTextStyle(styles.input);
   const { colors, accent } = useTheme();
   const [focused, setFocused] = useState(false);
   const [revealed, setRevealed] = useState(false);
@@ -73,7 +74,7 @@ export const TextField = forwardRef<TextFieldHandle, Props>(function TextField(
             onBlur?.(e);
           }}
           style={[
-            styles.input,
+            inputStyle,
             { color: colors.foreground, fontFamily: fonts.regular },
           ]}
         />

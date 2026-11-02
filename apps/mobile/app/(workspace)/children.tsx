@@ -1,5 +1,6 @@
 import { ChevronRight } from "lucide-react-native";
-import { Text, View } from "react-native";
+import { View } from "react-native";
+import { Text } from "@/components/Typography";
 import { Avatar } from "@/components/Avatar";
 import { Card } from "@/components/Surface";
 import { ListRow } from "@/components/ListRow";

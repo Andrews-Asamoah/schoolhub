@@ -1,6 +1,7 @@
 import { useNetworkState } from "expo-network";
 import { WifiOff } from "lucide-react-native";
-import { Text, View } from "react-native";
+import { View } from "react-native";
+import { Text } from "@/components/Typography";
 import { modulePalette } from "@/theme/palette";
 import { type, useTheme } from "@/theme/theme";
 export function OfflineNotice({ offline }: { offline: boolean }) {

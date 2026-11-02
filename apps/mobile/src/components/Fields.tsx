@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Search } from "lucide-react-native";
-import { Text, View } from "react-native";
+import { View } from "react-native";
+import { Text } from "@/components/Typography";
 import { type, useTheme } from "@/theme/theme";
 import { TextField } from "./TextField";
 import { SelectField } from "./SelectField";

@@ -10,11 +10,12 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { Text, View } from "react-native";
+import { View } from "react-native";
+import { Text } from "@/components/Typography";
 import Animated, { FadeInUp, FadeOutUp } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { radius, spacing, type, useTheme } from "@/theme/theme";
-import { GlassSurface } from "./GlassSurface";
+import { Card } from "./Surface";
 
 type Tone = "success" | "error" | "info";
 type ToastInput = { message: string; tone?: Tone };
@@ -77,10 +78,9 @@ export function ToastProvider({ children }: { children: ReactNode }) {
           }}
           pointerEvents="none"
         >
-          <GlassSurface
-            radius={radius.pill}
-            strong
-            contentStyle={{
+          <Card
+            style={{
+              borderRadius: radius.xl,
               flexDirection: "row",
               alignItems: "center",
               gap: 10,
@@ -94,7 +94,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                 {toast.message}
               </Text>
             </View>
-          </GlassSurface>
+          </Card>
         </Animated.View>
       ) : null}
     </ToastContext.Provider>

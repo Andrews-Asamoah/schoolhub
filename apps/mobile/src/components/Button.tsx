@@ -1,19 +1,14 @@
 import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
 import type { ReactNode } from "react";
-import {
-  ActivityIndicator,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
+import { Text } from "@/components/Typography";
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withSpring,
 } from "react-native-reanimated";
-import { fonts, radius, useTheme, withAlpha } from "@/theme/theme";
+import { fonts, radius, useTheme } from "@/theme/theme";
 
 type Variant = "primary" | "secondary" | "ghost" | "destructive";
 
@@ -97,7 +92,7 @@ export function Button({
             borderWidth: StyleSheet.hairlineWidth,
           },
           variant === "destructive" && { backgroundColor: colors.destructive },
-          variant === "ghost" && { backgroundColor: withAlpha(accent, 0.1) },
+          variant === "ghost" && { backgroundColor: colors.card },
         ]}
       >
         {variant === "primary" ? (

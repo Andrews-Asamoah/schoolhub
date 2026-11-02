@@ -1,8 +1,6 @@
 import { useState } from "react";
 import { router } from "expo-router";
 import {
-  ArrowUpRight,
-  Bell,
   BookOpen,
   CalendarCheck,
   CalendarDays,
@@ -10,15 +8,19 @@ import {
   Users,
   Wallet,
 } from "lucide-react-native";
-import { Pressable, Text, View } from "react-native";
-import { Avatar } from "@/components/Avatar";
-import { Card } from "@/components/Surface";
-import { ListRow } from "@/components/ListRow";
+import { View, useWindowDimensions } from "react-native";
 import { Screen } from "@/components/Screen";
-import { SegmentedControl } from "@/components/SegmentedControl";
+import { HeroCard } from "@/components/HeroCard";
+import { Entrance } from "@/components/Entrance";
 import { StatTile } from "@/components/StatTile";
-import { TAB_BAR_CLEARANCE } from "@/components/GlassTabBar";
-import { fonts, radius, type, useTheme, withAlpha } from "@/theme/theme";
+import {
+  FilterChips,
+  ModuleTile,
+  SectionHeader,
+  Timeline,
+} from "@/components/ModulePrimitives";
+import { modulePalette } from "@/theme/palette";
+import { useTheme } from "@/theme/theme";
 
 type Role = "Teacher" | "Guardian" | "Student";
 const roles = [
@@ -36,7 +38,7 @@ const dashboards: Record<
   }
 > = {
   Teacher: {
-    greeting: "Good morning, Andrews",
+    greeting: "Good morning",
     intro: "Your teaching day, organised in one place.",
     stats: [
       ["My classes", "6", "Across 3 year groups", "people"],
@@ -66,7 +68,7 @@ const dashboards: Record<
     ],
   },
   Student: {
-    greeting: "Hello, Kofi",
+    greeting: "Ready to learn?",
     intro: "Stay on top of your classes and learning.",
     stats: [
       ["Attendance", "98%", "This term", "attendance"],
@@ -83,267 +85,101 @@ const dashboards: Record<
 };
 export default function HomeScreen() {
   const [role, setRole] = useState<Role>("Teacher");
-  const { colors, accent } = useTheme();
+  const { scheme } = useTheme();
+  const { fontScale } = useWindowDimensions();
   const data = dashboards[role];
   return (
-    <Screen
-      title="Home"
-      subtitle="Your school, at a glance"
-      bottomInset={TAB_BAR_CLEARANCE}
-      right={
-        <Pressable
-          onPress={() => router.push("/(tabs)/notifications")}
-          accessibilityLabel="Notifications"
-          style={{
-            width: 42,
-            height: 42,
-            borderRadius: 21,
-            alignItems: "center",
-            justifyContent: "center",
-            backgroundColor: withAlpha(accent, 0.12),
-          }}
-        >
-          <Bell size={20} color={accent} />
-          <View
-            style={{
-              position: "absolute",
-              right: 9,
-              top: 8,
-              width: 8,
-              height: 8,
-              borderRadius: 4,
-              backgroundColor: colors.destructive,
-            }}
-          />
-        </Pressable>
-      }
-    >
-      <View
-        style={{
-          flexDirection: "row",
-          alignItems: "center",
-          gap: 12,
-          marginBottom: 20,
-        }}
-      >
-        <Avatar name="Andrews Asamoah" size={48} />
-        <View style={{ flex: 1 }}>
-          <Text style={[type.headline, { color: colors.foreground }]}>
-            {data.greeting}
-          </Text>
-          <Text style={[type.caption, { color: colors.mutedForeground }]}>
-            Wesley International School
-          </Text>
-        </View>
-        <GraduationCap color={accent} size={23} />
-      </View>
-      <Card padding={12} style={{ marginBottom: 20 }}>
-        <Text
-          style={[
-            type.overline,
-            { color: colors.mutedForeground, marginBottom: 8 },
-          ]}
-        >
-          PREVIEW ROLE
-        </Text>
-        <SegmentedControl<Role>
-          accessibilityLabel="Choose dashboard preview role"
+    <Screen title="Home" subtitle="Development dashboard fixtures">
+      <View style={{ gap: 20 }}>
+        <FilterChips
+          label="Dashboard preview role"
           value={role}
           onChange={setRole}
-          options={roles.map((x) => ({ ...x }))}
+          options={roles}
         />
-        <Text
-          style={[
-            type.caption,
-            { color: colors.mutedForeground, marginTop: 8 },
-          ]}
-        >
-          Sample UI preview only. This does not change account permissions.
-        </Text>
-      </Card>
-      <Text
-        style={[type.body, { color: colors.mutedForeground, marginBottom: 14 }]}
-      >
-        {data.intro}
-      </Text>
-      <View
-        style={{
-          flexDirection: "row",
-          flexWrap: "wrap",
-          gap: 12,
-          marginBottom: 24,
-        }}
-      >
-        {data.stats.map(([label, value, hint, kind]) => {
-          const icon =
-            kind === "people" ? (
-              <Users size={18} color={accent} />
-            ) : kind === "attendance" ? (
-              <CalendarCheck size={18} color={colors.success} />
-            ) : kind === "fees" ? (
-              <Wallet size={18} color={colors.warning} />
-            ) : (
-              <BookOpen size={18} color={colors.info} />
-            );
-          return (
-            <View key={label} style={{ width: "48%" }}>
-              <StatTile
-                label={label}
-                value={value}
-                hint={hint}
-                icon={icon}
-                tone={
-                  kind === "attendance"
-                    ? "success"
-                    : kind === "fees"
-                      ? "warning"
-                      : "neutral"
-                }
-              />
-            </View>
-          );
-        })}
-      </View>
-      <View
-        style={{
-          flexDirection: "row",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: 12,
-        }}
-      >
-        <Text style={[type.headline, { color: colors.foreground }]}>
-          Today at a glance
-        </Text>
-        <Text
-          style={{ color: accent, fontFamily: fonts.semibold, fontSize: 13 }}
-        >
-          View all
-        </Text>
-      </View>
-      <Card padding={12} style={{ marginBottom: 24 }}>
-        {data.activity.map(([title, subtitle, tag], i) => (
-          <ListRow
-            key={title}
-            title={title}
-            subtitle={subtitle}
-            divider={i !== data.activity.length - 1}
-            trailing={
+        <HeroCard
+          greeting={data.greeting}
+          schoolName="Example School"
+          detail={data.intro}
+        />
+        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 12 }}>
+          {data.stats.map(([label, value, hint, kind], index) => {
+            const hue =
+              kind === "attendance"
+                ? "emerald"
+                : kind === "fees"
+                  ? "teal"
+                  : kind === "book"
+                    ? "amber"
+                    : "indigo";
+            const Icon =
+              kind === "attendance"
+                ? CalendarCheck
+                : kind === "fees"
+                  ? Wallet
+                  : kind === "book"
+                    ? BookOpen
+                    : Users;
+            return (
               <View
-                style={{
-                  backgroundColor: withAlpha(accent, 0.1),
-                  borderRadius: radius.pill,
-                  paddingHorizontal: 8,
-                  paddingVertical: 5,
-                }}
+                key={label}
+                style={{ width: fontScale >= 1.3 ? "100%" : "48%" }}
               >
-                <Text
-                  style={{
-                    color: accent,
-                    fontSize: 12,
-                    fontFamily: fonts.semibold,
-                  }}
-                >
-                  {tag}
-                </Text>
+                <Entrance index={index}>
+                  <StatTile
+                    label={label}
+                    value={value}
+                    hint={hint}
+                    hue={hue}
+                    icon={
+                      <Icon size={22} color={modulePalette(hue, scheme).ink} />
+                    }
+                  />
+                </Entrance>
               </View>
-            }
-          />
-        ))}
-      </Card>
-      <Text
-        style={[type.headline, { color: colors.foreground, marginBottom: 12 }]}
-      >
-        Quick access
-      </Text>
-      <View style={{ flexDirection: "row", gap: 12, marginBottom: 20 }}>
-        <Pressable
+            );
+          })}
+        </View>
+        <SectionHeader
+          title="Today at a glance"
           onPress={() => router.push("/(tabs)/schedule")}
-          style={{ flex: 1 }}
-        >
-          <Card padding={16}>
-            <CalendarDays size={22} color={accent} />
-            <Text
-              style={[
-                type.bodyStrong,
-                { color: colors.foreground, marginTop: 12 },
-              ]}
-            >
-              My schedule
-            </Text>
-            <Text style={[type.caption, { color: colors.mutedForeground }]}>
-              Classes and events
-            </Text>
-            <ArrowUpRight
-              size={15}
-              color={colors.mutedForeground}
-              style={{ position: "absolute", right: 12, top: 12 }}
+        />
+        <Timeline
+          items={data.activity.map(([title, detail, status], i) => ({
+            id: String(i),
+            title,
+            detail,
+            status,
+            time: i === 0 ? "Next" : "Later",
+            hue: i === 0 ? "violet" : "orange",
+          }))}
+        />
+        <SectionHeader title="Quick access" />
+        <ModuleTile
+          label="My schedule"
+          detail="Classes and events"
+          hue="violet"
+          icon={
+            <CalendarDays
+              size={22}
+              color={modulePalette("violet", scheme).ink}
             />
-          </Card>
-        </Pressable>
-        <Pressable
-          onPress={() => router.push("/(tabs)/notifications")}
-          style={{ flex: 1 }}
-        >
-          <Card padding={16}>
-            <Bell size={22} color={accent} />
-            <Text
-              style={[
-                type.bodyStrong,
-                { color: colors.foreground, marginTop: 12 },
-              ]}
-            >
-              Updates
-            </Text>
-            <Text style={[type.caption, { color: colors.mutedForeground }]}>
-              Notices and alerts
-            </Text>
-            <ArrowUpRight
-              size={15}
-              color={colors.mutedForeground}
-              style={{ position: "absolute", right: 12, top: 12 }}
+          }
+          onPress={() => router.push("/(tabs)/schedule")}
+        />
+        <ModuleTile
+          label="School modules"
+          detail="Classes, attendance and learning"
+          hue="indigo"
+          icon={
+            <GraduationCap
+              size={22}
+              color={modulePalette("indigo", scheme).ink}
             />
-          </Card>
-        </Pressable>
+          }
+          onPress={() => router.push("/(workspace)")}
+        />
       </View>
-      <Pressable
-        onPress={() => router.push("/(workspace)")}
-        accessibilityRole="button"
-        style={{ marginBottom: 18 }}
-      >
-        <Card padding={16}>
-          <View
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              justifyContent: "space-between",
-            }}
-          >
-            <View style={{ flex: 1 }}>
-              <Text style={[type.bodyStrong, { color: colors.foreground }]}>
-                Explore school modules
-              </Text>
-              <Text
-                style={[
-                  type.caption,
-                  { color: colors.mutedForeground, marginTop: 3 },
-                ]}
-              >
-                Classes, attendance, children and learning
-              </Text>
-            </View>
-            <ArrowUpRight size={19} color={accent} />
-          </View>
-        </Card>
-      </Pressable>
-      <Text
-        style={[
-          type.caption,
-          { color: colors.mutedForeground, textAlign: "center" },
-        ]}
-      >
-        Illustrative sample content · Not live school data
-      </Text>
     </Screen>
   );
 }

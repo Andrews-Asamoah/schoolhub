@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
-import { Pressable, ScrollView, Text, View } from "react-native";
+import { Pressable, ScrollView, View } from "react-native";
+import { Text } from "@/components/Typography";
 import { modulePalette, type Hue } from "@/theme/palette";
 import { type, useTheme } from "@/theme/theme";
 import { Card } from "./Surface";

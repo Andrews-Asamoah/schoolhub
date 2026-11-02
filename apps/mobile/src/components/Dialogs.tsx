@@ -4,9 +4,9 @@ import {
   findNodeHandle,
   Modal,
   ScrollView,
-  Text,
   View,
 } from "react-native";
+import { Text } from "@/components/Typography";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { type, useTheme } from "@/theme/theme";
 import { Button } from "./Button";

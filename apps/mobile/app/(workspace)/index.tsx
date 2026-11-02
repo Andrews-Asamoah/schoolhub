@@ -7,10 +7,11 @@ import {
   UserRound,
   Wallet,
 } from "lucide-react-native";
-import { Pressable, Text, View } from "react-native";
-import { Card } from "@/components/Surface";
+import { View } from "react-native";
+import { ModuleTile } from "@/components/ModulePrimitives";
+import { modulePalette } from "@/theme/palette";
 import { WorkspaceScreen } from "@/components/WorkspaceScreen";
-import { type, useTheme } from "@/theme/theme";
+import { useTheme } from "@/theme/theme";
 
 const modules = [
   {
@@ -52,79 +53,30 @@ const modules = [
 ] as const;
 
 export default function WorkspaceHome() {
-  const { colors, accent } = useTheme();
+  const { scheme } = useTheme();
   return (
     <WorkspaceScreen
       title="School modules"
-      subtitle="Explore the SchoolHub mobile experience"
+      subtitle="Development module fixtures"
     >
-      <Card padding={16} style={{ marginBottom: 18 }}>
-        <Text style={[type.bodyStrong, { color: colors.foreground }]}>
-          Designed around your school day
-        </Text>
-        <Text
-          style={[
-            type.caption,
-            { color: colors.mutedForeground, marginTop: 5 },
-          ]}
-        >
-          Choose a module to preview its mobile layout. Content is illustrative
-          and not connected to a school account.
-        </Text>
-      </Card>
-      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 12 }}>
-        {modules.map((item) => {
+      <View style={{ gap: 16 }}>
+        {modules.map((item, index) => {
+          const hue = (
+            ["indigo", "emerald", "amber", "teal", "pink", "orange"] as const
+          )[index]!;
           const Icon = item.icon;
           return (
-            <Pressable
+            <ModuleTile
               key={item.title}
+              label={item.title}
+              detail={item.detail}
+              hue={hue}
+              icon={<Icon size={24} color={modulePalette(hue, scheme).ink} />}
               onPress={() => router.push(item.route)}
-              accessibilityRole="button"
-              accessibilityLabel={item.title}
-              style={{ width: "48%" }}
-            >
-              <Card padding={15} style={{ minHeight: 142 }}>
-                <View
-                  style={{
-                    width: 40,
-                    height: 40,
-                    borderRadius: 13,
-                    backgroundColor: colors.accent,
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}
-                >
-                  <Icon size={20} color={accent} />
-                </View>
-                <Text
-                  style={[
-                    type.bodyStrong,
-                    { color: colors.foreground, marginTop: 13 },
-                  ]}
-                >
-                  {item.title}
-                </Text>
-                <Text
-                  style={[
-                    type.caption,
-                    { color: colors.mutedForeground, marginTop: 3 },
-                  ]}
-                >
-                  {item.detail}
-                </Text>
-              </Card>
-            </Pressable>
+            />
           );
         })}
       </View>
-      <Text
-        style={[
-          type.caption,
-          { color: colors.mutedForeground, textAlign: "center", marginTop: 18 },
-        ]}
-      >
-        UI preview only · Sample records
-      </Text>
     </WorkspaceScreen>
   );
 }

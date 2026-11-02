@@ -1,12 +1,15 @@
 import {
   BottomSheetBackdrop,
   BottomSheetModal,
-  BottomSheetView,
+  BottomSheetScrollView,
   type BottomSheetBackdropProps,
 } from "@gorhom/bottom-sheet";
 import { useCallback, type ReactNode, type RefObject } from "react";
-import { StyleSheet, Text } from "react-native";
+import { StyleSheet, useWindowDimensions } from "react-native";
+import { Text } from "@/components/Typography";
 import { radius, spacing, type, useTheme } from "@/theme/theme";
+import { ReduceMotion } from "react-native-reanimated";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { GlassSurface } from "./GlassSurface";
 
 type Props = {
@@ -18,7 +21,9 @@ type Props = {
 
 /** Glass bottom sheet. Needs <BottomSheetModalProvider> (mounted in the root layout). */
 export function Sheet({ sheetRef, title, children, snapPoints }: Props) {
-  const { colors, glass } = useTheme();
+  const { colors, glass, reduceMotion } = useTheme();
+  const { height } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
   const backdrop = useCallback(
     (props: BottomSheetBackdropProps) => (
       <BottomSheetBackdrop
@@ -34,6 +39,10 @@ export function Sheet({ sheetRef, title, children, snapPoints }: Props) {
   return (
     <BottomSheetModal
       ref={sheetRef}
+      overrideReduceMotion={
+        reduceMotion ? ReduceMotion.Always : ReduceMotion.System
+      }
+      maxDynamicContentSize={height - insets.top - 24}
       enableDynamicSizing={!snapPoints}
       snapPoints={snapPoints}
       backdropComponent={backdrop}
@@ -49,10 +58,10 @@ export function Sheet({ sheetRef, title, children, snapPoints }: Props) {
       )}
       handleIndicatorStyle={{ backgroundColor: glass.border, width: 40 }}
     >
-      <BottomSheetView
-        style={{
+      <BottomSheetScrollView
+        contentContainerStyle={{
           padding: spacing.xl,
-          paddingBottom: spacing.huge,
+          paddingBottom: Math.max(spacing.xxl, insets.bottom),
           gap: spacing.md,
         }}
       >
@@ -65,7 +74,7 @@ export function Sheet({ sheetRef, title, children, snapPoints }: Props) {
           </Text>
         ) : null}
         {children}
-      </BottomSheetView>
+      </BottomSheetScrollView>
     </BottomSheetModal>
   );
 }

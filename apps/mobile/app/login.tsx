@@ -1,7 +1,9 @@
 import { router } from "expo-router";
 import { GraduationCap } from "lucide-react-native";
-import { Text, View } from "react-native";
+import { View } from "react-native";
+import { Text } from "@/components/Typography";
 import { Button } from "@/components/Button";
+import { HeroCard } from "@/components/HeroCard";
 import { Card } from "@/components/Surface";
 import { Screen } from "@/components/Screen";
 import { spacing, type, useTheme } from "@/theme/theme";
@@ -12,30 +14,36 @@ export default function SchoolAccessScreen() {
   const { colors } = useTheme();
   return (
     <Screen title="SchoolHub" subtitle="For teachers, students and guardians">
-      <Card padding={spacing.xxl}>
-        <View style={{ gap: spacing.lg }}>
-          <GraduationCap
-            size={44}
-            color={colors.primary}
-            accessibilityElementsHidden
-            importantForAccessibility="no"
-          />
-          <Text style={[type.title, { color: colors.foreground }]}>
-            School access is coming soon
-          </Text>
-          <Text style={[type.body, { color: colors.mutedForeground }]}>
-            Please continue using your school’s web portal while mobile access
-            is being prepared.
-          </Text>
-          {__DEV__ ? (
-            <Button
-              label="Open design gallery"
-              variant="secondary"
-              onPress={() => router.push("/dev-gallery")}
+      <View style={{ gap: 24 }}>
+        <HeroCard
+          greeting="Welcome to SchoolHub"
+          detail="A connected school day for teachers, students and guardians."
+        />
+        <Card padding={spacing.xxl}>
+          <View style={{ gap: spacing.lg }}>
+            <GraduationCap
+              size={44}
+              color={colors.primary}
+              accessibilityElementsHidden
+              importantForAccessibility="no"
             />
-          ) : null}
-        </View>
-      </Card>
+            <Text style={[type.title, { color: colors.foreground }]}>
+              School access is coming soon
+            </Text>
+            <Text style={[type.body, { color: colors.mutedForeground }]}>
+              Please continue using your school’s web portal while mobile access
+              is being prepared.
+            </Text>
+            {__DEV__ ? (
+              <Button
+                label="Open design gallery"
+                variant="secondary"
+                onPress={() => router.push("/dev-gallery")}
+              />
+            ) : null}
+          </View>
+        </Card>
+      </View>
     </Screen>
   );
 }

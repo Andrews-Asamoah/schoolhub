@@ -1,12 +1,15 @@
 import { useMemo, useState } from "react";
-import { Search, SlidersHorizontal } from "lucide-react-native";
-import { Text, TextInput, View } from "react-native";
+import { FlashList } from "@shopify/flash-list";
+import { View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Avatar } from "@/components/Avatar";
 import { Card } from "@/components/Surface";
 import { ListRow } from "@/components/ListRow";
 import { WorkspaceScreen } from "@/components/WorkspaceScreen";
-import { SegmentedControl } from "@/components/SegmentedControl";
-import { type, useTheme } from "@/theme/theme";
+import { SearchBar } from "@/components/Fields";
+import { FilterChips, SectionHeader } from "@/components/ModulePrimitives";
+import { EmptyState } from "@/components/States";
+import { useTheme } from "@/theme/theme";
 
 const records = [
   {
@@ -48,9 +51,10 @@ const filters = [
 ] as const;
 
 export default function StudentsScreen() {
-  const { colors, accent } = useTheme();
+  const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
   const [query, setQuery] = useState("");
-  const [filter, setFilter] = useState<string>("All");
+  const [filter, setFilter] = useState("All");
   const visible = useMemo(
     () =>
       records.filter(
@@ -61,85 +65,70 @@ export default function StudentsScreen() {
       ),
     [filter, query],
   );
+  type Item =
+    | { kind: "section"; id: string }
+    | { kind: "student"; id: string; record: (typeof records)[number] };
+  const data: Item[] = [
+    { kind: "section", id: "header" },
+    ...visible.map((record) => ({
+      kind: "student" as const,
+      id: record.id,
+      record,
+    })),
+  ];
   return (
-    <WorkspaceScreen title="Students" subtitle="Directory · 1,248 enrolled">
-      <Card padding={12} style={{ marginBottom: 14 }}>
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 9 }}>
-          <Search size={18} color={colors.mutedForeground} />
-          <TextInput
-            value={query}
-            onChangeText={setQuery}
-            placeholder="Search name or student ID"
-            placeholderTextColor={colors.mutedForeground}
-            style={{
-              flex: 1,
-              color: colors.foreground,
-              fontSize: 14,
-              paddingVertical: 7,
-            }}
-            accessibilityLabel="Search students"
-          />
-          <SlidersHorizontal size={18} color={accent} />
-        </View>
-      </Card>
-      <SegmentedControl
-        value={filter}
-        onChange={setFilter}
-        options={filters.map((x) => ({ ...x }))}
-        accessibilityLabel="Filter students by class"
+    <WorkspaceScreen
+      title="Students"
+      subtitle="Development directory fixtures"
+      scroll={false}
+    >
+      <FlashList
+        data={data}
+        keyExtractor={(item) => item.id}
+        stickyHeaderIndices={[0]}
+        getItemType={(item) => item.kind}
+        contentContainerStyle={{ paddingBottom: insets.bottom + 32 }}
+        ListHeaderComponent={
+          <View style={{ gap: 16, paddingBottom: 20 }}>
+            <SearchBar
+              label="Search students"
+              value={query}
+              onChange={setQuery}
+            />
+            <FilterChips
+              label="Filter students by class"
+              value={filter}
+              onChange={setFilter}
+              options={filters}
+            />
+          </View>
+        }
+        renderItem={({ item }) =>
+          item.kind === "section" ? (
+            <View style={{ padding: 16, backgroundColor: colors.card }}>
+              <SectionHeader title={`${visible.length} example students`} />
+            </View>
+          ) : (
+            <Card padding={12}>
+              <ListRow
+                title={item.record.name}
+                subtitle={`${item.record.id} · ${item.record.className}`}
+                leading={<Avatar name={item.record.name} />}
+                status={item.record.status}
+                hue={item.record.status === "Active" ? "emerald" : "amber"}
+              />
+            </Card>
+          )
+        }
+        ListFooterComponent={
+          visible.length === 0 ? (
+            <EmptyState
+              title="No matching students"
+              message="Try another name or class filter."
+            />
+          ) : null
+        }
       />
-      <View
-        style={{
-          flexDirection: "row",
-          justifyContent: "space-between",
-          marginVertical: 16,
-        }}
-      >
-        <Text style={[type.bodyStrong, { color: colors.foreground }]}>
-          {visible.length} sample records
-        </Text>
-        <Text style={[type.caption, { color: colors.mutedForeground }]}>
-          Updated just now
-        </Text>
-      </View>
-      <Card padding={12}>
-        {visible.map((item, index) => (
-          <ListRow
-            key={item.id}
-            leading={<Avatar name={item.name} size={42} />}
-            title={item.name}
-            subtitle={item.id + " · " + item.className}
-            trailing={
-              <Text
-                style={{
-                  color:
-                    item.status === "Active" ? colors.success : colors.warning,
-                  fontSize: 12,
-                }}
-              >
-                {item.status}
-              </Text>
-            }
-            divider={index !== visible.length - 1}
-          />
-        ))}
-        {visible.length === 0 ? (
-          <Text
-            style={[
-              type.caption,
-              { color: colors.mutedForeground, padding: 14 },
-            ]}
-          >
-            No matching sample students.
-          </Text>
-        ) : null}
-      </Card>
-      <Text
-        style={[type.caption, { color: colors.mutedForeground, marginTop: 14 }]}
-      >
-        Directory preview · Search and class filters work locally on sample
-        records.
-      </Text>
     </WorkspaceScreen>
   );
 }

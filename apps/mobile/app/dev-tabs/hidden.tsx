@@ -1,4 +1,5 @@
-import { Text } from "react-native";
+import {} from "react-native";
+import { Text } from "@/components/Typography";
 import { Screen } from "@/components/Screen";
 import { type, useTheme } from "@/theme/theme";
 
