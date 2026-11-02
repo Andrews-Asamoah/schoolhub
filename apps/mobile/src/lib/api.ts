@@ -2,12 +2,13 @@ import { assertMobileRole } from "./permissions";
 import { API_BASE } from "./config";
 import {
   emitSessionEvent,
+  sessionStore,
   getActiveRole,
   getSubdomain,
   getToken,
 } from "./session";
 
-import { ApiError } from "./api-error";
+import { ApiError, SessionChangedError } from "./api-error";
 export { ApiError } from "./api-error";
 
 /** Headers every authenticated request carries (mirrors apps/web/src/lib/api.ts). */
@@ -70,13 +71,17 @@ export async function apiFetch<T>(
   path: string,
   init?: RequestInit,
 ): Promise<T> {
+  const revision = sessionStore.getRevision();
   const res = await fetch(`${API_BASE}${path}`, {
     ...init,
     headers: buildHeaders(path, init),
   });
 
+  if (sessionStore.getRevision() !== revision) throw new SessionChangedError();
   if (!res.ok) {
     const body: unknown = await res.json().catch(() => ({}));
+    if (sessionStore.getRevision() !== revision)
+      throw new SessionChangedError();
     handleSessionErrors(res.status, body);
     throw new ApiError(
       res.status,
@@ -85,7 +90,9 @@ export async function apiFetch<T>(
     );
   }
   if (res.status === 204) return undefined as T;
-  return (await res.json()) as T;
+  const body = await res.json();
+  if (sessionStore.getRevision() !== revision) throw new SessionChangedError();
+  return body as T;
 }
 
 /**

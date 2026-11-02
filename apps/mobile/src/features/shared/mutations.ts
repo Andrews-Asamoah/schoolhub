@@ -6,6 +6,7 @@ export function useScopedMutation<TData, TVariables>(
   mutation: (variables: TVariables) => Promise<TData>,
 ) {
   const session = useSession();
+  const revision = sessionStore.getRevision();
   const queryClient = useQueryClient();
   const scope = ["school", session.subdomain, session.activeRole] as const;
   return useMutation({
@@ -15,6 +16,7 @@ export function useScopedMutation<TData, TVariables>(
     mutationFn: async (variables: TVariables) => {
       const current = sessionStore.getSnapshot();
       if (
+        sessionStore.getRevision() !== revision ||
         !isAuthorizedSession(current) ||
         current.subdomain !== session.subdomain ||
         current.activeRole !== session.activeRole ||
@@ -22,7 +24,10 @@ export function useScopedMutation<TData, TVariables>(
       )
         throw new Error("The active school session has changed.");
       const result = await mutation(variables);
-      if (sessionStore.getSnapshot().token !== session.token)
+      if (
+        sessionStore.getRevision() !== revision ||
+        sessionStore.getSnapshot().token !== session.token
+      )
         throw new Error("The active school session has changed.");
       return result;
     },

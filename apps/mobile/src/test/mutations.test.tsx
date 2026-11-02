@@ -14,7 +14,7 @@ jest.mock("@/lib/session", () => ({
     subdomain: "school",
     token: "fixture-session",
   })),
-  sessionStore: { getSnapshot: jest.fn() },
+  sessionStore: { getSnapshot: jest.fn(), getRevision: jest.fn(() => 0) },
 }));
 const ready = {
   status: "ready",
@@ -23,6 +23,7 @@ const ready = {
   token: "fixture-session",
 };
 beforeEach(() => {
+  jest.mocked(sessionStore.getRevision).mockReturnValue(0);
   jest.mocked(sessionStore.getSnapshot).mockReturnValue(ready as never);
 });
 function wrapper(client: QueryClient) {

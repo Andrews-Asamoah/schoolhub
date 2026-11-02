@@ -62,6 +62,7 @@ export function createSessionStore(
   }
   const store = {
     getSnapshot: () => state,
+    getRevision: () => epoch,
     subscribe(listener: () => void) {
       listeners.add(listener);
       return () => {
@@ -102,8 +103,8 @@ export function createSessionStore(
       return hydration;
     },
     async setToken(token: string | null) {
-      if (token === state.token) return;
-      ++epoch;
+      if (token === state.token) return epoch;
+      const version = ++epoch;
       publish({
         token,
         status: token ? "loading" : "signedOut",
@@ -116,6 +117,7 @@ export function createSessionStore(
         await store.clear();
         throw new Error("Unable to save the session securely.");
       }
+      return version;
     },
     async setSubdomain(subdomain: string | null) {
       const next = subdomain?.trim().toLowerCase() || null;

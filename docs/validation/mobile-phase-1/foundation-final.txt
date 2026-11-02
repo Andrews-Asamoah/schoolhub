@@ -2,7 +2,7 @@
 $ pnpm install --frozen-lockfile
 (cwd: .)
 Scope: all 6 workspace projects
-✓ Lockfile passes supply-chain policies (verified 8m ago)
+✓ Lockfile passes supply-chain policies (verified 15m ago)
 Lockfile is up to date, resolution step is skipped
 Packages: +5
 +++++
@@ -13,7 +13,7 @@ Progress: resolved 5, reused 5, downloaded 0, added 5, done
 .../node_modules/prisma preinstall: Done
 .../node_modules/prisma preinstall: Done
 .../node_modules/prisma preinstall: Done
-Done in 612ms using pnpm v12.4.1
+Done in 648ms using pnpm v12.4.1
 
 exit: 0
 
@@ -34,11 +34,11 @@ $ tsdown
 ℹ [CJS] 1 files, total: 61.97 kB
 ℹ [CJS] dist/index.d.cts  55.36 kB │ gzip: 9.89 kB
 ℹ [CJS] 1 files, total: 55.36 kB
-✔ Build complete in 616ms
+✔ Build complete in 560ms
 ℹ [ESM] dist/index.mjs    56.14 kB │ gzip: 14.78 kB
 ℹ [ESM] dist/index.d.mts  55.36 kB │ gzip:  9.89 kB
 ℹ [ESM] 2 files, total: 111.50 kB
-✔ Build complete in 617ms
+✔ Build complete in 623ms
 
 exit: 0
 
@@ -66,10 +66,10 @@ $ pnpm --filter @schoolhub/mobile test
 (cwd: .)
 $ jest --runInBand
 
-Test Suites: 8 passed, 8 total
-Tests:       46 passed, 46 total
+Test Suites: 10 passed, 10 total
+Tests:       58 passed, 58 total
 Snapshots:   0 total
-Time:        2.501 s, estimated 3 s
+Time:        2.583 s, estimated 3 s
 Ran all test suites.
 Jest did not exit one second after the test run has completed.
 
@@ -86,38 +86,41 @@ exit: 0
 
 $ pnpm --filter @schoolhub/mobile test:release
 (cwd: .)
-$ node --test scripts/verify-release.test.mjs scripts/verify-endpoints.test.mjs
-✔ normalises inventory parameter names (241.613639ms)
-✔ rejects unsupported endpoint configuration defineEndpoint({ method:'GET', path:'/missing', roles:['teacher'], response:schema }); (239.234205ms)
-✔ rejects unsupported endpoint configuration defineEndpoint({ method:'GET', path:'/announcements', roles:['admin'], response:schema }); (244.33944ms)
-✔ rejects unsupported endpoint configuration defineEndpoint({ method:'GET', path:'/students/me', roles:['guardian'], response:schema }); (258.185946ms)
-✔ rejects unsupported endpoint configuration defineEndpoint({ method:'DELETE', path:'/announcements', roles:['teacher'], response:schema }); (219.964436ms)
-✔ rejects unsupported endpoint configuration defineEndpoint({ method:'GET', path:'/external-exams/results', roles:['teacher'], response:schema }); (241.964382ms)
-✔ rejects unsupported endpoint configuration defineEndpoint(config) (227.656375ms)
-✔ rejects unsupported endpoint configuration apiFetch(path) (217.326123ms)
-✔ rejects unsupported endpoint configuration fetch(path) (220.245044ms)
-✔ rejects unsupported endpoint configuration defineEndpoint({ method:method, path:"/announcements", roles:["teacher"] }) (221.231954ms)
-✔ fails closed for an empty registry (217.446831ms)
-✔ accepts the production entry sources (79.907718ms)
-✔ rejects bundled route dev-gallery.tsx (58.886546ms)
-✔ rejects bundled route dev-tabs/index.tsx (57.68312ms)
-✔ rejects bundled route (tabs)/profile.tsx (67.601743ms)
-✔ rejects bundled route (workspace)/fees.tsx (61.251098ms)
-✔ rejects bundled route (superadmin)/index.tsx (60.264329ms)
-✔ rejects bundled route (management)/index.tsx (57.671683ms)
-✔ rejects bundled route (accountant)/index.tsx (66.616119ms)
-✔ rejects bundled route (admin)/index.tsx (57.968398ms)
-✔ rejects bundled route (student)/bece.tsx (62.146459ms)
-✔ rejects Windows development paths too (71.53283ms)
-✔ fails closed without source maps or app sources (131.149405ms)
-ℹ tests 23
+$ node --test scripts/verify-release.test.mjs scripts/verify-endpoints.test.mjs scripts/auth-transport.test.mjs
+✔ real Better Auth client preserves request and response ownership (9.149577ms)
+✔ real Better Auth response cannot restore a logged-out token (1.434635ms)
+✔ real Better Auth revocation uses the captured pre-logout credential (1.655428ms)
+✔ normalises inventory parameter names (289.863565ms)
+✔ rejects unsupported endpoint configuration defineEndpoint({ method:'GET', path:'/missing', roles:['teacher'], response:schema }); (263.252847ms)
+✔ rejects unsupported endpoint configuration defineEndpoint({ method:'GET', path:'/announcements', roles:['admin'], response:schema }); (280.281164ms)
+✔ rejects unsupported endpoint configuration defineEndpoint({ method:'GET', path:'/students/me', roles:['guardian'], response:schema }); (270.281208ms)
+✔ rejects unsupported endpoint configuration defineEndpoint({ method:'DELETE', path:'/announcements', roles:['teacher'], response:schema }); (245.306541ms)
+✔ rejects unsupported endpoint configuration defineEndpoint({ method:'GET', path:'/external-exams/results', roles:['teacher'], response:schema }); (253.355107ms)
+✔ rejects unsupported endpoint configuration defineEndpoint(config) (243.523085ms)
+✔ rejects unsupported endpoint configuration apiFetch(path) (234.499643ms)
+✔ rejects unsupported endpoint configuration fetch(path) (250.957549ms)
+✔ rejects unsupported endpoint configuration defineEndpoint({ method:method, path:"/announcements", roles:["teacher"] }) (254.492348ms)
+✔ fails closed for an empty registry (235.714462ms)
+✔ accepts the production entry sources (79.625987ms)
+✔ rejects bundled route dev-gallery.tsx (78.086128ms)
+✔ rejects bundled route dev-tabs/index.tsx (73.785719ms)
+✔ rejects bundled route (tabs)/profile.tsx (79.222793ms)
+✔ rejects bundled route (workspace)/fees.tsx (69.304652ms)
+✔ rejects bundled route (superadmin)/index.tsx (75.475012ms)
+✔ rejects bundled route (management)/index.tsx (74.547669ms)
+✔ rejects bundled route (accountant)/index.tsx (74.271361ms)
+✔ rejects bundled route (admin)/index.tsx (67.476323ms)
+✔ rejects bundled route (student)/bece.tsx (71.045994ms)
+✔ rejects Windows development paths too (74.38667ms)
+✔ fails closed without source maps or app sources (130.864421ms)
+ℹ tests 26
 ℹ suites 0
-ℹ pass 23
+ℹ pass 26
 ℹ fail 0
 ℹ cancelled 0
 ℹ skipped 0
 ℹ todo 0
-ℹ duration_ms 2650.592371
+ℹ duration_ms 2933.488949
 
 exit: 0
 
@@ -135,19 +138,19 @@ npm warn Unknown env config "http-proxy". This will stop working in the next maj
 Expo Autolinking module resolution enabled
 Starting Metro Bundler
 
-| (node:980) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (node:975) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
 | (Use `node --trace-warnings ...` to show where the warning was created)
-| (node:980) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (node:975) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
 | (Use `node --trace-warnings ...` to show where the warning was created)
-| (node:980) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (node:975) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
 | (Use `node --trace-warnings ...` to show where the warning was created)
-| (node:980) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (node:975) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
 | (Use `node --trace-warnings ...` to show where the warning was created)
-| (node:980) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (node:975) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
 | (Use `node --trace-warnings ...` to show where the warning was created)
-| (node:980) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (node:975) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
 | (Use `node --trace-warnings ...` to show where the warning was created)
-Android Bundled 35958ms node_modules/.pnpm/expo-router@58.0.29_fb6324e0c1d8956cb9285cdd7bad210d/node_modules/expo-router/entry.js (4252 modules)
+Android Bundled 35004ms node_modules/.pnpm/expo-router@58.0.29_fb6324e0c1d8956cb9285cdd7bad210d/node_modules/expo-router/entry.js (4253 modules)
 
 › Assets (30):
 ../../node_modules/.pnpm/@expo-google-fonts+inter@0.4.2/node_modules/@expo-google-fonts/inter/400Regular/Inter_400Regular.ttf (342KB)
@@ -170,8 +173,8 @@ Android Bundled 35958ms node_modules/.pnpm/expo-router@58.0.29_fb6324e0c1d8956cb
 ../../node_modules/.pnpm/expo-router@58.0.29_fb6324e0c1d8956cb9285cdd7bad210d/node_modules/expo-router/assets/unmatched.png (4.8KB)
 
 › android bundles (2):
-_expo/static/js/android/entry-de2932a5de5594dc9665ac2ea7b12442.hbc (6.2MB)
-_expo/static/js/android/entry-de2932a5de5594dc9665ac2ea7b12442.hbc.map (14MB)
+_expo/static/js/android/entry-b8206e26c68edef96ccb3b7709b7ac97.hbc (6.2MB)
+_expo/static/js/android/entry-b8206e26c68edef96ccb3b7709b7ac97.hbc.map (14MB)
 
 › Files (1):
 metadata.json (2KB)
@@ -182,7 +185,7 @@ exit: 0
 
 $ node scripts/verify-release.mjs dist
 (cwd: apps/mobile)
-entry-de2932a5de5594dc9665ac2ea7b12442.hbc: 6226460 bytes (Hermes)
+entry-b8206e26c68edef96ccb3b7709b7ac97.hbc: 6227372 bytes (Hermes)
 PASS: 1 source map(s), 9 app sources; no development, mock or Super Admin routes.
 
 exit: 0
@@ -193,19 +196,19 @@ npm warn Unknown env config "http-proxy". This will stop working in the next maj
 Expo Autolinking module resolution enabled
 Starting Metro Bundler
 
-| (node:1031) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (node:1026) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
 | (Use `node --trace-warnings ...` to show where the warning was created)
-| (node:1031) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (node:1026) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
 | (Use `node --trace-warnings ...` to show where the warning was created)
-| (node:1031) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (node:1026) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
 | (Use `node --trace-warnings ...` to show where the warning was created)
-| (node:1031) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (node:1026) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
 | (Use `node --trace-warnings ...` to show where the warning was created)
-| (node:1031) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (node:1026) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
 | (Use `node --trace-warnings ...` to show where the warning was created)
-| (node:1031) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (node:1026) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
 | (Use `node --trace-warnings ...` to show where the warning was created)
-iOS Bundled 36614ms node_modules/.pnpm/expo-router@58.0.29_fb6324e0c1d8956cb9285cdd7bad210d/node_modules/expo-router/entry.js (4253 modules)
+iOS Bundled 35193ms node_modules/.pnpm/expo-router@58.0.29_fb6324e0c1d8956cb9285cdd7bad210d/node_modules/expo-router/entry.js (4254 modules)
 
 › Assets (27):
 ../../node_modules/.pnpm/@expo-google-fonts+inter@0.4.2/node_modules/@expo-google-fonts/inter/400Regular/Inter_400Regular.ttf (342KB)
@@ -226,8 +229,8 @@ iOS Bundled 36614ms node_modules/.pnpm/expo-router@58.0.29_fb6324e0c1d8956cb9285
 ../../node_modules/.pnpm/expo-router@58.0.29_fb6324e0c1d8956cb9285cdd7bad210d/node_modules/expo-router/assets/unmatched.png (4.8KB)
 
 › ios bundles (2):
-_expo/static/js/ios/entry-e9d4ffb5e2b39ea02836037cc100c23e.hbc (6.2MB)
-_expo/static/js/ios/entry-e9d4ffb5e2b39ea02836037cc100c23e.hbc.map (15MB)
+_expo/static/js/ios/entry-0b4a0f9c0b01c56fc877819ccf7c71fc.hbc (6.2MB)
+_expo/static/js/ios/entry-0b4a0f9c0b01c56fc877819ccf7c71fc.hbc.map (15MB)
 
 › Files (1):
 metadata.json (1.8KB)
@@ -238,7 +241,7 @@ exit: 0
 
 $ node scripts/verify-release.mjs dist
 (cwd: apps/mobile)
-entry-e9d4ffb5e2b39ea02836037cc100c23e.hbc: 6231972 bytes (Hermes)
+entry-0b4a0f9c0b01c56fc877819ccf7c71fc.hbc: 6234188 bytes (Hermes)
 PASS: 1 source map(s), 9 app sources; no development, mock or Super Admin routes.
 
 exit: 0

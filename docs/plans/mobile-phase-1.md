@@ -47,12 +47,12 @@ All 13 commands exited 0 using pnpm 12.4.1 (Node 24.22.1 locally; Node 22 in CI)
 | --- | --- |
 | Frozen install / shared build | Pass |
 | Mobile typecheck / strict lint / formatting | Pass, no type or lint errors; lint allows zero warnings |
-| Jest Expo / RNTL unit and component suite | 8 suites, 46 tests passed |
+| Jest Expo / RNTL unit and component suite | 10 suites, 58 tests passed |
 | Endpoint inventory verifier | 2 declarations verified |
-| Endpoint and release script regression tests | 23 passed |
+| Endpoint and release script regression tests | 26 passed |
 | Expo Doctor, online | 20/20 passed |
-| Android export + source-map check | Pass, 6,226,460-byte Hermes bundle |
-| iOS export + source-map check | Pass, 6,231,972-byte Hermes bundle |
+| Android export + source-map check | Pass, 6,227,372-byte Hermes bundle |
+| iOS export + source-map check | Pass, 6,234,188-byte Hermes bundle |
 | Release application source inventory | 9 entry/role files; no dev/demo, management, accountant, platform or BECE routes |
 | Web/API source and dependency scope | No source changes; all non-mobile importers and 1,111 reachable snapshots preserved |
 
@@ -73,6 +73,10 @@ used. The shared package retains its existing tsdown/experimental-TS warning.
 - Logout/401 clears credentials and caches. A nonsecret logout marker prevents
   rehydrating an old token if SecureStore deletion fails. Tokens never enter
   AsyncStorage. Role/account changes invalidate caches and stale form submissions.
+- Request generations reject delayed auth tokens, stale session bodies and late
+  API errors/successes after logout or account changes, including pending secure
+  writes. Real Better Auth transport tests verify ownership and revocation with
+  the captured pre-logout credential. Local logout happens before remote revocation.
 - Stack.Protected gates only teacher/student/guardian groups; root navigation
   derives from session state. Role homes are explicit placeholders, not live
   dashboards or sample data. Dev previews offer no Admin/Accountant role and
@@ -89,6 +93,10 @@ used. The shared package retains its existing tsdown/experimental-TS warning.
 - Accessible text/select FormField primitives and a tested TanStack Form/Zod
   login controller are ready for Phase 3. The root error fallback works without
   providers/fonts and displays/logs no raw error or user data.
+
+Phase 3 must consume only guarded auth responses (`isCurrentAuthResponse`) and
+the session store; it must never establish a session from an unverified response
+body or cached Better Auth atom after its request generation has changed.
 
 ## Not completed or claimed
 

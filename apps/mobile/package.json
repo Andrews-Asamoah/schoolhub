@@ -11,7 +11,7 @@
     "typecheck": "tsc --noEmit",
     "lint": "expo lint --max-warnings 0",
     "verify:release": "node scripts/verify-release.mjs",
-    "test:release": "node --test scripts/verify-release.test.mjs scripts/verify-endpoints.test.mjs",
+    "test:release": "node --test scripts/verify-release.test.mjs scripts/verify-endpoints.test.mjs scripts/auth-transport.test.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "jest --runInBand",

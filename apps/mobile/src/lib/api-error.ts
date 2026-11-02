@@ -12,3 +12,10 @@ export class ApiError extends Error {
     return typeof e === "string" ? e : undefined;
   }
 }
+
+export class SessionChangedError extends Error {
+  constructor() {
+    super("The active school session has changed.");
+    this.name = "SessionChangedError";
+  }
+}

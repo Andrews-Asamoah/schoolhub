@@ -1,14 +1,16 @@
 import { restoreSession } from "@/lib/restore-session";
-import { authClient } from "@/lib/auth-client";
+import { authClient, isCurrentAuthResponse } from "@/lib/auth-client";
 import { getSchoolRoles } from "@/api/schools";
 import { sessionStorage, sessionStore } from "@/lib/session";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as SecureStore from "expo-secure-store";
 jest.mock("@/lib/auth-client", () => ({
   authClient: { getSession: jest.fn() },
+  isCurrentAuthResponse: jest.fn(() => true),
 }));
 jest.mock("@/api/schools", () => ({ getSchoolRoles: jest.fn() }));
 beforeEach(async () => {
+  jest.mocked(isCurrentAuthResponse).mockReturnValue(true);
   await sessionStore.clear();
   await sessionStore.setSubdomain("school");
   await sessionStore.setToken("fixture-session");
@@ -86,4 +88,22 @@ test("logout marker prevents restoration when secure token deletion fails", asyn
   jest.mocked(AsyncStorage.getItem).mockResolvedValueOnce("1");
   await expect(sessionStorage.readToken()).resolves.toBeNull();
   expect(SecureStore.getItemAsync).not.toHaveBeenCalled();
+});
+
+test("an old auth response cannot apply its user flags to a new login", async () => {
+  jest.mocked(isCurrentAuthResponse).mockReturnValue(false);
+  jest.mocked(authClient.getSession).mockImplementation(async () => {
+    await sessionStore.setToken("new-login-fixture");
+    return {
+      data: { user: { role: "teacher", mustChangePassword: false } },
+      error: null,
+    } as never;
+  });
+  await restoreSession();
+  expect(getSchoolRoles).not.toHaveBeenCalled();
+  expect(sessionStore.getSnapshot()).toMatchObject({
+    token: "new-login-fixture",
+    status: "loading",
+    activeRole: null,
+  });
 });
