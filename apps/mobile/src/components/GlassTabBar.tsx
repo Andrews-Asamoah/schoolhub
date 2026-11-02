@@ -1,5 +1,5 @@
 import * as Haptics from "expo-haptics";
-import type { Tabs } from "expo-router";
+import { Tabs, useNavigation } from "expo-router";
 import type { ComponentProps } from "react";
 import { useEffect, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
@@ -21,8 +21,9 @@ const SIDE_MARGIN = 16;
  */
 export const TAB_BAR_CLEARANCE = BAR_HEIGHT + 28;
 
-export function GlassTabBar({ state, descriptors, navigation }: TabBarProps) {
+export function GlassTabBar({ state, descriptors }: TabBarProps) {
   const { colors, accent } = useTheme();
+  const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const [width, setWidth] = useState(0);
 
