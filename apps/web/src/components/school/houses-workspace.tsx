@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   CircleAlert,
+  FileSpreadsheet,
   House,
   LoaderCircle,
   Pencil,
@@ -17,6 +18,7 @@ import {
 import { useSchoolRole } from "@/components/school/school-role-switcher";
 import { apiFetch } from "@/lib/api";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { AcademicStructureBulkImport } from "@/components/school/academic-structure-bulk-import";
 
 interface HouseRecord {
   id: string;
@@ -72,6 +74,7 @@ export function HousesWorkspace() {
   const canManage = activeRole === "owner" || activeRole === "admin";
   const [editing, setEditing] = useState<HouseRecord | null>(null);
   const [showForm, setShowForm] = useState(false);
+  const [showBulkImport, setShowBulkImport] = useState(false);
   const [values, setValues] = useState<HouseFormValues>(emptyForm);
 
   const housesQuery = useQuery({
@@ -187,6 +190,16 @@ export function HousesWorkspace() {
 
   return (
     <div className="space-y-5">
+      {showBulkImport && (
+        <AcademicStructureBulkImport
+          kind="houses"
+          onClose={() => setShowBulkImport(false)}
+          onComplete={() => {
+            void queryClient.invalidateQueries({ queryKey: ["academics", "houses"] });
+            void queryClient.invalidateQueries({ queryKey: ["students"] });
+          }}
+        />
+      )}
       <section className="rounded-2xl border border-border bg-gradient-to-br from-primary/10 via-card to-warning/5 p-5 sm:p-6">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="flex items-start gap-3">
@@ -204,14 +217,19 @@ export function HousesWorkspace() {
               </p>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={openCreate}
-            className="inline-flex h-10 items-center gap-2 rounded-lg bg-primary px-4 text-xs font-semibold text-primary-foreground shadow-sm hover:opacity-90"
-          >
-            <Plus className="size-4" />
-            Add house
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <button type="button" onClick={() => setShowBulkImport(true)} className="inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-card px-4 text-xs font-semibold text-foreground hover:bg-muted">
+              <FileSpreadsheet className="size-4" /> Bulk import
+            </button>
+            <button
+              type="button"
+              onClick={openCreate}
+              className="inline-flex h-10 items-center gap-2 rounded-lg bg-primary px-4 text-xs font-semibold text-primary-foreground shadow-sm hover:opacity-90"
+            >
+              <Plus className="size-4" />
+              Add house
+            </button>
+          </div>
         </div>
       </section>
 
