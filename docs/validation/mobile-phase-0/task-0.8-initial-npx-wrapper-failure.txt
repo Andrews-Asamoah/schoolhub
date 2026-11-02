@@ -1,0 +1,176 @@
+
+$ pnpm install --frozen-lockfile
+(cwd: .)
+Scope: all 6 workspace projects
+✓ Lockfile passes supply-chain policies (verified 10m ago)
+Lockfile is up to date, resolution step is skipped
+Packages: +17
++++++++++++++++++
+Progress: resolved 17, reused 17, downloaded 0, added 17, done
+.../esbuild@0.28.2/node_modules/esbuild postinstall$ node install.js
+.../node_modules/prisma preinstall$ node scripts/preinstall-entry.js
+.../node_modules/prisma preinstall$ node scripts/preinstall-entry.js
+.../node_modules/prisma preinstall$ node scripts/preinstall-entry.js
+.../esbuild@0.28.2/node_modules/esbuild postinstall: Done
+.../node_modules/prisma preinstall: Done
+.../node_modules/prisma preinstall: Done
+.../node_modules/prisma preinstall: Done
+Done in 641ms using pnpm v12.4.1
+
+exit: 0
+
+$ pnpm --filter @schoolhub/shared build
+(cwd: .)
+$ tsdown
+ℹ tsdown v0.23.4 powered by rolldown v1.2.16
+ℹ config file: /workspace/scratch/8ce198452ebc/schoolhub/packages/shared/tsdown.config.ts 
+ℹ entry: src/index.ts
+ℹ tsconfig: tsconfig.json
+ℹ Build start
+ℹ Cleaning 4 files
+
+ WARN  TypeScript 7.0 does not yet have a stable API and is experimental. Some options will be unavailable.
+
+ℹ Emit types with typescript@7.0.2
+ℹ [CJS] dist/index.cjs  61.97 kB │ gzip: 15.34 kB
+ℹ [CJS] 1 files, total: 61.97 kB
+ℹ [CJS] dist/index.d.cts  55.36 kB │ gzip: 9.89 kB
+ℹ [CJS] 1 files, total: 55.36 kB
+ℹ [ESM] dist/index.mjs    56.14 kB │ gzip: 14.78 kB
+ℹ [ESM] dist/index.d.mts  55.36 kB │ gzip:  9.89 kB
+ℹ [ESM] 2 files, total: 111.50 kB
+✔ Build complete in 690ms
+✔ Build complete in 690ms
+
+exit: 0
+
+$ pnpm --filter @schoolhub/mobile typecheck
+(cwd: .)
+$ tsc --noEmit
+
+exit: 0
+
+$ pnpm --filter @schoolhub/mobile lint
+(cwd: .)
+$ expo lint --max-warnings 0
+
+exit: 0
+
+$ pnpm --filter @schoolhub/mobile format:check
+(cwd: .)
+$ prettier --check .
+Checking formatting...
+All matched files use Prettier code style!
+
+exit: 0
+
+$ pnpm --filter @schoolhub/mobile test:release
+(cwd: .)
+$ node --test scripts/verify-release.test.mjs
+✔ accepts the production entry sources (75.542267ms)
+✔ rejects bundled route dev-gallery.tsx (62.630639ms)
+✔ rejects bundled route dev-tabs/index.tsx (65.095582ms)
+✔ rejects bundled route (tabs)/profile.tsx (70.573654ms)
+✔ rejects bundled route (workspace)/fees.tsx (78.252667ms)
+✔ rejects bundled route (superadmin)/index.tsx (80.757761ms)
+✔ rejects Windows development paths too (80.868173ms)
+✔ fails closed without source maps or app sources (139.920585ms)
+ℹ tests 8
+ℹ suites 0
+ℹ pass 8
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 759.845659
+
+exit: 0
+
+$ npx expo-doctor
+(cwd: apps/mobile)
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
+npm error code EUSAGE
+npm error
+npm error Run a command from a local or remote npm package
+npm error
+npm error Usage:
+npm error npm exec -- <pkg>[@<version>] [args...]
+npm error npm exec --package=<pkg>[@<version>] -- <cmd> [args...]
+npm error npm exec -c '<cmd> [args...]'
+npm error npm exec --package=foo -c '<cmd> [args...]'
+npm error
+npm error Options:
+npm error [--package <package-spec> [--package <package-spec> ...]] [-c|--call <call>]
+npm error [-w|--workspace <workspace-name> [-w|--workspace <workspace-name> ...]]
+npm error [--workspaces] [--include-workspace-root]
+npm error
+npm error alias: x
+npm error
+npm error Run "npm help exec" for more info
+npm error A complete log of this run can be found in: /root/.npm/_logs/2026-11-02T16_00_55_174Z-debug-0.log
+
+exit: 1
+
+$ npx expo export --platform android --source-maps
+(cwd: apps/mobile)
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
+npm error code EUSAGE
+npm error
+npm error Run a command from a local or remote npm package
+npm error
+npm error Usage:
+npm error npm exec -- <pkg>[@<version>] [args...]
+npm error npm exec --package=<pkg>[@<version>] -- <cmd> [args...]
+npm error npm exec -c '<cmd> [args...]'
+npm error npm exec --package=foo -c '<cmd> [args...]'
+npm error
+npm error Options:
+npm error [--package <package-spec> [--package <package-spec> ...]] [-c|--call <call>]
+npm error [-w|--workspace <workspace-name> [-w|--workspace <workspace-name> ...]]
+npm error [--workspaces] [--include-workspace-root]
+npm error
+npm error alias: x
+npm error
+npm error Run "npm help exec" for more info
+npm error A complete log of this run can be found in: /root/.npm/_logs/2026-11-02T16_00_55_468Z-debug-0.log
+
+exit: 1
+
+$ node scripts/verify-release.mjs dist
+(cwd: apps/mobile)
+entry-a5021e7553bcf5d3c2ba4b5ea7a9a5b6.hbc: 5410352 bytes (Hermes)
+PASS: 1 source map(s), 3 app sources; no development, mock or Super Admin routes.
+
+exit: 0
+
+$ npx expo export --platform ios --source-maps
+(cwd: apps/mobile)
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
+npm error code EUSAGE
+npm error
+npm error Run a command from a local or remote npm package
+npm error
+npm error Usage:
+npm error npm exec -- <pkg>[@<version>] [args...]
+npm error npm exec --package=<pkg>[@<version>] -- <cmd> [args...]
+npm error npm exec -c '<cmd> [args...]'
+npm error npm exec --package=foo -c '<cmd> [args...]'
+npm error
+npm error Options:
+npm error [--package <package-spec> [--package <package-spec> ...]] [-c|--call <call>]
+npm error [-w|--workspace <workspace-name> [-w|--workspace <workspace-name> ...]]
+npm error [--workspaces] [--include-workspace-root]
+npm error
+npm error alias: x
+npm error
+npm error Run "npm help exec" for more info
+npm error A complete log of this run can be found in: /root/.npm/_logs/2026-11-02T16_00_55_953Z-debug-0.log
+
+exit: 1
+
+$ node scripts/verify-release.mjs dist
+(cwd: apps/mobile)
+entry-a5021e7553bcf5d3c2ba4b5ea7a9a5b6.hbc: 5410352 bytes (Hermes)
+PASS: 1 source map(s), 3 app sources; no development, mock or Super Admin routes.
+
+exit: 0
