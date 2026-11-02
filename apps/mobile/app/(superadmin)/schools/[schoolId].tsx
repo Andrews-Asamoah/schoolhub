@@ -35,7 +35,10 @@ export default function SuperAdminSchoolDetailScreen() {
     } finally { setLoading(false); setRefreshing(false); }
   }, [schoolId]);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    const task = setTimeout(() => { void load(); }, 0);
+    return () => clearTimeout(task);
+  }, [load]);
 
   if (loading && !school) return <Screen title="School details"><ActivityIndicator color={accent} style={{ marginTop: 48 }} /></Screen>;
   if (error && !school) return <Screen title="School details" left={<Pressable onPress={() => router.back()} accessibilityRole="button"><ArrowLeft color={colors.foreground} /></Pressable>}><ErrorState title="School details unavailable" message={error} actionLabel="Retry" onAction={() => { setLoading(true); setError(null); void load(); }} /></Screen>;
