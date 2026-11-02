@@ -1,13 +1,13 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import type { DimensionValue, StyleProp, ViewStyle } from "react-native";
 import Animated, {
   cancelAnimation,
   useAnimatedStyle,
   useSharedValue,
   withRepeat,
-  withSequence,
   withTiming,
 } from "react-native-reanimated";
+import { LinearGradient } from "expo-linear-gradient";
 import { View } from "react-native";
 import { Card } from "./Surface";
 import { useTheme } from "@/theme/theme";
@@ -19,7 +19,7 @@ type Props = {
   style?: StyleProp<ViewStyle>;
 };
 
-/** Placeholder block. Pulses softly; stays still when Reduce Motion is on. */
+/** UI-thread shimmer; static when Reduce Motion is enabled. */
 export function Skeleton({
   width = "100%",
   height = 16,
@@ -27,35 +27,50 @@ export function Skeleton({
   style,
 }: Props) {
   const { colors, reduceMotion } = useTheme();
-  const opacity = useSharedValue(0.55);
+  const [measuredWidth, setWidth] = useState(0);
+  const progress = useSharedValue(0);
   useEffect(() => {
-    cancelAnimation(opacity);
-    if (reduceMotion) {
-      opacity.set(1);
-      return;
-    }
-    opacity.set(
-      withRepeat(
-        withSequence(
-          withTiming(1, { duration: 800 }),
-          withTiming(0.55, { duration: 800 }),
-        ),
-        -1,
-      ),
-    );
-    return () => cancelAnimation(opacity);
-  }, [reduceMotion, opacity]);
-  const animated = useAnimatedStyle(() => ({ opacity: opacity.value }));
+    cancelAnimation(progress);
+    progress.set(0);
+    if (!reduceMotion)
+      progress.set(withRepeat(withTiming(1, { duration: 1200 }), -1, false));
+    return () => cancelAnimation(progress);
+  }, [reduceMotion, progress]);
+  const animated = useAnimatedStyle(() => ({
+    transform: [{ translateX: (progress.value * 2 - 1) * measuredWidth }],
+  }));
   return (
-    <Animated.View
+    <View
       accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants"
+      onLayout={(e) => setWidth(e.nativeEvent.layout.width)}
       style={[
-        { width, height, borderRadius: radius, backgroundColor: colors.muted },
-        animated,
+        {
+          width,
+          height,
+          borderRadius: radius,
+          backgroundColor: colors.muted,
+          overflow: "hidden",
+        },
         style,
       ]}
-    />
+    >
+      {!reduceMotion && measuredWidth > 0 ? (
+        <Animated.View
+          style={[
+            { position: "absolute", top: 0, bottom: 0, width: measuredWidth },
+            animated,
+          ]}
+        >
+          <LinearGradient
+            colors={["transparent", colors.border, "transparent"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={{ flex: 1 }}
+          />
+        </Animated.View>
+      ) : null}
+    </View>
   );
 }
 

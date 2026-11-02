@@ -14,6 +14,19 @@ const { modulePalette, hueValues, neutrals, contrast, brandPalette, blend } =
   await import(
     "data:text/javascript;base64," + Buffer.from(code).toString("base64")
   );
+const tokenSource = readFileSync(
+  new URL("../src/theme/tokens.generated.ts", import.meta.url),
+  "utf8",
+);
+const tokenCode = ts.transpileModule(tokenSource, {
+  compilerOptions: {
+    module: ts.ModuleKind.ESNext,
+    target: ts.ScriptTarget.ES2022,
+  },
+}).outputText;
+const tokens = await import(
+  "data:text/javascript;base64," + Buffer.from(tokenCode).toString("base64")
+);
 let count = 0;
 const failures = [];
 function check(name, fg, bg, min = 4.5) {
@@ -23,6 +36,21 @@ function check(name, fg, bg, min = 4.5) {
 }
 for (const scheme of ["light", "dark"]) {
   const n = neutrals[scheme];
+  const c = tokens[scheme + "Tokens"];
+  for (const name of [
+    "primary",
+    "secondary",
+    "accent",
+    "destructive",
+    "success",
+    "warning",
+    "info",
+    "highlight",
+  ])
+    check(`${scheme} semantic ${name}`, c[name + "Foreground"], c[name]);
+  for (const name of ["destructive", "success", "warning", "info"])
+    check(`${scheme} semantic ${name} text`, c[name], n.card);
+
   for (const surface of [n.background, n.card, n.elevated])
     for (const fg of [n.foreground, n.mutedForeground])
       check(`${scheme} neutral`, fg, surface);
@@ -52,6 +80,19 @@ for (const scheme of ["light", "dark"]) {
   ]) {
     const b = brandPalette(primary, "#00FFFF", scheme);
     check(`${scheme} focus`, b.focus, n.card, 3);
+    // Worst overlapping static backdrop blobs at each opaque gradient stop.
+    const a = scheme === "dark" ? 0.06 : 0.025,
+      z = scheme === "dark" ? 0.04 : 0.02;
+    for (const stop of [
+      n.background,
+      blend(n.background, b.focus, a),
+      blend(n.background, b.gradient[1], z),
+    ]) {
+      const bg = blend(blend(stop, b.focus, a), b.gradient[1], z);
+      check(`${scheme} backdrop body`, n.foreground, bg);
+      check(`${scheme} backdrop muted`, n.mutedForeground, bg);
+    }
+
     for (let i = 0; i <= 20; i++) {
       const bg = blend(...b.gradient, i / 20);
       check(`${scheme} hero`, b.onSolid, bg);
