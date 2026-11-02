@@ -9,8 +9,15 @@ import {
   Body,
   Headers,
   UseGuards,
+  UseInterceptors,
+  UploadedFile,
+  Header,
+  BadRequestException,
+  ForbiddenException,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { AcademicsService } from './academics.service.js';
+import { AcademicStructureImportService } from './academic-structure-import.service.js';
 import { SchoolTenantGuard } from '../../common/guards/school-tenant.guard.js';
 import { RolesGuard } from '../../common/guards/roles.guard.js';
 import { Roles } from '../../common/decorators/roles.decorator.js';
@@ -53,8 +60,39 @@ import {
 export class AcademicsController {
   constructor(
     private readonly academicsService: AcademicsService,
+    private readonly structureImports: AcademicStructureImportService,
     private readonly teacherScope: TeacherScopeService,
   ) {}
+
+  @Post('import/preview')
+  @Roles('owner', 'admin', 'staff')
+  @Header('Cache-Control', 'no-store')
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 2 * 1024 * 1024, files: 1 } }))
+  previewStructureImport(
+    @CurrentSchool() school: School,
+    @CurrentSchoolRole() role: string | undefined,
+    @UploadedFile() file: Express.Multer.File | undefined,
+    @Query('kind') kind: string,
+  ) {
+    if (!file) throw new BadRequestException('Choose a CSV or XLSX file.');
+    if ((kind === 'departments' || kind === 'houses') && role !== 'owner' && role !== 'admin') {
+      throw new ForbiddenException(`Only school owners and administrators can import ${kind}.`);
+    }
+    return this.structureImports.preview(school, file, kind);
+  }
+
+  @Post('import')
+  @Roles('owner', 'admin', 'staff')
+  @Header('Cache-Control', 'no-store')
+  importStructureBatch(
+    @CurrentSchool() school: School,
+    @CurrentSchoolRole() role: string | undefined,
+    @Body() body: { kind?: string; rows?: { rowNumber: number; row: Record<string, unknown> }[] },
+  ) {
+    if (!body.kind) throw new BadRequestException('kind is required.');
+    if (!Array.isArray(body.rows)) throw new BadRequestException('rows must be an array.');
+    return this.structureImports.importBatch(school, role, body.kind, body.rows);
+  }
 
   /** Class ids a teacher may see; undefined (no limit) for every other role. */
   private scopeFor(school: School, role?: string, user?: AuthenticatedUser) {

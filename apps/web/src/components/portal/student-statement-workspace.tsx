@@ -1,9 +1,7 @@
 import { DatePicker } from "@/components/ui/date-picker";
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import ExcelJS from "exceljs";
-import { jsPDF } from "jspdf";
-import autoTable from "jspdf-autotable";
+import type { jsPDF as JsPDF } from "jspdf";
 import { Download, FileSpreadsheet, FileText, LoaderCircle, Printer, Search, UserRound } from "lucide-react";
 import type { StudentStatementResponse } from "@schoolhub/shared";
 import { apiFetch } from "@/lib/api";
@@ -111,6 +109,10 @@ export function StudentStatementWorkspace() {
     if (!statement) return;
     setExporting("pdf");
     try {
+      const [{ jsPDF }, { default: autoTable }] = await Promise.all([
+        import("jspdf"),
+        import("jspdf-autotable"),
+      ]);
       const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
       pdf.setFontSize(16);
       pdf.text("Student Statement of Account", 14, 18);
@@ -139,7 +141,7 @@ export function StudentStatementWorkspace() {
           pdf.text(`Page ${pageNumber}`, 194, 287, { align: "right" });
         },
       });
-      const finalY = (pdf as jsPDF & { lastAutoTable?: { finalY?: number } }).lastAutoTable?.finalY ?? 55;
+      const finalY = (pdf as JsPDF & { lastAutoTable?: { finalY?: number } }).lastAutoTable?.finalY ?? 55;
       pdf.setFontSize(10);
       pdf.text(`Closing balance: GHS ${statement.closingBalance}`, 14, Math.min(280, finalY + 8));
       pdf.save(`student-statement-${filenamePart}.pdf`);
@@ -152,6 +154,7 @@ export function StudentStatementWorkspace() {
     if (!statement) return;
     setExporting("excel");
     try {
+      const { default: ExcelJS } = await import("exceljs");
       const workbook = new ExcelJS.Workbook();
       workbook.creator = "SchoolHub";
       workbook.created = new Date();

@@ -1,9 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { FileSpreadsheet, FileText, LoaderCircle, Printer, ShieldCheck, UserRound } from "lucide-react";
 import { useMemo, useState } from "react";
-import ExcelJS from "exceljs";
-import { jsPDF } from "jspdf";
-import autoTable from "jspdf-autotable";
 import type { StudentStatementResponse } from "@schoolhub/shared";
 import type { StudentProfileData } from "@/components/school/student-profile-panel";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -43,8 +40,12 @@ export function GuardianFeesWorkspace() {
   const rows = useMemo(() => statement?.entries ?? [], [statement?.entries]);
   const filename = (statement?.student.admissionNumber || selectedId || "ward").replace(/[^a-zA-Z0-9_-]/g, "-");
 
-  const exportPdf = () => {
+  const exportPdf = async () => {
     if (!statement) return;
+    const [{ jsPDF }, { default: autoTable }] = await Promise.all([
+      import("jspdf"),
+      import("jspdf-autotable"),
+    ]);
     const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
     pdf.setFontSize(16); pdf.text("Student statement of account", 14, 18);
     pdf.setFontSize(10);
@@ -66,6 +67,7 @@ export function GuardianFeesWorkspace() {
     if (!statement) return;
     setExporting(true);
     try {
+      const { default: ExcelJS } = await import("exceljs");
       const workbook = new ExcelJS.Workbook();
       workbook.creator = "SchoolHub";
       workbook.created = new Date();

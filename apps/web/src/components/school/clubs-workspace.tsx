@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   CircleAlert,
+  FileSpreadsheet,
   LoaderCircle,
   Pencil,
   Plus,
@@ -23,6 +24,7 @@ import {
 import { useSchoolRole } from "@/components/school/school-role-switcher";
 import { apiFetch } from "@/lib/api";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { AcademicStructureBulkImport } from "@/components/school/academic-structure-bulk-import";
 
 interface ClubMemberRecord {
   id: string;
@@ -96,6 +98,7 @@ export function ClubsWorkspace() {
   
   const [editing, setEditing] = useState<ClubRecord | null>(null);
   const [showForm, setShowForm] = useState(false);
+  const [showBulkImport, setShowBulkImport] = useState(false);
   const [values, setValues] = useState<ClubFormValues>(emptyForm);
   const [selectedClubForMembers, setSelectedClubForMembers] = useState<ClubRecord | null>(null);
   const [searchFilter, setSearchFilter] = useState("");
@@ -275,6 +278,13 @@ export function ClubsWorkspace() {
 
   return (
     <div className="space-y-6">
+      {showBulkImport && (
+        <AcademicStructureBulkImport
+          kind="clubs"
+          onClose={() => setShowBulkImport(false)}
+          onComplete={() => void queryClient.invalidateQueries({ queryKey: ["academics", "clubs"] })}
+        />
+      )}
       {/* Overview Stat Cards */}
       <div className="grid gap-4 sm:grid-cols-3">
         <div className="rounded-2xl border border-border/80 bg-card p-5 shadow-xs">
@@ -343,13 +353,19 @@ export function ClubsWorkspace() {
         </div>
 
         {canManage && (
-          <button
-            onClick={openCreate}
-            className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-xs font-bold text-primary-foreground shadow-sm transition hover:bg-primary/90"
-          >
-            <Plus className="size-4" />
-            New Club
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <button type="button" onClick={() => setShowBulkImport(true)} className="inline-flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-2 text-xs font-semibold text-foreground hover:bg-muted">
+              <FileSpreadsheet className="size-4" /> Bulk import
+            </button>
+            <button
+              type="button"
+              onClick={openCreate}
+              className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-xs font-bold text-primary-foreground shadow-sm transition hover:bg-primary/90"
+            >
+              <Plus className="size-4" />
+              New Club
+            </button>
+          </div>
         )}
       </div>
 

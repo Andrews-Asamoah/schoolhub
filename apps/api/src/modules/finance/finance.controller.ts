@@ -331,6 +331,18 @@ export class FinanceController {
     return this.financeService.getFinanceSummary(school.id, { from, to, yearId, termId });
   }
 
+  @Get("detailed-report")
+  @Roles(...FINANCE_READ_ROLES)
+  getDetailedFinanceReport(
+    @CurrentSchool() school: School,
+    @Query("from") from?: string,
+    @Query("to") to?: string,
+    @Query("classId") classId?: string,
+    @Query("studentId") studentId?: string,
+  ) {
+    return this.financeService.getDetailedFinanceReport(school.id, { from, to, classId, studentId });
+  }
+
   @Get("receivables/history")
   @Roles(...FINANCE_READ_ROLES)
   historicalReceivables(

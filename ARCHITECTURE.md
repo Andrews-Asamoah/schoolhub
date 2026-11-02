@@ -23,7 +23,7 @@ apps/web and apps/api ── @schoolhub/shared (Zod schemas and TS types)
 apps/web ────────────── @schoolhub/config (shared TypeScript config)
 ```
 
-The API is intended to be the common backend for web, mobile, and desktop clients. The web client is the only client with checked-in application source at present. The `apps/desktop` and `apps/mobile` directories do not currently contain implementation files.
+The API is the common backend for web and mobile clients. Both `apps/web` and `apps/mobile` contain checked-in application source; `apps/desktop` remains a future client with no implementation files.
 
 ## 2. Repository and package map
 
@@ -87,9 +87,9 @@ React 19 single-page application built with Vite:
 
 The current UI is an initial slice, not a complete feature interface: it has a sign-in page, a polished dashboard, and school-workspace pages for the current API-backed features. Student directory, enrollments, teachers, non-teaching staff, guardians, classes, subjects, academic years, assessment templates, attendance, fee structures, payments, school settings, and support tickets are wired to available API operations. Enrollment history is recorded once per student, academic year, and term; class rosters can be filtered by year and term. Class-teacher changes are dated intervals and do not overwrite earlier assignments. Staff directory creation builds a profile without creating a password or sign-in invitation; teacher invitations and guardian portal access remain separate from the directory workflows. School support conversations are restricted to the active school and school owner/admin roles; the platform support desk is restricted to super admins. Ticket lists and conversations refresh every three seconds while open, and replies plus status/priority changes are kept in the timeline. Other sidebar destinations, including the student and guardian portal areas, have explicit planned-feature pages rather than fabricated records. The dashboard reads the current school when a session exists, but its displayed summary metrics, schedule, and activity feed are explicitly marked as preview data. Backend authorization remains authoritative.
 
-### `apps/desktop/` and `apps/mobile/`
+### `apps/mobile/` and `apps/desktop/`
 
-These directories currently have no checked-in source files. The API authentication setup and CORS allow-list anticipate native clients, but this repository does not yet include desktop/mobile applications or their build pipelines.
+`apps/mobile/` is the Expo/React Native client, using Expo Router, the shared API, and native session support. It has its own build, typecheck, lint, and release-verification scripts; Android distribution is configured through EAS. The web app remains the only browser client. `apps/desktop/` is reserved for a future client and currently has no implementation source.
 
 ### `packages/shared/` — shared contracts
 

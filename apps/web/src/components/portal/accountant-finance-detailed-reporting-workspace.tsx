@@ -3,7 +3,7 @@ import { DataTable, TableExportMenu, type DataTableColumn } from "@/components/u
 import { ServerExportButton } from "@/components/portal/server-export-button";
 import type { ExportTable } from "@/lib/table-export";
 
-import { useCallback, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { apiFetch, getClientSubdomain } from "@/lib/api";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -34,14 +34,14 @@ interface FinancePayment {
   paymentNumber: string;
   studentId: string;
   student: Student;
-  bill?: { id: string; billNumber: string } | null;
+  bill?: { id: string; billNumber: string; classId?: string | null; class?: FinanceClass | null } | null;
   amount: number | string;
   paymentMethod: string;
   paymentDate: string;
   status: string;
   referenceNumber?: string | null;
-  billAllocations?: Array<{ billId: string; amount: number | string; bill?: { id: string } | null }>;
-  paymentItems?: Array<{ amount: number | string; billItem?: { billId?: string; description?: string } | null }>;
+  billAllocations?: Array<{ billId: string; amount: number | string; bill?: { id: string; classId?: string | null; class?: FinanceClass | null } | null }>;
+  paymentItems?: Array<{ amount: number | string; billItem?: { billId?: string; description?: string; bill?: { id: string; classId?: string | null; class?: FinanceClass | null } | null } | null }>;
 }
 
 interface FinanceClass {
@@ -61,7 +61,34 @@ interface FinancePage<T> {
   total: number;
 }
 
-async function fetchAllFinancePages<T extends { id: string }>(path: string): Promise<T[]> {
+interface StudentPage {
+  data: Student[];
+  meta: { page: number; limit: number; total: number; totalPages: number };
+}
+
+interface DetailedFinanceSummary {
+  period: { from: string | null; to: string; basis: string };
+  billed: string;
+  billedCount: number;
+  collected: string;
+  receiptCount: number;
+  outstanding: string;
+  outstandingBillCount: number;
+  byClass: {
+    classId: string | null;
+    className: string;
+    billed: string;
+    collected: string;
+    outstanding: string;
+    billCount: number;
+    receiptCount: number;
+  }[];
+}
+
+async function fetchAllFinancePages<T extends { id: string }>(
+  path: string,
+  filters: URLSearchParams,
+): Promise<T[]> {
   const records: T[] = [];
   const seenCursors = new Set<string>();
   const seenRecordIds = new Set<string>();
@@ -73,7 +100,8 @@ async function fetchAllFinancePages<T extends { id: string }>(path: string): Pro
     if (pageCount >= 1000) {
       throw new Error("Finance report exceeded the safe pagination limit. Narrow the reporting period and try again.");
     }
-    const params = new URLSearchParams({ limit: "100" });
+    const params = new URLSearchParams(filters);
+    params.set("limit", "100");
     if (cursor) params.set("cursor", cursor);
     const page = await apiFetch<FinancePage<T>>(`${path}?${params.toString()}`);
     if (!Array.isArray(page.items) || !Number.isSafeInteger(page.total) || page.total < 0 ||
@@ -118,32 +146,21 @@ const money = (value: number) =>
     maximumFractionDigits: 2,
   }).format(Number.isFinite(value) ? value : 0);
 
-const amount = (value: number | string) => {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : 0;
-};
-
-// Financial totals are accumulated in integer pesewas, never binary floats.
-// Conversion to JS numbers happens only for existing chart/table presentation.
-function moneyCents(value: string | number): bigint {
-  // API money may arrive as a decimal string or an already-parsed JSON number.
-  // Normalise the latter to the database's two-decimal currency scale.
+function amountCents(value: number | string): bigint {
   const raw = (typeof value === "number" ? value.toFixed(2) : value).trim();
   const matched = /^(-?)(\d+)(?:\.(\d{1,2}))?$/.exec(raw);
-  if (!matched) throw new Error("Invalid money amount in financial report.");
+  if (!matched) throw new Error("Invalid money amount in finance report.");
   const cents = BigInt(matched[2]!) * 100n + BigInt((matched[3] ?? "").padEnd(2, "0"));
   return matched[1] ? -cents : cents;
 }
-function centsNumber(cents: bigint): number {
+
+function amount(value: number | string): number {
+  const cents = amountCents(value);
   if (cents > BigInt(Number.MAX_SAFE_INTEGER) || cents < BigInt(-Number.MAX_SAFE_INTEGER)) {
-    throw new Error("Financial report amount exceeds safe display precision.");
+    throw new Error("Finance report amount exceeds safe display precision.");
   }
   return Number(cents) / 100;
 }
-function moneyTotal<T>(rows: readonly T[], select: (row: T) => string | number): number {
-  return centsNumber(rows.reduce((total, row) => total + moneyCents(select(row)), 0n));
-}
-const settled = (status: string) => status.toUpperCase() === "COMPLETED";
 
 const dateText = (value?: string | null) => {
   if (!value) return "—";
@@ -169,34 +186,48 @@ type ClassAllocation = { classId: string; name: string; amount: number };
  * Never charge a whole multi-bill receipt to its legacy primary bill.
  */
 function paymentClassAllocations(payment: FinancePayment, billsById: Map<string, FinanceBill>): ClassAllocation[] {
-  const allocatedByBill = new Map<string, number>();
+  const allocatedByBill = new Map<string, { amount: number; classId?: string; className?: string }>();
   if (payment.billAllocations?.length) {
     for (const allocation of payment.billAllocations) {
       const id = allocation.billId ?? allocation.bill?.id;
       if (!id) continue;
-      allocatedByBill.set(id, (allocatedByBill.get(id) ?? 0) + amount(allocation.amount));
+      const current = allocatedByBill.get(id);
+      allocatedByBill.set(id, {
+        amount: (current?.amount ?? 0) + amount(allocation.amount),
+        classId: allocation.bill?.class?.id ?? allocation.bill?.classId ?? current?.classId,
+        className: allocation.bill?.class?.name ?? current?.className,
+      });
     }
   } else if (payment.paymentItems?.length) {
     for (const item of payment.paymentItems) {
-      const id = item.billItem?.billId;
+      const id = item.billItem?.billId ?? item.billItem?.bill?.id;
       if (!id) continue;
-      allocatedByBill.set(id, (allocatedByBill.get(id) ?? 0) + amount(item.amount));
+      const current = allocatedByBill.get(id);
+      allocatedByBill.set(id, {
+        amount: (current?.amount ?? 0) + amount(item.amount),
+        classId: item.billItem?.bill?.class?.id ?? item.billItem?.bill?.classId ?? current?.classId,
+        className: item.billItem?.bill?.class?.name ?? current?.className,
+      });
     }
   }
   // Legacy records may expose item descriptions without their bill IDs.
   // In that case fall back to the linked bill rather than treating a
   // known payment as unallocated.
   if (allocatedByBill.size === 0 && payment.bill?.id) {
-    allocatedByBill.set(payment.bill.id, amount(payment.amount));
+    allocatedByBill.set(payment.bill.id, {
+      amount: amount(payment.amount),
+      classId: payment.bill.class?.id ?? payment.bill.classId ?? undefined,
+      className: payment.bill.class?.name,
+    });
   }
 
   const byClass = new Map<string, ClassAllocation>();
   let applied = 0;
   for (const [billId, value] of allocatedByBill) {
-    const allocated = Math.max(0, value);
+    const allocated = Math.max(0, value.amount);
     const bill = billsById.get(billId);
-    const classId = bill?.class?.id ?? "no-class";
-    const name = bill?.class?.name ?? "Class not recorded";
+    const classId = bill?.class?.id ?? value.classId ?? "no-class";
+    const name = bill?.class?.name ?? value.className ?? "Class not recorded";
     const current = byClass.get(classId);
     byClass.set(classId, { classId, name, amount: (current?.amount ?? 0) + allocated });
     applied += allocated;
@@ -244,49 +275,24 @@ export function AccountantFinanceDetailedReportingWorkspace({ classes }: Props) 
     retry: false,
   });
   // Registers are paginated; never calculate a school-wide report from page one only.
-  const completeFinanceQuery = useQuery({
-    queryKey: ["finance", "complete-report-dataset", reportSchoolQuery.data?.id], 
-    enabled: reportSchoolQuery.isSuccess && Boolean(reportSchoolQuery.data?.id),
-    gcTime: 0,
-    queryFn: async () => {
-      const [bills, payments] = await Promise.all([
-        fetchAllFinancePages<FinanceBill>("/finance/bills"),
-        fetchAllFinancePages<FinancePayment>("/finance/payments"),
-      ]);
-      return { bills, payments };
-    },
-    retry: false,
-    staleTime: 30_000,
-  });
-  const bills = completeFinanceQuery.data?.bills ?? [];
-  const payments = completeFinanceQuery.data?.payments ?? [];
   const [reportType, setReportType] = useState<"class" | "student">("class");
   const [classId, setClassId] = useState("ALL");
   const [studentId, setStudentId] = useState("");
+  const [studentSearch, setStudentSearch] = useState("");
+  const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [from, setFrom] = useState(defaultStart);
   const [to, setTo] = useState(() => localDate(new Date()));
   const [search, setSearch] = useState("");
 
-  const students = useMemo(() => {
-    const byId = new Map<string, Student>();
-
-    for (const bill of bills) {
-      byId.set(bill.studentId, bill.student);
-    }
-
-    for (const payment of payments) {
-      byId.set(payment.studentId, payment.student);
-    }
-
-    return [...byId.values()].sort((a, b) =>
-      studentLabel(a).localeCompare(studentLabel(b)),
-    );
-  }, [bills, payments]);
-
-  const billsById = useMemo(
-    () => new Map(bills.map((bill) => [bill.id, bill])),
-    [bills],
-  );
+  const studentsQuery = useQuery({
+    queryKey: ["students", "finance-report-search", studentSearch.trim()],
+    queryFn: () =>
+      apiFetch<StudentPage>(
+        `/students?page=1&limit=50&search=${encodeURIComponent(studentSearch.trim())}`,
+      ),
+    enabled: reportType === "student" && studentSearch.trim().length >= 2,
+    retry: false,
+  });
 
   const range = useMemo(() => {
     const start = from ? new Date(from + "T00:00:00") : null;
@@ -301,72 +307,91 @@ export function AccountantFinanceDetailedReportingWorkspace({ classes }: Props) 
       end,
       valid:
         validDates &&
-        (!start || !end || start.getTime() <= end.getTime()),
+        start !== null &&
+        end !== null &&
+        start.getTime() <= end.getTime(),
     };
   }, [from, to]);
 
-  const inRange = useCallback(
-    (value: string) => {
-      const date = new Date(value);
+  const previousRange = useMemo(() => {
+    if (!from || !to || !range.valid) return null;
+    const start = new Date(`${from}T00:00:00.000Z`);
+    const end = new Date(`${to}T00:00:00.000Z`);
+    const durationDays = Math.round((end.getTime() - start.getTime()) / 86_400_000) + 1;
+    const previousEnd = new Date(start);
+    previousEnd.setUTCDate(previousEnd.getUTCDate() - 1);
+    const previousStart = new Date(previousEnd);
+    previousStart.setUTCDate(previousStart.getUTCDate() - durationDays + 1);
+    return {
+      from: previousStart.toISOString().slice(0, 10),
+      to: previousEnd.toISOString().slice(0, 10),
+    };
+  }, [from, to, range.valid]);
 
-      return (
-        !Number.isNaN(date.getTime()) &&
-        (!range.start || date >= range.start) &&
-        (!range.end || date <= range.end)
-      );
-    },
-    [range.start, range.end],
-  );
+  const filters = useMemo(() => {
+    const params = new URLSearchParams();
+    if (from) params.set("from", from);
+    if (to) params.set("to", to);
+    if (reportType === "student" && studentId) params.set("studentId", studentId);
+    if (reportType === "class" && classId !== "ALL") params.set("classId", classId);
+    return params;
+  }, [from, to, reportType, studentId, classId]);
 
-  const scopedBills = useMemo(
-    () =>
-      bills.filter((bill) => {
-        if (
-          reportType === "student" &&
-          (!studentId || bill.studentId !== studentId)
-        ) {
-          return false;
-        }
+  const previousFilters = useMemo(() => {
+    const params = new URLSearchParams();
+    if (previousRange) {
+      params.set("from", previousRange.from);
+      params.set("to", previousRange.to);
+    }
+    if (reportType === "student" && studentId) params.set("studentId", studentId);
+    if (reportType === "class" && classId !== "ALL") params.set("classId", classId);
+    return params;
+  }, [previousRange, reportType, studentId, classId]);
 
-        if (
-          reportType === "class" &&
-          classId !== "ALL" &&
-          bill.class?.id !== classId
-        ) {
-          return false;
-        }
-
-        return inRange(bill.issuedAt);
-      }),
-    [bills, reportType, studentId, classId, inRange],
-  );
-
-  const scopedPayments = useMemo(
-    () =>
-      payments.filter((payment) => {
-        if (
-          reportType === "student" &&
-          (!studentId || payment.studentId !== studentId)
-        ) {
-          return false;
-        }
-
-        if (reportType === "class" && classId !== "ALL" &&
-            !paymentClassAllocations(payment, billsById).some((allocation) => allocation.classId === classId && allocation.amount > 0)) {
-          return false;
-        }
-
-        return inRange(payment.paymentDate);
-      }),
-    [
-      payments,
-      billsById,
+  const completeFinanceQuery = useQuery({
+    queryKey: [
+      "finance",
+      "complete-report-dataset",
+      reportSchoolQuery.data?.id,
       reportType,
-      studentId,
       classId,
-      inRange,
+      studentId,
+      from,
+      to,
+      previousRange?.from,
+      previousRange?.to,
     ],
-  );
+    enabled:
+      reportSchoolQuery.isSuccess &&
+      Boolean(reportSchoolQuery.data?.id) &&
+      range.valid &&
+      (reportType !== "student" || Boolean(studentId)),
+    gcTime: 0,
+    queryFn: async () => {
+      const currentSummaryPath = `/finance/detailed-report?${filters.toString()}`;
+      const previousSummaryPath = previousRange
+        ? `/finance/detailed-report?${previousFilters.toString()}`
+        : null;
+      const [bills, payments, summary, previousSummary] = await Promise.all([
+        fetchAllFinancePages<FinanceBill>("/finance/bills", filters),
+        fetchAllFinancePages<FinancePayment>("/finance/payments", filters),
+        apiFetch<DetailedFinanceSummary>(currentSummaryPath),
+        previousSummaryPath
+          ? apiFetch<DetailedFinanceSummary>(previousSummaryPath)
+          : Promise.resolve(null),
+      ]);
+      return { bills, payments, summary, previousSummary };
+    },
+    retry: false,
+    staleTime: 30_000,
+  });
+  const bills = completeFinanceQuery.data?.bills ?? [];
+  const payments = completeFinanceQuery.data?.payments ?? [];
+  const reportSummary = completeFinanceQuery.data?.summary;
+  const previousSummary = completeFinanceQuery.data?.previousSummary;
+  const billsById = useMemo(() => new Map(bills.map((bill) => [bill.id, bill])), [bills]);
+  const scopedBills = bills;
+  const scopedPayments = payments;
 
   const query = search.trim().toLowerCase();
 
@@ -398,182 +423,20 @@ export function AccountantFinanceDetailedReportingWorkspace({ classes }: Props) 
     );
   });
 
-  const completedPayments = visiblePayments.filter((payment) =>
-    settled(payment.status),
-  );
-
-  const collected = moneyTotal(completedPayments, (payment) =>
-    reportType === "class" && classId !== "ALL"
-      ? paymentClassAllocations(payment, billsById).find((allocation) => allocation.classId === classId)?.amount ?? 0
-      : payment.amount,
-  );
-
-  const billedCents = visibleBills
-    .filter(
-      (bill) =>
-        bill.status !== "CANCELLED" && bill.status !== "WAIVED",
-    )
-    .reduce((sum, bill) => sum + moneyCents(bill.totalAmount), 0n);
-
-  const billed = centsNumber(billedCents);
-
-  // Outstanding is the current balance across all dates, not just the
-  // selected reporting period or search-filtered rows.
-  const outstanding =
-    reportType === "student"
-      ? studentId
-        ? bills
-            .filter(
-              (bill) =>
-                bill.studentId === studentId &&
-                bill.status !== "CANCELLED" &&
-                bill.status !== "WAIVED",
-            )
-            .reduce(
-              (sum, bill) =>
-                sum + (moneyCents(bill.balanceAmount) > 0n ? moneyCents(bill.balanceAmount) : 0n),
-              0n,
-            )
-        : 0n
-      : bills
-          .filter(
-            (bill) =>
-              (classId === "ALL" || bill.class?.id === classId) &&
-              bill.status !== "CANCELLED" &&
-              bill.status !== "WAIVED",
-          )
-          .reduce(
-            (sum, bill) =>
-              sum + (moneyCents(bill.balanceAmount) > 0n ? moneyCents(bill.balanceAmount) : 0n),
-            0n,
-          );
-
-  const outstandingMoney = centsNumber(outstanding);
-
-  const classSummary = useMemo(() => {
-    const totals = new Map<
-      string,
-      {
-        name: string;
-        collected: bigint;
-        receipts: number;
-        billed: bigint;
-        outstanding: bigint;
-      }
-    >();
-
-    for (const bill of visibleBills) {
-      const key = bill.class?.id ?? "no-class";
-
-      const entry = totals.get(key) ?? {
-        name: bill.class?.name ?? "Class not recorded",
-        collected: 0n,
-        receipts: 0,
-        billed: 0n,
-        outstanding: 0n,
-      };
-
-      if (
-        bill.status !== "CANCELLED" &&
-        bill.status !== "WAIVED"
-      ) {
-        entry.billed += moneyCents(bill.totalAmount);
-        entry.outstanding += moneyCents(bill.balanceAmount) > 0n ? moneyCents(bill.balanceAmount) : 0n;
-      }
-
-      totals.set(key, entry);
-    }
-
-    for (const payment of completedPayments) {
-      for (const allocation of paymentClassAllocations(payment, billsById)) {
-        if (reportType === "class" && classId !== "ALL" && allocation.classId !== classId) continue;
-        if (allocation.amount <= 0) continue;
-        const entry = totals.get(allocation.classId) ?? {
-          name: allocation.name,
-          collected: 0n,
-          receipts: 0,
-          billed: 0n,
-          outstanding: 0n,
-        };
-        entry.collected += moneyCents(allocation.amount);
-        entry.receipts += 1;
-        totals.set(allocation.classId, entry);
-      }
-    }
-
-    return [...totals.values()].sort((a, b) =>
-      a.collected === b.collected ? a.name.localeCompare(b.name) : a.collected > b.collected ? -1 : 1,
-    ).map((row) => ({
-      ...row,
-      collected: centsNumber(row.collected),
-      billed: centsNumber(row.billed),
-      outstanding: centsNumber(row.outstanding),
-    }));
-  }, [billsById, visibleBills, completedPayments, reportType, classId]);
-
-  const periodCollected = moneyTotal(
-    scopedPayments.filter((payment) => settled(payment.status)),
-    (payment) => reportType === "class" && classId !== "ALL"
-      ? paymentClassAllocations(payment, billsById).find((allocation) => allocation.classId === classId)?.amount ?? 0
-      : payment.amount,
-  );
-
-  const previousPeriodCollected = useMemo(() => {
-    if (
-      !range.start ||
-      !range.end ||
-      !range.valid
-    ) {
-      return null;
-    }
-
-    const duration =
-      range.end.getTime() - range.start.getTime() + 1;
-
-    const previousStart = range.start.getTime() - duration;
-    const previousEnd = range.start.getTime() - 1;
-
-    return centsNumber(payments
-      .filter((payment) => {
-        if (!settled(payment.status)) {
-          return false;
-        }
-
-        if (
-          reportType === "student" &&
-          (!studentId || payment.studentId !== studentId)
-        ) {
-          return false;
-        }
-
-        if (reportType === "class" && classId !== "ALL" &&
-            !paymentClassAllocations(payment, billsById).some((allocation) => allocation.classId === classId && allocation.amount > 0)) {
-          return false;
-        }
-
-        const timestamp = new Date(payment.paymentDate).getTime();
-
-        return (
-          !Number.isNaN(timestamp) &&
-          timestamp >= previousStart &&
-          timestamp <= previousEnd
-        );
-      })
-      .reduce((sum, payment) => sum + moneyCents(
-        reportType === "class" && classId !== "ALL"
-          ? paymentClassAllocations(payment, billsById).find((allocation) => allocation.classId === classId)?.amount ?? 0
-          : payment.amount
-      ), 0n));
-  }, [
-    payments,
-    billsById,
-    reportType,
-    studentId,
-    classId,
-    range.start,
-    range.end,
-    range.valid,
-  ]);
+  const billed = amount(reportSummary?.billed ?? 0);
+  const collected = amount(reportSummary?.collected ?? 0);
+  const outstandingMoney = amount(reportSummary?.outstanding ?? 0);
+  const classSummary = (reportSummary?.byClass ?? []).map((row) => ({
+    name: row.className,
+    collected: amount(row.collected),
+    receipts: row.receiptCount,
+    billed: amount(row.billed),
+    outstanding: amount(row.outstanding),
+  }));
+  const periodCollected = collected;
+  const previousPeriodCollected = previousSummary
+    ? amount(previousSummary.collected)
+    : null;
 
   const comparisonDelta =
     previousPeriodCollected === null
@@ -586,14 +449,22 @@ export function AccountantFinanceDetailedReportingWorkspace({ classes }: Props) 
       ? null
       : ((comparisonDelta ?? 0) / previousPeriodCollected) * 100;
 
-  const selectedStudent = students.find(
-    (student) => student.id === studentId,
-  );
-
   const invalidRange = !range.valid;
 
   const buildExportTable = (): ExportTable => {
-    const reportInfo = { period: from + " to " + to, filters: { reportType, student: selectedStudent ? studentLabel(selectedStudent) : undefined } };
+    const reportInfo = {
+      period: from + " to " + to,
+      filters: {
+        reportType,
+        class: reportType === "class" && classId !== "ALL"
+          ? classes.find((schoolClass) => schoolClass.id === classId)?.name ?? classId
+          : undefined,
+        student: selectedStudent ? studentLabel(selectedStudent) : undefined,
+        transactionSearch: reportType === "student"
+          ? search.trim() || undefined
+          : undefined,
+      },
+    };
     if (reportType === "student" && selectedStudent) {
       return {
         title: "Student statement of account",
@@ -609,7 +480,7 @@ export function AccountantFinanceDetailedReportingWorkspace({ classes }: Props) 
     }
     return {
       title: "Class collection report",
-      headers: ["Class", "Billed in period (GHS)", "Collected in period (GHS)", "Outstanding on period bills (GHS)", "Completed receipts"],
+      headers: ["Class", "Billed in period (GHS)", "Collected in period (GHS)", "Current outstanding (GHS)", "Completed receipts"],
       columnTypes: ["text", "money", "money", "money", "number"],
       rows: classSummary.map((item) => [item.name, item.billed, item.collected, item.outstanding, item.receipts]),
       totals: ["Total", null, null, null, null],
@@ -621,7 +492,7 @@ export function AccountantFinanceDetailedReportingWorkspace({ classes }: Props) 
     { id: "class", header: "Class", cell: (row) => row.name, value: (row) => row.name },
     { id: "billed", header: "Billed", cell: (row) => money(row.billed), value: (row) => row.billed, className: "text-right tabular-nums" },
     { id: "collected", header: "Collected", cell: (row) => money(row.collected), value: (row) => row.collected, className: "text-right tabular-nums" },
-    { id: "outstanding", header: "Outstanding", cell: (row) => money(row.outstanding), value: (row) => row.outstanding, className: "text-right tabular-nums" },
+    { id: "outstanding", header: "Current outstanding", cell: (row) => money(row.outstanding), value: (row) => row.outstanding, className: "text-right tabular-nums" },
     { id: "receipts", header: "Receipts", cell: (row) => row.receipts, value: (row) => row.receipts, className: "text-right tabular-nums" },
   ];
   const billColumns: DataTableColumn<FinanceBill>[] = [
@@ -665,7 +536,8 @@ export function AccountantFinanceDetailedReportingWorkspace({ classes }: Props) 
               </h2>
               <p className="mt-1 text-sm text-muted-foreground">
                 Build class collection reports and individual student
-                account statements from saved finance records.
+                account statements from saved finance records. Transactions
+                follow the date range; current outstanding is all-time.
               </p>
             </div>
           </div>
@@ -677,21 +549,35 @@ export function AccountantFinanceDetailedReportingWorkspace({ classes }: Props) 
         </div>
         </div>
 
-      {reportSchoolQuery.isPending || completeFinanceQuery.isPending ? (
+      {reportSchoolQuery.isPending ? (
         <div role="status" className="rounded-xl border border-border bg-muted/30 p-4 text-sm text-muted-foreground">
-          Loading all finance records for a complete report…
+          Preparing the school finance report…
         </div>
-      ) : reportSchoolQuery.error || completeFinanceQuery.error ? (
+      ) : reportSchoolQuery.error ? (
         <div role="alert" className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
-          Unable to load the complete finance dataset. Report totals are unavailable; no partial totals are displayed. {(reportSchoolQuery.error ?? completeFinanceQuery.error)?.message}
-          <button type="button" className="ml-2 font-semibold underline" onClick={() => { void reportSchoolQuery.refetch(); void completeFinanceQuery.refetch(); }}>Retry</button>
+          Unable to identify the active school for this report. {reportSchoolQuery.error.message}
+          <button type="button" className="ml-2 font-semibold underline" onClick={() => { void reportSchoolQuery.refetch(); }}>Retry</button>
+        </div>
+      ) : completeFinanceQuery.isPending &&
+        range.valid &&
+        (reportType !== "student" || Boolean(studentId)) ? (
+        <div role="status" className="rounded-xl border border-border bg-muted/30 p-4 text-sm text-muted-foreground">
+          Loading the selected finance records for a complete report…
+        </div>
+      ) : completeFinanceQuery.error ? (
+        <div role="alert" className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
+          Unable to load the complete finance report. Totals are unavailable; no partial totals are displayed. {completeFinanceQuery.error.message}
+          <button type="button" className="ml-2 font-semibold underline" onClick={() => { void completeFinanceQuery.refetch(); }}>Retry</button>
         </div>
       ) : (
       <>
       <div className="finance-report-print-actions grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         <label className="space-y-1 text-xs font-medium text-muted-foreground">
           Report type
-          <Select value={reportType} onValueChange={(value) => setReportType(value as "class" | "student")}>
+          <Select value={reportType} onValueChange={(value) => {
+            setReportType(value as "class" | "student");
+            setSearch("");
+          }}>
             <SelectTrigger aria-label="Report type" className={inputClass + " mt-1"}><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="class">Class collections</SelectItem>
@@ -712,16 +598,54 @@ export function AccountantFinanceDetailedReportingWorkspace({ classes }: Props) 
             </Select>
           </label>
         ) : (
-          <label className="space-y-1 text-xs font-medium text-muted-foreground">
-            Student
-            <Select value={studentId || "__none__"} onValueChange={(value) => setStudentId(value === "__none__" ? "" : value)}>
-              <SelectTrigger aria-label="Student" className={inputClass + " mt-1"}><SelectValue placeholder="Select a student..." /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__none__">Select a student...</SelectItem>
-                {students.map((student) => <SelectItem key={student.id} value={student.id}>{studentLabel(student)} | {student.admissionNumber}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </label>
+          <div className="relative space-y-1 text-xs font-medium text-muted-foreground">
+            <label htmlFor="finance-report-student-search">Student</label>
+            <input
+              id="finance-report-student-search"
+              className={inputClass + " mt-1"}
+              value={studentSearch}
+              onChange={(event) => {
+                setStudentSearch(event.target.value);
+                setStudentId("");
+                setSelectedStudent(null);
+              }}
+              placeholder="Search name or admission number"
+              autoComplete="off"
+            />
+            {studentsQuery.isError && (
+              <p role="alert" className="text-xs text-destructive">
+                Student search failed: {studentsQuery.error.message}
+              </p>
+            )}
+            {!studentId && studentsQuery.data?.data.length ? (
+              <div className="absolute z-20 mt-1 max-h-56 w-full overflow-y-auto rounded-xl border border-border bg-popover p-1 shadow-lg">
+                {studentsQuery.data.data.map((student) => (
+                  <button
+                    key={student.id}
+                    type="button"
+                    className="block w-full rounded-lg px-3 py-2 text-left hover:bg-muted"
+                    onClick={() => {
+                      setStudentId(student.id);
+                      setSelectedStudent(student);
+                      setStudentSearch(studentLabel(student));
+                    }}
+                  >
+                    <span className="block text-sm font-medium text-foreground">
+                      {studentLabel(student)}
+                    </span>
+                    <span className="block text-xs text-muted-foreground">
+                      {student.admissionNumber || "No admission number"}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            ) : null}
+            {selectedStudent && (
+              <p className="text-xs text-muted-foreground">
+                Selected: {studentLabel(selectedStudent)}
+              </p>
+            )}
+          </div>
         )}
 
         <label className="space-y-1 text-xs font-medium text-muted-foreground">
@@ -729,7 +653,7 @@ export function AccountantFinanceDetailedReportingWorkspace({ classes }: Props) 
           <DatePicker
             buttonClassName={inputClass + " mt-1"}
             value={from}
-            max={to || undefined}
+            max={range.valid ? to || undefined : undefined}
             onChange={(value) => setFrom(value)}
           />
         </label>
@@ -739,7 +663,7 @@ export function AccountantFinanceDetailedReportingWorkspace({ classes }: Props) 
           <DatePicker
             buttonClassName={inputClass + " mt-1"}
             value={to}
-            min={from || undefined}
+            min={range.valid ? from || undefined : undefined}
             onChange={(value) => setTo(value)}
           />
         </label>
@@ -753,19 +677,27 @@ export function AccountantFinanceDetailedReportingWorkspace({ classes }: Props) 
           onChange={(event) => setSearch(event.target.value)}
           placeholder={
             reportType === "student"
-              ? "Filter statement by bill, receipt or reference"
-              : "Filter class report by student or bill"
+              ? "Filter statement rows by bill, receipt or reference"
+              : "Filter transaction rows by student, bill or reference"
           }
           aria-label="Filter finance report"
         />
       </div>
+      <p className="-mt-4 text-xs text-muted-foreground">
+        Search filters the transaction tables; summary totals use all records matching the selected period and report filters.
+      </p>
 
-      {invalidRange && (
+      {invalidRange ? (
         <p role="alert" className="text-sm text-destructive">
-          The start date must be on or before the end date, and both dates
-          must be valid.
+          Select valid start and end dates, with the start date on or before
+          the end date.
         </p>
-      )}
+      ) : reportType === "student" && !studentId ? (
+        <div className="rounded-xl border border-dashed border-border bg-muted/20 p-5 text-sm text-muted-foreground">
+          Search for and select a student to load a date-scoped statement.
+        </div>
+      ) : (
+      <>
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <div className="rounded-xl bg-muted/60 p-4">
@@ -776,7 +708,7 @@ export function AccountantFinanceDetailedReportingWorkspace({ classes }: Props) 
             {money(billed)}
           </p>
           <p className="mt-1 text-xs text-muted-foreground">
-            {visibleBills.length} bill record(s)
+            {reportSummary?.billedCount ?? 0} bill record(s) in period
           </p>
         </div>
 
@@ -788,7 +720,7 @@ export function AccountantFinanceDetailedReportingWorkspace({ classes }: Props) 
             {money(collected)}
           </p>
           <p className="mt-1 text-xs text-muted-foreground">
-            {completedPayments.length} completed receipt(s)
+            {reportSummary?.receiptCount ?? 0} completed receipt(s)
           </p>
         </div>
 
@@ -970,6 +902,8 @@ export function AccountantFinanceDetailedReportingWorkspace({ classes }: Props) 
           bill balances and may cover dates outside this report period.
         </p>
       </div>
+      </>
+      )}
       </>
       )}
     </section>

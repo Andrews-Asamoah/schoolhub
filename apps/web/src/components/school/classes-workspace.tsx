@@ -8,6 +8,7 @@ import {
   Check,
   CalendarClock,
   CircleAlert,
+  FileSpreadsheet,
   GraduationCap,
   Pencil,
   Plus,
@@ -36,6 +37,7 @@ import { DataTable, type DataTableColumn } from "@/components/ui/data-table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { canExportTables } from "@/lib/table-export-policy";
 import { apiFetch } from "@/lib/api";
+import { AcademicStructureBulkImport } from "@/components/school/academic-structure-bulk-import";
 
 interface DepartmentOption {
   id: string;
@@ -105,6 +107,7 @@ export function ClassesWorkspace({
   const [editingClass, setEditingClass] = useState<ClassRecord | null>(null);
   const [managingTeacherClass, setManagingTeacherClass] = useState<ClassRecord | null>(null);
   const [showDepartmentForm, setShowDepartmentForm] = useState(false);
+  const [showDepartmentImport, setShowDepartmentImport] = useState(false);
 
   const classMutation = useMutation({
     mutationFn: (input: CreateClassInput) =>
@@ -309,6 +312,16 @@ export function ClassesWorkspace({
 
   return (
     <div className="space-y-7">
+      {showDepartmentImport && (
+        <AcademicStructureBulkImport
+          kind="departments"
+          onClose={() => setShowDepartmentImport(false)}
+          onComplete={() => {
+            void queryClient.invalidateQueries({ queryKey: ["academics", "departments"] });
+            void queryClient.invalidateQueries({ queryKey: ["academics", "classes"] });
+          }}
+        />
+      )}
       <section className="overflow-hidden rounded-3xl border border-border bg-card shadow-sm">
         <div className="relative isolate overflow-hidden border-b border-border bg-gradient-to-br from-primary/10 via-card to-info/5 px-5 py-6 sm:px-7 sm:py-8">
           <div className="pointer-events-none absolute -right-10 -top-16 -z-10 size-64 rounded-full bg-primary/10 blur-3xl" />
@@ -363,18 +376,23 @@ export function ClassesWorkspace({
             </div>
           </div>
           {canManage && (
-            <button
-              type="button"
-              onClick={() => {
-                departmentMutation.reset();
-                departmentForm.reset();
-                setShowDepartmentForm((isOpen) => !isOpen);
-              }}
-              className="inline-flex h-10 items-center gap-2 rounded-xl border border-border bg-background px-3.5 text-sm font-semibold text-foreground transition hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              {showDepartmentForm ? <X className="size-4" /> : <Plus className="size-4" />}
-              {showDepartmentForm ? "Close form" : "Add department"}
-            </button>
+            <div className="flex flex-wrap gap-2">
+              <button type="button" onClick={() => setShowDepartmentImport(true)} className="inline-flex h-10 items-center gap-2 rounded-xl border border-border bg-background px-3.5 text-sm font-semibold text-foreground transition hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                <FileSpreadsheet className="size-4" /> Bulk import
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  departmentMutation.reset();
+                  departmentForm.reset();
+                  setShowDepartmentForm((isOpen) => !isOpen);
+                }}
+                className="inline-flex h-10 items-center gap-2 rounded-xl border border-border bg-background px-3.5 text-sm font-semibold text-foreground transition hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                {showDepartmentForm ? <X className="size-4" /> : <Plus className="size-4" />}
+                {showDepartmentForm ? "Close form" : "Add department"}
+              </button>
+            </div>
           )}
         </div>
 

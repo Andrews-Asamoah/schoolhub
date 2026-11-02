@@ -323,6 +323,7 @@ export function AccountantPortalWorkspace({
       if (activeTab === "debtors") params.set("outstanding", "true");
       return apiFetch<FinancePage<ApiBill>>(`/finance/bills?${params.toString()}`);
     },
+    enabled: ["overview", "invoices", "debtors", "payments"].includes(activeTab),
     retry: false,
   });
   const paymentsQuery = useQuery({
@@ -333,30 +334,40 @@ export function AccountantPortalWorkspace({
       if (search.trim()) params.set("search", search.trim());
       return apiFetch<FinancePage<ApiPayment>>(`/finance/payments?${params.toString()}`);
     },
+    enabled: ["overview", "payments"].includes(activeTab),
     retry: false,
   });
   const expensesQuery = useQuery({
     queryKey: ["finance", "expenses"],
     queryFn: () => apiFetch<ApiExpense[]>("/finance/expenses"),
+    enabled: ["overview", "expenses"].includes(activeTab),
     retry: false,
   });
   const feeStructuresQuery = useQuery({
     queryKey: ["finance", "fee-structures"],
     queryFn: () => apiFetch<ApiFeeStructure[]>("/finance/fee-structures"),
+    enabled: activeTab === "invoices" && canWrite,
     retry: false,
   });
   const classesQuery = useQuery({
     queryKey: ["academics", "classes"],
     queryFn: () => apiFetch<ApiClass[]>("/academics/classes"),
+    enabled: ["overview", "invoices"].includes(activeTab),
     retry: false,
   });
   const yearsQuery = useQuery({
     queryKey: ["schools", "academic-years"],
     queryFn: () => apiFetch<ApiAcademicYear[]>("/schools/academic-years"),
+    enabled: ["overview", "invoices"].includes(activeTab),
     retry: false,
   });
   const currentYear = (yearsQuery.data ?? []).find((year) => year.isCurrent);
   const currentTerm = currentYear?.terms.find((term) => term.isCurrent);
+  const summaryPeriodReady =
+    reportPeriod === "all" ||
+    (yearsQuery.isSuccess &&
+      Boolean(currentYear?.startDate) &&
+      (reportPeriod === "year" || Boolean(currentTerm?.startDate)));
   const summaryQuery = useQuery({
     queryKey: ["finance", "summary", reportPeriod, currentYear?.id ?? null, currentTerm?.id ?? null],
     queryFn: () => {
@@ -365,6 +376,7 @@ export function AccountantPortalWorkspace({
       if (reportPeriod === "term" && currentTerm) params.set("termId", currentTerm.id);
       return apiFetch<FinanceSummary>(`/finance/summary${params.size ? `?${params.toString()}` : ""}`);
     },
+    enabled: activeTab === "overview" && summaryPeriodReady,
     retry: false,
   });
   const overdueBillsQuery = useQuery({
@@ -388,6 +400,7 @@ export function AccountantPortalWorkspace({
   const payrollQuery = useQuery({
     queryKey: ["finance", "payroll"],
     queryFn: () => apiFetch<ApiPayroll[]>("/finance/payroll"),
+    enabled: ["overview", "payroll"].includes(activeTab),
     retry: false,
   });
 
@@ -397,6 +410,8 @@ export function AccountantPortalWorkspace({
   const feeStructures = feeStructuresQuery.data ?? [];
   const classes = (classesQuery.data ?? []).filter((schoolClass) => schoolClass.isActive);
   const payroll = payrollQuery.data ?? [];
+  const summaryUnavailable =
+    !summaryPeriodReady || summaryQuery.isError;
   const selectedPayroll = payroll.find((run) => run.id === selectedPayrollId);
   const inventoryItems = inventoryQuery.data ?? [];
 
@@ -446,6 +461,7 @@ export function AccountantPortalWorkspace({
     return new Date();
   }, [reportPeriod, currentYear?.endDate, currentTerm?.endDate]);
   const isInReportPeriod = (value?: string | null) => {
+    if (!summaryPeriodReady) return false;
     if (!reportStartDate) return true;
     if (!value) return false;
     const date = new Date(value);
@@ -453,16 +469,17 @@ export function AccountantPortalWorkspace({
   };
   const reportExpenses = useMemo(
     () => expenses.filter((expense) => isInReportPeriod(expense.date)),
-    [expenses, reportStartDate, reportEndDate],
+    [expenses, reportStartDate, reportEndDate, summaryPeriodReady],
   );
   const reportExpenseTotal = sumCurrency(reportExpenses, (expense) => expense.amount);
   const reportPayroll = useMemo(() => {
+    if (!summaryPeriodReady) return [];
     if (!reportStartDate) return payroll;
     return payroll.filter((run) => {
       const periodDate = new Date(run.year, run.month - 1, 1);
       return periodDate >= reportStartDate && periodDate <= reportEndDate;
     });
-  }, [payroll, reportStartDate, reportEndDate]);
+  }, [payroll, reportStartDate, reportEndDate, summaryPeriodReady]);
   const reportPayrollPaid = reportPayroll.filter((run) => run.status === "PAID");
   const reportPayrollNet = sumCurrency(reportPayrollPaid, (run) => run.totalNet);
   const todayStart = new Date();
@@ -523,7 +540,6 @@ export function AccountantPortalWorkspace({
         queryClient.invalidateQueries({ queryKey: ["finance", "payments"] }),
         queryClient.invalidateQueries({ queryKey: ["finance", "complete-report-dataset"] }),
         queryClient.invalidateQueries({ queryKey: ["finance", "bills"] }),
-        queryClient.invalidateQueries({ queryKey: ["finance", "complete-report-dataset"] }),
         queryClient.invalidateQueries({ queryKey: ["students"] }),
       ]);
     },
@@ -553,7 +569,6 @@ export function AccountantPortalWorkspace({
         queryClient.invalidateQueries({ queryKey: ["finance", "payments"] }),
         queryClient.invalidateQueries({ queryKey: ["finance", "complete-report-dataset"] }),
         queryClient.invalidateQueries({ queryKey: ["finance", "bills"] }),
-        queryClient.invalidateQueries({ queryKey: ["finance", "complete-report-dataset"] }),
         queryClient.invalidateQueries({ queryKey: ["students"] }),
       ]);
     },
@@ -681,12 +696,26 @@ export function AccountantPortalWorkspace({
   }
 
   const loading =
-    (activeTab === "overview" && (summaryQuery.isPending || overdueBillsQuery.isPending)) ||
+    (activeTab === "overview" && (
+      summaryQuery.isFetching ||
+      overdueBillsQuery.isPending ||
+      expensesQuery.isPending ||
+      payrollQuery.isPending ||
+      paymentsQuery.isPending ||
+      classesQuery.isPending ||
+      billsQuery.isPending ||
+      yearsQuery.isPending
+    )) ||
     (["invoices", "debtors"].includes(activeTab) && billsQuery.isPending) ||
-    (activeTab === "payments" && paymentsQuery.isPending) ||
-    expensesQuery.isPending ||
-    feeStructuresQuery.isPending || classesQuery.isPending || yearsQuery.isPending ||
-    payrollQuery.isPending || (activeTab === "inventory" && inventoryQuery.isPending);
+    (activeTab === "invoices" && (
+      feeStructuresQuery.isPending ||
+      classesQuery.isPending ||
+      yearsQuery.isPending
+    )) ||
+    (activeTab === "payments" && (paymentsQuery.isPending || billsQuery.isPending)) ||
+    (activeTab === "expenses" && expensesQuery.isPending) ||
+    (activeTab === "payroll" && payrollQuery.isPending) ||
+    (activeTab === "inventory" && inventoryQuery.isPending);
 
   return (
     <div className="space-y-6"><style>{`@media print {
@@ -749,22 +778,33 @@ export function AccountantPortalWorkspace({
               </Select>
             </label>
           </div>
+          {summaryUnavailable && (
+            <p role="alert" className="rounded-xl border border-warning/30 bg-warning/5 p-3 text-sm text-foreground">
+              {yearsQuery.error
+                ? `Academic periods could not be loaded. ${yearsQuery.error.message}`
+                : !currentYear?.startDate
+                  ? "A current academic year with a start date is required. Select all available records or configure the current year in School Settings."
+                  : reportPeriod === "term" && !currentTerm?.startDate
+                    ? "A current academic term with a start date is required. Select another reporting period or configure the current term in School Settings."
+                    : summaryQuery.error?.message ?? "The selected reporting period is unavailable."}
+            </p>
+          )}
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-            <DashboardMetricLink to="payments" label="Fees collected" value={summaryQuery.error ? "Unavailable" : currency(reportCollected)} detail={summaryQuery.error ? "Collection data unavailable" : `${reportSettledPaymentCount} completed receipts in period`} icon={ArrowUpRight} />
-            <DashboardMetricLink to="invoices" label="Fees billed" value={summaryQuery.error ? "Unavailable" : currency(billedInPeriod)} detail={summaryQuery.error ? "Billing data unavailable" : "Bills issued in selected period"} icon={Receipt} />
-            <DashboardMetricLink to="debtors" label="Outstanding fees" value={summaryQuery.error ? "Unavailable" : currency(outstanding)} detail={summaryQuery.error ? "Receivable data unavailable" : `${summaryQuery.data?.outstandingBillCount ?? 0} bills with balances`} icon={AlertCircle} />
-            <DashboardMetricLink to="debtors" label="Overdue balances" value={summaryQuery.error ? "Unavailable" : currency(overdueTotal)} detail={summaryQuery.error ? "Receivable data unavailable" : `${summaryQuery.data?.overdueBillCount ?? 0} overdue bills`} icon={ArrowDownRight} />
-            <DashboardMetricLink to="expenses" label="Operating expenses" value={expensesQuery.error ? "Unavailable" : currency(reportExpenseTotal)} detail={expensesQuery.error ? "Expense data unavailable" : `${reportExpenses.length} expense records in period`} icon={Wallet} />
+            <DashboardMetricLink to="payments" label="Fees collected" value={summaryUnavailable ? "Unavailable" : currency(reportCollected)} detail={summaryUnavailable ? "Collection data unavailable" : `${reportSettledPaymentCount} completed receipts in period`} icon={ArrowUpRight} />
+            <DashboardMetricLink to="invoices" label="Fees billed" value={summaryUnavailable ? "Unavailable" : currency(billedInPeriod)} detail={summaryUnavailable ? "Billing data unavailable" : "Bills issued in selected period"} icon={Receipt} />
+            <DashboardMetricLink to="debtors" label="Outstanding fees" value={summaryUnavailable ? "Unavailable" : currency(outstanding)} detail={summaryUnavailable ? "Receivable data unavailable" : `${summaryQuery.data?.outstandingBillCount ?? 0} bills with balances`} icon={AlertCircle} />
+            <DashboardMetricLink to="debtors" label="Overdue balances" value={summaryUnavailable ? "Unavailable" : currency(overdueTotal)} detail={summaryUnavailable ? "Receivable data unavailable" : `${summaryQuery.data?.overdueBillCount ?? 0} overdue bills`} icon={ArrowDownRight} />
+            <DashboardMetricLink to="expenses" label="Operating expenses" value={summaryUnavailable || expensesQuery.error ? "Unavailable" : currency(reportExpenseTotal)} detail={summaryUnavailable || expensesQuery.error ? "Expense data unavailable" : `${reportExpenses.length} expense records in period`} icon={Wallet} />
           </div>
           <div className="grid gap-3 md:grid-cols-2">
             <div className="rounded-2xl border border-border bg-card p-4">
-              <div className="flex items-center justify-between gap-3"><span className="text-sm font-medium text-muted-foreground">Collection rate</span><span className="text-lg font-bold tabular-nums text-foreground">{collectionRate === null ? "—" : `${collectionRate.toFixed(1)}%`}</span></div>
+              <div className="flex items-center justify-between gap-3"><span className="text-sm font-medium text-muted-foreground">Collection rate</span><span className="text-lg font-bold tabular-nums text-foreground">{summaryUnavailable || collectionRate === null ? "—" : `${collectionRate.toFixed(1)}%`}</span></div>
               <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-primary transition-all" style={{ width: `${Math.min(100, Math.max(0, collectionRate ?? 0))}%` }} /></div>
-              <p className="mt-2 text-xs leading-5 text-muted-foreground">{collectionRate === null ? "No bills were issued in this reporting period, so a collection rate cannot be calculated." : "Completed collections divided by bills issued in the selected period; collections may include payments against earlier bills, so this is an operational indicator rather than a cohort collection rate."}</p>
+              <p className="mt-2 text-xs leading-5 text-muted-foreground">{summaryUnavailable ? "Collection-rate data is unavailable for the selected reporting period." : collectionRate === null ? "No bills were issued in this reporting period, so a collection rate cannot be calculated." : "Completed collections divided by bills issued in the selected period; collections may include payments against earlier bills, so this is an operational indicator rather than a cohort collection rate."}</p>
             </div>
             <div className="rounded-2xl border border-border bg-card p-4">
-              <div className="flex items-center justify-between gap-3"><span className="text-sm font-medium text-muted-foreground">Payroll paid (net)</span><span className="text-lg font-bold tabular-nums text-foreground">{payrollQuery.error ? "Unavailable" : currency(reportPayrollNet)}</span></div>
-              <p className="mt-2 text-xs text-muted-foreground">{payrollQuery.error ? "Payroll data unavailable" : `${reportPayrollPaid.length} paid payroll run(s) in the selected period`}</p>
+              <div className="flex items-center justify-between gap-3"><span className="text-sm font-medium text-muted-foreground">Payroll paid (net)</span><span className="text-lg font-bold tabular-nums text-foreground">{summaryUnavailable || payrollQuery.error ? "Unavailable" : currency(reportPayrollNet)}</span></div>
+              <p className="mt-2 text-xs text-muted-foreground">{summaryUnavailable || payrollQuery.error ? "Payroll data unavailable" : `${reportPayrollPaid.length} paid payroll run(s) in the selected period`}</p>
               <Link to="/$page" params={{ page: "payroll" }} className="mt-3 inline-flex text-xs font-semibold text-primary hover:underline">Review payroll records →</Link>
             </div>
           </div>
@@ -783,7 +823,7 @@ export function AccountantPortalWorkspace({
           <section className="rounded-2xl border border-border bg-card p-5">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div><h2 className="text-lg font-semibold text-foreground">Overdue-fees management</h2><p className="mt-1 text-sm text-muted-foreground">Prioritise bills past their due date with an outstanding balance, then open the bill or record a payment.</p></div>
-              <div className="rounded-xl bg-destructive/5 px-4 py-3 text-right"><p className="text-xs text-muted-foreground">Overdue balance</p><p className="mt-1 text-lg font-bold tabular-nums text-destructive">{summaryQuery.error ? "Unavailable" : currency(overdueTotal)}</p><p className="text-xs text-muted-foreground">{summaryQuery.data?.overdueBillCount ?? 0} overdue bill(s)</p></div>
+              <div className="rounded-xl bg-destructive/5 px-4 py-3 text-right"><p className="text-xs text-muted-foreground">Overdue balance</p><p className="mt-1 text-lg font-bold tabular-nums text-destructive">{summaryUnavailable ? "Unavailable" : currency(overdueTotal)}</p><p className="text-xs text-muted-foreground">{summaryUnavailable ? "Period totals unavailable" : `${summaryQuery.data?.overdueBillCount ?? 0} overdue bill(s)`}</p></div>
             </div>
             <div className="my-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_220px]">
               <div className="relative"><Search className="absolute left-3 top-3 size-4 text-muted-foreground" /><input className={cn(inputClass, "pl-9")} value={overdueSearch} onChange={(event) => setOverdueSearch(event.target.value)} placeholder="Search student, admission no., bill or class" aria-label="Search overdue bills" /></div>
@@ -807,7 +847,7 @@ export function AccountantPortalWorkspace({
             </section>
             <section className="rounded-2xl border border-border bg-card p-5">
               <h2 className="font-semibold text-foreground">Finance activity</h2><p className="mt-1 text-sm text-muted-foreground">Quick access to records that need attention.</p>
-              <div className="mt-4 space-y-3"><AttentionItem title="Bills with balances" value={summaryQuery.error ? "—" : String(summaryQuery.data?.outstandingBillCount ?? 0)} detail={summaryQuery.error ? "Could not load receivables" : currency(outstanding)} to="debtors" /><AttentionItem title="Overdue bills" value={summaryQuery.error ? "—" : String(summaryQuery.data?.overdueBillCount ?? 0)} detail={summaryQuery.error ? "Could not load receivables" : currency(overdueTotal)} to="debtors" /><AttentionItem title="Expense records" value={expensesQuery.error ? "—" : String(reportExpenses.length)} detail={expensesQuery.error ? "Could not load expense records" : currency(reportExpenseTotal)} to="expenses" /></div>
+              <div className="mt-4 space-y-3"><AttentionItem title="Bills with balances" value={summaryUnavailable ? "—" : String(summaryQuery.data?.outstandingBillCount ?? 0)} detail={summaryUnavailable ? "Could not load receivables" : currency(outstanding)} to="debtors" /><AttentionItem title="Overdue bills" value={summaryUnavailable ? "—" : String(summaryQuery.data?.overdueBillCount ?? 0)} detail={summaryUnavailable ? "Could not load receivables" : currency(overdueTotal)} to="debtors" /><AttentionItem title="Expense records" value={summaryUnavailable || expensesQuery.error ? "—" : String(reportExpenses.length)} detail={summaryUnavailable || expensesQuery.error ? "Could not load expense records" : currency(reportExpenseTotal)} to="expenses" /></div>
             </section>
           </div>
         </div>
