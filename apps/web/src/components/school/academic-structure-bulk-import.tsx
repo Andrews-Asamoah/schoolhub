@@ -8,19 +8,21 @@ type Kind = "departments" | "houses" | "clubs" | "classes";
 type PreviewRow = {
   rowNumber: number;
   name: string;
-  status: "ready" | "duplicate" | "error";
+  status: "ready" | "update" | "duplicate" | "error";
   errors: string[];
   row: Record<string, unknown> | null;
+  existingId?: string;
+  matchCode?: string;
 };
 type Preview = {
   file: { name: string; format: "csv" | "xlsx"; rows: number };
-  summary: { total: number; ready: number; duplicate: number; error: number };
+  summary: { total: number; ready: number; update: number; duplicate: number; error: number };
   rows: PreviewRow[];
 };
 type ImportResult = {
   rowNumber: number;
   name: string;
-  status: "created" | "failed";
+  status: "created" | "updated" | "failed";
   message?: string;
 };
 
@@ -46,7 +48,7 @@ const definitions: Record<Kind, {
     headers: ["name", "code", "description", "color", "motto", "houseTeacherEmail", "isActive"],
     example: ["Red House", "RED", "The red house", "#C0392B", "Lead with courage", "", "TRUE"],
     required: "name, code",
-    description: "House names and codes must be unique. Optional houseTeacherEmail must match an active teacher's invitation email.",
+    description: "Existing houses are matched by name or code. Optional houseTeacherEmail must match an active teacher's invitation email.",
   },
   clubs: {
     title: "clubs",
@@ -86,6 +88,7 @@ export function AcademicStructureBulkImport({
   const [templateBusy, setTemplateBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState("");
+  const [houseUpdateMode, setHouseUpdateMode] = useState<"merge" | "replace">("merge");
   const panel = useRef<HTMLElement>(null);
   const title = definitions[kind].title;
   const closeRef = useRef<() => void>(() => undefined);
@@ -176,7 +179,7 @@ export function AcademicStructureBulkImport({
   const runImport = async () => {
     if (!preview) return;
     const ready = preview.rows.filter((row): row is PreviewRow & { row: Record<string, unknown> } =>
-      row.status === "ready" && row.row !== null,
+      (row.status === "ready" || row.status === "update") && row.row !== null,
     );
     if (!ready.length) return;
     setLoading(true);
@@ -185,12 +188,17 @@ export function AcademicStructureBulkImport({
     try {
       for (let index = 0; index < ready.length; index += 25) {
         const batch = ready.slice(index, index + 25);
-        setProgress(`Creating ${Math.min(index + batch.length, ready.length)} of ${ready.length}…`);
+        setProgress(`Importing ${Math.min(index + batch.length, ready.length)} of ${ready.length}…`);
         const response = await apiFetch<{ results: ImportResult[] }>("/academics/import", {
           method: "POST",
           body: JSON.stringify({
             kind,
-            rows: batch.map((row) => ({ rowNumber: row.rowNumber, row: row.row })),
+            houseUpdateMode,
+            rows: batch.map((row) => ({
+              rowNumber: row.rowNumber,
+              row: row.row,
+              ...(row.existingId ? { existingId: row.existingId, matchCode: row.matchCode } : {}),
+            })),
           }),
         });
         all.push(...response.results);
@@ -208,7 +216,9 @@ export function AcademicStructureBulkImport({
   };
 
   const createdCount = results?.filter((result) => result.status === "created").length ?? 0;
+  const updatedCount = results?.filter((result) => result.status === "updated").length ?? 0;
   const failedCount = results?.filter((result) => result.status === "failed").length ?? 0;
+  const importableCount = (preview?.summary.ready ?? 0) + (preview?.summary.update ?? 0);
 
   return (
     <div
@@ -226,7 +236,7 @@ export function AcademicStructureBulkImport({
         <div className="flex items-start justify-between gap-3">
           <div>
             <h2 id="academic-import-title" className="text-lg font-bold">Bulk import {title}</h2>
-            <p className="mt-1 text-sm text-muted-foreground">Upload CSV or Excel, review the rows, then create the valid records.</p>
+            <p className="mt-1 text-sm text-muted-foreground">Upload CSV or Excel, review the rows, then import the valid records.</p>
           </div>
           <button type="button" onClick={() => closeRef.current()} aria-label="Close bulk import" className="rounded-lg p-2 hover:bg-muted">
             <X className="size-4" />
@@ -269,9 +279,10 @@ export function AcademicStructureBulkImport({
             {preview && (
               <div className="space-y-3 rounded-xl border border-border p-4">
                 <p className="text-xs text-muted-foreground">{preview.file.name} · {preview.file.rows} row{preview.file.rows === 1 ? "" : "s"}</p>
-                <div className="grid grid-cols-3 gap-2 text-center">
+                <div className={`grid gap-2 text-center ${kind === "houses" ? "grid-cols-2 sm:grid-cols-4" : "grid-cols-3"}`}>
                   {[
-                    ["Ready", preview.summary.ready],
+                    [kind === "houses" ? "New" : "Ready", preview.summary.ready],
+                    ...(kind === "houses" ? [["Updates", preview.summary.update] as const] : []),
                     ["Duplicates", preview.summary.duplicate],
                     ["Errors", preview.summary.error],
                   ].map(([label, count]) => (
@@ -281,6 +292,39 @@ export function AcademicStructureBulkImport({
                     </div>
                   ))}
                 </div>
+                {kind === "houses" && preview.summary.update > 0 && (
+                  <fieldset className="space-y-2 rounded-lg border border-border p-3">
+                    <legend className="px-1 text-xs font-semibold">How should matching houses be updated?</legend>
+                    <label className="flex cursor-pointer items-start gap-2 text-xs">
+                      <input
+                        type="radio"
+                        name="house-update-mode"
+                        value="merge"
+                        checked={houseUpdateMode === "merge"}
+                        onChange={() => setHouseUpdateMode("merge")}
+                        className="mt-0.5 accent-primary"
+                      />
+                      <span>
+                        <span className="font-semibold">Update changed fields</span>
+                        <span className="block text-muted-foreground">Blank optional cells stay unchanged.</span>
+                      </span>
+                    </label>
+                    <label className="flex cursor-pointer items-start gap-2 text-xs">
+                      <input
+                        type="radio"
+                        name="house-update-mode"
+                        value="replace"
+                        checked={houseUpdateMode === "replace"}
+                        onChange={() => setHouseUpdateMode("replace")}
+                        className="mt-0.5 accent-primary"
+                      />
+                      <span>
+                        <span className="font-semibold">Replace all fields</span>
+                        <span className="block text-muted-foreground">Blank description, color, motto, or teacher cells clear those values.</span>
+                      </span>
+                    </label>
+                  </fieldset>
+                )}
                 <div className="max-h-64 overflow-auto rounded-lg border border-border">
                   <table className="w-full text-left text-xs">
                     <thead className="sticky top-0 bg-muted">
@@ -292,15 +336,17 @@ export function AcademicStructureBulkImport({
                           <td className="p-2">{row.rowNumber}</td>
                           <td className="p-2">{row.name}</td>
                           <td className="p-2">{row.status}</td>
-                          <td className="p-2">{row.errors.join(" ") || "Ready to create"}</td>
+                          <td className="p-2">{row.errors.join(" ") || (row.status === "update" ? "Matches an existing house" : "Ready to create")}</td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
                 <div className="flex justify-end">
-                  <button type="button" disabled={loading || preview.summary.ready === 0} onClick={() => void runImport()} className="rounded-lg bg-primary px-4 py-2.5 text-xs font-bold text-primary-foreground disabled:opacity-50">
-                    {loading ? progress || "Importing…" : `Create ${preview.summary.ready} records`}
+                  <button type="button" disabled={loading || importableCount === 0} onClick={() => void runImport()} className="rounded-lg bg-primary px-4 py-2.5 text-xs font-bold text-primary-foreground disabled:opacity-50">
+                    {loading ? progress || "Importing…" : kind === "houses"
+                      ? `Import ${preview.summary.ready} new · ${houseUpdateMode === "replace" ? "replace" : "update"} ${preview.summary.update} existing`
+                      : `Create ${preview.summary.ready} records`}
                   </button>
                 </div>
               </div>
@@ -313,7 +359,7 @@ export function AcademicStructureBulkImport({
           <div className="mt-5 space-y-3">
             <h3 className="font-semibold">Import results</h3>
             <p role={loading ? "status" : undefined} className="text-sm text-muted-foreground">
-              {loading ? progress : `${createdCount} created · ${failedCount} failed.`}
+              {loading ? progress : `${createdCount} created · ${updatedCount} updated · ${failedCount} failed.`}
             </p>
             <div className="max-h-72 overflow-auto rounded-lg border border-border">
               <table className="w-full text-left text-xs">
