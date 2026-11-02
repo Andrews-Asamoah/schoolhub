@@ -174,13 +174,13 @@ export default function SuperAdminDashboard() {
 
       <Text style={[type.headline, { color: colors.foreground, marginBottom: spacing.md }]}>Platform workspace</Text>
       {[
-        { title: 'Schools directory', detail: 'Manage enrolled schools and onboarding', icon: Building2 },
+        { title: 'Schools directory', detail: 'Manage enrolled schools and onboarding', icon: Building2, route: '/(superadmin)/schools' },
         { title: 'Subscriptions & plans', detail: 'Review plans, billing and limits', icon: CreditCard },
         { title: 'System users', detail: 'Platform-wide account oversight', icon: Users },
         { title: 'Audit log', detail: 'Review security and administrative activity', icon: ShieldCheck },
         { title: 'Operations health', detail: 'Review platform service health', icon: Activity },
       ].map(item => (
-        <Pressable key={item.title} onPress={() => setError('This workspace module is scheduled for the next implementation milestone.')} accessibilityRole="button" style={{ marginBottom: 10 }}>
+        <Pressable key={item.title} onPress={() => { if ('route' in item) router.push(item.route as Href); else setError('This workspace module is scheduled for the next implementation milestone.'); }} accessibilityRole="button" style={{ marginBottom: 10 }}>
           <GlassCard padding={14}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
               <item.icon size={20} color={accent} />
