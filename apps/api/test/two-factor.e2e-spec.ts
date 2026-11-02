@@ -126,6 +126,33 @@ describe.skipIf(!DB)("two-factor authentication (real database)", () => {
     return { agent: a, secret, backupCodes: enable.body.backupCodes as string[], totpURI: enable.body.totpURI as string };
   }
 
+  it("supports native-origin MFA challenges and bearer-only tenant role discovery", async () => {
+    // Use its own teacher fixture so existing policy/lockout cases remain independent.
+    const { hashPassword } = await import("better-auth/crypto");
+    const { generateId } = await import("better-auth");
+    const id=generateId(),email=`native-${RUN}@e2e.test`,now=new Date();
+    await prisma.user.create({data:{id,name:"Native test",email,emailVerified:true,role:"user",createdAt:now,updatedAt:now}});
+    await prisma.account.create({data:{id:generateId(),accountId:id,providerId:"credential",userId:id,password:await hashPassword(PASSWORD),createdAt:now,updatedAt:now}});
+    await prisma.member.create({data:{id:generateId(),organizationId:ids.org,userId:id,role:"teacher",createdAt:now,updatedAt:now}});
+    const server=app.getHttpServer();
+    const initial=await request(server).post("/api/auth/sign-in/email").set("Origin","schoolhub://").set("X-Forwarded-For",nextIp()).send({email,password:PASSWORD});
+    expect(initial.status).toBe(200);const initialToken=initial.headers["set-auth-token"];expect(typeof initialToken).toBe("string");
+    const setup=await request(server).post("/api/auth/two-factor/enable").set("Origin","schoolhub://").set("Authorization",`Bearer ${initialToken}`).set("X-Forwarded-For",nextIp()).send({password:PASSWORD});
+    expect(setup.status).toBe(200);const secret=secretFromUri(setup.body.totpURI);
+    const confirmation=await request(server).post("/api/auth/two-factor/verify-totp").set("Origin","schoolhub://").set("Authorization",`Bearer ${initialToken}`).set("X-Forwarded-For",nextIp()).send({code:totp(secret),trustDevice:false});
+    expect(confirmation.status).toBe(200);
+
+    const first=await request(server).post("/api/auth/sign-in/email").set("Origin","schoolhub://").set("X-Forwarded-For",nextIp()).send({email,password:PASSWORD});
+    expect(first.status).toBe(200);expect(first.body.twoFactorRedirect).toBe(true);
+    const cookie=(first.headers["set-cookie"] as unknown as string[]).find(value=>/better-auth\.two_factor=/.test(value))!.split(";")[0]!;
+    const verify=await request(server).post("/api/auth/two-factor/verify-totp").set("Origin","schoolhub://").set("Cookie",cookie).set("X-Forwarded-For",nextIp()).send({code:totp(secret),trustDevice:false});
+    expect(verify.status).toBe(200);const token=verify.headers["set-auth-token"];expect(typeof token).toBe("string");
+    const roles=await request(server).get("/api/schools/roles").set("Authorization",`Bearer ${token}`).set("x-school-subdomain",`e2e-${RUN}`);
+    expect(roles.status).toBe(200);expect(roles.body.roles).toContain("teacher");
+    const school=await request(server).get("/api/schools/current").set("Authorization",`Bearer ${token}`).set("x-school-subdomain",`e2e-${RUN}`).set("x-school-role","teacher");
+    expect(school.status).toBe(200);
+  });
+
   // ======================================================================
   describe("enforcement for platform super-admins", () => {
     let secret = "";

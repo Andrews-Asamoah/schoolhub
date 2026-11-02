@@ -6,7 +6,7 @@ export function originPolicy(config: Record<string, string | undefined>) {
     (production && web.protocol !== "https:")) throw new Error("WEB_ORIGIN must be a bare HTTPS origin in production.");
   const roots = (config.TENANT_ROOT_DOMAINS ?? "").split(",").map(value => value.trim().toLowerCase()).filter(Boolean);
   for (const root of roots) if (!/^(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}$/.test(root)) throw new Error("TENANT_ROOT_DOMAINS must contain comma-separated owned domain names.");
-  const exact = new Set([web.origin]);
+  const exact = new Set([web.origin, "schoolhub://"]);
   for (const root of roots) exact.add(`https://${root}`);
   const trustedOrigins = [...exact, ...roots.map(root => `https://*.${root}`)];
   if (!production) {
