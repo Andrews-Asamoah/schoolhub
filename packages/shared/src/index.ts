@@ -412,7 +412,12 @@ export const createHouseSchema = z.object({
   isActive: z.boolean().default(true),
 });
 export type CreateHouseInput = z.infer<typeof createHouseSchema>;
-export const updateHouseSchema = createHouseSchema.partial();
+export const updateHouseSchema = createHouseSchema.partial().extend({
+  description: z.string().trim().max(500).nullable().optional(),
+  color: z.string().regex(/^#[0-9A-Fa-f]{6}$/, "Choose a valid hex color").nullable().optional(),
+  motto: z.string().trim().max(200).nullable().optional(),
+  houseTeacherId: z.string().nullable().optional(),
+});
 export type UpdateHouseInput = z.infer<typeof updateHouseSchema>;
 
 export const createClubSchema = z.object({

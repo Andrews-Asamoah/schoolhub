@@ -9,6 +9,8 @@ import {
   type CreateClassInput,
   type CreateDepartmentInput,
   type CreateHouseInput,
+  updateHouseSchema,
+  type UpdateHouseInput,
 } from "@schoolhub/shared";
 import type { School } from "@prisma/client";
 import { AcademicsService } from "./academics.service.js";
@@ -21,9 +23,21 @@ type PreviewStatus = "ready" | "duplicate" | "error";
 type PreviewRow = {
   rowNumber: number;
   name: string;
-  status: PreviewStatus;
+  status: PreviewStatus | "update";
   errors: string[];
-  row: RecordInput | null;
+  row: Record<string, unknown> | null;
+  existingId?: string;
+  matchCode?: string;
+};
+type ExistingRecord = {
+  id?: string;
+  name: string;
+  code?: string;
+  description?: string | null;
+  color?: string | null;
+  motto?: string | null;
+  houseTeacherId?: string | null;
+  isActive?: boolean;
 };
 
 const normalize = (value: string) => value.toLowerCase().replace(/[^a-z0-9]/g, "");
@@ -173,6 +187,23 @@ export class AcademicStructureImportService {
         } : {}),
       };
       const errors: string[] = [];
+      let existingHouse: ExistingRecord | undefined;
+
+      if (kind === "houses") {
+        const codeMatch = existing.find((item) => normalize(item.code ?? "") === normalize(raw.code ?? ""));
+        const nameMatch = existing.find((item) => normalize(item.name) === normalize(raw.name ?? ""));
+        if (codeMatch && nameMatch && codeMatch.id !== nameMatch.id) {
+          errors.push("This house name and code match different existing houses. Keep one existing identifier unchanged.");
+        } else {
+          existingHouse = codeMatch ?? nameMatch;
+        }
+        if (existingHouse) {
+          input.description = raw.description || null;
+          input.color = raw.color || null;
+          input.motto = raw.motto || null;
+          input.houseTeacherId = null;
+        }
+      }
 
       if (kind === "classes") {
         const department = departments.find((candidate) =>
@@ -212,10 +243,19 @@ export class AcademicStructureImportService {
         else input[kind === "houses" ? "houseTeacherId" : "teacherInChargeId"] = teacherId;
       }
 
+      if (kind === "houses" && raw.isActive) {
+        try {
+          const active = parseActive(raw.isActive);
+          if (active !== undefined) input.isActive = active;
+        } catch (error) {
+          errors.push(error instanceof Error ? error.message : "isActive must be TRUE or FALSE.");
+        }
+      }
+
       const schema = kind === "departments"
         ? createDepartmentSchema
         : kind === "houses"
-          ? createHouseSchema
+          ? existingHouse ? updateHouseSchema : createHouseSchema
           : kind === "clubs"
             ? createClubSchema
             : createClassSchema;
@@ -224,6 +264,16 @@ export class AcademicStructureImportService {
       if (errors.length) return { rowNumber: record.rowNumber, name: displayName, status: "error", errors, row: null };
 
       const data = checked.data as RecordInput;
+      const checkedData = checked.data as Record<string, unknown>;
+      if (existingHouse?.id) {
+        for (const field of ["description", "color", "motto"] as const) {
+          if (checkedData[field] === existingHouse[field]) delete input[field];
+        }
+        if ("houseTeacherId" in input && checkedData.houseTeacherId === existingHouse.houseTeacherId) {
+          delete input.houseTeacherId;
+        }
+        if ("isActive" in input && checkedData.isActive === existingHouse.isActive) delete input.isActive;
+      }
       const duplicateKeys = kind === "classes"
         ? [normalize(data.name)]
         : kind === "clubs"
@@ -231,7 +281,13 @@ export class AcademicStructureImportService {
         : kind === "houses"
           ? [normalize(data.name), normalize((data as CreateHouseInput).code)]
           : [normalize((data as CreateDepartmentInput).code)];
-      const duplicate = this.isDuplicate(kind, data, existing) || duplicateKeys.some((key) => seen.has(key));
+      const duplicate = (kind === "houses" && existingHouse
+        ? existing.some((item) =>
+            item.id !== existingHouse?.id &&
+            (normalize(item.name) === normalize(data.name) ||
+              normalize(item.code ?? "") === normalize((data as CreateHouseInput).code)),
+          )
+        : this.isDuplicate(kind, data, existing)) || duplicateKeys.some((key) => seen.has(key));
       if (duplicate) {
         const identifier = kind === "classes" || kind === "clubs" ? "name" : kind === "houses" ? "name or code" : "code";
         return {
@@ -243,13 +299,29 @@ export class AcademicStructureImportService {
         };
       }
       for (const key of duplicateKeys) seen.add(key);
-      return { rowNumber: record.rowNumber, name: displayName, status: "ready", errors: [], row: data };
+      return existingHouse?.id
+        ? {
+            rowNumber: record.rowNumber,
+            name: displayName,
+            status: "update",
+            errors: [],
+            row: input,
+            existingId: existingHouse.id,
+            ...(existingHouse.code ? { matchCode: existingHouse.code } : {}),
+          }
+        : { rowNumber: record.rowNumber, name: displayName, status: "ready", errors: [], row: data };
     });
 
     const count = (status: PreviewStatus) => rows.filter((row) => row.status === status).length;
     return {
       file: { name: file.originalname, format, rows: rows.length },
-      summary: { total: rows.length, ready: count("ready"), duplicate: count("duplicate"), error: count("error") },
+      summary: {
+        total: rows.length,
+        ready: count("ready"),
+        update: rows.filter((row) => row.status === "update").length,
+        duplicate: count("duplicate"),
+        error: count("error"),
+      },
       rows,
     };
   }
@@ -258,18 +330,22 @@ export class AcademicStructureImportService {
     school: Pick<School, "id">,
     role: string | undefined,
     rawKind: string,
-    values: { rowNumber: number; row: Record<string, unknown> }[],
+    values: { rowNumber: number; row: Record<string, unknown>; existingId?: string; matchCode?: string }[],
+    houseUpdateMode: string = "merge",
   ) {
     if (!isKind(rawKind)) throw new BadRequestException("kind must be departments, houses, clubs or classes.");
     const kind = rawKind;
     if (kind !== "clubs" && role !== "owner" && role !== "admin") {
       throw new ForbiddenException(`Only school owners and administrators can import ${kind}.`);
     }
+    if (kind === "houses" && houseUpdateMode !== "merge" && houseUpdateMode !== "replace") {
+      throw new BadRequestException("houseUpdateMode must be merge or replace.");
+    }
     if (!Array.isArray(values) || values.length < 1 || values.length > STUDENT_IMPORT_LIMITS.batchSize) {
       throw new BadRequestException(`Send between 1 and ${STUDENT_IMPORT_LIMITS.batchSize} rows per batch.`);
     }
 
-    const results: { rowNumber: number; name: string; status: "created" | "failed"; message?: string }[] = [];
+    const results: { rowNumber: number; name: string; status: "created" | "updated" | "failed"; message?: string }[] = [];
     for (const item of values) {
       if (!item || typeof item !== "object" || Array.isArray(item)) {
         results.push({ rowNumber: 0, name: "(invalid row)", status: "failed", message: "The row data is invalid. Validate the file again." });
@@ -282,6 +358,59 @@ export class AcademicStructureImportService {
       }
       const name = typeof item.row?.name === "string" ? item.row.name : "(no name)";
       try {
+        if (kind === "houses" && item.existingId) {
+          if (!item.matchCode) {
+            results.push({ rowNumber, name, status: "failed", message: "The house matching code is missing. Validate the file again." });
+            continue;
+          }
+          const existing = await this.prisma.client.house.findFirst({
+            where: { id: item.existingId, schoolId: school.id, code: item.matchCode },
+            select: { id: true, name: true, code: true, description: true, color: true, motto: true, houseTeacherId: true, isActive: true },
+          });
+          if (!existing) {
+            results.push({ rowNumber, name, status: "failed", message: "This house changed after validation. Validate the file again before importing." });
+            continue;
+          }
+          const updateInput = { ...item.row };
+          if (houseUpdateMode === "merge") {
+            for (const field of ["description", "color", "motto", "houseTeacherId"] as const) {
+              if (updateInput[field] === null) delete updateInput[field];
+            }
+          } else {
+            for (const field of ["description", "color", "motto", "houseTeacherId"] as const) {
+              if (updateInput[field] === undefined || updateInput[field] === "") updateInput[field] = null;
+            }
+            if (updateInput.isActive === undefined) updateInput.isActive = true;
+          }
+          const checkedUpdate = updateHouseSchema.safeParse(updateInput);
+          if (!checkedUpdate.success) {
+            results.push({
+              rowNumber,
+              name,
+              status: "failed",
+              message: checkedUpdate.error.issues.map((issue) => issue.message).join(" "),
+            });
+            continue;
+          }
+          const patch = { ...checkedUpdate.data };
+          for (const field of ["name", "code", "description", "color", "motto", "houseTeacherId", "isActive"] as const) {
+            if (field in patch && patch[field] === existing[field]) delete patch[field];
+          }
+          if (Object.keys(patch).length) {
+            await this.academics.updateHouse(school.id, existing.id, patch as UpdateHouseInput);
+          }
+          results.push({
+            rowNumber,
+            name,
+            status: "updated",
+            ...(Object.keys(patch).length ? {} : { message: "No changes were needed." }),
+          });
+          continue;
+        }
+        if (item.existingId && kind !== "houses") {
+          results.push({ rowNumber, name, status: "failed", message: "Only house rows can target an existing record." });
+          continue;
+        }
         const schema = kind === "departments"
           ? createDepartmentSchema
           : kind === "houses"
@@ -318,7 +447,7 @@ export class AcademicStructureImportService {
     return { results };
   }
 
-  private async loadExisting(schoolId: string, kind: AcademicStructureKind) {
+  private async loadExisting(schoolId: string, kind: AcademicStructureKind): Promise<ExistingRecord[]> {
     if (kind === "classes") {
       return this.prisma.client.class.findMany({
         where: { schoolId, deletedAt: null },
@@ -329,7 +458,10 @@ export class AcademicStructureImportService {
       return this.prisma.client.department.findMany({ where: { schoolId }, select: { name: true, code: true } });
     }
     if (kind === "houses") {
-      return this.prisma.client.house.findMany({ where: { schoolId }, select: { name: true, code: true } });
+      return this.prisma.client.house.findMany({
+        where: { schoolId },
+        select: { id: true, name: true, code: true, description: true, color: true, motto: true, houseTeacherId: true, isActive: true },
+      });
     }
     return this.prisma.client.club.findMany({ where: { schoolId }, select: { name: true } });
   }

@@ -83,19 +83,20 @@ async function installMocks(page, writes) {
       return route.fulfill({
         json: {
           file: { name: `${kind}-import-template.xlsx`, format: "xlsx", rows: 1 },
-          summary: { total: 1, ready: 1, duplicate: 0, error: 0 },
+          summary: { total: 1, ready: spec.kind === "houses" ? 0 : 1, update: spec.kind === "houses" ? 1 : 0, duplicate: 0, error: 0 },
           rows: [{
             rowNumber: 2,
             name: spec.name,
-            status: "ready",
+            status: spec.kind === "houses" ? "update" : "ready",
             errors: [],
-            row: spec.kind === "classes"
+            row: spec.kind === "houses"
+              ? { name: "Red House", code: "RED", description: "Updated description", color: null, motto: null, houseTeacherId: null }
+              : spec.kind === "classes"
               ? { name: spec.name, level: "JHS 1", departmentId: "department-jhs", capacity: 40, isGraduatingClass: false, isActive: true, order: 1 }
               : spec.kind === "departments"
                 ? { name: spec.name, code: "SCI", description: "Science department" }
-                : spec.kind === "houses"
-                  ? { name: spec.name, code: "RED", description: "Red team", color: "#C0392B", motto: "Lead with courage", isActive: true }
-                  : { name: spec.name, description: "Science projects", isActive: true },
+                : { name: spec.name, description: "Science projects", isActive: true },
+            ...(spec.kind === "houses" ? { existingId: "house-red", matchCode: "RED" } : {}),
           }],
         },
       });
@@ -108,7 +109,7 @@ async function installMocks(page, writes) {
           results: body.rows.map((row) => ({
             rowNumber: row.rowNumber,
             name: row.row.name,
-            status: "created",
+            status: row.existingId ? "updated" : "created",
           })),
         },
       });
@@ -156,12 +157,27 @@ try {
     });
     await page.getByRole("button", { name: "Validate file", exact: true }).click();
     await page.getByText(spec.name, { exact: true }).waitFor();
-    await page.getByRole("button", { name: "Create 1 records", exact: true }).click();
-    await page.getByText("1 created · 0 failed.", { exact: true }).waitFor();
+    if (spec.kind === "houses") {
+      assert.equal(await page.getByLabel("Update changed fields").isChecked(), true);
+      await page.getByLabel("Replace all fields").check();
+    }
+    await page.getByRole("button", {
+      name: spec.kind === "houses" ? "Import 0 new · replace 1 existing" : "Create 1 records",
+      exact: true,
+    }).click();
+    await page.getByText(spec.kind === "houses" ? "0 created · 1 updated · 0 failed." : "1 created · 0 updated · 0 failed.", { exact: true }).waitFor();
     assert.equal(writes.at(-1).kind, spec.kind);
     assert.equal(writes.at(-1).rows.length, 1);
     assert.equal(writes.at(-1).rows[0].row.name, spec.name);
-    if (spec.kind === "classes") {
+    if (spec.kind === "houses") {
+      assert.equal(writes.at(-1).houseUpdateMode, "replace");
+      assert.deepEqual(writes.at(-1).rows[0], {
+        rowNumber: 2,
+        row: { name: "Red House", code: "RED", description: "Updated description", color: null, motto: null, houseTeacherId: null },
+        existingId: "house-red",
+        matchCode: "RED",
+      });
+    } else if (spec.kind === "classes") {
       assert.deepEqual(writes.at(-1).rows[0].row, {
         name: spec.name, level: "JHS 1", departmentId: "department-jhs",
         capacity: 40, isGraduatingClass: false, isActive: true, order: 1,
