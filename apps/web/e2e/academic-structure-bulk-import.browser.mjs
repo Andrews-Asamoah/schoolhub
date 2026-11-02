@@ -119,7 +119,8 @@ async function installMocks(page, writes) {
 }
 
 try {
-  const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
+  // Match the other browser suites; POSIX runner locales are not valid Intl locales.
+  const page = await browser.newPage({ viewport: { width: 1440, height: 1000 }, locale: "en-GB" });
   const errors = [];
   const writes = [];
   page.on("pageerror", (error) => errors.push(error.message));

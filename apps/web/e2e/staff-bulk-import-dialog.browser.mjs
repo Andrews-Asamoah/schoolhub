@@ -90,7 +90,8 @@ async function installMocks(page) {
 }
 
 try {
-  const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+  // Match the other browser suites; POSIX runner locales are not valid Intl locales.
+  const page = await browser.newPage({ viewport: { width: 1280, height: 900 }, locale: "en-GB" });
   const errors = [];
   page.on("pageerror", (error) => errors.push(error.message));
   const uploadedFiles = await installMocks(page);
