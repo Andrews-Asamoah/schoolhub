@@ -11,7 +11,7 @@ import { spacing, type, useTheme } from "@/theme/theme";
 export default function SchoolAccessScreen() {
   const { colors } = useTheme();
   return (
-    <Screen title="SchoolHub" subtitle="Your school, connected">
+    <Screen title="SchoolHub" subtitle="For teachers, students and guardians">
       <GlassCard padding={spacing.xxl}>
         <View style={{ gap: spacing.lg }}>
           <GraduationCap

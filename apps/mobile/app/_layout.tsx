@@ -6,69 +6,44 @@ import { Inter_700Bold } from "@expo-google-fonts/inter/700Bold";
 import { useFonts } from "expo-font";
 import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
 import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
-import { router, Stack } from "expo-router";
+import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { ToastProvider, useToast } from "@/components/Toast";
-import {
-  persistOptions,
-  queryClient,
-  wipeQueryCache,
-} from "@/lib/query-client";
-import { clearSession, hydrateSession, onSessionEvent } from "@/lib/session";
+import { persistOptions, queryClient } from "@/lib/query-client";
+import { useSession, onSessionEvent } from "@/lib/session";
+import { restoreSession } from "@/lib/restore-session";
+import { canEnterRole, isAuthorizedSession } from "@/lib/permissions";
 import { ThemeProvider, useTheme } from "@/theme/theme";
 
 void SplashScreen.preventAutoHideAsync();
 
+export { AppErrorBoundary as ErrorBoundary } from "@/components/AppErrorBoundary";
+
 function Shell() {
   const { isDark } = useTheme();
+  const session = useSession();
   const { show } = useToast();
-
-  useEffect(() => {
-    let active = true;
-    let handling = false;
-    const unsubscribe = onSessionEvent((event) => {
-      if (handling) return;
-      handling = true;
-      const message = {
-        unauthorized: "Your session has expired. Please sign in again.",
-        "password-change-required":
-          "Please change your password in your school's web portal.",
-        "subscription-inactive":
-          "School access is paused. Please contact your school administrator.",
-        "two-factor-required":
-          "Please set up two-factor authentication in your school's web portal.",
-      }[event.type];
-      // Phase 0 fallback: all blocked sessions return to the entry screen.
-      // Phase 3 will route each event to its dedicated auth screen.
-      void (async () => {
-        let cleanupFailed = false;
-        try {
-          await Promise.all([clearSession(), wipeQueryCache()]);
-        } catch {
-          cleanupFailed = true;
-        } finally {
-          if (active) {
-            router.replace("/login");
-            show({
-              message: cleanupFailed
-                ? "Could not fully clear the saved session. Please restart the app."
-                : message,
-              tone: "error",
-            });
-          }
-          handling = false;
-        }
-      })();
-    });
-    return () => {
-      active = false;
-      unsubscribe();
-    };
-  }, [show]);
+  useEffect(
+    () =>
+      onSessionEvent((event) => {
+        const messages = {
+          unauthorized: "Your session has expired. Please sign in again.",
+          "password-change-required":
+            "Please change your password in your school's web portal.",
+          "subscription-inactive":
+            "School access is paused. Please contact your school administrator.",
+          "two-factor-required":
+            "Please complete two-factor authentication in your school's web portal.",
+        };
+        show({ message: messages[event.type], tone: "error" });
+      }),
+    [show],
+  );
+  const ready = isAuthorizedSession(session);
   return (
     <>
       <StatusBar style={isDark ? "light" : "dark"} />
@@ -78,35 +53,50 @@ function Shell() {
           animation: "fade",
           contentStyle: { backgroundColor: "transparent" },
         }}
-      />
+      >
+        <Stack.Screen name="index" />
+        <Stack.Protected guard={!ready}>
+          <Stack.Screen name="login" />
+        </Stack.Protected>
+        <Stack.Protected guard={canEnterRole(session, "teacher")}>
+          <Stack.Screen name="(teacher)" />
+        </Stack.Protected>
+        <Stack.Protected guard={canEnterRole(session, "student")}>
+          <Stack.Screen name="(student)" />
+        </Stack.Protected>
+        <Stack.Protected guard={canEnterRole(session, "guardian")}>
+          <Stack.Screen name="(guardian)" />
+        </Stack.Protected>
+        {__DEV__ ? (
+          <Stack.Protected guard={true}>
+            <Stack.Screen name="dev-gallery" />
+            <Stack.Screen name="dev-tabs" />
+            <Stack.Screen name="(tabs)" />
+            <Stack.Screen name="(workspace)" />
+          </Stack.Protected>
+        ) : null}
+      </Stack>
     </>
   );
 }
 
 export default function RootLayout() {
-  const [fontsLoaded] = useFonts({
+  const [fontsLoaded, fontError] = useFonts({
     Inter_400Regular,
     Inter_500Medium,
     Inter_600SemiBold,
     Inter_700Bold,
   });
-  const [sessionReady, setSessionReady] = useState(false);
-
+  const session = useSession();
   useEffect(() => {
-    // Invalidate credentials/cache left by the removed platform-only client.
-    // School session restoration is introduced with the Phase 1 session store.
-    void hydrateSession()
-      .then(() => Promise.all([clearSession(), wipeQueryCache()]))
-      .catch(() => {
-        /* No authenticated routes are available in this phase. */
-      })
-      .finally(() => setSessionReady(true));
+    void restoreSession();
   }, []);
 
-  const ready = fontsLoaded && sessionReady;
+  const ready = fontsLoaded && session.status !== "loading";
   useEffect(() => {
     if (ready) void SplashScreen.hideAsync();
   }, [ready]);
+  if (fontError) throw fontError;
   if (!ready) return null;
 
   return (

@@ -1,5 +1,15 @@
-import { Redirect } from "expo-router";
-
+import { Redirect, type Href } from "expo-router";
+import { useSession } from "@/lib/session";
+import { roleGroup } from "@/lib/permissions";
 export default function Index() {
-  return <Redirect href="/login" />;
+  const session = useSession();
+  return (
+    <Redirect
+      href={
+        session.status === "ready" && session.activeRole
+          ? (`/${roleGroup(session.activeRole)}` as Href)
+          : "/login"
+      }
+    />
+  );
 }
