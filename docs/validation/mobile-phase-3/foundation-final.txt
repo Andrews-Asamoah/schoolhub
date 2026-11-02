@@ -1,0 +1,349 @@
+
+$ pnpm install --frozen-lockfile
+(cwd: .)
+Scope: all 6 workspace projects
+✓ Lockfile passes supply-chain policies (verified 2h ago)
+Lockfile is up to date, resolution step is skipped
+Packages: +5
++++++
+Progress: resolved 5, reused 5, downloaded 0, added 5, done
+.../node_modules/@prisma/engines postinstall$ node scripts/postinstall.js
+.../node_modules/@prisma/engines postinstall$ node scripts/postinstall.js
+.../esbuild@0.28.2/node_modules/esbuild postinstall$ node install.js
+.../esbuild@0.28.2/node_modules/esbuild postinstall: Done
+.../node_modules/@prisma/engines postinstall: Done
+.../node_modules/@prisma/engines postinstall: Done
+.../node_modules/prisma preinstall$ node scripts/preinstall-entry.js
+.../node_modules/prisma preinstall$ node scripts/preinstall-entry.js
+.../node_modules/prisma preinstall$ node scripts/preinstall-entry.js
+.../node_modules/prisma preinstall: Done
+.../node_modules/prisma preinstall: Done
+.../node_modules/prisma preinstall: Done
+Done in 762ms using pnpm v12.4.1
+
+exit: 0
+
+$ pnpm --filter @schoolhub/shared build
+(cwd: .)
+$ tsdown
+ℹ tsdown v0.23.4 powered by rolldown v1.2.16
+ℹ config file: /workspace/scratch/8ce198452ebc/schoolhub/packages/shared/tsdown.config.ts 
+ℹ entry: src/index.ts
+ℹ tsconfig: tsconfig.json
+ℹ Build start
+ℹ Cleaning 4 files
+
+ WARN  TypeScript 7.0 does not yet have a stable API and is experimental. Some options will be unavailable.
+
+ℹ Emit types with typescript@7.0.2
+ℹ [CJS] dist/index.cjs  62.54 kB │ gzip: 15.41 kB
+ℹ [CJS] 1 files, total: 62.54 kB
+ℹ [CJS] dist/index.d.cts  55.60 kB │ gzip: 9.91 kB
+ℹ [CJS] 1 files, total: 55.60 kB
+✔ Build complete in 592ms
+ℹ [ESM] dist/index.mjs    56.65 kB │ gzip: 14.87 kB
+ℹ [ESM] dist/index.d.mts  55.60 kB │ gzip:  9.91 kB
+ℹ [ESM] 2 files, total: 112.25 kB
+✔ Build complete in 611ms
+
+exit: 0
+
+$ pnpm --filter @schoolhub/mobile typecheck
+(cwd: .)
+$ tsc --noEmit
+
+exit: 0
+
+$ pnpm --filter @schoolhub/mobile lint
+(cwd: .)
+$ expo lint --max-warnings 0
+
+exit: 0
+
+$ pnpm --filter @schoolhub/mobile audit:contrast
+(cwd: .)
+$ node scripts/audit-contrast.mjs
+PASS: 1624 text, icon, gradient and composited chrome contrast pairs across light/dark themes.
+
+exit: 0
+
+$ pnpm --filter @schoolhub/mobile format:check
+(cwd: .)
+$ prettier --check .
+Checking formatting...
+All matched files use Prettier code style!
+
+exit: 0
+
+$ pnpm --filter @schoolhub/mobile test
+(cwd: .)
+$ jest --runInBand
+
+Test Suites: 15 passed, 15 total
+Tests:       98 passed, 98 total
+Snapshots:   0 total
+Time:        3.463 s, estimated 11 s
+Ran all test suites.
+Jest did not exit one second after the test run has completed.
+
+'This usually means that there are asynchronous operations that weren't stopped in your tests. Consider running Jest with `--detectOpenHandles` to troubleshoot this issue.
+
+exit: 0
+
+$ pnpm --filter @schoolhub/mobile verify:endpoints
+(cwd: .)
+$ node scripts/verify-endpoints.mjs
+PASS: 7 endpoint declarations match inventory methods, paths and mobile roles.
+
+exit: 0
+
+$ pnpm --filter @schoolhub/mobile test:release
+(cwd: .)
+$ node --test scripts/verify-release.test.mjs scripts/verify-endpoints.test.mjs scripts/auth-transport.test.mjs scripts/native-auth.test.mjs
+✔ real Better Auth client preserves request and response ownership (9.773943ms)
+✔ real Better Auth response cannot restore a logged-out token (2.120052ms)
+✔ real Better Auth revocation uses the captured pre-logout credential (1.338355ms)
+✔ real client carries only MFA cookie with native origin, then uses the issued header bearer token (12.577043ms)
+✔ a delayed challenge cannot restore MFA state after logout (0.880526ms)
+✔ logout during a pending secure challenge write leaves no reusable challenge (0.508025ms)
+✔ native auth scrubs forged identity and unrelated cookies before sending (0.280052ms)
+✔ normalises inventory parameter names (307.062007ms)
+✔ rejects unsupported endpoint configuration defineEndpoint({ method:'GET', path:'/missing', roles:['teacher'], response:schema }); (257.515317ms)
+✔ rejects unsupported endpoint configuration defineEndpoint({ method:'GET', path:'/announcements', roles:['admin'], response:schema }); (258.157419ms)
+✔ rejects unsupported endpoint configuration defineEndpoint({ method:'GET', path:'/students/me', roles:['guardian'], response:schema }); (249.404618ms)
+✔ rejects unsupported endpoint configuration defineEndpoint({ method:'DELETE', path:'/announcements', roles:['teacher'], response:schema }); (220.36306ms)
+✔ rejects unsupported endpoint configuration defineEndpoint({ method:'GET', path:'/external-exams/results', roles:['teacher'], response:schema }); (260.286484ms)
+✔ rejects unsupported endpoint configuration defineEndpoint(config) (256.340438ms)
+✔ rejects unsupported endpoint configuration apiFetch(path) (237.187637ms)
+✔ rejects unsupported endpoint configuration fetch(path) (233.396215ms)
+✔ rejects unsupported endpoint configuration defineEndpoint({ method:method, path:"/announcements", roles:["teacher"] }) (272.739836ms)
+✔ fails closed for an empty registry (244.46079ms)
+✔ accepts reviewed anonymous GET /schools/public/:subdomain (253.238996ms)
+✔ accepts reviewed anonymous POST /schools/public/:subdomain/resolve-login (230.881859ms)
+✔ accepts reviewed anonymous POST /account/password-recovery/request (233.201326ms)
+✔ accepts reviewed anonymous POST /account/password-recovery/complete (226.492851ms)
+✔ rejects an incorrect authentication scope: defineEndpoint({method:'POST',path:'/account/change-password',roles:['teacher'],scope:'public',response:schema}) (258.464407ms)
+✔ rejects an incorrect authentication scope: defineEndpoint({method:'GET',path:'/schools/public/:subdomain',roles:['teacher'],scope:'account',response:schema}) (235.941886ms)
+✔ accepts the production entry sources (87.12556ms)
+✔ rejects bundled route dev-gallery.tsx (76.72915ms)
+✔ rejects bundled route dev-tabs/index.tsx (94.612409ms)
+✔ rejects bundled route (tabs)/profile.tsx (84.678201ms)
+✔ rejects bundled route (workspace)/fees.tsx (64.773277ms)
+✔ rejects bundled route (superadmin)/index.tsx (61.699229ms)
+✔ rejects bundled route (management)/index.tsx (64.833758ms)
+✔ rejects bundled route (accountant)/index.tsx (63.53921ms)
+✔ rejects bundled route (admin)/index.tsx (60.408255ms)
+✔ rejects bundled route (student)/bece.tsx (66.099363ms)
+✔ rejects Windows development paths too (61.59337ms)
+✔ fails closed without source maps or app sources (135.233199ms)
+ℹ tests 36
+ℹ suites 0
+ℹ pass 36
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 4371.022038
+
+exit: 0
+
+$ npx expo-doctor
+(cwd: apps/mobile)
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
+Running 20 checks on your project...
+20/20 checks passed. No issues detected!
+
+exit: 0
+
+$ npx expo export --platform android --source-maps
+(cwd: apps/mobile)
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
+Expo Autolinking module resolution enabled
+Starting Metro Bundler
+
+| (node:1098) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:1098) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:1098) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:1098) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:1098) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:1098) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+Android Bundled 34894ms node_modules/.pnpm/expo-router@58.0.29_fb6324e0c1d8956cb9285cdd7bad210d/node_modules/expo-router/entry.js (4346 modules)
+
+› Assets (30):
+../../node_modules/.pnpm/@expo-google-fonts+inter@0.4.2/node_modules/@expo-google-fonts/inter/400Regular/Inter_400Regular.ttf (342KB)
+../../node_modules/.pnpm/@expo-google-fonts+inter@0.4.2/node_modules/@expo-google-fonts/inter/500Medium/Inter_500Medium.ttf (343KB)
+../../node_modules/.pnpm/@expo-google-fonts+inter@0.4.2/node_modules/@expo-google-fonts/inter/600SemiBold/Inter_600SemiBold.ttf (344KB)
+../../node_modules/.pnpm/@expo-google-fonts+inter@0.4.2/node_modules/@expo-google-fonts/inter/700Bold/Inter_700Bold.ttf (344KB)
+../../node_modules/.pnpm/expo-router@58.0.29_fb6324e0c1d8956cb9285cdd7bad210d/node_modules/expo-router/assets/arrow_down.png (9.5KB)
+../../node_modules/.pnpm/expo-router@58.0.29_fb6324e0c1d8956cb9285cdd7bad210d/node_modules/expo-router/assets/arrow_right.xml (307B)
+../../node_modules/.pnpm/expo-router@58.0.29_fb6324e0c1d8956cb9285cdd7bad210d/node_modules/expo-router/assets/checkmark.xml (312B)
+../../node_modules/.pnpm/expo-router@58.0.29_fb6324e0c1d8956cb9285cdd7bad210d/node_modules/expo-router/assets/error.png (469B)
+../../node_modules/.pnpm/expo-router@58.0.29_fb6324e0c1d8956cb9285cdd7bad210d/node_modules/expo-router/assets/file.png (138B)
+../../node_modules/.pnpm/expo-router@58.0.29_fb6324e0c1d8956cb9285cdd7bad210d/node_modules/expo-router/assets/forward.png (188B)
+../../node_modules/.pnpm/expo-router@58.0.29_fb6324e0c1d8956cb9285cdd7bad210d/node_modules/expo-router/assets/pkg.png (364B)
+../../node_modules/.pnpm/expo-router@58.0.29_fb6324e0c1d8956cb9285cdd7bad210d/node_modules/expo-router/assets/react-navigation/elements/back-icon-mask.png (653B)
+../../node_modules/.pnpm/expo-router@58.0.29_fb6324e0c1d8956cb9285cdd7bad210d/node_modules/expo-router/assets/react-navigation/elements/back-icon.png (4 variations | 152B)
+../../node_modules/.pnpm/expo-router@58.0.29_fb6324e0c1d8956cb9285cdd7bad210d/node_modules/expo-router/assets/react-navigation/elements/clear-icon.png (4 variations | 425B)
+../../node_modules/.pnpm/expo-router@58.0.29_fb6324e0c1d8956cb9285cdd7bad210d/node_modules/expo-router/assets/react-navigation/elements/close-icon.png (4 variations | 235B)
+../../node_modules/.pnpm/expo-router@58.0.29_fb6324e0c1d8956cb9285cdd7bad210d/node_modules/expo-router/assets/react-navigation/elements/search-icon.png (4 variations | 599B)
+../../node_modules/.pnpm/expo-router@58.0.29_fb6324e0c1d8956cb9285cdd7bad210d/node_modules/expo-router/assets/sitemap.png (465B)
+../../node_modules/.pnpm/expo-router@58.0.29_fb6324e0c1d8956cb9285cdd7bad210d/node_modules/expo-router/assets/unmatched.png (4.8KB)
+
+› android bundles (2):
+_expo/static/js/android/entry-adae3f48dbce4c02fed6a9c5101cd2e0.hbc (6.5MB)
+_expo/static/js/android/entry-adae3f48dbce4c02fed6a9c5101cd2e0.hbc.map (15MB)
+
+› Files (1):
+metadata.json (2KB)
+
+Exported: dist
+
+exit: 0
+
+$ node scripts/verify-release.mjs dist
+(cwd: apps/mobile)
+entry-adae3f48dbce4c02fed6a9c5101cd2e0.hbc: 6462292 bytes (Hermes)
+PASS: 1 source map(s), 21 app sources; no development, mock or Super Admin routes.
+
+exit: 0
+
+$ npx expo export --platform ios --source-maps
+(cwd: apps/mobile)
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
+Expo Autolinking module resolution enabled
+Starting Metro Bundler
+
+| (node:1149) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:1149) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:1149) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:1149) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:1149) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:1149) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+iOS Bundled 33885ms node_modules/.pnpm/expo-router@58.0.29_fb6324e0c1d8956cb9285cdd7bad210d/node_modules/expo-router/entry.js (4347 modules)
+
+› Assets (27):
+../../node_modules/.pnpm/@expo-google-fonts+inter@0.4.2/node_modules/@expo-google-fonts/inter/400Regular/Inter_400Regular.ttf (342KB)
+../../node_modules/.pnpm/@expo-google-fonts+inter@0.4.2/node_modules/@expo-google-fonts/inter/500Medium/Inter_500Medium.ttf (343KB)
+../../node_modules/.pnpm/@expo-google-fonts+inter@0.4.2/node_modules/@expo-google-fonts/inter/600SemiBold/Inter_600SemiBold.ttf (344KB)
+../../node_modules/.pnpm/@expo-google-fonts+inter@0.4.2/node_modules/@expo-google-fonts/inter/700Bold/Inter_700Bold.ttf (344KB)
+../../node_modules/.pnpm/expo-router@58.0.29_fb6324e0c1d8956cb9285cdd7bad210d/node_modules/expo-router/assets/arrow_down.png (9.5KB)
+../../node_modules/.pnpm/expo-router@58.0.29_fb6324e0c1d8956cb9285cdd7bad210d/node_modules/expo-router/assets/error.png (469B)
+../../node_modules/.pnpm/expo-router@58.0.29_fb6324e0c1d8956cb9285cdd7bad210d/node_modules/expo-router/assets/file.png (138B)
+../../node_modules/.pnpm/expo-router@58.0.29_fb6324e0c1d8956cb9285cdd7bad210d/node_modules/expo-router/assets/forward.png (188B)
+../../node_modules/.pnpm/expo-router@58.0.29_fb6324e0c1d8956cb9285cdd7bad210d/node_modules/expo-router/assets/pkg.png (364B)
+../../node_modules/.pnpm/expo-router@58.0.29_fb6324e0c1d8956cb9285cdd7bad210d/node_modules/expo-router/assets/react-navigation/elements/back-icon-mask.png (653B)
+../../node_modules/.pnpm/expo-router@58.0.29_fb6324e0c1d8956cb9285cdd7bad210d/node_modules/expo-router/assets/react-navigation/elements/back-icon.png (4 variations | 566B)
+../../node_modules/.pnpm/expo-router@58.0.29_fb6324e0c1d8956cb9285cdd7bad210d/node_modules/expo-router/assets/react-navigation/elements/clear-icon.png (4 variations | 425B)
+../../node_modules/.pnpm/expo-router@58.0.29_fb6324e0c1d8956cb9285cdd7bad210d/node_modules/expo-router/assets/react-navigation/elements/close-icon.png (4 variations | 235B)
+../../node_modules/.pnpm/expo-router@58.0.29_fb6324e0c1d8956cb9285cdd7bad210d/node_modules/expo-router/assets/react-navigation/elements/search-icon.png (3 variations | 582B)
+../../node_modules/.pnpm/expo-router@58.0.29_fb6324e0c1d8956cb9285cdd7bad210d/node_modules/expo-router/assets/sitemap.png (465B)
+../../node_modules/.pnpm/expo-router@58.0.29_fb6324e0c1d8956cb9285cdd7bad210d/node_modules/expo-router/assets/unmatched.png (4.8KB)
+
+› ios bundles (2):
+_expo/static/js/ios/entry-f03b9949aa8e20ec24a05f1a597389da.hbc (6.5MB)
+_expo/static/js/ios/entry-f03b9949aa8e20ec24a05f1a597389da.hbc.map (15MB)
+
+› Files (1):
+metadata.json (1.8KB)
+
+Exported: dist
+
+exit: 0
+
+$ node scripts/verify-release.mjs dist
+(cwd: apps/mobile)
+entry-f03b9949aa8e20ec24a05f1a597389da.hbc: 6469036 bytes (Hermes)
+PASS: 1 source map(s), 21 app sources; no development, mock or Super Admin routes.
+
+exit: 0
+
+$ pnpm --filter @schoolhub/api typecheck
+(cwd: .)
+$ pnpm --filter @schoolhub/shared build && pnpm prisma:generate && tsc --noEmit
+$ tsdown
+ℹ tsdown v0.23.4 powered by rolldown v1.2.16
+ℹ config file: /workspace/scratch/8ce198452ebc/schoolhub/packages/shared/tsdown.config.ts 
+ℹ entry: src/index.ts
+ℹ tsconfig: tsconfig.json
+ℹ Build start
+ℹ Cleaning 4 files
+
+ WARN  TypeScript 7.0 does not yet have a stable API and is experimental. Some options will be unavailable.
+
+ℹ Emit types with typescript@7.0.2
+ℹ [CJS] dist/index.cjs  62.54 kB │ gzip: 15.41 kB
+ℹ [CJS] 1 files, total: 62.54 kB
+ℹ [CJS] dist/index.d.cts  55.60 kB │ gzip: 9.91 kB
+ℹ [CJS] 1 files, total: 55.60 kB
+✔ Build complete in 505ms
+ℹ [ESM] dist/index.mjs    56.65 kB │ gzip: 14.87 kB
+ℹ [ESM] dist/index.d.mts  55.60 kB │ gzip:  9.91 kB
+ℹ [ESM] 2 files, total: 112.25 kB
+✔ Build complete in 562ms
+$ prisma generate --config prisma.config.ts
+◇ injected env (0) from ../../.env
+Loaded Prisma config from prisma.config.ts.
+
+Prisma schema loaded from prisma/schema.
+
+✔ Generated Prisma Client (v7.10.1) to ./../../node_modules/.pnpm/@prisma+client@7.10.1_prisma@7.10.1_@types+node@26.6.6_@types+react-dom@19.3.0_@types+r_9ad14f230c371d32a321f5456517c777/node_modules/@prisma/client in 1.60s
+
+Start by importing your Prisma Client (See: https://pris.ly/d/importing-client)
+
+
+
+exit: 0
+
+$ pnpm --filter @schoolhub/api lint
+(cwd: .)
+$ oxlint --type-aware src/ test/
+src/modules/students/import/import-normalize.ts:58:16: warning eslint(no-control-regex): Unexpected control characters help: Avoid matching control characters in regular expressions. If intentional, disable this rule for the expression.
+src/modules/students/students.service.ts:1268:11: warning eslint(no-unused-vars): Variable 'totalBilled' is declared but never used. Unused variables should start with a '_'. help: Consider removing this declaration.
+src/modules/notifications/notifications.service.ts:1:10: warning eslint(no-unused-vars): Identifier 'BadRequestException' is imported but never used. help: Consider removing this import.
+src/modules/finance/finance-exports.helpers.spec.ts:50:78: warning eslint(no-useless-escape): Unnecessary escape character '\'' help: Replace `\'` with `'`.
+src/modules/assessments/external-bece-import.service.ts:1:9: warning eslint(no-unused-vars): Identifier 'BadRequestException' is imported but never used. help: Consider removing this import.
+src/modules/assessments/report-version.service.ts:2:3: warning eslint(no-unused-vars): Identifier 'BadRequestException' is imported but never used. help: Consider removing this import.
+src/modules/storage/r2.service.spec.ts:57:13: warning eslint(no-unsafe-optional-chaining): Unsafe usage of optional chaining help: If this short-circuits with 'undefined' the evaluation will throw TypeError
+src/modules/people/staff-import.service.ts:9:6: warning eslint(no-unused-vars): Type alias 'ImportRow' is declared but never used. help: Consider removing this declaration.
+src/modules/finance/finance.service.ts:2398:11: warning eslint(no-unused-vars): Variable 'todayDate' is declared but never used. Unused variables should start with a '_'. help: Consider removing this declaration.
+src/modules/finance/finance.service.ts:4415:11: warning eslint(no-unused-vars): Variable 'today' is declared but never used. Unused variables should start with a '_'. help: Consider removing this declaration.
+src/modules/storage/private-storage.service.ts:31:97: warning typescript(no-misused-spread): Using the spread operator on a string can mishandle special characters, because it produces Unicode code points, which will break complex characters (like emojis) into multiple parts. help: Consider using `Intl.Segmenter` for locale-aware string decomposition. Otherwise, if you don't need to preserve emojis or other non-ASCII characters, disable this lint rule on this line or configure the 'allow' rule option.
+src/modules/finance/finance.helpers.ts:42:88: warning typescript(no-base-to-string): 'err.meta?.target ?? ""' will use Object's default stringification format ('[object Object]') when stringified. help: Consider picking a property (e.g. `user.name`), using a formatter (or `JSON.stringify`), or implementing a custom `toString()`/`toLocaleString()` on the type.
+src/modules/attendance/attendance-calendar.service.ts:120:26: warning typescript(require-array-sort-compare): Require 'compare' argument.
+src/modules/admissions/admissions.service.ts:548:70: warning typescript(restrict-template-expressions): Invalid type used in template literal expression.
+src/modules/admissions/admissions.service.ts:583:33: warning typescript(restrict-template-expressions): Invalid type used in template literal expression.
+src/modules/admissions/admissions.service.ts:595:66: warning typescript(restrict-template-expressions): Invalid type used in template literal expression.
+src/modules/admissions/admissions.service.ts:622:65: warning typescript(restrict-template-expressions): Invalid type used in template literal expression.
+src/common/subscription-capacity.spec.ts:36:23: warning typescript(unbound-method): Avoid referencing unbound methods which may cause unintentional scoping of `this`. help: If your function does not access `this`, you can annotate it with `this: void`, or consider using an arrow function instead.
+src/modules/finance/finance-billing.integration.spec.ts:158:14: warning typescript(require-array-sort-compare): Require 'compare' argument.
+src/modules/super-admin/super-admin.operations-health.spec.ts:70:20: warning typescript(unbound-method): Avoid referencing unbound methods which may cause unintentional scoping of `this`. help: If your function does not access `this`, you can annotate it with `this: void`, or consider using an arrow function instead.
+src/modules/finance/finance.service.ts:1057:50: warning typescript(no-base-to-string): 'rawLateFeePolicy.value ?? "0.00"' will use Object's default stringification format ('[object Object]') when stringified. help: Consider picking a property (e.g. `user.name`), using a formatter (or `JSON.stringify`), or implementing a custom `toString()`/`toLocaleString()` on the type.
+src/modules/finance/finance.service.ts:1820:41: warning typescript(no-base-to-string): 'stored.value ?? "0.00"' will use Object's default stringification format ('[object Object]') when stringified. help: Consider picking a property (e.g. `user.name`), using a formatter (or `JSON.stringify`), or implementing a custom `toString()`/`toLocaleString()` on the type.
+
+exit: 0
+
+$ pnpm --filter @schoolhub/api exec vitest run src/common/origin-policy.spec.ts
+(cwd: .)
+
+ RUN  v5.0.5 /workspace/scratch/8ce198452ebc/schoolhub/apps/api
+
+
+ Test Files  1 passed (1)
+      Tests  3 passed (3)
+   Start at  23:43:32
+   Duration  153ms (import 37%, transform 24%, worker 22%, tests 17%)
+
+
+exit: 0
