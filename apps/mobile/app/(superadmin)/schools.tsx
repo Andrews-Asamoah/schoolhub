@@ -52,7 +52,10 @@ export default function SuperAdminSchoolsScreen() {
     } finally { setLoading(false); setRefreshing(false); }
   }, [page, query, status]);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    const task = setTimeout(() => { void load(); }, 0);
+    return () => clearTimeout(task);
+  }, [load]);
 
   const openSchool = (id: string) => router.push(`/(superadmin)/schools/${id}` as Href);
   const statusColor = (value?: string) => value === 'ACTIVE' ? colors.success : value === 'SUSPENDED' ? colors.destructive : colors.warning;
