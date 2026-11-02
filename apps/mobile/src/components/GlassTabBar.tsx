@@ -1,6 +1,6 @@
 import * as Haptics from "expo-haptics";
-import { Tabs, useNavigation } from "expo-router";
-import type { ComponentProps } from "react";
+import { Tabs } from "expo-router";
+import type { BottomTabBarProps } from "@react-navigation/bottom-tabs";
 import { useEffect, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from "react-native-reanimated";
@@ -9,7 +9,7 @@ import { fonts, radius, useTheme, withAlpha } from "@/theme/theme";
 import { GlassSurface } from "./GlassSurface";
 
 /** Props React Navigation hands to a custom `tabBar` renderer. */
-export type TabBarProps = Parameters<NonNullable<ComponentProps<typeof Tabs>["tabBar"]>>[0];
+export type TabBarProps = BottomTabBarProps;
 
 const BAR_HEIGHT = 64;
 const SIDE_MARGIN = 16;
@@ -21,9 +21,8 @@ const SIDE_MARGIN = 16;
  */
 export const TAB_BAR_CLEARANCE = BAR_HEIGHT + 28;
 
-export function GlassTabBar({ state, descriptors }: TabBarProps) {
+export function GlassTabBar({ state, descriptors, navigation }: TabBarProps) {
   const { colors, accent } = useTheme();
-  const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const [width, setWidth] = useState(0);
 
