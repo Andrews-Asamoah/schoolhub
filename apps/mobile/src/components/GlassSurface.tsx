@@ -37,14 +37,16 @@ export function GlassSurface({
   style,
   contentStyle,
 }: Props) {
-  const { glass, isDark, blurEnabled } = useTheme();
+  const { colors, glass, isDark, blurEnabled } = useTheme();
   const depth = useContext(GlassDepth);
   const renderBlur = blurEnabled && depth < 2;
   const fill = renderBlur
     ? strong
       ? glass.surfaceStrong
       : glass.surface
-    : glass.fallbackSurface;
+    : depth >= 2
+      ? colors.card
+      : glass.fallbackSurface;
 
   return (
     <GlassDepth.Provider value={depth + 1}>

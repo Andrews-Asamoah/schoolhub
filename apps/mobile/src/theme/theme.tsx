@@ -303,9 +303,9 @@ export function withAlpha(hex: string, alpha: number): string {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
-/** Picks a legible foreground (white or near-black) for text on `hex`. */
+/** Chooses the higher-contrast black/white foreground, including mid-grey. */
 export function readableOn(hex: string): string {
-  return contrast(hex, "#0B1020") >= contrast(hex, "#FFFFFF")
-    ? "#0B1020"
+  return contrast(hex, "#000000") >= contrast(hex, "#FFFFFF")
+    ? "#000000"
     : "#FFFFFF";
 }
