@@ -39,20 +39,20 @@ export default function SuperAdminSchoolsScreen() {
   }, [search]);
 
   const load = useCallback(async () => {
-    setError(null);
     try {
       const params = new URLSearchParams({ page: String(page), limit: String(LIMIT) });
       if (query) params.set('q', query);
       if (status !== 'all') params.set('status', status);
       const data = await apiFetch<Page<School>>(`/super-admin/schools?${params.toString()}`);
       setResult(data);
+      setError(null);
     } catch (e) {
       if (e instanceof ApiError && e.status === 401) router.replace('/login' as Href);
       else setError(e instanceof Error ? e.message : 'Schools could not be loaded.');
     } finally { setLoading(false); setRefreshing(false); }
   }, [page, query, status]);
 
-  useEffect(() => { setLoading(true); void load(); }, [load]);
+  useEffect(() => { void load(); }, [load]);
 
   const openSchool = (id: string) => router.push(`/(superadmin)/schools/${id}` as Href);
   const statusColor = (value?: string) => value === 'ACTIVE' ? colors.success : value === 'SUSPENDED' ? colors.destructive : colors.warning;
@@ -66,7 +66,7 @@ export default function SuperAdminSchoolsScreen() {
         <SegmentedControl options={filters} value={status} onChange={(value) => { setStatus(value); setPage(1); }} accessibilityLabel="Filter schools by subscription" />
       </View>
       {loading && !result ? <ActivityIndicator color={accent} style={{ marginVertical: 40 }} /> : error ? (
-        <ErrorState title="Unable to load schools" message={error} actionLabel="Try again" onAction={() => { setLoading(true); void load(); }} />
+        <ErrorState title="Unable to load schools" message={error} actionLabel="Try again" onAction={() => { setLoading(true); setError(null); void load(); }} />
       ) : result?.data.length ? (
         <>
           <Text style={[type.caption, { color: colors.mutedForeground, marginBottom: spacing.sm }]}>Showing {(page - 1) * LIMIT + 1}–{Math.min(page * LIMIT, result.meta.total)} of {result.meta.total.toLocaleString()}</Text>
