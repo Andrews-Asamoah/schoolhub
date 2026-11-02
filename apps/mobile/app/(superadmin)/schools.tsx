@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { router, type Href } from 'expo-router';
 import { ActivityIndicator, Pressable, Text, View } from 'react-native';
-import { ArrowLeft, Building2, ChevronLeft, ChevronRight, Search, X } from 'lucide-react-native';
+import { ArrowLeft, Building2, ChevronLeft, ChevronRight, Search } from 'lucide-react-native';
 import { apiFetch, ApiError } from '@/lib/api';
 import { Screen } from '@/components/Screen';
 import { GlassCard } from '@/components/GlassCard';
