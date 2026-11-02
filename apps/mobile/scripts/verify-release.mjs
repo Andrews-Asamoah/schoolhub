@@ -3,7 +3,7 @@ import { resolve, join } from "node:path";
 
 const root = resolve(process.argv[2] ?? "dist");
 const forbidden =
-  /(?:^|\/)app\/(?:dev-gallery[.]|dev-tabs\/|\(tabs\)\/|\(workspace\)\/|\(superadmin\)\/)/;
+  /(?:^|\/)app\/(?:dev-gallery[.]|dev-tabs\/|\(tabs\)\/|\(workspace\)\/|\(superadmin\)\/|\(accountant\)\/|\(management\)\/)/;
 let maps = 0;
 let appSources = 0;
 
@@ -11,7 +11,14 @@ function inspect(map) {
   for (const source of map.sources ?? []) {
     const path = source.replaceAll("\\", "/");
     if (/(?:^|\/)app\//.test(path)) appSources++;
-    if (forbidden.test(path))
+    const appPath = path.match(/(?:^|\/)app\/(.*)$/)?.[1];
+    const allowedApp =
+      /^(?:(?:_layout|index|login)\.[tj]sx?$|\((?:teacher|student|guardian|auth|shared)\)\/)/;
+    if (
+      (appPath && !allowedApp.test(appPath)) ||
+      /(?:^|\/)(?:app|src)\/.*(?:bece|external-exams)/i.test(path) ||
+      forbidden.test(path)
+    )
       throw new Error(`Forbidden release route: ${path}`);
   }
   for (const section of map.sections ?? []) inspect(section.map);
