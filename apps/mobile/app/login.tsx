@@ -54,8 +54,8 @@ export default function SuperAdminLoginScreen() {
         await finish(result.data?.user as { role?: string; mustChangePassword?: boolean } | undefined);
       } else {
         const result = backup
-          ? await authClient.twoFactor.verifyBackupCode({ code: code.replace(/[\\s-]/g, '') })
-          : await authClient.twoFactor.verifyTotp({ code: code.replace(/\\s/g, '') });
+          ? await authClient.twoFactor.verifyBackupCode({ code: code.replace(/[\s-]/g, '') })
+          : await authClient.twoFactor.verifyTotp({ code: code.replace(/\s/g, '') });
         if (result.error) {
           setError(result.error.message || 'The verification code was not accepted.');
           setCode('');
