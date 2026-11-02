@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Modal, Pressable, ScrollView, Text, View } from "react-native";
+import { Modal, Pressable, ScrollView, View } from "react-native";
+import { Text } from "@/components/Typography";
 import { type, useTheme } from "@/theme/theme";
 type Props = {
   label: string;
@@ -20,7 +21,7 @@ export function SelectField({
   disabled,
 }: Props) {
   const [open, setOpen] = useState(false);
-  const { colors } = useTheme();
+  const { colors, reduceMotion } = useTheme();
   function close() {
     setOpen(false);
     onBlur?.();
@@ -40,6 +41,7 @@ export function SelectField({
           minHeight: 52,
           justifyContent: "center",
           padding: 12,
+          backgroundColor: colors.card,
           borderWidth: 1,
           borderColor: error ? colors.destructive : colors.border,
           borderRadius: 14,
@@ -61,7 +63,7 @@ export function SelectField({
       <Modal
         visible={open}
         transparent
-        animationType="slide"
+        animationType={reduceMotion ? "none" : "slide"}
         onRequestClose={close}
       >
         <View

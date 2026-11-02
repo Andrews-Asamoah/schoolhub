@@ -1,180 +1,75 @@
-import { CalendarDays, MapPin } from "lucide-react-native";
-import { Text, View } from "react-native";
-import { GlassCard } from "@/components/GlassCard";
+import { useState } from "react";
+import { View } from "react-native";
 import { Screen } from "@/components/Screen";
-import { TAB_BAR_CLEARANCE } from "@/components/GlassTabBar";
-import {
-  fonts,
-  radius,
-  spacing,
-  type,
-  useTheme,
-  withAlpha,
-} from "@/theme/theme";
+import { HeroCard } from "@/components/HeroCard";
+import { FilterChips, Timeline } from "@/components/ModulePrimitives";
 const lessons = [
-  ["08:00", "08:40", "Mathematics", "JHS 2 · Room 04", "#635BDB", "Completed"],
-  [
-    "09:00",
-    "09:40",
-    "English Language",
-    "JHS 2 · Room 04",
-    "#0D9488",
-    "Completed",
-  ],
-  [
-    "10:30",
-    "11:10",
-    "Integrated Science",
-    "JHS 2 · Science Lab",
-    "#D97706",
-    "Next up",
-  ],
-  ["11:30", "12:10", "Computing", "JHS 1 · ICT Lab", "#2563EB", "Upcoming"],
-];
+  {
+    id: "math",
+    time: "08:00–08:40",
+    title: "Mathematics",
+    detail: "JHS 2 · Room 4",
+    status: "Completed",
+    hue: "emerald",
+  },
+  {
+    id: "english",
+    time: "09:00–09:40",
+    title: "English Language",
+    detail: "JHS 2 · Room 4",
+    status: "Completed",
+    hue: "sky",
+  },
+  {
+    id: "science",
+    time: "10:30–11:10",
+    title: "Integrated Science",
+    detail: "JHS 2 · Science Lab",
+    status: "Next up",
+    hue: "amber",
+  },
+  {
+    id: "computing",
+    time: "11:30–12:10",
+    title: "Computing",
+    detail: "JHS 1 · ICT Lab",
+    status: "Upcoming",
+    hue: "violet",
+  },
+] as const;
 export default function ScheduleScreen() {
-  const { colors, accent } = useTheme();
+  const [day, setDay] = useState("mon");
   return (
-    <Screen
-      title="Schedule"
-      subtitle="Monday, 2 November"
-      bottomInset={TAB_BAR_CLEARANCE}
-    >
-      <GlassCard padding={spacing.lg} style={{ marginBottom: spacing.xl }}>
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
-          <View
-            style={{
-              width: 48,
-              height: 48,
-              borderRadius: 16,
-              backgroundColor: withAlpha(accent, 0.13),
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <CalendarDays color={accent} size={23} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={[type.headline, { color: colors.foreground }]}>
-              Your teaching day
-            </Text>
-            <Text style={[type.caption, { color: colors.mutedForeground }]}>
-              4 lessons · 2 free periods
-            </Text>
-          </View>
-          <Text
-            style={{
-              color: colors.success,
-              fontFamily: fonts.semibold,
-              fontSize: 12,
-            }}
-          >
-            Today
-          </Text>
-        </View>
-      </GlassCard>
-      <Text
-        style={[
-          type.headline,
-          { color: colors.foreground, marginBottom: spacing.md },
-        ]}
-      >
-        Monday’s timetable
-      </Text>
-      {lessons.map(([start, end, subject, detail, tint, state], i) => (
-        <View
-          key={subject}
-          style={{ flexDirection: "row", gap: 12, marginBottom: 12 }}
-        >
-          <View style={{ width: 54, alignItems: "center", paddingTop: 4 }}>
-            <Text
-              style={{
-                color: colors.foreground,
-                fontFamily: fonts.semibold,
-                fontSize: 13,
-              }}
-            >
-              {start}
-            </Text>
-            <Text
-              style={{
-                color: colors.mutedForeground,
-                fontSize: 11,
-                marginTop: 3,
-              }}
-            >
-              {end}
-            </Text>
-            {i < lessons.length - 1 ? (
-              <View
-                style={{
-                  width: 1,
-                  flex: 1,
-                  minHeight: 54,
-                  backgroundColor: colors.border,
-                  marginTop: 8,
-                }}
-              />
-            ) : null}
-          </View>
-          <GlassCard
-            padding={14}
-            style={{ flex: 1, borderLeftWidth: 3, borderLeftColor: tint }}
-          >
-            <View
-              style={{
-                flexDirection: "row",
-                justifyContent: "space-between",
-                gap: 8,
-              }}
-            >
-              <Text
-                style={[type.bodyStrong, { color: colors.foreground, flex: 1 }]}
-              >
-                {subject}
-              </Text>
-              <Text
-                style={{
-                  fontSize: 10,
-                  fontFamily: fonts.semibold,
-                  color:
-                    state === "Completed"
-                      ? colors.success
-                      : state === "Next up"
-                        ? accent
-                        : colors.mutedForeground,
-                  backgroundColor: withAlpha(
-                    state === "Completed" ? colors.success : accent,
-                    0.1,
-                  ),
-                  paddingHorizontal: 8,
-                  paddingVertical: 4,
-                  borderRadius: radius.pill,
-                }}
-              >
-                {state}
-              </Text>
-            </View>
-            <View
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                gap: 6,
-                marginTop: 8,
-              }}
-            >
-              <MapPin size={13} color={colors.mutedForeground} />
-              <Text style={[type.caption, { color: colors.mutedForeground }]}>
-                {detail}
-              </Text>
-            </View>
-          </GlassCard>
-        </View>
-      ))}
-      <Text
-        style={[type.caption, { color: colors.mutedForeground, marginTop: 12 }]}
-      >
-        Example timetable for interface review only.
-      </Text>
+    <Screen title="Schedule" subtitle="Development timetable fixture">
+      <View style={{ gap: 20 }}>
+        <HeroCard
+          greeting="Make room for learning"
+          metric="4 lessons"
+          detail="Example school day"
+        />
+        <FilterChips
+          label="School day"
+          value={day}
+          onChange={setDay}
+          hue="violet"
+          options={[
+            { value: "mon", label: "Monday" },
+            { value: "tue", label: "Tuesday" },
+            { value: "wed", label: "Wednesday" },
+            { value: "thu", label: "Thursday" },
+            { value: "fri", label: "Friday" },
+          ]}
+        />
+        <Timeline
+          items={
+            day === "mon"
+              ? lessons
+              : lessons
+                  .slice(0, 2)
+                  .map((l) => ({ ...l, id: day + l.id, status: "Scheduled" }))
+          }
+        />
+      </View>
     </Screen>
   );
 }

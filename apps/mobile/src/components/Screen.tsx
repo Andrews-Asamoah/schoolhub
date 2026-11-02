@@ -1,19 +1,21 @@
 import type { ReactNode } from "react";
 import {
   RefreshControl,
-  Text,
   View,
   type StyleProp,
   type ViewStyle,
 } from "react-native";
+import { Text } from "@/components/Typography";
 import Animated, {
   useAnimatedScrollHandler,
   useSharedValue,
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { spacing, type, useTheme } from "@/theme/theme";
+import { useTabBarInset } from "./TabBarInset";
+import { OfflineBanner } from "./OfflineBanner";
 import { Backdrop } from "./Backdrop";
-import { GlassHeader, HEADER_BAR_HEIGHT } from "./GlassHeader";
+import { GlassHeader, useHeaderBarHeight } from "./GlassHeader";
 
 type Props = {
   title?: string;
@@ -25,8 +27,6 @@ type Props = {
   scroll?: boolean;
   refreshing?: boolean;
   onRefresh?: () => void;
-  /** Extra bottom space, e.g. to clear the floating tab bar. */
-  bottomInset?: number;
   contentStyle?: StyleProp<ViewStyle>;
 };
 
@@ -40,17 +40,17 @@ export function Screen({
   scroll = true,
   refreshing,
   onRefresh,
-  bottomInset = 0,
   contentStyle,
 }: Props) {
   const { colors, accent } = useTheme();
+  const bottomInset = useTabBarInset();
   const insets = useSafeAreaInsets();
   const scrollY = useSharedValue(0);
   const onScroll = useAnimatedScrollHandler((e) => {
     scrollY.value = e.contentOffset.y;
   });
 
-  const top = insets.top + HEADER_BAR_HEIGHT;
+  const top = insets.top + useHeaderBarHeight();
   const heading = title ? (
     <View style={{ paddingBottom: spacing.lg }}>
       <Text
@@ -82,7 +82,8 @@ export function Screen({
             {
               paddingTop: top,
               paddingHorizontal: spacing.lg,
-              paddingBottom: insets.bottom + spacing.xxxl + bottomInset,
+              paddingBottom:
+                Math.max(insets.bottom, bottomInset) + spacing.xxxl,
             },
             contentStyle,
           ]}
@@ -97,6 +98,7 @@ export function Screen({
             ) : undefined
           }
         >
+          <OfflineBanner />
           {heading}
           {children}
         </Animated.ScrollView>
@@ -107,6 +109,7 @@ export function Screen({
             contentStyle,
           ]}
         >
+          <OfflineBanner />
           {heading}
           {children}
         </View>

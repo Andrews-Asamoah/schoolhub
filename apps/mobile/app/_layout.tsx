@@ -24,7 +24,7 @@ void SplashScreen.preventAutoHideAsync();
 export { AppErrorBoundary as ErrorBoundary } from "@/components/AppErrorBoundary";
 
 function Shell() {
-  const { isDark } = useTheme();
+  const { isDark, reduceMotion } = useTheme();
   const session = useSession();
   const { show } = useToast();
   useEffect(
@@ -50,7 +50,7 @@ function Shell() {
       <Stack
         screenOptions={{
           headerShown: false,
-          animation: "fade",
+          animation: reduceMotion ? "none" : "fade",
           contentStyle: { backgroundColor: "transparent" },
         }}
       >

@@ -1,26 +1,14 @@
 import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
 import type { ReactNode } from "react";
-import {
-  ActivityIndicator,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
+import { Text } from "@/components/Typography";
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withSpring,
 } from "react-native-reanimated";
-import {
-  fonts,
-  mix,
-  radius,
-  readableOn,
-  useTheme,
-  withAlpha,
-} from "@/theme/theme";
+import { fonts, radius, useTheme } from "@/theme/theme";
 
 type Variant = "primary" | "secondary" | "ghost" | "destructive";
 
@@ -46,7 +34,7 @@ export function Button({
   block = true,
   haptic = true,
 }: Props) {
-  const { colors, accent, accentSecondary, glass, reduceMotion } = useTheme();
+  const { colors, accent, heroGradient, reduceMotion } = useTheme();
   const scale = useSharedValue(1);
   const style = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
@@ -55,7 +43,7 @@ export function Button({
 
   const fg =
     variant === "primary"
-      ? readableOn(accent)
+      ? "#FFFFFF"
       : variant === "destructive"
         ? colors.destructiveForeground
         : variant === "secondary"
@@ -99,17 +87,17 @@ export function Button({
         style={[
           styles.base,
           variant === "secondary" && {
-            backgroundColor: glass.surfaceStrong,
-            borderColor: glass.border,
+            backgroundColor: colors.card,
+            borderColor: colors.border,
             borderWidth: StyleSheet.hairlineWidth,
           },
           variant === "destructive" && { backgroundColor: colors.destructive },
-          variant === "ghost" && { backgroundColor: withAlpha(accent, 0.1) },
+          variant === "ghost" && { backgroundColor: colors.card },
         ]}
       >
         {variant === "primary" ? (
           <LinearGradient
-            colors={[accent, mix(accent, accentSecondary, 0.45)]}
+            colors={heroGradient ?? [accent, accent]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={StyleSheet.absoluteFill}
@@ -130,6 +118,11 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     paddingHorizontal: 20,
   },
-  row: { flexDirection: "row", alignItems: "center", gap: 8 },
-  label: { fontSize: 16 },
+  row: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingVertical: 14,
+  },
+  label: { fontSize: 16, flexShrink: 1, textAlign: "center" },
 });

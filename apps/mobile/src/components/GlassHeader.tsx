@@ -1,4 +1,4 @@
-import { View, StyleSheet } from "react-native";
+import { View, StyleSheet, useWindowDimensions } from "react-native";
 import Animated, {
   Extrapolation,
   interpolate,
@@ -10,7 +10,9 @@ import { fonts, useTheme } from "@/theme/theme";
 import { GlassSurface } from "./GlassSurface";
 import type { ReactNode } from "react";
 
-export const HEADER_BAR_HEIGHT = 52;
+export function useHeaderBarHeight() {
+  return Math.max(52, 28 * useWindowDimensions().fontScale + 20);
+}
 
 type Props = {
   title: string;
@@ -25,6 +27,7 @@ type Props = {
  */
 export function GlassHeader({ title, scrollY, left, right }: Props) {
   const { colors } = useTheme();
+  const height = useHeaderBarHeight();
   const insets = useSafeAreaInsets();
 
   const barStyle = useAnimatedStyle(() => ({
@@ -49,10 +52,12 @@ export function GlassHeader({ title, scrollY, left, right }: Props) {
           {null}
         </GlassSurface>
       </Animated.View>
-      <View style={styles.row} pointerEvents="box-none">
+      <View
+        style={[styles.row, { minHeight: height }]}
+        pointerEvents="box-none"
+      >
         <View style={styles.side}>{left}</View>
         <Animated.Text
-          numberOfLines={1}
           accessibilityRole="header"
           style={[
             {
@@ -75,7 +80,6 @@ export function GlassHeader({ title, scrollY, left, right }: Props) {
 const styles = StyleSheet.create({
   wrap: { position: "absolute", top: 0, left: 0, right: 0, zIndex: 10 },
   row: {
-    height: HEADER_BAR_HEIGHT,
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 16,

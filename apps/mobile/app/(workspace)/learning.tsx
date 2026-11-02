@@ -4,8 +4,9 @@ import {
   CheckCircle2,
   FileText,
 } from "lucide-react-native";
-import { Text, View } from "react-native";
-import { GlassCard } from "@/components/GlassCard";
+import { View } from "react-native";
+import { Text } from "@/components/Typography";
+import { Card } from "@/components/Surface";
 import { ListRow } from "@/components/ListRow";
 import { WorkspaceScreen } from "@/components/WorkspaceScreen";
 import { type, useTheme } from "@/theme/theme";
@@ -17,7 +18,7 @@ export default function LearningScreen() {
       title="My learning"
       subtitle="Assignments, resources and progress"
     >
-      <GlassCard padding={16} style={{ marginBottom: 18 }}>
+      <Card padding={16} style={{ marginBottom: 18 }}>
         <Text style={[type.caption, { color: colors.mutedForeground }]}>
           Learning progress · Sample student
         </Text>
@@ -57,19 +58,19 @@ export default function LearningScreen() {
             }}
           />
         </View>
-      </GlassCard>
+      </Card>
       <Text
         style={[type.headline, { color: colors.foreground, marginBottom: 12 }]}
       >
         Upcoming assignments
       </Text>
-      <GlassCard padding={12} style={{ marginBottom: 18 }}>
+      <Card padding={12} style={{ marginBottom: 18 }}>
         <ListRow
           leading={<FileText size={20} color={accent} />}
           title="Fractions and percentages"
           subtitle="Mathematics · Due Thursday"
           trailing={
-            <Text style={{ color: colors.warning, fontSize: 11 }}>
+            <Text style={{ color: colors.warning, fontSize: 12 }}>
               Due soon
             </Text>
           }
@@ -80,16 +81,16 @@ export default function LearningScreen() {
           title="Energy transformation worksheet"
           subtitle="Integrated Science · Due Friday"
           trailing={
-            <Text style={{ color: colors.info, fontSize: 11 }}>To do</Text>
+            <Text style={{ color: colors.info, fontSize: 12 }}>To do</Text>
           }
         />
-      </GlassCard>
+      </Card>
       <Text
         style={[type.headline, { color: colors.foreground, marginBottom: 12 }]}
       >
         Learning resources
       </Text>
-      <GlassCard padding={12}>
+      <Card padding={12}>
         <ListRow
           leading={<BookOpen size={20} color={accent} />}
           title="Revision notes: Algebra"
@@ -102,12 +103,12 @@ export default function LearningScreen() {
           title="Science practical preparation"
           subtitle="Integrated Science · Study guide"
           trailing={
-            <Text style={{ color: colors.mutedForeground, fontSize: 11 }}>
+            <Text style={{ color: colors.mutedForeground, fontSize: 12 }}>
               8 min
             </Text>
           }
         />
-      </GlassCard>
+      </Card>
       <Text
         style={[type.caption, { color: colors.mutedForeground, marginTop: 14 }]}
       >

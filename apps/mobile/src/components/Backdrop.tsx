@@ -8,19 +8,22 @@ import { mix, useTheme, withAlpha } from "@/theme/theme";
  */
 export function Backdrop() {
   const { colors, accent, accentSecondary, isDark } = useTheme();
-  const top = mix(colors.background, accent, isDark ? 0.16 : 0.08);
+  const top = mix(colors.background, accent, isDark ? 0.06 : 0.025);
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="none">
       <LinearGradient
         colors={[
           top,
           colors.background,
-          mix(colors.background, accentSecondary, isDark ? 0.1 : 0.05),
+          mix(colors.background, accentSecondary, isDark ? 0.04 : 0.02),
         ]}
         style={StyleSheet.absoluteFill}
       />
       <LinearGradient
-        colors={[withAlpha(accent, isDark ? 0.45 : 0.3), withAlpha(accent, 0)]}
+        colors={[
+          withAlpha(accent, isDark ? 0.06 : 0.025),
+          withAlpha(accent, 0),
+        ]}
         start={{ x: 0.2, y: 0.1 }}
         end={{ x: 0.8, y: 0.9 }}
         style={[
@@ -30,7 +33,7 @@ export function Backdrop() {
       />
       <LinearGradient
         colors={[
-          withAlpha(accentSecondary, isDark ? 0.35 : 0.22),
+          withAlpha(accentSecondary, isDark ? 0.04 : 0.02),
           withAlpha(accentSecondary, 0),
         ]}
         start={{ x: 0.2, y: 0.1 }}

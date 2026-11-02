@@ -1,4 +1,5 @@
-import { Text, View } from "react-native";
+import { View } from "react-native";
+import { Text } from "@/components/Typography";
 import { Screen } from "./Screen";
 import { Button } from "./Button";
 import { ROLE_LABELS } from "@/lib/permissions";

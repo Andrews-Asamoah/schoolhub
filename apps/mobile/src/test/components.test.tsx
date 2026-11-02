@@ -22,7 +22,10 @@ jest.mock("@/theme/theme", () => {
 });
 jest.mock("react-native-reanimated", () => ({
   __esModule: true,
-  default: { View: jest.requireActual("react-native").View },
+  default: {
+    View: jest.requireActual("react-native").View,
+    createAnimatedComponent: (c: unknown) => c,
+  },
   useSharedValue: () => ({ value: 1, set: jest.fn() }),
   useAnimatedStyle: (fn: () => unknown) => fn(),
   withSpring: (value: unknown) => value,

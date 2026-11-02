@@ -3,18 +3,22 @@ import { ArrowLeft } from "lucide-react-native";
 import type { ReactNode } from "react";
 import { Pressable } from "react-native";
 import { Screen } from "@/components/Screen";
-import { TAB_BAR_CLEARANCE } from "@/components/GlassTabBar";
 import { useTheme } from "@/theme/theme";
 
-type Props = { title: string; subtitle?: string; children: ReactNode };
+type Props = {
+  title: string;
+  subtitle?: string;
+  children: ReactNode;
+  scroll?: boolean;
+};
 
-export function WorkspaceScreen({ title, subtitle, children }: Props) {
+export function WorkspaceScreen({ title, subtitle, children, scroll }: Props) {
   const { colors } = useTheme();
   return (
     <Screen
+      scroll={scroll}
       title={title}
       subtitle={subtitle}
-      bottomInset={TAB_BAR_CLEARANCE}
       left={
         <Pressable
           onPress={() => router.back()}
@@ -22,8 +26,8 @@ export function WorkspaceScreen({ title, subtitle, children }: Props) {
           accessibilityLabel="Go back"
           hitSlop={10}
           style={{
-            width: 40,
-            height: 40,
+            minWidth: 44,
+            minHeight: 44,
             alignItems: "center",
             justifyContent: "center",
           }}
