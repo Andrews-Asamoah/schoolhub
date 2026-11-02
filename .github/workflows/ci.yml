@@ -243,6 +243,10 @@ jobs:
         run: pnpm --filter @schoolhub/mobile lint
       - name: Mobile formatting
         run: pnpm --filter @schoolhub/mobile format:check
+      - name: Mobile unit and component tests
+        run: pnpm --filter @schoolhub/mobile test
+      - name: Verify mobile endpoint inventory and roles
+        run: pnpm --filter @schoolhub/mobile verify:endpoints
       - name: Release verifier regression tests
         run: pnpm --filter @schoolhub/mobile test:release
       - name: Expo Doctor

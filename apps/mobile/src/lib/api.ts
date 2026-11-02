@@ -1,26 +1,15 @@
+import { assertMobileRole } from "./permissions";
 import { API_BASE } from "./config";
 import {
   emitSessionEvent,
-  getAcademicView,
+  sessionStore,
   getActiveRole,
   getSubdomain,
   getToken,
 } from "./session";
 
-export class ApiError extends Error {
-  constructor(
-    public readonly status: number,
-    message: string,
-    public readonly body: unknown,
-  ) {
-    super(message);
-    this.name = "ApiError";
-  }
-  get code(): string | undefined {
-    const e = (this.body as { error?: unknown } | null)?.error;
-    return typeof e === "string" ? e : undefined;
-  }
-}
+import { ApiError, SessionChangedError } from "./api-error";
+export { ApiError } from "./api-error";
 
 /** Headers every authenticated request carries (mirrors apps/web/src/lib/api.ts). */
 export function buildHeaders(path: string, init?: RequestInit): Headers {
@@ -28,21 +17,26 @@ export function buildHeaders(path: string, init?: RequestInit): Headers {
   if (!(init?.body instanceof FormData) && !headers.has("Content-Type")) {
     headers.set("Content-Type", "application/json");
   }
+  // Never accept caller-supplied identity or unsupported finance scope headers.
+  for (const name of [
+    "authorization",
+    "x-school-role",
+    "x-school-subdomain",
+    "x-academic-year-id",
+    "x-academic-term-id",
+  ])
+    headers.delete(name);
   const token = getToken();
   if (token) headers.set("Authorization", `Bearer ${token}`);
   const subdomain = getSubdomain();
   if (subdomain) headers.set("x-school-subdomain", subdomain);
 
   // /schools/roles is how the role list is discovered, so it must not send a role.
-  if (path !== "/schools/roles") {
+  if (path.split("?")[0]?.replace(/\/+$/, "") !== "/schools/roles") {
     const role = getActiveRole();
-    if (role) headers.set("x-school-role", role);
-    if (role === "accountant") {
-      const view = getAcademicView();
-      if (view) {
-        headers.set("x-academic-year-id", view.academicYearId);
-        headers.set("x-academic-term-id", view.termId);
-      }
+    if (role) {
+      assertMobileRole(role);
+      headers.set("x-school-role", role);
     }
   }
   return headers;
@@ -77,13 +71,17 @@ export async function apiFetch<T>(
   path: string,
   init?: RequestInit,
 ): Promise<T> {
+  const revision = sessionStore.getRevision();
   const res = await fetch(`${API_BASE}${path}`, {
     ...init,
     headers: buildHeaders(path, init),
   });
 
+  if (sessionStore.getRevision() !== revision) throw new SessionChangedError();
   if (!res.ok) {
     const body: unknown = await res.json().catch(() => ({}));
+    if (sessionStore.getRevision() !== revision)
+      throw new SessionChangedError();
     handleSessionErrors(res.status, body);
     throw new ApiError(
       res.status,
@@ -92,7 +90,9 @@ export async function apiFetch<T>(
     );
   }
   if (res.status === 204) return undefined as T;
-  return (await res.json()) as T;
+  const body = await res.json();
+  if (sessionStore.getRevision() !== revision) throw new SessionChangedError();
+  return body as T;
 }
 
 /**
@@ -107,6 +107,13 @@ export async function publicFetch<T>(
   const headers = new Headers(init?.headers);
   if (!headers.has("Content-Type"))
     headers.set("Content-Type", "application/json");
+  for (const name of [
+    "authorization",
+    "x-school-role",
+    "x-academic-year-id",
+    "x-academic-term-id",
+  ])
+    headers.delete(name);
   headers.set("x-school-subdomain", subdomain.trim().toLowerCase());
   const res = await fetch(`${API_BASE}${path}`, { ...init, headers });
   if (!res.ok) {

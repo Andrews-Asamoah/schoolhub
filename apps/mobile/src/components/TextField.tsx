@@ -94,6 +94,7 @@ export const TextField = forwardRef<TextFieldHandle, Props>(function TextField(
       </View>
       {error ? (
         <Text
+          accessibilityRole="alert"
           accessibilityLiveRegion="polite"
           style={[type.caption, { color: colors.destructive }]}
         >

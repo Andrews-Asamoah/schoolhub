@@ -20,13 +20,11 @@ import { StatTile } from "@/components/StatTile";
 import { TAB_BAR_CLEARANCE } from "@/components/GlassTabBar";
 import { fonts, radius, type, useTheme, withAlpha } from "@/theme/theme";
 
-type Role = "Admin" | "Teacher" | "Parent" | "Student" | "Accountant";
+type Role = "Teacher" | "Guardian" | "Student";
 const roles = [
-  { value: "Admin", label: "Admin" },
   { value: "Teacher", label: "Teacher" },
-  { value: "Parent", label: "Parent" },
+  { value: "Guardian", label: "Guardian" },
   { value: "Student", label: "Student" },
-  { value: "Accountant", label: "Finance" },
 ] as const;
 const dashboards: Record<
   Role,
@@ -37,25 +35,6 @@ const dashboards: Record<
     activity: [string, string, string][];
   }
 > = {
-  Admin: {
-    greeting: "Good morning, Andrews",
-    intro: "Here’s what’s happening across your school today.",
-    stats: [
-      ["Students", "1,248", "+24 this term", "people"],
-      ["Attendance", "96.8%", "Today’s average", "attendance"],
-      ["Fee collection", "82%", "Term progress", "fees"],
-      ["Teaching staff", "64", "Across 18 classes", "book"],
-    ],
-    activity: [
-      [
-        "Attendance review",
-        "3 classes have not submitted registers",
-        "Action needed",
-      ],
-      ["Staff meeting", "Conference room · 2:30 PM", "Upcoming"],
-      ["Term assessments", "Score submission closes Friday", "Reminder"],
-    ],
-  },
   Teacher: {
     greeting: "Good morning, Andrews",
     intro: "Your teaching day, organised in one place.",
@@ -71,7 +50,7 @@ const dashboards: Record<
       ["Staff announcement", "Updated observation schedule", "New"],
     ],
   },
-  Parent: {
+  Guardian: {
     greeting: "Welcome back",
     intro: "A quick look at your child’s school life.",
     stats: [
@@ -99,21 +78,6 @@ const dashboards: Record<
       ["Integrated Science", "Science Lab · 10:30 AM", "Next lesson"],
       ["English assignment", "Submit by Thursday", "Due soon"],
       ["Mathematics result", "Your latest score is available", "New result"],
-    ],
-  },
-  Accountant: {
-    greeting: "Good morning, Andrews",
-    intro: "A clear view of your school’s finances.",
-    stats: [
-      ["Collected", "GH₵ 86.4k", "This term", "fees"],
-      ["Outstanding", "GH₵ 18.2k", "126 accounts", "people"],
-      ["Transactions", "48", "Today", "attendance"],
-      ["Reconciliation", "92%", "This month", "book"],
-    ],
-    activity: [
-      ["Fee payments received", "12 payments recorded today", "Received"],
-      ["Outstanding accounts", "18 accounts need follow-up", "Review"],
-      ["Daily collection report", "Ready for review", "Report"],
     ],
   },
 };
@@ -365,7 +329,7 @@ export default function HomeScreen() {
                   { color: colors.mutedForeground, marginTop: 3 },
                 ]}
               >
-                Students, staff, attendance, fees and learning
+                Classes, attendance, children and learning
               </Text>
             </View>
             <ArrowUpRight size={19} color={accent} />

@@ -11,9 +11,11 @@
     "typecheck": "tsc --noEmit",
     "lint": "expo lint --max-warnings 0",
     "verify:release": "node scripts/verify-release.mjs",
-    "test:release": "node --test scripts/verify-release.test.mjs",
+    "test:release": "node --test scripts/verify-release.test.mjs scripts/verify-endpoints.test.mjs scripts/auth-transport.test.mjs",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "test": "jest --runInBand",
+    "verify:endpoints": "node scripts/verify-endpoints.mjs"
   },
   "dependencies": {
     "@better-auth/expo": "^1.7.14",
@@ -60,9 +62,13 @@
     "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@testing-library/react-native": "^14.1.0",
+    "@types/jest": "^30.0.0",
     "@types/react": "^19.3.0",
     "eslint": "^9.39.5",
     "eslint-config-expo": "^58.0.4",
+    "jest": "^30.5.2",
+    "jest-expo": "~58.0.13",
     "typescript": "^6.0.3"
   }
 }

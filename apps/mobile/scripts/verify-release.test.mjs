@@ -36,6 +36,10 @@ for (const route of [
   "(tabs)/profile.tsx",
   "(workspace)/fees.tsx",
   "(superadmin)/index.tsx",
+  "(management)/index.tsx",
+  "(accountant)/index.tsx",
+  "(admin)/index.tsx",
+  "(student)/bece.tsx",
 ]) {
   test(`rejects bundled route ${route}`, () => {
     const result = verify([`/repo/apps/mobile/app/${route}`]);

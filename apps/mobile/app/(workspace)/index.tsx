@@ -4,7 +4,6 @@ import {
   ClipboardCheck,
   CreditCard,
   GraduationCap,
-  Users,
   UserRound,
   Wallet,
 } from "lucide-react-native";
@@ -19,12 +18,6 @@ const modules = [
     detail: "Student directory and profiles",
     icon: GraduationCap,
     route: "/(workspace)/students",
-  },
-  {
-    title: "Staff",
-    detail: "Teaching and non-teaching staff",
-    icon: Users,
-    route: "/(workspace)/staff",
   },
   {
     title: "Attendance",

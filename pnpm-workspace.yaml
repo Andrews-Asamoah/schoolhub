@@ -4,6 +4,7 @@ packages:
 
 # pnpm 10 blocks install scripts by default; allow the ones we need
 allowBuilds:
+  '@parcel/watcher': false
   '@prisma/engines': true
   '@scarf/scarf': false
   core-js: false

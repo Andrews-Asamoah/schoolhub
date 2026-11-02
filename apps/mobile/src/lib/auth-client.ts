@@ -5,7 +5,11 @@ import {
   twoFactorClient,
 } from "better-auth/client/plugins";
 import { API_ORIGIN, AUTH_BASE_PATH } from "./config";
-import { getToken, setToken } from "./session";
+import { createTokenHooks } from "./auth-token-hooks";
+import { getToken, sessionStore } from "./session";
+
+const tokenHooks = createTokenHooks(sessionStore);
+export const isCurrentAuthResponse = tokenHooks.isCurrentResponse;
 
 /**
  * Better Auth client for native.
@@ -31,9 +35,7 @@ export const authClient = createAuthClient({
   ],
   fetchOptions: {
     auth: { type: "Bearer", token: () => getToken() ?? "" },
-    onSuccess: async (ctx) => {
-      const token = ctx.response.headers.get("set-auth-token");
-      if (token) await setToken(token);
-    },
+    onRequest: tokenHooks.onRequest,
+    onSuccess: tokenHooks.onSuccess,
   },
 });
