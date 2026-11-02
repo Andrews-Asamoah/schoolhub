@@ -9,7 +9,11 @@
     "ios": "expo start --ios",
     "tokens": "node scripts/generate-tokens.mjs",
     "typecheck": "tsc --noEmit",
-    "lint": "expo lint"
+    "lint": "expo lint --max-warnings 0",
+    "verify:release": "node scripts/verify-release.mjs",
+    "test:release": "node --test scripts/verify-release.test.mjs",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
   },
   "dependencies": {
     "@better-auth/expo": "^1.7.14",
