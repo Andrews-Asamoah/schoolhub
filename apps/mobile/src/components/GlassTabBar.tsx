@@ -1,6 +1,6 @@
 import * as Haptics from "expo-haptics";
-import { Tabs } from "expo-router";
-import type { BottomTabBarProps } from "@react-navigation/bottom-tabs";
+import type { Tabs } from "expo-router";
+import type React from "react";
 import { useEffect, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from "react-native-reanimated";
@@ -9,7 +9,7 @@ import { fonts, radius, useTheme, withAlpha } from "@/theme/theme";
 import { GlassSurface } from "./GlassSurface";
 
 /** Props React Navigation hands to a custom `tabBar` renderer. */
-export type TabBarProps = BottomTabBarProps;
+export type TabBarProps = Parameters<NonNullable<React.ComponentProps<typeof Tabs>["tabBar"]>>[0];
 
 const BAR_HEIGHT = 64;
 const SIDE_MARGIN = 16;
@@ -21,13 +21,13 @@ const SIDE_MARGIN = 16;
  */
 export const TAB_BAR_CLEARANCE = BAR_HEIGHT + 28;
 
-export function GlassTabBar({ state, descriptors, navigation }: TabBarProps) {
+export function GlassTabBar({ state, descriptors, emitter, navigateToTab }: TabBarProps) {
   const { colors, accent } = useTheme();
   const insets = useSafeAreaInsets();
   const [width, setWidth] = useState(0);
 
-  // Routes hidden with `href: null` stay in the navigation state; skip them.
-  const visible = state.routes.filter((r) => (descriptors[r.key]?.options as { href?: string | null } | undefined)?.href !== null);
+  // Expo Router 58 normalises `href: null` to `hidden: true`.
+  const visible = state.routes.filter((r) => !descriptors[r.key]?.options.hidden);
   const activeKey = state.routes[state.index]?.key;
   const activeVisibleIndex = Math.max(0, visible.findIndex((r) => r.key === activeKey));
   const itemWidth = visible.length > 0 && width > 0 ? width / visible.length : 0;
@@ -58,10 +58,10 @@ export function GlassTabBar({ state, descriptors, navigation }: TabBarProps) {
                   accessibilityState={{ selected: focused }}
                   accessibilityLabel={label}
                   onPress={() => {
-                    const event = navigation.emit({ type: "tabPress", target: route.key, canPreventDefault: true });
+                    const event = emitter.emit({ type: "tabPress", target: route.key, canPreventDefault: true });
                     if (!focused && !event.defaultPrevented) {
                       void Haptics.selectionAsync();
-                      navigation.navigate(route.name, route.params);
+                      navigateToTab(route.key);
                     }
                   }}
                   style={styles.item}
