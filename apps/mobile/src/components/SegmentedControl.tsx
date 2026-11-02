@@ -9,13 +9,21 @@ type Props<T extends string> = {
   accessibilityLabel?: string;
 };
 
-export function SegmentedControl<T extends string>({ options, value, onChange, accessibilityLabel }: Props<T>) {
+export function SegmentedControl<T extends string>({
+  options,
+  value,
+  onChange,
+  accessibilityLabel,
+}: Props<T>) {
   const { colors, glass, accent } = useTheme();
   return (
     <View
       accessibilityRole="tablist"
       accessibilityLabel={accessibilityLabel}
-      style={[styles.track, { backgroundColor: glass.surfaceStrong, borderColor: glass.border }]}
+      style={[
+        styles.track,
+        { backgroundColor: glass.surfaceStrong, borderColor: glass.border },
+      ]}
     >
       {options.map((o) => {
         const selected = o.value === value;
@@ -24,10 +32,24 @@ export function SegmentedControl<T extends string>({ options, value, onChange, a
             key={o.value}
             accessibilityRole="tab"
             accessibilityState={{ selected }}
-            onPress={() => { if (!selected) { void Haptics.selectionAsync(); onChange(o.value); } }}
-            style={[styles.item, selected && { backgroundColor: withAlpha(accent, 0.16) }]}
+            onPress={() => {
+              if (!selected) {
+                void Haptics.selectionAsync();
+                onChange(o.value);
+              }
+            }}
+            style={[
+              styles.item,
+              selected && { backgroundColor: withAlpha(accent, 0.16) },
+            ]}
           >
-            <Text style={{ fontFamily: selected ? fonts.semibold : fonts.medium, fontSize: 14, color: selected ? accent : colors.mutedForeground }}>
+            <Text
+              style={{
+                fontFamily: selected ? fonts.semibold : fonts.medium,
+                fontSize: 14,
+                color: selected ? accent : colors.mutedForeground,
+              }}
+            >
               {o.label}
             </Text>
           </Pressable>
@@ -38,6 +60,17 @@ export function SegmentedControl<T extends string>({ options, value, onChange, a
 }
 
 const styles = StyleSheet.create({
-  track: { flexDirection: "row", padding: 4, borderRadius: radius.md, borderWidth: StyleSheet.hairlineWidth },
-  item: { flex: 1, minHeight: 40, borderRadius: radius.sm, alignItems: "center", justifyContent: "center" },
+  track: {
+    flexDirection: "row",
+    padding: 4,
+    borderRadius: radius.md,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  item: {
+    flex: 1,
+    minHeight: 40,
+    borderRadius: radius.sm,
+    alignItems: "center",
+    justifyContent: "center",
+  },
 });

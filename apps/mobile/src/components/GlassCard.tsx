@@ -11,9 +11,21 @@ type Props = {
   style?: StyleProp<ViewStyle>;
 };
 
-export function GlassCard({ children, padding = spacing.lg, strong, flat, style }: Props) {
+export function GlassCard({
+  children,
+  padding = spacing.lg,
+  strong,
+  flat,
+  style,
+}: Props) {
   return (
-    <GlassSurface radius={radius.xl} strong={strong} flat={flat} style={style} contentStyle={{ padding }}>
+    <GlassSurface
+      radius={radius.xl}
+      strong={strong}
+      flat={flat}
+      style={style}
+      contentStyle={{ padding }}
+    >
       {children}
     </GlassSurface>
   );

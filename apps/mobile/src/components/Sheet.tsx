@@ -1,4 +1,9 @@
-import { BottomSheetBackdrop, BottomSheetModal, BottomSheetView, type BottomSheetBackdropProps } from "@gorhom/bottom-sheet";
+import {
+  BottomSheetBackdrop,
+  BottomSheetModal,
+  BottomSheetView,
+  type BottomSheetBackdropProps,
+} from "@gorhom/bottom-sheet";
 import { useCallback, type ReactNode, type RefObject } from "react";
 import { StyleSheet, Text } from "react-native";
 import { radius, spacing, type, useTheme } from "@/theme/theme";
@@ -16,7 +21,13 @@ export function Sheet({ sheetRef, title, children, snapPoints }: Props) {
   const { colors, glass } = useTheme();
   const backdrop = useCallback(
     (props: BottomSheetBackdropProps) => (
-      <BottomSheetBackdrop {...props} appearsOnIndex={0} disappearsOnIndex={-1} opacity={0.45} pressBehavior="close" />
+      <BottomSheetBackdrop
+        {...props}
+        appearsOnIndex={0}
+        disappearsOnIndex={-1}
+        opacity={0.45}
+        pressBehavior="close"
+      />
     ),
     [],
   );
@@ -27,12 +38,32 @@ export function Sheet({ sheetRef, title, children, snapPoints }: Props) {
       snapPoints={snapPoints}
       backdropComponent={backdrop}
       backgroundComponent={() => (
-        <GlassSurface radius={radius.sheet} strong style={StyleSheet.absoluteFill} contentStyle={StyleSheet.absoluteFill}>{null}</GlassSurface>
+        <GlassSurface
+          radius={radius.sheet}
+          strong
+          style={StyleSheet.absoluteFill}
+          contentStyle={StyleSheet.absoluteFill}
+        >
+          {null}
+        </GlassSurface>
       )}
       handleIndicatorStyle={{ backgroundColor: glass.border, width: 40 }}
     >
-      <BottomSheetView style={{ padding: spacing.xl, paddingBottom: spacing.huge, gap: spacing.md }}>
-        {title ? <Text accessibilityRole="header" style={[type.title, { color: colors.foreground }]}>{title}</Text> : null}
+      <BottomSheetView
+        style={{
+          padding: spacing.xl,
+          paddingBottom: spacing.huge,
+          gap: spacing.md,
+        }}
+      >
+        {title ? (
+          <Text
+            accessibilityRole="header"
+            style={[type.title, { color: colors.foreground }]}
+          >
+            {title}
+          </Text>
+        ) : null}
         {children}
       </BottomSheetView>
     </BottomSheetModal>

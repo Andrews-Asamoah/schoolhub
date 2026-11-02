@@ -23,7 +23,13 @@ type SessionState = {
   hydrated: boolean;
 };
 
-const state: SessionState = { token: null, subdomain: null, activeRole: null, academicView: null, hydrated: false };
+const state: SessionState = {
+  token: null,
+  subdomain: null,
+  activeRole: null,
+  academicView: null,
+  hydrated: false,
+};
 
 export type SessionEvent =
   | { type: "unauthorized" }
@@ -55,8 +61,14 @@ export async function hydrateSession(): Promise<void> {
   if (rawView) {
     try {
       const parsed = JSON.parse(rawView) as Partial<AcademicView>;
-      if (typeof parsed.academicYearId === "string" && typeof parsed.termId === "string") {
-        state.academicView = { academicYearId: parsed.academicYearId, termId: parsed.termId };
+      if (
+        typeof parsed.academicYearId === "string" &&
+        typeof parsed.termId === "string"
+      ) {
+        state.academicView = {
+          academicYearId: parsed.academicYearId,
+          termId: parsed.termId,
+        };
       }
     } catch {
       void AsyncStorage.removeItem(ACADEMIC_VIEW_KEY);
@@ -78,7 +90,8 @@ export async function setToken(token: string | null) {
 
 export async function setSubdomain(subdomain: string | null) {
   state.subdomain = subdomain ? subdomain.trim().toLowerCase() : null;
-  if (state.subdomain) await AsyncStorage.setItem(SUBDOMAIN_KEY, state.subdomain);
+  if (state.subdomain)
+    await AsyncStorage.setItem(SUBDOMAIN_KEY, state.subdomain);
   else await AsyncStorage.removeItem(SUBDOMAIN_KEY);
 }
 
@@ -96,5 +109,9 @@ export async function setAcademicView(view: AcademicView | null) {
 
 /** Clears credentials and role. Keeps the school code so the user can sign back in. */
 export async function clearSession() {
-  await Promise.all([setToken(null), setActiveRole(null), setAcademicView(null)]);
+  await Promise.all([
+    setToken(null),
+    setActiveRole(null),
+    setAcademicView(null),
+  ]);
 }

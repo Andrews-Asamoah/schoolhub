@@ -71,6 +71,7 @@ jobs:
           pnpm --filter @schoolhub/shared typecheck
           pnpm --filter @schoolhub/api typecheck
           pnpm --filter @schoolhub/web typecheck
+          pnpm --filter @schoolhub/mobile typecheck
       - name: Baseline web build
         if: ${{ always() && steps.prepare.outcome == 'success' }}
         run: pnpm --filter @schoolhub/web build
@@ -136,6 +137,7 @@ jobs:
           pnpm --filter @schoolhub/shared typecheck
           pnpm --filter @schoolhub/api typecheck
           pnpm --filter @schoolhub/web typecheck
+          pnpm --filter @schoolhub/mobile typecheck
       - name: Web build
         run: pnpm --filter @schoolhub/web build
       - name: Check controller route inventory
@@ -211,6 +213,51 @@ jobs:
         run: pnpm --filter @schoolhub/api build
       - name: Build web
         run: pnpm --filter @schoolhub/web build
+
+  mobile:
+    name: Mobile baseline and release bundles
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      EXPO_PUBLIC_API_URL: https://mobile-ci.schoolhub.invalid
+      EXPO_NO_TELEMETRY: '1'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 12.4.1
+          run_install: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Prepare mobile environment
+        run: |
+          cp apps/mobile/.env.example apps/mobile/.env
+          pnpm --filter @schoolhub/shared build
+      - name: Mobile typecheck
+        run: pnpm --filter @schoolhub/mobile typecheck
+      - name: Mobile lint (no warnings)
+        run: pnpm --filter @schoolhub/mobile lint
+      - name: Mobile formatting
+        run: pnpm --filter @schoolhub/mobile format:check
+      - name: Release verifier regression tests
+        run: pnpm --filter @schoolhub/mobile test:release
+      - name: Expo Doctor
+        working-directory: apps/mobile
+        run: npx --yes expo-doctor@1.21.5
+      - name: Export Android and check release sources
+        working-directory: apps/mobile
+        run: |
+          npx expo export --platform android --source-maps --output-dir dist/android
+          node scripts/verify-release.mjs dist/android
+      - name: Export iOS and check release sources
+        working-directory: apps/mobile
+        run: |
+          npx expo export --platform ios --source-maps --output-dir dist/ios
+          node scripts/verify-release.mjs dist/ios
 
   container-smoke:
     name: Container smoke (${{ matrix.component }})
