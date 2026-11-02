@@ -6,6 +6,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as SecureStore from "expo-secure-store";
 jest.mock("@/lib/auth-client", () => ({
   authClient: { getSession: jest.fn() },
+  guardedAuthOptions: jest.fn(() => ({})),
   isCurrentAuthResponse: jest.fn(() => true),
 }));
 jest.mock("@/api/schools", () => ({ getSchoolRoles: jest.fn() }));

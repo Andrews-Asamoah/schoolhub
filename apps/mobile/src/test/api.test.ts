@@ -74,17 +74,21 @@ test.each([
   );
 });
 test("forwards cancellation and treats 204 as an empty response", async () => {
+  let complete!: (value: Response) => void;
   global.fetch = jest.fn(
-    async () => new Response(null, { status: 204 }),
-  ) as jest.Mock;
-  const abort = new AbortController();
-  await expect(
-    apiFetch("/announcements", { signal: abort.signal }),
-  ).resolves.toBeUndefined();
-  expect(fetch).toHaveBeenCalledWith(
-    expect.any(String),
-    expect.objectContaining({ signal: abort.signal }),
+    () =>
+      new Promise<Response>((resolve) => {
+        complete = resolve;
+      }),
   );
+  const abort = new AbortController();
+  const pending = apiFetch("/announcements", { signal: abort.signal });
+  const forwarded = jest.mocked(fetch).mock.calls[0]?.[1]?.signal;
+  expect(forwarded).toBeInstanceOf(AbortSignal);
+  abort.abort();
+  expect(forwarded?.aborted).toBe(true);
+  complete(new Response(null, { status: 204 }));
+  await expect(pending).resolves.toBeUndefined();
 });
 
 test("anonymous school lookup cannot forward session or finance headers", async () => {
@@ -128,4 +132,41 @@ test("successful responses from an old session are discarded too", async () => {
   await expect(apiFetch("/announcements")).rejects.toThrow(
     "session has changed",
   );
+});
+
+test("anonymous recovery cannot override the configured HTTPS mail origin with an app scheme", async () => {
+  const fetcher = jest.spyOn(global, "fetch").mockResolvedValue({
+    ok: true,
+    json: async () => ({ success: true }),
+  } as Response);
+  await publicFetch("/account/password-recovery/request", "school", {
+    method: "POST",
+    headers: { Origin: "schoolhub://", Referer: "https://untrusted.invalid" },
+  });
+  const headers = fetcher.mock.calls[0]?.[1]?.headers as Headers;
+  expect(headers.has("origin")).toBe(false);
+  expect(headers.has("referer")).toBe(false);
+  fetcher.mockRestore();
+});
+
+test("a stalled startup role request has a bounded wait", async () => {
+  jest.useFakeTimers();
+  try {
+    jest.spyOn(global, "fetch").mockImplementation(
+      (_url, init) =>
+        new Promise((_resolve, reject) => {
+          init?.signal?.addEventListener(
+            "abort",
+            () => reject(new Error("request aborted")),
+            { once: true },
+          );
+        }),
+    );
+    const pending = apiFetch("/schools/roles");
+    const rejected = expect(pending).rejects.toThrow("request aborted");
+    await jest.advanceTimersByTimeAsync(20000);
+    await rejected;
+  } finally {
+    jest.useRealTimers();
+  }
 });

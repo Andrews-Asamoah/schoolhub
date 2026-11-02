@@ -1,3 +1,7 @@
+import { SessionChangedError } from "./api-error";
+import { log } from "./log";
+import * as SecureStore from "expo-secure-store";
+import { createNativeAuthHooks } from "./native-auth";
 import { createAuthClient } from "better-auth/react";
 import {
   inferAdditionalFields,
@@ -9,6 +13,24 @@ import { createTokenHooks } from "./auth-token-hooks";
 import { getToken, sessionStore } from "./session";
 
 const tokenHooks = createTokenHooks(sessionStore);
+const nativeHooks = createNativeAuthHooks(
+  sessionStore,
+  tokenHooks,
+  async (value) => {
+    if (value) await SecureStore.setItemAsync("schoolhub.mfa-challenge", value);
+    else await SecureStore.deleteItemAsync("schoolhub.mfa-challenge");
+  },
+);
+export const clearAuthChallenge = nativeHooks.clear;
+void clearAuthChallenge().catch(() => log("session.storage_failed"));
+let lastRevision = sessionStore.getRevision();
+sessionStore.subscribe(() => {
+  const revision = sessionStore.getRevision();
+  if (revision !== lastRevision) {
+    lastRevision = revision;
+    void clearAuthChallenge().catch(() => {});
+  }
+});
 export const isCurrentAuthResponse = tokenHooks.isCurrentResponse;
 
 /**
@@ -34,8 +56,20 @@ export const authClient = createAuthClient({
     }),
   ],
   fetchOptions: {
+    timeout: 20000,
     auth: { type: "Bearer", token: () => getToken() ?? "" },
-    onRequest: tokenHooks.onRequest,
-    onSuccess: tokenHooks.onSuccess,
+    onRequest: nativeHooks.onRequest,
+    onSuccess: nativeHooks.onSuccess,
   },
 });
+
+/** Bind UI intent to the generation that initiated it, before async fetch plugins run. */
+export function guardedAuthOptions(revision: number) {
+  return {
+    onRequest: async (request: Parameters<typeof nativeHooks.onRequest>[0]) => {
+      if (sessionStore.getRevision() !== revision)
+        throw new SessionChangedError();
+      await nativeHooks.onRequest(request);
+    },
+  };
+}

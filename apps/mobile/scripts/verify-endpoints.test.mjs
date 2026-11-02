@@ -42,3 +42,25 @@ for (const code of [
 }
 test("fails closed for an empty registry", () =>
   assert.notEqual(check("export const placeholder = true").status, 0));
+
+for (const [path, method] of [
+  ["/schools/public/:subdomain", "GET"],
+  ["/schools/public/:subdomain/resolve-login", "POST"],
+  ["/account/password-recovery/request", "POST"],
+  ["/account/password-recovery/complete", "POST"],
+]) {
+  test(`accepts reviewed anonymous ${method} ${path}`, () =>
+    assert.equal(
+      check(
+        `defineEndpoint({method:'${method}',path:'${path}',roles:['teacher','student','guardian'],scope:'public',response:schema})`,
+      ).status,
+      0,
+    ));
+}
+for (const code of [
+  "defineEndpoint({method:'POST',path:'/account/change-password',roles:['teacher'],scope:'public',response:schema})",
+  "defineEndpoint({method:'GET',path:'/schools/public/:subdomain',roles:['teacher'],scope:'account',response:schema})",
+]) {
+  test(`rejects an incorrect authentication scope: ${code}`, () =>
+    assert.notEqual(check(code).status, 0));
+}

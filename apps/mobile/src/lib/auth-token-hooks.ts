@@ -32,7 +32,12 @@ export function createTokenHooks(store: {
         revision !== store.getRevision()
       )
         return;
-      const token = context.response.headers.get("set-auth-token");
+      const challenged =
+        (context.data as { twoFactorRedirect?: boolean } | null)
+          ?.twoFactorRedirect === true;
+      const token = challenged
+        ? null
+        : context.response.headers.get("set-auth-token");
       // setToken returns its own generation, even if logout happens while its
       // secure write is pending. Never bless that old response as a new session.
       const ownerRevision = token ? await store.setToken(token) : revision;

@@ -19,3 +19,5 @@ export class SessionChangedError extends Error {
     this.name = "SessionChangedError";
   }
 }
+
+export class UnsupportedMobileRoleError extends Error {}

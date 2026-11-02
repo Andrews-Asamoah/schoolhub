@@ -20,6 +20,7 @@ export function buildHeaders(path: string, init?: RequestInit): Headers {
   // Never accept caller-supplied identity or unsupported finance scope headers.
   for (const name of [
     "authorization",
+    "cookie",
     "x-school-role",
     "x-school-subdomain",
     "x-academic-year-id",
@@ -67,32 +68,56 @@ function handleSessionErrors(status: number, body: unknown) {
     });
 }
 
+function requestDeadline(external?: AbortSignal | null) {
+  const controller = new AbortController();
+  const abort = () => controller.abort();
+  if (external?.aborted) controller.abort();
+  else external?.addEventListener("abort", abort, { once: true });
+  const timer = setTimeout(abort, 20000);
+  return {
+    signal: controller.signal,
+    dispose() {
+      clearTimeout(timer);
+      external?.removeEventListener("abort", abort);
+    },
+  };
+}
+
 export async function apiFetch<T>(
   path: string,
   init?: RequestInit,
 ): Promise<T> {
   const revision = sessionStore.getRevision();
-  const res = await fetch(`${API_BASE}${path}`, {
-    ...init,
-    headers: buildHeaders(path, init),
-  });
+  const deadline = requestDeadline(init?.signal);
+  try {
+    const res = await fetch(`${API_BASE}${path}`, {
+      ...init,
+      headers: buildHeaders(path, init),
+      credentials: "omit",
+      signal: deadline.signal,
+    });
 
-  if (sessionStore.getRevision() !== revision) throw new SessionChangedError();
-  if (!res.ok) {
-    const body: unknown = await res.json().catch(() => ({}));
     if (sessionStore.getRevision() !== revision)
       throw new SessionChangedError();
-    handleSessionErrors(res.status, body);
-    throw new ApiError(
-      res.status,
-      (body as { message?: string }).message ?? res.statusText,
-      body,
-    );
+    if (!res.ok) {
+      const body: unknown = await res.json().catch(() => ({}));
+      if (sessionStore.getRevision() !== revision)
+        throw new SessionChangedError();
+      handleSessionErrors(res.status, body);
+      throw new ApiError(
+        res.status,
+        (body as { message?: string }).message ?? res.statusText,
+        body,
+      );
+    }
+    if (res.status === 204) return undefined as T;
+    const body = await res.json();
+    if (sessionStore.getRevision() !== revision)
+      throw new SessionChangedError();
+    return body as T;
+  } finally {
+    deadline.dispose();
   }
-  if (res.status === 204) return undefined as T;
-  const body = await res.json();
-  if (sessionStore.getRevision() !== revision) throw new SessionChangedError();
-  return body as T;
 }
 
 /**
@@ -109,20 +134,33 @@ export async function publicFetch<T>(
     headers.set("Content-Type", "application/json");
   for (const name of [
     "authorization",
+    "cookie",
+    "origin",
+    "referer",
     "x-school-role",
     "x-academic-year-id",
     "x-academic-term-id",
   ])
     headers.delete(name);
   headers.set("x-school-subdomain", subdomain.trim().toLowerCase());
-  const res = await fetch(`${API_BASE}${path}`, { ...init, headers });
-  if (!res.ok) {
-    const body: unknown = await res.json().catch(() => ({}));
-    throw new ApiError(
-      res.status,
-      (body as { message?: string }).message ?? res.statusText,
-      body,
-    );
+  const deadline = requestDeadline(init?.signal);
+  try {
+    const res = await fetch(`${API_BASE}${path}`, {
+      ...init,
+      headers,
+      credentials: "omit",
+      signal: deadline.signal,
+    });
+    if (!res.ok) {
+      const body: unknown = await res.json().catch(() => ({}));
+      throw new ApiError(
+        res.status,
+        (body as { message?: string }).message ?? res.statusText,
+        body,
+      );
+    }
+    return (await res.json()) as T;
+  } finally {
+    deadline.dispose();
   }
-  return (await res.json()) as T;
 }

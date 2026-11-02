@@ -3,6 +3,7 @@ import { assertMobileRole, mobileRoles, type MobileRole } from "./permissions";
 export type SessionStatus =
   | "loading"
   | "signedOut"
+  | "needsTwoFactor"
   | "needsRoleSelection"
   | "needsPasswordChange"
   | "needsTwoFactorSetup"
@@ -101,6 +102,21 @@ export function createSessionStore(
         }
       })();
       return hydration;
+    },
+    requireStep(
+      status:
+        | "needsTwoFactor"
+        | "needsPasswordChange"
+        | "needsTwoFactorSetup"
+        | "subscriptionInactive",
+    ) {
+      if (status !== "needsTwoFactor" && !state.token)
+        throw new Error("A verified session is required.");
+      publish({ status, activeRole: null, roles: [] });
+    },
+    beginValidation() {
+      if (state.token)
+        publish({ status: "loading", activeRole: null, roles: [] });
     },
     async setToken(token: string | null) {
       if (token === state.token) return epoch;

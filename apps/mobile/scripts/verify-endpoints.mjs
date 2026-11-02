@@ -114,15 +114,38 @@ function walk(folder) {
             roles.some((role) => !route.roles.includes(role))
           )
             fail(file, "Declared role is not allowed by the route inventory.");
-          if (
-            !route.roles.length &&
-            !(
+          if (!route.roles.length) {
+            const scope = literal("scope");
+            const discovery =
               path === "/schools/roles" &&
-              literal("scope") === "discovery" &&
-              route.tenantGuard
-            )
-          )
-            fail(file, "Route without role metadata needs explicit review.");
+              scope === "discovery" &&
+              route.tenantGuard;
+            const publicPaths = [
+              "/schools/public/:subdomain",
+              "/schools/public/:subdomain/resolve-login",
+              "/account/password-recovery/request",
+              "/account/password-recovery/complete",
+            ];
+            const anonymous =
+              scope === "public" &&
+              publicPaths.includes(path) &&
+              (route.annotations.includes("AllowAnonymous") ||
+                (path.startsWith("/account/password-recovery/") &&
+                  route.file ===
+                    "apps/api/src/modules/accounts/password-recovery/password-recovery.controller.ts"));
+            const ownAccount =
+              scope === "account" &&
+              path === "/account/change-password" &&
+              method === "POST" &&
+              !(
+                route.annotations.includes("AllowAnonymous") ||
+                (path.startsWith("/account/password-recovery/") &&
+                  route.file ===
+                    "apps/api/src/modules/accounts/password-recovery/password-recovery.controller.ts")
+              );
+            if (!discovery && !anonymous && !ownAccount)
+              fail(file, "Route without role metadata needs explicit review.");
+          }
           count++;
         }
       }
