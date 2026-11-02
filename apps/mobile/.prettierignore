@@ -1,0 +1,5 @@
+node_modules/
+.expo/
+dist/
+assets/LICENSE-lucide
+src/theme/tokens.generated.ts
