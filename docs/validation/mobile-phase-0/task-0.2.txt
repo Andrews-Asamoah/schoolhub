@@ -1,0 +1,168 @@
+
+$ pnpm install --frozen-lockfile
+(cwd: .)
+Scope: all 6 workspace projects
+✓ Lockfile passes supply-chain policies (verified 17s ago)
+Lockfile is up to date, resolution step is skipped
+Progress: resolved 1, reused 0, downloaded 0, added 0
+Packages: +31 -190
++++++++++++---------------------------------------------------------------------
+Progress: resolved 31, reused 31, downloaded 0, added 17, done
+.../node_modules/prisma preinstall$ node scripts/preinstall-entry.js
+.../node_modules/prisma preinstall: Done
+
+Done in 2.2s using pnpm v11.25.0
+
+exit: 0
+
+$ pnpm --filter @schoolhub/shared build
+(cwd: .)
+$ tsdown
+ℹ tsdown v0.23.4 powered by rolldown v1.2.16
+ℹ config file: /workspace/scratch/8ce198452ebc/schoolhub/packages/shared/tsdown.config.ts 
+ℹ entry: src/index.ts
+ℹ tsconfig: tsconfig.json
+ℹ Build start
+ℹ Cleaning 4 files
+
+ WARN  TypeScript 7.0 does not yet have a stable API and is experimental. Some options will be unavailable.
+
+ℹ Emit types with typescript@7.0.2
+ℹ [CJS] dist/index.cjs  61.97 kB │ gzip: 15.34 kB
+ℹ [CJS] 1 files, total: 61.97 kB
+ℹ [CJS] dist/index.d.cts  55.36 kB │ gzip: 9.89 kB
+ℹ [CJS] 1 files, total: 55.36 kB
+✔ Build complete in 685ms
+ℹ [ESM] dist/index.mjs    56.14 kB │ gzip: 14.78 kB
+ℹ [ESM] dist/index.d.mts  55.36 kB │ gzip:  9.89 kB
+ℹ [ESM] 2 files, total: 111.50 kB
+✔ Build complete in 725ms
+
+exit: 0
+
+$ pnpm --filter @schoolhub/mobile typecheck
+(cwd: .)
+$ tsc --noEmit
+
+exit: 0
+
+$ pnpm --filter @schoolhub/mobile lint
+(cwd: .)
+$ expo lint
+
+exit: 0
+
+$ npx expo-doctor
+(cwd: apps/mobile)
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
+Running 20 checks on your project...
+19/20 checks passed. 1 checks failed. Possible issues detected:
+Use the --verbose flag to see more details about passed checks.
+
+✖ Check Expo config (app.json/ app.config.js) schema
+Error validating fields in /workspace/scratch/8ce198452ebc/schoolhub/apps/mobile/app.json:
+ Field: android.edgeToEdgeEnabled - Additional property "edgeToEdgeEnabled" is not allowed.
+Advice:
+Resolve schema errors in your app config. Learn more: https://docs.expo.dev/workflow/configuration/
+
+1 check failed, indicating possible issues with the project.
+
+exit: 1
+
+$ npx expo export --platform android
+(cwd: apps/mobile)
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
+Expo Autolinking module resolution enabled
+Starting Metro Bundler
+
+| (node:426) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:426) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:426) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:426) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:426) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:426) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+Android Bundled 46201ms node_modules/.pnpm/expo-router@58.0.29_691a03b90785e5d0405ee7454ee17d80/node_modules/expo-router/entry.js (4185 modules)
+
+› Assets (30):
+../../node_modules/.pnpm/@expo-google-fonts+inter@0.4.2/node_modules/@expo-google-fonts/inter/400Regular/Inter_400Regular.ttf (342KB)
+../../node_modules/.pnpm/@expo-google-fonts+inter@0.4.2/node_modules/@expo-google-fonts/inter/500Medium/Inter_500Medium.ttf (343KB)
+../../node_modules/.pnpm/@expo-google-fonts+inter@0.4.2/node_modules/@expo-google-fonts/inter/600SemiBold/Inter_600SemiBold.ttf (344KB)
+../../node_modules/.pnpm/@expo-google-fonts+inter@0.4.2/node_modules/@expo-google-fonts/inter/700Bold/Inter_700Bold.ttf (344KB)
+../../node_modules/.pnpm/expo-router@58.0.29_691a03b90785e5d0405ee7454ee17d80/node_modules/expo-router/assets/arrow_down.png (9.5KB)
+../../node_modules/.pnpm/expo-router@58.0.29_691a03b90785e5d0405ee7454ee17d80/node_modules/expo-router/assets/arrow_right.xml (307B)
+../../node_modules/.pnpm/expo-router@58.0.29_691a03b90785e5d0405ee7454ee17d80/node_modules/expo-router/assets/checkmark.xml (312B)
+../../node_modules/.pnpm/expo-router@58.0.29_691a03b90785e5d0405ee7454ee17d80/node_modules/expo-router/assets/error.png (469B)
+../../node_modules/.pnpm/expo-router@58.0.29_691a03b90785e5d0405ee7454ee17d80/node_modules/expo-router/assets/file.png (138B)
+../../node_modules/.pnpm/expo-router@58.0.29_691a03b90785e5d0405ee7454ee17d80/node_modules/expo-router/assets/forward.png (188B)
+../../node_modules/.pnpm/expo-router@58.0.29_691a03b90785e5d0405ee7454ee17d80/node_modules/expo-router/assets/pkg.png (364B)
+../../node_modules/.pnpm/expo-router@58.0.29_691a03b90785e5d0405ee7454ee17d80/node_modules/expo-router/assets/react-navigation/elements/back-icon-mask.png (653B)
+../../node_modules/.pnpm/expo-router@58.0.29_691a03b90785e5d0405ee7454ee17d80/node_modules/expo-router/assets/react-navigation/elements/back-icon.png (4 variations | 152B)
+../../node_modules/.pnpm/expo-router@58.0.29_691a03b90785e5d0405ee7454ee17d80/node_modules/expo-router/assets/react-navigation/elements/clear-icon.png (4 variations | 425B)
+../../node_modules/.pnpm/expo-router@58.0.29_691a03b90785e5d0405ee7454ee17d80/node_modules/expo-router/assets/react-navigation/elements/close-icon.png (4 variations | 235B)
+../../node_modules/.pnpm/expo-router@58.0.29_691a03b90785e5d0405ee7454ee17d80/node_modules/expo-router/assets/react-navigation/elements/search-icon.png (4 variations | 599B)
+../../node_modules/.pnpm/expo-router@58.0.29_691a03b90785e5d0405ee7454ee17d80/node_modules/expo-router/assets/sitemap.png (465B)
+../../node_modules/.pnpm/expo-router@58.0.29_691a03b90785e5d0405ee7454ee17d80/node_modules/expo-router/assets/unmatched.png (4.8KB)
+
+› android bundles (1):
+_expo/static/js/android/entry-7f0946037e3ec6b0bdee3939ce3f681c.hbc (7.2MB)
+
+› Files (1):
+metadata.json (2KB)
+
+Exported: dist
+
+exit: 0
+
+$ npx expo export --platform ios
+(cwd: apps/mobile)
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
+Expo Autolinking module resolution enabled
+Starting Metro Bundler
+
+| (node:464) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:464) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:464) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:464) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:464) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:464) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+iOS Bundled 44674ms node_modules/.pnpm/expo-router@58.0.29_691a03b90785e5d0405ee7454ee17d80/node_modules/expo-router/entry.js (4186 modules)
+
+› Assets (27):
+../../node_modules/.pnpm/@expo-google-fonts+inter@0.4.2/node_modules/@expo-google-fonts/inter/400Regular/Inter_400Regular.ttf (342KB)
+../../node_modules/.pnpm/@expo-google-fonts+inter@0.4.2/node_modules/@expo-google-fonts/inter/500Medium/Inter_500Medium.ttf (343KB)
+../../node_modules/.pnpm/@expo-google-fonts+inter@0.4.2/node_modules/@expo-google-fonts/inter/600SemiBold/Inter_600SemiBold.ttf (344KB)
+../../node_modules/.pnpm/@expo-google-fonts+inter@0.4.2/node_modules/@expo-google-fonts/inter/700Bold/Inter_700Bold.ttf (344KB)
+../../node_modules/.pnpm/expo-router@58.0.29_691a03b90785e5d0405ee7454ee17d80/node_modules/expo-router/assets/arrow_down.png (9.5KB)
+../../node_modules/.pnpm/expo-router@58.0.29_691a03b90785e5d0405ee7454ee17d80/node_modules/expo-router/assets/error.png (469B)
+../../node_modules/.pnpm/expo-router@58.0.29_691a03b90785e5d0405ee7454ee17d80/node_modules/expo-router/assets/file.png (138B)
+../../node_modules/.pnpm/expo-router@58.0.29_691a03b90785e5d0405ee7454ee17d80/node_modules/expo-router/assets/forward.png (188B)
+../../node_modules/.pnpm/expo-router@58.0.29_691a03b90785e5d0405ee7454ee17d80/node_modules/expo-router/assets/pkg.png (364B)
+../../node_modules/.pnpm/expo-router@58.0.29_691a03b90785e5d0405ee7454ee17d80/node_modules/expo-router/assets/react-navigation/elements/back-icon-mask.png (653B)
+../../node_modules/.pnpm/expo-router@58.0.29_691a03b90785e5d0405ee7454ee17d80/node_modules/expo-router/assets/react-navigation/elements/back-icon.png (4 variations | 566B)
+../../node_modules/.pnpm/expo-router@58.0.29_691a03b90785e5d0405ee7454ee17d80/node_modules/expo-router/assets/react-navigation/elements/clear-icon.png (4 variations | 425B)
+../../node_modules/.pnpm/expo-router@58.0.29_691a03b90785e5d0405ee7454ee17d80/node_modules/expo-router/assets/react-navigation/elements/close-icon.png (4 variations | 235B)
+../../node_modules/.pnpm/expo-router@58.0.29_691a03b90785e5d0405ee7454ee17d80/node_modules/expo-router/assets/react-navigation/elements/search-icon.png (3 variations | 582B)
+../../node_modules/.pnpm/expo-router@58.0.29_691a03b90785e5d0405ee7454ee17d80/node_modules/expo-router/assets/sitemap.png (465B)
+../../node_modules/.pnpm/expo-router@58.0.29_691a03b90785e5d0405ee7454ee17d80/node_modules/expo-router/assets/unmatched.png (4.8KB)
+
+› ios bundles (1):
+_expo/static/js/ios/entry-e64e09fd6397c6512fb52d375efd42e8.hbc (7.2MB)
+
+› Files (1):
+metadata.json (1.8KB)
+
+Exported: dist
+
+exit: 0

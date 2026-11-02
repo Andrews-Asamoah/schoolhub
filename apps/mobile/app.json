@@ -6,14 +6,12 @@
     "version": "0.1.0",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.schoolhub.mobile"
     },
     "android": {
-      "package": "com.schoolhub.mobile",
-      "edgeToEdgeEnabled": true
+      "package": "com.schoolhub.mobile"
     },
     "plugins": [
       "expo-router",
