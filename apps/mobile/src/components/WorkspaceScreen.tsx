@@ -21,7 +21,12 @@ export function WorkspaceScreen({ title, subtitle, children }: Props) {
           accessibilityRole="button"
           accessibilityLabel="Go back"
           hitSlop={10}
-          style={{ width: 40, height: 40, alignItems: "center", justifyContent: "center" }}
+          style={{
+            width: 40,
+            height: 40,
+            alignItems: "center",
+            justifyContent: "center",
+          }}
         >
           <ArrowLeft size={21} color={colors.foreground} />
         </Pressable>

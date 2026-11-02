@@ -14,12 +14,26 @@ export default function SchoolAccessScreen() {
     <Screen title="SchoolHub" subtitle="Your school, connected">
       <GlassCard padding={spacing.xxl}>
         <View style={{ gap: spacing.lg }}>
-          <GraduationCap size={44} color={colors.primary} accessibilityElementsHidden importantForAccessibility="no" />
-          <Text style={[type.title, { color: colors.foreground }]}>School access is coming soon</Text>
-          <Text style={[type.body, { color: colors.mutedForeground }]}>
-            Please continue using your school’s web portal while mobile access is being prepared.
+          <GraduationCap
+            size={44}
+            color={colors.primary}
+            accessibilityElementsHidden
+            importantForAccessibility="no"
+          />
+          <Text style={[type.title, { color: colors.foreground }]}>
+            School access is coming soon
           </Text>
-          {__DEV__ ? <Button label="Open design gallery" variant="secondary" onPress={() => router.push("/dev-gallery")} /> : null}
+          <Text style={[type.body, { color: colors.mutedForeground }]}>
+            Please continue using your school’s web portal while mobile access
+            is being prepared.
+          </Text>
+          {__DEV__ ? (
+            <Button
+              label="Open design gallery"
+              variant="secondary"
+              onPress={() => router.push("/dev-gallery")}
+            />
+          ) : null}
         </View>
       </GlassCard>
     </Screen>

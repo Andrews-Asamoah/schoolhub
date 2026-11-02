@@ -13,19 +13,53 @@ const outPath = resolve(here, "../src/theme/tokens.generated.ts");
 
 // Semantic tokens that mobile uses. Sidebar and support aliases are web-only.
 const KEEP = [
-  "background", "foreground", "card", "card-foreground", "popover", "popover-foreground",
-  "primary", "primary-foreground", "secondary", "secondary-foreground", "accent", "accent-foreground",
-  "muted", "muted-foreground", "border", "input", "ring", "overlay",
-  "destructive", "destructive-foreground", "success", "success-foreground",
-  "warning", "warning-foreground", "info", "info-foreground", "highlight", "highlight-foreground",
-  "brand", "brand-mid", "brand-soft", "brand-accent", "brand-glow", "brand-foreground",
-  "chart-1", "chart-2", "chart-3", "chart-4", "chart-5",
+  "background",
+  "foreground",
+  "card",
+  "card-foreground",
+  "popover",
+  "popover-foreground",
+  "primary",
+  "primary-foreground",
+  "secondary",
+  "secondary-foreground",
+  "accent",
+  "accent-foreground",
+  "muted",
+  "muted-foreground",
+  "border",
+  "input",
+  "ring",
+  "overlay",
+  "destructive",
+  "destructive-foreground",
+  "success",
+  "success-foreground",
+  "warning",
+  "warning-foreground",
+  "info",
+  "info-foreground",
+  "highlight",
+  "highlight-foreground",
+  "brand",
+  "brand-mid",
+  "brand-soft",
+  "brand-accent",
+  "brand-glow",
+  "brand-foreground",
+  "chart-1",
+  "chart-2",
+  "chart-3",
+  "chart-4",
+  "chart-5",
 ];
 
 const css = readFileSync(cssPath, "utf8");
 
 function block(selector) {
-  const start = css.search(new RegExp(`^${selector.replace(".", "\\.")}\\s*\\{`, "m"));
+  const start = css.search(
+    new RegExp(`^${selector.replace(".", "\\.")}\\s*\\{`, "m"),
+  );
   if (start < 0) throw new Error(`Block ${selector} not found in index.css`);
   const open = css.indexOf("{", start);
   let depth = 0;
@@ -38,13 +72,18 @@ function block(selector) {
 
 function vars(body) {
   const out = {};
-  for (const m of body.matchAll(/--([a-z0-9-]+)\s*:\s*([^;]+);/g)) out[m[1]] = m[2].trim();
+  for (const m of body.matchAll(/--([a-z0-9-]+)\s*:\s*([^;]+);/g))
+    out[m[1]] = m[2].trim();
   return out;
 }
 
 const clamp01 = (x) => Math.min(1, Math.max(0, x));
-const gamma = (c) => (c <= 0.0031308 ? 12.92 * c : 1.055 * Math.pow(c, 1 / 2.4) - 0.055);
-const hex2 = (x) => Math.round(clamp01(x) * 255).toString(16).padStart(2, "0");
+const gamma = (c) =>
+  c <= 0.0031308 ? 12.92 * c : 1.055 * Math.pow(c, 1 / 2.4) - 0.055;
+const hex2 = (x) =>
+  Math.round(clamp01(x) * 255)
+    .toString(16)
+    .padStart(2, "0");
 
 function oklchToRgb(L, C, hDeg) {
   const h = (hDeg * Math.PI) / 180;
@@ -53,7 +92,9 @@ function oklchToRgb(L, C, hDeg) {
   const l_ = L + 0.3963377774 * a + 0.2158037573 * b;
   const m_ = L - 0.1055613458 * a - 0.0638541728 * b;
   const s_ = L - 0.0894841775 * a - 1.291485548 * b;
-  const l = l_ ** 3, m = m_ ** 3, s = s_ ** 3;
+  const l = l_ ** 3,
+    m = m_ ** 3,
+    s = s_ ** 3;
   return [
     gamma(+4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s),
     gamma(-1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s),
@@ -62,7 +103,9 @@ function oklchToRgb(L, C, hDeg) {
 }
 
 function toColor(value) {
-  const m = value.match(/^oklch\(\s*([\d.]+)\s+([\d.]+)\s+([\d.]+)(?:\s*\/\s*([\d.]+))?\s*\)$/);
+  const m = value.match(
+    /^oklch\(\s*([\d.]+)\s+([\d.]+)\s+([\d.]+)(?:\s*\/\s*([\d.]+))?\s*\)$/,
+  );
   if (!m) throw new Error(`Unsupported colour value: ${value}`);
   const [, L, C, H, A] = m;
   const [r, g, b] = oklchToRgb(+L, +C, +H);
@@ -80,7 +123,8 @@ const dark = { ...light, ...vars(block(".dark")) };
 function build(source) {
   const lines = [];
   for (const key of KEEP) {
-    if (!(key in source)) throw new Error(`Token --${key} missing from index.css`);
+    if (!(key in source))
+      throw new Error(`Token --${key} missing from index.css`);
     lines.push(`  ${camel(key)}: ${JSON.stringify(toColor(source[key]))},`);
   }
   return lines.join("\n");

@@ -13,7 +13,15 @@ type Props = {
   divider?: boolean;
 };
 
-export function ListRow({ title, subtitle, leading, trailing, onPress, chevron, divider }: Props) {
+export function ListRow({
+  title,
+  subtitle,
+  leading,
+  trailing,
+  onPress,
+  chevron,
+  divider,
+}: Props) {
   const { colors, glass } = useTheme();
   return (
     <Pressable
@@ -21,19 +29,46 @@ export function ListRow({ title, subtitle, leading, trailing, onPress, chevron, 
       accessibilityLabel={subtitle ? `${title}, ${subtitle}` : title}
       onPress={onPress}
       disabled={!onPress}
-      style={({ pressed }) => [styles.row, divider && { borderBottomColor: glass.border, borderBottomWidth: StyleSheet.hairlineWidth }, pressed && { opacity: 0.6 }]}
+      style={({ pressed }) => [
+        styles.row,
+        divider && {
+          borderBottomColor: glass.border,
+          borderBottomWidth: StyleSheet.hairlineWidth,
+        },
+        pressed && { opacity: 0.6 },
+      ]}
     >
       {leading}
       <View style={{ flex: 1 }}>
-        <Text numberOfLines={1} style={[type.bodyStrong, { color: colors.foreground }]}>{title}</Text>
-        {subtitle ? <Text numberOfLines={2} style={[type.caption, { color: colors.mutedForeground }]}>{subtitle}</Text> : null}
+        <Text
+          numberOfLines={1}
+          style={[type.bodyStrong, { color: colors.foreground }]}
+        >
+          {title}
+        </Text>
+        {subtitle ? (
+          <Text
+            numberOfLines={2}
+            style={[type.caption, { color: colors.mutedForeground }]}
+          >
+            {subtitle}
+          </Text>
+        ) : null}
       </View>
       {trailing}
-      {chevron ? <ChevronRight size={18} color={colors.mutedForeground} /> : null}
+      {chevron ? (
+        <ChevronRight size={18} color={colors.mutedForeground} />
+      ) : null}
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  row: { minHeight: 56, flexDirection: "row", alignItems: "center", gap: spacing.md, paddingVertical: spacing.md },
+  row: {
+    minHeight: 56,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.md,
+    paddingVertical: spacing.md,
+  },
 });

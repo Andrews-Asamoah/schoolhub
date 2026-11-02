@@ -11,7 +11,8 @@ export const queryClient = new QueryClient({
       gcTime: 24 * 60 * 60 * 1000,
       retry: (count, error) => {
         // Auth and permission problems will not fix themselves on retry.
-        if (error instanceof ApiError && [401, 403, 404].includes(error.status)) return false;
+        if (error instanceof ApiError && [401, 403, 404].includes(error.status))
+          return false;
         return count < 2;
       },
     },
@@ -19,21 +20,26 @@ export const queryClient = new QueryClient({
 });
 
 const STORAGE_KEY = "schoolhub:query-cache";
-export const persister = createAsyncStoragePersister({ storage: AsyncStorage, key: STORAGE_KEY });
+export const persister = createAsyncStoragePersister({
+  storage: AsyncStorage,
+  key: STORAGE_KEY,
+});
 
 /**
  * Only queries that opt in with `meta: { persist: true }` reach disk. The cache
  * is plain AsyncStorage, so never opt in data that is sensitive (reports,
  * fees, personal details). Timetables and announcements are fine.
  */
-export const persistOptions: PersistQueryClientProviderProps["persistOptions"] = {
-  persister,
-  maxAge: 24 * 60 * 60 * 1000,
-  buster: "v1",
-  dehydrateOptions: {
-    shouldDehydrateQuery: (query) => query.state.status === "success" && query.meta?.persist === true,
-  },
-};
+export const persistOptions: PersistQueryClientProviderProps["persistOptions"] =
+  {
+    persister,
+    maxAge: 24 * 60 * 60 * 1000,
+    buster: "v1",
+    dehydrateOptions: {
+      shouldDehydrateQuery: (query) =>
+        query.state.status === "success" && query.meta?.persist === true,
+    },
+  };
 
 /** Sign-out: drop everything in memory and on disk. */
 export async function wipeQueryCache() {

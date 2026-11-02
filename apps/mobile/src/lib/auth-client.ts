@@ -1,5 +1,9 @@
 import { createAuthClient } from "better-auth/react";
-import { inferAdditionalFields, organizationClient, twoFactorClient } from "better-auth/client/plugins";
+import {
+  inferAdditionalFields,
+  organizationClient,
+  twoFactorClient,
+} from "better-auth/client/plugins";
 import { API_ORIGIN, AUTH_BASE_PATH } from "./config";
 import { getToken, setToken } from "./session";
 
