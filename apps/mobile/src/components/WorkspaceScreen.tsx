@@ -1,6 +1,7 @@
 import { router } from "expo-router";
 import { ArrowLeft } from "lucide-react-native";
-import { Pressable, type ReactNode } from "react";
+import type { ReactNode } from "react";
+import { Pressable } from "react-native";
 import { Screen } from "@/components/Screen";
 import { TAB_BAR_CLEARANCE } from "@/components/GlassTabBar";
 import { useTheme } from "@/theme/theme";
