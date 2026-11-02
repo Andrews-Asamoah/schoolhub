@@ -1,3 +1,4 @@
+import { useSchoolBranding } from "@/features/auth/school";
 // Per-weight imports: the package's root entry would bundle all 18 font files (~6 MB).
 import { Inter_400Regular } from "@expo-google-fonts/inter/400Regular";
 import { Inter_500Medium } from "@expo-google-fonts/inter/500Medium";
@@ -9,7 +10,7 @@ import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { ToastProvider, useToast } from "@/components/Toast";
@@ -24,6 +25,7 @@ void SplashScreen.preventAutoHideAsync();
 export { AppErrorBoundary as ErrorBoundary } from "@/components/AppErrorBoundary";
 
 function Shell() {
+  useSchoolBranding();
   const { isDark, reduceMotion } = useTheme();
   const session = useSession();
   const { show } = useToast();
@@ -33,11 +35,11 @@ function Shell() {
         const messages = {
           unauthorized: "Your session has expired. Please sign in again.",
           "password-change-required":
-            "Please change your password in your school's web portal.",
+            "Please change your password to continue.",
           "subscription-inactive":
             "School access is paused. Please contact your school administrator.",
           "two-factor-required":
-            "Please complete two-factor authentication in your school's web portal.",
+            "Please set up two-factor authentication to continue.",
         };
         show({ message: messages[event.type], tone: "error" });
       }),
@@ -56,7 +58,10 @@ function Shell() {
       >
         <Stack.Screen name="index" />
         <Stack.Protected guard={!ready}>
-          <Stack.Screen name="login" />
+          <Stack.Screen name="(auth)" />
+        </Stack.Protected>
+        <Stack.Protected guard={ready}>
+          <Stack.Screen name="(shared)" />
         </Stack.Protected>
         <Stack.Protected guard={canEnterRole(session, "teacher")}>
           <Stack.Screen name="(teacher)" />
@@ -87,12 +92,12 @@ export default function RootLayout() {
     Inter_600SemiBold,
     Inter_700Bold,
   });
-  const session = useSession();
+  const [restored, setRestored] = useState(false);
   useEffect(() => {
-    void restoreSession();
+    void restoreSession().finally(() => setRestored(true));
   }, []);
 
-  const ready = fontsLoaded && session.status !== "loading";
+  const ready = fontsLoaded && restored;
   useEffect(() => {
     if (ready) void SplashScreen.hideAsync();
   }, [ready]);

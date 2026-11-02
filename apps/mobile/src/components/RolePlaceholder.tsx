@@ -1,3 +1,4 @@
+import { router } from "expo-router";
 import { View } from "react-native";
 import { Text } from "@/components/Typography";
 import { Screen } from "./Screen";
@@ -8,7 +9,7 @@ import { signOut } from "@/lib/auth-actions";
 import { type, useTheme } from "@/theme/theme";
 import { useToast } from "./Toast";
 export function RolePlaceholder() {
-  const { activeRole } = useSession();
+  const { activeRole, roles } = useSession();
   const { colors } = useTheme();
   const { show } = useToast();
   return (
@@ -18,6 +19,13 @@ export function RolePlaceholder() {
           Your mobile workspace is being prepared. Please use your school’s web
           portal for now.
         </Text>
+        {roles.length > 1 ? (
+          <Button
+            label="Switch role"
+            variant="secondary"
+            onPress={() => router.push("/(shared)/role-switcher")}
+          />
+        ) : null}
         <Button
           label="Sign out"
           onPress={() =>
