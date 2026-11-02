@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { router } from 'expo-router';
-import { ActivityIndicator, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 import { Building2, GraduationCap, Users, CreditCard, ShieldCheck, RefreshCw, LogOut, ChevronRight, Activity } from 'lucide-react-native';
 import { authClient } from '@/lib/auth-client';
 import { apiFetch, ApiError } from '@/lib/api';
@@ -91,9 +91,8 @@ export default function SuperAdminDashboard() {
     }
   }
 
-  const refreshingNow = refreshing || loading;
   return (
-    <Screen title="Platform overview" subtitle="Live operational view across SchoolHub" right={
+    <Screen title="Platform overview" subtitle="Live operational view across SchoolHub" refreshing={refreshing} onRefresh={() => { setRefreshing(true); void load(); }} right={
       <Pressable accessibilityRole="button" accessibilityLabel="Refresh dashboard" onPress={() => { setRefreshing(true); void load(); }} style={{ padding: 9, borderRadius: 14, backgroundColor: withAlpha(accent, 0.12) }}>
         <RefreshCw size={19} color={accent} />
       </Pressable>
@@ -160,6 +159,17 @@ export default function SuperAdminDashboard() {
             </View>
           </View>
         )) : <Text style={[type.caption, { color: colors.mutedForeground, padding: 12 }]}>{loading ? 'Loading schools…' : 'No schools found.'}</Text>}
+      </GlassCard>
+
+      <GlassCard padding={14} style={{ marginBottom: spacing.xl }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+          <Activity size={18} color={health?.status === 'healthy' ? colors.success : colors.warning} />
+          <View style={{ flex: 1 }}>
+            <Text style={[type.bodyStrong, { color: colors.foreground }]}>Platform operations</Text>
+            <Text style={[type.caption, { color: colors.mutedForeground }]}>Database, migrations, storage and background jobs</Text>
+          </View>
+          <Text style={[type.caption, { color: health?.status === 'healthy' ? colors.success : colors.warning, fontFamily: fonts.semibold }]}>{health?.status ?? 'Checking'}</Text>
+        </View>
       </GlassCard>
 
       <Text style={[type.headline, { color: colors.foreground, marginBottom: spacing.md }]}>Platform workspace</Text>
