@@ -1,10 +1,12 @@
-import { AlertTriangle, Inbox } from "lucide-react-native";
+import { StateIllustration } from "./StateIllustration";
+import type { Hue } from "@/theme/palette";
 import type { ReactNode } from "react";
 import { Text, View } from "react-native";
-import { spacing, type, useTheme, withAlpha } from "@/theme/theme";
+import { spacing, type, useTheme } from "@/theme/theme";
 import { Button } from "./Button";
 
 type Props = {
+  hue?: Hue;
   title: string;
   message?: string;
   icon?: ReactNode;
@@ -12,14 +14,7 @@ type Props = {
   onAction?: () => void;
 };
 
-function StateView({
-  title,
-  message,
-  icon,
-  actionLabel,
-  onAction,
-  tint,
-}: Props & { tint: string }) {
+function StateView({ title, message, icon, actionLabel, onAction }: Props) {
   const { colors } = useTheme();
   return (
     <View
@@ -30,18 +25,7 @@ function StateView({
         paddingHorizontal: spacing.xl,
       }}
     >
-      <View
-        style={{
-          width: 72,
-          height: 72,
-          borderRadius: 36,
-          alignItems: "center",
-          justifyContent: "center",
-          backgroundColor: withAlpha(tint, 0.14),
-        }}
-      >
-        {icon}
-      </View>
+      {icon}
       <Text
         accessibilityRole="header"
         style={[
@@ -71,25 +55,18 @@ function StateView({
 }
 
 export function EmptyState(props: Props) {
-  const { accent } = useTheme();
   return (
     <StateView
       {...props}
-      tint={accent}
-      icon={props.icon ?? <Inbox size={30} color={accent} />}
+      icon={props.icon ?? <StateIllustration hue={props.hue} />}
     />
   );
 }
-
 export function ErrorState(props: Props) {
-  const { colors } = useTheme();
   return (
     <StateView
       {...props}
-      tint={colors.destructive}
-      icon={
-        props.icon ?? <AlertTriangle size={30} color={colors.destructive} />
-      }
+      icon={props.icon ?? <StateIllustration hue={props.hue ?? "rose"} error />}
     />
   );
 }

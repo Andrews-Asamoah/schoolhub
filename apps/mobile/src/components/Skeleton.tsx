@@ -1,12 +1,15 @@
 import { useEffect } from "react";
 import type { DimensionValue, StyleProp, ViewStyle } from "react-native";
 import Animated, {
+  cancelAnimation,
   useAnimatedStyle,
   useSharedValue,
   withRepeat,
   withSequence,
   withTiming,
 } from "react-native-reanimated";
+import { View } from "react-native";
+import { Card } from "./Surface";
 import { useTheme } from "@/theme/theme";
 
 type Props = {
@@ -26,7 +29,11 @@ export function Skeleton({
   const { colors, reduceMotion } = useTheme();
   const opacity = useSharedValue(0.55);
   useEffect(() => {
-    if (reduceMotion) return;
+    cancelAnimation(opacity);
+    if (reduceMotion) {
+      opacity.set(1);
+      return;
+    }
     opacity.set(
       withRepeat(
         withSequence(
@@ -36,6 +43,7 @@ export function Skeleton({
         -1,
       ),
     );
+    return () => cancelAnimation(opacity);
   }, [reduceMotion, opacity]);
   const animated = useAnimatedStyle(() => ({ opacity: opacity.value }));
   return (
@@ -48,5 +56,35 @@ export function Skeleton({
         style,
       ]}
     />
+  );
+}
+
+export function SkeletonRow() {
+  return (
+    <View style={{ flexDirection: "row", gap: 12, paddingVertical: 12 }}>
+      <Skeleton width={44} height={44} radius={16} />
+      <View style={{ flex: 1, gap: 8 }}>
+        <Skeleton width="60%" />
+        <Skeleton width="85%" height={14} />
+      </View>
+    </View>
+  );
+}
+export function SkeletonTile() {
+  return (
+    <Card style={{ gap: 16 }}>
+      <Skeleton width={44} height={44} />
+      <Skeleton width="60%" />
+      <Skeleton width="45%" height={34} />
+    </Card>
+  );
+}
+export function SkeletonHero() {
+  return (
+    <Card style={{ gap: 16 }}>
+      <Skeleton width="50%" />
+      <Skeleton width="85%" height={28} />
+      <Skeleton height={40} />
+    </Card>
   );
 }
