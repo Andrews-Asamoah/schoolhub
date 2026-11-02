@@ -1,15 +1,15 @@
-import { BadRequestException, HttpException, Injectable, Logger } from "@nestjs/common";
-import { Prisma, type School } from "@prisma/client";
+import { BadRequestException, HttpException, Injectable, Logger } from '@nestjs/common';
+import { Prisma, type School } from '@prisma/client';
 import {
   type CreateStudentInput,
   type ImportStudentBatchInput,
   type NormalizedStudentRow,
   type StudentImportField,
-} from "@schoolhub/shared";
-import { PrismaService } from "../../../prisma/prisma.service.js";
-import { StudentsService } from "../students.service.js";
-import { mapHeaders, normalizeRecord } from "./import-normalize.js";
-import { parseUpload } from "./import-parse.js";
+} from '@schoolhub/shared';
+import { PrismaService } from '../../../prisma/prisma.service.js';
+import { StudentsService } from '../students.service.js';
+import { mapHeaders, normalizeRecord } from './import-normalize.js';
+import { parseUpload } from './import-parse.js';
 import {
   evaluateRow,
   newSeen,
@@ -18,7 +18,7 @@ import {
   type ImportContext,
   type RowStatus,
   type RowVerdict,
-} from "./import-validate.js";
+} from './import-validate.js';
 
 export interface PreviewRow {
   rowNumber: number;
@@ -34,7 +34,7 @@ export interface PreviewRow {
 export interface ImportRowResult {
   rowNumber: number;
   name: string;
-  status: "created" | "skipped" | "failed";
+  status: 'created' | 'skipped' | 'failed';
   message?: string;
   studentId?: string;
   admissionNumber?: string | null;
@@ -65,12 +65,12 @@ export class StudentImportService {
     private readonly students: StudentsService,
   ) {}
 
-  async preview(school: Pick<School, "id">, file: { buffer: Buffer; originalname: string }) {
+  async preview(school: Pick<School, 'id'>, file: { buffer: Buffer; originalname: string }) {
     const { format, sheet } = await parseUpload(file.buffer, file.originalname);
     const mapping = mapHeaders(sheet.headers);
     if (mapping.missing.length) {
       throw new BadRequestException(
-        `The file is missing the required column${mapping.missing.length === 1 ? "" : "s"}: ${mapping.missing.join(", ")}. Download the template to see the exact headings.`,
+        `The file is missing the required column${mapping.missing.length === 1 ? '' : 's'}: ${mapping.missing.join(', ')}. Download the template to see the exact headings.`,
       );
     }
 
@@ -83,13 +83,22 @@ export class StudentImportService {
     const rows: PreviewRow[] = sheet.records.map((record) => {
       const get = (field: StudentImportField) => {
         const index = columnOf.get(field);
-        return index === undefined ? "" : (record.cells[index] ?? "");
+        return index === undefined ? '' : (record.cells[index] ?? '');
       };
       const outcome = normalizeRecord(get, record.rowNumber);
-      const rawName = `${get("firstName")} ${get("lastName")}`.replace(/\s+/g, " ").trim() || "(no name)";
+      const rawName =
+        `${get('firstName')} ${get('lastName')}`.replace(/\s+/g, ' ').trim() || '(no name)';
       if (!outcome.row) {
         classIds.push(null);
-        return { rowNumber: record.rowNumber, status: "error", errors: outcome.errors, warnings: outcome.warnings, row: null, name: rawName, className: get("className").trim() || null };
+        return {
+          rowNumber: record.rowNumber,
+          status: 'error',
+          errors: outcome.errors,
+          warnings: outcome.warnings,
+          row: null,
+          name: rawName,
+          className: get('className').trim() || null,
+        };
       }
       const verdict = evaluateRow(outcome.row, ctx, outcome.warnings, seen);
       classIds.push(verdict.classId);
@@ -105,34 +114,47 @@ export class StudentImportService {
     });
 
     const count = (status: RowStatus) => rows.filter((row) => row.status === status).length;
-    const importable = rows.filter((row) => row.status === "ready" || row.status === "warning");
+    const importable = rows.filter((row) => row.status === 'ready' || row.status === 'warning');
 
     // Warn when a class would end up over capacity, since the import would refuse the extra students.
     const incoming = new Map<string, number>();
     for (const [index, row] of rows.entries()) {
       const classId = classIds[index];
-      if ((row.status === "ready" || row.status === "warning") && classId) incoming.set(classId, (incoming.get(classId) ?? 0) + 1);
+      if ((row.status === 'ready' || row.status === 'warning') && classId)
+        incoming.set(classId, (incoming.get(classId) ?? 0) + 1);
     }
     const notices: string[] = [];
     for (const [classId, added] of incoming) {
       const load = ctx.classLoad.get(classId);
       if (load && load.capacity !== null && load.taken + added > load.capacity) {
-        notices.push(`${load.name} holds ${load.capacity} pupils and already has ${load.taken}. This file adds ${added}, so some will be refused. Raise the class capacity first if that's wrong.`);
+        notices.push(
+          `${load.name} holds ${load.capacity} pupils and already has ${load.taken}. This file adds ${added}, so some will be refused. Raise the class capacity first if that's wrong.`,
+        );
       }
     }
-    if (mapping.duplicated.length) notices.push(`These headings appear more than once and only the first was used: ${mapping.duplicated.join(", ")}.`);
+    if (mapping.duplicated.length)
+      notices.push(
+        `These headings appear more than once and only the first was used: ${mapping.duplicated.join(', ')}.`,
+      );
 
     return {
       file: { name: file.originalname, format, rows: rows.length },
       columns: { recognized: mapping.recognized, ignored: mapping.ignored },
-      summary: { total: rows.length, ready: count("ready"), warning: count("warning"), duplicate: count("duplicate"), error: count("error"), importable: importable.length },
+      summary: {
+        total: rows.length,
+        ready: count('ready'),
+        warning: count('warning'),
+        duplicate: count('duplicate'),
+        error: count('error'),
+        importable: importable.length,
+      },
       notices,
       rows,
     };
   }
 
   async importBatch(
-    school: Pick<School, "id" | "organizationId" | "subdomain">,
+    school: Pick<School, 'id' | 'organizationId' | 'subdomain'>,
     actorId: string,
     role: string | undefined,
     input: ImportStudentBatchInput,
@@ -144,24 +166,33 @@ export class StudentImportService {
       const name = `${row.firstName} ${row.lastName}`;
       const base = { rowNumber: row.rowNumber, name };
       const verdict = evaluateRow(row, ctx);
-      if (verdict.status === "duplicate") {
-        results.push({ ...base, status: "skipped", message: "Already in the school, so it was not added again." });
+      if (verdict.status === 'duplicate') {
+        results.push({
+          ...base,
+          status: 'skipped',
+          message: 'Already in the school, so it was not added again.',
+        });
         continue;
       }
-      if (verdict.status === "error") {
-        results.push({ ...base, status: "failed", message: verdict.errors.join(" ") });
+      if (verdict.status === 'error') {
+        results.push({ ...base, status: 'failed', message: verdict.errors.join(' ') });
         continue;
       }
       try {
-        const created = await this.students.createStudent(school, actorId, this.toCreateInput(row, verdict, input.createGuardianLogins), {
-          role,
-          admissionNumber: row.admissionNumber,
-          admissionDate: row.admissionDate,
-        });
+        const created = await this.students.createStudent(
+          school,
+          actorId,
+          this.toCreateInput(row, verdict, input.createGuardianLogins),
+          {
+            role,
+            admissionNumber: row.admissionNumber,
+            admissionDate: row.admissionDate,
+          },
+        );
         remember(ctx, row);
         results.push({
           ...base,
-          status: "created",
+          status: 'created',
           studentId: created.id,
           admissionNumber: created.admissionNumber,
           className: created.class?.name ?? null,
@@ -170,28 +201,38 @@ export class StudentImportService {
           temporaryPassword: created.credentials.temporaryPassword,
           guardianLogins: created.guardianCredentials.flatMap((guardian) =>
             guardian.credentials
-              ? [{ name: guardian.name, loginEmail: guardian.credentials.loginEmail, temporaryPassword: guardian.credentials.temporaryPassword }]
+              ? [
+                  {
+                    name: guardian.name,
+                    loginEmail: guardian.credentials.loginEmail,
+                    temporaryPassword: guardian.credentials.temporaryPassword,
+                  },
+                ]
               : [],
           ),
         });
       } catch (error) {
-        results.push({ ...base, status: "failed", message: this.explain(error, row.rowNumber) });
+        results.push({ ...base, status: 'failed', message: this.explain(error, row.rowNumber) });
       }
     }
 
     const totals = {
-      created: results.filter((result) => result.status === "created").length,
-      skipped: results.filter((result) => result.status === "skipped").length,
-      failed: results.filter((result) => result.status === "failed").length,
+      created: results.filter((result) => result.status === 'created').length,
+      skipped: results.filter((result) => result.status === 'skipped').length,
+      failed: results.filter((result) => result.status === 'failed').length,
     };
     await this.prisma.client.auditLog.create({
       data: {
         userId: actorId,
         schoolId: school.id,
-        action: "CREATE",
-        entityType: "STUDENT_IMPORT",
+        action: 'CREATE',
+        entityType: 'STUDENT_IMPORT',
         entityId: input.batchId,
-        newValues: { ...totals, rows: input.rows.length, createGuardianLogins: input.createGuardianLogins } satisfies Prisma.InputJsonObject,
+        newValues: {
+          ...totals,
+          rows: input.rows.length,
+          createGuardianLogins: input.createGuardianLogins,
+        } satisfies Prisma.InputJsonObject,
       },
     });
     return { batchId: input.batchId, totals, results };
@@ -199,7 +240,11 @@ export class StudentImportService {
 
   // --------------------------------------------------------------- helpers
 
-  private toCreateInput(row: NormalizedStudentRow, verdict: RowVerdict, createGuardianLogins: boolean): CreateStudentInput {
+  private toCreateInput(
+    row: NormalizedStudentRow,
+    verdict: RowVerdict,
+    createGuardianLogins: boolean,
+  ): CreateStudentInput {
     return {
       firstName: row.firstName,
       lastName: row.lastName,
@@ -208,7 +253,7 @@ export class StudentImportService {
       dateOfBirth: row.dateOfBirth,
       classId: verdict.classId ?? undefined,
       houseId: verdict.houseId ?? undefined,
-      nationality: row.nationality ?? "Ghanaian",
+      nationality: row.nationality ?? 'Ghanaian',
       residentialAddress: row.residentialAddress,
       city: row.city,
       region: row.region,
@@ -222,7 +267,7 @@ export class StudentImportService {
         firstName: guardian.firstName,
         lastName: guardian.lastName,
         phone: guardian.phone,
-        email: guardian.email ?? "",
+        email: guardian.email ?? '',
         relationshipType: guardian.relationshipType,
         isPrimary: index === 0,
         createLogin: createGuardianLogins,
@@ -233,17 +278,23 @@ export class StudentImportService {
   /** A message an administrator can act on. Unexpected errors are logged, not shown. */
   private explain(error: unknown, rowNumber: number): string {
     if (error instanceof HttpException) return error.message;
-    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
-      return "Another student already uses one of these details (such as the admission number).";
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+      return 'Another student already uses one of these details (such as the admission number).';
     }
-    this.logger.error(`Student import failed on row ${rowNumber}`, error instanceof Error ? error.stack : String(error));
-    return "Something went wrong saving this student. Upload the file again to retry the rows that failed.";
+    this.logger.error(
+      `Student import failed on row ${rowNumber}`,
+      error instanceof Error ? error.stack : String(error),
+    );
+    return 'Something went wrong saving this student. Upload the file again to retry the rows that failed.';
   }
 
   private async loadContext(schoolId: string): Promise<LoadedContext> {
     const db = this.prisma.client;
     const [classes, houses, year, existing] = await Promise.all([
-      db.class.findMany({ where: { schoolId, isActive: true, deletedAt: null }, select: { id: true, name: true, capacity: true } }),
+      db.class.findMany({
+        where: { schoolId, isActive: true, deletedAt: null },
+        select: { id: true, name: true, capacity: true },
+      }),
       db.house.findMany({ where: { schoolId, isActive: true }, select: { id: true, name: true } }),
       db.academicYear.findFirst({
         where: { schoolId, isCurrent: true },
@@ -251,7 +302,10 @@ export class StudentImportService {
       }),
       db.student.findMany({
         where: { schoolId, deletedAt: null },
-        select: { admissionNumber: true, profile: { select: { firstName: true, lastName: true, dateOfBirth: true } } },
+        select: {
+          admissionNumber: true,
+          profile: { select: { firstName: true, lastName: true, dateOfBirth: true } },
+        },
       }),
     ]);
     const term = year?.terms[0];
@@ -259,16 +313,29 @@ export class StudentImportService {
     const admissionNumbers = new Set<string>();
     const studentKeys = new Set<string>();
     for (const student of existing) {
-      if (student.admissionNumber) admissionNumbers.add(student.admissionNumber.trim().toLowerCase());
+      if (student.admissionNumber)
+        admissionNumbers.add(student.admissionNumber.trim().toLowerCase());
       const dob = student.profile.dateOfBirth;
-      if (dob) studentKeys.add(studentKey(student.profile.firstName, student.profile.lastName, dob.toISOString().slice(0, 10)));
+      if (dob)
+        studentKeys.add(
+          studentKey(
+            student.profile.firstName,
+            student.profile.lastName,
+            dob.toISOString().slice(0, 10),
+          ),
+        );
     }
 
     const counts =
       year && term
         ? await db.enrollment.groupBy({
-            by: ["classId"],
-            where: { academicYearId: year.id, termId: term.id, status: "ACTIVE", class: { schoolId } },
+            by: ['classId'],
+            where: {
+              academicYearId: year.id,
+              termId: term.id,
+              status: 'ACTIVE',
+              class: { schoolId },
+            },
             _count: { _all: true },
           })
         : [];
@@ -280,8 +347,12 @@ export class StudentImportService {
       hasCurrentTerm: !!term,
       admissionNumbers,
       studentKeys,
-      classLoad: new Map(classes.map((item) => [item.id, { name: item.name, capacity: item.capacity, taken: taken.get(item.id) ?? 0 }])),
+      classLoad: new Map(
+        classes.map((item) => [
+          item.id,
+          { name: item.name, capacity: item.capacity, taken: taken.get(item.id) ?? 0 },
+        ]),
+      ),
     };
   }
 }
-

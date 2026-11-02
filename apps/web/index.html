@@ -11,10 +11,10 @@
     <script>
       (function () {
         try {
-          var dark = localStorage.getItem("schoolhub-theme") === "dark";
+          var dark = localStorage.getItem('schoolhub-theme') === 'dark';
           var root = document.documentElement;
-          root.classList.toggle("dark", dark);
-          root.style.colorScheme = dark ? "dark" : "light";
+          root.classList.toggle('dark', dark);
+          root.style.colorScheme = dark ? 'dark' : 'light';
         } catch (e) {}
       })();
     </script>

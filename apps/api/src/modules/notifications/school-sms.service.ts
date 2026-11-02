@@ -1,14 +1,7 @@
-import {
-  Injectable,
-  NotFoundException,
-  ServiceUnavailableException,
-} from '@nestjs/common';
+import { Injectable, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import { randomUUID } from 'node:crypto';
-import {
-  schoolHubtelConnectionSchema,
-  type SchoolHubtelConnectionInput,
-} from '@schoolhub/shared';
+import { schoolHubtelConnectionSchema, type SchoolHubtelConnectionInput } from '@schoolhub/shared';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { writeAudit, type AuditActor } from '../../common/audit/audit.js';
 import {
@@ -76,8 +69,7 @@ export class SchoolSmsService {
   async resolve(
     schoolId: string,
     id: string | null | undefined,
-    db: Pick<Prisma.TransactionClient, 'schoolSmsConnection'> = this.prisma
-      .client,
+    db: Pick<Prisma.TransactionClient, 'schoolSmsConnection'> = this.prisma.client,
   ) {
     if (!id) return null;
     const row = await db.schoolSmsConnection.findFirst({
@@ -98,11 +90,10 @@ export class SchoolSmsService {
   async status(schoolId: string) {
     if (!(await this.prisma.client.school.count({ where: { id: schoolId } })))
       throw new NotFoundException('School not found.');
-    const settings =
-      await this.prisma.client.schoolNotificationSettings.findUnique({
-        where: { schoolId },
-        select: { smsConnectionId: true },
-      });
+    const settings = await this.prisma.client.schoolNotificationSettings.findUnique({
+      where: { schoolId },
+      select: { smsConnectionId: true },
+    });
     const row = settings?.smsConnectionId
       ? await this.prisma.client.schoolSmsConnection.findFirst({
           where: { id: settings.smsConnectionId, schoolId, revokedAt: null },
@@ -127,11 +118,7 @@ export class SchoolSmsService {
       billing: 'SCHOOL_HUBTEL_ACCOUNT' as const,
     };
   }
-  async save(
-    schoolId: string,
-    actor: AuditActor,
-    input: SchoolHubtelConnectionInput,
-  ) {
+  async save(schoolId: string, actor: AuditActor, input: SchoolHubtelConnectionInput) {
     await this.prisma.client.$transaction((tx) =>
       storeSchoolSmsConnection(tx, schoolId, actor, input),
     );

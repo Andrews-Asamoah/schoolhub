@@ -1,5 +1,5 @@
-import { Prisma } from "@prisma/client";
-import type { StudentStatementEntry, StudentStatementEntryType } from "@schoolhub/shared";
+import { Prisma } from '@prisma/client';
+import type { StudentStatementEntry, StudentStatementEntryType } from '@schoolhub/shared';
 
 export interface StatementEvent {
   id: string;
@@ -28,10 +28,11 @@ export function buildRunningStatement(
   openingBalance: Prisma.Decimal,
   input: readonly StatementEvent[],
 ): { entries: StudentStatementEntry[]; closingBalance: Prisma.Decimal } {
-  const events = [...input].sort((a, b) =>
-    a.date.localeCompare(b.date) ||
-    TYPE_ORDER[a.type] - TYPE_ORDER[b.type] ||
-    a.id.localeCompare(b.id),
+  const events = [...input].sort(
+    (a, b) =>
+      a.date.localeCompare(b.date) ||
+      TYPE_ORDER[a.type] - TYPE_ORDER[b.type] ||
+      a.id.localeCompare(b.id),
   );
   let balance = openingBalance;
   const entries = events.map((event) => {

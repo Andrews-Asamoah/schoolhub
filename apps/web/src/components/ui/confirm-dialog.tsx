@@ -1,9 +1,9 @@
-import { AlertTriangle } from "lucide-react";
-import { useEffect, useId, useRef } from "react";
-import { createPortal } from "react-dom";
-import { Button } from "@/components/ui/button";
+import { AlertTriangle } from 'lucide-react';
+import { useEffect, useId, useRef } from 'react';
+import { createPortal } from 'react-dom';
+import { Button } from '@/components/ui/button';
 
-type ConfirmVariant = "primary" | "danger";
+type ConfirmVariant = 'primary' | 'danger';
 
 interface ConfirmDialogProps {
   open: boolean;
@@ -25,9 +25,9 @@ export function ConfirmDialog({
   open,
   title,
   description,
-  confirmLabel = "Confirm",
-  cancelLabel = "Cancel",
-  confirmVariant = "primary",
+  confirmLabel = 'Confirm',
+  cancelLabel = 'Cancel',
+  confirmVariant = 'primary',
   loading = false,
   onConfirm,
   onCancel,
@@ -43,8 +43,8 @@ export function ConfirmDialog({
     cancelRef.current?.focus();
 
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && !loading) onCancel();
-      if (event.key === "Tab") {
+      if (event.key === 'Escape' && !loading) onCancel();
+      if (event.key === 'Tab') {
         // Keep keyboard focus inside this small modal.
         const dialog = document.getElementById(titleId)?.closest('[role="dialog"]');
         const focusable = dialog?.querySelectorAll<HTMLElement>(
@@ -64,14 +64,14 @@ export function ConfirmDialog({
       }
     };
 
-    document.addEventListener("keydown", handleKeyDown);
+    document.addEventListener('keydown', handleKeyDown);
     return () => {
-      document.removeEventListener("keydown", handleKeyDown);
+      document.removeEventListener('keydown', handleKeyDown);
       previouslyFocused?.focus();
     };
   }, [open, loading, onCancel, titleId]);
 
-  if (!open || typeof document === "undefined") return null;
+  if (!open || typeof document === 'undefined') return null;
 
   return createPortal(
     <div
@@ -88,12 +88,18 @@ export function ConfirmDialog({
         className="w-full max-w-md overflow-hidden rounded-xl border border-border bg-card text-card-foreground shadow-2xl"
       >
         <div className="flex gap-4 p-5 sm:p-6">
-          <span className={`flex size-10 shrink-0 items-center justify-center rounded-xl ${confirmVariant === "danger" ? "bg-destructive/10 text-destructive" : "bg-primary/10 text-primary"}`}>
+          <span
+            className={`flex size-10 shrink-0 items-center justify-center rounded-xl ${confirmVariant === 'danger' ? 'bg-destructive/10 text-destructive' : 'bg-primary/10 text-primary'}`}
+          >
             <AlertTriangle className="size-5" aria-hidden="true" />
           </span>
           <div className="min-w-0 pt-0.5">
-            <h2 id={titleId} className="text-base font-bold text-foreground">{title}</h2>
-            <p id={descriptionId} className="mt-2 text-sm leading-6 text-muted-foreground">{description}</p>
+            <h2 id={titleId} className="text-base font-bold text-foreground">
+              {title}
+            </h2>
+            <p id={descriptionId} className="mt-2 text-sm leading-6 text-muted-foreground">
+              {description}
+            </p>
           </div>
         </div>
         <div className="flex flex-col-reverse gap-2 border-t border-border bg-muted/30 px-5 py-4 sm:flex-row sm:justify-end sm:px-6">
@@ -103,10 +109,17 @@ export function ConfirmDialog({
             variant="outline"
             disabled={loading}
             onClick={onCancel}
-          >{cancelLabel}</Button>
-          <Button type="button" variant={confirmVariant === "danger" ? "destructive" : "default"}
-            loading={loading} disabled={loading} onClick={onConfirm}>
-            {loading ? "Please wait…" : confirmLabel}
+          >
+            {cancelLabel}
+          </Button>
+          <Button
+            type="button"
+            variant={confirmVariant === 'danger' ? 'destructive' : 'default'}
+            loading={loading}
+            disabled={loading}
+            onClick={onConfirm}
+          >
+            {loading ? 'Please wait…' : confirmLabel}
           </Button>
         </div>
       </section>

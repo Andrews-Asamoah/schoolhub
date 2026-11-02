@@ -1,22 +1,22 @@
-import { StudentAttendanceView } from "./student-attendance-view";
-import { StudentSubjectsView } from "./student-subjects-view";
-import { StudentTimetableView } from "./student-timetable-view";
-import { StudentReportView } from "./student-report-view";
-import { StudentClassmatesView } from "./student-classmates-view";
-import { StudentAssignmentsView } from "./student-assignments-view";
-import { StudentAnnouncementsView } from "./student-announcements-view";
-import { StudentOverview } from "./student-overview";
+import { StudentAttendanceView } from './student-attendance-view';
+import { StudentSubjectsView } from './student-subjects-view';
+import { StudentTimetableView } from './student-timetable-view';
+import { StudentReportView } from './student-report-view';
+import { StudentClassmatesView } from './student-classmates-view';
+import { StudentAssignmentsView } from './student-assignments-view';
+import { StudentAnnouncementsView } from './student-announcements-view';
+import { StudentOverview } from './student-overview';
 
 export type StudentPortalPage =
-  | "dashboard"
-  | "subjects"
-  | "timetable"
-  | "grades"
-  | "assessments"
-  | "assignments"
-  | "classmates"
-  | "attendance"
-  | "announcements";
+  | 'dashboard'
+  | 'subjects'
+  | 'timetable'
+  | 'grades'
+  | 'assessments'
+  | 'assignments'
+  | 'classmates'
+  | 'attendance'
+  | 'announcements';
 
 export interface StudentPortalWorkspaceProps {
   page?: StudentPortalPage;
@@ -26,24 +26,24 @@ export interface StudentPortalWorkspaceProps {
  * Renders the content for one student portal route. Navigation lives in the
  * school sidebar; this component deliberately does not duplicate it with tabs.
  */
-export function StudentPortalWorkspace({ page = "dashboard" }: StudentPortalWorkspaceProps) {
+export function StudentPortalWorkspace({ page = 'dashboard' }: StudentPortalWorkspaceProps) {
   switch (page) {
-    case "subjects":
+    case 'subjects':
       return <StudentSubjectsView />;
-    case "timetable":
+    case 'timetable':
       return <StudentTimetableView />;
-    case "grades":
-    case "assessments":
+    case 'grades':
+    case 'assessments':
       return <StudentReportView />;
-    case "assignments":
+    case 'assignments':
       return <StudentAssignmentsView />;
-    case "classmates":
+    case 'classmates':
       return <StudentClassmatesView />;
-    case "attendance":
+    case 'attendance':
       return <StudentAttendanceView />;
-    case "announcements":
+    case 'announcements':
       return <StudentAnnouncementsView />;
-    case "dashboard":
+    case 'dashboard':
     default:
       return <StudentOverview />;
   }

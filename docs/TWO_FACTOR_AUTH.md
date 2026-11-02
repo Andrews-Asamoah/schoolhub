@@ -4,11 +4,11 @@ Authenticator-app (TOTP) codes plus single-use backup codes, built on Better Aut
 
 ## Who needs it
 
-| Account | Policy |
-| --- | --- |
-| Platform super-admin | **Always required.** Every `/super-admin/*` route returns `403 TWO_FACTOR_REQUIRED` until enrolled; the web app sends them to `/two-factor-setup`. |
-| School owner / admin | **Optional by default** (a reminder banner and a card on their Profile page). Set `REQUIRE_2FA_SCHOOL_ADMINS=true` to make it mandatory. The check looks at *every* role the account holds, so an admin cannot skip it by asking to act as a teacher. |
-| Everyone else | Available on the Profile page for staff roles; not offered to students and guardians. |
+| Account              | Policy                                                                                                                                                                                                                                                |
+| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Platform super-admin | **Always required.** Every `/super-admin/*` route returns `403 TWO_FACTOR_REQUIRED` until enrolled; the web app sends them to `/two-factor-setup`.                                                                                                    |
+| School owner / admin | **Optional by default** (a reminder banner and a card on their Profile page). Set `REQUIRE_2FA_SCHOOL_ADMINS=true` to make it mandatory. The check looks at _every_ role the account holds, so an admin cannot skip it by asking to act as a teacher. |
+| Everyone else        | Available on the Profile page for staff roles; not offered to students and guardians.                                                                                                                                                                 |
 
 ## Deploy checklist
 
@@ -20,16 +20,16 @@ Authenticator-app (TOTP) codes plus single-use backup codes, built on Better Aut
 
 ## Behaviour
 
-* Sign-in is two steps. After the password, the server returns `twoFactorRedirect` and **no session** exists until a valid code arrives (5-minute window).
-* 2FA only turns on after the user proves they can generate a code; abandoning setup leaves it off.
-* Wrong codes: 5 attempts per minute per client, and **5 consecutive failures lock the account's second factor for 15 minutes** across all devices.
-* "Trust this device" is refused server-side: administrator accounts are always asked for a code.
-* The unused plugin endpoints `get-totp-uri`, `send-otp` and `verify-otp` are switched off.
-* Enabling, disabling and regenerating backup codes are written to the audit log. Turning it off needs the password.
+- Sign-in is two steps. After the password, the server returns `twoFactorRedirect` and **no session** exists until a valid code arrives (5-minute window).
+- 2FA only turns on after the user proves they can generate a code; abandoning setup leaves it off.
+- Wrong codes: 5 attempts per minute per client, and **5 consecutive failures lock the account's second factor for 15 minutes** across all devices.
+- "Trust this device" is refused server-side: administrator accounts are always asked for a code.
+- The unused plugin endpoints `get-totp-uri`, `send-otp` and `verify-otp` are switched off.
+- Enabling, disabling and regenerating backup codes are written to the audit log. Turning it off needs the password.
 
 ## Lost phone and backup codes
 
-1. **School admin:** a platform super-admin opens *Schools → school → Administrators → Reset 2FA*. This removes the factor, signs the admin out everywhere and is audited. **Verify identity first** (e.g. phone call).
+1. **School admin:** a platform super-admin opens _Schools → school → Administrators → Reset 2FA_. This removes the factor, signs the admin out everywhere and is audited. **Verify identity first** (e.g. phone call).
 2. **Super-admin:** from a shell with database access:
    ```bash
    pnpm --filter @schoolhub/api reset-2fa admin@example.com

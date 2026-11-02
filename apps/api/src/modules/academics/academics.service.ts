@@ -33,9 +33,7 @@ export class AcademicsService {
     role?: string,
     scopeClassIds?: string[],
   ) {
-    const today = new Date(
-      `${new Date().toISOString().slice(0, 10)}T00:00:00.000Z`,
-    );
+    const today = new Date(`${new Date().toISOString().slice(0, 10)}T00:00:00.000Z`);
     const { academicYear, term } =
       academicYearId || termId
         ? await this.resolveAcademicTerm(schoolId, academicYearId, termId, role)
@@ -138,9 +136,7 @@ export class AcademicsService {
       select: { id: true },
     });
     if (duplicate) {
-      throw new ConflictException(
-        'A class with this name already exists in this school',
-      );
+      throw new ConflictException('A class with this name already exists in this school');
     }
 
     await this.validateClassReferences(schoolId, input);
@@ -160,11 +156,7 @@ export class AcademicsService {
     });
   }
 
-  async updateClass(
-    schoolId: string,
-    classId: string,
-    input: UpdateClassInput,
-  ) {
+  async updateClass(schoolId: string, classId: string, input: UpdateClassInput) {
     const existing = await this.prisma.client.class.findFirst({
       where: { id: classId, schoolId, deletedAt: null },
       select: { id: true },
@@ -184,9 +176,7 @@ export class AcademicsService {
         select: { id: true },
       });
       if (duplicate) {
-        throw new ConflictException(
-          'A class with this name already exists in this school',
-        );
+        throw new ConflictException('A class with this name already exists in this school');
       }
     }
 
@@ -220,9 +210,7 @@ export class AcademicsService {
         select: { id: true },
       });
       if (!department) {
-        throw new BadRequestException(
-          'Choose an active department belonging to this school',
-        );
+        throw new BadRequestException('Choose an active department belonging to this school');
       }
     }
   }
@@ -252,9 +240,7 @@ export class AcademicsService {
       select: { id: true },
     });
     if (!teacher) {
-      throw new BadRequestException(
-        'Choose an active teacher belonging to this school',
-      );
+      throw new BadRequestException('Choose an active teacher belonging to this school');
     }
 
     return this.prisma.client.$transaction(
@@ -266,17 +252,11 @@ export class AcademicsService {
             OR: [
               {
                 effectiveFrom: { gte: effectiveFrom },
-                OR: [
-                  { effectiveTo: null },
-                  { effectiveTo: { gt: effectiveFrom } },
-                ],
+                OR: [{ effectiveTo: null }, { effectiveTo: { gt: effectiveFrom } }],
               },
               {
                 effectiveFrom: { lt: effectiveFrom },
-                OR: [
-                  { effectiveTo: null },
-                  { effectiveTo: { gt: effectiveFrom } },
-                ],
+                OR: [{ effectiveTo: null }, { effectiveTo: { gt: effectiveFrom } }],
               },
             ],
           },
@@ -286,8 +266,7 @@ export class AcademicsService {
           (assignment) => assignment.effectiveFrom < effectiveFrom,
         );
         const startsOnDate = existingAssignments.find(
-          (assignment) =>
-            assignment.effectiveFrom.getTime() === effectiveFrom.getTime(),
+          (assignment) => assignment.effectiveFrom.getTime() === effectiveFrom.getTime(),
         );
         const future = existingAssignments.find(
           (assignment) => assignment.effectiveFrom > effectiveFrom,
@@ -295,9 +274,7 @@ export class AcademicsService {
 
         if (startsOnDate) {
           if (startsOnDate.teacherId === teacher.id) return startsOnDate;
-          throw new ConflictException(
-            'A class teacher assignment already starts on this date',
-          );
+          throw new ConflictException('A class teacher assignment already starts on this date');
         }
         if (future) {
           throw new ConflictException(
@@ -363,11 +340,7 @@ export class AcademicsService {
       where: {
         academicYearId: academicYear.id,
         termId: term.id,
-        ...(classId
-          ? { classId }
-          : scopeClassIds
-            ? { classId: { in: scopeClassIds } }
-            : {}),
+        ...(classId ? { classId } : scopeClassIds ? { classId: { in: scopeClassIds } } : {}),
         status: { in: ['ACTIVE', 'COMPLETED'] },
         student: { schoolId, deletedAt: null },
         class: { schoolId },
@@ -429,10 +402,7 @@ export class AcademicsService {
             }
           : {}),
       },
-      orderBy: [
-        { profile: { lastName: 'asc' } },
-        { profile: { firstName: 'asc' } },
-      ],
+      orderBy: [{ profile: { lastName: 'asc' } }, { profile: { firstName: 'asc' } }],
       take: 100,
       include: {
         profile: {
@@ -443,11 +413,7 @@ export class AcademicsService {
     });
   }
 
-  async createEnrollments(
-    schoolId: string,
-    input: CreateEnrollmentInput,
-    role?: string,
-  ) {
+  async createEnrollments(schoolId: string, input: CreateEnrollmentInput, role?: string) {
     return this.prisma.client.$transaction(
       async (tx) => {
         const classEntity = await tx.class.findFirst({
@@ -554,13 +520,10 @@ export class AcademicsService {
     academicYearId?: string,
     termId?: string,
     role?: string,
-    client: Prisma.TransactionClient | typeof this.prisma.client = this.prisma
-      .client,
+    client: Prisma.TransactionClient | typeof this.prisma.client = this.prisma.client,
   ) {
     if (Boolean(academicYearId) !== Boolean(termId)) {
-      throw new BadRequestException(
-        'Academic year and term must be supplied together.',
-      );
+      throw new BadRequestException('Academic year and term must be supplied together.');
     }
     const currentYear = await client.academicYear.findFirst({
       where: { schoolId, isCurrent: true },
@@ -584,14 +547,11 @@ export class AcademicsService {
       include: { academicYear: true },
     });
     if (!selected) {
-      throw new BadRequestException(
-        'Choose a term belonging to an academic year in this school.',
-      );
+      throw new BadRequestException('Choose a term belonging to an academic year in this school.');
     }
     if (
       !canManageAcademicContext(role) &&
-      (selected.academicYearId !== currentYear.id ||
-        selected.id !== currentTerm.id)
+      (selected.academicYearId !== currentYear.id || selected.id !== currentTerm.id)
     ) {
       throw new ForbiddenException(
         'Only the current academic year and term are available for your role.',
@@ -607,9 +567,7 @@ export class AcademicsService {
       Number.isNaN(date.getTime()) ||
       date.toISOString().slice(0, 10) !== value
     ) {
-      throw new BadRequestException(
-        `${fieldName} must be a valid date in YYYY-MM-DD format`,
-      );
+      throw new BadRequestException(`${fieldName} must be a valid date in YYYY-MM-DD format`);
     }
     return date;
   }
@@ -659,11 +617,7 @@ export class AcademicsService {
 
   async createHouse(schoolId: string, input: CreateHouseInput) {
     await this.validateHouseFields(schoolId, input);
-    await this.ensureHouseNameAndCodeAvailable(
-      schoolId,
-      input.name,
-      input.code,
-    );
+    await this.ensureHouseNameAndCodeAvailable(schoolId, input.name, input.code);
 
     return this.prisma.client.house.create({
       data: {
@@ -690,11 +644,7 @@ export class AcademicsService {
     });
   }
 
-  async updateHouse(
-    schoolId: string,
-    houseId: string,
-    input: UpdateHouseInput,
-  ) {
+  async updateHouse(schoolId: string, houseId: string, input: UpdateHouseInput) {
     const existing = await this.prisma.client.house.findFirst({
       where: { id: houseId, schoolId },
       select: { id: true },
@@ -702,28 +652,18 @@ export class AcademicsService {
     if (!existing) throw new NotFoundException('House not found');
 
     await this.validateHouseFields(schoolId, input);
-    await this.ensureHouseNameAndCodeAvailable(
-      schoolId,
-      input.name,
-      input.code,
-      houseId,
-    );
+    await this.ensureHouseNameAndCodeAvailable(schoolId, input.name, input.code, houseId);
 
     return this.prisma.client.house.update({
       where: { id: houseId },
       data: {
         name: input.name,
         code: input.code,
-        description:
-          input.description === undefined
-            ? undefined
-            : input.description || null,
+        description: input.description === undefined ? undefined : input.description || null,
         color: input.color === undefined ? undefined : input.color || null,
         motto: input.motto === undefined ? undefined : input.motto || null,
         houseTeacherId:
-          input.houseTeacherId === undefined
-            ? undefined
-            : input.houseTeacherId || null,
+          input.houseTeacherId === undefined ? undefined : input.houseTeacherId || null,
         isActive: input.isActive,
       },
       include: {
@@ -755,9 +695,7 @@ export class AcademicsService {
         select: { id: true },
       });
       if (!teacher) {
-        throw new BadRequestException(
-          'Choose an active teacher belonging to this school.',
-        );
+        throw new BadRequestException('Choose an active teacher belonging to this school.');
       }
     }
   }
@@ -774,20 +712,14 @@ export class AcademicsService {
         schoolId,
         ...(houseId ? { id: { not: houseId } } : {}),
         OR: [
-          ...(name
-            ? [{ name: { equals: name, mode: 'insensitive' as const } }]
-            : []),
-          ...(code
-            ? [{ code: { equals: code, mode: 'insensitive' as const } }]
-            : []),
+          ...(name ? [{ name: { equals: name, mode: 'insensitive' as const } }] : []),
+          ...(code ? [{ code: { equals: code, mode: 'insensitive' as const } }] : []),
         ],
       },
       select: { id: true },
     });
     if (duplicate) {
-      throw new ConflictException(
-        'A house with this name or code already exists in this school.',
-      );
+      throw new ConflictException('A house with this name or code already exists in this school.');
     }
   }
 
@@ -807,10 +739,7 @@ export class AcademicsService {
       role,
       scopeClassIds,
     );
-    const latestPlacementByStudent = new Map<
-      string,
-      (typeof enrollments)[number]
-    >();
+    const latestPlacementByStudent = new Map<string, (typeof enrollments)[number]>();
     for (const enrollment of enrollments) {
       if (!latestPlacementByStudent.has(enrollment.studentId)) {
         latestPlacementByStudent.set(enrollment.studentId, enrollment);
@@ -988,7 +917,9 @@ export class AcademicsService {
       data: {
         ...(input.name !== undefined ? { name: input.name } : {}),
         ...(input.description !== undefined ? { description: input.description || null } : {}),
-        ...(input.teacherInChargeId !== undefined ? { teacherInChargeId: input.teacherInChargeId || null } : {}),
+        ...(input.teacherInChargeId !== undefined
+          ? { teacherInChargeId: input.teacherInChargeId || null }
+          : {}),
         ...(input.isActive !== undefined ? { isActive: input.isActive } : {}),
       },
       include: {

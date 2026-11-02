@@ -1,5 +1,5 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { createFileRoute } from '@tanstack/react-router';
+import { useQuery } from '@tanstack/react-query';
 import {
   Building2,
   Users,
@@ -12,16 +12,16 @@ import {
   Plus,
   Sparkles,
   RefreshCw,
-} from "lucide-react";
-import { apiFetch } from "@/lib/api";
-import { StatCard } from "@/components/superadmin/stat-card";
-import { OperationsHealthPanel } from "@/components/superadmin/operations-health-panel";
-import { SubscriptionBadge } from "@/components/superadmin/subscription-badge";
-import { DataTable, type DataTableColumn } from "@/components/ui/data-table";
-import { Link, useNavigate } from "@tanstack/react-router";
-import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
+} from 'lucide-react';
+import { apiFetch } from '@/lib/api';
+import { StatCard } from '@/components/superadmin/stat-card';
+import { OperationsHealthPanel } from '@/components/superadmin/operations-health-panel';
+import { SubscriptionBadge } from '@/components/superadmin/subscription-badge';
+import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
+import { Link, useNavigate } from '@tanstack/react-router';
+import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts';
 
-export const Route = createFileRoute("/admin/dashboard")({
+export const Route = createFileRoute('/admin/dashboard')({
   component: AdminDashboard,
 });
 
@@ -64,8 +64,8 @@ function AdminDashboard() {
     isFetching: statsFetching,
     dataUpdatedAt: statsUpdatedAt,
   } = useQuery({
-    queryKey: ["superadmin", "stats"],
-    queryFn: () => apiFetch<PlatformStats>("/super-admin/stats"),
+    queryKey: ['superadmin', 'stats'],
+    queryFn: () => apiFetch<PlatformStats>('/super-admin/stats'),
     retry: false,
     staleTime: 15_000,
     refetchInterval: 60_000,
@@ -80,8 +80,8 @@ function AdminDashboard() {
     isFetching: schoolsFetching,
     dataUpdatedAt: schoolsUpdatedAt,
   } = useQuery({
-    queryKey: ["superadmin", "schools", 1],
-    queryFn: () => apiFetch<SchoolsListResponse>("/super-admin/schools?page=1&limit=5"),
+    queryKey: ['superadmin', 'schools', 1],
+    queryFn: () => apiFetch<SchoolsListResponse>('/super-admin/schools?page=1&limit=5'),
     retry: false,
     staleTime: 15_000,
     refetchInterval: 60_000,
@@ -92,15 +92,15 @@ function AdminDashboard() {
   const lastUpdatedAt = Math.max(statsUpdatedAt, schoolsUpdatedAt);
   const regionOf = (metadata: string | null | undefined) => {
     try {
-      return (metadata ? (JSON.parse(metadata) as { region?: string }) : null)?.region ?? "";
+      return (metadata ? (JSON.parse(metadata) as { region?: string }) : null)?.region ?? '';
     } catch {
-      return "";
+      return '';
     }
   };
-  const schoolColumns: DataTableColumn<NonNullable<typeof schools>["data"][number]>[] = [
+  const schoolColumns: DataTableColumn<NonNullable<typeof schools>['data'][number]>[] = [
     {
-      id: "school",
-      header: "School",
+      id: 'school',
+      header: 'School',
       value: (school) => `${school.name} (${school.subdomain}.schoolhub)`,
       cell: (school) => (
         <div className="flex items-center gap-3">
@@ -109,29 +109,53 @@ function AdminDashboard() {
           </span>
           <div className="min-w-0">
             <p className="truncate text-sm font-semibold text-foreground">{school.name}</p>
-            <p className="mt-0.5 truncate text-xs text-muted-foreground">{school.subdomain}.schoolhub</p>
+            <p className="mt-0.5 truncate text-xs text-muted-foreground">
+              {school.subdomain}.schoolhub
+            </p>
           </div>
         </div>
       ),
     },
-    { id: "region", header: "Region", value: (school) => regionOf(school.organization.metadata), cell: (school) => regionOf(school.organization.metadata) || "—" },
-    { id: "students", header: "Students", value: (school) => school._count.students, cell: (school) => <span className="font-semibold tabular-nums">{school._count.students}</span> },
     {
-      id: "subscription",
-      header: "Subscription",
+      id: 'region',
+      header: 'Region',
+      value: (school) => regionOf(school.organization.metadata),
+      cell: (school) => regionOf(school.organization.metadata) || '—',
+    },
+    {
+      id: 'students',
+      header: 'Students',
+      value: (school) => school._count.students,
+      cell: (school) => (
+        <span className="font-semibold tabular-nums">{school._count.students}</span>
+      ),
+    },
+    {
+      id: 'subscription',
+      header: 'Subscription',
       value: (school) => school.organization.subscriptionStatus,
-      cell: (school) => <SubscriptionBadge status={school.organization.subscriptionStatus} expiresAt={school.organization.expiresAt} />,
+      cell: (school) => (
+        <SubscriptionBadge
+          status={school.organization.subscriptionStatus}
+          expiresAt={school.organization.expiresAt}
+        />
+      ),
     },
     {
-      id: "enrolled",
-      header: "Enrolled",
+      id: 'enrolled',
+      header: 'Enrolled',
       value: (school) => String(school.createdAt).slice(0, 10),
-      cell: (school) => new Date(school.createdAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }),
+      cell: (school) =>
+        new Date(school.createdAt).toLocaleDateString('en-GB', {
+          day: 'numeric',
+          month: 'short',
+          year: 'numeric',
+        }),
     },
     {
-      id: "actions",
-      header: "",
-      className: "text-right",
+      id: 'actions',
+      header: '',
+      className: 'text-right',
       cell: (school) => (
         <Link
           to="/admin/schools/$schoolId"
@@ -147,27 +171,41 @@ function AdminDashboard() {
   return (
     <div className="space-y-7">
       <section className="relative isolate overflow-hidden rounded-3xl bg-gradient-to-br from-brand via-brand-mid to-brand-soft px-6 py-7 text-brand-foreground shadow-xl shadow-brand/10 sm:px-8 sm:py-8">
-        <div aria-hidden="true" className="pointer-events-none absolute -right-16 -top-32 size-80 rounded-full border border-brand-foreground/10" />
-        <div aria-hidden="true" className="pointer-events-none absolute -right-2 -top-20 size-56 rounded-full border border-brand-foreground/10" />
-        <div aria-hidden="true" className="pointer-events-none absolute bottom-0 right-40 size-44 rounded-full bg-info/10 blur-3xl" />
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute -right-16 -top-32 size-80 rounded-full border border-brand-foreground/10"
+        />
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute -right-2 -top-20 size-56 rounded-full border border-brand-foreground/10"
+        />
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute bottom-0 right-40 size-44 rounded-full bg-info/10 blur-3xl"
+        />
         <div className="relative flex flex-wrap items-end justify-between gap-6">
           <div className="max-w-2xl">
             <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-brand-foreground/15 bg-brand-foreground/10 px-3 py-1.5 text-[11px] font-semibold text-brand-foreground/80 backdrop-blur">
               <Sparkles className="size-3.5 text-brand-foreground/80" />
               SchoolHub platform control
             </div>
-            <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
-              Platform overview
-            </h1>
+            <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Platform overview</h1>
             <p className="mt-2 max-w-xl text-sm leading-6 text-brand-foreground/80">
-              Platform-wide school, learner, educator, and subscription data. Automatically refreshes every minute.
+              Platform-wide school, learner, educator, and subscription data. Automatically
+              refreshes every minute.
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <div className="text-right text-xs text-brand-foreground/75" aria-live="polite">
-              <p>{isRefreshing ? "Refreshing platform data…" : "Platform data"}</p>
+              <p>{isRefreshing ? 'Refreshing platform data…' : 'Platform data'}</p>
               {lastUpdatedAt > 0 && !isRefreshing && (
-                <p className="mt-1">Updated {new Date(lastUpdatedAt).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}</p>
+                <p className="mt-1">
+                  Updated{' '}
+                  {new Date(lastUpdatedAt).toLocaleTimeString(undefined, {
+                    hour: 'numeric',
+                    minute: '2-digit',
+                  })}
+                </p>
               )}
             </div>
             <button
@@ -176,17 +214,20 @@ function AdminDashboard() {
               disabled={isRefreshing}
               className="inline-flex h-11 items-center gap-2 rounded-xl border border-brand-foreground/25 bg-brand-foreground/10 px-4 text-xs font-bold text-brand-foreground transition hover:bg-brand-foreground/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-foreground disabled:cursor-not-allowed disabled:opacity-60"
             >
-              <RefreshCw className={`size-3.5 ${isRefreshing ? "animate-spin" : ""}`} aria-hidden="true" />
-              {isRefreshing ? "Refreshing…" : "Refresh data"}
+              <RefreshCw
+                className={`size-3.5 ${isRefreshing ? 'animate-spin' : ''}`}
+                aria-hidden="true"
+              />
+              {isRefreshing ? 'Refreshing…' : 'Refresh data'}
             </button>
             <button
               type="button"
-              onClick={() => void navigate({ to: "/admin/schools/new" })}
-            className="superadmin-button-secondary inline-flex h-11 items-center gap-2 rounded-xl border border-border/70 bg-card px-4 text-xs font-bold text-primary shadow-lg shadow-primary/15 transition hover:-translate-y-0.5 hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-background focus-visible:ring-offset-2 focus-visible:ring-offset-primary"
-          >
-            <Plus className="size-4" />
-            Enroll a school
-            <ArrowRight className="size-3.5" />
+              onClick={() => void navigate({ to: '/admin/schools/new' })}
+              className="superadmin-button-secondary inline-flex h-11 items-center gap-2 rounded-xl border border-border/70 bg-card px-4 text-xs font-bold text-primary shadow-lg shadow-primary/15 transition hover:-translate-y-0.5 hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-background focus-visible:ring-offset-2 focus-visible:ring-offset-primary"
+            >
+              <Plus className="size-4" />
+              Enroll a school
+              <ArrowRight className="size-3.5" />
             </button>
           </div>
         </div>
@@ -195,131 +236,249 @@ function AdminDashboard() {
       <OperationsHealthPanel />
 
       {statsError && (
-        <div role="alert" className="flex items-start gap-3 rounded-xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+        <div
+          role="alert"
+          className="flex items-start gap-3 rounded-xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+        >
           <CircleAlert className="mt-0.5 size-4 shrink-0" />
           <span>Platform statistics could not be loaded: {statsError.message}</span>
         </div>
       )}
 
-      <section aria-label="Platform statistics" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <section
+        aria-label="Platform statistics"
+        className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"
+      >
         <StatCard
           label="Total schools"
-          value={statsLoading ? "…" : (stats?.totalSchools ?? "—")}
+          value={statsLoading ? '…' : (stats?.totalSchools ?? '—')}
           icon={Building2}
           color="indigo"
         />
         <StatCard
           label="Students"
-          value={statsLoading ? "…" : (stats?.totalStudents ?? "—")}
+          value={statsLoading ? '…' : (stats?.totalStudents ?? '—')}
           icon={Users}
           color="emerald"
         />
         <StatCard
           label="Teachers"
-          value={statsLoading ? "…" : (stats?.totalTeachers ?? "—")}
+          value={statsLoading ? '…' : (stats?.totalTeachers ?? '—')}
           icon={GraduationCap}
           color="amber"
         />
         <StatCard
           label="Active subscriptions"
-          value={statsLoading ? "…" : (stats?.activeSubscriptions ?? "—")}
+          value={statsLoading ? '…' : (stats?.activeSubscriptions ?? '—')}
           icon={CreditCard}
           color="rose"
         />
       </section>
 
-      {stats && (stats.lapsed ?? 0) + (stats.expiringSoon ?? 0) + (stats.pastDue ?? 0) + (stats.suspended ?? 0) > 0 && (
-        <section aria-label="Needs attention" className="flex flex-col gap-4 rounded-2xl border border-warning/30 bg-warning/10 p-5 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-start gap-3">
-            <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-warning/15 text-warning"><CircleAlert className="size-5" /></span>
-            <div>
-              <h2 className="text-sm font-bold text-foreground">Subscriptions need attention</h2>
-              <p className="mt-1 text-sm text-muted-foreground">
-                {[
-                  stats.lapsed ? `${stats.lapsed} lapsed` : null,
-                  stats.expiringSoon ? `${stats.expiringSoon} expiring within 14 days` : null,
-                  stats.pastDue ? `${stats.pastDue} past due` : null,
-                  stats.suspended ? `${stats.suspended} suspended` : null,
-                ].filter(Boolean).join(" · ")}
-              </p>
+      {stats &&
+        (stats.lapsed ?? 0) +
+          (stats.expiringSoon ?? 0) +
+          (stats.pastDue ?? 0) +
+          (stats.suspended ?? 0) >
+          0 && (
+          <section
+            aria-label="Needs attention"
+            className="flex flex-col gap-4 rounded-2xl border border-warning/30 bg-warning/10 p-5 sm:flex-row sm:items-center sm:justify-between"
+          >
+            <div className="flex items-start gap-3">
+              <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-warning/15 text-warning">
+                <CircleAlert className="size-5" />
+              </span>
+              <div>
+                <h2 className="text-sm font-bold text-foreground">Subscriptions need attention</h2>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {[
+                    stats.lapsed ? `${stats.lapsed} lapsed` : null,
+                    stats.expiringSoon ? `${stats.expiringSoon} expiring within 14 days` : null,
+                    stats.pastDue ? `${stats.pastDue} past due` : null,
+                    stats.suspended ? `${stats.suspended} suspended` : null,
+                  ]
+                    .filter(Boolean)
+                    .join(' · ')}
+                </p>
+              </div>
             </div>
-          </div>
-          <Link to="/admin/subscriptions" className="superadmin-button-secondary inline-flex shrink-0 items-center gap-2 self-start rounded-xl px-4 py-2.5 text-sm font-semibold sm:self-center">
-            Review subscriptions <ArrowRight className="size-3.5" />
-          </Link>
-        </section>
-      )}
+            <Link
+              to="/admin/subscriptions"
+              className="superadmin-button-secondary inline-flex shrink-0 items-center gap-2 self-start rounded-xl px-4 py-2.5 text-sm font-semibold sm:self-center"
+            >
+              Review subscriptions <ArrowRight className="size-3.5" />
+            </Link>
+          </section>
+        )}
 
       <section aria-label="Subscription analytics" className="grid gap-5 xl:grid-cols-[1.25fr_1fr]">
         <article className="min-w-0 rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-6">
           <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
             <div>
-              <h2 className="text-sm font-semibold text-foreground sm:text-base">Platform subscription distribution</h2>
-              <p className="mt-1 text-xs leading-5 text-muted-foreground">Current subscription status across every enrolled school, not only the newest records.</p>
+              <h2 className="text-sm font-semibold text-foreground sm:text-base">
+                Platform subscription distribution
+              </h2>
+              <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                Current subscription status across every enrolled school, not only the newest
+                records.
+              </p>
             </div>
-            <span className="rounded-full border border-border bg-muted/50 px-2.5 py-1 text-[10px] font-semibold text-muted-foreground">Platform-wide</span>
+            <span className="rounded-full border border-border bg-muted/50 px-2.5 py-1 text-[10px] font-semibold text-muted-foreground">
+              Platform-wide
+            </span>
           </div>
           {statsLoading ? (
-            <div className="flex h-56 items-center justify-center text-sm text-muted-foreground">Loading subscription data…</div>
+            <div className="flex h-56 items-center justify-center text-sm text-muted-foreground">
+              Loading subscription data…
+            </div>
           ) : statsError || !stats ? (
-            <div className="flex h-56 items-center justify-center rounded-xl border border-dashed border-border px-5 text-center text-sm text-muted-foreground">Subscription data is unavailable. Try refreshing the dashboard.</div>
-          ) : (() => {
-            const palette: Record<string, string> = {
-              ACTIVE: "var(--success)",
-              TRIALING: "var(--chart-1)",
-              PAST_DUE: "var(--warning)",
-              SUSPENDED: "var(--destructive)",
-              CANCELLED: "var(--chart-4)",
-              CANCELED: "var(--chart-4)",
-              EXPIRED: "var(--muted-foreground)",
-              UNPAID: "var(--chart-5)",
-              INCOMPLETE: "var(--info)",
-              INCOMPLETE_EXPIRED: "var(--chart-3)",
-              UNKNOWN: "var(--border)",
-            };
-            const data = Object.entries(stats.subscriptionStatusCounts ?? {})
-              .filter(([, value]) => value > 0)
-              .sort(([left], [right]) => left.localeCompare(right))
-              .map(([status, value]) => ({ status, label: status.replaceAll("_", " "), value, fill: palette[status] ?? "var(--chart-2)" }));
-            if (!data.length) {
-              return <div className="flex h-56 items-center justify-center rounded-xl border border-dashed border-border px-5 text-center text-sm text-muted-foreground">No school subscription records are available yet.</div>;
-            }
-            return (
-              <div className="grid min-w-0 items-center gap-4 sm:grid-cols-[minmax(180px,0.8fr)_minmax(0,1fr)]">
-                <div role="img" aria-label={data.map((item) => `${item.label}: ${item.value} schools`).join(", ")} className="h-56 min-w-0">
-                  <ResponsiveContainer width="100%" height="100%" minWidth={0}>
-                    <PieChart>
-                      <Pie data={data} dataKey="value" nameKey="label" cx="50%" cy="50%" innerRadius="57%" outerRadius="82%" paddingAngle={2} stroke="none">
-                        {data.map((item) => <Cell key={item.status} fill={item.fill} />)}
-                      </Pie>
-                      <Tooltip contentStyle={{ borderRadius: 12, border: "1px solid var(--border)", backgroundColor: "var(--popover)", color: "var(--popover-foreground)", fontSize: 12 }} formatter={(value) => [`${Number(value ?? 0).toLocaleString("en-GH")} schools`, "Schools"]} />
-                    </PieChart>
-                  </ResponsiveContainer>
+            <div className="flex h-56 items-center justify-center rounded-xl border border-dashed border-border px-5 text-center text-sm text-muted-foreground">
+              Subscription data is unavailable. Try refreshing the dashboard.
+            </div>
+          ) : (
+            (() => {
+              const palette: Record<string, string> = {
+                ACTIVE: 'var(--success)',
+                TRIALING: 'var(--chart-1)',
+                PAST_DUE: 'var(--warning)',
+                SUSPENDED: 'var(--destructive)',
+                CANCELLED: 'var(--chart-4)',
+                CANCELED: 'var(--chart-4)',
+                EXPIRED: 'var(--muted-foreground)',
+                UNPAID: 'var(--chart-5)',
+                INCOMPLETE: 'var(--info)',
+                INCOMPLETE_EXPIRED: 'var(--chart-3)',
+                UNKNOWN: 'var(--border)',
+              };
+              const data = Object.entries(stats.subscriptionStatusCounts ?? {})
+                .filter(([, value]) => value > 0)
+                .sort(([left], [right]) => left.localeCompare(right))
+                .map(([status, value]) => ({
+                  status,
+                  label: status.replaceAll('_', ' '),
+                  value,
+                  fill: palette[status] ?? 'var(--chart-2)',
+                }));
+              if (!data.length) {
+                return (
+                  <div className="flex h-56 items-center justify-center rounded-xl border border-dashed border-border px-5 text-center text-sm text-muted-foreground">
+                    No school subscription records are available yet.
+                  </div>
+                );
+              }
+              return (
+                <div className="grid min-w-0 items-center gap-4 sm:grid-cols-[minmax(180px,0.8fr)_minmax(0,1fr)]">
+                  <div
+                    role="img"
+                    aria-label={data
+                      .map((item) => `${item.label}: ${item.value} schools`)
+                      .join(', ')}
+                    className="h-56 min-w-0"
+                  >
+                    <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+                      <PieChart>
+                        <Pie
+                          data={data}
+                          dataKey="value"
+                          nameKey="label"
+                          cx="50%"
+                          cy="50%"
+                          innerRadius="57%"
+                          outerRadius="82%"
+                          paddingAngle={2}
+                          stroke="none"
+                        >
+                          {data.map((item) => (
+                            <Cell key={item.status} fill={item.fill} />
+                          ))}
+                        </Pie>
+                        <Tooltip
+                          contentStyle={{
+                            borderRadius: 12,
+                            border: '1px solid var(--border)',
+                            backgroundColor: 'var(--popover)',
+                            color: 'var(--popover-foreground)',
+                            fontSize: 12,
+                          }}
+                          formatter={(value) => [
+                            `${Number(value ?? 0).toLocaleString('en-GH')} schools`,
+                            'Schools',
+                          ]}
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                  <ul className="min-w-0 space-y-2">
+                    {data.map((item) => (
+                      <li
+                        key={item.status}
+                        className="flex items-center justify-between gap-3 text-xs"
+                      >
+                        <span className="flex min-w-0 items-center gap-2 text-muted-foreground">
+                          <span
+                            className="size-2.5 shrink-0 rounded-sm"
+                            style={{ backgroundColor: item.fill }}
+                          />
+                          <span className="truncate">{item.label}</span>
+                        </span>
+                        <span className="font-semibold tabular-nums text-foreground">
+                          {item.value.toLocaleString('en-GH')}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
                 </div>
-                <ul className="min-w-0 space-y-2">
-                  {data.map((item) => <li key={item.status} className="flex items-center justify-between gap-3 text-xs"><span className="flex min-w-0 items-center gap-2 text-muted-foreground"><span className="size-2.5 shrink-0 rounded-sm" style={{ backgroundColor: item.fill }} /><span className="truncate">{item.label}</span></span><span className="font-semibold tabular-nums text-foreground">{item.value.toLocaleString("en-GH")}</span></li>)}
-                </ul>
-              </div>
-            );
-          })()}
+              );
+            })()
+          )}
         </article>
 
         <article className="min-w-0 rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-6">
           <div className="mb-4">
-            <h2 className="text-sm font-semibold text-foreground sm:text-base">Subscription health</h2>
-            <p className="mt-1 text-xs leading-5 text-muted-foreground">Items that may need follow-up from the platform team.</p>
+            <h2 className="text-sm font-semibold text-foreground sm:text-base">
+              Subscription health
+            </h2>
+            <p className="mt-1 text-xs leading-5 text-muted-foreground">
+              Items that may need follow-up from the platform team.
+            </p>
           </div>
-          {statsLoading ? <div className="grid gap-3 sm:grid-cols-2"><div className="h-24 animate-pulse rounded-xl bg-muted" /><div className="h-24 animate-pulse rounded-xl bg-muted" /><div className="h-24 animate-pulse rounded-xl bg-muted" /><div className="h-24 animate-pulse rounded-xl bg-muted" /></div>
-          : statsError || !stats ? <div className="flex h-48 items-center justify-center rounded-xl border border-dashed border-border px-5 text-center text-sm text-muted-foreground">Subscription health is unavailable.</div>
-          : <div className="grid gap-3 sm:grid-cols-2">
-            {[
-              { label: "Expiring in 14 days", value: stats.expiringSoon ?? 0, tone: "warning" },
-              { label: "Past expiry", value: stats.lapsed ?? 0, tone: "destructive" },
-              { label: "Past due", value: stats.pastDue ?? 0, tone: "warning" },
-              { label: "Suspended", value: stats.suspended ?? 0, tone: "destructive" },
-            ].map((metric) => <div key={metric.label} className="rounded-xl border border-border p-3"><p className="text-xs text-muted-foreground">{metric.label}</p><p className={`mt-2 text-2xl font-bold tabular-nums ${metric.tone === "destructive" ? "text-destructive" : "text-warning"}`}>{metric.value.toLocaleString("en-GH")}</p></div>)}
-            <Link to="/admin/subscriptions" className="sm:col-span-2 inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-border px-3 text-xs font-semibold text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Review subscriptions <ArrowRight className="size-3.5" /></Link>
-          </div>}
+          {statsLoading ? (
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="h-24 animate-pulse rounded-xl bg-muted" />
+              <div className="h-24 animate-pulse rounded-xl bg-muted" />
+              <div className="h-24 animate-pulse rounded-xl bg-muted" />
+              <div className="h-24 animate-pulse rounded-xl bg-muted" />
+            </div>
+          ) : statsError || !stats ? (
+            <div className="flex h-48 items-center justify-center rounded-xl border border-dashed border-border px-5 text-center text-sm text-muted-foreground">
+              Subscription health is unavailable.
+            </div>
+          ) : (
+            <div className="grid gap-3 sm:grid-cols-2">
+              {[
+                { label: 'Expiring in 14 days', value: stats.expiringSoon ?? 0, tone: 'warning' },
+                { label: 'Past expiry', value: stats.lapsed ?? 0, tone: 'destructive' },
+                { label: 'Past due', value: stats.pastDue ?? 0, tone: 'warning' },
+                { label: 'Suspended', value: stats.suspended ?? 0, tone: 'destructive' },
+              ].map((metric) => (
+                <div key={metric.label} className="rounded-xl border border-border p-3">
+                  <p className="text-xs text-muted-foreground">{metric.label}</p>
+                  <p
+                    className={`mt-2 text-2xl font-bold tabular-nums ${metric.tone === 'destructive' ? 'text-destructive' : 'text-warning'}`}
+                  >
+                    {metric.value.toLocaleString('en-GH')}
+                  </p>
+                </div>
+              ))}
+              <Link
+                to="/admin/subscriptions"
+                className="sm:col-span-2 inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-border px-3 text-xs font-semibold text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                Review subscriptions <ArrowRight className="size-3.5" />
+              </Link>
+            </div>
+          )}
         </article>
       </section>
 

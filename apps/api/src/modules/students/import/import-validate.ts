@@ -1,7 +1,7 @@
-import type { NormalizedStudentRow } from "@schoolhub/shared";
+import type { NormalizedStudentRow } from '@schoolhub/shared';
 
 /** "JHS 1-A", "jhs1a" and "JHS 1A" all match the same class. */
-export const matchKey = (value: string) => value.toLowerCase().replace(/[^\p{L}\p{N}]/gu, "");
+export const matchKey = (value: string) => value.toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
 export const studentKey = (firstName: string, lastName: string, dateOfBirth: string) =>
   `${matchKey(firstName)}|${matchKey(lastName)}|${dateOfBirth}`;
 
@@ -21,7 +21,7 @@ export interface ImportContext {
   studentKeys: Set<string>;
 }
 
-export type RowStatus = "ready" | "warning" | "duplicate" | "error";
+export type RowStatus = 'ready' | 'warning' | 'duplicate' | 'error';
 
 export interface RowVerdict {
   status: RowStatus;
@@ -84,10 +84,10 @@ export function evaluateRow(
   const admission = row.admissionNumber?.trim().toLowerCase();
 
   if (admission && ctx.admissionNumbers.has(admission)) {
-    return { status: "duplicate", errors, warnings, classId: null, houseId: null };
+    return { status: 'duplicate', errors, warnings, classId: null, houseId: null };
   }
   if (ctx.studentKeys.has(key)) {
-    return { status: "duplicate", errors, warnings, classId: null, houseId: null };
+    return { status: 'duplicate', errors, warnings, classId: null, houseId: null };
   }
 
   if (seen) {
@@ -102,24 +102,40 @@ export function evaluateRow(
   let classId: string | null = null;
   if (row.className) {
     if (!ctx.hasCurrentTerm) {
-      errors.push("Set a current academic year and term before placing students in classes.");
+      errors.push('Set a current academic year and term before placing students in classes.');
     } else {
       const match = resolveByName(ctx.classes, row.className);
-      if ("id" in match) classId = match.id;
-      else if ("ambiguous" in match) errors.push(`Class "${row.className}" matches more than one class: ${match.ambiguous.join(", ")}.`);
-      else errors.push(`Class "${row.className}" doesn't exist${match.suggestion ? `. Did you mean ${match.suggestion}?` : ". Create it first, or fix the spelling."}`);
+      if ('id' in match) classId = match.id;
+      else if ('ambiguous' in match)
+        errors.push(
+          `Class "${row.className}" matches more than one class: ${match.ambiguous.join(', ')}.`,
+        );
+      else
+        errors.push(
+          `Class "${row.className}" doesn't exist${match.suggestion ? `. Did you mean ${match.suggestion}?` : '. Create it first, or fix the spelling.'}`,
+        );
     }
   }
 
   let houseId: string | null = null;
   if (row.houseName) {
     const match = resolveByName(ctx.houses, row.houseName);
-    if ("id" in match) houseId = match.id;
-    else if ("ambiguous" in match) errors.push(`House "${row.houseName}" matches more than one house.`);
-    else errors.push(`House "${row.houseName}" doesn't exist${match.suggestion ? `. Did you mean ${match.suggestion}?` : "."}`);
+    if ('id' in match) houseId = match.id;
+    else if ('ambiguous' in match)
+      errors.push(`House "${row.houseName}" matches more than one house.`);
+    else
+      errors.push(
+        `House "${row.houseName}" doesn't exist${match.suggestion ? `. Did you mean ${match.suggestion}?` : '.'}`,
+      );
   }
 
-  return { status: errors.length ? "error" : warnings.length ? "warning" : "ready", errors, warnings, classId, houseId };
+  return {
+    status: errors.length ? 'error' : warnings.length ? 'warning' : 'ready',
+    errors,
+    warnings,
+    classId,
+    houseId,
+  };
 }
 
 /** After a student is created, later rows in the same run see them as already present. */

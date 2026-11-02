@@ -5,26 +5,26 @@ import {
   HttpStatus,
   Injectable,
   NotFoundException,
-} from "@nestjs/common";
-import { hashPassword, verifyPassword } from "better-auth/crypto";
-import type { School } from "@prisma/client";
+} from '@nestjs/common';
+import { hashPassword, verifyPassword } from 'better-auth/crypto';
+import type { School } from '@prisma/client';
 import {
   guardianEmailDomain,
   studentLoginEmail,
   type ChangePasswordInput,
   type CredentialSubjectKind,
   type IssuedCredentials,
-} from "@schoolhub/shared";
-import { PrismaService } from "../../prisma/prisma.service.js";
-import { writeAudit, type AuditActor } from "../../common/audit/audit.js";
+} from '@schoolhub/shared';
+import { PrismaService } from '../../prisma/prisma.service.js';
+import { writeAudit, type AuditActor } from '../../common/audit/audit.js';
 import {
   CredentialsService,
   newGuardianLoginEmail,
   toIssuedCredentials,
   type PreparedCredential,
   type ProvisionableRole,
-} from "./credentials.service.js";
-import { roleForStaffType } from "./staff-roles.js";
+} from './credentials.service.js';
+import { roleForStaffType } from './staff-roles.js';
 
 const MAX_ATTEMPTS = 5;
 const WINDOW_MS = 60_000;
@@ -44,16 +44,21 @@ export class AccountsService {
   // records in its verification table; a cookie without a live record is not
   // accepted on the next sign-in.
   // --------------------------------------------------------------------------
-  async listTrustedDevices(user: { id: string; role?: string; mustChangePassword?: boolean; banned?: boolean }) {
+  async listTrustedDevices(user: {
+    id: string;
+    role?: string;
+    mustChangePassword?: boolean;
+    banned?: boolean;
+  }) {
     this.assertSuperAdmin(user);
     const devices = await this.prisma.client.verification.findMany({
       where: {
         value: user.id,
-        identifier: { startsWith: "trust-device-" },
+        identifier: { startsWith: 'trust-device-' },
         expiresAt: { gt: new Date() },
       },
       select: { id: true, createdAt: true, expiresAt: true },
-      orderBy: { createdAt: "desc" },
+      orderBy: { createdAt: 'desc' },
     });
     return { data: devices };
   }
@@ -69,24 +74,25 @@ export class AccountsService {
         where: {
           id: deviceId,
           value: user.id,
-          identifier: { startsWith: "trust-device-" },
+          identifier: { startsWith: 'trust-device-' },
         },
         select: { id: true, createdAt: true, expiresAt: true },
       });
-      if (!device) throw new NotFoundException("Trusted device not found or already revoked.");
+      if (!device) throw new NotFoundException('Trusted device not found or already revoked.');
 
       const deleted = await tx.verification.deleteMany({
         where: {
           id: deviceId,
           value: user.id,
-          identifier: { startsWith: "trust-device-" },
+          identifier: { startsWith: 'trust-device-' },
         },
       });
-      if (!deleted.count) throw new NotFoundException("Trusted device not found or already revoked.");
+      if (!deleted.count)
+        throw new NotFoundException('Trusted device not found or already revoked.');
 
       await writeAudit(tx, actor, {
-        action: "ACCESS_CHANGED",
-        entityType: "auth.two-factor.device-trust-revoked",
+        action: 'ACCESS_CHANGED',
+        entityType: 'auth.two-factor.device-trust-revoked',
         entityId: device.id,
         oldValues: { createdAt: device.createdAt, expiresAt: device.expiresAt },
         newValues: { revoked: true },
@@ -95,19 +101,22 @@ export class AccountsService {
     });
   }
 
-  async revokeAllTrustedDevices(user: { id: string; role?: string; mustChangePassword?: boolean; banned?: boolean }, actor: AuditActor) {
+  async revokeAllTrustedDevices(
+    user: { id: string; role?: string; mustChangePassword?: boolean; banned?: boolean },
+    actor: AuditActor,
+  ) {
     this.assertSuperAdmin(user);
     return this.prisma.client.$transaction(async (tx) => {
       const deleted = await tx.verification.deleteMany({
         where: {
           value: user.id,
-          identifier: { startsWith: "trust-device-" },
+          identifier: { startsWith: 'trust-device-' },
         },
       });
       if (deleted.count) {
         await writeAudit(tx, actor, {
-          action: "ACCESS_CHANGED",
-          entityType: "auth.two-factor.device-trust-revoked-all",
+          action: 'ACCESS_CHANGED',
+          entityType: 'auth.two-factor.device-trust-revoked-all',
           entityId: user.id,
           newValues: { revokedCount: deleted.count },
         });
@@ -116,15 +125,24 @@ export class AccountsService {
     });
   }
 
-  private assertSuperAdmin(user: { id: string; role?: string; mustChangePassword?: boolean; banned?: boolean }) {
-    if (user.role !== "superAdmin") {
-      throw new ForbiddenException("Trusted-device management is restricted to platform administrators.");
+  private assertSuperAdmin(user: {
+    id: string;
+    role?: string;
+    mustChangePassword?: boolean;
+    banned?: boolean;
+  }) {
+    if (user.role !== 'superAdmin') {
+      throw new ForbiddenException(
+        'Trusted-device management is restricted to platform administrators.',
+      );
     }
     if (user.banned) {
-      throw new ForbiddenException("This account has been suspended.");
+      throw new ForbiddenException('This account has been suspended.');
     }
     if (user.mustChangePassword) {
-      throw new ForbiddenException("Change your temporary password before managing trusted devices.");
+      throw new ForbiddenException(
+        'Change your temporary password before managing trusted devices.',
+      );
     }
   }
 
@@ -139,11 +157,11 @@ export class AccountsService {
     this.assertNotLockedOut(user.id);
 
     const account = await this.prisma.client.account.findFirst({
-      where: { userId: user.id, providerId: "credential" },
+      where: { userId: user.id, providerId: 'credential' },
       select: { id: true, password: true },
     });
     if (!account?.password) {
-      throw new BadRequestException("This account does not use a password.");
+      throw new BadRequestException('This account does not use a password.');
     }
 
     const valid = await verifyPassword({
@@ -153,7 +171,7 @@ export class AccountsService {
     if (!valid) {
       this.recordFailure(user.id);
       // 400 (not 401) so the web client does not mistake it for an expired session.
-      throw new BadRequestException("Your current password is incorrect.");
+      throw new BadRequestException('Your current password is incorrect.');
     }
     this.failedAttempts.delete(user.id);
 
@@ -184,13 +202,13 @@ export class AccountsService {
       });
       // Password changes revoke trusted-device tokens as well as other sessions.
       await tx.verification.deleteMany({
-        where: { value: user.id, identifier: { startsWith: "trust-device-" } },
+        where: { value: user.id, identifier: { startsWith: 'trust-device-' } },
       });
       await this.credentials.audit(tx, {
         actorId: user.id,
         schoolId: school?.id,
-        action: "PASSWORD_CHANGED",
-        entityType: "USER",
+        action: 'PASSWORD_CHANGED',
+        entityType: 'USER',
         entityId: user.id,
       });
     });
@@ -219,41 +237,41 @@ export class AccountsService {
       let role: ProvisionableRole;
       let loginId: string | undefined;
 
-      if (kind === "student") {
+      if (kind === 'student') {
         const student = await tx.student.findFirst({
           where: { id: recordId, schoolId: school.id, deletedAt: null },
           include: { profile: { include: { user: true } } },
         });
-        if (!student) throw new NotFoundException("Student not found.");
+        if (!student) throw new NotFoundException('Student not found.');
         userId = student.profile.userId;
-        role = "student";
+        role = 'student';
         credential = await this.credentials.prepare(role);
         // Students created with the username scheme sign in with it; older
         // records keep using their admission number.
         const studentLoginId = student.username ?? student.admissionNumber ?? student.studentId;
         loginId = studentLoginId;
         email = student.profile.user.email;
-        if (email.endsWith("@student.schoolhub")) {
+        if (email.endsWith('@student.schoolhub')) {
           // Legacy placeholder that is not a valid sign-in address.
           email = studentLoginEmail(studentLoginId, school.subdomain);
           await tx.user.update({ where: { id: userId }, data: { email } });
           await tx.userProfile.update({ where: { id: student.profileId }, data: { email } });
         }
-      } else if (kind === "teacher") {
+      } else if (kind === 'teacher') {
         const teacher = await tx.teacher.findFirst({
           where: { id: recordId, schoolId: school.id, deletedAt: null },
           include: { profile: { include: { user: true } } },
         });
-        if (!teacher) throw new NotFoundException("Teacher not found.");
-        role = "teacher";
+        if (!teacher) throw new NotFoundException('Teacher not found.');
+        role = 'teacher';
         credential = await this.credentials.prepare(role);
-        const displayName = `${teacher.firstName ?? ""} ${teacher.lastName ?? ""}`.trim();
+        const displayName = `${teacher.firstName ?? ''} ${teacher.lastName ?? ''}`.trim();
         if (teacher.profile) {
           userId = teacher.profile.userId;
           email = teacher.profile.user.email;
         } else {
           if (!teacher.invitationEmail) {
-            throw new BadRequestException("Add an email address for this teacher first.");
+            throw new BadRequestException('Add an email address for this teacher first.');
           }
           const created = await this.credentials.createLogin(tx, {
             name: displayName || teacher.invitationEmail,
@@ -261,35 +279,37 @@ export class AccountsService {
             role,
             organizationId: school.organizationId,
             credential,
-            profile: { firstName: teacher.firstName ?? "", lastName: teacher.lastName ?? "" },
+            profile: { firstName: teacher.firstName ?? '', lastName: teacher.lastName ?? '' },
           });
           await tx.teacher.update({
             where: { id: teacher.id },
             data: { profileId: created.profileId },
           });
-          await this.auditIssue(tx, actor.id, school.id, "CREDENTIALS_ISSUED", kind, teacher.id);
+          await this.auditIssue(tx, actor.id, school.id, 'CREDENTIALS_ISSUED', kind, teacher.id);
           return toIssuedCredentials(created.email, credential, role);
         }
-      } else if (kind === "staff") {
+      } else if (kind === 'staff') {
         const staff = await tx.staff.findFirst({
           where: { id: recordId, schoolId: school.id, deletedAt: null },
           include: { profile: { include: { user: true } } },
         });
-        if (!staff) throw new NotFoundException("Staff member not found.");
+        if (!staff) throw new NotFoundException('Staff member not found.');
         userId = staff.profile.userId;
         email = staff.profile.user.email;
         role = roleForStaffType(staff.staffType);
         credential = await this.credentials.prepare(role);
-        if (role === "admin" && actor.schoolRole === "headteacher") {
-          throw new ForbiddenException("Only a school owner or administrator can manage administrator logins.");
+        if (role === 'admin' && actor.schoolRole === 'headteacher') {
+          throw new ForbiddenException(
+            'Only a school owner or administrator can manage administrator logins.',
+          );
         }
       } else {
         const guardian = await tx.guardian.findFirst({
           where: { id: recordId, schoolId: school.id, deletedAt: null },
           include: { profile: { include: { user: true } } },
         });
-        if (!guardian) throw new NotFoundException("Guardian not found.");
-        role = "guardian";
+        if (!guardian) throw new NotFoundException('Guardian not found.');
+        role = 'guardian';
         credential = await this.credentials.prepare(role);
         const displayName = `${guardian.firstName} ${guardian.lastName}`.trim();
         if (guardian.profile) {
@@ -300,7 +320,7 @@ export class AccountsService {
             where: { id: school.id },
             select: { email: true, subdomain: true },
           });
-          if (!schoolEmailInfo) throw new NotFoundException("School not found.");
+          if (!schoolEmailInfo) throw new NotFoundException('School not found.');
           const guardianDomain = guardianEmailDomain(
             schoolEmailInfo.email,
             schoolEmailInfo.subdomain,
@@ -326,20 +346,20 @@ export class AccountsService {
             where: { id: guardian.id },
             data: { profileId: created.profileId, canLogin: true },
           });
-          await this.auditIssue(tx, actor.id, school.id, "CREDENTIALS_ISSUED", kind, guardian.id);
+          await this.auditIssue(tx, actor.id, school.id, 'CREDENTIALS_ISSUED', kind, guardian.id);
           return toIssuedCredentials(created.email, credential, role);
         }
       }
 
       if (userId === actor.id) {
-        throw new ForbiddenException("Use “Change password” to update your own password.");
+        throw new ForbiddenException('Use “Change password” to update your own password.');
       }
       const target = await tx.member.findUnique({
         where: { userId },
         select: { role: true, roles: true },
       });
       const targetRoles = new Set([target?.role, ...(target?.roles ?? [])]);
-      if (targetRoles.has("owner") && actor.schoolRole !== "owner") {
+      if (targetRoles.has('owner') && actor.schoolRole !== 'owner') {
         throw new ForbiddenException("Only the school owner can reset the owner's password.");
       }
 
@@ -349,19 +369,19 @@ export class AccountsService {
         organizationId: school.organizationId,
         credential,
       });
-      if (kind === "guardian") {
+      if (kind === 'guardian') {
         await tx.guardian.update({ where: { id: recordId }, data: { canLogin: true } });
       }
-      await this.auditIssue(tx, actor.id, school.id, "PASSWORD_RESET", kind, recordId);
+      await this.auditIssue(tx, actor.id, school.id, 'PASSWORD_RESET', kind, recordId);
       return toIssuedCredentials(email, credential, role, loginId);
     });
   }
 
   private auditIssue(
-    tx: Parameters<CredentialsService["audit"]>[0],
+    tx: Parameters<CredentialsService['audit']>[0],
     actorId: string,
     schoolId: string,
-    action: "CREDENTIALS_ISSUED" | "PASSWORD_RESET",
+    action: 'CREDENTIALS_ISSUED' | 'PASSWORD_RESET',
     kind: CredentialSubjectKind,
     entityId: string,
   ) {
@@ -381,7 +401,7 @@ export class AccountsService {
     this.failedAttempts.set(userId, recent);
     if (recent.length >= MAX_ATTEMPTS) {
       throw new HttpException(
-        "Too many incorrect attempts. Please wait a minute and try again.",
+        'Too many incorrect attempts. Please wait a minute and try again.',
         HttpStatus.TOO_MANY_REQUESTS,
       );
     }

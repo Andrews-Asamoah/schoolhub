@@ -22,8 +22,7 @@ import {
   ghanaPhone,
   type DeliveryPayload,
 } from './delivery-provider.js';
-const contactHash = (value: string) =>
-  createHash('sha256').update(value).digest('hex');
+const contactHash = (value: string) => createHash('sha256').update(value).digest('hex');
 @Injectable()
 export class NotificationTransport extends DeliveryProvider {
   constructor() {
@@ -31,9 +30,7 @@ export class NotificationTransport extends DeliveryProvider {
   }
 }
 @Injectable()
-export class NotificationDeliveryService
-  implements OnApplicationBootstrap, OnApplicationShutdown
-{
+export class NotificationDeliveryService implements OnApplicationBootstrap, OnApplicationShutdown {
   private readonly logger = new Logger(NotificationDeliveryService.name);
   private timer?: NodeJS.Timeout;
   private running = false;
@@ -46,9 +43,7 @@ export class NotificationDeliveryService
   onApplicationBootstrap() {
     if (process.env.NODE_ENV === 'test') return;
     const poll = () => {
-      void this.tick().catch(() =>
-        this.logger.error('notification.delivery.poll.failed'),
-      );
+      void this.tick().catch(() => this.logger.error('notification.delivery.poll.failed'));
     };
     this.timer = setInterval(poll, 30000);
     this.timer.unref();
@@ -66,9 +61,7 @@ export class NotificationDeliveryService
       await this.prisma.client
         .$executeRaw`UPDATE background_jobs j SET status='SUCCEEDED',"completedAt"=CURRENT_TIMESTAMP,"updatedAt"=CURRENT_TIMESTAMP FROM notification_deliveries d WHERE d.id=j.id AND j.kind='notification-delivery' AND j.status='PENDING' AND d.status NOT IN ('PENDING','SENDING')`;
       const channels = ['EMAIL', 'SMS'].filter((channel) =>
-        channel === 'SMS'
-          ? this.sms.encryptionReady()
-          : this.transport.configured(channel),
+        channel === 'SMS' ? this.sms.encryptionReady() : this.transport.configured(channel),
       );
       const pending = channels.length
         ? await this.prisma.client.$queryRaw<
@@ -76,15 +69,11 @@ export class NotificationDeliveryService
           >`SELECT j.id FROM background_jobs j JOIN notification_deliveries d ON d.id=j.id WHERE j.kind='notification-delivery' AND j."nextAttempt"<=${now} AND (j.status='PENDING' OR (j.status='RUNNING' AND j."leaseUntil"<${now})) AND d.channel IN (${Prisma.join(channels)}) ORDER BY j."nextAttempt",j.id LIMIT 25`
         : [];
       for (const job of pending) {
-        const delivery =
-          await this.prisma.client.notificationDelivery.findUnique({
-            where: { id: job.id },
-            select: { channel: true },
-          });
-        if (
-          !delivery ||
-          (delivery.channel === 'EMAIL' && !this.transport.configured('EMAIL'))
-        )
+        const delivery = await this.prisma.client.notificationDelivery.findUnique({
+          where: { id: job.id },
+          select: { channel: true },
+        });
+        if (!delivery || (delivery.channel === 'EMAIL' && !this.transport.configured('EMAIL')))
           continue;
         await this.jobs.run(job.id, async () => this.dispatch(job.id), now);
       }
@@ -103,23 +92,18 @@ export class NotificationDeliveryService
       }
       await this.processEvents();
       if (this.sms.encryptionReady()) {
-        const accepted = await this.prisma.client.notificationDelivery.findMany(
-          {
-            where: {
-              provider: 'HUBTEL',
-              status: 'ACCEPTED',
-              nextPollAt: { lte: now },
-              providerMessageId: { not: null },
-            },
-            orderBy: { nextPollAt: 'asc' },
-            take: 25,
+        const accepted = await this.prisma.client.notificationDelivery.findMany({
+          where: {
+            provider: 'HUBTEL',
+            status: 'ACCEPTED',
+            nextPollAt: { lte: now },
+            providerMessageId: { not: null },
           },
-        );
+          orderBy: { nextPollAt: 'asc' },
+          take: 25,
+        });
         for (const row of accepted) {
-          if (
-            row.acceptedAt &&
-            now.getTime() - row.acceptedAt.getTime() > 7 * 86400000
-          ) {
+          if (row.acceptedAt && now.getTime() - row.acceptedAt.getTime() > 7 * 86400000) {
             await this.prisma.client.notificationDelivery.updateMany({
               where: { id: row.id, status: 'ACCEPTED' },
               data: {
@@ -130,15 +114,9 @@ export class NotificationDeliveryService
             });
             continue;
           }
-          const credentials = await this.sms.resolve(
-            row.schoolId,
-            row.smsConnectionId,
-          );
+          const credentials = await this.sms.resolve(row.schoolId, row.smsConnectionId);
           const state = credentials
-            ? await this.transport.smsStatus(
-                row.providerMessageId!,
-                credentials,
-              )
+            ? await this.transport.smsStatus(row.providerMessageId!, credentials)
             : 'UNKNOWN';
           await this.prisma.client.notificationDelivery.updateMany({
             where: { id: row.id, status: 'ACCEPTED' },
@@ -215,9 +193,7 @@ export class NotificationDeliveryService
           })
         : null;
       const email = row.channel === 'EMAIL',
-        recipient = email
-          ? row.recipient.trim().toLowerCase()
-          : ghanaPhone(row.recipient);
+        recipient = email ? row.recipient.trim().toLowerCase() : ghanaPhone(row.recipient);
       let reason: string | null = null;
       if (
         !school ||
@@ -264,10 +240,7 @@ export class NotificationDeliveryService
       const smsCredentials = email
         ? undefined
         : await this.sms.resolve(row.schoolId, row.smsConnectionId, tx);
-      if (
-        !email &&
-        (!smsCredentials || row.smsConnectionId !== settings?.smsConnectionId)
-      ) {
+      if (!email && (!smsCredentials || row.smsConnectionId !== settings?.smsConnectionId)) {
         await tx.notificationDelivery.update({
           where: { id },
           data: {
@@ -286,9 +259,7 @@ export class NotificationDeliveryService
           data: [{ schoolId: row.schoolId, day: today, channel: row.channel }],
           skipDuplicates: true,
         });
-        const limit = email
-          ? settings!.emailDailyLimit
-          : settings!.smsDailyLimit;
+        const limit = email ? settings!.emailDailyLimit : settings!.smsDailyLimit;
         const reserved = await tx.notificationDailyUsage.updateMany({
           where: {
             schoolId: row.schoolId,
@@ -357,17 +328,12 @@ export class NotificationDeliveryService
         reason: result.reason,
       },
     });
-    if (result.state === 'RETRY')
-      throw new Error('Retryable notification delivery failure');
+    if (result.state === 'RETRY') throw new Error('Retryable notification delivery failure');
   }
-  async webhook(
-    raw: Buffer | undefined,
-    headers: Record<string, string | undefined>,
-  ) {
+  async webhook(raw: Buffer | undefined, headers: Record<string, string | undefined>) {
     if (!process.env.RESEND_WEBHOOK_SECRET)
       throw new BadRequestException('Webhook not configured.');
-    if (!raw || raw.length > 128 * 1024)
-      throw new BadRequestException('Invalid webhook payload.');
+    if (!raw || raw.length > 128 * 1024) throw new BadRequestException('Invalid webhook payload.');
     let event: unknown;
     try {
       new Webhook(process.env.RESEND_WEBHOOK_SECRET).verify(
@@ -435,10 +401,7 @@ export class NotificationDeliveryService
               reason: next === 'BOUNCED' || next === 'COMPLAINED' ? next : null,
             },
           });
-        if (
-          ['BOUNCED', 'COMPLAINED', 'SUPPRESSED'].includes(next) &&
-          delivery.recipientHash
-        )
+        if (['BOUNCED', 'COMPLAINED', 'SUPPRESSED'].includes(next) && delivery.recipientHash)
           await tx.notificationSuppression.createMany({
             data: [
               {
@@ -554,12 +517,7 @@ export class NotificationDeliveryService
       return settings;
     });
   }
-  async retryEmail(
-    schoolId: string,
-    actorId: string,
-    id: string,
-    reason: string,
-  ) {
+  async retryEmail(schoolId: string, actorId: string, id: string, reason: string) {
     return this.prisma.client.$transaction(async (tx) => {
       await tx.$executeRaw`SELECT id FROM notification_deliveries WHERE id=${id} FOR UPDATE`;
       const row = await tx.notificationDelivery.findFirst({
@@ -587,8 +545,7 @@ export class NotificationDeliveryService
           completedAt: null,
         },
       });
-      if (!job.count)
-        throw new BadRequestException('Delivery is still being processed.');
+      if (!job.count) throw new BadRequestException('Delivery is still being processed.');
       await tx.notificationDelivery.update({
         where: { id },
         data: { status: 'PENDING', reason: 'ADMIN_RETRY' },

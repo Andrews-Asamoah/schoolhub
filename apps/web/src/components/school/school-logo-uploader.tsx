@@ -1,8 +1,8 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { ImageUp, LoaderCircle, Trash2 } from "lucide-react";
-import { useRef, useState } from "react";
-import { apiFetch } from "@/lib/api";
-import { useSchoolRole } from "@/components/school/school-role-switcher";
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { ImageUp, LoaderCircle, Trash2 } from 'lucide-react';
+import { useRef, useState } from 'react';
+import { apiFetch } from '@/lib/api';
+import { useSchoolRole } from '@/components/school/school-role-switcher';
 
 const MAX_BYTES = 2 * 1024 * 1024;
 
@@ -15,43 +15,43 @@ export function SchoolLogoUploader({ logo }: { logo?: string | null }) {
 
   const refresh = () =>
     Promise.all([
-      queryClient.invalidateQueries({ queryKey: ["school"] }),
-      queryClient.invalidateQueries({ queryKey: ["tenant"] }),
+      queryClient.invalidateQueries({ queryKey: ['school'] }),
+      queryClient.invalidateQueries({ queryKey: ['tenant'] }),
     ]);
 
   const upload = useMutation({
     mutationFn: (file: File) => {
       const body = new FormData();
-      body.append("logo", file);
-      return apiFetch("/schools/current/logo", { method: "PUT", body });
+      body.append('logo', file);
+      return apiFetch('/schools/current/logo', { method: 'PUT', body });
     },
     onSuccess: async () => {
-      setMessage({ ok: true, text: "Logo updated." });
+      setMessage({ ok: true, text: 'Logo updated.' });
       await refresh();
     },
     onError: (error: Error) => setMessage({ ok: false, text: error.message }),
   });
 
   const remove = useMutation({
-    mutationFn: () => apiFetch("/schools/current/logo", { method: "DELETE" }),
+    mutationFn: () => apiFetch('/schools/current/logo', { method: 'DELETE' }),
     onSuccess: async () => {
-      setMessage({ ok: true, text: "Logo removed." });
+      setMessage({ ok: true, text: 'Logo removed.' });
       await refresh();
     },
     onError: (error: Error) => setMessage({ ok: false, text: error.message }),
   });
 
-  if (activeRole !== "owner" && activeRole !== "admin") return null;
+  if (activeRole !== 'owner' && activeRole !== 'admin') return null;
 
   function onPick(file: File | undefined) {
     setMessage(null);
     if (!file) return;
-    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
-      setMessage({ ok: false, text: "Choose a JPEG, PNG or WebP image." });
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+      setMessage({ ok: false, text: 'Choose a JPEG, PNG or WebP image.' });
       return;
     }
     if (file.size > MAX_BYTES) {
-      setMessage({ ok: false, text: "The image must be 2 MB or smaller." });
+      setMessage({ ok: false, text: 'The image must be 2 MB or smaller.' });
       return;
     }
     upload.mutate(file);
@@ -79,7 +79,7 @@ export function SchoolLogoUploader({ logo }: { logo?: string | null }) {
             className="sr-only"
             onChange={(event) => {
               onPick(event.target.files?.[0]);
-              event.target.value = "";
+              event.target.value = '';
             }}
           />
           <button
@@ -88,8 +88,12 @@ export function SchoolLogoUploader({ logo }: { logo?: string | null }) {
             onClick={() => inputRef.current?.click()}
             className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-primary px-3 text-[11px] font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-60"
           >
-            {upload.isPending ? <LoaderCircle className="size-3.5 animate-spin" /> : <ImageUp className="size-3.5" />}
-            {logo ? "Replace" : "Upload"}
+            {upload.isPending ? (
+              <LoaderCircle className="size-3.5 animate-spin" />
+            ) : (
+              <ImageUp className="size-3.5" />
+            )}
+            {logo ? 'Replace' : 'Upload'}
           </button>
           {logo && (
             <button
@@ -103,7 +107,10 @@ export function SchoolLogoUploader({ logo }: { logo?: string | null }) {
           )}
         </div>
         {message && (
-          <p role={message.ok ? "status" : "alert"} className={`mt-2 text-[11px] ${message.ok ? "text-success" : "text-destructive"}`}>
+          <p
+            role={message.ok ? 'status' : 'alert'}
+            className={`mt-2 text-[11px] ${message.ok ? 'text-success' : 'text-destructive'}`}
+          >
             {message.text}
           </p>
         )}

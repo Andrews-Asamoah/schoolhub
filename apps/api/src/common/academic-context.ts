@@ -1,8 +1,8 @@
 export const ACADEMIC_CONTEXT_MANAGER_ROLES = [
-  "owner",
-  "admin",
-  "headteacher",
-  "accountant",
+  'owner',
+  'admin',
+  'headteacher',
+  'accountant',
 ] as const;
 
 export function canManageAcademicContext(role: string | undefined) {

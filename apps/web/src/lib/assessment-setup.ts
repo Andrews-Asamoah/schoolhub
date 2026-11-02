@@ -1,4 +1,4 @@
-import type { AssessmentTypeName, SaveAssessmentTemplateInput } from "@schoolhub/shared";
+import type { AssessmentTypeName, SaveAssessmentTemplateInput } from '@schoolhub/shared';
 
 export interface SetupComponent {
   id: string;
@@ -54,22 +54,41 @@ export interface AssessmentSetup {
 
 /** A familiar six-grade scale, offered as a starting point. */
 export const STANDARD_BANDS: SetupBand[] = [
-  { grade: "A", description: "Excellent", minScore: 80, maxScore: 100, gradePoint: 4 },
-  { grade: "B", description: "Very good", minScore: 70, maxScore: 79, gradePoint: 3 },
-  { grade: "C", description: "Good", minScore: 60, maxScore: 69, gradePoint: 2 },
-  { grade: "D", description: "Satisfactory", minScore: 50, maxScore: 59, gradePoint: 1 },
-  { grade: "E", description: "Weak", minScore: 40, maxScore: 49, gradePoint: 0.5 },
-  { grade: "F", description: "Fail", minScore: 0, maxScore: 39, gradePoint: 0 },
+  { grade: 'A', description: 'Excellent', minScore: 80, maxScore: 100, gradePoint: 4 },
+  { grade: 'B', description: 'Very good', minScore: 70, maxScore: 79, gradePoint: 3 },
+  { grade: 'C', description: 'Good', minScore: 60, maxScore: 69, gradePoint: 2 },
+  { grade: 'D', description: 'Satisfactory', minScore: 50, maxScore: 59, gradePoint: 1 },
+  { grade: 'E', description: 'Weak', minScore: 40, maxScore: 49, gradePoint: 0.5 },
+  { grade: 'F', description: 'Fail', minScore: 0, maxScore: 39, gradePoint: 0 },
 ];
 
 /** Class assessment out of 30 plus an end-of-term exam out of 70. */
-export const STANDARD_COMPONENTS: Omit<SetupComponent, "id">[] = [
-  { name: "Class assessment", componentType: "CLASS_TEST", maxMarks: 30, weight: 30, isRequired: true, isRepeatable: false, expectedCount: 1 },
-  { name: "End-of-term exam", componentType: "FINAL_EXAM", maxMarks: 70, weight: 70, isRequired: true, isRepeatable: false, expectedCount: 1 },
+export const STANDARD_COMPONENTS: Omit<SetupComponent, 'id'>[] = [
+  {
+    name: 'Class assessment',
+    componentType: 'CLASS_TEST',
+    maxMarks: 30,
+    weight: 30,
+    isRequired: true,
+    isRepeatable: false,
+    expectedCount: 1,
+  },
+  {
+    name: 'End-of-term exam',
+    componentType: 'FINAL_EXAM',
+    maxMarks: 70,
+    weight: 70,
+    isRequired: true,
+    isRepeatable: false,
+    expectedCount: 1,
+  },
 ];
 
 /** The save payload for an existing assessment, so a quick change (on/off, lock) keeps everything else. */
-export function templateToInput(template: SetupTemplate, changes: Partial<SaveAssessmentTemplateInput> = {}): SaveAssessmentTemplateInput {
+export function templateToInput(
+  template: SetupTemplate,
+  changes: Partial<SaveAssessmentTemplateInput> = {},
+): SaveAssessmentTemplateInput {
   return {
     name: template.name,
     description: template.description,
@@ -85,4 +104,4 @@ export function templateToInput(template: SetupTemplate, changes: Partial<SaveAs
   };
 }
 
-export const setupKey = ["assessments", "setup"] as const;
+export const setupKey = ['assessments', 'setup'] as const;

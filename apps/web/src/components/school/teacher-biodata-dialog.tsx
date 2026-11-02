@@ -1,8 +1,8 @@
-import { useQuery } from "@tanstack/react-query";
-import { LoaderCircle, Lock, X } from "lucide-react";
-import { useEffect, useRef, type ReactNode } from "react";
-import { UserAvatar } from "@/components/ui/user-avatar";
-import { apiFetch } from "@/lib/api";
+import { useQuery } from '@tanstack/react-query';
+import { LoaderCircle, Lock, X } from 'lucide-react';
+import { useEffect, useRef, type ReactNode } from 'react';
+import { UserAvatar } from '@/components/ui/user-avatar';
+import { apiFetch } from '@/lib/api';
 
 interface TeacherBiodata {
   id: string;
@@ -40,12 +40,23 @@ interface TeacherBiodata {
   } | null;
 }
 
-const DASH = "—";
+const DASH = '—';
 const text = (value?: string | null) => (value?.trim() ? value : DASH);
 const date = (value?: string | null) =>
-  value ? new Date(value).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" }) : DASH;
+  value
+    ? new Date(value).toLocaleDateString('en-GB', {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+      })
+    : DASH;
 const words = (value?: string | null) =>
-  value ? value.toLowerCase().replaceAll("_", " ").replace(/^./, (c) => c.toUpperCase()) : DASH;
+  value
+    ? value
+        .toLowerCase()
+        .replaceAll('_', ' ')
+        .replace(/^./, (c) => c.toUpperCase())
+    : DASH;
 
 /** A teacher's biodata sheet. Address and emergency contact appear only for school managers. */
 export function TeacherBiodataDialog({
@@ -58,7 +69,7 @@ export function TeacherBiodataDialog({
   onClose: () => void;
 }) {
   const query = useQuery({
-    queryKey: ["people", "teachers", "biodata", teacherId],
+    queryKey: ['people', 'teachers', 'biodata', teacherId],
     queryFn: () => apiFetch<TeacherBiodata>(`/people/teachers/${teacherId}`),
     retry: false,
   });
@@ -70,17 +81,19 @@ export function TeacherBiodataDialog({
     const previous = document.activeElement as HTMLElement | null;
     closeButton.current?.focus();
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") closeRef.current();
+      if (event.key === 'Escape') closeRef.current();
     };
-    document.addEventListener("keydown", onKey);
+    document.addEventListener('keydown', onKey);
     return () => {
-      document.removeEventListener("keydown", onKey);
+      document.removeEventListener('keydown', onKey);
       previous?.focus();
     };
   }, []);
 
   const data = query.data;
-  const fullName = data ? [data.firstName, data.otherNames, data.lastName].filter(Boolean).join(" ") : fallbackName;
+  const fullName = data
+    ? [data.firstName, data.otherNames, data.lastName].filter(Boolean).join(' ')
+    : fallbackName;
 
   return (
     <div
@@ -99,16 +112,20 @@ export function TeacherBiodataDialog({
           <div className="flex min-w-0 items-center gap-4">
             <UserAvatar name={fullName} image={data?.image} className="size-16 text-xl" />
             <div className="min-w-0">
-              <h2 id="biodata-title" className="truncate text-base font-bold text-foreground">{fullName}</h2>
+              <h2 id="biodata-title" className="truncate text-base font-bold text-foreground">
+                {fullName}
+              </h2>
               {data && (
                 <p className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                   {data.teacherId}
                   <span
                     className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-                      data.isActive ? "bg-success/10 text-success" : "bg-muted text-muted-foreground"
+                      data.isActive
+                        ? 'bg-success/10 text-success'
+                        : 'bg-muted text-muted-foreground'
                     }`}
                   >
-                    {data.isActive ? "Active" : "Inactive"}
+                    {data.isActive ? 'Active' : 'Inactive'}
                   </span>
                 </p>
               )}
@@ -131,7 +148,10 @@ export function TeacherBiodataDialog({
           </p>
         )}
         {query.error && (
-          <p role="alert" className="mt-6 rounded-lg border border-destructive/20 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+          <p
+            role="alert"
+            className="mt-6 rounded-lg border border-destructive/20 bg-destructive/10 px-3 py-2 text-xs text-destructive"
+          >
             Biodata could not be loaded: {query.error.message}
           </p>
         )}
@@ -141,12 +161,20 @@ export function TeacherBiodataDialog({
             <Section title="Personal">
               <Field label="Gender" value={words(data.gender)} />
               <Field label="Date of birth" value={date(data.dateOfBirth)} />
-              <Field label="Nationality" value={text(data.private?.nationality)} hidden={!data.private} />
+              <Field
+                label="Nationality"
+                value={text(data.private?.nationality)}
+                hidden={!data.private}
+              />
             </Section>
 
             <Section title="Contact">
               <Field label="Phone" value={text(data.phone)} />
-              <Field label="Alternate phone" value={text(data.private?.alternatePhone)} hidden={!data.private} />
+              <Field
+                label="Alternate phone"
+                value={text(data.private?.alternatePhone)}
+                hidden={!data.private}
+              />
               <Field label="Email" value={text(data.email)} />
               <Field
                 label="Residential address"
@@ -154,10 +182,16 @@ export function TeacherBiodataDialog({
                 hidden={!data.private}
                 wide
               />
-              <Field label="Postal address" value={text(data.private?.postalAddress)} hidden={!data.private} />
+              <Field
+                label="Postal address"
+                value={text(data.private?.postalAddress)}
+                hidden={!data.private}
+              />
               <Field
                 label="City / region"
-                value={[data.private?.city, data.private?.region].filter(Boolean).join(", ") || DASH}
+                value={
+                  [data.private?.city, data.private?.region].filter(Boolean).join(', ') || DASH
+                }
                 hidden={!data.private}
               />
             </Section>
@@ -169,7 +203,11 @@ export function TeacherBiodataDialog({
               <Field label="Specialization" value={text(data.specialization)} />
               <Field
                 label="Experience"
-                value={data.experience == null ? DASH : `${data.experience} year${data.experience === 1 ? "" : "s"}`}
+                value={
+                  data.experience == null
+                    ? DASH
+                    : `${data.experience} year${data.experience === 1 ? '' : 's'}`
+                }
               />
               <Field label="Employment type" value={words(data.employmentType)} />
               <Field label="Hire date" value={date(data.hireDate)} />
@@ -181,7 +219,10 @@ export function TeacherBiodataDialog({
                 {data.subjects.length ? (
                   <ul className="flex flex-wrap gap-1.5">
                     {data.subjects.map((subject) => (
-                      <li key={subject.id} className="rounded-full bg-muted px-2.5 py-1 text-[11px] font-medium text-foreground">
+                      <li
+                        key={subject.id}
+                        className="rounded-full bg-muted px-2.5 py-1 text-[11px] font-medium text-foreground"
+                      >
                         {subject.name}
                       </li>
                     ))}
@@ -222,10 +263,20 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
-function Field({ label, value, hidden, wide }: { label: string; value: string; hidden?: boolean; wide?: boolean }) {
+function Field({
+  label,
+  value,
+  hidden,
+  wide,
+}: {
+  label: string;
+  value: string;
+  hidden?: boolean;
+  wide?: boolean;
+}) {
   if (hidden) return null;
   return (
-    <div className={wide ? "sm:col-span-2" : undefined}>
+    <div className={wide ? 'sm:col-span-2' : undefined}>
       <dt className="text-[11px] text-muted-foreground">{label}</dt>
       <dd className="mt-0.5 text-sm font-medium text-foreground">{value}</dd>
     </div>

@@ -1,6 +1,6 @@
-import { DatePicker } from "@/components/ui/date-picker";
-import { useMutation, useQuery, useQueryClient, type UseQueryResult } from "@tanstack/react-query";
-import { useForm } from "@tanstack/react-form";
+import { DatePicker } from '@/components/ui/date-picker';
+import { useMutation, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
+import { useForm } from '@tanstack/react-form';
 import {
   ArrowUpRight,
   BookOpenCheck,
@@ -14,8 +14,8 @@ import {
   Search,
   Users,
   X,
-} from "lucide-react";
-import { useMemo, useState } from "react";
+} from 'lucide-react';
+import { useMemo, useState } from 'react';
 import {
   createClassSchema,
   createClassTeacherAssignmentSchema,
@@ -24,18 +24,24 @@ import {
   type CreateClassTeacherAssignmentInput,
   type CreateDepartmentInput,
   type UpdateClassInput,
-} from "@schoolhub/shared";
+} from '@schoolhub/shared';
 import {
   FormField,
   FormInput,
   FormSelect,
   FormSubmitButton,
-} from "@/components/forms/form-controls";
-import { useSchoolRole } from "@/components/school/school-role-switcher";
-import { DataTable, type DataTableColumn } from "@/components/ui/data-table";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { canExportTables } from "@/lib/table-export-policy";
-import { apiFetch } from "@/lib/api";
+} from '@/components/forms/form-controls';
+import { useSchoolRole } from '@/components/school/school-role-switcher';
+import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { canExportTables } from '@/lib/table-export-policy';
+import { apiFetch } from '@/lib/api';
 
 interface DepartmentOption {
   id: string;
@@ -89,7 +95,7 @@ interface ClassesWorkspaceProps {
 }
 
 const controlClasses =
-  "h-10 rounded-xl border border-border bg-background px-3 text-sm text-foreground outline-none transition placeholder:text-muted-foreground focus:border-ring focus:ring-2 focus:ring-ring/20";
+  'h-10 rounded-xl border border-border bg-background px-3 text-sm text-foreground outline-none transition placeholder:text-muted-foreground focus:border-ring focus:ring-2 focus:ring-ring/20';
 
 export function ClassesWorkspace({
   classesQuery,
@@ -98,9 +104,9 @@ export function ClassesWorkspace({
 }: ClassesWorkspaceProps) {
   const queryClient = useQueryClient();
   const { activeRole } = useSchoolRole();
-  const canManage = activeRole === "owner" || activeRole === "admin";
-  const [search, setSearch] = useState("");
-  const [departmentFilter, setDepartmentFilter] = useState("all");
+  const canManage = activeRole === 'owner' || activeRole === 'admin';
+  const [search, setSearch] = useState('');
+  const [departmentFilter, setDepartmentFilter] = useState('all');
   const [showClassForm, setShowClassForm] = useState(false);
   const [editingClass, setEditingClass] = useState<ClassRecord | null>(null);
   const [managingTeacherClass, setManagingTeacherClass] = useState<ClassRecord | null>(null);
@@ -108,36 +114,36 @@ export function ClassesWorkspace({
 
   const classMutation = useMutation({
     mutationFn: (input: CreateClassInput) =>
-      apiFetch<ClassRecord>("/academics/classes", {
-        method: "POST",
+      apiFetch<ClassRecord>('/academics/classes', {
+        method: 'POST',
         body: JSON.stringify(input),
       }),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["academics", "classes"] });
-      await queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      await queryClient.invalidateQueries({ queryKey: ['academics', 'classes'] });
+      await queryClient.invalidateQueries({ queryKey: ['dashboard'] });
       setShowClassForm(false);
     },
   });
   const updateClassMutation = useMutation({
     mutationFn: ({ id, input }: { id: string; input: UpdateClassInput }) =>
       apiFetch<ClassRecord>(`/academics/classes/${id}`, {
-        method: "PATCH",
+        method: 'PATCH',
         body: JSON.stringify(input),
       }),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["academics", "classes"] });
-      await queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      await queryClient.invalidateQueries({ queryKey: ['academics', 'classes'] });
+      await queryClient.invalidateQueries({ queryKey: ['dashboard'] });
       setEditingClass(null);
     },
   });
   const departmentMutation = useMutation({
     mutationFn: (input: CreateDepartmentInput) =>
-      apiFetch<DepartmentOption>("/academics/departments", {
-        method: "POST",
+      apiFetch<DepartmentOption>('/academics/departments', {
+        method: 'POST',
         body: JSON.stringify(input),
       }),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["academics", "departments"] });
+      await queryClient.invalidateQueries({ queryKey: ['academics', 'departments'] });
       setShowDepartmentForm(false);
     },
   });
@@ -145,7 +151,7 @@ export function ClassesWorkspace({
   const availableDepartments = departmentsQuery.data ?? [];
 
   const departmentForm = useForm({
-    defaultValues: { name: "", code: "", description: "" } as CreateDepartmentInput,
+    defaultValues: { name: '', code: '', description: '' } as CreateDepartmentInput,
     validators: { onSubmit: createDepartmentSchema },
     onSubmit: async ({ value }) => {
       departmentMutation.reset();
@@ -163,14 +169,13 @@ export function ClassesWorkspace({
         [
           schoolClass.name,
           schoolClass.level,
-          schoolClass.department?.name ?? "",
+          schoolClass.department?.name ?? '',
           schoolClass.classTeacher?.profile
             ? `${schoolClass.classTeacher.profile.firstName} ${schoolClass.classTeacher.profile.lastName}`
-            : `${schoolClass.classTeacher?.firstName ?? ""} ${schoolClass.classTeacher?.lastName ?? ""}`,
+            : `${schoolClass.classTeacher?.firstName ?? ''} ${schoolClass.classTeacher?.lastName ?? ''}`,
         ].some((value) => value.toLocaleLowerCase().includes(normalizedSearch));
       const matchesDepartment =
-        departmentFilter === "all" ||
-        schoolClass.department?.id === departmentFilter;
+        departmentFilter === 'all' || schoolClass.department?.id === departmentFilter;
       return matchesSearch && matchesDepartment;
     });
   }, [allClasses, departmentFilter, search]);
@@ -193,8 +198,8 @@ export function ClassesWorkspace({
 
   const classColumns: DataTableColumn<ClassRecord>[] = [
     {
-      id: "class",
-      header: "Class",
+      id: 'class',
+      header: 'Class',
       value: (schoolClass) => `${schoolClass.name} (${schoolClass.level})`,
       cell: (schoolClass) => (
         <div className="flex items-center gap-3">
@@ -209,9 +214,9 @@ export function ClassesWorkspace({
       ),
     },
     {
-      id: "department",
-      header: "Department",
-      value: (schoolClass) => schoolClass.department?.name ?? "Not assigned",
+      id: 'department',
+      header: 'Department',
+      value: (schoolClass) => schoolClass.department?.name ?? 'Not assigned',
       cell: (schoolClass) =>
         schoolClass.department ? (
           <span className="inline-flex items-center gap-2 rounded-full bg-primary/8 px-2.5 py-1 text-xs font-medium text-primary">
@@ -222,8 +227,8 @@ export function ClassesWorkspace({
         ),
     },
     {
-      id: "learners",
-      header: "Learners",
+      id: 'learners',
+      header: 'Learners',
       value: (schoolClass) => schoolClass._count.students,
       cell: (schoolClass) => {
         const occupancy =
@@ -234,7 +239,9 @@ export function ClassesWorkspace({
           <div className="min-w-24">
             <p className="text-xs font-semibold text-foreground">
               {schoolClass._count.students}
-              {schoolClass.capacity ? <span className="font-normal text-muted-foreground"> / {schoolClass.capacity}</span> : null}
+              {schoolClass.capacity ? (
+                <span className="font-normal text-muted-foreground"> / {schoolClass.capacity}</span>
+              ) : null}
             </p>
             {occupancy !== null && (
               <div
@@ -245,7 +252,10 @@ export function ClassesWorkspace({
                 aria-valuemin={0}
                 aria-valuemax={100}
               >
-                <span className={`block h-full rounded-full ${occupancy >= 90 ? "bg-warning" : "bg-primary"}`} style={{ width: `${occupancy}%` }} />
+                <span
+                  className={`block h-full rounded-full ${occupancy >= 90 ? 'bg-warning' : 'bg-primary'}`}
+                  style={{ width: `${occupancy}%` }}
+                />
               </div>
             )}
           </div>
@@ -253,30 +263,34 @@ export function ClassesWorkspace({
       },
     },
     {
-      id: "teacher",
-      header: "Class teacher",
+      id: 'teacher',
+      header: 'Class teacher',
       cell: (schoolClass) => {
         const teacher = schoolClass.classTeacher?.profile ?? schoolClass.classTeacher;
-        return teacher ? `${teacher.firstName} ${teacher.lastName}` : "Not assigned";
+        return teacher ? `${teacher.firstName} ${teacher.lastName}` : 'Not assigned';
       },
     },
     {
-      id: "status",
-      header: "Status",
-      value: (schoolClass) => (schoolClass.isActive ? "Active" : "Inactive"),
+      id: 'status',
+      header: 'Status',
+      value: (schoolClass) => (schoolClass.isActive ? 'Active' : 'Inactive'),
       cell: (schoolClass) => (
-        <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold ${schoolClass.isActive ? "bg-success/10 text-success" : "bg-muted text-muted-foreground"}`}>
-          <span className={`size-1.5 rounded-full ${schoolClass.isActive ? "bg-success" : "bg-muted-foreground"}`} />
-          {schoolClass.isActive ? "Active" : "Inactive"}
+        <span
+          className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold ${schoolClass.isActive ? 'bg-success/10 text-success' : 'bg-muted text-muted-foreground'}`}
+        >
+          <span
+            className={`size-1.5 rounded-full ${schoolClass.isActive ? 'bg-success' : 'bg-muted-foreground'}`}
+          />
+          {schoolClass.isActive ? 'Active' : 'Inactive'}
         </span>
       ),
     },
     ...(canManage
       ? [
           {
-            id: "actions",
-            header: "",
-            className: "text-right",
+            id: 'actions',
+            header: '',
+            className: 'text-right',
             cell: (schoolClass: ClassRecord) => (
               <div className="inline-flex items-center gap-2">
                 <button
@@ -321,9 +335,9 @@ export function ClassesWorkspace({
                 Build classes around your departments
               </h2>
               <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                Create your school’s permanent class groups once and reuse them
-                across years. This page manages class structure; year-specific
-                student placement and promotion are not yet managed here.
+                Create your school’s permanent class groups once and reuse them across years. This
+                page manages class structure; year-specific student placement and promotion are not
+                yet managed here.
               </p>
             </div>
             {canManage && (
@@ -331,7 +345,7 @@ export function ClassesWorkspace({
                 type="button"
                 onClick={openClassForm}
                 disabled={!availableDepartments.length}
-                title={!availableDepartments.length ? "Create a department first" : undefined}
+                title={!availableDepartments.length ? 'Create a department first' : undefined}
                 className="inline-flex h-11 items-center gap-2 rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-sm transition hover:brightness-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <Plus className="size-4" />
@@ -340,10 +354,30 @@ export function ClassesWorkspace({
             )}
           </div>
           <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <MetricCard icon={GraduationCap} label="Classes" value={allClasses.length} detail="in this school" />
-            <MetricCard icon={Users} label="Learners" value={enrolledStudents} detail="across all classes" />
-            <MetricCard icon={Building2} label="Departments" value={availableDepartments.length} detail="active departments" />
-            <MetricCard icon={BookOpenCheck} label="Open places" value={availablePlaces} detail="based on class capacity" />
+            <MetricCard
+              icon={GraduationCap}
+              label="Classes"
+              value={allClasses.length}
+              detail="in this school"
+            />
+            <MetricCard
+              icon={Users}
+              label="Learners"
+              value={enrolledStudents}
+              detail="across all classes"
+            />
+            <MetricCard
+              icon={Building2}
+              label="Departments"
+              value={availableDepartments.length}
+              detail="active departments"
+            />
+            <MetricCard
+              icon={BookOpenCheck}
+              label="Open places"
+              value={availablePlaces}
+              detail="based on class capacity"
+            />
           </div>
         </div>
       </section>
@@ -357,8 +391,8 @@ export function ClassesWorkspace({
             <div>
               <h2 className="text-base font-bold text-foreground">Departments</h2>
               <p className="mt-1 max-w-2xl text-sm leading-5 text-muted-foreground">
-                Create the school’s academic departments first, then assign each
-                class to the department responsible for it.
+                Create the school’s academic departments first, then assign each class to the
+                department responsible for it.
               </p>
             </div>
           </div>
@@ -373,7 +407,7 @@ export function ClassesWorkspace({
               className="inline-flex h-10 items-center gap-2 rounded-xl border border-border bg-background px-3.5 text-sm font-semibold text-foreground transition hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               {showDepartmentForm ? <X className="size-4" /> : <Plus className="size-4" />}
-              {showDepartmentForm ? "Close form" : "Add department"}
+              {showDepartmentForm ? 'Close form' : 'Add department'}
             </button>
           )}
         </div>
@@ -397,7 +431,11 @@ export function ClassesWorkspace({
             <div className="grid gap-4 md:grid-cols-3">
               <departmentForm.Field name="name">
                 {(field) => (
-                  <FormField label="Department name" htmlFor={field.name} error={field.state.meta.errors}>
+                  <FormField
+                    label="Department name"
+                    htmlFor={field.name}
+                    error={field.state.meta.errors}
+                  >
                     <FormInput
                       id={field.name}
                       name={field.name}
@@ -413,7 +451,12 @@ export function ClassesWorkspace({
               </departmentForm.Field>
               <departmentForm.Field name="code">
                 {(field) => (
-                  <FormField label="Department code" htmlFor={field.name} hint="2–20 letters, numbers, or hyphens" error={field.state.meta.errors}>
+                  <FormField
+                    label="Department code"
+                    htmlFor={field.name}
+                    hint="2–20 letters, numbers, or hyphens"
+                    error={field.state.meta.errors}
+                  >
                     <FormInput
                       id={field.name}
                       name={field.name}
@@ -430,11 +473,15 @@ export function ClassesWorkspace({
               </departmentForm.Field>
               <departmentForm.Field name="description">
                 {(field) => (
-                  <FormField label="Description (optional)" htmlFor={field.name} error={field.state.meta.errors}>
+                  <FormField
+                    label="Description (optional)"
+                    htmlFor={field.name}
+                    error={field.state.meta.errors}
+                  >
                     <FormInput
                       id={field.name}
                       name={field.name}
-                      value={field.state.value ?? ""}
+                      value={field.state.value ?? ''}
                       onBlur={field.handleBlur}
                       onChange={(event) => field.handleChange(event.target.value)}
                       placeholder="Subjects or area covered"
@@ -457,7 +504,9 @@ export function ClassesWorkspace({
         {departmentsQuery.isPending ? (
           <InlineLoading label="Loading departments" />
         ) : departmentsQuery.error ? (
-          <InlineError message={`Departments could not be loaded: ${departmentsQuery.error.message}`} />
+          <InlineError
+            message={`Departments could not be loaded: ${departmentsQuery.error.message}`}
+          />
         ) : availableDepartments.length ? (
           <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
             {availableDepartments.map((department) => (
@@ -471,12 +520,17 @@ export function ClassesWorkspace({
                       {department.code.slice(0, 2)}
                     </span>
                     <div className="min-w-0">
-                      <h3 className="truncate text-sm font-semibold text-foreground">{department.name}</h3>
-                      <p className="mt-0.5 text-xs font-medium tracking-wide text-muted-foreground">{department.code}</p>
+                      <h3 className="truncate text-sm font-semibold text-foreground">
+                        {department.name}
+                      </h3>
+                      <p className="mt-0.5 text-xs font-medium tracking-wide text-muted-foreground">
+                        {department.code}
+                      </p>
                     </div>
                   </div>
                   <span className="rounded-full bg-muted px-2.5 py-1 text-[11px] font-semibold text-muted-foreground">
-                    {department._count.classes} {department._count.classes === 1 ? "class" : "classes"}
+                    {department._count.classes}{' '}
+                    {department._count.classes === 1 ? 'class' : 'classes'}
                   </span>
                 </div>
                 {department.description && (
@@ -490,7 +544,9 @@ export function ClassesWorkspace({
         ) : (
           <div className="mt-5 rounded-2xl border border-dashed border-border bg-muted/40 px-5 py-8 text-center">
             <Building2 className="mx-auto size-7 text-muted-foreground" />
-            <h3 className="mt-3 text-sm font-semibold text-foreground">Set up your first department</h3>
+            <h3 className="mt-3 text-sm font-semibold text-foreground">
+              Set up your first department
+            </h3>
             <p className="mx-auto mt-1 max-w-md text-xs leading-5 text-muted-foreground">
               Departments give classes a clear academic home. Add one before creating classes.
             </p>
@@ -500,22 +556,26 @@ export function ClassesWorkspace({
 
       {(showClassForm || editingClass) && canManage && (
         <ClassEditorForm
-          key={editingClass?.id ?? "new-class"}
-          initialValues={editingClass ? {
-            name: editingClass.name,
-            level: editingClass.level,
-            departmentId: editingClass.department?.id ?? "",
-            capacity: editingClass.capacity ?? undefined,
-            isGraduatingClass: editingClass.isGraduatingClass,
-            isActive: editingClass.isActive,
-          } : {
-            name: "",
-            level: "",
-            departmentId: departmentFilter === "all" ? "" : departmentFilter,
-            capacity: undefined,
-            isGraduatingClass: false,
-            isActive: true,
-          }}
+          key={editingClass?.id ?? 'new-class'}
+          initialValues={
+            editingClass
+              ? {
+                  name: editingClass.name,
+                  level: editingClass.level,
+                  departmentId: editingClass.department?.id ?? '',
+                  capacity: editingClass.capacity ?? undefined,
+                  isGraduatingClass: editingClass.isGraduatingClass,
+                  isActive: editingClass.isActive,
+                }
+              : {
+                  name: '',
+                  level: '',
+                  departmentId: departmentFilter === 'all' ? '' : departmentFilter,
+                  capacity: undefined,
+                  isGraduatingClass: false,
+                  isActive: true,
+                }
+          }
           departments={availableDepartments}
           isEditing={!!editingClass}
           isSubmitting={classMutation.isPending || updateClassMutation.isPending}
@@ -558,7 +618,8 @@ export function ClassesWorkspace({
           <div>
             <h2 className="text-base font-bold text-foreground">Class directory</h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              {filteredClasses.length} of {allClasses.length} {allClasses.length === 1 ? "class" : "classes"}
+              {filteredClasses.length} of {allClasses.length}{' '}
+              {allClasses.length === 1 ? 'class' : 'classes'}
             </p>
           </div>
           <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
@@ -574,10 +635,19 @@ export function ClassesWorkspace({
               />
             </label>
             <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
-              <SelectTrigger aria-label="Filter by department" className={`${controlClasses} min-w-40`}><SelectValue /></SelectTrigger>
+              <SelectTrigger
+                aria-label="Filter by department"
+                className={`${controlClasses} min-w-40`}
+              >
+                <SelectValue />
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All departments</SelectItem>
-                {availableDepartments.map((department) => <SelectItem key={department.id} value={department.id}>{department.name}</SelectItem>)}
+                {availableDepartments.map((department) => (
+                  <SelectItem key={department.id} value={department.id}>
+                    {department.name}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -603,19 +673,19 @@ export function ClassesWorkspace({
           <div className="px-5 py-12 text-center">
             <GraduationCap className="mx-auto size-8 text-muted-foreground" />
             <h3 className="mt-3 text-sm font-semibold text-foreground">
-              {allClasses.length ? "No classes match these filters" : "No classes yet"}
+              {allClasses.length ? 'No classes match these filters' : 'No classes yet'}
             </h3>
             <p className="mx-auto mt-1 max-w-md text-xs leading-5 text-muted-foreground">
               {allClasses.length
-                ? "Try a different search term or clear one of the filters."
-                : "Create a department, then add your permanent class groups. You can reuse them for every academic year."}
+                ? 'Try a different search term or clear one of the filters.'
+                : 'Create a department, then add your permanent class groups. You can reuse them for every academic year.'}
             </p>
             {allClasses.length > 0 && (
               <button
                 type="button"
                 onClick={() => {
-                  setSearch("");
-                  setDepartmentFilter("all");
+                  setSearch('');
+                  setDepartmentFilter('all');
                 }}
                 className="mt-4 inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
               >
@@ -689,12 +759,15 @@ function ClassEditorForm({
     <section className="rounded-3xl border border-primary/20 bg-card p-5 shadow-sm sm:p-6">
       <div className="mb-5 flex items-start justify-between gap-4">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-primary">Permanent class group</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-primary">
+            Permanent class group
+          </p>
           <h2 className="mt-1 text-lg font-bold text-foreground">
-            {isEditing ? "Edit class details" : "Create a class"}
+            {isEditing ? 'Edit class details' : 'Create a class'}
           </h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Student placements change by academic year; the class itself remains available for future years.
+            Student placements change by academic year; the class itself remains available for
+            future years.
           </p>
         </div>
         <button
@@ -719,24 +792,51 @@ function ClassEditorForm({
           <form.Field name="name">
             {(field) => (
               <FormField label="Class name" htmlFor={field.name} error={field.state.meta.errors}>
-                <FormInput id={field.name} name={field.name} value={field.state.value} onBlur={field.handleBlur} onChange={(event) => field.handleChange(event.target.value)} placeholder="e.g. JHS 1A" maxLength={100} required />
+                <FormInput
+                  id={field.name}
+                  name={field.name}
+                  value={field.state.value}
+                  onBlur={field.handleBlur}
+                  onChange={(event) => field.handleChange(event.target.value)}
+                  placeholder="e.g. JHS 1A"
+                  maxLength={100}
+                  required
+                />
               </FormField>
             )}
           </form.Field>
           <form.Field name="level">
             {(field) => (
               <FormField label="Level / grade" htmlFor={field.name} error={field.state.meta.errors}>
-                <FormInput id={field.name} name={field.name} value={field.state.value} onBlur={field.handleBlur} onChange={(event) => field.handleChange(event.target.value)} placeholder="e.g. JHS 1" maxLength={60} required />
+                <FormInput
+                  id={field.name}
+                  name={field.name}
+                  value={field.state.value}
+                  onBlur={field.handleBlur}
+                  onChange={(event) => field.handleChange(event.target.value)}
+                  placeholder="e.g. JHS 1"
+                  maxLength={60}
+                  required
+                />
               </FormField>
             )}
           </form.Field>
           <form.Field name="departmentId">
             {(field) => (
               <FormField label="Department" htmlFor={field.name} error={field.state.meta.errors}>
-                <FormSelect id={field.name} name={field.name} value={field.state.value} onBlur={field.handleBlur} onChange={(event) => field.handleChange(event.target.value)} required>
+                <FormSelect
+                  id={field.name}
+                  name={field.name}
+                  value={field.state.value}
+                  onBlur={field.handleBlur}
+                  onChange={(event) => field.handleChange(event.target.value)}
+                  required
+                >
                   <option value="">Select department</option>
                   {departments.map((department) => (
-                    <option key={department.id} value={department.id}>{department.name} ({department.code})</option>
+                    <option key={department.id} value={department.id}>
+                      {department.name} ({department.code})
+                    </option>
                   ))}
                 </FormSelect>
               </FormField>
@@ -744,15 +844,37 @@ function ClassEditorForm({
           </form.Field>
           <form.Field name="capacity">
             {(field) => (
-              <FormField label="Class capacity (optional)" htmlFor={field.name} error={field.state.meta.errors}>
-                <FormInput id={field.name} name={field.name} type="number" min={1} step={1} value={field.state.value ?? ""} onBlur={field.handleBlur} onChange={(event) => field.handleChange(event.target.value ? Number(event.target.value) : undefined)} placeholder="e.g. 40" />
+              <FormField
+                label="Class capacity (optional)"
+                htmlFor={field.name}
+                error={field.state.meta.errors}
+              >
+                <FormInput
+                  id={field.name}
+                  name={field.name}
+                  type="number"
+                  min={1}
+                  step={1}
+                  value={field.state.value ?? ''}
+                  onBlur={field.handleBlur}
+                  onChange={(event) =>
+                    field.handleChange(event.target.value ? Number(event.target.value) : undefined)
+                  }
+                  placeholder="e.g. 40"
+                />
               </FormField>
             )}
           </form.Field>
           <form.Field name="isGraduatingClass">
             {(field) => (
               <label className="flex items-center gap-3 self-end rounded-xl border border-border bg-background px-3 py-3 text-sm text-secondary-foreground">
-                <input type="checkbox" checked={field.state.value} onBlur={field.handleBlur} onChange={(event) => field.handleChange(event.target.checked)} className="size-4 accent-primary" />
+                <input
+                  type="checkbox"
+                  checked={field.state.value}
+                  onBlur={field.handleBlur}
+                  onChange={(event) => field.handleChange(event.target.checked)}
+                  className="size-4 accent-primary"
+                />
                 Mark as graduating class
               </label>
             )}
@@ -760,7 +882,13 @@ function ClassEditorForm({
           <form.Field name="isActive">
             {(field) => (
               <label className="flex items-center gap-3 self-end rounded-xl border border-border bg-background px-3 py-3 text-sm text-secondary-foreground">
-                <input type="checkbox" checked={field.state.value} onBlur={field.handleBlur} onChange={(event) => field.handleChange(event.target.checked)} className="size-4 accent-primary" />
+                <input
+                  type="checkbox"
+                  checked={field.state.value}
+                  onBlur={field.handleBlur}
+                  onChange={(event) => field.handleChange(event.target.checked)}
+                  className="size-4 accent-primary"
+                />
                 Class is active
               </label>
             )}
@@ -768,12 +896,16 @@ function ClassEditorForm({
         </div>
         {error && <MutationError error={error} />}
         <div className="flex justify-end gap-2">
-          <button type="button" onClick={onCancel} className="h-10 rounded-xl border border-border px-4 text-sm font-semibold text-secondary-foreground transition hover:bg-muted">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="h-10 rounded-xl border border-border px-4 text-sm font-semibold text-secondary-foreground transition hover:bg-muted"
+          >
             Cancel
           </button>
           <FormSubmitButton isSubmitting={isSubmitting}>
             <Check className="size-4" />
-            {isEditing ? "Save changes" : "Create class"}
+            {isEditing ? 'Save changes' : 'Create class'}
           </FormSubmitButton>
         </div>
       </form>
@@ -796,7 +928,7 @@ function ClassTeacherAssignmentsPanel({
 }) {
   const queryClient = useQueryClient();
   const assignmentsQuery = useQuery({
-    queryKey: ["academics", "classes", schoolClass.id, "teacher-assignments"],
+    queryKey: ['academics', 'classes', schoolClass.id, 'teacher-assignments'],
     queryFn: () =>
       apiFetch<ClassTeacherAssignment[]>(
         `/academics/classes/${schoolClass.id}/teacher-assignments`,
@@ -804,26 +936,26 @@ function ClassTeacherAssignmentsPanel({
   });
   const mutation = useMutation({
     mutationFn: (input: CreateClassTeacherAssignmentInput) =>
-      apiFetch<ClassTeacherAssignment>(
-        `/academics/classes/${schoolClass.id}/teacher-assignments`,
-        { method: "POST", body: JSON.stringify(input) },
-      ),
+      apiFetch<ClassTeacherAssignment>(`/academics/classes/${schoolClass.id}/teacher-assignments`, {
+        method: 'POST',
+        body: JSON.stringify(input),
+      }),
     onSuccess: async () => {
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["academics", "classes"] }),
+        queryClient.invalidateQueries({ queryKey: ['academics', 'classes'] }),
         queryClient.invalidateQueries({
-          queryKey: ["academics", "classes", schoolClass.id, "teacher-assignments"],
+          queryKey: ['academics', 'classes', schoolClass.id, 'teacher-assignments'],
         }),
       ]);
       form.reset({
-        teacherId: "",
+        teacherId: '',
         effectiveFrom: new Date().toISOString().slice(0, 10),
       });
     },
   });
   const form = useForm({
     defaultValues: {
-      teacherId: "",
+      teacherId: '',
       effectiveFrom: new Date().toISOString().slice(0, 10),
     } as CreateClassTeacherAssignmentInput,
     validators: {
@@ -831,9 +963,7 @@ function ClassTeacherAssignmentsPanel({
     },
     onSubmit: async ({ value }) => {
       mutation.reset();
-      await mutation.mutateAsync(
-        createClassTeacherAssignmentSchema.parse(value),
-      );
+      await mutation.mutateAsync(createClassTeacherAssignmentSchema.parse(value));
     },
   });
   const today = new Date().toISOString().slice(0, 10);
@@ -849,8 +979,8 @@ function ClassTeacherAssignmentsPanel({
             Class teacher · {schoolClass.name}
           </h2>
           <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-            Changes take effect on the selected date. The previous assignment
-            is retained with its end date, including changes between terms.
+            Changes take effect on the selected date. The previous assignment is retained with its
+            end date, including changes between terms.
           </p>
         </div>
         <button
@@ -884,13 +1014,9 @@ function ClassTeacherAssignmentsPanel({
               >
                 <option value="">Select a teacher</option>
                 {teachers.map((teacher) => (
-                  <option
-                    key={teacher.id}
-                    value={teacher.id}
-                    disabled={!teacher.isActive}
-                  >
+                  <option key={teacher.id} value={teacher.id} disabled={!teacher.isActive}>
                     {teacher.firstName} {teacher.lastName}
-                    {teacher.isActive ? "" : " (inactive)"}
+                    {teacher.isActive ? '' : ' (inactive)'}
                   </option>
                 ))}
               </FormSelect>
@@ -915,9 +1041,7 @@ function ClassTeacherAssignmentsPanel({
           Save assignment
         </FormSubmitButton>
       </form>
-      {teachersLoading && (
-        <p className="mt-3 text-xs text-muted-foreground">Loading teachers…</p>
-      )}
+      {teachersLoading && <p className="mt-3 text-xs text-muted-foreground">Loading teachers…</p>}
       {teachersError && (
         <div className="mt-3">
           <InlineError message={`Teachers could not be loaded: ${teachersError.message}`} />
@@ -934,21 +1058,19 @@ function ClassTeacherAssignmentsPanel({
         {assignmentsQuery.isPending ? (
           <InlineLoading label="Loading assignment history" />
         ) : assignmentsQuery.error ? (
-          <InlineError message={`Assignment history could not be loaded: ${assignmentsQuery.error.message}`} />
+          <InlineError
+            message={`Assignment history could not be loaded: ${assignmentsQuery.error.message}`}
+          />
         ) : assignmentsQuery.data?.length ? (
           <ol className="mt-3 divide-y divide-border rounded-2xl border border-border">
             {assignmentsQuery.data.map((assignment) => {
               const teacherName = assignment.teacher.profile
                 ? `${assignment.teacher.profile.firstName} ${assignment.teacher.profile.lastName}`
-                : `${assignment.teacher.firstName ?? ""} ${assignment.teacher.lastName ?? ""}`.trim();
+                : `${assignment.teacher.firstName ?? ''} ${assignment.teacher.lastName ?? ''}`.trim();
               const startsAt = assignment.effectiveFrom.slice(0, 10);
               const endsAt = assignment.effectiveTo?.slice(0, 10);
               const assignmentStatus =
-                startsAt > today
-                  ? "Scheduled"
-                  : endsAt && endsAt <= today
-                    ? "Past"
-                    : "Current";
+                startsAt > today ? 'Scheduled' : endsAt && endsAt <= today ? 'Past' : 'Current';
               return (
                 <li
                   key={assignment.id}
@@ -960,11 +1082,11 @@ function ClassTeacherAssignmentsPanel({
                     </span>
                     <div className="min-w-0">
                       <p className="truncate text-sm font-semibold text-foreground">
-                        {teacherName || "Teacher"}
+                        {teacherName || 'Teacher'}
                       </p>
                       <p className="text-xs text-muted-foreground">
                         {startsAt}
-                        {endsAt ? ` – ${endsAt} (exclusive end)` : " – Present"}
+                        {endsAt ? ` – ${endsAt} (exclusive end)` : ' – Present'}
                       </p>
                     </div>
                   </div>
@@ -996,7 +1118,10 @@ function InlineLoading({ label }: { label: string }) {
 
 function InlineError({ message }: { message: string }) {
   return (
-    <div role="alert" className="m-5 flex items-start gap-2 rounded-xl border border-destructive/20 bg-destructive/5 p-4 text-sm text-destructive">
+    <div
+      role="alert"
+      className="m-5 flex items-start gap-2 rounded-xl border border-destructive/20 bg-destructive/5 p-4 text-sm text-destructive"
+    >
       <CircleAlert className="mt-0.5 size-4 shrink-0" />
       <span>{message}</span>
     </div>

@@ -1,24 +1,24 @@
-import { Body, Controller, Get, Patch, UseGuards } from "@nestjs/common";
-import { updateMyProfileSchema, type UpdateMyProfileInput } from "@schoolhub/shared";
-import { CurrentSchoolRole } from "../../common/decorators/current-school-role.decorator.js";
-import { CurrentUser } from "../../common/decorators/current-user.decorator.js";
-import { RolesGuard } from "../../common/guards/roles.guard.js";
-import { SchoolTenantGuard } from "../../common/guards/school-tenant.guard.js";
-import { ZodValidationPipe } from "../../common/pipes/zod-validation.pipe.js";
-import { MeService } from "./me.service.js";
+import { Body, Controller, Get, Patch, UseGuards } from '@nestjs/common';
+import { updateMyProfileSchema, type UpdateMyProfileInput } from '@schoolhub/shared';
+import { CurrentSchoolRole } from '../../common/decorators/current-school-role.decorator.js';
+import { CurrentUser } from '../../common/decorators/current-user.decorator.js';
+import { RolesGuard } from '../../common/guards/roles.guard.js';
+import { SchoolTenantGuard } from '../../common/guards/school-tenant.guard.js';
+import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe.js';
+import { MeService } from './me.service.js';
 
 /** The signed-in user's own profile. No role restriction: everyone may edit themselves, only themselves. */
-@Controller("schools/current/me")
+@Controller('schools/current/me')
 @UseGuards(SchoolTenantGuard, RolesGuard)
 export class MeController {
   constructor(private readonly me: MeService) {}
 
-  @Get("profile")
+  @Get('profile')
   getProfile(@CurrentUser() user: { id: string }, @CurrentSchoolRole() role: string | undefined) {
     return this.me.getProfile(user.id, role);
   }
 
-  @Patch("profile")
+  @Patch('profile')
   updateProfile(
     @CurrentUser() user: { id: string },
     @CurrentSchoolRole() role: string | undefined,

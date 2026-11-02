@@ -1,6 +1,6 @@
-import { z } from "zod";
+import { z } from 'zod';
 
-const optionalUrl = z.preprocess(value => value === "" ? undefined : value, z.url().optional());
+const optionalUrl = z.preprocess((value) => (value === '' ? undefined : value), z.url().optional());
 
 export const env = z
   .object({
@@ -9,15 +9,15 @@ export const env = z
     BETTER_AUTH_URL: z.url(),
     WEB_ORIGIN: z.url(),
     PORT: z.coerce.number().default(3001),
-    NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
+    NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
     // Number of reverse proxies in front of the API ("1" for one load balancer).
     // Required for correct client IPs in rate limits and audit logs.
     TRUST_PROXY: z.string().optional(),
     // API docs are off in production unless explicitly enabled.
-    SWAGGER_ENABLED: z.enum(["true", "false"]).optional(),
+    SWAGGER_ENABLED: z.enum(['true', 'false']).optional(),
     // Make two-factor authentication mandatory for school owners/admins too.
     // (Super-admins always need it.)
-    REQUIRE_2FA_SCHOOL_ADMINS: z.enum(["true", "false"]).optional(),
+    REQUIRE_2FA_SCHOOL_ADMINS: z.enum(['true', 'false']).optional(),
     // Name shown in the authenticator app next to the account.
     TWO_FACTOR_ISSUER: z.string().min(1).max(40).optional(),
 

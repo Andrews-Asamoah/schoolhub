@@ -3,15 +3,13 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
-} from "@nestjs/common";
-import { PrismaService } from "../../prisma/prisma.service.js";
-import type { RecordScoreInput } from "@schoolhub/shared";
-import { Prisma } from "@prisma/client";
-import {
-  canManageAcademicContext,
-} from "../../common/academic-context.js";
-import { canEnterMarks } from "../../common/scope/teacher-access.js";
-import { TeacherScopeService } from "../../common/scope/teacher-scope.service.js";
+} from '@nestjs/common';
+import { PrismaService } from '../../prisma/prisma.service.js';
+import type { RecordScoreInput } from '@schoolhub/shared';
+import { Prisma } from '@prisma/client';
+import { canManageAcademicContext } from '../../common/academic-context.js';
+import { canEnterMarks } from '../../common/scope/teacher-access.js';
+import { TeacherScopeService } from '../../common/scope/teacher-scope.service.js';
 
 @Injectable()
 export class AssessmentsService {
@@ -24,8 +22,8 @@ export class AssessmentsService {
     return this.prisma.client.assessmentTemplate.findMany({
       where: { schoolId, isActive: true },
       include: {
-        components: { orderBy: { displayOrder: "asc" } },
-        gradingSystem: { include: { gradeScales: { orderBy: { displayOrder: "asc" } } } },
+        components: { orderBy: { displayOrder: 'asc' } },
+        gradingSystem: { include: { gradeScales: { orderBy: { displayOrder: 'asc' } } } },
       },
     });
   }
@@ -49,7 +47,7 @@ export class AssessmentsService {
       });
       if (!term) {
         throw new ForbiddenException(
-          "Scores can only be recorded for the currently selected academic term.",
+          'Scores can only be recorded for the currently selected academic term.',
         );
       }
       const [student, subject, template, enrollment] = await Promise.all([
@@ -70,7 +68,7 @@ export class AssessmentsService {
             studentId: input.studentId,
             academicYearId: term.academicYearId,
             termId: term.id,
-            status: "ACTIVE",
+            status: 'ACTIVE',
             student: { schoolId: _schoolId },
           },
           select: { id: true, classId: true },
@@ -78,7 +76,7 @@ export class AssessmentsService {
       ]);
       if (!student || !subject || !template || !enrollment) {
         throw new BadRequestException(
-          "Scores require an active student enrolled at this school for the current term, a school subject, and a school assessment template.",
+          'Scores require an active student enrolled at this school for the current term, a school subject, and a school assessment template.',
         );
       }
       // A teacher may only record marks for the subject they are assigned to in the pupil's class.
@@ -109,8 +107,7 @@ export class AssessmentsService {
       });
 
       // 2. Upsert the ComponentScore
-      const percentage =
-        input.maxMarks > 0 ? (input.marksObtained / input.maxMarks) * 100 : 0;
+      const percentage = input.maxMarks > 0 ? (input.marksObtained / input.maxMarks) * 100 : 0;
 
       await tx.componentScore.upsert({
         where: {
@@ -146,14 +143,8 @@ export class AssessmentsService {
         where: { assessmentScoreId: assessmentScore.id },
       });
 
-      const totalObtained = allComponentScores.reduce(
-        (sum, c) => sum + Number(c.marksObtained),
-        0,
-      );
-      const totalMax = allComponentScores.reduce(
-        (sum, c) => sum + Number(c.maxMarks),
-        0,
-      );
+      const totalObtained = allComponentScores.reduce((sum, c) => sum + Number(c.marksObtained), 0);
+      const totalMax = allComponentScores.reduce((sum, c) => sum + Number(c.maxMarks), 0);
       const totalPercentage = totalMax > 0 ? (totalObtained / totalMax) * 100 : 0;
 
       return tx.assessmentScore.update({
@@ -170,12 +161,7 @@ export class AssessmentsService {
     });
   }
 
-  async getStudentReportCard(
-    schoolId: string,
-    studentId: string,
-    termId: string,
-    role?: string,
-  ) {
+  async getStudentReportCard(schoolId: string, studentId: string, termId: string, role?: string) {
     const term = await this.prisma.client.term.findFirst({
       where: {
         id: termId,
@@ -184,14 +170,11 @@ export class AssessmentsService {
       include: { academicYear: { select: { id: true, name: true, isCurrent: true } } },
     });
     if (!term) {
-      throw new BadRequestException("Choose a term belonging to this school.");
+      throw new BadRequestException('Choose a term belonging to this school.');
     }
-    if (
-      !canManageAcademicContext(role) &&
-      (!term.isCurrent || !term.academicYear.isCurrent)
-    ) {
+    if (!canManageAcademicContext(role) && (!term.isCurrent || !term.academicYear.isCurrent)) {
       throw new ForbiddenException(
-        "Only the current academic year and term are available for your role.",
+        'Only the current academic year and term are available for your role.',
       );
     }
     const student = await this.prisma.client.student.findFirst({
@@ -203,22 +186,20 @@ export class AssessmentsService {
     });
 
     if (!student) {
-      throw new NotFoundException("Student not found");
+      throw new NotFoundException('Student not found');
     }
     const enrollment = await this.prisma.client.enrollment.findFirst({
       where: {
         studentId,
         academicYearId: term.academicYearId,
         termId,
-        status: { in: ["ACTIVE", "COMPLETED"] },
+        status: { in: ['ACTIVE', 'COMPLETED'] },
         student: { schoolId },
       },
       include: { class: { select: { id: true, name: true, level: true } } },
     });
     if (!enrollment) {
-      throw new NotFoundException(
-        "Student has no enrollment in the selected academic term.",
-      );
+      throw new NotFoundException('Student has no enrollment in the selected academic term.');
     }
 
     const scores = await this.prisma.client.assessmentScore.findMany({

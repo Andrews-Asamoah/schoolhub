@@ -1,20 +1,12 @@
-import {
-  Controller,
-  Get,
-  Patch,
-  Post,
-  Body,
-  Param,
-  UseGuards,
-} from "@nestjs/common";
-import { SchoolsService } from "./schools.service.js";
-import { SchoolTenantGuard } from "../../common/guards/school-tenant.guard.js";
-import { RolesGuard } from "../../common/guards/roles.guard.js";
-import { Roles } from "../../common/decorators/roles.decorator.js";
-import { CurrentSchool } from "../../common/decorators/current-school.decorator.js";
-import { CurrentSchoolRole } from "../../common/decorators/current-school-role.decorator.js";
-import { CurrentUser } from "../../common/decorators/current-user.decorator.js";
-import { ZodValidationPipe } from "../../common/pipes/zod-validation.pipe.js";
+import { Controller, Get, Patch, Post, Body, Param, UseGuards } from '@nestjs/common';
+import { SchoolsService } from './schools.service.js';
+import { SchoolTenantGuard } from '../../common/guards/school-tenant.guard.js';
+import { RolesGuard } from '../../common/guards/roles.guard.js';
+import { Roles } from '../../common/decorators/roles.decorator.js';
+import { CurrentSchool } from '../../common/decorators/current-school.decorator.js';
+import { CurrentSchoolRole } from '../../common/decorators/current-school-role.decorator.js';
+import { CurrentUser } from '../../common/decorators/current-user.decorator.js';
+import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe.js';
 import {
   createAcademicYearSchema,
   createTermSchema,
@@ -30,55 +22,44 @@ import {
   type SetAcademicContextInput,
   type UpdateSchoolMemberRolesInput,
   type UpdateSchoolSettingsInput,
-} from "@schoolhub/shared";
-import type { School } from "@prisma/client";
+} from '@schoolhub/shared';
+import type { School } from '@prisma/client';
 
-@Controller("schools")
+@Controller('schools')
 @UseGuards(SchoolTenantGuard, RolesGuard)
 export class SchoolsController {
   constructor(private readonly schoolsService: SchoolsService) {}
 
-  @Get("current")
-  getCurrentSchool(
-    @CurrentSchool() school: School,
-    @CurrentSchoolRole() role: string | undefined,
-  ) {
+  @Get('current')
+  getCurrentSchool(@CurrentSchool() school: School, @CurrentSchoolRole() role: string | undefined) {
     return this.schoolsService.getCurrentSchool(school.id, role);
   }
 
-  @Get("roles")
-  getMyRoles(
-    @CurrentSchool() school: School,
-    @CurrentUser() user: { id: string },
-  ) {
+  @Get('roles')
+  getMyRoles(@CurrentSchool() school: School, @CurrentUser() user: { id: string }) {
     return this.schoolsService.getMemberRoles(school.id, user.id);
   }
 
-  @Get("members")
-  @Roles("owner", "admin", "headteacher")
+  @Get('members')
+  @Roles('owner', 'admin', 'headteacher')
   listMembers(@CurrentSchool() school: School) {
     return this.schoolsService.listSchoolMembers(school.id);
   }
 
-  @Patch("members/:userId/roles")
-  @Roles("owner", "admin", "headteacher")
+  @Patch('members/:userId/roles')
+  @Roles('owner', 'admin', 'headteacher')
   updateMemberRoles(
     @CurrentSchool() school: School,
     @CurrentUser() user: { id: string },
-    @Param("userId") userId: string,
+    @Param('userId') userId: string,
     @Body(new ZodValidationPipe(updateSchoolMemberRolesSchema))
     body: UpdateSchoolMemberRolesInput,
   ) {
-    return this.schoolsService.updateMemberRoles(
-      school.id,
-      user.id,
-      userId,
-      body,
-    );
+    return this.schoolsService.updateMemberRoles(school.id, user.id, userId, body);
   }
 
-  @Patch("current")
-  @Roles("owner", "admin")
+  @Patch('current')
+  @Roles('owner', 'admin')
   updateSchool(
     @CurrentSchool() school: School,
     @Body(new ZodValidationPipe(updateSchoolSettingsSchema))
@@ -87,67 +68,60 @@ export class SchoolsController {
     return this.schoolsService.updateSchool(school, body);
   }
 
-  @Get("academic-years")
-  getAcademicYears(
-    @CurrentSchool() school: School,
-    @CurrentSchoolRole() role: string | undefined,
-  ) {
+  @Get('academic-years')
+  getAcademicYears(@CurrentSchool() school: School, @CurrentSchoolRole() role: string | undefined) {
     return this.schoolsService.getAcademicYears(school.id, role);
   }
 
-  @Get("academic-context")
+  @Get('academic-context')
   getAcademicContext(@CurrentSchool() school: School) {
     return this.schoolsService.getCurrentAcademicContext(school.id);
   }
 
-  @Patch("academic-context")
-  @Roles("owner", "admin", "headteacher")
+  @Patch('academic-context')
+  @Roles('owner', 'admin', 'headteacher')
   setAcademicContext(
     @CurrentSchool() school: School,
     @CurrentUser() user: { id: string },
     @Body(new ZodValidationPipe(setAcademicContextSchema))
     body: SetAcademicContextInput,
   ) {
-    return this.schoolsService.setCurrentAcademicContext(
-      school.id,
-      user.id,
-      body,
-    );
+    return this.schoolsService.setCurrentAcademicContext(school.id, user.id, body);
   }
 
-  @Patch("academic-years/:id")
-  @Roles("owner", "admin")
+  @Patch('academic-years/:id')
+  @Roles('owner', 'admin')
   updateAcademicYear(
     @CurrentSchool() school: School,
-    @Param("id") id: string,
+    @Param('id') id: string,
     @Body(new ZodValidationPipe(updateAcademicYearSchema))
     body: UpdateAcademicYearInput,
   ) {
     return this.schoolsService.updateAcademicYear(school.id, id, body);
   }
 
-  @Post("academic-years/:id/terms")
-  @Roles("owner", "admin")
+  @Post('academic-years/:id/terms')
+  @Roles('owner', 'admin')
   createTerm(
     @CurrentSchool() school: School,
-    @Param("id") id: string,
+    @Param('id') id: string,
     @Body(new ZodValidationPipe(createTermSchema)) body: CreateTermInput,
   ) {
     return this.schoolsService.createTerm(school.id, id, body);
   }
 
-  @Patch("terms/:id")
-  @Roles("owner", "admin")
+  @Patch('terms/:id')
+  @Roles('owner', 'admin')
   updateTerm(
     @CurrentSchool() school: School,
-    @Param("id") id: string,
+    @Param('id') id: string,
     @Body(new ZodValidationPipe(updateTermSchema)) body: UpdateTermInput,
   ) {
     return this.schoolsService.updateTerm(school.id, id, body);
   }
 
-  @Post("academic-years")
-  @Roles("owner", "admin")
+  @Post('academic-years')
+  @Roles('owner', 'admin')
   createAcademicYear(
     @CurrentSchool() school: School,
     @Body(new ZodValidationPipe(createAcademicYearSchema))

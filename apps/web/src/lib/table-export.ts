@@ -1,6 +1,6 @@
-import { isValidElement, type ReactNode } from "react";
+import { isValidElement, type ReactNode } from 'react';
 
-export type ExportColumnType = "text" | "number" | "money" | "date";
+export type ExportColumnType = 'text' | 'number' | 'money' | 'date';
 export interface ExportReportInfo {
   school?: string;
   period?: string;
@@ -20,57 +20,79 @@ export interface ExportTable {
 }
 
 export function nodeToText(node: ReactNode): string {
-  if (node == null || typeof node === "boolean") return "";
-  if (typeof node === "string" || typeof node === "number") return String(node);
-  if (Array.isArray(node)) return node.map(nodeToText).filter(Boolean).join(" ").replace(/\s+/g, " ").trim();
+  if (node == null || typeof node === 'boolean') return '';
+  if (typeof node === 'string' || typeof node === 'number') return String(node);
+  if (Array.isArray(node))
+    return node.map(nodeToText).filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
   if (isValidElement(node)) return nodeToText((node.props as { children?: ReactNode }).children);
-  return "";
+  return '';
 }
 const SAFE_NUMBER = /^-?(?:\d+\.?\d*|\.\d+)$/;
-const MONEY_HEADER = /(amount|money|gross|net|balance|paid|billed|collected|salary|tax|ssnit|deduction|cost|price|fee|outstanding|discount|revenue|expense|total due|receivable)/i;
+const MONEY_HEADER =
+  /(amount|money|gross|net|balance|paid|billed|collected|salary|tax|ssnit|deduction|cost|price|fee|outstanding|discount|revenue|expense|total due|receivable)/i;
 const DATE_HEADER = /(^date$|date|issued|due|period|created|updated|when|timestamp|paid at)/i;
 function escapeCellText(value: string | number | Date | null | undefined): string {
-  if (value == null) return "";
-  if (value instanceof Date) return Number.isNaN(value.getTime()) ? "" : value.toISOString();
+  if (value == null) return '';
+  if (value instanceof Date) return Number.isNaN(value.getTime()) ? '' : value.toISOString();
   const text = String(value);
   return /^[\s]*[=+\-@\t\r]/.test(text) && !SAFE_NUMBER.test(text.trim()) ? "'" + text : text;
 }
 function numericValue(value: string | number | Date | null | undefined): number | null {
-  if (typeof value === "number") return Number.isFinite(value) ? value : null;
+  if (typeof value === 'number') return Number.isFinite(value) ? value : null;
   if (value instanceof Date || value == null) return null;
   const raw = String(value).trim();
   if (!raw) return null;
   const negative = /^\(.*\)$/.test(raw);
-  const normalized = raw.replace(/[(),\s]/g, "").replace(/[^\d.+-]/g, "");
+  const normalized = raw.replace(/[(),\s]/g, '').replace(/[^\d.+-]/g, '');
   if (!SAFE_NUMBER.test(normalized)) return null;
   const n = Number(normalized) * (negative ? -1 : 1);
   return Number.isFinite(n) ? n : null;
 }
-function inferColumnType(header: string, values: (string | number | Date | null)[]): ExportColumnType {
-  if (MONEY_HEADER.test(header)) return "money";
-  if (DATE_HEADER.test(header)) return "date";
-  const nonEmpty = values.filter((value) => value != null && String(value).trim() !== "");
-  if (nonEmpty.length && nonEmpty.every((value) => typeof value === "number" || (typeof value === "string" && SAFE_NUMBER.test(value.trim())))) return "number";
-  return "text";
+function inferColumnType(
+  header: string,
+  values: (string | number | Date | null)[],
+): ExportColumnType {
+  if (MONEY_HEADER.test(header)) return 'money';
+  if (DATE_HEADER.test(header)) return 'date';
+  const nonEmpty = values.filter((value) => value != null && String(value).trim() !== '');
+  if (
+    nonEmpty.length &&
+    nonEmpty.every(
+      (value) =>
+        typeof value === 'number' || (typeof value === 'string' && SAFE_NUMBER.test(value.trim())),
+    )
+  )
+    return 'number';
+  return 'text';
 }
 function columnType(table: ExportTable, index: number): ExportColumnType {
-  return table.columnTypes?.[index] ?? inferColumnType(table.headers[index] ?? "", table.rows.map((row) => row[index] ?? null));
+  return (
+    table.columnTypes?.[index] ??
+    inferColumnType(
+      table.headers[index] ?? '',
+      table.rows.map((row) => row[index] ?? null),
+    )
+  );
 }
 
 function displayCell(value: string | number | Date | null, type: ExportColumnType): string {
-  if (value == null) return "";
+  if (value == null) return '';
   if (value instanceof Date) {
-    return Number.isNaN(value.getTime()) ? "" : value.toLocaleDateString("en-GB", { timeZone: "UTC" });
+    return Number.isNaN(value.getTime())
+      ? ''
+      : value.toLocaleDateString('en-GB', { timeZone: 'UTC' });
   }
-  if (type === "date") {
+  if (type === 'date') {
     const parsed = new Date(String(value));
-    return Number.isNaN(parsed.getTime()) ? String(value) : parsed.toLocaleDateString("en-GB", { timeZone: "UTC" });
+    return Number.isNaN(parsed.getTime())
+      ? String(value)
+      : parsed.toLocaleDateString('en-GB', { timeZone: 'UTC' });
   }
-  if (type === "money" || type === "number") {
+  if (type === 'money' || type === 'number') {
     const number = numericValue(value);
     if (number !== null) {
-      return new Intl.NumberFormat("en-GH", {
-        minimumFractionDigits: type === "money" ? 2 : 0,
+      return new Intl.NumberFormat('en-GH', {
+        minimumFractionDigits: type === 'money' ? 2 : 0,
         maximumFractionDigits: 2,
       }).format(number);
     }
@@ -80,26 +102,33 @@ function displayCell(value: string | number | Date | null, type: ExportColumnTyp
 
 function displayTotals(table: ExportTable, types: ExportColumnType[]): string[] {
   return table.headers.map((_, index) => {
-    if (index === 0) return String(table.totalLabel ?? table.totals?.[0] ?? "Total");
+    if (index === 0) return String(table.totalLabel ?? table.totals?.[0] ?? 'Total');
     const explicit = table.totals?.[index];
-    const type = types[index] ?? "text";
-    if (explicit !== null && explicit !== undefined && explicit !== "") {
+    const type = types[index] ?? 'text';
+    if (explicit !== null && explicit !== undefined && explicit !== '') {
       return displayCell(explicit, type);
     }
-    if (type === "money" || type === "number") {
+    if (type === 'money' || type === 'number') {
       const values = table.rows
         .map((row) => numericValue(row[index] ?? null))
         .filter((value): value is number => value !== null);
-      if (values.length === 0) return table.rows.length === 0 ? (type === "money" ? "0.00" : "0") : "";
-      return displayCell(values.reduce((sum, value) => sum + value, 0), type);
+      if (values.length === 0)
+        return table.rows.length === 0 ? (type === 'money' ? '0.00' : '0') : '';
+      return displayCell(
+        values.reduce((sum, value) => sum + value, 0),
+        type,
+      );
     }
-    return "";
+    return '';
   });
 }
-function excelValue(value: string | number | Date | null, type: ExportColumnType): string | number | Date {
-  if (value == null) return "";
-  if (type === "text") return escapeCellText(value);
-  if (type === "date") {
+function excelValue(
+  value: string | number | Date | null,
+  type: ExportColumnType,
+): string | number | Date {
+  if (value == null) return '';
+  if (type === 'text') return escapeCellText(value);
+  if (type === 'date') {
     if (value instanceof Date) return Number.isNaN(value.getTime()) ? escapeCellText(value) : value;
     const parsed = new Date(String(value));
     return !Number.isNaN(parsed.getTime()) ? parsed : escapeCellText(value);
@@ -108,12 +137,16 @@ function excelValue(value: string | number | Date | null, type: ExportColumnType
   return parsed == null ? escapeCellText(value) : parsed;
 }
 export function exportFileName(title: string, extension: string) {
-  const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "export";
-  return slug + "-" + new Date().toISOString().slice(0, 10) + "." + extension;
+  const slug =
+    title
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '') || 'export';
+  return slug + '-' + new Date().toISOString().slice(0, 10) + '.' + extension;
 }
 export function download(blob: Blob, fileName: string) {
   const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
+  const link = document.createElement('a');
   link.href = url;
   link.download = fileName;
   document.body.appendChild(link);
@@ -125,20 +158,24 @@ function reportInfoEntries(table: ExportTable): [string, string][] {
   const info = table.reportInfo;
   const generatedAt = info?.generatedAt ?? new Date();
   const entries: [string, string][] = [
-    ["Report", table.title],
-    ["School", info?.school ?? ""],
-    ["Period", info?.period ?? ""],
-    ["Generated by", info?.generatedBy ?? ""],
-    ["Generated at", generatedAt instanceof Date ? generatedAt.toLocaleString() : String(generatedAt)],
+    ['Report', table.title],
+    ['School', info?.school ?? ''],
+    ['Period', info?.period ?? ''],
+    ['Generated by', info?.generatedBy ?? ''],
+    [
+      'Generated at',
+      generatedAt instanceof Date ? generatedAt.toLocaleString() : String(generatedAt),
+    ],
   ];
   for (const [key, value] of Object.entries(info?.filters ?? {})) {
-    if (value !== null && value !== undefined && String(value) !== "") entries.push(["Filter: " + key, String(value)]);
+    if (value !== null && value !== undefined && String(value) !== '')
+      entries.push(['Filter: ' + key, String(value)]);
   }
-  return entries.filter(([key, value]) => key === "Report" || value !== "");
+  return entries.filter(([key, value]) => key === 'Report' || value !== '');
 }
 function excelCellFormulaColumn(index: number) {
   let number = index + 1;
-  let result = "";
+  let result = '';
   while (number > 0) {
     const remainder = (number - 1) % 26;
     result = String.fromCharCode(65 + remainder) + result;
@@ -147,69 +184,107 @@ function excelCellFormulaColumn(index: number) {
   return result;
 }
 export async function exportXlsx(table: ExportTable) {
-  const mod = await import("exceljs");
+  const mod = await import('exceljs');
   const ExcelJS = mod.default ?? (mod as unknown as typeof mod.default);
   const workbook = new ExcelJS.Workbook();
-  workbook.creator = table.reportInfo?.generatedBy ?? "SchoolHub";
+  workbook.creator = table.reportInfo?.generatedBy ?? 'SchoolHub';
   workbook.created = new Date();
-  const sheet = workbook.addWorksheet(table.title.slice(0, 31).replace(/[\\/?*[\]:]/g, " ") || "Report", { views: [{ state: "frozen", ySplit: 1 }] });
+  const sheet = workbook.addWorksheet(
+    table.title.slice(0, 31).replace(/[\\/?*[\]:]/g, ' ') || 'Report',
+    { views: [{ state: 'frozen', ySplit: 1 }] },
+  );
   sheet.addRow(table.headers.map((value) => String(value)));
-  sheet.getRow(1).font = { bold: true, color: { argb: "FFFFFFFF" } };
-  sheet.getRow(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF334155" } };
-  table.rows.forEach((row) => sheet.addRow(row.map((value, index) => excelValue(value, columnType(table, index)))));
+  sheet.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
+  sheet.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF334155' } };
+  table.rows.forEach((row) =>
+    sheet.addRow(row.map((value, index) => excelValue(value, columnType(table, index)))),
+  );
   if (table.totals) {
     const rowNumber = sheet.rowCount + 1;
     const rowValues = table.headers.map((_, index) => {
-      if (index === 0) return table.totalLabel ?? String(table.totals?.[0] ?? "Total");
+      if (index === 0) return table.totalLabel ?? String(table.totals?.[0] ?? 'Total');
       const type = columnType(table, index);
       const hasValues = table.rows.some((row) => numericValue(row[index]) !== null);
-      if (type === "number" || type === "money") {
+      if (type === 'number' || type === 'money') {
         if (table.rows.length === 0) return 0;
         if (hasValues) {
           const col = excelCellFormulaColumn(index);
-          return { formula: "SUM(" + col + "2:" + col + (rowNumber - 1) + ")" };
+          return { formula: 'SUM(' + col + '2:' + col + (rowNumber - 1) + ')' };
         }
       }
       return excelValue(table.totals?.[index] ?? null, type);
     });
     const totalRow = sheet.addRow(rowValues);
     totalRow.font = { bold: true };
-    totalRow.border = { top: { style: "thin", color: { argb: "FF64748B" } } };
+    totalRow.border = { top: { style: 'thin', color: { argb: 'FF64748B' } } };
   }
   sheet.columns.forEach((column, index) => {
-    const longest = Math.max(table.headers[index]?.length ?? 0, ...table.rows.map((row) => String(row[index] ?? "").length), String(table.totals?.[index] ?? "").length);
+    const longest = Math.max(
+      table.headers[index]?.length ?? 0,
+      ...table.rows.map((row) => String(row[index] ?? '').length),
+      String(table.totals?.[index] ?? '').length,
+    );
     column.width = Math.min(Math.max(longest + 2, 10), 42);
     const type = columnType(table, index);
-    if (type === "money") column.numFmt = '#,##0.00;[Red](#,##0.00)';
-    else if (type === "number") column.numFmt = "#,##0.##";
-    else if (type === "date") column.numFmt = "yyyy-mm-dd";
+    if (type === 'money') column.numFmt = '#,##0.00;[Red](#,##0.00)';
+    else if (type === 'number') column.numFmt = '#,##0.##';
+    else if (type === 'date') column.numFmt = 'yyyy-mm-dd';
   });
-  const info = workbook.addWorksheet("Report info");
-  info.addRows([["Field", "Value"], ...reportInfoEntries(table)]);
+  const info = workbook.addWorksheet('Report info');
+  info.addRows([['Field', 'Value'], ...reportInfoEntries(table)]);
   info.getRow(1).font = { bold: true };
   info.columns = [{ width: 24 }, { width: 55 }];
-  info.views = [{ state: "frozen", ySplit: 1 }];
+  info.views = [{ state: 'frozen', ySplit: 1 }];
   const buffer = await workbook.xlsx.writeBuffer();
-  download(new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), exportFileName(table.title, "xlsx"));
+  download(
+    new Blob([buffer], {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    }),
+    exportFileName(table.title, 'xlsx'),
+  );
 }
 export async function exportPdf(table: ExportTable) {
-  const modules = await Promise.all([import("jspdf"), import("jspdf-autotable")]);
+  const modules = await Promise.all([import('jspdf'), import('jspdf-autotable')]);
   const jsPDF = modules[0].jsPDF;
   const autoTable = modules[1].default;
-  const doc = new jsPDF({ orientation: table.headers.length > 6 ? "landscape" : "portrait", unit: "pt", format: "a4" });
+  const doc = new jsPDF({
+    orientation: table.headers.length > 6 ? 'landscape' : 'portrait',
+    unit: 'pt',
+    format: 'a4',
+  });
   const school = table.reportInfo?.school;
   const period = table.reportInfo?.period;
   doc.setFontSize(15);
   doc.setTextColor(25, 35, 50);
-  doc.text(school ? school + " · " + table.title : table.title, 36, 36, { maxWidth: doc.internal.pageSize.getWidth() - 72 });
+  doc.text(school ? school + ' · ' + table.title : table.title, 36, 36, {
+    maxWidth: doc.internal.pageSize.getWidth() - 72,
+  });
   doc.setFontSize(8);
   doc.setTextColor(100);
-  const subtitle = [period ? "Period: " + period : "", "Generated " + (table.reportInfo?.generatedAt ? String(table.reportInfo.generatedAt) : new Date().toLocaleString()), table.reportInfo?.generatedBy ? "By " + table.reportInfo.generatedBy : ""].filter(Boolean).join(" · ");
+  const subtitle = [
+    period ? 'Period: ' + period : '',
+    'Generated ' +
+      (table.reportInfo?.generatedAt
+        ? String(table.reportInfo.generatedAt)
+        : new Date().toLocaleString()),
+    table.reportInfo?.generatedBy ? 'By ' + table.reportInfo.generatedBy : '',
+  ]
+    .filter(Boolean)
+    .join(' · ');
   doc.text(subtitle, 36, 52, { maxWidth: doc.internal.pageSize.getWidth() - 72 });
   const types = table.headers.map((_, index) => columnType(table, index));
-  const body = table.rows.map((row) => row.map((cell, index) => displayCell(cell, types[index] ?? "text")));
+  const body = table.rows.map((row) =>
+    row.map((cell, index) => displayCell(cell, types[index] ?? 'text')),
+  );
   if (table.totals) body.push(displayTotals(table, types));
-  autoTable(doc, { startY: 64, head: [table.headers], body, styles: { fontSize: 7.5, cellPadding: 3, overflow: "linebreak" }, headStyles: { fillColor: [51, 65, 85] }, margin: { left: 36, right: 36, top: 64, bottom: 34 } });
+  autoTable(doc, {
+    startY: 64,
+    head: [table.headers],
+    body,
+    styles: { fontSize: 7.5, cellPadding: 3, overflow: 'linebreak' },
+    headStyles: { fillColor: [51, 65, 85] },
+    margin: { left: 36, right: 36, top: 64, bottom: 34 },
+  });
   const pages = doc.getNumberOfPages();
   for (let page = 1; page <= pages; page++) {
     doc.setPage(page);
@@ -217,31 +292,73 @@ export async function exportPdf(table: ExportTable) {
     const pageWidth = doc.internal.pageSize.getWidth();
     doc.setFontSize(8);
     doc.setTextColor(100);
-    doc.text("Page " + page + " of " + pages, pageWidth - 36, pageHeight - 16, { align: "right" });
-    if (table.confidential || /payroll|salary|payslip/i.test(table.title)) doc.text("CONFIDENTIAL", 36, pageHeight - 16);
+    doc.text('Page ' + page + ' of ' + pages, pageWidth - 36, pageHeight - 16, { align: 'right' });
+    if (table.confidential || /payroll|salary|payslip/i.test(table.title))
+      doc.text('CONFIDENTIAL', 36, pageHeight - 16);
   }
-  doc.save(exportFileName(table.title, "pdf"));
+  doc.save(exportFileName(table.title, 'pdf'));
 }
-const escapeHtml = (value: unknown) => String(value ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+const escapeHtml = (value: unknown) =>
+  String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
 export function printTable(table: ExportTable) {
-  const head = table.headers.map((header) => "<th>" + escapeHtml(header) + "</th>").join("");
+  const head = table.headers.map((header) => '<th>' + escapeHtml(header) + '</th>').join('');
   const types = table.headers.map((_, index) => columnType(table, index));
-  const body = table.rows.map((row) => "<tr>" + row.map((cell, index) => "<td>" + escapeHtml(displayCell(cell, types[index] ?? "text")) + "</td>").join("") + "</tr>").join("");
-  const totals = table.totals ? "<tr class='totals'>" + displayTotals(table, types).map((cell) => "<td>" + escapeHtml(cell) + "</td>").join("") + "</tr>" : "";
-  const meta = reportInfoEntries(table).map(([key, value]) => "<p><strong>" + escapeHtml(key) + ":</strong> " + escapeHtml(value) + "</p>").join("");
+  const body = table.rows
+    .map(
+      (row) =>
+        '<tr>' +
+        row
+          .map(
+            (cell, index) =>
+              '<td>' + escapeHtml(displayCell(cell, types[index] ?? 'text')) + '</td>',
+          )
+          .join('') +
+        '</tr>',
+    )
+    .join('');
+  const totals = table.totals
+    ? "<tr class='totals'>" +
+      displayTotals(table, types)
+        .map((cell) => '<td>' + escapeHtml(cell) + '</td>')
+        .join('') +
+      '</tr>'
+    : '';
+  const meta = reportInfoEntries(table)
+    .map(
+      ([key, value]) =>
+        '<p><strong>' + escapeHtml(key) + ':</strong> ' + escapeHtml(value) + '</p>',
+    )
+    .join('');
   const confidential = table.confidential || /payroll|salary|payslip/i.test(table.title);
-  const html = "<!doctype html><html><head><meta charset='utf-8'><title>" + escapeHtml(table.title) + "</title><style>" +
-    "*{box-sizing:border-box}body{font:12px Arial,sans-serif;color:#111;margin:22px}h1{font-size:18px;margin:0 0 6px}.meta{display:flex;flex-wrap:wrap;gap:4px 16px;font-size:10px;color:#444;margin-bottom:16px}.meta p{margin:0 0 3px}" +
-    "table{width:100%;border-collapse:collapse;page-break-inside:auto}thead{display:table-header-group}tr{page-break-inside:avoid;page-break-after:auto}th,td{border:1px solid #bbb;padding:5px;text-align:left;vertical-align:top;overflow-wrap:anywhere}th{background:#eee}tr.totals{font-weight:bold;border-top:2px solid #555}" +
-    "footer{position:fixed;bottom:0;left:0;right:0;font-size:9px;color:#555;text-align:center}.confidential{font-weight:bold;letter-spacing:1px}@page{size:auto;margin:12mm}@media print{body{margin:0}}</style></head><body><h1>" +
-    escapeHtml(schoolTitle(table)) + "</h1><div class='meta'>" + meta + "</div><table><thead><tr>" + head + "</tr></thead><tbody>" + body + totals + "</tbody></table><footer>" +
-    (confidential ? "<span class='confidential'>CONFIDENTIAL · </span>" : "") + "Generated by SchoolHub</footer><script>window.onload=function(){window.print();};</script></body></html>";
-  const popup = window.open("", "_blank");
-  if (!popup) throw new Error("The print window was blocked. Allow pop-ups for SchoolHub and try again.");
+  const html =
+    "<!doctype html><html><head><meta charset='utf-8'><title>" +
+    escapeHtml(table.title) +
+    '</title><style>' +
+    '*{box-sizing:border-box}body{font:12px Arial,sans-serif;color:#111;margin:22px}h1{font-size:18px;margin:0 0 6px}.meta{display:flex;flex-wrap:wrap;gap:4px 16px;font-size:10px;color:#444;margin-bottom:16px}.meta p{margin:0 0 3px}' +
+    'table{width:100%;border-collapse:collapse;page-break-inside:auto}thead{display:table-header-group}tr{page-break-inside:avoid;page-break-after:auto}th,td{border:1px solid #bbb;padding:5px;text-align:left;vertical-align:top;overflow-wrap:anywhere}th{background:#eee}tr.totals{font-weight:bold;border-top:2px solid #555}' +
+    'footer{position:fixed;bottom:0;left:0;right:0;font-size:9px;color:#555;text-align:center}.confidential{font-weight:bold;letter-spacing:1px}@page{size:auto;margin:12mm}@media print{body{margin:0}}</style></head><body><h1>' +
+    escapeHtml(schoolTitle(table)) +
+    "</h1><div class='meta'>" +
+    meta +
+    '</div><table><thead><tr>' +
+    head +
+    '</tr></thead><tbody>' +
+    body +
+    totals +
+    '</tbody></table><footer>' +
+    (confidential ? "<span class='confidential'>CONFIDENTIAL · </span>" : '') +
+    'Generated by SchoolHub</footer><script>window.onload=function(){window.print();};</script></body></html>';
+  const popup = window.open('', '_blank');
+  if (!popup)
+    throw new Error('The print window was blocked. Allow pop-ups for SchoolHub and try again.');
   popup.document.open();
   popup.document.write(html);
   popup.document.close();
 }
 function schoolTitle(table: ExportTable) {
-  return table.reportInfo?.school ? table.reportInfo.school + " · " + table.title : table.title;
+  return table.reportInfo?.school ? table.reportInfo.school + ' · ' + table.title : table.title;
 }

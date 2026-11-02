@@ -1,7 +1,7 @@
-import { PersonPhotoPicker, uploadPersonPhoto } from "./person-photo-picker";
-import { DatePicker } from "@/components/ui/date-picker";
-import { useForm } from "@tanstack/react-form";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { PersonPhotoPicker, uploadPersonPhoto } from './person-photo-picker';
+import { DatePicker } from '@/components/ui/date-picker';
+import { useForm } from '@tanstack/react-form';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Check,
   CheckCircle2,
@@ -17,13 +17,13 @@ import {
   UserRound,
   UsersRound,
   X,
-} from "lucide-react";
-import { Children, isValidElement, useDeferredValue, useState, type ReactNode } from "react";
-import type { IssuedCredentials } from "@schoolhub/shared";
+} from 'lucide-react';
+import { Children, isValidElement, useDeferredValue, useState, type ReactNode } from 'react';
+import type { IssuedCredentials } from '@schoolhub/shared';
 import {
   CredentialsDialog,
   type CredentialEntry,
-} from "@/components/credentials/credentials-dialog";
+} from '@/components/credentials/credentials-dialog';
 import {
   createGuardianSchema,
   createStaffSchema,
@@ -34,20 +34,26 @@ import {
   type CreateGuardianInput,
   type CreateStaffInput,
   type CreateTeacherInput,
-} from "@schoolhub/shared";
+} from '@schoolhub/shared';
 import {
   WorkspaceDataTable,
   WorkspaceStat,
   type WorkspaceColumn,
-} from "@/components/school/workspace-ui";
-import { useSchoolRole } from "@/components/school/school-role-switcher";
-import { TeacherBiodataDialog } from "@/components/school/teacher-biodata-dialog";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { apiFetch } from "@/lib/api";
-import { StaffBulkImport } from "@/components/school/staff-bulk-import";
+} from '@/components/school/workspace-ui';
+import { useSchoolRole } from '@/components/school/school-role-switcher';
+import { TeacherBiodataDialog } from '@/components/school/teacher-biodata-dialog';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { apiFetch } from '@/lib/api';
+import { StaffBulkImport } from '@/components/school/staff-bulk-import';
 
-type PeopleKind = "teachers" | "staff" | "guardians";
+type PeopleKind = 'teachers' | 'staff' | 'guardians';
 type Values = {
   firstName: string;
   lastName: string;
@@ -184,64 +190,58 @@ interface Row {
 }
 
 const inputClasses =
-  "mt-1.5 h-10 w-full rounded-lg border border-border bg-background px-3 text-sm text-foreground outline-none placeholder:text-muted-foreground focus:border-ring focus:ring-2 focus:ring-ring/20";
+  'mt-1.5 h-10 w-full rounded-lg border border-border bg-background px-3 text-sm text-foreground outline-none placeholder:text-muted-foreground focus:border-ring focus:ring-2 focus:ring-ring/20';
 const staffTypes = [
-  "ACCOUNTANT",
-  "HEADTEACHER",
-  "ADMIN",
-  "LIBRARIAN",
-  "DRIVER",
-  "SECURITY",
-  "NURSE",
-  "COUNSELOR",
-  "IT_SUPPORT",
-  "RECEPTIONIST",
-  "COOK",
-  "CLEANER",
-  "OTHER",
+  'ACCOUNTANT',
+  'HEADTEACHER',
+  'ADMIN',
+  'LIBRARIAN',
+  'DRIVER',
+  'SECURITY',
+  'NURSE',
+  'COUNSELOR',
+  'IT_SUPPORT',
+  'RECEPTIONIST',
+  'COOK',
+  'CLEANER',
+  'OTHER',
 ];
-const employmentTypes = [
-  "FULL_TIME",
-  "PART_TIME",
-  "CONTRACT",
-  "TEMPORARY",
-  "INTERN",
-];
+const employmentTypes = ['FULL_TIME', 'PART_TIME', 'CONTRACT', 'TEMPORARY', 'INTERN'];
 const relationships = [
-  "FATHER",
-  "MOTHER",
-  "GRANDFATHER",
-  "GRANDMOTHER",
-  "GUARDIAN",
-  "SIBLING",
-  "RELATIVE",
-  "OTHER",
+  'FATHER',
+  'MOTHER',
+  'GRANDFATHER',
+  'GRANDMOTHER',
+  'GUARDIAN',
+  'SIBLING',
+  'RELATIVE',
+  'OTHER',
 ];
 
 function initialValues(): Values {
   return {
-    firstName: "",
-    lastName: "",
-    otherNames: "",
-    staffId: "",
-    staffNumber: "",
+    firstName: '',
+    lastName: '',
+    otherNames: '',
+    staffId: '',
+    staffNumber: '',
     createLogin: false,
-    email: "",
-    phone: "",
-    gender: "MALE",
-    dateOfBirth: "",
-    departmentId: "",
-    qualification: "",
-    specialization: "",
-    experience: "",
-    staffType: "OTHER",
-    jobTitle: "",
-    employmentType: "FULL_TIME",
+    email: '',
+    phone: '',
+    gender: 'MALE',
+    dateOfBirth: '',
+    departmentId: '',
+    qualification: '',
+    specialization: '',
+    experience: '',
+    staffType: 'OTHER',
+    jobTitle: '',
+    employmentType: 'FULL_TIME',
     hireDate: new Date().toISOString().slice(0, 10),
-    relationshipType: "GUARDIAN",
-    alternatePhone: "",
-    occupation: "",
-    employer: "",
+    relationshipType: 'GUARDIAN',
+    alternatePhone: '',
+    occupation: '',
+    employer: '',
     studentIds: [],
   };
 }
@@ -249,48 +249,44 @@ function initialValues(): Values {
 export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
   const queryClient = useQueryClient();
   const { activeRole } = useSchoolRole();
-  const [search, setSearch] = useState("");
-  const [activeFilter, setActiveFilter] = useState("");
+  const [search, setSearch] = useState('');
+  const [activeFilter, setActiveFilter] = useState('');
   const [page, setPage] = useState(1);
   const [photo, setPhoto] = useState<File | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [showBulkImport, setShowBulkImport] = useState(false);
   const [editing, setEditing] = useState<{ id: string; name: string } | null>(null);
   const [viewing, setViewing] = useState<{ id: string; name: string } | null>(null);
-  const [confirmingLogin, setConfirmingLogin] = useState<{ id: string; name: string; hasLogin: boolean } | null>(null);
+  const [confirmingLogin, setConfirmingLogin] = useState<{
+    id: string;
+    name: string;
+    hasLogin: boolean;
+  } | null>(null);
   const [issued, setIssued] = useState<CredentialEntry[]>([]);
   const [notice, setNotice] = useState<string | null>(null);
   const deferredSearch = useDeferredValue(search.trim());
-  const isGuardianPage = kind === "guardians";
+  const isGuardianPage = kind === 'guardians';
   const canManage =
-    ["owner", "admin", "headteacher"].includes(activeRole ?? "") ||
-    (isGuardianPage && activeRole === "staff");
+    ['owner', 'admin', 'headteacher'].includes(activeRole ?? '') ||
+    (isGuardianPage && activeRole === 'staff');
   const title =
-    kind === "teachers"
-      ? "Teachers"
-      : isGuardianPage
-        ? "Guardians"
-        : "Non-teaching staff";
+    kind === 'teachers' ? 'Teachers' : isGuardianPage ? 'Guardians' : 'Non-teaching staff';
   const resourceName =
-    kind === "teachers"
-      ? "teacher"
-      : isGuardianPage
-        ? "guardian"
-        : "staff member";
+    kind === 'teachers' ? 'teacher' : isGuardianPage ? 'guardian' : 'staff member';
 
   const directoryQuery = useQuery({
     queryKey: [
-      "people",
+      'people',
       kind,
       isGuardianPage ? { activeFilter } : { page, search: deferredSearch, activeFilter },
     ],
     queryFn: async () => {
       const params = new URLSearchParams({
-        page: isGuardianPage ? "1" : String(page),
-        limit: isGuardianPage ? "100" : "20",
+        page: isGuardianPage ? '1' : String(page),
+        limit: isGuardianPage ? '100' : '20',
       });
-      if (!isGuardianPage && deferredSearch) params.set("search", deferredSearch);
-      if (activeFilter) params.set("active", activeFilter);
+      if (!isGuardianPage && deferredSearch) params.set('search', deferredSearch);
+      if (activeFilter) params.set('active', activeFilter);
 
       if (!isGuardianPage) {
         return apiFetch<DirectoryPage<Teacher | Staff | Guardian>>(
@@ -304,21 +300,13 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
         `/people/guardians?${params.toString()}`,
       );
       const remainingPages = await Promise.all(
-        Array.from(
-          { length: Math.max(0, firstPage.meta.totalPages - 1) },
-          (_, index) => {
-            const pageParams = new URLSearchParams(params);
-            pageParams.set("page", String(index + 2));
-            return apiFetch<DirectoryPage<Guardian>>(
-              `/people/guardians?${pageParams.toString()}`,
-            );
-          },
-        ),
+        Array.from({ length: Math.max(0, firstPage.meta.totalPages - 1) }, (_, index) => {
+          const pageParams = new URLSearchParams(params);
+          pageParams.set('page', String(index + 2));
+          return apiFetch<DirectoryPage<Guardian>>(`/people/guardians?${pageParams.toString()}`);
+        }),
       );
-      const allGuardians = [
-        ...firstPage.data,
-        ...remainingPages.flatMap((result) => result.data),
-      ];
+      const allGuardians = [...firstPage.data, ...remainingPages.flatMap((result) => result.data)];
       return {
         data: allGuardians,
         meta: { ...firstPage.meta, page: 1, limit: allGuardians.length, totalPages: 1 },
@@ -327,53 +315,58 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
     retry: false,
   });
   const departmentsQuery = useQuery({
-    queryKey: ["academics", "departments"],
-    queryFn: () => apiFetch<Department[]>("/academics/departments"),
-    enabled: showForm && (kind === "teachers" || kind === "staff"),
+    queryKey: ['academics', 'departments'],
+    queryFn: () => apiFetch<Department[]>('/academics/departments'),
+    enabled: showForm && (kind === 'teachers' || kind === 'staff'),
     retry: false,
   });
   const classesQuery = useQuery({
-    queryKey: ["academics", "classes"],
-    queryFn: () => apiFetch<SchoolClass[]>("/academics/classes"),
+    queryKey: ['academics', 'classes'],
+    queryFn: () => apiFetch<SchoolClass[]>('/academics/classes'),
     enabled: showForm && isGuardianPage,
     retry: false,
   });
   const statusMutation = useMutation({
     mutationFn: ({ id, isActive }: { id: string; isActive: boolean }) =>
       apiFetch(`/people/${kind}/${id}/status`, {
-        method: "PATCH",
+        method: 'PATCH',
         body: JSON.stringify({ isActive }),
       }),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["people", kind] });
+      await queryClient.invalidateQueries({ queryKey: ['people', kind] });
     },
   });
   const resetLoginMutation = useMutation({
     mutationFn: ({ id }: { id: string; name: string }) =>
       apiFetch<IssuedCredentials>(
-        `/accounts/people/${kind === "teachers" ? "teacher" : kind === "staff" ? "staff" : "guardian"}/${id}/credentials`,
-        { method: "POST" },
+        `/accounts/people/${kind === 'teachers' ? 'teacher' : kind === 'staff' ? 'staff' : 'guardian'}/${id}/credentials`,
+        { method: 'POST' },
       ),
     onSuccess: async (credentials, variables) => {
       // Held in component state only, never in the query cache.
       setIssued([{ label: variables.name, credentials }]);
-      await queryClient.invalidateQueries({ queryKey: ["people", kind] });
+      await queryClient.invalidateQueries({ queryKey: ['people', kind] });
     },
   });
   const createMutation = useMutation({
     mutationFn: (values: Values) => {
       if (editing) {
-        return apiFetch<{ id: string; credentials?: IssuedCredentials | null; linkedExistingAccount?: boolean }>(
-          `/people/${kind}/${editing.id}`,
-          {
-            method: "PATCH",
-            body: JSON.stringify(makeUpdatePayload(kind, values)),
-          },
-        );
+        return apiFetch<{
+          id: string;
+          credentials?: IssuedCredentials | null;
+          linkedExistingAccount?: boolean;
+        }>(`/people/${kind}/${editing.id}`, {
+          method: 'PATCH',
+          body: JSON.stringify(makeUpdatePayload(kind, values)),
+        });
       }
       const body = makePayload(kind, values);
-      return apiFetch<{ id: string; credentials?: IssuedCredentials | null; linkedExistingAccount?: boolean }>(`/people/${kind}`, {
-        method: "POST",
+      return apiFetch<{
+        id: string;
+        credentials?: IssuedCredentials | null;
+        linkedExistingAccount?: boolean;
+      }>(`/people/${kind}`, {
+        method: 'POST',
         body: JSON.stringify(body),
       });
     },
@@ -383,9 +376,14 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
           ? `${values.firstName} ${values.lastName} already has an account at this school. It now also has this role, and they keep signing in with their own password. No new password was created.`
           : null,
       );
-      if (kind === "teachers" && photo) {
-        try { await uploadPersonPhoto("teacher", editing?.id ?? created.id, photo); }
-        catch { setNotice("Teacher saved, but the image upload failed. Edit the teacher to try uploading the image again."); }
+      if (kind === 'teachers' && photo) {
+        try {
+          await uploadPersonPhoto('teacher', editing?.id ?? created.id, photo);
+        } catch {
+          setNotice(
+            'Teacher saved, but the image upload failed. Edit the teacher to try uploading the image again.',
+          );
+        }
       }
       setPhoto(null);
       if (!editing && created.credentials) {
@@ -398,9 +396,9 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
       }
       setShowForm(false);
       setEditing(null);
-      await queryClient.invalidateQueries({ queryKey: ["people", kind] });
+      await queryClient.invalidateQueries({ queryKey: ['people', kind] });
       if (isGuardianPage) {
-        await queryClient.invalidateQueries({ queryKey: ["students"] });
+        await queryClient.invalidateQueries({ queryKey: ['students'] });
       }
     },
   });
@@ -431,27 +429,23 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
   const activeCount = rows.filter((row) => row.isActive).length;
   const columns: WorkspaceColumn<Row>[] = [
     {
-      id: "person",
-      header: "Name",
+      id: 'person',
+      header: 'Name',
       cell: (row) => (
         <span className="flex items-center gap-3">
           <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
             <UserRound className="size-4" />
           </span>
           <span>
-            <span className="block font-semibold text-foreground">
-              {row.name}
-            </span>
-            <span className="block text-[11px] text-muted-foreground">
-              {row.publicId}
-            </span>
+            <span className="block font-semibold text-foreground">{row.name}</span>
+            <span className="block text-[11px] text-muted-foreground">{row.publicId}</span>
           </span>
         </span>
       ),
     },
     {
-      id: "details",
-      header: isGuardianPage ? "Relationship" : "Role",
+      id: 'details',
+      header: isGuardianPage ? 'Relationship' : 'Role',
       cell: (row) =>
         isGuardianPage ? (
           <span className="inline-flex items-center rounded-lg border border-primary/15 bg-primary/5 px-2.5 py-1 text-xs font-medium text-foreground">
@@ -464,23 +458,23 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
     ...(!isGuardianPage
       ? [
           {
-            id: "department",
-            header: "Department",
-            cell: (row: Row) => row.department || "—",
+            id: 'department',
+            header: 'Department',
+            cell: (row: Row) => row.department || '—',
           },
         ]
       : []),
     {
-      id: "contact",
-      header: "Contact",
+      id: 'contact',
+      header: 'Contact',
       cell: (row) => {
         if (isGuardianPage) {
-          const [phone, email] = row.contact.split(" · ");
+          const [phone, email] = row.contact.split(' · ');
           return (
             <span className="flex min-w-0 flex-col gap-1.5">
               <span className="flex items-center gap-2 text-sm text-foreground">
                 <Phone className="size-3.5 shrink-0 text-muted-foreground" />
-                <span>{phone || "No phone number"}</span>
+                <span>{phone || 'No phone number'}</span>
               </span>
               {email && (
                 <span className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
@@ -491,7 +485,9 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
               {row.relatedStudents && (
                 <span className="flex items-start gap-1.5 pt-0.5 text-[11px] text-muted-foreground">
                   <GraduationCap className="mt-0.5 size-3.5 shrink-0" />
-                  <span className="max-w-[260px] leading-4">Linked students: {row.relatedStudents}</span>
+                  <span className="max-w-[260px] leading-4">
+                    Linked students: {row.relatedStudents}
+                  </span>
                 </span>
               )}
             </span>
@@ -499,7 +495,7 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
         }
         return (
           <span>
-            <span className="block">{row.contact || "—"}</span>
+            <span className="block">{row.contact || '—'}</span>
             {row.relatedStudents && (
               <span className="block text-[11px] text-muted-foreground">
                 Students: {row.relatedStudents}
@@ -510,26 +506,24 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
       },
     },
     {
-      id: "status",
-      header: "Status",
+      id: 'status',
+      header: 'Status',
       cell: (row) => (
         <span
           className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
-            row.isActive
-              ? "bg-success/10 text-success"
-              : "bg-muted text-muted-foreground"
+            row.isActive ? 'bg-success/10 text-success' : 'bg-muted text-muted-foreground'
           }`}
         >
-          {row.isActive ? "Active" : "Inactive"}
+          {row.isActive ? 'Active' : 'Inactive'}
         </span>
       ),
     },
-    ...(kind === "teachers" || isGuardianPage
+    ...(kind === 'teachers' || isGuardianPage
       ? [
           {
-            id: "view",
-            header: "",
-            className: "w-24 text-right",
+            id: 'view',
+            header: '',
+            className: 'w-24 text-right',
             cell: (row: Row) => (
               <button
                 type="button"
@@ -547,9 +541,9 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
     ...(canManage
       ? [
           {
-            id: "action",
-            header: "",
-            className: "w-64 text-right",
+            id: 'action',
+            header: '',
+            className: 'w-64 text-right',
             cell: (row: Row) => (
               <span className="inline-flex gap-1">
                 <button
@@ -564,7 +558,7 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
                     setPhoto(null);
                     setEditing({ id: row.id, name: row.name });
                     setShowForm(true);
-                    window.scrollTo({ top: 0, behavior: "smooth" });
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
                   }}
                   className="rounded-md px-2 py-1.5 text-xs font-semibold text-primary hover:bg-primary/10"
                 >
@@ -582,17 +576,15 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
                   }
                   className="rounded-md px-2 py-1.5 text-xs font-semibold text-primary hover:bg-primary/10 disabled:opacity-50"
                 >
-                  {isGuardianPage && !row.hasLogin ? "Create login" : "Reset login"}
+                  {isGuardianPage && !row.hasLogin ? 'Create login' : 'Reset login'}
                 </button>
                 <button
                   type="button"
                   disabled={statusMutation.isPending}
-                  onClick={() =>
-                    statusMutation.mutate({ id: row.id, isActive: !row.isActive })
-                  }
+                  onClick={() => statusMutation.mutate({ id: row.id, isActive: !row.isActive })}
                   className="rounded-md px-2 py-1.5 text-xs font-semibold text-primary hover:bg-primary/10 disabled:opacity-50"
                 >
-                  {row.isActive ? "Deactivate" : "Reactivate"}
+                  {row.isActive ? 'Deactivate' : 'Reactivate'}
                 </button>
               </span>
             ),
@@ -607,20 +599,22 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
         open={confirmingLogin !== null}
         title={
           confirmingLogin && isGuardianPage && !confirmingLogin.hasLogin
-            ? "Create guardian login?"
-            : "Reset login credentials?"
+            ? 'Create guardian login?'
+            : 'Reset login credentials?'
         }
         description={
           confirmingLogin && isGuardianPage && !confirmingLogin.hasLogin
             ? `Create a parent-portal login for ${confirmingLogin.name}. A temporary password will be generated and shown once after creation.`
-            : `Issue a new temporary password for ${confirmingLogin?.name ?? "this person"}? Their current password will stop working and they will be signed out.`
+            : `Issue a new temporary password for ${confirmingLogin?.name ?? 'this person'}? Their current password will stop working and they will be signed out.`
         }
         confirmLabel={
           confirmingLogin && isGuardianPage && !confirmingLogin.hasLogin
-            ? "Create login"
-            : "Reset login"
+            ? 'Create login'
+            : 'Reset login'
         }
-        confirmVariant={confirmingLogin && isGuardianPage && !confirmingLogin.hasLogin ? "primary" : "danger"}
+        confirmVariant={
+          confirmingLogin && isGuardianPage && !confirmingLogin.hasLogin ? 'primary' : 'danger'
+        }
         loading={resetLoginMutation.isPending}
         onCancel={() => setConfirmingLogin(null)}
         onConfirm={() => {
@@ -631,8 +625,12 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
           );
         }}
       />
-      {viewing && kind === "teachers" && (
-        <TeacherBiodataDialog teacherId={viewing.id} fallbackName={viewing.name} onClose={() => setViewing(null)} />
+      {viewing && kind === 'teachers' && (
+        <TeacherBiodataDialog
+          teacherId={viewing.id}
+          fallbackName={viewing.name}
+          onClose={() => setViewing(null)}
+        />
       )}
       {viewing && isGuardianPage && peopleById.get(viewing.id) && (
         <GuardianDetailsDialog
@@ -643,14 +641,20 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
       <section
         className={`relative isolate overflow-hidden rounded-2xl border p-5 shadow-sm sm:p-6 ${
           isGuardianPage
-            ? "border-primary/20 bg-gradient-to-br from-primary/15 via-card to-highlight/10 dark:from-primary/20 dark:via-card"
-            : "border-border bg-gradient-to-br from-primary/10 via-card to-info/5"
+            ? 'border-primary/20 bg-gradient-to-br from-primary/15 via-card to-highlight/10 dark:from-primary/20 dark:via-card'
+            : 'border-border bg-gradient-to-br from-primary/10 via-card to-info/5'
         }`}
       >
         {isGuardianPage && (
           <>
-            <span aria-hidden="true" className="pointer-events-none absolute -right-12 -top-16 size-48 rounded-full bg-primary/10 blur-3xl" />
-            <span aria-hidden="true" className="pointer-events-none absolute -bottom-20 right-36 size-36 rounded-full bg-highlight/10 blur-3xl" />
+            <span
+              aria-hidden="true"
+              className="pointer-events-none absolute -right-12 -top-16 size-48 rounded-full bg-primary/10 blur-3xl"
+            />
+            <span
+              aria-hidden="true"
+              className="pointer-events-none absolute -bottom-20 right-36 size-36 rounded-full bg-highlight/10 blur-3xl"
+            />
           </>
         )}
         <div className="relative flex flex-wrap items-start justify-between gap-4">
@@ -668,18 +672,22 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
                 {title} directory
               </h2>
               <p className="mt-1.5 max-w-3xl text-sm leading-6 text-muted-foreground">
-                {kind === "teachers"
-                  ? "Manage teaching personnel and their school department. Teachers are not duplicated in the non-teaching Staff directory."
+                {kind === 'teachers'
+                  ? 'Manage teaching personnel and their school department. Teachers are not duplicated in the non-teaching Staff directory.'
                   : isGuardianPage
-                    ? "Keep guardian contacts, linked students and parent-portal access organised in one place."
-                    : "Manage non-teaching employees, departments, and operational roles. Teaching personnel are managed separately under Teachers."}
+                    ? 'Keep guardian contacts, linked students and parent-portal access organised in one place.'
+                    : 'Manage non-teaching employees, departments, and operational roles. Teaching personnel are managed separately under Teachers.'}
               </p>
             </div>
           </div>
           {canManage && (
             <div className="flex flex-wrap gap-2">
-              {(kind === "teachers" || kind === "staff") && (
-                <button type="button" onClick={() => setShowBulkImport(true)} className="inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-card px-4 text-xs font-semibold text-foreground hover:bg-muted">
+              {(kind === 'teachers' || kind === 'staff') && (
+                <button
+                  type="button"
+                  onClick={() => setShowBulkImport(true)}
+                  className="inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-card px-4 text-xs font-semibold text-foreground hover:bg-muted"
+                >
                   <UsersRound className="size-4" /> Bulk upload
                 </button>
               )}
@@ -704,11 +712,11 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
         </div>
       </section>
 
-      {showBulkImport && canManage && (kind === "teachers" || kind === "staff") && (
+      {showBulkImport && canManage && (kind === 'teachers' || kind === 'staff') && (
         <StaffBulkImport
-          kind={kind === "teachers" ? "teacher" : "staff"}
+          kind={kind === 'teachers' ? 'teacher' : 'staff'}
           onClose={() => setShowBulkImport(false)}
-          onComplete={() => void queryClient.invalidateQueries({ queryKey: ["people", kind] })}
+          onComplete={() => void queryClient.invalidateQueries({ queryKey: ['people', kind] })}
         />
       )}
 
@@ -719,11 +727,11 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
               {editing ? `Edit ${editing.name}` : `Add ${resourceName}`}
             </h3>
             <p className="mt-1 text-xs text-muted-foreground">
-              {kind === "staff"
-                ? "A staff profile is created without a password or sign-in invitation."
+              {kind === 'staff'
+                ? 'A staff profile is created without a password or sign-in invitation.'
                 : isGuardianPage
-                  ? "Linking students here creates family relationships only; it does not grant portal access."
-                  : "A teacher profile can be invited to sign in later through school team management."}
+                  ? 'Linking students here creates family relationships only; it does not grant portal access.'
+                  : 'A teacher profile can be invited to sign in later through school team management.'}
             </p>
           </div>
           <form
@@ -735,7 +743,7 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
             }}
             className="space-y-4"
           >
-            {kind === "teachers" && <PersonPhotoPicker file={photo} onChange={setPhoto} />}
+            {kind === 'teachers' && <PersonPhotoPicker file={photo} onChange={setPhoto} />}
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               <form.Field name="firstName">
                 {(field) => (
@@ -768,7 +776,7 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
                   )}
                 </form.Field>
               )}
-              {kind === "teachers" && (
+              {kind === 'teachers' && (
                 <>
                   <form.Field name="staffNumber">
                     {(field) => (
@@ -863,7 +871,7 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
                   </form.Field>
                 </>
               )}
-              {kind === "staff" && (
+              {kind === 'staff' && (
                 <>
                   <form.Field name="email">
                     {(field) => (
@@ -1015,24 +1023,26 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
                     )}
                   </form.Field>
                   <form.Field name="createLogin">
-                    {(field) => editing ? null : (
-                      <label className="flex items-start gap-2 text-xs text-foreground sm:col-span-2">
-                        <input
-                          type="checkbox"
-                          checked={field.state.value}
-                          onChange={(event) => field.handleChange(event.target.checked)}
-                          className="mt-0.5 size-4 rounded border-border"
-                        />
-                        <span>
-                          <span className="font-semibold">Create parent-portal login</span>
-                          <span className="block text-muted-foreground">
-                            If no contact email is entered, a sign-in email is generated
-                            using the school's domain. A temporary password is shown once;
-                            the guardian must change it at first sign-in.
+                    {(field) =>
+                      editing ? null : (
+                        <label className="flex items-start gap-2 text-xs text-foreground sm:col-span-2">
+                          <input
+                            type="checkbox"
+                            checked={field.state.value}
+                            onChange={(event) => field.handleChange(event.target.checked)}
+                            className="mt-0.5 size-4 rounded border-border"
+                          />
+                          <span>
+                            <span className="font-semibold">Create parent-portal login</span>
+                            <span className="block text-muted-foreground">
+                              If no contact email is entered, a sign-in email is generated using the
+                              school's domain. A temporary password is shown once; the guardian must
+                              change it at first sign-in.
+                            </span>
                           </span>
-                        </span>
-                      </label>
-                    )}
+                        </label>
+                      )
+                    }
                   </form.Field>
                   <form.Field name="relationshipType">
                     {(field) => (
@@ -1090,15 +1100,14 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
                 message={
                   departmentsQuery.error?.message ??
                   classesQuery.error?.message ??
-                  "The form options could not be loaded."
+                  'The form options could not be loaded.'
                 }
               />
             )}
             {(createMutation.error || statusMutation.error) && (
               <ErrorPanel
                 message={
-                  (createMutation.error ?? statusMutation.error)?.message ??
-                  "The request failed."
+                  (createMutation.error ?? statusMutation.error)?.message ?? 'The request failed.'
                 }
               />
             )}
@@ -1119,38 +1128,44 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
                 disabled={createMutation.isPending}
                 className="inline-flex h-9 items-center gap-2 rounded-lg bg-primary px-4 text-xs font-semibold text-primary-foreground disabled:opacity-60"
               >
-                {createMutation.isPending && (
-                  <LoaderCircle className="size-3.5 animate-spin" />
-                )}
-                {editing ? "Save changes" : `Save ${resourceName}`}
+                {createMutation.isPending && <LoaderCircle className="size-3.5 animate-spin" />}
+                {editing ? 'Save changes' : `Save ${resourceName}`}
               </button>
             </div>
           </form>
         </section>
       )}
 
-      <div className={`grid gap-3 sm:grid-cols-3 ${isGuardianPage ? "xl:gap-4" : ""}`}>
+      <div className={`grid gap-3 sm:grid-cols-3 ${isGuardianPage ? 'xl:gap-4' : ''}`}>
         <WorkspaceStat
-          label={isGuardianPage ? "Total guardians" : "Directory records"}
+          label={isGuardianPage ? 'Total guardians' : 'Directory records'}
           value={String(total)}
-          detail={isGuardianPage ? "in the directory" : "matching filters"}
+          detail={isGuardianPage ? 'in the directory' : 'matching filters'}
           icon={UsersRound}
         />
         <WorkspaceStat
-          label={isGuardianPage ? "Active guardians" : "Active on this page"}
+          label={isGuardianPage ? 'Active guardians' : 'Active on this page'}
           value={String(activeCount)}
-          detail={isGuardianPage ? "active records" : title.toLowerCase()}
+          detail={isGuardianPage ? 'active records' : title.toLowerCase()}
           icon={CheckCircle2}
         />
         <WorkspaceStat
-          label={isGuardianPage ? "Portal access" : "Page"}
-          value={isGuardianPage ? String(rows.filter((row) => row.hasLogin).length) : String(directoryQuery.data?.meta.page ?? 1) + " / " + String(directoryQuery.data?.meta.totalPages || 1)}
-          detail={isGuardianPage ? "guardians with a login" : "directory pagination"}
+          label={isGuardianPage ? 'Portal access' : 'Page'}
+          value={
+            isGuardianPage
+              ? String(rows.filter((row) => row.hasLogin).length)
+              : String(directoryQuery.data?.meta.page ?? 1) +
+                ' / ' +
+                String(directoryQuery.data?.meta.totalPages || 1)
+          }
+          detail={isGuardianPage ? 'guardians with a login' : 'directory pagination'}
           icon={isGuardianPage ? ShieldCheck : undefined}
         />
       </div>
 
-      <section className={`rounded-2xl border border-border bg-card/80 p-4 shadow-sm backdrop-blur-sm ${isGuardianPage ? "flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between" : "grid gap-3 md:grid-cols-[minmax(220px,1fr)_180px]"}`}>
+      <section
+        className={`rounded-2xl border border-border bg-card/80 p-4 shadow-sm backdrop-blur-sm ${isGuardianPage ? 'flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between' : 'grid gap-3 md:grid-cols-[minmax(220px,1fr)_180px]'}`}
+      >
         {!isGuardianPage && (
           <label className="relative">
             <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -1173,17 +1188,27 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
             </span>
             <div>
               <p className="text-sm font-semibold text-foreground">Filter guardians</p>
-              <p className="mt-0.5 text-xs text-muted-foreground">Narrow the directory by account status</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                Narrow the directory by account status
+              </p>
             </div>
           </div>
         )}
-        <label className={isGuardianPage ? "w-full sm:w-52" : ""}>
+        <label className={isGuardianPage ? 'w-full sm:w-52' : ''}>
           <span className="sr-only">Filter by status</span>
-          <Select value={activeFilter || "__all__"} onValueChange={(value) => {
-            setActiveFilter(value === "__all__" ? "" : value);
-            setPage(1);
-          }}>
-            <SelectTrigger aria-label="Filter by status" className={`${inputClasses} mt-0 ${isGuardianPage ? "sm:h-11 sm:px-3" : ""}`}><SelectValue placeholder="All statuses" /></SelectTrigger>
+          <Select
+            value={activeFilter || '__all__'}
+            onValueChange={(value) => {
+              setActiveFilter(value === '__all__' ? '' : value);
+              setPage(1);
+            }}
+          >
+            <SelectTrigger
+              aria-label="Filter by status"
+              className={`${inputClasses} mt-0 ${isGuardianPage ? 'sm:h-11 sm:px-3' : ''}`}
+            >
+              <SelectValue placeholder="All statuses" />
+            </SelectTrigger>
             <SelectContent>
               <SelectItem value="__all__">All statuses</SelectItem>
               <SelectItem value="true">Active</SelectItem>
@@ -1194,15 +1219,22 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
       </section>
 
       {(statusMutation.error || resetLoginMutation.error) && !showForm && (
-        <ErrorPanel
-          message={(statusMutation.error ?? resetLoginMutation.error)!.message}
-        />
+        <ErrorPanel message={(statusMutation.error ?? resetLoginMutation.error)!.message} />
       )}
       <CredentialsDialog entries={issued} onClose={() => setIssued([])} />
       {notice && (
-        <p role="status" className="flex items-start justify-between gap-3 rounded-xl border border-success/20 bg-success/10 px-4 py-3 text-xs text-success">
+        <p
+          role="status"
+          className="flex items-start justify-between gap-3 rounded-xl border border-success/20 bg-success/10 px-4 py-3 text-xs text-success"
+        >
           <span>{notice}</span>
-          <button type="button" onClick={() => setNotice(null)} className="font-semibold underline-offset-2 hover:underline">Dismiss</button>
+          <button
+            type="button"
+            onClick={() => setNotice(null)}
+            className="font-semibold underline-offset-2 hover:underline"
+          >
+            Dismiss
+          </button>
         </p>
       )}
       <WorkspaceDataTable
@@ -1216,8 +1248,8 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
       {!isGuardianPage && (directoryQuery.data?.meta.totalPages ?? 0) > 1 && (
         <div className="flex items-center justify-between rounded-xl border border-border bg-card px-4 py-3">
           <p className="text-xs text-muted-foreground">
-            Page {directoryQuery.data?.meta.page} of{" "}
-            {directoryQuery.data?.meta.totalPages} · {total} records
+            Page {directoryQuery.data?.meta.page} of {directoryQuery.data?.meta.totalPages} ·{' '}
+            {total} records
           </p>
           <div className="flex gap-2">
             <button
@@ -1244,44 +1276,44 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
 }
 
 function isoDay(value?: string | null) {
-  return value ? value.slice(0, 10) : "";
+  return value ? value.slice(0, 10) : '';
 }
 
 function valuesFromPerson(person: Teacher | Staff | Guardian): Values {
   const base = initialValues();
-  if ("teacherId" in person) {
+  if ('teacherId' in person) {
     return {
       ...base,
-      firstName: person.firstName || person.profile?.firstName || "",
-      lastName: person.lastName || person.profile?.lastName || "",
-      staffNumber: person.staffNumber ?? "",
-      email: person.profile?.user?.email ?? person.invitationEmail ?? "",
-      phone: person.profile?.phone ?? "",
-      gender: person.profile?.gender ?? "",
+      firstName: person.firstName || person.profile?.firstName || '',
+      lastName: person.lastName || person.profile?.lastName || '',
+      staffNumber: person.staffNumber ?? '',
+      email: person.profile?.user?.email ?? person.invitationEmail ?? '',
+      phone: person.profile?.phone ?? '',
+      gender: person.profile?.gender ?? '',
       dateOfBirth: isoDay(person.profile?.dateOfBirth),
       departmentId: person.department.id,
-      qualification: person.qualification ?? "",
-      specialization: person.specialization ?? "",
-      experience: person.experience != null ? String(person.experience) : "",
-      employmentType: person.employmentType ?? "FULL_TIME",
+      qualification: person.qualification ?? '',
+      specialization: person.specialization ?? '',
+      experience: person.experience != null ? String(person.experience) : '',
+      employmentType: person.employmentType ?? 'FULL_TIME',
       hireDate: isoDay(person.hireDate) || base.hireDate,
     };
   }
-  if ("staffId" in person) {
+  if ('staffId' in person) {
     return {
       ...base,
       firstName: person.profile.firstName,
       lastName: person.profile.lastName,
       email: person.profile.user.email,
-      phone: person.profile.phone ?? "",
-      gender: person.profile.gender ?? "MALE",
+      phone: person.profile.phone ?? '',
+      gender: person.profile.gender ?? 'MALE',
       dateOfBirth: isoDay(person.profile.dateOfBirth),
       staffId: person.staffId,
-      staffNumber: person.staffNumber ?? "",
+      staffNumber: person.staffNumber ?? '',
       staffType: person.staffType,
-      departmentId: person.department?.id ?? "",
-      jobTitle: person.jobTitle ?? "",
-      employmentType: person.employmentType ?? "FULL_TIME",
+      departmentId: person.department?.id ?? '',
+      jobTitle: person.jobTitle ?? '',
+      employmentType: person.employmentType ?? 'FULL_TIME',
       hireDate: isoDay(person.hireDate) || base.hireDate,
     };
   }
@@ -1289,20 +1321,20 @@ function valuesFromPerson(person: Teacher | Staff | Guardian): Values {
     ...base,
     firstName: person.firstName,
     lastName: person.lastName,
-    otherNames: person.otherNames ?? "",
-    email: person.email ?? person.profile?.user?.email ?? "",
+    otherNames: person.otherNames ?? '',
+    email: person.email ?? person.profile?.user?.email ?? '',
     phone: person.phone,
-    alternatePhone: person.alternatePhone ?? "",
-    gender: person.gender ?? "",
+    alternatePhone: person.alternatePhone ?? '',
+    gender: person.gender ?? '',
     relationshipType: person.relationshipType,
-    occupation: person.occupation ?? "",
-    employer: person.employer ?? "",
+    occupation: person.occupation ?? '',
+    employer: person.employer ?? '',
   };
 }
 
 /** Edit payloads are validated with the update schemas (no create-only fields). */
 function makeUpdatePayload(kind: PeopleKind, values: Values) {
-  if (kind === "teachers") {
+  if (kind === 'teachers') {
     return updateTeacherSchema.parse({
       firstName: values.firstName,
       lastName: values.lastName,
@@ -1319,7 +1351,7 @@ function makeUpdatePayload(kind: PeopleKind, values: Values) {
       hireDate: values.hireDate,
     });
   }
-  if (kind === "staff") {
+  if (kind === 'staff') {
     return updateStaffSchema.parse({
       firstName: values.firstName,
       lastName: values.lastName,
@@ -1351,14 +1383,14 @@ function makeUpdatePayload(kind: PeopleKind, values: Values) {
 }
 
 function makePayload(kind: PeopleKind, values: Values) {
-  if (kind === "teachers") {
+  if (kind === 'teachers') {
     const payload: CreateTeacherInput = createTeacherSchema.parse({
       ...values,
       experience: values.experience ? Number(values.experience) : undefined,
     });
     return payload;
   }
-  if (kind === "staff") {
+  if (kind === 'staff') {
     const payload: CreateStaffInput = createStaffSchema.parse(values);
     return payload;
   }
@@ -1367,38 +1399,33 @@ function makePayload(kind: PeopleKind, values: Values) {
 }
 
 function toRow(person: Teacher | Staff | Guardian): Row {
-  if ("teacherId" in person) {
+  if ('teacherId' in person) {
     const teacher = person;
-    const firstName = teacher.firstName || teacher.profile?.firstName || "";
-    const lastName = teacher.lastName || teacher.profile?.lastName || "";
+    const firstName = teacher.firstName || teacher.profile?.firstName || '';
+    const lastName = teacher.lastName || teacher.profile?.lastName || '';
     return {
       id: teacher.id,
       publicId: teacher.teacherId,
       name: `${firstName} ${lastName}`.trim(),
-      detail: "Teacher",
-      contact: [
-        teacher.invitationEmail || teacher.profile?.user?.email,
-        teacher.profile?.phone,
-      ]
+      detail: 'Teacher',
+      contact: [teacher.invitationEmail || teacher.profile?.user?.email, teacher.profile?.phone]
         .filter(Boolean)
-        .join(" · "),
+        .join(' · '),
       department: teacher.department.name,
-      relatedStudents: "",
+      relatedStudents: '',
       isActive: teacher.isActive,
     };
   }
-  if ("staffId" in person) {
+  if ('staffId' in person) {
     const staff = person;
     return {
       id: staff.id,
       publicId: staff.staffId,
       name: `${staff.profile.firstName} ${staff.profile.lastName}`,
       detail: staff.jobTitle || formatLabel(staff.staffType),
-      contact: [staff.profile.user.email, staff.profile.phone]
-        .filter(Boolean)
-        .join(" · "),
-      department: staff.department?.name ?? "",
-      relatedStudents: "",
+      contact: [staff.profile.user.email, staff.profile.phone].filter(Boolean).join(' · '),
+      department: staff.department?.name ?? '',
+      relatedStudents: '',
       isActive: staff.isActive,
     };
   }
@@ -1408,16 +1435,11 @@ function toRow(person: Teacher | Staff | Guardian): Row {
     publicId: guardian.guardianId,
     name: `${guardian.firstName} ${guardian.lastName}`,
     detail: formatLabel(guardian.relationshipType),
-    contact: guardian.email
-      ? `${guardian.phone} · ${guardian.email}`
-      : guardian.phone,
-    department: "",
+    contact: guardian.email ? `${guardian.phone} · ${guardian.email}` : guardian.phone,
+    department: '',
     relatedStudents: guardian.students
-      .map(
-        ({ student }) =>
-          `${student.profile.firstName} ${student.profile.lastName}`,
-      )
-      .join(", "),
+      .map(({ student }) => `${student.profile.firstName} ${student.profile.lastName}`)
+      .join(', '),
     isActive: guardian.isActive,
     hasLogin: guardian.canLogin ?? Boolean(guardian.profile?.user.email),
   };
@@ -1425,7 +1447,7 @@ function toRow(person: Teacher | Staff | Guardian): Row {
 
 function TextField({
   label,
-  type = "text",
+  type = 'text',
   required = false,
   value,
   onChange,
@@ -1439,16 +1461,21 @@ function TextField({
   return (
     <label className="text-xs font-semibold text-foreground">
       {label}
-      {required ? " *" : ""}
-      {type === "date" ? (
-        <DatePicker value={value} onChange={onChange} required={required}
-          ariaLabel={label} buttonClassName={inputClasses} />
+      {required ? ' *' : ''}
+      {type === 'date' ? (
+        <DatePicker
+          value={value}
+          onChange={onChange}
+          required={required}
+          ariaLabel={label}
+          buttonClassName={inputClasses}
+        />
       ) : (
         <input
           type={type}
           value={value}
           required={required}
-          min={type === "number" ? 0 : undefined}
+          min={type === 'number' ? 0 : undefined}
           onChange={(event) => onChange(event.target.value)}
           className={inputClasses}
         />
@@ -1478,10 +1505,10 @@ function SelectField({
         disabled?: boolean;
         children?: ReactNode;
       }>;
-      const rawValue = String(option.props.value ?? "");
+      const rawValue = String(option.props.value ?? '');
       return {
-        key: `${rawValue || "empty"}-${index}`,
-        value: rawValue || "__none__",
+        key: `${rawValue || 'empty'}-${index}`,
+        value: rawValue || '__none__',
         label: option.props.children,
         disabled: option.props.disabled ?? false,
       };
@@ -1490,12 +1517,20 @@ function SelectField({
   return (
     <label className="text-xs font-semibold text-foreground">
       {label}
-      {required ? " *" : ""}
-      <Select value={value || "__none__"} onValueChange={(nextValue) => onChange(nextValue === "__none__" ? "" : nextValue)} required={required}>
-        <SelectTrigger aria-label={label} className={inputClasses}><SelectValue placeholder={label} /></SelectTrigger>
+      {required ? ' *' : ''}
+      <Select
+        value={value || '__none__'}
+        onValueChange={(nextValue) => onChange(nextValue === '__none__' ? '' : nextValue)}
+        required={required}
+      >
+        <SelectTrigger aria-label={label} className={inputClasses}>
+          <SelectValue placeholder={label} />
+        </SelectTrigger>
         <SelectContent>
           {options.map((option) => (
-            <SelectItem key={option.key} value={option.value} disabled={option.disabled}>{option.label}</SelectItem>
+            <SelectItem key={option.key} value={option.value} disabled={option.disabled}>
+              {option.label}
+            </SelectItem>
           ))}
         </SelectContent>
       </Select>
@@ -1512,28 +1547,23 @@ function StudentSearchPicker({
   value: string[];
   onChange: (values: string[]) => void;
 }) {
-  const [search, setSearch] = useState("");
-  const [classId, setClassId] = useState("");
+  const [search, setSearch] = useState('');
+  const [classId, setClassId] = useState('');
   const deferredSearch = useDeferredValue(search.trim());
   const [selected, setSelected] = useState<StudentOption[]>([]);
   const studentsQuery = useQuery({
-    queryKey: [
-      "students",
-      "guardian-picker",
-      { search: deferredSearch, classId },
-    ],
+    queryKey: ['students', 'guardian-picker', { search: deferredSearch, classId }],
     queryFn: () => {
       const params = new URLSearchParams({
-        page: "1",
-        limit: "20",
-        status: "ACTIVE",
+        page: '1',
+        limit: '20',
+        status: 'ACTIVE',
       });
-      if (deferredSearch.length >= 2) params.set("search", deferredSearch);
-      if (classId) params.set("classId", classId);
+      if (deferredSearch.length >= 2) params.set('search', deferredSearch);
+      if (classId) params.set('classId', classId);
       return apiFetch<DirectoryPage<StudentOption>>(`/students?${params}`);
     },
-    enabled:
-      deferredSearch.length >= 2 || (deferredSearch.length === 0 && !!classId),
+    enabled: deferredSearch.length >= 2 || (deferredSearch.length === 0 && !!classId),
     retry: false,
   });
   const selectedIds = new Set(value);
@@ -1545,9 +1575,7 @@ function StudentSearchPicker({
   }
 
   function removeStudent(studentId: string) {
-    setSelected((current) =>
-      current.filter((student) => student.id !== studentId),
-    );
+    setSelected((current) => current.filter((student) => student.id !== studentId));
     onChange(value.filter((id) => id !== studentId));
   }
 
@@ -1559,8 +1587,7 @@ function StudentSearchPicker({
     >
       <p id="guardian-student-picker-label">Link students (optional)</p>
       <span className="mt-1 block font-normal text-muted-foreground">
-        Search by student name or narrow the list by class. You can select
-        multiple students.
+        Search by student name or narrow the list by class. You can select multiple students.
       </span>
       <div className="mt-2 grid gap-2 sm:grid-cols-[minmax(0,1fr)_220px]">
         <span className="relative">
@@ -1574,13 +1601,22 @@ function StudentSearchPicker({
           />
         </span>
         <span className="relative">
-          <Select value={classId || "__all__"} onValueChange={(value) => setClassId(value === "__all__" ? "" : value)}>
-            <SelectTrigger aria-label="Filter students by class" className={`${inputClasses} mt-0`}><SelectValue placeholder="All current classes" /></SelectTrigger>
+          <Select
+            value={classId || '__all__'}
+            onValueChange={(value) => setClassId(value === '__all__' ? '' : value)}
+          >
+            <SelectTrigger aria-label="Filter students by class" className={`${inputClasses} mt-0`}>
+              <SelectValue placeholder="All current classes" />
+            </SelectTrigger>
             <SelectContent>
               <SelectItem value="__all__">All current classes</SelectItem>
-              {classes.filter((schoolClass) => schoolClass.isActive).map((schoolClass) => (
-                <SelectItem key={schoolClass.id} value={schoolClass.id}>{schoolClass.name}</SelectItem>
-              ))}
+              {classes
+                .filter((schoolClass) => schoolClass.isActive)
+                .map((schoolClass) => (
+                  <SelectItem key={schoolClass.id} value={schoolClass.id}>
+                    {schoolClass.name}
+                  </SelectItem>
+                ))}
             </SelectContent>
           </Select>
         </span>
@@ -1615,10 +1651,7 @@ function StudentSearchPicker({
             Searching students…
           </p>
         ) : studentsQuery.error ? (
-          <p
-            role="alert"
-            className="px-3 py-3 text-xs font-normal text-destructive"
-          >
+          <p role="alert" className="px-3 py-3 text-xs font-normal text-destructive">
             {studentsQuery.error.message}
           </p>
         ) : deferredSearch.length === 1 ? (
@@ -1645,15 +1678,11 @@ function StudentSearchPicker({
                     {student.profile.firstName} {student.profile.lastName}
                   </span>
                   <span className="block truncate text-[11px] font-normal text-muted-foreground">
-                    {student.class?.name ?? "Not placed this term"}
-                    {student.admissionNumber
-                      ? ` · ${student.admissionNumber}`
-                      : ""}
+                    {student.class?.name ?? 'Not placed this term'}
+                    {student.admissionNumber ? ` · ${student.admissionNumber}` : ''}
                   </span>
                 </span>
-                {isSelected && (
-                  <Check className="size-4 shrink-0 text-primary" />
-                )}
+                {isSelected && <Check className="size-4 shrink-0 text-primary" />}
               </button>
             );
           })
@@ -1670,9 +1699,9 @@ function StudentSearchPicker({
 function formatLabel(value: string) {
   return value
     .toLowerCase()
-    .split("_")
+    .split('_')
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(" ");
+    .join(' ');
 }
 
 function Loading({ label }: { label: string }) {
@@ -1695,21 +1724,14 @@ function ErrorPanel({ message }: { message: string }) {
   );
 }
 
-
-function GuardianDetailsDialog({
-  guardian,
-  onClose,
-}: {
-  guardian: Guardian;
-  onClose: () => void;
-}) {
+function GuardianDetailsDialog({ guardian, onClose }: { guardian: Guardian; onClose: () => void }) {
   const fullName = [guardian.firstName, guardian.otherNames, guardian.lastName]
     .filter(Boolean)
-    .join(" ");
+    .join(' ');
   const loginEmail = guardian.profile?.user.email;
   const students = guardian.students.map(({ student }) => ({
     id: student.id,
-    name: [student.profile.firstName, student.profile.lastName].filter(Boolean).join(" "),
+    name: [student.profile.firstName, student.profile.lastName].filter(Boolean).join(' '),
     admissionNumber: student.admissionNumber,
   }));
 
@@ -1727,18 +1749,27 @@ function GuardianDetailsDialog({
       >
         <div className="flex items-start justify-between gap-3">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Guardian record</p>
-            <h2 id="guardian-details-title" className="mt-1 text-lg font-bold">{fullName}</h2>
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Guardian record
+            </p>
+            <h2 id="guardian-details-title" className="mt-1 text-lg font-bold">
+              {fullName}
+            </h2>
             <p className="mt-1 text-xs text-muted-foreground">{guardian.guardianId}</p>
           </div>
-          <button type="button" onClick={onClose} aria-label="Close guardian details" className="rounded-lg p-2 text-muted-foreground hover:bg-muted">
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close guardian details"
+            className="rounded-lg p-2 text-muted-foreground hover:bg-muted"
+          >
             <X className="size-4" />
           </button>
         </div>
 
         <div className="mt-5 grid gap-3 sm:grid-cols-2">
           <GuardianDetail label="Relationship" value={guardian.relationshipType} />
-          <GuardianDetail label="Status" value={guardian.isActive ? "Active" : "Inactive"} />
+          <GuardianDetail label="Status" value={guardian.isActive ? 'Active' : 'Inactive'} />
           <GuardianDetail label="Phone" value={guardian.phone} />
           <GuardianDetail label="Alternate phone" value={guardian.alternatePhone} />
           <GuardianDetail label="Contact email" value={guardian.email} />
@@ -1756,30 +1787,43 @@ function GuardianDetailsDialog({
           {students.length ? (
             <ul className="mt-2 divide-y divide-border">
               {students.map((student) => (
-                <li key={student.id} className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
+                <li
+                  key={student.id}
+                  className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm"
+                >
                   <span className="font-medium">{student.name}</span>
-                  <span className="text-xs text-muted-foreground">{student.admissionNumber || "No admission number"}</span>
+                  <span className="text-xs text-muted-foreground">
+                    {student.admissionNumber || 'No admission number'}
+                  </span>
                 </li>
               ))}
             </ul>
           ) : (
-            <p className="mt-2 text-sm text-muted-foreground">No students are linked to this guardian.</p>
+            <p className="mt-2 text-sm text-muted-foreground">
+              No students are linked to this guardian.
+            </p>
           )}
         </div>
 
         {!guardian.canLogin && (
           <p className="mt-4 rounded-lg bg-warning/10 px-3 py-2 text-xs text-warning">
-            This guardian does not currently have a parent-portal login. Use Reset login in the directory to create one.
+            This guardian does not currently have a parent-portal login. Use Reset login in the
+            directory to create one.
           </p>
         )}
-        {(loginEmail?.endsWith("@login.schoolhub.invalid") ||
-          /-g\d{4}@/i.test(loginEmail ?? "")) && (
+        {(loginEmail?.endsWith('@login.schoolhub.invalid') ||
+          /-g\d{4}@/i.test(loginEmail ?? '')) && (
           <p className="mt-2 text-xs text-muted-foreground">
-            This is a generated sign-in email for the parent portal. The guardian should use it with their password to sign in; it may not be a separately monitored mailbox.
+            This is a generated sign-in email for the parent portal. The guardian should use it with
+            their password to sign in; it may not be a separately monitored mailbox.
           </p>
         )}
         <div className="mt-5 flex justify-end">
-          <button type="button" onClick={onClose} className="inline-flex h-9 items-center rounded-lg border border-border px-4 text-xs font-semibold hover:bg-muted">
+          <button
+            type="button"
+            onClick={onClose}
+            className="inline-flex h-9 items-center rounded-lg border border-border px-4 text-xs font-semibold hover:bg-muted"
+          >
             Close
           </button>
         </div>
@@ -1792,7 +1836,7 @@ function GuardianDetail({ label, value }: { label: string; value?: string | null
   return (
     <div className="min-w-0 rounded-lg bg-muted/40 px-3 py-2.5">
       <p className="text-[11px] font-medium text-muted-foreground">{label}</p>
-      <p className="mt-1 break-words text-sm font-medium">{value || "—"}</p>
+      <p className="mt-1 break-words text-sm font-medium">{value || '—'}</p>
     </div>
   );
 }

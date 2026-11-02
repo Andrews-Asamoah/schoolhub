@@ -1,18 +1,22 @@
-import { useMutation } from "@tanstack/react-query";
-import { Camera, LoaderCircle, Trash2 } from "lucide-react";
-import { useRef, useState } from "react";
-import { UserAvatar } from "@/components/ui/user-avatar";
-import { apiFetch } from "@/lib/api";
-import { useSession } from "@/lib/auth-client";
+import { useMutation } from '@tanstack/react-query';
+import { Camera, LoaderCircle, Trash2 } from 'lucide-react';
+import { useRef, useState } from 'react';
+import { UserAvatar } from '@/components/ui/user-avatar';
+import { apiFetch } from '@/lib/api';
+import { useSession } from '@/lib/auth-client';
 
 const MAX_BYTES = 2 * 1024 * 1024;
-const ACCEPTED = ["image/jpeg", "image/png", "image/webp"];
+const ACCEPTED = ['image/jpeg', 'image/png', 'image/webp'];
 
 /**
  * Photo preview with Upload / Replace / Remove for the signed-in user. The API
  * stores the image in Cloudflare R2 and saves its public URL on the account.
  */
-export function ProfilePhotoControls({ avatarClassName = "size-16 text-xl" }: { avatarClassName?: string }) {
+export function ProfilePhotoControls({
+  avatarClassName = 'size-16 text-xl',
+}: {
+  avatarClassName?: string;
+}) {
   const { data: session, refetch } = useSession();
   const user = session?.user;
   const image = user?.image ?? null;
@@ -22,20 +26,20 @@ export function ProfilePhotoControls({ avatarClassName = "size-16 text-xl" }: { 
   const upload = useMutation({
     mutationFn: (file: File) => {
       const body = new FormData();
-      body.append("avatar", file);
-      return apiFetch("/schools/current/me/avatar", { method: "PUT", body });
+      body.append('avatar', file);
+      return apiFetch('/schools/current/me/avatar', { method: 'PUT', body });
     },
     onSuccess: async () => {
-      setMessage({ ok: true, text: "Photo updated." });
+      setMessage({ ok: true, text: 'Photo updated.' });
       await refetch();
     },
     onError: (error: Error) => setMessage({ ok: false, text: error.message }),
   });
 
   const remove = useMutation({
-    mutationFn: () => apiFetch("/schools/current/me/avatar", { method: "DELETE" }),
+    mutationFn: () => apiFetch('/schools/current/me/avatar', { method: 'DELETE' }),
     onSuccess: async () => {
-      setMessage({ ok: true, text: "Photo removed." });
+      setMessage({ ok: true, text: 'Photo removed.' });
       await refetch();
     },
     onError: (error: Error) => setMessage({ ok: false, text: error.message }),
@@ -45,11 +49,11 @@ export function ProfilePhotoControls({ avatarClassName = "size-16 text-xl" }: { 
     setMessage(null);
     if (!file) return;
     if (!ACCEPTED.includes(file.type)) {
-      setMessage({ ok: false, text: "Choose a JPEG, PNG or WebP image." });
+      setMessage({ ok: false, text: 'Choose a JPEG, PNG or WebP image.' });
       return;
     }
     if (file.size > MAX_BYTES) {
-      setMessage({ ok: false, text: "The image must be 2 MB or smaller." });
+      setMessage({ ok: false, text: 'The image must be 2 MB or smaller.' });
       return;
     }
     upload.mutate(file);
@@ -66,12 +70,12 @@ export function ProfilePhotoControls({ avatarClassName = "size-16 text-xl" }: { 
           <input
             ref={inputRef}
             type="file"
-            accept={ACCEPTED.join(",")}
+            accept={ACCEPTED.join(',')}
             className="sr-only"
             aria-label="Choose a profile photo"
             onChange={(event) => {
               onPick(event.target.files?.[0]);
-              event.target.value = "";
+              event.target.value = '';
             }}
           />
           <button
@@ -80,8 +84,12 @@ export function ProfilePhotoControls({ avatarClassName = "size-16 text-xl" }: { 
             onClick={() => inputRef.current?.click()}
             className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-primary px-3 text-[11px] font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-60"
           >
-            {upload.isPending ? <LoaderCircle className="size-3.5 animate-spin" /> : <Camera className="size-3.5" />}
-            {image ? "Replace photo" : "Upload photo"}
+            {upload.isPending ? (
+              <LoaderCircle className="size-3.5 animate-spin" />
+            ) : (
+              <Camera className="size-3.5" />
+            )}
+            {image ? 'Replace photo' : 'Upload photo'}
           </button>
           {image && (
             <button
@@ -90,13 +98,20 @@ export function ProfilePhotoControls({ avatarClassName = "size-16 text-xl" }: { 
               onClick={() => remove.mutate()}
               className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border px-3 text-[11px] font-semibold text-muted-foreground hover:bg-muted/50 disabled:opacity-60"
             >
-              {remove.isPending ? <LoaderCircle className="size-3.5 animate-spin" /> : <Trash2 className="size-3.5" />}
+              {remove.isPending ? (
+                <LoaderCircle className="size-3.5 animate-spin" />
+              ) : (
+                <Trash2 className="size-3.5" />
+              )}
               Remove
             </button>
           )}
         </div>
         {message && (
-          <p role={message.ok ? "status" : "alert"} className={`mt-2 text-[11px] ${message.ok ? "text-success" : "text-destructive"}`}>
+          <p
+            role={message.ok ? 'status' : 'alert'}
+            className={`mt-2 text-[11px] ${message.ok ? 'text-success' : 'text-destructive'}`}
+          >
             {message.text}
           </p>
         )}

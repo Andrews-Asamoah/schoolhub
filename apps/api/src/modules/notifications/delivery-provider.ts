@@ -9,8 +9,35 @@ export type DeliveryPayload = {
 };
 export type ProviderResult =
   | { state: 'ACCEPTED'; messageId: string }
-  | { state: 'RETRY' | 'FAILED' | 'UNKNOWN'; reason: string; providerStatus?: number; providerCode?: string };
-const resendErrorCodes = new Set(['missing_api_key', 'invalid_api_key', 'restricted_api_key', 'authentication_error', 'authorization_error', 'validation_error', 'invalid_parameter', 'invalid_access', 'invalid_from_address', 'unprocessable_entity', 'rate_limit_exceeded', 'daily_quota_exceeded', 'monthly_quota_exceeded', 'invalid_idempotency_key', 'invalid_idempotent_request', 'concurrent_idempotent_requests', 'application_error', 'internal_server_error', 'invalid_permission', 'suspended_api_key', 'service_unavailable']);
+  | {
+      state: 'RETRY' | 'FAILED' | 'UNKNOWN';
+      reason: string;
+      providerStatus?: number;
+      providerCode?: string;
+    };
+const resendErrorCodes = new Set([
+  'missing_api_key',
+  'invalid_api_key',
+  'restricted_api_key',
+  'authentication_error',
+  'authorization_error',
+  'validation_error',
+  'invalid_parameter',
+  'invalid_access',
+  'invalid_from_address',
+  'unprocessable_entity',
+  'rate_limit_exceeded',
+  'daily_quota_exceeded',
+  'monthly_quota_exceeded',
+  'invalid_idempotency_key',
+  'invalid_idempotent_request',
+  'concurrent_idempotent_requests',
+  'application_error',
+  'internal_server_error',
+  'invalid_permission',
+  'suspended_api_key',
+  'service_unavailable',
+]);
 export function ghanaPhone(value: string): string | null {
   let phone = value.replace(/[\s()-]/g, '');
   if (/^0[25]\d{8}$/.test(phone)) phone = '+233' + phone.slice(1);
@@ -43,15 +70,15 @@ export class DeliveryProvider {
   ) {}
   /** Requested account-security mail does not depend on school broadcast controls or receipts. */
   emailConfigured() {
-    return Boolean(this.config.RESEND_API_KEY?.trim() && z.email().safeParse(this.config.RESEND_FROM_EMAIL).success);
+    return Boolean(
+      this.config.RESEND_API_KEY?.trim() &&
+      z.email().safeParse(this.config.RESEND_FROM_EMAIL).success,
+    );
   }
   configured(channel: string, sms?: HubtelSmsCredentials) {
     if (this.config.NOTIFICATION_DELIVERY_ENABLED !== 'true') return false;
     if (channel === 'EMAIL')
-      return Boolean(
-        this.emailConfigured() &&
-        this.config.RESEND_WEBHOOK_SECRET,
-      );
+      return Boolean(this.emailConfigured() && this.config.RESEND_WEBHOOK_SECRET);
     if (channel !== 'SMS' || !sms) return false;
     try {
       this.hubtelBase(sms);
@@ -86,15 +113,12 @@ export class DeliveryProvider {
     sms?: HubtelSmsCredentials,
   ): Promise<ProviderResult> {
     const email = channel === 'EMAIL';
-    if (!email && !sms)
-      return { state: 'FAILED', reason: 'SCHOOL_SMS_ACCOUNT_REQUIRED' };
+    if (!email && !sms) return { state: 'FAILED', reason: 'SCHOOL_SMS_ACCOUNT_REQUIRED' };
     if (!email && sms && payload.from !== sms.senderId)
       return { state: 'FAILED', reason: 'SMS_SENDER_ACCOUNT_MISMATCH' };
     try {
       const response = await this.request(
-        email
-          ? 'https://api.resend.com/emails'
-          : this.hubtelBase(sms!) + '/send',
+        email ? 'https://api.resend.com/emails' : this.hubtelBase(sms!) + '/send',
         {
           method: 'POST',
           redirect: 'error',
@@ -109,9 +133,7 @@ export class DeliveryProvider {
                 'Content-Type': 'application/json',
                 Authorization:
                   'Basic ' +
-                  Buffer.from(`${sms!.clientId}:${sms!.clientSecret}`).toString(
-                    'base64',
-                  ),
+                  Buffer.from(`${sms!.clientId}:${sms!.clientSecret}`).toString('base64'),
               },
           body: JSON.stringify(
             email
@@ -132,14 +154,31 @@ export class DeliveryProvider {
         let providerCode: string | undefined;
         if (email) {
           try {
-            const body = await response.json() as { name?: unknown };
-            if (typeof body?.name === 'string' && resendErrorCodes.has(body.name)) providerCode = body.name;
-          } catch { /* Non-JSON rejection still has a useful HTTP status. */ }
+            const body = (await response.json()) as { name?: unknown };
+            if (typeof body?.name === 'string' && resendErrorCodes.has(body.name))
+              providerCode = body.name;
+          } catch {
+            /* Non-JSON rejection still has a useful HTTP status. */
+          }
         }
         return {
-          state: response.status === 429 ? 'RETRY' : response.status >= 500 ? (email ? 'RETRY' : 'UNKNOWN') : 'FAILED',
-          reason: response.status === 429 ? 'PROVIDER_RATE_LIMIT' : response.status >= 500 ? 'PROVIDER_UNCERTAIN' : 'PROVIDER_REJECTED',
-          ...(email ? { providerStatus: response.status, ...(providerCode ? { providerCode } : {}) } : {}),
+          state:
+            response.status === 429
+              ? 'RETRY'
+              : response.status >= 500
+                ? email
+                  ? 'RETRY'
+                  : 'UNKNOWN'
+                : 'FAILED',
+          reason:
+            response.status === 429
+              ? 'PROVIDER_RATE_LIMIT'
+              : response.status >= 500
+                ? 'PROVIDER_UNCERTAIN'
+                : 'PROVIDER_REJECTED',
+          ...(email
+            ? { providerStatus: response.status, ...(providerCode ? { providerCode } : {}) }
+            : {}),
         };
       }
       const data = (await response.json()) as {
@@ -147,11 +186,7 @@ export class DeliveryProvider {
         data?: { messageId?: unknown };
       };
       const messageId = email ? data.id : data.data?.messageId;
-      if (
-        typeof messageId !== 'string' ||
-        messageId.length < 1 ||
-        messageId.length > 200
-      )
+      if (typeof messageId !== 'string' || messageId.length < 1 || messageId.length > 200)
         return {
           state: email ? 'RETRY' : 'UNKNOWN',
           reason: 'INVALID_PROVIDER_RESPONSE',
@@ -177,10 +212,7 @@ export class DeliveryProvider {
           signal: AbortSignal.timeout(10000),
           headers: {
             Authorization:
-              'Basic ' +
-              Buffer.from(`${sms!.clientId}:${sms!.clientSecret}`).toString(
-                'base64',
-              ),
+              'Basic ' + Buffer.from(`${sms!.clientId}:${sms!.clientSecret}`).toString('base64'),
           },
         },
       );
@@ -192,18 +224,11 @@ export class DeliveryProvider {
       const status = body.data.status?.toUpperCase();
       return status === 'DELIVERED'
         ? 'DELIVERED'
-        : ['UNDELIVERED', 'FAILED', 'REJECTED', 'EXPIRED'].includes(
-              status ?? '',
-            )
+        : ['UNDELIVERED', 'FAILED', 'REJECTED', 'EXPIRED'].includes(status ?? '')
           ? 'FAILED'
-          : [
-                'SENT',
-                'ACCEPTED',
-                'PENDING',
-                'ACKNOWLEDGED',
-                'SCHEDULED',
-                'SUBMITTED',
-              ].includes(status ?? '')
+          : ['SENT', 'ACCEPTED', 'PENDING', 'ACKNOWLEDGED', 'SCHEDULED', 'SUBMITTED'].includes(
+                status ?? '',
+              )
             ? 'ACCEPTED'
             : 'UNKNOWN';
     } catch {

@@ -4,10 +4,10 @@ import type {
   ReactNode,
   SelectHTMLAttributes,
   TextareaHTMLAttributes,
-} from "react";
-import { Button } from "@/components/ui/button";
-import { Input, Textarea, inputClassName } from "@/components/ui/input";
-import { cn } from "@/lib/utils";
+} from 'react';
+import { Button } from '@/components/ui/button';
+import { Input, Textarea, inputClassName } from '@/components/ui/input';
+import { cn } from '@/lib/utils';
 
 const controlClassName = inputClassName;
 
@@ -29,11 +29,8 @@ export function FormField({
   const message = getFormErrorMessage(error);
 
   return (
-    <div className={cn("space-y-1.5", className)}>
-      <label
-        htmlFor={htmlFor}
-        className="block text-xs font-semibold text-foreground"
-      >
+    <div className={cn('space-y-1.5', className)}>
+      <label htmlFor={htmlFor} className="block text-xs font-semibold text-foreground">
         {label}
       </label>
       {children}
@@ -50,35 +47,34 @@ export function FormField({
   );
 }
 
-export function FormInput({
-  className,
-  ...props
-}: InputHTMLAttributes<HTMLInputElement>) {
+export function FormInput({ className, ...props }: InputHTMLAttributes<HTMLInputElement>) {
   return <Input className={className} {...props} />;
 }
 
-export function FormTextarea({
-  className,
-  ...props
-}: TextareaHTMLAttributes<HTMLTextAreaElement>) {
-  return (
-    <Textarea className={className} {...props} />
-  );
+export function FormTextarea({ className, ...props }: TextareaHTMLAttributes<HTMLTextAreaElement>) {
+  return <Textarea className={className} {...props} />;
 }
 
-export function FormSelect({
-  className,
-  ...props
-}: SelectHTMLAttributes<HTMLSelectElement>) {
+export function FormSelect({ className, ...props }: SelectHTMLAttributes<HTMLSelectElement>) {
   return <select className={cn(controlClassName, className)} {...props} />;
 }
 
 export function FormSubmitButton({
-  children, className, isSubmitting = false, disabled, ...props
+  children,
+  className,
+  isSubmitting = false,
+  disabled,
+  ...props
 }: ButtonHTMLAttributes<HTMLButtonElement> & { isSubmitting?: boolean }) {
   return (
-    <Button {...props} type="submit" loading={isSubmitting} disabled={disabled} className={className}>
-      {isSubmitting ? "Saving…" : children}
+    <Button
+      {...props}
+      type="submit"
+      loading={isSubmitting}
+      disabled={disabled}
+      className={className}
+    >
+      {isSubmitting ? 'Saving…' : children}
     </Button>
   );
 }
@@ -88,7 +84,7 @@ export function FormCancelButton({ className, ...props }: ButtonHTMLAttributes<H
 }
 
 function getFormErrorMessage(error: unknown): string | undefined {
-  if (typeof error === "string") return error;
+  if (typeof error === 'string') return error;
   if (Array.isArray(error)) {
     for (const item of error) {
       const message = getFormErrorMessage(item);
@@ -96,10 +92,10 @@ function getFormErrorMessage(error: unknown): string | undefined {
     }
   }
   if (
-    typeof error === "object" &&
+    typeof error === 'object' &&
     error !== null &&
-    "message" in error &&
-    typeof error.message === "string"
+    'message' in error &&
+    typeof error.message === 'string'
   ) {
     return error.message;
   }

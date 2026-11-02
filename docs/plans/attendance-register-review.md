@@ -15,7 +15,7 @@ Target branch: **dev**. No changes to existing marks or account access defaults.
   management endpoints.
 - A school's holiday/closure **affects every class**, not just the class in
   focus. The UI requires a school-wide acknowledgement and audit reason.
-- A closure is rejected if *any* student already has an attendance record on
+- A closure is rejected if _any_ student already has an attendance record on
   that date, or if term reports have been published. Full-calendar replacement
   also refuses to turn days containing saved attendance into closures.
 - Calendar operations and register writes acquire the same Postgres

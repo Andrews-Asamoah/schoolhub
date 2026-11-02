@@ -1,5 +1,5 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import * as SecureStore from "expo-secure-store";
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
 
 /**
  * In-memory session state, mirrored to storage.
@@ -8,10 +8,10 @@ import * as SecureStore from "expo-secure-store";
  *
  * Call hydrateSession() once at startup, before the first request.
  */
-const TOKEN_KEY = "schoolhub.bearer-token";
-const SUBDOMAIN_KEY = "schoolhub:subdomain";
-const ROLE_KEY = "schoolhub:active-role";
-const ACADEMIC_VIEW_KEY = "schoolhub:accountant-academic-view";
+const TOKEN_KEY = 'schoolhub.bearer-token';
+const SUBDOMAIN_KEY = 'schoolhub:subdomain';
+const ROLE_KEY = 'schoolhub:active-role';
+const ACADEMIC_VIEW_KEY = 'schoolhub:accountant-academic-view';
 
 export type AcademicView = { academicYearId: string; termId: string };
 
@@ -23,13 +23,19 @@ type SessionState = {
   hydrated: boolean;
 };
 
-const state: SessionState = { token: null, subdomain: null, activeRole: null, academicView: null, hydrated: false };
+const state: SessionState = {
+  token: null,
+  subdomain: null,
+  activeRole: null,
+  academicView: null,
+  hydrated: false,
+};
 
 export type SessionEvent =
-  | { type: "unauthorized" }
-  | { type: "password-change-required" }
-  | { type: "subscription-inactive"; reason: string }
-  | { type: "two-factor-required"; audience: string };
+  | { type: 'unauthorized' }
+  | { type: 'password-change-required' }
+  | { type: 'subscription-inactive'; reason: string }
+  | { type: 'two-factor-required'; audience: string };
 
 type Listener = (event: SessionEvent) => void;
 const listeners = new Set<Listener>();
@@ -55,7 +61,7 @@ export async function hydrateSession(): Promise<void> {
   if (rawView) {
     try {
       const parsed = JSON.parse(rawView) as Partial<AcademicView>;
-      if (typeof parsed.academicYearId === "string" && typeof parsed.termId === "string") {
+      if (typeof parsed.academicYearId === 'string' && typeof parsed.termId === 'string') {
         state.academicView = { academicYearId: parsed.academicYearId, termId: parsed.termId };
       }
     } catch {

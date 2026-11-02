@@ -1,4 +1,4 @@
-import { templateSpecificity, type TargetClass, type TemplateScope } from "./assessment-entry.js";
+import { templateSpecificity, type TargetClass, type TemplateScope } from './assessment-entry.js';
 
 /** Where an assessment applies. null means "all". */
 export interface Coverage {
@@ -19,11 +19,21 @@ export function narrowsCoverage(before: Coverage, after: Coverage): string | nul
     before.classIds === null
       ? after.classIds !== null
       : after.classIds !== null && before.classIds.some((id) => !after.classIds!.includes(id));
-  if (narrowedClasses) return "classes";
-  if (before.subjectCode !== null && after.subjectCode !== null && before.subjectCode.toLowerCase() !== after.subjectCode.toLowerCase()) return "subject";
-  if (before.subjectCode === null && after.subjectCode !== null) return "subject";
-  if (before.termNumber !== null && after.termNumber !== null && before.termNumber !== after.termNumber) return "term";
-  if (before.termNumber === null && after.termNumber !== null) return "term";
+  if (narrowedClasses) return 'classes';
+  if (
+    before.subjectCode !== null &&
+    after.subjectCode !== null &&
+    before.subjectCode.toLowerCase() !== after.subjectCode.toLowerCase()
+  )
+    return 'subject';
+  if (before.subjectCode === null && after.subjectCode !== null) return 'subject';
+  if (
+    before.termNumber !== null &&
+    after.termNumber !== null &&
+    before.termNumber !== after.termNumber
+  )
+    return 'term';
+  if (before.termNumber === null && after.termNumber !== null) return 'term';
   return null;
 }
 
@@ -43,15 +53,34 @@ export function findUncoveredPairs(
   templates: TemplateScope[],
   termNumber: number,
 ) {
-  const uncovered: { classId: string; className: string; subjectId: string; subjectName: string }[] = [];
+  const uncovered: {
+    classId: string;
+    className: string;
+    subjectId: string;
+    subjectName: string;
+  }[] = [];
   for (const pair of pairs) {
     const klass = classes.get(pair.classId);
     const subject = subjects.get(pair.subjectId);
     if (!klass || !subject) continue;
-    if (templates.some((template) => templateSpecificity(template, klass, subject.code, termNumber) !== null)) continue;
-    uncovered.push({ classId: klass.id, className: klass.name, subjectId: subject.id, subjectName: subject.name });
+    if (
+      templates.some(
+        (template) => templateSpecificity(template, klass, subject.code, termNumber) !== null,
+      )
+    )
+      continue;
+    uncovered.push({
+      classId: klass.id,
+      className: klass.name,
+      subjectId: subject.id,
+      subjectName: subject.name,
+    });
   }
-  return uncovered.sort((a, b) => a.className.localeCompare(b.className, undefined, { numeric: true }) || a.subjectName.localeCompare(b.subjectName));
+  return uncovered.sort(
+    (a, b) =>
+      a.className.localeCompare(b.className, undefined, { numeric: true }) ||
+      a.subjectName.localeCompare(b.subjectName),
+  );
 }
 
 /** "2026-12-18" becomes the end of that day, so marks can be entered all day on the deadline. */
@@ -60,5 +89,11 @@ export function deadlineFromDate(date: string | null | undefined): Date | null {
 }
 
 export function slugCode(name: string): string {
-  return name.toUpperCase().replace(/[^A-Z0-9]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 24) || "SCALE";
+  return (
+    name
+      .toUpperCase()
+      .replace(/[^A-Z0-9]+/g, '_')
+      .replace(/^_+|_+$/g, '')
+      .slice(0, 24) || 'SCALE'
+  );
 }

@@ -6,18 +6,18 @@ import {
   ForbiddenException,
   NotFoundException,
   UnauthorizedException,
-} from "@nestjs/common";
-import { Reflector } from "@nestjs/core";
-import { evaluateSubscriptionAccess, SUBSCRIPTION_INACTIVE } from "@schoolhub/shared";
-import { PrismaService } from "../../prisma/prisma.service.js";
-import { actorFromRequest, writeAudit } from "../audit/audit.js";
-import { ALLOW_INACTIVE_SUBSCRIPTION } from "../decorators/allow-inactive-subscription.decorator.js";
-import { assertPasswordChangeNotPending } from "./password-change.js";
+} from '@nestjs/common';
+import { Reflector } from '@nestjs/core';
+import { evaluateSubscriptionAccess, SUBSCRIPTION_INACTIVE } from '@schoolhub/shared';
+import { PrismaService } from '../../prisma/prisma.service.js';
+import { actorFromRequest, writeAudit } from '../audit/audit.js';
+import { ALLOW_INACTIVE_SUBSCRIPTION } from '../decorators/allow-inactive-subscription.decorator.js';
+import { assertPasswordChangeNotPending } from './password-change.js';
 import {
   assertTwoFactorEnabled,
   hasSchoolAdminRole,
   schoolAdminTwoFactorRequired,
-} from "./two-factor.js";
+} from './two-factor.js';
 
 /** A superAdmin entering a school is audited at most once per window, not per request. */
 const ACCESS_AUDIT_WINDOW_MS = 15 * 60 * 1000;
@@ -30,20 +30,20 @@ const INACTIVE_MESSAGES: Record<string, string> = {
 };
 
 function extractSubdomain(req: any): string | null {
-  const customHeader = req.headers["x-school-subdomain"];
-  if (typeof customHeader === "string" && customHeader.trim().length > 0) {
+  const customHeader = req.headers['x-school-subdomain'];
+  if (typeof customHeader === 'string' && customHeader.trim().length > 0) {
     return customHeader.trim().toLowerCase();
   }
 
-  const rawHost = (req.headers["x-forwarded-host"] || req.headers["host"] || "") as string;
-  const host = rawHost.split(":")[0]?.toLowerCase();
+  const rawHost = (req.headers['x-forwarded-host'] || req.headers['host'] || '') as string;
+  const host = rawHost.split(':')[0]?.toLowerCase();
   if (!host) return null;
 
   // Check for localhost subdomain: e.g. achimota.localhost
   const localMatch = host.match(/^([a-z0-9-]+)\.localhost$/i);
   if (localMatch && localMatch[1]) {
     const sub = localMatch[1].toLowerCase();
-    if (!["api", "admin", "www", "app", "demo", "staging"].includes(sub)) {
+    if (!['api', 'admin', 'www', 'app', 'demo', 'staging'].includes(sub)) {
       return sub;
     }
   }
@@ -52,7 +52,7 @@ function extractSubdomain(req: any): string | null {
   const domainMatch = host.match(/^([a-z0-9-]+)\.schoolhub\.(gh|app|com)$/i);
   if (domainMatch && domainMatch[1]) {
     const sub = domainMatch[1].toLowerCase();
-    if (!["api", "admin", "www", "app", "demo", "staging"].includes(sub)) {
+    if (!['api', 'admin', 'www', 'app', 'demo', 'staging'].includes(sub)) {
       return sub;
     }
   }
@@ -74,15 +74,15 @@ export class SchoolTenantGuard implements CanActivate {
     const session = request.session;
 
     if (!session?.user) {
-      throw new UnauthorizedException("Authentication required");
+      throw new UnauthorizedException('Authentication required');
     }
 
     const user = session.user;
     if (user.banned === true) {
-      throw new ForbiddenException("This account has been suspended.");
+      throw new ForbiddenException('This account has been suspended.');
     }
     assertPasswordChangeNotPending(user);
-    const isSuperAdmin = user.role === "superAdmin";
+    const isSuperAdmin = user.role === 'superAdmin';
 
     // Determine active organization / school ID
     const detectedSubdomain = extractSubdomain(request);
@@ -120,12 +120,12 @@ export class SchoolTenantGuard implements CanActivate {
     } else {
       organizationId =
         session.session?.activeOrganizationId ??
-        (request.headers["x-organization-id"] as string | undefined);
+        (request.headers['x-organization-id'] as string | undefined);
     }
 
     if (!organizationId) {
       throw new ForbiddenException(
-        "No active school selected. Please set an active organization in your session.",
+        'No active school selected. Please set an active organization in your session.',
       );
     }
 
@@ -139,14 +139,10 @@ export class SchoolTenantGuard implements CanActivate {
     });
 
     if (!member && !isSuperAdmin) {
-      throw new ForbiddenException(
-        "You are not a registered member of this school.",
-      );
+      throw new ForbiddenException('You are not a registered member of this school.');
     }
     if (member?.banned && !isSuperAdmin) {
-      throw new ForbiddenException(
-        "Your membership in this school has been suspended.",
-      );
+      throw new ForbiddenException('Your membership in this school has been suspended.');
     }
     if (!isSuperAdmin && member) {
       const schoolMembershipCount = await this.prisma.client.member.count({
@@ -154,27 +150,23 @@ export class SchoolTenantGuard implements CanActivate {
       });
       if (schoolMembershipCount > 1) {
         throw new ForbiddenException(
-          "This account is linked to more than one school. Use separate credentials for each school.",
+          'This account is linked to more than one school. Use separate credentials for each school.',
         );
       }
 
       const availableRoles = new Set([member.role, ...member.roles]);
-      const requestedRole = request.headers["x-school-role"];
+      const requestedRole = request.headers['x-school-role'];
       const activeRole =
-        typeof requestedRole === "string" && requestedRole.length > 0
-          ? requestedRole
-          : member.role;
+        typeof requestedRole === 'string' && requestedRole.length > 0 ? requestedRole : member.role;
       if (!availableRoles.has(activeRole)) {
-        throw new ForbiddenException(
-          "The selected role is not assigned to your school account.",
-        );
+        throw new ForbiddenException('The selected role is not assigned to your school account.');
       }
       request.schoolRole = activeRole;
 
       // Judge by every role the account holds, not the one requested in the
       // header, so an admin cannot skip two-factor by asking to act as a teacher.
       if (schoolAdminTwoFactorRequired() && hasSchoolAdminRole(availableRoles)) {
-        assertTwoFactorEnabled(user, "school-admin");
+        assertTwoFactorEnabled(user, 'school-admin');
       }
     }
 
@@ -185,7 +177,7 @@ export class SchoolTenantGuard implements CanActivate {
     });
 
     if (!schoolWithOrg) {
-      throw new ForbiddenException("School not found for this organization.");
+      throw new ForbiddenException('School not found for this organization.');
     }
     const { organization, ...school } = schoolWithOrg;
 
@@ -231,11 +223,14 @@ export class SchoolTenantGuard implements CanActivate {
       }
     }
     void writeAudit(this.prisma.client, actorFromRequest(request), {
-      action: "SCHOOL_ACCESSED",
-      entityType: "super-admin.school.access",
+      action: 'SCHOOL_ACCESSED',
+      entityType: 'super-admin.school.access',
       entityId: schoolId,
       schoolId,
-      newValues: { method: request.method, path: request.originalUrl?.split("?")[0] ?? request.path },
+      newValues: {
+        method: request.method,
+        path: request.originalUrl?.split('?')[0] ?? request.path,
+      },
     }).catch((error: Error) => {
       this.logger.error(`SuperAdmin access audit failed: ${error.message}`);
     });

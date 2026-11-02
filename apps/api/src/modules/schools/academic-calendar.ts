@@ -17,7 +17,9 @@ export function toIsoDate(value: Date): string {
 /** Returns a message when `term` is not valid inside `year`, otherwise null. */
 export function termProblemWithinYear(year: DateRange, term: DateRange): string | null {
   if (term.endDate <= term.startDate) return 'A term must end after it starts.';
-  const duration = (Date.parse(term.endDate + "T00:00:00Z") - Date.parse(term.startDate + "T00:00:00Z")) / 86400000;
+  const duration =
+    (Date.parse(term.endDate + 'T00:00:00Z') - Date.parse(term.startDate + 'T00:00:00Z')) /
+    86400000;
   if (!Number.isFinite(duration) || duration > MAX_TERM_DAYS) {
     return `An academic term cannot exceed ${MAX_TERM_DAYS + 1} calendar days.`;
   }
@@ -45,7 +47,5 @@ export function findOverlappingTerm(
 
 /** Existing terms that would fall outside a changed year range. */
 export function termsOutsideYear(terms: TermRange[], year: DateRange): TermRange[] {
-  return terms.filter(
-    (term) => term.startDate < year.startDate || term.endDate > year.endDate,
-  );
+  return terms.filter((term) => term.startDate < year.startDate || term.endDate > year.endDate);
 }

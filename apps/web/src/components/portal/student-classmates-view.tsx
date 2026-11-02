@@ -1,7 +1,15 @@
-import { useQuery } from "@tanstack/react-query";
-import { GraduationCap, Search, Users, UsersRound, House, RefreshCw, UserRound } from "lucide-react";
-import { useState } from "react";
-import { apiFetch } from "@/lib/api";
+import { useQuery } from '@tanstack/react-query';
+import {
+  GraduationCap,
+  Search,
+  Users,
+  UsersRound,
+  House,
+  RefreshCw,
+  UserRound,
+} from 'lucide-react';
+import { useState } from 'react';
+import { apiFetch } from '@/lib/api';
 
 interface ClassmateItem {
   id: string;
@@ -26,17 +34,11 @@ interface ClassmatesResponse {
 }
 
 export function StudentClassmatesView() {
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState('');
 
-  const {
-    data,
-    isLoading,
-    isError,
-    refetch,
-    isFetching,
-  } = useQuery({
-    queryKey: ["students", "me", "classmates"],
-    queryFn: () => apiFetch<ClassmatesResponse>("/students/me/classmates"),
+  const { data, isLoading, isError, refetch, isFetching } = useQuery({
+    queryKey: ['students', 'me', 'classmates'],
+    queryFn: () => apiFetch<ClassmatesResponse>('/students/me/classmates'),
     retry: false,
   });
 
@@ -52,7 +54,7 @@ export function StudentClassmatesView() {
       classmate.studentId,
     ]
       .filter(Boolean)
-      .join(" ")
+      .join(' ')
       .toLocaleLowerCase();
     return searchable.includes(normalizedSearch);
   });
@@ -67,9 +69,11 @@ export function StudentClassmatesView() {
               <GraduationCap className="size-6" />
             </span>
             <div className="min-w-0">
-              <p className="text-xs font-semibold uppercase tracking-wider text-primary">Student community</p>
+              <p className="text-xs font-semibold uppercase tracking-wider text-primary">
+                Student community
+              </p>
               <h2 className="mt-1 text-xl font-bold tracking-tight text-foreground sm:text-2xl">
-                {className ?? "My classmates"}
+                {className ?? 'My classmates'}
               </h2>
               <p className="mt-1 text-sm text-muted-foreground">
                 Your classmates enrolled in the current academic term.
@@ -80,10 +84,10 @@ export function StudentClassmatesView() {
           <div className="flex shrink-0 items-center gap-2 self-start rounded-xl border border-border bg-background px-3 py-2 sm:self-center">
             <Users className="size-4 text-primary" />
             <span className="text-sm font-semibold text-foreground">
-              {isLoading ? "—" : classmates.length}
+              {isLoading ? '—' : classmates.length}
             </span>
             <span className="text-sm text-muted-foreground">
-              {classmates.length === 1 ? "student" : "students"}
+              {classmates.length === 1 ? 'student' : 'students'}
             </span>
           </div>
         </div>
@@ -94,7 +98,8 @@ export function StudentClassmatesView() {
           <div>
             <h3 className="font-semibold text-foreground">We couldn’t load your classmates</h3>
             <p className="mt-1 text-sm text-muted-foreground">
-              Check your connection and try again. Only school records returned by the server are shown.
+              Check your connection and try again. Only school records returned by the server are
+              shown.
             </p>
           </div>
           <button
@@ -103,7 +108,7 @@ export function StudentClassmatesView() {
             disabled={isFetching}
             className="inline-flex items-center gap-2 rounded-xl border border-border bg-background px-3 py-2 text-sm font-semibold text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
           >
-            <RefreshCw className={`size-4 ${isFetching ? "animate-spin" : ""}`} />
+            <RefreshCw className={`size-4 ${isFetching ? 'animate-spin' : ''}`} />
             Try again
           </button>
         </section>
@@ -123,7 +128,8 @@ export function StudentClassmatesView() {
             </div>
             {!isLoading && (
               <p className="text-sm text-muted-foreground">
-                Showing {filtered.length} of {classmates.length} {classmates.length === 1 ? "student" : "students"}
+                Showing {filtered.length} of {classmates.length}{' '}
+                {classmates.length === 1 ? 'student' : 'students'}
               </p>
             )}
           </div>
@@ -131,7 +137,10 @@ export function StudentClassmatesView() {
           {isLoading ? (
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
               {Array.from({ length: 6 }).map((_, index) => (
-                <div key={index} className="flex items-center gap-3 rounded-2xl border border-border bg-card p-4">
+                <div
+                  key={index}
+                  className="flex items-center gap-3 rounded-2xl border border-border bg-card p-4"
+                >
                   <div className="size-11 animate-pulse rounded-xl bg-muted" />
                   <div className="min-w-0 flex-1 space-y-2">
                     <div className="h-3 w-2/3 animate-pulse rounded bg-muted" />
@@ -147,24 +156,25 @@ export function StudentClassmatesView() {
               </span>
               <h3 className="mt-4 font-semibold text-foreground">No current class found</h3>
               <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">
-                Your class and classmates will appear here once the school records your current-term enrollment.
+                Your class and classmates will appear here once the school records your current-term
+                enrollment.
               </p>
             </div>
           ) : filtered.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-border bg-card px-5 py-12 text-center">
               <Search className="mx-auto size-8 text-muted-foreground" />
               <h3 className="mt-3 font-semibold text-foreground">
-                {classmates.length === 0 ? "No classmates listed yet" : "No matching classmates"}
+                {classmates.length === 0 ? 'No classmates listed yet' : 'No matching classmates'}
               </h3>
               <p className="mt-1 text-sm text-muted-foreground">
                 {classmates.length === 0
-                  ? "There are no active or completed enrollments for your class in the current term."
-                  : "Try another name, house or admission number."}
+                  ? 'There are no active or completed enrollments for your class in the current term.'
+                  : 'Try another name, house or admission number.'}
               </p>
               {search && (
                 <button
                   type="button"
-                  onClick={() => setSearch("")}
+                  onClick={() => setSearch('')}
                   className="mt-3 text-sm font-semibold text-primary hover:underline"
                 >
                   Clear search
@@ -178,7 +188,7 @@ export function StudentClassmatesView() {
                   .trim()
                   .split(/\s+/)
                   .map((part) => part[0])
-                  .join("")
+                  .join('')
                   .slice(0, 2)
                   .toUpperCase();
 
@@ -186,14 +196,14 @@ export function StudentClassmatesView() {
                   <article
                     key={classmate.id}
                     className={`flex min-w-0 items-center gap-3 rounded-2xl border bg-card p-4 transition hover:border-primary/40 hover:shadow-sm ${
-                      classmate.isSelf ? "border-primary/40 bg-primary/5" : "border-border"
+                      classmate.isSelf ? 'border-primary/40 bg-primary/5' : 'border-border'
                     }`}
                   >
                     <span
                       className={`flex size-11 shrink-0 items-center justify-center rounded-xl text-sm font-bold ${
                         classmate.isSelf
-                          ? "bg-primary text-primary-foreground"
-                          : "bg-muted text-foreground"
+                          ? 'bg-primary text-primary-foreground'
+                          : 'bg-muted text-foreground'
                       }`}
                       aria-hidden="true"
                     >
@@ -201,9 +211,13 @@ export function StudentClassmatesView() {
                     </span>
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
-                        <h3 className="truncate text-sm font-semibold text-foreground">{classmate.name}</h3>
+                        <h3 className="truncate text-sm font-semibold text-foreground">
+                          {classmate.name}
+                        </h3>
                         {classmate.isSelf && (
-                          <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold text-primary">You</span>
+                          <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold text-primary">
+                            You
+                          </span>
                         )}
                       </div>
                       {(classmate.admissionNumber || classmate.studentId) && (
@@ -211,7 +225,7 @@ export function StudentClassmatesView() {
                           {classmate.admissionNumber || classmate.studentId}
                         </p>
                       )}
-                      {classmate.house && classmate.house !== "No House" && (
+                      {classmate.house && classmate.house !== 'No House' && (
                         <p className="mt-2 inline-flex max-w-full items-center gap-1 rounded-lg bg-muted px-2 py-1 text-xs text-muted-foreground">
                           <House className="size-3 shrink-0" />
                           <span className="truncate">{classmate.house}</span>

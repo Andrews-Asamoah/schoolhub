@@ -1,19 +1,25 @@
-import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
-import { Prisma } from "@prisma/client";
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import {
   lockedStructureProblem,
   type SaveAssessmentTemplateInput,
   type SaveGradingSystemInput,
-} from "@schoolhub/shared";
-import { PrismaService } from "../../prisma/prisma.service.js";
-import { classScopeScore, type TemplateScope } from "./assessment-entry.js";
+} from '@schoolhub/shared';
+import { PrismaService } from '../../prisma/prisma.service.js';
+import { classScopeScore, type TemplateScope } from './assessment-entry.js';
 import {
   deadlineFromDate,
   findUncoveredPairs,
   narrowsCoverage,
   nextCopyName,
   slugCode,
-} from "./assessment-setup.js";
+} from './assessment-setup.js';
 
 type Db = Prisma.TransactionClient;
 
@@ -36,29 +42,38 @@ export class AssessmentSetupService {
         where: { schoolId, deletedAt: null, isActive: true },
         select: { id: true, name: true, level: true, departmentId: true },
       }),
-      db.subject.findMany({ where: { schoolId, isActive: true }, select: { id: true, code: true, name: true }, orderBy: { name: "asc" } }),
+      db.subject.findMany({
+        where: { schoolId, isActive: true },
+        select: { id: true, code: true, name: true },
+        orderBy: { name: 'asc' },
+      }),
       db.classSubject.findMany({
-        where: { class: { schoolId, deletedAt: null, isActive: true }, subject: { schoolId, isActive: true } },
+        where: {
+          class: { schoolId, deletedAt: null, isActive: true },
+          subject: { schoolId, isActive: true },
+        },
         select: { classId: true, subjectId: true },
       }),
       db.assessmentTemplate.findMany({
         where: { schoolId },
-        orderBy: { createdAt: "desc" },
+        orderBy: { createdAt: 'desc' },
         include: {
           classes: { select: { classId: true } },
-          components: { orderBy: { displayOrder: "asc" } },
+          components: { orderBy: { displayOrder: 'asc' } },
           gradingSystem: { select: { id: true, name: true } },
           _count: { select: { assessmentScores: true } },
         },
       }),
       db.gradingSystem.findMany({
         where: { isActive: true, OR: [{ schoolId }, { schoolId: null, isSystemDefault: true }] },
-        orderBy: [{ isSystemDefault: "asc" }, { name: "asc" }],
-        include: { gradeScales: { orderBy: { displayOrder: "asc" } } },
+        orderBy: [{ isSystemDefault: 'asc' }, { name: 'asc' }],
+        include: { gradeScales: { orderBy: { displayOrder: 'asc' } } },
       }),
     ]);
 
-    const classList = [...classes].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+    const classList = [...classes].sort((a, b) =>
+      a.name.localeCompare(b.name, undefined, { numeric: true }),
+    );
     const scopeOf = (row: (typeof templates)[number]): TemplateScope => ({
       isActive: row.isActive,
       termNumber: row.termNumber,
@@ -71,10 +86,12 @@ export class AssessmentSetupService {
 
     const withMarks = new Map<string, number>(); // grading system -> assessments with recorded marks
     for (const row of templates) {
-      if (row._count.assessmentScores > 0) withMarks.set(row.gradingSystemId, (withMarks.get(row.gradingSystemId) ?? 0) + 1);
+      if (row._count.assessmentScores > 0)
+        withMarks.set(row.gradingSystemId, (withMarks.get(row.gradingSystemId) ?? 0) + 1);
     }
     const usage = new Map<string, number>();
-    for (const row of templates) usage.set(row.gradingSystemId, (usage.get(row.gradingSystemId) ?? 0) + 1);
+    for (const row of templates)
+      usage.set(row.gradingSystemId, (usage.get(row.gradingSystemId) ?? 0) + 1);
 
     return {
       term,
@@ -82,7 +99,9 @@ export class AssessmentSetupService {
       subjects,
       templates: templates.map((row) => {
         const scope = scopeOf(row);
-        const covered = classList.filter((klass) => classScopeScore(scope, klass) !== null).map((klass) => klass.id);
+        const covered = classList
+          .filter((klass) => classScopeScore(scope, klass) !== null)
+          .map((klass) => klass.id);
         return {
           id: row.id,
           name: row.name,
@@ -168,13 +187,20 @@ export class AssessmentSetupService {
         },
         select: { id: true },
       });
-      await this.audit(tx, userId, schoolId, "CREATE", "ASSESSMENT_TEMPLATE", created.id, { name: input.name });
+      await this.audit(tx, userId, schoolId, 'CREATE', 'ASSESSMENT_TEMPLATE', created.id, {
+        name: input.name,
+      });
       return created.id;
     });
     return { id };
   }
 
-  async updateTemplate(schoolId: string, userId: string, id: string, input: SaveAssessmentTemplateInput) {
+  async updateTemplate(
+    schoolId: string,
+    userId: string,
+    id: string,
+    input: SaveAssessmentTemplateInput,
+  ) {
     const existing = await this.prisma.client.assessmentTemplate.findFirst({
       where: { id, schoolId },
       include: {
@@ -183,12 +209,14 @@ export class AssessmentSetupService {
         _count: { select: { assessmentScores: true } },
       },
     });
-    if (!existing) throw new NotFoundException("Assessment not found.");
+    if (!existing) throw new NotFoundException('Assessment not found.');
     await this.checkTemplateInput(schoolId, input, id);
 
     if (existing._count.assessmentScores > 0) {
       if (input.gradingSystemId !== existing.gradingSystemId) {
-        throw new ConflictException("Marks have already been recorded, so the grading scale can't change. Duplicate this assessment to use a different scale.");
+        throw new ConflictException(
+          "Marks have already been recorded, so the grading scale can't change. Duplicate this assessment to use a different scale.",
+        );
       }
       const problem = lockedStructureProblem(
         existing.components.map((component) => ({
@@ -200,7 +228,10 @@ export class AssessmentSetupService {
           isRepeatable: component.isRepeatable,
           expectedCount: component.expectedCount,
         })),
-        input.components.map((component) => ({ ...component, expectedCount: component.isRepeatable ? component.expectedCount : 1 })),
+        input.components.map((component) => ({
+          ...component,
+          expectedCount: component.isRepeatable ? component.expectedCount : 1,
+        })),
       );
       if (problem) throw new ConflictException(problem);
 
@@ -209,11 +240,17 @@ export class AssessmentSetupService {
         select: { id: true, level: true, departmentId: true },
       });
       const before = allClasses
-        .filter((klass) =>
-          classScopeScore(
-            { classId: existing.classId, classIds: existing.classes.map((item) => item.classId), classLevel: existing.classLevel, departmentId: existing.departmentId },
-            { ...klass },
-          ) !== null,
+        .filter(
+          (klass) =>
+            classScopeScore(
+              {
+                classId: existing.classId,
+                classIds: existing.classes.map((item) => item.classId),
+                classLevel: existing.classLevel,
+                departmentId: existing.departmentId,
+              },
+              { ...klass },
+            ) !== null,
         )
         .map((klass) => klass.id);
       const narrowed = narrowsCoverage(
@@ -223,13 +260,18 @@ export class AssessmentSetupService {
           termNumber: existing.termNumber,
         },
         {
-          classIds: input.classIds.length === 0 || input.classIds.length >= allClasses.length ? null : input.classIds,
+          classIds:
+            input.classIds.length === 0 || input.classIds.length >= allClasses.length
+              ? null
+              : input.classIds,
           subjectCode: input.subjectCode ?? null,
           termNumber: input.termNumber ?? null,
         },
       );
       if (narrowed) {
-        throw new ConflictException(`Marks have already been recorded, so you can widen where this assessment applies but not narrow it (${narrowed}).`);
+        throw new ConflictException(
+          `Marks have already been recorded, so you can widen where this assessment applies but not narrow it (${narrowed}).`,
+        );
       }
     }
 
@@ -253,14 +295,25 @@ export class AssessmentSetupService {
       });
       await tx.assessmentTemplateClass.deleteMany({ where: { templateId: id } });
       if (input.classIds.length) {
-        await tx.assessmentTemplateClass.createMany({ data: input.classIds.map((classId) => ({ templateId: id, classId })) });
+        await tx.assessmentTemplateClass.createMany({
+          data: input.classIds.map((classId) => ({ templateId: id, classId })),
+        });
       }
 
       const known = new Set(existing.components.map((component) => component.id));
-      const keep = new Set(input.components.flatMap((component) => (component.id && known.has(component.id) ? [component.id] : [])));
+      const keep = new Set(
+        input.components.flatMap((component) =>
+          component.id && known.has(component.id) ? [component.id] : [],
+        ),
+      );
       if (existing._count.assessmentScores === 0) {
-        const removed = existing.components.filter((component) => !keep.has(component.id)).map((component) => component.id);
-        if (removed.length) await tx.assessmentComponent.deleteMany({ where: { id: { in: removed }, templateId: id } });
+        const removed = existing.components
+          .filter((component) => !keep.has(component.id))
+          .map((component) => component.id);
+        if (removed.length)
+          await tx.assessmentComponent.deleteMany({
+            where: { id: { in: removed }, templateId: id },
+          });
       }
       for (const [index, component] of input.components.entries()) {
         const values = {
@@ -279,7 +332,9 @@ export class AssessmentSetupService {
           await tx.assessmentComponent.create({ data: { templateId: id, ...values } });
         }
       }
-      await this.audit(tx, userId, schoolId, "UPDATE", "ASSESSMENT_TEMPLATE", id, { name: input.name });
+      await this.audit(tx, userId, schoolId, 'UPDATE', 'ASSESSMENT_TEMPLATE', id, {
+        name: input.name,
+      });
     });
     return { id };
   }
@@ -289,16 +344,20 @@ export class AssessmentSetupService {
       where: { id, schoolId },
       select: { name: true, _count: { select: { assessmentScores: true } } },
     });
-    if (!existing) throw new NotFoundException("Assessment not found.");
+    if (!existing) throw new NotFoundException('Assessment not found.');
     if (existing._count.assessmentScores > 0) {
-      throw new ConflictException("Marks have been recorded with this assessment, so it can't be deleted. Turn it off instead.");
+      throw new ConflictException(
+        "Marks have been recorded with this assessment, so it can't be deleted. Turn it off instead.",
+      );
     }
     await this.prisma.client.$transaction(async (tx) => {
       await tx.assessmentExtension.deleteMany({ where: { templateId: id } });
       await tx.assessmentComponent.deleteMany({ where: { templateId: id } });
       await tx.assessmentTemplateClass.deleteMany({ where: { templateId: id } });
       await tx.assessmentTemplate.delete({ where: { id } });
-      await this.audit(tx, userId, schoolId, "DELETE", "ASSESSMENT_TEMPLATE", id, { name: existing.name });
+      await this.audit(tx, userId, schoolId, 'DELETE', 'ASSESSMENT_TEMPLATE', id, {
+        name: existing.name,
+      });
     });
     return { success: true };
   }
@@ -307,11 +366,20 @@ export class AssessmentSetupService {
   async duplicateTemplate(schoolId: string, userId: string, id: string) {
     const source = await this.prisma.client.assessmentTemplate.findFirst({
       where: { id, schoolId },
-      include: { classes: { select: { classId: true } }, components: { orderBy: { displayOrder: "asc" } } },
+      include: {
+        classes: { select: { classId: true } },
+        components: { orderBy: { displayOrder: 'asc' } },
+      },
     });
-    if (!source) throw new NotFoundException("Assessment not found.");
-    const names = await this.prisma.client.assessmentTemplate.findMany({ where: { schoolId }, select: { name: true } });
-    const name = nextCopyName(source.name, names.map((row) => row.name));
+    if (!source) throw new NotFoundException('Assessment not found.');
+    const names = await this.prisma.client.assessmentTemplate.findMany({
+      where: { schoolId },
+      select: { name: true },
+    });
+    const name = nextCopyName(
+      source.name,
+      names.map((row) => row.name),
+    );
     const copyId = await this.prisma.client.$transaction(async (tx) => {
       const created = await tx.assessmentTemplate.create({
         data: {
@@ -343,7 +411,10 @@ export class AssessmentSetupService {
         },
         select: { id: true },
       });
-      await this.audit(tx, userId, schoolId, "CREATE", "ASSESSMENT_TEMPLATE", created.id, { name, copiedFrom: id });
+      await this.audit(tx, userId, schoolId, 'CREATE', 'ASSESSMENT_TEMPLATE', created.id, {
+        name,
+        copiedFrom: id,
+      });
       return created.id;
     });
     return { id: copyId, name };
@@ -365,36 +436,59 @@ export class AssessmentSetupService {
         },
         select: { id: true },
       });
-      await this.audit(tx, userId, schoolId, "CREATE", "GRADING_SYSTEM", created.id, { name: input.name });
+      await this.audit(tx, userId, schoolId, 'CREATE', 'GRADING_SYSTEM', created.id, {
+        name: input.name,
+      });
       return created.id;
     });
     return { id };
   }
 
-  async updateGradingSystem(schoolId: string, userId: string, id: string, input: SaveGradingSystemInput) {
+  async updateGradingSystem(
+    schoolId: string,
+    userId: string,
+    id: string,
+    input: SaveGradingSystemInput,
+  ) {
     const system = await this.ownedGradingSystem(schoolId, id);
-    const withMarks = await this.prisma.client.assessmentScore.count({ where: { template: { gradingSystemId: id, schoolId } } });
+    const withMarks = await this.prisma.client.assessmentScore.count({
+      where: { template: { gradingSystemId: id, schoolId } },
+    });
     if (withMarks > 0) {
-      throw new ConflictException("Marks have already been graded with this scale, so it can't change. Create a new grading scale for new assessments.");
+      throw new ConflictException(
+        "Marks have already been graded with this scale, so it can't change. Create a new grading scale for new assessments.",
+      );
     }
     await this.prisma.client.$transaction(async (tx) => {
-      await tx.gradingSystem.update({ where: { id }, data: { name: input.name, description: input.description ?? null } });
+      await tx.gradingSystem.update({
+        where: { id },
+        data: { name: input.name, description: input.description ?? null },
+      });
       await tx.gradeScale.deleteMany({ where: { gradingSystemId: id } });
-      await tx.gradeScale.createMany({ data: this.scaleRows(input).map((row) => ({ ...row, gradingSystemId: id })) });
-      await this.audit(tx, userId, schoolId, "UPDATE", "GRADING_SYSTEM", id, { name: input.name, was: system.name });
+      await tx.gradeScale.createMany({
+        data: this.scaleRows(input).map((row) => ({ ...row, gradingSystemId: id })),
+      });
+      await this.audit(tx, userId, schoolId, 'UPDATE', 'GRADING_SYSTEM', id, {
+        name: input.name,
+        was: system.name,
+      });
     });
     return { id };
   }
 
   async deleteGradingSystem(schoolId: string, userId: string, id: string) {
     const system = await this.ownedGradingSystem(schoolId, id);
-    const used = await this.prisma.client.assessmentTemplate.count({ where: { gradingSystemId: id } });
+    const used = await this.prisma.client.assessmentTemplate.count({
+      where: { gradingSystemId: id },
+    });
     if (used > 0) {
-      throw new ConflictException("This grading scale is used by an assessment, so it can't be deleted.");
+      throw new ConflictException(
+        "This grading scale is used by an assessment, so it can't be deleted.",
+      );
     }
     await this.prisma.client.$transaction(async (tx) => {
       await tx.gradingSystem.delete({ where: { id } });
-      await this.audit(tx, userId, schoolId, "DELETE", "GRADING_SYSTEM", id, { name: system.name });
+      await this.audit(tx, userId, schoolId, 'DELETE', 'GRADING_SYSTEM', id, { name: system.name });
     });
     return { success: true };
   }
@@ -420,46 +514,79 @@ export class AssessmentSetupService {
       where: { id, OR: [{ schoolId }, { schoolId: null }] },
       select: { id: true, name: true, schoolId: true },
     });
-    if (!system) throw new NotFoundException("Grading scale not found.");
+    if (!system) throw new NotFoundException('Grading scale not found.');
     if (system.schoolId === null) {
-      throw new ForbiddenException("Shared grading scales can't be changed. Create your own scale instead.");
+      throw new ForbiddenException(
+        "Shared grading scales can't be changed. Create your own scale instead.",
+      );
     }
     return system;
   }
 
   private async freeCode(schoolId: string, wanted: string) {
-    const taken = await this.prisma.client.gradingSystem.findMany({ where: { schoolId, code: { startsWith: wanted } }, select: { code: true } });
+    const taken = await this.prisma.client.gradingSystem.findMany({
+      where: { schoolId, code: { startsWith: wanted } },
+      select: { code: true },
+    });
     const used = new Set(taken.map((row) => row.code));
     let code = wanted;
     for (let n = 2; used.has(code); n++) code = `${wanted}_${n}`;
     return code;
   }
 
-  private async checkTemplateInput(schoolId: string, input: SaveAssessmentTemplateInput, exceptId?: string) {
+  private async checkTemplateInput(
+    schoolId: string,
+    input: SaveAssessmentTemplateInput,
+    exceptId?: string,
+  ) {
     const db = this.prisma.client;
     const [scale, classes, subject, sameName] = await Promise.all([
       db.gradingSystem.findFirst({
-        where: { id: input.gradingSystemId, isActive: true, OR: [{ schoolId }, { schoolId: null, isSystemDefault: true }] },
+        where: {
+          id: input.gradingSystemId,
+          isActive: true,
+          OR: [{ schoolId }, { schoolId: null, isSystemDefault: true }],
+        },
         select: { id: true },
       }),
       input.classIds.length
         ? db.class.count({ where: { id: { in: input.classIds }, schoolId, deletedAt: null } })
         : Promise.resolve(0),
-      input.subjectCode ? db.subject.findFirst({ where: { schoolId, code: { equals: input.subjectCode, mode: "insensitive" } }, select: { id: true } }) : Promise.resolve(true),
+      input.subjectCode
+        ? db.subject.findFirst({
+            where: { schoolId, code: { equals: input.subjectCode, mode: 'insensitive' } },
+            select: { id: true },
+          })
+        : Promise.resolve(true),
       db.assessmentTemplate.findFirst({
-        where: { schoolId, name: { equals: input.name, mode: "insensitive" }, ...(exceptId ? { NOT: { id: exceptId } } : {}) },
+        where: {
+          schoolId,
+          name: { equals: input.name, mode: 'insensitive' },
+          ...(exceptId ? { NOT: { id: exceptId } } : {}),
+        },
         select: { id: true },
       }),
     ]);
-    if (!scale) throw new BadRequestException("Choose a grading scale that belongs to this school.");
+    if (!scale)
+      throw new BadRequestException('Choose a grading scale that belongs to this school.');
     if (input.classIds.length && classes !== new Set(input.classIds).size) {
-      throw new BadRequestException("Choose classes that belong to this school.");
+      throw new BadRequestException('Choose classes that belong to this school.');
     }
-    if (!subject) throw new BadRequestException("Choose a subject that belongs to this school.");
-    if (sameName) throw new ConflictException("An assessment with this name already exists.");
+    if (!subject) throw new BadRequestException('Choose a subject that belongs to this school.');
+    if (sameName) throw new ConflictException('An assessment with this name already exists.');
   }
 
-  private async audit(tx: Db, userId: string, schoolId: string, action: "CREATE" | "UPDATE" | "DELETE", entityType: string, entityId: string, newValues: Prisma.InputJsonObject) {
-    await tx.auditLog.create({ data: { userId, schoolId, action, entityType, entityId, newValues } });
+  private async audit(
+    tx: Db,
+    userId: string,
+    schoolId: string,
+    action: 'CREATE' | 'UPDATE' | 'DELETE',
+    entityType: string,
+    entityId: string,
+    newValues: Prisma.InputJsonObject,
+  ) {
+    await tx.auditLog.create({
+      data: { userId, schoolId, action, entityType, entityId, newValues },
+    });
   }
 }

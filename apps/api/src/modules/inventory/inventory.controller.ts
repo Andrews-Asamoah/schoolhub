@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import {
   createInventoryItemSchema,
   inventoryStockMovementSchema,
@@ -6,41 +6,50 @@ import {
   type UpdateInventoryItemInput,
   type CreateInventoryItemInput,
   type InventoryStockMovementInput,
-} from "@schoolhub/shared";
-import type { School } from "@prisma/client";
-import { CurrentSchool } from "../../common/decorators/current-school.decorator.js";
-import { CurrentUser, type AuthenticatedUser } from "../../common/decorators/current-user.decorator.js";
-import { Roles } from "../../common/decorators/roles.decorator.js";
-import { RolesGuard } from "../../common/guards/roles.guard.js";
-import { SchoolTenantGuard } from "../../common/guards/school-tenant.guard.js";
-import { ZodValidationPipe } from "../../common/pipes/zod-validation.pipe.js";
-import { InventoryService } from "./inventory.service.js";
+} from '@schoolhub/shared';
+import type { School } from '@prisma/client';
+import { CurrentSchool } from '../../common/decorators/current-school.decorator.js';
+import {
+  CurrentUser,
+  type AuthenticatedUser,
+} from '../../common/decorators/current-user.decorator.js';
+import { Roles } from '../../common/decorators/roles.decorator.js';
+import { RolesGuard } from '../../common/guards/roles.guard.js';
+import { SchoolTenantGuard } from '../../common/guards/school-tenant.guard.js';
+import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe.js';
+import { InventoryService } from './inventory.service.js';
 
-@Controller("inventory")
+@Controller('inventory')
 @UseGuards(SchoolTenantGuard, RolesGuard)
 export class InventoryController {
   constructor(private readonly inventoryService: InventoryService) {}
 
-  @Get("items")
-  @Roles("owner", "admin", "headteacher", "accountant")
+  @Get('items')
+  @Roles('owner', 'admin', 'headteacher', 'accountant')
   listItems(@CurrentSchool() school: School) {
     return this.inventoryService.listItems(school.id);
   }
 
-  @Get("transactions")
-  @Roles("owner", "admin", "headteacher", "accountant")
+  @Get('transactions')
+  @Roles('owner', 'admin', 'headteacher', 'accountant')
   listTransactions(
     @CurrentSchool() school: School,
-    @Query("from") fromDate?: string,
-    @Query("to") toDate?: string,
-    @Query("itemId") itemId?: string,
-    @Query("type") transactionType?: string,
+    @Query('from') fromDate?: string,
+    @Query('to') toDate?: string,
+    @Query('itemId') itemId?: string,
+    @Query('type') transactionType?: string,
   ) {
-    return this.inventoryService.listTransactions(school.id, fromDate, toDate, itemId, transactionType);
+    return this.inventoryService.listTransactions(
+      school.id,
+      fromDate,
+      toDate,
+      itemId,
+      transactionType,
+    );
   }
 
-  @Post("items")
-  @Roles("owner", "admin", "headteacher", "accountant")
+  @Post('items')
+  @Roles('owner', 'admin', 'headteacher', 'accountant')
   createItem(
     @CurrentSchool() school: School,
     @CurrentUser() user: AuthenticatedUser,
@@ -49,22 +58,22 @@ export class InventoryController {
     return this.inventoryService.createItem(school.id, user.id, body);
   }
 
-  @Patch("items/:id")
-  @Roles("owner", "admin", "headteacher", "accountant")
+  @Patch('items/:id')
+  @Roles('owner', 'admin', 'headteacher', 'accountant')
   updateItem(
     @CurrentSchool() school: School,
-    @Param("id") id: string,
+    @Param('id') id: string,
     @Body(new ZodValidationPipe(updateInventoryItemSchema)) body: UpdateInventoryItemInput,
   ) {
     return this.inventoryService.updateItem(school.id, id, body);
   }
 
-  @Post("items/:id/movements")
-  @Roles("owner", "admin", "headteacher", "accountant")
+  @Post('items/:id/movements')
+  @Roles('owner', 'admin', 'headteacher', 'accountant')
   recordMovement(
     @CurrentSchool() school: School,
     @CurrentUser() user: AuthenticatedUser,
-    @Param("id") id: string,
+    @Param('id') id: string,
     @Body(new ZodValidationPipe(inventoryStockMovementSchema)) body: InventoryStockMovementInput,
   ) {
     return this.inventoryService.recordMovement(school.id, id, user.id, body);

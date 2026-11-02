@@ -1,5 +1,5 @@
-import { Global, Injectable, Module } from "@nestjs/common";
-import { PrismaService } from "../../prisma/prisma.service.js";
+import { Global, Injectable, Module } from '@nestjs/common';
+import { PrismaService } from '../../prisma/prisma.service.js';
 
 /**
  * Works out which classes a teacher is responsible for so that the teacher
@@ -45,7 +45,9 @@ export class TeacherScopeService {
       schoolId,
       deletedAt: null,
       isActive: true,
-      ...(currentYear ? { OR: [{ academicYearId: currentYear.id }, { academicYearId: null }] } : {}),
+      ...(currentYear
+        ? { OR: [{ academicYearId: currentYear.id }, { academicYearId: null }] }
+        : {}),
     };
 
     const [classTeacher, subjects] = await Promise.all([

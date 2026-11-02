@@ -1,18 +1,24 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { batchAttendanceSchema } from "@schoolhub/shared";
-import { CircleAlert, CircleCheck, LoaderCircle } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
-import { apiFetch } from "@/lib/api";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { DatePicker } from "@/components/ui/date-picker";
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { batchAttendanceSchema } from '@schoolhub/shared';
+import { CircleAlert, CircleCheck, LoaderCircle } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { apiFetch } from '@/lib/api';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { DatePicker } from '@/components/ui/date-picker';
 
 const STATUSES = [
-  ["PRESENT", "Present"],
-  ["ABSENT", "Absent"],
-  ["LATE", "Late"],
-  ["EXCUSED", "Excused"],
-  ["SICK", "Sick"],
-  ["PERMISSION", "Permission"],
+  ['PRESENT', 'Present'],
+  ['ABSENT', 'Absent'],
+  ['LATE', 'Late'],
+  ['EXCUSED', 'Excused'],
+  ['SICK', 'Sick'],
+  ['PERMISSION', 'Permission'],
 ] as const;
 type Status = (typeof STATUSES)[number][0];
 const LABEL = Object.fromEntries(STATUSES) as Record<Status, string>;
@@ -23,31 +29,42 @@ interface RegisterRow {
   name: string;
   attendance: { status: Status; remarks?: string | null } | null;
 }
-type Draft = Record<string, { status: Status | ""; remarks: string }>;
+type Draft = Record<string, { status: Status | ''; remarks: string }>;
 
 const todayIso = () => new Date().toISOString().slice(0, 10);
 const fromServer = (rows: RegisterRow[]): Draft =>
   Object.fromEntries(
-    rows.map((row) => [row.studentId, { status: row.attendance?.status ?? "", remarks: row.attendance?.remarks ?? "" }]),
+    rows.map((row) => [
+      row.studentId,
+      { status: row.attendance?.status ?? '', remarks: row.attendance?.remarks ?? '' },
+    ]),
   );
 
 /**
  * A class's daily register. Only the assigned class teacher can mark it;
  * school managers and other permitted roles can review recorded statuses.
  */
-export function ClassRegister({ classId, className, canMark }: { classId: string; className: string; canMark: boolean }) {
+export function ClassRegister({
+  classId,
+  className,
+  canMark,
+}: {
+  classId: string;
+  className: string;
+  canMark: boolean;
+}) {
   const queryClient = useQueryClient();
   const [date, setDate] = useState(todayIso);
   const [draft, setDraft] = useState<Draft>({});
   const [notice, setNotice] = useState<string | null>(null);
 
   const query = useQuery({
-    queryKey: ["attendance", "class", classId, date],
+    queryKey: ['attendance', 'class', classId, date],
     queryFn: () => apiFetch<RegisterRow[]>(`/attendance/class/${classId}?date=${date}`),
     retry: false,
   });
   const markedDatesQuery = useQuery({
-    queryKey: ["attendance", "class", classId, "marked-dates"],
+    queryKey: ['attendance', 'class', classId, 'marked-dates'],
     queryFn: () => apiFetch<string[]>(`/attendance/class/${classId}/dates`),
     enabled: Boolean(classId),
     retry: false,
@@ -61,10 +78,13 @@ export function ClassRegister({ classId, className, canMark }: { classId: string
   }, [rows]);
 
   const save = useMutation({
-    mutationFn: (body: unknown) => apiFetch("/attendance/batch", { method: "POST", body: JSON.stringify(body) }),
+    mutationFn: (body: unknown) =>
+      apiFetch('/attendance/batch', { method: 'POST', body: JSON.stringify(body) }),
     onSuccess: async () => {
-      setNotice(`Register saved for ${new Date(`${date}T00:00:00`).toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" })}.`);
-      await queryClient.invalidateQueries({ queryKey: ["attendance"] });
+      setNotice(
+        `Register saved for ${new Date(`${date}T00:00:00`).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}.`,
+      );
+      await queryClient.invalidateQueries({ queryKey: ['attendance'] });
     },
   });
 
@@ -72,7 +92,8 @@ export function ClassRegister({ classId, className, canMark }: { classId: string
     const result = { PRESENT: 0, ABSENT: 0, LATE: 0, other: 0, unmarked: 0 };
     for (const entry of Object.values(draft)) {
       if (!entry.status) result.unmarked += 1;
-      else if (entry.status === "PRESENT" || entry.status === "ABSENT" || entry.status === "LATE") result[entry.status] += 1;
+      else if (entry.status === 'PRESENT' || entry.status === 'ABSENT' || entry.status === 'LATE')
+        result[entry.status] += 1;
       else result.other += 1;
     }
     return result;
@@ -83,24 +104,36 @@ export function ClassRegister({ classId, className, canMark }: { classId: string
       (rows ?? []).some((row) => {
         const entry = draft[row.studentId];
         const saved = row.attendance;
-        return (entry?.status ?? "") !== (saved?.status ?? "") || (entry?.remarks ?? "") !== (saved?.remarks ?? "");
+        return (
+          (entry?.status ?? '') !== (saved?.status ?? '') ||
+          (entry?.remarks ?? '') !== (saved?.remarks ?? '')
+        );
       }),
     [rows, draft],
   );
 
-  function setStatus(studentId: string, status: Status | "") {
+  function setStatus(studentId: string, status: Status | '') {
     setNotice(null);
-    setDraft((current) => ({ ...current, [studentId]: { status, remarks: current[studentId]?.remarks ?? "" } }));
+    setDraft((current) => ({
+      ...current,
+      [studentId]: { status, remarks: current[studentId]?.remarks ?? '' },
+    }));
   }
   function setRemarks(studentId: string, remarks: string) {
     setNotice(null);
-    setDraft((current) => ({ ...current, [studentId]: { status: current[studentId]?.status ?? "", remarks } }));
+    setDraft((current) => ({
+      ...current,
+      [studentId]: { status: current[studentId]?.status ?? '', remarks },
+    }));
   }
   function markAllPresent() {
     setNotice(null);
     setDraft((current) =>
       Object.fromEntries(
-        Object.entries(current).map(([id, entry]) => [id, { ...entry, status: entry.status || "PRESENT" }]),
+        Object.entries(current).map(([id, entry]) => [
+          id,
+          { ...entry, status: entry.status || 'PRESENT' },
+        ]),
       ),
     );
   }
@@ -119,12 +152,19 @@ export function ClassRegister({ classId, className, canMark }: { classId: string
   const marked = (rows?.length ?? 0) - counts.unmarked;
 
   return (
-    <section aria-label={`Register for ${className}`} className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+    <section
+      aria-label={`Register for ${className}`}
+      className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm"
+    >
       <div className="flex flex-col gap-4 border-b border-border p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
         <div>
-          <h3 className="text-base font-semibold tracking-tight text-foreground">{className} register</h3>
+          <h3 className="text-base font-semibold tracking-tight text-foreground">
+            {className} register
+          </h3>
           <p className="mt-1 text-sm text-muted-foreground">
-            {canMark ? "Mark each pupil, then save." : "Only the class teacher can mark this register."}
+            {canMark
+              ? 'Mark each pupil, then save.'
+              : 'Only the class teacher can mark this register.'}
           </p>
         </div>
         <div className="grid w-full gap-1.5 text-xs font-semibold text-foreground sm:w-56">
@@ -145,13 +185,18 @@ export function ClassRegister({ classId, className, canMark }: { classId: string
         </p>
       )}
       {query.error && (
-        <p role="alert" className="m-4 rounded-xl border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+        <p
+          role="alert"
+          className="m-4 rounded-xl border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive"
+        >
           The register could not be loaded: {query.error.message}
         </p>
       )}
 
       {rows && rows.length === 0 && (
-        <p className="p-6 text-sm text-muted-foreground">No pupils are enrolled in this class this term.</p>
+        <p className="p-6 text-sm text-muted-foreground">
+          No pupils are enrolled in this class this term.
+        </p>
       )}
 
       {rows && rows.length > 0 && (
@@ -163,15 +208,30 @@ export function ClassRegister({ classId, className, canMark }: { classId: string
             </p>
           )}
           <div className="grid grid-cols-2 gap-3 p-4 sm:grid-cols-4 sm:p-5" aria-live="polite">
-            <SummaryCard tone="present" label="Present" value={counts.PRESENT} detail="Marked present" />
-            <SummaryCard tone="absent" label="Absent" value={counts.ABSENT} detail="Marked absent" />
+            <SummaryCard
+              tone="present"
+              label="Present"
+              value={counts.PRESENT}
+              detail="Marked present"
+            />
+            <SummaryCard
+              tone="absent"
+              label="Absent"
+              value={counts.ABSENT}
+              detail="Marked absent"
+            />
             <SummaryCard tone="late" label="Late" value={counts.LATE} detail="Arrived late" />
-            <SummaryCard tone="progress" label="Register progress" value={marked} detail={`of ${rows.length} pupils marked`} />
+            <SummaryCard
+              tone="progress"
+              label="Register progress"
+              value={marked}
+              detail={`of ${rows.length} pupils marked`}
+            />
           </div>
           {canMark && (
             <div className="flex flex-wrap items-center justify-between gap-3 border-y border-border bg-muted/30 px-4 py-3 sm:px-5">
               <p className="text-sm text-muted-foreground">
-                {counts.unmarked} pupil{counts.unmarked === 1 ? "" : "s"} still unmarked
+                {counts.unmarked} pupil{counts.unmarked === 1 ? '' : 's'} still unmarked
               </p>
               <button
                 type="button"
@@ -185,30 +245,42 @@ export function ClassRegister({ classId, className, canMark }: { classId: string
 
           <ul className="mt-3 divide-y divide-border">
             {rows.map((row) => {
-              const entry = draft[row.studentId] ?? { status: "", remarks: "" };
+              const entry = draft[row.studentId] ?? { status: '', remarks: '' };
               return (
-                <li key={row.studentId} className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:gap-4">
+                <li
+                  key={row.studentId}
+                  className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:gap-4"
+                >
                   <div className="min-w-44 flex-1">
                     <p className="text-sm font-semibold text-foreground">{row.name}</p>
-                    <p className="text-xs text-muted-foreground">{row.admissionNumber ?? "No admission number"}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {row.admissionNumber ?? 'No admission number'}
+                    </p>
                   </div>
                   {canMark ? (
                     <>
                       <Select
-                        value={entry.status || "UNMARKED"}
-                        onValueChange={(value) => setStatus(row.studentId, value === "UNMARKED" ? "" : value as Status)}
+                        value={entry.status || 'UNMARKED'}
+                        onValueChange={(value) =>
+                          setStatus(row.studentId, value === 'UNMARKED' ? '' : (value as Status))
+                        }
                       >
-                        <SelectTrigger aria-label={`Attendance for ${row.name}`} className="w-full sm:w-44">
+                        <SelectTrigger
+                          aria-label={`Attendance for ${row.name}`}
+                          className="w-full sm:w-44"
+                        >
                           <SelectValue placeholder="Choose status" />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="UNMARKED">Not marked</SelectItem>
                           {STATUSES.map(([value, label]) => (
-                            <SelectItem key={value} value={value}>{label}</SelectItem>
+                            <SelectItem key={value} value={value}>
+                              {label}
+                            </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
-                      {entry.status && entry.status !== "PRESENT" && (
+                      {entry.status && entry.status !== 'PRESENT' && (
                         <input
                           aria-label={`Note for ${row.name}`}
                           value={entry.remarks}
@@ -238,7 +310,9 @@ export function ClassRegister({ classId, className, canMark }: { classId: string
                 {save.isPending && <LoaderCircle className="size-3.5 animate-spin" />}
                 Save register
               </button>
-              {dirty && !notice && <span className="text-sm text-muted-foreground">You have unsaved changes.</span>}
+              {dirty && !notice && (
+                <span className="text-sm text-muted-foreground">You have unsaved changes.</span>
+              )}
               {notice && (
                 <p role="status" className="flex items-center gap-2 text-sm text-foreground">
                   <CircleCheck className="size-3.5" /> {notice}
@@ -263,45 +337,49 @@ function SummaryCard({
   value,
   detail,
 }: {
-  tone: "present" | "absent" | "late" | "progress";
+  tone: 'present' | 'absent' | 'late' | 'progress';
   label: string;
   value: number;
   detail: string;
 }) {
   const tones = {
     present: {
-      border: "border-success/30",
-      icon: "bg-success/10 text-success",
-      value: "text-success",
-      dot: "bg-success",
+      border: 'border-success/30',
+      icon: 'bg-success/10 text-success',
+      value: 'text-success',
+      dot: 'bg-success',
     },
     absent: {
-      border: "border-destructive/30",
-      icon: "bg-destructive/10 text-destructive",
-      value: "text-destructive",
-      dot: "bg-destructive",
+      border: 'border-destructive/30',
+      icon: 'bg-destructive/10 text-destructive',
+      value: 'text-destructive',
+      dot: 'bg-destructive',
     },
     late: {
-      border: "border-warning/30",
-      icon: "bg-warning/10 text-warning",
-      value: "text-warning",
-      dot: "bg-warning",
+      border: 'border-warning/30',
+      icon: 'bg-warning/10 text-warning',
+      value: 'text-warning',
+      dot: 'bg-warning',
     },
     progress: {
-      border: "border-info/30",
-      icon: "bg-info/10 text-info",
-      value: "text-info",
-      dot: "bg-info",
+      border: 'border-info/30',
+      icon: 'bg-info/10 text-info',
+      value: 'text-info',
+      dot: 'bg-info',
     },
   }[tone];
 
   return (
-    <article className={`rounded-xl border ${tones.border} bg-background p-3 shadow-sm transition-colors sm:p-4`}>
+    <article
+      className={`rounded-xl border ${tones.border} bg-background p-3 shadow-sm transition-colors sm:p-4`}
+    >
       <div className="flex items-center justify-between gap-2">
         <p className="text-sm font-semibold text-foreground">{label}</p>
         <span className={`size-2 rounded-full ${tones.dot}`} aria-hidden="true" />
       </div>
-      <p className={`mt-2 text-3xl font-bold tracking-tight tabular-nums ${tones.value}`}>{value}</p>
+      <p className={`mt-2 text-3xl font-bold tracking-tight tabular-nums ${tones.value}`}>
+        {value}
+      </p>
       <p className="mt-1 text-sm text-muted-foreground">{detail}</p>
     </article>
   );
@@ -316,12 +394,17 @@ function StatusPill({ status }: { status: Status | null }) {
     );
   }
   return (
-    <span className={`inline-flex items-center rounded-full border px-3 py-1.5 text-xs font-semibold ${
-      status === "PRESENT" ? "border-success/30 bg-success/10 text-success"
-        : status === "ABSENT" ? "border-destructive/30 bg-destructive/10 text-destructive"
-          : status === "LATE" ? "border-warning/30 bg-warning/10 text-warning"
-            : "border-info/30 bg-info/10 text-info"
-    }`}>
+    <span
+      className={`inline-flex items-center rounded-full border px-3 py-1.5 text-xs font-semibold ${
+        status === 'PRESENT'
+          ? 'border-success/30 bg-success/10 text-success'
+          : status === 'ABSENT'
+            ? 'border-destructive/30 bg-destructive/10 text-destructive'
+            : status === 'LATE'
+              ? 'border-warning/30 bg-warning/10 text-warning'
+              : 'border-info/30 bg-info/10 text-info'
+      }`}
+    >
       {LABEL[status]}
     </span>
   );

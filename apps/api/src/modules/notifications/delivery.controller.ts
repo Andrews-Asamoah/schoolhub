@@ -1,14 +1,4 @@
-import {
-  Body,
-  Controller,
-  Get,
-  Patch,
-  Post,
-  Param,
-  Query,
-  Req,
-  UseGuards,
-} from '@nestjs/common';
+import { Body, Controller, Get, Patch, Post, Param, Query, Req, UseGuards } from '@nestjs/common';
 import { AllowAnonymous } from '@thallesp/nestjs-better-auth';
 import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import type { School } from '@prisma/client';
@@ -39,16 +29,7 @@ export { NotificationDeliveryAdminGuard } from './delivery-admin.guard.js';
 import { NotificationDeliveryAdminGuard } from './delivery-admin.guard.js';
 @Controller('notifications/delivery')
 @UseGuards(SchoolTenantGuard, RolesGuard, ThrottlerGuard)
-@Roles(
-  'owner',
-  'admin',
-  'headteacher',
-  'teacher',
-  'accountant',
-  'staff',
-  'student',
-  'guardian',
-)
+@Roles('owner', 'admin', 'headteacher', 'teacher', 'accountant', 'staff', 'student', 'guardian')
 export class NotificationDeliveryController {
   constructor(private readonly delivery: NotificationDeliveryService) {}
   @Get('preferences') preferences(
@@ -91,11 +72,7 @@ export class NotificationDeliveryController {
     @CurrentSchool() school: School,
     @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
-    @Body(
-      new ZodValidationPipe(
-        z.object({ reason: z.string().trim().min(10).max(500) }),
-      ),
-    )
+    @Body(new ZodValidationPipe(z.object({ reason: z.string().trim().min(10).max(500) })))
     input: { reason: string },
   ) {
     return this.delivery.retryEmail(school.id, user.id, id, input.reason);

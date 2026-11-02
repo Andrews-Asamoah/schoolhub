@@ -5,25 +5,25 @@ import {
   CreditCard,
   ReceiptText,
   UserRoundPlus,
-} from "lucide-react";
-import { cn } from "@/lib/utils";
-import type { DashboardActivity } from "@/components/school/dashboard/dashboard-data";
+} from 'lucide-react';
+import { cn } from '@/lib/utils';
+import type { DashboardActivity } from '@/components/school/dashboard/dashboard-data';
 
-const money = new Intl.NumberFormat("en-GH", {
-  style: "currency",
-  currency: "GHS",
+const money = new Intl.NumberFormat('en-GH', {
+  style: 'currency',
+  currency: 'GHS',
   maximumFractionDigits: 2,
 });
 
 const timestamp = (value: string) =>
-  new Intl.DateTimeFormat("en-GH", {
-    dateStyle: "medium",
-    timeStyle: "short",
+  new Intl.DateTimeFormat('en-GH', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
   }).format(new Date(value));
 
 const date = (value: string) =>
-  new Intl.DateTimeFormat("en-GH", {
-    dateStyle: "medium",
+  new Intl.DateTimeFormat('en-GH', {
+    dateStyle: 'medium',
   }).format(new Date(value));
 
 interface AcademicTerm {
@@ -43,11 +43,7 @@ interface AcademicYear {
   terms: AcademicTerm[];
 }
 
-export function SchoolYearCard({
-  academicYear,
-}: {
-  academicYear?: AcademicYear;
-}) {
+export function SchoolYearCard({ academicYear }: { academicYear?: AcademicYear }) {
   return (
     <section className="min-w-0 rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-6">
       <div className="mb-5 flex items-start gap-3">
@@ -56,12 +52,8 @@ export function SchoolYearCard({
         </span>
 
         <div className="min-w-0 flex-1">
-          <h2 className="text-sm font-semibold text-foreground">
-            Academic year
-          </h2>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Current school year and term dates
-          </p>
+          <h2 className="text-sm font-semibold text-foreground">Academic year</h2>
+          <p className="mt-1 text-xs text-muted-foreground">Current school year and term dates</p>
         </div>
 
         {academicYear?.isCurrent && (
@@ -74,9 +66,7 @@ export function SchoolYearCard({
       {!academicYear ? (
         <div className="rounded-xl border border-dashed border-border p-6 text-center">
           <Clock3 className="mx-auto size-5 text-muted-foreground" />
-          <p className="mt-2 text-sm font-medium text-foreground">
-            No academic year selected
-          </p>
+          <p className="mt-2 text-sm font-medium text-foreground">No academic year selected</p>
           <p className="mt-1 text-xs text-muted-foreground">
             Create an academic year and its terms to see the schedule here.
           </p>
@@ -84,9 +74,7 @@ export function SchoolYearCard({
       ) : (
         <>
           <div className="rounded-xl bg-muted/40 p-4">
-            <p className="text-base font-semibold text-foreground">
-              {academicYear.name}
-            </p>
+            <p className="text-base font-semibold text-foreground">{academicYear.name}</p>
             <p className="mt-1 text-xs text-muted-foreground">
               {date(academicYear.startDate)} – {date(academicYear.endDate)}
             </p>
@@ -113,10 +101,10 @@ export function SchoolYearCard({
                   >
                     <span
                       className={cn(
-                        "mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-lg",
+                        'mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-lg',
                         term.isCurrent
-                          ? "bg-success/10 text-success"
-                          : "bg-muted text-muted-foreground",
+                          ? 'bg-success/10 text-success'
+                          : 'bg-muted text-muted-foreground',
                       )}
                     >
                       {term.isCurrent ? (
@@ -128,13 +116,9 @@ export function SchoolYearCard({
 
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
-                        <p className="text-xs font-semibold text-foreground">
-                          {term.name}
-                        </p>
+                        <p className="text-xs font-semibold text-foreground">{term.name}</p>
                         {term.isCurrent && (
-                          <span className="text-[10px] font-medium text-success">
-                            Current term
-                          </span>
+                          <span className="text-[10px] font-medium text-success">Current term</span>
                         )}
                       </div>
                       <p className="mt-1 text-[11px] text-muted-foreground">
@@ -167,9 +151,7 @@ export function RecentActivityCard({
     <section className="min-w-0 rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-6">
       <div className="mb-5 flex items-start justify-between gap-3">
         <div>
-          <h2 className="text-sm font-semibold text-foreground">
-            Recent activity
-          </h2>
+          <h2 className="text-sm font-semibold text-foreground">Recent activity</h2>
           <p className="mt-1 text-xs text-muted-foreground">
             Latest changes recorded in this school
           </p>
@@ -182,10 +164,7 @@ export function RecentActivityCard({
       {isLoading ? (
         <div className="space-y-3">
           {[1, 2, 3].map((item) => (
-            <div
-              key={item}
-              className="h-14 animate-pulse rounded-lg bg-muted/60"
-            />
+            <div key={item} className="h-14 animate-pulse rounded-lg bg-muted/60" />
           ))}
         </div>
       ) : isError ? (
@@ -197,9 +176,7 @@ export function RecentActivityCard({
         </p>
       ) : activities.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border p-7 text-center">
-          <p className="text-sm font-medium text-foreground">
-            No recent activity yet
-          </p>
+          <p className="text-sm font-medium text-foreground">No recent activity yet</p>
           <p className="mt-1 text-xs text-muted-foreground">
             New student records and other recorded updates will appear here.
           </p>
@@ -208,18 +185,18 @@ export function RecentActivityCard({
         <div className="divide-y divide-border/70">
           {activities.map((activity) => {
             const Icon =
-              activity.type === "student"
+              activity.type === 'student'
                 ? UserRoundPlus
-                : activity.type === "payment"
+                : activity.type === 'payment'
                   ? CreditCard
                   : ReceiptText;
 
             const iconClass =
-              activity.type === "student"
-                ? "bg-primary/10 text-primary"
-                : activity.type === "payment"
-                  ? "bg-success/10 text-success"
-                  : "bg-warning/10 text-warning";
+              activity.type === 'student'
+                ? 'bg-primary/10 text-primary'
+                : activity.type === 'payment'
+                  ? 'bg-success/10 text-success'
+                  : 'bg-warning/10 text-warning';
 
             return (
               <div
@@ -228,7 +205,7 @@ export function RecentActivityCard({
               >
                 <span
                   className={cn(
-                    "flex size-9 shrink-0 items-center justify-center rounded-xl",
+                    'flex size-9 shrink-0 items-center justify-center rounded-xl',
                     iconClass,
                   )}
                 >
@@ -236,9 +213,7 @@ export function RecentActivityCard({
                 </span>
 
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-xs font-semibold text-foreground">
-                    {activity.title}
-                  </p>
+                  <p className="truncate text-xs font-semibold text-foreground">{activity.title}</p>
                   <p className="mt-1 truncate text-[11px] text-muted-foreground">
                     {activity.detail}
                   </p>

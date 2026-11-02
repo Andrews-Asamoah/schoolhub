@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   CircleAlert,
   LoaderCircle,
@@ -13,16 +13,18 @@ import {
   Users,
   UsersRound,
   X,
-} from "lucide-react";
-import { useState } from "react";
+} from 'lucide-react';
+import { useState } from 'react';
+import { createClubSchema, updateClubSchema, addClubMemberSchema } from '@schoolhub/shared';
+import { useSchoolRole } from '@/components/school/school-role-switcher';
+import { apiFetch } from '@/lib/api';
 import {
-  createClubSchema,
-  updateClubSchema,
-  addClubMemberSchema,
-} from "@schoolhub/shared";
-import { useSchoolRole } from "@/components/school/school-role-switcher";
-import { apiFetch } from "@/lib/api";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 interface ClubMemberRecord {
   id: string;
@@ -80,49 +82,49 @@ interface ClubFormValues {
 }
 
 const emptyForm: ClubFormValues = {
-  name: "",
-  description: "",
-  teacherInChargeId: "",
+  name: '',
+  description: '',
+  teacherInChargeId: '',
   isActive: true,
 };
 
 const inputClasses =
-  "mt-1.5 h-10 w-full rounded-lg border border-border bg-background px-3 text-sm text-foreground outline-none placeholder:text-muted-foreground focus:border-ring focus:ring-2 focus:ring-ring/20";
+  'mt-1.5 h-10 w-full rounded-lg border border-border bg-background px-3 text-sm text-foreground outline-none placeholder:text-muted-foreground focus:border-ring focus:ring-2 focus:ring-ring/20';
 
 export function ClubsWorkspace() {
   const queryClient = useQueryClient();
   const { activeRole } = useSchoolRole();
-  const canManage = activeRole === "owner" || activeRole === "admin" || activeRole === "staff";
-  
+  const canManage = activeRole === 'owner' || activeRole === 'admin' || activeRole === 'staff';
+
   const [editing, setEditing] = useState<ClubRecord | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [values, setValues] = useState<ClubFormValues>(emptyForm);
   const [selectedClubForMembers, setSelectedClubForMembers] = useState<ClubRecord | null>(null);
-  const [searchFilter, setSearchFilter] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"ALL" | "ACTIVE" | "INACTIVE">("ALL");
+  const [searchFilter, setSearchFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'ACTIVE' | 'INACTIVE'>('ALL');
 
   // New Member Modal State
-  const [memberStudentId, setMemberStudentId] = useState("");
-  const [memberRole, setMemberRole] = useState("Member");
-  const [memberSearch, setMemberSearch] = useState("");
+  const [memberStudentId, setMemberStudentId] = useState('');
+  const [memberRole, setMemberRole] = useState('Member');
+  const [memberSearch, setMemberSearch] = useState('');
 
   const clubsQuery = useQuery({
-    queryKey: ["academics", "clubs"],
-    queryFn: () => apiFetch<ClubRecord[]>("/academics/clubs"),
+    queryKey: ['academics', 'clubs'],
+    queryFn: () => apiFetch<ClubRecord[]>('/academics/clubs'),
     retry: false,
   });
 
   const teachersQuery = useQuery({
-    queryKey: ["academics", "class-teachers"],
-    queryFn: () => apiFetch<TeacherOption[]>("/academics/teachers"),
+    queryKey: ['academics', 'class-teachers'],
+    queryFn: () => apiFetch<TeacherOption[]>('/academics/teachers'),
     enabled: canManage,
     retry: false,
   });
 
   const studentsQuery = useQuery({
-    queryKey: ["students", "roster-all"],
+    queryKey: ['students', 'roster-all'],
     queryFn: async () => {
-      const res = await apiFetch<{ data: StudentOption[] }>("/students?limit=200");
+      const res = await apiFetch<{ data: StudentOption[] }>('/students?limit=200');
       return res.data;
     },
     enabled: !!selectedClubForMembers && canManage,
@@ -130,13 +132,7 @@ export function ClubsWorkspace() {
   });
 
   const saveMutation = useMutation({
-    mutationFn: async ({
-      id,
-      input,
-    }: {
-      id?: string;
-      input: ClubFormValues;
-    }) => {
+    mutationFn: async ({ id, input }: { id?: string; input: ClubFormValues }) => {
       if (id) {
         const payload = updateClubSchema.parse({
           name: input.name,
@@ -145,7 +141,7 @@ export function ClubsWorkspace() {
           isActive: input.isActive,
         });
         return apiFetch<ClubRecord>(`/academics/clubs/${id}`, {
-          method: "PATCH",
+          method: 'PATCH',
           body: JSON.stringify(payload),
         });
       }
@@ -155,13 +151,13 @@ export function ClubsWorkspace() {
         teacherInChargeId: input.teacherInChargeId || null,
         isActive: input.isActive,
       });
-      return apiFetch<ClubRecord>("/academics/clubs", {
-        method: "POST",
+      return apiFetch<ClubRecord>('/academics/clubs', {
+        method: 'POST',
         body: JSON.stringify(payload),
       });
     },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["academics", "clubs"] });
+      await queryClient.invalidateQueries({ queryKey: ['academics', 'clubs'] });
       closeForm();
     },
   });
@@ -176,16 +172,16 @@ export function ClubsWorkspace() {
       studentId: string;
       role?: string;
     }) => {
-      const payload = addClubMemberSchema.parse({ studentId, role: role || "Member" });
+      const payload = addClubMemberSchema.parse({ studentId, role: role || 'Member' });
       return apiFetch(`/academics/clubs/${clubId}/members`, {
-        method: "POST",
+        method: 'POST',
         body: JSON.stringify(payload),
       });
     },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["academics", "clubs"] });
-      setMemberStudentId("");
-      setMemberRole("Member");
+      await queryClient.invalidateQueries({ queryKey: ['academics', 'clubs'] });
+      setMemberStudentId('');
+      setMemberRole('Member');
       // refresh selected club
       if (selectedClubForMembers) {
         const updated = await apiFetch<ClubRecord>(`/academics/clubs/${selectedClubForMembers.id}`);
@@ -195,19 +191,13 @@ export function ClubsWorkspace() {
   });
 
   const removeMemberMutation = useMutation({
-    mutationFn: async ({
-      clubId,
-      studentId,
-    }: {
-      clubId: string;
-      studentId: string;
-    }) => {
+    mutationFn: async ({ clubId, studentId }: { clubId: string; studentId: string }) => {
       return apiFetch(`/academics/clubs/${clubId}/members/${studentId}`, {
-        method: "DELETE",
+        method: 'DELETE',
       });
     },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["academics", "clubs"] });
+      await queryClient.invalidateQueries({ queryKey: ['academics', 'clubs'] });
       if (selectedClubForMembers) {
         const updated = await apiFetch<ClubRecord>(`/academics/clubs/${selectedClubForMembers.id}`);
         setSelectedClubForMembers(updated);
@@ -218,11 +208,11 @@ export function ClubsWorkspace() {
   const deleteClubMutation = useMutation({
     mutationFn: async (clubId: string) => {
       return apiFetch(`/academics/clubs/${clubId}`, {
-        method: "DELETE",
+        method: 'DELETE',
       });
     },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["academics", "clubs"] });
+      await queryClient.invalidateQueries({ queryKey: ['academics', 'clubs'] });
       if (selectedClubForMembers) {
         setSelectedClubForMembers(null);
       }
@@ -239,8 +229,8 @@ export function ClubsWorkspace() {
     setEditing(club);
     setValues({
       name: club.name,
-      description: club.description ?? "",
-      teacherInChargeId: club.teacherInChargeId ?? "",
+      description: club.description ?? '',
+      teacherInChargeId: club.teacherInChargeId ?? '',
       isActive: club.isActive,
     });
     setShowForm(true);
@@ -258,16 +248,17 @@ export function ClubsWorkspace() {
   const totalMembers = clubs.reduce((acc, c) => acc + (c._count?.members || 0), 0);
 
   const filteredClubs = clubs.filter((c) => {
-    if (statusFilter === "ACTIVE" && !c.isActive) return false;
-    if (statusFilter === "INACTIVE" && c.isActive) return false;
+    if (statusFilter === 'ACTIVE' && !c.isActive) return false;
+    if (statusFilter === 'INACTIVE' && c.isActive) return false;
     if (searchFilter) {
       const q = searchFilter.toLowerCase();
       const matchName = c.name.toLowerCase().includes(q);
       const matchDesc = c.description?.toLowerCase().includes(q) ?? false;
-      const matchTeacher =
-        c.teacherInCharge?.profile
-          ? `${c.teacherInCharge.profile.firstName} ${c.teacherInCharge.profile.lastName}`.toLowerCase().includes(q)
-          : false;
+      const matchTeacher = c.teacherInCharge?.profile
+        ? `${c.teacherInCharge.profile.firstName} ${c.teacherInCharge.profile.lastName}`
+            .toLowerCase()
+            .includes(q)
+        : false;
       return matchName || matchDesc || matchTeacher;
     }
     return true;
@@ -301,7 +292,9 @@ export function ClubsWorkspace() {
 
         <div className="rounded-2xl border border-border/80 bg-card p-5 shadow-xs">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-muted-foreground">Total Student Enrollments</span>
+            <span className="text-xs font-semibold text-muted-foreground">
+              Total Student Enrollments
+            </span>
             <span className="flex size-9 items-center justify-center rounded-xl bg-primary/10 text-primary">
               <Users className="size-4" />
             </span>
@@ -326,17 +319,17 @@ export function ClubsWorkspace() {
           </div>
 
           <div className="inline-flex rounded-xl border border-border bg-card p-0.5 text-xs">
-            {(["ALL", "ACTIVE", "INACTIVE"] as const).map((mode) => (
+            {(['ALL', 'ACTIVE', 'INACTIVE'] as const).map((mode) => (
               <button
                 key={mode}
                 onClick={() => setStatusFilter(mode)}
                 className={`rounded-lg px-3 py-1 font-semibold transition ${
                   statusFilter === mode
-                    ? "bg-primary text-primary-foreground shadow-xs"
-                    : "text-muted-foreground hover:text-foreground"
+                    ? 'bg-primary text-primary-foreground shadow-xs'
+                    : 'text-muted-foreground hover:text-foreground'
                 }`}
               >
-                {mode === "ALL" ? "All Clubs" : mode === "ACTIVE" ? "Active" : "Inactive"}
+                {mode === 'ALL' ? 'All Clubs' : mode === 'ACTIVE' ? 'Active' : 'Inactive'}
               </button>
             ))}
           </div>
@@ -364,11 +357,11 @@ export function ClubsWorkspace() {
           <Sparkles className="mx-auto size-10 text-primary" />
           <h3 className="mt-3 text-sm font-bold text-foreground">No clubs found</h3>
           <p className="mt-1 text-xs text-muted-foreground">
-            {searchFilter || statusFilter !== "ALL"
-              ? "Try adjusting your search filters."
+            {searchFilter || statusFilter !== 'ALL'
+              ? 'Try adjusting your search filters.'
               : "Get started by adding your school's clubs and societies."}
           </p>
-          {canManage && !searchFilter && statusFilter === "ALL" && (
+          {canManage && !searchFilter && statusFilter === 'ALL' && (
             <button
               onClick={openCreate}
               className="mt-4 inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-xs font-bold text-primary-foreground shadow-sm hover:bg-primary/90"
@@ -385,7 +378,7 @@ export function ClubsWorkspace() {
               ? `${club.teacherInCharge.profile.firstName} ${club.teacherInCharge.profile.lastName}`
               : club.teacherInCharge
                 ? `${club.teacherInCharge.firstName} ${club.teacherInCharge.lastName}`
-                : "No patron assigned";
+                : 'No patron assigned';
 
             return (
               <div
@@ -403,18 +396,18 @@ export function ClubsWorkspace() {
                         <span
                           className={`inline-block rounded-md px-1.5 py-0.5 text-[9px] font-bold ${
                             club.isActive
-                              ? "bg-success/10 text-success"
-                              : "bg-muted text-muted-foreground"
+                              ? 'bg-success/10 text-success'
+                              : 'bg-muted text-muted-foreground'
                           }`}
                         >
-                          {club.isActive ? "Active" : "Inactive"}
+                          {club.isActive ? 'Active' : 'Inactive'}
                         </span>
                       </div>
                     </div>
                   </div>
 
                   <p className="mt-3 text-xs text-muted-foreground line-clamp-2 leading-relaxed">
-                    {club.description || "No description provided for this club."}
+                    {club.description || 'No description provided for this club.'}
                   </p>
 
                   <div className="mt-4 space-y-1.5 border-t border-border/60 pt-3 text-xs text-muted-foreground">
@@ -425,7 +418,9 @@ export function ClubsWorkspace() {
                       </span>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span className="text-[11px] text-muted-foreground/70">Members Enrolled:</span>
+                      <span className="text-[11px] text-muted-foreground/70">
+                        Members Enrolled:
+                      </span>
                       <span className="font-bold text-primary">
                         {club._count?.members ?? 0} students
                       </span>
@@ -477,7 +472,7 @@ export function ClubsWorkspace() {
           <div className="w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-2xl">
             <div className="flex items-center justify-between pb-3 border-b border-border/60">
               <h3 className="text-base font-bold text-foreground">
-                {editing ? "Edit Club" : "Create New Club"}
+                {editing ? 'Edit Club' : 'Create New Club'}
               </h3>
               <button
                 onClick={closeForm}
@@ -525,11 +520,22 @@ export function ClubsWorkspace() {
                 <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
                   Patron / Teacher in Charge
                 </label>
-                <Select value={values.teacherInChargeId || "__none__"} onValueChange={(value) => setValues({ ...values, teacherInChargeId: value === "__none__" ? "" : value })}>
-                  <SelectTrigger aria-label="Patron / teacher in charge" className={inputClasses}><SelectValue /></SelectTrigger>
+                <Select
+                  value={values.teacherInChargeId || '__none__'}
+                  onValueChange={(value) =>
+                    setValues({ ...values, teacherInChargeId: value === '__none__' ? '' : value })
+                  }
+                >
+                  <SelectTrigger aria-label="Patron / teacher in charge" className={inputClasses}>
+                    <SelectValue />
+                  </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="__none__">No patron assigned</SelectItem>
-                    {(teachersQuery.data ?? []).map((teacher) => <SelectItem key={teacher.id} value={teacher.id}>{teacher.firstName} {teacher.lastName}</SelectItem>)}
+                    {(teachersQuery.data ?? []).map((teacher) => (
+                      <SelectItem key={teacher.id} value={teacher.id}>
+                        {teacher.firstName} {teacher.lastName}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -550,7 +556,7 @@ export function ClubsWorkspace() {
               {saveMutation.isError && (
                 <p className="flex items-center gap-1.5 text-xs font-medium text-destructive">
                   <CircleAlert className="size-4 shrink-0" />
-                  {saveMutation.error?.message || "Failed to save club"}
+                  {saveMutation.error?.message || 'Failed to save club'}
                 </p>
               )}
 
@@ -572,7 +578,7 @@ export function ClubsWorkspace() {
                   ) : (
                     <Save className="size-4" />
                   )}
-                  {editing ? "Save Changes" : "Create Club"}
+                  {editing ? 'Save Changes' : 'Create Club'}
                 </button>
               </div>
             </form>
@@ -616,16 +622,31 @@ export function ClubsWorkspace() {
                 }}
                 className="mt-4 flex flex-wrap items-center gap-2 rounded-xl bg-muted/50 p-3"
               >
-                <Select value={memberStudentId || "__none__"} onValueChange={(value) => setMemberStudentId(value === "__none__" ? "" : value)}>
-                  <SelectTrigger aria-label="Select student to enroll" className="h-9 min-w-48 flex-1"><SelectValue placeholder="Select student to enroll..." /></SelectTrigger>
+                <Select
+                  value={memberStudentId || '__none__'}
+                  onValueChange={(value) => setMemberStudentId(value === '__none__' ? '' : value)}
+                >
+                  <SelectTrigger
+                    aria-label="Select student to enroll"
+                    className="h-9 min-w-48 flex-1"
+                  >
+                    <SelectValue placeholder="Select student to enroll..." />
+                  </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="__none__">Select student to enroll...</SelectItem>
-                    {(studentsQuery.data ?? []).map((student) => <SelectItem key={student.id} value={student.id}>{student.firstName} {student.lastName} ({student.admissionNumber || student.studentId})</SelectItem>)}
+                    {(studentsQuery.data ?? []).map((student) => (
+                      <SelectItem key={student.id} value={student.id}>
+                        {student.firstName} {student.lastName} (
+                        {student.admissionNumber || student.studentId})
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
 
                 <Select value={memberRole} onValueChange={setMemberRole}>
-                  <SelectTrigger aria-label="Club member role" className="h-9 w-40"><SelectValue /></SelectTrigger>
+                  <SelectTrigger aria-label="Club member role" className="h-9 w-40">
+                    <SelectValue />
+                  </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="Member">Member</SelectItem>
                     <SelectItem value="President">President</SelectItem>
@@ -653,7 +674,7 @@ export function ClubsWorkspace() {
 
             {addMemberMutation.isError && (
               <p className="mt-2 text-xs font-medium text-destructive">
-                {addMemberMutation.error?.message || "Failed to add member"}
+                {addMemberMutation.error?.message || 'Failed to add member'}
               </p>
             )}
 
@@ -666,10 +687,7 @@ export function ClubsWorkspace() {
               ) : (
                 <div className="divide-y divide-border/60 rounded-xl border border-border/80">
                   {selectedClubForMembers.members?.map((m) => (
-                    <div
-                      key={m.id}
-                      className="flex items-center justify-between p-3 text-xs"
-                    >
+                    <div key={m.id} className="flex items-center justify-between p-3 text-xs">
                       <div className="flex items-center gap-3">
                         <div className="flex size-8 items-center justify-center rounded-lg bg-primary/10 font-bold text-primary">
                           {m.student.profile.firstName[0]}
@@ -680,19 +698,20 @@ export function ClubsWorkspace() {
                             {m.student.profile.firstName} {m.student.profile.lastName}
                           </p>
                           <p className="text-[10px] text-muted-foreground/70">
-                            {m.student.admissionNumber || m.student.studentId} • {m.student.house?.name ?? "No House"}
+                            {m.student.admissionNumber || m.student.studentId} •{' '}
+                            {m.student.house?.name ?? 'No House'}
                           </p>
                         </div>
                       </div>
 
                       <div className="flex items-center gap-3">
                         <span className="rounded-md bg-warning/10 px-2 py-0.5 text-[10px] font-bold text-warning">
-                          {m.role || "Member"}
+                          {m.role || 'Member'}
                         </span>
                         {canManage && (
                           <button
                             onClick={() => {
-                              if (confirm("Remove student from this club?")) {
+                              if (confirm('Remove student from this club?')) {
                                 removeMemberMutation.mutate({
                                   clubId: selectedClubForMembers.id,
                                   studentId: m.studentId,

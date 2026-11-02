@@ -1,8 +1,8 @@
 /** Roles that may see a teacher's home address and emergency contact. */
-export const BIODATA_PRIVATE_ROLES = ["owner", "admin", "headteacher"] as const;
+export const BIODATA_PRIVATE_ROLES = ['owner', 'admin', 'headteacher'] as const;
 
 export function canSeePrivateBiodata(role: string | undefined) {
-  return (BIODATA_PRIVATE_ROLES as readonly string[]).includes(role ?? "");
+  return (BIODATA_PRIVATE_ROLES as readonly string[]).includes(role ?? '');
 }
 
 export interface TeacherBiodataSource {
@@ -53,8 +53,8 @@ export function toTeacherBiodata(teacher: TeacherBiodataSource, canSeePrivate: b
     teacherId: teacher.teacherId,
     staffNumber: teacher.staffNumber,
     isActive: teacher.isActive,
-    firstName: profile?.firstName ?? teacher.firstName ?? "",
-    lastName: profile?.lastName ?? teacher.lastName ?? "",
+    firstName: profile?.firstName ?? teacher.firstName ?? '',
+    lastName: profile?.lastName ?? teacher.lastName ?? '',
     otherNames: profile?.otherNames ?? null,
     gender: profile?.gender ?? null,
     dateOfBirth: profile?.dateOfBirth ?? null,

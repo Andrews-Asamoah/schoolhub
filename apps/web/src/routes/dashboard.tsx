@@ -1,17 +1,15 @@
-import { useQuery } from "@tanstack/react-query";
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect } from "react";
-import { SchoolSidebar } from "@/components/school/school-sidebar";
-import { DashboardContent } from "@/components/school/dashboard/dashboard-content";
-import { DashboardHeader } from "@/components/school/dashboard/dashboard-header";
-import { SidebarProvider } from "@/components/ui/sidebar";
-import { apiFetch } from "@/lib/api";
-import { useSession } from "@/lib/auth-client";
-import {
-  useSchoolOrganization,
-} from "@/components/school/school-organization";
+import { useQuery } from '@tanstack/react-query';
+import { createFileRoute, useNavigate } from '@tanstack/react-router';
+import { useEffect } from 'react';
+import { SchoolSidebar } from '@/components/school/school-sidebar';
+import { DashboardContent } from '@/components/school/dashboard/dashboard-content';
+import { DashboardHeader } from '@/components/school/dashboard/dashboard-header';
+import { SidebarProvider } from '@/components/ui/sidebar';
+import { apiFetch } from '@/lib/api';
+import { useSession } from '@/lib/auth-client';
+import { useSchoolOrganization } from '@/components/school/school-organization';
 
-export const Route = createFileRoute("/dashboard")({
+export const Route = createFileRoute('/dashboard')({
   component: DashboardPage,
 });
 
@@ -34,25 +32,22 @@ function DashboardPage() {
   } = useSchoolOrganization();
   const navigate = useNavigate();
   const { data: school } = useQuery({
-    queryKey: ["school", "current"],
-    queryFn: () => apiFetch<School>("/schools/current"),
-    enabled:
-      !!session?.user &&
-      !!activeOrganization &&
-      organizations.length === 1,
+    queryKey: ['school', 'current'],
+    queryFn: () => apiFetch<School>('/schools/current'),
+    enabled: !!session?.user && !!activeOrganization && organizations.length === 1,
     retry: false,
   });
-  const today = new Intl.DateTimeFormat("en-US", {
-    weekday: "long",
-    month: "long",
-    day: "numeric",
-    year: "numeric",
+  const today = new Intl.DateTimeFormat('en-US', {
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
   }).format(new Date());
-  const greetingName = session?.user?.name?.split(" ")[0] ?? "there";
+  const greetingName = session?.user?.name?.split(' ')[0] ?? 'there';
 
   useEffect(() => {
     if (!sessionLoading && !session?.user) {
-      void navigate({ to: "/login", replace: true });
+      void navigate({ to: '/login', replace: true });
     }
   }, [session, sessionLoading, navigate]);
 
@@ -61,7 +56,7 @@ function DashboardPage() {
       <div className="flex min-h-screen items-center justify-center bg-background dark:bg-background">
         <div className="flex items-center gap-3 text-sm text-muted-foreground">
           <span className="size-2 animate-pulse rounded-full bg-primary" />
-          {sessionLoading ? "Loading your workspace…" : "Redirecting to sign in…"}
+          {sessionLoading ? 'Loading your workspace…' : 'Redirecting to sign in…'}
         </div>
       </div>
     );
@@ -73,8 +68,8 @@ function DashboardPage() {
         <SchoolSidebar
           activePage="dashboard"
           schoolName={school?.name}
-          schoolLogo={school?.logo}     // <--- Passed logo here
-          schoolMotto={school?.motto}   // <--- Passed motto here
+          schoolLogo={school?.logo} // <--- Passed logo here
+          schoolMotto={school?.motto} // <--- Passed motto here
           userName={session?.user?.name}
           userEmail={session?.user?.email}
           userImage={session?.user?.image}
@@ -87,14 +82,21 @@ function DashboardPage() {
               Loading your school workspace…
             </div>
           ) : selectionError ? (
-            <div role="alert" className="mx-auto mt-8 max-w-3xl rounded-2xl border border-destructive/20 bg-destructive/10 p-6 text-sm text-destructive shadow-sm">
+            <div
+              role="alert"
+              className="mx-auto mt-8 max-w-3xl rounded-2xl border border-destructive/20 bg-destructive/10 p-6 text-sm text-destructive shadow-sm"
+            >
               {selectionError}
             </div>
           ) : organizations.length > 1 ? (
-            <div role="alert" className="mx-auto mt-8 max-w-3xl rounded-2xl border border-warning/20 bg-warning/10 p-6 text-warning shadow-sm">
+            <div
+              role="alert"
+              className="mx-auto mt-8 max-w-3xl rounded-2xl border border-warning/20 bg-warning/10 p-6 text-warning shadow-sm"
+            >
               <h1 className="text-lg font-bold">This account is linked to multiple schools</h1>
               <p className="mt-1 text-sm text-warning">
-                School accounts cannot be shared across schools. Contact support to correct the memberships, then use separate credentials for each school.
+                School accounts cannot be shared across schools. Contact support to correct the
+                memberships, then use separate credentials for each school.
               </p>
             </div>
           ) : organizations.length === 0 ? (
@@ -110,10 +112,7 @@ function DashboardPage() {
               Activating your school workspace…
             </div>
           ) : (
-            <DashboardContent
-              today={today}
-              greetingName={greetingName}
-            />
+            <DashboardContent today={today} greetingName={greetingName} />
           )}
         </div>
       </div>

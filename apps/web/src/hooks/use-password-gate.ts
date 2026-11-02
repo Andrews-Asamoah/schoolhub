@@ -1,5 +1,5 @@
-import { useEffect } from "react";
-import { useNavigate } from "@tanstack/react-router";
+import { useEffect } from 'react';
+import { useNavigate } from '@tanstack/react-router';
 
 /**
  * Sends a signed-in user whose password is still an administrator-issued
@@ -15,7 +15,7 @@ export function usePasswordChangeGate(
 
   useEffect(() => {
     if (!isPending && mustChange) {
-      void navigate({ to: "/change-password", replace: true });
+      void navigate({ to: '/change-password', replace: true });
     }
   }, [isPending, mustChange, navigate]);
 

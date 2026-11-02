@@ -8,20 +8,20 @@
  * the trust boundary. Ends all of the account's sessions and writes an audit
  * entry. The person must sign in with their password and enrol again.
  */
-import { config } from "dotenv";
-import { resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { config } from 'dotenv';
+import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const __dirname = fileURLToPath(new URL(".", import.meta.url));
-config({ path: resolve(__dirname, "../../../.env") });
+const __dirname = fileURLToPath(new URL('.', import.meta.url));
+config({ path: resolve(__dirname, '../../../.env') });
 
-import pg from "pg";
-import { PrismaPg } from "@prisma/adapter-pg";
-import { PrismaClient } from "@prisma/client";
+import pg from 'pg';
+import { PrismaPg } from '@prisma/adapter-pg';
+import { PrismaClient } from '@prisma/client';
 
 const email = process.argv[2]?.trim().toLowerCase();
-if (!email || !email.includes("@")) {
-  console.error("Usage: pnpm --filter @schoolhub/api reset-2fa <email>");
+if (!email || !email.includes('@')) {
+  console.error('Usage: pnpm --filter @schoolhub/api reset-2fa <email>');
   process.exit(1);
 }
 
@@ -42,15 +42,17 @@ async function main() {
     prisma.auditLog.create({
       data: {
         userId: user.id,
-        action: "ACCESS_CHANGED",
-        entityType: "cli.two-factor.reset",
+        action: 'ACCESS_CHANGED',
+        entityType: 'cli.two-factor.reset',
         entityId: user.id,
         oldValues: { twoFactorEnabled: user.twoFactorEnabled },
         newValues: { twoFactorEnabled: false },
       },
     }),
   ]);
-  console.log(`Two-factor authentication removed for ${email}. They must sign in and set it up again.`);
+  console.log(
+    `Two-factor authentication removed for ${email}. They must sign in and set it up again.`,
+  );
 }
 
 main()

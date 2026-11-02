@@ -1,9 +1,13 @@
-import { Injectable, NotFoundException, BadRequestException } from "@nestjs/common";
-import { Prisma, type School } from "@prisma/client";
-import { jsPDF } from "jspdf";
-import { autoTable } from "jspdf-autotable";
-import { PrismaService } from "../../prisma/prisma.service.js";
-import { buildFinanceWorkbook, type FinanceExportCell, type FinanceWorkbookInput } from "./finance-exports.helpers.js";
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Prisma, type School } from '@prisma/client';
+import { jsPDF } from 'jspdf';
+import { autoTable } from 'jspdf-autotable';
+import { PrismaService } from '../../prisma/prisma.service.js';
+import {
+  buildFinanceWorkbook,
+  type FinanceExportCell,
+  type FinanceWorkbookInput,
+} from './finance-exports.helpers.js';
 
 export interface FinanceExportFile {
   buffer: Buffer;
@@ -21,24 +25,27 @@ export interface FinanceExportContext {
   to?: string;
 }
 
-type ExportKind = "bills" | "payments" | "expenses" | "payroll" | "salaries";
+type ExportKind = 'bills' | 'payments' | 'expenses' | 'payroll' | 'salaries';
 type DateRange = { gte?: Date; lte?: Date };
 
-const dayStart = (value: string) => new Date(value + "T00:00:00.000Z");
-const dayEnd = (value: string) => new Date(value + "T23:59:59.999Z");
-const isoDay = (value: Date | null | undefined) => value ? value.toISOString().slice(0, 10) : "";
+const dayStart = (value: string) => new Date(value + 'T00:00:00.000Z');
+const dayEnd = (value: string) => new Date(value + 'T23:59:59.999Z');
+const isoDay = (value: Date | null | undefined) => (value ? value.toISOString().slice(0, 10) : '');
 
 function validateDate(value: string | undefined, label: string): Date | undefined {
   if (!value) return undefined;
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) throw new BadRequestException("Enter " + label + " as YYYY-MM-DD.");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value))
+    throw new BadRequestException('Enter ' + label + ' as YYYY-MM-DD.');
   const parsed = dayStart(value);
-  if (Number.isNaN(parsed.getTime()) || isoDay(parsed) !== value) throw new BadRequestException("Enter a valid " + label + ".");
+  if (Number.isNaN(parsed.getTime()) || isoDay(parsed) !== value)
+    throw new BadRequestException('Enter a valid ' + label + '.');
   return parsed;
 }
 function dateRange(from?: string, to?: string, dateOnly = false): DateRange | undefined {
-  const start = validateDate(from, "start date");
-  const end = validateDate(to, "end date");
-  if (start && end && start.getTime() > end.getTime()) throw new BadRequestException("Start date must be before or equal to end date.");
+  const start = validateDate(from, 'start date');
+  const end = validateDate(to, 'end date');
+  if (start && end && start.getTime() > end.getTime())
+    throw new BadRequestException('Start date must be before or equal to end date.');
   if (!start && !end) return undefined;
   return {
     ...(start ? { gte: start } : {}),
@@ -48,62 +55,118 @@ function dateRange(from?: string, to?: string, dateOnly = false): DateRange | un
 function asNumber(value: Prisma.Decimal | null | undefined): number | null {
   return value == null ? null : value.toNumber();
 }
-function studentName(student: { profile?: { firstName?: string | null; lastName?: string | null } | null; admissionNumber?: string | null } | null | undefined) {
-  const name = [student?.profile?.firstName, student?.profile?.lastName].filter(Boolean).join(" ").trim();
-  return name || student?.admissionNumber || "Unidentified student";
+function studentName(
+  student:
+    | {
+        profile?: { firstName?: string | null; lastName?: string | null } | null;
+        admissionNumber?: string | null;
+      }
+    | null
+    | undefined,
+) {
+  const name = [student?.profile?.firstName, student?.profile?.lastName]
+    .filter(Boolean)
+    .join(' ')
+    .trim();
+  return name || student?.admissionNumber || 'Unidentified student';
 }
 function formatMoney(value: Prisma.Decimal): string {
   const fixed = value.toFixed(2);
-  const negative = fixed.startsWith("-");
+  const negative = fixed.startsWith('-');
   const absolute = negative ? fixed.slice(1) : fixed;
-  const [whole = "0", fraction = "00"] = absolute.split(".");
-  const grouped = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-  return "GHS " + (negative ? "-" : "") + grouped + "." + fraction;
+  const [whole = '0', fraction = '00'] = absolute.split('.');
+  const grouped = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  return 'GHS ' + (negative ? '-' : '') + grouped + '.' + fraction;
 }
 
-const smallNumbers = ["zero","one","two","three","four","five","six","seven","eight","nine","ten","eleven","twelve","thirteen","fourteen","fifteen","sixteen","seventeen","eighteen","nineteen"];
-const tensWords = ["","","twenty","thirty","forty","fifty","sixty","seventy","eighty","ninety"];
+const smallNumbers = [
+  'zero',
+  'one',
+  'two',
+  'three',
+  'four',
+  'five',
+  'six',
+  'seven',
+  'eight',
+  'nine',
+  'ten',
+  'eleven',
+  'twelve',
+  'thirteen',
+  'fourteen',
+  'fifteen',
+  'sixteen',
+  'seventeen',
+  'eighteen',
+  'nineteen',
+];
+const tensWords = [
+  '',
+  '',
+  'twenty',
+  'thirty',
+  'forty',
+  'fifty',
+  'sixty',
+  'seventy',
+  'eighty',
+  'ninety',
+];
 function underThousand(value: number): string {
   const parts: string[] = [];
   if (value >= 100) {
-    parts.push(smallNumbers[Math.floor(value / 100)] + " hundred");
+    parts.push(smallNumbers[Math.floor(value / 100)] + ' hundred');
     value %= 100;
   }
   if (value >= 20) {
-    parts.push(tensWords[Math.floor(value / 10)] + (value % 10 ? "-" + smallNumbers[value % 10] : ""));
+    parts.push(
+      tensWords[Math.floor(value / 10)] + (value % 10 ? '-' + smallNumbers[value % 10] : ''),
+    );
   } else if (value > 0) {
     parts.push(smallNumbers[value]);
   }
-  return parts.join(" ");
+  return parts.join(' ');
 }
 function integerWords(input: bigint): string {
-  if (input === 0n) return "zero";
-  if (input < 0n) return "minus " + integerWords(-input);
-  const scales = ["", "thousand", "million", "billion", "trillion", "quadrillion", "quintillion"];
+  if (input === 0n) return 'zero';
+  if (input < 0n) return 'minus ' + integerWords(-input);
+  const scales = ['', 'thousand', 'million', 'billion', 'trillion', 'quadrillion', 'quintillion'];
   const parts: string[] = [];
   let value = input;
   let scaleIndex = 0;
   while (value > 0n) {
     const group = Number(value % 1000n);
-    if (group) parts.unshift(underThousand(group) + (scales[scaleIndex] ? " " + scales[scaleIndex] : ""));
+    if (group)
+      parts.unshift(underThousand(group) + (scales[scaleIndex] ? ' ' + scales[scaleIndex] : ''));
     value /= 1000n;
     scaleIndex += 1;
   }
-  return parts.join(" ");
+  return parts.join(' ');
 }
 function amountInWords(value: Prisma.Decimal): string {
   const fixed = value.toFixed(2);
-  const negative = fixed.startsWith("-");
+  const negative = fixed.startsWith('-');
   const absolute = negative ? fixed.slice(1) : fixed;
-  const [whole = "0", fraction = "00"] = absolute.split(".");
-  return (negative ? "minus " : "") + integerWords(BigInt(whole)) + " Ghana cedis and " + integerWords(BigInt(fraction)) + " pesewas";
+  const [whole = '0', fraction = '00'] = absolute.split('.');
+  return (
+    (negative ? 'minus ' : '') +
+    integerWords(BigInt(whole)) +
+    ' Ghana cedis and ' +
+    integerWords(BigInt(fraction)) +
+    ' pesewas'
+  );
 }
 function primaryRgb(color: string | null | undefined): [number, number, number] {
-  const normalized = (color ?? "").trim();
+  const normalized = (color ?? '').trim();
   const match = /^#?([0-9a-f]{6})$/i.exec(normalized);
   if (!match) return [37, 99, 235];
   const hex = match[1]!;
-  return [parseInt(hex.slice(0, 2), 16), parseInt(hex.slice(2, 4), 16), parseInt(hex.slice(4, 6), 16)];
+  return [
+    parseInt(hex.slice(0, 2), 16),
+    parseInt(hex.slice(2, 4), 16),
+    parseInt(hex.slice(4, 6), 16),
+  ];
 }
 
 @Injectable()
@@ -112,23 +175,30 @@ export class FinanceExportsService {
 
   private async school(schoolId: string): Promise<School> {
     const school = await this.prisma.client.school.findUnique({ where: { id: schoolId } });
-    if (!school) throw new NotFoundException("School not found.");
+    if (!school) throw new NotFoundException('School not found.');
     return school;
   }
 
-  private async auditExport(context: FinanceExportContext, exportType: string, rowCount: number, filters: Record<string, string | undefined>) {
+  private async auditExport(
+    context: FinanceExportContext,
+    exportType: string,
+    rowCount: number,
+    filters: Record<string, string | undefined>,
+  ) {
     // The export has already been generated successfully. Fail closed if this audit record cannot be persisted.
     await this.prisma.client.auditLog.create({
       data: {
         userId: context.actorId,
         schoolId: context.schoolId,
-        action: "SCHOOL_ACCESSED",
-        entityType: "FINANCE_EXPORT",
+        action: 'SCHOOL_ACCESSED',
+        entityType: 'FINANCE_EXPORT',
         entityId: exportType,
         newValues: {
           exportType,
           rowCount,
-          filters: Object.fromEntries(Object.entries(filters).filter(([, value]) => value !== undefined)),
+          filters: Object.fromEntries(
+            Object.entries(filters).filter(([, value]) => value !== undefined),
+          ),
           generatedAt: new Date().toISOString(),
         } as Prisma.InputJsonValue,
         ipAddress: context.ipAddress ?? null,
@@ -140,13 +210,13 @@ export class FinanceExportsService {
   async exportExcel(context: FinanceExportContext, kind: ExportKind): Promise<FinanceExportFile> {
     const school = await this.school(context.schoolId);
     const issuedAt = new Date().toISOString();
-    const period = (context.from ?? "All dates") + " to " + (context.to ?? "present");
+    const period = (context.from ?? 'All dates') + ' to ' + (context.to ?? 'present');
     const reportInfo = {
       School: school.name,
-      "School code": school.code,
+      'School code': school.code,
       Period: period,
-      "Generated by": context.actorName ?? context.actorId,
-      "Generated at": issuedAt,
+      'Generated by': context.actorName ?? context.actorId,
+      'Generated at': issuedAt,
       ...(context.from ? { From: context.from } : {}),
       ...(context.to ? { To: context.to } : {}),
     };
@@ -155,13 +225,18 @@ export class FinanceExportsService {
     let fileName: string;
     let rowCount = 0;
 
-    if (kind === "bills") {
+    if (kind === 'bills') {
       const range = dateRange(context.from, context.to);
       const records = await this.prisma.client.bill.findMany({
         where: { schoolId: context.schoolId, ...(range ? { issuedAt: range } : {}) },
-        orderBy: [{ issuedAt: "asc" }, { id: "asc" }],
+        orderBy: [{ issuedAt: 'asc' }, { id: 'asc' }],
         include: {
-          student: { select: { admissionNumber: true, profile: { select: { firstName: true, lastName: true } } } },
+          student: {
+            select: {
+              admissionNumber: true,
+              profile: { select: { firstName: true, lastName: true } },
+            },
+          },
           class: { select: { name: true } },
           academicYear: { select: { name: true } },
           term: { select: { name: true } },
@@ -169,45 +244,117 @@ export class FinanceExportsService {
       });
       rowCount = records.length;
       input = {
-        title: "Invoice register",
-        headers: ["Invoice", "Student", "Admission number", "Class", "Academic year", "Term", "Issued", "Due date", "Gross (GHS)", "Discount (GHS)", "Total billed (GHS)", "Paid (GHS)", "Balance (GHS)", "Status"],
-        columnTypes: ["text","text","text","text","text","text","date","date","money","money","money","money","money","text"],
-        rows: records.map((row) => [
-          row.billNumber, studentName(row.student), row.student.admissionNumber ?? "", row.class?.name ?? "",
-          row.academicYear.name, row.term?.name ?? "", row.issuedAt, row.dueDate, asNumber(row.grossAmount), asNumber(row.discountAmount),
-          asNumber(row.totalAmount), asNumber(row.paidAmount), asNumber(row.balanceAmount), row.status,
-        ] as FinanceExportCell[]),
-        totalColumns: [8,9,10,11,12],
-        totalLabel: "Totals",
+        title: 'Invoice register',
+        headers: [
+          'Invoice',
+          'Student',
+          'Admission number',
+          'Class',
+          'Academic year',
+          'Term',
+          'Issued',
+          'Due date',
+          'Gross (GHS)',
+          'Discount (GHS)',
+          'Total billed (GHS)',
+          'Paid (GHS)',
+          'Balance (GHS)',
+          'Status',
+        ],
+        columnTypes: [
+          'text',
+          'text',
+          'text',
+          'text',
+          'text',
+          'text',
+          'date',
+          'date',
+          'money',
+          'money',
+          'money',
+          'money',
+          'money',
+          'text',
+        ],
+        rows: records.map(
+          (row) =>
+            [
+              row.billNumber,
+              studentName(row.student),
+              row.student.admissionNumber ?? '',
+              row.class?.name ?? '',
+              row.academicYear.name,
+              row.term?.name ?? '',
+              row.issuedAt,
+              row.dueDate,
+              asNumber(row.grossAmount),
+              asNumber(row.discountAmount),
+              asNumber(row.totalAmount),
+              asNumber(row.paidAmount),
+              asNumber(row.balanceAmount),
+              row.status,
+            ] as FinanceExportCell[],
+        ),
+        totalColumns: [8, 9, 10, 11, 12],
+        totalLabel: 'Totals',
         reportInfo,
       };
-      fileName = "schoolhub-invoice-register.xlsx";
-    } else if (kind === "payments") {
+      fileName = 'schoolhub-invoice-register.xlsx';
+    } else if (kind === 'payments') {
       const range = dateRange(context.from, context.to, true);
       const records = await this.prisma.client.payment.findMany({
         where: { schoolId: context.schoolId, ...(range ? { paymentDate: range } : {}) },
-        orderBy: [{ paymentDate: "asc" }, { id: "asc" }],
+        orderBy: [{ paymentDate: 'asc' }, { id: 'asc' }],
         include: {
-          student: { select: { admissionNumber: true, profile: { select: { firstName: true, lastName: true } } } },
+          student: {
+            select: {
+              admissionNumber: true,
+              profile: { select: { firstName: true, lastName: true } },
+            },
+          },
           bill: { select: { billNumber: true } },
         },
       });
       rowCount = records.length;
       input = {
-        title: "Payment register",
-        headers: ["Receipt", "Date", "Student", "Admission number", "Invoice", "Method", "Reference", "Status", "Amount (GHS)"],
-        columnTypes: ["text","date","text","text","text","text","text","text","money"],
-        rows: records.map((row) => [row.paymentNumber, row.paymentDate, studentName(row.student), row.student.admissionNumber ?? "", row.bill?.billNumber ?? "Unallocated", row.paymentMethod, row.referenceNumber ?? "", row.status, asNumber(row.amount)] as FinanceExportCell[]),
+        title: 'Payment register',
+        headers: [
+          'Receipt',
+          'Date',
+          'Student',
+          'Admission number',
+          'Invoice',
+          'Method',
+          'Reference',
+          'Status',
+          'Amount (GHS)',
+        ],
+        columnTypes: ['text', 'date', 'text', 'text', 'text', 'text', 'text', 'text', 'money'],
+        rows: records.map(
+          (row) =>
+            [
+              row.paymentNumber,
+              row.paymentDate,
+              studentName(row.student),
+              row.student.admissionNumber ?? '',
+              row.bill?.billNumber ?? 'Unallocated',
+              row.paymentMethod,
+              row.referenceNumber ?? '',
+              row.status,
+              asNumber(row.amount),
+            ] as FinanceExportCell[],
+        ),
         totalColumns: [8],
-        totalLabel: "Totals",
+        totalLabel: 'Totals',
         reportInfo,
       };
-      fileName = "schoolhub-payment-register.xlsx";
-    } else if (kind === "expenses") {
+      fileName = 'schoolhub-payment-register.xlsx';
+    } else if (kind === 'expenses') {
       const range = dateRange(context.from, context.to, true);
       const records = await this.prisma.client.expense.findMany({
         where: { schoolId: context.schoolId, ...(range ? { date: range } : {}) },
-        orderBy: [{ date: "asc" }, { id: "asc" }],
+        orderBy: [{ date: 'asc' }, { id: 'asc' }],
         include: {
           registryCategory: { select: { name: true } },
           customCategory: { select: { name: true } },
@@ -216,20 +363,55 @@ export class FinanceExportsService {
       });
       rowCount = records.length;
       input = {
-        title: "Expense register",
-        headers: ["Date", "Voucher", "Description", "Payee", "Expense category", "Accounting group", "Payment method", "Cheque", "Reference", "Amount (GHS)", "Recorded by"],
-        columnTypes: ["date","text","text","text","text","text","text","text","text","money","text"],
-        rows: records.map((row) => [
-          row.date, row.voucherNumber ?? "", row.description, row.payee ?? "",
-          row.registryCategory?.name ?? row.customCategory?.name ?? "Uncategorised", row.category ?? "",
-          row.paymentMethod, row.checkNumber ?? "", row.referenceNumber ?? "", asNumber(row.amount), row.recordedBy?.name ?? "",
-        ] as FinanceExportCell[]),
+        title: 'Expense register',
+        headers: [
+          'Date',
+          'Voucher',
+          'Description',
+          'Payee',
+          'Expense category',
+          'Accounting group',
+          'Payment method',
+          'Cheque',
+          'Reference',
+          'Amount (GHS)',
+          'Recorded by',
+        ],
+        columnTypes: [
+          'date',
+          'text',
+          'text',
+          'text',
+          'text',
+          'text',
+          'text',
+          'text',
+          'text',
+          'money',
+          'text',
+        ],
+        rows: records.map(
+          (row) =>
+            [
+              row.date,
+              row.voucherNumber ?? '',
+              row.description,
+              row.payee ?? '',
+              row.registryCategory?.name ?? row.customCategory?.name ?? 'Uncategorised',
+              row.category ?? '',
+              row.paymentMethod,
+              row.checkNumber ?? '',
+              row.referenceNumber ?? '',
+              asNumber(row.amount),
+              row.recordedBy?.name ?? '',
+            ] as FinanceExportCell[],
+        ),
         totalColumns: [9],
-        totalLabel: "Totals",
+        totalLabel: 'Totals',
         reportInfo,
       };
-      fileName = "schoolhub-expense-register.xlsx";
-    } else if (kind === "salaries") {
+      fileName = 'schoolhub-expense-register.xlsx';
+    } else if (kind === 'salaries') {
       const [teachers, staff] = await Promise.all([
         this.prisma.client.teacher.findMany({
           where: { schoolId: context.schoolId, isActive: true, deletedAt: null },
@@ -254,44 +436,72 @@ export class FinanceExportsService {
       ]);
       const employees = [
         ...teachers.map((person) => ({
-          type: "TEACHER",
+          type: 'TEACHER',
           identifier: person.staffNumber || person.teacherId,
-          name: [person.profile?.firstName || person.firstName, person.profile?.lastName || person.lastName].filter(Boolean).join(" ").trim() || person.teacherId,
+          name:
+            [
+              person.profile?.firstName || person.firstName,
+              person.profile?.lastName || person.lastName,
+            ]
+              .filter(Boolean)
+              .join(' ')
+              .trim() || person.teacherId,
           monthlySalary: person.monthlySalary,
         })),
         ...staff.map((person) => ({
-          type: "STAFF",
+          type: 'STAFF',
           identifier: person.staffNumber || person.staffId,
-          name: [person.profile.firstName, person.profile.lastName].filter(Boolean).join(" ").trim() || person.staffId,
+          name:
+            [person.profile.firstName, person.profile.lastName].filter(Boolean).join(' ').trim() ||
+            person.staffId,
           monthlySalary: person.monthlySalary,
         })),
       ].sort((a, b) => a.name.localeCompare(b.name));
       rowCount = employees.length;
       input = {
-        title: "Confidential salary register",
-        headers: ["Employee", "Employee ID", "Employee type", "Monthly salary (GHS)", "Salary configured"],
-        columnTypes: ["text", "text", "text", "money", "text"],
-        rows: employees.map((person) => [person.name, person.identifier, person.type, asNumber(person.monthlySalary), person.monthlySalary == null ? "No" : "Yes"]),
+        title: 'Confidential salary register',
+        headers: [
+          'Employee',
+          'Employee ID',
+          'Employee type',
+          'Monthly salary (GHS)',
+          'Salary configured',
+        ],
+        columnTypes: ['text', 'text', 'text', 'money', 'text'],
+        rows: employees.map((person) => [
+          person.name,
+          person.identifier,
+          person.type,
+          asNumber(person.monthlySalary),
+          person.monthlySalary == null ? 'No' : 'Yes',
+        ]),
         totalColumns: [3],
-        totalLabel: "Total monthly salary",
-        reportInfo: { ...reportInfo, Confidentiality: "Confidential employee salary information" },
+        totalLabel: 'Total monthly salary',
+        reportInfo: { ...reportInfo, Confidentiality: 'Confidential employee salary information' },
       };
-      fileName = "schoolhub-confidential-salary-register.xlsx";
+      fileName = 'schoolhub-confidential-salary-register.xlsx';
     } else {
-      const periodFrom = validateDate(context.from, "start date");
-      const periodTo = validateDate(context.to, "end date");
+      const periodFrom = validateDate(context.from, 'start date');
+      const periodTo = validateDate(context.to, 'end date');
       if (periodFrom && periodTo && periodFrom.getTime() > periodTo.getTime()) {
-        throw new BadRequestException("Start date must be before or equal to end date.");
+        throw new BadRequestException('Start date must be before or equal to end date.');
       }
       const allRecords = await this.prisma.client.payrollRecord.findMany({
         where: { schoolId: context.schoolId },
-        orderBy: [{ year: "asc" }, { month: "asc" }, { id: "asc" }],
+        orderBy: [{ year: 'asc' }, { month: 'asc' }, { id: 'asc' }],
         include: {
           payslips: {
             where: { schoolId: context.schoolId },
             include: {
-              staff: { select: { staffId: true, profile: { select: { firstName: true, lastName: true } } } },
-              teacher: { select: { teacherId: true, profile: { select: { firstName: true, lastName: true } } } },
+              staff: {
+                select: { staffId: true, profile: { select: { firstName: true, lastName: true } } },
+              },
+              teacher: {
+                select: {
+                  teacherId: true,
+                  profile: { select: { firstName: true, lastName: true } },
+                },
+              },
             },
           },
         },
@@ -300,63 +510,128 @@ export class FinanceExportsService {
       const records = allRecords.filter((run) => {
         const monthStart = new Date(Date.UTC(run.year, run.month - 1, 1));
         const monthEnd = new Date(Date.UTC(run.year, run.month, 0, 23, 59, 59, 999));
-        return (!periodFrom || monthEnd.getTime() >= periodFrom.getTime()) &&
-          (!periodTo || monthStart.getTime() <= dayEnd(context.to!).getTime());
+        return (
+          (!periodFrom || monthEnd.getTime() >= periodFrom.getTime()) &&
+          (!periodTo || monthStart.getTime() <= dayEnd(context.to!).getTime())
+        );
       });
       rowCount = records.reduce((count, record) => count + record.payslips.length, 0);
       input = {
-        title: "Confidential payroll register",
-        headers: ["Period", "Run status", "Employee", "Employee ID", "Basic (GHS)", "Allowances (GHS)", "Gross (GHS)", "Employee SSNIT (GHS)", "PAYE (GHS)", "Employer SSNIT (GHS)", "Other deductions (GHS)", "Net pay (GHS)", "Payment status"],
-        columnTypes: ["text","text","text","text","money","money","money","money","money","money","money","money","text"],
-        rows: records.flatMap((run) => run.payslips.map((slip) => [
-          String(run.year) + "-" + String(run.month).padStart(2,"0"), run.status,
-          studentName({ profile: slip.staff?.profile ?? slip.teacher?.profile, admissionNumber: slip.staff?.staffId ?? slip.teacher?.teacherId }),
-          slip.staff?.staffId ?? slip.teacher?.teacherId ?? "",
-          asNumber(slip.basicSalary), asNumber(slip.allowances), asNumber(slip.grossSalary), asNumber(slip.ssnitEmployee), asNumber(slip.incomeTax), asNumber(slip.ssnitEmployer), asNumber(slip.otherDeductions), asNumber(slip.netSalary), slip.paymentStatus,
-        ] as FinanceExportCell[])),
-        totalColumns: [4,5,6,7,8,9,10,11],
-        totalLabel: "Totals",
-        reportInfo: { ...reportInfo, Confidentiality: "Confidential payroll and salary information" },
+        title: 'Confidential payroll register',
+        headers: [
+          'Period',
+          'Run status',
+          'Employee',
+          'Employee ID',
+          'Basic (GHS)',
+          'Allowances (GHS)',
+          'Gross (GHS)',
+          'Employee SSNIT (GHS)',
+          'PAYE (GHS)',
+          'Employer SSNIT (GHS)',
+          'Other deductions (GHS)',
+          'Net pay (GHS)',
+          'Payment status',
+        ],
+        columnTypes: [
+          'text',
+          'text',
+          'text',
+          'text',
+          'money',
+          'money',
+          'money',
+          'money',
+          'money',
+          'money',
+          'money',
+          'money',
+          'text',
+        ],
+        rows: records.flatMap((run) =>
+          run.payslips.map(
+            (slip) =>
+              [
+                String(run.year) + '-' + String(run.month).padStart(2, '0'),
+                run.status,
+                studentName({
+                  profile: slip.staff?.profile ?? slip.teacher?.profile,
+                  admissionNumber: slip.staff?.staffId ?? slip.teacher?.teacherId,
+                }),
+                slip.staff?.staffId ?? slip.teacher?.teacherId ?? '',
+                asNumber(slip.basicSalary),
+                asNumber(slip.allowances),
+                asNumber(slip.grossSalary),
+                asNumber(slip.ssnitEmployee),
+                asNumber(slip.incomeTax),
+                asNumber(slip.ssnitEmployer),
+                asNumber(slip.otherDeductions),
+                asNumber(slip.netSalary),
+                slip.paymentStatus,
+              ] as FinanceExportCell[],
+          ),
+        ),
+        totalColumns: [4, 5, 6, 7, 8, 9, 10, 11],
+        totalLabel: 'Totals',
+        reportInfo: {
+          ...reportInfo,
+          Confidentiality: 'Confidential payroll and salary information',
+        },
       };
-      fileName = "schoolhub-confidential-payroll-register.xlsx";
+      fileName = 'schoolhub-confidential-payroll-register.xlsx';
     }
 
-    input.reportInfo = { ...input.reportInfo, "Generated at": generatedAt.toLocaleString("en-GH") };
+    input.reportInfo = { ...input.reportInfo, 'Generated at': generatedAt.toLocaleString('en-GH') };
     const buffer = await buildFinanceWorkbook(input);
-    await this.auditExport(context, kind + ".xlsx", rowCount, { from: context.from, to: context.to });
+    await this.auditExport(context, kind + '.xlsx', rowCount, {
+      from: context.from,
+      to: context.to,
+    });
     return {
       buffer,
       fileName,
-      contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     };
   }
 
   private async pdfDocument(school: School, title: string, reference: string) {
-    const doc = new jsPDF({ orientation: "portrait", unit: "pt", format: "a4" });
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
     const pageWidth = doc.internal.pageSize.getWidth();
     const [red, green, blue] = primaryRgb(school.primaryColor);
     doc.setFillColor(red, green, blue);
-    doc.rect(0, 0, pageWidth, 78, "F");
+    doc.rect(0, 0, pageWidth, 78, 'F');
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(16);
-    doc.setFont("helvetica", "bold");
+    doc.setFont('helvetica', 'bold');
     doc.text(school.name, 36, 30, { maxWidth: pageWidth - 72 });
-    doc.setFont("helvetica", "normal");
+    doc.setFont('helvetica', 'normal');
     doc.setFontSize(8);
-    const contact = [school.code, school.address, school.phone, school.email, school.website].filter(Boolean).join(" · ");
-    doc.text(contact || "School finance office", 36, 47, { maxWidth: pageWidth - 125 });
+    const contact = [school.code, school.address, school.phone, school.email, school.website]
+      .filter(Boolean)
+      .join(' · ');
+    doc.text(contact || 'School finance office', 36, 47, { maxWidth: pageWidth - 125 });
     if (school.motto) doc.text(school.motto, 36, 62, { maxWidth: pageWidth - 125 });
     doc.setTextColor(25, 35, 50);
-    doc.setFont("helvetica", "bold");
+    doc.setFont('helvetica', 'bold');
     doc.setFontSize(14);
     doc.text(title, 36, 106, { maxWidth: pageWidth - 72 });
-    doc.setFont("helvetica", "normal");
+    doc.setFont('helvetica', 'normal');
     doc.setFontSize(8);
-    doc.text("Document reference: " + reference + " · Created " + new Date().toLocaleString("en-GH"), 36, 122, { maxWidth: pageWidth - 72 });
+    doc.text(
+      'Document reference: ' + reference + ' · Created ' + new Date().toLocaleString('en-GH'),
+      36,
+      122,
+      { maxWidth: pageWidth - 72 },
+    );
     return { doc, pageWidth };
   }
 
-  private finishPdf(doc: jsPDF, kind: string, confidential = false, watermark?: "VOID" | "REVERSED") {
+  private finishPdf(
+    doc: jsPDF,
+    kind: string,
+    confidential = false,
+    watermark?: 'VOID' | 'REVERSED',
+  ) {
     const pageCount = doc.getNumberOfPages();
     for (let page = 1; page <= pageCount; page += 1) {
       doc.setPage(page);
@@ -364,54 +639,75 @@ export class FinanceExportsService {
       const pageHeight = doc.internal.pageSize.getHeight();
       if (watermark) {
         doc.setTextColor(190, 35, 45);
-        doc.setFont("helvetica", "bold");
+        doc.setFont('helvetica', 'bold');
         doc.setFontSize(28);
-        doc.text(watermark, pageWidth / 2, pageHeight / 2, { align: "center", angle: 25 });
+        doc.text(watermark, pageWidth / 2, pageHeight / 2, { align: 'center', angle: 25 });
       }
       doc.setTextColor(100, 110, 120);
-      doc.setFont("helvetica", "normal");
+      doc.setFont('helvetica', 'normal');
       doc.setFontSize(8);
-      if (confidential) doc.text("CONFIDENTIAL", 36, pageHeight - 18);
-      doc.text("SchoolHub · " + kind + " · Page " + page + " of " + pageCount, pageWidth - 36, pageHeight - 18, { align: "right" });
+      if (confidential) doc.text('CONFIDENTIAL', 36, pageHeight - 18);
+      doc.text(
+        'SchoolHub · ' + kind + ' · Page ' + page + ' of ' + pageCount,
+        pageWidth - 36,
+        pageHeight - 18,
+        { align: 'right' },
+      );
     }
   }
 
   private pdfBuffer(doc: jsPDF): Buffer {
-    return Buffer.from(doc.output("arraybuffer"));
+    return Buffer.from(doc.output('arraybuffer'));
   }
 
   private async findBill(schoolId: string, billId: string) {
     const bill = await this.prisma.client.bill.findFirst({
       where: { id: billId, schoolId },
       include: {
-        student: { select: { id: true, admissionNumber: true, profile: { select: { firstName: true, lastName: true } } } },
+        student: {
+          select: {
+            id: true,
+            admissionNumber: true,
+            profile: { select: { firstName: true, lastName: true } },
+          },
+        },
         class: { select: { name: true } },
         academicYear: { select: { name: true } },
         term: { select: { name: true } },
-        items: { orderBy: { createdAt: "asc" } },
-        concessions: { orderBy: { createdAt: "asc" } },
+        items: { orderBy: { createdAt: 'asc' } },
+        concessions: { orderBy: { createdAt: 'asc' } },
       },
     });
-    if (!bill) throw new NotFoundException("Invoice not found.");
+    if (!bill) throw new NotFoundException('Invoice not found.');
     return bill;
   }
 
   async invoicePdf(context: FinanceExportContext, billId: string): Promise<FinanceExportFile> {
     const school = await this.school(context.schoolId);
     const bill = await this.findBill(context.schoolId, billId);
-    const { doc } = await this.pdfDocument(school, "Student invoice", bill.billNumber);
+    const { doc } = await this.pdfDocument(school, 'Student invoice', bill.billNumber);
     const student = studentName(bill.student);
     doc.setFontSize(10);
-    doc.text("Student: " + student, 36, 150);
-    doc.text("Admission number: " + (bill.student.admissionNumber ?? "—"), 36, 166);
-    doc.text("Class: " + (bill.class?.name ?? "—"), 36, 182);
-    doc.text("Academic period: " + bill.academicYear.name + (bill.term?.name ? " · " + bill.term.name : ""), 36, 198);
-    doc.text("Issued: " + isoDay(bill.issuedAt) + "    Due date: " + isoDay(bill.dueDate), 36, 214);
+    doc.text('Student: ' + student, 36, 150);
+    doc.text('Admission number: ' + (bill.student.admissionNumber ?? '—'), 36, 166);
+    doc.text('Class: ' + (bill.class?.name ?? '—'), 36, 182);
+    doc.text(
+      'Academic period: ' +
+        bill.academicYear.name +
+        (bill.term?.name ? ' · ' + bill.term.name : ''),
+      36,
+      198,
+    );
+    doc.text('Issued: ' + isoDay(bill.issuedAt) + '    Due date: ' + isoDay(bill.dueDate), 36, 214);
     autoTable(doc, {
       startY: 230,
-      head: [["Fee item", "Qty", "Unit amount", "Line total", "Discount"]],
+      head: [['Fee item', 'Qty', 'Unit amount', 'Line total', 'Discount']],
       body: bill.items.map((item) => [
-        item.description, String(item.quantity), formatMoney(item.amount), formatMoney(item.totalAmount), formatMoney(item.discountAmount),
+        item.description,
+        String(item.quantity),
+        formatMoney(item.amount),
+        formatMoney(item.totalAmount),
+        formatMoney(item.discountAmount),
       ]),
       styles: { fontSize: 8, cellPadding: 5 },
       headStyles: { fillColor: primaryRgb(school.primaryColor) },
@@ -420,22 +716,42 @@ export class FinanceExportsService {
     let y = (doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY ?? 240;
     y += 22;
     const totals = [
-      ["Gross fees", formatMoney(bill.grossAmount)],
-      ["Discounts and scholarships", formatMoney(bill.discountAmount)],
-      ["Total billed", formatMoney(bill.totalAmount)],
-      ["Payments recorded", formatMoney(bill.paidAmount)],
-      ["Balance due", formatMoney(bill.balanceAmount)],
+      ['Gross fees', formatMoney(bill.grossAmount)],
+      ['Discounts and scholarships', formatMoney(bill.discountAmount)],
+      ['Total billed', formatMoney(bill.totalAmount)],
+      ['Payments recorded', formatMoney(bill.paidAmount)],
+      ['Balance due', formatMoney(bill.balanceAmount)],
     ];
-    autoTable(doc, { startY: y, body: totals, theme: "plain", styles: { fontSize: 9, cellPadding: 3 }, columnStyles: { 1: { halign: "right" } }, margin: { left: 210, right: 36, bottom: 46 } });
+    autoTable(doc, {
+      startY: y,
+      body: totals,
+      theme: 'plain',
+      styles: { fontSize: 9, cellPadding: 3 },
+      columnStyles: { 1: { halign: 'right' } },
+      margin: { left: 210, right: 36, bottom: 46 },
+    });
     y = (doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY ?? y;
     doc.setFontSize(8);
-    doc.text("Amount due in words: " + amountInWords(bill.balanceAmount), 36, y + 20, { maxWidth: 520 });
-    doc.text("Status: " + bill.status, 36, y + 34);
-    doc.text("Invoice reflects the saved SchoolHub billing records.", 36, y + 48, { maxWidth: 520 });
-    this.finishPdf(doc, "Invoice", false, ["CANCELLED", "WAIVED"].includes(bill.status) ? "VOID" : undefined);
+    doc.text('Amount due in words: ' + amountInWords(bill.balanceAmount), 36, y + 20, {
+      maxWidth: 520,
+    });
+    doc.text('Status: ' + bill.status, 36, y + 34);
+    doc.text('Invoice reflects the saved SchoolHub billing records.', 36, y + 48, {
+      maxWidth: 520,
+    });
+    this.finishPdf(
+      doc,
+      'Invoice',
+      false,
+      ['CANCELLED', 'WAIVED'].includes(bill.status) ? 'VOID' : undefined,
+    );
     const buffer = this.pdfBuffer(doc);
-    await this.auditExport(context, "invoice.pdf", bill.items.length + 1, {});
-    return { buffer, fileName: "invoice-" + bill.billNumber + ".pdf", contentType: "application/pdf" };
+    await this.auditExport(context, 'invoice.pdf', bill.items.length + 1, {});
+    return {
+      buffer,
+      fileName: 'invoice-' + bill.billNumber + '.pdf',
+      contentType: 'application/pdf',
+    };
   }
 
   async receiptPdf(context: FinanceExportContext, paymentId: string): Promise<FinanceExportFile> {
@@ -443,74 +759,134 @@ export class FinanceExportsService {
     const payment = await this.prisma.client.payment.findFirst({
       where: { id: paymentId, schoolId: context.schoolId },
       include: {
-        student: { select: { admissionNumber: true, profile: { select: { firstName: true, lastName: true } } } },
+        student: {
+          select: {
+            admissionNumber: true,
+            profile: { select: { firstName: true, lastName: true } },
+          },
+        },
         bill: { select: { billNumber: true } },
         recordedBy: { select: { name: true, email: true } },
       },
     });
-    if (!payment) throw new NotFoundException("Receipt not found.");
-    const { doc } = await this.pdfDocument(school, "Payment receipt", payment.paymentNumber);
+    if (!payment) throw new NotFoundException('Receipt not found.');
+    const { doc } = await this.pdfDocument(school, 'Payment receipt', payment.paymentNumber);
     const fields = [
-      ["Student", studentName(payment.student)],
-      ["Admission number", payment.student.admissionNumber ?? "—"],
-      ["Invoice", payment.bill?.billNumber ?? "Unallocated receipt"],
-      ["Date", isoDay(payment.paymentDate)],
-      ["Payment method", payment.paymentMethod.replaceAll("_", " ")],
-      ["Transaction reference", payment.referenceNumber ?? "—"],
-      ["Status", payment.status],
-      ["Recorded by", payment.recordedBy?.name ?? payment.recordedBy?.email ?? "School accounts"],
-      ["Amount received", formatMoney(payment.amount)],
-      ["Amount in words", amountInWords(payment.amount)],
+      ['Student', studentName(payment.student)],
+      ['Admission number', payment.student.admissionNumber ?? '—'],
+      ['Invoice', payment.bill?.billNumber ?? 'Unallocated receipt'],
+      ['Date', isoDay(payment.paymentDate)],
+      ['Payment method', payment.paymentMethod.replaceAll('_', ' ')],
+      ['Transaction reference', payment.referenceNumber ?? '—'],
+      ['Status', payment.status],
+      ['Recorded by', payment.recordedBy?.name ?? payment.recordedBy?.email ?? 'School accounts'],
+      ['Amount received', formatMoney(payment.amount)],
+      ['Amount in words', amountInWords(payment.amount)],
     ];
-    autoTable(doc, { startY: 154, body: fields, theme: "plain", styles: { fontSize: 9, cellPadding: 6 }, columnStyles: { 0: { fontStyle: "bold", cellWidth: 130 } }, margin: { left: 36, right: 36, bottom: 48 } });
+    autoTable(doc, {
+      startY: 154,
+      body: fields,
+      theme: 'plain',
+      styles: { fontSize: 9, cellPadding: 6 },
+      columnStyles: { 0: { fontStyle: 'bold', cellWidth: 130 } },
+      margin: { left: 36, right: 36, bottom: 48 },
+    });
     doc.setFontSize(8);
-    doc.text("This document reflects the stored SchoolHub payment record; it does not independently verify an external bank or mobile-money transaction.", 36, ((doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY ?? 220) + 24, { maxWidth: 520 });
-    const watermark = payment.reversedAt || payment.status === "REFUNDED" ? "REVERSED" : payment.status === "CANCELLED" ? "VOID" : undefined;
-    this.finishPdf(doc, "Receipt", false, watermark);
+    doc.text(
+      'This document reflects the stored SchoolHub payment record; it does not independently verify an external bank or mobile-money transaction.',
+      36,
+      ((doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY ?? 220) + 24,
+      { maxWidth: 520 },
+    );
+    const watermark =
+      payment.reversedAt || payment.status === 'REFUNDED'
+        ? 'REVERSED'
+        : payment.status === 'CANCELLED'
+          ? 'VOID'
+          : undefined;
+    this.finishPdf(doc, 'Receipt', false, watermark);
     const buffer = this.pdfBuffer(doc);
-    await this.auditExport(context, "receipt.pdf", fields.length, {});
-    return { buffer, fileName: "receipt-" + payment.paymentNumber + ".pdf", contentType: "application/pdf" };
+    await this.auditExport(context, 'receipt.pdf', fields.length, {});
+    return {
+      buffer,
+      fileName: 'receipt-' + payment.paymentNumber + '.pdf',
+      contentType: 'application/pdf',
+    };
   }
 
-  async studentStatementPdf(context: FinanceExportContext, studentId: string): Promise<FinanceExportFile> {
+  async studentStatementPdf(
+    context: FinanceExportContext,
+    studentId: string,
+  ): Promise<FinanceExportFile> {
     const school = await this.school(context.schoolId);
     const student = await this.prisma.client.student.findFirst({
       where: { id: studentId, schoolId: context.schoolId },
-      select: { id: true, admissionNumber: true, profile: { select: { firstName: true, lastName: true } } },
+      select: {
+        id: true,
+        admissionNumber: true,
+        profile: { select: { firstName: true, lastName: true } },
+      },
     });
-    if (!student) throw new NotFoundException("Student not found.");
+    if (!student) throw new NotFoundException('Student not found.');
     const [bills, payments] = await Promise.all([
       this.prisma.client.bill.findMany({
         where: { schoolId: context.schoolId, studentId },
-        orderBy: [{ issuedAt: "asc" }, { id: "asc" }],
-        select: { billNumber: true, issuedAt: true, totalAmount: true, status: true, term: { select: { name: true } }, academicYear: { select: { name: true } } },
+        orderBy: [{ issuedAt: 'asc' }, { id: 'asc' }],
+        select: {
+          billNumber: true,
+          issuedAt: true,
+          totalAmount: true,
+          status: true,
+          term: { select: { name: true } },
+          academicYear: { select: { name: true } },
+        },
       }),
       this.prisma.client.payment.findMany({
         where: { schoolId: context.schoolId, studentId },
-        orderBy: [{ paymentDate: "asc" }, { createdAt: "asc" }, { id: "asc" }],
-        select: { paymentNumber: true, paymentDate: true, amount: true, status: true, reversedAt: true, bill: { select: { billNumber: true } } },
+        orderBy: [{ paymentDate: 'asc' }, { createdAt: 'asc' }, { id: 'asc' }],
+        select: {
+          paymentNumber: true,
+          paymentDate: true,
+          amount: true,
+          status: true,
+          reversedAt: true,
+          bill: { select: { billNumber: true } },
+        },
       }),
     ]);
-    type StatementEntry = { date: Date; reference: string; description: string; debit: Prisma.Decimal; credit: Prisma.Decimal; sort: number };
+    type StatementEntry = {
+      date: Date;
+      reference: string;
+      description: string;
+      debit: Prisma.Decimal;
+      credit: Prisma.Decimal;
+      sort: number;
+    };
     const entries: StatementEntry[] = [];
     for (const bill of bills) {
-      if (bill.status === "CANCELLED" || bill.status === "WAIVED") continue;
+      if (bill.status === 'CANCELLED' || bill.status === 'WAIVED') continue;
       entries.push({
         date: bill.issuedAt,
         reference: bill.billNumber,
-        description: "Invoice" + (bill.academicYear?.name ? " · " + bill.academicYear.name : "") + (bill.term?.name ? " · " + bill.term.name : ""),
+        description:
+          'Invoice' +
+          (bill.academicYear?.name ? ' · ' + bill.academicYear.name : '') +
+          (bill.term?.name ? ' · ' + bill.term.name : ''),
         debit: bill.totalAmount,
         credit: new Prisma.Decimal(0),
         sort: 0,
       });
     }
     for (const payment of payments) {
-      const reversed = !!payment.reversedAt || payment.status === "REFUNDED" || payment.status === "CANCELLED";
-      if (payment.status === "COMPLETED" || payment.reversedAt || payment.status === "REFUNDED") {
+      const reversed =
+        !!payment.reversedAt || payment.status === 'REFUNDED' || payment.status === 'CANCELLED';
+      if (payment.status === 'COMPLETED' || payment.reversedAt || payment.status === 'REFUNDED') {
         entries.push({
           date: payment.paymentDate,
           reference: payment.paymentNumber,
-          description: "Receipt" + (payment.bill?.billNumber ? " · " + payment.bill.billNumber : " · Unallocated"),
+          description:
+            'Receipt' +
+            (payment.bill?.billNumber ? ' · ' + payment.bill.billNumber : ' · Unallocated'),
           debit: new Prisma.Decimal(0),
           credit: payment.amount,
           sort: 1,
@@ -519,7 +895,7 @@ export class FinanceExportsService {
           entries.push({
             date: payment.reversedAt ?? payment.paymentDate,
             reference: payment.paymentNumber,
-            description: payment.status === "REFUNDED" ? "Refund / reversal" : "Voided receipt",
+            description: payment.status === 'REFUNDED' ? 'Refund / reversal' : 'Voided receipt',
             debit: payment.amount,
             credit: new Prisma.Decimal(0),
             sort: 2,
@@ -527,11 +903,16 @@ export class FinanceExportsService {
         }
       }
     }
-    entries.sort((a,b) => a.date.getTime() - b.date.getTime() || a.sort - b.sort || a.reference.localeCompare(b.reference));
-    const rangeStart = validateDate(context.from, "start date");
-    const rangeEnd = validateDate(context.to, "end date");
+    entries.sort(
+      (a, b) =>
+        a.date.getTime() - b.date.getTime() ||
+        a.sort - b.sort ||
+        a.reference.localeCompare(b.reference),
+    );
+    const rangeStart = validateDate(context.from, 'start date');
+    const rangeEnd = validateDate(context.to, 'end date');
     if (rangeStart && rangeEnd && rangeStart.getTime() > rangeEnd.getTime()) {
-      throw new BadRequestException("Start date must be before or equal to end date.");
+      throw new BadRequestException('Start date must be before or equal to end date.');
     }
     const rangeEndInclusive = context.to ? dayEnd(context.to) : undefined;
     const inSelectedPeriod = (entry: StatementEntry) =>
@@ -539,38 +920,81 @@ export class FinanceExportsService {
       (!rangeEndInclusive || entry.date.getTime() <= rangeEndInclusive.getTime());
     const openingBalance = entries
       .filter((entry) => rangeStart && entry.date.getTime() < rangeStart.getTime())
-      .reduce((balance, entry) => balance.plus(entry.debit).minus(entry.credit), new Prisma.Decimal(0));
+      .reduce(
+        (balance, entry) => balance.plus(entry.debit).minus(entry.credit),
+        new Prisma.Decimal(0),
+      );
     const visibleEntries = entries.filter(inSelectedPeriod);
     let balance = openingBalance;
     const rows = visibleEntries.map((entry) => {
       balance = balance.plus(entry.debit).minus(entry.credit);
-      return [isoDay(entry.date), entry.reference, entry.description, formatMoney(entry.debit), formatMoney(entry.credit), formatMoney(balance)];
+      return [
+        isoDay(entry.date),
+        entry.reference,
+        entry.description,
+        formatMoney(entry.debit),
+        formatMoney(entry.credit),
+        formatMoney(balance),
+      ];
     });
-    const { doc } = await this.pdfDocument(school, "Student statement of account", student.admissionNumber ?? student.id);
+    const { doc } = await this.pdfDocument(
+      school,
+      'Student statement of account',
+      student.admissionNumber ?? student.id,
+    );
     doc.setFontSize(10);
-    doc.text("Student: " + studentName(student), 36, 150);
-    doc.text("Admission number: " + (student.admissionNumber ?? "—"), 36, 166);
+    doc.text('Student: ' + studentName(student), 36, 150);
+    doc.text('Admission number: ' + (student.admissionNumber ?? '—'), 36, 166);
     doc.setFontSize(8);
-    const periodLabel = context.from || context.to ? "Period: " + (context.from ?? "All history") + " to " + (context.to ?? "Present") : "Period: All available history";
+    const periodLabel =
+      context.from || context.to
+        ? 'Period: ' + (context.from ?? 'All history') + ' to ' + (context.to ?? 'Present')
+        : 'Period: All available history';
     doc.text(periodLabel, 36, 184);
-    doc.text("Opening balance for this period: " + formatMoney(openingBalance), 36, 198);
+    doc.text('Opening balance for this period: ' + formatMoney(openingBalance), 36, 198);
     doc.setFontSize(7.5);
-    doc.text("Opening balance is calculated from available earlier bill/payment history; no separate opening balance is stored in this model.", 36, 211, { maxWidth: 520 });
+    doc.text(
+      'Opening balance is calculated from available earlier bill/payment history; no separate opening balance is stored in this model.',
+      36,
+      211,
+      { maxWidth: 520 },
+    );
     autoTable(doc, {
       startY: 224,
-      head: [["Date", "Reference", "Description", "Debit", "Credit", "Running balance"]],
+      head: [['Date', 'Reference', 'Description', 'Debit', 'Credit', 'Running balance']],
       body: rows,
       styles: { fontSize: 7.5, cellPadding: 4 },
       headStyles: { fillColor: primaryRgb(school.primaryColor) },
-      columnStyles: { 0: { cellWidth: 52 }, 1: { cellWidth: 78 }, 2: { cellWidth: 150 }, 3: { halign: "right" }, 4: { halign: "right" }, 5: { halign: "right" } },
+      columnStyles: {
+        0: { cellWidth: 52 },
+        1: { cellWidth: 78 },
+        2: { cellWidth: 150 },
+        3: { halign: 'right' },
+        4: { halign: 'right' },
+        5: { halign: 'right' },
+      },
       margin: { left: 30, right: 30, bottom: 38 },
     });
     const y = (doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY ?? 230;
-    autoTable(doc, { startY: y + 12, body: [["Closing balance", formatMoney(balance)]], theme: "plain", styles: { fontSize: 10, fontStyle: "bold" }, columnStyles: { 1: { halign: "right" } }, margin: { left: 320, right: 30 } });
-    this.finishPdf(doc, "Student statement");
+    autoTable(doc, {
+      startY: y + 12,
+      body: [['Closing balance', formatMoney(balance)]],
+      theme: 'plain',
+      styles: { fontSize: 10, fontStyle: 'bold' },
+      columnStyles: { 1: { halign: 'right' } },
+      margin: { left: 320, right: 30 },
+    });
+    this.finishPdf(doc, 'Student statement');
     const buffer = this.pdfBuffer(doc);
-    await this.auditExport(context, "student-statement.pdf", visibleEntries.length, { from: context.from, to: context.to });
-    return { buffer, fileName: "student-statement-" + (student.admissionNumber ?? student.id) + ".pdf", contentType: "application/pdf" };
+    await this.auditExport(context, 'student-statement.pdf', visibleEntries.length, {
+      from: context.from,
+      to: context.to,
+    });
+    return {
+      buffer,
+      fileName: 'student-statement-' + (student.admissionNumber ?? student.id) + '.pdf',
+      contentType: 'application/pdf',
+    };
   }
 
   async payslipPdf(context: FinanceExportContext, payslipId: string): Promise<FinanceExportFile> {
@@ -578,53 +1002,70 @@ export class FinanceExportsService {
     const slip = await this.prisma.client.payslip.findFirst({
       where: { id: payslipId, schoolId: context.schoolId },
       include: {
-        payrollRecord: { select: { id: true, month: true, year: true, status: true, schoolId: true } },
-        staff: { select: { staffId: true, profile: { select: { firstName: true, lastName: true } } } },
-        teacher: { select: { teacherId: true, profile: { select: { firstName: true, lastName: true } } } },
+        payrollRecord: {
+          select: { id: true, month: true, year: true, status: true, schoolId: true },
+        },
+        staff: {
+          select: { staffId: true, profile: { select: { firstName: true, lastName: true } } },
+        },
+        teacher: {
+          select: { teacherId: true, profile: { select: { firstName: true, lastName: true } } },
+        },
       },
     });
-    if (!slip || slip.payrollRecord.schoolId !== context.schoolId) throw new NotFoundException("Payslip not found.");
+    if (!slip || slip.payrollRecord.schoolId !== context.schoolId)
+      throw new NotFoundException('Payslip not found.');
 
-    const period = String(slip.payrollRecord.year) + "-" + String(slip.payrollRecord.month).padStart(2, "0");
+    const period =
+      String(slip.payrollRecord.year) + '-' + String(slip.payrollRecord.month).padStart(2, '0');
     const employee = studentName({
       profile: slip.staff?.profile ?? slip.teacher?.profile,
       admissionNumber: slip.staff?.staffId ?? slip.teacher?.teacherId,
     });
-    const employeeId = slip.staff?.staffId ?? slip.teacher?.teacherId ?? "—";
-    const { doc } = await this.pdfDocument(school, "Confidential employee payslip", employeeId);
+    const employeeId = slip.staff?.staffId ?? slip.teacher?.teacherId ?? '—';
+    const { doc } = await this.pdfDocument(school, 'Confidential employee payslip', employeeId);
     doc.setFontSize(10);
-    doc.text("Employee: " + employee, 36, 152);
-    doc.text("Employee ID: " + employeeId, 36, 168);
-    doc.text("Payroll period: " + period, 36, 184);
-    doc.text("Run status: " + slip.payrollRecord.status + " · Payment status: " + slip.paymentStatus, 36, 200);
+    doc.text('Employee: ' + employee, 36, 152);
+    doc.text('Employee ID: ' + employeeId, 36, 168);
+    doc.text('Payroll period: ' + period, 36, 184);
+    doc.text(
+      'Run status: ' + slip.payrollRecord.status + ' · Payment status: ' + slip.paymentStatus,
+      36,
+      200,
+    );
     autoTable(doc, {
       startY: 218,
-      head: [["Pay item", "Amount (GHS)"]],
+      head: [['Pay item', 'Amount (GHS)']],
       body: [
-        ["Basic salary", formatMoney(slip.basicSalary)],
-        ["Allowances", formatMoney(slip.allowances)],
-        ["Gross pay", formatMoney(slip.grossSalary)],
-        ["Employee SSNIT", formatMoney(slip.ssnitEmployee)],
-        ["PAYE", formatMoney(slip.incomeTax)],
-        ["Other deductions", formatMoney(slip.otherDeductions)],
-        ["Net pay", formatMoney(slip.netSalary)],
-        ["Employer SSNIT (memo)", formatMoney(slip.ssnitEmployer)],
+        ['Basic salary', formatMoney(slip.basicSalary)],
+        ['Allowances', formatMoney(slip.allowances)],
+        ['Gross pay', formatMoney(slip.grossSalary)],
+        ['Employee SSNIT', formatMoney(slip.ssnitEmployee)],
+        ['PAYE', formatMoney(slip.incomeTax)],
+        ['Other deductions', formatMoney(slip.otherDeductions)],
+        ['Net pay', formatMoney(slip.netSalary)],
+        ['Employer SSNIT (memo)', formatMoney(slip.ssnitEmployer)],
       ],
       styles: { fontSize: 9, cellPadding: 6 },
       headStyles: { fillColor: primaryRgb(school.primaryColor) },
-      columnStyles: { 1: { halign: "right" } },
+      columnStyles: { 1: { halign: 'right' } },
       margin: { left: 36, right: 36, bottom: 46 },
     });
     const y = (doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY ?? 340;
     doc.setFontSize(8);
-    doc.text("Net pay in words: " + amountInWords(slip.netSalary), 36, y + 22, { maxWidth: 520 });
-    this.finishPdf(doc, "Payslip", true, slip.payrollRecord.status === "CANCELLED" ? "VOID" : undefined);
+    doc.text('Net pay in words: ' + amountInWords(slip.netSalary), 36, y + 22, { maxWidth: 520 });
+    this.finishPdf(
+      doc,
+      'Payslip',
+      true,
+      slip.payrollRecord.status === 'CANCELLED' ? 'VOID' : undefined,
+    );
     const buffer = this.pdfBuffer(doc);
-    await this.auditExport(context, "payslip.pdf", 1, { from: period });
+    await this.auditExport(context, 'payslip.pdf', 1, { from: period });
     return {
       buffer,
-      fileName: "confidential-payslip-" + period + "-" + employeeId + ".pdf",
-      contentType: "application/pdf",
+      fileName: 'confidential-payslip-' + period + '-' + employeeId + '.pdf',
+      contentType: 'application/pdf',
     };
   }
 
@@ -636,23 +1077,52 @@ export class FinanceExportsService {
         payslips: {
           where: { schoolId: context.schoolId },
           include: {
-            staff: { select: { staffId: true, profile: { select: { firstName: true, lastName: true } } } },
-            teacher: { select: { teacherId: true, profile: { select: { firstName: true, lastName: true } } } },
+            staff: {
+              select: { staffId: true, profile: { select: { firstName: true, lastName: true } } },
+            },
+            teacher: {
+              select: { teacherId: true, profile: { select: { firstName: true, lastName: true } } },
+            },
           },
         },
       },
     });
-    if (!run) throw new NotFoundException("Payroll run not found.");
-    const { doc } = await this.pdfDocument(school, "Payroll payslip schedule", String(run.year) + "-" + String(run.month).padStart(2,"0"));
+    if (!run) throw new NotFoundException('Payroll run not found.');
+    const { doc } = await this.pdfDocument(
+      school,
+      'Payroll payslip schedule',
+      String(run.year) + '-' + String(run.month).padStart(2, '0'),
+    );
     autoTable(doc, {
       startY: 152,
-      head: [["Employee", "Employee ID", "Basic", "Allowance", "Gross", "Employee SSNIT", "PAYE", "Employer SSNIT", "Other deductions", "Net pay"]],
+      head: [
+        [
+          'Employee',
+          'Employee ID',
+          'Basic',
+          'Allowance',
+          'Gross',
+          'Employee SSNIT',
+          'PAYE',
+          'Employer SSNIT',
+          'Other deductions',
+          'Net pay',
+        ],
+      ],
       body: run.payslips.map((slip) => [
-        studentName({ profile: slip.staff?.profile ?? slip.teacher?.profile, admissionNumber: slip.staff?.staffId ?? slip.teacher?.teacherId }),
-        slip.staff?.staffId ?? slip.teacher?.teacherId ?? "",
-        formatMoney(slip.basicSalary), formatMoney(slip.allowances), formatMoney(slip.grossSalary),
-        formatMoney(slip.ssnitEmployee), formatMoney(slip.incomeTax), formatMoney(slip.ssnitEmployer),
-        formatMoney(slip.otherDeductions), formatMoney(slip.netSalary),
+        studentName({
+          profile: slip.staff?.profile ?? slip.teacher?.profile,
+          admissionNumber: slip.staff?.staffId ?? slip.teacher?.teacherId,
+        }),
+        slip.staff?.staffId ?? slip.teacher?.teacherId ?? '',
+        formatMoney(slip.basicSalary),
+        formatMoney(slip.allowances),
+        formatMoney(slip.grossSalary),
+        formatMoney(slip.ssnitEmployee),
+        formatMoney(slip.incomeTax),
+        formatMoney(slip.ssnitEmployer),
+        formatMoney(slip.otherDeductions),
+        formatMoney(slip.netSalary),
       ]),
       styles: { fontSize: 6.5, cellPadding: 3 },
       headStyles: { fillColor: primaryRgb(school.primaryColor) },
@@ -662,21 +1132,29 @@ export class FinanceExportsService {
     autoTable(doc, {
       startY: y + 14,
       body: [
-        ["Employees", String(run.payslips.length)],
-        ["Gross payroll", formatMoney(run.totalGross)],
-        ["PAYE", formatMoney(run.totalTax)],
-        ["SSNIT total", formatMoney(run.totalSSNIT)],
-        ["Net payroll", formatMoney(run.totalNet)],
-        ["Run status", run.status],
+        ['Employees', String(run.payslips.length)],
+        ['Gross payroll', formatMoney(run.totalGross)],
+        ['PAYE', formatMoney(run.totalTax)],
+        ['SSNIT total', formatMoney(run.totalSSNIT)],
+        ['Net payroll', formatMoney(run.totalNet)],
+        ['Run status', run.status],
       ],
-      theme: "plain",
+      theme: 'plain',
       styles: { fontSize: 9, cellPadding: 4 },
-      columnStyles: { 1: { halign: "right" } },
+      columnStyles: { 1: { halign: 'right' } },
       margin: { left: 300, right: 30 },
     });
-    this.finishPdf(doc, "Payroll schedule", true, run.status === "CANCELLED" ? "VOID" : undefined);
+    this.finishPdf(doc, 'Payroll schedule', true, run.status === 'CANCELLED' ? 'VOID' : undefined);
     const buffer = this.pdfBuffer(doc);
-    await this.auditExport(context, "payroll-payslips.pdf", run.payslips.length, { from: String(run.year), to: String(run.month) });
-    return { buffer, fileName: "confidential-payslips-" + run.year + "-" + String(run.month).padStart(2,"0") + ".pdf", contentType: "application/pdf" };
+    await this.auditExport(context, 'payroll-payslips.pdf', run.payslips.length, {
+      from: String(run.year),
+      to: String(run.month),
+    });
+    return {
+      buffer,
+      fileName:
+        'confidential-payslips-' + run.year + '-' + String(run.month).padStart(2, '0') + '.pdf',
+      contentType: 'application/pdf',
+    };
   }
 }

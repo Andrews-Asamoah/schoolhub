@@ -1,5 +1,5 @@
-import { useQuery } from "@tanstack/react-query";
-import { apiFetch } from "@/lib/api";
+import { useQuery } from '@tanstack/react-query';
+import { apiFetch } from '@/lib/api';
 
 export interface TeachingClass {
   id: string;
@@ -20,8 +20,8 @@ export interface TeachingOverview {
 /** The signed-in teacher's own classes: where they are class teacher and what they teach. */
 export function useTeachingOverview(enabled = true) {
   return useQuery({
-    queryKey: ["teaching", "me"],
-    queryFn: () => apiFetch<TeachingOverview>("/teaching/me"),
+    queryKey: ['teaching', 'me'],
+    queryFn: () => apiFetch<TeachingOverview>('/teaching/me'),
     enabled,
     retry: false,
     staleTime: 60_000,

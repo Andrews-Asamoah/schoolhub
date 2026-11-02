@@ -1,9 +1,9 @@
-import { useEffect, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { Bell, LoaderCircle, Megaphone, Pin, RefreshCw, Search, X } from "lucide-react";
-import { apiFetch } from "@/lib/api";
-import { cn } from "@/lib/utils";
-import { PortalModal } from "./portal-modal";
+import { useEffect, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { Bell, LoaderCircle, Megaphone, Pin, RefreshCw, Search, X } from 'lucide-react';
+import { apiFetch } from '@/lib/api';
+import { cn } from '@/lib/utils';
+import { PortalModal } from './portal-modal';
 import {
   ANNOUNCEMENT_CATEGORY_STYLES,
   announcementCategoryLabel,
@@ -11,27 +11,27 @@ import {
   announcementQueryRoleKey,
   announcementTargetLabel,
   type AnnouncementItem,
-} from "./announcement-utils";
-import type { AnnouncementCategory } from "@schoolhub/shared";
+} from './announcement-utils';
+import type { AnnouncementCategory } from '@schoolhub/shared';
 
-type CategoryFilter = "ALL" | AnnouncementCategory;
+type CategoryFilter = 'ALL' | AnnouncementCategory;
 
-const READ_STORAGE_KEY = "schoolhub-read-announcements";
+const READ_STORAGE_KEY = 'schoolhub-read-announcements';
 
 const filterOptions: { value: CategoryFilter; label: string }[] = [
-  { value: "ALL", label: "All Notices" },
-  { value: "ACADEMIC", label: "Academic" },
-  { value: "EVENT", label: "Events" },
-  { value: "HOUSE", label: "House" },
-  { value: "GENERAL", label: "General" },
+  { value: 'ALL', label: 'All Notices' },
+  { value: 'ACADEMIC', label: 'Academic' },
+  { value: 'EVENT', label: 'Events' },
+  { value: 'HOUSE', label: 'House' },
+  { value: 'GENERAL', label: 'General' },
 ];
 
 function loadReadIds() {
-  if (typeof window === "undefined") return new Set<string>();
+  if (typeof window === 'undefined') return new Set<string>();
   try {
-    const parsed: unknown = JSON.parse(window.localStorage.getItem(READ_STORAGE_KEY) ?? "[]");
+    const parsed: unknown = JSON.parse(window.localStorage.getItem(READ_STORAGE_KEY) ?? '[]');
     return new Set(
-      Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === "string") : [],
+      Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === 'string') : [],
     );
   } catch {
     return new Set<string>();
@@ -39,18 +39,18 @@ function loadReadIds() {
 }
 
 function errorText(error: unknown) {
-  return error instanceof Error ? error.message : "The request failed. Please try again.";
+  return error instanceof Error ? error.message : 'The request failed. Please try again.';
 }
 
 export function StudentAnnouncementsView() {
-  const [filter, setFilter] = useState<CategoryFilter>("ALL");
-  const [search, setSearch] = useState("");
+  const [filter, setFilter] = useState<CategoryFilter>('ALL');
+  const [search, setSearch] = useState('');
   const [readIds, setReadIds] = useState<Set<string>>(loadReadIds);
   const [selected, setSelected] = useState<AnnouncementItem | null>(null);
 
   const announcementsQuery = useQuery({
-    queryKey: ["announcements", announcementQueryRoleKey()],
-    queryFn: () => apiFetch<AnnouncementItem[]>("/announcements"),
+    queryKey: ['announcements', announcementQueryRoleKey()],
+    queryFn: () => apiFetch<AnnouncementItem[]>('/announcements'),
     retry: false,
   });
 
@@ -65,22 +65,24 @@ export function StudentAnnouncementsView() {
   const announcements = announcementsQuery.data ?? [];
 
   useEffect(() => {
-    const announcementId = new URLSearchParams(window.location.search).get("announcementId");
+    const announcementId = new URLSearchParams(window.location.search).get('announcementId');
     if (!announcementId) return;
     const matchingAnnouncement = announcements.find((item) => item.id === announcementId);
     if (!matchingAnnouncement) return;
     setSelected(matchingAnnouncement);
-    setReadIds((current) => current.has(matchingAnnouncement.id)
-      ? current
-      : new Set([...current, matchingAnnouncement.id]));
+    setReadIds((current) =>
+      current.has(matchingAnnouncement.id)
+        ? current
+        : new Set([...current, matchingAnnouncement.id]),
+    );
     const url = new URL(window.location.href);
-    url.searchParams.delete("announcementId");
-    window.history.replaceState(window.history.state, "", url.pathname + url.search + url.hash);
+    url.searchParams.delete('announcementId');
+    window.history.replaceState(window.history.state, '', url.pathname + url.search + url.hash);
   }, [announcements]);
 
   const normalizedSearch = search.trim().toLowerCase();
   const filtered = announcements.filter((item) => {
-    const matchesCategory = filter === "ALL" || item.category === filter;
+    const matchesCategory = filter === 'ALL' || item.category === filter;
     const matchesSearch =
       !normalizedSearch ||
       item.title.toLowerCase().includes(normalizedSearch) ||
@@ -123,19 +125,19 @@ export function StudentAnnouncementsView() {
             aria-label="Refresh announcements"
             className="rounded-lg border border-border p-2 text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-50"
           >
-            <RefreshCw className={cn("size-4", announcementsQuery.isFetching && "animate-spin")} />
+            <RefreshCw className={cn('size-4', announcementsQuery.isFetching && 'animate-spin')} />
           </button>
         </div>
       </div>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         {[
-          { label: "Total Notices", value: announcements.length, color: "text-foreground" },
-          { label: "Pinned", value: pinnedCount, color: "text-primary" },
-          { label: "Unread", value: unreadCount, color: "text-destructive" },
+          { label: 'Total Notices', value: announcements.length, color: 'text-foreground' },
+          { label: 'Pinned', value: pinnedCount, color: 'text-primary' },
+          { label: 'Unread', value: unreadCount, color: 'text-destructive' },
         ].map((stat) => (
           <div key={stat.label} className="rounded-2xl border border-border bg-card p-4 shadow-sm">
-            <p className={cn("text-2xl font-black tabular-nums", stat.color)}>{stat.value}</p>
+            <p className={cn('text-2xl font-black tabular-nums', stat.color)}>{stat.value}</p>
             <p className="mt-1 text-xs text-muted-foreground">{stat.label}</p>
           </div>
         ))}
@@ -153,7 +155,7 @@ export function StudentAnnouncementsView() {
         {search && (
           <button
             type="button"
-            onClick={() => setSearch("")}
+            onClick={() => setSearch('')}
             aria-label="Clear search"
             className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md p-1 text-muted-foreground hover:bg-muted"
           >
@@ -170,10 +172,10 @@ export function StudentAnnouncementsView() {
             onClick={() => setFilter(option.value)}
             aria-pressed={filter === option.value}
             className={cn(
-              "shrink-0 rounded-xl px-4 py-2 text-sm font-semibold transition",
+              'shrink-0 rounded-xl px-4 py-2 text-sm font-semibold transition',
               filter === option.value
-                ? "bg-primary text-primary-foreground"
-                : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                ? 'bg-primary text-primary-foreground'
+                : 'text-muted-foreground hover:bg-muted hover:text-foreground',
             )}
           >
             {option.label}
@@ -187,9 +189,14 @@ export function StudentAnnouncementsView() {
           Loading announcements…
         </div>
       ) : announcementsQuery.isError ? (
-        <div role="alert" className="rounded-2xl border border-destructive/30 bg-destructive/10 p-6">
+        <div
+          role="alert"
+          className="rounded-2xl border border-destructive/30 bg-destructive/10 p-6"
+        >
           <p className="font-semibold text-destructive">Announcements could not be loaded.</p>
-          <p className="mt-1 text-sm text-muted-foreground">{errorText(announcementsQuery.error)}</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {errorText(announcementsQuery.error)}
+          </p>
           <button
             type="button"
             onClick={() => void announcementsQuery.refetch()}
@@ -202,17 +209,20 @@ export function StudentAnnouncementsView() {
         <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-card px-5 py-14 text-center">
           <Megaphone className="size-10 text-muted-foreground" />
           <h3 className="mt-4 text-sm font-bold text-foreground">
-            {announcements.length === 0 ? "No announcements yet" : "No notices found"}
+            {announcements.length === 0 ? 'No announcements yet' : 'No notices found'}
           </h3>
           <p className="mt-1 max-w-sm text-sm text-muted-foreground">
-            {search || filter !== "ALL"
-              ? "Try a different search term or category."
-              : "New school notices will appear here when they are published."}
+            {search || filter !== 'ALL'
+              ? 'Try a different search term or category.'
+              : 'New school notices will appear here when they are published.'}
           </p>
-          {(search || filter !== "ALL") && (
+          {(search || filter !== 'ALL') && (
             <button
               type="button"
-              onClick={() => { setSearch(""); setFilter("ALL"); }}
+              onClick={() => {
+                setSearch('');
+                setFilter('ALL');
+              }}
               className="mt-4 rounded-lg border border-border px-3 py-2 text-sm font-semibold hover:bg-muted"
             >
               Clear filters
@@ -230,31 +240,44 @@ export function StudentAnnouncementsView() {
                 type="button"
                 onClick={() => openAnnouncement(item)}
                 className={cn(
-                  "w-full rounded-2xl border bg-card p-5 text-left shadow-sm transition hover:border-primary/40 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                  item.isPinned ? "border-primary/40" : "border-border",
-                  isRead && "opacity-75",
+                  'w-full rounded-2xl border bg-card p-5 text-left shadow-sm transition hover:border-primary/40 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                  item.isPinned ? 'border-primary/40' : 'border-border',
+                  isRead && 'opacity-75',
                 )}
               >
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="flex flex-wrap items-center gap-2">
-                    {!isRead && <span className="size-2 rounded-full bg-primary" aria-label="Unread" />}
+                    {!isRead && (
+                      <span className="size-2 rounded-full bg-primary" aria-label="Unread" />
+                    )}
                     {item.isPinned && (
                       <span className="inline-flex items-center gap-1 rounded-md bg-primary/10 px-2 py-1 text-xs font-semibold text-primary">
                         <Pin className="size-3" /> Pinned
                       </span>
                     )}
-                    <span className={cn("rounded-md px-2 py-1 text-xs font-semibold", colors.background, colors.foreground)}>
+                    <span
+                      className={cn(
+                        'rounded-md px-2 py-1 text-xs font-semibold',
+                        colors.background,
+                        colors.foreground,
+                      )}
+                    >
                       {announcementCategoryLabel(item.category)}
                     </span>
                   </div>
-                  <span className="text-xs text-muted-foreground">{announcementDate(item.createdAt)}</span>
+                  <span className="text-xs text-muted-foreground">
+                    {announcementDate(item.createdAt)}
+                  </span>
                 </div>
                 <h3 className="mt-3 text-base font-bold text-foreground">{item.title}</h3>
                 <p className="mt-1.5 line-clamp-2 whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">
                   {item.content}
                 </p>
                 <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-border pt-3 text-xs text-muted-foreground">
-                  <span>Published by <strong className="font-semibold text-foreground">{item.author.name}</strong></span>
+                  <span>
+                    Published by{' '}
+                    <strong className="font-semibold text-foreground">{item.author.name}</strong>
+                  </span>
                   <span>{announcementTargetLabel(item.target)}</span>
                 </div>
               </button>
@@ -266,8 +289,12 @@ export function StudentAnnouncementsView() {
       <PortalModal
         isOpen={!!selected}
         onClose={() => setSelected(null)}
-        title={selected?.title ?? "Announcement"}
-        description={selected ? `${announcementCategoryLabel(selected.category)} · ${announcementDate(selected.createdAt)} · Published by ${selected.author.name}` : undefined}
+        title={selected?.title ?? 'Announcement'}
+        description={
+          selected
+            ? `${announcementCategoryLabel(selected.category)} · ${announcementDate(selected.createdAt)} · Published by ${selected.author.name}`
+            : undefined
+        }
         maxWidth="lg"
       >
         {selected && (
@@ -278,14 +305,22 @@ export function StudentAnnouncementsView() {
                   <Pin className="size-3" /> Pinned
                 </span>
               )}
-              <span className={cn("rounded-md px-2 py-1 text-xs font-semibold", ANNOUNCEMENT_CATEGORY_STYLES[selected.category].background, ANNOUNCEMENT_CATEGORY_STYLES[selected.category].foreground)}>
+              <span
+                className={cn(
+                  'rounded-md px-2 py-1 text-xs font-semibold',
+                  ANNOUNCEMENT_CATEGORY_STYLES[selected.category].background,
+                  ANNOUNCEMENT_CATEGORY_STYLES[selected.category].foreground,
+                )}
+              >
                 {announcementCategoryLabel(selected.category)}
               </span>
               <span className="rounded-md bg-muted px-2 py-1 text-xs font-medium text-muted-foreground">
                 {announcementTargetLabel(selected.target)}
               </span>
             </div>
-            <p className="whitespace-pre-wrap text-sm leading-7 text-foreground">{selected.content}</p>
+            <p className="whitespace-pre-wrap text-sm leading-7 text-foreground">
+              {selected.content}
+            </p>
             <div className="flex justify-end border-t border-border pt-4">
               <button
                 type="button"

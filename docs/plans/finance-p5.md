@@ -1,6 +1,6 @@
 # Finance P5 — cash, bank and mobile-money reconciliation
 
-Source: *SchoolHub Finance: Hardening and Completion Plan* (26 October 2026), Phase 5.
+Source: _SchoolHub Finance: Hardening and Completion Plan_ (26 October 2026), Phase 5.
 
 ## Preconditions (blocking)
 

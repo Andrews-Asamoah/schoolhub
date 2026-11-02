@@ -7,7 +7,7 @@ Target and merge branch: **dev** (never main). No real WIS data was imported.
 1. A school manager or assigned subject teacher requests a correction to a **published** Mock 1/Mock 2 report, identifying the candidate, subject, replacement mark or explicit absence, base report version, and a mandatory explanation.
 2. The server verifies tenant, class, candidate, paper maximum, snapshot hash, exact previous value and current published version. One pending request per mock prevents overlapping rank recalculations.
 3. A **different** authenticated headteacher approves or rejects with a separate reason. Neither the requester nor an ordinary teacher can approve.
-4. An approved request creates *new report versions for the entire candidate cohort*, recalculating each average and competition rank from the **frozen previously published** grading bands. The original source score, approvals and PDF remain immutable. No locked InternalExamMark rows are overwritten.
+4. An approved request creates _new report versions for the entire candidate cohort_, recalculating each average and competition rank from the **frozen previously published** grading bands. The original source score, approvals and PDF remain immutable. No locked InternalExamMark rows are overwritten.
 5. Every new version returns to GENERATED. The assigned class teacher then submits a recommendation, followed by a distinct headteacher approval. Management republishes the fully approved cohort atomically. The portal shows only the newest published report for each pupil/mock; older releases remain retained for staff audit.
 6. A rejected request remains in the immutable audit history; no new versions are created.
 

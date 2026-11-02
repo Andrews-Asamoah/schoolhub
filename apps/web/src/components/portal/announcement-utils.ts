@@ -2,7 +2,7 @@ import type {
   AnnouncementCategory,
   AnnouncementStatus,
   AnnouncementTarget,
-} from "@schoolhub/shared";
+} from '@schoolhub/shared';
 
 export interface AnnouncementItem {
   id: string;
@@ -23,53 +23,57 @@ export const ANNOUNCEMENT_CATEGORY_STYLES: Record<
   AnnouncementCategory,
   { background: string; foreground: string }
 > = {
-  ACADEMIC: { background: "bg-info/10", foreground: "text-info" },
-  EVENT: { background: "bg-highlight/10", foreground: "text-highlight" },
-  HOUSE: { background: "bg-warning/10", foreground: "text-warning" },
-  GENERAL: { background: "bg-muted", foreground: "text-muted-foreground" },
+  ACADEMIC: { background: 'bg-info/10', foreground: 'text-info' },
+  EVENT: { background: 'bg-highlight/10', foreground: 'text-highlight' },
+  HOUSE: { background: 'bg-warning/10', foreground: 'text-warning' },
+  GENERAL: { background: 'bg-muted', foreground: 'text-muted-foreground' },
 };
 
 export const ANNOUNCEMENT_TARGET_OPTIONS: {
   value: AnnouncementTarget;
   label: string;
 }[] = [
-  { value: "ALL_STUDENTS", label: "All Students" },
-  { value: "SELECTED_CLASSES", label: "Students in Selected Classes" },
-  { value: "SELECTED_CLASS_GUARDIANS", label: "Parents / Guardians of Selected Classes" },
-  { value: "SCHOOL_HOUSES", label: "All School Houses" },
-  { value: "SCHOOL_COMMUNITY", label: "Entire School Community" },
-  { value: "PARENTS_GUARDIANS", label: "All Parents & Guardians" },
-  { value: "TEACHERS", label: "All Teachers" },
-  { value: "OUTSTANDING_FEE_GUARDIANS", label: "Parents / Guardians with Outstanding Fees" },
+  { value: 'ALL_STUDENTS', label: 'All Students' },
+  { value: 'SELECTED_CLASSES', label: 'Students in Selected Classes' },
+  { value: 'SELECTED_CLASS_GUARDIANS', label: 'Parents / Guardians of Selected Classes' },
+  { value: 'SCHOOL_HOUSES', label: 'All School Houses' },
+  { value: 'SCHOOL_COMMUNITY', label: 'Entire School Community' },
+  { value: 'PARENTS_GUARDIANS', label: 'All Parents & Guardians' },
+  { value: 'TEACHERS', label: 'All Teachers' },
+  { value: 'OUTSTANDING_FEE_GUARDIANS', label: 'Parents / Guardians with Outstanding Fees' },
 ];
 
 const targetLabels: Record<string, string> = {
-  ALL: "Entire School Community",
-  ALL_STUDENTS: "All Students",
-  JHS_STUDENTS: "All JHS Students (legacy audience)",
-  SELECTED_CLASSES: "Students in Selected Classes",
-  SELECTED_CLASS_GUARDIANS: "Parents / Guardians of Selected Classes",
-  SCHOOL_HOUSES: "All School Houses",
-  SCHOOL_COMMUNITY: "Entire School Community",
-  PARENTS_GUARDIANS: "All Parents & Guardians",
-  TEACHERS: "All Teachers",
-  OUTSTANDING_FEE_GUARDIANS: "Parents / Guardians with Outstanding Fees",
+  ALL: 'Entire School Community',
+  ALL_STUDENTS: 'All Students',
+  JHS_STUDENTS: 'All JHS Students (legacy audience)',
+  SELECTED_CLASSES: 'Students in Selected Classes',
+  SELECTED_CLASS_GUARDIANS: 'Parents / Guardians of Selected Classes',
+  SCHOOL_HOUSES: 'All School Houses',
+  SCHOOL_COMMUNITY: 'Entire School Community',
+  PARENTS_GUARDIANS: 'All Parents & Guardians',
+  TEACHERS: 'All Teachers',
+  OUTSTANDING_FEE_GUARDIANS: 'Parents / Guardians with Outstanding Fees',
 };
 
 export function announcementTargetLabel(target: string) {
-  const key = target.trim().toUpperCase().replace(/[^A-Z0-9]+/g, "_").replace(/^_|_$/g, "");
+  const key = target
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, '_')
+    .replace(/^_|_$/g, '');
   return targetLabels[key] ?? target;
 }
 
 export function announcementDate(date: string) {
   const value = new Date(date);
-  if (Number.isNaN(value.getTime())) return "Date unavailable";
+  if (Number.isNaN(value.getTime())) return 'Date unavailable';
   return new Intl.DateTimeFormat(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
   }).format(value);
 }
 
@@ -79,6 +83,6 @@ export function announcementCategoryLabel(category: AnnouncementCategory) {
 
 /** Includes the active portal role so role-specific announcement results never share a cache. */
 export function announcementQueryRoleKey() {
-  if (typeof window === "undefined") return "server";
-  return window.localStorage.getItem("schoolhub-active-role") ?? "default";
+  if (typeof window === 'undefined') return 'server';
+  return window.localStorage.getItem('schoolhub-active-role') ?? 'default';
 }

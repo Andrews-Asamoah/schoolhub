@@ -1,18 +1,14 @@
-import { sendAccountVerification } from "./verification-mail.js";
-import { originPolicy } from "../common/origin-policy.js";
-import { betterAuth } from "better-auth";
-import { prismaAdapter } from "better-auth/adapters/prisma";
-import { bearer, organization, twoFactor } from "better-auth/plugins";
-import { APIError, createAuthMiddleware, getSessionFromCtx } from "better-auth/api";
-import { isTemporaryPasswordExpired } from "../common/guards/password-change.js";
-import {
-  PASSWORD_MAX_LENGTH,
-  PASSWORD_MIN_LENGTH,
-  passwordSchema,
-} from "@schoolhub/shared";
+import { sendAccountVerification } from './verification-mail.js';
+import { originPolicy } from '../common/origin-policy.js';
+import { betterAuth } from 'better-auth';
+import { prismaAdapter } from 'better-auth/adapters/prisma';
+import { bearer, organization, twoFactor } from 'better-auth/plugins';
+import { APIError, createAuthMiddleware, getSessionFromCtx } from 'better-auth/api';
+import { isTemporaryPasswordExpired } from '../common/guards/password-change.js';
+import { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH, passwordSchema } from '@schoolhub/shared';
 
 /** Better Auth endpoints that accept a brand-new password from the client. */
-const PASSWORD_SETTING_PATHS = new Set(["/change-password", "/reset-password", "/set-password"]);
+const PASSWORD_SETTING_PATHS = new Set(['/change-password', '/reset-password', '/set-password']);
 
 /** Platform super-admin sessions are short-lived: re-authenticate every working day. */
 const SUPER_ADMIN_SESSION_SECONDS = 60 * 60 * 8;
@@ -25,15 +21,15 @@ type PrismaLike = Parameters<typeof prismaAdapter>[0];
  * (email/SMS code) flow is not configured.
  */
 const DISABLED_TWO_FACTOR_PATHS = new Set([
-  "/two-factor/get-totp-uri",
-  "/two-factor/send-otp",
-  "/two-factor/verify-otp",
+  '/two-factor/get-totp-uri',
+  '/two-factor/send-otp',
+  '/two-factor/verify-otp',
 ]);
 
 /** Better Auth endpoints that change a user's second-factor setup; each is audited. */
 const TWO_FACTOR_AUDITED: Record<string, string> = {
-  "/two-factor/disable": "auth.two-factor.disabled",
-  "/two-factor/generate-backup-codes": "auth.two-factor.backup-codes-regenerated",
+  '/two-factor/disable': 'auth.two-factor.disabled',
+  '/two-factor/generate-backup-codes': 'auth.two-factor.backup-codes-regenerated',
 };
 
 /** Subset of the Prisma client used for security audit writes made from auth hooks. */
@@ -58,7 +54,7 @@ async function recordAuthAudit(
     data: {
       userId: entry.userId,
       schoolId: membership?.organization.school?.id ?? null,
-      action: "ACCESS_CHANGED",
+      action: 'ACCESS_CHANGED',
       entityType: entry.entityType,
       entityId: entry.userId,
       ipAddress: entry.ip,
@@ -77,7 +73,7 @@ export function createAuth(prisma: PrismaLike) {
   >();
 
   return betterAuth({
-    database: prismaAdapter(prisma, { provider: "postgresql" }),
+    database: prismaAdapter(prisma, { provider: 'postgresql' }),
     emailAndPassword: {
       enabled: true,
       // Accounts are provisioned by school staff only. Without this, anyone
@@ -106,55 +102,63 @@ export function createAuth(prisma: PrismaLike) {
       window: 60,
       max: 100,
       customRules: {
-        "/send-verification-email": { window: 3600, max: 3 },
-        "/sign-in/email": { window: 60, max: 5 },
-        "/change-password": { window: 60, max: 5 },
+        '/send-verification-email': { window: 3600, max: 3 },
+        '/sign-in/email': { window: 60, max: 5 },
+        '/change-password': { window: 60, max: 5 },
         // Guessing a 6-digit code must be slow. (A per-account lockout in the
         // plugin backs this up across IP addresses.)
-        "/two-factor/verify-totp": { window: 60, max: 5 },
-        "/two-factor/verify-backup-code": { window: 60, max: 5 },
-        "/two-factor/enable": { window: 60, max: 5 },
-        "/two-factor/disable": { window: 60, max: 5 },
-        "/two-factor/generate-backup-codes": { window: 60, max: 5 },
+        '/two-factor/verify-totp': { window: 60, max: 5 },
+        '/two-factor/verify-backup-code': { window: 60, max: 5 },
+        '/two-factor/enable': { window: 60, max: 5 },
+        '/two-factor/disable': { window: 60, max: 5 },
+        '/two-factor/generate-backup-codes': { window: 60, max: 5 },
       },
     },
     // Enforce the same complexity rules on any endpoint that sets a password.
     hooks: {
       before: createAuthMiddleware(async (ctx) => {
-        if (ctx.path === "/send-verification-email") {
+        if (ctx.path === '/send-verification-email') {
           const session = await getSessionFromCtx(ctx);
           if (!session || (session.user as { banned?: boolean }).banned) {
-            throw new APIError("UNAUTHORIZED", { message: "Sign in to verify your own email address." });
+            throw new APIError('UNAUTHORIZED', {
+              message: 'Sign in to verify your own email address.',
+            });
           }
         }
         // The application recovery flow owns atomic token consumption, credential
         // lifecycle, session revocation and auditing. Do not expose a parallel reset path.
-        if (ctx.path === "/request-password-reset" || ctx.path === "/reset-password" || ctx.path.startsWith("/reset-password/")) {
-          throw new APIError("NOT_FOUND", { message: "Not found" });
+        if (
+          ctx.path === '/request-password-reset' ||
+          ctx.path === '/reset-password' ||
+          ctx.path.startsWith('/reset-password/')
+        ) {
+          throw new APIError('NOT_FOUND', { message: 'Not found' });
         }
         if (DISABLED_TWO_FACTOR_PATHS.has(ctx.path)) {
-          throw new APIError("NOT_FOUND", { message: "Not found" });
+          throw new APIError('NOT_FOUND', { message: 'Not found' });
         }
         // An unused temporary password stops working after its expiry. Refuse
         // the sign-in itself so an expired credential can never open a session.
-        if (ctx.path === "/sign-in/email") {
+        if (ctx.path === '/sign-in/email') {
           const email = (ctx.body as { email?: unknown } | undefined)?.email;
-          if (typeof email === "string") {
-            const pending = await (prisma as unknown as {
-              user: {
-                findUnique: (args: unknown) => Promise<{
-                  mustChangePassword: boolean;
-                  temporaryPasswordExpiresAt: Date | null;
-                } | null>;
-              };
-            }).user.findUnique({
+          if (typeof email === 'string') {
+            const pending = await (
+              prisma as unknown as {
+                user: {
+                  findUnique: (args: unknown) => Promise<{
+                    mustChangePassword: boolean;
+                    temporaryPasswordExpiresAt: Date | null;
+                  } | null>;
+                };
+              }
+            ).user.findUnique({
               where: { email: email.trim().toLowerCase() },
               select: { mustChangePassword: true, temporaryPasswordExpiresAt: true },
             });
             if (pending && isTemporaryPasswordExpired(pending)) {
-              throw new APIError("FORBIDDEN", {
+              throw new APIError('FORBIDDEN', {
                 message:
-                  "Your temporary password has expired. Ask your school administrator to issue a new one.",
+                  'Your temporary password has expired. Ask your school administrator to issue a new one.',
               });
             }
           }
@@ -163,40 +167,40 @@ export function createAuth(prisma: PrismaLike) {
         // Resolve the pending 2FA challenge from Better Auth's signed cookie: a
         // password-only login has no authenticated session yet at this point.
         if (
-          ctx.path.startsWith("/two-factor/verify") &&
+          ctx.path.startsWith('/two-factor/verify') &&
           (ctx.body as { trustDevice?: unknown } | undefined)?.trustDevice === true
         ) {
           const sessionUser = ctx.context.session?.user as
-            | { id: string; role?: string }
-            | undefined;
+            { id: string; role?: string } | undefined;
           let userId = sessionUser?.id;
           if (!userId) {
-            const challengeCookie = ctx.context.createAuthCookie("two_factor");
+            const challengeCookie = ctx.context.createAuthCookie('two_factor');
             const challengeToken = await ctx.getSignedCookie(
               challengeCookie.name,
               ctx.context.secret,
             );
             if (challengeToken) {
-              const challenge = await ctx.context.internalAdapter.findVerificationValue(
-                challengeToken,
-              );
+              const challenge =
+                await ctx.context.internalAdapter.findVerificationValue(challengeToken);
               if (challenge && challenge.expiresAt > new Date()) userId = challenge.value;
             }
           }
 
           const account = userId
-            ? await (prisma as unknown as {
-                user: {
-                  findUnique: (args: unknown) => Promise<{ role: string } | null>;
-                };
-              }).user.findUnique({
+            ? await (
+                prisma as unknown as {
+                  user: {
+                    findUnique: (args: unknown) => Promise<{ role: string } | null>;
+                  };
+                }
+              ).user.findUnique({
                 where: { id: userId },
                 select: { role: true },
               })
             : null;
-          if (account?.role !== "superAdmin") {
-            throw new APIError("FORBIDDEN", {
-              message: "Trusted devices are available only to platform administrators.",
+          if (account?.role !== 'superAdmin') {
+            throw new APIError('FORBIDDEN', {
+              message: 'Trusted devices are available only to platform administrators.',
             });
           }
           const verificationDb = prisma as unknown as {
@@ -207,7 +211,7 @@ export function createAuth(prisma: PrismaLike) {
           const existingRecords = await verificationDb.verification.findMany({
             where: {
               value: userId,
-              identifier: { startsWith: "trust-device-" },
+              identifier: { startsWith: 'trust-device-' },
             },
             select: { identifier: true },
           });
@@ -220,8 +224,8 @@ export function createAuth(prisma: PrismaLike) {
         const candidate = (ctx.body as { newPassword?: unknown } | undefined)?.newPassword;
         const parsed = passwordSchema.safeParse(candidate);
         if (!parsed.success) {
-          throw new APIError("BAD_REQUEST", {
-            message: parsed.error.issues[0]?.message ?? "Password does not meet requirements",
+          throw new APIError('BAD_REQUEST', {
+            message: parsed.error.issues[0]?.message ?? 'Password does not meet requirements',
           });
         }
       }),
@@ -235,25 +239,30 @@ export function createAuth(prisma: PrismaLike) {
         // Turning off 2FA must invalidate every trusted-device record, not only
         // the cookie on the browser performing the change. Otherwise an older
         // device cookie could bypass 2FA if the account later re-enables it.
-        if (ctx.path === "/two-factor/disable") {
+        if (ctx.path === '/two-factor/disable') {
           const sessionUser = ctx.context.session?.user as { id: string } | undefined;
           if (sessionUser?.id) {
             try {
-              await (prisma as unknown as {
-                verification: { deleteMany: (args: unknown) => Promise<unknown> };
-              }).verification.deleteMany({
+              await (
+                prisma as unknown as {
+                  verification: { deleteMany: (args: unknown) => Promise<unknown> };
+                }
+              ).verification.deleteMany({
                 where: {
                   value: sessionUser.id,
-                  identifier: { startsWith: "trust-device-" },
+                  identifier: { startsWith: 'trust-device-' },
                 },
               });
             } catch (error) {
-              console.error("Trusted-device revocation after 2FA disable failed:", (error as Error).message);
+              console.error(
+                'Trusted-device revocation after 2FA disable failed:',
+                (error as Error).message,
+              );
             }
           }
         }
 
-        if (pendingTrust && ctx.path.startsWith("/two-factor/verify")) {
+        if (pendingTrust && ctx.path.startsWith('/two-factor/verify')) {
           try {
             const verificationDb = prisma as unknown as {
               verification: {
@@ -263,32 +272,35 @@ export function createAuth(prisma: PrismaLike) {
             const trustedRecords = await verificationDb.verification.findMany({
               where: {
                 value: pendingTrust.userId,
-                identifier: { startsWith: "trust-device-" },
+                identifier: { startsWith: 'trust-device-' },
               },
               select: { identifier: true },
             });
             if (trustedRecords.some((record) => !pendingTrust.identifiers.has(record.identifier))) {
               await recordAuthAudit(prisma as unknown as AuditDb, {
                 userId: pendingTrust.userId,
-                entityType: "auth.two-factor.device-trusted",
-                ip: ctx.request?.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null,
-                userAgent: ctx.request?.headers.get("user-agent") ?? null,
+                entityType: 'auth.two-factor.device-trusted',
+                ip: ctx.request?.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null,
+                userAgent: ctx.request?.headers.get('user-agent') ?? null,
               });
             }
           } catch (error) {
             // Trust must remain usable even if an audit write fails.
-            console.error("Trusted-device audit write failed:", (error as Error).message);
+            console.error('Trusted-device audit write failed:', (error as Error).message);
           }
         }
 
         let entityType = TWO_FACTOR_AUDITED[ctx.path];
         const sessionUser = ctx.context.session?.user as
-          | { id: string; twoFactorEnabled?: boolean }
-          | undefined;
+          { id: string; twoFactorEnabled?: boolean } | undefined;
         // Confirming the first code while signed in completes enrolment.
         // (Verifying at sign-in has no session yet, so it is not matched.)
-        if (ctx.path === "/two-factor/verify-totp" && sessionUser && !sessionUser.twoFactorEnabled) {
-          entityType = "auth.two-factor.enabled";
+        if (
+          ctx.path === '/two-factor/verify-totp' &&
+          sessionUser &&
+          !sessionUser.twoFactorEnabled
+        ) {
+          entityType = 'auth.two-factor.enabled';
         }
         if (!entityType || !sessionUser) return;
 
@@ -296,27 +308,27 @@ export function createAuth(prisma: PrismaLike) {
           await recordAuthAudit(prisma as unknown as AuditDb, {
             userId: sessionUser.id,
             entityType,
-            ip: ctx.request?.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null,
-            userAgent: ctx.request?.headers.get("user-agent") ?? null,
+            ip: ctx.request?.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null,
+            userAgent: ctx.request?.headers.get('user-agent') ?? null,
           });
         } catch (error) {
           // Never fail a completed security change because its audit write failed.
-          console.error("Two-factor audit write failed:", (error as Error).message);
+          console.error('Two-factor audit write failed:', (error as Error).message);
         }
       }),
     },
     user: {
       additionalFields: {
         role: {
-          type: "string",
+          type: 'string',
           required: false,
-          defaultValue: "user",
+          defaultValue: 'user',
           input: false,
         },
         // Set by the API when credentials are issued/reset; never writable
         // by the client (input: false) so it cannot be cleared via update-user.
         mustChangePassword: {
-          type: "boolean",
+          type: 'boolean',
           required: false,
           defaultValue: false,
           input: false,
@@ -324,13 +336,13 @@ export function createAuth(prisma: PrismaLike) {
         // Unused administrator-issued passwords expire; guards and the sign-in
         // hook read this.
         temporaryPasswordExpiresAt: {
-          type: "date",
+          type: 'date',
           required: false,
           input: false,
         },
         // Exposed on the session so guards can refuse a banned account.
         banned: {
-          type: "boolean",
+          type: 'boolean',
           required: false,
           defaultValue: false,
           input: false,
@@ -343,18 +355,20 @@ export function createAuth(prisma: PrismaLike) {
       session: {
         create: {
           before: async (session) => {
-            const account = await (prisma as unknown as {
-              user: {
-                findUnique: (args: unknown) => Promise<{ banned: boolean; role: string } | null>;
-              };
-            }).user.findUnique({
+            const account = await (
+              prisma as unknown as {
+                user: {
+                  findUnique: (args: unknown) => Promise<{ banned: boolean; role: string } | null>;
+                };
+              }
+            ).user.findUnique({
               where: { id: session.userId },
               select: { banned: true, role: true },
             });
             if (account?.banned) {
-              throw new APIError("FORBIDDEN", { message: "This account has been suspended." });
+              throw new APIError('FORBIDDEN', { message: 'This account has been suspended.' });
             }
-            if (account?.role === "superAdmin") {
+            if (account?.role === 'superAdmin') {
               const cap = new Date(Date.now() + SUPER_ADMIN_SESSION_SECONDS * 1000);
               const expiresAt =
                 session.expiresAt && session.expiresAt < cap ? session.expiresAt : cap;
@@ -367,18 +381,16 @@ export function createAuth(prisma: PrismaLike) {
     },
     trustedOrigins,
     advanced: {
-      useSecureCookies: process.env.NODE_ENV === "production",
-      ...(cookieDomain
-        ? { crossSubDomainCookies: { enabled: true, domain: cookieDomain } }
-        : {}),
+      useSecureCookies: process.env.NODE_ENV === 'production',
+      ...(cookieDomain ? { crossSubDomainCookies: { enabled: true, domain: cookieDomain } } : {}),
     },
     plugins: [
       organization(), // each school = one organization
       bearer(), // token auth for mobile and desktop
       twoFactor({
-        issuer: process.env.TWO_FACTOR_ISSUER ?? "SchoolHub",
+        issuer: process.env.TWO_FACTOR_ISSUER ?? 'SchoolHub',
         totpOptions: { digits: 6, period: 30 },
-        backupCodeOptions: { amount: 10, length: 10, storeBackupCodes: "encrypted" },
+        backupCodeOptions: { amount: 10, length: 10, storeBackupCodes: 'encrypted' },
         // Five wrong codes in a row locks the account's second factor for 15
         // minutes, across every device and challenge.
         accountLockout: { enabled: true, maxFailedAttempts: 5, durationSeconds: 15 * 60 },

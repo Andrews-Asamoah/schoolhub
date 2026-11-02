@@ -4,16 +4,16 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
-} from "@nestjs/common";
-import { Prisma } from "@prisma/client";
+} from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import type {
   CreateSchoolAssignmentInput,
   GradeSchoolAssignmentInput,
   SubmitSchoolAssignmentInput,
-} from "./assignments.schemas.js";
-import { PrismaService } from "../../prisma/prisma.service.js";
-import { TeacherScopeService } from "../../common/scope/teacher-scope.service.js";
-import { canEnterMarks } from "../../common/scope/teacher-access.js";
+} from './assignments.schemas.js';
+import { PrismaService } from '../../prisma/prisma.service.js';
+import { TeacherScopeService } from '../../common/scope/teacher-scope.service.js';
+import { canEnterMarks } from '../../common/scope/teacher-access.js';
 
 @Injectable()
 export class AssignmentsService {
@@ -37,7 +37,9 @@ export class AssignmentsService {
     });
     const term = year?.terms[0];
     if (!year || !term) {
-      throw new BadRequestException("Select a current academic year and term before using assignments.");
+      throw new BadRequestException(
+        'Select a current academic year and term before using assignments.',
+      );
     }
     return { academicYear: { id: year.id, name: year.name }, term };
   }
@@ -47,7 +49,7 @@ export class AssignmentsService {
       where: { schoolId, deletedAt: null, profile: { userId } },
       select: { id: true },
     });
-    if (!student) throw new NotFoundException("Student record not found.");
+    if (!student) throw new NotFoundException('Student record not found.');
     return student;
   }
 
@@ -55,10 +57,10 @@ export class AssignmentsService {
     return this.prisma.client.enrollment.findFirst({
       where: {
         studentId,
-        status: "ACTIVE",
+        status: 'ACTIVE',
         term: { isCurrent: true, academicYear: { isCurrent: true, schoolId } },
       },
-      orderBy: { enrolledAt: "desc" },
+      orderBy: { enrolledAt: 'desc' },
       select: {
         classId: true,
         academicYearId: true,
@@ -81,16 +83,24 @@ export class AssignmentsService {
         classId: enrollment.classId,
         academicYearId: enrollment.academicYearId,
         termId: enrollment.termId,
-        status: "PUBLISHED",
+        status: 'PUBLISHED',
       },
-      orderBy: [{ dueAt: "asc" }, { createdAt: "desc" }],
+      orderBy: [{ dueAt: 'asc' }, { createdAt: 'desc' }],
       include: {
         subject: { select: { id: true, name: true, code: true } },
         createdBy: { select: { id: true, name: true } },
         submissions: {
           where: { studentId: student.id },
           take: 1,
-          select: { id: true, responseText: true, status: true, score: true, feedback: true, submittedAt: true, gradedAt: true },
+          select: {
+            id: true,
+            responseText: true,
+            status: true,
+            score: true,
+            feedback: true,
+            submittedAt: true,
+            gradedAt: true,
+          },
         },
       },
     });
@@ -110,7 +120,10 @@ export class AssignmentsService {
         subject: row.subject,
         teacher: row.createdBy,
         submission: row.submissions[0]
-          ? { ...row.submissions[0], score: row.submissions[0].score === null ? null : Number(row.submissions[0].score) }
+          ? {
+              ...row.submissions[0],
+              score: row.submissions[0].score === null ? null : Number(row.submissions[0].score),
+            }
           : null,
       })),
     };
@@ -122,26 +135,29 @@ export class AssignmentsService {
       schoolId,
       academicYearId: current.academicYear.id,
       termId: current.term.id,
-      status: { not: "ARCHIVED" },
+      status: { not: 'ARCHIVED' },
     };
 
-    if (role === "teacher") {
+    if (role === 'teacher') {
       const scope = await this.teacherScope.getAssignments(schoolId, userId);
       if (!scope.subjectAssignments.length) {
         return { academicYear: current.academicYear, term: current.term, assignments: [] };
       }
-      baseWhere.OR = scope.subjectAssignments.map(({ classId, subjectId }) => ({ classId, subjectId }));
+      baseWhere.OR = scope.subjectAssignments.map(({ classId, subjectId }) => ({
+        classId,
+        subjectId,
+      }));
     }
 
     const rows = await this.prisma.client.schoolAssignment.findMany({
       where: baseWhere,
-      orderBy: [{ dueAt: "asc" }, { createdAt: "desc" }],
+      orderBy: [{ dueAt: 'asc' }, { createdAt: 'desc' }],
       include: {
         class: { select: { id: true, name: true, level: true } },
         subject: { select: { id: true, name: true, code: true } },
         createdBy: { select: { id: true, name: true } },
         submissions: {
-          orderBy: { submittedAt: "desc" },
+          orderBy: { submittedAt: 'desc' },
           include: {
             student: {
               select: {
@@ -172,9 +188,14 @@ export class AssignmentsService {
     };
   }
 
-  async create(schoolId: string, userId: string, role: string | undefined, input: CreateSchoolAssignmentInput) {
-    if (!["owner", "admin", "headteacher", "teacher"].includes(role ?? "")) {
-      throw new ForbiddenException("Your role cannot publish assignments.");
+  async create(
+    schoolId: string,
+    userId: string,
+    role: string | undefined,
+    input: CreateSchoolAssignmentInput,
+  ) {
+    if (!['owner', 'admin', 'headteacher', 'teacher'].includes(role ?? '')) {
+      throw new ForbiddenException('Your role cannot publish assignments.');
     }
     const current = await this.currentTerm(schoolId);
     const [schoolClass, subject] = await Promise.all([
@@ -193,27 +214,29 @@ export class AssignmentsService {
         select: { id: true, name: true },
       }),
     ]);
-    if (!schoolClass) throw new NotFoundException("Active class not found in this school.");
-    if (!subject) throw new NotFoundException("Active subject not found in this school.");
+    if (!schoolClass) throw new NotFoundException('Active class not found in this school.');
+    if (!subject) throw new NotFoundException('Active subject not found in this school.');
 
     const classSubject = await this.prisma.client.classSubject.findFirst({
       where: { classId: schoolClass.id, subjectId: subject.id },
       select: { id: true },
     });
     if (!classSubject) {
-      throw new BadRequestException("The selected subject is not assigned to this class.");
+      throw new BadRequestException('The selected subject is not assigned to this class.');
     }
 
-    if (role === "teacher") {
+    if (role === 'teacher') {
       const scope = await this.teacherScope.getAssignments(schoolId, userId);
       if (!canEnterMarks(role, scope, schoolClass.id, subject.id)) {
-        throw new ForbiddenException("Teachers can only publish assignments for subjects assigned to them.");
+        throw new ForbiddenException(
+          'Teachers can only publish assignments for subjects assigned to them.',
+        );
       }
     }
 
     const dueAt = input.dueAt ? new Date(input.dueAt) : null;
     if (dueAt && Number.isNaN(dueAt.getTime())) {
-      throw new BadRequestException("Enter a valid due date.");
+      throw new BadRequestException('Enter a valid due date.');
     }
 
     return this.prisma.client.$transaction(async (tx) => {
@@ -229,7 +252,7 @@ export class AssignmentsService {
           instructions: input.instructions.trim(),
           dueAt,
           maxScore: new Prisma.Decimal(input.maxScore),
-          status: "PUBLISHED",
+          status: 'PUBLISHED',
         },
         include: {
           class: { select: { id: true, name: true, level: true } },
@@ -243,7 +266,7 @@ export class AssignmentsService {
           classId: schoolClass.id,
           academicYearId: current.academicYear.id,
           termId: current.term.id,
-          status: "ACTIVE",
+          status: 'ACTIVE',
           student: { schoolId, deletedAt: null },
         },
         select: { student: { select: { profile: { select: { userId: true } } } } },
@@ -254,21 +277,33 @@ export class AssignmentsService {
           data: recipientIds.map((recipientId) => ({
             schoolId,
             userId: recipientId,
-            type: "GENERAL" as const,
+            type: 'GENERAL' as const,
             title: `New assignment: ${assignment.title}`,
             message: `${assignment.subject.name} · ${assignment.class.name}`,
-            link: "/assignments",
+            link: '/assignments',
           })),
         });
       }
-      return { ...assignment, maxScore: Number(assignment.maxScore), notifiedStudents: recipientIds.length };
+      return {
+        ...assignment,
+        maxScore: Number(assignment.maxScore),
+        notifiedStudents: recipientIds.length,
+      };
     });
   }
 
-  async submit(schoolId: string, userId: string, assignmentId: string, input: SubmitSchoolAssignmentInput) {
+  async submit(
+    schoolId: string,
+    userId: string,
+    assignmentId: string,
+    input: SubmitSchoolAssignmentInput,
+  ) {
     const student = await this.currentStudent(schoolId, userId);
     const enrollment = await this.enrollmentForCurrentTerm(schoolId, student.id);
-    if (!enrollment) throw new BadRequestException("You do not have an active class enrollment for the current term.");
+    if (!enrollment)
+      throw new BadRequestException(
+        'You do not have an active class enrollment for the current term.',
+      );
 
     const assignment = await this.prisma.client.schoolAssignment.findFirst({
       where: {
@@ -277,18 +312,21 @@ export class AssignmentsService {
         classId: enrollment.classId,
         academicYearId: enrollment.academicYearId,
         termId: enrollment.termId,
-        status: "PUBLISHED",
+        status: 'PUBLISHED',
       },
       select: { id: true, title: true, subject: { select: { name: true } }, createdById: true },
     });
-    if (!assignment) throw new NotFoundException("Published assignment not found for your current class.");
+    if (!assignment)
+      throw new NotFoundException('Published assignment not found for your current class.');
 
     const existing = await this.prisma.client.schoolAssignmentSubmission.findUnique({
       where: { assignmentId_studentId: { assignmentId, studentId: student.id } },
       select: { id: true, status: true },
     });
-    if (existing?.status === "GRADED") {
-      throw new ConflictException("This submission has already been graded and can no longer be changed.");
+    if (existing?.status === 'GRADED') {
+      throw new ConflictException(
+        'This submission has already been graded and can no longer be changed.',
+      );
     }
 
     return this.prisma.client.$transaction(async (tx) => {
@@ -299,12 +337,12 @@ export class AssignmentsService {
           studentId: student.id,
           submittedById: userId,
           responseText: input.responseText.trim(),
-          status: "SUBMITTED",
+          status: 'SUBMITTED',
         },
         update: {
           submittedById: userId,
           responseText: input.responseText.trim(),
-          status: "SUBMITTED",
+          status: 'SUBMITTED',
           score: null,
           feedback: null,
           gradedAt: null,
@@ -317,10 +355,10 @@ export class AssignmentsService {
         data: {
           schoolId,
           userId: assignment.createdById,
-          type: "GENERAL",
-          title: "Assignment submitted",
+          type: 'GENERAL',
+          title: 'Assignment submitted',
           message: `${assignment.subject.name} · ${assignment.title}`,
-          link: "/assignments",
+          link: '/assignments',
         },
       });
       return submission;
@@ -336,7 +374,7 @@ export class AssignmentsService {
     input: GradeSchoolAssignmentInput,
   ) {
     const assignment = await this.prisma.client.schoolAssignment.findFirst({
-      where: { id: assignmentId, schoolId, status: { not: "ARCHIVED" } },
+      where: { id: assignmentId, schoolId, status: { not: 'ARCHIVED' } },
       select: {
         id: true,
         classId: true,
@@ -346,12 +384,14 @@ export class AssignmentsService {
         subject: { select: { name: true } },
       },
     });
-    if (!assignment) throw new NotFoundException("Assignment not found.");
-    if (!["owner", "admin", "headteacher"].includes(role ?? "")) {
-      if (role !== "teacher") throw new ForbiddenException("Your role cannot grade assignments.");
+    if (!assignment) throw new NotFoundException('Assignment not found.');
+    if (!['owner', 'admin', 'headteacher'].includes(role ?? '')) {
+      if (role !== 'teacher') throw new ForbiddenException('Your role cannot grade assignments.');
       const scope = await this.teacherScope.getAssignments(schoolId, userId);
       if (!canEnterMarks(role, scope, assignment.classId, assignment.subjectId)) {
-        throw new ForbiddenException("Teachers can only grade submissions for their assigned subjects.");
+        throw new ForbiddenException(
+          'Teachers can only grade submissions for their assigned subjects.',
+        );
       }
     }
     if (input.score > Number(assignment.maxScore)) {
@@ -365,13 +405,13 @@ export class AssignmentsService {
         student: { select: { profile: { select: { userId: true } } } },
       },
     });
-    if (!submission) throw new NotFoundException("Assignment submission not found.");
+    if (!submission) throw new NotFoundException('Assignment submission not found.');
 
     return this.prisma.client.$transaction(async (tx) => {
       const updated = await tx.schoolAssignmentSubmission.update({
         where: { id: submission.id },
         data: {
-          status: "GRADED",
+          status: 'GRADED',
           score: new Prisma.Decimal(input.score),
           feedback: input.feedback?.trim() || null,
           gradedAt: new Date(),
@@ -383,10 +423,10 @@ export class AssignmentsService {
         data: {
           schoolId,
           userId: submission.student.profile.userId,
-          type: "GENERAL",
-          title: "Assignment graded",
-          message: assignment.subject.name + " · " + assignment.title,
-          link: "/assignments",
+          type: 'GENERAL',
+          title: 'Assignment graded',
+          message: assignment.subject.name + ' · ' + assignment.title,
+          link: '/assignments',
         },
       });
       return { ...updated, score: updated.score === null ? null : Number(updated.score) };

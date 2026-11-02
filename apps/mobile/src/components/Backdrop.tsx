@@ -1,6 +1,6 @@
-import { LinearGradient } from "expo-linear-gradient";
-import { StyleSheet, View } from "react-native";
-import { mix, useTheme, withAlpha } from "@/theme/theme";
+import { LinearGradient } from 'expo-linear-gradient';
+import { StyleSheet, View } from 'react-native';
+import { mix, useTheme, withAlpha } from '@/theme/theme';
 
 /**
  * Atmospheric background that glass sits on. Tinted by the school's colours
@@ -11,7 +11,14 @@ export function Backdrop() {
   const top = mix(colors.background, accent, isDark ? 0.16 : 0.08);
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="none">
-      <LinearGradient colors={[top, colors.background, mix(colors.background, accentSecondary, isDark ? 0.1 : 0.05)]} style={StyleSheet.absoluteFill} />
+      <LinearGradient
+        colors={[
+          top,
+          colors.background,
+          mix(colors.background, accentSecondary, isDark ? 0.1 : 0.05),
+        ]}
+        style={StyleSheet.absoluteFill}
+      />
       <LinearGradient
         colors={[withAlpha(accent, isDark ? 0.45 : 0.3), withAlpha(accent, 0)]}
         start={{ x: 0.2, y: 0.1 }}
@@ -28,4 +35,4 @@ export function Backdrop() {
   );
 }
 
-const styles = StyleSheet.create({ orb: { position: "absolute", borderRadius: 999 } });
+const styles = StyleSheet.create({ orb: { position: 'absolute', borderRadius: 999 } });

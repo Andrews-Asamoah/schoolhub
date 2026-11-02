@@ -3,15 +3,15 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
-} from "@nestjs/common";
-import { Prisma } from "@prisma/client";
-import type { SaveAssessmentEntryInput } from "@schoolhub/shared";
-import { PrismaService } from "../../prisma/prisma.service.js";
-import { canEnterMarks, canViewMarks, isSchoolManager } from "../../common/scope/teacher-access.js";
+} from '@nestjs/common';
+import { Prisma } from '@prisma/client';
+import type { SaveAssessmentEntryInput } from '@schoolhub/shared';
+import { PrismaService } from '../../prisma/prisma.service.js';
+import { canEnterMarks, canViewMarks, isSchoolManager } from '../../common/scope/teacher-access.js';
 import {
   TeacherScopeService,
   type TeacherAssignments,
-} from "../../common/scope/teacher-scope.service.js";
+} from '../../common/scope/teacher-scope.service.js';
 import {
   computeStudentResult,
   rankByPercentage,
@@ -19,9 +19,13 @@ import {
   validateMarks,
   type EntryComponent,
   type GradeBand,
-} from "./assessment-entry.js";
+} from './assessment-entry.js';
 
-const NO_ASSIGNMENTS: TeacherAssignments = { teacherId: null, classTeacherClassIds: [], subjectAssignments: [] };
+const NO_ASSIGNMENTS: TeacherAssignments = {
+  teacherId: null,
+  classTeacherClassIds: [],
+  subjectAssignments: [],
+};
 const round2 = (value: number) => Math.round(value * 100) / 100;
 
 /** Entering and reading a class's marks for one subject, with the access rules applied. */
@@ -41,12 +45,13 @@ export class AssessmentEntryService {
   ) {
     const ctx = await this.loadContext(schoolId, userId, role, query.classId, query.subjectId);
     if (!canViewMarks(role, ctx.assignments, query.classId, query.subjectId)) {
-      throw new ForbiddenException("You do not teach this subject in this class.");
+      throw new ForbiddenException('You do not teach this subject in this class.');
     }
     const canEditRole = canEnterMarks(role, ctx.assignments, query.classId, query.subjectId);
 
     const templates = ctx.templates;
-    const selected = templates.find((template) => template.id === query.templateId) ?? templates[0] ?? null;
+    const selected =
+      templates.find((template) => template.id === query.templateId) ?? templates[0] ?? null;
 
     const base = {
       class: ctx.klass,
@@ -60,7 +65,8 @@ export class AssessmentEntryService {
         template: null,
         students: [],
         canEdit: false,
-        readOnlyReason: "No assessment applies to this class and subject yet. Ask an administrator to set one up.",
+        readOnlyReason:
+          'No assessment applies to this class and subject yet. Ask an administrator to set one up.',
       };
     }
 
@@ -72,7 +78,9 @@ export class AssessmentEntryService {
           id: true,
           studentId: true,
           isLocked: true,
-          componentScores: { select: { componentId: true, occurrenceIndex: true, marksObtained: true } },
+          componentScores: {
+            select: { componentId: true, occurrenceIndex: true, marksObtained: true },
+          },
         },
       }),
     ]);
@@ -99,15 +107,20 @@ export class AssessmentEntryService {
       };
     });
     const ranks = rankByPercentage(
-      students.map((student) => ({ id: student.studentId, percentage: student.complete ? student.percentage : null })),
+      students.map((student) => ({
+        id: student.studentId,
+        percentage: student.complete ? student.percentage : null,
+      })),
     );
     for (const student of students) student.position = ranks.get(student.studentId) ?? null;
 
     let readOnlyReason: string | null = null;
-    if (!canEditRole) readOnlyReason = "You can view these marks, but only the teacher assigned to this subject can change them.";
-    else if (selected.isLocked) readOnlyReason = "This assessment has been locked.";
+    if (!canEditRole)
+      readOnlyReason =
+        'You can view these marks, but only the teacher assigned to this subject can change them.';
+    else if (selected.isLocked) readOnlyReason = 'This assessment has been locked.';
     else if (selected.deadline && selected.deadline < new Date() && !isSchoolManager(role)) {
-      readOnlyReason = "The deadline for this assessment has passed.";
+      readOnlyReason = 'The deadline for this assessment has passed.';
     }
 
     return {
@@ -141,28 +154,41 @@ export class AssessmentEntryService {
   ) {
     const ctx = await this.loadContext(schoolId, userId, role, input.classId, input.subjectId);
     if (!canEnterMarks(role, ctx.assignments, input.classId, input.subjectId)) {
-      throw new ForbiddenException("Only the teacher assigned to this subject in this class can enter marks.");
+      throw new ForbiddenException(
+        'Only the teacher assigned to this subject in this class can enter marks.',
+      );
     }
     const template = ctx.templates.find((item) => item.id === input.templateId);
-    if (!template) throw new BadRequestException("That assessment does not apply to this class and subject.");
-    if (template.isLocked) throw new ForbiddenException("This assessment has been locked.");
+    if (!template)
+      throw new BadRequestException('That assessment does not apply to this class and subject.');
+    if (template.isLocked) throw new ForbiddenException('This assessment has been locked.');
     if (template.deadline && template.deadline < new Date() && !isSchoolManager(role)) {
-      throw new ForbiddenException("The deadline for this assessment has passed.");
+      throw new ForbiddenException('The deadline for this assessment has passed.');
     }
 
     const roster = await this.loadRoster(ctx.klass.id, ctx.term.id);
     const rosterIds = new Set(roster.map((student) => student.id));
     if (input.entries.some((entry) => !rosterIds.has(entry.studentId))) {
-      throw new BadRequestException("Marks can only be entered for pupils enrolled in this class this term.");
+      throw new BadRequestException(
+        'Marks can only be entered for pupils enrolled in this class this term.',
+      );
     }
     const problems = validateMarks(input.entries, template.components);
     if (problems.length) {
-      throw new BadRequestException(problems.slice(0, 3).map((problem) => problem.message).join(" "));
+      throw new BadRequestException(
+        problems
+          .slice(0, 3)
+          .map((problem) => problem.message)
+          .join(' '),
+      );
     }
 
-    const componentById = new Map(template.components.map((component) => [component.id, component]));
-    const byStudent = new Map<string, SaveAssessmentEntryInput["entries"]>();
-    for (const entry of input.entries) byStudent.set(entry.studentId, [...(byStudent.get(entry.studentId) ?? []), entry]);
+    const componentById = new Map(
+      template.components.map((component) => [component.id, component]),
+    );
+    const byStudent = new Map<string, SaveAssessmentEntryInput['entries']>();
+    for (const entry of input.entries)
+      byStudent.set(entry.studentId, [...(byStudent.get(entry.studentId) ?? []), entry]);
 
     await this.prisma.client.$transaction(
       async (tx) => {
@@ -179,7 +205,7 @@ export class AssessmentEntryService {
             select: { id: true, isLocked: true },
           });
           if (score?.isLocked && !isSchoolManager(role)) {
-            throw new ForbiddenException("These marks have been locked.");
+            throw new ForbiddenException('These marks have been locked.');
           }
           if (!score && entries.every((entry) => entry.marks == null)) continue;
           score ??= await tx.assessmentScore.create({
@@ -205,7 +231,11 @@ export class AssessmentEntryService {
             };
             if (entry.marks == null) {
               await tx.componentScore.deleteMany({
-                where: { assessmentScoreId: score.id, componentId: entry.componentId, occurrenceIndex: entry.occurrenceIndex },
+                where: {
+                  assessmentScoreId: score.id,
+                  componentId: entry.componentId,
+                  occurrenceIndex: entry.occurrenceIndex,
+                },
               });
               continue;
             }
@@ -221,7 +251,12 @@ export class AssessmentEntryService {
             await tx.componentScore.upsert({
               where,
               update: values,
-              create: { assessmentScoreId: score.id, componentId: entry.componentId, occurrenceIndex: entry.occurrenceIndex, ...values },
+              create: {
+                assessmentScoreId: score.id,
+                componentId: entry.componentId,
+                occurrenceIndex: entry.occurrenceIndex,
+                ...values,
+              },
             });
           }
         }
@@ -237,7 +272,9 @@ export class AssessmentEntryService {
           select: {
             id: true,
             studentId: true,
-            componentScores: { select: { componentId: true, occurrenceIndex: true, marksObtained: true } },
+            componentScores: {
+              select: { componentId: true, occurrenceIndex: true, marksObtained: true },
+            },
           },
         });
         const results = new Map<string, ReturnType<typeof computeStudentResult>>();
@@ -260,7 +297,10 @@ export class AssessmentEntryService {
           );
         }
         const ranks = rankByPercentage(
-          [...results].map(([id, result]) => ({ id, percentage: result.complete ? result.percentage : null })),
+          [...results].map(([id, result]) => ({
+            id,
+            percentage: result.complete ? result.percentage : null,
+          })),
         );
         for (const [id, result] of results) {
           await tx.assessmentScore.update({
@@ -299,27 +339,33 @@ export class AssessmentEntryService {
       where: { isCurrent: true, academicYear: { schoolId, isCurrent: true } },
       select: { id: true, name: true, termNumber: true },
     });
-    if (!term) throw new BadRequestException("No academic term is currently selected for this school.");
+    if (!term)
+      throw new BadRequestException('No academic term is currently selected for this school.');
 
     const [klass, subject, link, assignments] = await Promise.all([
       db.class.findFirst({
         where: { id: classId, schoolId, deletedAt: null },
         select: { id: true, name: true, level: true, departmentId: true },
       }),
-      db.subject.findFirst({ where: { id: subjectId, schoolId }, select: { id: true, name: true, code: true } }),
+      db.subject.findFirst({
+        where: { id: subjectId, schoolId },
+        select: { id: true, name: true, code: true },
+      }),
       db.classSubject.findFirst({ where: { classId, subjectId }, select: { id: true } }),
-      role === "teacher" ? this.teacherScope.getAssignments(schoolId, userId) : Promise.resolve(NO_ASSIGNMENTS),
+      role === 'teacher'
+        ? this.teacherScope.getAssignments(schoolId, userId)
+        : Promise.resolve(NO_ASSIGNMENTS),
     ]);
-    if (!klass) throw new NotFoundException("Class not found.");
-    if (!subject) throw new NotFoundException("Subject not found.");
+    if (!klass) throw new NotFoundException('Class not found.');
+    if (!subject) throw new NotFoundException('Subject not found.');
     if (!link) throw new BadRequestException(`${klass.name} does not take ${subject.name}.`);
 
     const rows = await db.assessmentTemplate.findMany({
       where: { schoolId, isActive: true },
       include: {
         classes: { select: { classId: true } },
-        components: { orderBy: { displayOrder: "asc" } },
-        gradingSystem: { include: { gradeScales: { orderBy: { displayOrder: "asc" } } } },
+        components: { orderBy: { displayOrder: 'asc' } },
+        gradingSystem: { include: { gradeScales: { orderBy: { displayOrder: 'asc' } } } },
       },
     });
     const templates = rows
@@ -347,17 +393,15 @@ export class AssessmentEntryService {
         name: row.name,
         isLocked: row.isLocked,
         deadline: row.deadline,
-        components: row.components.map(
-          (component): EntryComponent & { name: string } => ({
-            id: component.id,
-            name: component.name,
-            maxMarks: Number(component.maxMarks),
-            weight: Number(component.weight),
-            isRequired: component.isRequired,
-            isRepeatable: component.isRepeatable,
-            expectedCount: component.expectedCount,
-          }),
-        ),
+        components: row.components.map((component): EntryComponent & { name: string } => ({
+          id: component.id,
+          name: component.name,
+          maxMarks: Number(component.maxMarks),
+          weight: Number(component.weight),
+          isRequired: component.isRequired,
+          isRepeatable: component.isRepeatable,
+          expectedCount: component.expectedCount,
+        })),
         bands: row.gradingSystem.gradeScales.map(
           (scale): GradeBand & { description: string; maxScore: number } => ({
             grade: scale.grade,
@@ -374,10 +418,14 @@ export class AssessmentEntryService {
 
   private async loadRoster(classId: string, termId: string) {
     const enrollments = await this.prisma.client.enrollment.findMany({
-      where: { classId, termId, status: "ACTIVE", student: { deletedAt: null } },
+      where: { classId, termId, status: 'ACTIVE', student: { deletedAt: null } },
       select: {
         student: {
-          select: { id: true, admissionNumber: true, profile: { select: { firstName: true, lastName: true } } },
+          select: {
+            id: true,
+            admissionNumber: true,
+            profile: { select: { firstName: true, lastName: true } },
+          },
         },
       },
     });

@@ -1,12 +1,6 @@
-import {
-  createContext,
-  useContext,
-  useEffect,
-  useState,
-  type ReactNode,
-} from "react";
+import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 
-type Theme = "light" | "dark";
+type Theme = 'light' | 'dark';
 
 interface ThemeContextValue {
   theme: Theme;
@@ -17,13 +11,13 @@ interface ThemeContextValue {
 const ThemeContext = createContext<ThemeContextValue | null>(null);
 
 /** Keep in sync with the pre-paint script in index.html. */
-const THEME_STORAGE_KEY = "schoolhub-theme";
+const THEME_STORAGE_KEY = 'schoolhub-theme';
 
 function readStoredTheme(): Theme {
   try {
-    return window.localStorage.getItem(THEME_STORAGE_KEY) === "dark" ? "dark" : "light";
+    return window.localStorage.getItem(THEME_STORAGE_KEY) === 'dark' ? 'dark' : 'light';
   } catch {
-    return "light"; // storage can be blocked (private mode, strict settings)
+    return 'light'; // storage can be blocked (private mode, strict settings)
   }
 }
 
@@ -39,7 +33,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const root = document.documentElement;
-    root.classList.toggle("dark", theme === "dark");
+    root.classList.toggle('dark', theme === 'dark');
     root.style.colorScheme = theme;
     try {
       window.localStorage.setItem(THEME_STORAGE_KEY, theme);
@@ -53,8 +47,8 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     const onStorage = (event: StorageEvent) => {
       if (event.key === THEME_STORAGE_KEY) setTheme(readStoredTheme());
     };
-    window.addEventListener("storage", onStorage);
-    return () => window.removeEventListener("storage", onStorage);
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
   }, []);
 
   return (
@@ -62,7 +56,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       value={{
         theme,
         setTheme,
-        toggleTheme: () => setTheme((current) => (current === "dark" ? "light" : "dark")),
+        toggleTheme: () => setTheme((current) => (current === 'dark' ? 'light' : 'dark')),
       }}
     >
       {children}
@@ -73,7 +67,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 export function useTheme() {
   const context = useContext(ThemeContext);
   if (!context) {
-    throw new Error("useTheme must be used inside ThemeProvider.");
+    throw new Error('useTheme must be used inside ThemeProvider.');
   }
   return context;
 }

@@ -1,13 +1,13 @@
-import { useId } from "react";
-import type { SchoolHubtelConnectionInput } from "@schoolhub/shared";
+import { useId } from 'react';
+import type { SchoolHubtelConnectionInput } from '@schoolhub/shared';
 export const emptySchoolSms = (): SchoolHubtelConnectionInput => ({
-  senderId: "",
-  clientId: "",
-  clientSecret: "",
-  apiBaseUrl: "https://sms.hubtel.com/v1/messages",
+  senderId: '',
+  clientId: '',
+  clientSecret: '',
+  apiBaseUrl: 'https://sms.hubtel.com/v1/messages',
 });
 const input =
-  "w-full min-w-0 rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring";
+  'w-full min-w-0 rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring';
 export function SchoolSmsFields({
   value,
   onChange,
@@ -24,21 +24,16 @@ export function SchoolSmsFields({
         Approved Hubtel sender ID
         <input
           aria-label="Approved Hubtel sender ID"
-          aria-describedby={fieldId + "-sender-help"}
+          aria-describedby={fieldId + '-sender-help'}
           className={input}
           required
           maxLength={11}
           pattern="[A-Za-z0-9]{1,11}"
           value={value.senderId}
-          onChange={(event) =>
-            onChange({ ...value, senderId: event.target.value })
-          }
+          onChange={(event) => onChange({ ...value, senderId: event.target.value })}
           autoComplete="off"
         />
-        <span
-          id={fieldId + "-sender-help"}
-          className="font-normal text-muted-foreground"
-        >
+        <span id={fieldId + '-sender-help'} className="font-normal text-muted-foreground">
           1–11 letters/numbers. Approval is managed in Hubtel.
         </span>
       </label>
@@ -46,28 +41,20 @@ export function SchoolSmsFields({
         Hubtel API endpoint
         <select
           aria-label="Hubtel API endpoint"
-          aria-describedby={fieldId + "-endpoint-help"}
+          aria-describedby={fieldId + '-endpoint-help'}
           className={input}
           value={value.apiBaseUrl}
           onChange={(event) =>
             onChange({
               ...value,
-              apiBaseUrl: event.target
-                .value as SchoolHubtelConnectionInput["apiBaseUrl"],
+              apiBaseUrl: event.target.value as SchoolHubtelConnectionInput['apiBaseUrl'],
             })
           }
         >
-          <option value="https://sms.hubtel.com/v1/messages">
-            sms.hubtel.com
-          </option>
-          <option value="https://smsc.hubtel.com/v1/messages">
-            smsc.hubtel.com
-          </option>
+          <option value="https://sms.hubtel.com/v1/messages">sms.hubtel.com</option>
+          <option value="https://smsc.hubtel.com/v1/messages">smsc.hubtel.com</option>
         </select>
-        <span
-          id={fieldId + "-endpoint-help"}
-          className="font-normal text-muted-foreground"
-        >
+        <span id={fieldId + '-endpoint-help'} className="font-normal text-muted-foreground">
           Choose the host shown in the school's Hubtel API details.
         </span>
       </label>
@@ -78,9 +65,7 @@ export function SchoolSmsFields({
           required
           maxLength={128}
           value={value.clientId}
-          onChange={(event) =>
-            onChange({ ...value, clientId: event.target.value })
-          }
+          onChange={(event) => onChange({ ...value, clientId: event.target.value })}
           autoComplete="off"
           spellCheck={false}
         />
@@ -93,9 +78,7 @@ export function SchoolSmsFields({
           required
           maxLength={256}
           value={value.clientSecret}
-          onChange={(event) =>
-            onChange({ ...value, clientSecret: event.target.value })
-          }
+          onChange={(event) => onChange({ ...value, clientSecret: event.target.value })}
           autoComplete="new-password"
           spellCheck={false}
         />

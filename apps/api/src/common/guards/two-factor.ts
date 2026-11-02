@@ -1,10 +1,10 @@
-import { ForbiddenException } from "@nestjs/common";
+import { ForbiddenException } from '@nestjs/common';
 
 /** Machine-readable marker the web client looks for in the `error` field. */
-export const TWO_FACTOR_REQUIRED = "TWO_FACTOR_REQUIRED";
+export const TWO_FACTOR_REQUIRED = 'TWO_FACTOR_REQUIRED';
 
 /** School roles that hold administrative power over a whole school. */
-export const SCHOOL_ADMIN_ROLES = ["owner", "admin"] as const;
+export const SCHOOL_ADMIN_ROLES = ['owner', 'admin'] as const;
 
 /**
  * Platform super-admins must always use two-factor authentication. School
@@ -14,8 +14,8 @@ export const SCHOOL_ADMIN_ROLES = ["owner", "admin"] as const;
  */
 export function schoolAdminTwoFactorRequired(): boolean {
   return process.env.REQUIRE_2FA_SCHOOL_ADMINS === undefined
-    ? process.env.NODE_ENV === "production"
-    : process.env.REQUIRE_2FA_SCHOOL_ADMINS === "true";
+    ? process.env.NODE_ENV === 'production'
+    : process.env.REQUIRE_2FA_SCHOOL_ADMINS === 'true';
 }
 
 export function hasSchoolAdminRole(roles: Iterable<string>): boolean {
@@ -33,14 +33,14 @@ export function hasSchoolAdminRole(roles: Iterable<string>): boolean {
  */
 export function assertTwoFactorEnabled(
   user: { twoFactorEnabled?: unknown } | undefined,
-  audience: "super-admin" | "school-admin",
+  audience: 'super-admin' | 'school-admin',
 ) {
   if (user?.twoFactorEnabled === true) return;
   throw new ForbiddenException({
     message:
-      audience === "super-admin"
-        ? "Two-factor authentication is required for platform administrators. Set it up to continue."
-        : "Your school requires administrators to use two-factor authentication. Set it up to continue.",
+      audience === 'super-admin'
+        ? 'Two-factor authentication is required for platform administrators. Set it up to continue.'
+        : 'Your school requires administrators to use two-factor authentication. Set it up to continue.',
     error: TWO_FACTOR_REQUIRED,
     audience,
   });

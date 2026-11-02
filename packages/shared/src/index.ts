@@ -1,18 +1,18 @@
-import { z } from "zod";
+import { z } from 'zod';
 
 // ============================================================================
 // ROLES & ACCESS
 // ============================================================================
 
 export const ROLES = [
-  "owner",
-  "admin",
-  "headteacher",
-  "teacher",
-  "accountant",
-  "staff",
-  "student",
-  "guardian",
+  'owner',
+  'admin',
+  'headteacher',
+  'teacher',
+  'accountant',
+  'staff',
+  'student',
+  'guardian',
 ] as const;
 export type Role = (typeof ROLES)[number];
 
@@ -32,25 +32,25 @@ export const passwordSchema = z
   .string()
   .min(PASSWORD_MIN_LENGTH, `Use at least ${PASSWORD_MIN_LENGTH} characters`)
   .max(PASSWORD_MAX_LENGTH, `Use at most ${PASSWORD_MAX_LENGTH} characters`)
-  .regex(/[a-z]/, "Include a lowercase letter")
-  .regex(/[A-Z]/, "Include an uppercase letter")
-  .regex(/[0-9]/, "Include a number");
+  .regex(/[a-z]/, 'Include a lowercase letter')
+  .regex(/[A-Z]/, 'Include an uppercase letter')
+  .regex(/[0-9]/, 'Include a number');
 
 /** Trimmed, lower-cased, validated email (uses the Zod 4 top-level `z.email()`). */
 export const emailSchema = z
   .string()
   .trim()
   .toLowerCase()
-  .pipe(z.email("Enter a valid email address"));
+  .pipe(z.email('Enter a valid email address'));
 
 export const changePasswordSchema = z
   .object({
-    currentPassword: z.string().min(1, "Enter your current password").max(PASSWORD_MAX_LENGTH),
+    currentPassword: z.string().min(1, 'Enter your current password').max(PASSWORD_MAX_LENGTH),
     newPassword: passwordSchema,
   })
   .refine((value) => value.newPassword !== value.currentPassword, {
-    path: ["newPassword"],
-    message: "Choose a password different from your current one",
+    path: ['newPassword'],
+    message: 'Choose a password different from your current one',
   });
 export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;
 
@@ -69,7 +69,7 @@ export interface IssuedCredentials {
   mustChangePassword: true;
 }
 
-export const STUDENT_LOGIN_EMAIL_DOMAIN = "schoolhub.gh";
+export const STUDENT_LOGIN_EMAIL_DOMAIN = 'schoolhub.gh';
 
 /** Deterministic, globally unique login email for a student account. */
 export function studentLoginEmail(admissionNumber: string, schoolSubdomain: string) {
@@ -84,19 +84,19 @@ export function studentLoginEmail(admissionNumber: string, schoolSubdomain: stri
  * so its students get an address under the platform domain instead.
  */
 const PUBLIC_EMAIL_DOMAINS = new Set([
-  "gmail.com",
-  "googlemail.com",
-  "yahoo.com",
-  "yahoo.co.uk",
-  "outlook.com",
-  "hotmail.com",
-  "live.com",
-  "msn.com",
-  "icloud.com",
-  "aol.com",
-  "proton.me",
-  "protonmail.com",
-  "mail.com",
+  'gmail.com',
+  'googlemail.com',
+  'yahoo.com',
+  'yahoo.co.uk',
+  'outlook.com',
+  'hotmail.com',
+  'live.com',
+  'msn.com',
+  'icloud.com',
+  'aol.com',
+  'proton.me',
+  'protonmail.com',
+  'mail.com',
 ]);
 
 /**
@@ -107,7 +107,7 @@ export function studentEmailDomain(
   schoolEmail: string | null | undefined,
   schoolSubdomain: string,
 ): string {
-  const domain = schoolEmail?.split("@")[1]?.trim().toLowerCase();
+  const domain = schoolEmail?.split('@')[1]?.trim().toLowerCase();
   if (
     domain &&
     /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/.test(domain) &&
@@ -126,7 +126,7 @@ export function guardianEmailDomain(
   schoolEmail: string | null | undefined,
   schoolSubdomain: string,
 ): string {
-  const domain = schoolEmail?.split("@")[1]?.trim().toLowerCase();
+  const domain = schoolEmail?.split('@')[1]?.trim().toLowerCase();
   if (
     domain &&
     /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/.test(domain) &&
@@ -137,20 +137,19 @@ export function guardianEmailDomain(
   return `${schoolSubdomain.trim().toLowerCase()}.${STUDENT_LOGIN_EMAIL_DOMAIN}`;
 }
 
-
 const toLetters = (value: string) =>
   value
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "") // strip accents (e.g. é -> e)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '') // strip accents (e.g. é -> e)
     .toLowerCase()
-    .replace(/[^a-z0-9]/g, "");
+    .replace(/[^a-z0-9]/g, '');
 
 /**
  * Base username: first letter of the first name + "." + surname.
  * Andrews Asamoah -> a.asamoah. Returns null when a name has no usable letters.
  */
 export function studentUsernameBase(firstName: string, surname: string): string | null {
-  const initial = toLetters(firstName).replace(/[0-9]/g, "").charAt(0);
+  const initial = toLetters(firstName).replace(/[0-9]/g, '').charAt(0);
   const last = toLetters(surname);
   if (!initial || !last) return null;
   return `${initial}.${last}`;
@@ -161,7 +160,7 @@ export function studentUsernameCandidate(base: string, attempt: number): string 
   return attempt === 0 ? base : `${base}${attempt}`;
 }
 
-export const CREDENTIAL_SUBJECT_KINDS = ["student", "teacher", "staff", "guardian"] as const;
+export const CREDENTIAL_SUBJECT_KINDS = ['student', 'teacher', 'staff', 'guardian'] as const;
 export type CredentialSubjectKind = (typeof CREDENTIAL_SUBJECT_KINDS)[number];
 
 // ============================================================================
@@ -169,22 +168,22 @@ export type CredentialSubjectKind = (typeof CREDENTIAL_SUBJECT_KINDS)[number];
 // ============================================================================
 
 export const studentGuardianSchema = z.object({
-  firstName: z.string().trim().min(1, "First name is required").max(100),
-  lastName: z.string().trim().min(1, "Last name is required").max(100),
+  firstName: z.string().trim().min(1, 'First name is required').max(100),
+  lastName: z.string().trim().min(1, 'Last name is required').max(100),
   otherNames: z.string().trim().max(100).optional(),
   phone: z.string().trim().min(5).max(30),
   alternatePhone: z.string().trim().max(30).optional(),
-  email: z.email().optional().or(z.literal("")),
-  gender: z.enum(["MALE", "FEMALE", "OTHER"]).optional(),
+  email: z.email().optional().or(z.literal('')),
+  gender: z.enum(['MALE', 'FEMALE', 'OTHER']).optional(),
   relationshipType: z.enum([
-    "FATHER",
-    "MOTHER",
-    "GUARDIAN",
-    "SIBLING",
-    "GRANDFATHER",
-    "GRANDMOTHER",
-    "RELATIVE",
-    "OTHER",
+    'FATHER',
+    'MOTHER',
+    'GUARDIAN',
+    'SIBLING',
+    'GRANDFATHER',
+    'GRANDMOTHER',
+    'RELATIVE',
+    'OTHER',
   ]),
   occupation: z.string().trim().max(100).optional(),
   employer: z.string().trim().max(100).optional(),
@@ -202,16 +201,16 @@ export type StudentGuardianInput = z.infer<typeof studentGuardianSchema>;
  * "not provided" so it never reaches the database as an invalid foreign key.
  */
 export const optionalId = z.preprocess(
-  (value) => (typeof value === "string" && value.trim() === "" ? undefined : value),
+  (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
   z.string().trim().min(1).optional(),
 );
 
 export const createStudentSchema = z.object({
-  firstName: z.string().min(1, "First name is required"),
-  lastName: z.string().min(1, "Last name is required"),
+  firstName: z.string().min(1, 'First name is required'),
+  lastName: z.string().min(1, 'Last name is required'),
   otherNames: z.string().optional(),
-  gender: z.enum(["MALE", "FEMALE", "OTHER"]).default("MALE"),
-  dateOfBirth: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Format: YYYY-MM-DD"),
+  gender: z.enum(['MALE', 'FEMALE', 'OTHER']).default('MALE'),
+  dateOfBirth: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Format: YYYY-MM-DD'),
   /** Department the student belongs to (must exist in this school). */
   departmentId: optionalId,
   /** Class to place the student in for the current (or given) term. */
@@ -220,7 +219,7 @@ export const createStudentSchema = z.object({
   academicYearId: optionalId,
   termId: optionalId,
   houseId: optionalId,
-  nationality: z.string().default("Ghanaian"),
+  nationality: z.string().default('Ghanaian'),
   residentialAddress: z.string().optional(),
   city: z.string().optional(),
   region: z.string().optional(),
@@ -232,13 +231,12 @@ export const createStudentSchema = z.object({
   medicalConditions: z.string().optional(),
   guardians: z
     .array(studentGuardianSchema)
-    .max(10, "A student can have up to 10 guardians")
+    .max(10, 'A student can have up to 10 guardians')
     .default([])
     .refine(
       (guardians) =>
-        guardians.length === 0 ||
-        guardians.filter((guardian) => guardian.isPrimary).length === 1,
-      "Choose exactly one primary guardian.",
+        guardians.length === 0 || guardians.filter((guardian) => guardian.isPrimary).length === 1,
+      'Choose exactly one primary guardian.',
     ),
 });
 export type CreateStudentInput = z.infer<typeof createStudentSchema>;
@@ -249,15 +247,7 @@ export const updateStudentSchema = createStudentSchema
   .partial();
 export const updateStudentRecordSchema = updateStudentSchema.extend({
   status: z
-    .enum([
-      "ACTIVE",
-      "GRADUATED",
-      "WITHDRAWN",
-      "SUSPENDED",
-      "TRANSFERRED",
-      "EXPELLED",
-      "DECEASED",
-    ])
+    .enum(['ACTIVE', 'GRADUATED', 'WITHDRAWN', 'SUSPENDED', 'TRANSFERRED', 'EXPELLED', 'DECEASED'])
     .optional(),
 });
 export type UpdateStudentInput = z.infer<typeof updateStudentRecordSchema>;
@@ -269,19 +259,19 @@ export const createTeacherSchema = z.object({
   /** Sign-in email. A login is always created for new teachers. */
   email: emailSchema,
   phone: z.string().trim().max(30).optional(),
-  gender: z.enum(["MALE", "FEMALE", "OTHER"]).optional(),
+  gender: z.enum(['MALE', 'FEMALE', 'OTHER']).optional(),
   dateOfBirth: z
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/)
     .optional()
-    .or(z.literal("")),
+    .or(z.literal('')),
   departmentId: z.string().min(1),
   qualification: z.string().trim().max(150).optional(),
   specialization: z.string().trim().max(150).optional(),
   experience: z.number().int().min(0).max(70).optional(),
   employmentType: z
-    .enum(["FULL_TIME", "PART_TIME", "CONTRACT", "TEMPORARY", "INTERN"])
-    .default("FULL_TIME"),
+    .enum(['FULL_TIME', 'PART_TIME', 'CONTRACT', 'TEMPORARY', 'INTERN'])
+    .default('FULL_TIME'),
   hireDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
 });
 export type CreateTeacherInput = z.infer<typeof createTeacherSchema>;
@@ -291,39 +281,37 @@ export const createStaffSchema = z.object({
   lastName: z.string().trim().min(1).max(100),
   email: emailSchema,
   phone: z.string().trim().min(5).max(30),
-  gender: z.enum(["MALE", "FEMALE", "OTHER"]),
+  gender: z.enum(['MALE', 'FEMALE', 'OTHER']),
   dateOfBirth: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   staffId: z.string().trim().max(40).optional(),
   staffNumber: z.string().trim().max(40).optional(),
   staffType: z.enum([
-    "ACCOUNTANT",
-    "HEADTEACHER",
-    "ADMIN",
-    "LIBRARIAN",
-    "DRIVER",
-    "SECURITY",
-    "NURSE",
-    "COUNSELOR",
-    "IT_SUPPORT",
-    "RECEPTIONIST",
-    "COOK",
-    "CLEANER",
-    "OTHER",
+    'ACCOUNTANT',
+    'HEADTEACHER',
+    'ADMIN',
+    'LIBRARIAN',
+    'DRIVER',
+    'SECURITY',
+    'NURSE',
+    'COUNSELOR',
+    'IT_SUPPORT',
+    'RECEPTIONIST',
+    'COOK',
+    'CLEANER',
+    'OTHER',
   ]),
   departmentId: z.string().optional(),
   jobTitle: z.string().trim().max(100).optional(),
   employmentType: z
-    .enum(["FULL_TIME", "PART_TIME", "CONTRACT", "TEMPORARY", "INTERN"])
-    .default("FULL_TIME"),
+    .enum(['FULL_TIME', 'PART_TIME', 'CONTRACT', 'TEMPORARY', 'INTERN'])
+    .default('FULL_TIME'),
   hireDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
 });
 export type CreateStaffInput = z.infer<typeof createStaffSchema>;
 
-export const createGuardianSchema = studentGuardianSchema
-  .omit({ isPrimary: true })
-  .extend({
-    studentIds: z.array(z.string().min(1)).max(100).default([]),
-  });
+export const createGuardianSchema = studentGuardianSchema.omit({ isPrimary: true }).extend({
+  studentIds: z.array(z.string().min(1)).max(100).default([]),
+});
 export type CreateGuardianInput = z.infer<typeof createGuardianSchema>;
 
 export const updatePeopleStatusSchema = z.object({
@@ -336,10 +324,10 @@ export type UpdatePeopleStatusInput = z.infer<typeof updatePeopleStatusSchema>;
 // ============================================================================
 
 export const createClassSchema = z.object({
-  name: z.string().trim().min(1, "Class name is required").max(100),
-  level: z.string().trim().min(1, "Class level is required").max(60),
+  name: z.string().trim().min(1, 'Class name is required').max(100),
+  level: z.string().trim().min(1, 'Class level is required').max(60),
   capacity: z.number().int().positive().optional(),
-  departmentId: z.string().min(1, "Department is required"),
+  departmentId: z.string().min(1, 'Department is required'),
   isGraduatingClass: z.boolean().default(false),
   isActive: z.boolean().default(true),
   order: z.number().int().optional(),
@@ -352,17 +340,15 @@ export const updateClassSchema = createClassSchema
   })
   .partial()
   .refine((value) => Object.keys(value).length > 0, {
-    message: "Provide at least one class field to update",
+    message: 'Provide at least one class field to update',
   });
 export type UpdateClassInput = z.infer<typeof updateClassSchema>;
 
 export const createClassTeacherAssignmentSchema = z.object({
   teacherId: z.string().min(1),
-  effectiveFrom: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD"),
+  effectiveFrom: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Use YYYY-MM-DD'),
 });
-export type CreateClassTeacherAssignmentInput = z.infer<
-  typeof createClassTeacherAssignmentSchema
->;
+export type CreateClassTeacherAssignmentInput = z.infer<typeof createClassTeacherAssignmentSchema>;
 
 export const createEnrollmentSchema = z
   .object({
@@ -371,41 +357,38 @@ export const createEnrollmentSchema = z
     academicYearId: z.string().min(1),
     termId: z.string().min(1),
   })
-  .refine(
-    (value) => new Set(value.studentIds).size === value.studentIds.length,
-    {
-      message: "Each student can only be selected once",
-      path: ["studentIds"],
-    },
-  );
+  .refine((value) => new Set(value.studentIds).size === value.studentIds.length, {
+    message: 'Each student can only be selected once',
+    path: ['studentIds'],
+  });
 export type CreateEnrollmentInput = z.infer<typeof createEnrollmentSchema>;
 
 export const createDepartmentSchema = z.object({
-  name: z.string().trim().min(2, "Enter a department name").max(100),
+  name: z.string().trim().min(2, 'Enter a department name').max(100),
   code: z
     .string()
     .trim()
-    .min(2, "Enter a department code")
+    .min(2, 'Enter a department code')
     .max(20)
-    .regex(/^[A-Za-z0-9-]+$/, "Use only letters, numbers, and hyphens")
+    .regex(/^[A-Za-z0-9-]+$/, 'Use only letters, numbers, and hyphens')
     .transform((value) => value.toUpperCase()),
   description: z.string().trim().max(500).optional(),
 });
 export type CreateDepartmentInput = z.infer<typeof createDepartmentSchema>;
 
 export const createHouseSchema = z.object({
-  name: z.string().trim().min(2, "Enter a house name").max(100),
+  name: z.string().trim().min(2, 'Enter a house name').max(100),
   code: z
     .string()
     .trim()
-    .min(2, "Enter a house code")
+    .min(2, 'Enter a house code')
     .max(20)
-    .regex(/^[A-Za-z0-9-]+$/, "Use only letters, numbers, and hyphens")
+    .regex(/^[A-Za-z0-9-]+$/, 'Use only letters, numbers, and hyphens')
     .transform((value) => value.toUpperCase()),
   description: z.string().trim().max(500).optional(),
   color: z
     .string()
-    .regex(/^#[0-9A-Fa-f]{6}$/, "Choose a valid hex color")
+    .regex(/^#[0-9A-Fa-f]{6}$/, 'Choose a valid hex color')
     .optional(),
   motto: z.string().trim().max(200).optional(),
   houseTeacherId: z.string().optional(),
@@ -416,7 +399,7 @@ export const updateHouseSchema = createHouseSchema.partial();
 export type UpdateHouseInput = z.infer<typeof updateHouseSchema>;
 
 export const createClubSchema = z.object({
-  name: z.string().trim().min(2, "Enter a club name").max(100),
+  name: z.string().trim().min(2, 'Enter a club name').max(100),
   description: z.string().trim().max(500).optional(),
   teacherInChargeId: z.string().optional().nullable(),
   isActive: z.boolean().default(true),
@@ -426,14 +409,14 @@ export const updateClubSchema = createClubSchema.partial();
 export type UpdateClubInput = z.infer<typeof updateClubSchema>;
 
 export const addClubMemberSchema = z.object({
-  studentId: z.string().min(1, "Select a student"),
+  studentId: z.string().min(1, 'Select a student'),
   role: z.string().trim().max(50).optional().nullable(),
 });
 export type AddClubMemberInput = z.infer<typeof addClubMemberSchema>;
 
 export const createSubjectSchema = z.object({
-  name: z.string().min(1, "Subject name is required"),
-  code: z.string().min(1, "Subject code is required"),
+  name: z.string().min(1, 'Subject name is required'),
+  code: z.string().min(1, 'Subject code is required'),
   description: z.string().optional(),
   periodsPerWeek: z.number().int().min(1).default(4),
 });
@@ -441,21 +424,17 @@ export type CreateSubjectInput = z.infer<typeof createSubjectSchema>;
 
 export const createAcademicYearSchema = z
   .object({
-    name: z.string().min(1, "Academic year name is required (e.g. 2025/2026)"),
-    startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Format: YYYY-MM-DD"),
-    endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Format: YYYY-MM-DD"),
+    name: z.string().min(1, 'Academic year name is required (e.g. 2025/2026)'),
+    startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Format: YYYY-MM-DD'),
+    endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Format: YYYY-MM-DD'),
     isCurrent: z.boolean().default(false),
     terms: z
       .array(
         z.object({
           name: z.string().trim().min(2).max(60),
           termNumber: z.number().int().min(1).max(3),
-          startDate: z
-            .string()
-            .regex(/^\d{4}-\d{2}-\d{2}$/, "Format: YYYY-MM-DD"),
-          endDate: z
-            .string()
-            .regex(/^\d{4}-\d{2}-\d{2}$/, "Format: YYYY-MM-DD"),
+          startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Format: YYYY-MM-DD'),
+          endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Format: YYYY-MM-DD'),
           isCurrent: z.boolean().default(false),
         }),
       )
@@ -465,39 +444,37 @@ export const createAcademicYearSchema = z
   .superRefine((year, context) => {
     if (year.endDate <= year.startDate) {
       context.addIssue({
-        code: "custom",
-        path: ["endDate"],
-        message: "The academic year must end after it starts.",
+        code: 'custom',
+        path: ['endDate'],
+        message: 'The academic year must end after it starts.',
       });
     }
 
     const termNumbers = new Set<number>();
     const orderedTerms = (year.terms ?? [])
       .map((term, index) => ({ term, index }))
-      .sort((first, second) =>
-        first.term.startDate.localeCompare(second.term.startDate),
-      );
+      .sort((first, second) => first.term.startDate.localeCompare(second.term.startDate));
 
     orderedTerms.forEach(({ term, index }, orderedIndex) => {
       if (term.endDate <= term.startDate) {
         context.addIssue({
-          code: "custom",
-          path: ["terms", index, "endDate"],
-          message: "The term must end after it starts.",
+          code: 'custom',
+          path: ['terms', index, 'endDate'],
+          message: 'The term must end after it starts.',
         });
       }
       if (term.startDate < year.startDate || term.endDate > year.endDate) {
         context.addIssue({
-          code: "custom",
-          path: ["terms", index, "startDate"],
-          message: "Term dates must fall within the academic year.",
+          code: 'custom',
+          path: ['terms', index, 'startDate'],
+          message: 'Term dates must fall within the academic year.',
         });
       }
       if (termNumbers.has(term.termNumber)) {
         context.addIssue({
-          code: "custom",
-          path: ["terms", index, "termNumber"],
-          message: "Each term must have a unique number.",
+          code: 'custom',
+          path: ['terms', index, 'termNumber'],
+          message: 'Each term must have a unique number.',
         });
       }
       termNumbers.add(term.termNumber);
@@ -505,18 +482,18 @@ export const createAcademicYearSchema = z
       const previousTerm = orderedTerms[orderedIndex - 1]?.term;
       if (previousTerm && term.startDate <= previousTerm.endDate) {
         context.addIssue({
-          code: "custom",
-          path: ["terms", index, "startDate"],
-          message: "Terms cannot overlap.",
+          code: 'custom',
+          path: ['terms', index, 'startDate'],
+          message: 'Terms cannot overlap.',
         });
       }
     });
 
     if ((year.terms ?? []).filter((term) => term.isCurrent).length > 1) {
       context.addIssue({
-        code: "custom",
-        path: ["terms"],
-        message: "Only one term can be current.",
+        code: 'custom',
+        path: ['terms'],
+        message: 'Only one term can be current.',
       });
     }
   });
@@ -543,9 +520,7 @@ export const updateSchoolMemberRolesSchema = z.object({
    */
   guardianPhone: z.string().trim().min(7).max(30).optional(),
 });
-export type UpdateSchoolMemberRolesInput = z.infer<
-  typeof updateSchoolMemberRolesSchema
->;
+export type UpdateSchoolMemberRolesInput = z.infer<typeof updateSchoolMemberRolesSchema>;
 
 // ============================================================================
 // ATTENDANCE SCHEMAS
@@ -553,22 +528,13 @@ export type UpdateSchoolMemberRolesInput = z.infer<
 
 export const attendanceRecordSchema = z.object({
   studentId: z.string().min(1),
-  status: z.enum([
-    "PRESENT",
-    "ABSENT",
-    "LATE",
-    "EXCUSED",
-    "SICK",
-    "PERMISSION",
-  ]),
+  status: z.enum(['PRESENT', 'ABSENT', 'LATE', 'EXCUSED', 'SICK', 'PERMISSION']),
   remarks: z.string().optional(),
 });
 
 export const batchAttendanceSchema = z.object({
-  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Format: YYYY-MM-DD"),
-  records: z
-    .array(attendanceRecordSchema)
-    .min(1, "At least one record is required"),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Format: YYYY-MM-DD'),
+  records: z.array(attendanceRecordSchema).min(1, 'At least one record is required'),
 });
 export type BatchAttendanceInput = z.infer<typeof batchAttendanceSchema>;
 
@@ -602,7 +568,7 @@ export const saveAssessmentEntrySchema = z.object({
         marks: z.number().min(0).max(10000).nullable(),
       }),
     )
-    .min(1, "There are no marks to save")
+    .min(1, 'There are no marks to save')
     .max(5000),
 });
 export type SaveAssessmentEntryInput = z.infer<typeof saveAssessmentEntrySchema>;
@@ -612,28 +578,33 @@ export type SaveAssessmentEntryInput = z.infer<typeof saveAssessmentEntrySchema>
 // ============================================================================
 
 export const recordPaymentSchema = z.object({
-  studentId: z.string().min(1, "Student ID is required"),
+  studentId: z.string().min(1, 'Student ID is required'),
   billId: z.string().optional(),
-  amount: z.number().finite().positive("Amount must be greater than zero"),
+  amount: z.number().finite().positive('Amount must be greater than zero'),
   paymentMethod: z.enum([
-    "CASH",
-    "BANK_TRANSFER",
-    "CHEQUE",
-    "MOBILE_MONEY",
-    "CARD",
-    "ONLINE",
-    "OTHER",
+    'CASH',
+    'BANK_TRANSFER',
+    'CHEQUE',
+    'MOBILE_MONEY',
+    'CARD',
+    'ONLINE',
+    'OTHER',
   ]),
-  paymentDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Format: YYYY-MM-DD"),
+  paymentDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Format: YYYY-MM-DD'),
   referenceNumber: z.string().trim().max(100).optional(),
   notes: z.string().trim().max(1000).optional(),
   /** Client-generated unique key (e.g. a UUID). Retrying with the same key never records a second receipt. */
   idempotencyKey: z.string().trim().min(8).max(100).optional(),
   /** Explicit per-fee-component allocation. Older clients retain the API's FIFO fallback. */
-  allocations: z.array(z.object({
-    billItemId: z.string().min(1),
-    amount: z.number().finite().positive("Each allocation must be greater than zero"),
-  })).min(1).optional(),
+  allocations: z
+    .array(
+      z.object({
+        billItemId: z.string().min(1),
+        amount: z.number().finite().positive('Each allocation must be greater than zero'),
+      }),
+    )
+    .min(1)
+    .optional(),
 });
 export type RecordPaymentInput = z.infer<typeof recordPaymentSchema>;
 
@@ -654,12 +625,7 @@ export const generateBillSchema = z.object({
 export type GenerateBillInput = z.infer<typeof generateBillSchema>;
 
 export type StudentStatementEntryType =
-  | "INVOICE"
-  | "DISCOUNT"
-  | "RECEIPT"
-  | "REVERSAL"
-  | "REFUND"
-  | "ADJUSTMENT";
+  'INVOICE' | 'DISCOUNT' | 'RECEIPT' | 'REVERSAL' | 'REFUND' | 'ADJUSTMENT';
 
 export interface StudentStatementEntry {
   id: string;
@@ -682,28 +648,48 @@ export interface StudentStatementResponse {
     admissionNumber: string | null;
     name: string;
   };
-  scope: "term" | "year" | "all";
-  period: { from: string | null; to: string | null; academicYear?: string | null; term?: string | null };
+  scope: 'term' | 'year' | 'all';
+  period: {
+    from: string | null;
+    to: string | null;
+    academicYear?: string | null;
+    term?: string | null;
+  };
   openingBalance: string;
   entries: StudentStatementEntry[];
   closingBalance: string;
-  ageing: { days0To30: string; days31To60: string; days61To90: string; days90Plus: string; notDue: string };
+  ageing: {
+    days0To30: string;
+    days31To60: string;
+    days61To90: string;
+    days90Plus: string;
+    notDue: string;
+  };
   unallocatedCredit: string;
-  dataSource: "bills_and_payments";
+  dataSource: 'bills_and_payments';
 }
 
 export const createExpenseSchema = z.object({
-  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Format: YYYY-MM-DD"),
-  amount: z.number().positive("Amount must be greater than zero"),
-  description: z.string().trim().min(3, "Enter a meaningful expense description").max(500),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Format: YYYY-MM-DD'),
+  amount: z.number().positive('Amount must be greater than zero'),
+  description: z.string().trim().min(3, 'Enter a meaningful expense description').max(500),
   payee: z.string().trim().max(200).optional(),
-  category: z.enum([
-    "SALARY", "UTILITIES", "SUPPLIES", "MAINTENANCE", "TRANSPORT",
-    "RENT", "INSURANCE", "TAXES", "OTHER",
-  ]).default("OTHER"),
-  paymentMethod: z.enum([
-    "CASH", "BANK_TRANSFER", "CHEQUE", "MOBILE_MONEY", "CARD", "ONLINE", "OTHER",
-  ]).default("CASH"),
+  category: z
+    .enum([
+      'SALARY',
+      'UTILITIES',
+      'SUPPLIES',
+      'MAINTENANCE',
+      'TRANSPORT',
+      'RENT',
+      'INSURANCE',
+      'TAXES',
+      'OTHER',
+    ])
+    .default('OTHER'),
+  paymentMethod: z
+    .enum(['CASH', 'BANK_TRANSFER', 'CHEQUE', 'MOBILE_MONEY', 'CARD', 'ONLINE', 'OTHER'])
+    .default('CASH'),
   registryCategoryId: optionalId,
   checkNumber: z.string().trim().max(120).optional(),
   voucherNumber: z.string().trim().max(120).optional(),
@@ -713,46 +699,56 @@ export const createExpenseSchema = z.object({
 export type CreateExpenseInput = z.infer<typeof createExpenseSchema>;
 
 export const createInventoryItemSchema = z.object({
-  name: z.string().trim().min(2, "Item name must contain at least 2 characters").max(150),
+  name: z.string().trim().min(2, 'Item name must contain at least 2 characters').max(150),
   description: z.string().trim().max(500).optional(),
   category: z.string().trim().max(100).optional(),
-  unit: z.string().trim().min(1).max(20).default("pcs"),
+  unit: z.string().trim().min(1).max(20).default('pcs'),
   minQuantity: z.number().int().min(0).default(0),
   initialQuantity: z.number().int().min(0).default(0),
 });
 export type CreateInventoryItemInput = z.infer<typeof createInventoryItemSchema>;
 
 export const updateInventoryItemSchema = z.object({
-  name: z.string().trim().min(2, "Item name must contain at least 2 characters").max(150),
+  name: z.string().trim().min(2, 'Item name must contain at least 2 characters').max(150),
   description: z.string().trim().max(500).optional(),
   category: z.string().trim().max(100).optional(),
-  unit: z.string().trim().min(1).max(20).default("pcs"),
+  unit: z.string().trim().min(1).max(20).default('pcs'),
   minQuantity: z.number().int().min(0).default(0),
 });
 export type UpdateInventoryItemInput = z.infer<typeof updateInventoryItemSchema>;
 
 export const inventoryStockMovementSchema = z.object({
-  type: z.enum(["IN", "OUT"]),
-  quantity: z.number().int().positive("Quantity must be a positive whole number"),
-  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Format: YYYY-MM-DD"),
+  type: z.enum(['IN', 'OUT']),
+  quantity: z.number().int().positive('Quantity must be a positive whole number'),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Format: YYYY-MM-DD'),
   description: z.string().trim().max(500).optional(),
   recipientName: z.string().trim().max(150).optional(),
 });
 export type InventoryStockMovementInput = z.infer<typeof inventoryStockMovementSchema>;
 
 export const updatePayrollSalarySchema = z.object({
-  monthlySalary: z.number().finite().min(0, "Monthly salary cannot be negative").max(10000000),
+  monthlySalary: z.number().finite().min(0, 'Monthly salary cannot be negative').max(10000000),
 });
 export type UpdatePayrollSalaryInput = z.infer<typeof updatePayrollSalarySchema>;
-
-
 
 // ============================================================================
 // SUPER ADMIN SCHEMAS
 // ============================================================================
 
 /** Subdomains the platform itself uses; a school may never claim them. */
-export const RESERVED_SUBDOMAINS = ["api", "admin", "www", "app", "demo", "staging", "mail", "static", "docs", "status", "support"] as const;
+export const RESERVED_SUBDOMAINS = [
+  'api',
+  'admin',
+  'www',
+  'app',
+  'demo',
+  'staging',
+  'mail',
+  'static',
+  'docs',
+  'status',
+  'support',
+] as const;
 
 export const subdomainSchema = z
   .string()
@@ -760,15 +756,38 @@ export const subdomainSchema = z
   .toLowerCase()
   .min(3)
   .max(30)
-  .regex(/^[a-z0-9]([a-z0-9-]*[a-z0-9])$/, "Lowercase letters, numbers and hyphens; cannot start or end with a hyphen")
-  .refine((value) => !(RESERVED_SUBDOMAINS as readonly string[]).includes(value), "This subdomain is reserved");
+  .regex(
+    /^[a-z0-9]([a-z0-9-]*[a-z0-9])$/,
+    'Lowercase letters, numbers and hyphens; cannot start or end with a hyphen',
+  )
+  .refine(
+    (value) => !(RESERVED_SUBDOMAINS as readonly string[]).includes(value),
+    'This subdomain is reserved',
+  );
 
 // Schools fund their own Hubtel Programmable SMS account. Never use query-string credentials.
 export const schoolHubtelConnectionSchema = z.object({
-  senderId: z.string().trim().min(1).max(11).regex(/^[A-Za-z0-9]+$/, "Use 1–11 letters/numbers from your approved Hubtel sender ID"),
-  clientId: z.string().trim().min(1).max(128).regex(/^[^\s:]+$/, "Invalid Hubtel Client ID"),
-  clientSecret: z.string().trim().min(1).max(256).regex(/^[^\s]+$/, "Invalid Hubtel Client secret"),
-  apiBaseUrl: z.enum(["https://sms.hubtel.com/v1/messages", "https://smsc.hubtel.com/v1/messages"]).default("https://sms.hubtel.com/v1/messages"),
+  senderId: z
+    .string()
+    .trim()
+    .min(1)
+    .max(11)
+    .regex(/^[A-Za-z0-9]+$/, 'Use 1–11 letters/numbers from your approved Hubtel sender ID'),
+  clientId: z
+    .string()
+    .trim()
+    .min(1)
+    .max(128)
+    .regex(/^[^\s:]+$/, 'Invalid Hubtel Client ID'),
+  clientSecret: z
+    .string()
+    .trim()
+    .min(1)
+    .max(256)
+    .regex(/^[^\s]+$/, 'Invalid Hubtel Client secret'),
+  apiBaseUrl: z
+    .enum(['https://sms.hubtel.com/v1/messages', 'https://smsc.hubtel.com/v1/messages'])
+    .default('https://sms.hubtel.com/v1/messages'),
 });
 export type SchoolHubtelConnectionInput = z.infer<typeof schoolHubtelConnectionSchema>;
 
@@ -779,7 +798,7 @@ export const enrollSchoolSchema = z.object({
     .string()
     .min(3)
     .max(20)
-    .regex(/^[A-Z0-9-]+$/, "Uppercase letters, numbers, hyphens only"),
+    .regex(/^[A-Z0-9-]+$/, 'Uppercase letters, numbers, hyphens only'),
   schoolEmail: z.email().optional(),
   schoolPhone: z.string().optional(),
   schoolAddress: z.string().optional(),
@@ -801,9 +820,9 @@ export const updateSchoolSchema = z.object({
     .string()
     .min(3)
     .max(20)
-    .regex(/^[A-Z0-9-]+$/, "Uppercase letters, numbers, hyphens only"),
+    .regex(/^[A-Z0-9-]+$/, 'Uppercase letters, numbers, hyphens only'),
   subdomain: subdomainSchema,
-  schoolEmail: z.union([z.email(), z.literal("")]).optional(),
+  schoolEmail: z.union([z.email(), z.literal('')]).optional(),
   schoolPhone: z.string().optional(),
   schoolAddress: z.string().optional(),
 });
@@ -815,31 +834,34 @@ export const addSchoolAdminSchema = z.object({
 });
 export type AddSchoolAdminInput = z.infer<typeof addSchoolAdminSchema>;
 
-export const setSchoolAdminBannedSchema = z.object({
-  banned: z.boolean(),
-  reason: z.string().trim().min(10, "Enter a reason of at least 10 characters").max(500).optional(),
-}).superRefine((value, ctx) => {
-  if (value.banned && !value.reason) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      path: ["reason"],
-      message: "A reason is required when suspending a school administrator",
-    });
-  }
-});
-export type SetSchoolAdminBannedInput = z.infer<
-  typeof setSchoolAdminBannedSchema
->;
+export const setSchoolAdminBannedSchema = z
+  .object({
+    banned: z.boolean(),
+    reason: z
+      .string()
+      .trim()
+      .min(10, 'Enter a reason of at least 10 characters')
+      .max(500)
+      .optional(),
+  })
+  .superRefine((value, ctx) => {
+    if (value.banned && !value.reason) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['reason'],
+        message: 'A reason is required when suspending a school administrator',
+      });
+    }
+  });
+export type SetSchoolAdminBannedInput = z.infer<typeof setSchoolAdminBannedSchema>;
 
 export const createSupportTicketSchema = z.object({
   subject: z.string().trim().min(5).max(160),
   description: z.string().trim().min(10).max(10000),
   category: z.string().trim().min(2).max(60),
-  priority: z.enum(["LOW", "MEDIUM", "HIGH", "URGENT"]).default("MEDIUM"),
+  priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'URGENT']).default('MEDIUM'),
 });
-export type CreateSupportTicketInput = z.infer<
-  typeof createSupportTicketSchema
->;
+export type CreateSupportTicketInput = z.infer<typeof createSupportTicketSchema>;
 
 export const supportTicketReplySchema = z.object({
   message: z.string().trim().min(2).max(10000),
@@ -847,23 +869,21 @@ export const supportTicketReplySchema = z.object({
 export type SupportTicketReplyInput = z.infer<typeof supportTicketReplySchema>;
 
 export const updateSupportTicketSchema = z.object({
-  status: z.enum(["OPEN", "IN_PROGRESS", "RESOLVED", "CLOSED"]),
-  priority: z.enum(["LOW", "MEDIUM", "HIGH", "URGENT"]).optional(),
+  status: z.enum(['OPEN', 'IN_PROGRESS', 'RESOLVED', 'CLOSED']),
+  priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'URGENT']).optional(),
 });
-export type UpdateSupportTicketInput = z.infer<
-  typeof updateSupportTicketSchema
->;
+export type UpdateSupportTicketInput = z.infer<typeof updateSupportTicketSchema>;
 
 // ----------------------------------------------------------------------------
 // Subscription rules (single source of truth for API enforcement and the UI)
 // ----------------------------------------------------------------------------
 
 export const SUBSCRIPTION_STATUSES = [
-  "TRIALING",
-  "ACTIVE",
-  "PAST_DUE",
-  "CANCELLED",
-  "SUSPENDED",
+  'TRIALING',
+  'ACTIVE',
+  'PAST_DUE',
+  'CANCELLED',
+  'SUSPENDED',
 ] as const;
 export type SubscriptionStatusValue = (typeof SUBSCRIPTION_STATUSES)[number];
 
@@ -873,12 +893,7 @@ export const SUBSCRIPTION_TRIAL_DAYS = 30;
 export const SUBSCRIPTION_GRACE_DAYS = 7;
 
 export type SubscriptionAccessReason =
-  | "OK"
-  | "GRACE_PERIOD"
-  | "EXPIRED"
-  | "SUSPENDED"
-  | "CANCELLED"
-  | "PAST_DUE";
+  'OK' | 'GRACE_PERIOD' | 'EXPIRED' | 'SUSPENDED' | 'CANCELLED' | 'PAST_DUE';
 
 export interface SubscriptionAccess {
   allowed: boolean;
@@ -909,25 +924,25 @@ export function evaluateSubscriptionAccess(
     ? Math.ceil((validExpiry.getTime() - now.getTime()) / DAY_MS)
     : null;
 
-  const normalised = status === "CANCELED" ? "CANCELLED" : status;
-  if (normalised === "SUSPENDED") return { allowed: false, reason: "SUSPENDED", daysRemaining };
-  if (normalised === "CANCELLED") return { allowed: false, reason: "CANCELLED", daysRemaining };
-  if (normalised !== "TRIALING" && normalised !== "ACTIVE" && normalised !== "PAST_DUE") {
-    return { allowed: false, reason: "SUSPENDED", daysRemaining };
+  const normalised = status === 'CANCELED' ? 'CANCELLED' : status;
+  if (normalised === 'SUSPENDED') return { allowed: false, reason: 'SUSPENDED', daysRemaining };
+  if (normalised === 'CANCELLED') return { allowed: false, reason: 'CANCELLED', daysRemaining };
+  if (normalised !== 'TRIALING' && normalised !== 'ACTIVE' && normalised !== 'PAST_DUE') {
+    return { allowed: false, reason: 'SUSPENDED', daysRemaining };
   }
 
   if (validExpiry && validExpiry.getTime() <= now.getTime()) {
     const graceEnds = validExpiry.getTime() + SUBSCRIPTION_GRACE_DAYS * DAY_MS;
     return now.getTime() < graceEnds
-      ? { allowed: true, reason: "GRACE_PERIOD", daysRemaining }
-      : { allowed: false, reason: "EXPIRED", daysRemaining };
+      ? { allowed: true, reason: 'GRACE_PERIOD', daysRemaining }
+      : { allowed: false, reason: 'EXPIRED', daysRemaining };
   }
-  if (normalised === "PAST_DUE") return { allowed: true, reason: "PAST_DUE", daysRemaining };
-  return { allowed: true, reason: "OK", daysRemaining };
+  if (normalised === 'PAST_DUE') return { allowed: true, reason: 'PAST_DUE', daysRemaining };
+  return { allowed: true, reason: 'OK', daysRemaining };
 }
 
 /** Machine-readable marker in the `error` field when a school's access is blocked. */
-export const SUBSCRIPTION_INACTIVE = "SUBSCRIPTION_INACTIVE";
+export const SUBSCRIPTION_INACTIVE = 'SUBSCRIPTION_INACTIVE';
 
 export const updateSubscriptionSchema = z.object({
   status: z.enum(SUBSCRIPTION_STATUSES),
@@ -937,7 +952,7 @@ export const updateSubscriptionSchema = z.object({
       z
         .string()
         .trim()
-        .refine((value) => !Number.isNaN(new Date(value).getTime()), "Enter a valid date"),
+        .refine((value) => !Number.isNaN(new Date(value).getTime()), 'Enter a valid date'),
       z.null(),
     ])
     .optional(),
@@ -960,7 +975,7 @@ export const superAdminSchoolsQuerySchema = z.object({
   q: searchQuery,
   status: z.enum(SUBSCRIPTION_STATUSES).optional(),
   /** `expiring` = lapses within 14 days; `lapsed` = past its expiry date. */
-  expiry: z.enum(["expiring", "lapsed"]).optional(),
+  expiry: z.enum(['expiring', 'lapsed']).optional(),
 });
 export type SuperAdminSchoolsQuery = z.infer<typeof superAdminSchoolsQuerySchema>;
 
@@ -974,44 +989,48 @@ export const superAdminUsersQuerySchema = z.object({
 export type SuperAdminUsersQuery = z.infer<typeof superAdminUsersQuerySchema>;
 
 export const SUPER_ADMIN_AUDIT_ACTIONS = [
-  "CREATE",
-  "UPDATE",
-  "DELETE",
-  "CREDENTIALS_ISSUED",
-  "ACCESS_CHANGED",
-  "SUBSCRIPTION_CHANGED",
-  "SCHOOL_ACCESSED",
+  'CREATE',
+  'UPDATE',
+  'DELETE',
+  'CREDENTIALS_ISSUED',
+  'ACCESS_CHANGED',
+  'SUBSCRIPTION_CHANGED',
+  'SCHOOL_ACCESSED',
 ] as const;
 
-const auditDateQuery = z.string().trim().min(1).max(40).refine(
-  (value) => !Number.isNaN(new Date(value).getTime()),
-  "Enter a valid date",
-);
+const auditDateQuery = z
+  .string()
+  .trim()
+  .min(1)
+  .max(40)
+  .refine((value) => !Number.isNaN(new Date(value).getTime()), 'Enter a valid date');
 
-export const superAdminAuditQuerySchema = z.object({
-  page: pageQuery,
-  limit: limitQuery,
-  action: z.enum(SUPER_ADMIN_AUDIT_ACTIONS).optional(),
-  schoolId: z.string().trim().max(64).optional(),
-  actorId: z.string().trim().max(64).optional(),
-  from: auditDateQuery.optional(),
-  to: auditDateQuery.optional(),
-  q: searchQuery,
-}).superRefine((query, ctx) => {
-  if (!query.from || !query.to) return;
-  const from = new Date(query.from);
-  const to = new Date(query.to);
-  if (/^\d{4}-\d{2}-\d{2}$/.test(query.to)) {
-    to.setUTCHours(23, 59, 59, 999);
-  }
-  if (from.getTime() > to.getTime()) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      path: ["to"],
-      message: "The end date must be on or after the start date",
-    });
-  }
-});
+export const superAdminAuditQuerySchema = z
+  .object({
+    page: pageQuery,
+    limit: limitQuery,
+    action: z.enum(SUPER_ADMIN_AUDIT_ACTIONS).optional(),
+    schoolId: z.string().trim().max(64).optional(),
+    actorId: z.string().trim().max(64).optional(),
+    from: auditDateQuery.optional(),
+    to: auditDateQuery.optional(),
+    q: searchQuery,
+  })
+  .superRefine((query, ctx) => {
+    if (!query.from || !query.to) return;
+    const from = new Date(query.from);
+    const to = new Date(query.to);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(query.to)) {
+      to.setUTCHours(23, 59, 59, 999);
+    }
+    if (from.getTime() > to.getTime()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['to'],
+        message: 'The end date must be on or after the start date',
+      });
+    }
+  });
 export type SuperAdminAuditQuery = z.infer<typeof superAdminAuditQuerySchema>;
 
 // ============================================================================
@@ -1021,9 +1040,9 @@ export type SuperAdminAuditQuery = z.infer<typeof superAdminAuditQuerySchema>;
 // that Zod defaults, such as employmentType = FULL_TIME, can never silently
 // overwrite stored values when a field is simply left out of an edit.
 
-const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD");
-const genderEnum = z.enum(["MALE", "FEMALE", "OTHER"]);
-const employmentTypeEnum = z.enum(["FULL_TIME", "PART_TIME", "CONTRACT", "TEMPORARY", "INTERN"]);
+const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Use YYYY-MM-DD');
+const genderEnum = z.enum(['MALE', 'FEMALE', 'OTHER']);
+const employmentTypeEnum = z.enum(['FULL_TIME', 'PART_TIME', 'CONTRACT', 'TEMPORARY', 'INTERN']);
 
 export const updateTeacherSchema = z.object({
   firstName: z.string().trim().min(1).max(100).optional(),
@@ -1032,7 +1051,7 @@ export const updateTeacherSchema = z.object({
   email: emailSchema.optional(),
   phone: z.string().trim().max(30).optional(),
   gender: genderEnum.optional(),
-  dateOfBirth: isoDate.optional().or(z.literal("")),
+  dateOfBirth: isoDate.optional().or(z.literal('')),
   departmentId: z.string().min(1).optional(),
   qualification: z.string().trim().max(150).optional(),
   specialization: z.string().trim().max(150).optional(),
@@ -1103,13 +1122,13 @@ export type UpdateTermInput = z.infer<typeof updateTermSchema>;
 export const subjectCodeSchema = z
   .string()
   .trim()
-  .min(2, "Subject code is required")
+  .min(2, 'Subject code is required')
   .max(20)
-  .regex(/^[A-Za-z0-9_-]+$/, "Use letters, numbers, - or _")
+  .regex(/^[A-Za-z0-9_-]+$/, 'Use letters, numbers, - or _')
   .transform((value) => value.toUpperCase());
 
 export const saveSubjectSchema = z.object({
-  name: z.string().trim().min(2, "Subject name is required").max(100),
+  name: z.string().trim().min(2, 'Subject name is required').max(100),
   code: subjectCodeSchema,
   description: z.string().trim().max(500).optional(),
   periodsPerWeek: z.number().int().min(1).max(20),
@@ -1139,10 +1158,18 @@ export type SetSubjectTeachersInput = z.infer<typeof setSubjectTeachersSchema>;
 // TIMETABLE
 // ============================================================================
 
-export const TIMETABLE_DAYS = ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"] as const;
+export const TIMETABLE_DAYS = [
+  'MONDAY',
+  'TUESDAY',
+  'WEDNESDAY',
+  'THURSDAY',
+  'FRIDAY',
+  'SATURDAY',
+  'SUNDAY',
+] as const;
 export type TimetableDay = (typeof TIMETABLE_DAYS)[number];
 
-const clockTime = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Use 24-hour HH:MM");
+const clockTime = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Use 24-hour HH:MM');
 
 export const savePeriodSchema = z
   .object({
@@ -1154,8 +1181,8 @@ export const savePeriodSchema = z
     departmentId: z.string().min(1).nullable().optional(),
   })
   .refine((period) => period.endTime > period.startTime, {
-    path: ["endTime"],
-    message: "A period must end after it starts.",
+    path: ['endTime'],
+    message: 'A period must end after it starts.',
   });
 export type SavePeriodInput = z.infer<typeof savePeriodSchema>;
 
@@ -1163,11 +1190,11 @@ export type SavePeriodInput = z.infer<typeof savePeriodSchema>;
 export const copyPeriodsSchema = z
   .object({
     fromDepartmentId: z.string().min(1).nullable(),
-    toDepartmentIds: z.array(z.string().min(1)).min(1, "Choose a department to copy to").max(30),
+    toDepartmentIds: z.array(z.string().min(1)).min(1, 'Choose a department to copy to').max(30),
   })
-  .refine((input) => !input.toDepartmentIds.includes(input.fromDepartmentId ?? ""), {
-    path: ["toDepartmentIds"],
-    message: "Choose departments other than the one you are copying from.",
+  .refine((input) => !input.toDepartmentIds.includes(input.fromDepartmentId ?? ''), {
+    path: ['toDepartmentIds'],
+    message: 'Choose departments other than the one you are copying from.',
   });
 export type CopyPeriodsInput = z.infer<typeof copyPeriodsSchema>;
 
@@ -1179,21 +1206,29 @@ export type SaveClassroomInput = z.infer<typeof saveClassroomSchema>;
 
 export const saveTimetableEntrySchema = z
   .object({
-    classId: z.string().min(1, "Choose a class"),
+    classId: z.string().min(1, 'Choose a class'),
     dayOfWeek: z.enum(TIMETABLE_DAYS),
-    periodId: z.string().min(1, "Choose a period"),
-    type: z.enum(["LESSON", "BREAK", "ACTIVITY"]).default("LESSON"),
+    periodId: z.string().min(1, 'Choose a period'),
+    type: z.enum(['LESSON', 'BREAK', 'ACTIVITY']).default('LESSON'),
     subjectId: z.string().min(1).optional(),
     teacherId: z.string().min(1).optional(),
     classroomId: z.string().min(1).optional(),
     label: z.string().trim().max(60).optional(),
   })
   .superRefine((entry, context) => {
-    if (entry.type === "LESSON" && !entry.subjectId) {
-      context.addIssue({ code: "custom", path: ["subjectId"], message: "Choose a subject for a lesson." });
+    if (entry.type === 'LESSON' && !entry.subjectId) {
+      context.addIssue({
+        code: 'custom',
+        path: ['subjectId'],
+        message: 'Choose a subject for a lesson.',
+      });
     }
-    if (entry.type !== "LESSON" && !entry.label) {
-      context.addIssue({ code: "custom", path: ["label"], message: "Give this slot a label, e.g. Lunch." });
+    if (entry.type !== 'LESSON' && !entry.label) {
+      context.addIssue({
+        code: 'custom',
+        path: ['label'],
+        message: 'Give this slot a label, e.g. Lunch.',
+      });
     }
   });
 export type SaveTimetableEntryInput = z.infer<typeof saveTimetableEntrySchema>;
@@ -1202,38 +1237,38 @@ export type SaveTimetableEntryInput = z.infer<typeof saveTimetableEntrySchema>;
 // ADMISSIONS (enrollment windows, applications, entrance exam, admission)
 // ============================================================================
 
-export const ADMISSION_CYCLE_STATUSES = ["DRAFT", "OPEN", "CLOSED"] as const;
+export const ADMISSION_CYCLE_STATUSES = ['DRAFT', 'OPEN', 'CLOSED'] as const;
 export type AdmissionCycleStatus = (typeof ADMISSION_CYCLE_STATUSES)[number];
 
 export const APPLICATION_STATUSES = [
-  "SUBMITTED",
-  "UNDER_REVIEW",
-  "EXAM_SCHEDULED",
-  "EXAM_COMPLETED",
-  "ACCEPTED",
-  "WAITLISTED",
-  "REJECTED",
-  "ADMITTED",
-  "WITHDRAWN",
+  'SUBMITTED',
+  'UNDER_REVIEW',
+  'EXAM_SCHEDULED',
+  'EXAM_COMPLETED',
+  'ACCEPTED',
+  'WAITLISTED',
+  'REJECTED',
+  'ADMITTED',
+  'WITHDRAWN',
 ] as const;
 export type ApplicationStatus = (typeof APPLICATION_STATUSES)[number];
 
 export const GUARDIAN_RELATIONSHIPS = [
-  "FATHER",
-  "MOTHER",
-  "GUARDIAN",
-  "GRANDFATHER",
-  "GRANDMOTHER",
-  "SIBLING",
-  "RELATIVE",
-  "OTHER",
+  'FATHER',
+  'MOTHER',
+  'GUARDIAN',
+  'GRANDFATHER',
+  'GRANDMOTHER',
+  'SIBLING',
+  'RELATIVE',
+  'OTHER',
 ] as const;
 
 /** Admin: create / edit an enrollment window. */
 export const saveAdmissionCycleSchema = z
   .object({
-    name: z.string().trim().min(3, "Give the intake a name").max(120),
-    academicYearId: z.string().min(1, "Choose an academic year"),
+    name: z.string().trim().min(3, 'Give the intake a name').max(120),
+    academicYearId: z.string().min(1, 'Choose an academic year'),
     termId: optionalId,
     opensAt: isoDate,
     closesAt: isoDate,
@@ -1243,10 +1278,10 @@ export const saveAdmissionCycleSchema = z
     /** Cash fee each applicant pays on exam day (0 = no fee). Non-refundable. */
     admissionFee: z
       .number()
-      .min(0, "The fee cannot be negative")
+      .min(0, 'The fee cannot be negative')
       .max(1_000_000)
       .refine((v) => Math.abs(v * 100 - Math.round(v * 100)) < 1e-6, {
-        message: "Use at most two decimal places.",
+        message: 'Use at most two decimal places.',
       })
       .default(0),
     instructions: z.string().trim().max(2000).optional(),
@@ -1258,44 +1293,44 @@ export const saveAdmissionCycleSchema = z
           seats: z.number().int().positive().max(5000).nullable().optional(),
         }),
       )
-      .min(1, "Open at least one class for applications")
+      .min(1, 'Open at least one class for applications')
       .max(100),
   })
   .refine((v) => v.closesAt >= v.opensAt, {
-    path: ["closesAt"],
-    message: "Applications must close on or after the opening date.",
+    path: ['closesAt'],
+    message: 'Applications must close on or after the opening date.',
   })
   .refine((v) => v.passMark <= v.examMaxScore, {
-    path: ["passMark"],
+    path: ['passMark'],
     message: "The pass mark cannot be higher than the exam's maximum score.",
   })
   .refine((v) => new Set(v.classes.map((c) => c.classId)).size === v.classes.length, {
-    path: ["classes"],
-    message: "A class can only be listed once.",
+    path: ['classes'],
+    message: 'A class can only be listed once.',
   });
 export type SaveAdmissionCycleInput = z.infer<typeof saveAdmissionCycleSchema>;
 
 /** Public: the enrollment form a prospective student's guardian fills in. */
 export const submitApplicationSchema = z.object({
-  classId: z.string().min(1, "Choose the class applied for"),
-  firstName: z.string().trim().min(1, "First name is required").max(100),
-  lastName: z.string().trim().min(1, "Last name is required").max(100),
+  classId: z.string().min(1, 'Choose the class applied for'),
+  firstName: z.string().trim().min(1, 'First name is required').max(100),
+  lastName: z.string().trim().min(1, 'Last name is required').max(100),
   otherNames: z.string().trim().max(100).optional(),
-  gender: z.enum(["MALE", "FEMALE", "OTHER"]),
+  gender: z.enum(['MALE', 'FEMALE', 'OTHER']),
   dateOfBirth: isoDate,
-  nationality: z.string().trim().min(2).max(60).default("Ghanaian"),
+  nationality: z.string().trim().min(2).max(60).default('Ghanaian'),
   previousSchool: z.string().trim().max(150).optional(),
   previousClass: z.string().trim().max(60).optional(),
   residentialAddress: z.string().trim().max(250).optional(),
   city: z.string().trim().max(100).optional(),
   region: z.string().trim().max(100).optional(),
-  guardianFirstName: z.string().trim().min(1, "Guardian first name is required").max(100),
-  guardianLastName: z.string().trim().min(1, "Guardian last name is required").max(100),
-  guardianPhone: z.string().trim().min(7, "Enter a valid phone number").max(30),
-  guardianEmail: z.email("Enter a valid email address").optional().or(z.literal("")),
+  guardianFirstName: z.string().trim().min(1, 'Guardian first name is required').max(100),
+  guardianLastName: z.string().trim().min(1, 'Guardian last name is required').max(100),
+  guardianPhone: z.string().trim().min(7, 'Enter a valid phone number').max(30),
+  guardianEmail: z.email('Enter a valid email address').optional().or(z.literal('')),
   guardianRelationship: z.enum(GUARDIAN_RELATIONSHIPS),
   /** Must be ticked: the guardian confirms the details are correct. */
-  declaration: z.literal(true, { error: "Please confirm the declaration." }),
+  declaration: z.literal(true, { error: 'Please confirm the declaration.' }),
   /** Honeypot - real users never see or fill this; bots do. */
   website: z.string().max(200).optional(),
 });
@@ -1310,8 +1345,8 @@ export type TrackApplicationInput = z.infer<typeof trackApplicationSchema>;
 
 export const scheduleExamSchema = z.object({
   applicationIds: z.array(z.string().min(1)).min(1).max(500),
-  examDate: z.string().regex(/^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2})?/, "Use a valid date and time"),
-  venue: z.string().trim().min(2, "Enter the exam venue").max(150),
+  examDate: z.string().regex(/^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2})?/, 'Use a valid date and time'),
+  venue: z.string().trim().min(2, 'Enter the exam venue').max(150),
 });
 export type ScheduleExamInput = z.infer<typeof scheduleExamSchema>;
 
@@ -1322,30 +1357,33 @@ export type ScheduleExamInput = z.infer<typeof scheduleExamSchema>;
 export const updateApplicationExamSchema = z
   .object({
     /** ISO timestamp (preferred) or "YYYY-MM-DD[THH:mm]". */
-    examDate: z.string().regex(/^\d{4}-\d{2}-\d{2}/, "Use a valid date and time").optional(),
-    venue: z.string().trim().min(2, "Enter the exam venue").max(150).optional(),
-    score: z.number().min(0, "Score cannot be negative").max(1000).nullable().optional(),
+    examDate: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}/, 'Use a valid date and time')
+      .optional(),
+    venue: z.string().trim().min(2, 'Enter the exam venue').max(150).optional(),
+    score: z.number().min(0, 'Score cannot be negative').max(1000).nullable().optional(),
   })
   .refine((v) => v.examDate !== undefined || v.venue !== undefined || v.score !== undefined, {
-    message: "Nothing to update.",
+    message: 'Nothing to update.',
   });
 export type UpdateApplicationExamInput = z.infer<typeof updateApplicationExamSchema>;
 
 export const recordExamScoreSchema = z.object({
-  score: z.number().min(0, "Score cannot be negative").max(1000),
+  score: z.number().min(0, 'Score cannot be negative').max(1000),
 });
 export type RecordExamScoreInput = z.infer<typeof recordExamScoreSchema>;
 
 export const decideApplicationSchema = z
   .object({
-    decision: z.enum(["ACCEPTED", "WAITLISTED", "REJECTED"]),
+    decision: z.enum(['ACCEPTED', 'WAITLISTED', 'REJECTED']),
     note: z.string().trim().max(500).optional(),
     /** Accept an applicant who is below the pass mark (needs a written reason). */
     overridePassMark: z.boolean().default(false),
   })
   .refine((v) => !v.overridePassMark || (v.note && v.note.length >= 5), {
-    path: ["note"],
-    message: "Explain why the pass mark is being overridden.",
+    path: ['note'],
+    message: 'Explain why the pass mark is being overridden.',
   });
 export type DecideApplicationInput = z.infer<typeof decideApplicationSchema>;
 
@@ -1354,7 +1392,7 @@ export const admitApplicationSchema = z.object({
 });
 export type AdmitApplicationInput = z.infer<typeof admitApplicationSchema>;
 
-export const ADMISSION_FEE_STATUSES = ["NOT_REQUIRED", "PENDING", "PAID", "EXEMPTED"] as const;
+export const ADMISSION_FEE_STATUSES = ['NOT_REQUIRED', 'PENDING', 'PAID', 'EXEMPTED'] as const;
 export type AdmissionFeeStatus = (typeof ADMISSION_FEE_STATUSES)[number];
 
 /** Cash received from an applicant for the entrance exam. The amount is the fee due. */
@@ -1370,7 +1408,7 @@ export const exemptAdmissionFeeSchema = z.object({
   reason: z
     .string()
     .trim()
-    .min(5, "Give a reason for the exemption (at least 5 characters).")
+    .min(5, 'Give a reason for the exemption (at least 5 characters).')
     .max(300),
 });
 export type ExemptAdmissionFeeInput = z.infer<typeof exemptAdmissionFeeSchema>;
@@ -1382,44 +1420,44 @@ export type ExemptAdmissionFeeInput = z.infer<typeof exemptAdmissionFeeSchema>;
 /** Blank text becomes null so a field can be cleared; missing stays "unchanged". */
 const clearable = <T extends z.ZodType>(schema: T) =>
   z.preprocess(
-    (value) => (typeof value === "string" && value.trim() === "" ? null : value),
+    (value) => (typeof value === 'string' && value.trim() === '' ? null : value),
     schema.nullable().optional(),
   );
 
-const phoneText = z.string().trim().min(5, "Enter a valid phone number").max(30);
+const phoneText = z.string().trim().min(5, 'Enter a valid phone number').max(30);
 const HEX_COLOR = /^#[0-9a-fA-F]{6}$/;
 
 /** Details an owner or admin may change. Code and subdomain are identifiers and are not editable. */
 export const updateSchoolSettingsSchema = z.object({
-  name: z.string().trim().min(2, "School name is required").max(120).optional(),
-  email: clearable(z.email("Enter a valid email address").max(160)),
+  name: z.string().trim().min(2, 'School name is required').max(120).optional(),
+  email: clearable(z.email('Enter a valid email address').max(160)),
   phone: clearable(phoneText),
   address: clearable(z.string().trim().max(250)),
   motto: clearable(z.string().trim().max(150)),
   website: clearable(
     z.preprocess(
       (value) =>
-        typeof value === "string" && value.trim() && !/^https?:\/\//i.test(value.trim())
+        typeof value === 'string' && value.trim() && !/^https?:\/\//i.test(value.trim())
           ? `https://${value.trim()}`
           : value,
       z
-        .url("Enter a valid website address")
+        .url('Enter a valid website address')
         .max(200)
-        .refine((value) => /^https?:\/\//i.test(value), "Use an http or https address"),
+        .refine((value) => /^https?:\/\//i.test(value), 'Use an http or https address'),
     ),
   ),
-  primaryColor: z.string().regex(HEX_COLOR, "Use a colour like #3B82F6").optional(),
-  secondaryColor: z.string().regex(HEX_COLOR, "Use a colour like #10B981").optional(),
+  primaryColor: z.string().regex(HEX_COLOR, 'Use a colour like #3B82F6').optional(),
+  secondaryColor: z.string().regex(HEX_COLOR, 'Use a colour like #10B981').optional(),
 });
 export type UpdateSchoolSettingsInput = z.infer<typeof updateSchoolSettingsSchema>;
 
 /** Roles whose name is part of an official school record, so only the school can change it. */
-export const NAME_LOCKED_ROLES = ["student", "guardian"] as const;
+export const NAME_LOCKED_ROLES = ['student', 'guardian'] as const;
 
 /** Basic details any signed-in user may change about themselves. Email and role are not included. */
 export const updateMyProfileSchema = z.object({
-  firstName: z.string().trim().min(1, "First name is required").max(100).optional(),
-  lastName: z.string().trim().min(1, "Last name is required").max(100).optional(),
+  firstName: z.string().trim().min(1, 'First name is required').max(100).optional(),
+  lastName: z.string().trim().min(1, 'Last name is required').max(100).optional(),
   otherNames: clearable(z.string().trim().max(100)),
   phone: clearable(phoneText),
   alternatePhone: clearable(phoneText),
@@ -1437,30 +1475,30 @@ export type UpdateMyProfileInput = z.infer<typeof updateMyProfileSchema>;
 // ============================================================================
 
 export const ASSESSMENT_TYPES = [
-  "CLASS_TEST",
-  "QUIZ",
-  "ASSIGNMENT",
-  "PROJECT",
-  "PRACTICAL",
-  "HOMEWORK",
-  "PRESENTATION",
-  "MID_TERM_EXAM",
-  "MOCK_EXAM",
-  "FINAL_EXAM",
+  'CLASS_TEST',
+  'QUIZ',
+  'ASSIGNMENT',
+  'PROJECT',
+  'PRACTICAL',
+  'HOMEWORK',
+  'PRESENTATION',
+  'MID_TERM_EXAM',
+  'MOCK_EXAM',
+  'FINAL_EXAM',
 ] as const;
 export type AssessmentTypeName = (typeof ASSESSMENT_TYPES)[number];
 
 export const ASSESSMENT_TYPE_LABELS: Record<AssessmentTypeName, string> = {
-  CLASS_TEST: "Class test",
-  QUIZ: "Quiz",
-  ASSIGNMENT: "Assignment",
-  PROJECT: "Project",
-  PRACTICAL: "Practical",
-  HOMEWORK: "Homework",
-  PRESENTATION: "Presentation",
-  MID_TERM_EXAM: "Mid-term exam",
-  MOCK_EXAM: "Mock exam",
-  FINAL_EXAM: "End-of-term exam",
+  CLASS_TEST: 'Class test',
+  QUIZ: 'Quiz',
+  ASSIGNMENT: 'Assignment',
+  PROJECT: 'Project',
+  PRACTICAL: 'Practical',
+  HOMEWORK: 'Homework',
+  PRESENTATION: 'Presentation',
+  MID_TERM_EXAM: 'Mid-term exam',
+  MOCK_EXAM: 'Mock exam',
+  FINAL_EXAM: 'End-of-term exam',
 };
 
 export interface GradeBandLike {
@@ -1480,7 +1518,8 @@ export function gradeScaleProblems(bands: GradeBandLike[]): string[] {
 
   const seen = new Set<string>();
   for (const band of bands) {
-    if (band.minScore > band.maxScore) problems.push(`${band.grade || "A grade"}: the lowest score is above the highest score.`);
+    if (band.minScore > band.maxScore)
+      problems.push(`${band.grade || 'A grade'}: the lowest score is above the highest score.`);
     const key = band.grade.trim().toLowerCase();
     if (seen.has(key)) problems.push(`The grade "${band.grade}" is used more than once.`);
     seen.add(key);
@@ -1491,39 +1530,54 @@ export function gradeScaleProblems(bands: GradeBandLike[]): string[] {
     const previous = sorted[index - 1]!;
     const current = sorted[index]!;
     if (current.minScore <= previous.maxScore) {
-      problems.push(`${previous.grade} (${previous.minScore}-${previous.maxScore}) overlaps ${current.grade} (${current.minScore}-${current.maxScore}).`);
+      problems.push(
+        `${previous.grade} (${previous.minScore}-${previous.maxScore}) overlaps ${current.grade} (${current.minScore}-${current.maxScore}).`,
+      );
     }
   }
-  if (sorted[0]!.minScore !== 0) problems.push("The lowest grade must start at 0 so every score gets a grade.");
-  if (Math.max(...bands.map((band) => band.maxScore)) !== 100) problems.push("The highest grade must reach 100.");
+  if (sorted[0]!.minScore !== 0)
+    problems.push('The lowest grade must start at 0 so every score gets a grade.');
+  if (Math.max(...bands.map((band) => band.maxScore)) !== 100)
+    problems.push('The highest grade must reach 100.');
   return problems;
 }
 
 export const gradeBandInputSchema = z.object({
-  grade: z.string().trim().min(1, "Every grade needs a name").max(4, "Keep grade names short, like A or B+"),
-  description: z.string().trim().min(1, "Describe each grade, for example Excellent").max(40),
-  minScore: z.number("Enter a lowest score").min(0).max(100),
-  maxScore: z.number("Enter a highest score").min(0).max(100),
-  gradePoint: z.number("Enter a grade point").min(0).max(10),
+  grade: z
+    .string()
+    .trim()
+    .min(1, 'Every grade needs a name')
+    .max(4, 'Keep grade names short, like A or B+'),
+  description: z.string().trim().min(1, 'Describe each grade, for example Excellent').max(40),
+  minScore: z.number('Enter a lowest score').min(0).max(100),
+  maxScore: z.number('Enter a highest score').min(0).max(100),
+  gradePoint: z.number('Enter a grade point').min(0).max(10),
 });
 
 export const saveGradingSystemSchema = z
   .object({
-    name: z.string().trim().min(2, "Give the grading scale a name").max(80),
+    name: z.string().trim().min(2, 'Give the grading scale a name').max(80),
     description: clearable(z.string().trim().max(300)),
-    scales: z.array(gradeBandInputSchema).min(2, "Add at least two grades").max(15),
+    scales: z.array(gradeBandInputSchema).min(2, 'Add at least two grades').max(15),
   })
   .superRefine((value, ctx) => {
-    for (const message of gradeScaleProblems(value.scales)) ctx.addIssue({ code: "custom", path: ["scales"], message });
+    for (const message of gradeScaleProblems(value.scales))
+      ctx.addIssue({ code: 'custom', path: ['scales'], message });
   });
 export type SaveGradingSystemInput = z.infer<typeof saveGradingSystemSchema>;
 
 export const assessmentComponentInputSchema = z.object({
   id: z.string().min(1).optional(),
-  name: z.string().trim().min(1, "Give every component a name").max(60),
+  name: z.string().trim().min(1, 'Give every component a name').max(60),
   componentType: z.enum(ASSESSMENT_TYPES),
-  maxMarks: z.number("Enter the maximum marks").positive("Maximum marks must be more than 0").max(1000),
-  weight: z.number("Enter the weight").min(0, "Weight cannot be negative").max(100, "Weight cannot be more than 100"),
+  maxMarks: z
+    .number('Enter the maximum marks')
+    .positive('Maximum marks must be more than 0')
+    .max(1000),
+  weight: z
+    .number('Enter the weight')
+    .min(0, 'Weight cannot be negative')
+    .max(100, 'Weight cannot be more than 100'),
   isRequired: z.boolean().default(true),
   isRepeatable: z.boolean().default(false),
   expectedCount: z.number().int().min(1).max(10).default(1),
@@ -1532,9 +1586,9 @@ export type AssessmentComponentInput = z.infer<typeof assessmentComponentInputSc
 
 export const saveAssessmentTemplateSchema = z
   .object({
-    name: z.string().trim().min(2, "Give the assessment a name").max(120),
+    name: z.string().trim().min(2, 'Give the assessment a name').max(120),
     description: clearable(z.string().trim().max(500)),
-    gradingSystemId: z.string().min(1, "Choose a grading scale"),
+    gradingSystemId: z.string().min(1, 'Choose a grading scale'),
     /** Empty means every class. */
     classIds: z.array(z.string().min(1)).max(300).default([]),
     /** null means every subject. */
@@ -1542,20 +1596,32 @@ export const saveAssessmentTemplateSchema = z
     /** null means every term. */
     termNumber: z.number().int().min(1).max(6).nullable().optional(),
     /** A date, YYYY-MM-DD. Marks can be entered up to the end of that day. */
-    deadline: clearable(z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use a date like 2026-12-18")),
+    deadline: clearable(z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Use a date like 2026-12-18')),
     isActive: z.boolean().default(true),
     isLocked: z.boolean().default(false),
-    components: z.array(assessmentComponentInputSchema).min(1, "Add at least one component").max(12),
+    components: z
+      .array(assessmentComponentInputSchema)
+      .min(1, 'Add at least one component')
+      .max(12),
   })
   .superRefine((value, ctx) => {
     const total = value.components.reduce((sum, component) => sum + component.weight, 0);
     if (Math.abs(total - 100) > 0.01) {
-      ctx.addIssue({ code: "custom", path: ["components"], message: `Component weights must add up to 100%. They add up to ${Math.round(total * 100) / 100}%.` });
+      ctx.addIssue({
+        code: 'custom',
+        path: ['components'],
+        message: `Component weights must add up to 100%. They add up to ${Math.round(total * 100) / 100}%.`,
+      });
     }
     const names = new Set<string>();
     for (const component of value.components) {
       const key = component.name.trim().toLowerCase();
-      if (names.has(key)) ctx.addIssue({ code: "custom", path: ["components"], message: `"${component.name}" is used twice. Give each component its own name.` });
+      if (names.has(key))
+        ctx.addIssue({
+          code: 'custom',
+          path: ['components'],
+          message: `"${component.name}" is used twice. Give each component its own name.`,
+        });
       names.add(key);
     }
   });
@@ -1567,8 +1633,24 @@ export type SaveAssessmentTemplateInput = z.infer<typeof saveAssessmentTemplateS
  * grades already recorded depend on them. Returns a reason, or null if fine.
  */
 export function lockedStructureProblem(
-  existing: { id: string; maxMarks: number; weight: number; componentType: string; isRequired: boolean; isRepeatable: boolean; expectedCount: number }[],
-  incoming: { id?: string; maxMarks: number; weight: number; componentType: string; isRequired: boolean; isRepeatable: boolean; expectedCount: number }[],
+  existing: {
+    id: string;
+    maxMarks: number;
+    weight: number;
+    componentType: string;
+    isRequired: boolean;
+    isRepeatable: boolean;
+    expectedCount: number;
+  }[],
+  incoming: {
+    id?: string;
+    maxMarks: number;
+    weight: number;
+    componentType: string;
+    isRequired: boolean;
+    isRepeatable: boolean;
+    expectedCount: number;
+  }[],
 ): string | null {
   const message =
     "Marks have already been recorded, so the components, their maximum marks and weights can't change. You can rename components, or duplicate this assessment to start a new one.";
@@ -1591,38 +1673,37 @@ export function lockedStructureProblem(
   return null;
 }
 
-
 // ============================================================================
 // ANNOUNCEMENTS
 // ============================================================================
 
-export const ANNOUNCEMENT_CATEGORIES = ["ACADEMIC", "EVENT", "HOUSE", "GENERAL"] as const;
+export const ANNOUNCEMENT_CATEGORIES = ['ACADEMIC', 'EVENT', 'HOUSE', 'GENERAL'] as const;
 export type AnnouncementCategory = (typeof ANNOUNCEMENT_CATEGORIES)[number];
 
 export const ANNOUNCEMENT_TARGETS = [
-  "ALL_STUDENTS",
-  "SELECTED_CLASSES",
-  "SELECTED_CLASS_GUARDIANS",
-  "SCHOOL_HOUSES",
-  "SCHOOL_COMMUNITY",
-  "PARENTS_GUARDIANS",
-  "TEACHERS",
-  "OUTSTANDING_FEE_GUARDIANS",
+  'ALL_STUDENTS',
+  'SELECTED_CLASSES',
+  'SELECTED_CLASS_GUARDIANS',
+  'SCHOOL_HOUSES',
+  'SCHOOL_COMMUNITY',
+  'PARENTS_GUARDIANS',
+  'TEACHERS',
+  'OUTSTANDING_FEE_GUARDIANS',
 ] as const;
 export type AnnouncementTarget = (typeof ANNOUNCEMENT_TARGETS)[number];
 
-export const ANNOUNCEMENT_STATUSES = ["PUBLISHED", "DRAFT"] as const;
+export const ANNOUNCEMENT_STATUSES = ['PUBLISHED', 'DRAFT'] as const;
 export type AnnouncementStatus = (typeof ANNOUNCEMENT_STATUSES)[number];
 
 export const createAnnouncementSchema = z.object({
-  title: z.string().trim().min(3, "Title must contain at least 3 characters").max(180),
-  content: z.string().trim().min(1, "Announcement content is required").max(10000),
-  category: z.enum(ANNOUNCEMENT_CATEGORIES).default("GENERAL"),
-  target: z.enum(ANNOUNCEMENT_TARGETS).default("SCHOOL_COMMUNITY"),
+  title: z.string().trim().min(3, 'Title must contain at least 3 characters').max(180),
+  content: z.string().trim().min(1, 'Announcement content is required').max(10000),
+  category: z.enum(ANNOUNCEMENT_CATEGORIES).default('GENERAL'),
+  target: z.enum(ANNOUNCEMENT_TARGETS).default('SCHOOL_COMMUNITY'),
   /** Explicit class audience used for class and class-guardian announcements. */
   classIds: z.array(z.string().trim().min(1)).max(100).default([]),
   isPinned: z.boolean().default(false),
-  status: z.enum(ANNOUNCEMENT_STATUSES).default("PUBLISHED"),
+  status: z.enum(ANNOUNCEMENT_STATUSES).default('PUBLISHED'),
 });
 export type CreateAnnouncementInput = z.infer<typeof createAnnouncementSchema>;
 
@@ -1649,35 +1730,35 @@ export const STUDENT_IMPORT_LIMITS = {
 } as const;
 
 export const STUDENT_IMPORT_FIELDS = [
-  "firstName",
-  "lastName",
-  "otherNames",
-  "gender",
-  "dateOfBirth",
-  "admissionNumber",
-  "admissionDate",
-  "className",
-  "houseName",
-  "nationality",
-  "residentialAddress",
-  "city",
-  "region",
-  "bloodGroup",
-  "allergies",
-  "medicalConditions",
-  "emergencyContactName",
-  "emergencyContactPhone",
-  "emergencyRelationship",
-  "g1FirstName",
-  "g1LastName",
-  "g1Relationship",
-  "g1Phone",
-  "g1Email",
-  "g2FirstName",
-  "g2LastName",
-  "g2Relationship",
-  "g2Phone",
-  "g2Email",
+  'firstName',
+  'lastName',
+  'otherNames',
+  'gender',
+  'dateOfBirth',
+  'admissionNumber',
+  'admissionDate',
+  'className',
+  'houseName',
+  'nationality',
+  'residentialAddress',
+  'city',
+  'region',
+  'bloodGroup',
+  'allergies',
+  'medicalConditions',
+  'emergencyContactName',
+  'emergencyContactPhone',
+  'emergencyRelationship',
+  'g1FirstName',
+  'g1LastName',
+  'g1Relationship',
+  'g1Phone',
+  'g1Email',
+  'g2FirstName',
+  'g2LastName',
+  'g2Relationship',
+  'g2Phone',
+  'g2Email',
 ] as const;
 export type StudentImportField = (typeof STUDENT_IMPORT_FIELDS)[number];
 
@@ -1693,49 +1774,220 @@ export interface StudentImportColumn {
 }
 
 const guardianColumns = (n: 1 | 2): StudentImportColumn[] => {
-  const prefix = `g${n}` as "g1" | "g2";
+  const prefix = `g${n}` as 'g1' | 'g2';
   const label = `Guardian ${n}`;
-  const alias = (suffix: string) => [`guardian${n}${suffix}`, `parent${n}${suffix}`, ...(n === 1 ? [`guardian${suffix}`, `parent${suffix}`] : [])];
+  const alias = (suffix: string) => [
+    `guardian${n}${suffix}`,
+    `parent${n}${suffix}`,
+    ...(n === 1 ? [`guardian${suffix}`, `parent${suffix}`] : []),
+  ];
   return [
-    { key: `${prefix}FirstName` as StudentImportField, label: `${label} first name`, aliases: alias("firstname"), help: n === 1 ? "The main parent or guardian. Needs a phone number to be saved." : "Optional second guardian.", example: n === 1 ? "Kofi" : "Ama" },
-    { key: `${prefix}LastName` as StudentImportField, label: `${label} last name`, aliases: alias("lastname").concat(alias("surname")), help: "", example: "Mensah" },
-    { key: `${prefix}Relationship` as StudentImportField, label: `${label} relationship`, aliases: alias("relationship").concat(alias("relation")), help: "Father, Mother, Guardian, Grandmother, Relative...", example: n === 1 ? "Father" : "Mother" },
-    { key: `${prefix}Phone` as StudentImportField, label: `${label} phone`, aliases: alias("phone").concat(alias("contact"), alias("telephone")), help: "For example 0244123456 or +233244123456.", example: "0244123456" },
-    { key: `${prefix}Email` as StudentImportField, label: `${label} email`, aliases: alias("email"), help: "Optional. Needed only to create a parent-portal login.", example: "" },
+    {
+      key: `${prefix}FirstName` as StudentImportField,
+      label: `${label} first name`,
+      aliases: alias('firstname'),
+      help:
+        n === 1
+          ? 'The main parent or guardian. Needs a phone number to be saved.'
+          : 'Optional second guardian.',
+      example: n === 1 ? 'Kofi' : 'Ama',
+    },
+    {
+      key: `${prefix}LastName` as StudentImportField,
+      label: `${label} last name`,
+      aliases: alias('lastname').concat(alias('surname')),
+      help: '',
+      example: 'Mensah',
+    },
+    {
+      key: `${prefix}Relationship` as StudentImportField,
+      label: `${label} relationship`,
+      aliases: alias('relationship').concat(alias('relation')),
+      help: 'Father, Mother, Guardian, Grandmother, Relative...',
+      example: n === 1 ? 'Father' : 'Mother',
+    },
+    {
+      key: `${prefix}Phone` as StudentImportField,
+      label: `${label} phone`,
+      aliases: alias('phone').concat(alias('contact'), alias('telephone')),
+      help: 'For example 0244123456 or +233244123456.',
+      example: '0244123456',
+    },
+    {
+      key: `${prefix}Email` as StudentImportField,
+      label: `${label} email`,
+      aliases: alias('email'),
+      help: 'Optional. Needed only to create a parent-portal login.',
+      example: '',
+    },
   ];
 };
 
 export const STUDENT_IMPORT_COLUMNS: StudentImportColumn[] = [
-  { key: "firstName", label: "First name", required: true, aliases: ["firstname", "givenname", "forename", "first"], help: "", example: "Akosua" },
-  { key: "lastName", label: "Last name", required: true, aliases: ["lastname", "surname", "familyname", "last"], help: "", example: "Mensah" },
-  { key: "otherNames", label: "Other names", aliases: ["othernames", "middlename", "middlenames", "othername"], help: "", example: "Serwaa" },
-  { key: "gender", label: "Gender", required: true, aliases: ["gender", "sex"], help: "Male or Female (M or F also works).", example: "Female" },
-  { key: "dateOfBirth", label: "Date of birth", required: true, aliases: ["dateofbirth", "dob", "birthdate", "birthday", "dateborn"], help: "Day first: 25/12/2012 or 25 Dec 2012. Year-first 2012-12-25 also works.", example: "25/12/2012" },
-  { key: "admissionNumber", label: "Admission number", aliases: ["admissionnumber", "admissionno", "admissionnum", "admno", "admission", "admissionid"], help: "The number the student already has. Leave blank to have one generated.", example: "" },
-  { key: "admissionDate", label: "Admission date", aliases: ["admissiondate", "dateadmitted", "dateofadmission", "enrolmentdate", "enrollmentdate"], help: "When the student joined the school. Leave blank for today.", example: "" },
-  { key: "className", label: "Class", aliases: ["class", "classname", "grade", "form", "level", "currentclass"], help: "Must match a class you have already created, such as JHS 1A.", example: "JHS 1A" },
-  { key: "houseName", label: "House", aliases: ["house", "housename"], help: "Must match an existing house. Optional.", example: "" },
-  { key: "nationality", label: "Nationality", aliases: ["nationality", "citizenship"], help: "Blank means Ghanaian.", example: "Ghanaian" },
-  { key: "residentialAddress", label: "Residential address", aliases: ["residentialaddress", "address", "homeaddress"], help: "", example: "12 Palm Street" },
-  { key: "city", label: "City", aliases: ["city", "town"], help: "", example: "Accra" },
-  { key: "region", label: "Region", aliases: ["region", "state", "province"], help: "", example: "Greater Accra" },
-  { key: "bloodGroup", label: "Blood group", aliases: ["bloodgroup", "bloodtype"], help: "", example: "O+" },
-  { key: "allergies", label: "Allergies", aliases: ["allergies", "allergy"], help: "", example: "" },
-  { key: "medicalConditions", label: "Medical conditions", aliases: ["medicalconditions", "medicalcondition", "medical", "healthconditions"], help: "", example: "" },
-  { key: "emergencyContactName", label: "Emergency contact name", aliases: ["emergencycontactname", "emergencycontact", "emergencyname"], help: "", example: "Kofi Mensah" },
-  { key: "emergencyContactPhone", label: "Emergency contact phone", aliases: ["emergencycontactphone", "emergencyphone", "emergencycontactnumber"], help: "", example: "0244123456" },
-  { key: "emergencyRelationship", label: "Emergency contact relationship", aliases: ["emergencycontactrelationship", "emergencyrelationship", "emergencyrelation"], help: "", example: "Father" },
+  {
+    key: 'firstName',
+    label: 'First name',
+    required: true,
+    aliases: ['firstname', 'givenname', 'forename', 'first'],
+    help: '',
+    example: 'Akosua',
+  },
+  {
+    key: 'lastName',
+    label: 'Last name',
+    required: true,
+    aliases: ['lastname', 'surname', 'familyname', 'last'],
+    help: '',
+    example: 'Mensah',
+  },
+  {
+    key: 'otherNames',
+    label: 'Other names',
+    aliases: ['othernames', 'middlename', 'middlenames', 'othername'],
+    help: '',
+    example: 'Serwaa',
+  },
+  {
+    key: 'gender',
+    label: 'Gender',
+    required: true,
+    aliases: ['gender', 'sex'],
+    help: 'Male or Female (M or F also works).',
+    example: 'Female',
+  },
+  {
+    key: 'dateOfBirth',
+    label: 'Date of birth',
+    required: true,
+    aliases: ['dateofbirth', 'dob', 'birthdate', 'birthday', 'dateborn'],
+    help: 'Day first: 25/12/2012 or 25 Dec 2012. Year-first 2012-12-25 also works.',
+    example: '25/12/2012',
+  },
+  {
+    key: 'admissionNumber',
+    label: 'Admission number',
+    aliases: [
+      'admissionnumber',
+      'admissionno',
+      'admissionnum',
+      'admno',
+      'admission',
+      'admissionid',
+    ],
+    help: 'The number the student already has. Leave blank to have one generated.',
+    example: '',
+  },
+  {
+    key: 'admissionDate',
+    label: 'Admission date',
+    aliases: [
+      'admissiondate',
+      'dateadmitted',
+      'dateofadmission',
+      'enrolmentdate',
+      'enrollmentdate',
+    ],
+    help: 'When the student joined the school. Leave blank for today.',
+    example: '',
+  },
+  {
+    key: 'className',
+    label: 'Class',
+    aliases: ['class', 'classname', 'grade', 'form', 'level', 'currentclass'],
+    help: 'Must match a class you have already created, such as JHS 1A.',
+    example: 'JHS 1A',
+  },
+  {
+    key: 'houseName',
+    label: 'House',
+    aliases: ['house', 'housename'],
+    help: 'Must match an existing house. Optional.',
+    example: '',
+  },
+  {
+    key: 'nationality',
+    label: 'Nationality',
+    aliases: ['nationality', 'citizenship'],
+    help: 'Blank means Ghanaian.',
+    example: 'Ghanaian',
+  },
+  {
+    key: 'residentialAddress',
+    label: 'Residential address',
+    aliases: ['residentialaddress', 'address', 'homeaddress'],
+    help: '',
+    example: '12 Palm Street',
+  },
+  { key: 'city', label: 'City', aliases: ['city', 'town'], help: '', example: 'Accra' },
+  {
+    key: 'region',
+    label: 'Region',
+    aliases: ['region', 'state', 'province'],
+    help: '',
+    example: 'Greater Accra',
+  },
+  {
+    key: 'bloodGroup',
+    label: 'Blood group',
+    aliases: ['bloodgroup', 'bloodtype'],
+    help: '',
+    example: 'O+',
+  },
+  {
+    key: 'allergies',
+    label: 'Allergies',
+    aliases: ['allergies', 'allergy'],
+    help: '',
+    example: '',
+  },
+  {
+    key: 'medicalConditions',
+    label: 'Medical conditions',
+    aliases: ['medicalconditions', 'medicalcondition', 'medical', 'healthconditions'],
+    help: '',
+    example: '',
+  },
+  {
+    key: 'emergencyContactName',
+    label: 'Emergency contact name',
+    aliases: ['emergencycontactname', 'emergencycontact', 'emergencyname'],
+    help: '',
+    example: 'Kofi Mensah',
+  },
+  {
+    key: 'emergencyContactPhone',
+    label: 'Emergency contact phone',
+    aliases: ['emergencycontactphone', 'emergencyphone', 'emergencycontactnumber'],
+    help: '',
+    example: '0244123456',
+  },
+  {
+    key: 'emergencyRelationship',
+    label: 'Emergency contact relationship',
+    aliases: ['emergencycontactrelationship', 'emergencyrelationship', 'emergencyrelation'],
+    help: '',
+    example: 'Father',
+  },
   ...guardianColumns(1),
   ...guardianColumns(2),
 ];
 
 const importText = (max: number) => z.string().trim().max(max).optional();
-const importIsoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use a date like 2012-12-25");
+const importIsoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Use a date like 2012-12-25');
 
 export const importedGuardianSchema = z.object({
   firstName: z.string().trim().min(1).max(100),
   lastName: z.string().trim().min(1).max(100),
-  relationshipType: z.enum(["FATHER", "MOTHER", "GUARDIAN", "SIBLING", "GRANDFATHER", "GRANDMOTHER", "RELATIVE", "OTHER"]),
+  relationshipType: z.enum([
+    'FATHER',
+    'MOTHER',
+    'GUARDIAN',
+    'SIBLING',
+    'GRANDFATHER',
+    'GRANDMOTHER',
+    'RELATIVE',
+    'OTHER',
+  ]),
   phone: z.string().trim().min(5).max(30),
   email: z.email().optional(),
 });
@@ -1747,9 +1999,16 @@ export const normalizedStudentRowSchema = z.object({
   firstName: z.string().trim().min(1).max(100),
   lastName: z.string().trim().min(1).max(100),
   otherNames: importText(100),
-  gender: z.enum(["MALE", "FEMALE", "OTHER"]),
+  gender: z.enum(['MALE', 'FEMALE', 'OTHER']),
   dateOfBirth: importIsoDate,
-  admissionNumber: z.string().trim().regex(/^[A-Za-z0-9][A-Za-z0-9/_.\- ]{0,29}$/, "Admission numbers use letters, digits and / _ . - only").optional(),
+  admissionNumber: z
+    .string()
+    .trim()
+    .regex(
+      /^[A-Za-z0-9][A-Za-z0-9/_.\- ]{0,29}$/,
+      'Admission numbers use letters, digits and / _ . - only',
+    )
+    .optional(),
   admissionDate: importIsoDate.optional(),
   className: importText(60),
   houseName: importText(60),

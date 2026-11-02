@@ -1,10 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { schoolHubtelConnectionSchema } from '@schoolhub/shared';
-import {
-  canEncryptSchoolSms,
-  decryptSchoolSms,
-  encryptSchoolSms,
-} from './school-sms-crypto.js';
+import { canEncryptSchoolSms, decryptSchoolSms, encryptSchoolSms } from './school-sms-crypto.js';
 const first = Buffer.alloc(32, 1).toString('base64'),
   second = Buffer.alloc(32, 2).toString('base64'),
   auth = { clientId: 'synthetic-client', clientSecret: 'synthetic-secret' };
@@ -43,12 +39,9 @@ describe('school SMS credential isolation', () => {
       { clientSecret: '' },
       { apiBaseUrl: 'https://evil.example/v1/messages' },
       {
-        apiBaseUrl:
-          'https://sms.hubtel.com/v1/messages/send?clientsecret=synthetic',
+        apiBaseUrl: 'https://sms.hubtel.com/v1/messages/send?clientsecret=synthetic',
       },
     ])
-      expect(
-        schoolHubtelConnectionSchema.safeParse({ ...input, ...patch }).success,
-      ).toBe(false);
+      expect(schoolHubtelConnectionSchema.safeParse({ ...input, ...patch }).success).toBe(false);
   });
 });

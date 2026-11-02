@@ -1,7 +1,7 @@
-import { Injectable } from "@nestjs/common";
-import { PrismaService } from "../../prisma/prisma.service.js";
-import { TeacherScopeService } from "../../common/scope/teacher-scope.service.js";
-import { buildTeachingClasses } from "./teaching-classes.js";
+import { Injectable } from '@nestjs/common';
+import { PrismaService } from '../../prisma/prisma.service.js';
+import { TeacherScopeService } from '../../common/scope/teacher-scope.service.js';
+import { buildTeachingClasses } from './teaching-classes.js';
 
 /** The signed-in teacher's own classes: where they are class teacher and what they teach. */
 @Injectable()
@@ -17,14 +17,21 @@ export class TeachingService {
     if (!assignments.teacherId) return { teacher: null, term: null, classes: [] };
 
     const classIds = [
-      ...new Set([...assignments.classTeacherClassIds, ...assignments.subjectAssignments.map((row) => row.classId)]),
+      ...new Set([
+        ...assignments.classTeacherClassIds,
+        ...assignments.subjectAssignments.map((row) => row.classId),
+      ]),
     ];
     const subjectIds = [...new Set(assignments.subjectAssignments.map((row) => row.subjectId))];
 
     const [teacher, term, classes, subjects] = await Promise.all([
       db.teacher.findFirst({
         where: { id: assignments.teacherId },
-        select: { firstName: true, lastName: true, profile: { select: { firstName: true, lastName: true } } },
+        select: {
+          firstName: true,
+          lastName: true,
+          profile: { select: { firstName: true, lastName: true } },
+        },
       }),
       db.term.findFirst({
         where: { isCurrent: true, academicYear: { schoolId, isCurrent: true } },
@@ -42,8 +49,13 @@ export class TeachingService {
 
     const counts = term
       ? await db.enrollment.groupBy({
-          by: ["classId"],
-          where: { classId: { in: classIds }, termId: term.id, status: "ACTIVE", student: { deletedAt: null } },
+          by: ['classId'],
+          where: {
+            classId: { in: classIds },
+            termId: term.id,
+            status: 'ACTIVE',
+            student: { deletedAt: null },
+          },
           _count: { _all: true },
         })
       : [];
@@ -51,7 +63,7 @@ export class TeachingService {
     return {
       teacher: {
         id: assignments.teacherId,
-        name: `${teacher?.profile?.firstName ?? teacher?.firstName ?? ""} ${teacher?.profile?.lastName ?? teacher?.lastName ?? ""}`.trim(),
+        name: `${teacher?.profile?.firstName ?? teacher?.firstName ?? ''} ${teacher?.profile?.lastName ?? teacher?.lastName ?? ''}`.trim(),
       },
       term,
       classes: buildTeachingClasses(

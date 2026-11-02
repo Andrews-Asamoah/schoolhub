@@ -18,11 +18,13 @@ The calendar summary additionally translates bad inherited term/calendar configu
 into an actionable HTTP 400 rather than an internal server error.
 
 ## Rollback
+
 This is a non-destructive expansion migration. If a deployment must be rolled back,
 leave the nullable columns and constraints in place while reverting the application.
 Do not automatically rewrite historical actor IDs. Dropping FKs is a separately
 reviewed operational intervention only.
 
 ## Validation
+
 Prisma client generation/typecheck, real PostgreSQL FK tests and current CI are mandatory
 before merging into `dev`. No WIS legacy data is imported by this PR.

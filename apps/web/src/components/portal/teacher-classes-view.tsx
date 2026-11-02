@@ -1,7 +1,7 @@
-import { ClipboardCheck, FileSpreadsheet, GraduationCap, Users } from "lucide-react";
-import { useState } from "react";
-import { ClassRegister } from "@/components/school/class-register";
-import { useTeachingOverview } from "@/lib/teaching";
+import { ClipboardCheck, FileSpreadsheet, GraduationCap, Users } from 'lucide-react';
+import { useState } from 'react';
+import { ClassRegister } from '@/components/school/class-register';
+import { useTeachingOverview } from '@/lib/teaching';
 
 /**
  * The teacher's own classes. A class teacher also gets "Manage class", which
@@ -15,15 +15,22 @@ export function TeacherClassesView({
   const overview = useTeachingOverview();
   const [managing, setManaging] = useState<string | null>(null);
 
-  if (overview.isPending) return <p className="text-xs text-muted-foreground">Loading your classes…</p>;
-  if (overview.error) return <p role="alert" className="text-xs text-destructive">Could not load your classes: {overview.error.message}</p>;
+  if (overview.isPending)
+    return <p className="text-xs text-muted-foreground">Loading your classes…</p>;
+  if (overview.error)
+    return (
+      <p role="alert" className="text-xs text-destructive">
+        Could not load your classes: {overview.error.message}
+      </p>
+    );
   const classes = overview.data.classes;
   if (classes.length === 0) {
     return (
       <div className="rounded-2xl border border-dashed border-input p-8 text-center">
         <h2 className="text-sm font-semibold text-foreground">You have no classes yet</h2>
         <p className="mx-auto mt-1 max-w-md text-xs text-muted-foreground">
-          Classes appear here once an administrator makes you the class teacher or assigns you a subject in a class.
+          Classes appear here once an administrator makes you the class teacher or assigns you a
+          subject in a class.
         </p>
       </div>
     );
@@ -45,11 +52,14 @@ export function TeacherClassesView({
                     <h3 className="flex flex-wrap items-center gap-2 text-sm font-bold text-foreground">
                       {klass.name}
                       {klass.isClassTeacher && (
-                        <span className="rounded-full bg-primary px-2 py-0.5 text-[10px] font-semibold text-primary-foreground">Class teacher</span>
+                        <span className="rounded-full bg-primary px-2 py-0.5 text-[10px] font-semibold text-primary-foreground">
+                          Class teacher
+                        </span>
                       )}
                     </h3>
                     <p className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
-                      <Users className="size-3.5" /> {klass.studentCount} pupil{klass.studentCount === 1 ? "" : "s"} · {klass.level}
+                      <Users className="size-3.5" /> {klass.studentCount} pupil
+                      {klass.studentCount === 1 ? '' : 's'} · {klass.level}
                     </p>
                   </div>
                 </div>
@@ -61,14 +71,16 @@ export function TeacherClassesView({
                     className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary px-4 text-xs font-semibold text-primary-foreground hover:bg-primary/90"
                   >
                     <ClipboardCheck className="size-4" />
-                    {open ? "Close register" : `Manage ${klass.name}`}
+                    {open ? 'Close register' : `Manage ${klass.name}`}
                   </button>
                 )}
               </div>
 
               {klass.subjects.length > 0 && (
                 <div className="mt-4 border-t border-border/60 pt-3">
-                  <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70">I teach here</p>
+                  <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70">
+                    I teach here
+                  </p>
                   <ul className="flex flex-wrap gap-2">
                     {klass.subjects.map((subject) => (
                       <li key={subject.id}>

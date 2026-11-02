@@ -1,7 +1,7 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useSession } from "@/lib/auth-client";
-import { useEffect } from "react";
-import { useNavigate } from "@tanstack/react-router";
+import { createFileRoute } from '@tanstack/react-router';
+import { useSession } from '@/lib/auth-client';
+import { useEffect } from 'react';
+import { useNavigate } from '@tanstack/react-router';
 
 /**
  * Index route — smart redirect based on session role.
@@ -9,7 +9,7 @@ import { useNavigate } from "@tanstack/react-router";
  * logged in  → /dashboard
  * no session → /login
  */
-export const Route = createFileRoute("/")({
+export const Route = createFileRoute('/')({
   component: IndexRedirect,
 });
 
@@ -20,11 +20,11 @@ function IndexRedirect() {
   useEffect(() => {
     if (isPending) return;
     if (!session?.user) {
-      void navigate({ to: "/login" });
-    } else if (session.user.role === "superAdmin") {
-      void navigate({ to: "/admin/dashboard" });
+      void navigate({ to: '/login' });
+    } else if (session.user.role === 'superAdmin') {
+      void navigate({ to: '/admin/dashboard' });
     } else {
-      void navigate({ to: "/dashboard" });
+      void navigate({ to: '/dashboard' });
     }
   }, [session, isPending, navigate]);
 

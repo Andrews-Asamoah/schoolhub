@@ -1,13 +1,13 @@
-import { ConflictException, Injectable } from "@nestjs/common";
-import { generateId } from "better-auth";
-import { randomInt } from "node:crypto";
-import { hashPassword } from "better-auth/crypto";
-import { temporaryPasswordExpiry } from "../../common/guards/password-change.js";
-import type { AuditAction, Prisma } from "@prisma/client";
-import type { IssuedCredentials, Role } from "@schoolhub/shared";
+import { ConflictException, Injectable } from '@nestjs/common';
+import { generateId } from 'better-auth';
+import { randomInt } from 'node:crypto';
+import { hashPassword } from 'better-auth/crypto';
+import { temporaryPasswordExpiry } from '../../common/guards/password-change.js';
+import type { AuditAction, Prisma } from '@prisma/client';
+import type { IssuedCredentials, Role } from '@schoolhub/shared';
 
 /** Roles an administrator may provision. "owner" is only created at school enrolment. */
-export type ProvisionableRole = Exclude<Role, "owner">;
+export type ProvisionableRole = Exclude<Role, 'owner'>;
 
 /**
  * Creates a short guardian sign-in email using the school's email domain.
@@ -16,15 +16,15 @@ export type ProvisionableRole = Exclude<Role, "owner">;
  */
 export function newGuardianLoginEmail(name: string, emailDomain: string) {
   const parts = name
-    .normalize("NFKD")
-    .replace(/[\u0300-\u036f]/g, "")
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
     .split(/[^a-z0-9]+/)
     .filter(Boolean);
-  const first = parts[0] ?? "guardian";
-  const last = parts.length > 1 ? parts[parts.length - 1] : "";
+  const first = parts[0] ?? 'guardian';
+  const last = parts.length > 1 ? parts[parts.length - 1] : '';
   const namePart = (last ? `${first[0]}${last}` : first).slice(0, 24);
-  const suffix = randomInt(0, 10_000).toString().padStart(4, "0");
+  const suffix = randomInt(0, 10_000).toString().padStart(4, '0');
   return `${namePart}-g${suffix}@${emailDomain.trim().toLowerCase()}`;
 }
 
@@ -33,19 +33,22 @@ export interface PreparedCredential {
   passwordHash: string;
 }
 
-const LOWER = "abcdefghijkmnopqrstuvwxyz"; // no l
-const UPPER = "ABCDEFGHJKLMNPQRSTUVWXYZ"; // no I, O
-const DIGITS = "23456789"; // no 0, 1
-const SYMBOLS = "@#$%&*+=?";
+const LOWER = 'abcdefghijkmnopqrstuvwxyz'; // no l
+const UPPER = 'ABCDEFGHJKLMNPQRSTUVWXYZ'; // no I, O
+const DIGITS = '23456789'; // no 0, 1
+const SYMBOLS = '@#$%&*+=?';
 
 /**
  * Cryptographically random one-time password that always satisfies the shared
  * password policy and avoids look-alike characters (easy to read out loud).
  */
-export function generateTemporaryPassword(length = 16, options: { symbols?: boolean } = {}): string {
+export function generateTemporaryPassword(
+  length = 16,
+  options: { symbols?: boolean } = {},
+): string {
   const useSymbols = options.symbols !== false;
   const pick = (alphabet: string) => alphabet[randomInt(0, alphabet.length)]!;
-  const all = LOWER + UPPER + DIGITS + (useSymbols ? SYMBOLS : "");
+  const all = LOWER + UPPER + DIGITS + (useSymbols ? SYMBOLS : '');
   const chars = [pick(LOWER), pick(UPPER), pick(DIGITS)];
   if (useSymbols) chars.push(pick(SYMBOLS));
   while (chars.length < length) chars.push(pick(all));
@@ -53,7 +56,7 @@ export function generateTemporaryPassword(length = 16, options: { symbols?: bool
     const j = randomInt(0, i + 1);
     [chars[i], chars[j]] = [chars[j]!, chars[i]!];
   }
-  return chars.join("");
+  return chars.join('');
 }
 
 export function toIssuedCredentials(
@@ -77,7 +80,7 @@ interface CreateLoginInput {
   role: ProvisionableRole;
   organizationId: string;
   credential: PreparedCredential;
-  profile?: Omit<Prisma.UserProfileUncheckedCreateInput, "userId" | "id">;
+  profile?: Omit<Prisma.UserProfileUncheckedCreateInput, 'userId' | 'id'>;
 }
 
 interface ResetLoginInput {
@@ -100,7 +103,7 @@ export class CredentialsService {
    */
   async prepare(role: Role): Promise<PreparedCredential> {
     const temporaryPassword =
-      role === "student" || role === "guardian"
+      role === 'student' || role === 'guardian'
         ? generateTemporaryPassword(12, { symbols: false })
         : generateTemporaryPassword();
     return { temporaryPassword, passwordHash: await hashPassword(temporaryPassword) };
@@ -130,7 +133,7 @@ export class CredentialsService {
         name: input.name,
         email,
         emailVerified: false,
-        role: "user", // platform-level role; school access comes from `member`
+        role: 'user', // platform-level role; school access comes from `member`
         mustChangePassword: true,
         temporaryPasswordExpiresAt: temporaryPasswordExpiry(now),
         createdAt: now,
@@ -141,7 +144,7 @@ export class CredentialsService {
       data: {
         id: generateId(),
         accountId: userId,
-        providerId: "credential",
+        providerId: 'credential',
         userId,
         password: input.credential.passwordHash,
         createdAt: now,
@@ -204,8 +207,10 @@ export class CredentialsService {
       const fill: Prisma.UserProfileUncheckedUpdateInput = {};
       if (!profile.phone && input.profile.phone) fill.phone = input.profile.phone;
       if (!profile.gender && input.profile.gender) fill.gender = input.profile.gender;
-      if (!profile.dateOfBirth && input.profile.dateOfBirth) fill.dateOfBirth = input.profile.dateOfBirth;
-      if (Object.keys(fill).length) await tx.userProfile.update({ where: { id: profile.id }, data: fill });
+      if (!profile.dateOfBirth && input.profile.dateOfBirth)
+        fill.dateOfBirth = input.profile.dateOfBirth;
+      if (Object.keys(fill).length)
+        await tx.userProfile.update({ where: { id: profile.id }, data: fill });
     }
     return { userId: user.id, email, profileId, linked: true as const };
   }
@@ -218,7 +223,7 @@ export class CredentialsService {
   async resetLogin(tx: Prisma.TransactionClient, input: ResetLoginInput) {
     const now = new Date();
     const account = await tx.account.findFirst({
-      where: { userId: input.userId, providerId: "credential" },
+      where: { userId: input.userId, providerId: 'credential' },
       select: { id: true },
     });
     if (account) {
@@ -231,7 +236,7 @@ export class CredentialsService {
         data: {
           id: generateId(),
           accountId: input.userId,
-          providerId: "credential",
+          providerId: 'credential',
           userId: input.userId,
           password: input.credential.passwordHash,
           createdAt: now,
@@ -256,7 +261,7 @@ export class CredentialsService {
         },
       });
     } else if (membership.organizationId !== input.organizationId) {
-      throw new ConflictException("This account belongs to a different school.");
+      throw new ConflictException('This account belongs to a different school.');
     }
 
     await tx.user.update({

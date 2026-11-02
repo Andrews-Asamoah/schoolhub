@@ -5,8 +5,8 @@ import {
   HttpStatus,
   Injectable,
   NotFoundException,
-} from "@nestjs/common";
-import { Prisma, type School } from "@prisma/client";
+} from '@nestjs/common';
+import { Prisma, type School } from '@prisma/client';
 import {
   createStudentSchema,
   type AdmitApplicationInput,
@@ -19,16 +19,16 @@ import {
   type SubmitApplicationInput,
   type TrackApplicationInput,
   type UpdateApplicationExamInput,
-} from "@schoolhub/shared";
-import { PrismaService } from "../../prisma/prisma.service.js";
-import { CredentialsService } from "../accounts/credentials.service.js";
-import { FinanceService } from "../finance/finance.service.js";
-import { StudentsService } from "../students/students.service.js";
+} from '@schoolhub/shared';
+import { PrismaService } from '../../prisma/prisma.service.js';
+import { CredentialsService } from '../accounts/credentials.service.js';
+import { FinanceService } from '../finance/finance.service.js';
+import { StudentsService } from '../students/students.service.js';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const startOfDay = (iso: string) => new Date(`${iso}T00:00:00.000Z`);
 const endOfDay = (iso: string) => new Date(`${iso}T23:59:59.999Z`);
-const digits = (value: string) => value.replace(/\D/g, "");
+const digits = (value: string) => value.replace(/\D/g, '');
 
 /**
  * Exam date/time from the browser: a full ISO timestamp (with Z or an offset)
@@ -37,7 +37,9 @@ const digits = (value: string) => value.replace(/\D/g, "");
 function parseExamDate(value: string): Date {
   if (/(Z|[+-]\d{2}:\d{2})$/.test(value)) return new Date(value);
   if (value.length === 10) return new Date(`${value}T09:00:00.000Z`);
-  return new Date(`${value.length === 16 ? `${value}:00` : value}.000Z`.replace(/\.000Z\.000Z$/, ".000Z"));
+  return new Date(
+    `${value.length === 16 ? `${value}:00` : value}.000Z`.replace(/\.000Z\.000Z$/, '.000Z'),
+  );
 }
 
 /**
@@ -56,14 +58,15 @@ class RateLimiter {
     if (recent.length >= this.max) {
       this.hits.set(key, recent);
       throw new HttpException(
-        "Too many requests. Please try again later.",
+        'Too many requests. Please try again later.',
         HttpStatus.TOO_MANY_REQUESTS,
       );
     }
     recent.push(now);
     this.hits.set(key, recent);
     if (this.hits.size > 5000) {
-      for (const [k, v] of this.hits) if (!v.some((t) => now - t < this.windowMs)) this.hits.delete(k);
+      for (const [k, v] of this.hits)
+        if (!v.some((t) => now - t < this.windowMs)) this.hits.delete(k);
     }
   }
 }
@@ -86,7 +89,7 @@ export class AdmissionsService {
     const school = await this.prisma.client.school.findUnique({
       where: { subdomain: subdomain.trim().toLowerCase() },
     });
-    if (!school) throw new NotFoundException("School not found.");
+    if (!school) throw new NotFoundException('School not found.');
     return school;
   }
 
@@ -97,11 +100,11 @@ export class AdmissionsService {
     const cycles = await this.prisma.client.admissionCycle.findMany({
       where: {
         schoolId: school.id,
-        status: "OPEN",
+        status: 'OPEN',
         opensAt: { lte: now },
         closesAt: { gte: now },
       },
-      orderBy: { closesAt: "asc" },
+      orderBy: { closesAt: 'asc' },
       include: {
         academicYear: { select: { name: true } },
         classes: {
@@ -139,15 +142,22 @@ export class AdmissionsService {
     this.submitLimiter.check(`${school.id}:${ip}`);
 
     // Honeypot: bots fill the hidden field. Pretend it worked, store nothing.
-    if (input.website && input.website.trim() !== "") {
-      return { applicationNumber: "PENDING", status: "SUBMITTED", className: "", cycleName: "", admissionFee: 0, currency: school.currency };
+    if (input.website && input.website.trim() !== '') {
+      return {
+        applicationNumber: 'PENDING',
+        status: 'SUBMITTED',
+        className: '',
+        cycleName: '',
+        admissionFee: 0,
+        currency: school.currency,
+      };
     }
 
     const dob = startOfDay(input.dateOfBirth);
     const today = new Date();
     const ageYears = (today.getTime() - dob.getTime()) / (365.25 * DAY_MS);
     if (Number.isNaN(dob.getTime()) || dob > today || ageYears < 2 || ageYears > 25) {
-      throw new BadRequestException("Check the date of birth entered.");
+      throw new BadRequestException('Check the date of birth entered.');
     }
 
     const guardianEmail = input.guardianEmail?.trim().toLowerCase() || null;
@@ -159,7 +169,7 @@ export class AdmissionsService {
           class: { schoolId: school.id, isActive: true, deletedAt: null },
           cycle: {
             schoolId: school.id,
-            status: "OPEN",
+            status: 'OPEN',
             opensAt: { lte: new Date() },
             closesAt: { gte: new Date() },
           },
@@ -171,36 +181,41 @@ export class AdmissionsService {
       });
       if (!offered) {
         throw new BadRequestException(
-          "Applications for that class are not open. Choose a class from the list.",
+          'Applications for that class are not open. Choose a class from the list.',
         );
       }
 
       const duplicate = await tx.application.findFirst({
         where: {
           cycleId: offered.cycleId,
-          firstName: { equals: input.firstName, mode: "insensitive" },
-          lastName: { equals: input.lastName, mode: "insensitive" },
+          firstName: { equals: input.firstName, mode: 'insensitive' },
+          lastName: { equals: input.lastName, mode: 'insensitive' },
           dateOfBirth: dob,
-          status: { notIn: ["WITHDRAWN", "REJECTED"] },
+          status: { notIn: ['WITHDRAWN', 'REJECTED'] },
         },
         select: { id: true },
       });
       if (duplicate) {
         throw new ConflictException(
-          "An application for this applicant already exists in this intake. Use “Track application” to check its progress.",
+          'An application for this applicant already exists in this intake. Use “Track application” to check its progress.',
         );
       }
 
       const yy = String(new Date().getUTCFullYear()).slice(-2);
-      const prefix = `${school.code.replace(/[^a-zA-Z0-9]/g, "").toUpperCase().slice(0, 8) || "SCH"}-A${yy}-`;
+      const prefix = `${
+        school.code
+          .replace(/[^a-zA-Z0-9]/g, '')
+          .toUpperCase()
+          .slice(0, 8) || 'SCH'
+      }-A${yy}-`;
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${school.id}), hashtext(${prefix}))`;
       const last = await tx.application.findFirst({
         where: { schoolId: school.id, applicationNumber: { startsWith: prefix } },
-        orderBy: { applicationNumber: "desc" },
+        orderBy: { applicationNumber: 'desc' },
         select: { applicationNumber: true },
       });
       const seq = last ? Number(last.applicationNumber.slice(prefix.length)) + 1 : 1;
-      const applicationNumber = `${prefix}${String(seq).padStart(5, "0")}`;
+      const applicationNumber = `${prefix}${String(seq).padStart(5, '0')}`;
 
       await tx.application.create({
         data: {
@@ -227,12 +242,12 @@ export class AdmissionsService {
           guardianRelationship: input.guardianRelationship,
           // The fee is fixed when the application is made (cash, on exam day).
           feeDue: offered.cycle.admissionFee,
-          feeStatus: offered.cycle.admissionFee.gt(0) ? "PENDING" : "NOT_REQUIRED",
+          feeStatus: offered.cycle.admissionFee.gt(0) ? 'PENDING' : 'NOT_REQUIRED',
         },
       });
       return {
         applicationNumber,
-        status: "SUBMITTED" as const,
+        status: 'SUBMITTED' as const,
         className: offered.class.name,
         cycleName: offered.cycle.name,
         admissionFee: Number(offered.cycle.admissionFee),
@@ -256,10 +271,11 @@ export class AdmissionsService {
     const matches =
       app &&
       ((app.guardianEmail && app.guardianEmail === contact) ||
-        (digits(contact).length >= 7 && digits(app.guardianPhone).endsWith(digits(contact).slice(-9))));
+        (digits(contact).length >= 7 &&
+          digits(app.guardianPhone).endsWith(digits(contact).slice(-9))));
     // Same answer for "no such application" and "wrong contact": no probing.
-    if (!app || !matches) throw new NotFoundException("No application matches those details.");
-    const showDecision = ["ACCEPTED", "WAITLISTED", "REJECTED", "ADMITTED"].includes(app.status);
+    if (!app || !matches) throw new NotFoundException('No application matches those details.');
+    const showDecision = ['ACCEPTED', 'WAITLISTED', 'REJECTED', 'ADMITTED'].includes(app.status);
     return {
       applicationNumber: app.applicationNumber,
       applicantName: `${app.firstName} ${app.lastName}`,
@@ -267,8 +283,8 @@ export class AdmissionsService {
       cycleName: app.cycle.name,
       status: app.status,
       submittedAt: app.submittedAt,
-      examDate: app.status === "EXAM_SCHEDULED" ? app.examDate : null,
-      examVenue: app.status === "EXAM_SCHEDULED" ? app.examVenue : null,
+      examDate: app.status === 'EXAM_SCHEDULED' ? app.examDate : null,
+      examVenue: app.status === 'EXAM_SCHEDULED' ? app.examVenue : null,
       decisionNote: showDecision ? app.decisionNote : null,
       feeStatus: app.feeStatus,
       feeDue: Number(app.feeDue),
@@ -281,7 +297,7 @@ export class AdmissionsService {
   async listCycles(schoolId: string) {
     const cycles = await this.prisma.client.admissionCycle.findMany({
       where: { schoolId },
-      orderBy: { opensAt: "desc" },
+      orderBy: { opensAt: 'desc' },
       include: {
         academicYear: { select: { id: true, name: true } },
         term: { select: { id: true, name: true } },
@@ -289,13 +305,14 @@ export class AdmissionsService {
       },
     });
     const counts = await this.prisma.client.application.groupBy({
-      by: ["cycleId", "status"],
+      by: ['cycleId', 'status'],
       where: { schoolId },
       _count: { _all: true },
     });
     return cycles.map((c) => {
       const byStatus: Record<string, number> = {};
-      for (const row of counts.filter((x) => x.cycleId === c.id)) byStatus[row.status] = row._count._all;
+      for (const row of counts.filter((x) => x.cycleId === c.id))
+        byStatus[row.status] = row._count._all;
       return { ...c, applicationCounts: byStatus };
     });
   }
@@ -305,13 +322,13 @@ export class AdmissionsService {
       where: { id: input.academicYearId, schoolId },
       select: { id: true },
     });
-    if (!year) throw new BadRequestException("Choose an academic year of this school.");
+    if (!year) throw new BadRequestException('Choose an academic year of this school.');
     if (input.termId) {
       const term = await this.prisma.client.term.findFirst({
         where: { id: input.termId, academicYearId: year.id },
         select: { id: true },
       });
-      if (!term) throw new BadRequestException("Choose a term that belongs to that academic year.");
+      if (!term) throw new BadRequestException('Choose a term that belongs to that academic year.');
     }
     const classCount = await this.prisma.client.class.count({
       where: {
@@ -322,7 +339,7 @@ export class AdmissionsService {
       },
     });
     if (classCount !== input.classes.length) {
-      throw new BadRequestException("Choose active classes that belong to this school.");
+      throw new BadRequestException('Choose active classes that belong to this school.');
     }
   }
 
@@ -332,7 +349,7 @@ export class AdmissionsService {
       where: { schoolId, name: input.name },
       select: { id: true },
     });
-    if (clash) throw new ConflictException("An intake with this name already exists.");
+    if (clash) throw new ConflictException('An intake with this name already exists.');
     const created = await this.prisma.client.admissionCycle.create({
       data: {
         schoolId,
@@ -341,7 +358,7 @@ export class AdmissionsService {
         termId: input.termId ?? null,
         opensAt: startOfDay(input.opensAt),
         closesAt: endOfDay(input.closesAt),
-        status: input.status ?? "DRAFT",
+        status: input.status ?? 'DRAFT',
         examMaxScore: input.examMaxScore,
         passMark: input.passMark,
         admissionFee: input.admissionFee,
@@ -359,13 +376,13 @@ export class AdmissionsService {
       where: { id, schoolId },
       include: { classes: true },
     });
-    if (!existing) throw new NotFoundException("Intake not found.");
+    if (!existing) throw new NotFoundException('Intake not found.');
     await this.validateCycleInput(schoolId, input);
     const clash = await this.prisma.client.admissionCycle.findFirst({
       where: { schoolId, name: input.name, NOT: { id } },
       select: { id: true },
     });
-    if (clash) throw new ConflictException("An intake with this name already exists.");
+    if (clash) throw new ConflictException('An intake with this name already exists.');
 
     const keep = new Set(input.classes.map((c) => c.classId));
     const removed = existing.classes.filter((c) => !keep.has(c.classId));
@@ -375,7 +392,7 @@ export class AdmissionsService {
       });
       if (used > 0) {
         throw new ConflictException(
-          "A class that already has applications cannot be removed from the intake. Close the intake instead.",
+          'A class that already has applications cannot be removed from the intake. Close the intake instead.',
         );
       }
     }
@@ -394,10 +411,10 @@ export class AdmissionsService {
       // exemptions already recorded keep the amount they were made at.
       if (!existing.admissionFee.equals(input.admissionFee)) {
         await tx.application.updateMany({
-          where: { cycleId: id, feeStatus: { in: ["PENDING", "NOT_REQUIRED"] } },
+          where: { cycleId: id, feeStatus: { in: ['PENDING', 'NOT_REQUIRED'] } },
           data: {
             feeDue: input.admissionFee,
-            feeStatus: input.admissionFee > 0 ? "PENDING" : "NOT_REQUIRED",
+            feeStatus: input.admissionFee > 0 ? 'PENDING' : 'NOT_REQUIRED',
           },
         });
       }
@@ -442,9 +459,9 @@ export class AdmissionsService {
       ...(q.search
         ? {
             OR: [
-              { applicationNumber: { contains: q.search, mode: "insensitive" } },
-              { firstName: { contains: q.search, mode: "insensitive" } },
-              { lastName: { contains: q.search, mode: "insensitive" } },
+              { applicationNumber: { contains: q.search, mode: 'insensitive' } },
+              { firstName: { contains: q.search, mode: 'insensitive' } },
+              { lastName: { contains: q.search, mode: 'insensitive' } },
               { guardianPhone: { contains: q.search } },
             ],
           }
@@ -453,7 +470,7 @@ export class AdmissionsService {
     const [data, total] = await Promise.all([
       this.prisma.client.application.findMany({
         where,
-        orderBy: { submittedAt: "desc" },
+        orderBy: { submittedAt: 'desc' },
         skip: (page - 1) * limit,
         take: limit,
         include: {
@@ -475,7 +492,7 @@ export class AdmissionsService {
         class: { select: { id: true, name: true } },
       },
     });
-    if (!app) throw new NotFoundException("Application not found.");
+    if (!app) throw new NotFoundException('Application not found.');
     return app;
   }
 
@@ -485,10 +502,13 @@ export class AdmissionsService {
 
   async markUnderReview(schoolId: string, id: string) {
     const app = await this.requireApplication(schoolId, id);
-    if (app.status !== "SUBMITTED") {
-      throw new ConflictException("Only a newly submitted application can be moved to review.");
+    if (app.status !== 'SUBMITTED') {
+      throw new ConflictException('Only a newly submitted application can be moved to review.');
     }
-    return this.prisma.client.application.update({ where: { id }, data: { status: "UNDER_REVIEW" } });
+    return this.prisma.client.application.update({
+      where: { id },
+      data: { status: 'UNDER_REVIEW' },
+    });
   }
 
   async scheduleExam(schoolId: string, input: ScheduleExamInput) {
@@ -496,17 +516,20 @@ export class AdmissionsService {
       where: { schoolId, id: { in: input.applicationIds } },
       select: { id: true, status: true },
     });
-    const eligible = ["SUBMITTED", "UNDER_REVIEW", "EXAM_SCHEDULED"];
-    if (apps.length !== input.applicationIds.length || apps.some((a) => !eligible.includes(a.status))) {
+    const eligible = ['SUBMITTED', 'UNDER_REVIEW', 'EXAM_SCHEDULED'];
+    if (
+      apps.length !== input.applicationIds.length ||
+      apps.some((a) => !eligible.includes(a.status))
+    ) {
       throw new ConflictException(
-        "Every selected application must belong to this school and be awaiting an exam.",
+        'Every selected application must belong to this school and be awaiting an exam.',
       );
     }
     const when = parseExamDate(input.examDate);
-    if (Number.isNaN(when.getTime())) throw new BadRequestException("Enter a valid exam date.");
+    if (Number.isNaN(when.getTime())) throw new BadRequestException('Enter a valid exam date.');
     await this.prisma.client.application.updateMany({
       where: { id: { in: apps.map((a) => a.id) }, schoolId },
-      data: { status: "EXAM_SCHEDULED", examDate: when, examVenue: input.venue },
+      data: { status: 'EXAM_SCHEDULED', examDate: when, examVenue: input.venue },
     });
     return { scheduled: apps.length };
   }
@@ -517,22 +540,28 @@ export class AdmissionsService {
    * EXAM_SCHEDULED, and clearing a score steps back to EXAM_SCHEDULED. Once a
    * decision is made the exam is locked; change the decision first.
    */
-  async updateExam(schoolId: string, actorId: string, id: string, input: UpdateApplicationExamInput) {
+  async updateExam(
+    schoolId: string,
+    actorId: string,
+    id: string,
+    input: UpdateApplicationExamInput,
+  ) {
     const app = await this.requireApplication(schoolId, id);
-    const editable = ["SUBMITTED", "UNDER_REVIEW", "EXAM_SCHEDULED", "EXAM_COMPLETED"];
+    const editable = ['SUBMITTED', 'UNDER_REVIEW', 'EXAM_SCHEDULED', 'EXAM_COMPLETED'];
     if (!editable.includes(app.status)) {
-      throw new ConflictException("Exam details cannot be changed after a decision has been made.");
+      throw new ConflictException('Exam details cannot be changed after a decision has been made.');
     }
 
     let examDate = app.examDate;
     let venue = app.examVenue;
     if (input.examDate !== undefined) {
       examDate = parseExamDate(input.examDate);
-      if (Number.isNaN(examDate.getTime())) throw new BadRequestException("Enter a valid exam date and time.");
+      if (Number.isNaN(examDate.getTime()))
+        throw new BadRequestException('Enter a valid exam date and time.');
     }
     if (input.venue !== undefined) venue = input.venue;
     if ((input.examDate !== undefined || input.venue !== undefined) && (!examDate || !venue)) {
-      throw new BadRequestException("Enter both the exam date and the venue.");
+      throw new BadRequestException('Enter both the exam date and the venue.');
     }
 
     let examScore: Prisma.Decimal | number | null = app.examScore;
@@ -541,9 +570,9 @@ export class AdmissionsService {
         examScore = null;
       } else {
         if (!examDate) {
-          throw new BadRequestException("Set the exam date and venue before recording a score.");
+          throw new BadRequestException('Set the exam date and venue before recording a score.');
         }
-        this.assertFeeSettled(app, "recording the exam score");
+        this.assertFeeSettled(app, 'recording the exam score');
         if (input.score > Number(app.cycle.examMaxScore)) {
           throw new BadRequestException(`The score cannot be above ${app.cycle.examMaxScore}.`);
         }
@@ -551,8 +580,7 @@ export class AdmissionsService {
       }
     }
 
-    const status =
-      examScore !== null ? "EXAM_COMPLETED" : examDate ? "EXAM_SCHEDULED" : app.status;
+    const status = examScore !== null ? 'EXAM_COMPLETED' : examDate ? 'EXAM_SCHEDULED' : app.status;
     const updated = await this.prisma.client.$transaction(async (tx) => {
       const row = await tx.application.update({
         where: { id },
@@ -561,8 +589,8 @@ export class AdmissionsService {
       await this.credentials.audit(tx, {
         actorId,
         schoolId,
-        action: "UPDATE",
-        entityType: "APPLICATION_EXAM",
+        action: 'UPDATE',
+        entityType: 'APPLICATION_EXAM',
         entityId: id,
         details: {
           examDate: examDate?.toISOString() ?? null,
@@ -578,7 +606,7 @@ export class AdmissionsService {
 
   /** Fee is settled when it was paid in cash, waived, or never applied. */
   private assertFeeSettled(app: { feeStatus: string; feeDue: Prisma.Decimal }, doing: string) {
-    if (app.feeStatus === "PENDING") {
+    if (app.feeStatus === 'PENDING') {
       throw new ConflictException(
         `The admission fee of ${app.feeDue} is still unpaid. Receive the cash fee or record an exemption before ${doing}.`,
       );
@@ -587,16 +615,16 @@ export class AdmissionsService {
 
   async recordScore(schoolId: string, id: string, input: RecordExamScoreInput) {
     const app = await this.requireApplication(schoolId, id);
-    this.assertFeeSettled(app, "recording the exam score");
-    if (!["EXAM_SCHEDULED", "EXAM_COMPLETED"].includes(app.status)) {
-      throw new ConflictException("Schedule the entrance exam before recording a score.");
+    this.assertFeeSettled(app, 'recording the exam score');
+    if (!['EXAM_SCHEDULED', 'EXAM_COMPLETED'].includes(app.status)) {
+      throw new ConflictException('Schedule the entrance exam before recording a score.');
     }
     if (input.score > Number(app.cycle.examMaxScore)) {
       throw new BadRequestException(`The score cannot be above ${app.cycle.examMaxScore}.`);
     }
     return this.prisma.client.application.update({
       where: { id },
-      data: { examScore: input.score, status: "EXAM_COMPLETED" },
+      data: { examScore: input.score, status: 'EXAM_COMPLETED' },
     });
   }
 
@@ -606,19 +634,19 @@ export class AdmissionsService {
         where: { id, schoolId },
         include: { cycle: true, cycleClass: true },
       });
-      if (!app) throw new NotFoundException("Application not found.");
-      if (["ADMITTED", "WITHDRAWN"].includes(app.status)) {
-        throw new ConflictException("This application is already closed.");
+      if (!app) throw new NotFoundException('Application not found.');
+      if (['ADMITTED', 'WITHDRAWN'].includes(app.status)) {
+        throw new ConflictException('This application is already closed.');
       }
 
-      if (input.decision === "ACCEPTED") {
-        this.assertFeeSettled(app, "accepting the applicant");
+      if (input.decision === 'ACCEPTED') {
+        this.assertFeeSettled(app, 'accepting the applicant');
         const score = app.examScore === null ? null : Number(app.examScore);
         const passed = score !== null && score >= Number(app.cycle.passMark);
         if (!passed && !input.overridePassMark) {
           throw new BadRequestException(
             score === null
-              ? "Record the entrance exam score before accepting, or override with a reason."
+              ? 'Record the entrance exam score before accepting, or override with a reason.'
               : `The score (${score}) is below the pass mark (${app.cycle.passMark}). Waitlist or reject, or override with a reason.`,
           );
         }
@@ -627,13 +655,13 @@ export class AdmissionsService {
           const taken = await tx.application.count({
             where: {
               cycleClassId: app.cycleClassId,
-              status: { in: ["ACCEPTED", "ADMITTED"] },
+              status: { in: ['ACCEPTED', 'ADMITTED'] },
               NOT: { id },
             },
           });
           if (taken >= app.cycleClass.seats) {
             throw new ConflictException(
-              `All ${app.cycleClass.seats} seats for ${app.classId ? "this class" : "the class"} are taken. Waitlist the applicant instead.`,
+              `All ${app.cycleClass.seats} seats for ${app.classId ? 'this class' : 'the class'} are taken. Waitlist the applicant instead.`,
             );
           }
         }
@@ -651,8 +679,8 @@ export class AdmissionsService {
       await this.credentials.audit(tx, {
         actorId,
         schoolId,
-        action: "UPDATE",
-        entityType: "APPLICATION",
+        action: 'UPDATE',
+        entityType: 'APPLICATION',
         entityId: id,
         details: { decision: input.decision, overridePassMark: input.overridePassMark },
       });
@@ -668,25 +696,25 @@ export class AdmissionsService {
   // touch it, and no refund operation exists on purpose.
 
   /** Cash received: record a numbered receipt and post the amount to the income ledger. */
-  async receiveFee(
-    schoolId: string,
-    actorId: string,
-    id: string,
-    input: ReceiveAdmissionFeeInput,
-  ) {
-    const paidOn = input.paymentDate ? new Date(`${input.paymentDate}T00:00:00.000Z`) : new Date(new Date().toISOString().slice(0, 10) + "T00:00:00.000Z");
+  async receiveFee(schoolId: string, actorId: string, id: string, input: ReceiveAdmissionFeeInput) {
+    const paidOn = input.paymentDate
+      ? new Date(`${input.paymentDate}T00:00:00.000Z`)
+      : new Date(new Date().toISOString().slice(0, 10) + 'T00:00:00.000Z');
     if (paidOn.getTime() > Date.now()) {
-      throw new BadRequestException("The payment date cannot be in the future.");
+      throw new BadRequestException('The payment date cannot be in the future.');
     }
     return this.prisma.client.$transaction(async (tx) => {
       const app = await tx.application.findFirst({ where: { id, schoolId } });
-      if (!app) throw new NotFoundException("Application not found.");
-      if (app.feeStatus === "PAID") throw new ConflictException("The fee has already been received.");
-      if (app.feeStatus === "EXEMPTED") {
-        throw new ConflictException("This applicant is exempted. Withdraw the exemption first to collect a fee.");
+      if (!app) throw new NotFoundException('Application not found.');
+      if (app.feeStatus === 'PAID')
+        throw new ConflictException('The fee has already been received.');
+      if (app.feeStatus === 'EXEMPTED') {
+        throw new ConflictException(
+          'This applicant is exempted. Withdraw the exemption first to collect a fee.',
+        );
       }
-      if (app.feeStatus === "NOT_REQUIRED") {
-        throw new ConflictException("No admission fee is set for this intake.");
+      if (app.feeStatus === 'NOT_REQUIRED') {
+        throw new ConflictException('No admission fee is set for this intake.');
       }
 
       const yy = String(paidOn.getUTCFullYear()).slice(-2);
@@ -694,17 +722,19 @@ export class AdmissionsService {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${schoolId}), hashtext(${prefix}))`;
       const last = await tx.application.findFirst({
         where: { schoolId, feeReceiptNumber: { startsWith: prefix } },
-        orderBy: { feeReceiptNumber: "desc" },
+        orderBy: { feeReceiptNumber: 'desc' },
         select: { feeReceiptNumber: true },
       });
-      const seq = last?.feeReceiptNumber ? Number(last.feeReceiptNumber.slice(prefix.length)) + 1 : 1;
-      const receiptNumber = `${prefix}${String(seq).padStart(5, "0")}`;
+      const seq = last?.feeReceiptNumber
+        ? Number(last.feeReceiptNumber.slice(prefix.length)) + 1
+        : 1;
+      const receiptNumber = `${prefix}${String(seq).padStart(5, '0')}`;
 
       // Claim first: a double click or a second cashier cannot take the fee twice.
       const claimed = await tx.application.updateMany({
-        where: { id, schoolId, feeStatus: "PENDING" },
+        where: { id, schoolId, feeStatus: 'PENDING' },
         data: {
-          feeStatus: "PAID",
+          feeStatus: 'PAID',
           feePaidAmount: app.feeDue,
           feePaidAt: paidOn,
           feeReceiptNumber: receiptNumber,
@@ -712,16 +742,16 @@ export class AdmissionsService {
           feeReceivedById: actorId,
         },
       });
-      if (claimed.count !== 1) throw new ConflictException("The fee has already been received.");
+      if (claimed.count !== 1) throw new ConflictException('The fee has already been received.');
 
       const ledger = await this.finance.postIncome(tx, {
         schoolId,
         amount: app.feeDue,
         date: paidOn,
         description: `Admission fee - ${app.firstName} ${app.lastName} (${app.applicationNumber})`,
-        category: "ADMISSION_FEE",
-        revenueAccount: { name: "Admission Fees", code: "4200" },
-        referenceType: "ADMISSION_APPLICATION",
+        category: 'ADMISSION_FEE',
+        revenueAccount: { name: 'Admission Fees', code: '4200' },
+        referenceType: 'ADMISSION_APPLICATION',
         referenceId: app.id,
         referenceNumber: receiptNumber,
         notes: input.notes || undefined,
@@ -733,10 +763,10 @@ export class AdmissionsService {
       await this.credentials.audit(tx, {
         actorId,
         schoolId,
-        action: "UPDATE",
-        entityType: "APPLICATION_FEE",
+        action: 'UPDATE',
+        entityType: 'APPLICATION_FEE',
         entityId: id,
-        details: { event: "RECEIVED", amount: app.feeDue.toString(), receiptNumber },
+        details: { event: 'RECEIVED', amount: app.feeDue.toString(), receiptNumber },
       });
       return {
         application: updated,
@@ -754,32 +784,35 @@ export class AdmissionsService {
   async exemptFee(schoolId: string, actorId: string, id: string, input: ExemptAdmissionFeeInput) {
     return this.prisma.client.$transaction(async (tx) => {
       const claimed = await tx.application.updateMany({
-        where: { id, schoolId, feeStatus: "PENDING" },
+        where: { id, schoolId, feeStatus: 'PENDING' },
         data: {
-          feeStatus: "EXEMPTED",
+          feeStatus: 'EXEMPTED',
           feeExemptionReason: input.reason,
           feeExemptedById: actorId,
           feeExemptedAt: new Date(),
         },
       });
       if (claimed.count !== 1) {
-        const app = await tx.application.findFirst({ where: { id, schoolId }, select: { feeStatus: true } });
-        if (!app) throw new NotFoundException("Application not found.");
+        const app = await tx.application.findFirst({
+          where: { id, schoolId },
+          select: { feeStatus: true },
+        });
+        if (!app) throw new NotFoundException('Application not found.');
         throw new ConflictException(
-          app.feeStatus === "PAID"
-            ? "The fee was already paid; paid fees are not refunded or waived."
-            : app.feeStatus === "EXEMPTED"
-              ? "This applicant is already exempted."
-              : "No admission fee is set for this intake, so there is nothing to waive.",
+          app.feeStatus === 'PAID'
+            ? 'The fee was already paid; paid fees are not refunded or waived.'
+            : app.feeStatus === 'EXEMPTED'
+              ? 'This applicant is already exempted.'
+              : 'No admission fee is set for this intake, so there is nothing to waive.',
         );
       }
       await this.credentials.audit(tx, {
         actorId,
         schoolId,
-        action: "UPDATE",
-        entityType: "APPLICATION_FEE",
+        action: 'UPDATE',
+        entityType: 'APPLICATION_FEE',
         entityId: id,
-        details: { event: "EXEMPTED", reason: input.reason },
+        details: { event: 'EXEMPTED', reason: input.reason },
       });
       return tx.application.findUniqueOrThrow({ where: { id } });
     });
@@ -789,23 +822,24 @@ export class AdmissionsService {
   async withdrawExemption(schoolId: string, actorId: string, id: string) {
     return this.prisma.client.$transaction(async (tx) => {
       const app = await tx.application.findFirst({ where: { id, schoolId } });
-      if (!app) throw new NotFoundException("Application not found.");
-      if (app.feeStatus !== "EXEMPTED") throw new ConflictException("This applicant is not exempted.");
-      if (app.status === "ADMITTED") {
-        throw new ConflictException("The applicant is already admitted; the exemption stands.");
+      if (!app) throw new NotFoundException('Application not found.');
+      if (app.feeStatus !== 'EXEMPTED')
+        throw new ConflictException('This applicant is not exempted.');
+      if (app.status === 'ADMITTED') {
+        throw new ConflictException('The applicant is already admitted; the exemption stands.');
       }
       await this.credentials.audit(tx, {
         actorId,
         schoolId,
-        action: "UPDATE",
-        entityType: "APPLICATION_FEE",
+        action: 'UPDATE',
+        entityType: 'APPLICATION_FEE',
         entityId: id,
-        details: { event: "EXEMPTION_WITHDRAWN", previousReason: app.feeExemptionReason },
+        details: { event: 'EXEMPTION_WITHDRAWN', previousReason: app.feeExemptionReason },
       });
       return tx.application.update({
         where: { id },
         data: {
-          feeStatus: app.feeDue.gt(0) ? "PENDING" : "NOT_REQUIRED",
+          feeStatus: app.feeDue.gt(0) ? 'PENDING' : 'NOT_REQUIRED',
           feeExemptionReason: null,
           feeExemptedById: null,
           feeExemptedAt: null,
@@ -816,7 +850,7 @@ export class AdmissionsService {
 
   async feeSummary(schoolId: string, cycleId?: string) {
     const rows = await this.prisma.client.application.groupBy({
-      by: ["feeStatus"],
+      by: ['feeStatus'],
       where: { schoolId, ...(cycleId ? { cycleId } : {}) },
       _count: { _all: true },
       _sum: { feeDue: true, feePaidAmount: true },
@@ -824,12 +858,12 @@ export class AdmissionsService {
     const get = (status: string) => rows.find((r) => r.feeStatus === status);
     const num = (value: Prisma.Decimal | null | undefined) => Number(value ?? 0);
     return {
-      collected: num(get("PAID")?._sum.feePaidAmount),
-      collectedCount: get("PAID")?._count._all ?? 0,
-      pending: num(get("PENDING")?._sum.feeDue),
-      pendingCount: get("PENDING")?._count._all ?? 0,
-      exemptedCount: get("EXEMPTED")?._count._all ?? 0,
-      waived: num(get("EXEMPTED")?._sum.feeDue),
+      collected: num(get('PAID')?._sum.feePaidAmount),
+      collectedCount: get('PAID')?._count._all ?? 0,
+      pending: num(get('PENDING')?._sum.feeDue),
+      pendingCount: get('PENDING')?._count._all ?? 0,
+      exemptedCount: get('EXEMPTED')?._count._all ?? 0,
+      waived: num(get('EXEMPTED')?._sum.feeDue),
     };
   }
 
@@ -839,16 +873,16 @@ export class AdmissionsService {
    * login, then marks the application ADMITTED - all in one transaction.
    */
   async admit(
-    school: Pick<School, "id" | "organizationId" | "subdomain">,
+    school: Pick<School, 'id' | 'organizationId' | 'subdomain'>,
     actorId: string,
     id: string,
     input: AdmitApplicationInput,
   ) {
     const app = await this.requireApplication(school.id, id);
-    if (app.status !== "ACCEPTED" || app.studentId) {
-      throw new ConflictException("Only an accepted application can be admitted, and only once.");
+    if (app.status !== 'ACCEPTED' || app.studentId) {
+      throw new ConflictException('Only an accepted application can be admitted, and only once.');
     }
-    this.assertFeeSettled(app, "granting admission");
+    this.assertFeeSettled(app, 'granting admission');
     const studentInput = createStudentSchema.parse({
       firstName: app.firstName,
       lastName: app.lastName,
@@ -869,7 +903,7 @@ export class AdmissionsService {
           firstName: app.guardianFirstName,
           lastName: app.guardianLastName,
           phone: app.guardianPhone,
-          email: app.guardianEmail ?? "",
+          email: app.guardianEmail ?? '',
           relationshipType: app.guardianRelationship,
           isPrimary: true,
           createLogin: Boolean(app.guardianEmail),
@@ -879,15 +913,15 @@ export class AdmissionsService {
 
     const result = await this.students.createStudent(school, actorId, studentInput, {
       // The intake's term is admin policy, not a per-role restriction.
-      role: "admin",
+      role: 'admin',
       afterCreate: async (tx, student) => {
         const claimed = await tx.application.updateMany({
-          where: { id, schoolId: school.id, status: "ACCEPTED", studentId: null },
-          data: { status: "ADMITTED", studentId: student.id, admittedAt: new Date() },
+          where: { id, schoolId: school.id, status: 'ACCEPTED', studentId: null },
+          data: { status: 'ADMITTED', studentId: student.id, admittedAt: new Date() },
         });
         // Lost a race with another admit click: roll everything back.
         if (claimed.count !== 1) {
-          throw new ConflictException("This application was already admitted.");
+          throw new ConflictException('This application was already admitted.');
         }
       },
     });

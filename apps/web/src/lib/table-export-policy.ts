@@ -1,4 +1,4 @@
-import { useSchoolRole } from "@/components/school/school-role-switcher";
+import { useSchoolRole } from '@/components/school/school-role-switcher';
 
 /**
  * Roles allowed to download, print or export table data. Students and
@@ -6,10 +6,17 @@ import { useSchoolRole } from "@/components/school/school-role-switcher";
  * stays the real access check: exports only contain rows the user could
  * already load.
  */
-export const TABLE_EXPORT_ROLES = ["owner", "admin", "headteacher", "accountant", "teacher", "staff"] as const;
+export const TABLE_EXPORT_ROLES = [
+  'owner',
+  'admin',
+  'headteacher',
+  'accountant',
+  'teacher',
+  'staff',
+] as const;
 
 /** Payroll and salary data are confidential: only finance officers and school leadership may export them. */
-export const PAYROLL_EXPORT_ROLES = ["accountant", "owner", "headteacher"] as const;
+export const PAYROLL_EXPORT_ROLES = ['accountant', 'owner', 'headteacher'] as const;
 
 export function canExportPayrollTables(role: string | null | undefined) {
   return !!role && (PAYROLL_EXPORT_ROLES as readonly string[]).includes(role);

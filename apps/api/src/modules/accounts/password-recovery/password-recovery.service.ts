@@ -45,13 +45,18 @@ export class PasswordRecoveryService {
           where: { id: user.id },
           select: { banned: true, email: true, emailVerified: true },
         });
-        const credentials=await tx.account.findMany({where:{userId:user.id,providerId:"credential"},take:2,select:{password:true}});
+        const credentials = await tx.account.findMany({
+          where: { userId: user.id, providerId: 'credential' },
+          take: 2,
+          select: { password: true },
+        });
         if (
           !current ||
           current.banned ||
           !current.emailVerified ||
           current.email.trim().toLowerCase() !== address ||
-          credentials.length !== 1 || !credentials[0]?.password
+          credentials.length !== 1 ||
+          !credentials[0]?.password
         )
           return;
         if (
@@ -66,10 +71,7 @@ export class PasswordRecoveryService {
         const token = randomBytes(32).toString('base64url'),
           id = 'recovery_' + randomUUID(),
           expiresAt = new Date(Date.now() + 15 * 60000);
-        const link = new URL(
-          '/reset-password',
-          origin ?? process.env.WEB_ORIGIN!,
-        );
+        const link = new URL('/reset-password', origin ?? process.env.WEB_ORIGIN!);
         if (school) link.searchParams.set('school', school);
         link.hash = new URLSearchParams({ token }).toString();
         const payload = {
@@ -90,21 +92,11 @@ export class PasswordRecoveryService {
             tokenHash: recoveryHash(token),
             credentialFingerprint: recoveryHash(credentials[0]!.password!),
             recipientHash: recoveryHash(address),
-            encryptedPayload: sealRecovery(
-              id,
-              payload,
-              process.env.BETTER_AUTH_SECRET!,
-            ),
+            encryptedPayload: sealRecovery(id, payload, process.env.BETTER_AUTH_SECRET!),
             expiresAt,
           },
         });
-        await this.jobs.enqueue(
-          id,
-          'password-recovery',
-          null,
-          { requestId: id },
-          tx,
-        );
+        await this.jobs.enqueue(id, 'password-recovery', null, { requestId: id }, tx);
         const membership = await tx.member.findFirst({
           where: { userId: user.id },
           select: {
@@ -135,17 +127,14 @@ export class PasswordRecoveryService {
     const parsed = passwordSchema.safeParse(newPassword);
     if (!parsed.success)
       throw new BadRequestException(
-        parsed.error.issues[0]?.message ??
-          'Password does not meet requirements.',
+        parsed.error.issues[0]?.message ?? 'Password does not meet requirements.',
       );
     const tokenHash = recoveryHash(token),
       candidate = await this.prisma.client.passwordRecoveryRequest.findUnique({
         where: { tokenHash },
       });
     const invalid = () =>
-      new BadRequestException(
-        'This reset link is invalid or expired. Request a new link.',
-      );
+      new BadRequestException('This reset link is invalid or expired. Request a new link.');
     if (
       !candidate ||
       candidate.consumedAt ||
@@ -170,10 +159,19 @@ export class PasswordRecoveryService {
         recoveryHash(user.email.trim().toLowerCase()) !== row.recipientHash
       )
         throw invalid();
-      const credentials=await tx.account.findMany({where:{userId:user.id,providerId:"credential"},take:2,select:{id:true,password:true}});
-      if(credentials.length!==1||!credentials[0]?.password||recoveryHash(credentials[0].password)!==row.credentialFingerprint)throw invalid();
+      const credentials = await tx.account.findMany({
+        where: { userId: user.id, providerId: 'credential' },
+        take: 2,
+        select: { id: true, password: true },
+      });
+      if (
+        credentials.length !== 1 ||
+        !credentials[0]?.password ||
+        recoveryHash(credentials[0].password) !== row.credentialFingerprint
+      )
+        throw invalid();
       const accounts = await tx.account.updateMany({
-        where: { id: credentials[0].id, password:credentials[0].password },
+        where: { id: credentials[0].id, password: credentials[0].password },
         data: { password },
       });
       if (accounts.count !== 1) throw invalid();

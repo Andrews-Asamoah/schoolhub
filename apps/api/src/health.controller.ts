@@ -1,12 +1,12 @@
-import { Controller, Get, Logger, ServiceUnavailableException } from "@nestjs/common";
-import { AllowAnonymous, Session, type UserSession } from "@thallesp/nestjs-better-auth";
-import { PrismaService } from "./prisma/prisma.service.js";
+import { Controller, Get, Logger, ServiceUnavailableException } from '@nestjs/common';
+import { AllowAnonymous, Session, type UserSession } from '@thallesp/nestjs-better-auth';
+import { PrismaService } from './prisma/prisma.service.js';
 
 const READINESS_TIMEOUT_MS = 2_000;
 
 /** Same precedence the super-admin operations report uses. */
 export function buildVersion(env: NodeJS.ProcessEnv = process.env): string {
-  return env.BUILD_SHA ?? env.GIT_SHA ?? env.SOURCE_VERSION ?? "unknown";
+  return env.BUILD_SHA ?? env.GIT_SHA ?? env.SOURCE_VERSION ?? 'unknown';
 }
 
 /** Resolves true if the database answers a trivial query before the timeout. */
@@ -19,7 +19,7 @@ export async function databaseIsReachable(
     await Promise.race([
       ping(),
       new Promise((_, reject) => {
-        timer = setTimeout(() => reject(new Error("database check timed out")), timeoutMs);
+        timer = setTimeout(() => reject(new Error('database check timed out')), timeoutMs);
       }),
     ]);
     return true;
@@ -38,16 +38,16 @@ export class HealthController {
 
   /** Legacy probe kept for existing monitors and CI. Same as /health/live. */
   @AllowAnonymous()
-  @Get("health")
+  @Get('health')
   health() {
     return { ok: true };
   }
 
   /** Liveness: the process is up and serving HTTP. Never touches dependencies. */
   @AllowAnonymous()
-  @Get("health/live")
+  @Get('health/live')
   live() {
-    return { status: "ok", version: buildVersion() };
+    return { status: 'ok', version: buildVersion() };
   }
 
   /**
@@ -58,18 +58,18 @@ export class HealthController {
    * for storage and migration status).
    */
   @AllowAnonymous()
-  @Get("health/ready")
+  @Get('health/ready')
   async ready() {
     const ok = await databaseIsReachable(() => this.prisma.client.$queryRaw`SELECT 1`);
     if (!ok) {
-      this.logger.error("Readiness check failed: database unreachable");
-      throw new ServiceUnavailableException({ status: "unavailable", database: "down" });
+      this.logger.error('Readiness check failed: database unreachable');
+      throw new ServiceUnavailableException({ status: 'unavailable', database: 'down' });
     }
-    return { status: "ready", database: "up", version: buildVersion() };
+    return { status: 'ready', database: 'up', version: buildVersion() };
   }
 
   // Protected by default: the library registers a global auth guard
-  @Get("me")
+  @Get('me')
   me(@Session() session: UserSession) {
     return session;
   }

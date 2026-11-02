@@ -109,7 +109,17 @@ export class PeopleService {
       this.prisma.client.teacher.count({ where }),
     ]);
     return {
-      data: data.map(person => ({ ...person, profile: person.profile ? { ...person.profile, signatureUrl: person.profile.signatureUrl ? `/api/schools/current/signatures/teacher/${person.id}` : null } : null })),
+      data: data.map((person) => ({
+        ...person,
+        profile: person.profile
+          ? {
+              ...person.profile,
+              signatureUrl: person.profile.signatureUrl
+                ? `/api/schools/current/signatures/teacher/${person.id}`
+                : null,
+            }
+          : null,
+      })),
       meta: { page, limit, total, totalPages: Math.ceil(total / limit) },
     };
   }
@@ -136,9 +146,7 @@ export class PeopleService {
           lastName: input.lastName,
           phone: input.phone || null,
           gender: input.gender ?? null,
-          dateOfBirth: input.dateOfBirth
-            ? new Date(`${input.dateOfBirth}T00:00:00.000Z`)
-            : null,
+          dateOfBirth: input.dateOfBirth ? new Date(`${input.dateOfBirth}T00:00:00.000Z`) : null,
         },
       });
       const created = await tx.teacher.create({
@@ -272,10 +280,7 @@ export class PeopleService {
         where,
         skip,
         take: limit,
-        orderBy: [
-          { profile: { lastName: 'asc' } },
-          { profile: { firstName: 'asc' } },
-        ],
+        orderBy: [{ profile: { lastName: 'asc' } }, { profile: { firstName: 'asc' } }],
         include: {
           department: { select: { id: true, name: true } },
           profile: {
@@ -286,9 +291,17 @@ export class PeopleService {
       this.prisma.client.staff.count({ where }),
     ]);
     return {
-      data: data.map(person => {
+      data: data.map((person) => {
         const { signatureStorageKey: _key, ...profile } = person.profile;
-        return { ...person, profile: { ...profile, signatureUrl: profile.signatureUrl ? `/api/schools/current/signatures/staff/${person.id}` : null } };
+        return {
+          ...person,
+          profile: {
+            ...profile,
+            signatureUrl: profile.signatureUrl
+              ? `/api/schools/current/signatures/staff/${person.id}`
+              : null,
+          },
+        };
       }),
       meta: { page, limit, total, totalPages: Math.ceil(total / limit) },
     };
@@ -358,9 +371,7 @@ export class PeopleService {
 
     return {
       ...result.staff,
-      credentials: result.linked
-        ? null
-        : toIssuedCredentials(result.loginEmail, credential, role),
+      credentials: result.linked ? null : toIssuedCredentials(result.loginEmail, credential, role),
       linkedExistingAccount: result.linked,
     };
   }
@@ -438,10 +449,7 @@ export class PeopleService {
       select: { email: true, subdomain: true },
     });
     if (!schoolEmailInfo) throw new NotFoundException('School not found.');
-    const guardianDomain = guardianEmailDomain(
-      schoolEmailInfo.email,
-      schoolEmailInfo.subdomain,
-    );
+    const guardianDomain = guardianEmailDomain(schoolEmailInfo.email, schoolEmailInfo.subdomain);
     const suppliedEmail = input.email?.trim().toLowerCase() || null;
     const email =
       suppliedEmail ||
@@ -589,11 +597,7 @@ export class PeopleService {
     return value === undefined ? undefined : value.trim() === '' ? null : value.trim();
   }
 
-  private async changeLoginEmail(
-    tx: Prisma.TransactionClient,
-    userId: string,
-    email: string,
-  ) {
+  private async changeLoginEmail(tx: Prisma.TransactionClient, userId: string, email: string) {
     const taken = await tx.user.findFirst({
       where: { email, NOT: { id: userId } },
       select: { id: true },
@@ -668,9 +672,7 @@ export class PeopleService {
             specialization: this.blankToNull(input.specialization),
             experience: input.experience,
             employmentType: input.employmentType,
-            hireDate: input.hireDate
-              ? new Date(`${input.hireDate}T00:00:00.000Z`)
-              : undefined,
+            hireDate: input.hireDate ? new Date(`${input.hireDate}T00:00:00.000Z`) : undefined,
           },
           include: {
             department: { select: { id: true, name: true } },
@@ -717,10 +719,7 @@ export class PeopleService {
     const roleChanges = nextRole !== currentRole;
     // Administrator accounts are managed by owners and administrators only,
     // and nobody may change their own access level.
-    if (
-      (nextRole === 'admin' || currentRole === 'admin') &&
-      actor.schoolRole === 'headteacher'
-    ) {
+    if ((nextRole === 'admin' || currentRole === 'admin') && actor.schoolRole === 'headteacher') {
       throw new ForbiddenException(
         'Only a school owner or administrator can change administrator accounts.',
       );
@@ -774,9 +773,7 @@ export class PeopleService {
             departmentId: input.departmentId === '' ? null : input.departmentId,
             jobTitle: this.blankToNull(input.jobTitle),
             employmentType: input.employmentType,
-            hireDate: input.hireDate
-              ? new Date(`${input.hireDate}T00:00:00.000Z`)
-              : undefined,
+            hireDate: input.hireDate ? new Date(`${input.hireDate}T00:00:00.000Z`) : undefined,
           },
           include: {
             department: { select: { id: true, name: true } },
@@ -809,8 +806,7 @@ export class PeopleService {
       include: { profile: { include: { user: { select: { id: true, email: true } } } } },
     });
     if (!existing) throw new NotFoundException('Guardian not found.');
-    const email =
-      input.email === undefined ? undefined : input.email.trim().toLowerCase() || null;
+    const email = input.email === undefined ? undefined : input.email.trim().toLowerCase() || null;
     if (email === null && existing.profile) {
       throw new BadRequestException(
         'This guardian has a portal login, so an email address is required.',
@@ -862,7 +858,11 @@ export class PeopleService {
         const fresh = addStudentIds.filter((studentId) => !alreadyLinked.has(studentId));
         // A student's first guardian becomes primary; later ones are secondary.
         const withPrimary = await tx.guardianStudent.findMany({
-          where: { studentId: { in: fresh }, isPrimary: true, guardian: { schoolId: school.id, deletedAt: null } },
+          where: {
+            studentId: { in: fresh },
+            isPrimary: true,
+            guardian: { schoolId: school.id, deletedAt: null },
+          },
           select: { studentId: true },
         });
         const hasPrimary = new Set(withPrimary.map((link) => link.studentId));
@@ -926,9 +926,7 @@ export class PeopleService {
       select: { id: true },
     });
     if (!department) {
-      throw new BadRequestException(
-        'Choose an active department belonging to this school.',
-      );
+      throw new BadRequestException('Choose an active department belonging to this school.');
     }
   }
 }

@@ -1,20 +1,19 @@
-import { AcademicRolloverWorkspace } from "./academic-rollover-workspace";
-import { useMutation, useQuery, useQueryClient, type UseQueryResult } from "@tanstack/react-query";
+import { AcademicRolloverWorkspace } from './academic-rollover-workspace';
+import { useMutation, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
+import { CalendarDays, Check, CircleAlert, GraduationCap, Search, Users } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import type { CreateEnrollmentInput } from '@schoolhub/shared';
+import { useSchoolRole } from '@/components/school/school-role-switcher';
+import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
 import {
-  CalendarDays,
-  Check,
-  CircleAlert,
-  GraduationCap,
-  Search,
-  Users,
-} from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
-import type { CreateEnrollmentInput } from "@schoolhub/shared";
-import { useSchoolRole } from "@/components/school/school-role-switcher";
-import { DataTable, type DataTableColumn } from "@/components/ui/data-table";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { canExportTables } from "@/lib/table-export-policy";
-import { apiFetch } from "@/lib/api";
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { canExportTables } from '@/lib/table-export-policy';
+import { apiFetch } from '@/lib/api';
 
 interface EnrollmentClass {
   id: string;
@@ -66,26 +65,23 @@ interface EnrollmentWorkspaceProps {
 }
 
 const controlClasses =
-  "h-10 w-full rounded-xl border border-border bg-background px-3 text-sm text-foreground outline-none transition focus:border-ring focus:ring-2 focus:ring-ring/20";
+  'h-10 w-full rounded-xl border border-border bg-background px-3 text-sm text-foreground outline-none transition focus:border-ring focus:ring-2 focus:ring-ring/20';
 
-export function EnrollmentWorkspace({
-  yearsQuery,
-  classesQuery,
-}: EnrollmentWorkspaceProps) {
+export function EnrollmentWorkspace({ yearsQuery, classesQuery }: EnrollmentWorkspaceProps) {
   const queryClient = useQueryClient();
   const { activeRole } = useSchoolRole();
-  const canEnroll = ["owner", "admin", "staff"].includes(activeRole ?? "");
+  const canEnroll = ['owner', 'admin', 'staff'].includes(activeRole ?? '');
   const years = yearsQuery.data ?? [];
   const classes = (classesQuery.data ?? []).filter((schoolClass) => schoolClass.isActive);
-  const [academicYearId, setAcademicYearId] = useState("");
-  const [termId, setTermId] = useState("");
-  const [classId, setClassId] = useState("");
-  const [studentSearch, setStudentSearch] = useState("");
+  const [academicYearId, setAcademicYearId] = useState('');
+  const [termId, setTermId] = useState('');
+  const [classId, setClassId] = useState('');
+  const [studentSearch, setStudentSearch] = useState('');
   const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
 
   useEffect(() => {
     if (!academicYearId && years.length) {
-      setAcademicYearId(years.find((year) => year.isCurrent)?.id ?? years.at(0)?.id ?? "");
+      setAcademicYearId(years.find((year) => year.isCurrent)?.id ?? years.at(0)?.id ?? '');
     }
   }, [academicYearId, years]);
 
@@ -94,17 +90,17 @@ export function EnrollmentWorkspace({
 
   useEffect(() => {
     if (terms.length && !terms.some((term) => term.id === termId)) {
-      setTermId(terms.find((term) => term.isCurrent)?.id ?? terms.at(0)?.id ?? "");
+      setTermId(terms.find((term) => term.isCurrent)?.id ?? terms.at(0)?.id ?? '');
       setSelectedStudentIds([]);
     }
-    if (!terms.length && termId) setTermId("");
+    if (!terms.length && termId) setTermId('');
   }, [academicYearId, termId, terms]);
 
   const eligibleQuery = useQuery({
-    queryKey: ["academics", "eligible-students", academicYearId, termId, studentSearch],
+    queryKey: ['academics', 'eligible-students', academicYearId, termId, studentSearch],
     queryFn: () => {
       const params = new URLSearchParams({ academicYearId, termId });
-      if (studentSearch.trim()) params.set("search", studentSearch.trim());
+      if (studentSearch.trim()) params.set('search', studentSearch.trim());
       return apiFetch<EnrollmentStudentOption[]>(
         `/academics/eligible-students?${params.toString()}`,
       );
@@ -113,35 +109,33 @@ export function EnrollmentWorkspace({
     retry: false,
   });
   const rosterQuery = useQuery({
-    queryKey: ["academics", "enrollments", academicYearId, termId, classId],
+    queryKey: ['academics', 'enrollments', academicYearId, termId, classId],
     queryFn: () => {
       const params = new URLSearchParams({ academicYearId, termId });
-      if (classId) params.set("classId", classId);
-      return apiFetch<EnrollmentRecord[]>(
-        `/academics/enrollments?${params.toString()}`,
-      );
+      if (classId) params.set('classId', classId);
+      return apiFetch<EnrollmentRecord[]>(`/academics/enrollments?${params.toString()}`);
     },
     enabled: Boolean(academicYearId && termId),
     retry: false,
   });
   const enrollmentMutation = useMutation({
     mutationFn: (input: CreateEnrollmentInput) =>
-      apiFetch<{ enrolledCount: number }>("/academics/enrollments", {
-        method: "POST",
+      apiFetch<{ enrolledCount: number }>('/academics/enrollments', {
+        method: 'POST',
         body: JSON.stringify(input),
       }),
     onSuccess: async () => {
       setSelectedStudentIds([]);
       await Promise.all([
         queryClient.invalidateQueries({
-          queryKey: ["academics", "enrollments"],
+          queryKey: ['academics', 'enrollments'],
         }),
         queryClient.invalidateQueries({
-          queryKey: ["academics", "eligible-students"],
+          queryKey: ['academics', 'eligible-students'],
         }),
-        queryClient.invalidateQueries({ queryKey: ["academics", "classes"] }),
-        queryClient.invalidateQueries({ queryKey: ["students"] }),
-        queryClient.invalidateQueries({ queryKey: ["dashboard"] }),
+        queryClient.invalidateQueries({ queryKey: ['academics', 'classes'] }),
+        queryClient.invalidateQueries({ queryKey: ['students'] }),
+        queryClient.invalidateQueries({ queryKey: ['dashboard'] }),
       ]);
     },
   });
@@ -151,8 +145,8 @@ export function EnrollmentWorkspace({
 
   const rosterColumns: DataTableColumn<(typeof roster)[number]>[] = [
     {
-      id: "student",
-      header: "Student",
+      id: 'student',
+      header: 'Student',
       value: (enrollment) =>
         `${enrollment.student.profile.firstName} ${enrollment.student.profile.lastName} (${enrollment.student.studentId})`,
       cell: (enrollment) => (
@@ -165,13 +159,13 @@ export function EnrollmentWorkspace({
       ),
     },
     {
-      id: "admission",
-      header: "Admission number",
-      cell: (enrollment) => enrollment.student.admissionNumber || "—",
+      id: 'admission',
+      header: 'Admission number',
+      cell: (enrollment) => enrollment.student.admissionNumber || '—',
     },
     {
-      id: "class",
-      header: "Class",
+      id: 'class',
+      header: 'Class',
       cell: (enrollment) => (
         <span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary">
           {enrollment.class.name}
@@ -179,8 +173,8 @@ export function EnrollmentWorkspace({
       ),
     },
     {
-      id: "enrolled",
-      header: "Enrolled",
+      id: 'enrolled',
+      header: 'Enrolled',
       value: (enrollment) => enrollment.enrolledAt.slice(0, 10),
       cell: (enrollment) => new Date(enrollment.enrolledAt).toLocaleDateString(),
     },
@@ -190,13 +184,10 @@ export function EnrollmentWorkspace({
   const currentClassCount = roster.length;
   const atCapacity = Boolean(
     selectedClass?.capacity !== null &&
-      selectedClass?.capacity !== undefined &&
-      currentClassCount + selectedStudentIds.length > selectedClass.capacity,
+    selectedClass?.capacity !== undefined &&
+    currentClassCount + selectedStudentIds.length > selectedClass.capacity,
   );
-  const selectedIds = useMemo(
-    () => new Set(selectedStudentIds),
-    [selectedStudentIds],
-  );
+  const selectedIds = useMemo(() => new Set(selectedStudentIds), [selectedStudentIds]);
 
   function toggleStudent(studentId: string) {
     setSelectedStudentIds((current) =>
@@ -237,45 +228,77 @@ export function EnrollmentWorkspace({
             Enroll students by year and term
           </h2>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
-            Each student has one class placement per term. Previous terms stay
-            in the roster history, so changing a student’s current class does
-            not rewrite earlier academic records.
+            Each student has one class placement per term. Previous terms stay in the roster
+            history, so changing a student’s current class does not rewrite earlier academic
+            records.
           </p>
         </div>
         <div className="grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-3 sm:p-6">
           <label className="space-y-1.5">
             <span className="text-xs font-semibold text-secondary-foreground">Academic year</span>
-            <Select value={academicYearId || "__none__"} onValueChange={(value) => {
-              setAcademicYearId(value === "__none__" ? "" : value);
-              setSelectedStudentIds([]);
-            }} disabled={yearsQuery.isPending || !years.length}>
-              <SelectTrigger aria-label="Academic year" className={controlClasses}><SelectValue placeholder="Select academic year" /></SelectTrigger>
+            <Select
+              value={academicYearId || '__none__'}
+              onValueChange={(value) => {
+                setAcademicYearId(value === '__none__' ? '' : value);
+                setSelectedStudentIds([]);
+              }}
+              disabled={yearsQuery.isPending || !years.length}
+            >
+              <SelectTrigger aria-label="Academic year" className={controlClasses}>
+                <SelectValue placeholder="Select academic year" />
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value="__none__">Select academic year</SelectItem>
-                {years.map((year) => <SelectItem key={year.id} value={year.id}>{year.name}{year.isCurrent ? " (Current)" : ""}</SelectItem>)}
+                {years.map((year) => (
+                  <SelectItem key={year.id} value={year.id}>
+                    {year.name}
+                    {year.isCurrent ? ' (Current)' : ''}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </label>
           <label className="space-y-1.5">
             <span className="text-xs font-semibold text-secondary-foreground">Term</span>
-            <Select value={termId || "__none__"} onValueChange={(value) => {
-              setTermId(value === "__none__" ? "" : value);
-              setSelectedStudentIds([]);
-            }} disabled={!terms.length}>
-              <SelectTrigger aria-label="Term" className={controlClasses}><SelectValue placeholder="Select term" /></SelectTrigger>
+            <Select
+              value={termId || '__none__'}
+              onValueChange={(value) => {
+                setTermId(value === '__none__' ? '' : value);
+                setSelectedStudentIds([]);
+              }}
+              disabled={!terms.length}
+            >
+              <SelectTrigger aria-label="Term" className={controlClasses}>
+                <SelectValue placeholder="Select term" />
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value="__none__">Select term</SelectItem>
-                {terms.map((term) => <SelectItem key={term.id} value={term.id}>{term.name}{term.isCurrent ? " (Current)" : ""}</SelectItem>)}
+                {terms.map((term) => (
+                  <SelectItem key={term.id} value={term.id}>
+                    {term.name}
+                    {term.isCurrent ? ' (Current)' : ''}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </label>
           <label className="space-y-1.5">
             <span className="text-xs font-semibold text-secondary-foreground">Class roster</span>
-            <Select value={classId || "__all__"} onValueChange={(value) => setClassId(value === "__all__" ? "" : value)} disabled={classesQuery.isPending}>
-              <SelectTrigger aria-label="Class roster" className={controlClasses}><SelectValue placeholder="All classes" /></SelectTrigger>
+            <Select
+              value={classId || '__all__'}
+              onValueChange={(value) => setClassId(value === '__all__' ? '' : value)}
+              disabled={classesQuery.isPending}
+            >
+              <SelectTrigger aria-label="Class roster" className={controlClasses}>
+                <SelectValue placeholder="All classes" />
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value="__all__">All classes</SelectItem>
-                {classes.map((schoolClass) => <SelectItem key={schoolClass.id} value={schoolClass.id}>{schoolClass.name} · {schoolClass.level}</SelectItem>)}
+                {classes.map((schoolClass) => (
+                  <SelectItem key={schoolClass.id} value={schoolClass.id}>
+                    {schoolClass.name} · {schoolClass.level}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </label>
@@ -283,7 +306,7 @@ export function EnrollmentWorkspace({
         {(yearsQuery.error || classesQuery.error) && (
           <div className="px-5 pb-5 sm:px-6">
             <InlineError
-              message={`Setup data could not be loaded: ${[yearsQuery.error?.message, classesQuery.error?.message].filter(Boolean).join("; ")}`}
+              message={`Setup data could not be loaded: ${[yearsQuery.error?.message, classesQuery.error?.message].filter(Boolean).join('; ')}`}
             />
           </div>
         )}
@@ -316,8 +339,8 @@ export function EnrollmentWorkspace({
             >
               <Check className="size-4" />
               {enrollmentMutation.isPending
-                ? "Enrolling…"
-                : `Enroll selected${selectedStudentIds.length ? ` (${selectedStudentIds.length})` : ""}`}
+                ? 'Enrolling…'
+                : `Enroll selected${selectedStudentIds.length ? ` (${selectedStudentIds.length})` : ''}`}
             </button>
           </div>
 
@@ -333,7 +356,8 @@ export function EnrollmentWorkspace({
           )}
           {atCapacity && (
             <p className="px-5 pt-4 text-sm font-medium text-destructive sm:px-6">
-              This selection exceeds the class capacity. Reduce the selected students or choose another class.
+              This selection exceeds the class capacity. Reduce the selected students or choose
+              another class.
             </p>
           )}
 
@@ -363,7 +387,9 @@ export function EnrollmentWorkspace({
           {eligibleQuery.isPending ? (
             <InlineLoading label="Loading eligible students" />
           ) : eligibleQuery.error ? (
-            <InlineError message={`Eligible students could not be loaded: ${eligibleQuery.error.message}`} />
+            <InlineError
+              message={`Eligible students could not be loaded: ${eligibleQuery.error.message}`}
+            />
           ) : eligibleStudents.length ? (
             <div className="max-h-[420px] overflow-auto border-t border-border">
               <ul className="divide-y divide-border">
@@ -383,7 +409,7 @@ export function EnrollmentWorkspace({
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-sm font-semibold text-foreground">
                           {student.profile.firstName} {student.profile.lastName}
-                          {student.profile.otherNames ? ` ${student.profile.otherNames}` : ""}
+                          {student.profile.otherNames ? ` ${student.profile.otherNames}` : ''}
                         </span>
                         <span className="mt-0.5 block text-xs text-muted-foreground">
                           {student.admissionNumber || student.studentId}
@@ -421,16 +447,16 @@ export function EnrollmentWorkspace({
           <div>
             <h3 className="text-base font-bold text-foreground">Term roster</h3>
             <p className="mt-1 text-xs text-muted-foreground">
-              {selectedYear?.name ?? "Select a year"}
+              {selectedYear?.name ?? 'Select a year'}
               {terms.find((term) => term.id === termId)
                 ? ` · ${terms.find((term) => term.id === termId)?.name}`
-                : ""}
-              {selectedClass ? ` · ${selectedClass.name}` : " · All classes"}
+                : ''}
+              {selectedClass ? ` · ${selectedClass.name}` : ' · All classes'}
             </p>
           </div>
           <span className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary">
             <Users className="size-3.5" />
-            {roster.length} {roster.length === 1 ? "student" : "students"}
+            {roster.length} {roster.length === 1 ? 'student' : 'students'}
           </span>
         </div>
         {rosterQuery.isPending ? (
@@ -452,7 +478,9 @@ export function EnrollmentWorkspace({
         ) : (
           <div className="px-5 py-10 text-center">
             <CalendarDays className="mx-auto size-7 text-muted-foreground" />
-            <p className="mt-3 text-sm font-semibold text-foreground">No placements for these filters</p>
+            <p className="mt-3 text-sm font-semibold text-foreground">
+              No placements for these filters
+            </p>
             <p className="mt-1 text-xs text-muted-foreground">
               Select another year, term, or class, or enroll eligible students above.
             </p>

@@ -1,6 +1,6 @@
 export interface DashboardActivity {
   id: string;
-  type: "student" | "payment" | "expense";
+  type: 'student' | 'payment' | 'expense';
   title: string;
   detail: string;
   amount: number | null;

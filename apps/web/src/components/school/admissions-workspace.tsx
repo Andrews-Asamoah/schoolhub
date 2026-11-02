@@ -1,18 +1,27 @@
-import { DatePicker, DateTimePicker } from "@/components/ui/date-picker";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Pencil } from "lucide-react";
-import { useState } from "react";
+import { DatePicker, DateTimePicker } from '@/components/ui/date-picker';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Pencil } from 'lucide-react';
+import { useState } from 'react';
 import {
   saveAdmissionCycleSchema,
   type ApplicationStatus,
   type IssuedCredentials,
-} from "@schoolhub/shared";
-import { CredentialsDialog, type CredentialEntry } from "@/components/credentials/credentials-dialog";
-import { useSchoolRole } from "@/components/school/school-role-switcher";
-import { WorkspaceEmptyState } from "@/components/school/workspace-ui";
-import { apiFetch } from "@/lib/api";
-import { getTenantSubdomain, useTenantSchool } from "@/lib/tenant";
+} from '@schoolhub/shared';
+import {
+  CredentialsDialog,
+  type CredentialEntry,
+} from '@/components/credentials/credentials-dialog';
+import { useSchoolRole } from '@/components/school/school-role-switcher';
+import { WorkspaceEmptyState } from '@/components/school/workspace-ui';
+import { apiFetch } from '@/lib/api';
+import { getTenantSubdomain, useTenantSchool } from '@/lib/tenant';
 
 interface ClassOption {
   id: string;
@@ -26,7 +35,7 @@ interface YearOption {
   isCurrent: boolean;
   terms: { id: string; name: string; isCurrent: boolean }[];
 }
-type FeeStatus = "NOT_REQUIRED" | "PENDING" | "PAID" | "EXEMPTED";
+type FeeStatus = 'NOT_REQUIRED' | 'PENDING' | 'PAID' | 'EXEMPTED';
 interface FeeSummary {
   collected: number;
   collectedCount: number;
@@ -39,15 +48,15 @@ interface FeeSummary {
 /** Money in the school's currency (GHS by default). */
 function useMoney() {
   const { school } = useTenantSchool();
-  const currency = school?.currency || "GHS";
+  const currency = school?.currency || 'GHS';
   return (value: number | string) =>
-    new Intl.NumberFormat("en-GH", { style: "currency", currency }).format(Number(value));
+    new Intl.NumberFormat('en-GH', { style: 'currency', currency }).format(Number(value));
 }
 
 interface Cycle {
   id: string;
   name: string;
-  status: "DRAFT" | "OPEN" | "CLOSED";
+  status: 'DRAFT' | 'OPEN' | 'CLOSED';
   opensAt: string;
   closesAt: string;
   passMark: string;
@@ -93,48 +102,54 @@ interface ApplicationPage {
 }
 
 const input =
-  "mt-1.5 h-10 w-full rounded-lg border border-border bg-background px-3 text-sm text-foreground outline-none focus:border-ring focus:ring-2 focus:ring-ring/20";
+  'mt-1.5 h-10 w-full rounded-lg border border-border bg-background px-3 text-sm text-foreground outline-none focus:border-ring focus:ring-2 focus:ring-ring/20';
 const btn =
-  "inline-flex h-9 items-center justify-center rounded-lg px-3 text-xs font-semibold disabled:opacity-50";
+  'inline-flex h-9 items-center justify-center rounded-lg px-3 text-xs font-semibold disabled:opacity-50';
 const primary = `${btn} bg-primary text-primary-foreground hover:opacity-90`;
 const ghost = `${btn} border border-border text-foreground hover:bg-muted`;
 
 const STATUS_STYLE: Record<string, string> = {
-  SUBMITTED: "bg-muted-foreground/10 text-muted-foreground",
-  UNDER_REVIEW: "bg-primary/10 text-primary",
-  EXAM_SCHEDULED: "bg-highlight/10 text-highlight",
-  EXAM_COMPLETED: "bg-warning/10 text-warning",
-  ACCEPTED: "bg-success/10 text-success",
-  WAITLISTED: "bg-warning/10 text-warning",
-  REJECTED: "bg-destructive/10 text-destructive",
-  ADMITTED: "bg-success/15 text-success",
-  WITHDRAWN: "bg-muted-foreground/10 text-muted-foreground",
-  NOT_REQUIRED: "bg-muted-foreground/10 text-muted-foreground",
-  PENDING_FEE: "bg-warning/10 text-warning",
-  PAID: "bg-success/10 text-success",
-  EXEMPTED: "bg-info/10 text-info",
-  DRAFT: "bg-muted-foreground/10 text-muted-foreground",
-  OPEN: "bg-success/10 text-success",
-  CLOSED: "bg-destructive/10 text-destructive",
+  SUBMITTED: 'bg-muted-foreground/10 text-muted-foreground',
+  UNDER_REVIEW: 'bg-primary/10 text-primary',
+  EXAM_SCHEDULED: 'bg-highlight/10 text-highlight',
+  EXAM_COMPLETED: 'bg-warning/10 text-warning',
+  ACCEPTED: 'bg-success/10 text-success',
+  WAITLISTED: 'bg-warning/10 text-warning',
+  REJECTED: 'bg-destructive/10 text-destructive',
+  ADMITTED: 'bg-success/15 text-success',
+  WITHDRAWN: 'bg-muted-foreground/10 text-muted-foreground',
+  NOT_REQUIRED: 'bg-muted-foreground/10 text-muted-foreground',
+  PENDING_FEE: 'bg-warning/10 text-warning',
+  PAID: 'bg-success/10 text-success',
+  EXEMPTED: 'bg-info/10 text-info',
+  DRAFT: 'bg-muted-foreground/10 text-muted-foreground',
+  OPEN: 'bg-success/10 text-success',
+  CLOSED: 'bg-destructive/10 text-destructive',
 };
-const label = (value: string) => value.replaceAll("_", " ").toLowerCase().replace(/^\w/, (c) => c.toUpperCase());
+const label = (value: string) =>
+  value
+    .replaceAll('_', ' ')
+    .toLowerCase()
+    .replace(/^\w/, (c) => c.toUpperCase());
 function Badge({ value }: { value: string }) {
   return (
-    <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${STATUS_STYLE[value] ?? ""}`}>
+    <span
+      className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${STATUS_STYLE[value] ?? ''}`}
+    >
       {label(value)}
     </span>
   );
 }
-const errorText = (e: unknown) => (e instanceof Error ? e.message : "Something went wrong.");
+const errorText = (e: unknown) => (e instanceof Error ? e.message : 'Something went wrong.');
 
 export function AdmissionsWorkspace() {
-  const [tab, setTab] = useState<"applications" | "intakes">("applications");
+  const [tab, setTab] = useState<'applications' | 'intakes'>('applications');
   const { activeRole } = useSchoolRole();
-  const canDecide = activeRole === "owner" || activeRole === "admin";
+  const canDecide = activeRole === 'owner' || activeRole === 'admin';
   const subdomain = getTenantSubdomain();
   const cyclesQuery = useQuery({
-    queryKey: ["admissions", "cycles"],
-    queryFn: () => apiFetch<Cycle[]>("/admissions/cycles"),
+    queryKey: ['admissions', 'cycles'],
+    queryFn: () => apiFetch<Cycle[]>('/admissions/cycles'),
     retry: false,
   });
 
@@ -142,29 +157,37 @@ export function AdmissionsWorkspace() {
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-card p-4">
         <div className="inline-flex rounded-lg border border-border p-0.5">
-          {(["applications", "intakes"] as const).map((key) => (
+          {(['applications', 'intakes'] as const).map((key) => (
             <button
               key={key}
               type="button"
               onClick={() => setTab(key)}
-              className={`rounded-md px-3 py-1.5 text-xs font-semibold ${tab === key ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}
+              className={`rounded-md px-3 py-1.5 text-xs font-semibold ${tab === key ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'}`}
             >
-              {key === "applications" ? "Applications" : "Intakes"}
+              {key === 'applications' ? 'Applications' : 'Intakes'}
             </button>
           ))}
         </div>
         {subdomain && (
           <p className="text-xs text-muted-foreground">
-            Public enrollment form:{" "}
-            <a className="font-semibold text-primary underline" href={`/apply${window.location.search}`} target="_blank" rel="noreferrer">
+            Public enrollment form:{' '}
+            <a
+              className="font-semibold text-primary underline"
+              href={`/apply${window.location.search}`}
+              target="_blank"
+              rel="noreferrer"
+            >
               {window.location.origin}/apply
             </a>
           </p>
         )}
       </div>
       {cyclesQuery.error ? (
-        <WorkspaceEmptyState title="Could not load admissions" description={errorText(cyclesQuery.error)} />
-      ) : tab === "intakes" ? (
+        <WorkspaceEmptyState
+          title="Could not load admissions"
+          description={errorText(cyclesQuery.error)}
+        />
+      ) : tab === 'intakes' ? (
         <IntakesPanel cycles={cyclesQuery.data ?? []} canEdit={canDecide} />
       ) : (
         <ApplicationsPanel cycles={cyclesQuery.data ?? []} canDecide={canDecide} />
@@ -176,16 +199,18 @@ export function AdmissionsWorkspace() {
 // ------------------------------------------------------------------ intakes
 
 function IntakesPanel({ cycles, canEdit }: { cycles: Cycle[]; canEdit: boolean }) {
-  const [editing, setEditing] = useState<Cycle | "new" | null>(null);
+  const [editing, setEditing] = useState<Cycle | 'new' | null>(null);
   const money = useMoney();
   return (
     <div className="space-y-4">
       {canEdit && !editing && (
-        <button type="button" className={primary} onClick={() => setEditing("new")}>
+        <button type="button" className={primary} onClick={() => setEditing('new')}>
           Open a new intake
         </button>
       )}
-      {editing && <IntakeForm cycle={editing === "new" ? null : editing} onDone={() => setEditing(null)} />}
+      {editing && (
+        <IntakeForm cycle={editing === 'new' ? null : editing} onDone={() => setEditing(null)} />
+      )}
       {cycles.length === 0 && !editing ? (
         <WorkspaceEmptyState
           title="No intakes yet"
@@ -202,25 +227,34 @@ function IntakesPanel({ cycles, canEdit }: { cycles: Cycle[]; canEdit: boolean }
                     <h3 className="text-sm font-bold text-foreground">{cycle.name}</h3>
                     <p className="mt-0.5 text-xs text-muted-foreground">
                       {cycle.academicYear.name}
-                      {cycle.term ? ` · ${cycle.term.name}` : ""} · {cycle.opensAt.slice(0, 10)} to {cycle.closesAt.slice(0, 10)}
+                      {cycle.term ? ` · ${cycle.term.name}` : ''} · {cycle.opensAt.slice(0, 10)} to{' '}
+                      {cycle.closesAt.slice(0, 10)}
                     </p>
                   </div>
                   <Badge value={cycle.status} />
                 </div>
                 <p className="mt-3 text-xs text-muted-foreground">
-                  Pass mark {Number(cycle.passMark)}/{Number(cycle.examMaxScore)} · Exam fee{" "}
-                  {Number(cycle.admissionFee) > 0 ? `${money(cycle.admissionFee)} (cash)` : "none"} · {total} application{total === 1 ? "" : "s"}
+                  Pass mark {Number(cycle.passMark)}/{Number(cycle.examMaxScore)} · Exam fee{' '}
+                  {Number(cycle.admissionFee) > 0 ? `${money(cycle.admissionFee)} (cash)` : 'none'}{' '}
+                  · {total} application{total === 1 ? '' : 's'}
                 </p>
                 <ul className="mt-2 flex flex-wrap gap-1.5">
                   {cycle.classes.map((row) => (
-                    <li key={row.classId} className="rounded-md bg-muted px-2 py-1 text-[11px] text-foreground">
+                    <li
+                      key={row.classId}
+                      className="rounded-md bg-muted px-2 py-1 text-[11px] text-foreground"
+                    >
                       {row.class.name}
-                      {row.seats ? ` · ${row.seats} seats` : ""}
+                      {row.seats ? ` · ${row.seats} seats` : ''}
                     </li>
                   ))}
                 </ul>
                 {canEdit && (
-                  <button type="button" className={`${ghost} mt-3`} onClick={() => setEditing(cycle)}>
+                  <button
+                    type="button"
+                    className={`${ghost} mt-3`}
+                    onClick={() => setEditing(cycle)}
+                  >
                     Edit intake
                   </button>
                 )}
@@ -236,39 +270,43 @@ function IntakesPanel({ cycles, canEdit }: { cycles: Cycle[]; canEdit: boolean }
 function IntakeForm({ cycle, onDone }: { cycle: Cycle | null; onDone: () => void }) {
   const queryClient = useQueryClient();
   const classesQuery = useQuery({
-    queryKey: ["academics", "classes"],
-    queryFn: () => apiFetch<ClassOption[]>("/academics/classes"),
+    queryKey: ['academics', 'classes'],
+    queryFn: () => apiFetch<ClassOption[]>('/academics/classes'),
   });
   const yearsQuery = useQuery({
-    queryKey: ["schools", "academic-years"],
-    queryFn: () => apiFetch<YearOption[]>("/schools/academic-years"),
+    queryKey: ['schools', 'academic-years'],
+    queryFn: () => apiFetch<YearOption[]>('/schools/academic-years'),
   });
-  const [name, setName] = useState(cycle?.name ?? "");
-  const [academicYearId, setAcademicYearId] = useState(cycle?.academicYearId ?? "");
-  const [termId, setTermId] = useState(cycle?.termId ?? "");
-  const [opensAt, setOpensAt] = useState(cycle?.opensAt.slice(0, 10) ?? "");
-  const [closesAt, setClosesAt] = useState(cycle?.closesAt.slice(0, 10) ?? "");
-  const [status, setStatus] = useState<Cycle["status"]>(cycle?.status ?? "DRAFT");
+  const [name, setName] = useState(cycle?.name ?? '');
+  const [academicYearId, setAcademicYearId] = useState(cycle?.academicYearId ?? '');
+  const [termId, setTermId] = useState(cycle?.termId ?? '');
+  const [opensAt, setOpensAt] = useState(cycle?.opensAt.slice(0, 10) ?? '');
+  const [closesAt, setClosesAt] = useState(cycle?.closesAt.slice(0, 10) ?? '');
+  const [status, setStatus] = useState<Cycle['status']>(cycle?.status ?? 'DRAFT');
   const [examMaxScore, setExamMaxScore] = useState(String(Number(cycle?.examMaxScore ?? 100)));
   const [passMark, setPassMark] = useState(String(Number(cycle?.passMark ?? 50)));
   const [admissionFee, setAdmissionFee] = useState(String(Number(cycle?.admissionFee ?? 0)));
-  const [instructions, setInstructions] = useState(cycle?.instructions ?? "");
+  const [instructions, setInstructions] = useState(cycle?.instructions ?? '');
   const [seats, setSeats] = useState<Record<string, string>>(
-    Object.fromEntries((cycle?.classes ?? []).map((c) => [c.classId, c.seats ? String(c.seats) : ""])),
+    Object.fromEntries(
+      (cycle?.classes ?? []).map((c) => [c.classId, c.seats ? String(c.seats) : '']),
+    ),
   );
-  const [selected, setSelected] = useState<Set<string>>(new Set((cycle?.classes ?? []).map((c) => c.classId)));
+  const [selected, setSelected] = useState<Set<string>>(
+    new Set((cycle?.classes ?? []).map((c) => c.classId)),
+  );
   const [formError, setFormError] = useState<string | null>(null);
   const years = yearsQuery.data ?? [];
   const terms = years.find((y) => y.id === academicYearId)?.terms ?? [];
 
   const save = useMutation({
     mutationFn: (body: unknown) =>
-      apiFetch(cycle ? `/admissions/cycles/${cycle.id}` : "/admissions/cycles", {
-        method: cycle ? "PATCH" : "POST",
+      apiFetch(cycle ? `/admissions/cycles/${cycle.id}` : '/admissions/cycles', {
+        method: cycle ? 'PATCH' : 'POST',
         body: JSON.stringify(body),
       }),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["admissions"] });
+      await queryClient.invalidateQueries({ queryKey: ['admissions'] });
       onDone();
     },
   });
@@ -286,10 +324,13 @@ function IntakeForm({ cycle, onDone }: { cycle: Cycle | null; onDone: () => void
       passMark: Number(passMark),
       admissionFee: Number(admissionFee || 0),
       instructions: instructions || undefined,
-      classes: [...selected].map((classId) => ({ classId, seats: seats[classId] ? Number(seats[classId]) : null })),
+      classes: [...selected].map((classId) => ({
+        classId,
+        seats: seats[classId] ? Number(seats[classId]) : null,
+      })),
     });
     if (!parsed.success) {
-      setFormError(parsed.error.issues[0]?.message ?? "Check the form.");
+      setFormError(parsed.error.issues[0]?.message ?? 'Check the form.');
       return;
     }
     save.mutate(parsed.data);
@@ -297,59 +338,116 @@ function IntakeForm({ cycle, onDone }: { cycle: Cycle | null; onDone: () => void
 
   return (
     <section className="rounded-2xl border border-border bg-card p-5">
-      <h3 className="text-sm font-bold text-foreground">{cycle ? "Edit intake" : "New intake"}</h3>
+      <h3 className="text-sm font-bold text-foreground">{cycle ? 'Edit intake' : 'New intake'}</h3>
       <div className="mt-4 grid gap-4 sm:grid-cols-2">
         <label className="text-xs font-semibold sm:col-span-2">
           Intake name
-          <input className={input} value={name} onChange={(e) => setName(e.target.value)} placeholder="2027/2028 Term 1 Intake" />
+          <input
+            className={input}
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="2027/2028 Term 1 Intake"
+          />
         </label>
         <label className="text-xs font-semibold">
           Academic year
-          <Select value={academicYearId || "__none__"} onValueChange={(value) => { setAcademicYearId(value === "__none__" ? "" : value); setTermId(""); }}>
-            <SelectTrigger aria-label="Academic year" className={input}><SelectValue placeholder="Choose…" /></SelectTrigger>
+          <Select
+            value={academicYearId || '__none__'}
+            onValueChange={(value) => {
+              setAcademicYearId(value === '__none__' ? '' : value);
+              setTermId('');
+            }}
+          >
+            <SelectTrigger aria-label="Academic year" className={input}>
+              <SelectValue placeholder="Choose…" />
+            </SelectTrigger>
             <SelectContent>
               <SelectItem value="__none__">Choose…</SelectItem>
-              {years.map((year) => <SelectItem key={year.id} value={year.id}>{year.name}</SelectItem>)}
+              {years.map((year) => (
+                <SelectItem key={year.id} value={year.id}>
+                  {year.name}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </label>
         <label className="text-xs font-semibold">
           Term students join (optional)
-          <Select value={termId || "__current__"} onValueChange={(value) => setTermId(value === "__current__" ? "" : value)} disabled={!academicYearId}>
-            <SelectTrigger aria-label="Term students join" className={input}><SelectValue /></SelectTrigger>
+          <Select
+            value={termId || '__current__'}
+            onValueChange={(value) => setTermId(value === '__current__' ? '' : value)}
+            disabled={!academicYearId}
+          >
+            <SelectTrigger aria-label="Term students join" className={input}>
+              <SelectValue />
+            </SelectTrigger>
             <SelectContent>
               <SelectItem value="__current__">Current term at admission</SelectItem>
-              {terms.map((term) => <SelectItem key={term.id} value={term.id}>{term.name}</SelectItem>)}
+              {terms.map((term) => (
+                <SelectItem key={term.id} value={term.id}>
+                  {term.name}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </label>
         <label className="text-xs font-semibold">
           Applications open
-          <DatePicker buttonClassName={input} value={opensAt} onChange={(value) => setOpensAt(value)} />
+          <DatePicker
+            buttonClassName={input}
+            value={opensAt}
+            onChange={(value) => setOpensAt(value)}
+          />
         </label>
         <label className="text-xs font-semibold">
           Applications close
-          <DatePicker buttonClassName={input} value={closesAt} onChange={(value) => setClosesAt(value)} />
+          <DatePicker
+            buttonClassName={input}
+            value={closesAt}
+            onChange={(value) => setClosesAt(value)}
+          />
         </label>
         <label className="text-xs font-semibold">
           Exam maximum score
-          <input type="number" min={1} className={input} value={examMaxScore} onChange={(e) => setExamMaxScore(e.target.value)} />
+          <input
+            type="number"
+            min={1}
+            className={input}
+            value={examMaxScore}
+            onChange={(e) => setExamMaxScore(e.target.value)}
+          />
         </label>
         <label className="text-xs font-semibold">
           Pass mark
-          <input type="number" min={0} className={input} value={passMark} onChange={(e) => setPassMark(e.target.value)} />
+          <input
+            type="number"
+            min={0}
+            className={input}
+            value={passMark}
+            onChange={(e) => setPassMark(e.target.value)}
+          />
         </label>
         <label className="text-xs font-semibold sm:col-span-2">
           Admission (entrance exam) fee per applicant, paid in cash on exam day
-          <input type="number" min={0} step="0.01" className={input} value={admissionFee} onChange={(e) => setAdmissionFee(e.target.value)} />
+          <input
+            type="number"
+            min={0}
+            step="0.01"
+            className={input}
+            value={admissionFee}
+            onChange={(e) => setAdmissionFee(e.target.value)}
+          />
           <span className="mt-1 block text-[11px] font-normal text-muted-foreground">
-            Counts as school income and is not refundable, whether or not the applicant is admitted. Use 0 for no fee.
+            Counts as school income and is not refundable, whether or not the applicant is admitted.
+            Use 0 for no fee.
           </span>
         </label>
         <label className="text-xs font-semibold">
           Status
-          <Select value={status} onValueChange={(value) => setStatus(value as Cycle["status"])}>
-            <SelectTrigger aria-label="Intake publication status" className={input}><SelectValue /></SelectTrigger>
+          <Select value={status} onValueChange={(value) => setStatus(value as Cycle['status'])}>
+            <SelectTrigger aria-label="Intake publication status" className={input}>
+              <SelectValue />
+            </SelectTrigger>
             <SelectContent>
               <SelectItem value="DRAFT">Draft (not public)</SelectItem>
               <SelectItem value="OPEN">Open (accepting applications)</SelectItem>
@@ -359,46 +457,64 @@ function IntakeForm({ cycle, onDone }: { cycle: Cycle | null; onDone: () => void
         </label>
         <label className="text-xs font-semibold sm:col-span-2">
           Instructions shown on the form (documents to bring, exam details…)
-          <textarea className={`${input} h-24 py-2`} value={instructions} onChange={(e) => setInstructions(e.target.value)} />
+          <textarea
+            className={`${input} h-24 py-2`}
+            value={instructions}
+            onChange={(e) => setInstructions(e.target.value)}
+          />
         </label>
       </div>
       <fieldset className="mt-4">
-        <legend className="text-xs font-semibold text-foreground">Classes admitting students (seats optional)</legend>
+        <legend className="text-xs font-semibold text-foreground">
+          Classes admitting students (seats optional)
+        </legend>
         <div className="mt-2 grid gap-2 sm:grid-cols-2">
-          {(classesQuery.data ?? []).filter((c) => c.isActive).map((c) => (
-            <div key={c.id} className="flex items-center gap-2 rounded-lg border border-border px-3 py-2">
-              <input
-                id={`cls-${c.id}`}
-                type="checkbox"
-                checked={selected.has(c.id)}
-                onChange={(e) => {
-                  const next = new Set(selected);
-                  if (e.target.checked) next.add(c.id); else next.delete(c.id);
-                  setSelected(next);
-                }}
-              />
-              <label htmlFor={`cls-${c.id}`} className="flex-1 text-sm">{c.name}</label>
-              <input
-                type="number"
-                min={1}
-                placeholder="Seats"
-                disabled={!selected.has(c.id)}
-                value={seats[c.id] ?? ""}
-                onChange={(e) => setSeats({ ...seats, [c.id]: e.target.value })}
-                className="h-8 w-20 rounded-md border border-border bg-background px-2 text-xs"
-              />
-            </div>
-          ))}
+          {(classesQuery.data ?? [])
+            .filter((c) => c.isActive)
+            .map((c) => (
+              <div
+                key={c.id}
+                className="flex items-center gap-2 rounded-lg border border-border px-3 py-2"
+              >
+                <input
+                  id={`cls-${c.id}`}
+                  type="checkbox"
+                  checked={selected.has(c.id)}
+                  onChange={(e) => {
+                    const next = new Set(selected);
+                    if (e.target.checked) next.add(c.id);
+                    else next.delete(c.id);
+                    setSelected(next);
+                  }}
+                />
+                <label htmlFor={`cls-${c.id}`} className="flex-1 text-sm">
+                  {c.name}
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  placeholder="Seats"
+                  disabled={!selected.has(c.id)}
+                  value={seats[c.id] ?? ''}
+                  onChange={(e) => setSeats({ ...seats, [c.id]: e.target.value })}
+                  className="h-8 w-20 rounded-md border border-border bg-background px-2 text-xs"
+                />
+              </div>
+            ))}
         </div>
       </fieldset>
       {(formError || save.error) && (
-        <p role="alert" className="mt-3 text-xs text-destructive">{formError ?? errorText(save.error)}</p>
+        <p role="alert" className="mt-3 text-xs text-destructive">
+          {formError ?? errorText(save.error)}
+        </p>
       )}
       <div className="mt-4 flex gap-2">
         <button type="button" className={primary} onClick={submit} disabled={save.isPending}>
-          {save.isPending ? "Saving…" : "Save intake"}
+          {save.isPending ? 'Saving…' : 'Save intake'}
         </button>
-        <button type="button" className={ghost} onClick={onDone}>Cancel</button>
+        <button type="button" className={ghost} onClick={onDone}>
+          Cancel
+        </button>
       </div>
     </section>
   );
@@ -408,48 +524,57 @@ function IntakeForm({ cycle, onDone }: { cycle: Cycle | null; onDone: () => void
 
 function ApplicationsPanel({ cycles, canDecide }: { cycles: Cycle[]; canDecide: boolean }) {
   const queryClient = useQueryClient();
-  const [cycleId, setCycleId] = useState("");
-  const [status, setStatus] = useState("");
-  const [search, setSearch] = useState("");
+  const [cycleId, setCycleId] = useState('');
+  const [status, setStatus] = useState('');
+  const [search, setSearch] = useState('');
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [issued, setIssued] = useState<CredentialEntry[]>([]);
-  const [examDate, setExamDate] = useState("");
-  const [venue, setVenue] = useState("");
-  const [deciding, setDeciding] = useState<{ app: Application; decision: "ACCEPTED" | "WAITLISTED" | "REJECTED" } | null>(null);
-  const [feeStatus, setFeeStatus] = useState("");
+  const [examDate, setExamDate] = useState('');
+  const [venue, setVenue] = useState('');
+  const [deciding, setDeciding] = useState<{
+    app: Application;
+    decision: 'ACCEPTED' | 'WAITLISTED' | 'REJECTED';
+  } | null>(null);
+  const [feeStatus, setFeeStatus] = useState('');
   const [receiving, setReceiving] = useState<Application | null>(null);
   const [exempting, setExempting] = useState<Application | null>(null);
-  const [receipt, setReceipt] = useState<{ receiptNumber: string; amount: string; name: string } | null>(null);
+  const [receipt, setReceipt] = useState<{
+    receiptNumber: string;
+    amount: string;
+    name: string;
+  } | null>(null);
   const { activeRole } = useSchoolRole();
   const money = useMoney();
-  const canCollect = ["owner", "admin", "staff", "accountant"].includes(activeRole ?? "");
-  const canEditExam = ["owner", "admin", "staff"].includes(activeRole ?? "");
+  const canCollect = ['owner', 'admin', 'staff', 'accountant'].includes(activeRole ?? '');
+  const canEditExam = ['owner', 'admin', 'staff'].includes(activeRole ?? '');
   const summaryQuery = useQuery({
-    queryKey: ["admissions", "fees", cycleId],
-    queryFn: () => apiFetch<FeeSummary>(`/admissions/fees/summary${cycleId ? `?cycleId=${cycleId}` : ""}`),
+    queryKey: ['admissions', 'fees', cycleId],
+    queryFn: () =>
+      apiFetch<FeeSummary>(`/admissions/fees/summary${cycleId ? `?cycleId=${cycleId}` : ''}`),
     retry: false,
   });
   const withdraw = useMutation({
-    mutationFn: (id: string) => apiFetch(`/admissions/applications/${id}/fee/exemption`, { method: "DELETE" }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admissions"] }),
+    mutationFn: (id: string) =>
+      apiFetch(`/admissions/applications/${id}/fee/exemption`, { method: 'DELETE' }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admissions'] }),
   });
 
   const query = useQuery({
-    queryKey: ["admissions", "applications", { cycleId, status, feeStatus, search }],
+    queryKey: ['admissions', 'applications', { cycleId, status, feeStatus, search }],
     queryFn: () => {
-      const params = new URLSearchParams({ limit: "100" });
-      if (cycleId) params.set("cycleId", cycleId);
-      if (status) params.set("status", status);
-      if (feeStatus) params.set("feeStatus", feeStatus);
-      if (search.trim()) params.set("search", search.trim());
+      const params = new URLSearchParams({ limit: '100' });
+      if (cycleId) params.set('cycleId', cycleId);
+      if (status) params.set('status', status);
+      if (feeStatus) params.set('feeStatus', feeStatus);
+      if (search.trim()) params.set('search', search.trim());
       return apiFetch<ApplicationPage>(`/admissions/applications?${params}`);
     },
     retry: false,
   });
-  const refresh = () => queryClient.invalidateQueries({ queryKey: ["admissions"] });
+  const refresh = () => queryClient.invalidateQueries({ queryKey: ['admissions'] });
   const act = useMutation({
     mutationFn: ({ path, body }: { path: string; body?: unknown }) =>
-      apiFetch<any>(path, { method: "POST", body: JSON.stringify(body ?? {}) }),
+      apiFetch<any>(path, { method: 'POST', body: JSON.stringify(body ?? {}) }),
     onSuccess: refresh,
   });
 
@@ -461,19 +586,29 @@ function ApplicationsPanel({ cycles, canDecide }: { cycles: Cycle[]; canDecide: 
           const student = result.student;
           const name = `${app.firstName} ${app.lastName}`;
           const entries: CredentialEntry[] = [];
-          if (student.credentials) entries.push({ label: `${name} (student)`, credentials: student.credentials as IssuedCredentials });
+          if (student.credentials)
+            entries.push({
+              label: `${name} (student)`,
+              credentials: student.credentials as IssuedCredentials,
+            });
           for (const g of student.guardianCredentials ?? []) {
-            if (g.credentials) entries.push({ label: `${g.name} (guardian of ${name})`, credentials: g.credentials });
+            if (g.credentials)
+              entries.push({
+                label: `${g.name} (guardian of ${name})`,
+                credentials: g.credentials,
+              });
           }
           setIssued(entries);
-          void queryClient.invalidateQueries({ queryKey: ["students"] });
+          void queryClient.invalidateQueries({ queryKey: ['students'] });
         },
       },
     );
   }
 
   const rows = query.data?.data ?? [];
-  const schedulable = rows.filter((r) => ["SUBMITTED", "UNDER_REVIEW", "EXAM_SCHEDULED"].includes(r.status));
+  const schedulable = rows.filter((r) =>
+    ['SUBMITTED', 'UNDER_REVIEW', 'EXAM_SCHEDULED'].includes(r.status),
+  );
 
   return (
     <div className="space-y-4">
@@ -481,46 +616,97 @@ function ApplicationsPanel({ cycles, canDecide }: { cycles: Cycle[]; canDecide: 
         <div className="grid gap-3 sm:grid-cols-3">
           <div className="rounded-2xl border border-border bg-card p-4">
             <p className="text-xs text-muted-foreground">Admission fees collected (cash)</p>
-            <p className="mt-1 text-lg font-bold text-foreground">{money(summaryQuery.data.collected)}</p>
-            <p className="text-[11px] text-muted-foreground">{summaryQuery.data.collectedCount} paid · non-refundable school income</p>
+            <p className="mt-1 text-lg font-bold text-foreground">
+              {money(summaryQuery.data.collected)}
+            </p>
+            <p className="text-[11px] text-muted-foreground">
+              {summaryQuery.data.collectedCount} paid · non-refundable school income
+            </p>
           </div>
           <div className="rounded-2xl border border-border bg-card p-4">
             <p className="text-xs text-muted-foreground">Still to collect</p>
-            <p className="mt-1 text-lg font-bold text-foreground">{money(summaryQuery.data.pending)}</p>
-            <p className="text-[11px] text-muted-foreground">{summaryQuery.data.pendingCount} applicant{summaryQuery.data.pendingCount === 1 ? "" : "s"} unpaid</p>
+            <p className="mt-1 text-lg font-bold text-foreground">
+              {money(summaryQuery.data.pending)}
+            </p>
+            <p className="text-[11px] text-muted-foreground">
+              {summaryQuery.data.pendingCount} applicant
+              {summaryQuery.data.pendingCount === 1 ? '' : 's'} unpaid
+            </p>
           </div>
           <div className="rounded-2xl border border-border bg-card p-4">
             <p className="text-xs text-muted-foreground">Fee exemptions</p>
-            <p className="mt-1 text-lg font-bold text-foreground">{summaryQuery.data.exemptedCount}</p>
-            <p className="text-[11px] text-muted-foreground">{money(summaryQuery.data.waived)} waived</p>
+            <p className="mt-1 text-lg font-bold text-foreground">
+              {summaryQuery.data.exemptedCount}
+            </p>
+            <p className="text-[11px] text-muted-foreground">
+              {money(summaryQuery.data.waived)} waived
+            </p>
           </div>
         </div>
       )}
       {receipt && (
-        <div role="status" className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-success/30 bg-success/10 p-4 text-sm text-success">
+        <div
+          role="status"
+          className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-success/30 bg-success/10 p-4 text-sm text-success"
+        >
           <span>
-            Received {money(receipt.amount)} cash from <b>{receipt.name}</b>. Receipt <b>{receipt.receiptNumber}</b> — recorded as school income.
+            Received {money(receipt.amount)} cash from <b>{receipt.name}</b>. Receipt{' '}
+            <b>{receipt.receiptNumber}</b> — recorded as school income.
           </span>
-          <button type="button" className={ghost} onClick={() => setReceipt(null)}>Dismiss</button>
+          <button type="button" className={ghost} onClick={() => setReceipt(null)}>
+            Dismiss
+          </button>
         </div>
       )}
       <div className="grid gap-3 rounded-2xl border border-border bg-card p-4 sm:grid-cols-4">
-        <Select value={cycleId || "__all__"} onValueChange={(value) => setCycleId(value === "__all__" ? "" : value)}>
-          <SelectTrigger aria-label="Intake" className={input}><SelectValue placeholder="All intakes" /></SelectTrigger>
+        <Select
+          value={cycleId || '__all__'}
+          onValueChange={(value) => setCycleId(value === '__all__' ? '' : value)}
+        >
+          <SelectTrigger aria-label="Intake" className={input}>
+            <SelectValue placeholder="All intakes" />
+          </SelectTrigger>
           <SelectContent>
             <SelectItem value="__all__">All intakes</SelectItem>
-            {cycles.map((cycle) => <SelectItem key={cycle.id} value={cycle.id}>{cycle.name}</SelectItem>)}
+            {cycles.map((cycle) => (
+              <SelectItem key={cycle.id} value={cycle.id}>
+                {cycle.name}
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
-        <Select value={status || "__all__"} onValueChange={(value) => setStatus(value === "__all__" ? "" : value)}>
-          <SelectTrigger aria-label="Status" className={input}><SelectValue placeholder="All statuses" /></SelectTrigger>
+        <Select
+          value={status || '__all__'}
+          onValueChange={(value) => setStatus(value === '__all__' ? '' : value)}
+        >
+          <SelectTrigger aria-label="Status" className={input}>
+            <SelectValue placeholder="All statuses" />
+          </SelectTrigger>
           <SelectContent>
             <SelectItem value="__all__">All statuses</SelectItem>
-            {["SUBMITTED", "UNDER_REVIEW", "EXAM_SCHEDULED", "EXAM_COMPLETED", "ACCEPTED", "WAITLISTED", "REJECTED", "ADMITTED"].map((value) => <SelectItem key={value} value={value}>{label(value)}</SelectItem>)}
+            {[
+              'SUBMITTED',
+              'UNDER_REVIEW',
+              'EXAM_SCHEDULED',
+              'EXAM_COMPLETED',
+              'ACCEPTED',
+              'WAITLISTED',
+              'REJECTED',
+              'ADMITTED',
+            ].map((value) => (
+              <SelectItem key={value} value={value}>
+                {label(value)}
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
-        <Select value={feeStatus || "__all__"} onValueChange={(value) => setFeeStatus(value === "__all__" ? "" : value)}>
-          <SelectTrigger aria-label="Fee status" className={input}><SelectValue placeholder="Any fee status" /></SelectTrigger>
+        <Select
+          value={feeStatus || '__all__'}
+          onValueChange={(value) => setFeeStatus(value === '__all__' ? '' : value)}
+        >
+          <SelectTrigger aria-label="Fee status" className={input}>
+            <SelectValue placeholder="Any fee status" />
+          </SelectTrigger>
           <SelectContent>
             <SelectItem value="__all__">Any fee status</SelectItem>
             <SelectItem value="PENDING">Fee unpaid</SelectItem>
@@ -528,18 +714,32 @@ function ApplicationsPanel({ cycles, canDecide }: { cycles: Cycle[]; canDecide: 
             <SelectItem value="EXEMPTED">Fee exempted</SelectItem>
           </SelectContent>
         </Select>
-        <input className={input} placeholder="Search name, number or phone" value={search} onChange={(e) => setSearch(e.target.value)} />
+        <input
+          className={input}
+          placeholder="Search name, number or phone"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
       </div>
 
       {picked.size > 0 && (
         <div className="flex flex-wrap items-end gap-3 rounded-2xl border border-border bg-card p-4">
           <label className="text-xs font-semibold">
             Exam date and time
-            <DateTimePicker buttonClassName={input} value={examDate} onChange={(value) => setExamDate(value)} />
+            <DateTimePicker
+              buttonClassName={input}
+              value={examDate}
+              onChange={(value) => setExamDate(value)}
+            />
           </label>
           <label className="text-xs font-semibold">
             Venue
-            <input className={input} value={venue} onChange={(e) => setVenue(e.target.value)} placeholder="Main Hall" />
+            <input
+              className={input}
+              value={venue}
+              onChange={(e) => setVenue(e.target.value)}
+              placeholder="Main Hall"
+            />
           </label>
           <button
             type="button"
@@ -547,21 +747,31 @@ function ApplicationsPanel({ cycles, canDecide }: { cycles: Cycle[]; canDecide: 
             disabled={act.isPending || !examDate || venue.trim().length < 2}
             onClick={() =>
               act.mutate(
-                { path: "/admissions/applications/schedule-exam", body: { applicationIds: [...picked], examDate, venue } },
+                {
+                  path: '/admissions/applications/schedule-exam',
+                  body: { applicationIds: [...picked], examDate, venue },
+                },
                 { onSuccess: () => setPicked(new Set()) },
               )
             }
           >
-            Schedule exam for {picked.size} applicant{picked.size === 1 ? "" : "s"}
+            Schedule exam for {picked.size} applicant{picked.size === 1 ? '' : 's'}
           </button>
         </div>
       )}
-      {act.error && <p role="alert" className="text-xs text-destructive">{errorText(act.error)}</p>}
+      {act.error && (
+        <p role="alert" className="text-xs text-destructive">
+          {errorText(act.error)}
+        </p>
+      )}
 
       {query.isPending ? (
         <p className="text-sm text-muted-foreground">Loading applications…</p>
       ) : rows.length === 0 ? (
-        <WorkspaceEmptyState title="No applications" description="Applications appear here as parents submit the public enrollment form." />
+        <WorkspaceEmptyState
+          title="No applications"
+          description="Applications appear here as parents submit the public enrollment form."
+        />
       ) : (
         <div className="overflow-x-auto rounded-2xl border border-border bg-card">
           <table className="w-full min-w-[860px] text-left text-sm">
@@ -572,7 +782,11 @@ function ApplicationsPanel({ cycles, canDecide }: { cycles: Cycle[]; canDecide: 
                     type="checkbox"
                     aria-label="Select all awaiting exam"
                     checked={schedulable.length > 0 && schedulable.every((r) => picked.has(r.id))}
-                    onChange={(e) => setPicked(e.target.checked ? new Set(schedulable.map((r) => r.id)) : new Set())}
+                    onChange={(e) =>
+                      setPicked(
+                        e.target.checked ? new Set(schedulable.map((r) => r.id)) : new Set(),
+                      )
+                    }
                   />
                 </th>
                 <th className="p-3">Applicant</th>
@@ -588,29 +802,39 @@ function ApplicationsPanel({ cycles, canDecide }: { cycles: Cycle[]; canDecide: 
               {rows.map((app) => (
                 <tr key={app.id} className="border-b border-border/60 align-top last:border-0">
                   <td className="p-3">
-                    {["SUBMITTED", "UNDER_REVIEW", "EXAM_SCHEDULED"].includes(app.status) && (
+                    {['SUBMITTED', 'UNDER_REVIEW', 'EXAM_SCHEDULED'].includes(app.status) && (
                       <input
                         type="checkbox"
                         aria-label={`Select ${app.firstName} ${app.lastName}`}
                         checked={picked.has(app.id)}
                         onChange={(e) => {
                           const next = new Set(picked);
-                          if (e.target.checked) next.add(app.id); else next.delete(app.id);
+                          if (e.target.checked) next.add(app.id);
+                          else next.delete(app.id);
                           setPicked(next);
                         }}
                       />
                     )}
                   </td>
                   <td className="p-3">
-                    <p className="font-semibold text-foreground">{app.firstName} {app.lastName}</p>
-                    <p className="text-xs text-muted-foreground">{app.applicationNumber} · {app.dateOfBirth.slice(0, 10)}</p>
+                    <p className="font-semibold text-foreground">
+                      {app.firstName} {app.lastName}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {app.applicationNumber} · {app.dateOfBirth.slice(0, 10)}
+                    </p>
                   </td>
                   <td className="p-3 text-foreground">{app.class.name}</td>
                   <td className="p-3 text-xs text-muted-foreground">
-                    {app.guardianFirstName} {app.guardianLastName} ({label(app.guardianRelationship)})
-                    <br />{app.guardianPhone}{app.guardianEmail ? ` · ${app.guardianEmail}` : ""}
+                    {app.guardianFirstName} {app.guardianLastName} (
+                    {label(app.guardianRelationship)})
+                    <br />
+                    {app.guardianPhone}
+                    {app.guardianEmail ? ` · ${app.guardianEmail}` : ''}
                   </td>
-                  <td className="p-3"><Badge value={app.status} /></td>
+                  <td className="p-3">
+                    <Badge value={app.status} />
+                  </td>
                   <td className="p-3">
                     <FeeCell
                       app={app}
@@ -627,7 +851,14 @@ function ApplicationsPanel({ cycles, canDecide }: { cycles: Cycle[]; canDecide: 
                     <ExamCell app={app} canEdit={canEditExam} onSaved={() => void refresh()} />
                   </td>
                   <td className="p-3">
-                    <RowActions app={app} canDecide={canDecide} busy={act.isPending} onAct={act.mutate} onDecide={(decision) => setDeciding({ app, decision })} onAdmit={() => admit(app)} />
+                    <RowActions
+                      app={app}
+                      canDecide={canDecide}
+                      busy={act.isPending}
+                      onAct={act.mutate}
+                      onDecide={(decision) => setDeciding({ app, decision })}
+                      onAdmit={() => admit(app)}
+                    />
                   </td>
                 </tr>
               ))}
@@ -636,7 +867,11 @@ function ApplicationsPanel({ cycles, canDecide }: { cycles: Cycle[]; canDecide: 
         </div>
       )}
 
-      {withdraw.error && <p role="alert" className="text-xs text-destructive">{errorText(withdraw.error)}</p>}
+      {withdraw.error && (
+        <p role="alert" className="text-xs text-destructive">
+          {errorText(withdraw.error)}
+        </p>
+      )}
       {receiving && (
         <ReceiveFeeDialog
           app={receiving}
@@ -690,33 +925,48 @@ function RowActions({
   canDecide: boolean;
   busy: boolean;
   onAct: (v: { path: string; body?: unknown }) => void;
-  onDecide: (d: "ACCEPTED" | "WAITLISTED" | "REJECTED") => void;
+  onDecide: (d: 'ACCEPTED' | 'WAITLISTED' | 'REJECTED') => void;
   onAdmit: () => void;
 }) {
-  const closed = ["ADMITTED", "WITHDRAWN"].includes(app.status);
+  const closed = ['ADMITTED', 'WITHDRAWN'].includes(app.status);
   return (
     <div className="flex flex-col gap-1.5">
-      {app.status === "SUBMITTED" && (
-        <button type="button" className={ghost} disabled={busy} onClick={() => onAct({ path: `/admissions/applications/${app.id}/review` })}>
+      {app.status === 'SUBMITTED' && (
+        <button
+          type="button"
+          className={ghost}
+          disabled={busy}
+          onClick={() => onAct({ path: `/admissions/applications/${app.id}/review` })}
+        >
           Start review
         </button>
       )}
-      {canDecide && !closed && app.status !== "ACCEPTED" && (
+      {canDecide && !closed && app.status !== 'ACCEPTED' && (
         <div className="flex flex-wrap gap-1.5">
-          <button type="button" className={ghost} onClick={() => onDecide("ACCEPTED")}>Accept</button>
-          <button type="button" className={ghost} onClick={() => onDecide("WAITLISTED")}>Waitlist</button>
-          <button type="button" className={ghost} onClick={() => onDecide("REJECTED")}>Reject</button>
+          <button type="button" className={ghost} onClick={() => onDecide('ACCEPTED')}>
+            Accept
+          </button>
+          <button type="button" className={ghost} onClick={() => onDecide('WAITLISTED')}>
+            Waitlist
+          </button>
+          <button type="button" className={ghost} onClick={() => onDecide('REJECTED')}>
+            Reject
+          </button>
         </div>
       )}
-      {canDecide && app.status === "ACCEPTED" && (
+      {canDecide && app.status === 'ACCEPTED' && (
         <>
           <button type="button" className={primary} disabled={busy} onClick={onAdmit}>
             Grant admission &amp; create portal
           </button>
-          <button type="button" className={ghost} onClick={() => onDecide("REJECTED")}>Withdraw offer</button>
+          <button type="button" className={ghost} onClick={() => onDecide('REJECTED')}>
+            Withdraw offer
+          </button>
         </>
       )}
-      {app.status === "ADMITTED" && <span className="text-xs text-success">Student record and portal created</span>}
+      {app.status === 'ADMITTED' && (
+        <span className="text-xs text-success">Student record and portal created</span>
+      )}
     </div>
   );
 }
@@ -729,41 +979,60 @@ function DecisionDialog({
   onSubmit,
 }: {
   app: Application;
-  decision: "ACCEPTED" | "WAITLISTED" | "REJECTED";
+  decision: 'ACCEPTED' | 'WAITLISTED' | 'REJECTED';
   busy: boolean;
   onClose: () => void;
   onSubmit: (body: { decision: string; note?: string; overridePassMark: boolean }) => void;
 }) {
-  const [note, setNote] = useState("");
+  const [note, setNote] = useState('');
   const [override, setOverride] = useState(false);
   const score = app.examScore === null ? null : Number(app.examScore);
-  const belowPass = decision === "ACCEPTED" && (score === null || score < Number(app.cycle.passMark));
+  const belowPass =
+    decision === 'ACCEPTED' && (score === null || score < Number(app.cycle.passMark));
   return (
-    <div role="dialog" aria-modal="true" className="fixed inset-0 z-50 flex items-center justify-center bg-overlay p-4">
+    <div
+      role="dialog"
+      aria-modal="true"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-overlay p-4"
+    >
       <div className="w-full max-w-md rounded-2xl border border-border bg-card p-5 shadow-xl">
         <h3 className="text-sm font-bold text-foreground">
           {label(decision)}: {app.firstName} {app.lastName}
         </h3>
         {belowPass && (
           <div className="mt-3 rounded-lg bg-warning/10 p-3 text-xs text-warning">
-            {score === null ? "No entrance exam score is recorded." : `Score ${score} is below the pass mark of ${Number(app.cycle.passMark)}.`}
+            {score === null
+              ? 'No entrance exam score is recorded.'
+              : `Score ${score} is below the pass mark of ${Number(app.cycle.passMark)}.`}
             <label className="mt-2 flex items-center gap-2 font-semibold">
-              <input type="checkbox" checked={override} onChange={(e) => setOverride(e.target.checked)} />
+              <input
+                type="checkbox"
+                checked={override}
+                onChange={(e) => setOverride(e.target.checked)}
+              />
               Accept anyway (reason required)
             </label>
           </div>
         )}
         <label className="mt-3 block text-xs font-semibold">
-          Note {override ? "(required)" : "(optional, shown to the guardian)"}
-          <textarea className={`${input} h-20 py-2`} value={note} onChange={(e) => setNote(e.target.value)} />
+          Note {override ? '(required)' : '(optional, shown to the guardian)'}
+          <textarea
+            className={`${input} h-20 py-2`}
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+          />
         </label>
         <div className="mt-4 flex justify-end gap-2">
-          <button type="button" className={ghost} onClick={onClose}>Cancel</button>
+          <button type="button" className={ghost} onClick={onClose}>
+            Cancel
+          </button>
           <button
             type="button"
             className={primary}
             disabled={busy || (belowPass && !override) || (override && note.trim().length < 5)}
-            onClick={() => onSubmit({ decision, note: note.trim() || undefined, overridePassMark: override })}
+            onClick={() =>
+              onSubmit({ decision, note: note.trim() || undefined, overridePassMark: override })
+            }
           >
             Confirm {label(decision).toLowerCase()}
           </button>
@@ -794,21 +1063,31 @@ function FeeCell({
   onExempt: () => void;
   onWithdraw: () => void;
 }) {
-  if (app.feeStatus === "NOT_REQUIRED") return <Badge value="NOT_REQUIRED" />;
+  if (app.feeStatus === 'NOT_REQUIRED') return <Badge value="NOT_REQUIRED" />;
   return (
     <div className="flex flex-col gap-1.5">
-      {app.feeStatus === "PENDING" && (
+      {app.feeStatus === 'PENDING' && (
         <>
-          <span className={`w-fit rounded-full px-2 py-0.5 text-[11px] font-semibold ${STATUS_STYLE.PENDING_FEE}`}>
+          <span
+            className={`w-fit rounded-full px-2 py-0.5 text-[11px] font-semibold ${STATUS_STYLE.PENDING_FEE}`}
+          >
             Unpaid · {money(app.feeDue)}
           </span>
           <div className="flex flex-wrap gap-1.5">
-            {canCollect && <button type="button" className={primary} onClick={onReceive}>Receive cash</button>}
-            {canExempt && <button type="button" className={ghost} onClick={onExempt}>Exempt…</button>}
+            {canCollect && (
+              <button type="button" className={primary} onClick={onReceive}>
+                Receive cash
+              </button>
+            )}
+            {canExempt && (
+              <button type="button" className={ghost} onClick={onExempt}>
+                Exempt…
+              </button>
+            )}
           </div>
         </>
       )}
-      {app.feeStatus === "PAID" && (
+      {app.feeStatus === 'PAID' && (
         <>
           <Badge value="PAID" />
           <p className="text-[11px] text-muted-foreground">
@@ -816,12 +1095,16 @@ function FeeCell({
           </p>
         </>
       )}
-      {app.feeStatus === "EXEMPTED" && (
+      {app.feeStatus === 'EXEMPTED' && (
         <>
           <Badge value="EXEMPTED" />
-          <p className="max-w-[200px] text-[11px] text-muted-foreground">Reason: {app.feeExemptionReason}</p>
-          {canExempt && app.status !== "ADMITTED" && (
-            <button type="button" className={ghost} disabled={busy} onClick={onWithdraw}>Withdraw exemption</button>
+          <p className="max-w-[200px] text-[11px] text-muted-foreground">
+            Reason: {app.feeExemptionReason}
+          </p>
+          {canExempt && app.status !== 'ADMITTED' && (
+            <button type="button" className={ghost} disabled={busy} onClick={onWithdraw}>
+              Withdraw exemption
+            </button>
           )}
         </>
       )}
@@ -841,39 +1124,74 @@ function ReceiveFeeDialog({
   onDone: (receipt: { receiptNumber: string; amount: string }) => void;
 }) {
   const [paymentDate, setPaymentDate] = useState(new Date().toISOString().slice(0, 10));
-  const [notes, setNotes] = useState("");
+  const [notes, setNotes] = useState('');
   const [confirmed, setConfirmed] = useState(false);
   const receive = useMutation({
     mutationFn: () =>
-      apiFetch<{ receipt: { receiptNumber: string; amount: string } }>(`/admissions/applications/${app.id}/fee/receive`, {
-        method: "POST",
-        body: JSON.stringify({ paymentDate, notes: notes.trim() || undefined }),
-      }),
+      apiFetch<{ receipt: { receiptNumber: string; amount: string } }>(
+        `/admissions/applications/${app.id}/fee/receive`,
+        {
+          method: 'POST',
+          body: JSON.stringify({ paymentDate, notes: notes.trim() || undefined }),
+        },
+      ),
     onSuccess: (result) => onDone(result.receipt),
   });
   return (
-    <div role="dialog" aria-modal="true" className="fixed inset-0 z-50 flex items-center justify-center bg-overlay p-4">
+    <div
+      role="dialog"
+      aria-modal="true"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-overlay p-4"
+    >
       <div className="w-full max-w-md rounded-2xl border border-border bg-card p-5 shadow-xl">
-        <h3 className="text-sm font-bold text-foreground">Receive admission fee: {app.firstName} {app.lastName}</h3>
-        <p className="mt-1 text-xs text-muted-foreground">{app.applicationNumber} · {app.class.name}</p>
-        <p className="mt-4 rounded-lg bg-muted p-3 text-center text-2xl font-bold text-foreground">{money(app.feeDue)}</p>
+        <h3 className="text-sm font-bold text-foreground">
+          Receive admission fee: {app.firstName} {app.lastName}
+        </h3>
+        <p className="mt-1 text-xs text-muted-foreground">
+          {app.applicationNumber} · {app.class.name}
+        </p>
+        <p className="mt-4 rounded-lg bg-muted p-3 text-center text-2xl font-bold text-foreground">
+          {money(app.feeDue)}
+        </p>
         <label className="mt-3 block text-xs font-semibold">
           Date received
-          <DatePicker max={new Date().toISOString().slice(0, 10)} buttonClassName={input} value={paymentDate} onChange={(value) => setPaymentDate(value)} />
+          <DatePicker
+            max={new Date().toISOString().slice(0, 10)}
+            buttonClassName={input}
+            value={paymentDate}
+            onChange={(value) => setPaymentDate(value)}
+          />
         </label>
         <label className="mt-3 block text-xs font-semibold">
           Note (optional)
           <input className={input} value={notes} onChange={(e) => setNotes(e.target.value)} />
         </label>
         <label className="mt-3 flex items-start gap-2 text-xs text-foreground">
-          <input type="checkbox" className="mt-0.5" checked={confirmed} onChange={(e) => setConfirmed(e.target.checked)} />
-          I have received {money(app.feeDue)} in cash. It is recorded as school income and is not refundable, whatever the admission outcome.
+          <input
+            type="checkbox"
+            className="mt-0.5"
+            checked={confirmed}
+            onChange={(e) => setConfirmed(e.target.checked)}
+          />
+          I have received {money(app.feeDue)} in cash. It is recorded as school income and is not
+          refundable, whatever the admission outcome.
         </label>
-        {receive.error && <p role="alert" className="mt-3 text-xs text-destructive">{errorText(receive.error)}</p>}
+        {receive.error && (
+          <p role="alert" className="mt-3 text-xs text-destructive">
+            {errorText(receive.error)}
+          </p>
+        )}
         <div className="mt-4 flex justify-end gap-2">
-          <button type="button" className={ghost} onClick={onClose}>Cancel</button>
-          <button type="button" className={primary} disabled={!confirmed || receive.isPending} onClick={() => receive.mutate()}>
-            {receive.isPending ? "Recording…" : "Record cash received"}
+          <button type="button" className={ghost} onClick={onClose}>
+            Cancel
+          </button>
+          <button
+            type="button"
+            className={primary}
+            disabled={!confirmed || receive.isPending}
+            onClick={() => receive.mutate()}
+          >
+            {receive.isPending ? 'Recording…' : 'Record cash received'}
           </button>
         </div>
       </div>
@@ -881,31 +1199,62 @@ function ReceiveFeeDialog({
   );
 }
 
-function ExemptFeeDialog({ app, onClose, onDone }: { app: Application; onClose: () => void; onDone: () => void }) {
-  const [reason, setReason] = useState("");
+function ExemptFeeDialog({
+  app,
+  onClose,
+  onDone,
+}: {
+  app: Application;
+  onClose: () => void;
+  onDone: () => void;
+}) {
+  const [reason, setReason] = useState('');
   const exempt = useMutation({
     mutationFn: () =>
       apiFetch(`/admissions/applications/${app.id}/fee/exemption`, {
-        method: "POST",
+        method: 'POST',
         body: JSON.stringify({ reason: reason.trim() }),
       }),
     onSuccess: onDone,
   });
   return (
-    <div role="dialog" aria-modal="true" className="fixed inset-0 z-50 flex items-center justify-center bg-overlay p-4">
+    <div
+      role="dialog"
+      aria-modal="true"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-overlay p-4"
+    >
       <div className="w-full max-w-md rounded-2xl border border-border bg-card p-5 shadow-xl">
-        <h3 className="text-sm font-bold text-foreground">Exempt from admission fee: {app.firstName} {app.lastName}</h3>
+        <h3 className="text-sm font-bold text-foreground">
+          Exempt from admission fee: {app.firstName} {app.lastName}
+        </h3>
         <p className="mt-1 text-xs text-muted-foreground">
-          The applicant can then sit the exam without paying. The reason is kept on record and cannot be left blank.
+          The applicant can then sit the exam without paying. The reason is kept on record and
+          cannot be left blank.
         </p>
         <label className="mt-3 block text-xs font-semibold">
           Reason for exemption (required)
-          <textarea className={`${input} h-24 py-2`} value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. Child of a staff member, approved by the headteacher" />
+          <textarea
+            className={`${input} h-24 py-2`}
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            placeholder="e.g. Child of a staff member, approved by the headteacher"
+          />
         </label>
-        {exempt.error && <p role="alert" className="mt-3 text-xs text-destructive">{errorText(exempt.error)}</p>}
+        {exempt.error && (
+          <p role="alert" className="mt-3 text-xs text-destructive">
+            {errorText(exempt.error)}
+          </p>
+        )}
         <div className="mt-4 flex justify-end gap-2">
-          <button type="button" className={ghost} onClick={onClose}>Cancel</button>
-          <button type="button" className={primary} disabled={reason.trim().length < 5 || exempt.isPending} onClick={() => exempt.mutate()}>
+          <button type="button" className={ghost} onClick={onClose}>
+            Cancel
+          </button>
+          <button
+            type="button"
+            className={primary}
+            disabled={reason.trim().length < 5 || exempt.isPending}
+            onClick={() => exempt.mutate()}
+          >
             Confirm exemption
           </button>
         </div>
@@ -916,38 +1265,49 @@ function ExemptFeeDialog({ app, onClose, onDone }: { app: Application; onClose: 
 
 // -------------------------------------------------------------- exam editor
 
-const EDITABLE_EXAM_STATUSES = ["SUBMITTED", "UNDER_REVIEW", "EXAM_SCHEDULED", "EXAM_COMPLETED"];
+const EDITABLE_EXAM_STATUSES = ['SUBMITTED', 'UNDER_REVIEW', 'EXAM_SCHEDULED', 'EXAM_COMPLETED'];
 
 /** ISO timestamp -> value for <DateTimePicker> in the viewer's timezone. */
 function toLocalInput(iso: string | null): string {
-  if (!iso) return "";
+  if (!iso) return '';
   const d = new Date(iso);
-  const pad = (n: number) => String(n).padStart(2, "0");
+  const pad = (n: number) => String(n).padStart(2, '0');
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-const scoreText = (value: string | null) => (value === null ? "" : String(Number(value)));
+const scoreText = (value: string | null) => (value === null ? '' : String(Number(value)));
 
 /**
  * The applicant's exam: date and time, venue and score, editable in place.
  * Staff can schedule, reschedule, enter a score and correct it until a
  * decision is made. Saving sends only what changed.
  */
-function ExamCell({ app, canEdit, onSaved }: { app: Application; canEdit: boolean; onSaved: () => void }) {
+function ExamCell({
+  app,
+  canEdit,
+  onSaved,
+}: {
+  app: Application;
+  canEdit: boolean;
+  onSaved: () => void;
+}) {
   const [editing, setEditing] = useState(false);
-  const [date, setDate] = useState("");
-  const [venue, setVenue] = useState("");
-  const [score, setScore] = useState("");
+  const [date, setDate] = useState('');
+  const [venue, setVenue] = useState('');
+  const [score, setScore] = useState('');
   const [formError, setFormError] = useState<string | null>(null);
 
   const max = Number(app.cycle.examMaxScore);
   const pass = Number(app.cycle.passMark);
   const editable = canEdit && EDITABLE_EXAM_STATUSES.includes(app.status);
-  const feePending = app.feeStatus === "PENDING";
+  const feePending = app.feeStatus === 'PENDING';
 
   const save = useMutation({
     mutationFn: (body: Record<string, unknown>) =>
-      apiFetch(`/admissions/applications/${app.id}/exam`, { method: "PATCH", body: JSON.stringify(body) }),
+      apiFetch(`/admissions/applications/${app.id}/exam`, {
+        method: 'PATCH',
+        body: JSON.stringify(body),
+      }),
     onSuccess: () => {
       setEditing(false);
       onSaved();
@@ -956,7 +1316,7 @@ function ExamCell({ app, canEdit, onSaved }: { app: Application; canEdit: boolea
 
   function open() {
     setDate(toLocalInput(app.examDate));
-    setVenue(app.examVenue ?? "");
+    setVenue(app.examVenue ?? '');
     setScore(scoreText(app.examScore));
     setFormError(null);
     save.reset();
@@ -967,21 +1327,22 @@ function ExamCell({ app, canEdit, onSaved }: { app: Application; canEdit: boolea
     event.preventDefault();
     setFormError(null);
     const body: Record<string, unknown> = {};
-    const venueChanged = venue.trim() !== (app.examVenue ?? "");
+    const venueChanged = venue.trim() !== (app.examVenue ?? '');
     const dateChanged = date !== toLocalInput(app.examDate);
     if (dateChanged || venueChanged) {
-      if (!date) return setFormError("Choose the exam date and time.");
-      if (venue.trim().length < 2) return setFormError("Enter the exam venue.");
-      if (Number.isNaN(new Date(date).getTime())) return setFormError("Enter a valid exam date and time.");
+      if (!date) return setFormError('Choose the exam date and time.');
+      if (venue.trim().length < 2) return setFormError('Enter the exam venue.');
+      if (Number.isNaN(new Date(date).getTime()))
+        return setFormError('Enter a valid exam date and time.');
       if (dateChanged) body.examDate = new Date(date).toISOString();
       if (venueChanged) body.venue = venue.trim();
     }
     if (score !== scoreText(app.examScore)) {
-      if (score.trim() === "") {
+      if (score.trim() === '') {
         body.score = null;
       } else {
         const n = Number(score);
-        if (Number.isNaN(n) || n < 0) return setFormError("Enter a valid score.");
+        if (Number.isNaN(n) || n < 0) return setFormError('Enter a valid score.');
         if (n > max) return setFormError(`The score cannot be above ${max}.`);
         body.score = n;
       }
@@ -995,17 +1356,34 @@ function ExamCell({ app, canEdit, onSaved }: { app: Application; canEdit: boolea
 
   if (editing) {
     return (
-      <form onSubmit={submit} noValidate className="space-y-2.5" aria-label={`Edit exam for ${app.firstName} ${app.lastName}`}>
+      <form
+        onSubmit={submit}
+        noValidate
+        className="space-y-2.5"
+        aria-label={`Edit exam for ${app.firstName} ${app.lastName}`}
+      >
         <label className="block text-[11px] font-semibold text-foreground">
           Date and time
-          <DateTimePicker buttonClassName={`${input} !mt-1 !h-9 text-xs`} value={date} onChange={setDate} />
+          <DateTimePicker
+            buttonClassName={`${input} !mt-1 !h-9 text-xs`}
+            value={date}
+            onChange={setDate}
+          />
         </label>
         <label className="block text-[11px] font-semibold text-foreground">
           Venue
-          <input className={`${input} !mt-1 !h-9 text-xs`} value={venue} onChange={(e) => setVenue(e.target.value)} placeholder="Main Hall" />
+          <input
+            className={`${input} !mt-1 !h-9 text-xs`}
+            value={venue}
+            onChange={(e) => setVenue(e.target.value)}
+            placeholder="Main Hall"
+          />
         </label>
         <label className="block text-[11px] font-semibold text-foreground">
-          Score <span className="font-normal text-muted-foreground">(out of {max}, pass mark {pass})</span>
+          Score{' '}
+          <span className="font-normal text-muted-foreground">
+            (out of {max}, pass mark {pass})
+          </span>
           <input
             type="number"
             min={0}
@@ -1031,9 +1409,14 @@ function ExamCell({ app, canEdit, onSaved }: { app: Application; canEdit: boolea
         )}
         <div className="flex gap-1.5">
           <button type="submit" className={primary} disabled={save.isPending}>
-            {save.isPending ? "Saving…" : "Save"}
+            {save.isPending ? 'Saving…' : 'Save'}
           </button>
-          <button type="button" className={ghost} onClick={() => setEditing(false)} disabled={save.isPending}>
+          <button
+            type="button"
+            className={ghost}
+            onClick={() => setEditing(false)}
+            disabled={save.isPending}
+          >
             Cancel
           </button>
         </div>
@@ -1046,8 +1429,8 @@ function ExamCell({ app, canEdit, onSaved }: { app: Application; canEdit: boolea
     <div className="space-y-1">
       {app.examDate ? (
         <p className="text-muted-foreground">
-          {new Date(app.examDate).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })}
-          {app.examVenue ? ` · ${app.examVenue}` : ""}
+          {new Date(app.examDate).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
+          {app.examVenue ? ` · ${app.examVenue}` : ''}
         </p>
       ) : (
         <p className="text-muted-foreground">Not scheduled</p>
@@ -1056,9 +1439,9 @@ function ExamCell({ app, canEdit, onSaved }: { app: Application; canEdit: boolea
         <p className="flex flex-wrap items-center gap-1.5 font-semibold text-foreground">
           Score {score_}/{max}
           <span
-            className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${score_ >= pass ? "bg-success/10 text-success" : "bg-warning/10 text-warning"}`}
+            className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${score_ >= pass ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning'}`}
           >
-            {score_ >= pass ? "Passed" : "Below pass mark"}
+            {score_ >= pass ? 'Passed' : 'Below pass mark'}
           </span>
         </p>
       ) : (
@@ -1072,7 +1455,7 @@ function ExamCell({ app, canEdit, onSaved }: { app: Application; canEdit: boolea
           className="mt-0.5 inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-[11px] font-semibold text-primary hover:bg-primary/10"
         >
           <Pencil className="size-3" />
-          {app.examDate ? "Edit exam" : "Schedule exam"}
+          {app.examDate ? 'Edit exam' : 'Schedule exam'}
         </button>
       )}
     </div>

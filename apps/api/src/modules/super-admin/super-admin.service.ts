@@ -1,5 +1,5 @@
-import { storeSchoolSmsConnection } from "../notifications/school-sms.service.js";
-import { temporaryPasswordExpiry } from "../../common/guards/password-change.js";
+import { storeSchoolSmsConnection } from '../notifications/school-sms.service.js';
+import { temporaryPasswordExpiry } from '../../common/guards/password-change.js';
 import {
   Injectable,
   Inject,
@@ -7,13 +7,17 @@ import {
   ConflictException,
   BadRequestException,
   NotFoundException,
-} from "@nestjs/common";
-import { PrismaService } from "../../prisma/prisma.service.js";
-import { generateId } from "better-auth";
-import { Prisma } from "@prisma/client";
-import { CredentialsService, toIssuedCredentials } from "../accounts/credentials.service.js";
-import { PRIVATE_STORAGE_HEALTH_PROBE, STORAGE_HEALTH_PROBE, type StorageHealthProbe } from "../storage/storage-health.js";
-import { writeAudit, type AuditActor } from "../../common/audit/audit.js";
+} from '@nestjs/common';
+import { PrismaService } from '../../prisma/prisma.service.js';
+import { generateId } from 'better-auth';
+import { Prisma } from '@prisma/client';
+import { CredentialsService, toIssuedCredentials } from '../accounts/credentials.service.js';
+import {
+  PRIVATE_STORAGE_HEALTH_PROBE,
+  STORAGE_HEALTH_PROBE,
+  type StorageHealthProbe,
+} from '../storage/storage-health.js';
+import { writeAudit, type AuditActor } from '../../common/audit/audit.js';
 import {
   evaluateSubscriptionAccess,
   SUBSCRIPTION_TRIAL_DAYS,
@@ -25,30 +29,24 @@ import {
   type SuperAdminUsersQuery,
   type UpdateSchoolInput,
   type UpdateSubscriptionInput,
-} from "@schoolhub/shared";
+} from '@schoolhub/shared';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const EXPIRING_SOON_DAYS = 14;
 
 /** A date-only value ("2027-01-31") means "through the end of that day" (UTC). */
 function parseExpiry(value: string): Date {
-  return /^\d{4}-\d{2}-\d{2}$/.test(value)
-    ? new Date(`${value}T23:59:59.999Z`)
-    : new Date(value);
+  return /^\d{4}-\d{2}-\d{2}$/.test(value) ? new Date(`${value}T23:59:59.999Z`) : new Date(value);
 }
 
 /** Prisma's SubscriptionStatus enum spells it CANCELED; the platform value is CANCELLED. */
 function toSubscriptionEnum(status: string) {
-  return (status === "CANCELLED" ? "CANCELED" : status) as
-    | "ACTIVE"
-    | "TRIALING"
-    | "PAST_DUE"
-    | "CANCELED"
-    | "SUSPENDED";
+  return (status === 'CANCELLED' ? 'CANCELED' : status) as
+    'ACTIVE' | 'TRIALING' | 'PAST_DUE' | 'CANCELED' | 'SUSPENDED';
 }
 
 function isUniqueViolation(error: unknown): error is Prisma.PrismaClientKnownRequestError {
-  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002";
+  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002';
 }
 
 const paginate = (total: number, page: number, limit: number) => ({
@@ -64,7 +62,9 @@ export class SuperAdminService {
     private readonly prisma: PrismaService,
     private readonly credentials: CredentialsService,
     @Optional() @Inject(STORAGE_HEALTH_PROBE) private readonly storage?: StorageHealthProbe,
-    @Optional() @Inject(PRIVATE_STORAGE_HEALTH_PROBE) private readonly privateStorage?: StorageHealthProbe,
+    @Optional()
+    @Inject(PRIVATE_STORAGE_HEALTH_PROBE)
+    private readonly privateStorage?: StorageHealthProbe,
   ) {}
 
   async listSchools(query: SuperAdminSchoolsQuery) {
@@ -72,9 +72,12 @@ export class SuperAdminService {
     const now = new Date();
     const organization: Prisma.organizationWhereInput = {};
     if (status) organization.subscriptionStatus = status;
-    if (expiry === "expiring") {
-      organization.expiresAt = { gt: now, lte: new Date(now.getTime() + EXPIRING_SOON_DAYS * DAY_MS) };
-    } else if (expiry === "lapsed") {
+    if (expiry === 'expiring') {
+      organization.expiresAt = {
+        gt: now,
+        lte: new Date(now.getTime() + EXPIRING_SOON_DAYS * DAY_MS),
+      };
+    } else if (expiry === 'lapsed') {
       organization.expiresAt = { lte: now };
     }
 
@@ -83,9 +86,9 @@ export class SuperAdminService {
       ...(q
         ? {
             OR: [
-              { name: { contains: q, mode: "insensitive" } },
-              { code: { contains: q, mode: "insensitive" } },
-              { subdomain: { contains: q, mode: "insensitive" } },
+              { name: { contains: q, mode: 'insensitive' } },
+              { code: { contains: q, mode: 'insensitive' } },
+              { subdomain: { contains: q, mode: 'insensitive' } },
             ],
           }
         : {}),
@@ -105,17 +108,26 @@ export class SuperAdminService {
             select: { subscriptionStatus: true, expiresAt: true, metadata: true },
           },
           subscription: {
-            select: { planId: true, planName: true, amount: true, currency: true, billingCycle: true,
-              maxStudents: true, maxTeachers: true, maxGuardians: true, maxStaff: true },
+            select: {
+              planId: true,
+              planName: true,
+              amount: true,
+              currency: true,
+              billingCycle: true,
+              maxStudents: true,
+              maxTeachers: true,
+              maxGuardians: true,
+              maxStaff: true,
+            },
           },
           _count: {
-          select: {
-            students: { where: { deletedAt: null } },
-            teachers: { where: { deletedAt: null } },
+            select: {
+              students: { where: { deletedAt: null } },
+              teachers: { where: { deletedAt: null } },
+            },
           },
         },
-        },
-        orderBy: { createdAt: "desc" },
+        orderBy: { createdAt: 'desc' },
         skip: (page - 1) * limit,
         take: limit,
       }),
@@ -128,7 +140,7 @@ export class SuperAdminService {
   async listSchoolOptions() {
     return this.prisma.client.school.findMany({
       select: { id: true, name: true, code: true },
-      orderBy: { name: "asc" },
+      orderBy: { name: 'asc' },
     });
   }
 
@@ -139,13 +151,13 @@ export class SuperAdminService {
       ...(role ? { OR: [{ role }, { roles: { has: role } }] } : {}),
     };
     const where: Prisma.userWhereInput = {
-      role: { not: "superAdmin" },
+      role: { not: 'superAdmin' },
       members: { some: memberFilter },
       ...(q
         ? {
             OR: [
-              { name: { contains: q, mode: "insensitive" } },
-              { email: { contains: q, mode: "insensitive" } },
+              { name: { contains: q, mode: 'insensitive' } },
+              { email: { contains: q, mode: 'insensitive' } },
             ],
           }
         : {}),
@@ -175,7 +187,7 @@ export class SuperAdminService {
             },
           },
         },
-        orderBy: { createdAt: "desc" },
+        orderBy: { createdAt: 'desc' },
         skip: (page - 1) * limit,
         take: limit,
       }),
@@ -189,22 +201,30 @@ export class SuperAdminService {
     const { page, limit, action, schoolId, actorId, from, to, q } = query;
     const fromDate = from ? new Date(from) : null;
     const toDate = to ? new Date(to) : null;
-    if ((fromDate && Number.isNaN(fromDate.getTime())) || (toDate && Number.isNaN(toDate.getTime()))) {
-      throw new BadRequestException("Enter valid from/to dates");
+    if (
+      (fromDate && Number.isNaN(fromDate.getTime())) ||
+      (toDate && Number.isNaN(toDate.getTime()))
+    ) {
+      throw new BadRequestException('Enter valid from/to dates');
     }
     if (toDate && /^\d{4}-\d{2}-\d{2}$/.test(to!)) toDate.setUTCHours(23, 59, 59, 999);
     if (fromDate && toDate && fromDate.getTime() > toDate.getTime()) {
-      throw new BadRequestException("The end date must be on or after the start date");
+      throw new BadRequestException('The end date must be on or after the start date');
     }
 
     const where: Prisma.AuditLogWhereInput = {
-      ...(action ? { action: action as Prisma.AuditLogWhereInput["action"] } : {}),
+      ...(action ? { action: action as Prisma.AuditLogWhereInput['action'] } : {}),
       ...(schoolId ? { schoolId } : {}),
       ...(actorId ? { userId: actorId } : {}),
       ...(fromDate || toDate
-        ? { createdAt: { ...(fromDate ? { gte: fromDate } : {}), ...(toDate ? { lte: toDate } : {}) } }
+        ? {
+            createdAt: {
+              ...(fromDate ? { gte: fromDate } : {}),
+              ...(toDate ? { lte: toDate } : {}),
+            },
+          }
         : {}),
-      ...(q ? { entityType: { contains: q, mode: "insensitive" } } : {}),
+      ...(q ? { entityType: { contains: q, mode: 'insensitive' } } : {}),
     };
 
     const [rows, total] = await Promise.all([
@@ -223,7 +243,7 @@ export class SuperAdminService {
           user: { select: { id: true, name: true, email: true, role: true } },
           school: { select: { id: true, name: true, code: true } },
         },
-        orderBy: { createdAt: "desc" },
+        orderBy: { createdAt: 'desc' },
         skip: (page - 1) * limit,
         take: limit,
       }),
@@ -270,50 +290,52 @@ export class SuperAdminService {
     const counts = school._count;
     const steps = [
       {
-        id: "school-profile",
-        label: "School contact profile",
+        id: 'school-profile',
+        label: 'School contact profile',
         complete: Boolean(school.email?.trim() && school.phone?.trim() && school.address?.trim()),
-        detail: school.email?.trim() && school.phone?.trim() && school.address?.trim()
-          ? "Email, phone, and address are recorded."
-          : "Add the school's email, phone, and address.",
+        detail:
+          school.email?.trim() && school.phone?.trim() && school.address?.trim()
+            ? 'Email, phone, and address are recorded.'
+            : "Add the school's email, phone, and address.",
       },
       {
-        id: "academic-calendar",
-        label: "Academic year and term",
+        id: 'academic-calendar',
+        label: 'Academic year and term',
         complete: Boolean(currentYear && currentYear.terms.length > 0),
         detail: currentYear
           ? `${currentYear.name} is current; ${currentYear.terms.length} term(s) configured.`
-          : "Set a current academic year and add at least one term.",
+          : 'Set a current academic year and add at least one term.',
       },
       {
-        id: "classes",
-        label: "Classes",
+        id: 'classes',
+        label: 'Classes',
         complete: counts.classes > 0,
         detail: `${counts.classes} class record(s) found.`,
       },
       {
-        id: "subjects",
-        label: "Subjects",
+        id: 'subjects',
+        label: 'Subjects',
         complete: counts.subjects > 0,
         detail: `${counts.subjects} subject record(s) found.`,
       },
       {
-        id: "teachers",
-        label: "Teaching staff",
+        id: 'teachers',
+        label: 'Teaching staff',
         complete: counts.teachers > 0,
         detail: `${counts.teachers} teacher record(s) found.`,
       },
       {
-        id: "finance",
-        label: "Finance setup",
+        id: 'finance',
+        label: 'Finance setup',
         complete: Boolean(school.financeSettings && counts.feeStructures > 0),
-        detail: school.financeSettings && counts.feeStructures > 0
-          ? `${counts.feeStructures} fee structure(s) and finance settings are configured.`
-          : "Configure finance settings and at least one fee structure.",
+        detail:
+          school.financeSettings && counts.feeStructures > 0
+            ? `${counts.feeStructures} fee structure(s) and finance settings are configured.`
+            : 'Configure finance settings and at least one fee structure.',
       },
       {
-        id: "assessment",
-        label: "Assessment and report cards",
+        id: 'assessment',
+        label: 'Assessment and report cards',
         complete: counts.assessmentTemplates > 0 && counts.reportCardTemplates > 0,
         detail: `${counts.assessmentTemplates} assessment template(s); ${counts.reportCardTemplates} report-card template(s).`,
       },
@@ -337,17 +359,25 @@ export class SuperAdminService {
           include: {
             members: {
               include: {
-                user: { select: { id: true, name: true, email: true, banned: true, twoFactorEnabled: true } },
+                user: {
+                  select: {
+                    id: true,
+                    name: true,
+                    email: true,
+                    banned: true,
+                    twoFactorEnabled: true,
+                  },
+                },
               },
             },
           },
         },
         _count: {
-            select: {
-              students: { where: { deletedAt: null } },
-              teachers: { where: { deletedAt: null } },
-            },
+          select: {
+            students: { where: { deletedAt: null } },
+            teachers: { where: { deletedAt: null } },
           },
+        },
         academicYears: {
           where: { isCurrent: true },
           take: 1,
@@ -394,7 +424,7 @@ export class SuperAdminService {
     // exist would silently break their logins.
     if (input.subdomain !== school.subdomain && school._count.students > 0) {
       throw new ConflictException(
-        "The subdomain cannot be changed once students have been enrolled, because student login emails are derived from it.",
+        'The subdomain cannot be changed once students have been enrolled, because student login emails are derived from it.',
       );
     }
 
@@ -428,8 +458,8 @@ export class SuperAdminService {
           },
         });
         await writeAudit(tx, actor, {
-          action: "UPDATE",
-          entityType: "super-admin.school.update",
+          action: 'UPDATE',
+          entityType: 'super-admin.school.update',
           entityId: id,
           schoolId: id,
           oldValues: {
@@ -445,7 +475,9 @@ export class SuperAdminService {
       });
     } catch (error) {
       if (isUniqueViolation(error)) {
-        throw new ConflictException("That school code or subdomain was just taken by another school");
+        throw new ConflictException(
+          'That school code or subdomain was just taken by another school',
+        );
       }
       throw error;
     }
@@ -465,11 +497,11 @@ export class SuperAdminService {
     const existingUser = await this.prisma.client.user.findUnique({
       where: { email: input.email },
     });
-    if (existingUser?.role === "superAdmin") {
-      throw new ConflictException("A platform super admin cannot be added as a school admin");
+    if (existingUser?.role === 'superAdmin') {
+      throw new ConflictException('A platform super admin cannot be added as a school admin');
     }
     if (existingUser?.banned) {
-      throw new ConflictException("This user account is banned and cannot be added");
+      throw new ConflictException('This user account is banned and cannot be added');
     }
     if (existingUser) {
       const existingMember = await this.prisma.client.member.findUnique({
@@ -481,7 +513,7 @@ export class SuperAdminService {
         },
       });
       if (existingMember) {
-        throw new ConflictException("This user is already a member of the school");
+        throw new ConflictException('This user is already a member of the school');
       }
       const otherSchoolMembership = await this.prisma.client.member.findFirst({
         where: { userId: existingUser.id },
@@ -489,7 +521,7 @@ export class SuperAdminService {
       });
       if (otherSchoolMembership) {
         throw new ConflictException(
-          "This account already belongs to another school. Use different credentials for each school.",
+          'This account already belongs to another school. Use different credentials for each school.',
         );
       }
     }
@@ -506,7 +538,7 @@ export class SuperAdminService {
       admin = await this.prisma.client.$transaction(async (transaction) => {
         if (!existingUser) {
           if (!credential) {
-            throw new Error("Expected a prepared credential when creating a new admin account");
+            throw new Error('Expected a prepared credential when creating a new admin account');
           }
           await transaction.user.create({
             data: {
@@ -514,7 +546,7 @@ export class SuperAdminService {
               name: input.name,
               email: input.email,
               emailVerified: false,
-              role: "user",
+              role: 'user',
               mustChangePassword: true,
               temporaryPasswordExpiresAt: temporaryPasswordExpiry(now),
               createdAt: now,
@@ -525,7 +557,7 @@ export class SuperAdminService {
             data: {
               id: generateId(),
               accountId: userId,
-              providerId: "credential",
+              providerId: 'credential',
               userId,
               password: credential.passwordHash,
               createdAt: now,
@@ -539,7 +571,7 @@ export class SuperAdminService {
             id: memberId,
             organizationId: school.organizationId,
             userId,
-            role: "admin",
+            role: 'admin',
             createdAt: now,
             updatedAt: now,
           },
@@ -547,40 +579,43 @@ export class SuperAdminService {
         });
 
         await writeAudit(transaction, actor, {
-          action: existingUser ? "ACCESS_CHANGED" : "CREDENTIALS_ISSUED",
-          entityType: "super-admin.school-admin.add",
+          action: existingUser ? 'ACCESS_CHANGED' : 'CREDENTIALS_ISSUED',
+          entityType: 'super-admin.school-admin.add',
           entityId: userId,
           schoolId: id,
-          newValues: { email: input.email, role: "admin", createdAccount: !existingUser },
+          newValues: { email: input.email, role: 'admin', createdAccount: !existingUser },
         });
 
         return member.user;
       });
     } catch (error) {
       if (isUniqueViolation(error)) {
-        throw new ConflictException("That email address was just registered by someone else");
+        throw new ConflictException('That email address was just registered by someone else');
       }
       throw error;
     }
 
     return {
-      admin: { ...admin, role: "admin" },
+      admin: { ...admin, role: 'admin' },
       createdAccount: !existingUser,
       // Shown once to the super admin to hand over; the admin must change it at first sign-in.
-      credentials: credential ? toIssuedCredentials(input.email, credential, "admin") : null,
+      credentials: credential ? toIssuedCredentials(input.email, credential, 'admin') : null,
     };
   }
 
   async setSchoolAdminBanned(
     id: string,
     userId: string,
-    banned: SetSchoolAdminBannedInput["banned"],
+    banned: SetSchoolAdminBannedInput['banned'],
     actor: AuditActor,
     reason?: string,
   ) {
     const normalizedReason = reason?.trim();
-    if (banned && (!normalizedReason || normalizedReason.length < 10 || normalizedReason.length > 500)) {
-      throw new BadRequestException("A suspension reason of 10 to 500 characters is required");
+    if (
+      banned &&
+      (!normalizedReason || normalizedReason.length < 10 || normalizedReason.length > 500)
+    ) {
+      throw new BadRequestException('A suspension reason of 10 to 500 characters is required');
     }
     const member = await this.findSchoolAdminMembership(id, userId);
     await this.prisma.client.$transaction(
@@ -590,14 +625,14 @@ export class SuperAdminService {
             where: {
               organizationId: member.organizationId,
               userId: { not: userId },
-              role: { in: ["owner", "admin"] },
+              role: { in: ['owner', 'admin'] },
               banned: false,
               user: { banned: false },
             },
             select: { id: true },
           });
           if (!anotherAdmin) {
-            throw new BadRequestException("The school must have at least one active administrator");
+            throw new BadRequestException('The school must have at least one active administrator');
           }
         }
 
@@ -613,15 +648,15 @@ export class SuperAdminService {
           await transaction.session.deleteMany({ where: { userId } });
         }
         await writeAudit(transaction, actor, {
-          action: "ACCESS_CHANGED",
-          entityType: banned ? "super-admin.school-admin.ban" : "super-admin.school-admin.unban",
+          action: 'ACCESS_CHANGED',
+          entityType: banned ? 'super-admin.school-admin.ban' : 'super-admin.school-admin.unban',
           entityId: userId,
           schoolId: id,
           oldValues: { banned: member.banned },
           newValues: { banned, ...(banned ? { reason: normalizedReason } : {}) },
         });
       },
-      { isolationLevel: "Serializable" },
+      { isolationLevel: 'Serializable' },
     );
 
     return { success: true, banned };
@@ -635,27 +670,27 @@ export class SuperAdminService {
           where: {
             organizationId: member.organizationId,
             userId: { not: userId },
-            role: { in: ["owner", "admin"] },
+            role: { in: ['owner', 'admin'] },
             banned: false,
             user: { banned: false },
           },
           select: { id: true },
         });
         if (!anotherAdmin) {
-          throw new BadRequestException("The school must have at least one active administrator");
+          throw new BadRequestException('The school must have at least one active administrator');
         }
 
         await transaction.member.delete({ where: { id: member.id } });
         await transaction.session.deleteMany({ where: { userId } });
         await writeAudit(transaction, actor, {
-          action: "DELETE",
-          entityType: "super-admin.school-admin.remove",
+          action: 'DELETE',
+          entityType: 'super-admin.school-admin.remove',
           entityId: userId,
           schoolId: id,
           oldValues: { role: member.role },
         });
       },
-      { isolationLevel: "Serializable" },
+      { isolationLevel: 'Serializable' },
     );
     return { success: true };
   }
@@ -677,8 +712,8 @@ export class SuperAdminService {
       await tx.user.update({ where: { id: userId }, data: { twoFactorEnabled: false } });
       await tx.session.deleteMany({ where: { userId } });
       await writeAudit(tx, actor, {
-        action: "ACCESS_CHANGED",
-        entityType: "super-admin.school-admin.reset-two-factor",
+        action: 'ACCESS_CHANGED',
+        entityType: 'super-admin.school-admin.reset-two-factor',
         entityId: userId,
         schoolId: id,
         oldValues: { twoFactorEnabled: user?.twoFactorEnabled ?? false, role: member.role },
@@ -705,8 +740,8 @@ export class SuperAdminService {
         },
       },
     });
-    if (!member || !["owner", "admin"].includes(member.role)) {
-      throw new NotFoundException("School administrator membership not found");
+    if (!member || !['owner', 'admin'].includes(member.role)) {
+      throw new NotFoundException('School administrator membership not found');
     }
 
     return member;
@@ -749,7 +784,7 @@ export class SuperAdminService {
               region: input.region ?? null,
               schoolCode: input.schoolCode,
             }),
-            subscriptionStatus: "TRIALING",
+            subscriptionStatus: 'TRIALING',
             expiresAt: trialEndsAt,
             createdAt: now,
             updatedAt: now,
@@ -761,9 +796,9 @@ export class SuperAdminService {
             name: input.adminName,
             email: input.adminEmail,
             emailVerified: false,
-            role: "owner",
+            role: 'owner',
             mustChangePassword: true,
-              temporaryPasswordExpiresAt: temporaryPasswordExpiry(now),
+            temporaryPasswordExpiresAt: temporaryPasswordExpiry(now),
             createdAt: now,
             updatedAt: now,
           },
@@ -772,7 +807,7 @@ export class SuperAdminService {
           data: {
             id: generateId(),
             accountId: userId,
-            providerId: "credential",
+            providerId: 'credential',
             userId,
             password: credential.passwordHash,
             createdAt: now,
@@ -784,7 +819,7 @@ export class SuperAdminService {
             id: generateId(),
             organizationId: orgId,
             userId,
-            role: "owner",
+            role: 'owner',
             createdAt: now,
             updatedAt: now,
           },
@@ -800,11 +835,12 @@ export class SuperAdminService {
             address: input.schoolAddress,
           },
         });
-        if (input.smsConnection) await storeSchoolSmsConnection(tx, school.id, actor, input.smsConnection);
+        if (input.smsConnection)
+          await storeSchoolSmsConnection(tx, school.id, actor, input.smsConnection);
         await tx.subscription.create({
           data: {
             schoolId: school.id,
-            status: "TRIALING",
+            status: 'TRIALING',
             isOnTrial: true,
             trialStartsAt: now,
             trialEndsAt,
@@ -813,8 +849,8 @@ export class SuperAdminService {
           },
         });
         await writeAudit(tx, actor, {
-          action: "CREATE",
-          entityType: "super-admin.school.enroll",
+          action: 'CREATE',
+          entityType: 'super-admin.school.enroll',
           entityId: school.id,
           schoolId: school.id,
           newValues: {
@@ -826,11 +862,11 @@ export class SuperAdminService {
           },
         });
         await writeAudit(tx, actor, {
-          action: "CREDENTIALS_ISSUED",
-          entityType: "super-admin.school-owner.credentials",
+          action: 'CREDENTIALS_ISSUED',
+          entityType: 'super-admin.school-owner.credentials',
           entityId: userId,
           schoolId: school.id,
-          newValues: { email: input.adminEmail, role: "owner" },
+          newValues: { email: input.adminEmail, role: 'owner' },
         });
         return { school, adminUser };
       });
@@ -843,12 +879,12 @@ export class SuperAdminService {
           email: adminUser.email,
           role: adminUser.role,
         },
-        credentials: toIssuedCredentials(adminUser.email, credential, "owner"),
+        credentials: toIssuedCredentials(adminUser.email, credential, 'owner'),
       };
     } catch (error) {
       if (isUniqueViolation(error)) {
         throw new ConflictException(
-          "That school code, subdomain or admin email was just taken. Check the values and try again.",
+          'That school code, subdomain or admin email was just taken. Check the values and try again.',
         );
       }
       throw error;
@@ -858,7 +894,9 @@ export class SuperAdminService {
   async updateSubscription(id: string, input: UpdateSubscriptionInput, actor: AuditActor) {
     const school = await this.prisma.client.school.findUnique({
       where: { id },
-      include: { organization: { select: { id: true, subscriptionStatus: true, expiresAt: true } } },
+      include: {
+        organization: { select: { id: true, subscriptionStatus: true, expiresAt: true } },
+      },
     });
 
     if (!school) {
@@ -875,11 +913,11 @@ export class SuperAdminService {
 
     // Refuse a change that would lock the school out the moment it is saved.
     if (
-      ["TRIALING", "ACTIVE", "PAST_DUE"].includes(input.status) &&
+      ['TRIALING', 'ACTIVE', 'PAST_DUE'].includes(input.status) &&
       !evaluateSubscriptionAccess(input.status, nextExpiry).allowed
     ) {
       throw new BadRequestException(
-        "That expiry date has already passed, so the school would be locked out immediately. Choose a future date, or leave the expiry empty.",
+        'That expiry date has already passed, so the school would be locked out immediately. Choose a future date, or leave the expiry empty.',
       );
     }
 
@@ -893,10 +931,10 @@ export class SuperAdminService {
       const subscriptionStatus = toSubscriptionEnum(input.status);
       const common = {
         status: subscriptionStatus,
-        isOnTrial: input.status === "TRIALING",
+        isOnTrial: input.status === 'TRIALING',
         currentPeriodEnd: nextExpiry,
-        trialEndsAt: input.status === "TRIALING" ? nextExpiry : null,
-        canceledAt: input.status === "CANCELLED" ? new Date() : null,
+        trialEndsAt: input.status === 'TRIALING' ? nextExpiry : null,
+        canceledAt: input.status === 'CANCELLED' ? new Date() : null,
         cancelAtPeriodEnd: false,
       };
       await tx.subscription.upsert({
@@ -906,8 +944,8 @@ export class SuperAdminService {
       });
 
       await writeAudit(tx, actor, {
-        action: "SUBSCRIPTION_CHANGED",
-        entityType: "super-admin.subscription.update",
+        action: 'SUBSCRIPTION_CHANGED',
+        entityType: 'super-admin.subscription.update',
         entityId: id,
         schoolId: id,
         oldValues: {
@@ -923,15 +961,19 @@ export class SuperAdminService {
 
   async assignSubscriptionPlan(
     schoolId: string,
-    input: { planId: string; billingCycle: "MONTHLY" | "YEARLY" },
+    input: { planId: string; billingCycle: 'MONTHLY' | 'YEARLY' },
     actor: AuditActor,
   ) {
     const [school, plan] = await Promise.all([
-      this.prisma.client.school.findUnique({ where: { id: schoolId }, select: { id: true, name: true } }),
+      this.prisma.client.school.findUnique({
+        where: { id: schoolId },
+        select: { id: true, name: true },
+      }),
       this.prisma.client.subscriptionPlan.findUnique({ where: { id: input.planId } }),
     ]);
-    if (!school) throw new NotFoundException("School not found");
-    if (!plan || !plan.isActive) throw new BadRequestException("Choose an active subscription plan");
+    if (!school) throw new NotFoundException('School not found');
+    if (!plan || !plan.isActive)
+      throw new BadRequestException('Choose an active subscription plan');
     const [students, teachers, guardians, staff] = await Promise.all([
       this.prisma.client.student.count({ where: { schoolId, deletedAt: null } }),
       this.prisma.client.teacher.count({ where: { schoolId, deletedAt: null } }),
@@ -939,41 +981,73 @@ export class SuperAdminService {
       this.prisma.client.staff.count({ where: { schoolId, deletedAt: null } }),
     ]);
     const overLimit = [
-      ["students", students, plan.maxStudents],
-      ["teachers", teachers, plan.maxTeachers],
-      ["guardians", guardians, plan.maxGuardians],
-      ["staff", staff, plan.maxStaff],
-    ].find(([, used, limit]) => limit !== null && limit !== undefined && Number(used) > Number(limit));
+      ['students', students, plan.maxStudents],
+      ['teachers', teachers, plan.maxTeachers],
+      ['guardians', guardians, plan.maxGuardians],
+      ['staff', staff, plan.maxStaff],
+    ].find(
+      ([, used, limit]) => limit !== null && limit !== undefined && Number(used) > Number(limit),
+    );
     if (overLimit) {
-      throw new BadRequestException(`Cannot assign this plan: current ${overLimit[0]} usage (${overLimit[1]}) exceeds its limit (${overLimit[2]}). Existing records are preserved; choose a plan that accommodates current usage.`);
+      throw new BadRequestException(
+        `Cannot assign this plan: current ${overLimit[0]} usage (${overLimit[1]}) exceeds its limit (${overLimit[2]}). Existing records are preserved; choose a plan that accommodates current usage.`,
+      );
     }
-    const price = input.billingCycle === "YEARLY" ? plan.yearlyPrice : plan.monthlyPrice;
-    const legacyPlanType = ["FREE", "BASIC", "STANDARD", "PREMIUM", "ENTERPRISE"].includes(plan.code)
-      ? plan.code as "FREE" | "BASIC" | "STANDARD" | "PREMIUM" | "ENTERPRISE"
-      : "BASIC";
+    const price = input.billingCycle === 'YEARLY' ? plan.yearlyPrice : plan.monthlyPrice;
+    const legacyPlanType = ['FREE', 'BASIC', 'STANDARD', 'PREMIUM', 'ENTERPRISE'].includes(
+      plan.code,
+    )
+      ? (plan.code as 'FREE' | 'BASIC' | 'STANDARD' | 'PREMIUM' | 'ENTERPRISE')
+      : 'BASIC';
     const updated = await this.prisma.client.$transaction(async (tx) => {
       const subscription = await tx.subscription.upsert({
         where: { schoolId },
         update: {
-          planId: plan.id, planName: plan.name, planType: legacyPlanType,
-          billingCycle: input.billingCycle, amount: price, currency: plan.currency,
-          maxStudents: plan.maxStudents, maxTeachers: plan.maxTeachers,
-          maxGuardians: plan.maxGuardians, maxStaff: plan.maxStaff,
+          planId: plan.id,
+          planName: plan.name,
+          planType: legacyPlanType,
+          billingCycle: input.billingCycle,
+          amount: price,
+          currency: plan.currency,
+          maxStudents: plan.maxStudents,
+          maxTeachers: plan.maxTeachers,
+          maxGuardians: plan.maxGuardians,
+          maxStaff: plan.maxStaff,
         },
         create: {
-          schoolId, planId: plan.id, planName: plan.name, planType: legacyPlanType,
-          billingCycle: input.billingCycle, amount: price, currency: plan.currency,
-          maxStudents: plan.maxStudents, maxTeachers: plan.maxTeachers,
-          maxGuardians: plan.maxGuardians, maxStaff: plan.maxStaff,
+          schoolId,
+          planId: plan.id,
+          planName: plan.name,
+          planType: legacyPlanType,
+          billingCycle: input.billingCycle,
+          amount: price,
+          currency: plan.currency,
+          maxStudents: plan.maxStudents,
+          maxTeachers: plan.maxTeachers,
+          maxGuardians: plan.maxGuardians,
+          maxStaff: plan.maxStaff,
         },
       });
       await writeAudit(tx, actor, {
-        action: "SUBSCRIPTION_CHANGED", entityType: "super-admin.subscription-plan.assign",
-        entityId: subscription.id, schoolId,
-        newValues: { planId: plan.id, planCode: plan.code, planName: plan.name,
-          billingCycle: input.billingCycle, amount: price.toString(), currency: plan.currency,
-          limits: { students: plan.maxStudents, teachers: plan.maxTeachers,
-            guardians: plan.maxGuardians, staff: plan.maxStaff, storageMb: plan.maxStorageMb } },
+        action: 'SUBSCRIPTION_CHANGED',
+        entityType: 'super-admin.subscription-plan.assign',
+        entityId: subscription.id,
+        schoolId,
+        newValues: {
+          planId: plan.id,
+          planCode: plan.code,
+          planName: plan.name,
+          billingCycle: input.billingCycle,
+          amount: price.toString(),
+          currency: plan.currency,
+          limits: {
+            students: plan.maxStudents,
+            teachers: plan.maxTeachers,
+            guardians: plan.maxGuardians,
+            staff: plan.maxStaff,
+            storageMb: plan.maxStorageMb,
+          },
+        },
       });
       return subscription;
     });
@@ -983,24 +1057,42 @@ export class SuperAdminService {
   /** Platform-owned plan catalogue. Nullable limits intentionally mean unlimited. */
   async listSubscriptionPlans() {
     return this.prisma.client.subscriptionPlan.findMany({
-      orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+      orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
     });
   }
 
-  async createSubscriptionPlan(input: {
-    code: string; name: string; description?: string | null;
-    monthlyPrice: number; yearlyPrice: number; currency: string;
-    maxStudents: number | null; maxTeachers: number | null;
-    maxGuardians: number | null; maxStaff: number | null; maxStorageMb: number | null;
-    features: string[]; isPublic: boolean; isActive: boolean; sortOrder: number;
-  }, actor: AuditActor) {
-    const code = input.code.trim().toUpperCase().replace(/[^A-Z0-9_-]/g, "");
-    if (!code) throw new BadRequestException("Plan code must contain letters or numbers");
+  async createSubscriptionPlan(
+    input: {
+      code: string;
+      name: string;
+      description?: string | null;
+      monthlyPrice: number;
+      yearlyPrice: number;
+      currency: string;
+      maxStudents: number | null;
+      maxTeachers: number | null;
+      maxGuardians: number | null;
+      maxStaff: number | null;
+      maxStorageMb: number | null;
+      features: string[];
+      isPublic: boolean;
+      isActive: boolean;
+      sortOrder: number;
+    },
+    actor: AuditActor,
+  ) {
+    const code = input.code
+      .trim()
+      .toUpperCase()
+      .replace(/[^A-Z0-9_-]/g, '');
+    if (!code) throw new BadRequestException('Plan code must contain letters or numbers');
     try {
       const plan = await this.prisma.client.$transaction(async (tx) => {
         const created = await tx.subscriptionPlan.create({
           data: {
-            ...input, code, name: input.name.trim(),
+            ...input,
+            code,
+            name: input.name.trim(),
             description: input.description?.trim() || null,
             monthlyPrice: new Prisma.Decimal(input.monthlyPrice),
             yearlyPrice: new Prisma.Decimal(input.yearlyPrice),
@@ -1008,59 +1100,112 @@ export class SuperAdminService {
           },
         });
         await writeAudit(tx, actor, {
-          action: "CREATE", entityType: "super-admin.subscription-plan.create",
+          action: 'CREATE',
+          entityType: 'super-admin.subscription-plan.create',
           entityId: created.id,
-          newValues: { code: created.code, name: created.name, monthlyPrice: created.monthlyPrice.toString(),
-            yearlyPrice: created.yearlyPrice.toString(), currency: created.currency,
-            limits: { students: created.maxStudents, teachers: created.maxTeachers,
-              guardians: created.maxGuardians, staff: created.maxStaff, storageMb: created.maxStorageMb },
-            isActive: created.isActive, isPublic: created.isPublic },
+          newValues: {
+            code: created.code,
+            name: created.name,
+            monthlyPrice: created.monthlyPrice.toString(),
+            yearlyPrice: created.yearlyPrice.toString(),
+            currency: created.currency,
+            limits: {
+              students: created.maxStudents,
+              teachers: created.maxTeachers,
+              guardians: created.maxGuardians,
+              staff: created.maxStaff,
+              storageMb: created.maxStorageMb,
+            },
+            isActive: created.isActive,
+            isPublic: created.isPublic,
+          },
         });
         return created;
       });
       return plan;
     } catch (error) {
-      if (isUniqueViolation(error)) throw new ConflictException("A subscription plan with this code already exists");
+      if (isUniqueViolation(error))
+        throw new ConflictException('A subscription plan with this code already exists');
       throw error;
     }
   }
 
-  async updateSubscriptionPlan(id: string, input: {
-    code?: string; name?: string; description?: string | null;
-    monthlyPrice?: number; yearlyPrice?: number; currency?: string;
-    maxStudents?: number | null; maxTeachers?: number | null;
-    maxGuardians?: number | null; maxStaff?: number | null; maxStorageMb?: number | null;
-    features?: string[]; isPublic?: boolean; isActive?: boolean; sortOrder?: number;
-  }, actor: AuditActor) {
+  async updateSubscriptionPlan(
+    id: string,
+    input: {
+      code?: string;
+      name?: string;
+      description?: string | null;
+      monthlyPrice?: number;
+      yearlyPrice?: number;
+      currency?: string;
+      maxStudents?: number | null;
+      maxTeachers?: number | null;
+      maxGuardians?: number | null;
+      maxStaff?: number | null;
+      maxStorageMb?: number | null;
+      features?: string[];
+      isPublic?: boolean;
+      isActive?: boolean;
+      sortOrder?: number;
+    },
+    actor: AuditActor,
+  ) {
     const existing = await this.prisma.client.subscriptionPlan.findUnique({ where: { id } });
-    if (!existing) throw new NotFoundException("Subscription plan not found");
+    if (!existing) throw new NotFoundException('Subscription plan not found');
     const data: Prisma.SubscriptionPlanUpdateInput = {
-      ...(input.code !== undefined ? { code: input.code.trim().toUpperCase().replace(/[^A-Z0-9_-]/g, "") } : {}),
+      ...(input.code !== undefined
+        ? {
+            code: input.code
+              .trim()
+              .toUpperCase()
+              .replace(/[^A-Z0-9_-]/g, ''),
+          }
+        : {}),
       ...(input.name !== undefined ? { name: input.name.trim() } : {}),
-      ...(input.description !== undefined ? { description: input.description?.trim() || null } : {}),
-      ...(input.monthlyPrice !== undefined ? { monthlyPrice: new Prisma.Decimal(input.monthlyPrice) } : {}),
-      ...(input.yearlyPrice !== undefined ? { yearlyPrice: new Prisma.Decimal(input.yearlyPrice) } : {}),
+      ...(input.description !== undefined
+        ? { description: input.description?.trim() || null }
+        : {}),
+      ...(input.monthlyPrice !== undefined
+        ? { monthlyPrice: new Prisma.Decimal(input.monthlyPrice) }
+        : {}),
+      ...(input.yearlyPrice !== undefined
+        ? { yearlyPrice: new Prisma.Decimal(input.yearlyPrice) }
+        : {}),
       ...(input.currency !== undefined ? { currency: input.currency } : {}),
       ...(input.maxStudents !== undefined ? { maxStudents: input.maxStudents } : {}),
       ...(input.maxTeachers !== undefined ? { maxTeachers: input.maxTeachers } : {}),
       ...(input.maxGuardians !== undefined ? { maxGuardians: input.maxGuardians } : {}),
       ...(input.maxStaff !== undefined ? { maxStaff: input.maxStaff } : {}),
       ...(input.maxStorageMb !== undefined ? { maxStorageMb: input.maxStorageMb } : {}),
-      ...(input.features !== undefined ? { features: input.features as Prisma.InputJsonValue } : {}),
+      ...(input.features !== undefined
+        ? { features: input.features as Prisma.InputJsonValue }
+        : {}),
       ...(input.isPublic !== undefined ? { isPublic: input.isPublic } : {}),
       ...(input.isActive !== undefined ? { isActive: input.isActive } : {}),
       ...(input.sortOrder !== undefined ? { sortOrder: input.sortOrder } : {}),
       version: { increment: 1 },
     };
-    if (input.code !== undefined && !data.code) throw new BadRequestException("Invalid plan code");
+    if (input.code !== undefined && !data.code) throw new BadRequestException('Invalid plan code');
     const updated = await this.prisma.client.$transaction(async (tx) => {
       const plan = await tx.subscriptionPlan.update({ where: { id }, data });
       await writeAudit(tx, actor, {
-        action: "UPDATE", entityType: "super-admin.subscription-plan.update", entityId: id,
+        action: 'UPDATE',
+        entityType: 'super-admin.subscription-plan.update',
+        entityId: id,
         oldValues: { version: existing.version, isActive: existing.isActive },
-        newValues: { version: plan.version, isActive: plan.isActive, isPublic: plan.isPublic,
-          limits: { students: plan.maxStudents, teachers: plan.maxTeachers,
-            guardians: plan.maxGuardians, staff: plan.maxStaff, storageMb: plan.maxStorageMb } },
+        newValues: {
+          version: plan.version,
+          isActive: plan.isActive,
+          isPublic: plan.isPublic,
+          limits: {
+            students: plan.maxStudents,
+            teachers: plan.maxTeachers,
+            guardians: plan.maxGuardians,
+            staff: plan.maxStaff,
+            storageMb: plan.maxStorageMb,
+          },
+        },
       });
       return plan;
     });
@@ -1073,28 +1218,30 @@ export class SuperAdminService {
    */
   async getOperationsHealth() {
     const checkedAt = new Date().toISOString();
-    let database: { status: "healthy" | "unavailable"; latencyMs: number | null };
+    let database: { status: 'healthy' | 'unavailable'; latencyMs: number | null };
     const startedAt = Date.now();
 
     try {
       await this.prisma.client.$queryRaw`SELECT 1`;
-      database = { status: "healthy", latencyMs: Date.now() - startedAt };
+      database = { status: 'healthy', latencyMs: Date.now() - startedAt };
     } catch {
-      database = { status: "unavailable", latencyMs: null };
+      database = { status: 'unavailable', latencyMs: null };
     }
 
     const expectedMigration = process.env.EXPECTED_MIGRATION_NAME?.trim();
     let migrations: {
-      status: "current" | "mismatch" | "incomplete" | "not_configured" | "unavailable";
+      status: 'current' | 'mismatch' | 'incomplete' | 'not_configured' | 'unavailable';
       latestApplied: string | null;
       unfinishedCount: number | null;
-    } = { status: "unavailable", latestApplied: null, unfinishedCount: null };
-    if (database.status === "healthy") {
+    } = { status: 'unavailable', latestApplied: null, unfinishedCount: null };
+    if (database.status === 'healthy') {
       try {
-        const rows = await this.prisma.client.$queryRaw<Array<{
-          latest_migration: string | null;
-          unfinished_count: bigint | number;
-        }>>`
+        const rows = await this.prisma.client.$queryRaw<
+          Array<{
+            latest_migration: string | null;
+            unfinished_count: bigint | number;
+          }>
+        >`
           SELECT
             (
               SELECT migration_name
@@ -1111,41 +1258,54 @@ export class SuperAdminService {
         const latestApplied = rows[0]?.latest_migration ?? null;
         const unfinishedCount = Number(rows[0]?.unfinished_count ?? 0);
         migrations = {
-          status: unfinishedCount > 0
-            ? "incomplete"
-            : expectedMigration
-              ? latestApplied === expectedMigration ? "current" : "mismatch"
-              : "not_configured",
+          status:
+            unfinishedCount > 0
+              ? 'incomplete'
+              : expectedMigration
+                ? latestApplied === expectedMigration
+                  ? 'current'
+                  : 'mismatch'
+                : 'not_configured',
           latestApplied,
           unfinishedCount,
         };
       } catch {
         // Do not leak SQL/schema details. A missing migration table is not
         // evidence that migrations are current; report it as unverified.
-        migrations = { status: "unavailable", latestApplied: null, unfinishedCount: null };
+        migrations = { status: 'unavailable', latestApplied: null, unfinishedCount: null };
       }
     }
 
     // A missing expected migration is an unverified deployment, not a healthy one.
-    const migrationDegraded = ["mismatch", "incomplete", "not_configured", "unavailable"].includes(migrations.status);
+    const migrationDegraded = ['mismatch', 'incomplete', 'not_configured', 'unavailable'].includes(
+      migrations.status,
+    );
     const storage = this.storage
       ? await this.storage.checkHealth()
-      : { status: "not_instrumented" as const, latencyMs: null };
-    const privateStorage = this.privateStorage ? await this.privateStorage.checkHealth() : { status: "not_instrumented" as const, latencyMs: null };
-    const storageDegraded = [storage.status, privateStorage.status].some(status => status === "not_configured" || status === "unavailable");
+      : { status: 'not_instrumented' as const, latencyMs: null };
+    const privateStorage = this.privateStorage
+      ? await this.privateStorage.checkHealth()
+      : { status: 'not_instrumented' as const, latencyMs: null };
+    const storageDegraded = [storage.status, privateStorage.status].some(
+      (status) => status === 'not_configured' || status === 'unavailable',
+    );
     const backgroundJobs = await this.backgroundJobHealth();
 
     return {
       status:
-        database.status === "healthy" && !migrationDegraded && !storageDegraded && !["degraded", "unavailable"].includes(backgroundJobs.status)
-          ? "healthy"
-          : "degraded",
+        database.status === 'healthy' &&
+        !migrationDegraded &&
+        !storageDegraded &&
+        !['degraded', 'unavailable'].includes(backgroundJobs.status)
+          ? 'healthy'
+          : 'degraded',
       checkedAt,
       application: {
-        status: "healthy",
-        version: process.env.npm_package_version ?? "unknown",
-        environment: process.env.NODE_ENV ?? "unknown",
-        commitSha: process.env.BUILD_SHA ?? process.env.GIT_SHA ?? process.env.SOURCE_VERSION ?? "unknown",
+        status: 'healthy',
+        version: process.env.npm_package_version ?? 'unknown',
+        environment: process.env.NODE_ENV ?? 'unknown',
+        commitSha:
+          process.env.BUILD_SHA ?? process.env.GIT_SHA ?? process.env.SOURCE_VERSION ?? 'unknown',
       },
       migrations,
       dependencies: {
@@ -1154,26 +1314,48 @@ export class SuperAdminService {
         privateStorage,
         // Notification delivery and background workers have no provider/heartbeat
         // contract in this deployment yet, so they remain explicitly unmonitored.
-        notifications: { status: "not_instrumented" },
+        notifications: { status: 'not_instrumented' },
         backgroundJobs,
       },
     } as const;
   }
 
   private async backgroundJobHealth() {
-    if (!this.prisma.client.backgroundJob) return { status: "not_instrumented" as const };
+    if (!this.prisma.client.backgroundJob) return { status: 'not_instrumented' as const };
     try {
       const now = new Date();
       const [dead, overdue, expired, lastSuccess] = await Promise.all([
-        this.prisma.client.backgroundJob.count({ where: { status: "DEAD" } }),
-        this.prisma.client.backgroundJob.count({ where: { status: "PENDING", nextAttempt: { lt: new Date(now.getTime() - 15 * 60_000) } } }),
-        this.prisma.client.backgroundJob.count({ where: { status: "RUNNING", leaseUntil: { lt: now } } }),
-        this.prisma.client.backgroundJob.findFirst({ where: { kind: "finance-integrity", status: "SUCCEEDED" }, orderBy: { completedAt: "desc" }, select: { completedAt: true } }),
+        this.prisma.client.backgroundJob.count({ where: { status: 'DEAD' } }),
+        this.prisma.client.backgroundJob.count({
+          where: { status: 'PENDING', nextAttempt: { lt: new Date(now.getTime() - 15 * 60_000) } },
+        }),
+        this.prisma.client.backgroundJob.count({
+          where: { status: 'RUNNING', leaseUntil: { lt: now } },
+        }),
+        this.prisma.client.backgroundJob.findFirst({
+          where: { kind: 'finance-integrity', status: 'SUCCEEDED' },
+          orderBy: { completedAt: 'desc' },
+          select: { completedAt: true },
+        }),
       ]);
-      const stale = lastSuccess?.completedAt ? now.getTime() - lastSuccess.completedAt.getTime() > 26 * 3600_000 : false;
-      return { status: dead || overdue || expired || stale ? "degraded" as const : lastSuccess ? "healthy" as const : "not_instrumented" as const,
-        dead, overdue, expired, lastFinanceSuccessAt: lastSuccess?.completedAt?.toISOString() ?? null };
-    } catch { return { status: "unavailable" as const }; }
+      const stale = lastSuccess?.completedAt
+        ? now.getTime() - lastSuccess.completedAt.getTime() > 26 * 3600_000
+        : false;
+      return {
+        status:
+          dead || overdue || expired || stale
+            ? ('degraded' as const)
+            : lastSuccess
+              ? ('healthy' as const)
+              : ('not_instrumented' as const),
+        dead,
+        overdue,
+        expired,
+        lastFinanceSuccessAt: lastSuccess?.completedAt?.toISOString() ?? null,
+      };
+    } catch {
+      return { status: 'unavailable' as const };
+    }
   }
 
   async getPlatformStats() {
@@ -1185,21 +1367,21 @@ export class SuperAdminService {
         this.prisma.client.student.count({ where: { deletedAt: null } }),
         this.prisma.client.teacher.count({ where: { deletedAt: null } }),
         this.prisma.client.organization.groupBy({
-          by: ["subscriptionStatus"],
+          by: ['subscriptionStatus'],
           where: { school: { isNot: null } },
           _count: { _all: true },
         }),
         this.prisma.client.organization.count({
           where: {
             school: { isNot: null },
-            subscriptionStatus: { in: ["TRIALING", "ACTIVE", "PAST_DUE"] },
+            subscriptionStatus: { in: ['TRIALING', 'ACTIVE', 'PAST_DUE'] },
             expiresAt: { gt: now, lte: soon },
           },
         }),
         this.prisma.client.organization.count({
           where: {
             school: { isNot: null },
-            subscriptionStatus: { in: ["TRIALING", "ACTIVE", "PAST_DUE"] },
+            subscriptionStatus: { in: ['TRIALING', 'ACTIVE', 'PAST_DUE'] },
             expiresAt: { lte: now },
           },
         }),

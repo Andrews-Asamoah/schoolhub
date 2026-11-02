@@ -1,10 +1,10 @@
-import type { TeacherAssignments } from "./teacher-scope.service.js";
+import type { TeacherAssignments } from './teacher-scope.service.js';
 
 /** Roles allowed to manage academic marks; attendance marking is class-teacher-only. */
-export const SCHOOL_MANAGER_ROLES = ["owner", "admin", "headteacher"] as const;
+export const SCHOOL_MANAGER_ROLES = ['owner', 'admin', 'headteacher'] as const;
 
 export function isSchoolManager(role: string | undefined) {
-  return (SCHOOL_MANAGER_ROLES as readonly string[]).includes(role ?? "");
+  return (SCHOOL_MANAGER_ROLES as readonly string[]).includes(role ?? '');
 }
 
 /**
@@ -18,7 +18,7 @@ export function canMarkRegister(
   assignments: TeacherAssignments,
   classIds: readonly string[],
 ): boolean {
-  if (role !== "teacher" || classIds.length === 0) return false;
+  if (role !== 'teacher' || classIds.length === 0) return false;
   const owned = new Set(assignments.classTeacherClassIds);
   return classIds.every((classId) => owned.has(classId));
 }
@@ -30,8 +30,10 @@ export function canEnterMarks(
   subjectId: string,
 ): boolean {
   if (isSchoolManager(role)) return true;
-  if (role !== "teacher") return false;
-  return assignments.subjectAssignments.some((row) => row.classId === classId && row.subjectId === subjectId);
+  if (role !== 'teacher') return false;
+  return assignments.subjectAssignments.some(
+    (row) => row.classId === classId && row.subjectId === subjectId,
+  );
 }
 
 export function canViewMarks(
@@ -41,5 +43,5 @@ export function canViewMarks(
   subjectId: string,
 ): boolean {
   if (canEnterMarks(role, assignments, classId, subjectId)) return true;
-  return role === "teacher" && assignments.classTeacherClassIds.includes(classId);
+  return role === 'teacher' && assignments.classTeacherClassIds.includes(classId);
 }

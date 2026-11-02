@@ -1,13 +1,13 @@
-import { useForm } from "@tanstack/react-form";
-import { useEffect } from "react";
+import { useForm } from '@tanstack/react-form';
+import { useEffect } from 'react';
 import {
   createSupportTicketSchema,
   supportTicketReplySchema,
   updateSupportTicketSchema,
   type CreateSupportTicketInput,
-} from "@schoolhub/shared";
-import { Check, Send } from "lucide-react";
-import type { ReactNode } from "react";
+} from '@schoolhub/shared';
+import { Check, Send } from 'lucide-react';
+import type { ReactNode } from 'react';
 import {
   FormCancelButton,
   FormField,
@@ -15,10 +15,10 @@ import {
   FormSelect,
   FormSubmitButton,
   FormTextarea,
-} from "@/components/forms/form-controls";
+} from '@/components/forms/form-controls';
 
-type TicketStatus = "OPEN" | "IN_PROGRESS" | "RESOLVED" | "CLOSED";
-type TicketPriority = "LOW" | "MEDIUM" | "HIGH" | "URGENT";
+type TicketStatus = 'OPEN' | 'IN_PROGRESS' | 'RESOLVED' | 'CLOSED';
+type TicketPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
 type CreateTicketFormValues = {
   subject: string;
   description: string;
@@ -27,26 +27,26 @@ type CreateTicketFormValues = {
 };
 
 const priorityLabels: Record<TicketPriority, string> = {
-  LOW: "Low",
-  MEDIUM: "Medium",
-  HIGH: "High",
-  URGENT: "Urgent",
+  LOW: 'Low',
+  MEDIUM: 'Medium',
+  HIGH: 'High',
+  URGENT: 'Urgent',
 };
 
 const statusLabels: Record<TicketStatus, string> = {
-  OPEN: "Open",
-  IN_PROGRESS: "In progress",
-  RESOLVED: "Resolved",
-  CLOSED: "Closed",
+  OPEN: 'Open',
+  IN_PROGRESS: 'In progress',
+  RESOLVED: 'Resolved',
+  CLOSED: 'Closed',
 };
 
 const categories = [
-  "General",
-  "Account access",
-  "Students and records",
-  "Billing",
-  "Technical issue",
-  "Feature request",
+  'General',
+  'Account access',
+  'Students and records',
+  'Billing',
+  'Technical issue',
+  'Feature request',
 ];
 
 export function CreateTicketForm({
@@ -62,10 +62,10 @@ export function CreateTicketForm({
 }) {
   const form = useForm({
     defaultValues: {
-      subject: "",
-      description: "",
-      category: "General",
-      priority: "MEDIUM" as TicketPriority,
+      subject: '',
+      description: '',
+      category: 'General',
+      priority: 'MEDIUM' as TicketPriority,
     } as CreateTicketFormValues,
     validators: {
       onBlur: createSupportTicketSchema,
@@ -91,9 +91,7 @@ export function CreateTicketForm({
           <Send className="size-4" />
         </span>
         <div>
-          <h2 className="text-sm font-semibold text-foreground">
-            Tell us what’s happening
-          </h2>
+          <h2 className="text-sm font-semibold text-foreground">Tell us what’s happening</h2>
           <p className="text-xs text-muted-foreground">
             A support specialist will follow up in this thread.
           </p>
@@ -102,11 +100,7 @@ export function CreateTicketForm({
       <div className="grid gap-3 sm:grid-cols-2">
         <form.Field name="subject">
           {(field) => (
-            <FormField
-              label="Subject"
-              htmlFor={field.name}
-              error={field.state.meta.errors}
-            >
+            <FormField label="Subject" htmlFor={field.name} error={field.state.meta.errors}>
               <FormInput
                 id={field.name}
                 name={field.name}
@@ -117,7 +111,9 @@ export function CreateTicketForm({
                 maxLength={160}
                 placeholder="A short summary of the issue"
                 aria-invalid={field.state.meta.errors.length > 0}
-                aria-describedby={field.state.meta.errors.length > 0 ? `${field.name}-error` : undefined}
+                aria-describedby={
+                  field.state.meta.errors.length > 0 ? `${field.name}-error` : undefined
+                }
               />
             </FormField>
           )}
@@ -134,7 +130,9 @@ export function CreateTicketForm({
                 className="support-select"
               >
                 {categories.map((category) => (
-                  <option key={category} value={category}>{category}</option>
+                  <option key={category} value={category}>
+                    {category}
+                  </option>
                 ))}
               </FormSelect>
             </FormField>
@@ -159,7 +157,9 @@ export function CreateTicketForm({
                 maxLength={10000}
                 placeholder="Include what you were doing and what you expected to happen."
                 aria-invalid={field.state.meta.errors.length > 0}
-                aria-describedby={field.state.meta.errors.length > 0 ? `${field.name}-error` : undefined}
+                aria-describedby={
+                  field.state.meta.errors.length > 0 ? `${field.name}-error` : undefined
+                }
               />
             </FormField>
           )}
@@ -176,7 +176,9 @@ export function CreateTicketForm({
                 className="support-select"
               >
                 {Object.entries(priorityLabels).map(([value, label]) => (
-                  <option key={value} value={value}>{label}</option>
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
                 ))}
               </FormSelect>
             </FormField>
@@ -207,7 +209,7 @@ export function ReplyForm({
   placeholder: string;
 }) {
   const form = useForm({
-    defaultValues: { message: "" },
+    defaultValues: { message: '' },
     validators: {
       onBlur: supportTicketReplySchema,
       onSubmit: supportTicketReplySchema,
@@ -248,7 +250,9 @@ export function ReplyForm({
                 placeholder={placeholder}
                 className="support-reply-textarea min-h-11 resize-y"
                 aria-invalid={field.state.meta.errors.length > 0}
-                aria-describedby={field.state.meta.errors.length > 0 ? "ticket-reply-error" : undefined}
+                aria-describedby={
+                  field.state.meta.errors.length > 0 ? 'ticket-reply-error' : undefined
+                }
               />
             </FormField>
           )}
@@ -324,7 +328,9 @@ export function PlatformTicketUpdateForm({
               className="support-select min-w-36 py-2 text-xs"
             >
               {Object.entries(statusLabels).map(([value, label]) => (
-                <option key={value} value={value}>{label}</option>
+                <option key={value} value={value}>
+                  {label}
+                </option>
               ))}
             </FormSelect>
           </FormField>
@@ -342,16 +348,15 @@ export function PlatformTicketUpdateForm({
               className="support-select min-w-28 py-2 text-xs"
             >
               {Object.entries(priorityLabels).map(([value, label]) => (
-                <option key={value} value={value}>{label}</option>
+                <option key={value} value={value}>
+                  {label}
+                </option>
               ))}
             </FormSelect>
           </FormField>
         )}
       </form.Field>
-      <FormSubmitButton
-        isSubmitting={isSubmitting}
-        className="h-9 px-3 text-xs"
-      >
+      <FormSubmitButton isSubmitting={isSubmitting} className="h-9 px-3 text-xs">
         <Check className="size-3.5" />
         Save updates
       </FormSubmitButton>
@@ -369,7 +374,7 @@ export function CloseTicketForm({
   onSubmit: () => Promise<unknown>;
 }) {
   const form = useForm({
-    defaultValues: { status: "CLOSED" as TicketStatus } as {
+    defaultValues: { status: 'CLOSED' as TicketStatus } as {
       status: TicketStatus;
       priority?: TicketPriority;
     },

@@ -159,10 +159,7 @@ export class AcademicsController {
 
   @Get('classes/:id/teacher-assignments')
   @Roles('owner', 'admin', 'teacher', 'staff')
-  listClassTeacherAssignments(
-    @CurrentSchool() school: School,
-    @Param('id') id: string,
-  ) {
+  listClassTeacherAssignments(@CurrentSchool() school: School, @Param('id') id: string) {
     return this.academicsService.listClassTeacherAssignments(school.id, id);
   }
 

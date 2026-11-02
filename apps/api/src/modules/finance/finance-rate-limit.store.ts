@@ -1,6 +1,10 @@
-import { Injectable } from "@nestjs/common";
-import { PrismaService } from "../../prisma/prisma.service.js";
-import { FINANCE_WRITES_PER_MINUTE, FINANCE_RATE_LIMIT_WINDOW_MS as WINDOW_MS, type FinanceRateLimitStore } from "./finance-safeguards.js";
+import { Injectable } from '@nestjs/common';
+import { PrismaService } from '../../prisma/prisma.service.js';
+import {
+  FINANCE_WRITES_PER_MINUTE,
+  FINANCE_RATE_LIMIT_WINDOW_MS as WINDOW_MS,
+  type FinanceRateLimitStore,
+} from './finance-safeguards.js';
 
 /**
  * Shared store: one atomic upsert per write, so every API instance sees the same

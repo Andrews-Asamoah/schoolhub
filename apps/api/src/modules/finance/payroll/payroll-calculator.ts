@@ -26,9 +26,9 @@ import {
   parseRate,
   RATE_DENOMINATOR,
   type RoundingMode,
-} from "./payroll-money.js";
+} from './payroll-money.js';
 
-export type ContributionBase = "BASIC" | "GROSS" | "PENSIONABLE_ITEMS";
+export type ContributionBase = 'BASIC' | 'GROSS' | 'PENSIONABLE_ITEMS';
 
 export interface PayrollEarningInput {
   code: string;
@@ -103,13 +103,13 @@ export interface PayrollSettings {
 }
 
 export interface PayslipInput {
-  residency: "RESIDENT" | "NON_RESIDENT";
+  residency: 'RESIDENT' | 'NON_RESIDENT';
   earnings: PayrollEarningInput[];
   deductions: PayrollDeductionInput[];
   enrolments: EnrolmentInput[];
 }
 
-export type PayslipLineKind = "EARNING" | "DEDUCTION" | "EMPLOYER_CONTRIBUTION" | "MEMO";
+export type PayslipLineKind = 'EARNING' | 'DEDUCTION' | 'EMPLOYER_CONTRIBUTION' | 'MEMO';
 
 export interface PayslipLineOutput {
   kind: PayslipLineKind;
@@ -151,21 +151,36 @@ function sumBig(values: bigint[]): bigint {
   return values.reduce((total, value) => total + value, 0n);
 }
 
-function calculatePaye(chargeable: bigint, schedule: TaxScheduleInput, residency: PayslipInput["residency"], mode: RoundingMode): bigint {
+function calculatePaye(
+  chargeable: bigint,
+  schedule: TaxScheduleInput,
+  residency: PayslipInput['residency'],
+  mode: RoundingMode,
+): bigint {
   if (chargeable <= 0n) return 0n;
-  if (residency === "NON_RESIDENT") {
-    return applyRate(chargeable, parseRate(schedule.nonResidentRate, "Non-resident tax rate"), mode);
+  if (residency === 'NON_RESIDENT') {
+    return applyRate(
+      chargeable,
+      parseRate(schedule.nonResidentRate, 'Non-resident tax rate'),
+      mode,
+    );
   }
-  if (!schedule.bands.length) throw new PayrollCalculationError("The tax schedule has no bands.");
+  if (!schedule.bands.length) throw new PayrollCalculationError('The tax schedule has no bands.');
   let remaining = chargeable;
   let weighted = 0n; // sum of pesewas × rateScaled, rounded once at the end
   for (const [index, band] of schedule.bands.entries()) {
     if (remaining <= 0n) break;
-    const portion = band.width === null ? remaining : minBig(remaining, parseMoney(band.width, `Band ${index + 1} width`));
+    const portion =
+      band.width === null
+        ? remaining
+        : minBig(remaining, parseMoney(band.width, `Band ${index + 1} width`));
     weighted += portion * parseRate(band.rate, `Band ${index + 1} rate`);
     remaining -= portion;
   }
-  if (remaining > 0n) throw new PayrollCalculationError("The tax schedule has no open-ended top band, so part of the income cannot be taxed.");
+  if (remaining > 0n)
+    throw new PayrollCalculationError(
+      'The tax schedule has no open-ended top band, so part of the income cannot be taxed.',
+    );
   return divideRounded(weighted, RATE_DENOMINATOR, mode);
 }
 
@@ -175,15 +190,28 @@ export function calculatePayslip(settings: PayrollSettings, input: PayslipInput)
   const lines: PayslipLineOutput[] = [];
 
   // 1. Earnings ---------------------------------------------------------------
-  if (!input.earnings.length) throw new PayrollCalculationError("A payslip needs at least one earning.");
-  const earnings = input.earnings.map((item) => ({ ...item, pesewas: parseMoney(item.amount, `Earning "${item.code}"`) }));
+  if (!input.earnings.length)
+    throw new PayrollCalculationError('A payslip needs at least one earning.');
+  const earnings = input.earnings.map((item) => ({
+    ...item,
+    pesewas: parseMoney(item.amount, `Earning "${item.code}"`),
+  }));
   const gross = sumBig(earnings.map((item) => item.pesewas));
   const basic = sumBig(earnings.filter((item) => item.isBasic).map((item) => item.pesewas));
-  const pensionable = sumBig(earnings.filter((item) => item.pensionable).map((item) => item.pesewas));
-  const taxableEarnings = sumBig(earnings.filter((item) => item.taxable).map((item) => item.pesewas));
+  const pensionable = sumBig(
+    earnings.filter((item) => item.pensionable).map((item) => item.pesewas),
+  );
+  const taxableEarnings = sumBig(
+    earnings.filter((item) => item.taxable).map((item) => item.pesewas),
+  );
   const hasBasic = earnings.some((item) => item.isBasic);
   for (const item of earnings) {
-    lines.push({ kind: "EARNING", code: item.code, description: item.description, amount: formatMoney(item.pesewas) });
+    lines.push({
+      kind: 'EARNING',
+      code: item.code,
+      description: item.description,
+      amount: formatMoney(item.pesewas),
+    });
   }
 
   // 2. Contribution schemes -----------------------------------------------------
@@ -191,10 +219,14 @@ export function calculatePayslip(settings: PayrollSettings, input: PayslipInput)
   const enrolled = new Set<string>();
   for (const enrolment of input.enrolments) {
     if (!schemesByKey.has(enrolment.schemeKey)) {
-      throw new PayrollCalculationError(`The employee is enrolled in "${enrolment.schemeKey}", which is not an active scheme.`);
+      throw new PayrollCalculationError(
+        `The employee is enrolled in "${enrolment.schemeKey}", which is not an active scheme.`,
+      );
     }
     if (enrolled.has(enrolment.schemeKey)) {
-      throw new PayrollCalculationError(`The employee is enrolled in "${enrolment.schemeKey}" more than once.`);
+      throw new PayrollCalculationError(
+        `The employee is enrolled in "${enrolment.schemeKey}" more than once.`,
+      );
     }
     enrolled.add(enrolment.schemeKey);
   }
@@ -211,28 +243,44 @@ export function calculatePayslip(settings: PayrollSettings, input: PayslipInput)
 
     let base: bigint;
     switch (scheme.base) {
-      case "BASIC":
-        if (!hasBasic) throw new PayrollCalculationError(`Scheme "${scheme.key}" uses the basic salary, but no earning is marked as basic.`);
+      case 'BASIC':
+        if (!hasBasic)
+          throw new PayrollCalculationError(
+            `Scheme "${scheme.key}" uses the basic salary, but no earning is marked as basic.`,
+          );
         base = basic;
         break;
-      case "GROSS":
+      case 'GROSS':
         base = gross;
         break;
-      case "PENSIONABLE_ITEMS":
+      case 'PENSIONABLE_ITEMS':
         base = pensionable;
         break;
     }
     const unclamped: bigint = base;
-    if (scheme.insurableMax) base = minBig(base, parseMoney(scheme.insurableMax, `${scheme.key} insurable maximum`));
-    if (scheme.insurableMin) base = maxBig(base, parseMoney(scheme.insurableMin, `${scheme.key} insurable minimum`));
-    if (base !== unclamped) warnings.push(`${scheme.label}: contribution base adjusted to the insurable range (${formatMoney(unclamped)} → ${formatMoney(base)}).`);
+    if (scheme.insurableMax)
+      base = minBig(base, parseMoney(scheme.insurableMax, `${scheme.key} insurable maximum`));
+    if (scheme.insurableMin)
+      base = maxBig(base, parseMoney(scheme.insurableMin, `${scheme.key} insurable minimum`));
+    if (base !== unclamped)
+      warnings.push(
+        `${scheme.label}: contribution base adjusted to the insurable range (${formatMoney(unclamped)} → ${formatMoney(base)}).`,
+      );
 
     const employeeAmount = enrolment.employeeFixed
       ? parseMoney(enrolment.employeeFixed, `${scheme.key} fixed employee amount`)
-      : applyRate(base, parseRate(enrolment.employeeRate ?? scheme.employeeRate, `${scheme.key} employee rate`), mode);
+      : applyRate(
+          base,
+          parseRate(enrolment.employeeRate ?? scheme.employeeRate, `${scheme.key} employee rate`),
+          mode,
+        );
     const employerAmount = enrolment.employerFixed
       ? parseMoney(enrolment.employerFixed, `${scheme.key} fixed employer amount`)
-      : applyRate(base, parseRate(enrolment.employerRate ?? scheme.employerRate, `${scheme.key} employer rate`), mode);
+      : applyRate(
+          base,
+          parseRate(enrolment.employerRate ?? scheme.employerRate, `${scheme.key} employer rate`),
+          mode,
+        );
     const memoAmount = applyRate(base, parseRate(scheme.memoRate, `${scheme.key} memo rate`), mode);
 
     const bornByEmployer = enrolment.employerBearsEmployeeShare;
@@ -241,23 +289,50 @@ export function calculatePayslip(settings: PayrollSettings, input: PayslipInput)
 
     if (bornByEmployer && enrolment.employerShareTaxable) taxableBenefit += employeeAmount;
     if (scheme.employeeShareTaxDeductible && (!bornByEmployer || enrolment.employerShareTaxable)) {
-      const cap = scheme.reliefCapRate ? applyRate(gross, parseRate(scheme.reliefCapRate, `${scheme.key} relief cap`), mode) : null;
+      const cap = scheme.reliefCapRate
+        ? applyRate(gross, parseRate(scheme.reliefCapRate, `${scheme.key} relief cap`), mode)
+        : null;
       const deductible = cap === null ? employeeAmount : minBig(employeeAmount, cap);
-      if (cap !== null && employeeAmount > cap) warnings.push(`${scheme.label}: tax relief limited to ${formatMoney(cap)}.`);
+      if (cap !== null && employeeAmount > cap)
+        warnings.push(`${scheme.label}: tax relief limited to ${formatMoney(cap)}.`);
       deductibleTotal += deductible;
     }
 
     if (!bornByEmployer && employeeAmount > 0n) {
-      lines.push({ kind: "DEDUCTION", code: scheme.key, description: `${scheme.label} (employee)`, amount: formatMoney(employeeAmount), schemeKey: scheme.key });
+      lines.push({
+        kind: 'DEDUCTION',
+        code: scheme.key,
+        description: `${scheme.label} (employee)`,
+        amount: formatMoney(employeeAmount),
+        schemeKey: scheme.key,
+      });
     }
     if (employerAmount > 0n) {
-      lines.push({ kind: "EMPLOYER_CONTRIBUTION", code: scheme.key, description: `${scheme.label} (employer)`, amount: formatMoney(employerAmount), schemeKey: scheme.key });
+      lines.push({
+        kind: 'EMPLOYER_CONTRIBUTION',
+        code: scheme.key,
+        description: `${scheme.label} (employer)`,
+        amount: formatMoney(employerAmount),
+        schemeKey: scheme.key,
+      });
     }
     if (bornByEmployer && employeeAmount > 0n) {
-      lines.push({ kind: "EMPLOYER_CONTRIBUTION", code: scheme.key, description: `${scheme.label} (employee share paid by school)`, amount: formatMoney(employeeAmount), schemeKey: scheme.key });
+      lines.push({
+        kind: 'EMPLOYER_CONTRIBUTION',
+        code: scheme.key,
+        description: `${scheme.label} (employee share paid by school)`,
+        amount: formatMoney(employeeAmount),
+        schemeKey: scheme.key,
+      });
     }
     if (memoAmount > 0n) {
-      lines.push({ kind: "MEMO", code: scheme.key, description: `${scheme.label} contribution`, amount: formatMoney(memoAmount), schemeKey: scheme.key });
+      lines.push({
+        kind: 'MEMO',
+        code: scheme.key,
+        description: `${scheme.label} contribution`,
+        amount: formatMoney(memoAmount),
+        schemeKey: scheme.key,
+      });
     }
 
     schemeResults.push({
@@ -276,7 +351,12 @@ export function calculatePayslip(settings: PayrollSettings, input: PayslipInput)
   const chargeable = maxBig(0n, taxableEarnings + taxableBenefit - deductibleTotal);
   const paye = calculatePaye(chargeable, settings.taxSchedule, input.residency, mode);
   if (paye > 0n) {
-    lines.push({ kind: "DEDUCTION", code: "PAYE", description: "Income tax (PAYE)", amount: formatMoney(paye) });
+    lines.push({
+      kind: 'DEDUCTION',
+      code: 'PAYE',
+      description: 'Income tax (PAYE)',
+      amount: formatMoney(paye),
+    });
   }
 
   // 5. Other deductions and net pay ------------------------------------------------
@@ -285,18 +365,29 @@ export function calculatePayslip(settings: PayrollSettings, input: PayslipInput)
     const amount = parseMoney(item.amount, `Deduction "${item.code}"`);
     otherDeductions += amount;
     lines.push({
-      kind: "DEDUCTION",
+      kind: 'DEDUCTION',
       code: item.code,
       description: item.description,
       amount: formatMoney(amount),
-      ...(item.originalAmount ? { originalAmount: formatMoney(parseMoney(item.originalAmount, `Deduction "${item.code}" original amount`)) } : {}),
-      ...(item.balance ? { balance: formatMoney(parseMoney(item.balance, `Deduction "${item.code}" balance`)) } : {}),
+      ...(item.originalAmount
+        ? {
+            originalAmount: formatMoney(
+              parseMoney(item.originalAmount, `Deduction "${item.code}" original amount`),
+            ),
+          }
+        : {}),
+      ...(item.balance
+        ? { balance: formatMoney(parseMoney(item.balance, `Deduction "${item.code}" balance`)) }
+        : {}),
     });
   }
 
   const totalDeductions = employeeDeducted + paye + otherDeductions;
   const net = gross - totalDeductions;
-  if (net < 0n) warnings.push("Deductions exceed gross pay; net pay is negative and must be reviewed before approval.");
+  if (net < 0n)
+    warnings.push(
+      'Deductions exceed gross pay; net pay is negative and must be reviewed before approval.',
+    );
 
   return {
     gross: formatMoney(gross),

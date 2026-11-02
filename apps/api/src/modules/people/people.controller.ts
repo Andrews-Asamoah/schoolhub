@@ -9,7 +9,7 @@ import {
   Post,
   Query,
   UseGuards,
-} from "@nestjs/common";
+} from '@nestjs/common';
 import {
   createGuardianSchema,
   createStaffSchema,
@@ -25,20 +25,20 @@ import {
   type CreateStaffInput,
   type CreateTeacherInput,
   type UpdatePeopleStatusInput,
-} from "@schoolhub/shared";
-import { canSeePrivateBiodata } from "./teacher-biodata.js";
-import { CurrentSchool } from "../../common/decorators/current-school.decorator.js";
-import { CurrentSchoolRole } from "../../common/decorators/current-school-role.decorator.js";
+} from '@schoolhub/shared';
+import { canSeePrivateBiodata } from './teacher-biodata.js';
+import { CurrentSchool } from '../../common/decorators/current-school.decorator.js';
+import { CurrentSchoolRole } from '../../common/decorators/current-school-role.decorator.js';
 import {
   CurrentUser,
   type AuthenticatedUser,
-} from "../../common/decorators/current-user.decorator.js";
-import { Roles } from "../../common/decorators/roles.decorator.js";
-import { RolesGuard } from "../../common/guards/roles.guard.js";
-import { SchoolTenantGuard } from "../../common/guards/school-tenant.guard.js";
-import { ZodValidationPipe } from "../../common/pipes/zod-validation.pipe.js";
-import { PeopleService } from "./people.service.js";
-import type { School } from "@prisma/client";
+} from '../../common/decorators/current-user.decorator.js';
+import { Roles } from '../../common/decorators/roles.decorator.js';
+import { RolesGuard } from '../../common/guards/roles.guard.js';
+import { SchoolTenantGuard } from '../../common/guards/school-tenant.guard.js';
+import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe.js';
+import { PeopleService } from './people.service.js';
+import type { School } from '@prisma/client';
 
 function parsePageParam(value: string | undefined, name: string) {
   if (value === undefined) return undefined;
@@ -46,55 +46,55 @@ function parsePageParam(value: string | undefined, name: string) {
   if (!Number.isInteger(parsed) || parsed < 1) {
     throw new BadRequestException(`${name} must be a positive integer.`);
   }
-  if (name === "limit" && parsed > 100) {
-    throw new BadRequestException("limit cannot be greater than 100.");
+  if (name === 'limit' && parsed > 100) {
+    throw new BadRequestException('limit cannot be greater than 100.');
   }
   return parsed;
 }
 
 function parseActiveParam(value?: string) {
   if (value === undefined) return undefined;
-  if (value !== "true" && value !== "false") {
-    throw new BadRequestException("active must be either true or false.");
+  if (value !== 'true' && value !== 'false') {
+    throw new BadRequestException('active must be either true or false.');
   }
-  return value === "true";
+  return value === 'true';
 }
 
-@Controller("people")
+@Controller('people')
 @UseGuards(SchoolTenantGuard, RolesGuard)
 export class PeopleController {
   constructor(private readonly peopleService: PeopleService) {}
 
-  @Get("teachers")
-  @Roles("owner", "admin", "headteacher", "teacher", "staff")
+  @Get('teachers')
+  @Roles('owner', 'admin', 'headteacher', 'teacher', 'staff')
   listTeachers(
     @CurrentSchool() school: School,
-    @Query("page") page?: string,
-    @Query("limit") limit?: string,
-    @Query("search") search?: string,
-    @Query("active") active?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('search') search?: string,
+    @Query('active') active?: string,
   ) {
     return this.peopleService.listTeachers(school.id, {
-      page: parsePageParam(page, "page"),
-      limit: parsePageParam(limit, "limit"),
+      page: parsePageParam(page, 'page'),
+      limit: parsePageParam(limit, 'limit'),
       search,
       isActive: parseActiveParam(active),
     });
   }
 
-  @Get("teachers/:id")
-  @Roles("owner", "admin", "headteacher", "teacher", "staff")
+  @Get('teachers/:id')
+  @Roles('owner', 'admin', 'headteacher', 'teacher', 'staff')
   getTeacher(
     @CurrentSchool() school: School,
     @CurrentSchoolRole() role: string | undefined,
-    @Param("id") id: string,
+    @Param('id') id: string,
   ) {
     return this.peopleService.getTeacherBiodata(school.id, id, canSeePrivateBiodata(role));
   }
 
-  @Post("teachers")
-  @Roles("owner", "admin", "headteacher")
-  @Header("Cache-Control", "no-store") // response carries a one-time password
+  @Post('teachers')
+  @Roles('owner', 'admin', 'headteacher')
+  @Header('Cache-Control', 'no-store') // response carries a one-time password
   createTeacher(
     @CurrentSchool() school: School,
     @CurrentUser() actor: AuthenticatedUser | undefined,
@@ -104,48 +104,48 @@ export class PeopleController {
     return this.peopleService.createTeacher(school, actor!.id, body);
   }
 
-  @Patch("teachers/:id")
-  @Roles("owner", "admin", "headteacher")
+  @Patch('teachers/:id')
+  @Roles('owner', 'admin', 'headteacher')
   updateTeacher(
     @CurrentSchool() school: School,
     @CurrentUser() actor: AuthenticatedUser | undefined,
-    @Param("id") id: string,
+    @Param('id') id: string,
     @Body(new ZodValidationPipe(updateTeacherSchema)) body: UpdateTeacherInput,
   ) {
     return this.peopleService.updateTeacher(school, actor!.id, id, body);
   }
 
-  @Patch("teachers/:id/status")
-  @Roles("owner", "admin", "headteacher")
+  @Patch('teachers/:id/status')
+  @Roles('owner', 'admin', 'headteacher')
   setTeacherStatus(
     @CurrentSchool() school: School,
-    @Param("id") id: string,
+    @Param('id') id: string,
     @Body(new ZodValidationPipe(updatePeopleStatusSchema))
     body: UpdatePeopleStatusInput,
   ) {
     return this.peopleService.setTeacherStatus(school.id, id, body.isActive);
   }
 
-  @Get("staff")
-  @Roles("owner", "admin", "headteacher", "staff")
+  @Get('staff')
+  @Roles('owner', 'admin', 'headteacher', 'staff')
   listStaff(
     @CurrentSchool() school: School,
-    @Query("page") page?: string,
-    @Query("limit") limit?: string,
-    @Query("search") search?: string,
-    @Query("active") active?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('search') search?: string,
+    @Query('active') active?: string,
   ) {
     return this.peopleService.listStaff(school.id, {
-      page: parsePageParam(page, "page"),
-      limit: parsePageParam(limit, "limit"),
+      page: parsePageParam(page, 'page'),
+      limit: parsePageParam(limit, 'limit'),
       search,
       isActive: parseActiveParam(active),
     });
   }
 
-  @Post("staff")
-  @Roles("owner", "admin", "headteacher")
-  @Header("Cache-Control", "no-store")
+  @Post('staff')
+  @Roles('owner', 'admin', 'headteacher')
+  @Header('Cache-Control', 'no-store')
   createStaff(
     @CurrentSchool() school: School,
     @CurrentSchoolRole() schoolRole: string | undefined,
@@ -153,61 +153,52 @@ export class PeopleController {
     @Body(new ZodValidationPipe(createStaffSchema))
     body: CreateStaffInput,
   ) {
-    return this.peopleService.createStaff(
-      school,
-      { id: actor!.id, schoolRole },
-      body,
-    );
+    return this.peopleService.createStaff(school, { id: actor!.id, schoolRole }, body);
   }
 
-  @Patch("staff/:id")
-  @Roles("owner", "admin", "headteacher")
+  @Patch('staff/:id')
+  @Roles('owner', 'admin', 'headteacher')
   updateStaff(
     @CurrentSchool() school: School,
     @CurrentSchoolRole() schoolRole: string | undefined,
     @CurrentUser() actor: AuthenticatedUser | undefined,
-    @Param("id") id: string,
+    @Param('id') id: string,
     @Body(new ZodValidationPipe(updateStaffSchema)) body: UpdateStaffInput,
   ) {
-    return this.peopleService.updateStaff(
-      school,
-      { id: actor!.id, schoolRole },
-      id,
-      body,
-    );
+    return this.peopleService.updateStaff(school, { id: actor!.id, schoolRole }, id, body);
   }
 
-  @Patch("staff/:id/status")
-  @Roles("owner", "admin", "headteacher")
+  @Patch('staff/:id/status')
+  @Roles('owner', 'admin', 'headteacher')
   setStaffStatus(
     @CurrentSchool() school: School,
-    @Param("id") id: string,
+    @Param('id') id: string,
     @Body(new ZodValidationPipe(updatePeopleStatusSchema))
     body: UpdatePeopleStatusInput,
   ) {
     return this.peopleService.setStaffStatus(school.id, id, body.isActive);
   }
 
-  @Get("guardians")
-  @Roles("owner", "admin", "headteacher", "staff")
+  @Get('guardians')
+  @Roles('owner', 'admin', 'headteacher', 'staff')
   listGuardians(
     @CurrentSchool() school: School,
-    @Query("page") page?: string,
-    @Query("limit") limit?: string,
-    @Query("search") search?: string,
-    @Query("active") active?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('search') search?: string,
+    @Query('active') active?: string,
   ) {
     return this.peopleService.listGuardians(school.id, {
-      page: parsePageParam(page, "page"),
-      limit: parsePageParam(limit, "limit"),
+      page: parsePageParam(page, 'page'),
+      limit: parsePageParam(limit, 'limit'),
       search,
       isActive: parseActiveParam(active),
     });
   }
 
-  @Post("guardians")
-  @Roles("owner", "admin", "headteacher", "staff")
-  @Header("Cache-Control", "no-store")
+  @Post('guardians')
+  @Roles('owner', 'admin', 'headteacher', 'staff')
+  @Header('Cache-Control', 'no-store')
   createGuardian(
     @CurrentSchool() school: School,
     @CurrentUser() actor: AuthenticatedUser | undefined,
@@ -217,22 +208,22 @@ export class PeopleController {
     return this.peopleService.createGuardian(school, actor!.id, body);
   }
 
-  @Patch("guardians/:id")
-  @Roles("owner", "admin", "headteacher")
+  @Patch('guardians/:id')
+  @Roles('owner', 'admin', 'headteacher')
   updateGuardian(
     @CurrentSchool() school: School,
     @CurrentUser() actor: AuthenticatedUser | undefined,
-    @Param("id") id: string,
+    @Param('id') id: string,
     @Body(new ZodValidationPipe(updateGuardianSchema)) body: UpdateGuardianInput,
   ) {
     return this.peopleService.updateGuardian(school, actor!.id, id, body);
   }
 
-  @Patch("guardians/:id/status")
-  @Roles("owner", "admin", "headteacher")
+  @Patch('guardians/:id/status')
+  @Roles('owner', 'admin', 'headteacher')
   setGuardianStatus(
     @CurrentSchool() school: School,
-    @Param("id") id: string,
+    @Param('id') id: string,
     @Body(new ZodValidationPipe(updatePeopleStatusSchema))
     body: UpdatePeopleStatusInput,
   ) {

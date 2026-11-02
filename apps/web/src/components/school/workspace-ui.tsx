@@ -1,12 +1,12 @@
-import type { LucideIcon } from "lucide-react";
-import type { RowData } from "@tanstack/react-table";
-import { ArrowUpRight } from "lucide-react";
-import { PageHeader } from "@/components/ui/page-header";
-import { EmptyState } from "@/components/ui/empty-state";
-import { Badge } from "@/components/ui/badge";
-import type { ReactNode } from "react";
-import { DataTable, type DataTableColumn } from "@/components/ui/data-table";
-import { useCanExportTables } from "@/lib/table-export-policy";
+import type { LucideIcon } from 'lucide-react';
+import type { RowData } from '@tanstack/react-table';
+import { ArrowUpRight } from 'lucide-react';
+import { PageHeader } from '@/components/ui/page-header';
+import { EmptyState } from '@/components/ui/empty-state';
+import { Badge } from '@/components/ui/badge';
+import type { ReactNode } from 'react';
+import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
+import { useCanExportTables } from '@/lib/table-export-policy';
 
 export function WorkspacePageHeading({
   section,
@@ -21,14 +21,24 @@ export function WorkspacePageHeading({
   icon: LucideIcon;
   action?: ReactNode;
 }) {
-  return <PageHeader eyebrow={section} title={title} description={description}
-    icon={Icon} actions={action} className="mb-7" />;
+  return (
+    <PageHeader
+      eyebrow={section}
+      title={title}
+      description={description}
+      icon={Icon}
+      actions={action}
+      className="mb-7"
+    />
+  );
 }
 
 export function PreviewDataNotice({ children }: { children: ReactNode }) {
   return (
     <div className="mb-5 flex items-start gap-2 rounded-xl border border-warning/20 bg-warning/10 px-4 py-3 text-xs leading-relaxed text-warning">
-      <Badge variant="warning" className="mt-0.5 shrink-0">Preview</Badge>
+      <Badge variant="warning" className="mt-0.5 shrink-0">
+        Preview
+      </Badge>
       <p>{children}</p>
     </div>
   );
@@ -71,8 +81,12 @@ export function WorkspaceDataTable<T extends RowData>({
 }
 
 export function WorkspaceEmptyState({
-  title, description,
-}: { title: string; description: string }) {
+  title,
+  description,
+}: {
+  title: string;
+  description: string;
+}) {
   return <EmptyState title={title} description={description} />;
 }
 
@@ -89,7 +103,10 @@ export function WorkspaceStat({
 }) {
   return (
     <article className="group relative overflow-hidden rounded-xl border border-border bg-card p-4 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-md sm:p-5">
-      <span aria-hidden="true" className="pointer-events-none absolute -right-6 -top-8 size-24 rounded-full bg-primary/5 blur-2xl transition group-hover:bg-primary/10" />
+      <span
+        aria-hidden="true"
+        className="pointer-events-none absolute -right-6 -top-8 size-24 rounded-full bg-primary/5 blur-2xl transition group-hover:bg-primary/10"
+      />
       <div className="relative flex items-start justify-between gap-3">
         <div>
           <p className="text-xs font-medium text-muted-foreground">{label}</p>

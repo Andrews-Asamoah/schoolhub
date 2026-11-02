@@ -1,32 +1,32 @@
-import { useEffect, useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { CircleAlert, UserRoundCog } from "lucide-react";
-import { apiFetch } from "@/lib/api";
-import { useSchoolOrganization } from "@/components/school/school-organization";
+import { useEffect, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { CircleAlert, UserRoundCog } from 'lucide-react';
+import { apiFetch } from '@/lib/api';
+import { useSchoolOrganization } from '@/components/school/school-organization';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
+} from '@/components/ui/select';
 
-const ACTIVE_ROLE_STORAGE_KEY = "schoolhub-active-role";
-const ROLE_CHANGE_EVENT = "schoolhub-role-change";
+const ACTIVE_ROLE_STORAGE_KEY = 'schoolhub-active-role';
+const ROLE_CHANGE_EVENT = 'schoolhub-role-change';
 
 const roleLabels: Record<string, string> = {
-  owner: "School owner",
-  admin: "Administrator",
-  headteacher: "Headteacher",
-  teacher: "Teacher",
-  accountant: "Accountant",
-  staff: "Staff",
-  student: "Student",
-  guardian: "Parent / guardian",
+  owner: 'School owner',
+  admin: 'Administrator',
+  headteacher: 'Headteacher',
+  teacher: 'Teacher',
+  accountant: 'Accountant',
+  staff: 'Staff',
+  student: 'Student',
+  guardian: 'Parent / guardian',
 };
 
 export function schoolRoleLabel(role: string | null | undefined) {
-  return role ? roleLabels[role] ?? role : "School member";
+  return role ? (roleLabels[role] ?? role) : 'School member';
 }
 
 interface SchoolRoles {
@@ -38,25 +38,22 @@ export function useSchoolRole() {
   const { activeOrganization, organizations } = useSchoolOrganization(false);
   const queryClient = useQueryClient();
   const [storedRole, setStoredRole] = useState<string | null>(() =>
-    typeof window === "undefined"
-      ? null
-      : window.localStorage.getItem(ACTIVE_ROLE_STORAGE_KEY),
+    typeof window === 'undefined' ? null : window.localStorage.getItem(ACTIVE_ROLE_STORAGE_KEY),
   );
   const query = useQuery({
-    queryKey: ["schools", "roles"],
-    queryFn: () => apiFetch<SchoolRoles>("/schools/roles"),
+    queryKey: ['schools', 'roles'],
+    queryFn: () => apiFetch<SchoolRoles>('/schools/roles'),
     enabled: !!activeOrganization && organizations.length === 1,
     retry: false,
   });
 
   useEffect(() => {
-    const syncRole = () =>
-      setStoredRole(window.localStorage.getItem(ACTIVE_ROLE_STORAGE_KEY));
+    const syncRole = () => setStoredRole(window.localStorage.getItem(ACTIVE_ROLE_STORAGE_KEY));
     window.addEventListener(ROLE_CHANGE_EVENT, syncRole);
-    window.addEventListener("storage", syncRole);
+    window.addEventListener('storage', syncRole);
     return () => {
       window.removeEventListener(ROLE_CHANGE_EVENT, syncRole);
-      window.removeEventListener("storage", syncRole);
+      window.removeEventListener('storage', syncRole);
     };
   }, []);
 
@@ -69,10 +66,9 @@ export function useSchoolRole() {
     }
   }, [query.data, storedRole]);
 
-  const activeRole =
-    query.data?.roles.includes(storedRole ?? "")
-      ? storedRole!
-      : query.data?.primaryRole ?? null;
+  const activeRole = query.data?.roles.includes(storedRole ?? '')
+    ? storedRole!
+    : (query.data?.primaryRole ?? null);
 
   async function selectRole(role: string) {
     if (!query.data?.roles.includes(role)) return;
@@ -123,7 +119,10 @@ export function SchoolRoleSwitcher() {
 
   return (
     <Select value={activeRole} onValueChange={(val) => void selectRole(val)}>
-      <SelectTrigger aria-label="Switch school role" className="group h-9 max-w-[min(9rem,32vw)] gap-1.5 px-2 sm:max-w-44 sm:gap-2 sm:px-3 cursor-pointer">
+      <SelectTrigger
+        aria-label="Switch school role"
+        className="group h-9 max-w-[min(9rem,32vw)] gap-1.5 px-2 sm:max-w-44 sm:gap-2 sm:px-3 cursor-pointer"
+      >
         <UserRoundCog className="size-4 shrink-0 text-primary" />
         <SelectValue>
           <span className="block max-w-[min(5.5rem,22vw)] truncate text-left sm:max-w-40">

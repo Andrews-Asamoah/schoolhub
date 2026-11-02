@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { cn } from "@/lib/utils";
+import { useEffect, useState } from 'react';
+import { cn } from '@/lib/utils';
 
 /** Round profile picture with an initial as the fallback (no image, or it failed to load). */
 export function UserAvatar({
@@ -17,8 +17,8 @@ export function UserAvatar({
   return (
     <span
       className={cn(
-        "flex shrink-0 items-center justify-center overflow-hidden rounded-full bg-muted-foreground/20 text-xs font-semibold text-foreground/80",
-        className ?? "size-8",
+        'flex shrink-0 items-center justify-center overflow-hidden rounded-full bg-muted-foreground/20 text-xs font-semibold text-foreground/80',
+        className ?? 'size-8',
       )}
     >
       {image && !failed ? (
@@ -30,7 +30,7 @@ export function UserAvatar({
           className="size-full object-cover"
         />
       ) : (
-        (name?.trim().charAt(0).toUpperCase() || "S")
+        name?.trim().charAt(0).toUpperCase() || 'S'
       )}
     </span>
   );

@@ -1,7 +1,7 @@
-import { ForbiddenException } from "@nestjs/common";
-import type { Prisma } from "@prisma/client";
+import { ForbiddenException } from '@nestjs/common';
+import type { Prisma } from '@prisma/client';
 
-type Capacity = "students" | "teachers" | "guardians" | "staff";
+type Capacity = 'students' | 'teachers' | 'guardians' | 'staff';
 
 /**
  * Must be called inside the write transaction before creating a record.
@@ -31,17 +31,18 @@ export async function assertSubscriptionCapacity(
   }[capacity];
   if (cap === null || cap === undefined) return;
 
-  const current = capacity === "students"
-    ? await tx.student.count({ where: { schoolId, deletedAt: null } })
-    : capacity === "teachers"
-      ? await tx.teacher.count({ where: { schoolId, deletedAt: null } })
-      : capacity === "guardians"
-        ? await tx.guardian.count({ where: { schoolId, deletedAt: null } })
-        : await tx.staff.count({ where: { schoolId, deletedAt: null } });
+  const current =
+    capacity === 'students'
+      ? await tx.student.count({ where: { schoolId, deletedAt: null } })
+      : capacity === 'teachers'
+        ? await tx.teacher.count({ where: { schoolId, deletedAt: null } })
+        : capacity === 'guardians'
+          ? await tx.guardian.count({ where: { schoolId, deletedAt: null } })
+          : await tx.staff.count({ where: { schoolId, deletedAt: null } });
 
   if (current + incoming > cap) {
     throw new ForbiddenException({
-      error: "SUBSCRIPTION_CAPACITY_REACHED",
+      error: 'SUBSCRIPTION_CAPACITY_REACHED',
       message: `This school's subscription allows up to ${cap} ${capacity}. Current usage is ${current}. Upgrade the plan or contact the platform administrator.`,
       capacity,
       limit: cap,

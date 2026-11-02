@@ -1,6 +1,10 @@
-import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
-import type { CreateInventoryItemInput, InventoryStockMovementInput, UpdateInventoryItemInput } from "@schoolhub/shared";
-import { PrismaService } from "../../prisma/prisma.service.js";
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import type {
+  CreateInventoryItemInput,
+  InventoryStockMovementInput,
+  UpdateInventoryItemInput,
+} from '@schoolhub/shared';
+import { PrismaService } from '../../prisma/prisma.service.js';
 
 @Injectable()
 export class InventoryService {
@@ -9,10 +13,10 @@ export class InventoryService {
   listItems(schoolId: string) {
     return this.prisma.client.inventoryItem.findMany({
       where: { schoolId },
-      orderBy: [{ category: "asc" }, { name: "asc" }],
+      orderBy: [{ category: 'asc' }, { name: 'asc' }],
       include: {
         transactions: {
-          orderBy: { createdAt: "desc" },
+          orderBy: { createdAt: 'desc' },
           take: 5,
           select: {
             id: true,
@@ -46,35 +50,37 @@ export class InventoryService {
       }
       return date;
     };
-    const startDate = parseDate(fromDate, "start date");
-    const endDate = parseDate(toDate, "end date");
+    const startDate = parseDate(fromDate, 'start date');
+    const endDate = parseDate(toDate, 'end date');
     if (startDate && endDate && startDate > endDate) {
-      throw new BadRequestException("Start date must be on or before the end date.");
+      throw new BadRequestException('Start date must be on or before the end date.');
     }
-    if (transactionType && !["IN", "OUT", "ADJUSTMENT"].includes(transactionType)) {
-      throw new BadRequestException("Choose a valid stock movement type.");
+    if (transactionType && !['IN', 'OUT', 'ADJUSTMENT'].includes(transactionType)) {
+      throw new BadRequestException('Choose a valid stock movement type.');
     }
     if (itemId) {
       const item = await this.prisma.client.inventoryItem.findFirst({
         where: { id: itemId, schoolId },
         select: { id: true },
       });
-      if (!item) throw new NotFoundException("Inventory item not found.");
+      if (!item) throw new NotFoundException('Inventory item not found.');
     }
     const endExclusive = endDate ? new Date(endDate.getTime() + 24 * 60 * 60 * 1000) : undefined;
     return this.prisma.client.inventoryTransaction.findMany({
       where: {
         schoolId,
         ...(itemId ? { itemId } : {}),
-        ...(transactionType ? { type: transactionType as "IN" | "OUT" | "ADJUSTMENT" } : {}),
-        ...(startDate || endExclusive ? {
-          date: {
-            ...(startDate ? { gte: startDate } : {}),
-            ...(endExclusive ? { lt: endExclusive } : {}),
-          },
-        } : {}),
+        ...(transactionType ? { type: transactionType as 'IN' | 'OUT' | 'ADJUSTMENT' } : {}),
+        ...(startDate || endExclusive
+          ? {
+              date: {
+                ...(startDate ? { gte: startDate } : {}),
+                ...(endExclusive ? { lt: endExclusive } : {}),
+              },
+            }
+          : {}),
       },
-      orderBy: [{ date: "desc" }, { createdAt: "desc" }],
+      orderBy: [{ date: 'desc' }, { createdAt: 'desc' }],
       take: 1000,
       include: {
         item: { select: { id: true, name: true, category: true, unit: true } },
@@ -91,7 +97,7 @@ export class InventoryService {
           name: input.name,
           description: input.description || null,
           category: input.category || null,
-          unit: input.unit || "pcs",
+          unit: input.unit || 'pcs',
           minQuantity: input.minQuantity,
           quantity: input.initialQuantity,
         },
@@ -102,10 +108,10 @@ export class InventoryService {
           data: {
             schoolId,
             itemId: item.id,
-            type: "IN",
+            type: 'IN',
             quantity: input.initialQuantity,
             date: new Date(),
-            description: "Opening stock",
+            description: 'Opening stock',
             performedById,
           },
         });
@@ -125,14 +131,22 @@ export class InventoryService {
         minQuantity: input.minQuantity,
       },
     });
-    if (updated.count !== 1) throw new NotFoundException("Inventory item not found.");
+    if (updated.count !== 1) throw new NotFoundException('Inventory item not found.');
     return this.prisma.client.inventoryItem.findFirst({
       where: { id: itemId, schoolId },
       include: {
         transactions: {
-          orderBy: { createdAt: "desc" },
+          orderBy: { createdAt: 'desc' },
           take: 5,
-          select: { id: true, type: true, quantity: true, date: true, description: true, recipientName: true, createdAt: true },
+          select: {
+            id: true,
+            type: true,
+            quantity: true,
+            date: true,
+            description: true,
+            recipientName: true,
+            createdAt: true,
+          },
         },
       },
     });
@@ -146,7 +160,7 @@ export class InventoryService {
   ) {
     const date = new Date(`${input.date}T00:00:00.000Z`);
     if (Number.isNaN(date.getTime())) {
-      throw new BadRequestException("Enter a valid stock movement date.");
+      throw new BadRequestException('Enter a valid stock movement date.');
     }
 
     return this.prisma.client.$transaction(async (tx) => {
@@ -154,9 +168,9 @@ export class InventoryService {
         where: { id: itemId, schoolId },
         select: { id: true, quantity: true, name: true },
       });
-      if (!item) throw new NotFoundException("Inventory item not found.");
+      if (!item) throw new NotFoundException('Inventory item not found.');
 
-      if (input.type === "OUT") {
+      if (input.type === 'OUT') {
         const updated = await tx.inventoryItem.updateMany({
           where: { id: itemId, schoolId, quantity: { gte: input.quantity } },
           data: { quantity: { decrement: input.quantity } },

@@ -1,4 +1,4 @@
-import { createAuthClient } from "better-auth/react";
+import { createAuthClient } from 'better-auth/react';
 
 /**
  * Better Auth client for the web app.
@@ -18,11 +18,11 @@ import {
   inferAdditionalFields,
   organizationClient,
   twoFactorClient,
-} from "better-auth/client/plugins";
+} from 'better-auth/client/plugins';
 
 export const authClient = createAuthClient({
   baseURL: window.location.origin,
-  basePath: "/api/auth",
+  basePath: '/api/auth',
   plugins: [
     organizationClient(),
     adminClient(),
@@ -32,8 +32,8 @@ export const authClient = createAuthClient({
     // Server-set flag: true while the password is an admin-issued temporary one.
     inferAdditionalFields({
       user: {
-        mustChangePassword: { type: "boolean", required: false },
-        twoFactorEnabled: { type: "boolean", required: false },
+        mustChangePassword: { type: 'boolean', required: false },
+        twoFactorEnabled: { type: 'boolean', required: false },
       },
     }),
   ],

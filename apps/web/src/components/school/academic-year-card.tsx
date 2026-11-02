@@ -1,10 +1,10 @@
-import { DatePicker } from "@/components/ui/date-picker";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { CircleAlert, Pencil, Plus, X } from "lucide-react";
-import { useState, type FormEvent } from "react";
-import type { CreateTermInput, UpdateAcademicYearInput, UpdateTermInput } from "@schoolhub/shared";
-import { FormField, FormInput } from "@/components/forms/form-controls";
-import { apiFetch } from "@/lib/api";
+import { DatePicker } from '@/components/ui/date-picker';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { CircleAlert, Pencil, Plus, X } from 'lucide-react';
+import { useState, type FormEvent } from 'react';
+import type { CreateTermInput, UpdateAcademicYearInput, UpdateTermInput } from '@schoolhub/shared';
+import { FormField, FormInput } from '@/components/forms/form-controls';
+import { apiFetch } from '@/lib/api';
 
 export interface YearTerm {
   id: string;
@@ -28,9 +28,9 @@ const day = (value: string) => value.slice(0, 10);
 const show = (value: string) => new Date(value).toLocaleDateString();
 
 const smallButton =
-  "inline-flex h-8 items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 text-[11px] font-semibold text-foreground/80 transition hover:bg-muted/50 disabled:opacity-50";
+  'inline-flex h-8 items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 text-[11px] font-semibold text-foreground/80 transition hover:bg-muted/50 disabled:opacity-50';
 const primaryButton =
-  "inline-flex h-8 items-center gap-1.5 rounded-lg bg-primary px-3 text-[11px] font-semibold text-primary-foreground transition hover:bg-primary/90 disabled:opacity-50";
+  'inline-flex h-8 items-center gap-1.5 rounded-lg bg-primary px-3 text-[11px] font-semibold text-primary-foreground transition hover:bg-primary/90 disabled:opacity-50';
 
 /** One academic year with inline editing of the year, its terms, and adding terms later. */
 export function AcademicYearCard({ year }: { year: YearRecord }) {
@@ -41,15 +41,18 @@ export function AcademicYearCard({ year }: { year: YearRecord }) {
 
   const refresh = async () => {
     await Promise.all([
-      queryClient.invalidateQueries({ queryKey: ["schools", "academic-years"] }),
-      queryClient.invalidateQueries({ queryKey: ["school", "current"] }),
-      queryClient.invalidateQueries({ queryKey: ["academics"] }),
+      queryClient.invalidateQueries({ queryKey: ['schools', 'academic-years'] }),
+      queryClient.invalidateQueries({ queryKey: ['school', 'current'] }),
+      queryClient.invalidateQueries({ queryKey: ['academics'] }),
     ]);
   };
 
   const saveYear = useMutation({
     mutationFn: (input: UpdateAcademicYearInput) =>
-      apiFetch(`/schools/academic-years/${year.id}`, { method: "PATCH", body: JSON.stringify(input) }),
+      apiFetch(`/schools/academic-years/${year.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(input),
+      }),
     onSuccess: async () => {
       setEditingYear(false);
       await refresh();
@@ -57,7 +60,7 @@ export function AcademicYearCard({ year }: { year: YearRecord }) {
   });
   const saveTerm = useMutation({
     mutationFn: ({ id, input }: { id: string; input: UpdateTermInput }) =>
-      apiFetch(`/schools/terms/${id}`, { method: "PATCH", body: JSON.stringify(input) }),
+      apiFetch(`/schools/terms/${id}`, { method: 'PATCH', body: JSON.stringify(input) }),
     onSuccess: async () => {
       setEditingTermId(null);
       await refresh();
@@ -65,7 +68,10 @@ export function AcademicYearCard({ year }: { year: YearRecord }) {
   });
   const addTerm = useMutation({
     mutationFn: (input: CreateTermInput) =>
-      apiFetch(`/schools/academic-years/${year.id}/terms`, { method: "POST", body: JSON.stringify(input) }),
+      apiFetch(`/schools/academic-years/${year.id}/terms`, {
+        method: 'POST',
+        body: JSON.stringify(input),
+      }),
     onSuccess: async () => {
       setAddingTerm(false);
       await refresh();
@@ -104,13 +110,18 @@ export function AcademicYearCard({ year }: { year: YearRecord }) {
                 type="button"
                 className={smallButton}
                 disabled={saveYear.isPending || year.terms.length === 0}
-                title={year.terms.length === 0 ? "Add a term first" : undefined}
+                title={year.terms.length === 0 ? 'Add a term first' : undefined}
                 onClick={() => saveYear.mutate({ isCurrent: true })}
               >
                 Make current
               </button>
             )}
-            <button type="button" className={smallButton} onClick={() => setEditingYear(true)} aria-label={`Edit ${year.name}`}>
+            <button
+              type="button"
+              className={smallButton}
+              onClick={() => setEditingYear(true)}
+              aria-label={`Edit ${year.name}`}
+            >
               <Pencil className="size-3" /> Edit
             </button>
           </div>
@@ -122,7 +133,11 @@ export function AcademicYearCard({ year }: { year: YearRecord }) {
           editingTermId === term.id ? (
             <li key={term.id}>
               <TermForm
-                initial={{ name: term.name, startDate: day(term.startDate), endDate: day(term.endDate) }}
+                initial={{
+                  name: term.name,
+                  startDate: day(term.startDate),
+                  endDate: day(term.endDate),
+                }}
                 canBeCurrent={year.isCurrent}
                 isCurrent={term.isCurrent}
                 pending={saveTerm.isPending}
@@ -138,7 +153,7 @@ export function AcademicYearCard({ year }: { year: YearRecord }) {
               <span>
                 <span className="font-semibold text-foreground">
                   {term.name}
-                  {term.isCurrent ? " · Current" : ""}
+                  {term.isCurrent ? ' · Current' : ''}
                 </span>
                 <span className="ml-2 text-muted-foreground">
                   {show(term.startDate)} – {show(term.endDate)}
@@ -155,7 +170,12 @@ export function AcademicYearCard({ year }: { year: YearRecord }) {
                     Make current
                   </button>
                 )}
-                <button type="button" className={smallButton} onClick={() => setEditingTermId(term.id)} aria-label={`Edit ${term.name}`}>
+                <button
+                  type="button"
+                  className={smallButton}
+                  onClick={() => setEditingTermId(term.id)}
+                  aria-label={`Edit ${term.name}`}
+                >
                   <Pencil className="size-3" /> Edit
                 </button>
               </span>
@@ -170,7 +190,7 @@ export function AcademicYearCard({ year }: { year: YearRecord }) {
       {addingTerm && nextTermNumber ? (
         <div className="mt-3">
           <TermForm
-            initial={{ name: `Term ${nextTermNumber}`, startDate: "", endDate: "" }}
+            initial={{ name: `Term ${nextTermNumber}`, startDate: '', endDate: '' }}
             canBeCurrent={year.isCurrent}
             isCurrent={false}
             pending={addTerm.isPending}
@@ -180,8 +200,8 @@ export function AcademicYearCard({ year }: { year: YearRecord }) {
               addTerm.mutate({
                 name: values.name ?? `Term ${nextTermNumber}`,
                 termNumber: nextTermNumber,
-                startDate: values.startDate ?? "",
-                endDate: values.endDate ?? "",
+                startDate: values.startDate ?? '',
+                endDate: values.endDate ?? '',
                 isCurrent: values.isCurrent ?? false,
               })
             }
@@ -192,7 +212,7 @@ export function AcademicYearCard({ year }: { year: YearRecord }) {
           type="button"
           className={`${smallButton} mt-3`}
           disabled={!nextTermNumber}
-          title={!nextTermNumber ? "An academic year can have at most three terms" : undefined}
+          title={!nextTermNumber ? 'An academic year can have at most three terms' : undefined}
           onClick={() => {
             addTerm.reset();
             setAddingTerm(true);
@@ -203,7 +223,10 @@ export function AcademicYearCard({ year }: { year: YearRecord }) {
       )}
 
       {error && (
-        <p role="alert" className="mt-3 flex items-start gap-2 rounded-lg border border-destructive/20 bg-destructive/10 px-3 py-2 text-[11px] text-destructive">
+        <p
+          role="alert"
+          className="mt-3 flex items-start gap-2 rounded-lg border border-destructive/20 bg-destructive/10 px-3 py-2 text-[11px] text-destructive"
+        >
           <CircleAlert className="mt-0.5 size-3.5 shrink-0" />
           {error.message}
         </p>
@@ -230,8 +253,9 @@ function YearForm({
   const [problem, setProblem] = useState<string | null>(null);
   function submit(event: FormEvent) {
     event.preventDefault();
-    if (!values.name.trim()) return setProblem("Enter a name for the academic year.");
-    if (values.endDate <= values.startDate) return setProblem("The academic year must end after it starts.");
+    if (!values.name.trim()) return setProblem('Enter a name for the academic year.');
+    if (values.endDate <= values.startDate)
+      return setProblem('The academic year must end after it starts.');
     setProblem(null);
     onSave({ ...values, ...(current !== isCurrent ? { isCurrent: current } : {}) });
   }
@@ -239,25 +263,50 @@ function YearForm({
     <form onSubmit={submit} className="space-y-3" noValidate>
       <div className="grid gap-3 sm:grid-cols-3">
         <FormField label="Year name" htmlFor="year-name">
-          <FormInput id="year-name" value={values.name} onChange={(e) => setValues({ ...values, name: e.target.value })} />
+          <FormInput
+            id="year-name"
+            value={values.name}
+            onChange={(e) => setValues({ ...values, name: e.target.value })}
+          />
         </FormField>
         <FormField label="Starts" htmlFor="year-start">
-          <DatePicker id="year-start" value={values.startDate} onChange={(value) => setValues({ ...values, startDate: value })} />
+          <DatePicker
+            id="year-start"
+            value={values.startDate}
+            onChange={(value) => setValues({ ...values, startDate: value })}
+          />
         </FormField>
         <FormField label="Ends" htmlFor="year-end">
-          <DatePicker id="year-end" value={values.endDate} onChange={(value) => setValues({ ...values, endDate: value })} />
+          <DatePicker
+            id="year-end"
+            value={values.endDate}
+            onChange={(value) => setValues({ ...values, endDate: value })}
+          />
         </FormField>
       </div>
       {!isCurrent && (
         <label className="flex items-center gap-2 text-[11px] font-medium text-foreground/80">
-          <input type="checkbox" checked={current} onChange={(e) => setCurrent(e.target.checked)} className="size-4 accent-primary" />
+          <input
+            type="checkbox"
+            checked={current}
+            onChange={(e) => setCurrent(e.target.checked)}
+            className="size-4 accent-primary"
+          />
           Set as current year
         </label>
       )}
-      {problem && <p role="alert" className="text-[11px] text-destructive">{problem}</p>}
+      {problem && (
+        <p role="alert" className="text-[11px] text-destructive">
+          {problem}
+        </p>
+      )}
       <div className="flex gap-2">
-        <button type="submit" className={primaryButton} disabled={pending}>Save year</button>
-        <button type="button" className={smallButton} onClick={onCancel}><X className="size-3" /> Cancel</button>
+        <button type="submit" className={primaryButton} disabled={pending}>
+          Save year
+        </button>
+        <button type="button" className={smallButton} onClick={onCancel}>
+          <X className="size-3" /> Cancel
+        </button>
       </div>
     </form>
   );
@@ -275,7 +324,7 @@ function TermForm({
   isCurrent,
   canBeCurrent,
   pending,
-  submitLabel = "Save term",
+  submitLabel = 'Save term',
   onSave,
   onCancel,
 }: {
@@ -292,35 +341,64 @@ function TermForm({
   const [problem, setProblem] = useState<string | null>(null);
   function submit(event: FormEvent) {
     event.preventDefault();
-    if (values.name.trim().length < 2) return setProblem("Enter a term name.");
-    if (!values.startDate || !values.endDate) return setProblem("Choose start and end dates.");
-    if (values.endDate <= values.startDate) return setProblem("A term must end after it starts.");
+    if (values.name.trim().length < 2) return setProblem('Enter a term name.');
+    if (!values.startDate || !values.endDate) return setProblem('Choose start and end dates.');
+    if (values.endDate <= values.startDate) return setProblem('A term must end after it starts.');
     setProblem(null);
     onSave({ ...values, ...(current !== isCurrent ? { isCurrent: current } : {}) });
   }
   return (
-    <form onSubmit={submit} className="space-y-3 rounded-lg border border-primary/20 bg-primary/10 p-3" noValidate>
+    <form
+      onSubmit={submit}
+      className="space-y-3 rounded-lg border border-primary/20 bg-primary/10 p-3"
+      noValidate
+    >
       <div className="grid gap-3 sm:grid-cols-3">
         <FormField label="Term name" htmlFor="term-name">
-          <FormInput id="term-name" value={values.name} onChange={(e) => setValues({ ...values, name: e.target.value })} />
+          <FormInput
+            id="term-name"
+            value={values.name}
+            onChange={(e) => setValues({ ...values, name: e.target.value })}
+          />
         </FormField>
         <FormField label="Starts" htmlFor="term-start">
-          <DatePicker id="term-start" value={values.startDate} onChange={(value) => setValues({ ...values, startDate: value })} />
+          <DatePicker
+            id="term-start"
+            value={values.startDate}
+            onChange={(value) => setValues({ ...values, startDate: value })}
+          />
         </FormField>
         <FormField label="Ends" htmlFor="term-end">
-          <DatePicker id="term-end" value={values.endDate} onChange={(value) => setValues({ ...values, endDate: value })} />
+          <DatePicker
+            id="term-end"
+            value={values.endDate}
+            onChange={(value) => setValues({ ...values, endDate: value })}
+          />
         </FormField>
       </div>
       {canBeCurrent && !isCurrent && (
         <label className="flex items-center gap-2 text-[11px] font-medium text-foreground/80">
-          <input type="checkbox" checked={current} onChange={(e) => setCurrent(e.target.checked)} className="size-4 accent-primary" />
+          <input
+            type="checkbox"
+            checked={current}
+            onChange={(e) => setCurrent(e.target.checked)}
+            className="size-4 accent-primary"
+          />
           Make this the current term
         </label>
       )}
-      {problem && <p role="alert" className="text-[11px] text-destructive">{problem}</p>}
+      {problem && (
+        <p role="alert" className="text-[11px] text-destructive">
+          {problem}
+        </p>
+      )}
       <div className="flex gap-2">
-        <button type="submit" className={primaryButton} disabled={pending}>{submitLabel}</button>
-        <button type="button" className={smallButton} onClick={onCancel}><X className="size-3" /> Cancel</button>
+        <button type="submit" className={primaryButton} disabled={pending}>
+          {submitLabel}
+        </button>
+        <button type="button" className={smallButton} onClick={onCancel}>
+          <X className="size-3" /> Cancel
+        </button>
       </div>
     </form>
   );

@@ -1,10 +1,10 @@
-import { useQuery } from "@tanstack/react-query";
-import { CheckCircle2, Clock, AlertTriangle, ShieldCheck } from "lucide-react";
-import { apiFetch } from "@/lib/api";
-import { cn } from "@/lib/utils";
+import { useQuery } from '@tanstack/react-query';
+import { CheckCircle2, Clock, AlertTriangle, ShieldCheck } from 'lucide-react';
+import { apiFetch } from '@/lib/api';
+import { cn } from '@/lib/utils';
 
 export interface StudentFeeStatus {
-  status: "FULLY_PAID" | "PARTIALLY_PAID" | "YET_TO_PAY" | "UNKNOWN";
+  status: 'FULLY_PAID' | 'PARTIALLY_PAID' | 'YET_TO_PAY' | 'UNKNOWN';
   label: string;
   description: string;
   academicYear?: string | null;
@@ -12,15 +12,15 @@ export interface StudentFeeStatus {
 }
 
 interface StudentFeeBadgeProps {
-  status?: "FULLY_PAID" | "PARTIALLY_PAID" | "YET_TO_PAY" | "UNKNOWN";
+  status?: 'FULLY_PAID' | 'PARTIALLY_PAID' | 'YET_TO_PAY' | 'UNKNOWN';
   label?: string;
   className?: string;
 }
 
 export function useStudentFeeStatus() {
   return useQuery({
-    queryKey: ["students", "me", "fee-status"],
-    queryFn: () => apiFetch<StudentFeeStatus>("/students/me/fee-status"),
+    queryKey: ['students', 'me', 'fee-status'],
+    queryFn: () => apiFetch<StudentFeeStatus>('/students/me/fee-status'),
     retry: false,
     staleTime: 60_000,
   });
@@ -33,29 +33,53 @@ export function useStudentFeeStatus() {
 export function StudentFeeBadge({ status, label, className }: StudentFeeBadgeProps) {
   const statusQuery = useStudentFeeStatus();
   const { data } = statusQuery;
-  if (!status && (statusQuery.isPending || statusQuery.isError || !data || data.status === "UNKNOWN")) {
-    return <span className={cn("inline-flex items-center gap-1.5 rounded-full border border-border bg-muted px-3 py-1 text-xs font-bold text-muted-foreground", className)}><ShieldCheck className="size-3.5" /><span>Fee Status: Unknown</span></span>;
-  }
-  const currentStatus = status ?? data?.status ?? "UNKNOWN";
-  const currentLabel = label ?? data?.label ?? (
-    currentStatus === "FULLY_PAID"
-      ? "Fully Paid"
-      : currentStatus === "PARTIALLY_PAID"
-        ? "Partially Paid"
-        : currentStatus === "YET_TO_PAY"
-          ? "Yet to Make Payment"
-          : "Unknown"
-  );
-
-  if (currentStatus === "UNKNOWN") {
-    return <span className={cn("inline-flex items-center gap-1.5 rounded-full border border-border bg-muted px-3 py-1 text-xs font-bold text-muted-foreground", className)}><ShieldCheck className="size-3.5" /><span>Fee Status: {currentLabel}</span></span>;
-  }
-
-  if (currentStatus === "FULLY_PAID") {
+  if (
+    !status &&
+    (statusQuery.isPending || statusQuery.isError || !data || data.status === 'UNKNOWN')
+  ) {
     return (
       <span
         className={cn(
-          "inline-flex items-center gap-1.5 rounded-full border border-success/30 bg-success/10 px-3 py-1 text-xs font-bold text-success shadow-2xs",
+          'inline-flex items-center gap-1.5 rounded-full border border-border bg-muted px-3 py-1 text-xs font-bold text-muted-foreground',
+          className,
+        )}
+      >
+        <ShieldCheck className="size-3.5" />
+        <span>Fee Status: Unknown</span>
+      </span>
+    );
+  }
+  const currentStatus = status ?? data?.status ?? 'UNKNOWN';
+  const currentLabel =
+    label ??
+    data?.label ??
+    (currentStatus === 'FULLY_PAID'
+      ? 'Fully Paid'
+      : currentStatus === 'PARTIALLY_PAID'
+        ? 'Partially Paid'
+        : currentStatus === 'YET_TO_PAY'
+          ? 'Yet to Make Payment'
+          : 'Unknown');
+
+  if (currentStatus === 'UNKNOWN') {
+    return (
+      <span
+        className={cn(
+          'inline-flex items-center gap-1.5 rounded-full border border-border bg-muted px-3 py-1 text-xs font-bold text-muted-foreground',
+          className,
+        )}
+      >
+        <ShieldCheck className="size-3.5" />
+        <span>Fee Status: {currentLabel}</span>
+      </span>
+    );
+  }
+
+  if (currentStatus === 'FULLY_PAID') {
+    return (
+      <span
+        className={cn(
+          'inline-flex items-center gap-1.5 rounded-full border border-success/30 bg-success/10 px-3 py-1 text-xs font-bold text-success shadow-2xs',
           className,
         )}
       >
@@ -65,11 +89,11 @@ export function StudentFeeBadge({ status, label, className }: StudentFeeBadgePro
     );
   }
 
-  if (currentStatus === "PARTIALLY_PAID") {
+  if (currentStatus === 'PARTIALLY_PAID') {
     return (
       <span
         className={cn(
-          "inline-flex items-center gap-1.5 rounded-full border border-warning/30 bg-warning/10 px-3 py-1 text-xs font-bold text-warning shadow-2xs",
+          'inline-flex items-center gap-1.5 rounded-full border border-warning/30 bg-warning/10 px-3 py-1 text-xs font-bold text-warning shadow-2xs',
           className,
         )}
       >
@@ -82,7 +106,7 @@ export function StudentFeeBadge({ status, label, className }: StudentFeeBadgePro
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1.5 rounded-full border border-destructive/30 bg-destructive/10 px-3 py-1 text-xs font-bold text-destructive shadow-2xs",
+        'inline-flex items-center gap-1.5 rounded-full border border-destructive/30 bg-destructive/10 px-3 py-1 text-xs font-bold text-destructive shadow-2xs',
         className,
       )}
     >
@@ -100,23 +124,37 @@ export function StudentFeeBadge({ status, label, className }: StudentFeeBadgePro
 export function StudentFeeAlertBanner({ className }: { className?: string }) {
   const statusQuery = useStudentFeeStatus();
   const { data } = statusQuery;
-  if (statusQuery.isPending || statusQuery.isError || !data || data.status === "UNKNOWN") {
-    return <div role="status" className={cn("rounded-2xl border border-border bg-muted/50 p-4 text-sm text-muted-foreground", className)}><strong>School fee status: Unknown</strong><p className="mt-1">The current fee status could not be verified. Please check again later or contact the school accounts office.</p></div>;
+  if (statusQuery.isPending || statusQuery.isError || !data || data.status === 'UNKNOWN') {
+    return (
+      <div
+        role="status"
+        className={cn(
+          'rounded-2xl border border-border bg-muted/50 p-4 text-sm text-muted-foreground',
+          className,
+        )}
+      >
+        <strong>School fee status: Unknown</strong>
+        <p className="mt-1">
+          The current fee status could not be verified. Please check again later or contact the
+          school accounts office.
+        </p>
+      </div>
+    );
   }
   const currentStatus = data.status;
   const description =
     data?.description ??
-    (currentStatus === "FULLY_PAID"
-      ? "All required school fees have been cleared. Examination hall pass is active."
-      : currentStatus === "PARTIALLY_PAID"
-        ? "Partial school fee payment recorded. Remind parent or guardian to clear the remainder on their portal."
-        : "Term fee payment is pending. Please remind your parent or guardian to settle term fees via the parent portal.");
+    (currentStatus === 'FULLY_PAID'
+      ? 'All required school fees have been cleared. Examination hall pass is active.'
+      : currentStatus === 'PARTIALLY_PAID'
+        ? 'Partial school fee payment recorded. Remind parent or guardian to clear the remainder on their portal.'
+        : 'Term fee payment is pending. Please remind your parent or guardian to settle term fees via the parent portal.');
 
-  if (currentStatus === "FULLY_PAID") {
+  if (currentStatus === 'FULLY_PAID') {
     return (
       <div
         className={cn(
-          "flex items-center justify-between rounded-2xl border border-success/20 bg-gradient-to-r from-success/10 via-success/10 to-card p-4 text-xs dark:bg-card",
+          'flex items-center justify-between rounded-2xl border border-success/20 bg-gradient-to-r from-success/10 via-success/10 to-card p-4 text-xs dark:bg-card',
           className,
         )}
       >
@@ -126,27 +164,23 @@ export function StudentFeeAlertBanner({ className }: { className?: string }) {
           </span>
           <div>
             <div className="flex items-center gap-2">
-              <span className="font-black text-success">
-                School Fees: Fully Paid
-              </span>
+              <span className="font-black text-success">School Fees: Fully Paid</span>
               <span className="rounded-md bg-success/20 px-1.5 py-0.2 text-[10px] font-bold text-success">
                 Cleared
               </span>
             </div>
-            <p className="mt-0.5 text-[11px] text-success/90">
-              {description}
-            </p>
+            <p className="mt-0.5 text-[11px] text-success/90">{description}</p>
           </div>
         </div>
       </div>
     );
   }
 
-  if (currentStatus === "PARTIALLY_PAID") {
+  if (currentStatus === 'PARTIALLY_PAID') {
     return (
       <div
         className={cn(
-          "flex items-center justify-between rounded-2xl border border-warning/20 bg-gradient-to-r from-warning/10 via-warning/10 to-card p-4 text-xs dark:bg-card",
+          'flex items-center justify-between rounded-2xl border border-warning/20 bg-gradient-to-r from-warning/10 via-warning/10 to-card p-4 text-xs dark:bg-card',
           className,
         )}
       >
@@ -156,16 +190,12 @@ export function StudentFeeAlertBanner({ className }: { className?: string }) {
           </span>
           <div>
             <div className="flex items-center gap-2">
-              <span className="font-black text-warning">
-                School Fees: Partially Paid
-              </span>
+              <span className="font-black text-warning">School Fees: Partially Paid</span>
               <span className="rounded-md bg-warning/20 px-1.5 py-0.2 text-[10px] font-bold text-warning">
                 Pending Balance
               </span>
             </div>
-            <p className="mt-0.5 text-[11px] text-warning/90">
-              {description}
-            </p>
+            <p className="mt-0.5 text-[11px] text-warning/90">{description}</p>
           </div>
         </div>
       </div>
@@ -175,7 +205,7 @@ export function StudentFeeAlertBanner({ className }: { className?: string }) {
   return (
     <div
       className={cn(
-        "flex items-center justify-between rounded-2xl border border-destructive/20 bg-gradient-to-r from-destructive/10 via-destructive/10 to-card p-4 text-xs dark:bg-card",
+        'flex items-center justify-between rounded-2xl border border-destructive/20 bg-gradient-to-r from-destructive/10 via-destructive/10 to-card p-4 text-xs dark:bg-card',
         className,
       )}
     >
@@ -185,16 +215,12 @@ export function StudentFeeAlertBanner({ className }: { className?: string }) {
         </span>
         <div>
           <div className="flex items-center gap-2">
-            <span className="font-black text-destructive">
-              School Fees: Yet to Make Payment
-            </span>
+            <span className="font-black text-destructive">School Fees: Yet to Make Payment</span>
             <span className="rounded-md bg-destructive/20 px-1.5 py-0.2 text-[10px] font-bold text-destructive">
               Action Required by Guardian
             </span>
           </div>
-          <p className="mt-0.5 text-[11px] text-destructive/90">
-            {description}
-          </p>
+          <p className="mt-0.5 text-[11px] text-destructive/90">{description}</p>
         </div>
       </div>
     </div>

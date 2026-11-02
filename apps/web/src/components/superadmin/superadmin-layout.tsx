@@ -1,11 +1,11 @@
-import { type ReactNode } from "react";
-import { ShieldCheck } from "lucide-react";
-import { ThemeToggle } from "@/components/school/theme-toggle";
-import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
-import { SuperAdminSidebar } from "./superadmin-sidebar";
-import { PageContainer } from "@/components/ui/page-container";
-import { Badge } from "@/components/ui/badge";
-import { SchoolSwitcher } from "./school-switcher";
+import { type ReactNode } from 'react';
+import { ShieldCheck } from 'lucide-react';
+import { ThemeToggle } from '@/components/school/theme-toggle';
+import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
+import { SuperAdminSidebar } from './superadmin-sidebar';
+import { PageContainer } from '@/components/ui/page-container';
+import { Badge } from '@/components/ui/badge';
+import { SchoolSwitcher } from './school-switcher';
 
 interface SuperAdminLayoutProps {
   children: ReactNode;
@@ -25,27 +25,30 @@ export function SuperAdminLayout({
   return (
     <SidebarProvider>
       <div className="superadmin-app-shell min-h-screen md:flex">
-        <SuperAdminSidebar
-          activePage={activePage}
-          userName={userName}
-          userEmail={userEmail}
-        />
+        <SuperAdminSidebar activePage={activePage} userName={userName} userEmail={userEmail} />
         <div className="min-w-0 flex-1">
           {/* Top bar */}
           <header className="superadmin-topbar sticky top-0 z-10 flex h-16 items-center gap-3 border-b border-border bg-card px-4 md:px-7 ">
             <SidebarTrigger className="superadmin-button-secondary shrink-0" />
             <div className="h-4 w-px bg-border" />
             <div className="superadmin-breadcrumb flex min-w-0 items-center gap-2 text-sm">
-              <span className="superadmin-breadcrumb-root hidden font-semibold sm:block">Platform</span>
+              <span className="superadmin-breadcrumb-root hidden font-semibold sm:block">
+                Platform
+              </span>
               {breadcrumb && (
                 <>
                   <span className="superadmin-breadcrumb-separator hidden sm:block">/</span>
-                  <span aria-current="page" className="superadmin-breadcrumb-current truncate font-bold">{breadcrumb}</span>
+                  <span
+                    aria-current="page"
+                    className="superadmin-breadcrumb-current truncate font-bold"
+                  >
+                    {breadcrumb}
+                  </span>
                 </>
               )}
             </div>
             <div className="ml-auto flex items-center gap-2 sm:gap-3">
-              {activePage === "dashboard" && <SchoolSwitcher />}
+              {activePage === 'dashboard' && <SchoolSwitcher />}
               <ThemeToggle className="superadmin-button-secondary" />
               <span className="hidden h-6 w-px bg-border sm:block" />
               <Badge variant="default" className="rounded-full px-2.5 py-1 text-[11px] sm:text-xs">

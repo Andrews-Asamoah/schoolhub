@@ -1,4 +1,4 @@
-import { Redirect } from "expo-router";
+import { Redirect } from 'expo-router';
 
 /** UI prototype entry point; a real session gate can replace this later. */
 export default function Index() {

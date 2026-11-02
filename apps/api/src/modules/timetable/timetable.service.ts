@@ -28,9 +28,7 @@ const entryInclude = {
   timeSlot: true,
 } as const;
 
-type EntryRow = Awaited<
-  ReturnType<TimetableService['findEntries']>
->[number];
+type EntryRow = Awaited<ReturnType<TimetableService['findEntries']>>[number];
 
 function personName(person: {
   firstName: string | null;
@@ -90,9 +88,7 @@ export class TimetableService {
         }),
       ]);
     const year =
-      years.find((row) => row.id === academicYearId) ??
-      years.find((row) => row.isCurrent) ??
-      null;
+      years.find((row) => row.id === academicYearId) ?? years.find((row) => row.isCurrent) ?? null;
     return {
       academicYear: year,
       academicYears: years,
@@ -144,8 +140,7 @@ export class TimetableService {
   async updatePeriod(schoolId: string, id: string, input: SavePeriodInput) {
     const period = await this.requirePeriod(schoolId, id);
     await this.assertNoPeriodOverlap(schoolId, period.departmentId, input, id);
-    const timesChanged =
-      period.startTime !== input.startTime || period.endTime !== input.endTime;
+    const timesChanged = period.startTime !== input.startTime || period.endTime !== input.endTime;
     if (timesChanged && (await this.countEntriesInPeriod(schoolId, period)) > 0) {
       throw new ConflictException(
         'Lessons are already scheduled in this period. Move or remove them before changing its times.',
@@ -366,7 +361,9 @@ export class TimetableService {
     ]);
     if (!klass) throw new BadRequestException('Choose a class that belongs to this school.');
     if ((period.departmentId ?? null) !== (klass.departmentId ?? null)) {
-      throw new BadRequestException("This period belongs to a different department than the class.");
+      throw new BadRequestException(
+        'This period belongs to a different department than the class.',
+      );
     }
 
     let subjectId: string | null = null;
@@ -390,7 +387,9 @@ export class TimetableService {
       subjectId = subject?.id ?? null;
     }
     if (input.type !== 'BREAK' && input.classroomId) {
-      classroomId = await this.requireClassroom(schoolId, input.classroomId).then((room) => room.id);
+      classroomId = await this.requireClassroom(schoolId, input.classroomId).then(
+        (room) => room.id,
+      );
     }
 
     const slot = await this.ensureTimeSlot(schoolId, input.dayOfWeek, period);
@@ -560,7 +559,8 @@ export class TimetableService {
       where: { id, schoolId },
       select: { id: true },
     });
-    if (!department) throw new BadRequestException('Choose a department that belongs to this school.');
+    if (!department)
+      throw new BadRequestException('Choose a department that belongs to this school.');
   }
 
   private async requireClassroom(schoolId: string, id: string) {
@@ -625,7 +625,8 @@ export class TimetableService {
 
     const enrollment = await db.enrollment.findFirst({
       where: {
-        studentId, status: 'ACTIVE',
+        studentId,
+        status: 'ACTIVE',
         term: { isCurrent: true, academicYear: { isCurrent: true, schoolId } },
         class: { schoolId, deletedAt: null },
       },
@@ -638,7 +639,9 @@ export class TimetableService {
       },
     });
     if (!enrollment) return { class: null, academicYear: null, term: null, entries: [] };
-    const entries = await this.findEntries(schoolId, enrollment.academicYear.id, { classId: enrollment.classId });
+    const entries = await this.findEntries(schoolId, enrollment.academicYear.id, {
+      classId: enrollment.classId,
+    });
     return {
       class: enrollment.class,
       academicYear: enrollment.academicYear,
@@ -646,5 +649,4 @@ export class TimetableService {
       entries: entries.map((row) => this.toDto(row)),
     };
   }
-
 }

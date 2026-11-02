@@ -21,53 +21,56 @@ function hasLabel(value: string, label: RegExp): boolean {
  * dry run still connects to and reads from the selected database.
  */
 export function getDevResetSafetyError(input: DevResetSafetyInput): string | null {
-  if (input.nodeEnv?.toLowerCase() === "production") {
-    return "Refusing to run: NODE_ENV is production. This script deletes financial records.";
+  if (input.nodeEnv?.toLowerCase() === 'production') {
+    return 'Refusing to run: NODE_ENV is production. This script deletes financial records.';
   }
 
-  if (input.allowDevReset !== "true") {
-    return "Refusing to run: set ALLOW_DEV_RESET=true explicitly to use this destructive development script.";
+  if (input.allowDevReset !== 'true') {
+    return 'Refusing to run: set ALLOW_DEV_RESET=true explicitly to use this destructive development script.';
   }
 
   if (!input.databaseUrl?.trim()) {
-    return "Refusing to run: DATABASE_URL must identify a local or development/test database.";
+    return 'Refusing to run: DATABASE_URL must identify a local or development/test database.';
   }
 
   let target: URL;
   try {
     target = new URL(input.databaseUrl);
   } catch {
-    return "Refusing to run: DATABASE_URL is not a valid PostgreSQL connection URL.";
+    return 'Refusing to run: DATABASE_URL is not a valid PostgreSQL connection URL.';
   }
 
-  if (target.protocol !== "postgres:" && target.protocol !== "postgresql:") {
-    return "Refusing to run: DATABASE_URL must use the postgres or postgresql protocol.";
+  if (target.protocol !== 'postgres:' && target.protocol !== 'postgresql:') {
+    return 'Refusing to run: DATABASE_URL must use the postgres or postgresql protocol.';
   }
 
-  const hostname = target.hostname.toLowerCase().replace(/^\[|\]$/g, "").replace(/\.$/, "");
-  let databaseName = target.pathname.split("/").filter(Boolean).at(-1) ?? "";
+  const hostname = target.hostname
+    .toLowerCase()
+    .replace(/^\[|\]$/g, '')
+    .replace(/\.$/, '');
+  let databaseName = target.pathname.split('/').filter(Boolean).at(-1) ?? '';
   try {
     databaseName = decodeURIComponent(databaseName);
   } catch {
-    return "Refusing to run: DATABASE_URL contains an invalid database name.";
+    return 'Refusing to run: DATABASE_URL contains an invalid database name.';
   }
 
   if (hasLabel(hostname, PRODUCTION_LABEL) || hasLabel(databaseName, PRODUCTION_LABEL)) {
-    return "Refusing to run: DATABASE_URL appears to target a production, live, or primary database.";
+    return 'Refusing to run: DATABASE_URL appears to target a production, live, or primary database.';
   }
 
   const isLocalHost =
-    hostname === "localhost" ||
-    hostname === "127.0.0.1" ||
-    hostname === "::1" ||
-    hostname.endsWith(".localhost") ||
-    hostname.endsWith(".local");
+    hostname === 'localhost' ||
+    hostname === '127.0.0.1' ||
+    hostname === '::1' ||
+    hostname.endsWith('.localhost') ||
+    hostname.endsWith('.local');
 
   const isClearlyDevOrTest =
     hasLabel(hostname, DEVELOPMENT_LABEL) || hasLabel(databaseName, DEVELOPMENT_LABEL);
 
   if (!isLocalHost && !isClearlyDevOrTest) {
-    return "Refusing to run: DATABASE_URL does not appear to target a local or clearly labelled development/test database.";
+    return 'Refusing to run: DATABASE_URL does not appear to target a local or clearly labelled development/test database.';
   }
 
   return null;

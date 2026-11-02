@@ -1,11 +1,17 @@
-import { DatePicker } from "@/components/ui/date-picker";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useMemo, useState, type FormEvent } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { apiFetch } from "@/lib/api";
-import { Check, ChevronsUpDown, LoaderCircle, School, X } from "lucide-react";
-import type { RecordPaymentInput } from "@schoolhub/shared";
-import { cn } from "@/lib/utils";
+import { DatePicker } from '@/components/ui/date-picker';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { useMemo, useState, type FormEvent } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { apiFetch } from '@/lib/api';
+import { Check, ChevronsUpDown, LoaderCircle, School, X } from 'lucide-react';
+import type { RecordPaymentInput } from '@schoolhub/shared';
+import { cn } from '@/lib/utils';
 
 interface PaymentStudent {
   id: string;
@@ -61,34 +67,29 @@ interface AccountantRecordPaymentDialogProps {
 }
 
 const inputClass =
-  "h-10 w-full rounded-xl border border-border bg-background px-3 text-sm text-foreground outline-none transition placeholder:text-muted-foreground focus:ring-2 focus:ring-ring/30";
+  'h-10 w-full rounded-xl border border-border bg-background px-3 text-sm text-foreground outline-none transition placeholder:text-muted-foreground focus:ring-2 focus:ring-ring/30';
 const primaryButton =
-  "inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50";
+  'inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50';
 const secondaryButton =
-  "inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-border bg-card px-4 py-2 text-sm font-semibold text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50";
+  'inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-border bg-card px-4 py-2 text-sm font-semibold text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50';
 const today = () => {
   const now = new Date();
-  return new Date(now.getTime() - now.getTimezoneOffset() * 60_000)
-    .toISOString()
-    .slice(0, 10);
+  return new Date(now.getTime() - now.getTimezoneOffset() * 60_000).toISOString().slice(0, 10);
 };
 const amount = (value: number | string) => Number(value) || 0;
 const money = (value: number) =>
-  new Intl.NumberFormat("en-GH", {
-    style: "currency",
-    currency: "GHS",
+  new Intl.NumberFormat('en-GH', {
+    style: 'currency',
+    currency: 'GHS',
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(value);
 const studentName = (student?: PaymentStudent | null) =>
-  [student?.profile?.firstName, student?.profile?.lastName]
-    .filter(Boolean)
-    .join(" ")
-    .trim() || student?.admissionNumber || "Unknown student";
+  [student?.profile?.firstName, student?.profile?.lastName].filter(Boolean).join(' ').trim() ||
+  student?.admissionNumber ||
+  'Unknown student';
 const outstanding = (bill: PaymentBill) =>
-  amount(bill.balanceAmount) > 0 &&
-  bill.status !== "CANCELLED" &&
-  bill.status !== "WAIVED";
+  amount(bill.balanceAmount) > 0 && bill.status !== 'CANCELLED' && bill.status !== 'WAIVED';
 
 function allocationsForBill(bill?: PaymentBill): AllocationDraft[] {
   return (bill?.items ?? [])
@@ -112,31 +113,31 @@ export function AccountantRecordPaymentDialog({
   onSubmit,
 }: AccountantRecordPaymentDialogProps) {
   const initialBill = bills.find((bill) => bill.id === initialBillId);
-  const [classId, setClassId] = useState("ALL");
-  const [studentId, setStudentId] = useState(initialBill?.studentId ?? "");
+  const [classId, setClassId] = useState('ALL');
+  const [studentId, setStudentId] = useState(initialBill?.studentId ?? '');
   const [studentSearch, setStudentSearch] = useState(
-    initialBill ? studentName(initialBill.student) : "",
+    initialBill ? studentName(initialBill.student) : '',
   );
   const [studentPickerOpen, setStudentPickerOpen] = useState(false);
-  const [billId, setBillId] = useState(initialBill?.id ?? "");
+  const [billId, setBillId] = useState(initialBill?.id ?? '');
   const [allocations, setAllocations] = useState<AllocationDraft[]>(
     allocationsForBill(initialBill),
   );
-  const [paymentMethod, setPaymentMethod] =
-    useState<RecordPaymentInput["paymentMethod"]>("CASH");
+  const [paymentMethod, setPaymentMethod] = useState<RecordPaymentInput['paymentMethod']>('CASH');
   const [paymentDate, setPaymentDate] = useState(today);
-  const [referenceNumber, setReferenceNumber] = useState("");
-  const [notes, setNotes] = useState("");
-  const [validationError, setValidationError] = useState("");
+  const [referenceNumber, setReferenceNumber] = useState('');
+  const [notes, setNotes] = useState('');
+  const [validationError, setValidationError] = useState('');
 
   const studentsQuery = useQuery({
-    queryKey: ["finance", "students", "outstanding"],
-    queryFn: () => apiFetch<OutstandingStudent[]>("/finance/students/outstanding"),
+    queryKey: ['finance', 'students', 'outstanding'],
+    queryFn: () => apiFetch<OutstandingStudent[]>('/finance/students/outstanding'),
     retry: false,
   });
   const studentBillsQuery = useQuery({
-    queryKey: ["finance", "bills", "student", studentId],
-    queryFn: () => apiFetch<PaymentBill[]>("/finance/bills?studentId=" + encodeURIComponent(studentId)),
+    queryKey: ['finance', 'bills', 'student', studentId],
+    queryFn: () =>
+      apiFetch<PaymentBill[]>('/finance/bills?studentId=' + encodeURIComponent(studentId)),
     enabled: Boolean(studentId),
     retry: false,
   });
@@ -145,7 +146,10 @@ export function AccountantRecordPaymentDialog({
   const studentOptions = useMemo(() => {
     const term = studentSearch.trim().toLowerCase();
     return allStudents
-      .filter((student) => classId === "ALL" || student.classes.some((schoolClass) => schoolClass.id === classId))
+      .filter(
+        (student) =>
+          classId === 'ALL' || student.classes.some((schoolClass) => schoolClass.id === classId),
+      )
       .filter((student) => {
         const name = studentName(student).toLowerCase();
         const admission = student.admissionNumber.toLowerCase();
@@ -157,9 +161,11 @@ export function AccountantRecordPaymentDialog({
   const selectedStudent =
     allStudents.find((student) => student.id === studentId) ??
     eligibleBills.find((bill) => bill.studentId === studentId)?.student;
-  const selectedStudentBills = (studentBillsQuery.data ?? eligibleBills.filter((bill) => bill.studentId === studentId))
+  const selectedStudentBills = (
+    studentBillsQuery.data ?? eligibleBills.filter((bill) => bill.studentId === studentId)
+  )
     .filter(outstanding)
-    .filter((bill) => classId === "ALL" || bill.class?.id === classId);
+    .filter((bill) => classId === 'ALL' || bill.class?.id === classId);
   const selectedBill = selectedStudentBills.find((bill) => bill.id === billId);
   const allocationTotal = allocations.reduce(
     (sum, item) => sum + (item.selected ? Math.round((Number(item.amount) || 0) * 100) / 100 : 0),
@@ -182,28 +188,28 @@ export function AccountantRecordPaymentDialog({
 
   function changeClass(value: string) {
     setClassId(value);
-    setStudentId("");
-    setStudentSearch("");
+    setStudentId('');
+    setStudentSearch('');
     setStudentPickerOpen(false);
-    setBillId("");
+    setBillId('');
     setAllocations([]);
-    setValidationError("");
+    setValidationError('');
   }
 
   function chooseStudent(id: string, name: string) {
     setStudentId(id);
     setStudentSearch(name);
     setStudentPickerOpen(false);
-    setBillId("");
+    setBillId('');
     setAllocations([]);
-    setValidationError("");
+    setValidationError('');
   }
 
   function chooseBill(value: string) {
     const nextBill = selectedStudentBills.find((bill) => bill.id === value);
     setBillId(value);
     setAllocations(allocationsForBill(nextBill));
-    setValidationError("");
+    setValidationError('');
   }
 
   function updateAllocation(index: number, update: Partial<AllocationDraft>) {
@@ -213,7 +219,7 @@ export function AccountantRecordPaymentDialog({
           ? {
               ...item,
               ...update,
-              ...(update.selected === false ? { amount: "0.00" } : {}),
+              ...(update.selected === false ? { amount: '0.00' } : {}),
               ...(update.selected === true && Number(item.amount) <= 0
                 ? { amount: item.balance.toFixed(2) }
                 : {}),
@@ -221,22 +227,24 @@ export function AccountantRecordPaymentDialog({
           : item,
       ),
     );
-    setValidationError("");
+    setValidationError('');
   }
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setValidationError("");
+    setValidationError('');
     if (!selectedBill || !studentId) {
-      setValidationError("Select a student and an outstanding bill.");
+      setValidationError('Select a student and an outstanding bill.');
       return;
     }
     if (!Number.isFinite(allocationTotal) || allocationTotal <= 0) {
-      setValidationError("Select at least one fee component and enter an amount greater than zero.");
+      setValidationError(
+        'Select at least one fee component and enter an amount greater than zero.',
+      );
       return;
     }
     if (allocationTotal > billBalance + 0.009) {
-      setValidationError("The allocated amount cannot exceed the bill balance.");
+      setValidationError('The allocated amount cannot exceed the bill balance.');
       return;
     }
     if (
@@ -248,11 +256,13 @@ export function AccountantRecordPaymentDialog({
             Number(item.amount) > item.balance + 0.009),
       )
     ) {
-      setValidationError("Each selected component must have an amount greater than zero and no more than its outstanding balance.");
+      setValidationError(
+        'Each selected component must have an amount greater than zero and no more than its outstanding balance.',
+      );
       return;
     }
-    if (paymentMethod !== "CASH" && !referenceNumber.trim()) {
-      setValidationError("Enter the transaction reference for this payment method.");
+    if (paymentMethod !== 'CASH' && !referenceNumber.trim()) {
+      setValidationError('Enter the transaction reference for this payment method.');
       return;
     }
 
@@ -311,19 +321,33 @@ export function AccountantRecordPaymentDialog({
 
         <form onSubmit={submit} className="space-y-5">
           {(errorMessage || validationError) && (
-            <div role="alert" className="rounded-xl border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+            <div
+              role="alert"
+              className="rounded-xl border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive"
+            >
               {validationError || errorMessage}
             </div>
           )}
 
           <div className="grid gap-4 sm:grid-cols-2">
             <label className="grid gap-1.5 text-sm font-medium text-foreground">
-              <span className="flex items-center gap-2"><School className="size-4 text-muted-foreground" />Class</span>
+              <span className="flex items-center gap-2">
+                <School className="size-4 text-muted-foreground" />
+                Class
+              </span>
               <Select value={classId} onValueChange={changeClass}>
-                <SelectTrigger aria-label="Class" className={inputClass}><SelectValue /></SelectTrigger>
+                <SelectTrigger aria-label="Class" className={inputClass}>
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="ALL">All classes</SelectItem>
-                  {classes.filter((schoolClass) => schoolClass.isActive).map((schoolClass) => <SelectItem key={schoolClass.id} value={schoolClass.id}>{schoolClass.name}</SelectItem>)}
+                  {classes
+                    .filter((schoolClass) => schoolClass.isActive)
+                    .map((schoolClass) => (
+                      <SelectItem key={schoolClass.id} value={schoolClass.id}>
+                        {schoolClass.name}
+                      </SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
             </label>
@@ -333,7 +357,7 @@ export function AccountantRecordPaymentDialog({
               <div className="relative">
                 <input
                   id="payment-student-search"
-                  className={cn(inputClass, "pr-10")}
+                  className={cn(inputClass, 'pr-10')}
                   value={studentSearch}
                   onFocus={() => setStudentPickerOpen(true)}
                   onChange={(event) => {
@@ -341,8 +365,8 @@ export function AccountantRecordPaymentDialog({
                     setStudentSearch(value);
                     setStudentPickerOpen(true);
                     if (studentId && value !== studentName(selectedStudent)) {
-                      setStudentId("");
-                      setBillId("");
+                      setStudentId('');
+                      setBillId('');
                       setAllocations([]);
                     }
                   }}
@@ -361,30 +385,45 @@ export function AccountantRecordPaymentDialog({
                   className="absolute left-0 right-0 top-[4.7rem] z-30 max-h-60 overflow-y-auto rounded-xl border border-border bg-popover p-1.5 text-popover-foreground shadow-xl"
                 >
                   {studentsQuery.isPending ? (
-                    <p className="px-3 py-6 text-center text-sm text-muted-foreground">Loading students with outstanding bills…</p>
-                  ) : studentsQuery.error ? (
-                    <p role="alert" className="px-3 py-6 text-center text-sm text-destructive">{studentsQuery.error.message}</p>
-                  ) : studentOptions.length ? studentOptions.map((student) => (
-                    <button
-                      key={student.id}
-                      type="button"
-                      role="option"
-                      aria-selected={studentId === student.id}
-                      className="flex w-full items-start justify-between gap-3 rounded-lg px-3 py-2 text-left hover:bg-muted"
-                      onMouseDown={(event) => event.preventDefault()}
-                      onClick={() => chooseStudent(student.id, studentName(student))}
-                    >
-                      <span className="min-w-0">
-                        <span className="block truncate text-sm font-medium">{studentName(student)}</span>
-                        <span className="mt-0.5 block text-xs text-muted-foreground">
-                          {student.admissionNumber} · {student.classes.map((schoolClass) => schoolClass.name).join(", ") || "No class"} · Outstanding {money(amount(student.outstandingBalance))}
-                        </span>
-                      </span>
-                      {studentId === student.id && <Check className="mt-1 size-4 shrink-0 text-primary" />}
-                    </button>
-                  )) : (
                     <p className="px-3 py-6 text-center text-sm text-muted-foreground">
-                      {allStudents.length ? "No students match this search and class." : "No students with outstanding bills were found."}
+                      Loading students with outstanding bills…
+                    </p>
+                  ) : studentsQuery.error ? (
+                    <p role="alert" className="px-3 py-6 text-center text-sm text-destructive">
+                      {studentsQuery.error.message}
+                    </p>
+                  ) : studentOptions.length ? (
+                    studentOptions.map((student) => (
+                      <button
+                        key={student.id}
+                        type="button"
+                        role="option"
+                        aria-selected={studentId === student.id}
+                        className="flex w-full items-start justify-between gap-3 rounded-lg px-3 py-2 text-left hover:bg-muted"
+                        onMouseDown={(event) => event.preventDefault()}
+                        onClick={() => chooseStudent(student.id, studentName(student))}
+                      >
+                        <span className="min-w-0">
+                          <span className="block truncate text-sm font-medium">
+                            {studentName(student)}
+                          </span>
+                          <span className="mt-0.5 block text-xs text-muted-foreground">
+                            {student.admissionNumber} ·{' '}
+                            {student.classes.map((schoolClass) => schoolClass.name).join(', ') ||
+                              'No class'}{' '}
+                            · Outstanding {money(amount(student.outstandingBalance))}
+                          </span>
+                        </span>
+                        {studentId === student.id && (
+                          <Check className="mt-1 size-4 shrink-0 text-primary" />
+                        )}
+                      </button>
+                    ))
+                  ) : (
+                    <p className="px-3 py-6 text-center text-sm text-muted-foreground">
+                      {allStudents.length
+                        ? 'No students match this search and class.'
+                        : 'No students with outstanding bills were found.'}
                     </p>
                   )}
                   <button
@@ -402,11 +441,33 @@ export function AccountantRecordPaymentDialog({
 
           <label className="grid gap-1.5 text-sm font-medium text-foreground">
             <span>Bill to pay</span>
-            <Select value={billId || "__none__"} onValueChange={(value) => chooseBill(value === "__none__" ? "" : value)} disabled={!studentId || studentBillsQuery.isPending || !selectedStudentBills.length} required>
-              <SelectTrigger aria-label="Bill to pay" className={inputClass}><SelectValue placeholder={studentBillsQuery.isPending ? "Loading outstanding bills…" : "Select an outstanding bill…"} /></SelectTrigger>
+            <Select
+              value={billId || '__none__'}
+              onValueChange={(value) => chooseBill(value === '__none__' ? '' : value)}
+              disabled={!studentId || studentBillsQuery.isPending || !selectedStudentBills.length}
+              required
+            >
+              <SelectTrigger aria-label="Bill to pay" className={inputClass}>
+                <SelectValue
+                  placeholder={
+                    studentBillsQuery.isPending
+                      ? 'Loading outstanding bills…'
+                      : 'Select an outstanding bill…'
+                  }
+                />
+              </SelectTrigger>
               <SelectContent>
-                <SelectItem value="__none__" disabled>{studentBillsQuery.isPending ? "Loading outstanding bills…" : "Select an outstanding bill…"}</SelectItem>
-                {selectedStudentBills.map((bill) => <SelectItem key={bill.id} value={bill.id}>{bill.feeStructure?.name || bill.billNumber} ({bill.billNumber}) · Balance {money(amount(bill.balanceAmount))}</SelectItem>)}
+                <SelectItem value="__none__" disabled>
+                  {studentBillsQuery.isPending
+                    ? 'Loading outstanding bills…'
+                    : 'Select an outstanding bill…'}
+                </SelectItem>
+                {selectedStudentBills.map((bill) => (
+                  <SelectItem key={bill.id} value={bill.id}>
+                    {bill.feeStructure?.name || bill.billNumber} ({bill.billNumber}) · Balance{' '}
+                    {money(amount(bill.balanceAmount))}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </label>
@@ -422,7 +483,8 @@ export function AccountantRecordPaymentDialog({
                 <div>
                   <h3 className="text-sm font-semibold">Payment distribution</h3>
                   <p className="mt-1 text-xs text-muted-foreground">
-                    Choose the components to pay. Each amount is capped at that component’s outstanding balance.
+                    Choose the components to pay. Each amount is capped at that component’s
+                    outstanding balance.
                   </p>
                 </div>
                 <span className="rounded-full border border-border px-2.5 py-1 text-xs font-semibold">
@@ -433,13 +495,18 @@ export function AccountantRecordPaymentDialog({
               {allocations.length ? (
                 <div className="mt-4 space-y-2">
                   {allocations.map((item, index) => (
-                    <div key={item.billItemId} className="grid gap-3 rounded-xl border border-border bg-card p-3 sm:grid-cols-[minmax(0,1fr)_150px] sm:items-center">
+                    <div
+                      key={item.billItemId}
+                      className="grid gap-3 rounded-xl border border-border bg-card p-3 sm:grid-cols-[minmax(0,1fr)_150px] sm:items-center"
+                    >
                       <label className="flex min-w-0 items-start gap-3">
                         <input
                           type="checkbox"
                           className="mt-1 size-4 accent-primary"
                           checked={item.selected}
-                          onChange={(event) => updateAllocation(index, { selected: event.target.checked })}
+                          onChange={(event) =>
+                            updateAllocation(index, { selected: event.target.checked })
+                          }
                         />
                         <span className="min-w-0">
                           <span className="block text-sm font-medium">{item.description}</span>
@@ -452,13 +519,15 @@ export function AccountantRecordPaymentDialog({
                         Amount (GHS)
                         <input
                           type="number"
-                          className={cn(inputClass, "text-right tabular-nums")}
+                          className={cn(inputClass, 'text-right tabular-nums')}
                           min="0.01"
                           max={item.balance}
                           step="0.01"
                           value={item.amount}
                           disabled={!item.selected}
-                          onChange={(event) => updateAllocation(index, { amount: event.target.value })}
+                          onChange={(event) =>
+                            updateAllocation(index, { amount: event.target.value })
+                          }
                           aria-label={`Amount for ${item.description}`}
                         />
                       </label>
@@ -467,16 +536,21 @@ export function AccountantRecordPaymentDialog({
                 </div>
               ) : (
                 <p className="mt-4 rounded-xl border border-dashed border-border p-4 text-sm text-muted-foreground">
-                  This bill has no outstanding itemised components. Review the bill details before recording a payment.
+                  This bill has no outstanding itemised components. Review the bill details before
+                  recording a payment.
                 </p>
               )}
 
               <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
                 <span className="text-sm font-medium text-muted-foreground">Total payment</span>
-                <span className="text-xl font-bold tabular-nums text-foreground">{money(allocationTotal)}</span>
+                <span className="text-xl font-bold tabular-nums text-foreground">
+                  {money(allocationTotal)}
+                </span>
               </div>
               {allocationTotal > billBalance + 0.009 && (
-                <p className="mt-2 text-xs text-destructive">The total allocation exceeds the outstanding bill balance.</p>
+                <p className="mt-2 text-xs text-destructive">
+                  The total allocation exceeds the outstanding bill balance.
+                </p>
               )}
             </section>
           )}
@@ -484,23 +558,52 @@ export function AccountantRecordPaymentDialog({
           <div className="grid gap-4 sm:grid-cols-2">
             <label className="grid gap-1.5 text-sm font-medium text-foreground">
               <span>Payment method</span>
-              <Select value={paymentMethod} onValueChange={(value) => setPaymentMethod(value as RecordPaymentInput["paymentMethod"])}>
-                <SelectTrigger aria-label="Payment method" className={inputClass}><SelectValue /></SelectTrigger>
-                <SelectContent>{["CASH", "BANK_TRANSFER", "MOBILE_MONEY", "CHEQUE", "CARD", "ONLINE", "OTHER"].map((method) => <SelectItem key={method} value={method}>{method.replaceAll("_", " ")}</SelectItem>)}</SelectContent>
+              <Select
+                value={paymentMethod}
+                onValueChange={(value) =>
+                  setPaymentMethod(value as RecordPaymentInput['paymentMethod'])
+                }
+              >
+                <SelectTrigger aria-label="Payment method" className={inputClass}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {[
+                    'CASH',
+                    'BANK_TRANSFER',
+                    'MOBILE_MONEY',
+                    'CHEQUE',
+                    'CARD',
+                    'ONLINE',
+                    'OTHER',
+                  ].map((method) => (
+                    <SelectItem key={method} value={method}>
+                      {method.replaceAll('_', ' ')}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
               </Select>
             </label>
             <label className="grid gap-1.5 text-sm font-medium text-foreground">
               <span>Payment date</span>
-              <DatePicker buttonClassName={inputClass} required value={paymentDate} onChange={(value) => setPaymentDate(value)} />
+              <DatePicker
+                buttonClassName={inputClass}
+                required
+                value={paymentDate}
+                onChange={(value) => setPaymentDate(value)}
+              />
             </label>
             <label className="grid gap-1.5 text-sm font-medium text-foreground sm:col-span-2">
-              <span>Reference number {paymentMethod !== "CASH" && <span className="text-destructive">*</span>}</span>
+              <span>
+                Reference number{' '}
+                {paymentMethod !== 'CASH' && <span className="text-destructive">*</span>}
+              </span>
               <input
                 className={inputClass}
                 value={referenceNumber}
                 onChange={(event) => setReferenceNumber(event.target.value)}
                 placeholder="Bank / Mobile Money transaction reference"
-                required={paymentMethod !== "CASH"}
+                required={paymentMethod !== 'CASH'}
               />
             </label>
           </div>
@@ -508,7 +611,7 @@ export function AccountantRecordPaymentDialog({
           <label className="grid gap-1.5 text-sm font-medium text-foreground">
             <span>Notes (optional)</span>
             <textarea
-              className={cn(inputClass, "h-20 py-2")}
+              className={cn(inputClass, 'h-20 py-2')}
               value={notes}
               onChange={(event) => setNotes(event.target.value)}
               placeholder="Additional receipt notes"
@@ -516,8 +619,24 @@ export function AccountantRecordPaymentDialog({
           </label>
 
           <div className="flex justify-end gap-2 border-t border-border pt-4">
-            <button type="button" className={secondaryButton} onClick={onClose} disabled={isSubmitting}>Cancel</button>
-            <button type="submit" className={primaryButton} disabled={isSubmitting || !selectedBill || invalidAllocations || (paymentMethod !== "CASH" && !referenceNumber.trim())}>
+            <button
+              type="button"
+              className={secondaryButton}
+              onClick={onClose}
+              disabled={isSubmitting}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className={primaryButton}
+              disabled={
+                isSubmitting ||
+                !selectedBill ||
+                invalidAllocations ||
+                (paymentMethod !== 'CASH' && !referenceNumber.trim())
+              }
+            >
               {isSubmitting && <LoaderCircle className="size-4 animate-spin" />}
               Save payment
             </button>

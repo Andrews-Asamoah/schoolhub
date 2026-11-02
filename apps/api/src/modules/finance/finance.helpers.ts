@@ -19,28 +19,30 @@ export function createSequence(existing: ReadonlyArray<string | null>, prefix: s
   return {
     next(): string {
       highest += 1;
-      return prefix + String(highest).padStart(width, "0");
+      return prefix + String(highest).padStart(width, '0');
     },
   };
 }
 
 /** True for PostgreSQL serialization failures / deadlocks surfaced by Prisma. */
 export function isSerializationFailure(error: unknown): boolean {
-  if (!error || typeof error !== "object") return false;
+  if (!error || typeof error !== 'object') return false;
   const err = error as { code?: unknown; meta?: { code?: unknown }; message?: unknown };
-  if (err.code === "P2034") return true;
-  if (err.meta?.code === "40001" || err.meta?.code === "40P01") return true;
-  const message = typeof err.message === "string" ? err.message : "";
+  if (err.code === 'P2034') return true;
+  if (err.meta?.code === '40001' || err.meta?.code === '40P01') return true;
+  const message = typeof err.message === 'string' ? err.message : '';
   return /could not serialize access|serialization failure|deadlock detected/i.test(message);
 }
 
 /** True when a unique-index violation was on the payment idempotency key (a duplicate request racing itself). */
 export function isIdempotencyRace(error: unknown): boolean {
-  if (!error || typeof error !== "object") return false;
+  if (!error || typeof error !== 'object') return false;
   const err = error as { code?: unknown; meta?: { target?: unknown }; message?: unknown };
-  if (err.code !== "P2002") return false;
-  const target = Array.isArray(err.meta?.target) ? err.meta!.target.join(",") : String(err.meta?.target ?? "");
-  const message = typeof err.message === "string" ? err.message : "";
+  if (err.code !== 'P2002') return false;
+  const target = Array.isArray(err.meta?.target)
+    ? err.meta!.target.join(',')
+    : String(err.meta?.target ?? '');
+  const message = typeof err.message === 'string' ? err.message : '';
   return /idempotencyKey/i.test(target) || /idempotencyKey/i.test(message);
 }
 
@@ -51,7 +53,12 @@ export function isIdempotencyRace(error: unknown): boolean {
  */
 export async function withSerializableRetry<T>(
   run: () => Promise<T>,
-  options: { attempts?: number; baseDelayMs?: number; retryIf?: (error: unknown) => boolean; onExhausted?: (cause: unknown) => Error } = {},
+  options: {
+    attempts?: number;
+    baseDelayMs?: number;
+    retryIf?: (error: unknown) => boolean;
+    onExhausted?: (cause: unknown) => Error;
+  } = {},
 ): Promise<T> {
   const attempts = options.attempts ?? 4;
   const baseDelayMs = options.baseDelayMs ?? 25;
@@ -79,10 +86,14 @@ const isoDay = (date: Date) => date.toISOString().slice(0, 10);
  * - in the future (one day of slack for time zones)
  * - on or before the date the books were closed through
  */
-export function postingDateProblem(date: Date, lockedThrough: Date | null, now: Date = new Date()): string | null {
-  if (Number.isNaN(date.getTime())) return "Enter a valid date.";
+export function postingDateProblem(
+  date: Date,
+  lockedThrough: Date | null,
+  now: Date = new Date(),
+): string | null {
+  if (Number.isNaN(date.getTime())) return 'Enter a valid date.';
   const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
-  if (isoDay(date) > isoDay(tomorrow)) return "Transactions cannot be dated in the future.";
+  if (isoDay(date) > isoDay(tomorrow)) return 'Transactions cannot be dated in the future.';
   if (lockedThrough && isoDay(date) <= isoDay(lockedThrough)) {
     return `The books are closed through ${isoDay(lockedThrough)}. Use a later date, or ask for the period to be reopened.`;
   }

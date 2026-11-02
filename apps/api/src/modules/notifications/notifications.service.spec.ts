@@ -1,6 +1,6 @@
-import { NotFoundException } from "@nestjs/common";
-import { describe, expect, it, vi } from "vitest";
-import { NotificationsService } from "./notifications.service.js";
+import { NotFoundException } from '@nestjs/common';
+import { describe, expect, it, vi } from 'vitest';
+import { NotificationsService } from './notifications.service.js';
 
 function buildService() {
   const client = {
@@ -14,28 +14,28 @@ function buildService() {
   return { service: new NotificationsService({ client } as never), client };
 }
 
-describe("NotificationsService history", () => {
-  it("applies school/user, read state, search and pagination to history queries", async () => {
+describe('NotificationsService history', () => {
+  it('applies school/user, read state, search and pagination to history queries', async () => {
     const { service, client } = buildService();
 
-    const result = await service.listHistory("school-a", "user-a", {
-      search: " fee reminder ",
-      status: "UNREAD",
-      page: "2",
-      limit: "10",
+    const result = await service.listHistory('school-a', 'user-a', {
+      search: ' fee reminder ',
+      status: 'UNREAD',
+      page: '2',
+      limit: '10',
     });
 
     expect(client.notification.findMany).toHaveBeenCalledWith({
       where: {
-        schoolId: "school-a",
-        userId: "user-a",
+        schoolId: 'school-a',
+        userId: 'user-a',
         isRead: false,
         OR: [
-          { title: { contains: "fee reminder", mode: "insensitive" } },
-          { message: { contains: "fee reminder", mode: "insensitive" } },
+          { title: { contains: 'fee reminder', mode: 'insensitive' } },
+          { message: { contains: 'fee reminder', mode: 'insensitive' } },
         ],
       },
-      orderBy: { createdAt: "desc" },
+      orderBy: { createdAt: 'desc' },
       skip: 10,
       take: 10,
     });
@@ -52,15 +52,21 @@ describe("NotificationsService history", () => {
   it("does not allow a user to mark another user's notification as read", async () => {
     const { service, client } = buildService();
 
-    await expect(service.markRead("school-a", "user-a", "notification-from-user-b"))
-      .rejects.toBeInstanceOf(NotFoundException);
+    await expect(
+      service.markRead('school-a', 'user-a', 'notification-from-user-b'),
+    ).rejects.toBeInstanceOf(NotFoundException);
 
     expect(client.notification.updateMany).toHaveBeenCalledWith({
-      where: { id: "notification-from-user-b", schoolId: "school-a", userId: "user-a", isRead: false },
+      where: {
+        id: 'notification-from-user-b',
+        schoolId: 'school-a',
+        userId: 'user-a',
+        isRead: false,
+      },
       data: { isRead: true },
     });
     expect(client.notification.findFirst).toHaveBeenCalledWith({
-      where: { id: "notification-from-user-b", schoolId: "school-a", userId: "user-a" },
+      where: { id: 'notification-from-user-b', schoolId: 'school-a', userId: 'user-a' },
       select: { id: true },
     });
   });

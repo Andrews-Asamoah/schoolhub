@@ -19,7 +19,7 @@ import {
   type RowData,
   type RowSelectionState,
   type SortingState,
-} from "@tanstack/react-table";
+} from '@tanstack/react-table';
 import {
   ArrowDown,
   ArrowUp,
@@ -35,8 +35,8 @@ import {
   Printer,
   Search,
   SlidersHorizontal,
-} from "lucide-react";
-import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
+} from 'lucide-react';
+import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   Table,
   TableBody,
@@ -44,16 +44,22 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
+} from '@/components/ui/table';
 import {
   exportPdf,
   exportXlsx,
   nodeToText,
   printTable,
   type ExportTable,
-} from "@/lib/table-export";
-import { cn } from "@/lib/utils";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+} from '@/lib/table-export';
+import { cn } from '@/lib/utils';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 /** Shared native TanStack Table v9 features. The core row model is automatic. */
 const dataTableFeatures = tableFeatures({
@@ -82,14 +88,18 @@ export interface DataTableColumn<T> {
   sortable?: boolean;
 }
 
-const isActionColumn = (column: { header: string }) => !column.header.trim() || /^actions?$/i.test(column.header.trim());
+const isActionColumn = (column: { header: string }) =>
+  !column.header.trim() || /^actions?$/i.test(column.header.trim());
 
 const toExportCell = (value: string | number | null | undefined) =>
-  typeof value === "number" ? value : value == null ? "" : String(value);
+  typeof value === 'number' ? value : value == null ? '' : String(value);
 
 function compareValues(a: unknown, b: unknown) {
-  if (typeof a === "number" && typeof b === "number") return a - b;
-  return String(a ?? "").localeCompare(String(b ?? ""), undefined, { numeric: true, sensitivity: "base" });
+  if (typeof a === 'number' && typeof b === 'number') return a - b;
+  return String(a ?? '').localeCompare(String(b ?? ''), undefined, {
+    numeric: true,
+    sensitivity: 'base',
+  });
 }
 
 export interface DataTableProps<T extends RowData> {
@@ -120,9 +130,9 @@ export function DataTable<T extends RowData>({
   getRowId,
   emptyTitle,
   emptyDescription,
-  exportTitle = "Export",
+  exportTitle = 'Export',
   canExport = false,
-  searchPlaceholder = "Search…",
+  searchPlaceholder = 'Search…',
   pageSize = 10,
   compact = false,
   searchable = true,
@@ -130,7 +140,7 @@ export function DataTable<T extends RowData>({
   paginate = true,
 }: DataTableProps<T>) {
   const [sorting, setSorting] = useState<SortingState>([]);
-  const [globalFilter, setGlobalFilter] = useState("");
+  const [globalFilter, setGlobalFilter] = useState('');
   const [columnFilters] = useState<ColumnFiltersState>([]);
   const [columnVisibility, setColumnVisibility] = useState<ColumnVisibilityState>({});
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
@@ -142,18 +152,21 @@ export function DataTable<T extends RowData>({
       header: column.header,
       accessorFn: (row) => {
         const value = column.value ? column.value(row) : nodeToText(column.cell(row));
-        return value ?? "";
+        return value ?? '';
       },
       cell: ({ row }) => column.cell(row.original),
       enableSorting: column.sortable ?? !isActionColumn(column),
       enableGlobalFilter: !isActionColumn(column) || column.value !== undefined,
       sortFn: (a, b, id) => compareValues(a.getValue(id), b.getValue(id)),
-      meta: { className: column.className, exportable: column.exportable ?? !isActionColumn(column) },
+      meta: {
+        className: column.className,
+        exportable: column.exportable ?? !isActionColumn(column),
+      },
     }));
     if (!canExport) return data;
     return [
       {
-        id: "__select",
+        id: '__select',
         header: ({ table }) => (
           <input
             type="checkbox"
@@ -178,7 +191,7 @@ export function DataTable<T extends RowData>({
         enableSorting: false,
         enableHiding: false,
         enableGlobalFilter: false,
-        meta: { className: "w-10", exportable: false },
+        meta: { className: 'w-10', exportable: false },
       },
       ...data,
     ];
@@ -195,7 +208,7 @@ export function DataTable<T extends RowData>({
     onColumnVisibilityChange: setColumnVisibility,
     onRowSelectionChange: setRowSelection,
     enableRowSelection: canExport,
-    globalFilterFn: "includesString",
+    globalFilterFn: 'includesString',
     // For server-paginated parents the current rows are already the page.
     manualPagination: !paginate,
     initialState: { pagination: { pageIndex: 0, pageSize } },
@@ -211,14 +224,19 @@ export function DataTable<T extends RowData>({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rows]);
 
-  if (rows.length === 0) return <DataTableEmpty title={emptyTitle} description={emptyDescription} />;
+  if (rows.length === 0)
+    return <DataTableEmpty title={emptyTitle} description={emptyDescription} />;
 
   const filteredCount = table.getPrePaginatedRowModel().rows.length;
   const selectedCount = table.getSelectedRowModel().rows.length;
   const showToolbar = !compact;
 
   function buildExport(): ExportTable {
-    const visible = table.getVisibleLeafColumns().filter((column) => (column.columnDef.meta as { exportable?: boolean } | undefined)?.exportable);
+    const visible = table
+      .getVisibleLeafColumns()
+      .filter(
+        (column) => (column.columnDef.meta as { exportable?: boolean } | undefined)?.exportable,
+      );
     // Selected rows when any are ticked, otherwise everything matching the search, in the sorted order.
     const source: Row<typeof dataTableFeatures, T>[] = selectedCount
       ? table.getSortedRowModel().rows.filter((row) => row.getIsSelected())
@@ -226,7 +244,9 @@ export function DataTable<T extends RowData>({
     return {
       title: exportTitle,
       headers: visible.map((column) => String(column.columnDef.header)),
-      rows: source.map((row) => visible.map((column) => toExportCell(row.getValue<string | number>(column.id)))),
+      rows: source.map((row) =>
+        visible.map((column) => toExportCell(row.getValue<string | number>(column.id))),
+      ),
     };
   }
 
@@ -236,33 +256,47 @@ export function DataTable<T extends RowData>({
   const to = Math.min(filteredCount, (pageIndex + 1) * size);
 
   return (
-    <div className={cn("overflow-hidden text-card-foreground", embedded ? "border-t border-border" : "rounded-2xl border border-border bg-card shadow-sm")}>
+    <div
+      className={cn(
+        'overflow-hidden text-card-foreground',
+        embedded ? 'border-t border-border' : 'rounded-2xl border border-border bg-card shadow-sm',
+      )}
+    >
       {showToolbar && (
         <div className="flex flex-wrap items-center gap-2 border-b border-border px-4 py-3">
-          {searchable && <div className="relative min-w-[200px] max-w-xs flex-1">
-            <label htmlFor={searchId} className="sr-only">Search table</label>
-            <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-            <input
-              id={searchId}
-              value={globalFilter}
-              onChange={(event) => {
-                setGlobalFilter(event.target.value);
-                table.setPageIndex(0);
-              }}
-              placeholder={searchPlaceholder}
-              className="h-9 w-full rounded-lg border border-border bg-background pl-8 pr-3 text-xs text-foreground outline-none placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-ring/30"
-            />
-          </div>}
+          {searchable && (
+            <div className="relative min-w-[200px] max-w-xs flex-1">
+              <label htmlFor={searchId} className="sr-only">
+                Search table
+              </label>
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+              <input
+                id={searchId}
+                value={globalFilter}
+                onChange={(event) => {
+                  setGlobalFilter(event.target.value);
+                  table.setPageIndex(0);
+                }}
+                placeholder={searchPlaceholder}
+                className="h-9 w-full rounded-lg border border-border bg-background pl-8 pr-3 text-xs text-foreground outline-none placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-ring/30"
+              />
+            </div>
+          )}
           <div className="ml-auto flex items-center gap-2">
             {canExport && selectedCount > 0 && (
-              <span className="text-[11px] text-muted-foreground" role="status">{selectedCount} selected</span>
+              <span className="text-[11px] text-muted-foreground" role="status">
+                {selectedCount} selected
+              </span>
             )}
             <Menu label="Columns" icon={<SlidersHorizontal className="size-3.5" />}>
               {table
                 .getAllLeafColumns()
                 .filter((column) => column.getCanHide())
                 .map((column) => (
-                  <label key={column.id} className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-xs hover:bg-muted">
+                  <label
+                    key={column.id}
+                    className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-xs hover:bg-muted"
+                  >
                     <input
                       type="checkbox"
                       className="size-3.5 accent-primary"
@@ -278,10 +312,10 @@ export function DataTable<T extends RowData>({
                 build={buildExport}
                 note={
                   selectedCount
-                    ? `${selectedCount} selected row${selectedCount === 1 ? "" : "s"}`
+                    ? `${selectedCount} selected row${selectedCount === 1 ? '' : 's'}`
                     : paginate
-                      ? `All ${filteredCount} matching row${filteredCount === 1 ? "" : "s"}`
-                      : `Current page only · ${filteredCount} row${filteredCount === 1 ? "" : "s"}`
+                      ? `All ${filteredCount} matching row${filteredCount === 1 ? '' : 's'}`
+                      : `Current page only · ${filteredCount} row${filteredCount === 1 ? '' : 's'}`
                 }
               />
             )}
@@ -300,8 +334,10 @@ export function DataTable<T extends RowData>({
                   <TableHead
                     key={header.id}
                     scope="col"
-                    aria-sort={sorted === "asc" ? "ascending" : sorted === "desc" ? "descending" : undefined}
-                    className={cn("px-5", meta?.className)}
+                    aria-sort={
+                      sorted === 'asc' ? 'ascending' : sorted === 'desc' ? 'descending' : undefined
+                    }
+                    className={cn('px-5', meta?.className)}
                   >
                     {header.isPlaceholder ? null : header.column.getCanSort() ? (
                       <button
@@ -310,7 +346,13 @@ export function DataTable<T extends RowData>({
                         className="-ml-1 inline-flex items-center gap-1 rounded px-1 py-0.5 uppercase tracking-wider hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                       >
                         {flexRender(header.column.columnDef.header, header.getContext())}
-                        {sorted === "asc" ? <ArrowUp className="size-3" /> : sorted === "desc" ? <ArrowDown className="size-3" /> : <ArrowUpDown className="size-3 opacity-50" />}
+                        {sorted === 'asc' ? (
+                          <ArrowUp className="size-3" />
+                        ) : sorted === 'desc' ? (
+                          <ArrowDown className="size-3" />
+                        ) : (
+                          <ArrowUpDown className="size-3 opacity-50" />
+                        )}
                       </button>
                     ) : (
                       flexRender(header.column.columnDef.header, header.getContext())
@@ -324,11 +366,11 @@ export function DataTable<T extends RowData>({
         <TableBody>
           {table.getRowModel().rows.length ? (
             table.getRowModel().rows.map((row) => (
-              <TableRow key={row.id} data-state={row.getIsSelected() ? "selected" : undefined}>
+              <TableRow key={row.id} data-state={row.getIsSelected() ? 'selected' : undefined}>
                 {row.getVisibleCells().map((cell) => {
                   const meta = cell.column.columnDef.meta as { className?: string } | undefined;
                   return (
-                    <TableCell key={cell.id} className={cn("px-5 py-3.5", meta?.className)}>
+                    <TableCell key={cell.id} className={cn('px-5 py-3.5', meta?.className)}>
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </TableCell>
                   );
@@ -337,7 +379,10 @@ export function DataTable<T extends RowData>({
             ))
           ) : (
             <TableRow className="hover:bg-transparent">
-              <TableCell colSpan={table.getVisibleLeafColumns().length} className="h-24 text-center text-muted-foreground">
+              <TableCell
+                colSpan={table.getVisibleLeafColumns().length}
+                className="h-24 text-center text-muted-foreground"
+              >
                 No rows match “{globalFilter}”.
               </TableCell>
             </TableRow>
@@ -348,27 +393,63 @@ export function DataTable<T extends RowData>({
       {!compact && paginate && (
         <div className="flex min-w-0 flex-wrap items-center justify-between gap-3 border-t border-border px-4 py-3 text-[11px] text-muted-foreground">
           <span role="status" aria-live="polite" aria-atomic="true">
-            {filteredCount === 0 ? "0 rows" : `${from}–${to} of ${filteredCount}`}
+            {filteredCount === 0 ? '0 rows' : `${from}–${to} of ${filteredCount}`}
             {filteredCount !== rows.length && ` (filtered from ${rows.length})`}
           </span>
           <div className="flex min-w-0 flex-wrap items-center gap-3">
             <div className="flex items-center gap-2">
               <span id={`${searchId}-page-size-label`}>Rows per page</span>
-              <Select value={String(size)} onValueChange={(value) => table.setPageSize(Number(value))}>
-                <SelectTrigger aria-labelledby={`${searchId}-page-size-label`} className="h-8 w-[76px] px-2 text-xs">
+              <Select
+                value={String(size)}
+                onValueChange={(value) => table.setPageSize(Number(value))}
+              >
+                <SelectTrigger
+                  aria-labelledby={`${searchId}-page-size-label`}
+                  className="h-8 w-[76px] px-2 text-xs"
+                >
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent align="end">
-                  {[10, 25, 50, 100].map((option) => <SelectItem key={option} value={String(option)}>{option}</SelectItem>)}
+                  {[10, 25, 50, 100].map((option) => (
+                    <SelectItem key={option} value={String(option)}>
+                      {option}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
-            <span>Page {pageIndex + 1} of {Math.max(1, table.getPageCount())}</span>
+            <span>
+              Page {pageIndex + 1} of {Math.max(1, table.getPageCount())}
+            </span>
             <div className="flex gap-1">
-              <PagerButton label="First page" disabled={!table.getCanPreviousPage()} onClick={() => table.setPageIndex(0)}><ChevronsLeft className="size-3.5" /></PagerButton>
-              <PagerButton label="Previous page" disabled={!table.getCanPreviousPage()} onClick={() => table.previousPage()}><ChevronLeft className="size-3.5" /></PagerButton>
-              <PagerButton label="Next page" disabled={!table.getCanNextPage()} onClick={() => table.nextPage()}><ChevronRight className="size-3.5" /></PagerButton>
-              <PagerButton label="Last page" disabled={!table.getCanNextPage()} onClick={() => table.setPageIndex(table.getPageCount() - 1)}><ChevronsRight className="size-3.5" /></PagerButton>
+              <PagerButton
+                label="First page"
+                disabled={!table.getCanPreviousPage()}
+                onClick={() => table.setPageIndex(0)}
+              >
+                <ChevronsLeft className="size-3.5" />
+              </PagerButton>
+              <PagerButton
+                label="Previous page"
+                disabled={!table.getCanPreviousPage()}
+                onClick={() => table.previousPage()}
+              >
+                <ChevronLeft className="size-3.5" />
+              </PagerButton>
+              <PagerButton
+                label="Next page"
+                disabled={!table.getCanNextPage()}
+                onClick={() => table.nextPage()}
+              >
+                <ChevronRight className="size-3.5" />
+              </PagerButton>
+              <PagerButton
+                label="Last page"
+                disabled={!table.getCanNextPage()}
+                onClick={() => table.setPageIndex(table.getPageCount() - 1)}
+              >
+                <ChevronsRight className="size-3.5" />
+              </PagerButton>
             </div>
           </div>
         </div>
@@ -381,10 +462,23 @@ export function DataTable<T extends RowData>({
 export function TableExportMenu({ build, note }: { build: () => ExportTable; note?: string }) {
   return (
     <Menu label="Export" icon={<Download className="size-3.5" />}>
-      <MenuButton icon={<Printer className="size-3.5" />} onClick={() => printTable(build())}>Print</MenuButton>
-      <MenuButton icon={<FileSpreadsheet className="size-3.5" />} onClick={() => void exportXlsx(build())}>Export Excel</MenuButton>
-      <MenuButton icon={<FileText className="size-3.5" />} onClick={() => void exportPdf(build())}>Export PDF</MenuButton>
-      {note && <p className="border-t border-border px-2 pb-1 pt-2 text-[10px] text-muted-foreground">{note}</p>}
+      <MenuButton icon={<Printer className="size-3.5" />} onClick={() => printTable(build())}>
+        Print
+      </MenuButton>
+      <MenuButton
+        icon={<FileSpreadsheet className="size-3.5" />}
+        onClick={() => void exportXlsx(build())}
+      >
+        Export Excel
+      </MenuButton>
+      <MenuButton icon={<FileText className="size-3.5" />} onClick={() => void exportPdf(build())}>
+        Export PDF
+      </MenuButton>
+      {note && (
+        <p className="border-t border-border px-2 pb-1 pt-2 text-[10px] text-muted-foreground">
+          {note}
+        </p>
+      )}
     </Menu>
   );
 }
@@ -401,7 +495,17 @@ export function DataTableEmpty({ title, description }: { title: string; descript
   );
 }
 
-function PagerButton({ label, disabled, onClick, children }: { label: string; disabled: boolean; onClick: () => void; children: ReactNode }) {
+function PagerButton({
+  label,
+  disabled,
+  onClick,
+  children,
+}: {
+  label: string;
+  disabled: boolean;
+  onClick: () => void;
+  children: ReactNode;
+}) {
   return (
     <button
       type="button"
@@ -422,16 +526,16 @@ function Menu({ label, icon, children }: { label: string; icon: ReactNode; child
     if (!open) return;
     const close = (event: MouseEvent | KeyboardEvent) => {
       if (event instanceof KeyboardEvent) {
-        if (event.key === "Escape") setOpen(false);
+        if (event.key === 'Escape') setOpen(false);
       } else if (ref.current && !ref.current.contains(event.target as Node)) {
         setOpen(false);
       }
     };
-    document.addEventListener("mousedown", close);
-    document.addEventListener("keydown", close);
+    document.addEventListener('mousedown', close);
+    document.addEventListener('keydown', close);
     return () => {
-      document.removeEventListener("mousedown", close);
-      document.removeEventListener("keydown", close);
+      document.removeEventListener('mousedown', close);
+      document.removeEventListener('keydown', close);
     };
   }, [open]);
   return (
@@ -446,9 +550,13 @@ function Menu({ label, icon, children }: { label: string; icon: ReactNode; child
         {icon} {label}
       </button>
       {open && (
-        <div role="menu" className="absolute right-0 z-20 mt-1 min-w-48 rounded-xl border border-border bg-popover p-1 text-popover-foreground shadow-lg" onClick={(event) => {
-          if ((event.target as HTMLElement).closest("[data-menu-close]")) setOpen(false);
-        }}>
+        <div
+          role="menu"
+          className="absolute right-0 z-20 mt-1 min-w-48 rounded-xl border border-border bg-popover p-1 text-popover-foreground shadow-lg"
+          onClick={(event) => {
+            if ((event.target as HTMLElement).closest('[data-menu-close]')) setOpen(false);
+          }}
+        >
           {children}
         </div>
       )}
@@ -456,9 +564,23 @@ function Menu({ label, icon, children }: { label: string; icon: ReactNode; child
   );
 }
 
-function MenuButton({ icon, onClick, children }: { icon: ReactNode; onClick: () => void; children: ReactNode }) {
+function MenuButton({
+  icon,
+  onClick,
+  children,
+}: {
+  icon: ReactNode;
+  onClick: () => void;
+  children: ReactNode;
+}) {
   return (
-    <button type="button" role="menuitem" data-menu-close onClick={onClick} className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs hover:bg-muted">
+    <button
+      type="button"
+      role="menuitem"
+      data-menu-close
+      onClick={onClick}
+      className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs hover:bg-muted"
+    >
       {icon} {children}
     </button>
   );

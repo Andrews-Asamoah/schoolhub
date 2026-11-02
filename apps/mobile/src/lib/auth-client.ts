@@ -1,7 +1,11 @@
-import { createAuthClient } from "better-auth/react";
-import { inferAdditionalFields, organizationClient, twoFactorClient } from "better-auth/client/plugins";
-import { API_ORIGIN, AUTH_BASE_PATH } from "./config";
-import { getToken, setToken } from "./session";
+import { createAuthClient } from 'better-auth/react';
+import {
+  inferAdditionalFields,
+  organizationClient,
+  twoFactorClient,
+} from 'better-auth/client/plugins';
+import { API_ORIGIN, AUTH_BASE_PATH } from './config';
+import { getToken, setToken } from './session';
 
 /**
  * Better Auth client for native.
@@ -20,15 +24,15 @@ export const authClient = createAuthClient({
     twoFactorClient(),
     inferAdditionalFields({
       user: {
-        mustChangePassword: { type: "boolean", required: false },
-        twoFactorEnabled: { type: "boolean", required: false },
+        mustChangePassword: { type: 'boolean', required: false },
+        twoFactorEnabled: { type: 'boolean', required: false },
       },
     }),
   ],
   fetchOptions: {
-    auth: { type: "Bearer", token: () => getToken() ?? "" },
+    auth: { type: 'Bearer', token: () => getToken() ?? '' },
     onSuccess: async (ctx) => {
-      const token = ctx.response.headers.get("set-auth-token");
+      const token = ctx.response.headers.get('set-auth-token');
       if (token) await setToken(token);
     },
   },

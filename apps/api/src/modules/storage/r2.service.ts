@@ -3,10 +3,10 @@ import {
   HeadBucketCommand,
   PutObjectCommand,
   S3Client,
-} from "@aws-sdk/client-s3";
-import { Injectable, Logger, ServiceUnavailableException } from "@nestjs/common";
-import { randomUUID } from "node:crypto";
-import { env } from "../../env.js";
+} from '@aws-sdk/client-s3';
+import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
+import { randomUUID } from 'node:crypto';
+import { env } from '../../env.js';
 
 /**
  * Cloudflare R2 (S3-compatible) object storage.
@@ -20,28 +20,25 @@ export class R2Service {
   private readonly logger = new Logger(R2Service.name);
   private client: S3Client | null = null;
 
-  private readonly publicBase = env.R2_PUBLIC_URL?.replace(/\/+$/, "");
+  private readonly publicBase = env.R2_PUBLIC_URL?.replace(/\/+$/, '');
 
   get isConfigured(): boolean {
     return Boolean(
       env.R2_ACCOUNT_ID &&
-        env.R2_ACCESS_KEY_ID &&
-        env.R2_SECRET_ACCESS_KEY &&
-        env.R2_BUCKET_NAME &&
-        this.publicBase,
+      env.R2_ACCESS_KEY_ID &&
+      env.R2_SECRET_ACCESS_KEY &&
+      env.R2_BUCKET_NAME &&
+      this.publicBase,
     );
   }
 
   private getClient(): S3Client {
     if (!this.isConfigured) {
-      throw new ServiceUnavailableException(
-        "File storage is not configured on this server.",
-      );
+      throw new ServiceUnavailableException('File storage is not configured on this server.');
     }
     this.client ??= new S3Client({
-      region: "auto",
-      endpoint:
-        env.R2_ENDPOINT ?? `https://${env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+      region: 'auto',
+      endpoint: env.R2_ENDPOINT ?? `https://${env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
       credentials: {
         accessKeyId: env.R2_ACCESS_KEY_ID!,
         secretAccessKey: env.R2_SECRET_ACCESS_KEY!,
@@ -55,23 +52,22 @@ export class R2Service {
    * Bound the request so a slow provider cannot hold the health endpoint open.
    */
   async checkHealth(): Promise<
-    | { status: "healthy"; latencyMs: number }
-    | { status: "not_configured" | "unavailable"; latencyMs: null }
+    | { status: 'healthy'; latencyMs: number }
+    | { status: 'not_configured' | 'unavailable'; latencyMs: null }
   > {
     if (!this.isConfigured) {
-      return { status: "not_configured", latencyMs: null };
+      return { status: 'not_configured', latencyMs: null };
     }
 
     const startedAt = Date.now();
     try {
-      await this.getClient().send(
-        new HeadBucketCommand({ Bucket: env.R2_BUCKET_NAME }),
-        { abortSignal: AbortSignal.timeout(3_000) },
-      );
-      return { status: "healthy", latencyMs: Date.now() - startedAt };
+      await this.getClient().send(new HeadBucketCommand({ Bucket: env.R2_BUCKET_NAME }), {
+        abortSignal: AbortSignal.timeout(3_000),
+      });
+      return { status: 'healthy', latencyMs: Date.now() - startedAt };
     } catch {
       // Do not expose provider credentials, endpoint details, or raw SDK errors.
-      return { status: "unavailable", latencyMs: null };
+      return { status: 'unavailable', latencyMs: null };
     }
   }
 
@@ -108,7 +104,7 @@ export class R2Service {
         Body: body,
         ContentType: contentType,
         // Keys are unique per upload, so the object never changes: cache hard.
-        CacheControl: "public, max-age=31536000, immutable",
+        CacheControl: 'public, max-age=31536000, immutable',
       }),
     );
     return this.publicUrl(key);

@@ -19,17 +19,17 @@
  * Requires explicit ALLOW_DEV_RESET=true and a local or clearly labelled dev/test database.
  * Refuses to run when NODE_ENV=production or the database target appears production-labelled.
  */
-import { config } from "dotenv";
-import { resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { config } from 'dotenv';
+import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const __dirname = fileURLToPath(new URL(".", import.meta.url));
-config({ path: resolve(__dirname, "../../../.env") });
+const __dirname = fileURLToPath(new URL('.', import.meta.url));
+config({ path: resolve(__dirname, '../../../.env') });
 
-import pg from "pg";
-import { PrismaPg } from "@prisma/adapter-pg";
-import { Prisma, PrismaClient } from "@prisma/client";
-import { getDevResetSafetyError } from "../src/common/dev-reset-safety.js";
+import pg from 'pg';
+import { PrismaPg } from '@prisma/adapter-pg';
+import { Prisma, PrismaClient } from '@prisma/client';
+import { getDevResetSafetyError } from '../src/common/dev-reset-safety.js';
 
 const safetyError = getDevResetSafetyError({
   allowDevReset: process.env.ALLOW_DEV_RESET,
@@ -42,12 +42,12 @@ if (safetyError) {
 }
 
 const args = process.argv.slice(2);
-const confirmed = args.includes("--yes");
-const schoolFlag = args.indexOf("--school");
+const confirmed = args.includes('--yes');
+const schoolFlag = args.indexOf('--school');
 const subdomain = schoolFlag >= 0 ? args[schoolFlag + 1] : undefined;
 
 if (schoolFlag >= 0 && !subdomain) {
-  console.error("--school needs a subdomain, e.g. --school achimota");
+  console.error('--school needs a subdomain, e.g. --school achimota');
   process.exit(1);
 }
 
@@ -60,27 +60,37 @@ async function main() {
     select: { id: true, name: true, subdomain: true },
   });
   if (!schools.length) {
-    console.error(subdomain ? `No school with subdomain "${subdomain}".` : "No schools found.");
+    console.error(subdomain ? `No school with subdomain "${subdomain}".` : 'No schools found.');
     process.exit(1);
   }
 
   const host = (() => {
     try {
-      return new URL(process.env.DATABASE_URL ?? "").host;
+      return new URL(process.env.DATABASE_URL ?? '').host;
     } catch {
-      return "unknown";
+      return 'unknown';
     }
   })();
   console.log(`Database host: ${host}`);
-  console.log(confirmed ? "MODE: APPLY (changes will be written)\n" : "MODE: dry run (nothing will change; add --yes to apply)\n");
+  console.log(
+    confirmed
+      ? 'MODE: APPLY (changes will be written)\n'
+      : 'MODE: dry run (nothing will change; add --yes to apply)\n',
+  );
 
   for (const school of schools) {
     const [payments, ledger, bills] = await Promise.all([
       prisma.payment.count({ where: { schoolId: school.id } }),
-      prisma.transaction.count({ where: { schoolId: school.id, referenceType: { in: ["PAYMENT", "PAYMENT_REVERSAL"] } } }),
-      prisma.bill.count({ where: { schoolId: school.id, status: { notIn: ["CANCELLED", "WAIVED"] } } }),
+      prisma.transaction.count({
+        where: { schoolId: school.id, referenceType: { in: ['PAYMENT', 'PAYMENT_REVERSAL'] } },
+      }),
+      prisma.bill.count({
+        where: { schoolId: school.id, status: { notIn: ['CANCELLED', 'WAIVED'] } },
+      }),
     ]);
-    console.log(`${school.name} (${school.subdomain}): ${payments} payments, ${ledger} ledger entries, ${bills} bills to reset`);
+    console.log(
+      `${school.name} (${school.subdomain}): ${payments} payments, ${ledger} ledger entries, ${bills} bills to reset`,
+    );
     if (!confirmed) continue;
 
     await prisma.$transaction(
@@ -88,14 +98,21 @@ async function main() {
         // 1. Undo ledger balances, then remove the entries. Fee receipts raised both
         // accounts (debit cash/bank, credit revenue); reversals lowered both.
         const entries = await tx.transaction.findMany({
-          where: { schoolId: school.id, referenceType: { in: ["PAYMENT", "PAYMENT_REVERSAL"] } },
+          where: { schoolId: school.id, referenceType: { in: ['PAYMENT', 'PAYMENT_REVERSAL'] } },
         });
         for (const entry of entries) {
-          const change = entry.referenceType === "PAYMENT"
-            ? { decrement: entry.amount }
-            : { increment: entry.amount };
-          await tx.chartAccount.update({ where: { id: entry.debitAccountId }, data: { balance: change } });
-          await tx.chartAccount.update({ where: { id: entry.creditAccountId }, data: { balance: change } });
+          const change =
+            entry.referenceType === 'PAYMENT'
+              ? { decrement: entry.amount }
+              : { increment: entry.amount };
+          await tx.chartAccount.update({
+            where: { id: entry.debitAccountId },
+            data: { balance: change },
+          });
+          await tx.chartAccount.update({
+            where: { id: entry.creditAccountId },
+            data: { balance: change },
+          });
         }
 
         // Bill-level allocations are derived from saved receipts. Remove these
@@ -104,12 +121,14 @@ async function main() {
         // Payments first (their item allocations cascade).
         await tx.payment.deleteMany({ where: { schoolId: school.id } });
         if (entries.length) {
-          await tx.transaction.deleteMany({ where: { id: { in: entries.map((entry) => entry.id) } } });
+          await tx.transaction.deleteMany({
+            where: { id: { in: entries.map((entry) => entry.id) } },
+          });
         }
 
         // 3 + 4. Reset bills and rebuild each student's outstanding balance.
         const billRows = await tx.bill.findMany({
-          where: { schoolId: school.id, status: { notIn: ["CANCELLED", "WAIVED"] } },
+          where: { schoolId: school.id, status: { notIn: ['CANCELLED', 'WAIVED'] } },
           include: { items: true },
         });
         const outstanding = new Map<string, Prisma.Decimal>();
@@ -121,7 +140,7 @@ async function main() {
               data: {
                 paidAmount: new Prisma.Decimal(0),
                 balanceAmount: net,
-                status: net.lte(0) ? "FULLY_PAID" : "UNPAID",
+                status: net.lte(0) ? 'FULLY_PAID' : 'UNPAID',
               },
             });
           }
@@ -130,21 +149,30 @@ async function main() {
             data: {
               paidAmount: new Prisma.Decimal(0),
               balanceAmount: bill.totalAmount,
-              status: bill.totalAmount.lte(0) ? "PAID" : "PENDING",
+              status: bill.totalAmount.lte(0) ? 'PAID' : 'PENDING',
             },
           });
-          outstanding.set(bill.studentId, (outstanding.get(bill.studentId) ?? new Prisma.Decimal(0)).plus(bill.totalAmount));
+          outstanding.set(
+            bill.studentId,
+            (outstanding.get(bill.studentId) ?? new Prisma.Decimal(0)).plus(bill.totalAmount),
+          );
         }
-        await tx.student.updateMany({ where: { schoolId: school.id }, data: { outstandingBalance: new Prisma.Decimal(0) } });
+        await tx.student.updateMany({
+          where: { schoolId: school.id },
+          data: { outstandingBalance: new Prisma.Decimal(0) },
+        });
         for (const [studentId, amount] of outstanding) {
-          await tx.student.update({ where: { id: studentId }, data: { outstandingBalance: amount } });
+          await tx.student.update({
+            where: { id: studentId },
+            data: { outstandingBalance: amount },
+          });
         }
       },
       { timeout: 120_000, maxWait: 10_000 },
     );
     console.log(`  done: ${school.subdomain} reset.`);
   }
-  console.log(confirmed ? "\nFinished." : "\nDry run only. Re-run with --yes to apply.");
+  console.log(confirmed ? '\nFinished.' : '\nDry run only. Re-run with --yes to apply.');
 }
 
 main()

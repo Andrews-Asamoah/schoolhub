@@ -1,14 +1,10 @@
-import {
-  BadRequestException,
-  Injectable,
-  NotFoundException,
-} from "@nestjs/common";
-import { PrismaService } from "../../prisma/prisma.service.js";
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { PrismaService } from '../../prisma/prisma.service.js';
 import type {
   CreateSupportTicketInput,
   SupportTicketReplyInput,
   UpdateSupportTicketInput,
-} from "@schoolhub/shared";
+} from '@schoolhub/shared';
 
 @Injectable()
 export class SupportService {
@@ -17,7 +13,7 @@ export class SupportService {
   listSchoolTickets(schoolId: string) {
     return this.prisma.client.supportTicket.findMany({
       where: { schoolId, isInternal: false },
-      orderBy: { updatedAt: "desc" },
+      orderBy: { updatedAt: 'desc' },
       take: 100,
       include: {
         submittedBy: { select: { id: true, name: true, email: true } },
@@ -28,7 +24,7 @@ export class SupportService {
 
   listPlatformTickets() {
     return this.prisma.client.supportTicket.findMany({
-      orderBy: { updatedAt: "desc" },
+      orderBy: { updatedAt: 'desc' },
       take: 200,
       include: {
         school: { select: { id: true, name: true, code: true } },
@@ -44,12 +40,12 @@ export class SupportService {
       include: {
         submittedBy: { select: { id: true, name: true, email: true } },
         replies: {
-          orderBy: { createdAt: "asc" },
+          orderBy: { createdAt: 'asc' },
           include: { author: { select: { id: true, name: true, role: true } } },
         },
       },
     });
-    if (!ticket) throw new NotFoundException("Support ticket not found");
+    if (!ticket) throw new NotFoundException('Support ticket not found');
     return ticket;
   }
 
@@ -60,20 +56,16 @@ export class SupportService {
         school: { select: { id: true, name: true, code: true } },
         submittedBy: { select: { id: true, name: true, email: true } },
         replies: {
-          orderBy: { createdAt: "asc" },
+          orderBy: { createdAt: 'asc' },
           include: { author: { select: { id: true, name: true, role: true } } },
         },
       },
     });
-    if (!ticket) throw new NotFoundException("Support ticket not found");
+    if (!ticket) throw new NotFoundException('Support ticket not found');
     return ticket;
   }
 
-  createTicket(
-    schoolId: string,
-    submittedById: string,
-    input: CreateSupportTicketInput,
-  ) {
+  createTicket(schoolId: string, submittedById: string, input: CreateSupportTicketInput) {
     return this.prisma.client.supportTicket.create({
       data: {
         schoolId,
@@ -101,11 +93,7 @@ export class SupportService {
     return this.getSchoolTicket(schoolId, ticketId);
   }
 
-  async replyToPlatformTicket(
-    ticketId: string,
-    authorId: string,
-    input: SupportTicketReplyInput,
-  ) {
+  async replyToPlatformTicket(ticketId: string, authorId: string, input: SupportTicketReplyInput) {
     await this.getPlatformTicket(ticketId);
     await this.createReply(ticketId, authorId, input.message);
     return this.getPlatformTicket(ticketId);
@@ -118,24 +106,16 @@ export class SupportService {
     input: UpdateSupportTicketInput,
   ) {
     const ticket = await this.getSchoolTicket(schoolId, ticketId);
-    if (
-      input.status !== "CLOSED" ||
-      ticket.status !== "RESOLVED" ||
-      input.priority !== undefined
-    ) {
+    if (input.status !== 'CLOSED' || ticket.status !== 'RESOLVED' || input.priority !== undefined) {
       throw new BadRequestException(
-        "School administrators can only close a ticket after support has resolved it.",
+        'School administrators can only close a ticket after support has resolved it.',
       );
     }
     await this.updateTicket(ticketId, actorId, input);
     return this.getSchoolTicket(schoolId, ticketId);
   }
 
-  async updatePlatformTicket(
-    ticketId: string,
-    actorId: string,
-    input: UpdateSupportTicketInput,
-  ) {
+  async updatePlatformTicket(ticketId: string, actorId: string, input: UpdateSupportTicketInput) {
     await this.getPlatformTicket(ticketId);
     await this.updateTicket(ticketId, actorId, input);
     return this.getPlatformTicket(ticketId);
@@ -146,8 +126,8 @@ export class SupportService {
       where: { id: ticketId },
       select: { status: true },
     });
-    if (ticket.status === "CLOSED") {
-      throw new BadRequestException("This ticket is closed and cannot receive replies.");
+    if (ticket.status === 'CLOSED') {
+      throw new BadRequestException('This ticket is closed and cannot receive replies.');
     }
 
     await this.prisma.client.$transaction([
@@ -161,11 +141,7 @@ export class SupportService {
     ]);
   }
 
-  private async updateTicket(
-    ticketId: string,
-    actorId: string,
-    input: UpdateSupportTicketInput,
-  ) {
+  private async updateTicket(ticketId: string, actorId: string, input: UpdateSupportTicketInput) {
     const current = await this.prisma.client.supportTicket.findUniqueOrThrow({
       where: { id: ticketId },
       select: { status: true, priority: true },
@@ -195,7 +171,7 @@ export class SupportService {
           data: {
             ticketId,
             authorId: actorId,
-            message: changes.join(" "),
+            message: changes.join(' '),
           },
         });
       }
@@ -205,7 +181,7 @@ export class SupportService {
   private label(value: string) {
     return value
       .toLowerCase()
-      .replaceAll("_", " ")
+      .replaceAll('_', ' ')
       .replace(/\b\w/g, (letter) => letter.toUpperCase());
   }
 }

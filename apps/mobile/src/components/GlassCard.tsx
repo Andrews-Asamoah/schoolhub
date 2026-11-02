@@ -1,7 +1,7 @@
-import type { ReactNode } from "react";
-import type { StyleProp, ViewStyle } from "react-native";
-import { radius, spacing } from "@/theme/theme";
-import { GlassSurface } from "./GlassSurface";
+import type { ReactNode } from 'react';
+import type { StyleProp, ViewStyle } from 'react-native';
+import { radius, spacing } from '@/theme/theme';
+import { GlassSurface } from './GlassSurface';
 
 type Props = {
   children?: ReactNode;
@@ -13,7 +13,13 @@ type Props = {
 
 export function GlassCard({ children, padding = spacing.lg, strong, flat, style }: Props) {
   return (
-    <GlassSurface radius={radius.xl} strong={strong} flat={flat} style={style} contentStyle={{ padding }}>
+    <GlassSurface
+      radius={radius.xl}
+      strong={strong}
+      flat={flat}
+      style={style}
+      contentStyle={{ padding }}
+    >
       {children}
     </GlassSurface>
   );

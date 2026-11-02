@@ -27,12 +27,7 @@ const email = deliveryPayload(
   'alerts@example.test',
   'https://portal.example.test',
 );
-const sms = deliveryPayload(
-  'SMS',
-  '+233241234567',
-  'SchoolHub',
-  'https://portal.example.test',
-);
+const sms = deliveryPayload('SMS', '+233241234567', 'SchoolHub', 'https://portal.example.test');
 describe('notification provider contracts', () => {
   it('requires the global switch, email signing secret, and valid sender configuration', () => {
     expect(new DeliveryProvider(fetch, {}).configured('EMAIL')).toBe(false);
@@ -76,20 +71,13 @@ describe('notification provider contracts', () => {
   it('normalizes Ghana mobile numbers and rejects short, foreign and injected contacts', () => {
     expect(ghanaPhone('024 123 4567')).toBe('+233241234567');
     expect(ghanaPhone('233541234567')).toBe('+233541234567');
-    for (const value of [
-      '+12025550123',
-      '123',
-      '+233241234567;bad',
-      '02412345678',
-    ])
+    for (const value of ['+12025550123', '123', '+233241234567;bad', '02412345678'])
       expect(ghanaPhone(value)).toBeNull();
   });
   it('sends only a generic portal reminder with a stable email idempotency key', async () => {
     const request = vi
       .fn()
-      .mockResolvedValue(
-        new Response(JSON.stringify({ id: 'email-1' }), { status: 200 }),
-      );
+      .mockResolvedValue(new Response(JSON.stringify({ id: 'email-1' }), { status: 200 }));
     const provider = new DeliveryProvider(request, config);
     expect(await provider.send('EMAIL', 'delivery-1', email)).toEqual({
       state: 'ACCEPTED',
@@ -97,17 +85,13 @@ describe('notification provider contracts', () => {
     });
     await provider.send('EMAIL', 'delivery-1', email);
     expect(request.mock.calls[0][1].body).toBe(request.mock.calls[1][1].body);
-    expect(request.mock.calls[0][1].headers).toEqual(
-      request.mock.calls[1][1].headers,
-    );
+    expect(request.mock.calls[0][1].headers).toEqual(request.mock.calls[1][1].headers);
     const [url, init] = request.mock.calls[0];
     expect(url).toBe('https://api.resend.com/emails');
     expect(init.headers['Idempotency-Key']).toBe('schoolhub/delivery-1');
     expect(JSON.parse(init.body)).toMatchObject({
       to: ['user@example.test'],
-      text: expect.stringContaining(
-        'https://portal.example.test/notifications',
-      ),
+      text: expect.stringContaining('https://portal.example.test/notifications'),
     });
     expect(sms.text.length).toBeLessThan(160);
     expect(/^[\x20-\x7e]+$/.test(sms.text)).toBe(true);
@@ -121,9 +105,7 @@ describe('notification provider contracts', () => {
         }),
       )
       .mockResolvedValueOnce(
-        new Response(
-          JSON.stringify({ data: { messageId: 'sms-1', status: 'Delivered' } }),
-        ),
+        new Response(JSON.stringify({ data: { messageId: 'sms-1', status: 'Delivered' } })),
       )
       .mockResolvedValueOnce(
         new Response(
@@ -137,9 +119,7 @@ describe('notification provider contracts', () => {
       state: 'ACCEPTED',
       messageId: 'sms-1',
     });
-    expect(request.mock.calls[0][0]).toBe(
-      'https://smsc.hubtel.com/v1/messages/send',
-    );
+    expect(request.mock.calls[0][0]).toBe('https://smsc.hubtel.com/v1/messages/send');
     expect(JSON.parse(request.mock.calls[0][1].body)).toEqual({
       from: 'SchoolHub',
       to: '+233241234567',
@@ -151,17 +131,12 @@ describe('notification provider contracts', () => {
       'Basic ' + Buffer.from('test-id:test-secret').toString('base64'),
     );
   });
-  it.each([500, 502])(
-    'never blindly retries uncertain SMS HTTP %s',
-    async (status) => {
-      const request = vi.fn().mockResolvedValue(new Response('{}', { status }));
-      const provider = new DeliveryProvider(request, config);
-      expect((await provider.send('SMS', 'd', sms, schoolSms)).state).toBe(
-        'UNKNOWN',
-      );
-      expect((await provider.send('EMAIL', 'd', email)).state).toBe('RETRY');
-    },
-  );
+  it.each([500, 502])('never blindly retries uncertain SMS HTTP %s', async (status) => {
+    const request = vi.fn().mockResolvedValue(new Response('{}', { status }));
+    const provider = new DeliveryProvider(request, config);
+    expect((await provider.send('SMS', 'd', sms, schoolSms)).state).toBe('UNKNOWN');
+    expect((await provider.send('EMAIL', 'd', email)).state).toBe('RETRY');
+  });
   it('distinguishes rate limits, rejection, malformed success and network uncertainty', async () => {
     for (const [status, state] of [
       [429, 'RETRY'],
@@ -170,21 +145,12 @@ describe('notification provider contracts', () => {
     ] as const) {
       const request = vi.fn().mockResolvedValue(new Response('{}', { status }));
       expect(
-        (
-          await new DeliveryProvider(request, config).send(
-            'SMS',
-            'd',
-            sms,
-            schoolSms,
-          )
-        ).state,
+        (await new DeliveryProvider(request, config).send('SMS', 'd', sms, schoolSms)).state,
       ).toBe(state);
     }
     const request = vi.fn().mockRejectedValue(new Error('timeout'));
     const provider = new DeliveryProvider(request, config);
-    expect((await provider.send('SMS', 'd', sms, schoolSms)).state).toBe(
-      'UNKNOWN',
-    );
+    expect((await provider.send('SMS', 'd', sms, schoolSms)).state).toBe('UNKNOWN');
     expect((await provider.send('EMAIL', 'd', email)).state).toBe('RETRY');
   });
   it('rejects arbitrary endpoint overrides without making a request', async () => {
@@ -204,17 +170,48 @@ describe('notification provider contracts', () => {
     expect(provider.configured('SMS')).toBe(false);
     expect(request).not.toHaveBeenCalled();
   });
-  it.each([401, 403, 422, 429, 500])('retains safe Resend rejection metadata for HTTP %s without returning provider text', async (status) => {
-    const request = vi.fn().mockResolvedValue(new Response(JSON.stringify({ name: 'validation_error', message: 'private-recipient@example.test https://private.test/verify?token=secret', detail: 'secret-key' }), { status }));
-    const result = await new DeliveryProvider(request, config).send('EMAIL', 'verification', email);
-    expect(result).toMatchObject({ providerStatus: status, providerCode: 'validation_error' });
-    expect(JSON.stringify(result)).not.toMatch(/private|secret/);
-  });
+  it.each([401, 403, 422, 429, 500])(
+    'retains safe Resend rejection metadata for HTTP %s without returning provider text',
+    async (status) => {
+      const request = vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            name: 'validation_error',
+            message: 'private-recipient@example.test https://private.test/verify?token=secret',
+            detail: 'secret-key',
+          }),
+          { status },
+        ),
+      );
+      const result = await new DeliveryProvider(request, config).send(
+        'EMAIL',
+        'verification',
+        email,
+      );
+      expect(result).toMatchObject({ providerStatus: status, providerCode: 'validation_error' });
+      expect(JSON.stringify(result)).not.toMatch(/private|secret/);
+    },
+  );
   it('discards unrecognized error codes and handles non-JSON Resend rejections', async () => {
-    const request = vi.fn().mockResolvedValueOnce(new Response(JSON.stringify({ name: 'secret-token', message: 'secret-body' }), { status: 403 })).mockResolvedValueOnce(new Response('<html>secret-body</html>', { status: 502 }));
+    const request = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ name: 'secret-token', message: 'secret-body' }), {
+          status: 403,
+        }),
+      )
+      .mockResolvedValueOnce(new Response('<html>secret-body</html>', { status: 502 }));
     const provider = new DeliveryProvider(request, config);
-    expect(await provider.send('EMAIL', 'verification', email)).toEqual({ state: 'FAILED', reason: 'PROVIDER_REJECTED', providerStatus: 403 });
-    expect(await provider.send('EMAIL', 'verification', email)).toEqual({ state: 'RETRY', reason: 'PROVIDER_UNCERTAIN', providerStatus: 502 });
+    expect(await provider.send('EMAIL', 'verification', email)).toEqual({
+      state: 'FAILED',
+      reason: 'PROVIDER_REJECTED',
+      providerStatus: 403,
+    });
+    expect(await provider.send('EMAIL', 'verification', email)).toEqual({
+      state: 'RETRY',
+      reason: 'PROVIDER_UNCERTAIN',
+      providerStatus: 502,
+    });
   });
   it('does not downgrade delivery receipts on delayed or replayed events', () => {
     expect(advancesDelivery('DELIVERED', 'ACCEPTED')).toBe(false);

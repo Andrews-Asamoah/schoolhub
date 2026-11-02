@@ -1,0 +1,31 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build outputs and caches
+dist/
+build/
+.next/
+out/
+.turbo/
+.output/
+coverage/
+
+# Expo
+.expo/
+
+# Generated files
+**/src/generated/
+apps/web/src/routeTree.gen.ts
+apps/mobile/expo-env.d.ts
+
+# Environment files
+.env
+.env.*
+
+# Lockfiles
+pnpm-lock.yaml
+
+# Test outputs
+playwright-report/
+test-results/

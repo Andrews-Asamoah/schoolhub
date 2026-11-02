@@ -18,9 +18,7 @@ describe('recovery bearer material protection', () => {
   it('rejects altered ciphertext, request substitution and secret rotation', () => {
     const sealed = sealRecovery('request-1', payload, secret);
     expect(() => openRecovery('request-2', sealed, secret)).toThrow();
-    expect(() =>
-      openRecovery('request-1', sealed, secret + 'rotated'),
-    ).toThrow();
+    expect(() => openRecovery('request-1', sealed, secret + 'rotated')).toThrow();
     const parts = sealed.split('.');
     parts[2] = 'AAAA' + parts[2];
     expect(() => openRecovery('request-1', parts.join('.'), secret)).toThrow();

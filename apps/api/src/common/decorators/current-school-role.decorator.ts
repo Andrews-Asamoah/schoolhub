@@ -1,4 +1,4 @@
-import { createParamDecorator, type ExecutionContext } from "@nestjs/common";
+import { createParamDecorator, type ExecutionContext } from '@nestjs/common';
 
 export const CurrentSchoolRole = createParamDecorator(
   (_data: unknown, ctx: ExecutionContext): string | undefined => {

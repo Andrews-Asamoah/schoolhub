@@ -1,12 +1,11 @@
-import { useEffect, useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
-import { authClient } from "@/lib/auth-client";
-import { useTenantSchool } from "@/lib/tenant";
+import { useEffect, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { authClient } from '@/lib/auth-client';
+import { useTenantSchool } from '@/lib/tenant';
 
 export function useSchoolOrganization(autoSelectSingle = true) {
   const queryClient = useQueryClient();
-  const { data: activeOrganization, isPending: activePending } =
-    authClient.useActiveOrganization();
+  const { data: activeOrganization, isPending: activePending } = authClient.useActiveOrganization();
   const { data: organizations, isPending: organizationsPending } =
     authClient.useListOrganizations();
   const { school: tenantSchool, isTenantSite, isLoading: tenantLoading } = useTenantSchool();
@@ -32,7 +31,7 @@ export function useSchoolOrganization(autoSelectSingle = true) {
           .setActive({ organizationId: targetOrgId })
           .then(({ error }) => {
             if (error) {
-              setSelectionError(error.message ?? "Could not connect to this school.");
+              setSelectionError(error.message ?? 'Could not connect to this school.');
               return;
             }
             setSelectionError(null);
@@ -40,7 +39,7 @@ export function useSchoolOrganization(autoSelectSingle = true) {
           })
           .catch((error: unknown) => {
             setSelectionError(
-              error instanceof Error ? error.message : "Could not connect to this school.",
+              error instanceof Error ? error.message : 'Could not connect to this school.',
             );
           });
       }
@@ -48,13 +47,8 @@ export function useSchoolOrganization(autoSelectSingle = true) {
     }
 
     // 2. Default single-org fallback on root/central domain
-    const soleOrganizationId =
-      organizations?.length === 1 ? organizations[0]?.id : undefined;
-    if (
-      !autoSelectSingle ||
-      activeOrganization ||
-      !soleOrganizationId
-    ) {
+    const soleOrganizationId = organizations?.length === 1 ? organizations[0]?.id : undefined;
+    if (!autoSelectSingle || activeOrganization || !soleOrganizationId) {
       return;
     }
 
@@ -62,16 +56,14 @@ export function useSchoolOrganization(autoSelectSingle = true) {
       .setActive({ organizationId: soleOrganizationId })
       .then(({ error }) => {
         if (error) {
-          setSelectionError(error.message ?? "Could not select your school.");
+          setSelectionError(error.message ?? 'Could not select your school.');
           return;
         }
         setSelectionError(null);
         return queryClient.invalidateQueries();
       })
       .catch((error: unknown) => {
-        setSelectionError(
-          error instanceof Error ? error.message : "Could not select your school.",
-        );
+        setSelectionError(error instanceof Error ? error.message : 'Could not select your school.');
       });
   }, [
     activeOrganization,

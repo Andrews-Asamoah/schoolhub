@@ -24,11 +24,14 @@ export interface TargetClass {
  * other classes. No class limits at all means every class, scoring 0.
  */
 export function classScopeScore(
-  template: Pick<TemplateScope, "classId" | "classIds" | "classLevel" | "departmentId">,
+  template: Pick<TemplateScope, 'classId' | 'classIds' | 'classLevel' | 'departmentId'>,
   target: TargetClass,
 ): number | null {
   const limitsClass =
-    template.classId != null || template.classIds.length > 0 || template.classLevel != null || template.departmentId != null;
+    template.classId != null ||
+    template.classIds.length > 0 ||
+    template.classLevel != null ||
+    template.departmentId != null;
   if (!limitsClass) return 0;
   if (template.classId === target.id || template.classIds.includes(target.id)) return 8;
   if (template.classLevel != null && template.classLevel === target.level) return 4;
@@ -49,7 +52,8 @@ export function templateSpecificity(
 ): number | null {
   if (!template.isActive) return null;
   if (template.termNumber != null && template.termNumber !== termNumber) return null;
-  if (template.subjectCode && template.subjectCode.toLowerCase() !== subjectCode.toLowerCase()) return null;
+  if (template.subjectCode && template.subjectCode.toLowerCase() !== subjectCode.toLowerCase())
+    return null;
 
   const classScore = classScopeScore(template, target);
   if (classScore === null) return null;
@@ -113,7 +117,8 @@ export function computeStudentResult(
       if (component.isRequired) complete = false;
       continue;
     }
-    const average = own.reduce((sum, cell) => sum + cell.marks / component.maxMarks, 0) / own.length;
+    const average =
+      own.reduce((sum, cell) => sum + cell.marks / component.maxMarks, 0) / own.length;
     totalScore += average * component.weight;
   }
 
@@ -122,7 +127,9 @@ export function computeStudentResult(
   let gradePoint: number | null = null;
   if (complete) {
     // Highest band whose minimum the percentage reaches, so gaps such as 79.5 still land somewhere.
-    const band = [...bands].sort((a, b) => b.minScore - a.minScore).find((item) => percentage >= item.minScore);
+    const band = [...bands]
+      .sort((a, b) => b.minScore - a.minScore)
+      .find((item) => percentage >= item.minScore);
     if (band) {
       grade = band.grade;
       gradePoint = band.gradePoint;
@@ -132,14 +139,19 @@ export function computeStudentResult(
 }
 
 /** Standard competition ranking (1, 2, 2, 4) among rows that have a percentage. */
-export function rankByPercentage<T extends string>(rows: { id: T; percentage: number | null }[]): Map<T, number> {
+export function rankByPercentage<T extends string>(
+  rows: { id: T; percentage: number | null }[],
+): Map<T, number> {
   const ranked = rows
     .filter((row): row is { id: T; percentage: number } => row.percentage != null)
     .sort((a, b) => b.percentage - a.percentage);
   const positions = new Map<T, number>();
   ranked.forEach((row, index) => {
     const previous = ranked[index - 1];
-    positions.set(row.id, previous && previous.percentage === row.percentage ? positions.get(previous.id)! : index + 1);
+    positions.set(
+      row.id,
+      previous && previous.percentage === row.percentage ? positions.get(previous.id)! : index + 1,
+    );
   });
   return positions;
 }
@@ -152,7 +164,12 @@ export interface MarkProblem {
 
 /** Checks entered marks against each component's limits. */
 export function validateMarks(
-  entries: { studentId: string; componentId: string; occurrenceIndex: number; marks: number | null }[],
+  entries: {
+    studentId: string;
+    componentId: string;
+    occurrenceIndex: number;
+    marks: number | null;
+  }[],
   components: EntryComponent[],
 ): MarkProblem[] {
   const byId = new Map(components.map((component) => [component.id, component]));
@@ -161,12 +178,19 @@ export function validateMarks(
     const base = { componentId: entry.componentId, studentId: entry.studentId };
     const component = byId.get(entry.componentId);
     if (!component) {
-      problems.push({ ...base, message: "This component does not belong to the chosen assessment." });
+      problems.push({
+        ...base,
+        message: 'This component does not belong to the chosen assessment.',
+      });
       continue;
     }
     const slots = component.isRepeatable ? Math.max(component.expectedCount, 1) : 1;
-    if (!Number.isInteger(entry.occurrenceIndex) || entry.occurrenceIndex < 0 || entry.occurrenceIndex >= slots) {
-      problems.push({ ...base, message: "This entry does not exist for the component." });
+    if (
+      !Number.isInteger(entry.occurrenceIndex) ||
+      entry.occurrenceIndex < 0 ||
+      entry.occurrenceIndex >= slots
+    ) {
+      problems.push({ ...base, message: 'This entry does not exist for the component.' });
       continue;
     }
     if (entry.marks == null) continue; // clearing a mark is always allowed

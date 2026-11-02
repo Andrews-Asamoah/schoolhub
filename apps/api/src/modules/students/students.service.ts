@@ -101,19 +101,14 @@ export class StudentsService {
     };
 
     // Teachers are limited to the classes they teach; others may filter freely.
-    if (
-      params.scopeClassIds &&
-      params.classId &&
-      !params.scopeClassIds.includes(params.classId)
-    ) {
+    if (params.scopeClassIds && params.classId && !params.scopeClassIds.includes(params.classId)) {
       return {
         data: [],
         meta: { page, limit, total: 0, totalPages: 0 },
       };
     }
     const classFilter: string | { in: string[] } | undefined =
-      params.classId ??
-      (params.scopeClassIds ? { in: params.scopeClassIds } : undefined);
+      params.classId ?? (params.scopeClassIds ? { in: params.scopeClassIds } : undefined);
     if (classFilter) {
       if (!academicYearId || !termId) {
         if (params.scopeClassIds && !params.classId) {
@@ -242,9 +237,7 @@ export class StudentsService {
   ) {
     const currentOnly = !canManageAcademicContext(role);
     if (Boolean(requestedAcademicYearId) !== Boolean(requestedTermId)) {
-      throw new BadRequestException(
-        'Academic year and term must be supplied together.',
-      );
+      throw new BadRequestException('Academic year and term must be supplied together.');
     }
     let academicYearId = requestedAcademicYearId;
     let termId = requestedTermId;
@@ -389,7 +382,7 @@ export class StudentsService {
           contactEmail ||
           (guardian.createLogin
             ? newGuardianLoginEmail(
-                `${guardian.firstName ?? ""} ${guardian.lastName ?? ""}`.trim(),
+                `${guardian.firstName ?? ''} ${guardian.lastName ?? ''}`.trim(),
                 guardianDomain,
               )
             : null);
@@ -419,9 +412,7 @@ export class StudentsService {
           select: { id: true },
         });
         if (!house) {
-          throw new BadRequestException(
-            'Choose an active house belonging to this school.',
-          );
+          throw new BadRequestException('Choose an active house belonging to this school.');
         }
       }
 
@@ -432,9 +423,7 @@ export class StudentsService {
           select: { id: true },
         });
         if (!department) {
-          throw new BadRequestException(
-            'Choose an active department belonging to this school.',
-          );
+          throw new BadRequestException('Choose an active department belonging to this school.');
         }
       }
 
@@ -445,9 +434,7 @@ export class StudentsService {
       if (placement) {
         const classDepartmentId = placement.class.departmentId;
         if (departmentId && classDepartmentId && classDepartmentId !== departmentId) {
-          throw new BadRequestException(
-            'The selected class belongs to a different department.',
-          );
+          throw new BadRequestException('The selected class belongs to a different department.');
         }
         // A class that sits in a department puts its students there too.
         departmentId ??= classDepartmentId ?? undefined;
@@ -491,9 +478,7 @@ export class StudentsService {
           select: { admissionNumber: true },
         });
         const lastSequence = existingNumbers.reduce((max, student) => {
-          const sequencePart = student.admissionNumber?.slice(
-            admissionPrefix.length,
-          );
+          const sequencePart = student.admissionNumber?.slice(admissionPrefix.length);
           if (!sequencePart || !/^\d{4}$/.test(sequencePart)) return max;
           return Math.max(max, Number(sequencePart));
         }, 0);
@@ -528,16 +513,11 @@ export class StudentsService {
           select: { email: true },
         }),
       ]);
-      const usedUsernames = new Set(
-        takenUsernames.map((row) => row.username?.toLowerCase()),
-      );
+      const usedUsernames = new Set(takenUsernames.map((row) => row.username?.toLowerCase()));
       const usedEmails = new Set(takenEmails.map((row) => row.email.toLowerCase()));
       let attempt = 0;
       let username = studentUsernameCandidate(usernameBase, attempt);
-      while (
-        usedUsernames.has(username) ||
-        usedEmails.has(`${username}@${emailDomain}`)
-      ) {
+      while (usedUsernames.has(username) || usedEmails.has(`${username}@${emailDomain}`)) {
         attempt += 1;
         if (attempt > 9999) {
           throw new ConflictException(
@@ -710,8 +690,7 @@ export class StudentsService {
         entityType: 'STUDENT',
         entityId: student.id,
         details: {
-          guardianLoginsIssued: guardianCredentials.filter((g) => g.credentials)
-            .length,
+          guardianLoginsIssued: guardianCredentials.filter((g) => g.credentials).length,
         },
       });
 
@@ -734,9 +713,7 @@ export class StudentsService {
         loginEmail,
         username,
         guardianCredentials,
-        subjects: placement
-          ? await this.subjectsForClass(tx, placement.class.id)
-          : [],
+        subjects: placement ? await this.subjectsForClass(tx, placement.class.id) : [],
       };
     });
 
@@ -767,18 +744,14 @@ export class StudentsService {
     role?: string,
   ) {
     if (Boolean(input.academicYearId) !== Boolean(input.termId)) {
-      throw new BadRequestException(
-        'Academic year and term must be supplied together.',
-      );
+      throw new BadRequestException('Academic year and term must be supplied together.');
     }
     const klass = await tx.class.findFirst({
       where: { id: input.classId, schoolId, isActive: true, deletedAt: null },
       select: { id: true, name: true, capacity: true, departmentId: true },
     });
     if (!klass) {
-      throw new BadRequestException(
-        'Choose an active class belonging to this school.',
-      );
+      throw new BadRequestException('Choose an active class belonging to this school.');
     }
 
     const currentYear = await tx.academicYear.findFirst({
@@ -798,12 +771,9 @@ export class StudentsService {
       select: { id: true },
     });
     if (!term) {
-      throw new BadRequestException(
-        'Choose a term belonging to an academic year in this school.',
-      );
+      throw new BadRequestException('Choose a term belonging to an academic year in this school.');
     }
-    const isCurrentPeriod =
-      academicYearId === currentYear.id && termId === currentTerm.id;
+    const isCurrentPeriod = academicYearId === currentYear.id && termId === currentTerm.id;
     if (!isCurrentPeriod && !canManageAcademicContext(role)) {
       throw new ForbiddenException(
         'Only the current academic year and term are available for your role.',
@@ -815,9 +785,7 @@ export class StudentsService {
         where: { classId: klass.id, academicYearId, termId, status: 'ACTIVE' },
       });
       if (taken + 1 > klass.capacity) {
-        throw new ConflictException(
-          `${klass.name} is full (capacity ${klass.capacity}).`,
-        );
+        throw new ConflictException(`${klass.name} is full (capacity ${klass.capacity}).`);
       }
     }
     return { class: klass, academicYearId, termId, isCurrentPeriod };
@@ -915,9 +883,7 @@ export class StudentsService {
       orderBy: { enrolledAt: 'desc' },
       include: { class: { select: { id: true, name: true, level: true } } },
     });
-    const subjects = enrollment
-      ? await this.subjectsForClass(db, enrollment.classId)
-      : [];
+    const subjects = enrollment ? await this.subjectsForClass(db, enrollment.classId) : [];
 
     const p = student.profile;
     return {
@@ -1027,7 +993,13 @@ export class StudentsService {
     schoolId: string,
     userId: string,
     studentId: string,
-    query: { scope?: 'term' | 'year' | 'all'; from?: string; to?: string; yearId?: string; termId?: string } = {},
+    query: {
+      scope?: 'term' | 'year' | 'all';
+      from?: string;
+      to?: string;
+      yearId?: string;
+      termId?: string;
+    } = {},
   ) {
     const guardian = await this.requireGuardian(schoolId, userId);
     const link = await this.prisma.client.guardianStudent.findFirst({
@@ -1040,7 +1012,8 @@ export class StudentsService {
       select: { id: true },
     });
     if (!link) throw new NotFoundException('Student not found');
-    if (!this.financeService) throw new NotFoundException('Fee statements are temporarily unavailable.');
+    if (!this.financeService)
+      throw new NotFoundException('Fee statements are temporarily unavailable.');
     return this.financeService.getStudentStatement(schoolId, studentId, 'guardian', query, true);
   }
 
@@ -1091,9 +1064,7 @@ export class StudentsService {
         status: { in: ['ACTIVE', 'COMPLETED'] },
         student: { schoolId, deletedAt: null },
         class: { schoolId },
-        ...(options.scopeClassIds
-          ? { classId: { in: options.scopeClassIds } }
-          : {}),
+        ...(options.scopeClassIds ? { classId: { in: options.scopeClassIds } } : {}),
       },
       include: { class: { select: { id: true, name: true, level: true } } },
     });
@@ -1102,10 +1073,7 @@ export class StudentsService {
     }
     return {
       class: enrollment.class,
-      subjects: await this.subjectsForClass(
-        this.prisma.client,
-        enrollment.classId,
-      ),
+      subjects: await this.subjectsForClass(this.prisma.client, enrollment.classId),
     };
   }
 
@@ -1238,12 +1206,14 @@ export class StudentsService {
       this.prisma.client.school.findFirst({ where: { id: schoolId }, select: { settings: true } }),
     ]);
     const currentTerm = currentYear?.terms[0];
-    const settings = school?.settings && typeof school.settings === 'object' && !Array.isArray(school.settings)
-      ? school.settings as Record<string, unknown>
-      : {};
-    const arrearsPolicy = settings.arrearsPolicy === 'BLOCK_CLEARANCE_UNTIL_PAID'
-      ? 'BLOCK_CLEARANCE_UNTIL_PAID'
-      : 'SHOW_ONLY';
+    const settings =
+      school?.settings && typeof school.settings === 'object' && !Array.isArray(school.settings)
+        ? (school.settings as Record<string, unknown>)
+        : {};
+    const arrearsPolicy =
+      settings.arrearsPolicy === 'BLOCK_CLEARANCE_UNTIL_PAID'
+        ? 'BLOCK_CLEARANCE_UNTIL_PAID'
+        : 'SHOW_ONLY';
 
     const activeBillWhere = {
       schoolId,
@@ -1252,7 +1222,9 @@ export class StudentsService {
     };
     const currentBillWhere = {
       ...activeBillWhere,
-      ...(currentYear && currentTerm ? { academicYearId: currentYear.id, termId: currentTerm.id } : {}),
+      ...(currentYear && currentTerm
+        ? { academicYearId: currentYear.id, termId: currentTerm.id }
+        : {}),
     };
     const [currentAgg, allOpenAgg] = await Promise.all([
       this.prisma.client.bill.aggregate({
@@ -1269,7 +1241,8 @@ export class StudentsService {
     const totalPaid = currentAgg._sum.paidAmount ?? new Prisma.Decimal(0);
     const currentOutstanding = currentAgg._sum.balanceAmount ?? new Prisma.Decimal(0);
     const allOutstanding = allOpenAgg._sum.balanceAmount ?? new Prisma.Decimal(0);
-    const clearanceBalance = arrearsPolicy === 'BLOCK_CLEARANCE_UNTIL_PAID' ? allOutstanding : currentOutstanding;
+    const clearanceBalance =
+      arrearsPolicy === 'BLOCK_CLEARANCE_UNTIL_PAID' ? allOutstanding : currentOutstanding;
 
     let status: 'FULLY_PAID' | 'PARTIALLY_PAID' | 'YET_TO_PAY' | 'UNKNOWN';
     let label: string;
@@ -1278,21 +1251,24 @@ export class StudentsService {
     if (currentAgg._count._all === 0 && clearanceBalance.eq(0)) {
       status = 'UNKNOWN';
       label = 'Fee status unknown';
-      description = 'There are no active bills for this period, so a fee-clearance status cannot be confirmed.';
+      description =
+        'There are no active bills for this period, so a fee-clearance status cannot be confirmed.';
       clearanceAllowed = false;
     } else if (clearanceBalance.gt(0)) {
       status = totalPaid.gt(0) ? 'PARTIALLY_PAID' : 'YET_TO_PAY';
       label = status === 'PARTIALLY_PAID' ? 'Partially Paid' : 'Yet to Make Payment';
-      description = arrearsPolicy === 'BLOCK_CLEARANCE_UNTIL_PAID' && allOutstanding.gt(currentOutstanding)
-        ? 'Previous-term arrears remain unpaid. Examination clearance is blocked until all outstanding fees are settled.'
-        : 'Your school fee account has an outstanding balance. Please ask your parent or guardian to review the statement.';
+      description =
+        arrearsPolicy === 'BLOCK_CLEARANCE_UNTIL_PAID' && allOutstanding.gt(currentOutstanding)
+          ? 'Previous-term arrears remain unpaid. Examination clearance is blocked until all outstanding fees are settled.'
+          : 'Your school fee account has an outstanding balance. Please ask your parent or guardian to review the statement.';
       clearanceAllowed = false;
     } else {
       status = 'FULLY_PAID';
       label = 'Fully Paid';
-      description = arrearsPolicy === 'SHOW_ONLY' && allOutstanding.gt(0)
-        ? 'The current term is settled. Previous-term balances are still shown on the account but do not block clearance under this school policy.'
-        : 'All fee obligations required by the current school policy are settled.';
+      description =
+        arrearsPolicy === 'SHOW_ONLY' && allOutstanding.gt(0)
+          ? 'The current term is settled. Previous-term balances are still shown on the account but do not block clearance under this school policy.'
+          : 'All fee obligations required by the current school policy are settled.';
       clearanceAllowed = true;
     }
 
@@ -1347,9 +1323,7 @@ export class StudentsService {
       data: { profileId: login.profileId, canLogin: true },
     });
     return {
-      credentials: login.linked
-        ? null
-        : toIssuedCredentials(login.email, credential, 'guardian'),
+      credentials: login.linked ? null : toIssuedCredentials(login.email, credential, 'guardian'),
       linked: login.linked,
     };
   }
@@ -1371,9 +1345,7 @@ export class StudentsService {
           select: { id: true, isActive: true },
         });
         if (!house || (!house.isActive && input.houseId !== existing.houseId)) {
-          throw new BadRequestException(
-            'Choose an active house belonging to this school.',
-          );
+          throw new BadRequestException('Choose an active house belonging to this school.');
         }
       }
 
@@ -1382,13 +1354,8 @@ export class StudentsService {
           where: { id: input.departmentId, schoolId },
           select: { id: true, isActive: true },
         });
-        if (
-          !department ||
-          (!department.isActive && input.departmentId !== existing.departmentId)
-        ) {
-          throw new BadRequestException(
-            'Choose an active department belonging to this school.',
-          );
+        if (!department || (!department.isActive && input.departmentId !== existing.departmentId)) {
+          throw new BadRequestException('Choose an active department belonging to this school.');
         }
       }
 
@@ -1400,9 +1367,7 @@ export class StudentsService {
             lastName: input.lastName,
             otherNames: input.otherNames,
             gender: input.gender,
-            dateOfBirth: input.dateOfBirth
-              ? new Date(input.dateOfBirth)
-              : undefined,
+            dateOfBirth: input.dateOfBirth ? new Date(input.dateOfBirth) : undefined,
             residentialAddress: input.residentialAddress,
             city: input.city,
             region: input.region,

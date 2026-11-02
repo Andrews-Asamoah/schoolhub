@@ -4,9 +4,9 @@ import {
   type ExecutionContext,
   ForbiddenException,
   UnauthorizedException,
-} from "@nestjs/common";
-import { assertPasswordChangeNotPending } from "./password-change.js";
-import { assertTwoFactorEnabled } from "./two-factor.js";
+} from '@nestjs/common';
+import { assertPasswordChangeNotPending } from './password-change.js';
+import { assertTwoFactorEnabled } from './two-factor.js';
 
 /**
  * SuperAdminGuard — allows only users with role === "superAdmin" to proceed.
@@ -19,23 +19,21 @@ export class SuperAdminGuard implements CanActivate {
     const user = request.session?.user;
 
     if (!user) {
-      throw new UnauthorizedException("Authentication required");
+      throw new UnauthorizedException('Authentication required');
     }
 
     if (user.banned === true) {
-      throw new ForbiddenException("This account has been suspended.");
+      throw new ForbiddenException('This account has been suspended.');
     }
 
     assertPasswordChangeNotPending(user);
 
-    if (user.role !== "superAdmin") {
-      throw new ForbiddenException(
-        "Access denied: SuperAdmin privileges required",
-      );
+    if (user.role !== 'superAdmin') {
+      throw new ForbiddenException('Access denied: SuperAdmin privileges required');
     }
 
     // The most powerful account on the platform must use a second factor.
-    assertTwoFactorEnabled(user, "super-admin");
+    assertTwoFactorEnabled(user, 'super-admin');
 
     return true;
   }

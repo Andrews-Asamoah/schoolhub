@@ -53,16 +53,16 @@ This execution environment could not resolve `github.com` for a local clone, so 
 
 Fill in the following from the first CI run and the post-change CI run:
 
-| Check | Baseline (`f0e9d20`) | Proposed branch |
-| --- | --- | --- |
-| Frozen install | Pass | Pass |
-| Typecheck | Pass | Pass |
-| API lint | Pass | Pass |
-| Database migrations | Pass | Pass |
-| Web theme lint | Pass | Pass |
-| API test suite | 260 passed, 26 files | 266 passed, 27 files |
-| PostgreSQL finance integration suite | 25 passed | 25 passed |
-| Development reset guard tests | Not present | Included in passing suite |
+| Check                                | Baseline (`f0e9d20`) | Proposed branch           |
+| ------------------------------------ | -------------------- | ------------------------- |
+| Frozen install                       | Pass                 | Pass                      |
+| Typecheck                            | Pass                 | Pass                      |
+| API lint                             | Pass                 | Pass                      |
+| Database migrations                  | Pass                 | Pass                      |
+| Web theme lint                       | Pass                 | Pass                      |
+| API test suite                       | 260 passed, 26 files | 266 passed, 27 files      |
+| PostgreSQL finance integration suite | 25 passed            | 25 passed                 |
+| Development reset guard tests        | Not present          | Included in passing suite |
 
 ## Phase gate
 

@@ -9,9 +9,7 @@ import { DurableJobsService } from '../../../common/jobs/durable-jobs.service.js
 import { RecoveryTransport } from './recovery-transport.js';
 import { openRecovery, recoveryHash } from './recovery-crypto.js';
 @Injectable()
-export class PasswordRecoveryWorker
-  implements OnApplicationBootstrap, OnApplicationShutdown
-{
+export class PasswordRecoveryWorker implements OnApplicationBootstrap, OnApplicationShutdown {
   private readonly logger = new Logger(PasswordRecoveryWorker.name);
   private timer?: NodeJS.Timeout;
   private running = false;
@@ -23,9 +21,7 @@ export class PasswordRecoveryWorker
   onApplicationBootstrap() {
     if (process.env.NODE_ENV === 'test') return;
     const poll = () => {
-      void this.tick().catch(() =>
-        this.logger.error('password.recovery.poll.failed'),
-      );
+      void this.tick().catch(() => this.logger.error('password.recovery.poll.failed'));
     };
     this.timer = setInterval(poll, 10000);
     this.timer.unref();
@@ -80,17 +76,13 @@ export class PasswordRecoveryWorker
         where: {
           kind: 'password-recovery',
           nextAttempt: { lte: now },
-          OR: [
-            { status: 'PENDING' },
-            { status: 'RUNNING', leaseUntil: { lt: now } },
-          ],
+          OR: [{ status: 'PENDING' }, { status: 'RUNNING', leaseUntil: { lt: now } }],
         },
         orderBy: [{ nextAttempt: 'asc' }, { id: 'asc' }],
         take: 25,
         select: { id: true },
       });
-      for (const job of pending)
-        await this.jobs.run(job.id, () => this.dispatch(job.id), now);
+      for (const job of pending) await this.jobs.run(job.id, () => this.dispatch(job.id), now);
     } finally {
       this.running = false;
     }
@@ -104,10 +96,16 @@ export class PasswordRecoveryWorker
       where: { id: row.userId },
       select: { banned: true, email: true, emailVerified: true },
     });
-    const credentials=await this.prisma.client.account.findMany({where:{userId:row.userId,providerId:"credential"},take:2,select:{password:true}});
+    const credentials = await this.prisma.client.account.findMany({
+      where: { userId: row.userId, providerId: 'credential' },
+      take: 2,
+      select: { password: true },
+    });
     // Leave enough time for the bounded HTTP request and opening the email.
     if (
-      credentials.length!==1||!credentials[0]?.password||recoveryHash(credentials[0].password)!==row.credentialFingerprint||
+      credentials.length !== 1 ||
+      !credentials[0]?.password ||
+      recoveryHash(credentials[0].password) !== row.credentialFingerprint ||
       row.consumedAt ||
       row.revokedAt ||
       !current ||
@@ -128,13 +126,8 @@ export class PasswordRecoveryWorker
       });
       return;
     }
-    if (!this.transport.configured('EMAIL'))
-      throw new Error('Recovery delivery not configured');
-    const payload = openRecovery(
-      id,
-      row.encryptedPayload,
-      process.env.BETTER_AUTH_SECRET!,
-    );
+    if (!this.transport.configured('EMAIL')) throw new Error('Recovery delivery not configured');
+    const payload = openRecovery(id, row.encryptedPayload, process.env.BETTER_AUTH_SECRET!);
     const result = await this.transport.send('EMAIL', id, payload);
     if (result.state === 'ACCEPTED') {
       await this.prisma.client.passwordRecoveryRequest.updateMany({
@@ -147,11 +140,17 @@ export class PasswordRecoveryWorker
       });
       return;
     }
-    this.logger.warn(JSON.stringify({ event: 'password.recovery.delivery_failed', requestId: id,
-      reason: result.reason, providerStatus: result.providerStatus ?? null, providerCode: result.providerCode ?? null }));
+    this.logger.warn(
+      JSON.stringify({
+        event: 'password.recovery.delivery_failed',
+        requestId: id,
+        reason: result.reason,
+        providerStatus: result.providerStatus ?? null,
+        providerCode: result.providerCode ?? null,
+      }),
+    );
     // Resend has a stable payload/key; ambiguous outcomes retry only inside the token window.
-    if (result.state === 'RETRY')
-      throw new Error('Retryable recovery delivery failure');
+    if (result.state === 'RETRY') throw new Error('Retryable recovery delivery failure');
     await this.prisma.client.passwordRecoveryRequest.updateMany({
       where: { id, status: 'PENDING' },
       data: { status: 'DEAD', encryptedPayload: null },

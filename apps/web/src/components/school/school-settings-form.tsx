@@ -1,10 +1,10 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { updateSchoolSettingsSchema } from "@schoolhub/shared";
-import { LoaderCircle, Pencil } from "lucide-react";
-import { useState, type FormEvent } from "react";
-import { FormField, FormInput, FormTextarea } from "@/components/forms/form-controls";
-import { useSchoolRole } from "@/components/school/school-role-switcher";
-import { apiFetch } from "@/lib/api";
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { updateSchoolSettingsSchema } from '@schoolhub/shared';
+import { LoaderCircle, Pencil } from 'lucide-react';
+import { useState, type FormEvent } from 'react';
+import { FormField, FormInput, FormTextarea } from '@/components/forms/form-controls';
+import { useSchoolRole } from '@/components/school/school-role-switcher';
+import { apiFetch } from '@/lib/api';
 
 export interface SchoolDetails {
   id: string;
@@ -18,16 +18,16 @@ export interface SchoolDetails {
   website?: string | null;
 }
 
-const EDITABLE = ["name", "email", "phone", "website", "address", "motto"] as const;
+const EDITABLE = ['name', 'email', 'phone', 'website', 'address', 'motto'] as const;
 type Field = (typeof EDITABLE)[number];
 
 const toValues = (school: SchoolDetails): Record<Field, string> => ({
   name: school.name,
-  email: school.email ?? "",
-  phone: school.phone ?? "",
-  website: school.website ?? "",
-  address: school.address ?? "",
-  motto: school.motto ?? "",
+  email: school.email ?? '',
+  phone: school.phone ?? '',
+  website: school.website ?? '',
+  address: school.address ?? '',
+  motto: school.motto ?? '',
 });
 
 /**
@@ -36,7 +36,7 @@ const toValues = (school: SchoolDetails): Record<Field, string> => ({
  */
 export function SchoolSettingsForm({ school }: { school: SchoolDetails }) {
   const { activeRole } = useSchoolRole();
-  const canEdit = activeRole === "owner" || activeRole === "admin";
+  const canEdit = activeRole === 'owner' || activeRole === 'admin';
   const queryClient = useQueryClient();
   const [editing, setEditing] = useState(false);
   const [values, setValues] = useState(() => toValues(school));
@@ -44,13 +44,14 @@ export function SchoolSettingsForm({ school }: { school: SchoolDetails }) {
   const [saved, setSaved] = useState(false);
 
   const save = useMutation({
-    mutationFn: (body: unknown) => apiFetch("/schools/current", { method: "PATCH", body: JSON.stringify(body) }),
+    mutationFn: (body: unknown) =>
+      apiFetch('/schools/current', { method: 'PATCH', body: JSON.stringify(body) }),
     onSuccess: async () => {
       setEditing(false);
       setSaved(true);
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["school"] }),
-        queryClient.invalidateQueries({ queryKey: ["tenant"] }),
+        queryClient.invalidateQueries({ queryKey: ['school'] }),
+        queryClient.invalidateQueries({ queryKey: ['tenant'] }),
       ]);
     },
   });
@@ -83,14 +84,14 @@ export function SchoolSettingsForm({ school }: { school: SchoolDetails }) {
     setValues((current) => ({ ...current, [field]: event.target.value }));
 
   const readOnly: [string, string][] = [
-    ["School name", school.name],
-    ["School code", school.code],
-    ["Subdomain", school.subdomain],
-    ["Email", school.email || "Not set"],
-    ["Phone", school.phone || "Not set"],
-    ["Address", school.address || "Not set"],
-    ["Motto", school.motto || "Not set"],
-    ["Website", school.website || "Not set"],
+    ['School name', school.name],
+    ['School code', school.code],
+    ['Subdomain', school.subdomain],
+    ['Email', school.email || 'Not set'],
+    ['Phone', school.phone || 'Not set'],
+    ['Address', school.address || 'Not set'],
+    ['Motto', school.motto || 'Not set'],
+    ['Website', school.website || 'Not set'],
   ];
 
   return (
@@ -98,7 +99,9 @@ export function SchoolSettingsForm({ school }: { school: SchoolDetails }) {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-sm font-semibold text-foreground">School profile</h2>
-          <p className="mt-1 text-xs text-muted-foreground">Current details for your active school.</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Current details for your active school.
+          </p>
         </div>
         {canEdit && !editing && (
           <button
@@ -112,36 +115,81 @@ export function SchoolSettingsForm({ school }: { school: SchoolDetails }) {
       </div>
 
       {saved && !editing && (
-        <p role="status" className="mt-3 text-xs text-success">School details saved.</p>
+        <p role="status" className="mt-3 text-xs text-success">
+          School details saved.
+        </p>
       )}
 
       {editing ? (
         <form onSubmit={submit} noValidate className="mt-5 space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
             <FormField label="School name" htmlFor="school-name" error={errors.name}>
-              <FormInput id="school-name" value={values.name} onChange={set("name")} maxLength={120} />
+              <FormInput
+                id="school-name"
+                value={values.name}
+                onChange={set('name')}
+                maxLength={120}
+              />
             </FormField>
             <FormField label="Email" htmlFor="school-email" error={errors.email}>
-              <FormInput id="school-email" type="email" value={values.email} onChange={set("email")} />
+              <FormInput
+                id="school-email"
+                type="email"
+                value={values.email}
+                onChange={set('email')}
+              />
             </FormField>
             <FormField label="Phone" htmlFor="school-phone" error={errors.phone}>
-              <FormInput id="school-phone" type="tel" value={values.phone} onChange={set("phone")} />
+              <FormInput
+                id="school-phone"
+                type="tel"
+                value={values.phone}
+                onChange={set('phone')}
+              />
             </FormField>
-            <FormField label="Website" htmlFor="school-website" error={errors.website} hint="For example www.yourschool.edu.gh">
-              <FormInput id="school-website" value={values.website} onChange={set("website")} />
+            <FormField
+              label="Website"
+              htmlFor="school-website"
+              error={errors.website}
+              hint="For example www.yourschool.edu.gh"
+            >
+              <FormInput id="school-website" value={values.website} onChange={set('website')} />
             </FormField>
-            <FormField label="Address" htmlFor="school-address" error={errors.address} className="sm:col-span-2">
-              <FormTextarea id="school-address" rows={2} value={values.address} onChange={set("address")} />
+            <FormField
+              label="Address"
+              htmlFor="school-address"
+              error={errors.address}
+              className="sm:col-span-2"
+            >
+              <FormTextarea
+                id="school-address"
+                rows={2}
+                value={values.address}
+                onChange={set('address')}
+              />
             </FormField>
-            <FormField label="Motto" htmlFor="school-motto" error={errors.motto} className="sm:col-span-2">
-              <FormInput id="school-motto" value={values.motto} onChange={set("motto")} maxLength={150} />
+            <FormField
+              label="Motto"
+              htmlFor="school-motto"
+              error={errors.motto}
+              className="sm:col-span-2"
+            >
+              <FormInput
+                id="school-motto"
+                value={values.motto}
+                onChange={set('motto')}
+                maxLength={150}
+              />
             </FormField>
           </div>
           <p className="text-[11px] text-muted-foreground">
-            The school code ({school.code}) and subdomain ({school.subdomain}) identify your school and cannot be changed here.
+            The school code ({school.code}) and subdomain ({school.subdomain}) identify your school
+            and cannot be changed here.
           </p>
           {save.error && (
-            <p role="alert" className="text-xs text-destructive">{save.error.message}</p>
+            <p role="alert" className="text-xs text-destructive">
+              {save.error.message}
+            </p>
           )}
           <div className="flex gap-2">
             <button
@@ -165,7 +213,9 @@ export function SchoolSettingsForm({ school }: { school: SchoolDetails }) {
         <dl className="mt-5 grid gap-x-8 sm:grid-cols-2">
           {readOnly.map(([label, value]) => (
             <div key={label} className="border-b border-border/60 py-3 first:pt-0">
-              <dt className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70">{label}</dt>
+              <dt className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70">
+                {label}
+              </dt>
               <dd className="mt-1 text-xs font-medium text-foreground/80">{value}</dd>
             </div>
           ))}

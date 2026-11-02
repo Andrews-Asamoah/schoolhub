@@ -1,7 +1,7 @@
-import { createFileRoute, Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
-import { useSession } from "@/lib/auth-client";
-import { useEffect } from "react";
-import { SuperAdminLayout } from "@/components/superadmin/superadmin-layout";
+import { createFileRoute, Outlet, useNavigate, useRouterState } from '@tanstack/react-router';
+import { useSession } from '@/lib/auth-client';
+import { useEffect } from 'react';
+import { SuperAdminLayout } from '@/components/superadmin/superadmin-layout';
 
 /**
  * Layout route for all /admin/* pages.
@@ -10,7 +10,7 @@ import { SuperAdminLayout } from "@/components/superadmin/superadmin-layout";
  * redirect inside a component body is not valid in TanStack Router and
  * causes "Something went wrong" errors.
  */
-export const Route = createFileRoute("/admin")({
+export const Route = createFileRoute('/admin')({
   component: AdminLayout,
 });
 
@@ -22,21 +22,25 @@ function AdminLayout() {
   // Bootstrap credentials must be replaced before the portal can render.
   // The API independently blocks business endpoints until the password is changed.
   const needsPasswordChange =
-    session?.user?.role === "superAdmin" && Boolean(session.user.mustChangePassword);
+    session?.user?.role === 'superAdmin' && Boolean(session.user.mustChangePassword);
 
   // Platform administrators must use two-factor authentication. This is only
   // the friendly redirect: the API refuses every /super-admin request without it.
   const needsTwoFactor =
-    session?.user?.role === "superAdmin" && !needsPasswordChange && !session.user.twoFactorEnabled;
+    session?.user?.role === 'superAdmin' && !needsPasswordChange && !session.user.twoFactorEnabled;
 
   useEffect(() => {
     if (isPending) return;
-    if (!session?.user || session.user.role !== "superAdmin") {
-      void navigate({ to: "/login", replace: true });
+    if (!session?.user || session.user.role !== 'superAdmin') {
+      void navigate({ to: '/login', replace: true });
     } else if (needsPasswordChange) {
-      void navigate({ to: "/change-password", replace: true });
+      void navigate({ to: '/change-password', replace: true });
     } else if (needsTwoFactor) {
-      void navigate({ to: "/two-factor-setup", search: { audience: "super-admin" }, replace: true });
+      void navigate({
+        to: '/two-factor-setup',
+        search: { audience: 'super-admin' },
+        replace: true,
+      });
     }
   }, [session, isPending, navigate, needsPasswordChange, needsTwoFactor]);
 
@@ -54,7 +58,7 @@ function AdminLayout() {
   // While navigating away (unauthenticated), render nothing to avoid flash
   if (
     !session?.user ||
-    session.user.role !== "superAdmin" ||
+    session.user.role !== 'superAdmin' ||
     needsPasswordChange ||
     needsTwoFactor
   ) {
@@ -63,23 +67,23 @@ function AdminLayout() {
 
   // Derive active page from live router location
   const pathname = routerState.location.pathname;
-  let activePage = "dashboard";
-  if (pathname.includes("/admin/schools")) activePage = "schools";
-  else if (pathname.startsWith("/admin/users")) activePage = "users";
-  else if (pathname.startsWith("/admin/subscriptions")) activePage = "subscriptions";
-  else if (pathname.startsWith("/admin/plans")) activePage = "plans";
-  else if (pathname.startsWith("/admin/support")) activePage = "support";
-  else if (pathname.startsWith("/admin/audit")) activePage = "audit";
-  else if (pathname.startsWith("/admin/profile")) activePage = "profile";
+  let activePage = 'dashboard';
+  if (pathname.includes('/admin/schools')) activePage = 'schools';
+  else if (pathname.startsWith('/admin/users')) activePage = 'users';
+  else if (pathname.startsWith('/admin/subscriptions')) activePage = 'subscriptions';
+  else if (pathname.startsWith('/admin/plans')) activePage = 'plans';
+  else if (pathname.startsWith('/admin/support')) activePage = 'support';
+  else if (pathname.startsWith('/admin/audit')) activePage = 'audit';
+  else if (pathname.startsWith('/admin/profile')) activePage = 'profile';
   const breadcrumb = {
-    dashboard: "Dashboard",
-    schools: "Schools",
-    users: "System users",
-    subscriptions: "Subscriptions",
-    plans: "Subscription plans",
-    support: "Support desk",
-    audit: "Audit log",
-    profile: "Account & security",
+    dashboard: 'Dashboard',
+    schools: 'Schools',
+    users: 'System users',
+    subscriptions: 'Subscriptions',
+    plans: 'Subscription plans',
+    support: 'Support desk',
+    audit: 'Audit log',
+    profile: 'Account & security',
   }[activePage];
 
   return (

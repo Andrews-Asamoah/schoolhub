@@ -1,10 +1,10 @@
-import type { ReactNode } from "react";
-import { RefreshControl, Text, View, type StyleProp, type ViewStyle } from "react-native";
-import Animated, { useAnimatedScrollHandler, useSharedValue } from "react-native-reanimated";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { spacing, type, useTheme } from "@/theme/theme";
-import { Backdrop } from "./Backdrop";
-import { GlassHeader, HEADER_BAR_HEIGHT } from "./GlassHeader";
+import type { ReactNode } from 'react';
+import { RefreshControl, Text, View, type StyleProp, type ViewStyle } from 'react-native';
+import Animated, { useAnimatedScrollHandler, useSharedValue } from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { spacing, type, useTheme } from '@/theme/theme';
+import { Backdrop } from './Backdrop';
+import { GlassHeader, HEADER_BAR_HEIGHT } from './GlassHeader';
 
 type Props = {
   title?: string;
@@ -23,7 +23,16 @@ type Props = {
 
 /** Screen scaffold: backdrop, collapsing glass header, large title, pull-to-refresh. */
 export function Screen({
-  title, subtitle, left, right, children, scroll = true, refreshing, onRefresh, bottomInset = 0, contentStyle,
+  title,
+  subtitle,
+  left,
+  right,
+  children,
+  scroll = true,
+  refreshing,
+  onRefresh,
+  bottomInset = 0,
+  contentStyle,
 }: Props) {
   const { colors, accent } = useTheme();
   const insets = useSafeAreaInsets();
@@ -35,8 +44,12 @@ export function Screen({
   const top = insets.top + HEADER_BAR_HEIGHT;
   const heading = title ? (
     <View style={{ paddingBottom: spacing.lg }}>
-      <Text accessibilityRole="header" style={[type.largeTitle, { color: colors.foreground }]}>{title}</Text>
-      {subtitle ? <Text style={[type.body, { color: colors.mutedForeground, marginTop: 2 }]}>{subtitle}</Text> : null}
+      <Text accessibilityRole="header" style={[type.largeTitle, { color: colors.foreground }]}>
+        {title}
+      </Text>
+      {subtitle ? (
+        <Text style={[type.body, { color: colors.mutedForeground, marginTop: 2 }]}>{subtitle}</Text>
+      ) : null}
     </View>
   ) : null;
 
@@ -50,10 +63,23 @@ export function Screen({
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={[
-            { paddingTop: top, paddingHorizontal: spacing.lg, paddingBottom: insets.bottom + spacing.xxxl + bottomInset },
+            {
+              paddingTop: top,
+              paddingHorizontal: spacing.lg,
+              paddingBottom: insets.bottom + spacing.xxxl + bottomInset,
+            },
             contentStyle,
           ]}
-          refreshControl={onRefresh ? <RefreshControl refreshing={!!refreshing} onRefresh={onRefresh} tintColor={accent} progressViewOffset={top} /> : undefined}
+          refreshControl={
+            onRefresh ? (
+              <RefreshControl
+                refreshing={!!refreshing}
+                onRefresh={onRefresh}
+                tintColor={accent}
+                progressViewOffset={top}
+              />
+            ) : undefined
+          }
         >
           {heading}
           {children}
@@ -64,7 +90,7 @@ export function Screen({
           {children}
         </View>
       )}
-      <GlassHeader title={title ?? ""} scrollY={scrollY} left={left} right={right} />
+      <GlassHeader title={title ?? ''} scrollY={scrollY} left={left} right={right} />
     </View>
   );
 }

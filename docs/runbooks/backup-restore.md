@@ -4,11 +4,11 @@ Status: **template to be completed and rehearsed.** A backup that has never been
 
 ## What must be recoverable
 
-| Data | Where it lives | Backup method | Target |
-|---|---|---|---|
-| Application data (all schools) | PostgreSQL | Managed point-in-time recovery (PITR) plus a nightly logical dump | RPO [15 min], RTO [2 h] |
-| Uploaded files (logos, avatars, documents) | Cloudflare R2 bucket | Bucket versioning on; periodic copy to a second bucket or provider | RPO [24 h] |
-| Secrets (`BETTER_AUTH_SECRET`, R2 keys, DB URL) | Host secret store | Stored in a password manager the team can reach if the host is lost | n/a |
+| Data                                            | Where it lives       | Backup method                                                       | Target                  |
+| ----------------------------------------------- | -------------------- | ------------------------------------------------------------------- | ----------------------- |
+| Application data (all schools)                  | PostgreSQL           | Managed point-in-time recovery (PITR) plus a nightly logical dump   | RPO [15 min], RTO [2 h] |
+| Uploaded files (logos, avatars, documents)      | Cloudflare R2 bucket | Bucket versioning on; periodic copy to a second bucket or provider  | RPO [24 h]              |
+| Secrets (`BETTER_AUTH_SECRET`, R2 keys, DB URL) | Host secret store    | Stored in a password manager the team can reach if the host is lost | n/a                     |
 
 Losing `BETTER_AUTH_SECRET` signs everyone out and invalidates 2FA secrets and trusted devices; keep it backed up separately from the database.
 
@@ -57,5 +57,5 @@ Images are tagged by commit. Roll back by redeploying the previous tag. Migratio
 ## Drill log
 
 | Date | Backup used | Restore time | Verified by | Problems found |
-|---|---|---|---|---|
-| | | | | |
+| ---- | ----------- | ------------ | ----------- | -------------- |
+|      |             |              |             |                |

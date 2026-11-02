@@ -1,8 +1,8 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { createAsyncStoragePersister } from "@tanstack/query-async-storage-persister";
-import { QueryClient } from "@tanstack/react-query";
-import type { PersistQueryClientProviderProps } from "@tanstack/react-query-persist-client";
-import { ApiError } from "./api";
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { createAsyncStoragePersister } from '@tanstack/query-async-storage-persister';
+import { QueryClient } from '@tanstack/react-query';
+import type { PersistQueryClientProviderProps } from '@tanstack/react-query-persist-client';
+import { ApiError } from './api';
 
 export const queryClient = new QueryClient({
   defaultOptions: {
@@ -18,7 +18,7 @@ export const queryClient = new QueryClient({
   },
 });
 
-const STORAGE_KEY = "schoolhub:query-cache";
+const STORAGE_KEY = 'schoolhub:query-cache';
 export const persister = createAsyncStoragePersister({ storage: AsyncStorage, key: STORAGE_KEY });
 
 /**
@@ -26,12 +26,13 @@ export const persister = createAsyncStoragePersister({ storage: AsyncStorage, ke
  * is plain AsyncStorage, so never opt in data that is sensitive (reports,
  * fees, personal details). Timetables and announcements are fine.
  */
-export const persistOptions: PersistQueryClientProviderProps["persistOptions"] = {
+export const persistOptions: PersistQueryClientProviderProps['persistOptions'] = {
   persister,
   maxAge: 24 * 60 * 60 * 1000,
-  buster: "v1",
+  buster: 'v1',
   dehydrateOptions: {
-    shouldDehydrateQuery: (query) => query.state.status === "success" && query.meta?.persist === true,
+    shouldDehydrateQuery: (query) =>
+      query.state.status === 'success' && query.meta?.persist === true,
   },
 };
 

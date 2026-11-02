@@ -1,6 +1,6 @@
-import { useState, type ReactNode } from "react";
-import { LoaderCircle } from "lucide-react";
-import { apiDownload } from "@/lib/api";
+import { useState, type ReactNode } from 'react';
+import { LoaderCircle } from 'lucide-react';
+import { apiDownload } from '@/lib/api';
 
 export function ServerExportButton({
   endpoint,
@@ -24,7 +24,7 @@ export function ServerExportButton({
     try {
       await apiDownload(endpoint, fileName);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "The export could not be downloaded.");
+      setError(cause instanceof Error ? cause.message : 'The export could not be downloaded.');
     } finally {
       setPending(false);
     }
@@ -32,11 +32,21 @@ export function ServerExportButton({
 
   return (
     <span className="inline-flex min-w-0 flex-col items-start gap-1">
-      <button type="button" className={className} disabled={pending} aria-busy={pending} onClick={() => void downloadExport()}>
+      <button
+        type="button"
+        className={className}
+        disabled={pending}
+        aria-busy={pending}
+        onClick={() => void downloadExport()}
+      >
         {pending ? <LoaderCircle className="size-4 animate-spin" aria-hidden /> : icon}
-        <span>{pending ? "Preparing…" : label}</span>
+        <span>{pending ? 'Preparing…' : label}</span>
       </button>
-      {error && <span role="alert" className="max-w-xs text-xs text-destructive">{error}</span>}
+      {error && (
+        <span role="alert" className="max-w-xs text-xs text-destructive">
+          {error}
+        </span>
+      )}
     </span>
   );
 }

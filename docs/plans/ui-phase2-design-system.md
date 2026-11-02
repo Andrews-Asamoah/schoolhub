@@ -4,6 +4,7 @@ This PR introduces consistent shadcn-inspired UI building blocks, retaining
 SchoolHub's semantic design tokens and existing business logic.
 
 ## Shared components
+
 - `ui/page-header.tsx`: one responsive page header with eyebrow, optional icon,
   description and actions
 - `ui/page-container.tsx`: one responsive content width/spacing for school and
@@ -16,6 +17,7 @@ SchoolHub's semantic design tokens and existing business logic.
   focus indicators and theme tokens
 
 ## Roll-out
+
 - School page headings and empty states now use the same components as
   the superadmin equivalents
 - Layouts share a 1500px maximum content width and responsive gutters
@@ -25,6 +27,7 @@ SchoolHub's semantic design tokens and existing business logic.
 - Clickable financial metric cards are real keyboard-operable buttons
 
 ## Guardrails
+
 - No changes to roles, tenant access, accounting calculations or API contracts
 - Keep `pnpm --filter @schoolhub/web lint:theme` passing in both themes
 - Accessibility and visual smoke tests (mobile/desktop, light/dark, calendar

@@ -12,10 +12,7 @@ import {
 } from '@nestjs/common';
 import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import type { School } from '@prisma/client';
-import {
-  schoolHubtelConnectionSchema,
-  type SchoolHubtelConnectionInput,
-} from '@schoolhub/shared';
+import { schoolHubtelConnectionSchema, type SchoolHubtelConnectionInput } from '@schoolhub/shared';
 import { CurrentSchool } from '../../common/decorators/current-school.decorator.js';
 import { Roles } from '../../common/decorators/roles.decorator.js';
 import { SchoolTenantGuard } from '../../common/guards/school-tenant.guard.js';
@@ -27,12 +24,7 @@ import { AuditActorParam } from '../../common/audit/audit-actor.decorator.js';
 import type { AuditActor } from '../../common/audit/audit.js';
 import { SchoolSmsService } from './school-sms.service.js';
 @Controller('notifications/delivery/sms-account')
-@UseGuards(
-  SchoolTenantGuard,
-  RolesGuard,
-  NotificationDeliveryAdminGuard,
-  ThrottlerGuard,
-)
+@UseGuards(SchoolTenantGuard, RolesGuard, NotificationDeliveryAdminGuard, ThrottlerGuard)
 @Roles('owner', 'admin')
 @Throttle({ default: { limit: 10, ttl: 60000 } })
 export class SchoolSmsController {
@@ -77,9 +69,7 @@ export class SchoolSmsController {
 @Throttle({ default: { limit: 10, ttl: 60000 } })
 export class SuperAdminSchoolSmsController {
   constructor(private readonly sms: SchoolSmsService) {}
-  @Get(':id/sms') @Header('Cache-Control', 'no-store') status(
-    @Param('id') id: string,
-  ) {
+  @Get(':id/sms') @Header('Cache-Control', 'no-store') status(@Param('id') id: string) {
     return this.sms.status(id);
   }
   @Put(':id/sms') @Header('Cache-Control', 'no-store') save(

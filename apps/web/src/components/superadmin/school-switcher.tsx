@@ -1,7 +1,7 @@
-import { useQuery } from "@tanstack/react-query";
-import { useNavigate } from "@tanstack/react-router";
-import { Building2 } from "lucide-react";
-import { apiFetch } from "@/lib/api";
+import { useQuery } from '@tanstack/react-query';
+import { useNavigate } from '@tanstack/react-router';
+import { Building2 } from 'lucide-react';
+import { apiFetch } from '@/lib/api';
 
 interface SchoolOption {
   id: string;
@@ -12,8 +12,8 @@ interface SchoolOption {
 export function SchoolSwitcher() {
   const navigate = useNavigate();
   const schools = useQuery({
-    queryKey: ["superadmin", "school-options"],
-    queryFn: () => apiFetch<SchoolOption[]>("/super-admin/schools/options"),
+    queryKey: ['superadmin', 'school-options'],
+    queryFn: () => apiFetch<SchoolOption[]>('/super-admin/schools/options'),
     retry: false,
   });
 
@@ -39,7 +39,7 @@ export function SchoolSwitcher() {
           const schoolId = event.target.value;
           if (schoolId) {
             void navigate({
-              to: "/admin/schools/$schoolId",
+              to: '/admin/schools/$schoolId',
               params: { schoolId },
             });
           }

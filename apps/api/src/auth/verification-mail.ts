@@ -13,8 +13,7 @@ export async function sendAccountVerification(
 ) {
   if (!transport.emailConfigured())
     throw new APIError('SERVICE_UNAVAILABLE', {
-      message:
-        'Email verification delivery is not configured. Contact school support.',
+      message: 'Email verification delivery is not configured. Contact school support.',
     });
   const result = await transport.send(
     'EMAIL',
@@ -27,15 +26,39 @@ export async function sendAccountVerification(
     },
   );
   if (result.state !== 'ACCEPTED') {
-    logger.warn(JSON.stringify({ event: 'account.verification.delivery_failed', reason: result.reason, providerStatus: result.providerStatus ?? null, providerCode: result.providerCode ?? null }));
+    logger.warn(
+      JSON.stringify({
+        event: 'account.verification.delivery_failed',
+        reason: result.reason,
+        providerStatus: result.providerStatus ?? null,
+        providerCode: result.providerCode ?? null,
+      }),
+    );
     let message = 'The verification email could not be confirmed. Please try again later.';
-    if (result.providerStatus === 429 || result.providerCode === 'daily_quota_exceeded' || result.providerCode === 'monthly_quota_exceeded') message = 'Resend has reached a sending limit. Check the account quota and try again later.';
-    else if (result.providerStatus === 401) message = 'Resend rejected the email API key. Ask the administrator to check RESEND_API_KEY and restart the API.';
-    else if (result.providerStatus === 403) message = 'Resend denied this email. Ask the administrator to check the verified sender domain, API key permissions and any test-recipient restrictions in Resend Logs.';
-    else if (result.providerStatus === 400 || result.providerStatus === 422) message = 'Resend rejected the verification email details. Check the API key, sender and recipient addresses; the administrator can inspect Resend Logs for the exact error.';
-    else if (result.providerStatus === 409) message = 'Resend could not process this verification request yet. Wait a moment, then request a fresh verification email.';
-    else if (result.reason === 'PROVIDER_OUTCOME_UNKNOWN') message = 'SchoolHub could not confirm a response from Resend. Check your inbox before retrying; the administrator should check the API server connection to Resend.';
-    else if (result.providerStatus && result.providerStatus >= 500) message = 'Resend is temporarily unable to confirm this email. Check your inbox and try again later.';
+    if (
+      result.providerStatus === 429 ||
+      result.providerCode === 'daily_quota_exceeded' ||
+      result.providerCode === 'monthly_quota_exceeded'
+    )
+      message = 'Resend has reached a sending limit. Check the account quota and try again later.';
+    else if (result.providerStatus === 401)
+      message =
+        'Resend rejected the email API key. Ask the administrator to check RESEND_API_KEY and restart the API.';
+    else if (result.providerStatus === 403)
+      message =
+        'Resend denied this email. Ask the administrator to check the verified sender domain, API key permissions and any test-recipient restrictions in Resend Logs.';
+    else if (result.providerStatus === 400 || result.providerStatus === 422)
+      message =
+        'Resend rejected the verification email details. Check the API key, sender and recipient addresses; the administrator can inspect Resend Logs for the exact error.';
+    else if (result.providerStatus === 409)
+      message =
+        'Resend could not process this verification request yet. Wait a moment, then request a fresh verification email.';
+    else if (result.reason === 'PROVIDER_OUTCOME_UNKNOWN')
+      message =
+        'SchoolHub could not confirm a response from Resend. Check your inbox before retrying; the administrator should check the API server connection to Resend.';
+    else if (result.providerStatus && result.providerStatus >= 500)
+      message =
+        'Resend is temporarily unable to confirm this email. Check your inbox and try again later.';
     throw new APIError('SERVICE_UNAVAILABLE', { message });
   }
 }

@@ -1,13 +1,19 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CircleAlert, Crown, LoaderCircle, Lock, ShieldCheck, UserRoundCog, X } from "lucide-react";
-import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { ROLES, updateSchoolMemberRolesSchema, type Role } from "@schoolhub/shared";
-import { DataTable, type DataTableColumn } from "@/components/ui/data-table";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { schoolRoleLabel, useSchoolRole } from "@/components/school/school-role-switcher";
-import { useSession } from "@/lib/auth-client";
-import { useCanExportTables } from "@/lib/table-export-policy";
-import { apiFetch } from "@/lib/api";
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { CircleAlert, Crown, LoaderCircle, Lock, ShieldCheck, UserRoundCog, X } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
+import { ROLES, updateSchoolMemberRolesSchema, type Role } from '@schoolhub/shared';
+import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { schoolRoleLabel, useSchoolRole } from '@/components/school/school-role-switcher';
+import { useSession } from '@/lib/auth-client';
+import { useCanExportTables } from '@/lib/table-export-policy';
+import { apiFetch } from '@/lib/api';
 
 interface SchoolMember {
   userId: string;
@@ -18,22 +24,22 @@ interface SchoolMember {
 }
 
 /** Mirrors the API: only the owner may grant or remove these. */
-const OWNER_ONLY: readonly Role[] = ["admin", "headteacher"];
+const OWNER_ONLY: readonly Role[] = ['admin', 'headteacher'];
 
 const ROLE_HELP: Record<Role, string> = {
-  owner: "Owns the school workspace.",
-  admin: "Manages school settings, classes, people and roles.",
-  headteacher: "Same management access as an administrator.",
-  teacher: "Their students and classes, subjects, timetable, assessments and attendance.",
-  accountant: "Fees, payments, expenses and payroll.",
-  staff: "General records, attendance and inventory.",
-  student: "Student portal and timetable.",
-  guardian: "Parent portal for their own children. Can be combined with any other role.",
+  owner: 'Owns the school workspace.',
+  admin: 'Manages school settings, classes, people and roles.',
+  headteacher: 'Same management access as an administrator.',
+  teacher: 'Their students and classes, subjects, timetable, assessments and attendance.',
+  accountant: 'Fees, payments, expenses and payroll.',
+  staff: 'General records, attendance and inventory.',
+  student: 'Student portal and timetable.',
+  guardian: 'Parent portal for their own children. Can be combined with any other role.',
 };
 
-const assignable = ROLES.filter((role) => role !== "owner");
+const assignable = ROLES.filter((role) => role !== 'owner');
 const inputClass =
-  "h-9 rounded-lg border border-border bg-card px-3 text-xs text-foreground/80 outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/20";
+  'h-9 rounded-lg border border-border bg-card px-3 text-xs text-foreground/80 outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/20';
 
 export function TeamRoleWorkspace() {
   const queryClient = useQueryClient();
@@ -41,22 +47,24 @@ export function TeamRoleWorkspace() {
   const { primaryRole: actorRole } = useSchoolRole();
   const canExport = useCanExportTables();
   const [editing, setEditing] = useState<SchoolMember | null>(null);
-  const [filter, setFilter] = useState<Role | "all">("all");
+  const [filter, setFilter] = useState<Role | 'all'>('all');
   const [notice, setNotice] = useState<string | null>(null);
 
   const members = useQuery({
-    queryKey: ["school", "members"],
-    queryFn: () => apiFetch<SchoolMember[]>("/schools/members"),
+    queryKey: ['school', 'members'],
+    queryFn: () => apiFetch<SchoolMember[]>('/schools/members'),
     retry: false,
   });
 
   const rows = useMemo(
-    () => (members.data ?? []).filter((member) => filter === "all" || member.roles.includes(filter)),
+    () =>
+      (members.data ?? []).filter((member) => filter === 'all' || member.roles.includes(filter)),
     [members.data, filter],
   );
   const counts = useMemo(() => {
     const result = new Map<Role, number>();
-    for (const member of members.data ?? []) for (const role of member.roles) result.set(role, (result.get(role) ?? 0) + 1);
+    for (const member of members.data ?? [])
+      for (const role of member.roles) result.set(role, (result.get(role) ?? 0) + 1);
     return result;
   }, [members.data]);
 
@@ -70,7 +78,10 @@ export function TeamRoleWorkspace() {
   }
   if (members.error) {
     return (
-      <div role="alert" className="rounded-xl border border-destructive/20 bg-destructive/10 p-4 text-sm text-destructive">
+      <div
+        role="alert"
+        className="rounded-xl border border-destructive/20 bg-destructive/10 p-4 text-sm text-destructive"
+      >
         School accounts could not be loaded: {members.error.message}
       </div>
     );
@@ -78,15 +89,17 @@ export function TeamRoleWorkspace() {
 
   const columns: DataTableColumn<SchoolMember>[] = [
     {
-      id: "person",
-      header: "Person",
+      id: 'person',
+      header: 'Person',
       value: (member) => `${member.name} (${member.email})`,
       cell: (member) => (
         <div className="min-w-0">
           <p className="truncate text-sm font-semibold text-foreground">
             {member.name}
             {member.userId === session?.user?.id && (
-              <span className="ml-2 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">You</span>
+              <span className="ml-2 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">
+                You
+              </span>
             )}
           </p>
           <p className="truncate text-xs text-muted-foreground">{member.email}</p>
@@ -94,30 +107,33 @@ export function TeamRoleWorkspace() {
       ),
     },
     {
-      id: "primary",
-      header: "Primary role",
+      id: 'primary',
+      header: 'Primary role',
       value: (member) => schoolRoleLabel(member.primaryRole),
       cell: (member) => (
         <span className="inline-flex items-center gap-1 rounded-full border border-primary/20 bg-primary/10 px-2.5 py-1 text-[11px] font-semibold text-primary">
-          {member.primaryRole === "owner" && <Crown className="size-3" />}
+          {member.primaryRole === 'owner' && <Crown className="size-3" />}
           {schoolRoleLabel(member.primaryRole)}
         </span>
       ),
     },
     {
-      id: "extra",
-      header: "Additional roles",
+      id: 'extra',
+      header: 'Additional roles',
       value: (member) =>
         member.roles
           .filter((role) => role !== member.primaryRole)
           .map(schoolRoleLabel)
-          .join(", "),
+          .join(', '),
       cell: (member) => {
         const extra = member.roles.filter((role) => role !== member.primaryRole);
         return extra.length ? (
           <div className="flex flex-wrap gap-1.5">
             {extra.map((role) => (
-              <span key={role} className="rounded-full bg-muted px-2.5 py-1 text-[11px] font-medium text-foreground">
+              <span
+                key={role}
+                className="rounded-full bg-muted px-2.5 py-1 text-[11px] font-medium text-foreground"
+              >
                 {schoolRoleLabel(role)}
               </span>
             ))}
@@ -128,9 +144,9 @@ export function TeamRoleWorkspace() {
       },
     },
     {
-      id: "actions",
-      header: "",
-      className: "text-right",
+      id: 'actions',
+      header: '',
+      className: 'text-right',
       cell: (member) => (
         <button
           type="button"
@@ -157,14 +173,20 @@ export function TeamRoleWorkspace() {
           <div>
             <h2 className="text-base font-bold text-foreground">Team roles</h2>
             <p className="mt-1 max-w-3xl text-sm leading-6 text-muted-foreground">
-              One account can hold several roles in this school, for example a teacher who is also an accountant. Each person keeps their primary role and can switch between the roles you give them. Only the school owner can grant or remove administrator and headteacher access.
+              One account can hold several roles in this school, for example a teacher who is also
+              an accountant. Each person keeps their primary role and can switch between the roles
+              you give them. Only the school owner can grant or remove administrator and headteacher
+              access.
             </p>
           </div>
         </div>
       </div>
 
       {notice && (
-        <p role="status" className="rounded-xl border border-success/20 bg-success/10 px-4 py-3 text-sm text-success">
+        <p
+          role="status"
+          className="rounded-xl border border-success/20 bg-success/10 px-4 py-3 text-sm text-success"
+        >
           {notice}
         </p>
       )}
@@ -172,12 +194,16 @@ export function TeamRoleWorkspace() {
       <div className="flex flex-wrap items-center gap-2">
         <label className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
           Show
-          <Select value={filter} onValueChange={(value) => setFilter(value as Role | "all")}>
-            <SelectTrigger aria-label="Filter team by role" className={inputClass}><SelectValue /></SelectTrigger>
+          <Select value={filter} onValueChange={(value) => setFilter(value as Role | 'all')}>
+            <SelectTrigger aria-label="Filter team by role" className={inputClass}>
+              <SelectValue />
+            </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Everyone ({members.data?.length ?? 0})</SelectItem>
               {ROLES.filter((role) => counts.has(role)).map((role) => (
-                <SelectItem key={role} value={role}>{schoolRoleLabel(role)} ({counts.get(role)})</SelectItem>
+                <SelectItem key={role} value={role}>
+                  {schoolRoleLabel(role)} ({counts.get(role)})
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -191,11 +217,11 @@ export function TeamRoleWorkspace() {
         exportTitle="Team roles"
         canExport={canExport}
         searchPlaceholder="Search name or email…"
-        emptyTitle={filter === "all" ? "No school accounts yet" : "No one has this role"}
+        emptyTitle={filter === 'all' ? 'No school accounts yet' : 'No one has this role'}
         emptyDescription={
-          filter === "all"
-            ? "Accounts appear here once people are given a login."
-            : "Choose another role to see who holds it."
+          filter === 'all'
+            ? 'Accounts appear here once people are given a login.'
+            : 'Choose another role to see who holds it.'
         }
       />
 
@@ -203,7 +229,7 @@ export function TeamRoleWorkspace() {
         <RoleDialog
           key={editing.userId}
           member={editing}
-          actorIsOwner={actorRole === "owner"}
+          actorIsOwner={actorRole === 'owner'}
           onClose={() => setEditing(null)}
           onSaved={async (updated) => {
             setEditing(null);
@@ -211,12 +237,12 @@ export function TeamRoleWorkspace() {
             // A new teacher role also creates a teacher record, so refresh everything
             // that lists teachers (people, class teachers, subjects, timetable).
             await Promise.all([
-              queryClient.invalidateQueries({ queryKey: ["school", "members"] }),
-              queryClient.invalidateQueries({ queryKey: ["schools", "roles"] }),
-              queryClient.invalidateQueries({ queryKey: ["people"] }),
-              queryClient.invalidateQueries({ queryKey: ["academics"] }),
-              queryClient.invalidateQueries({ queryKey: ["subjects"] }),
-              queryClient.invalidateQueries({ queryKey: ["timetable"] }),
+              queryClient.invalidateQueries({ queryKey: ['school', 'members'] }),
+              queryClient.invalidateQueries({ queryKey: ['schools', 'roles'] }),
+              queryClient.invalidateQueries({ queryKey: ['people'] }),
+              queryClient.invalidateQueries({ queryKey: ['academics'] }),
+              queryClient.invalidateQueries({ queryKey: ['subjects'] }),
+              queryClient.invalidateQueries({ queryKey: ['timetable'] }),
             ]);
           }}
         />
@@ -238,15 +264,16 @@ function RoleDialog({
 }) {
   const [selected, setSelected] = useState<Role[]>(member.roles);
   const [problem, setProblem] = useState<string | null>(null);
-  const [teacherDepartmentId, setTeacherDepartmentId] = useState("");
-  const [guardianPhone, setGuardianPhone] = useState("");
+  const [teacherDepartmentId, setTeacherDepartmentId] = useState('');
+  const [guardianPhone, setGuardianPhone] = useState('');
   // A guardian (parent) record is created the first time that role is granted.
-  const newGuardian = selected.includes("guardian") && !member.roles.includes("guardian");
+  const newGuardian = selected.includes('guardian') && !member.roles.includes('guardian');
   // A teacher record (with a department) is created the first time the role is granted.
-  const newTeacher = selected.includes("teacher") && !member.roles.includes("teacher");
+  const newTeacher = selected.includes('teacher') && !member.roles.includes('teacher');
   const departments = useQuery({
-    queryKey: ["academics", "departments"],
-    queryFn: () => apiFetch<{ id: string; name: string; isActive: boolean }[]>("/academics/departments"),
+    queryKey: ['academics', 'departments'],
+    queryFn: () =>
+      apiFetch<{ id: string; name: string; isActive: boolean }[]>('/academics/departments'),
     enabled: newTeacher,
     retry: false,
   });
@@ -257,13 +284,13 @@ function RoleDialog({
   // Runs once: focus the first option, close on Escape, and hand focus back on close.
   useEffect(() => {
     const previous = document.activeElement as HTMLElement | null;
-    panelRef.current?.querySelector<HTMLElement>("input:not(:disabled)")?.focus();
+    panelRef.current?.querySelector<HTMLElement>('input:not(:disabled)')?.focus();
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") closeRef.current();
+      if (event.key === 'Escape') closeRef.current();
     };
-    document.addEventListener("keydown", onKey);
+    document.addEventListener('keydown', onKey);
     return () => {
-      document.removeEventListener("keydown", onKey);
+      document.removeEventListener('keydown', onKey);
       previous?.focus();
     };
   }, []);
@@ -271,29 +298,32 @@ function RoleDialog({
   const save = useMutation({
     mutationFn: (body: { roles: Role[]; teacherDepartmentId?: string; guardianPhone?: string }) =>
       apiFetch<SchoolMember>(`/schools/members/${member.userId}/roles`, {
-        method: "PATCH",
+        method: 'PATCH',
         body: JSON.stringify(body),
       }),
     onSuccess: onSaved,
   });
 
   const changed =
-    selected.length !== member.roles.length || selected.some((role) => !member.roles.includes(role));
+    selected.length !== member.roles.length ||
+    selected.some((role) => !member.roles.includes(role));
 
   function toggle(role: Role, checked: boolean) {
     setProblem(null);
-    setSelected((current) => (checked ? [...new Set([...current, role])] : current.filter((item) => item !== role)));
+    setSelected((current) =>
+      checked ? [...new Set([...current, role])] : current.filter((item) => item !== role),
+    );
   }
 
   function submit(event: FormEvent) {
     event.preventDefault();
     const parsed = updateSchoolMemberRolesSchema.safeParse({ roles: selected });
-    if (!parsed.success) return setProblem("Choose at least one role.");
+    if (!parsed.success) return setProblem('Choose at least one role.');
     if (newTeacher && !teacherDepartmentId) {
-      return setProblem("Choose the department this teacher belongs to.");
+      return setProblem('Choose the department this teacher belongs to.');
     }
     if (newGuardian && guardianPhone.trim().length < 7) {
-      return setProblem("Enter a phone number for this parent.");
+      return setProblem('Enter a phone number for this parent.');
     }
     setProblem(null);
     save.mutate({
@@ -337,16 +367,16 @@ function RoleDialog({
         <form onSubmit={submit} noValidate className="mt-4">
           <fieldset className="space-y-2">
             <legend className="sr-only">Assigned roles</legend>
-            {member.primaryRole === "owner" && (
+            {member.primaryRole === 'owner' && (
               <RoleOption role="owner" checked disabled note="Primary role, cannot be removed." />
             )}
             {assignable.map((role) => {
               const isPrimary = role === member.primaryRole;
               const ownerOnly = OWNER_ONLY.includes(role) && !actorIsOwner;
               const note = isPrimary
-                ? "Primary role, cannot be removed."
+                ? 'Primary role, cannot be removed.'
                 : ownerOnly
-                  ? "Only the school owner can change this."
+                  ? 'Only the school owner can change this.'
                   : ROLE_HELP[role];
               return (
                 <RoleOption
@@ -366,27 +396,40 @@ function RoleDialog({
             <div className="mt-4 rounded-xl border border-primary/20 bg-primary/10 p-3">
               <label className="block text-xs font-semibold text-foreground">
                 Teacher&apos;s department
-                <Select value={teacherDepartmentId || "__none__"} onValueChange={(value) => {
-                  setProblem(null);
-                  setTeacherDepartmentId(value === "__none__" ? "" : value);
-                }}>
-                  <SelectTrigger aria-label="Teacher's department" className={`${inputClass} mt-1.5 w-full`}><SelectValue /></SelectTrigger>
+                <Select
+                  value={teacherDepartmentId || '__none__'}
+                  onValueChange={(value) => {
+                    setProblem(null);
+                    setTeacherDepartmentId(value === '__none__' ? '' : value);
+                  }}
+                >
+                  <SelectTrigger
+                    aria-label="Teacher's department"
+                    className={`${inputClass} mt-1.5 w-full`}
+                  >
+                    <SelectValue />
+                  </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="__none__">
                       {departments.isPending
-                        ? "Loading departments…"
+                        ? 'Loading departments…'
                         : (departments.data ?? []).length
-                          ? "Select a department"
-                          : "No departments yet"}
+                          ? 'Select a department'
+                          : 'No departments yet'}
                     </SelectItem>
-                    {(departments.data ?? []).filter((department) => department.isActive).map((department) => (
-                      <SelectItem key={department.id} value={department.id}>{department.name}</SelectItem>
-                    ))}
+                    {(departments.data ?? [])
+                      .filter((department) => department.isActive)
+                      .map((department) => (
+                        <SelectItem key={department.id} value={department.id}>
+                          {department.name}
+                        </SelectItem>
+                      ))}
                   </SelectContent>
                 </Select>
               </label>
               <p className="mt-1.5 text-[11px] text-muted-foreground">
-                A teacher record is created so this person can be assigned to classes, subjects and the timetable.
+                A teacher record is created so this person can be assigned to classes, subjects and
+                the timetable.
               </p>
             </div>
           )}
@@ -407,15 +450,18 @@ function RoleDialog({
                 />
               </label>
               <p className="mt-1.5 text-[11px] text-muted-foreground">
-                A parent record is created so this person can be linked to their children and see them
-                in the parent portal. Link children from the Guardians page. They keep their current
-                password and sign in as usual.
+                A parent record is created so this person can be linked to their children and see
+                them in the parent portal. Link children from the Guardians page. They keep their
+                current password and sign in as usual.
               </p>
             </div>
           )}
 
           {(problem || save.error) && (
-            <p role="alert" className="mt-4 flex items-start gap-2 rounded-lg border border-destructive/20 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+            <p
+              role="alert"
+              className="mt-4 flex items-start gap-2 rounded-lg border border-destructive/20 bg-destructive/10 px-3 py-2 text-xs text-destructive"
+            >
               <CircleAlert className="mt-0.5 size-3.5 shrink-0" />
               {problem ?? `Roles could not be saved: ${save.error?.message}`}
             </p>
@@ -463,10 +509,8 @@ function RoleOption({
   return (
     <label
       className={`flex items-start gap-3 rounded-xl border px-3 py-2.5 ${
-        checked
-          ? "border-primary/20 bg-primary/10"
-          : "border-border/60"
-      }  ${disabled ? "opacity-80" : "cursor-pointer hover:bg-muted/50"}`}
+        checked ? 'border-primary/20 bg-primary/10' : 'border-border/60'
+      }  ${disabled ? 'opacity-80' : 'cursor-pointer hover:bg-muted/50'}`}
     >
       <input
         type="checkbox"

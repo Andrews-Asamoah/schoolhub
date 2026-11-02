@@ -1,4 +1,4 @@
-import type { AuditAction, Prisma } from "@prisma/client";
+import type { AuditAction, Prisma } from '@prisma/client';
 
 /** Who performed an action, captured once at the controller boundary. */
 export interface AuditActor {
@@ -23,12 +23,13 @@ const SENSITIVE_KEYS = /password|token|secret|authorization|hash/i;
 export function redactForAudit(value: unknown, depth = 0): unknown {
   if (value === null || value === undefined) return value ?? null;
   if (value instanceof Date) return value.toISOString();
-  if (typeof value !== "object") return value;
-  if (depth > 5) return "[truncated]";
-  if (Array.isArray(value)) return value.slice(0, 100).map((item) => redactForAudit(item, depth + 1));
+  if (typeof value !== 'object') return value;
+  if (depth > 5) return '[truncated]';
+  if (Array.isArray(value))
+    return value.slice(0, 100).map((item) => redactForAudit(item, depth + 1));
   const out: Record<string, unknown> = {};
   for (const [key, inner] of Object.entries(value as Record<string, unknown>)) {
-    out[key] = SENSITIVE_KEYS.test(key) ? "[redacted]" : redactForAudit(inner, depth + 1);
+    out[key] = SENSITIVE_KEYS.test(key) ? '[redacted]' : redactForAudit(inner, depth + 1);
   }
   return out;
 }
@@ -38,7 +39,7 @@ export function redactForAudit(value: unknown, depth = 0): unknown {
  * commits (or rolls back) together with the change it describes.
  */
 export async function writeAudit(
-  client: Pick<Prisma.TransactionClient, "auditLog">,
+  client: Pick<Prisma.TransactionClient, 'auditLog'>,
   actor: AuditActor,
   entry: AuditEntry,
 ) {
@@ -49,8 +50,10 @@ export async function writeAudit(
       action: entry.action,
       entityType: entry.entityType,
       entityId: entry.entityId,
-      oldValues: (redactForAudit(entry.oldValues) ?? undefined) as Prisma.InputJsonValue | undefined,
-      newValues: (redactForAudit(entry.newValues) ?? undefined) as Prisma.InputJsonValue | undefined,
+      oldValues: (redactForAudit(entry.oldValues) ?? undefined) as
+        Prisma.InputJsonValue | undefined,
+      newValues: (redactForAudit(entry.newValues) ?? undefined) as
+        Prisma.InputJsonValue | undefined,
       ipAddress: actor.ipAddress,
       userAgent: actor.userAgent?.slice(0, 300) ?? null,
     },
@@ -63,9 +66,9 @@ export function actorFromRequest(request: {
   ip?: string;
   headers?: Record<string, string | string[] | undefined>;
 }): AuditActor {
-  const userAgent = request.headers?.["user-agent"];
+  const userAgent = request.headers?.['user-agent'];
   return {
-    id: request.session?.user?.id ?? "unknown",
+    id: request.session?.user?.id ?? 'unknown',
     ipAddress: request.ip ?? null,
     userAgent: Array.isArray(userAgent) ? (userAgent[0] ?? null) : (userAgent ?? null),
   };

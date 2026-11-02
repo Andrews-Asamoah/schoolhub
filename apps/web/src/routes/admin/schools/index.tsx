@@ -1,19 +1,19 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { useState } from "react";
-import { Plus, School } from "lucide-react";
-import { apiFetch } from "@/lib/api";
-import { SubscriptionBadge } from "@/components/superadmin/subscription-badge";
-import { DataTable, type DataTableColumn } from "@/components/ui/data-table";
-import { PageHeader } from "@/components/superadmin/page-header";
-import { Pagination } from "@/components/superadmin/pagination";
-import { SearchInput } from "@/components/superadmin/search-input";
-import { FilterChips } from "@/components/superadmin/filter-chips";
-import { EmptyPanel, ErrorPanel, LoadingPanel } from "@/components/superadmin/state-panels";
-import { useDebouncedValue } from "@/components/superadmin/use-debounced-value";
-import { cn } from "@/lib/utils";
+import { createFileRoute, Link } from '@tanstack/react-router';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
+import { Plus, School } from 'lucide-react';
+import { apiFetch } from '@/lib/api';
+import { SubscriptionBadge } from '@/components/superadmin/subscription-badge';
+import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
+import { PageHeader } from '@/components/superadmin/page-header';
+import { Pagination } from '@/components/superadmin/pagination';
+import { SearchInput } from '@/components/superadmin/search-input';
+import { FilterChips } from '@/components/superadmin/filter-chips';
+import { EmptyPanel, ErrorPanel, LoadingPanel } from '@/components/superadmin/state-panels';
+import { useDebouncedValue } from '@/components/superadmin/use-debounced-value';
+import { cn } from '@/lib/utils';
 
-export const Route = createFileRoute("/admin/schools/")({
+export const Route = createFileRoute('/admin/schools/')({
   component: SchoolsListPage,
 });
 
@@ -36,16 +36,16 @@ const LIMIT = 20;
 
 function SchoolsListPage() {
   const [page, setPage] = useState(1);
-  const [search, setSearch] = useState("");
-  const [status, setStatus] = useState("all");
+  const [search, setSearch] = useState('');
+  const [status, setStatus] = useState('all');
   const q = useDebouncedValue(search.trim());
 
   const params = new URLSearchParams({ page: String(page), limit: String(LIMIT) });
-  if (q) params.set("q", q);
-  if (status !== "all") params.set("status", status);
+  if (q) params.set('q', q);
+  if (status !== 'all') params.set('status', status);
 
   const { data, isPending, error, isPlaceholderData, refetch } = useQuery({
-    queryKey: ["superadmin", "schools", params.toString()],
+    queryKey: ['superadmin', 'schools', params.toString()],
     queryFn: () => apiFetch<SchoolsListResponse>(`/super-admin/schools?${params.toString()}`),
     placeholderData: keepPreviousData,
     retry: false,
@@ -54,8 +54,8 @@ function SchoolsListPage() {
 
   const columns: DataTableColumn<SchoolSummary>[] = [
     {
-      id: "name",
-      header: "School Name",
+      id: 'name',
+      header: 'School Name',
       value: (school) => `${school.name} (${school.subdomain})`,
       cell: (school) => (
         <div>
@@ -65,29 +65,57 @@ function SchoolsListPage() {
       ),
     },
     {
-      id: "code",
-      header: "Code",
+      id: 'code',
+      header: 'Code',
       value: (school) => school.code,
-      cell: (school) => <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs text-foreground">{school.code}</code>,
+      cell: (school) => (
+        <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs text-foreground">
+          {school.code}
+        </code>
+      ),
     },
-    { id: "students", header: "Students", value: (school) => school._count.students, cell: (school) => <span className="text-sm font-medium text-foreground">{school._count.students}</span> },
-    { id: "teachers", header: "Teachers", value: (school) => school._count.teachers, cell: (school) => <span className="text-sm font-medium text-foreground">{school._count.teachers}</span> },
     {
-      id: "subscription",
-      header: "Subscription",
+      id: 'students',
+      header: 'Students',
+      value: (school) => school._count.students,
+      cell: (school) => (
+        <span className="text-sm font-medium text-foreground">{school._count.students}</span>
+      ),
+    },
+    {
+      id: 'teachers',
+      header: 'Teachers',
+      value: (school) => school._count.teachers,
+      cell: (school) => (
+        <span className="text-sm font-medium text-foreground">{school._count.teachers}</span>
+      ),
+    },
+    {
+      id: 'subscription',
+      header: 'Subscription',
       value: (school) => school.organization.subscriptionStatus,
-      cell: (school) => <SubscriptionBadge status={school.organization.subscriptionStatus} expiresAt={school.organization.expiresAt} />,
+      cell: (school) => (
+        <SubscriptionBadge
+          status={school.organization.subscriptionStatus}
+          expiresAt={school.organization.expiresAt}
+        />
+      ),
     },
     {
-      id: "enrolled",
-      header: "Enrolled",
+      id: 'enrolled',
+      header: 'Enrolled',
       value: (school) => school.createdAt.slice(0, 10),
-      cell: (school) => new Date(school.createdAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }),
+      cell: (school) =>
+        new Date(school.createdAt).toLocaleDateString('en-GB', {
+          day: 'numeric',
+          month: 'short',
+          year: 'numeric',
+        }),
     },
     {
-      id: "actions",
-      header: "",
-      className: "text-right",
+      id: 'actions',
+      header: '',
+      className: 'text-right',
       cell: (school) => (
         <Link
           to="/admin/schools/$schoolId"
@@ -105,9 +133,16 @@ function SchoolsListPage() {
       <PageHeader
         eyebrow="Platform management"
         title="Schools"
-        description={data ? `${data.meta.total.toLocaleString()} ${q || status !== "all" ? "matching" : "registered"} schools` : "Loading…"}
+        description={
+          data
+            ? `${data.meta.total.toLocaleString()} ${q || status !== 'all' ? 'matching' : 'registered'} schools`
+            : 'Loading…'
+        }
         actions={
-          <Link to="/admin/schools/new" className="superadmin-button-primary inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold">
+          <Link
+            to="/admin/schools/new"
+            className="superadmin-button-primary inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold"
+          >
             <Plus className="size-4" /> Enroll school
           </Link>
         }
@@ -118,32 +153,60 @@ function SchoolsListPage() {
           <FilterChips
             label="Filter by subscription"
             value={status}
-            onChange={(next) => { setStatus(next); setPage(1); }}
+            onChange={(next) => {
+              setStatus(next);
+              setPage(1);
+            }}
             options={[
-              { value: "all", label: "All" },
-              { value: "ACTIVE", label: "Active" },
-              { value: "TRIALING", label: "Trial" },
-              { value: "PAST_DUE", label: "Past due" },
-              { value: "SUSPENDED", label: "Suspended" },
+              { value: 'all', label: 'All' },
+              { value: 'ACTIVE', label: 'Active' },
+              { value: 'TRIALING', label: 'Trial' },
+              { value: 'PAST_DUE', label: 'Past due' },
+              { value: 'SUSPENDED', label: 'Suspended' },
             ]}
           />
-          <SearchInput className="w-full lg:w-80" label="Search schools" placeholder="Search name, code or subdomain…" value={search} onChange={(value) => { setSearch(value); setPage(1); }} />
+          <SearchInput
+            className="w-full lg:w-80"
+            label="Search schools"
+            placeholder="Search name, code or subdomain…"
+            value={search}
+            onChange={(value) => {
+              setSearch(value);
+              setPage(1);
+            }}
+          />
         </div>
 
         {isPending ? (
           <LoadingPanel label="Loading schools…" />
         ) : error ? (
-          <ErrorPanel message={`Schools could not be loaded: ${error.message}`} onRetry={() => void refetch()} />
+          <ErrorPanel
+            message={`Schools could not be loaded: ${error.message}`}
+            onRetry={() => void refetch()}
+          />
         ) : !filtered || filtered.length === 0 ? (
           <EmptyPanel
             icon={<School className="size-8" />}
-            title={q || status !== "all" ? "No schools match your filters" : "No schools enrolled yet"}
-            description={q || status !== "all" ? undefined : "Enroll your first school to get started."}
-            action={!q && status === "all" ? <Link to="/admin/schools/new" className="superadmin-button-primary rounded-lg px-4 py-2 text-xs font-semibold">Enroll a school</Link> : undefined}
+            title={
+              q || status !== 'all' ? 'No schools match your filters' : 'No schools enrolled yet'
+            }
+            description={
+              q || status !== 'all' ? undefined : 'Enroll your first school to get started.'
+            }
+            action={
+              !q && status === 'all' ? (
+                <Link
+                  to="/admin/schools/new"
+                  className="superadmin-button-primary rounded-lg px-4 py-2 text-xs font-semibold"
+                >
+                  Enroll a school
+                </Link>
+              ) : undefined
+            }
           />
         ) : (
           <>
-            <div className={cn("transition-opacity", isPlaceholderData && "opacity-60")}>
+            <div className={cn('transition-opacity', isPlaceholderData && 'opacity-60')}>
               <DataTable
                 embedded
                 searchable={false}
@@ -157,7 +220,15 @@ function SchoolsListPage() {
                 emptyDescription="No schools match your search."
               />
             </div>
-            {data && <Pagination page={data.meta.page} totalPages={data.meta.totalPages} total={data.meta.total} limit={LIMIT} onChange={setPage} />}
+            {data && (
+              <Pagination
+                page={data.meta.page}
+                totalPages={data.meta.totalPages}
+                total={data.meta.total}
+                limit={LIMIT}
+                onChange={setPage}
+              />
+            )}
           </>
         )}
       </section>

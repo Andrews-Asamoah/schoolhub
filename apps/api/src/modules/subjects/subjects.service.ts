@@ -3,14 +3,14 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
-} from "@nestjs/common";
+} from '@nestjs/common';
 import type {
   SaveSubjectInput,
   SetSubjectClassesInput,
   SetSubjectTeachersInput,
-} from "@schoolhub/shared";
-import { findUnqualifiedTeachers } from "./subject-assignments.js";
-import { PrismaService } from "../../prisma/prisma.service.js";
+} from '@schoolhub/shared';
+import { findUnqualifiedTeachers } from './subject-assignments.js';
+import { PrismaService } from '../../prisma/prisma.service.js';
 
 const teacherSelect = {
   id: true,
@@ -24,9 +24,9 @@ function teacherName(teacher: {
   lastName: string | null;
   profile: { firstName: string; lastName: string } | null;
 }) {
-  const first = teacher.firstName ?? teacher.profile?.firstName ?? "";
-  const last = teacher.lastName ?? teacher.profile?.lastName ?? "";
-  return `${first} ${last}`.trim() || "Unnamed teacher";
+  const first = teacher.firstName ?? teacher.profile?.firstName ?? '';
+  const last = teacher.lastName ?? teacher.profile?.lastName ?? '';
+  return `${first} ${last}`.trim() || 'Unnamed teacher';
 }
 
 @Injectable()
@@ -36,7 +36,7 @@ export class SubjectsService {
   async list(schoolId: string, includeInactive: boolean) {
     const subjects = await this.prisma.client.subject.findMany({
       where: { schoolId, deletedAt: null, ...(includeInactive ? {} : { isActive: true }) },
-      orderBy: { name: "asc" },
+      orderBy: { name: 'asc' },
       include: {
         classSubjects: {
           where: { class: { schoolId, deletedAt: null } },
@@ -44,7 +44,7 @@ export class SubjectsService {
             class: { select: { id: true, name: true, level: true } },
             teacher: { select: teacherSelect },
           },
-          orderBy: { class: { name: "asc" } },
+          orderBy: { class: { name: 'asc' } },
         },
         teachers: { include: { teacher: { select: teacherSelect } } },
       },
@@ -103,12 +103,12 @@ export class SubjectsService {
     ]);
     if (scores > 0) {
       throw new ConflictException(
-        "This subject has recorded scores, so it cannot be deleted. Deactivate it instead to keep the history.",
+        'This subject has recorded scores, so it cannot be deleted. Deactivate it instead to keep the history.',
       );
     }
     if (timetable > 0) {
       throw new ConflictException(
-        "This subject is on the timetable. Remove its lessons first, or deactivate it instead.",
+        'This subject is on the timetable. Remove its lessons first, or deactivate it instead.',
       );
     }
     await this.prisma.client.$transaction([
@@ -132,7 +132,7 @@ export class SubjectsService {
     await this.require(schoolId, id);
     const classIds = input.assignments.map((row) => row.classId);
     if (new Set(classIds).size !== classIds.length) {
-      throw new BadRequestException("A class can only be listed once.");
+      throw new BadRequestException('A class can only be listed once.');
     }
     const [classes, teacherCount] = await Promise.all([
       this.prisma.client.class.count({
@@ -144,16 +144,22 @@ export class SubjectsService {
       ),
     ]);
     if (classes !== classIds.length) {
-      throw new BadRequestException("Choose classes that belong to this school.");
+      throw new BadRequestException('Choose classes that belong to this school.');
     }
     if (teacherCount.expected !== teacherCount.found) {
-      throw new BadRequestException("Choose active teachers that belong to this school.");
+      throw new BadRequestException('Choose active teachers that belong to this school.');
     }
 
     // Only teachers assigned to this subject can be put in charge of it in a class.
     const [qualified, current] = await Promise.all([
-      this.prisma.client.subjectTeacher.findMany({ where: { subjectId: id }, select: { teacherId: true } }),
-      this.prisma.client.classSubject.findMany({ where: { subjectId: id }, select: { classId: true, teacherId: true } }),
+      this.prisma.client.subjectTeacher.findMany({
+        where: { subjectId: id },
+        select: { teacherId: true },
+      }),
+      this.prisma.client.classSubject.findMany({
+        where: { subjectId: id },
+        select: { classId: true, teacherId: true },
+      }),
     ]);
     const unqualified = findUnqualifiedTeachers(
       input.assignments,
@@ -162,7 +168,7 @@ export class SubjectsService {
     );
     if (unqualified.length) {
       throw new BadRequestException(
-        "Only teachers assigned to this subject can teach it in a class. Assign them to the subject first.",
+        'Only teachers assigned to this subject can teach it in a class. Assign them to the subject first.',
       );
     }
 
@@ -174,13 +180,13 @@ export class SubjectsService {
       const scheduled = await this.prisma.client.timetableEntry.findMany({
         where: { subjectId: id, classId: { in: removed.map((row) => row.classId) } },
         select: { class: { select: { name: true } } },
-        distinct: ["classId"],
+        distinct: ['classId'],
       });
       if (scheduled.length) {
         throw new ConflictException(
           `Remove this subject from the timetable of ${scheduled
             .map((row) => row.class?.name)
-            .join(", ")} before unassigning it.`,
+            .join(', ')} before unassigning it.`,
         );
       }
     }
@@ -211,7 +217,7 @@ export class SubjectsService {
     const unique = [...new Set(input.teacherIds)];
     const check = await this.countTeachers(schoolId, unique);
     if (check.expected !== check.found) {
-      throw new BadRequestException("Choose active teachers that belong to this school.");
+      throw new BadRequestException('Choose active teachers that belong to this school.');
     }
     await this.prisma.client.$transaction([
       this.prisma.client.subjectTeacher.deleteMany({
@@ -238,7 +244,7 @@ export class SubjectsService {
     const subject = await this.prisma.client.subject.findFirst({
       where: { id, schoolId, deletedAt: null },
     });
-    if (!subject) throw new NotFoundException("Subject not found.");
+    if (!subject) throw new NotFoundException('Subject not found.');
     return subject;
   }
 

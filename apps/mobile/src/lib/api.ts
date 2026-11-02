@@ -1,7 +1,11 @@
-import { API_BASE } from "./config";
+import { API_BASE } from './config';
 import {
-  emitSessionEvent, getAcademicView, getActiveRole, getSubdomain, getToken,
-} from "./session";
+  emitSessionEvent,
+  getAcademicView,
+  getActiveRole,
+  getSubdomain,
+  getToken,
+} from './session';
 
 export class ApiError extends Error {
   constructor(
@@ -10,34 +14,34 @@ export class ApiError extends Error {
     public readonly body: unknown,
   ) {
     super(message);
-    this.name = "ApiError";
+    this.name = 'ApiError';
   }
   get code(): string | undefined {
     const e = (this.body as { error?: unknown } | null)?.error;
-    return typeof e === "string" ? e : undefined;
+    return typeof e === 'string' ? e : undefined;
   }
 }
 
 /** Headers every authenticated request carries (mirrors apps/web/src/lib/api.ts). */
 export function buildHeaders(path: string, init?: RequestInit): Headers {
   const headers = new Headers(init?.headers);
-  if (!(init?.body instanceof FormData) && !headers.has("Content-Type")) {
-    headers.set("Content-Type", "application/json");
+  if (!(init?.body instanceof FormData) && !headers.has('Content-Type')) {
+    headers.set('Content-Type', 'application/json');
   }
   const token = getToken();
-  if (token) headers.set("Authorization", `Bearer ${token}`);
+  if (token) headers.set('Authorization', `Bearer ${token}`);
   const subdomain = getSubdomain();
-  if (subdomain) headers.set("x-school-subdomain", subdomain);
+  if (subdomain) headers.set('x-school-subdomain', subdomain);
 
   // /schools/roles is how the role list is discovered, so it must not send a role.
-  if (path !== "/schools/roles") {
+  if (path !== '/schools/roles') {
     const role = getActiveRole();
-    if (role) headers.set("x-school-role", role);
-    if (role === "accountant") {
+    if (role) headers.set('x-school-role', role);
+    if (role === 'accountant') {
       const view = getAcademicView();
       if (view) {
-        headers.set("x-academic-year-id", view.academicYearId);
-        headers.set("x-academic-term-id", view.termId);
+        headers.set('x-academic-year-id', view.academicYearId);
+        headers.set('x-academic-term-id', view.termId);
       }
     }
   }
@@ -47,13 +51,16 @@ export function buildHeaders(path: string, init?: RequestInit): Headers {
 function handleSessionErrors(status: number, body: unknown) {
   const b = (body ?? {}) as { error?: string; reason?: string; audience?: string };
   if (status === 401) {
-    emitSessionEvent({ type: "unauthorized" });
+    emitSessionEvent({ type: 'unauthorized' });
     return;
   }
   if (status !== 403) return;
-  if (b.error === "PASSWORD_CHANGE_REQUIRED") emitSessionEvent({ type: "password-change-required" });
-  else if (b.error === "SUBSCRIPTION_INACTIVE") emitSessionEvent({ type: "subscription-inactive", reason: b.reason ?? "EXPIRED" });
-  else if (b.error === "TWO_FACTOR_REQUIRED") emitSessionEvent({ type: "two-factor-required", audience: b.audience ?? "school-admin" });
+  if (b.error === 'PASSWORD_CHANGE_REQUIRED')
+    emitSessionEvent({ type: 'password-change-required' });
+  else if (b.error === 'SUBSCRIPTION_INACTIVE')
+    emitSessionEvent({ type: 'subscription-inactive', reason: b.reason ?? 'EXPIRED' });
+  else if (b.error === 'TWO_FACTOR_REQUIRED')
+    emitSessionEvent({ type: 'two-factor-required', audience: b.audience ?? 'school-admin' });
 }
 
 export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
@@ -72,10 +79,14 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
  * Anonymous school lookup, used before a session exists (school-code screen).
  * Sends the school code explicitly because the stored one may not be set yet.
  */
-export async function publicFetch<T>(path: string, subdomain: string, init?: RequestInit): Promise<T> {
+export async function publicFetch<T>(
+  path: string,
+  subdomain: string,
+  init?: RequestInit,
+): Promise<T> {
   const headers = new Headers(init?.headers);
-  if (!headers.has("Content-Type")) headers.set("Content-Type", "application/json");
-  headers.set("x-school-subdomain", subdomain.trim().toLowerCase());
+  if (!headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
+  headers.set('x-school-subdomain', subdomain.trim().toLowerCase());
   const res = await fetch(`${API_BASE}${path}`, { ...init, headers });
   if (!res.ok) {
     const body: unknown = await res.json().catch(() => ({}));

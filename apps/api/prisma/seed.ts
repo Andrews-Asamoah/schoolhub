@@ -1,17 +1,17 @@
-import { config } from "dotenv";
-import { resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { config } from 'dotenv';
+import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 // Load .env from repo root before importing Prisma
-const __dirname = fileURLToPath(new URL(".", import.meta.url));
-config({ path: resolve(__dirname, "../../../.env") });
+const __dirname = fileURLToPath(new URL('.', import.meta.url));
+config({ path: resolve(__dirname, '../../../.env') });
 
-import pg from "pg";
-import { PrismaPg } from "@prisma/adapter-pg";
-import { PrismaClient } from "@prisma/client";
+import pg from 'pg';
+import { PrismaPg } from '@prisma/adapter-pg';
+import { PrismaClient } from '@prisma/client';
 
-import { generateId } from "better-auth";
-import { hashPassword } from "better-auth/crypto";
+import { generateId } from 'better-auth';
+import { hashPassword } from 'better-auth/crypto';
 
 const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
 const adapter = new PrismaPg(pool);
@@ -22,10 +22,10 @@ async function main() {
   // never from source control. See .env.example.
   const SUPER_ADMIN_EMAIL = process.env.SUPER_ADMIN_EMAIL?.trim().toLowerCase();
   const SUPER_ADMIN_PASSWORD = process.env.SUPER_ADMIN_PASSWORD;
-  const SUPER_ADMIN_NAME = process.env.SUPER_ADMIN_NAME?.trim() || "SchoolHub Admin";
+  const SUPER_ADMIN_NAME = process.env.SUPER_ADMIN_NAME?.trim() || 'SchoolHub Admin';
 
   if (!SUPER_ADMIN_EMAIL || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(SUPER_ADMIN_EMAIL)) {
-    throw new Error("Set SUPER_ADMIN_EMAIL to a valid email address before seeding.");
+    throw new Error('Set SUPER_ADMIN_EMAIL to a valid email address before seeding.');
   }
   if (
     !SUPER_ADMIN_PASSWORD ||
@@ -35,7 +35,7 @@ async function main() {
     !/[0-9]/.test(SUPER_ADMIN_PASSWORD)
   ) {
     throw new Error(
-      "Set SUPER_ADMIN_PASSWORD to at least 14 characters with upper-case, lower-case and a number.",
+      'Set SUPER_ADMIN_PASSWORD to at least 14 characters with upper-case, lower-case and a number.',
     );
   }
 
@@ -48,7 +48,7 @@ async function main() {
     const credentialAccount = await prisma.account.findFirst({
       where: {
         userId: existing.id,
-        providerId: "credential",
+        providerId: 'credential',
       },
     });
 
@@ -60,11 +60,11 @@ async function main() {
           updatedAt: new Date(),
         },
       });
-      console.log("SuperAdmin credential account repaired.");
+      console.log('SuperAdmin credential account repaired.');
       return;
     }
 
-    console.log("SuperAdmin already exists — skipping seed.");
+    console.log('SuperAdmin already exists — skipping seed.');
     return;
   }
 
@@ -80,7 +80,7 @@ async function main() {
         name: SUPER_ADMIN_NAME,
         email: SUPER_ADMIN_EMAIL,
         emailVerified: true,
-        role: "superAdmin",
+        role: 'superAdmin',
         // The bootstrap password has been seen by whoever ran the seed.
         mustChangePassword: true,
         createdAt: now,
@@ -91,7 +91,7 @@ async function main() {
       data: {
         id: accountId,
         accountId: userId,
-        providerId: "credential",
+        providerId: 'credential',
         userId,
         password: hashedPassword,
         createdAt: now,

@@ -1,4 +1,4 @@
-import type { TeacherAssignments } from "../../common/scope/teacher-scope.service.js";
+import type { TeacherAssignments } from '../../common/scope/teacher-scope.service.js';
 
 export interface TeachingClass {
   id: string;
@@ -34,5 +34,7 @@ export function buildTeachingClasses(
         .filter((subject): subject is NonNullable<typeof subject> => subject !== undefined)
         .sort((a, b) => a.name.localeCompare(b.name)),
     }))
-    .sort((a, b) => Number(b.isClassTeacher) - Number(a.isClassTeacher) || a.name.localeCompare(b.name));
+    .sort(
+      (a, b) => Number(b.isClassTeacher) - Number(a.isClassTeacher) || a.name.localeCompare(b.name),
+    );
 }

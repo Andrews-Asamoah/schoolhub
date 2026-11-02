@@ -1,6 +1,6 @@
-import { SetMetadata } from "@nestjs/common";
+import { SetMetadata } from '@nestjs/common';
 
-export const ALLOW_INACTIVE_SUBSCRIPTION = "schoolhub:allow-inactive-subscription";
+export const ALLOW_INACTIVE_SUBSCRIPTION = 'schoolhub:allow-inactive-subscription';
 
 /**
  * Lets a handler run even when the school's subscription is suspended,

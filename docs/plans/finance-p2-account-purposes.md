@@ -5,6 +5,7 @@ Only a different owner/headteacher (or platform superAdmin with recorded support
 may activate them. Existing chart-account balances and historical journals are never edited.
 
 ## APIs
+
 - GET `/finance/account-purposes` shows school mappings and source chart accounts.
 - POST `/finance/account-purposes` creates a DRAFT, requiring purpose, account ID,
   effective-from date (today or later), optional end date and a documented source note.
@@ -12,12 +13,14 @@ may activate them. Existing chart-account balances and historical journals are n
   after checking account ownership, accounting type, receivable category and overlaps.
 
 ## Purposes
+
 - STUDENT_RECEIVABLE: asset in the Accounts Receivable category.
 - FEE_REVENUE: revenue account.
 - BAD_DEBT_EXPENSE / CONCESSION_EXPENSE: expense accounts.
 - DEFERRED_REVENUE / STUDENT_CREDIT_LIABILITY: liability accounts.
 
 ## Production control
+
 An application posting service must resolve exactly one ACTIVE and in-range mapping for
 its date. Missing or conflicting mapping blocks posting. Accounts are never
 auto-created or silently guessed from category or code.

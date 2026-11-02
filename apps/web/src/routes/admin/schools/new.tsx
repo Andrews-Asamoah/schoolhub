@@ -1,8 +1,8 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { ArrowLeft } from "lucide-react";
-import { EnrollSchoolForm } from "@/components/superadmin/enroll-school-form";
+import { createFileRoute, Link } from '@tanstack/react-router';
+import { ArrowLeft } from 'lucide-react';
+import { EnrollSchoolForm } from '@/components/superadmin/enroll-school-form';
 
-export const Route = createFileRoute("/admin/schools/new")({
+export const Route = createFileRoute('/admin/schools/new')({
   component: EnrollSchoolPage,
 });
 
@@ -18,9 +18,7 @@ function EnrollSchoolPage() {
           <ArrowLeft className="size-3.5" />
           Back to Schools
         </Link>
-        <h1 className="text-2xl font-bold tracking-tight text-foreground">
-          Enroll New School
-        </h1>
+        <h1 className="text-2xl font-bold tracking-tight text-foreground">Enroll New School</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Create an organization, school record, and admin account in one step.
         </p>

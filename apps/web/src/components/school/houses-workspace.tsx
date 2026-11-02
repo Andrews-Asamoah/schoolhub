@@ -1,22 +1,16 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { CircleAlert, House, LoaderCircle, Pencil, Plus, Save, UsersRound, X } from 'lucide-react';
+import { useState } from 'react';
+import { createHouseSchema, updateHouseSchema } from '@schoolhub/shared';
+import { useSchoolRole } from '@/components/school/school-role-switcher';
+import { apiFetch } from '@/lib/api';
 import {
-  CircleAlert,
-  House,
-  LoaderCircle,
-  Pencil,
-  Plus,
-  Save,
-  UsersRound,
-  X,
-} from "lucide-react";
-import { useState } from "react";
-import {
-  createHouseSchema,
-  updateHouseSchema,
-} from "@schoolhub/shared";
-import { useSchoolRole } from "@/components/school/school-role-switcher";
-import { apiFetch } from "@/lib/api";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 interface HouseRecord {
   id: string;
@@ -54,63 +48,57 @@ interface HouseFormValues {
 }
 
 const emptyForm: HouseFormValues = {
-  name: "",
-  code: "",
-  description: "",
-  color: "#2563EB",
-  motto: "",
-  houseTeacherId: "",
+  name: '',
+  code: '',
+  description: '',
+  color: '#2563EB',
+  motto: '',
+  houseTeacherId: '',
   isActive: true,
 };
 
 const inputClasses =
-  "mt-1.5 h-10 w-full rounded-lg border border-border bg-background px-3 text-sm text-foreground outline-none placeholder:text-muted-foreground focus:border-ring focus:ring-2 focus:ring-ring/20";
+  'mt-1.5 h-10 w-full rounded-lg border border-border bg-background px-3 text-sm text-foreground outline-none placeholder:text-muted-foreground focus:border-ring focus:ring-2 focus:ring-ring/20';
 
 export function HousesWorkspace() {
   const queryClient = useQueryClient();
   const { activeRole } = useSchoolRole();
-  const canManage = activeRole === "owner" || activeRole === "admin";
+  const canManage = activeRole === 'owner' || activeRole === 'admin';
   const [editing, setEditing] = useState<HouseRecord | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [values, setValues] = useState<HouseFormValues>(emptyForm);
 
   const housesQuery = useQuery({
-    queryKey: ["academics", "houses"],
-    queryFn: () => apiFetch<HouseRecord[]>("/academics/houses"),
+    queryKey: ['academics', 'houses'],
+    queryFn: () => apiFetch<HouseRecord[]>('/academics/houses'),
     retry: false,
   });
   const teachersQuery = useQuery({
-    queryKey: ["academics", "class-teachers"],
-    queryFn: () => apiFetch<TeacherOption[]>("/academics/teachers"),
+    queryKey: ['academics', 'class-teachers'],
+    queryFn: () => apiFetch<TeacherOption[]>('/academics/teachers'),
     enabled: canManage,
     retry: false,
   });
 
   const saveMutation = useMutation({
-    mutationFn: async ({
-      id,
-      input,
-    }: {
-      id?: string;
-      input: HouseFormValues;
-    }) => {
+    mutationFn: async ({ id, input }: { id?: string; input: HouseFormValues }) => {
       if (id) {
         const payload = updateHouseSchema.parse(input);
         return apiFetch<HouseRecord>(`/academics/houses/${id}`, {
-          method: "PATCH",
+          method: 'PATCH',
           body: JSON.stringify(payload),
         });
       }
       const payload = createHouseSchema.parse(input);
-      return apiFetch<HouseRecord>("/academics/houses", {
-        method: "POST",
+      return apiFetch<HouseRecord>('/academics/houses', {
+        method: 'POST',
         body: JSON.stringify(payload),
       });
     },
     onSuccess: async () => {
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["academics", "houses"] }),
-        queryClient.invalidateQueries({ queryKey: ["students"] }),
+        queryClient.invalidateQueries({ queryKey: ['academics', 'houses'] }),
+        queryClient.invalidateQueries({ queryKey: ['students'] }),
       ]);
       closeForm();
     },
@@ -135,10 +123,10 @@ export function HousesWorkspace() {
     setValues({
       name: house.name,
       code: house.code,
-      description: house.description ?? "",
-      color: house.color ?? "#2563EB",
-      motto: house.motto ?? "",
-      houseTeacherId: house.houseTeacherId ?? "",
+      description: house.description ?? '',
+      color: house.color ?? '#2563EB',
+      motto: house.motto ?? '',
+      houseTeacherId: house.houseTeacherId ?? '',
       isActive: house.isActive,
     });
     saveMutation.reset();
@@ -180,10 +168,7 @@ export function HousesWorkspace() {
   const houses = housesQuery.data ?? [];
   const teachers = teachersQuery.data ?? [];
   const activeCount = houses.filter((house) => house.isActive).length;
-  const assignedStudents = houses.reduce(
-    (total, house) => total + house._count.students,
-    0,
-  );
+  const assignedStudents = houses.reduce((total, house) => total + house._count.students, 0);
 
   return (
     <div className="space-y-5">
@@ -194,13 +179,10 @@ export function HousesWorkspace() {
               <House className="size-5" />
             </span>
             <div>
-              <h2 className="text-base font-bold text-foreground">
-                School houses
-              </h2>
+              <h2 className="text-base font-bold text-foreground">School houses</h2>
               <p className="mt-1 max-w-3xl text-sm leading-6 text-muted-foreground">
-                Set up permanent houses for your school. Houses stay in place
-                across academic years; students can be assigned to an active
-                house when their profile is created or edited.
+                Set up permanent houses for your school. Houses stay in place across academic years;
+                students can be assigned to an active house when their profile is created or edited.
               </p>
             </div>
           </div>
@@ -226,11 +208,11 @@ export function HousesWorkspace() {
           <div className="mb-5 flex items-start justify-between gap-3">
             <div>
               <h3 className="text-sm font-bold text-foreground">
-                {editing ? `Edit ${editing.name}` : "Create a house"}
+                {editing ? `Edit ${editing.name}` : 'Create a house'}
               </h3>
               <p className="mt-1 text-xs text-muted-foreground">
-                House details and assignments are school-wide, not tied to a
-                particular academic year.
+                House details and assignments are school-wide, not tied to a particular academic
+                year.
               </p>
             </div>
             <button
@@ -259,9 +241,7 @@ export function HousesWorkspace() {
                   maxLength={100}
                   className={inputClasses}
                   value={values.name}
-                  onChange={(event) =>
-                    setValues({ ...values, name: event.target.value })
-                  }
+                  onChange={(event) => setValues({ ...values, name: event.target.value })}
                   placeholder="e.g. Golden Eagles"
                 />
               </label>
@@ -273,9 +253,7 @@ export function HousesWorkspace() {
                   pattern="[A-Za-z0-9-]+"
                   className={inputClasses}
                   value={values.code}
-                  onChange={(event) =>
-                    setValues({ ...values, code: event.target.value })
-                  }
+                  onChange={(event) => setValues({ ...values, code: event.target.value })}
                   placeholder="e.g. EAGLES"
                 />
               </label>
@@ -286,9 +264,7 @@ export function HousesWorkspace() {
                     type="color"
                     aria-label="Choose house color"
                     value={values.color}
-                    onChange={(event) =>
-                      setValues({ ...values, color: event.target.value })
-                    }
+                    onChange={(event) => setValues({ ...values, color: event.target.value })}
                     className="size-7 cursor-pointer rounded border-0 bg-transparent p-0"
                   />
                   <span className="font-mono text-xs font-medium uppercase text-muted-foreground">
@@ -298,13 +274,25 @@ export function HousesWorkspace() {
               </label>
               <label className="text-xs font-semibold text-foreground">
                 Lead teacher
-                <Select value={values.houseTeacherId || "__none__"} onValueChange={(value) => setValues({ ...values, houseTeacherId: value === "__none__" ? "" : value })}>
-                  <SelectTrigger aria-label="Lead teacher" className={inputClasses}><SelectValue /></SelectTrigger>
+                <Select
+                  value={values.houseTeacherId || '__none__'}
+                  onValueChange={(value) =>
+                    setValues({ ...values, houseTeacherId: value === '__none__' ? '' : value })
+                  }
+                >
+                  <SelectTrigger aria-label="Lead teacher" className={inputClasses}>
+                    <SelectValue />
+                  </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="__none__">No lead teacher assigned</SelectItem>
-                    {teachers.filter((teacher) => teacher.isActive || teacher.id === values.houseTeacherId).map((teacher) => (
-                      <SelectItem key={teacher.id} value={teacher.id}>{teacher.firstName} {teacher.lastName}{!teacher.isActive ? " (inactive)" : ""}</SelectItem>
-                    ))}
+                    {teachers
+                      .filter((teacher) => teacher.isActive || teacher.id === values.houseTeacherId)
+                      .map((teacher) => (
+                        <SelectItem key={teacher.id} value={teacher.id}>
+                          {teacher.firstName} {teacher.lastName}
+                          {!teacher.isActive ? ' (inactive)' : ''}
+                        </SelectItem>
+                      ))}
                   </SelectContent>
                 </Select>
               </label>
@@ -314,9 +302,7 @@ export function HousesWorkspace() {
                   maxLength={200}
                   className={inputClasses}
                   value={values.motto}
-                  onChange={(event) =>
-                    setValues({ ...values, motto: event.target.value })
-                  }
+                  onChange={(event) => setValues({ ...values, motto: event.target.value })}
                   placeholder="A short phrase that represents the house"
                 />
               </label>
@@ -327,9 +313,7 @@ export function HousesWorkspace() {
                   rows={3}
                   className={`${inputClasses} h-auto min-h-20 py-2.5`}
                   value={values.description}
-                  onChange={(event) =>
-                    setValues({ ...values, description: event.target.value })
-                  }
+                  onChange={(event) => setValues({ ...values, description: event.target.value })}
                   placeholder="Optional background or information about this house"
                 />
               </label>
@@ -340,9 +324,7 @@ export function HousesWorkspace() {
                 <input
                   type="checkbox"
                   checked={values.isActive}
-                  onChange={(event) =>
-                    setValues({ ...values, isActive: event.target.checked })
-                  }
+                  onChange={(event) => setValues({ ...values, isActive: event.target.checked })}
                   className="size-4 rounded border-border accent-primary"
                 />
                 Active and available for new student assignments
@@ -374,7 +356,7 @@ export function HousesWorkspace() {
                 ) : (
                   <Save className="size-4" />
                 )}
-                {editing ? "Save changes" : "Create house"}
+                {editing ? 'Save changes' : 'Create house'}
               </button>
             </div>
           </form>
@@ -385,30 +367,25 @@ export function HousesWorkspace() {
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {houses.map((house) => {
             const leadName = house.houseTeacher
-              ? `${house.houseTeacher.profile?.firstName ?? house.houseTeacher.firstName ?? ""} ${house.houseTeacher.profile?.lastName ?? house.houseTeacher.lastName ?? ""}`.trim()
+              ? `${house.houseTeacher.profile?.firstName ?? house.houseTeacher.firstName ?? ''} ${house.houseTeacher.profile?.lastName ?? house.houseTeacher.lastName ?? ''}`.trim()
               : null;
             return (
               <article
                 key={house.id}
                 className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm"
               >
-                <div
-                  className="h-1.5"
-                  style={{ backgroundColor: house.color ?? "#64748B" }}
-                />
+                <div className="h-1.5" style={{ backgroundColor: house.color ?? '#64748B' }} />
                 <div className="space-y-4 p-4">
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex min-w-0 items-center gap-3">
                       <span
                         className="flex size-11 shrink-0 items-center justify-center rounded-xl text-sm font-bold text-white"
-                        style={{ backgroundColor: house.color ?? "#64748B" }}
+                        style={{ backgroundColor: house.color ?? '#64748B' }}
                       >
                         {house.code.slice(0, 2)}
                       </span>
                       <div className="min-w-0">
-                        <h3 className="truncate text-sm font-bold text-foreground">
-                          {house.name}
-                        </h3>
+                        <h3 className="truncate text-sm font-bold text-foreground">{house.name}</h3>
                         <p className="text-[11px] font-medium tracking-wide text-muted-foreground">
                           {house.code}
                         </p>
@@ -417,11 +394,11 @@ export function HousesWorkspace() {
                     <span
                       className={`rounded-full px-2 py-1 text-[10px] font-semibold ${
                         house.isActive
-                          ? "bg-success/10 text-success"
-                          : "bg-muted text-muted-foreground"
+                          ? 'bg-success/10 text-success'
+                          : 'bg-muted text-muted-foreground'
                       }`}
                     >
-                      {house.isActive ? "Active" : "Inactive"}
+                      {house.isActive ? 'Active' : 'Inactive'}
                     </span>
                   </div>
 
@@ -434,15 +411,13 @@ export function HousesWorkspace() {
                   <div className="flex items-center justify-between gap-3 border-t border-border pt-3">
                     <div className="min-w-0 space-y-1.5 text-xs">
                       <p className="truncate text-muted-foreground">
-                        <span className="font-semibold text-foreground">
-                          Lead:
-                        </span>{" "}
-                        {leadName || "Not assigned"}
+                        <span className="font-semibold text-foreground">Lead:</span>{' '}
+                        {leadName || 'Not assigned'}
                       </p>
                       <p className="flex items-center gap-1.5 text-muted-foreground">
                         <UsersRound className="size-3.5" />
-                        {house._count.students}{" "}
-                        {house._count.students === 1 ? "student" : "students"}
+                        {house._count.students}{' '}
+                        {house._count.students === 1 ? 'student' : 'students'}
                       </p>
                     </div>
                     <button
@@ -464,12 +439,10 @@ export function HousesWorkspace() {
           <span className="mx-auto flex size-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
             <House className="size-5" />
           </span>
-          <h3 className="mt-3 text-sm font-semibold text-foreground">
-            Create your first house
-          </h3>
+          <h3 className="mt-3 text-sm font-semibold text-foreground">Create your first house</h3>
           <p className="mx-auto mt-1 max-w-md text-xs leading-5 text-muted-foreground">
-            Add each permanent school house with its color, motto, and lead
-            teacher. You can assign students to houses from their profiles.
+            Add each permanent school house with its color, motto, and lead teacher. You can assign
+            students to houses from their profiles.
           </p>
           <button
             type="button"

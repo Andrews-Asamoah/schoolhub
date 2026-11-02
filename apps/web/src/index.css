@@ -1,4 +1,4 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 
 /*
   ============================================================================
@@ -25,7 +25,7 @@
 
 :root {
   color-scheme: light;
-  --font-sans: "Inter", system-ui, sans-serif;
+  --font-sans: 'Inter', system-ui, sans-serif;
 
   /* Surfaces */
   --background: oklch(0.985 0.003 250);
@@ -236,7 +236,11 @@
 
   /* Native form controls inherit the selected app theme, not the OS theme.
      Component utility classes can still override these base-layer defaults. */
-  input:where(:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="file"]):not([type="hidden"])),
+  input:where(
+    :not([type='checkbox']):not([type='radio']):not([type='range']):not([type='color']):not(
+        [type='button']
+      ):not([type='submit']):not([type='reset']):not([type='file']):not([type='hidden'])
+  ),
   select,
   textarea {
     border-color: var(--input);
@@ -255,7 +259,11 @@
     color: var(--popover-foreground);
   }
 
-  input:where(:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="file"]):not([type="hidden"])):disabled,
+  input:where(
+      :not([type='checkbox']):not([type='radio']):not([type='range']):not([type='color']):not(
+          [type='button']
+        ):not([type='submit']):not([type='reset']):not([type='file']):not([type='hidden'])
+    ):disabled,
   select:disabled,
   textarea:disabled {
     background-color: var(--muted);
@@ -284,7 +292,7 @@
 }
 
 @media (min-width: 768px) {
-  aside[data-collapsed="true"] .sidebar-expanded {
+  aside[data-collapsed='true'] .sidebar-expanded {
     display: none;
   }
 }
@@ -395,18 +403,18 @@
   background: color-mix(in oklab, var(--warning) 18%, transparent);
 }
 
-.superadmin-app-shell .superadmin-nav-item[aria-current="page"] {
+.superadmin-app-shell .superadmin-nav-item[aria-current='page'] {
   background: var(--primary);
   color: var(--primary-foreground);
   box-shadow: 0 4px 10px color-mix(in oklab, var(--primary) 22%, transparent);
 }
 
-.superadmin-app-shell .superadmin-nav-item[aria-current="page"]:hover {
+.superadmin-app-shell .superadmin-nav-item[aria-current='page']:hover {
   background: color-mix(in oklab, var(--primary) 90%, transparent);
   color: var(--primary-foreground);
 }
 
-.superadmin-app-shell .superadmin-nav-item:not([aria-current="page"]):hover {
+.superadmin-app-shell .superadmin-nav-item:not([aria-current='page']):hover {
   background: var(--muted);
   color: var(--foreground);
 }
@@ -432,25 +440,25 @@
   color: var(--foreground);
 }
 
-.school-sidebar-shell .school-sidebar-nav-item[aria-current="page"] {
+.school-sidebar-shell .school-sidebar-nav-item[aria-current='page'] {
   color: var(--primary);
 }
 
-.school-sidebar-shell .school-sidebar-nav-item[aria-current="page"]:hover {
+.school-sidebar-shell .school-sidebar-nav-item[aria-current='page']:hover {
   color: color-mix(in oklab, var(--primary) 85%, transparent);
 }
 
-.superadmin-app-shell .superadmin-tab[aria-pressed="true"] {
+.superadmin-app-shell .superadmin-tab[aria-pressed='true'] {
   background: var(--primary);
   color: var(--primary-foreground);
   box-shadow: 0 2px 6px color-mix(in oklab, var(--primary) 24%, transparent);
 }
 
-.superadmin-app-shell .superadmin-tab[aria-pressed="false"] {
+.superadmin-app-shell .superadmin-tab[aria-pressed='false'] {
   color: var(--muted-foreground);
 }
 
-.superadmin-app-shell .superadmin-tab[aria-pressed="false"]:hover {
+.superadmin-app-shell .superadmin-tab[aria-pressed='false']:hover {
   background: var(--accent);
   color: var(--accent-foreground);
 }
@@ -470,7 +478,11 @@
 .superadmin-confirm-dialog {
   border-color: color-mix(in oklab, var(--border) 70%, transparent);
   background:
-    radial-gradient(ellipse at 100% 0%, color-mix(in oklab, var(--primary) 9%, transparent), transparent 18rem),
+    radial-gradient(
+      ellipse at 100% 0%,
+      color-mix(in oklab, var(--primary) 9%, transparent),
+      transparent 18rem
+    ),
     color-mix(in oklab, var(--card) 96%, transparent);
   color: var(--card-foreground);
   backdrop-filter: blur(24px);
@@ -659,8 +671,6 @@
 .support-workspace .support-reply-textarea::placeholder {
   color: var(--muted-foreground);
 }
-
-
 
 /*
  * Student timetable print sheet. The named page keeps the A4 landscape setup
@@ -939,68 +949,69 @@
     page-break-before: avoid;
   }
 
-  .student-timetable-print[data-density="compact"] .student-timetable-print-table th,
-  .student-timetable-print[data-density="compact"] .student-timetable-print-table td {
+  .student-timetable-print[data-density='compact'] .student-timetable-print-table th,
+  .student-timetable-print[data-density='compact'] .student-timetable-print-table td {
     padding: 0.5mm 0.65mm;
   }
 
-  .student-timetable-print[data-density="compact"] .student-timetable-print-period-title {
+  .student-timetable-print[data-density='compact'] .student-timetable-print-period-title {
     font-size: 6.2pt;
   }
 
-  .student-timetable-print[data-density="compact"] .student-timetable-print-meta {
+  .student-timetable-print[data-density='compact'] .student-timetable-print-meta {
     font-size: 5.2pt;
   }
 
-  .student-timetable-print[data-density="tight"] .student-timetable-print-header {
+  .student-timetable-print[data-density='tight'] .student-timetable-print-header {
     margin-bottom: 1.5mm;
     padding-bottom: 1.5mm;
   }
 
-  .student-timetable-print[data-density="tight"] .student-timetable-print-header h1 {
+  .student-timetable-print[data-density='tight'] .student-timetable-print-header h1 {
     font-size: 11pt;
   }
 
-  .student-timetable-print[data-density="tight"] .student-timetable-print-contact {
+  .student-timetable-print[data-density='tight'] .student-timetable-print-contact {
     font-size: 5pt;
   }
 
-  .student-timetable-print[data-density="tight"] .student-timetable-print-motto {
+  .student-timetable-print[data-density='tight'] .student-timetable-print-motto {
     font-size: 5.3pt;
   }
 
-  .student-timetable-print[data-density="tight"] .student-timetable-print-table {
+  .student-timetable-print[data-density='tight'] .student-timetable-print-table {
     font-size: 5.7pt;
   }
 
-  .student-timetable-print[data-density="tight"] .student-timetable-print-table th,
-  .student-timetable-print[data-density="tight"] .student-timetable-print-table td {
+  .student-timetable-print[data-density='tight'] .student-timetable-print-table th,
+  .student-timetable-print[data-density='tight'] .student-timetable-print-table td {
     padding: 0.35mm 0.5mm;
   }
 
-  .student-timetable-print[data-density="tight"] .student-timetable-print-period-title {
+  .student-timetable-print[data-density='tight'] .student-timetable-print-period-title {
     font-size: 5.4pt;
     line-height: 1;
   }
 
-  .student-timetable-print[data-density="tight"] .student-timetable-print-meta {
+  .student-timetable-print[data-density='tight'] .student-timetable-print-meta {
     margin-top: 0.25mm;
     font-size: 4.5pt;
     line-height: 1;
   }
 
-  .student-timetable-print[data-density="tight"] .student-timetable-print-period + .student-timetable-print-period {
+  .student-timetable-print[data-density='tight']
+    .student-timetable-print-period
+    + .student-timetable-print-period {
     margin-top: 0.5mm;
     padding-top: 0.5mm;
   }
 
-  .student-timetable-print[data-density="tight"] .student-timetable-print-footer {
+  .student-timetable-print[data-density='tight'] .student-timetable-print-footer {
     margin-top: 1mm;
     padding-top: 0.8mm;
     font-size: 5pt;
   }
 }
-
 
 /* Print only the one-time credentials dialog, never the dashboard behind it. */
 @media print {

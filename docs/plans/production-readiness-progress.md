@@ -9,18 +9,18 @@ Foundation merged via PR #149 after full CI. Release controls and restore verifi
 
 ## Delivery status
 
-| Workstream | Implemented in this change | Still required before production acceptance |
-|---|---|---|
-| Baseline | Generated controller route/guard/role inventory with stale-output check | Manually review service resource scope and audit coverage for all routes; production access and branch rulesets |
-| Private files | Separate private bucket; stored keys; authenticated tenant/role checks; leadership audience; no-store; upload/download/delete audits | Configure the bucket without ANY public endpoints; migrate old files and purge cached public URLs |
-| Uploads | Image decode/re-encode and pixel limits; PDF parsing and active-content rejection; fail-closed ClamAV scanning for production PDFs | Deploy and monitor ClamAV with updated signatures; load-test adversarial documents |
-| Cleanup | Durable pre-upload cleanup reservations and transactional cancellation; retries and dead letters | Exercise storage outage and process-kill recovery against staging R2 |
-| Finance scheduling | Durable per-school daily runs, startup catch-up, atomic claims, lease heartbeats, retry/backoff, dead letters | Exercise live operational alerts and obtain accountant acceptance |
-| Origins/proxy | Shared explicit HTTPS origin policy; production school-admin 2FA default; shutdown hooks; preserved nginx headers and explicit external scheme | Set owned domain roots, trusted proxy hops and external scheme; verify the real TLS chain |
-| Deployment | Executable API entrypoint; CI-gated immutable image digests and release manifest; migration provenance checks; API/web runtime smoke tests | Configure protected environments/required checks; exercise a staging release and host rollout/rollback |
-| School operations | Existing academic, attendance, BECE and finance implementation retained | Full term/year journeys, policy-versioned promotion, migration reconciliation |
-| Notifications | Existing in-app records retained; durable job infrastructure available | Provider delivery contracts, transactional outbox, receipt validation and cost limits |
-| Recovery | Read-only restored-database verifier; synthetic CI dump/restore round trip with a balanced ledger fixture | Actual encrypted backup/PITR setup, private object copies, measured production-like restore, operator ownership |
+| Workstream         | Implemented in this change                                                                                                                     | Still required before production acceptance                                                                     |
+| ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| Baseline           | Generated controller route/guard/role inventory with stale-output check                                                                        | Manually review service resource scope and audit coverage for all routes; production access and branch rulesets |
+| Private files      | Separate private bucket; stored keys; authenticated tenant/role checks; leadership audience; no-store; upload/download/delete audits           | Configure the bucket without ANY public endpoints; migrate old files and purge cached public URLs               |
+| Uploads            | Image decode/re-encode and pixel limits; PDF parsing and active-content rejection; fail-closed ClamAV scanning for production PDFs             | Deploy and monitor ClamAV with updated signatures; load-test adversarial documents                              |
+| Cleanup            | Durable pre-upload cleanup reservations and transactional cancellation; retries and dead letters                                               | Exercise storage outage and process-kill recovery against staging R2                                            |
+| Finance scheduling | Durable per-school daily runs, startup catch-up, atomic claims, lease heartbeats, retry/backoff, dead letters                                  | Exercise live operational alerts and obtain accountant acceptance                                               |
+| Origins/proxy      | Shared explicit HTTPS origin policy; production school-admin 2FA default; shutdown hooks; preserved nginx headers and explicit external scheme | Set owned domain roots, trusted proxy hops and external scheme; verify the real TLS chain                       |
+| Deployment         | Executable API entrypoint; CI-gated immutable image digests and release manifest; migration provenance checks; API/web runtime smoke tests     | Configure protected environments/required checks; exercise a staging release and host rollout/rollback          |
+| School operations  | Existing academic, attendance, BECE and finance implementation retained                                                                        | Full term/year journeys, policy-versioned promotion, migration reconciliation                                   |
+| Notifications      | Existing in-app records retained; durable job infrastructure available                                                                         | Provider delivery contracts, transactional outbox, receipt validation and cost limits                           |
+| Recovery           | Read-only restored-database verifier; synthetic CI dump/restore round trip with a balanced ledger fixture                                      | Actual encrypted backup/PITR setup, private object copies, measured production-like restore, operator ownership |
 
 ## Route inventory
 
@@ -29,15 +29,15 @@ Run `node apps/api/scripts/route-inventory.mjs` after changing controllers. CI r
 
 ## Role acceptance matrix
 
-| Actor | Required acceptance evidence | Current evidence |
-|---|---|---|
-| Owner/admin/headteacher | Staff + leadership documents; signature administration; account policy and publication approval | New real PostgreSQL HTTP document role tests; existing auth/assessment suites |
-| Teacher | Staff documents, assigned classes/subjects only; no leadership documents | New HTTP document audience tests; existing teacher-scope suites |
-| Accountant | Staff documents; financial approvals and reconciled reports; no leadership files | New HTTP document audience tests; existing finance integration suites |
-| Staff | Staff documents, restricted personal records; no leadership files | New HTTP document audience tests; service resource review remains |
-| Guardian/student | Their own authorised published academic records; no staff document/signature or BECE access | New document denial tests; existing report/BECE denial suites; complete browser journey remains |
-| SuperAdmin | Enforced 2FA, audited tenant entry and privileged actions | Existing real database 2FA E2E and SuperAdmin tests; support-access policy review remains |
-| Revoked member | Copied private links stop working immediately | New HTTP test uses live membership suspension with an existing session identity |
+| Actor                   | Required acceptance evidence                                                                    | Current evidence                                                                                |
+| ----------------------- | ----------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| Owner/admin/headteacher | Staff + leadership documents; signature administration; account policy and publication approval | New real PostgreSQL HTTP document role tests; existing auth/assessment suites                   |
+| Teacher                 | Staff documents, assigned classes/subjects only; no leadership documents                        | New HTTP document audience tests; existing teacher-scope suites                                 |
+| Accountant              | Staff documents; financial approvals and reconciled reports; no leadership files                | New HTTP document audience tests; existing finance integration suites                           |
+| Staff                   | Staff documents, restricted personal records; no leadership files                               | New HTTP document audience tests; service resource review remains                               |
+| Guardian/student        | Their own authorised published academic records; no staff document/signature or BECE access     | New document denial tests; existing report/BECE denial suites; complete browser journey remains |
+| SuperAdmin              | Enforced 2FA, audited tenant entry and privileged actions                                       | Existing real database 2FA E2E and SuperAdmin tests; support-access policy review remains       |
+| Revoked member          | Copied private links stop working immediately                                                   | New HTTP test uses live membership suspension with an existing session identity                 |
 
 ## Operator handoff — private storage
 

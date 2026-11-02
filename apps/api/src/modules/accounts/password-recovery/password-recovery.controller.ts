@@ -1,12 +1,4 @@
-import {
-  Body,
-  Controller,
-  Header,
-  HttpCode,
-  Post,
-  Req,
-  UseGuards,
-} from '@nestjs/common';
+import { Body, Controller, Header, HttpCode, Post, Req, UseGuards } from '@nestjs/common';
 import { AllowAnonymous } from '@thallesp/nestjs-better-auth';
 import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { passwordSchema } from '@schoolhub/shared';
@@ -39,11 +31,7 @@ export class PasswordRecoveryController {
     input: z.infer<typeof requestSchema>,
     @Req() request: Request,
   ) {
-    return this.recovery.request(
-      input.email,
-      request.get('origin'),
-      input.school,
-    );
+    return this.recovery.request(input.email, request.get('origin'), input.school);
   }
   @Post('complete')
   @HttpCode(200)

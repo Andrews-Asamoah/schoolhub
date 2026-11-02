@@ -5,10 +5,10 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
-} from "@nestjs/common";
-import { randomUUID } from "node:crypto";
-import type { Prisma, School } from "@prisma/client";
-import { PrismaService } from "../../prisma/prisma.service.js";
+} from '@nestjs/common';
+import { randomUUID } from 'node:crypto';
+import type { Prisma, School } from '@prisma/client';
+import { PrismaService } from '../../prisma/prisma.service.js';
 import {
   studentEmailDomain,
   type CreateAcademicYearInput,
@@ -18,15 +18,15 @@ import {
   type SetAcademicContextInput,
   type UpdateSchoolMemberRolesInput,
   type UpdateSchoolSettingsInput,
-} from "@schoolhub/shared";
-import { checkRoleChange } from "./member-roles.js";
+} from '@schoolhub/shared';
+import { checkRoleChange } from './member-roles.js';
 import {
   findOverlappingTerm,
   termProblemWithinYear,
   termsOutsideYear,
   toIsoDate,
-} from "./academic-calendar.js";
-import { canManageAcademicContext } from "../../common/academic-context.js";
+} from './academic-calendar.js';
+import { canManageAcademicContext } from '../../common/academic-context.js';
 
 @Injectable()
 export class SchoolsService {
@@ -45,25 +45,28 @@ export class SchoolsService {
     const now = Date.now();
     const recent = (this.resolveHits.get(ip) ?? []).filter((t) => now - t < 10 * 60 * 1000);
     if (recent.length >= 60) {
-      throw new HttpException("Too many attempts. Please wait a few minutes.", HttpStatus.TOO_MANY_REQUESTS);
+      throw new HttpException(
+        'Too many attempts. Please wait a few minutes.',
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
     }
     recent.push(now);
     this.resolveHits.set(ip, recent);
 
     const id = identifier.trim().toLowerCase();
-    if (!id || id.length > 120) throw new BadRequestException("Enter your username or email.");
-    if (id.includes("@")) return { email: id };
+    if (!id || id.length > 120) throw new BadRequestException('Enter your username or email.');
+    if (id.includes('@')) return { email: id };
 
     const school = await this.prisma.client.school.findUnique({
       where: { subdomain: subdomain.toLowerCase().trim() },
       select: { id: true, email: true, subdomain: true },
     });
-    if (!school) throw new NotFoundException("School not found.");
+    if (!school) throw new NotFoundException('School not found.');
     const student = await this.prisma.client.student.findFirst({
       where: {
         schoolId: school.id,
         deletedAt: null,
-        OR: [{ username: id }, { admissionNumber: { equals: id, mode: "insensitive" } }],
+        OR: [{ username: id }, { admissionNumber: { equals: id, mode: 'insensitive' } }],
       },
       select: { profile: { select: { user: { select: { email: true } } } } },
     });
@@ -79,15 +82,13 @@ export class SchoolsService {
       where: { id: schoolId },
       include: {
         academicYears: {
-          where: canManageAcademicContext(role)
-            ? undefined
-            : { isCurrent: true },
-          orderBy: { startDate: "desc" },
+          where: canManageAcademicContext(role) ? undefined : { isCurrent: true },
+          orderBy: { startDate: 'desc' },
           take: canManageAcademicContext(role) ? 5 : 1,
           include: {
             terms: {
               where: canManageAcademicContext(role) ? undefined : { isCurrent: true },
-              orderBy: { termNumber: "asc" },
+              orderBy: { termNumber: 'asc' },
             },
           },
         },
@@ -95,7 +96,7 @@ export class SchoolsService {
     });
 
     if (!school) {
-      throw new NotFoundException("School not found");
+      throw new NotFoundException('School not found');
     }
 
     return school;
@@ -134,7 +135,12 @@ export class SchoolsService {
     const [updated] = await client.$transaction([
       client.school.update({ where: { id: school.id }, data }),
       ...(data.name && data.name !== school.name
-        ? [client.organization.update({ where: { id: school.organizationId }, data: { name: data.name } })]
+        ? [
+            client.organization.update({
+              where: { id: school.organizationId },
+              data: { name: data.name },
+            }),
+          ]
         : []),
     ]);
     return updated;
@@ -147,11 +153,11 @@ export class SchoolsService {
         schoolId,
         ...(canViewHistory ? {} : { isCurrent: true }),
       },
-      orderBy: { startDate: "desc" },
+      orderBy: { startDate: 'desc' },
       include: {
         terms: {
           where: canViewHistory ? undefined : { isCurrent: true },
-          orderBy: { termNumber: "asc" },
+          orderBy: { termNumber: 'asc' },
         },
       },
     });
@@ -174,11 +180,20 @@ export class SchoolsService {
     return { academicYear, term };
   }
 
-  private async requireSafeYearSwitch(tx: Prisma.TransactionClient, schoolId: string, nextYearId: string | null) {
+  private async requireSafeYearSwitch(
+    tx: Prisma.TransactionClient,
+    schoolId: string,
+    nextYearId: string | null,
+  ) {
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${schoolId}),hashtext('academic-rollover'))`;
-    const current = await tx.academicYear.findFirst({ where: { schoolId, isCurrent: true, ...(nextYearId ? { id: { not: nextYearId } } : {}) }, select: { id: true } });
-    if (current && await tx.enrollment.count({ where: { academicYearId: current.id } })) {
-      throw new BadRequestException("Use the approved promotion/year-rollover workflow to change the current year once enrolments exist. Use historical viewing controls to review old years.");
+    const current = await tx.academicYear.findFirst({
+      where: { schoolId, isCurrent: true, ...(nextYearId ? { id: { not: nextYearId } } : {}) },
+      select: { id: true },
+    });
+    if (current && (await tx.enrollment.count({ where: { academicYearId: current.id } }))) {
+      throw new BadRequestException(
+        'Use the approved promotion/year-rollover workflow to change the current year once enrolments exist. Use historical viewing controls to review old years.',
+      );
     }
   }
 
@@ -187,78 +202,78 @@ export class SchoolsService {
     actorId: string,
     input: SetAcademicContextInput,
   ) {
-    return this.prisma.client.$transaction(async (transaction) => {
-      await this.requireSafeYearSwitch(transaction, schoolId, input.academicYearId);
-      const previousYear = await transaction.academicYear.findFirst({
-        where: { schoolId, isCurrent: true },
-        include: { terms: { where: { isCurrent: true }, take: 1 } },
-      });
-      const previousTerm = previousYear?.terms[0];
-      const selectedTerm = await transaction.term.findFirst({
-        where: {
-          id: input.termId,
-          academicYearId: input.academicYearId,
-          academicYear: { schoolId },
-        },
-        select: { id: true },
-      });
-      if (!selectedTerm) {
-        throw new BadRequestException(
-          "Choose a term belonging to an academic year in this school.",
-        );
-      }
-
-      await transaction.academicYear.updateMany({
-        where: { schoolId, isCurrent: true },
-        data: { isCurrent: false },
-      });
-      await transaction.term.updateMany({
-        where: { academicYear: { schoolId }, isCurrent: true },
-        data: { isCurrent: false },
-      });
-      await transaction.academicYear.update({
-        where: { id: input.academicYearId },
-        data: { isCurrent: true },
-      });
-      await transaction.term.update({
-        where: { id: input.termId },
-        data: { isCurrent: true },
-      });
-      if (
-        previousYear?.id !== input.academicYearId ||
-        previousTerm?.id !== input.termId
-      ) {
-        await transaction.auditLog.create({
-          data: {
-            userId: actorId,
-            schoolId,
-            action: "UPDATE",
-            entityType: "AcademicContext",
-            entityId: input.academicYearId,
-            oldValues: previousYear
-              ? {
-                  academicYearId: previousYear.id,
-                  academicYearName: previousYear.name,
-                  termId: previousTerm?.id ?? null,
-                  termName: previousTerm?.name ?? null,
-                }
-              : undefined,
-            newValues: {
-              academicYearId: input.academicYearId,
-              termId: input.termId,
-            },
-          },
+    return this.prisma.client.$transaction(
+      async (transaction) => {
+        await this.requireSafeYearSwitch(transaction, schoolId, input.academicYearId);
+        const previousYear = await transaction.academicYear.findFirst({
+          where: { schoolId, isCurrent: true },
+          include: { terms: { where: { isCurrent: true }, take: 1 } },
         });
-      }
+        const previousTerm = previousYear?.terms[0];
+        const selectedTerm = await transaction.term.findFirst({
+          where: {
+            id: input.termId,
+            academicYearId: input.academicYearId,
+            academicYear: { schoolId },
+          },
+          select: { id: true },
+        });
+        if (!selectedTerm) {
+          throw new BadRequestException(
+            'Choose a term belonging to an academic year in this school.',
+          );
+        }
 
-      const academicYear = await transaction.academicYear.findUniqueOrThrow({
-        where: { id: input.academicYearId },
-      });
-      const term = await transaction.term.findUniqueOrThrow({
-        where: { id: input.termId },
-      });
-      return { academicYear, term };
-    }, { isolationLevel: "Serializable" });
+        await transaction.academicYear.updateMany({
+          where: { schoolId, isCurrent: true },
+          data: { isCurrent: false },
+        });
+        await transaction.term.updateMany({
+          where: { academicYear: { schoolId }, isCurrent: true },
+          data: { isCurrent: false },
+        });
+        await transaction.academicYear.update({
+          where: { id: input.academicYearId },
+          data: { isCurrent: true },
+        });
+        await transaction.term.update({
+          where: { id: input.termId },
+          data: { isCurrent: true },
+        });
+        if (previousYear?.id !== input.academicYearId || previousTerm?.id !== input.termId) {
+          await transaction.auditLog.create({
+            data: {
+              userId: actorId,
+              schoolId,
+              action: 'UPDATE',
+              entityType: 'AcademicContext',
+              entityId: input.academicYearId,
+              oldValues: previousYear
+                ? {
+                    academicYearId: previousYear.id,
+                    academicYearName: previousYear.name,
+                    termId: previousTerm?.id ?? null,
+                    termName: previousTerm?.name ?? null,
+                  }
+                : undefined,
+              newValues: {
+                academicYearId: input.academicYearId,
+                termId: input.termId,
+              },
+            },
+          });
+        }
+
+        const academicYear = await transaction.academicYear.findUniqueOrThrow({
+          where: { id: input.academicYearId },
+        });
+        const term = await transaction.term.findUniqueOrThrow({
+          where: { id: input.termId },
+        });
+        return { academicYear, term };
+      },
+      { isolationLevel: 'Serializable' },
+    );
   }
 
   async getMemberRoles(schoolId: string, userId: string) {
@@ -267,7 +282,7 @@ export class SchoolsService {
       select: { role: true, roles: true },
     });
     if (!member) {
-      throw new ForbiddenException("You are not a member of this school.");
+      throw new ForbiddenException('You are not a member of this school.');
     }
 
     return {
@@ -285,7 +300,7 @@ export class SchoolsService {
         roles: true,
         user: { select: { name: true, email: true } },
       },
-      orderBy: { user: { name: "asc" } },
+      orderBy: { user: { name: 'asc' } },
     });
 
     return members.map((member) => ({
@@ -307,7 +322,7 @@ export class SchoolsService {
       where: { id: schoolId },
       select: { organizationId: true },
     });
-    if (!school) throw new NotFoundException("School not found.");
+    if (!school) throw new NotFoundException('School not found.');
 
     const [actor, target] = await Promise.all([
       this.prisma.client.member.findUnique({
@@ -329,7 +344,7 @@ export class SchoolsService {
       }),
     ]);
     if (!actor || !target) {
-      throw new NotFoundException("School membership not found.");
+      throw new NotFoundException('School membership not found.');
     }
 
     const change = checkRoleChange({
@@ -338,19 +353,19 @@ export class SchoolsService {
       requested: input.roles,
     });
     if (!change.ok) {
-      throw change.kind === "forbidden"
+      throw change.kind === 'forbidden'
         ? new ForbiddenException(change.message)
         : new BadRequestException(change.message);
     }
     const roles = change.roles;
-    const hadTeacher = target.role === "teacher" || target.roles.includes("teacher");
-    const wantsTeacher = target.role === "teacher" || roles.includes("teacher");
-    const hadGuardian = target.role === "guardian" || target.roles.includes("guardian");
-    const wantsGuardian = target.role === "guardian" || roles.includes("guardian");
+    const hadTeacher = target.role === 'teacher' || target.roles.includes('teacher');
+    const wantsTeacher = target.role === 'teacher' || roles.includes('teacher');
+    const hadGuardian = target.role === 'guardian' || target.roles.includes('guardian');
+    const wantsGuardian = target.role === 'guardian' || roles.includes('guardian');
     const updated = await this.prisma.client.$transaction(async (tx) => {
       // The teacher role is only useful once there is a teacher record to
       // assign to classes and subjects, so keep the two in step.
-      if (wantsTeacher && target.role !== "teacher") {
+      if (wantsTeacher && target.role !== 'teacher') {
         await this.ensureTeacherRecord(tx, schoolId, target.userId, input.teacherDepartmentId);
       } else if (hadTeacher && !wantsTeacher) {
         // Keep history (past classes, subjects) but stop offering them as a teacher.
@@ -360,7 +375,7 @@ export class SchoolsService {
         });
       }
       // Same for parents: an administrator or staff member can also be a guardian.
-      if (wantsGuardian && target.role !== "guardian") {
+      if (wantsGuardian && target.role !== 'guardian') {
         await this.ensureGuardianRecord(tx, schoolId, target.userId, input.guardianPhone);
       } else if (hadGuardian && !wantsGuardian) {
         await tx.guardian.updateMany({
@@ -401,7 +416,7 @@ export class SchoolsService {
       select: { name: true, email: true },
     });
     const [firstName = user.name, ...rest] = user.name.trim().split(/\s+/);
-    const lastName = rest.join(" ") || "-";
+    const lastName = rest.join(' ') || '-';
     const profile =
       (await tx.userProfile.findUnique({ where: { userId } })) ??
       (await tx.userProfile.create({ data: { userId, firstName, lastName } }));
@@ -419,20 +434,20 @@ export class SchoolsService {
     }
 
     if (!departmentId) {
-      throw new BadRequestException("Choose a department for this teacher.");
+      throw new BadRequestException('Choose a department for this teacher.');
     }
     const department = await tx.department.findFirst({
       where: { id: departmentId, schoolId, isActive: true },
       select: { id: true },
     });
     if (!department) {
-      throw new BadRequestException("Choose an active department belonging to this school.");
+      throw new BadRequestException('Choose an active department belonging to this school.');
     }
     await tx.teacher.create({
       data: {
         schoolId,
         profileId: profile.id,
-        teacherId: `TCH-${new Date().getFullYear()}-${randomUUID().replaceAll("-", "").slice(0, 8).toUpperCase()}`,
+        teacherId: `TCH-${new Date().getFullYear()}-${randomUUID().replaceAll('-', '').slice(0, 8).toUpperCase()}`,
         invitationEmail: user.email,
         firstName,
         lastName,
@@ -453,7 +468,7 @@ export class SchoolsService {
       select: { name: true, email: true },
     });
     const [firstName = user.name, ...rest] = user.name.trim().split(/\s+/);
-    const lastName = rest.join(" ") || "-";
+    const lastName = rest.join(' ') || '-';
     let profile = await tx.userProfile.findUnique({ where: { userId } });
     if (!profile) {
       profile = await tx.userProfile.create({ data: { userId, firstName, lastName, phone } });
@@ -488,19 +503,19 @@ export class SchoolsService {
 
     const contactPhone = profile.phone ?? phone;
     if (!contactPhone) {
-      throw new BadRequestException("Enter a phone number for this parent.");
+      throw new BadRequestException('Enter a phone number for this parent.');
     }
     await tx.guardian.create({
       data: {
         schoolId,
         profileId: profile.id,
         canLogin: true,
-        guardianId: `GUA-${randomUUID().replaceAll("-", "").slice(0, 12).toUpperCase()}`,
+        guardianId: `GUA-${randomUUID().replaceAll('-', '').slice(0, 12).toUpperCase()}`,
         firstName,
         lastName,
         phone: contactPhone,
         email: user.email.toLowerCase(),
-        relationshipType: "GUARDIAN",
+        relationshipType: 'GUARDIAN',
       },
     });
   }
@@ -515,12 +530,11 @@ export class SchoolsService {
       const hasCurrentTerm = input.terms?.some((term) => term.isCurrent) ?? false;
       const isCurrent = input.isCurrent || hasCurrentTerm;
       if (isCurrent && !input.terms?.length) {
-        throw new BadRequestException(
-          "A current academic year must include at least one term.",
-        );
+        throw new BadRequestException('A current academic year must include at least one term.');
       }
-      const currentTermNumber = input.terms?.find((term) => term.isCurrent)
-        ?.termNumber ?? (input.isCurrent ? input.terms?.[0]?.termNumber : undefined);
+      const currentTermNumber =
+        input.terms?.find((term) => term.isCurrent)?.termNumber ??
+        (input.isCurrent ? input.terms?.[0]?.termNumber : undefined);
 
       if (isCurrent) {
         await this.requireSafeYearSwitch(transaction, schoolId, null);
@@ -555,7 +569,7 @@ export class SchoolsService {
               }
             : undefined,
         },
-        include: { terms: { orderBy: { termNumber: "asc" } } },
+        include: { terms: { orderBy: { termNumber: 'asc' } } },
       });
     });
   }
@@ -571,9 +585,9 @@ export class SchoolsService {
   private async requireYear(schoolId: string, id: string) {
     const year = await this.prisma.client.academicYear.findFirst({
       where: { id, schoolId },
-      include: { terms: { orderBy: { termNumber: "asc" } } },
+      include: { terms: { orderBy: { termNumber: 'asc' } } },
     });
-    if (!year) throw new NotFoundException("Academic year not found.");
+    if (!year) throw new NotFoundException('Academic year not found.');
     return year;
   }
 
@@ -584,7 +598,7 @@ export class SchoolsService {
       endDate: input.endDate ?? toIsoDate(year.endDate),
     };
     if (range.endDate <= range.startDate) {
-      throw new BadRequestException("The academic year must end after it starts.");
+      throw new BadRequestException('The academic year must end after it starts.');
     }
     const outside = termsOutsideYear(
       year.terms.map((term) => ({ ...this.asRange(term), name: term.name })),
@@ -594,11 +608,11 @@ export class SchoolsService {
       throw new BadRequestException(
         `These terms would fall outside the new dates: ${outside
           .map((term) => term.name)
-          .join(", ")}. Edit the terms first.`,
+          .join(', ')}. Edit the terms first.`,
       );
     }
     if (input.isCurrent === true && year.terms.length === 0) {
-      throw new BadRequestException("Add at least one term before making this the current year.");
+      throw new BadRequestException('Add at least one term before making this the current year.');
     }
 
     try {
@@ -637,12 +651,12 @@ export class SchoolsService {
             endDate: input.endDate ? new Date(input.endDate) : undefined,
             isCurrent: input.isCurrent,
           },
-          include: { terms: { orderBy: { termNumber: "asc" } } },
+          include: { terms: { orderBy: { termNumber: 'asc' } } },
         });
       });
     } catch (error) {
-      if ((error as { code?: string })?.code === "P2002") {
-        throw new BadRequestException("Another academic year already uses that name.");
+      if ((error as { code?: string })?.code === 'P2002') {
+        throw new BadRequestException('Another academic year already uses that name.');
       }
       throw error;
     }
@@ -651,10 +665,12 @@ export class SchoolsService {
   async createTerm(schoolId: string, yearId: string, input: CreateTermInput) {
     const year = await this.requireYear(schoolId, yearId);
     if (year.terms.length >= 3) {
-      throw new BadRequestException("An academic year can have at most three terms.");
+      throw new BadRequestException('An academic year can have at most three terms.');
     }
     if (year.terms.some((term) => term.termNumber === input.termNumber)) {
-      throw new BadRequestException(`Term ${input.termNumber} already exists in this academic year.`);
+      throw new BadRequestException(
+        `Term ${input.termNumber} already exists in this academic year.`,
+      );
     }
     const problem = termProblemWithinYear(this.asRange(year), input);
     if (problem) throw new BadRequestException(problem);
@@ -669,10 +685,15 @@ export class SchoolsService {
     return this.prisma.client.$transaction(async (tx) => {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${schoolId}),hashtext('academic-rollover'))`;
       const liveYear = await tx.academicYear.findUnique({ where: { id: yearId } });
-      if (input.isCurrent && !liveYear?.isCurrent) throw new BadRequestException("The academic year is no longer current. Reload before changing its current term.");
+      if (input.isCurrent && !liveYear?.isCurrent)
+        throw new BadRequestException(
+          'The academic year is no longer current. Reload before changing its current term.',
+        );
       const makeCurrent = input.isCurrent && year.isCurrent;
       if (input.isCurrent && !year.isCurrent) {
-        throw new BadRequestException("Make the academic year current before choosing a current term.");
+        throw new BadRequestException(
+          'Make the academic year current before choosing a current term.',
+        );
       }
       if (makeCurrent) {
         await tx.term.updateMany({
@@ -699,7 +720,7 @@ export class SchoolsService {
       where: { id: termId, academicYear: { schoolId } },
       include: { academicYear: { include: { terms: true } } },
     });
-    if (!term) throw new NotFoundException("Term not found.");
+    if (!term) throw new NotFoundException('Term not found.');
     const range = {
       startDate: input.startDate ?? toIsoDate(term.startDate),
       endDate: input.endDate ?? toIsoDate(term.endDate),
@@ -716,17 +737,30 @@ export class SchoolsService {
     );
     if (overlap) throw new BadRequestException(`These dates overlap ${overlap.name}.`);
     if (input.isCurrent === true && !term.academicYear.isCurrent) {
-      throw new BadRequestException("Make the academic year current before choosing a current term.");
+      throw new BadRequestException(
+        'Make the academic year current before choosing a current term.',
+      );
     }
     if (input.isCurrent === false && term.isCurrent && term.academicYear.isCurrent) {
-      throw new BadRequestException("The current year needs a current term. Choose another term instead.");
+      throw new BadRequestException(
+        'The current year needs a current term. Choose another term instead.',
+      );
     }
 
     return this.prisma.client.$transaction(async (tx) => {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${schoolId}),hashtext('academic-rollover'))`;
-      const liveTerm = await tx.term.findUnique({ where: { id: termId }, include: { academicYear: true } });
-      if (input.isCurrent === true && !liveTerm?.academicYear.isCurrent) throw new BadRequestException("The academic year is no longer current. Reload before changing its current term.");
-      if (input.isCurrent === false && liveTerm?.isCurrent && liveTerm.academicYear.isCurrent) throw new BadRequestException("The current year needs a current term. Choose another term instead.");
+      const liveTerm = await tx.term.findUnique({
+        where: { id: termId },
+        include: { academicYear: true },
+      });
+      if (input.isCurrent === true && !liveTerm?.academicYear.isCurrent)
+        throw new BadRequestException(
+          'The academic year is no longer current. Reload before changing its current term.',
+        );
+      if (input.isCurrent === false && liveTerm?.isCurrent && liveTerm.academicYear.isCurrent)
+        throw new BadRequestException(
+          'The current year needs a current term. Choose another term instead.',
+        );
       if (input.isCurrent === true) {
         await tx.term.updateMany({
           where: { academicYear: { schoolId }, isCurrent: true, NOT: { id: termId } },

@@ -59,10 +59,7 @@ export class TimetableController {
   /** Current class timetable for the authenticated student. */
   @Get('me')
   @Roles('student')
-  myTimetable(
-    @CurrentSchool() school: School,
-    @CurrentUser() user: AuthenticatedUser | undefined,
-  ) {
+  myTimetable(@CurrentSchool() school: School, @CurrentUser() user: AuthenticatedUser | undefined) {
     return this.timetable.getStudentOwnTimetable(school.id, user!.id);
   }
 
@@ -184,5 +181,4 @@ export class TimetableController {
   ) {
     return this.timetable.getGuardianWardTimetable(school.id, user!.id, studentId);
   }
-
 }

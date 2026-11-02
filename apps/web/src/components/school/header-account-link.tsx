@@ -1,6 +1,6 @@
-import { Link } from "@tanstack/react-router";
-import { UserAvatar } from "@/components/ui/user-avatar";
-import { useSession } from "@/lib/auth-client";
+import { Link } from '@tanstack/react-router';
+import { UserAvatar } from '@/components/ui/user-avatar';
+import { useSession } from '@/lib/auth-client';
 
 /**
  * Header shortcut to the signed-in user's profile page. Sign-out and the
@@ -14,12 +14,14 @@ export function HeaderAccountLink({ subtitle }: { subtitle: string }) {
   return (
     <Link
       to="/$page"
-      params={{ page: "profile" }}
+      params={{ page: 'profile' }}
       aria-label="My profile"
       className="flex items-center gap-2.5 rounded-lg px-1.5 py-1 text-right transition hover:bg-muted"
     >
       <span className="hidden sm:block">
-        <span className="block text-xs font-semibold text-foreground">{user?.name ?? "School admin"}</span>
+        <span className="block text-xs font-semibold text-foreground">
+          {user?.name ?? 'School admin'}
+        </span>
         <span className="block text-[10px] text-muted-foreground">{subtitle}</span>
       </span>
       <UserAvatar name={user?.name} image={user?.image} className="size-9" />
