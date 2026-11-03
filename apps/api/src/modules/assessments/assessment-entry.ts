@@ -66,6 +66,9 @@ export interface EntryComponent {
   isRequired: boolean;
   isRepeatable: boolean;
   expectedCount: number;
+  subjectStrandId?: string | null;
+  subjectStrandName?: string | null;
+  canEdit?: boolean;
 }
 
 export interface MarkCell {
