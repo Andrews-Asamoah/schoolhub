@@ -184,11 +184,13 @@ export const saveRegister = defineEndpoint({
   method: "POST",
   path: "/attendance/batch",
   roles: ["teacher"],
+  idempotent: true,
   request: batchAttendanceSchema,
   response: z.object({
     success: z.boolean(),
     count: z.number(),
     date: z.string(),
+    replayed: z.boolean().optional(),
   }),
 });
 export const assessmentSheetSchema = z.object({

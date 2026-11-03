@@ -1,6 +1,6 @@
-import { memo, useState } from "react";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { useLocalSearchParams } from "expo-router";
-import { View } from "react-native";
+import { AppState, View } from "react-native";
 import { FlashList } from "@shopify/flash-list";
 import type { AttendanceStatus, Register } from "@/api/teacher";
 import {
@@ -12,6 +12,14 @@ import {
   saveRegister,
 } from "@/api/teacher";
 import { useScopedMutation } from "@/features/shared/mutations";
+import { useSession } from "@/lib/session";
+import {
+  enqueueRegister,
+  flushRegisterQueue,
+  isRetryableRegisterError,
+  newIdempotencyKey,
+  pendingRegisterCount,
+} from "@/lib/register-queue";
 import { useTeacherQuery } from "./queries";
 import {
   calendarBlock,
@@ -72,10 +80,63 @@ function RegisterBody() {
       getRegisterGaps({ signal, params: { classId: params.classId } }),
     !!klass,
   );
+  const subdomain = useSession().subdomain;
+  // One key per save intent: a retry after an unknown outcome reuses it, so the
+  // server applies the batch at most once.
+  const keyRef = useRef<string | undefined>(undefined);
   const mutation = useScopedMutation(
     (input: Parameters<typeof saveRegister>[0]["request"]) =>
-      saveRegister({ request: input }),
+      saveRegister({ request: input, idempotencyKey: keyRef.current }),
   );
+  const [pending, setPending] = useState(0);
+  const [syncNote, setSyncNote] = useState<string | null>(null);
+  const [queuedNote, setQueuedNote] = useState(false);
+  const refetchRegister = query.refetch;
+  /** Sends queued registers; resolves with what to show (never sets state itself). */
+  const runSync = useCallback(async () => {
+    if (!subdomain) return null;
+    const result = await flushRegisterQueue({
+      subdomain,
+      send: (entry) =>
+        saveRegister({ request: entry.batch, idempotencyKey: entry.key }),
+    }).catch(() => null);
+    const remaining = await pendingRegisterCount(subdomain).catch(() => 0);
+    return { result, remaining };
+  }, [subdomain]);
+  const applySync = useCallback(
+    (outcome: Awaited<ReturnType<typeof runSync>>) => {
+      if (!outcome) return;
+      setPending(outcome.remaining);
+      const { result } = outcome;
+      if (!result) return;
+      if (result.rejected.length)
+        setSyncNote(
+          `${result.rejected.length} saved register${result.rejected.length === 1 ? " was" : "s were"} rejected by the server (for example a closed day or changed assignment) and removed: ${result.rejected.map((r) => r.date).join(", ")}. Review those dates.`,
+        );
+      else if (result.synced) setSyncNote(null);
+      if (result.synced) void refetchRegister();
+    },
+    [refetchRegister],
+  );
+  const syncPending = useCallback(
+    () => runSync().then(applySync),
+    [runSync, applySync],
+  );
+  useEffect(() => {
+    let active = true;
+    const sync = () =>
+      void runSync().then((outcome) => {
+        if (active) applySync(outcome);
+      });
+    sync();
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state === "active") sync();
+    });
+    return () => {
+      active = false;
+      subscription.remove();
+    };
+  }, [runSync, applySync]);
   const rows = query.data ?? [];
   const dirty = Object.keys(draft).length > 0;
   const block = calendarBlock(
@@ -112,11 +173,28 @@ function RegisterBody() {
   );
   async function save() {
     if (!editable || !dirty) return;
+    const batch = attendanceBatch(date, rows, draft);
+    const key = newIdempotencyKey();
+    keyRef.current = key;
+    setQueuedNote(false);
     try {
-      await mutation.mutateAsync(attendanceBatch(date, rows, draft));
+      await mutation.mutateAsync(batch);
       setDraft({});
-    } catch {
-      /* Keep unsaved intent visible. Never queue or retry a rejected batch. */
+      void syncPending();
+    } catch (error) {
+      /* A server rejection is never queued or retried: unsaved marks stay visible.
+         Only an unknown outcome (offline, timeout, 5xx) is kept for a safe retry. */
+      if (subdomain && isRetryableRegisterError(error)) {
+        const queued = await enqueueRegister({ key, subdomain, batch }).catch(
+          () => false,
+        );
+        if (queued) {
+          mutation.reset();
+          setDraft({});
+          setQueuedNote(true);
+          setPending(await pendingRegisterCount(subdomain).catch(() => 0));
+        }
+      }
     }
   }
   return (
@@ -165,6 +243,31 @@ function RegisterBody() {
                       Register saved and confirmed by the server.
                     </Copy>
                   ) : null}
+                  {queuedNote ? (
+                    <Copy alert>
+                      You appear to be offline. The register is saved on this
+                      device and will sync automatically when you reopen the app
+                      with a connection.
+                    </Copy>
+                  ) : null}
+                  {pending > 0 ? (
+                    <>
+                      <Copy alert>
+                        {pending} register{pending === 1 ? "" : "s"} waiting to
+                        sync. Server-confirmed marks may be out of date until it
+                        finishes.
+                      </Copy>
+                      <Button
+                        label="Sync now"
+                        variant="secondary"
+                        disabled={mutation.isPending}
+                        onPress={() => {
+                          void syncPending();
+                        }}
+                      />
+                    </>
+                  ) : null}
+                  {syncNote ? <Copy alert>{syncNote}</Copy> : null}
                   <Copy>
                     {
                       rows.filter((r) => registerStatus(r, draft) === "PRESENT")

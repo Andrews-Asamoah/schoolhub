@@ -16,6 +16,16 @@ export class AttendanceService {
     private readonly calendarService: AttendanceCalendarService,
   ) {}
 
+  private replayResult(
+    replay: { inputHash: string; recordCount: number; date: Date },
+    inputHash: string,
+  ) {
+    if (replay.inputHash !== inputHash) {
+      throw new ConflictException("This idempotency key was already used for a different attendance batch.");
+    }
+    return { success: true, count: replay.recordCount, date: replay.date.toISOString().slice(0, 10), replayed: true };
+  }
+
   async batchRecordAttendance(
     schoolId: string,
     markedById: string,
@@ -27,6 +37,15 @@ export class AttendanceService {
       throw new BadRequestException("Invalid attendance idempotency key.");
     }
     const inputHash = idempotencyKey ? createHash("sha256").update(JSON.stringify(input)).digest("hex") : null;
+    if (idempotencyKey && inputHash) {
+      // A retry of an already-saved batch must succeed even if the day, term or the
+      // teacher's assignment has changed since. The lookup is scoped to this school,
+      // user and key, so it only ever returns the caller's own earlier result.
+      const existing = await this.prisma.client.attendanceBatchReplay.findUnique({
+        where: { schoolId_userId_key: { schoolId, userId: markedById, key: idempotencyKey } },
+      });
+      if (existing) return this.replayResult(existing, inputHash);
+    }
     if (input.date > new Date().toISOString().slice(0, 10)) {
       throw new BadRequestException("The register cannot be marked for a future date.");
     }
@@ -101,10 +120,8 @@ export class AttendanceService {
         where: { schoolId_userId_key: { schoolId, userId: markedById, key: idempotencyKey } },
       });
       if (!replay) throw error;
-      if (replay.inputHash !== inputHash) {
-        throw new ConflictException("This idempotency key was already used for a different attendance batch.");
-      }
-      return { success: true, count: replay.recordCount, date: replay.date.toISOString().slice(0, 10), replayed: true };
+      // Lost a concurrent first-write race: the other request already saved this batch.
+      return this.replayResult(replay, inputHash);
     }
 
     return {

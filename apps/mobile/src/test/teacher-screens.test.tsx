@@ -29,6 +29,9 @@ import {
 } from "@/features/teacher/Mocks";
 import { TeacherReports, TeacherMockReports } from "@/features/teacher/Reports";
 import TeacherClubs from "@/features/teacher/Clubs";
+import { ApiError } from "@/lib/api-error";
+import * as registerQueue from "@/lib/register-queue";
+import * as session from "@/lib/session";
 const mockQuery = jest.fn();
 const mockMutate = jest.fn();
 const mockParams = {
@@ -88,6 +91,16 @@ jest.mock("@shopify/flash-list", () => ({
   },
 }));
 jest.mock("@/components/Dialogs", () => ({ ConfirmDialog: () => null }));
+jest.mock("@/lib/register-queue", () => ({
+  ...jest.requireActual("@/lib/register-queue"),
+  enqueueRegister: jest.fn(async () => true),
+  flushRegisterQueue: jest.fn(async () => ({
+    synced: 0,
+    rejected: [],
+    remaining: 0,
+  })),
+  pendingRegisterCount: jest.fn(async () => 0),
+}));
 jest.mock("@/components/Screen", () => {
   const React = jest.requireActual<typeof import("react")>("react");
   const { Text, View } =
@@ -617,4 +630,63 @@ test("a background refresh cannot silently advance a pending mock edit's version
       },
     }),
   );
+});
+
+describe("offline register saves", () => {
+  beforeEach(() => {
+    jest.spyOn(session, "useSession").mockReturnValue({
+      subdomain: "school",
+      status: "ready",
+      activeRole: "teacher",
+    } as never);
+    jest
+      .mocked(registerQueue.enqueueRegister)
+      .mockClear()
+      .mockResolvedValue(true);
+    jest.mocked(registerQueue.pendingRegisterCount).mockResolvedValue(0);
+  });
+  afterEach(() => jest.restoreAllMocks());
+  async function markAndSave() {
+    await render(<RegisterScreen />);
+    await fireEvent.press(
+      screen.getByRole("button", { name: "Pupil Fixture: PRESENT" }),
+    );
+    await fireEvent.press(
+      screen.getByRole("button", { name: "Save register" }),
+    );
+    await waitFor(() => expect(mockMutate).toHaveBeenCalled());
+  }
+  test("an unknown-outcome failure is queued with its idempotency key", async () => {
+    mockMutate.mockRejectedValue(new TypeError("Network request failed"));
+    jest.mocked(registerQueue.pendingRegisterCount).mockResolvedValue(1);
+    await markAndSave();
+    await waitFor(() =>
+      expect(registerQueue.enqueueRegister).toHaveBeenCalledWith({
+        key: expect.stringMatching(/^reg-/),
+        subdomain: "school",
+        batch: {
+          date: expect.any(String),
+          records: [{ studentId: "p", status: "PRESENT" }],
+        },
+      }),
+    );
+    expect(await screen.findByText(/saved on this device/)).toBeVisible();
+    expect(screen.queryByText(/unsaved marks/)).toBeNull();
+    expect(await screen.findByText(/1 register waiting to sync/)).toBeVisible();
+  });
+  test("a server rejection is never queued", async () => {
+    mockMutate.mockRejectedValue(new ApiError(403, "School closed", {}));
+    await markAndSave();
+    expect(registerQueue.enqueueRegister).not.toHaveBeenCalled();
+    expect(screen.getByText(/1 unsaved marks/)).toBeVisible();
+  });
+  test("a full queue keeps the marks on screen", async () => {
+    mockMutate.mockRejectedValue(new ApiError(503, "Unavailable", {}));
+    jest.mocked(registerQueue.enqueueRegister).mockResolvedValue(false);
+    await markAndSave();
+    await waitFor(() =>
+      expect(registerQueue.enqueueRegister).toHaveBeenCalled(),
+    );
+    expect(screen.getByText(/1 unsaved marks/)).toBeVisible();
+  });
 });

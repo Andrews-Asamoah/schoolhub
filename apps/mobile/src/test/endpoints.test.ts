@@ -261,3 +261,48 @@ test("avatar uploads enforce their image type and size limits", async () => {
     type: "image/jpeg",
   });
 });
+
+test("idempotency keys are only accepted by endpoints that declare them, and are validated", async () => {
+  jest.mocked(apiFetch).mockResolvedValue({ ok: true });
+  const plain = defineEndpoint({
+    method: "POST",
+    path: "/attendance/batch",
+    roles: ["teacher"],
+    request: z.object({ a: z.number() }),
+    response: z.unknown(),
+  });
+  await expect(
+    plain({ request: { a: 1 }, idempotencyKey: "reg-aaaaaaaa" }),
+  ).rejects.toThrow("does not accept an idempotency key");
+  const idem = defineEndpoint({
+    method: "POST",
+    path: "/attendance/batch",
+    roles: ["teacher"],
+    idempotent: true,
+    request: z.object({ a: z.number() }),
+    response: z.unknown(),
+  });
+  await expect(
+    idem({ request: { a: 1 }, idempotencyKey: "short" }),
+  ).rejects.toThrow("Invalid idempotency key");
+  await expect(
+    idem({ request: { a: 1 }, idempotencyKey: "bad key with spaces" }),
+  ).rejects.toThrow("Invalid idempotency key");
+  expect(apiFetch).not.toHaveBeenCalled();
+  await idem({ request: { a: 1 }, idempotencyKey: "reg-aaaaaaaa" });
+  expect(apiFetch).toHaveBeenCalledWith(
+    "/attendance/batch",
+    expect.objectContaining({ headers: { "Idempotency-Key": "reg-aaaaaaaa" } }),
+  );
+  await idem({ request: { a: 1 } });
+  expect(jest.mocked(apiFetch).mock.calls[1]![1]).not.toHaveProperty("headers");
+  expect(() =>
+    defineEndpoint({
+      method: "GET",
+      path: "/attendance/class/:classId",
+      roles: ["teacher"],
+      idempotent: true,
+      response: z.unknown(),
+    }),
+  ).toThrow("Only write endpoints");
+});

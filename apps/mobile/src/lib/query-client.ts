@@ -1,4 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { clearRegisterQueue } from "./register-queue";
 import { createAsyncStoragePersister } from "@tanstack/query-async-storage-persister";
 import { QueryClient } from "@tanstack/react-query";
 import type { PersistQueryClientProviderProps } from "@tanstack/react-query-persist-client";
@@ -52,4 +53,6 @@ export async function wipeQueryCache() {
   await queryClient.cancelQueries();
   queryClient.clear();
   await AsyncStorage.removeItem(STORAGE_KEY);
+  // Queued offline registers belong to the signed-in teacher and school.
+  await clearRegisterQueue();
 }
