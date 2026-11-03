@@ -11,6 +11,7 @@ import type {
   SetSubjectStrandsInput,
 } from "@schoolhub/shared";
 import { findUnqualifiedTeachers } from "./subject-assignments.js";
+import { Prisma } from "@prisma/client";
 import { PrismaService } from "../../prisma/prisma.service.js";
 
 const teacherSelect = {
@@ -54,7 +55,6 @@ export class SubjectsService {
             classAssignments: {
               where: {
                 classSubject: {
-                  subjectId: { not: undefined },
                   class: { schoolId, deletedAt: null },
                 },
               },
