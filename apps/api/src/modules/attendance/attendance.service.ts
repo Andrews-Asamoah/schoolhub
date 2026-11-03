@@ -1,4 +1,5 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
+import { createHash } from "node:crypto";
 import { PrismaService } from "../../prisma/prisma.service.js";
 import type { BatchAttendanceInput } from "@schoolhub/shared";
 import { canManageAcademicContext } from "../../common/academic-context.js";
@@ -20,7 +21,12 @@ export class AttendanceService {
     markedById: string,
     input: BatchAttendanceInput,
     role?: string,
+    idempotencyKey?: string,
   ) {
+    if (idempotencyKey && !/^[A-Za-z0-9._:-]{8,128}$/.test(idempotencyKey)) {
+      throw new BadRequestException("Invalid attendance idempotency key.");
+    }
+    const inputHash = idempotencyKey ? createHash("sha256").update(JSON.stringify(input)).digest("hex") : null;
     if (input.date > new Date().toISOString().slice(0, 10)) {
       throw new BadRequestException("The register cannot be marked for a future date.");
     }
@@ -53,7 +59,15 @@ export class AttendanceService {
 
     // Calendar writes and attendance writes acquire the same scoped advisory lock.
     // Repeat the eligibility checks under the lock so an exclusion cannot race a register save.
-    const results = await this.prisma.client.$transaction(async (tx) => {
+    let results;
+    try {
+      results = await this.prisma.client.$transaction(async (tx) => {
+      if (idempotencyKey && inputHash) {
+        await tx.attendanceBatchReplay.create({ data: {
+          schoolId, userId: markedById, key: idempotencyKey, inputHash,
+          date: attendanceDate, recordCount: input.records.length,
+        } });
+      }
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${schoolId}), hashtext(${term.id}))`;
       await tx.$queryRaw`SELECT "id" FROM "terms" WHERE "id" = ${term.id} FOR UPDATE`;
       const [latestTerm, overrides, excluded] = await Promise.all([
@@ -80,12 +94,24 @@ export class AttendanceService {
         }));
       }
       return saved;
-    });
+      });
+    } catch (error) {
+      if (!idempotencyKey || !inputHash) throw error;
+      const replay = await this.prisma.client.attendanceBatchReplay.findUnique({
+        where: { schoolId_userId_key: { schoolId, userId: markedById, key: idempotencyKey } },
+      });
+      if (!replay) throw error;
+      if (replay.inputHash !== inputHash) {
+        throw new ConflictException("This idempotency key was already used for a different attendance batch.");
+      }
+      return { success: true, count: replay.recordCount, date: replay.date.toISOString().slice(0, 10), replayed: true };
+    }
 
     return {
       success: true,
       count: results.length,
       date: input.date,
+      ...(idempotencyKey ? { replayed: false } : {}),
     };
   }
 
