@@ -9,8 +9,12 @@ const ama: TeacherAssignments = {
     { classId: "c-1a", subjectId: "math" },
     { classId: "c-1b", subjectId: "math" },
   ],
+  subjectStrandAssignments: [
+    { classId: "c-1a", subjectId: "cad", subjectStrandId: "arts" },
+    { classId: "c-1a", subjectId: "cad", subjectStrandId: "music" },
+  ],
 };
-const none: TeacherAssignments = { teacherId: null, classTeacherClassIds: [], subjectAssignments: [] };
+const none: TeacherAssignments = { teacherId: null, classTeacherClassIds: [], subjectAssignments: [], subjectStrandAssignments: [] };
 
 describe("canMarkRegister", () => {
   it("keeps attendance marking restricted to assigned class teachers", () => {
