@@ -1,1 +1,1 @@
-export { RolePlaceholder as default } from "@/components/RolePlaceholder";
+export { TeacherHome as default } from "@/features/teacher/overview";

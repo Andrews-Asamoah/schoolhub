@@ -35,10 +35,12 @@ export function TeacherPage({
   children,
   query,
   back = false,
+  scroll = true,
 }: {
   title: string;
   children: ReactNode;
   back?: boolean;
+  scroll?: boolean;
   query?: { isRefetching: boolean; refetch: () => unknown };
 }) {
   return (
@@ -47,6 +49,7 @@ export function TeacherPage({
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
       <Screen
+        scroll={scroll}
         title={title}
         refreshing={query?.isRefetching}
         onRefresh={
@@ -67,7 +70,9 @@ export function TeacherPage({
           ) : undefined
         }
       >
-        <View style={{ gap: spacing.lg }}>{children}</View>
+        <View style={[{ gap: spacing.lg }, !scroll && { flex: 1 }]}>
+          {children}
+        </View>
       </Screen>
     </KeyboardAvoidingView>
   );

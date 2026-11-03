@@ -1,12 +1,5 @@
 import { router } from "expo-router";
-import {
-  BookOpen,
-  ClipboardCheck,
-  CreditCard,
-  GraduationCap,
-  UserRound,
-  Wallet,
-} from "lucide-react-native";
+import { CreditCard, UserRound, Wallet } from "lucide-react-native";
 import { View } from "react-native";
 import { ModuleTile } from "@/components/ModulePrimitives";
 import { modulePalette } from "@/theme/palette";
@@ -14,24 +7,6 @@ import { WorkspaceScreen } from "@/components/WorkspaceScreen";
 import { useTheme } from "@/theme/theme";
 
 const modules = [
-  {
-    title: "Students",
-    detail: "Student directory and profiles",
-    icon: GraduationCap,
-    route: "/(workspace)/students",
-  },
-  {
-    title: "Attendance",
-    detail: "Daily registers and summaries",
-    icon: ClipboardCheck,
-    route: "/(workspace)/attendance",
-  },
-  {
-    title: "Assessments",
-    detail: "Results and progress overview",
-    icon: BookOpen,
-    route: "/(workspace)/assessments",
-  },
   {
     title: "Fees",
     detail: "Statements and payment history",
