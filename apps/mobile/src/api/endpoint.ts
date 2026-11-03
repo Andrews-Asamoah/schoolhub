@@ -17,6 +17,8 @@ type BaseOptions = {
   query?: Query;
   subdomain?: string;
   signal?: AbortSignal;
+  /** Only for endpoints declared `idempotent`; sent as the `Idempotency-Key` header. */
+  idempotencyKey?: string;
 };
 type EndpointOptions<TRequest> = BaseOptions & { request?: TRequest };
 type EndpointArguments<TRequestSchema extends z.ZodType | undefined> =
@@ -28,6 +30,11 @@ type EndpointArguments<TRequestSchema extends z.ZodType | undefined> =
       ]
     : [options?: EndpointOptions<never>];
 type EndpointScope = "public" | "session" | "discovery" | "tenant";
+/** Mirrors the API's accepted idempotency-key format. */
+const IDEMPOTENCY_KEY = /^[A-Za-z0-9._:-]{8,128}$/;
+export function isValidIdempotencyKey(value: string): boolean {
+  return IDEMPOTENCY_KEY.test(value);
+}
 
 const publicEndpoints = new Set([
   "GET /schools/public/:subdomain",
@@ -130,7 +137,14 @@ export function defineEndpoint<
   scope?: EndpointScope;
   request?: TRequestSchema;
   response: z.ZodType<TResponse>;
+  /** Writes the server de-duplicates by `Idempotency-Key` (offline retries). */
+  idempotent?: boolean;
 }) {
+  if (
+    definition.idempotent &&
+    !["POST", "PUT", "PATCH"].includes(definition.method)
+  )
+    throw new Error("Only write endpoints can be idempotent.");
   assertDefinition(
     definition.method,
     definition.path,
@@ -155,9 +169,18 @@ export function defineEndpoint<
     } else if (options.request !== undefined) {
       throw new Error("This endpoint does not accept a request body.");
     }
+    if (options.idempotencyKey !== undefined) {
+      if (!definition.idempotent)
+        throw new Error("This endpoint does not accept an idempotency key.");
+      if (!isValidIdempotencyKey(options.idempotencyKey))
+        throw new Error("Invalid idempotency key.");
+    }
     const init: RequestInit = {
       method: definition.method,
       signal: options.signal,
+      ...(options.idempotencyKey === undefined
+        ? {}
+        : { headers: { "Idempotency-Key": options.idempotencyKey } }),
       ...(body === undefined ? {} : { body }),
     };
     const result =
