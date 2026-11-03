@@ -253,6 +253,7 @@ model Teacher {
   remarks               Remark[]
   subjects              SubjectTeacher[]
   classSubjects         ClassSubject[]
+  classSubjectStrandAssignments ClassSubjectStrandAssignment[]
   clubs                 Club[]
   payslips              Payslip[]
   timetableEntries      TimetableEntry[]
