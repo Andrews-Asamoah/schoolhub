@@ -28,6 +28,7 @@ interface TimetableEntry {
   startTime: string;
   endTime: string;
   subject?: { id: string; name: string; code?: string } | null;
+  subjectStrand?: { id: string; name: string } | null;
   teacher?: { id: string; name: string } | null;
   classroom?: { id: string; name: string } | null;
 }
@@ -128,6 +129,9 @@ function parseTime(value: string): number | null {
 }
 
 function periodTitle(entry: TimetableEntry) {
+  if (entry.subject?.name && entry.subjectStrand?.name) {
+    return `${entry.subject.name} / ${entry.subjectStrand.name}`;
+  }
   if (entry.subject?.name) return entry.subject.name;
   if (entry.label?.trim()) return entry.label.trim();
   if (entry.type === "BREAK") return "Break time";
