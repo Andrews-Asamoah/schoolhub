@@ -97,3 +97,12 @@ Phase 3 details the auth and endpoint adapter at
 `pnpm --filter @schoolhub/mobile verify:endpoints` from the root.
 Device/emulator validation and screenshots remain required before the phases
 can be declared fully complete.
+
+## Teacher workspace (Phase 7)
+
+Teacher tabs now use the school API for classes, rosters, register gaps, the
+online attendance register, score entry, internal mocks, report recommendations,
+assignments and clubs. Attendance edits stay in memory until a confirmed save;
+no offline replay is enabled. See [Phase 7](../../docs/plans/mobile-phase-7.md)
+for contracts, real validation transcripts and pending device acceptance.
+Teacher announcement creation and documents remain deferred pending N3.
