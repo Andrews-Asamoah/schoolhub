@@ -250,7 +250,12 @@ export class SubjectsService {
 
     const classIds = [...new Set(input.strands.flatMap((strand) => strand.assignments.map((row) => row.classId)))];
     const teacherIds = [...new Set(input.strands.flatMap((strand) => strand.assignments.map((row) => row.teacherId)))];
-    const [classSubjects, teacherCount, qualified] = await Promise.all([
+    const activeStrands = input.strands.filter((strand) => strand.isActive);
+    const weights = activeStrands.map((strand) => strand.examWeightPercent);
+    if (weights.some((weight) => weight > 0) && Math.abs(weights.reduce((sum, weight) => sum + weight, 0) - 100) > 0.01) {
+      throw new BadRequestException("When examination contributions are configured, active teaching-area weights must add up to 100%.");
+    }
+    const [classSubjects, teacherCount, qualified, allOfferings] = await Promise.all([
       classIds.length
         ? this.prisma.client.classSubject.findMany({
             where: { subjectId: id, classId: { in: classIds }, class: { schoolId, deletedAt: null } },
@@ -261,6 +266,10 @@ export class SubjectsService {
       this.prisma.client.subjectTeacher.findMany({
         where: { subjectId: id, teacherId: { in: teacherIds } },
         select: { teacherId: true },
+      }),
+      this.prisma.client.classSubject.findMany({
+        where: { subjectId: id, class: { schoolId, deletedAt: null } },
+        select: { id: true, classId: true },
       }),
     ]);
     if (classSubjects.length !== classIds.length) {
@@ -273,7 +282,15 @@ export class SubjectsService {
     if (teacherIds.some((teacherId) => !qualifiedIds.has(teacherId))) {
       throw new BadRequestException("Add each teacher to the subject's qualified-teacher list before assigning a teaching area.");
     }
-    const classSubjectByClass = new Map(classSubjects.map((row) => [row.classId, row.id]));
+    const requiredClassIds = new Set(allOfferings.map((row) => row.classId));
+    for (const strand of activeStrands) {
+      const assignedClassIds = new Set(strand.assignments.map((row) => row.classId));
+      if (requiredClassIds.size === 0 || assignedClassIds.size !== requiredClassIds.size ||
+          [...requiredClassIds].some((classId) => !assignedClassIds.has(classId))) {
+        throw new BadRequestException(`Assign a qualified teacher for ${strand.name} in every class that studies this subject.`);
+      }
+    }
+    const classSubjectByClass = new Map([...allOfferings, ...classSubjects].map((row) => [row.classId, row.id]));
 
     await this.prisma.client.$transaction(async (tx) => {
       for (const strand of input.strands) {
