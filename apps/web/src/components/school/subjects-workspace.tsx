@@ -700,14 +700,14 @@ function StrandsPanel({
                 </label>
               </div>
               <div className="grid gap-3 sm:grid-cols-3">
-                <FormField label="Code (optional)">
-                  <FormInput value={strand.code} onChange={(event) => update(strand.key, { code: event.target.value.toUpperCase() })} disabled={!strand.isActive} placeholder="ART" />
+                <FormField label="Code (optional)" htmlFor={`strand-code-${strand.key}`}>
+                  <FormInput id={`strand-code-${strand.key}`} value={strand.code} onChange={(event) => update(strand.key, { code: event.target.value.toUpperCase() })} disabled={!strand.isActive} placeholder="ART" />
                 </FormField>
-                <FormField label="Exam contribution (%)" hint="Optional; active areas must total 100% when used.">
-                  <FormInput type="number" min={0} max={100} step="0.01" value={strand.examWeightPercent} onChange={(event) => update(strand.key, { examWeightPercent: event.target.value })} disabled={!strand.isActive} />
+                <FormField label="Exam contribution (%)" htmlFor={`strand-weight-${strand.key}`} hint="Optional; active areas must total 100% when used.">
+                  <FormInput id={`strand-weight-${strand.key}`} type="number" min={0} max={100} step="0.01" value={strand.examWeightPercent} onChange={(event) => update(strand.key, { examWeightPercent: event.target.value })} disabled={!strand.isActive} />
                 </FormField>
-                <FormField label="Description (optional)">
-                  <FormInput value={strand.description} onChange={(event) => update(strand.key, { description: event.target.value })} disabled={!strand.isActive} />
+                <FormField label="Description (optional)" htmlFor={`strand-description-${strand.key}`}>
+                  <FormInput id={`strand-description-${strand.key}`} value={strand.description} onChange={(event) => update(strand.key, { description: event.target.value })} disabled={!strand.isActive} />
                 </FormField>
               </div>
               {strand.isActive && offeredClasses.map((schoolClass) => (
