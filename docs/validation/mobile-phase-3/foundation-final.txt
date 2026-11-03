@@ -47,7 +47,7 @@ $ pnpm --filter @schoolhub/mobile test
 $ jest --runInBand
 
 Test Suites: 17 passed, 17 total
-Tests:       89 passed, 89 total
+Tests:       90 passed, 90 total
 Snapshots:   0 total
 Time:        8.595 s, estimated 11 s
 Ran all test suites.
@@ -162,7 +162,7 @@ exit: 0
 
 --- Android release route verification ---
 $ pnpm --filter @schoolhub/mobile exec node scripts/verify-release.mjs .phase3-android-export
-entry-7403f57fa014220f68427e81e824d736.hbc: 6497144 bytes (Hermes)
+entry-22ed3b120a9b33d20b2943e0635bf674.hbc: 6497172 bytes (Hermes)
 PASS: 1 source map(s), 17 app sources; no development, mock or Super Admin routes.
 exit: 0
 
@@ -205,10 +205,11 @@ exit: 0
 
 --- iOS release route verification ---
 $ pnpm --filter @schoolhub/mobile exec node scripts/verify-release.mjs .phase3-ios-export
-entry-6cdabd4930f0279bd9ba0d6feaa605e5.hbc: 6504620 bytes (Hermes)
+entry-919cd906a507fdfd19af1f4d6e886b3e.hbc: 6504648 bytes (Hermes)
 PASS: 1 source map(s), 17 app sources; no development, mock or Super Admin routes.
 exit: 0
 
 NOTE: Frozen install skipped; no dependency manifest or lockfile changed.
 NOTE: Expo Doctor was attempted with npx but produced no output for more than 190 seconds and was stopped; the executable is not installed locally.
+NOTE: Follow-up after branch reconciliation: 90 Jest tests passed, including a regression test preventing temporary 2FA bearer tokens from being saved. Android and iOS exports and release route verification were rerun successfully.
 NOTE: Live account, device/emulator, accessibility and screenshot checks are not performed by this automated gate.

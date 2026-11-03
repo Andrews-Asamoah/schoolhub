@@ -20,6 +20,16 @@ test("a current authentication response may save its secure token", async () => 
   await hooks.onSuccess({ request, response });
   expect(store.getSnapshot().token).toBe("response-fixture");
 });
+test("a two-factor challenge cannot save its temporary bearer token", async () => {
+  const { hooks, store, storage } = fixture();
+  const request = { url: "/api/auth/sign-in/email" };
+  const data = { twoFactorRedirect: true };
+  hooks.onRequest(request);
+  await hooks.onSuccess({ request, response, data });
+  expect(store.getSnapshot().token).toBeNull();
+  expect(storage.writeToken).not.toHaveBeenCalled();
+  expect(hooks.isCurrentResponse(data)).toBe(true);
+});
 test.each(["/api/auth/get-session", "/api/auth/sign-in/email"])(
   "late %s response cannot undo logout",
   async (url) => {

@@ -55,7 +55,7 @@ The automated gate is recorded in
 | Check | Result |
 | --- | --- |
 | Shared build, mobile typecheck, lint and formatting | Pass |
-| Jest | 17 suites, 89 tests passed |
+| Jest | 17 suites, 90 tests passed |
 | Endpoint/release/auth regression tests | 40 passed; 7 declarations verified |
 | Contrast audit | 1,624 pairs passed |
 | Android/iOS production exports | Pass; 17 app sources each, with no development, mock or Super Admin routes |
