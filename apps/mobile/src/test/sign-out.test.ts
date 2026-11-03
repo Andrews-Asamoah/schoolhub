@@ -1,4 +1,4 @@
-import { signOut } from "@/lib/auth-actions";
+import { signOut } from "@/lib/sign-out";
 import { authClient } from "@/lib/auth-client";
 import { clearSession } from "@/lib/session";
 jest.mock("@/lib/session", () => ({

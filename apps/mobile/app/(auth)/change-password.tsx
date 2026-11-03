@@ -12,7 +12,7 @@ import {
 } from "@/features/auth/forms";
 import { changePasswordForCurrentSession } from "@/features/auth/auth-actions";
 import { spacing, type, useTheme } from "@/theme/theme";
-import { signOut } from "@/lib/auth-actions";
+import { signOut } from "@/lib/sign-out";
 
 export default function ChangePasswordScreen() {
   const { colors } = useTheme();

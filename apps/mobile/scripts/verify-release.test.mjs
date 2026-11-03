@@ -26,7 +26,8 @@ function verify(sources) {
 
 test("accepts the production entry sources", () => {
   assert.equal(
-    verify(["/repo/apps/mobile/app/_layout.tsx", "../app/login.tsx"]).status,
+    verify(["/repo/apps/mobile/app/_layout.tsx", "../app/(auth)/login.tsx"])
+      .status,
     0,
   );
 });

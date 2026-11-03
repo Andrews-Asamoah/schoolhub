@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { router, type Href } from "expo-router";
+import { Redirect, router, type Href } from "expo-router";
 import { View } from "react-native";
 import { Button } from "@/components/Button";
 import { Card } from "@/components/Surface";
@@ -11,10 +11,11 @@ import {
   schoolSubdomainSchema,
 } from "@/features/auth/forms";
 import { getPublicSchool } from "@/api/auth";
-import { setSubdomain } from "@/lib/session";
+import { setSubdomain, useSession } from "@/lib/session";
 import { spacing, type, useTheme } from "@/theme/theme";
 
 export default function SchoolAccessScreen() {
+  const { subdomain } = useSession();
   const { colors, setTenant } = useTheme();
   const [code, setCode] = useState("");
   const [error, setError] = useState("");
@@ -46,6 +47,8 @@ export default function SchoolAccessScreen() {
       setLoading(false);
     }
   }
+
+  if (subdomain) return <Redirect href={"/(auth)/login" as Href} />;
 
   return (
     <Screen

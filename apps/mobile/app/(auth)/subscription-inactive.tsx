@@ -7,7 +7,7 @@ import { Screen } from "@/components/Screen";
 import { Text } from "@/components/Typography";
 import { authFailureMessage } from "@/features/auth/forms";
 import { retrySession } from "@/lib/restore-session";
-import { signOut } from "@/lib/auth-actions";
+import { signOut } from "@/lib/sign-out";
 import { sessionStore } from "@/lib/session";
 import { spacing, type, useTheme } from "@/theme/theme";
 

@@ -4,7 +4,7 @@ import { Screen } from "./Screen";
 import { Button } from "./Button";
 import { ROLE_LABELS } from "@/lib/permissions";
 import { useSession } from "@/lib/session";
-import { signOut } from "@/lib/auth-actions";
+import { signOut } from "@/lib/sign-out";
 import { type, useTheme } from "@/theme/theme";
 import { useToast } from "./Toast";
 export function RolePlaceholder() {

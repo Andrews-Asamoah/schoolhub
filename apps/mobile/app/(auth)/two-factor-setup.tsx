@@ -5,7 +5,7 @@ import { Button } from "@/components/Button";
 import { Card } from "@/components/Surface";
 import { Screen } from "@/components/Screen";
 import { Text } from "@/components/Typography";
-import { signOut } from "@/lib/auth-actions";
+import { signOut } from "@/lib/sign-out";
 import { spacing, type, useTheme } from "@/theme/theme";
 
 export default function TwoFactorSetupScreen() {

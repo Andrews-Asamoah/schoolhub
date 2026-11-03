@@ -50,7 +50,7 @@ jest.mock("@/lib/auth-client", () => ({
   isCurrentAuthResponse: (...args: unknown[]) =>
     mockIsCurrentAuthResponse(...args),
 }));
-jest.mock("@/lib/auth-actions", () => ({
+jest.mock("@/lib/sign-out", () => ({
   signOut: (...args: unknown[]) => mockSignOut(...args),
 }));
 

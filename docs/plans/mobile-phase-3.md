@@ -52,17 +52,33 @@ BECE/external examinations remain blocked.
 The automated gate is recorded in
 `docs/validation/mobile-phase-3/foundation-final.txt`.
 
-| Check | Result |
-| --- | --- |
-| Shared build, mobile typecheck, lint and formatting | Pass |
-| Jest | 17 suites, 90 tests passed |
-| Endpoint/release/auth regression tests | 40 passed; 7 declarations verified |
-| Contrast audit | 1,624 pairs passed |
-| Android/iOS production exports | Pass; 17 app sources each, with no development, mock or Super Admin routes |
-| Expo Doctor | Not completed; `npx expo-doctor` produced no output and was stopped |
-| Frozen install | Skipped; dependency manifests and lockfile are unchanged |
+| Check                                               | Result                                                                     |
+| --------------------------------------------------- | -------------------------------------------------------------------------- |
+| Shared build, mobile typecheck, lint and formatting | Pass                                                                       |
+| Jest                                                | 17 suites, 90 tests passed                                                 |
+| Endpoint/release/auth regression tests              | 40 passed; 7 declarations verified                                         |
+| Contrast audit                                      | 1,624 pairs passed                                                         |
+| Android/iOS production exports                      | Pass; 17 app sources each, with no development, mock or Super Admin routes |
+| Expo Doctor                                         | Phase 3.5 follow-up: 20/20 checks passed; no issues detected               |
+| Frozen install                                      | Phase 3.5 follow-up: passed; lockfile is up to date                        |
 
 Seeded-account sign-in, device/emulator accessibility and visual acceptance,
 screenshots, and a live API test remain outstanding. Keep the phase PR in draft
 until those manual checks are completed; automated tests do not substitute for
 them.
+
+## Phase 3.5 follow-up
+
+The route ambiguity and helper naming fixes are implemented on
+`fix/mobile-phase-3-5-fixups`. The Expo Router route-tree regression passes,
+saved school context now forwards the school screen to login, and export folders
+are ignored. The updated automated gate, Expo Doctor, and Android/iOS export
+results are recorded in
+[`docs/validation/mobile-phase-3/phase-3-5-fixups.txt`](../validation/mobile-phase-3/phase-3-5-fixups.txt).
+
+Native two-factor remains deferred: neither client approach has been validated
+on real devices, and no API/auth-client change was made. See the
+[spike findings](../validation/mobile-phase-3/native-two-factor-spike.md).
+Real-device and seeded-account acceptance remains outstanding; use the
+[device acceptance checklist](../validation/mobile-device-acceptance.md) and
+attach screenshots before considering the phase fully accepted.

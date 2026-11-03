@@ -14,6 +14,6 @@ export default function Index() {
             ? ("/(auth)/subscription-inactive" as Href)
             : session.status === "needsTwoFactorSetup"
               ? ("/(auth)/two-factor-setup" as Href)
-              : "/login";
+              : ("/(auth)/school" as Href);
   return <Redirect href={href} />;
 }

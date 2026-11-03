@@ -55,7 +55,6 @@ function Shell() {
       >
         <Stack.Screen name="index" />
         <Stack.Protected guard={!ready}>
-          <Stack.Screen name="login" />
           <Stack.Screen name="(auth)" />
         </Stack.Protected>
         <Stack.Protected guard={canEnterRole(session, "teacher")}>

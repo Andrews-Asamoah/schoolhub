@@ -95,6 +95,7 @@ test("unauthorized clears memory, secure storage and cache", async () => {
   await f.store.handleEvent({ type: "unauthorized" });
   expect(f.store.getSnapshot()).toMatchObject({
     token: null,
+    subdomain: "school",
     activeRole: null,
     roles: [],
     status: "signedOut",

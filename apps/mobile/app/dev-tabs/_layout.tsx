@@ -1,11 +1,11 @@
 import { TabBarInsetProvider } from "@/components/TabBarInset";
-import { Redirect, Tabs } from "expo-router";
+import { Redirect, Tabs, type Href } from "expo-router";
 import { CalendarDays, Home, MoreHorizontal } from "lucide-react-native";
 import { GlassTabBar } from "@/components/GlassTabBar";
 
 /** Development-only host for the floating glass tab bar. */
 export default function DevTabsLayout() {
-  if (!__DEV__) return <Redirect href="/login" />;
+  if (!__DEV__) return <Redirect href={"/(auth)/school" as Href} />;
   return (
     <TabBarInsetProvider>
       <Tabs

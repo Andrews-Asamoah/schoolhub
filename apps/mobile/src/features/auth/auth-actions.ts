@@ -2,7 +2,7 @@ import { z } from "zod";
 import { getSchoolRoles } from "@/api/schools";
 import { resolveLogin, changeOwnPassword } from "@/api/auth";
 import { ApiError, SessionChangedError } from "@/lib/api-error";
-import { signOut } from "@/lib/auth-actions";
+import { signOut } from "@/lib/sign-out";
 import { authClient, isCurrentAuthResponse } from "@/lib/auth-client";
 import { mobileRoles } from "@/lib/permissions";
 import { sessionStore } from "@/lib/session";
