@@ -8,6 +8,7 @@ import type {
   SaveSubjectInput,
   SetSubjectClassesInput,
   SetSubjectTeachersInput,
+  SetSubjectStrandsInput,
 } from "@schoolhub/shared";
 import { findUnqualifiedTeachers } from "./subject-assignments.js";
 import { PrismaService } from "../../prisma/prisma.service.js";
@@ -47,9 +48,28 @@ export class SubjectsService {
           orderBy: { class: { name: "asc" } },
         },
         teachers: { include: { teacher: { select: teacherSelect } } },
+        strands: {
+          orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
+          include: {
+            classAssignments: {
+              where: {
+                classSubject: {
+                  subjectId: { not: undefined },
+                  class: { schoolId, deletedAt: null },
+                },
+              },
+              include: {
+                teacher: { select: teacherSelect },
+                classSubject: {
+                  include: { class: { select: { id: true, name: true, level: true } } },
+                },
+              },
+            },
+          },
+        },
       },
     });
-    return subjects.map(({ classSubjects, teachers, ...subject }) => ({
+    return subjects.map(({ classSubjects, teachers, strands, ...subject }) => ({
       ...subject,
       classes: classSubjects.map((row) => ({
         classId: row.class.id,
@@ -62,6 +82,15 @@ export class SubjectsService {
       teachers: teachers.map((row) => ({
         id: row.teacher.id,
         name: teacherName(row.teacher),
+      })),
+      strands: strands.map(({ classAssignments, ...strand }) => ({
+        ...strand,
+        assignments: classAssignments.map((row) => ({
+          classId: row.classSubject.class.id,
+          className: row.classSubject.class.name,
+          teacherId: row.teacher.id,
+          teacherName: teacherName(row.teacher),
+        })),
       })),
     }));
   }
@@ -205,6 +234,74 @@ export class SubjectsService {
     return this.list(schoolId, true).then((all) => all.find((s) => s.id === id));
   }
 
+  /** Replace strand metadata and per-class teaching responsibility without deleting historical strands. */
+  async setStrands(schoolId: string, id: string, input: SetSubjectStrandsInput) {
+    await this.require(schoolId, id);
+    const requestedIds = input.strands.flatMap((strand) => strand.id ? [strand.id] : []);
+    const existing = requestedIds.length
+      ? await this.prisma.client.subjectStrand.findMany({
+          where: { id: { in: requestedIds }, subjectId: id },
+          select: { id: true },
+        })
+      : [];
+    if (existing.length !== new Set(requestedIds).size) {
+      throw new BadRequestException("A selected teaching area does not belong to this subject.");
+    }
+
+    const classIds = [...new Set(input.strands.flatMap((strand) => strand.assignments.map((row) => row.classId)))];
+    const teacherIds = [...new Set(input.strands.flatMap((strand) => strand.assignments.map((row) => row.teacherId)))];
+    const [classSubjects, teacherCount, qualified] = await Promise.all([
+      classIds.length
+        ? this.prisma.client.classSubject.findMany({
+            where: { subjectId: id, classId: { in: classIds }, class: { schoolId, deletedAt: null } },
+            select: { id: true, classId: true },
+          })
+        : Promise.resolve([]),
+      this.countTeachers(schoolId, teacherIds),
+      this.prisma.client.subjectTeacher.findMany({
+        where: { subjectId: id, teacherId: { in: teacherIds } },
+        select: { teacherId: true },
+      }),
+    ]);
+    if (classSubjects.length !== classIds.length) {
+      throw new BadRequestException("Teaching areas can only be assigned to classes that take this subject.");
+    }
+    if (teacherCount.expected !== teacherCount.found) {
+      throw new BadRequestException("Choose active teachers that belong to this school.");
+    }
+    const qualifiedIds = new Set(qualified.map((row) => row.teacherId));
+    if (teacherIds.some((teacherId) => !qualifiedIds.has(teacherId))) {
+      throw new BadRequestException("Add each teacher to the subject's qualified-teacher list before assigning a teaching area.");
+    }
+    const classSubjectByClass = new Map(classSubjects.map((row) => [row.classId, row.id]));
+
+    await this.prisma.client.$transaction(async (tx) => {
+      for (const strand of input.strands) {
+        const values = {
+          name: strand.name,
+          code: strand.code || null,
+          description: strand.description || null,
+          sortOrder: strand.sortOrder,
+          examWeightPercent: new Prisma.Decimal(strand.examWeightPercent),
+          isActive: strand.isActive,
+        };
+        const saved = strand.id
+          ? await tx.subjectStrand.update({ where: { id: strand.id }, data: values, select: { id: true } })
+          : await tx.subjectStrand.create({ data: { subjectId: id, ...values }, select: { id: true } });
+        await tx.classSubjectStrandAssignment.deleteMany({ where: { subjectStrandId: saved.id } });
+        const assignments = strand.assignments.map((row) => ({
+          classSubjectId: classSubjectByClass.get(row.classId)!,
+          subjectStrandId: saved.id,
+          teacherId: row.teacherId,
+        }));
+        if (assignments.length) {
+          await tx.classSubjectStrandAssignment.createMany({ data: assignments });
+        }
+      }
+    });
+    return this.list(schoolId, true).then((all) => all.find((subject) => subject.id === id));
+  }
+
   /** Replace the set of teachers qualified to teach this subject. */
   async setTeachers(schoolId: string, id: string, input: SetSubjectTeachersInput) {
     await this.require(schoolId, id);
@@ -212,6 +309,13 @@ export class SubjectsService {
     const check = await this.countTeachers(schoolId, unique);
     if (check.expected !== check.found) {
       throw new BadRequestException("Choose active teachers that belong to this school.");
+    }
+    const assignedStrandTeacher = await this.prisma.client.classSubjectStrandAssignment.findFirst({
+      where: { subjectStrand: { subjectId: id }, teacherId: { notIn: unique } },
+      select: { id: true },
+    });
+    if (assignedStrandTeacher) {
+      throw new ConflictException("A teacher is still assigned to a teaching area. Reassign that area before removing the teacher from this subject.");
     }
     await this.prisma.client.$transaction([
       this.prisma.client.subjectTeacher.deleteMany({
