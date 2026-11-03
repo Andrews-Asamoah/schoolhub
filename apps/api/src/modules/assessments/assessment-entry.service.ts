@@ -21,7 +21,7 @@ import {
   type GradeBand,
 } from "./assessment-entry.js";
 
-const NO_ASSIGNMENTS: TeacherAssignments = { teacherId: null, classTeacherClassIds: [], subjectAssignments: [] };
+const NO_ASSIGNMENTS: TeacherAssignments = { teacherId: null, classTeacherClassIds: [], subjectAssignments: [], subjectStrandAssignments: [] };
 const round2 = (value: number) => Math.round(value * 100) / 100;
 
 /** Entering and reading a class's marks for one subject, with the access rules applied. */
