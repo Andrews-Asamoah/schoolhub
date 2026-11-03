@@ -1146,6 +1146,37 @@ export const setSubjectTeachersSchema = z.object({
 });
 export type SetSubjectTeachersInput = z.infer<typeof setSubjectTeachersSchema>;
 
+/** Replace a subject's strand metadata and its class-specific teacher allocations. */
+export const setSubjectStrandsSchema = z.object({
+  strands: z.array(z.object({
+    id: z.string().min(1).optional(),
+    name: z.string().trim().min(2).max(80),
+    code: z.string().trim().max(20).optional(),
+    description: z.string().trim().max(500).optional(),
+    sortOrder: z.number().int().min(0).max(100).default(0),
+    examWeightPercent: z.number().min(0).max(100).default(0),
+    isActive: z.boolean().default(true),
+    assignments: z.array(z.object({
+      classId: z.string().min(1),
+      teacherId: z.string().min(1),
+    })).max(200).default([]),
+  })).max(50),
+}).superRefine((value, ctx) => {
+  const names = new Set<string>();
+  for (const strand of value.strands) {
+    const name = strand.name.toLocaleLowerCase();
+    if (names.has(name)) {
+      ctx.addIssue({ code: "custom", path: ["strands"], message: "Strand names must be unique within a subject." });
+    }
+    names.add(name);
+    const classes = strand.assignments.map((assignment) => assignment.classId);
+    if (new Set(classes).size !== classes.length) {
+      ctx.addIssue({ code: "custom", path: ["strands"], message: `A class can only have one teacher for ${strand.name}.` });
+    }
+  }
+});
+export type SetSubjectStrandsInput = z.infer<typeof setSubjectStrandsSchema>;
+
 // ============================================================================
 // TIMETABLE
 // ============================================================================
@@ -1195,6 +1226,7 @@ export const saveTimetableEntrySchema = z
     periodId: z.string().min(1, "Choose a period"),
     type: z.enum(["LESSON", "BREAK", "ACTIVITY"]).default("LESSON"),
     subjectId: z.string().min(1).optional(),
+    subjectStrandId: z.string().min(1).optional(),
     teacherId: z.string().min(1).optional(),
     classroomId: z.string().min(1).optional(),
     label: z.string().trim().max(60).optional(),
@@ -1538,6 +1570,7 @@ export const assessmentComponentInputSchema = z.object({
   isRequired: z.boolean().default(true),
   isRepeatable: z.boolean().default(false),
   expectedCount: z.number().int().min(1).max(10).default(1),
+  subjectStrandId: z.string().min(1).optional(),
 });
 export type AssessmentComponentInput = z.infer<typeof assessmentComponentInputSchema>;
 
@@ -1578,8 +1611,8 @@ export type SaveAssessmentTemplateInput = z.infer<typeof saveAssessmentTemplateS
  * grades already recorded depend on them. Returns a reason, or null if fine.
  */
 export function lockedStructureProblem(
-  existing: { id: string; maxMarks: number; weight: number; componentType: string; isRequired: boolean; isRepeatable: boolean; expectedCount: number }[],
-  incoming: { id?: string; maxMarks: number; weight: number; componentType: string; isRequired: boolean; isRepeatable: boolean; expectedCount: number }[],
+  existing: { id: string; maxMarks: number; weight: number; componentType: string; isRequired: boolean; isRepeatable: boolean; expectedCount: number; subjectStrandId?: string | null }[],
+  incoming: { id?: string; maxMarks: number; weight: number; componentType: string; isRequired: boolean; isRepeatable: boolean; expectedCount: number; subjectStrandId?: string | null }[],
 ): string | null {
   const message =
     "Marks have already been recorded, so the components, their maximum marks and weights can't change. You can rename components, or duplicate this assessment to start a new one.";
@@ -1594,7 +1627,8 @@ export function lockedStructureProblem(
       before.componentType !== component.componentType ||
       before.isRequired !== component.isRequired ||
       before.isRepeatable !== component.isRepeatable ||
-      before.expectedCount !== component.expectedCount
+      before.expectedCount !== component.expectedCount ||
+      (before.subjectStrandId ?? null) !== (component.subjectStrandId ?? null)
     ) {
       return message;
     }
