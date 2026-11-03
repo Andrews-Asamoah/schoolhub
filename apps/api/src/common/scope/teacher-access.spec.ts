@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canEnterMarks, canMarkRegister, canViewMarks } from "./teacher-access.js";
+import { canEnterComponentMarks, canEnterMarks, canMarkRegister, canViewMarks } from "./teacher-access.js";
 import type { TeacherAssignments } from "./teacher-scope.service.js";
 
 const ama: TeacherAssignments = {
@@ -11,7 +11,6 @@ const ama: TeacherAssignments = {
   ],
   subjectStrandAssignments: [
     { classId: "c-1a", subjectId: "cad", subjectStrandId: "arts" },
-    { classId: "c-1a", subjectId: "cad", subjectStrandId: "music" },
   ],
 };
 const none: TeacherAssignments = { teacherId: null, classTeacherClassIds: [], subjectAssignments: [], subjectStrandAssignments: [] };
@@ -31,6 +30,21 @@ describe("canMarkRegister", () => {
     for (const role of ["staff", "accountant", "student", "guardian", undefined]) expect(canMarkRegister(role, ama, ["c-1a"])).toBe(false);
     expect(canMarkRegister("teacher", ama, [])).toBe(false);
     expect(canMarkRegister("teacher", none, ["c-1a"])).toBe(false);
+  });
+});
+
+describe("strand-level assessment permissions", () => {
+  it("allows a specialist to edit only their assigned strand in their assigned class", () => {
+    expect(canEnterComponentMarks("teacher", ama, "c-1a", "cad", "arts")).toBe(true);
+    expect(canEnterComponentMarks("teacher", ama, "c-1a", "cad", "music")).toBe(false);
+    expect(canEnterComponentMarks("teacher", ama, "c-1b", "cad", "arts")).toBe(false);
+    expect(canEnterComponentMarks("teacher", ama, "c-1a", "cad", null)).toBe(false);
+  });
+
+  it("retains manager permissions and legacy single-teacher subjects", () => {
+    expect(canEnterComponentMarks("admin", none, "c-1a", "cad", "music")).toBe(true);
+    expect(canEnterComponentMarks("teacher", ama, "c-1a", "math", null)).toBe(true);
+    expect(canViewMarks("teacher", ama, "c-1a", "cad")).toBe(true);
   });
 });
 
