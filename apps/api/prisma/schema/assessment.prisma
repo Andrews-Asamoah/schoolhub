@@ -111,14 +111,17 @@ model AssessmentComponent {
   isRequired    Boolean        @default(true)
   isRepeatable  Boolean        @default(false)
   expectedCount Int            @default(1)
+  subjectStrandId String?
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
 
   template AssessmentTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  subjectStrand SubjectStrand? @relation(fields: [subjectStrandId], references: [id], onDelete: SetNull)
   scores   ComponentScore[]
 
   @@index([templateId])
   @@index([componentType])
+  @@index([subjectStrandId])
   @@map("assessment_components")
 }
 
