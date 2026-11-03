@@ -621,3 +621,23 @@ model InternalMockCorrection {
   @@index([candidateId, paperId])
   @@map("internal_mock_corrections")
 }
+
+
+/// Server-side replay guard for offline attendance batch retries.
+model AttendanceBatchReplay {
+  id          String   @id @default(cuid())
+  schoolId    String
+  userId      String
+  key         String
+  inputHash   String
+  date        DateTime @db.Date
+  recordCount Int
+  createdAt   DateTime @default(now())
+
+  school School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  user   user   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([schoolId, userId, key])
+  @@index([schoolId, createdAt])
+  @@map("attendance_batch_replays")
+}

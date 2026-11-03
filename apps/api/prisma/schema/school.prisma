@@ -35,6 +35,7 @@ model School {
   academicYears               AcademicYear[]
   calendarDays                AcademicCalendarDay[]
   attendanceExclusions        StudentAttendanceExclusion[]
+  attendanceBatchReplays      AttendanceBatchReplay[]
   assessmentTemplates         AssessmentTemplate[]
   reportCardVersions          ReportCardVersion[]
   internalExamSessions       InternalExamSession[]
