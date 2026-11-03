@@ -7,7 +7,7 @@ import {
 import { Prisma } from "@prisma/client";
 import type { SaveAssessmentEntryInput } from "@schoolhub/shared";
 import { PrismaService } from "../../prisma/prisma.service.js";
-import { canEnterMarks, canViewMarks, isSchoolManager } from "../../common/scope/teacher-access.js";
+import { canEnterComponentMarks, canViewMarks, isSchoolManager } from "../../common/scope/teacher-access.js";
 import {
   TeacherScopeService,
   type TeacherAssignments,
@@ -43,8 +43,6 @@ export class AssessmentEntryService {
     if (!canViewMarks(role, ctx.assignments, query.classId, query.subjectId)) {
       throw new ForbiddenException("You do not teach this subject in this class.");
     }
-    const canEditRole = canEnterMarks(role, ctx.assignments, query.classId, query.subjectId);
-
     const templates = ctx.templates;
     const selected = templates.find((template) => template.id === query.templateId) ?? templates[0] ?? null;
 
@@ -103,12 +101,15 @@ export class AssessmentEntryService {
     );
     for (const student of students) student.position = ranks.get(student.studentId) ?? null;
 
+    const deadlinePassed = Boolean(selected.deadline && selected.deadline < new Date() && !isSchoolManager(role));
+    const assessmentLocked = selected.isLocked;
+    const canEditAnyComponent = selected.components.some((component) =>
+      canEnterComponentMarks(role, ctx.assignments, query.classId, query.subjectId, component.subjectStrandId),
+    );
     let readOnlyReason: string | null = null;
-    if (!canEditRole) readOnlyReason = "You can view these marks, but only the teacher assigned to this subject can change them.";
-    else if (selected.isLocked) readOnlyReason = "This assessment has been locked.";
-    else if (selected.deadline && selected.deadline < new Date() && !isSchoolManager(role)) {
-      readOnlyReason = "The deadline for this assessment has passed.";
-    }
+    if (assessmentLocked) readOnlyReason = "This assessment has been locked.";
+    else if (deadlinePassed) readOnlyReason = "The deadline for this assessment has passed.";
+    else if (!canEditAnyComponent) readOnlyReason = "You can view these marks, but you are not assigned to any teaching area in this subject.";
 
     return {
       ...base,
@@ -123,6 +124,11 @@ export class AssessmentEntryService {
           weight: component.weight,
           isRequired: component.isRequired,
           slots: component.isRepeatable ? Math.max(component.expectedCount, 1) : 1,
+          subjectStrandId: component.subjectStrandId ?? null,
+          subjectStrandName: component.subjectStrandName ?? null,
+          canEdit: !assessmentLocked && !deadlinePassed && canEnterComponentMarks(
+            role, ctx.assignments, query.classId, query.subjectId, component.subjectStrandId,
+          ),
         })),
         grades: selected.bands,
       },
@@ -140,9 +146,6 @@ export class AssessmentEntryService {
     input: SaveAssessmentEntryInput,
   ) {
     const ctx = await this.loadContext(schoolId, userId, role, input.classId, input.subjectId);
-    if (!canEnterMarks(role, ctx.assignments, input.classId, input.subjectId)) {
-      throw new ForbiddenException("Only the teacher assigned to this subject in this class can enter marks.");
-    }
     const template = ctx.templates.find((item) => item.id === input.templateId);
     if (!template) throw new BadRequestException("That assessment does not apply to this class and subject.");
     if (template.isLocked) throw new ForbiddenException("This assessment has been locked.");
@@ -161,6 +164,15 @@ export class AssessmentEntryService {
     }
 
     const componentById = new Map(template.components.map((component) => [component.id, component]));
+    const unauthorized = input.entries.find((entry) => {
+      const component = componentById.get(entry.componentId);
+      return !component || !canEnterComponentMarks(
+        role, ctx.assignments, input.classId, input.subjectId, component.subjectStrandId,
+      );
+    });
+    if (unauthorized) {
+      throw new ForbiddenException("You can only enter marks for the teaching areas assigned to you in this class.");
+    }
     const byStudent = new Map<string, SaveAssessmentEntryInput["entries"]>();
     for (const entry of input.entries) byStudent.set(entry.studentId, [...(byStudent.get(entry.studentId) ?? []), entry]);
 
@@ -318,7 +330,10 @@ export class AssessmentEntryService {
       where: { schoolId, isActive: true },
       include: {
         classes: { select: { classId: true } },
-        components: { orderBy: { displayOrder: "asc" } },
+        components: {
+          orderBy: { displayOrder: "asc" },
+          include: { subjectStrand: { select: { id: true, name: true, subjectId: true } } },
+        },
         gradingSystem: { include: { gradeScales: { orderBy: { displayOrder: "asc" } } } },
       },
     });
@@ -341,6 +356,9 @@ export class AssessmentEntryService {
         ),
       }))
       .filter((item): item is { row: (typeof rows)[number]; score: number } => item.score !== null)
+      .filter(({ row }) => row.components.every((component) =>
+        !component.subjectStrand || component.subjectStrand.subjectId === subjectId,
+      ))
       .sort((a, b) => b.score - a.score || a.row.name.localeCompare(b.row.name))
       .map(({ row }) => ({
         id: row.id,
@@ -356,6 +374,8 @@ export class AssessmentEntryService {
             isRequired: component.isRequired,
             isRepeatable: component.isRepeatable,
             expectedCount: component.expectedCount,
+            subjectStrandId: component.subjectStrandId,
+            subjectStrandName: component.subjectStrand?.name ?? null,
           }),
         ),
         bands: row.gradingSystem.gradeScales.map(
