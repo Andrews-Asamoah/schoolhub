@@ -9,6 +9,8 @@ export interface SetupComponent {
   isRequired: boolean;
   isRepeatable: boolean;
   expectedCount: number;
+  subjectStrandId: string | null;
+  subjectStrandName: string | null;
 }
 export interface SetupTemplate {
   id: string;
@@ -46,7 +48,7 @@ export interface SetupGradingSystem {
 export interface AssessmentSetup {
   term: { id: string; name: string; termNumber: number } | null;
   classes: { id: string; name: string; level: string }[];
-  subjects: { id: string; code: string; name: string }[];
+  subjects: { id: string; code: string; name: string; strands: { id: string; name: string; code: string | null; sortOrder: number }[] }[];
   templates: SetupTemplate[];
   gradingSystems: SetupGradingSystem[];
   uncovered: { classId: string; className: string; subjectId: string; subjectName: string }[];
