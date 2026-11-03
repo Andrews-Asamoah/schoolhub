@@ -4,10 +4,10 @@ Only teacher, student and guardian role contexts are supported. All other
 roles, including Super Admin, are web-only. The app supports school-code lookup,
 school-account sign-in, role selection, two-factor access guidance, password
 recovery and required password changes. Accounts requiring two-factor sign-in
-must use the school's web portal until native verification is supported. Role
-teacher and student home screens remain placeholders; Guardian now has its
-family dashboard, child profiles, attendance, timetable, fees, published
-reports, announcements and school-community lists.
+must use the school's web portal until native verification is supported. The Student app includes a dashboard, timetable, assignments and text
+submissions, attendance, subjects, classmates, school community, and published
+reports. Guardian includes a family dashboard, child profiles, attendance,
+timetable, fees, published reports, announcements and school-community lists.
 Signed-in accounts can use shared notifications, messages, announcements,
 profile and appearance settings, personal details, security guidance and
 academic context. Development builds also expose the component gallery.
@@ -19,12 +19,17 @@ From the repository root:
 
 ```sh
 pnpm install --frozen-lockfile
-pnpm --filter @schoolhub/shared build
 cp apps/mobile/.env.example apps/mobile/.env
 pnpm --filter @schoolhub/mobile dev
 ```
 
 The filtered command starts Expo with `apps/mobile` as the project directory.
+Metro resolves `@schoolhub/shared` directly from its TypeScript source, so a
+separate shared-package build is not required to start the mobile app. The API
+and web workspaces still use the shared package's generated `dist` output;
+build it with `pnpm --filter @schoolhub/shared build` before running those
+workspaces.
+
 Alternatively, run `npx expo start` or `pnpm dev` from `apps/mobile`. Avoid
 starting Expo from the repository root without the package filter.
 
@@ -39,7 +44,12 @@ npx expo start --clear
 ```
 
 Set EXPO_PUBLIC_API_URL to the API origin without /api; the example explains
-emulator/device addresses. Never put credentials in an EXPO_PUBLIC variable.
+emulator/device addresses. In particular, `10.0.2.2` is for the Android
+emulator only. Use `http://localhost:3001` for the iOS simulator, or the
+development computer's reachable LAN IP (for example
+`http://172.26.104.18:3001`) for a physical iPhone on the same network. After
+changing `.env`, restart Expo so the public variable is reloaded. Never put
+credentials in an EXPO_PUBLIC variable.
 
 ## Build prerequisites
 
@@ -80,9 +90,9 @@ toolchain. Check app icons, Android masks and light/dark splash on a device.
 ## Validation
 
 Phase 0 transcripts: ../../docs/validation/mobile-phase-0/.
-Phase 1 adds Jest tests and endpoint verification; the contrast audit remains
-Phase 2. Phase 3 details the auth and endpoint adapter at
-../../docs/plans/mobile-phase-3.md. Run
+Phase 3 details the auth and endpoint adapter at
+../../docs/plans/mobile-phase-3.md; the Student app is documented at
+../../docs/plans/mobile-phase-6.md. Run
 `pnpm --filter @schoolhub/mobile test` and
 `pnpm --filter @schoolhub/mobile verify:endpoints` from the root.
 Device/emulator validation and screenshots remain required before the phases
