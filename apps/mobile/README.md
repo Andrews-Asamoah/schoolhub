@@ -5,9 +5,13 @@ roles, including Super Admin, are web-only. The app supports school-code lookup,
 school-account sign-in, role selection, two-factor access guidance, password
 recovery and required password changes. Accounts requiring two-factor sign-in
 must use the school's web portal until native verification is supported. Role
-home screens remain placeholders; live role features arrive in later phases.
-Development builds also expose the component gallery. Production bundles
-exclude the gallery and mock routes.
+teacher and student home screens remain placeholders; Guardian now has its
+family dashboard, child profiles, attendance, timetable, fees, published
+reports, announcements and school-community lists.
+Signed-in accounts can use shared notifications, messages, announcements,
+profile and appearance settings, personal details, security guidance and
+academic context. Development builds also expose the component gallery.
+Production bundles exclude the gallery and mock routes.
 
 ## Local development
 
@@ -20,6 +24,20 @@ cp apps/mobile/.env.example apps/mobile/.env
 pnpm --filter @schoolhub/mobile dev
 ```
 
+The filtered command starts Expo with `apps/mobile` as the project directory.
+Alternatively, run `npx expo start` or `pnpm dev` from `apps/mobile`. Avoid
+starting Expo from the repository root without the package filter.
+
+If Metro reports that it cannot resolve
+`./apps/mobile/node_modules/expo-router/entry` from the repository root, stop
+any older Expo/Metro server and restart once with a cleared cache from the app
+directory:
+
+```sh
+cd apps/mobile
+npx expo start --clear
+```
+
 Set EXPO_PUBLIC_API_URL to the API origin without /api; the example explains
 emulator/device addresses. Never put credentials in an EXPO_PUBLIC variable.
 
@@ -30,6 +48,18 @@ unchanged. The development profile includes expo-dev-client; development and
 preview produce internally distributed Android APKs, production produces an AAB.
 The production profile increments the remote build number. App version remains
 in app.json. No EAS builds or submissions have been initiated by Phase 0.
+
+When adding or changing a native module, rebuild and reinstall the development
+client before launching Metro. JavaScript bundling cannot add native code to an
+already-installed app. For the iOS development client, run from apps/mobile:
+
+```sh
+npx eas-cli build --platform ios --profile development
+```
+
+Install the resulting development build on the iOS device/simulator, then start
+Metro from this directory. `npx expo run:ios` is an alternative on macOS with
+Xcode and the iOS simulator installed.
 
 Configure EXPO_PUBLIC_API_URL in the matching EAS environment (development,
 preview, production) before building. Use a real HTTPS origin for preview and

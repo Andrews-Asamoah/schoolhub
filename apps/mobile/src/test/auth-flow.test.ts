@@ -1,11 +1,24 @@
 import {
   establishAuthenticatedResponse,
   signInWithSchoolCredentials,
+  changePasswordForAuthenticatedSession,
   UnsupportedMobileRoleError,
   UnsupportedMobileTwoFactorError,
 } from "@/features/auth/auth-actions";
 
-const mockSession = {
+type MockSessionState = {
+  status: string;
+  token: string | null;
+  subdomain: string | null;
+  roles: string[];
+  activeRole: string | null;
+  rememberedRole: string | null;
+};
+const mockSession: {
+  state: MockSessionState;
+  revision: number;
+  establish: jest.Mock;
+} = {
   state: {
     status: "signedOut",
     token: null as string | null,
@@ -28,13 +41,14 @@ const mockResolveLogin = jest.fn();
 const mockSignInEmail = jest.fn();
 const mockIsCurrentAuthResponse = jest.fn();
 const mockSignOut = jest.fn();
+const mockChangeOwnPassword = jest.fn();
 
 jest.mock("@/api/schools", () => ({
   getSchoolRoles: (...args: unknown[]) => mockGetSchoolRoles(...args),
 }));
 jest.mock("@/api/auth", () => ({
   resolveLogin: (...args: unknown[]) => mockResolveLogin(...args),
-  changeOwnPassword: jest.fn(),
+  changeOwnPassword: (...args: unknown[]) => mockChangeOwnPassword(...args),
 }));
 jest.mock("@/lib/session", () => ({
   sessionStore: {
@@ -71,6 +85,7 @@ beforeEach(() => {
   mockSignInEmail.mockReset();
   mockIsCurrentAuthResponse.mockReset();
   mockSignOut.mockReset().mockResolvedValue(undefined);
+  mockChangeOwnPassword.mockReset().mockResolvedValue({ success: true });
   mockSession.establish.mockClear();
 });
 
@@ -158,4 +173,60 @@ test("a two-factor challenge fails closed and directs the account to web", async
   ).rejects.toBeInstanceOf(UnsupportedMobileTwoFactorError);
   expect(mockGetSchoolRoles).not.toHaveBeenCalled();
   expect(mockSession.establish).not.toHaveBeenCalled();
+});
+
+test("authenticated users can change their password without re-establishing the session", async () => {
+  mockSession.state = {
+    status: "ready",
+    token: "verified-token",
+    subdomain: "school",
+    roles: ["teacher"],
+    activeRole: "teacher",
+    rememberedRole: "teacher",
+  };
+  await expect(
+    changePasswordForAuthenticatedSession({
+      currentPassword: "Current123",
+      newPassword: "Replacement123",
+      confirmPassword: "Replacement123",
+    }),
+  ).resolves.toBeUndefined();
+  expect(mockChangeOwnPassword).toHaveBeenCalledWith({
+    request: {
+      currentPassword: "Current123",
+      newPassword: "Replacement123",
+    },
+  });
+  expect(mockSession.establish).not.toHaveBeenCalled();
+});
+
+test("authenticated password changes reject signed-out and stale sessions", async () => {
+  await expect(
+    changePasswordForAuthenticatedSession({
+      currentPassword: "Current123",
+      newPassword: "Replacement123",
+      confirmPassword: "Replacement123",
+    }),
+  ).rejects.toThrow("active school session");
+  expect(mockChangeOwnPassword).not.toHaveBeenCalled();
+
+  mockSession.state = {
+    status: "ready",
+    token: "verified-token",
+    subdomain: "school",
+    roles: ["teacher"],
+    activeRole: "teacher",
+    rememberedRole: "teacher",
+  };
+  mockChangeOwnPassword.mockImplementation(async () => {
+    mockSession.revision++;
+    return { success: true };
+  });
+  await expect(
+    changePasswordForAuthenticatedSession({
+      currentPassword: "Current123",
+      newPassword: "Replacement123",
+      confirmPassword: "Replacement123",
+    }),
+  ).rejects.toThrow("session has changed");
 });

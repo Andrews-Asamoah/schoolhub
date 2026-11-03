@@ -27,7 +27,7 @@ type EndpointArguments<TRequestSchema extends z.ZodType | undefined> =
         },
       ]
     : [options?: EndpointOptions<never>];
-type EndpointScope = "public" | "session" | "discovery";
+type EndpointScope = "public" | "session" | "discovery" | "tenant";
 
 const publicEndpoints = new Set([
   "GET /schools/public/:subdomain",
@@ -35,8 +35,17 @@ const publicEndpoints = new Set([
   "POST /account/password-recovery/request",
   "POST /account/password-recovery/complete",
 ]);
-const sessionEndpoints = new Set(["POST /account/change-password"]);
+const sessionEndpoints = new Set(["GET /me", "POST /account/change-password"]);
 const discoveryEndpoints = new Set(["GET /schools/roles"]);
+const tenantEndpoints = new Set([
+  "GET /schools/academic-context",
+  "GET /schools/current/me/profile",
+  "PATCH /schools/current/me/profile",
+  "PUT /schools/current/me/avatar",
+  "DELETE /schools/current/me/avatar",
+]);
+const MAX_AVATAR_BYTES = 2 * 1024 * 1024;
+const avatarMimeTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
 let downloadSequence = 0;
 
 function assertDefinition(
@@ -57,9 +66,11 @@ function assertDefinition(
     throw new Error("Unsupported role-independent session endpoint.");
   if (scope === "discovery" && !discoveryEndpoints.has(key))
     throw new Error("Unsupported role-discovery endpoint.");
-  if (scope && scope !== "discovery" && roles.length)
+  if (scope === "tenant" && !tenantEndpoints.has(key))
+    throw new Error("Unsupported tenant-scoped mobile endpoint.");
+  if (scope && scope !== "discovery" && scope !== "tenant" && roles.length)
     throw new Error("Non-role endpoints cannot declare school roles.");
-  if (!scope && !roles.length)
+  if ((scope === "tenant" || !scope) && !roles.length)
     throw new Error("A school endpoint must declare at least one mobile role.");
 }
 
@@ -96,7 +107,8 @@ function assertScope(
   if (scope === "public") return session;
   if (!session.token || !session.subdomain)
     throw new Error("A school session is required.");
-  if (scope === "discovery" || scope === "session") return session;
+  if (scope === "session") return session;
+  if (scope === "discovery") return session;
   assertMobileRole(session.activeRole);
   if (
     session.status !== "ready" ||
@@ -156,6 +168,43 @@ export function defineEndpoint<
             init,
           )
         : await apiFetch<unknown>(path, init);
+    return definition.response.parse(result);
+  };
+}
+
+/** Uploads a resized profile image as multipart form data. */
+export function defineUpload<TResponse>(definition: {
+  method: "PUT";
+  path: string;
+  roles: readonly MobileRole[];
+  scope: "tenant";
+  field: string;
+  response: z.ZodType<TResponse>;
+}) {
+  assertDefinition(
+    definition.method,
+    definition.path,
+    definition.scope,
+    definition.roles,
+  );
+  return async (input: {
+    file: Blob;
+    mimeType: string;
+    signal?: AbortSignal;
+  }): Promise<TResponse> => {
+    assertScope(definition.scope, definition.roles);
+    if (!avatarMimeTypes.has(input.mimeType))
+      throw new Error("Choose a JPEG, PNG, or WebP image.");
+    if (!input.file.size || input.file.size > MAX_AVATAR_BYTES)
+      throw new Error("The resized profile photo must be under 2 MB.");
+    const body = new FormData();
+    const file = input.file.slice(0, input.file.size, input.mimeType);
+    body.append(definition.field, file, `profile.${input.mimeType.slice(6)}`);
+    const result = await apiFetch<unknown>(definition.path, {
+      method: definition.method,
+      body,
+      signal: input.signal,
+    });
     return definition.response.parse(result);
   };
 }

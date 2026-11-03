@@ -1,6 +1,6 @@
 import { TabBarInsetProvider } from "@/components/TabBarInset";
 import { Redirect, Tabs, type Href } from "expo-router";
-import { Bell, CalendarDays, House, UserRound } from "lucide-react-native";
+import { CalendarDays, House } from "lucide-react-native";
 import { GlassTabBar } from "@/components/GlassTabBar";
 
 export default function AppTabsLayout() {
@@ -14,9 +14,6 @@ export default function AppTabsLayout() {
             hues={{
               index: "indigo",
               schedule: "violet",
-              notifications: "rose",
-              profile: "pink",
-              more: "pink",
             }}
           />
         )}
@@ -37,23 +34,6 @@ export default function AppTabsLayout() {
             title: "Schedule",
             tabBarIcon: ({ color, size }) => (
               <CalendarDays color={color} size={size} />
-            ),
-          }}
-        />
-        <Tabs.Screen
-          name="notifications"
-          options={{
-            title: "Updates",
-            tabBarBadge: 2,
-            tabBarIcon: ({ color, size }) => <Bell color={color} size={size} />,
-          }}
-        />
-        <Tabs.Screen
-          name="profile"
-          options={{
-            title: "Profile",
-            tabBarIcon: ({ color, size }) => (
-              <UserRound color={color} size={size} />
             ),
           }}
         />

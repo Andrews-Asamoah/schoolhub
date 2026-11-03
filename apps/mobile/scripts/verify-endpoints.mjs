@@ -45,6 +45,7 @@ function walk(folder) {
           "publicFetch",
           "defineEndpoint",
           "defineDownload",
+          "defineUpload",
         ].includes(node.propertyName?.text) &&
         node.propertyName.text !== node.name.text
       )
@@ -64,7 +65,11 @@ function walk(folder) {
           !transport
         )
           fail(file, "Undeclared network call. Use src/api endpoint adapters.");
-        if (name === "defineEndpoint" || name === "defineDownload") {
+        if (
+          name === "defineEndpoint" ||
+          name === "defineDownload" ||
+          name === "defineUpload"
+        ) {
           const config = node.arguments[0];
           if (!config || !ts.isObjectLiteralExpression(config))
             fail(file, "Endpoint metadata must be a literal object.");
@@ -86,6 +91,8 @@ function walk(folder) {
           const path = literal("path");
           if (name === "defineDownload" && method !== "GET")
             fail(file, "Downloads must use GET.");
+          if (name === "defineUpload" && method !== "PUT")
+            fail(file, "Uploads must use PUT.");
           if (
             !path.startsWith("/") ||
             path.startsWith("/api/") ||
@@ -118,10 +125,36 @@ function walk(folder) {
           );
           if (!route)
             fail(file, `Missing inventory endpoint: ${method} ${path}`);
-          if (route.roles.length) {
+          if (scope === "tenant") {
+            if (!route.tenantGuard || route.platformGuard || !roles.length)
+              fail(
+                file,
+                "Tenant-scoped endpoints require a tenant guard and mobile roles.",
+              );
+            const routeRoles = route.roles.flatMap((role) =>
+              role === "...roles" || role === "...schoolRoles"
+                ? [...allowed]
+                : [role],
+            );
+            if (
+              routeRoles.length &&
+              roles.some((role) => !routeRoles.includes(role))
+            )
+              fail(
+                file,
+                "Declared role is not allowed by the route inventory.",
+              );
+          } else if (route.roles.length) {
             if (
               !roles.length ||
-              roles.some((role) => !route.roles.includes(role))
+              roles.some((role) => {
+                const routeRoles =
+                  route.roles.includes("...roles") ||
+                  route.roles.includes("...schoolRoles")
+                    ? [...allowed]
+                    : route.roles;
+                return !routeRoles.includes(role);
+              })
             )
               fail(
                 file,
@@ -146,9 +179,13 @@ function walk(folder) {
                 !route.tenantGuard &&
                 !route.platformGuard) ||
               (scope === "session" &&
-                key === "POST /account/change-password" &&
+                ["GET /me", "POST /account/change-password"].includes(key) &&
                 !route.tenantGuard &&
-                !route.platformGuard);
+                !route.platformGuard) ||
+              (scope === "tenant" &&
+                route.tenantGuard &&
+                !route.platformGuard &&
+                roles.length > 0);
             if (!explicitScope || (scope !== "discovery" && roles.length))
               fail(
                 file,

@@ -123,6 +123,18 @@ export async function changePasswordForCurrentSession(
   });
 }
 
+export async function changePasswordForAuthenticatedSession(
+  input: Parameters<typeof changePasswordRequest>[0],
+): Promise<void> {
+  const current = sessionStore.getSnapshot();
+  const revision = sessionStore.getRevision();
+  if (current.status !== "ready" || !current.token || !current.subdomain)
+    throw new Error("An active school session is required.");
+
+  await changeOwnPassword({ request: changePasswordRequest(input) });
+  if (sessionStore.getRevision() !== revision) throw new SessionChangedError();
+}
+
 export function isRateLimited(error: unknown): boolean {
   if (error instanceof ApiError) return error.status === 429;
   return (

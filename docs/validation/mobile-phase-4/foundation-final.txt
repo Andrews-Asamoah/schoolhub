@@ -1,0 +1,111 @@
+# Mobile Phase 4 automated acceptance
+
+Branch: `feat/mobile-phase-4-shared`
+Validation run: 2026-11-03
+
+## Frozen install
+
+```text
+> pnpm install --frozen-lockfile
+Scope: all 6 workspace projects
+✓ Lockfile passes supply-chain policies (verified 2h ago)
+Lockfile is up to date, resolution step is skipped
+Done in 159ms using pnpm v12.4.1
+```
+
+## Shared build
+
+```text
+> pnpm --filter @schoolhub/shared build
+ℹ tsdown v0.23.4 powered by rolldown v1.2.16
+WARN TypeScript 7.0 does not yet have a stable API and is experimental. Some options will be unavailable.
+✔ Build complete in 1117ms
+```
+
+## Mobile checks
+
+```text
+> pnpm --filter @schoolhub/mobile typecheck
+$ tsc --noEmit
+Exit code: 0
+
+> pnpm --filter @schoolhub/mobile lint
+$ expo lint --max-warnings 0
+Exit code: 0; zero warnings
+
+> pnpm --filter @schoolhub/mobile format:check
+$ prettier --check .
+Checking formatting...
+All matched files use Prettier code style!
+
+> pnpm --filter @schoolhub/mobile test -- --runInBand
+Test Suites: 20 passed, 20 total
+Tests:       146 passed, 146 total
+Snapshots:   0 total
+
+> pnpm --filter @schoolhub/mobile audit:contrast
+PASS: 1624 text, icon, gradient and composited chrome contrast pairs across light/dark themes.
+
+> pnpm --filter @schoolhub/mobile verify:endpoints
+PASS: 25 endpoint declarations match inventory methods, paths and mobile roles.
+
+> pnpm --filter @schoolhub/mobile test:release
+ℹ tests 41
+ℹ pass 41
+ℹ fail 0
+```
+
+The shared-screen interaction tests were extended to verify marking individual
+and all notifications read, and opening an inbox message marks it read and
+displays its thread. Final focused result:
+
+```text
+> pnpm --filter @schoolhub/mobile test -- --runInBand src/test/shared-screens.test.tsx
+Test Suites: 1 passed, 1 total
+Tests:       42 passed, 42 total
+```
+
+Expo SDK dependency alignment:
+
+```text
+> npx expo install --check
+Dependencies are up to date
+```
+
+Expo Doctor:
+
+```text
+> npx expo-doctor
+Running 20 checks on your project...
+20/20 checks passed. No issues detected!
+```
+
+## Production exports
+
+Android:
+
+```text
+> npx expo export --platform android --source-maps --output-dir dist/android
+Android Bundled ... (4393 modules)
+Exported: dist/android
+entry-1dd02f6c58a8bbd39a56f8a2293fb799.hbc: 6585112 bytes (Hermes)
+> node scripts/verify-release.mjs dist/android
+PASS: 1 source map(s), 30 app sources; no development, mock or Super Admin routes.
+```
+
+iOS:
+
+```text
+> npx expo export --platform ios --source-maps --output-dir dist/ios
+iOS Bundled ... (4394 modules)
+Exported: dist/ios
+entry-c01208a22611bce8e9f15855bcc49cf1.hbc: 6592620 bytes (Hermes)
+> node scripts/verify-release.mjs dist/ios
+PASS: 1 source map(s), 30 app sources; no development, mock or Super Admin routes.
+```
+
+## Not run
+
+No Android/iOS device or emulator, seeded-account API run, accessibility run or
+light/dark screenshots were available in this environment. These manual gates
+remain outstanding; automated exports do not certify device behavior.
