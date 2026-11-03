@@ -1,0 +1,214 @@
+
+--- Shared package build ---
+$ pnpm --filter @schoolhub/shared build
+$ tsdown
+ℹ tsdown v0.23.4 powered by rolldown v1.2.16
+ℹ config file: D:\Projects\schoolhub\packages\shared\tsdown.config.ts
+ℹ entry: src/index.ts
+ℹ tsconfig: tsconfig.json
+ℹ Build start
+ℹ Cleaning 5 files
+
+ WARN  TypeScript 7.0 does not yet have a stable API and is experimental. Some options will be unavailable.
+
+ℹ Emit types with typescript@7.0.2
+ℹ [CJS] dist\index.cjs  62.54 kB │ gzip: 15.41 kB
+ℹ [CJS] 1 files, total: 62.54 kB
+ℹ [CJS] dist\index.d.cts  55.60 kB │ gzip: 9.91 kB
+ℹ [CJS] 1 files, total: 55.60 kB
+✔ Build complete in 627ms
+ℹ [ESM] dist\index.mjs    56.65 kB │ gzip: 14.87 kB
+ℹ [ESM] dist\index.d.mts  55.60 kB │ gzip:  9.91 kB
+ℹ [ESM] 2 files, total: 112.25 kB
+✔ Build complete in 633ms
+exit: 0
+
+--- Mobile typecheck ---
+$ pnpm --filter @schoolhub/mobile typecheck
+$ tsc --noEmit
+exit: 0
+
+--- Mobile lint ---
+$ pnpm --filter @schoolhub/mobile lint
+$ expo lint --max-warnings 0
+env: load .env
+env: export EXPO_PUBLIC_API_URL
+exit: 0
+
+--- Mobile format check ---
+$ pnpm --filter @schoolhub/mobile format:check
+$ prettier --check .
+Checking formatting...
+All matched files use Prettier code style!
+exit: 0
+
+--- Mobile Jest suite ---
+$ pnpm --filter @schoolhub/mobile test
+$ jest --runInBand
+
+Test Suites: 17 passed, 17 total
+Tests:       89 passed, 89 total
+Snapshots:   0 total
+Time:        8.595 s, estimated 11 s
+Ran all test suites.
+Jest did not exit one second after the test run has completed.
+
+'This usually means that there are asynchronous operations that weren't stopped in your tests. Consider running Jest with `--detectOpenHandles` to troubleshoot this issue.
+exit: 0
+
+--- Contrast audit ---
+$ pnpm --filter @schoolhub/mobile audit:contrast
+$ node scripts/audit-contrast.mjs
+PASS: 1624 text, icon, gradient and composited chrome contrast pairs across light/dark themes.
+exit: 0
+
+--- Endpoint verifier ---
+$ pnpm --filter @schoolhub/mobile verify:endpoints
+$ node scripts/verify-endpoints.mjs
+PASS: 7 endpoint declarations match inventory methods, paths and mobile roles.
+exit: 0
+
+--- Endpoint/release/auth regression tests ---
+$ pnpm --filter @schoolhub/mobile test:release
+$ node --test scripts/verify-release.test.mjs scripts/verify-endpoints.test.mjs scripts/auth-transport.test.mjs
+✔ real Better Auth client preserves request and response ownership (42.8666ms)
+✔ real Better Auth response cannot restore a logged-out token (3.2647ms)
+✔ real Better Auth revocation uses the captured pre-logout credential (5.1282ms)
+✔ normalises inventory parameter names (369.4648ms)
+✔ accepts inventoried GET /academics/classes (319.4819ms)
+✔ accepts inventoried POST /academics/clubs/:id/members (374.3646ms)
+✔ accepts inventoried PUT /assessments/entry (332.7812ms)
+✔ accepts inventoried PATCH /assignments/:id/submissions/:submissionId/grade (350.7401ms)
+✔ accepts inventoried DELETE /academics/clubs/:id/members/:studentId (343.3386ms)
+✔ accepts explicit public scope for GET /schools/public/:subdomain (328.8826ms)
+✔ accepts explicit public scope for POST /schools/public/:subdomain/resolve-login (338.9495ms)
+✔ accepts explicit public scope for POST /account/password-recovery/request (341.1014ms)
+✔ accepts explicit public scope for POST /account/password-recovery/complete (345.2593ms)
+✔ accepts explicit session scope for POST /account/change-password (332.3148ms)
+✔ accepts explicit discovery scope for GET /schools/roles (344.5782ms)
+✔ rejects unsupported endpoint configuration defineEndpoint({ method:'GET', path:'/missing', roles:['teacher'], response:schema }); (380.374ms)
+✔ rejects unsupported endpoint configuration defineEndpoint({ method:'GET', path:'/announcements', roles:['admin'], response:schema }); (362.0387ms)
+✔ rejects unsupported endpoint configuration defineEndpoint({ method:'GET', path:'/students/me', roles:['guardian'], response:schema }); (365.8299ms)
+✔ rejects unsupported endpoint configuration defineEndpoint({ method:'DELETE', path:'/announcements', roles:['teacher'], response:schema }); (379.9429ms)
+✔ rejects unsupported endpoint configuration defineEndpoint({ method:'POST', path:'/schools/public/:subdomain', roles:[], scope:'public', response:schema }); (390.5776ms)
+✔ rejects unsupported endpoint configuration defineEndpoint({ method:'GET', path:'/account/change-password', roles:[], scope:'session', response:schema }); (352.2043ms)
+✔ rejects unsupported endpoint configuration defineEndpoint({ method:'GET', path:'/schools/public/:subdomain', roles:[], response:schema }); (371.1104ms)
+✔ rejects unsupported endpoint configuration defineEndpoint({ method:'GET', path:'/external-exams/results', roles:['teacher'], response:schema }); (352.1533ms)
+✔ rejects unsupported endpoint configuration defineEndpoint(config) (348.719ms)
+✔ rejects unsupported endpoint configuration apiFetch(path) (373.0967ms)
+✔ rejects unsupported endpoint configuration fetch(path) (354.2384ms)
+✔ rejects unsupported endpoint configuration defineEndpoint({ method:method, path:"/announcements", roles:["teacher"] }) (373.5573ms)
+✔ fails closed for an empty registry (348.4017ms)
+✔ accepts the production entry sources (87.6746ms)
+✔ rejects bundled route dev-gallery.tsx (78.41ms)
+✔ rejects bundled route dev-tabs/index.tsx (84.3279ms)
+✔ rejects bundled route (tabs)/profile.tsx (79.2977ms)
+✔ rejects bundled route (workspace)/fees.tsx (93.5536ms)
+✔ rejects bundled route (superadmin)/index.tsx (75.9486ms)
+✔ rejects bundled route (management)/index.tsx (80.8991ms)
+✔ rejects bundled route (accountant)/index.tsx (77.0092ms)
+✔ rejects bundled route (admin)/index.tsx (79.4015ms)
+✔ rejects bundled route (student)/bece.tsx (81.2007ms)
+✔ rejects Windows development paths too (71.8163ms)
+✔ fails closed without source maps or app sources (182.093ms)
+ℹ tests 40
+ℹ suites 0
+ℹ pass 40
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 9006.6919
+exit: 0
+
+--- Android production export ---
+$ pnpm --filter @schoolhub/mobile exec expo export --platform android --output-dir .phase3-android-export --source-maps
+env: load .env
+env: export EXPO_PUBLIC_API_URL
+Expo Autolinking module resolution enabled
+Starting Metro Bundler
+
+Android Bundled 34330ms node_modules\.pnpm\expo-router@58.0.29_fb6324e0c1d8956cb9285cdd7bad210d\node_modules\expo-router\entry.js (4356 modules)
+
+› Assets (30):
+..\..\node_modules\.pnpm\@expo-google-fonts+inter@0.4.2\node_modules\@expo-google-fonts\inter\400Regular\Inter_400Regular.ttf (342KB)
+..\..\node_modules\.pnpm\@expo-google-fonts+inter@0.4.2\node_modules\@expo-google-fonts\inter\500Medium\Inter_500Medium.ttf (343KB)
+..\..\node_modules\.pnpm\@expo-google-fonts+inter@0.4.2\node_modules\@expo-google-fonts\inter\600SemiBold\Inter_600SemiBold.ttf (344KB)
+..\..\node_modules\.pnpm\@expo-google-fonts+inter@0.4.2\node_modules\@expo-google-fonts\inter\700Bold\Inter_700Bold.ttf (344KB)
+..\..\node_modules\.pnpm\expo-router@58.0.29_fb6324e0c1d8956cb9285cdd7bad210d\node_modules\expo-router\assets\arrow_down.png (9.5KB)
+..\..\node_modules\.pnpm\expo-router@58.0.29_fb6324e0c1d8956cb9285cdd7bad210d\node_modules\expo-router\assets\arrow_right.xml (307B)
+..\..\node_modules\.pnpm\expo-router@58.0.29_fb6324e0c1d8956cb9285cdd7bad210d\node_modules\expo-router\assets\checkmark.xml (312B)
+..\..\node_modules\.pnpm\expo-router@58.0.29_fb6324e0c1d8956cb9285cdd7bad210d\node_modules\expo-router\assets\error.png (469B)
+..\..\node_modules\.pnpm\expo-router@58.0.29_fb6324e0c1d8956cb9285cdd7bad210d\node_modules\expo-router\assets\file.png (138B)
+..\..\node_modules\.pnpm\expo-router@58.0.29_fb6324e0c1d8956cb9285cdd7bad210d\node_modules\expo-router\assets\forward.png (188B)
+..\..\node_modules\.pnpm\expo-router@58.0.29_fb6324e0c1d8956cb9285cdd7bad210d\node_modules\expo-router\assets\pkg.png (364B)
+..\..\node_modules\.pnpm\expo-router@58.0.29_fb6324e0c1d8956cb9285cdd7bad210d\node_modules\expo-router\assets\react-navigation\elements\back-icon-mask.png (653B)
+..\..\node_modules\.pnpm\expo-router@58.0.29_fb6324e0c1d8956cb9285cdd7bad210d\node_modules\expo-router\assets\react-navigation\elements\back-icon.png (4 variations | 152B)
+..\..\node_modules\.pnpm\expo-router@58.0.29_fb6324e0c1d8956cb9285cdd7bad210d\node_modules\expo-router\assets\react-navigation\elements\clear-icon.png (4 variations | 425B)
+..\..\node_modules\.pnpm\expo-router@58.0.29_fb6324e0c1d8956cb9285cdd7bad210d\node_modules\expo-router\assets\react-navigation\elements\close-icon.png (4 variations | 235B)
+..\..\node_modules\.pnpm\expo-router@58.0.29_fb6324e0c1d8956cb9285cdd7bad210d\node_modules\expo-router\assets\react-navigation\elements\search-icon.png (4 variations | 599B)
+..\..\node_modules\.pnpm\expo-router@58.0.29_fb6324e0c1d8956cb9285cdd7bad210d\node_modules\expo-router\assets\sitemap.png (465B)
+..\..\node_modules\.pnpm\expo-router@58.0.29_fb6324e0c1d8956cb9285cdd7bad210d\node_modules\expo-router\assets\unmatched.png (4.8KB)
+
+› android bundles (2):
+_expo/static/js/android/entry-7403f57fa014220f68427e81e824d736.hbc (6.5MB)
+_expo/static/js/android/entry-7403f57fa014220f68427e81e824d736.hbc.map (15MB)
+
+› Files (1):
+metadata.json (2.1KB)
+
+Exported: .phase3-android-export
+exit: 0
+
+--- Android release route verification ---
+$ pnpm --filter @schoolhub/mobile exec node scripts/verify-release.mjs .phase3-android-export
+entry-7403f57fa014220f68427e81e824d736.hbc: 6497144 bytes (Hermes)
+PASS: 1 source map(s), 17 app sources; no development, mock or Super Admin routes.
+exit: 0
+
+--- iOS production export ---
+$ pnpm --filter @schoolhub/mobile exec expo export --platform ios --output-dir .phase3-ios-export --source-maps
+env: load .env
+env: export EXPO_PUBLIC_API_URL
+Expo Autolinking module resolution enabled
+Starting Metro Bundler
+
+iOS Bundled 34317ms node_modules\.pnpm\expo-router@58.0.29_fb6324e0c1d8956cb9285cdd7bad210d\node_modules\expo-router\entry.js (4357 modules)
+
+› Assets (27):
+..\..\node_modules\.pnpm\@expo-google-fonts+inter@0.4.2\node_modules\@expo-google-fonts\inter\400Regular\Inter_400Regular.ttf (342KB)
+..\..\node_modules\.pnpm\@expo-google-fonts+inter@0.4.2\node_modules\@expo-google-fonts\inter\500Medium\Inter_500Medium.ttf (343KB)
+..\..\node_modules\.pnpm\@expo-google-fonts+inter@0.4.2\node_modules\@expo-google-fonts\inter\600SemiBold\Inter_600SemiBold.ttf (344KB)
+..\..\node_modules\.pnpm\@expo-google-fonts+inter@0.4.2\node_modules\@expo-google-fonts\inter\700Bold\Inter_700Bold.ttf (344KB)
+..\..\node_modules\.pnpm\expo-router@58.0.29_fb6324e0c1d8956cb9285cdd7bad210d\node_modules\expo-router\assets\arrow_down.png (9.5KB)
+..\..\node_modules\.pnpm\expo-router@58.0.29_fb6324e0c1d8956cb9285cdd7bad210d\node_modules\expo-router\assets\error.png (469B)
+..\..\node_modules\.pnpm\expo-router@58.0.29_fb6324e0c1d8956cb9285cdd7bad210d\node_modules\expo-router\assets\file.png (138B)
+..\..\node_modules\.pnpm\expo-router@58.0.29_fb6324e0c1d8956cb9285cdd7bad210d\node_modules\expo-router\assets\forward.png (188B)
+..\..\node_modules\.pnpm\expo-router@58.0.29_fb6324e0c1d8956cb9285cdd7bad210d\node_modules\expo-router\assets\pkg.png (364B)
+..\..\node_modules\.pnpm\expo-router@58.0.29_fb6324e0c1d8956cb9285cdd7bad210d\node_modules\expo-router\assets\react-navigation\elements\back-icon-mask.png (653B)
+..\..\node_modules\.pnpm\expo-router@58.0.29_fb6324e0c1d8956cb9285cdd7bad210d\node_modules\expo-router\assets\react-navigation\elements\back-icon.png (4 variations | 566B)
+..\..\node_modules\.pnpm\expo-router@58.0.29_fb6324e0c1d8956cb9285cdd7bad210d\node_modules\expo-router\assets\react-navigation\elements\clear-icon.png (4 variations | 425B)
+..\..\node_modules\.pnpm\expo-router@58.0.29_fb6324e0c1d8956cb9285cdd7bad210d\node_modules\expo-router\assets\react-navigation\elements\close-icon.png (4 variations | 235B)
+..\..\node_modules\.pnpm\expo-router@58.0.29_fb6324e0c1d8956cb9285cdd7bad210d\node_modules\expo-router\assets\react-navigation\elements\search-icon.png (3 variations | 582B)
+..\..\node_modules\.pnpm\expo-router@58.0.29_fb6324e0c1d8956cb9285cdd7bad210d\node_modules\expo-router\assets\sitemap.png (465B)
+..\..\node_modules\.pnpm\expo-router@58.0.29_fb6324e0c1d8956cb9285cdd7bad210d\node_modules\expo-router\assets\unmatched.png (4.8KB)
+
+› ios bundles (2):
+_expo/static/js/ios/entry-6cdabd4930f0279bd9ba0d6feaa605e5.hbc (6.5MB)
+_expo/static/js/ios/entry-6cdabd4930f0279bd9ba0d6feaa605e5.hbc.map (15MB)
+
+› Files (1):
+metadata.json (1.9KB)
+
+Exported: .phase3-ios-export
+exit: 0
+
+--- iOS release route verification ---
+$ pnpm --filter @schoolhub/mobile exec node scripts/verify-release.mjs .phase3-ios-export
+entry-6cdabd4930f0279bd9ba0d6feaa605e5.hbc: 6504620 bytes (Hermes)
+PASS: 1 source map(s), 17 app sources; no development, mock or Super Admin routes.
+exit: 0
+
+NOTE: Frozen install skipped; no dependency manifest or lockfile changed.
+NOTE: Expo Doctor was attempted with npx but produced no output for more than 190 seconds and was stopped; the executable is not installed locally.
+NOTE: Live account, device/emulator, accessibility and screenshot checks are not performed by this automated gate.

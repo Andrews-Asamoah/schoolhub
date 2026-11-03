@@ -39,9 +39,13 @@ function walk(folder) {
     function visit(node) {
       if (
         ts.isImportSpecifier(node) &&
-        ["apiFetch", "publicFetch", "defineEndpoint"].includes(
-          node.propertyName?.text,
-        ) &&
+        [
+          "apiFetch",
+          "apiBytes",
+          "publicFetch",
+          "defineEndpoint",
+          "defineDownload",
+        ].includes(node.propertyName?.text) &&
         node.propertyName.text !== node.name.text
       )
         fail(file, "Adapter aliases are not verifiable.");
@@ -60,7 +64,7 @@ function walk(folder) {
           !transport
         )
           fail(file, "Undeclared network call. Use src/api endpoint adapters.");
-        if (name === "defineEndpoint") {
+        if (name === "defineEndpoint" || name === "defineDownload") {
           const config = node.arguments[0];
           if (!config || !ts.isObjectLiteralExpression(config))
             fail(file, "Endpoint metadata must be a literal object.");
@@ -80,6 +84,8 @@ function walk(folder) {
           }
           const method = literal("method");
           const path = literal("path");
+          if (name === "defineDownload" && method !== "GET")
+            fail(file, "Downloads must use GET.");
           if (
             !path.startsWith("/") ||
             path.startsWith("/api/") ||
@@ -89,16 +95,19 @@ function walk(folder) {
               file,
               "Use an API-relative path template, without query strings.",
             );
+          const scopeNode = properties.get("scope");
+          if (scopeNode && !ts.isStringLiteral(scopeNode))
+            fail(file, "scope must be a string literal.");
+          const scope = scopeNode?.text;
           if (/(?:^|\/)(?:external-exams|bece)(?:\/|$)/.test(path))
             fail(file, "External examinations are out of mobile v1 scope.");
           const rolesNode = properties.get("roles");
           if (
             !rolesNode ||
             !ts.isArrayLiteralExpression(rolesNode) ||
-            !rolesNode.elements.length ||
             !rolesNode.elements.every(ts.isStringLiteral)
           )
-            fail(file, "roles must be a nonempty literal array.");
+            fail(file, "roles must be a literal array.");
           const roles = rolesNode.elements.map((n) => n.text);
           if (roles.some((role) => !allowed.has(role)))
             fail(file, "Unsupported mobile role.");
@@ -109,20 +118,43 @@ function walk(folder) {
           );
           if (!route)
             fail(file, `Missing inventory endpoint: ${method} ${path}`);
-          if (
-            route.roles.length &&
-            roles.some((role) => !route.roles.includes(role))
-          )
-            fail(file, "Declared role is not allowed by the route inventory.");
-          if (
-            !route.roles.length &&
-            !(
-              path === "/schools/roles" &&
-              literal("scope") === "discovery" &&
-              route.tenantGuard
+          if (route.roles.length) {
+            if (
+              !roles.length ||
+              roles.some((role) => !route.roles.includes(role))
             )
-          )
-            fail(file, "Route without role metadata needs explicit review.");
+              fail(
+                file,
+                "Declared role is not allowed by the route inventory.",
+              );
+            if (scope)
+              fail(file, "Role-scoped routes cannot use a special scope.");
+          } else {
+            const key = `${method} ${path}`;
+            const allowedPublic = new Set([
+              "GET /schools/public/:subdomain",
+              "POST /schools/public/:subdomain/resolve-login",
+              "POST /account/password-recovery/request",
+              "POST /account/password-recovery/complete",
+            ]);
+            const explicitScope =
+              (scope === "discovery" &&
+                key === "GET /schools/roles" &&
+                route.tenantGuard) ||
+              (scope === "public" &&
+                allowedPublic.has(key) &&
+                !route.tenantGuard &&
+                !route.platformGuard) ||
+              (scope === "session" &&
+                key === "POST /account/change-password" &&
+                !route.tenantGuard &&
+                !route.platformGuard);
+            if (!explicitScope || (scope !== "discovery" && roles.length))
+              fail(
+                file,
+                "Route without role metadata needs an explicit supported scope.",
+              );
+          }
           count++;
         }
       }

@@ -10,9 +10,10 @@ export async function signOut() {
     cleanupFailed = true;
   }
   try {
-    await authClient.signOut({
+    const result = await authClient.signOut({
       fetchOptions: { auth: { type: "Bearer", token: token ?? "" } },
     });
+    if (result.error) throw new Error("Unable to revoke the server session.");
   } finally {
     if (cleanupFailed)
       throw new Error("Unable to fully clear saved credentials.");

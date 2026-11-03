@@ -21,16 +21,42 @@ function check(code) {
 }
 const declaration = (path, roles = "'teacher'", method = "GET") =>
   `defineEndpoint({ method:'${method}', path:'${path}', roles:[${roles}], response:schema });`;
+const scopedDeclaration = (method, path, scope) =>
+  `defineEndpoint({ method:'${method}', path:'${path}', roles:[], scope:'${scope}', response:schema });`;
 test("normalises inventory parameter names", () =>
   assert.equal(
     check(declaration("/academics/classes/:classId/students")).status,
     0,
   ));
+for (const [method, path] of [
+  ["GET", "/academics/classes"],
+  ["POST", "/academics/clubs/:id/members"],
+  ["PUT", "/assessments/entry"],
+  ["PATCH", "/assignments/:id/submissions/:submissionId/grade"],
+  ["DELETE", "/academics/clubs/:id/members/:studentId"],
+]) {
+  test(`accepts inventoried ${method} ${path}`, () =>
+    assert.equal(check(declaration(path, "'teacher'", method)).status, 0));
+}
+for (const [method, path, scope] of [
+  ["GET", "/schools/public/:subdomain", "public"],
+  ["POST", "/schools/public/:subdomain/resolve-login", "public"],
+  ["POST", "/account/password-recovery/request", "public"],
+  ["POST", "/account/password-recovery/complete", "public"],
+  ["POST", "/account/change-password", "session"],
+  ["GET", "/schools/roles", "discovery"],
+]) {
+  test(`accepts explicit ${scope} scope for ${method} ${path}`, () =>
+    assert.equal(check(scopedDeclaration(method, path, scope)).status, 0));
+}
 for (const code of [
   declaration("/missing"),
   declaration("/announcements", "'admin'"),
   declaration("/students/me", "'guardian'"),
   declaration("/announcements", "'teacher'", "DELETE"),
+  scopedDeclaration("POST", "/schools/public/:subdomain", "public"),
+  scopedDeclaration("GET", "/account/change-password", "session"),
+  "defineEndpoint({ method:'GET', path:'/schools/public/:subdomain', roles:[], response:schema });",
   declaration("/external-exams/results"),
   "defineEndpoint(config)",
   "apiFetch(path)",

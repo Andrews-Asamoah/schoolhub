@@ -1,9 +1,13 @@
 # SchoolHub mobile
 
-Only teacher, student and guardian role contexts are supported. All other roles, including Super Admin, are web-only. School-account sign-in is scheduled for Phase 3.
-Until that flow is implemented, the app opens a school-access information
-screen and does not accept credentials. Development builds also expose the
-component gallery. Production bundles exclude the gallery and mock routes.
+Only teacher, student and guardian role contexts are supported. All other
+roles, including Super Admin, are web-only. The app supports school-code lookup,
+school-account sign-in, role selection, two-factor access guidance, password
+recovery and required password changes. Accounts requiring two-factor sign-in
+must use the school's web portal until native verification is supported. Role
+home screens remain placeholders; live role features arrive in later phases.
+Development builds also expose the component gallery. Production bundles
+exclude the gallery and mock routes.
 
 ## Local development
 
@@ -46,6 +50,10 @@ toolchain. Check app icons, Android masks and light/dark splash on a device.
 ## Validation
 
 Phase 0 transcripts: ../../docs/validation/mobile-phase-0/.
-Phase 1 adds Jest tests and endpoint verification; the contrast audit remains Phase 2. Run `pnpm --filter @schoolhub/mobile test` and `pnpm --filter @schoolhub/mobile verify:endpoints` from the root.
-Device/emulator validation and screenshots remain required before Phase 0 can
-be declared fully complete. See ../../docs/plans/mobile-phase-0.md.
+Phase 1 adds Jest tests and endpoint verification; the contrast audit remains
+Phase 2. Phase 3 details the auth and endpoint adapter at
+../../docs/plans/mobile-phase-3.md. Run
+`pnpm --filter @schoolhub/mobile test` and
+`pnpm --filter @schoolhub/mobile verify:endpoints` from the root.
+Device/emulator validation and screenshots remain required before the phases
+can be declared fully complete.

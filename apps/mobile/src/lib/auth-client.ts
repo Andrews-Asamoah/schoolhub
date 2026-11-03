@@ -2,7 +2,6 @@ import { createAuthClient } from "better-auth/react";
 import {
   inferAdditionalFields,
   organizationClient,
-  twoFactorClient,
 } from "better-auth/client/plugins";
 import { API_ORIGIN, AUTH_BASE_PATH } from "./config";
 import { createTokenHooks } from "./auth-token-hooks";
@@ -12,20 +11,16 @@ const tokenHooks = createTokenHooks(sessionStore);
 export const isCurrentAuthResponse = tokenHooks.isCurrentResponse;
 
 /**
- * Better Auth client for native.
- *
- * The API already registers the bearer() plugin, so native clients authenticate
- * with `Authorization: Bearer <token>` and never use cookies. That also avoids
- * Better Auth's cookie-based origin (CSRF) check, which native requests (no
- * Origin header) would otherwise fail. The token arrives in the `set-auth-token`
- * response header on sign-in and is kept in expo-secure-store.
+ * The API bearer plugin supplies native session auth. The token arrives in the
+ * `set-auth-token` response header and is kept in SecureStore. Native two-factor
+ * challenge cookies are not persisted, so accounts requiring a challenge must
+ * use the school's web portal.
  */
 export const authClient = createAuthClient({
   baseURL: API_ORIGIN,
   basePath: AUTH_BASE_PATH,
   plugins: [
     organizationClient(),
-    twoFactorClient(),
     inferAdditionalFields({
       user: {
         mustChangePassword: { type: "boolean", required: false },

@@ -32,12 +32,11 @@ function Shell() {
       onSessionEvent((event) => {
         const messages = {
           unauthorized: "Your session has expired. Please sign in again.",
-          "password-change-required":
-            "Please change your password in your school's web portal.",
+          "password-change-required": "Set a new password to continue.",
           "subscription-inactive":
             "School access is paused. Please contact your school administrator.",
           "two-factor-required":
-            "Please complete two-factor authentication in your school's web portal.",
+            "Additional verification is required. Sign out and contact your school administrator.",
         };
         show({ message: messages[event.type], tone: "error" });
       }),
@@ -57,6 +56,7 @@ function Shell() {
         <Stack.Screen name="index" />
         <Stack.Protected guard={!ready}>
           <Stack.Screen name="login" />
+          <Stack.Screen name="(auth)" />
         </Stack.Protected>
         <Stack.Protected guard={canEnterRole(session, "teacher")}>
           <Stack.Screen name="(teacher)" />

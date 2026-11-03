@@ -71,6 +71,27 @@ export async function apiFetch<T>(
   path: string,
   init?: RequestInit,
 ): Promise<T> {
+  const { response, revision } = await authenticatedRequest(path, init);
+  if (response.status === 204) return undefined as T;
+  const body = await response.json();
+  if (sessionStore.getRevision() !== revision) throw new SessionChangedError();
+  return body as T;
+}
+
+export async function apiBytes(
+  path: string,
+  init?: RequestInit,
+): Promise<Uint8Array> {
+  const { response, revision } = await authenticatedRequest(path, init);
+  const bytes = new Uint8Array(await response.arrayBuffer());
+  if (sessionStore.getRevision() !== revision) throw new SessionChangedError();
+  return bytes;
+}
+
+async function authenticatedRequest(
+  path: string,
+  init?: RequestInit,
+): Promise<{ response: Response; revision: number }> {
   const revision = sessionStore.getRevision();
   const res = await fetch(`${API_BASE}${path}`, {
     ...init,
@@ -89,10 +110,7 @@ export async function apiFetch<T>(
       body,
     );
   }
-  if (res.status === 204) return undefined as T;
-  const body = await res.json();
-  if (sessionStore.getRevision() !== revision) throw new SessionChangedError();
-  return body as T;
+  return { response: res, revision };
 }
 
 /**
@@ -101,7 +119,7 @@ export async function apiFetch<T>(
  */
 export async function publicFetch<T>(
   path: string,
-  subdomain: string,
+  subdomain?: string,
   init?: RequestInit,
 ): Promise<T> {
   const headers = new Headers(init?.headers);
@@ -110,11 +128,13 @@ export async function publicFetch<T>(
   for (const name of [
     "authorization",
     "x-school-role",
+    "x-school-subdomain",
     "x-academic-year-id",
     "x-academic-term-id",
   ])
     headers.delete(name);
-  headers.set("x-school-subdomain", subdomain.trim().toLowerCase());
+  if (subdomain?.trim())
+    headers.set("x-school-subdomain", subdomain.trim().toLowerCase());
   const res = await fetch(`${API_BASE}${path}`, { ...init, headers });
   if (!res.ok) {
     const body: unknown = await res.json().catch(() => ({}));

@@ -5,6 +5,14 @@ import { isMobileRole } from "./permissions";
 import { log } from "./log";
 
 export async function restoreSession() {
+  await restoreSavedSession(false);
+}
+
+export async function retrySession() {
+  await restoreSavedSession(true);
+}
+
+async function restoreSavedSession(retry: boolean) {
   await hydrateSession();
   const saved = sessionStore.getSnapshot();
   if (!saved.token) return;
@@ -32,7 +40,10 @@ export async function restoreSession() {
     // A sign-out while the request was in flight must never resurrect its token.
     if (
       !sessionStore.getSnapshot().token ||
-      sessionStore.getSnapshot().status !== "loading"
+      (sessionStore.getSnapshot().status !== "loading" &&
+        !(
+          retry && sessionStore.getSnapshot().status === "subscriptionInactive"
+        ))
     )
       return;
     const token = sessionStore.getSnapshot().token!;
@@ -52,6 +63,10 @@ export async function restoreSession() {
     });
   } catch {
     if (sessionStore.getRevision() !== ownerRevision) return;
+    if (retry)
+      throw new Error(
+        "Unable to refresh your school session. Try again shortly.",
+      );
     log("session.restore_failed");
     await sessionStore.clear().catch(() => log("session.storage_failed"));
   }

@@ -48,13 +48,14 @@ test("schemas reject malformed responses and strip unneeded personal fields", as
   await expect(listAnnouncements()).rejects.toThrow();
 });
 test("BECE guard applies in executable paths, even to teacher sessions", async () => {
-  const forbidden = defineEndpoint({
-    method: "GET",
-    path: "/external-exams/results",
-    roles: ["teacher"],
-    response: z.unknown(),
-  });
-  await expect(forbidden()).rejects.toThrow("External examinations");
+  expect(() =>
+    defineEndpoint({
+      method: "GET",
+      path: "/external-exams/results",
+      roles: ["teacher"],
+      response: z.unknown(),
+    }),
+  ).toThrow("External examinations");
   expect(apiFetch).not.toHaveBeenCalled();
 });
 test("encodes path parameters and forwards abort signals", async () => {
@@ -70,5 +71,61 @@ test("encodes path parameters and forwards abort signals", async () => {
   expect(apiFetch).toHaveBeenCalledWith(
     "/academics/classes/a%2Fb/students",
     expect.objectContaining({ signal: controller.signal }),
+  );
+});
+
+test("validates request bodies before making a protected request", async () => {
+  const endpoint = defineEndpoint({
+    method: "POST",
+    path: "/announcements",
+    roles: ["teacher"],
+    request: z.object({ title: z.string().min(2) }),
+    response: z.object({ id: z.string() }),
+  });
+  await expect(endpoint({ request: { title: "" } })).rejects.toThrow();
+  expect(apiFetch).not.toHaveBeenCalled();
+});
+
+test("supports POST, PUT, PATCH and DELETE requests", async () => {
+  for (const method of ["POST", "PUT", "PATCH", "DELETE"] as const) {
+    const endpoint = defineEndpoint({
+      method,
+      path: "/announcements",
+      roles: ["teacher"],
+      request: z.object({ title: z.string() }),
+      response: z.object({ success: z.boolean() }),
+    });
+    jest.mocked(apiFetch).mockResolvedValue({ success: true });
+    await endpoint({ request: { title: "Term update" } });
+    expect(apiFetch).toHaveBeenLastCalledWith(
+      "/announcements",
+      expect.objectContaining({
+        method,
+        body: JSON.stringify({ title: "Term update" }),
+      }),
+    );
+  }
+});
+
+test("serializes query values with URLSearchParams", async () => {
+  const endpoint = defineEndpoint({
+    method: "GET",
+    path: "/academics/classes/:id/students",
+    roles: ["teacher"],
+    response: z.array(z.unknown()),
+  });
+  jest.mocked(apiFetch).mockResolvedValue([]);
+  await endpoint({
+    params: { id: "class/a b" },
+    query: {
+      search: "A & B",
+      active: true,
+      skip: null,
+      tag: ["one two", "x/y"],
+    },
+  });
+  expect(apiFetch).toHaveBeenCalledWith(
+    "/academics/classes/class%2Fa%20b/students?search=A+%26+B&active=true&tag=one+two&tag=x%2Fy",
+    expect.objectContaining({ method: "GET" }),
   );
 });
