@@ -166,29 +166,57 @@ export class InternalExamsService {
   async sheet(schoolId:string,userId:string,role:string|undefined,paperId:string){
     const paper=await this.prisma.client.internalExamPaper.findFirst({
       where:{id:paperId,session:{schoolId}},
-      select:{id:true,subjectId:true,nameSnapshot:true,codeSnapshot:true,maxMarks:true,finalizedAt:true,
+      select:{
+        id:true,subjectId:true,nameSnapshot:true,codeSnapshot:true,maxMarks:true,finalizedAt:true,
+        sections:{
+          orderBy:{subjectStrand:{sortOrder:"asc"}},
+          select:{id:true,subjectStrandId:true,teacherId:true,nameSnapshot:true,codeSnapshot:true,maxMarks:true,weightPercent:true},
+        },
         session:{select:{id:true,classId:true,name:true,status:true,
           candidates:{orderBy:{nameSnapshot:"asc"},
-            select:{id:true,studentId:true,nameSnapshot:true,admissionNumberSnapshot:true,
-              marks:{where:{paperId},select:{marks:true,status:true,version:true,updatedAt:true}}}}}},
+            select:{
+              id:true,studentId:true,nameSnapshot:true,admissionNumberSnapshot:true,
+              marks:{where:{paperId},select:{marks:true,status:true,version:true,updatedAt:true}},
+              sectionMarks:{where:{paperSection:{paperId}},select:{paperSectionId:true,marks:true,status:true,version:true,updatedAt:true}},
+            },
+          },
+        }},
       },
     });
     if(!paper)throw new NotFoundException("Mock subject paper not found.");
-    await this.canRead(schoolId,userId,role,paper.session.classId,paper.subjectId);
-    const canEdit=role==="teacher"&&!paper.finalizedAt&&paper.session.status==="OPEN"&&
-      (await this.scope.getAssignments(schoolId,userId)).subjectAssignments.some(x=>
-        x.classId===paper.session.classId&&x.subjectId===paper.subjectId);
+    const assignments=role==="teacher"?await this.scope.getAssignments(schoolId,userId):null;
+    const sectionTeacherIds=paper.sections.flatMap(section=>section.teacherId?[section.teacherId]:[]);
+    await this.canRead(schoolId,userId,role,paper.session.classId,paper.subjectId,sectionTeacherIds);
+    const editablePaper=!paper.finalizedAt&&paper.session.status==="OPEN";
+    const sections=paper.sections.map(section=>({
+      id:section.id,
+      subjectStrandId:section.subjectStrandId,
+      name:section.nameSnapshot,
+      code:section.codeSnapshot,
+      maxMarks:Number(section.maxMarks),
+      weightPercent:Number(section.weightPercent),
+      canEdit:Boolean(editablePaper&&role==="teacher"&&assignments?.teacherId&&section.teacherId===assignments.teacherId),
+    }));
+    const legacyCanEdit=Boolean(editablePaper&&role==="teacher"&&assignments?.subjectAssignments.some(x=>
+      x.classId===paper.session.classId&&x.subjectId===paper.subjectId));
     return {
       paper:{id:paper.id,name:paper.nameSnapshot,code:paper.codeSnapshot,
-        maxMarks:Number(paper.maxMarks),finalizedAt:paper.finalizedAt},
+        maxMarks:Number(paper.maxMarks),finalizedAt:paper.finalizedAt,sections},
       session:{id:paper.session.id,name:paper.session.name,status:paper.session.status},
-      canEdit,
+      canEdit:sections.length?sections.some(section=>section.canEdit):legacyCanEdit,
       candidates:paper.session.candidates.map(c=>{
         const m=c.marks[0];
-        return {id:c.id,studentId:c.studentId,name:c.nameSnapshot,
-          admissionNumber:c.admissionNumberSnapshot,marks:m?.marks==null?null:Number(m.marks),
-          status:m?.status??null,version:m?.version??0,
-          percentage:mockPercent(m?.marks==null?null:Number(m.marks),Number(paper.maxMarks))};
+        return {
+          id:c.id,studentId:c.studentId,name:c.nameSnapshot,admissionNumber:c.admissionNumberSnapshot,
+          marks:m?.marks==null?null:Number(m.marks),status:m?.status??null,version:m?.version??0,
+          percentage:mockPercent(m?.marks==null?null:Number(m.marks),Number(paper.maxMarks)),
+          sectionMarks:c.sectionMarks.map(mark=>({
+            sectionId:mark.paperSectionId,
+            marks:mark.marks==null?null:Number(mark.marks),
+            status:mark.status,
+            version:mark.version,
+          })),
+        };
       }),
     };
   }
