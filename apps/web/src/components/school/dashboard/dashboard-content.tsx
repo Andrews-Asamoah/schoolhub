@@ -46,9 +46,9 @@ interface Metric { label: string; value: string; detail: string; icon: LucideIco
 const numberFormat = new Intl.NumberFormat("en-GH");
 const moneyFormat = new Intl.NumberFormat("en-GH", { style: "currency", currency: "GHS", maximumFractionDigits: 2 });
 function MetricTile({ metric }: { metric: Metric }) {
-  return <article className="min-w-0 rounded-2xl border border-border bg-card p-4 shadow-sm sm:p-5">
-    <div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="text-xs font-medium text-muted-foreground">{metric.label}</p><p className="mt-3 break-words text-2xl font-bold tracking-tight text-foreground">{metric.value}</p></div><span className={`flex size-10 shrink-0 items-center justify-center rounded-xl ${metric.className}`}><metric.icon className="size-[18px]" /></span></div>
-    <p className="mt-2 text-[11px] text-muted-foreground">{metric.detail}</p>
+  return <article className="group min-w-0 rounded-2xl border border-border/80 bg-card p-5 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-lg hover:shadow-foreground/[0.04] sm:p-5">
+    <div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="text-xs font-medium text-muted-foreground">{metric.label}</p><p className="mt-3 break-words text-[1.75rem] font-semibold tracking-[-0.04em] text-foreground tabular-nums">{metric.value}</p></div><span className={`flex size-11 shrink-0 items-center justify-center rounded-2xl ${metric.className}`}><metric.icon className="size-[18px]" /></span></div>
+    <p className="mt-2.5 text-xs text-muted-foreground">{metric.detail}</p>
   </article>;
 }
 function Metrics({ data, isLoading, isError }: { data?: DashboardAnalytics; isLoading: boolean; isError: boolean }) {
@@ -141,19 +141,19 @@ export function DashboardContent({ today, greetingName }: DashboardContentProps)
 
   return (
     <main className="mx-auto max-w-[1440px] px-4 py-7 sm:px-6 lg:px-9 lg:py-9">
-      <div className="mb-7">
-        <p className="mb-2 text-xs font-medium text-muted-foreground">{today}</p>
-        <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-[30px]">Good day, {greetingName}<span className="ml-2">👋</span></h1>
+      <div className="mb-8">
+        <p className="mb-2 inline-flex items-center rounded-full border border-border bg-card px-3 py-1 text-xs font-medium text-muted-foreground shadow-sm">{today}</p>
+        <h1 className="text-[1.75rem] font-semibold tracking-[-0.04em] text-foreground sm:text-[2.15rem]">Good day, {greetingName}<span className="ml-2">👋</span></h1>
         <p className="mt-1.5 text-sm text-muted-foreground">A live overview of your school&apos;s records and activity.</p>
       </div>
 
-      {isManagementRole && <section className="mb-6 overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
-        <div className="flex flex-wrap items-start justify-between gap-4 border-b border-border bg-muted/30 px-5 py-5 sm:px-6">
+      {isManagementRole && <section className="mb-7 overflow-hidden rounded-2xl border border-border/80 bg-card shadow-sm">
+        <div className="flex flex-wrap items-start justify-between gap-4 border-b border-border bg-gradient-to-r from-primary/[0.055] via-card to-card px-5 py-6 sm:px-7">
           <div><p className="text-[10px] font-bold uppercase tracking-[0.16em] text-primary">Getting started</p><h2 className="mt-1 text-lg font-bold tracking-tight text-foreground">Prepare your school to run</h2><p className="mt-1 max-w-2xl text-xs leading-5 text-muted-foreground">These checks reflect your current school configuration.</p></div>
           <div className="min-w-32 rounded-xl border border-border bg-card px-4 py-3"><p className="text-lg font-bold text-foreground">{completedSteps}<span className="text-muted-foreground">/{setupItems.length}</span></p><p className="text-[10px] font-medium text-muted-foreground">setup steps complete</p><div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-primary transition-all" style={{ width: `${(completedSteps / setupItems.length) * 100}%` }} /></div></div>
         </div>
         {setupHasError && <p role="alert" className="flex items-center gap-2 border-b border-destructive/20 bg-destructive/5 px-5 py-2.5 text-xs text-destructive"><CircleAlert className="size-4 shrink-0" />Some setup checks could not load. Retry after the API connection is restored.</p>}
-        <div className="grid gap-px bg-border sm:grid-cols-2 xl:grid-cols-4">{setupItems.map(({ title, detail, complete, icon: Icon, page }) => <Link key={page} to="/$page" params={{ page }} className="group flex min-h-24 items-start gap-3 bg-card p-4 transition hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary"><span className={`mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg ${complete ? "bg-success/10 text-success" : "bg-primary/10 text-primary"}`}>{complete ? <ArrowRight className="size-4" /> : <Icon className="size-4" />}</span><span className="min-w-0 flex-1"><span className="block text-xs font-semibold text-foreground">{title}</span><span className="mt-1 block text-[10px] leading-4 text-muted-foreground">{complete ? "Complete" : detail}</span></span></Link>)}</div>
+        <div className="grid gap-px bg-border/70 sm:grid-cols-2 xl:grid-cols-4">{setupItems.map(({ title, detail, complete, icon: Icon, page }) => <Link key={page} to="/$page" params={{ page }} className="group flex min-h-24 items-start gap-3 bg-card p-4 transition hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary"><span className={`mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg ${complete ? "bg-success/10 text-success" : "bg-primary/10 text-primary"}`}>{complete ? <ArrowRight className="size-4" /> : <Icon className="size-4" />}</span><span className="min-w-0 flex-1"><span className="block text-xs font-semibold text-foreground">{title}</span><span className="mt-1 block text-[10px] leading-4 text-muted-foreground">{complete ? "Complete" : detail}</span></span></Link>)}</div>
       </section>}
 
       {!isManagementRole && <section className="mb-5 rounded-2xl border border-border bg-card p-5"><p className="text-xs font-semibold uppercase tracking-wide text-primary">{schoolRoleLabel(activeRole)}</p><p className="mt-1 text-sm text-muted-foreground">Quick links for your workspace</p><div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{roleLinks.map((item) => <Link key={item.id} to="/$page" params={{ page: item.id }} className="flex items-center gap-3 rounded-xl border border-border p-3 transition hover:bg-muted/50"><span className="flex size-9 items-center justify-center rounded-lg bg-primary/10 text-primary"><item.icon className="size-4" /></span><span><span className="block text-sm font-semibold text-foreground">{item.label}</span><span className="mt-0.5 block text-xs text-muted-foreground">{item.description}</span></span></Link>)}</div></section>}
