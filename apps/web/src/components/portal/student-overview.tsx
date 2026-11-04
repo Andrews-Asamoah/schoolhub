@@ -36,14 +36,14 @@ export function StudentOverview() {
 
   return (
     <div className="space-y-6">
-      <section className="relative overflow-hidden rounded-3xl border border-border bg-card p-6 shadow-sm sm:p-8">
+      <section className="relative isolate overflow-hidden rounded-3xl border border-primary/15 bg-gradient-to-br from-primary/12 via-card to-card p-6 shadow-sm sm:p-8">
         <div className="pointer-events-none absolute -right-12 -top-16 size-56 rounded-full bg-primary/10 blur-3xl" />
         <div className="relative flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
           <div className="max-w-2xl">
             <p className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-3 py-1 text-xs font-semibold text-primary">
               <GraduationCap className="size-4" /> Student portal
             </p>
-            <h1 className="mt-4 text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+            <h1 className="mt-4 text-[1.8rem] font-semibold tracking-[-0.04em] text-foreground sm:text-[2.15rem]">
               Welcome{firstName ? `, ${firstName}` : ""}
             </h1>
             <p className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground">
@@ -72,8 +72,8 @@ export function StudentOverview() {
         </div>
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {quickLinks.map(({ title, description, page, icon: Icon }) => (
-            <Link key={page} to="/$page" params={{ page }} className="group flex min-h-28 items-start gap-4 rounded-2xl border border-border bg-card p-4 transition hover:border-primary/40 hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-              <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary transition group-hover:bg-primary group-hover:text-primary-foreground">
+            <Link key={page} to="/$page" params={{ page }} className="group flex min-h-28 items-start gap-4 rounded-2xl border border-border/80 bg-card p-5 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/35 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+              <span className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary transition group-hover:bg-primary group-hover:text-primary-foreground">
                 <Icon className="size-5" />
               </span>
               <span className="min-w-0 flex-1">
