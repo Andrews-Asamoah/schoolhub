@@ -14,9 +14,11 @@ type ExamSession = {
   _count:{candidates:number};
 };
 type MockClass = {id:string;name:string;level:string;isGraduatingClass:boolean;isActive:boolean};
+type PaperSection = {id:string;subjectStrandId:string;name:string;code:string|null;maxMarks:number;weightPercent:number;canEdit:boolean};
+type SectionMark = {sectionId:string;marks:number|null;status:"MARKED"|"ABSENT";version:number};
 type Pupil = {id:string;name:string;admissionNumber:string|null;marks:number|null;
-  status:"MARKED"|"ABSENT"|null;version:number;percentage:number|null};
-type Sheet = {paper:{id:string;name:string;code:string;maxMarks:number;finalizedAt:string|null};
+  status:"MARKED"|"ABSENT"|null;version:number;percentage:number|null;sectionMarks:SectionMark[]};
+type Sheet = {paper:{id:string;name:string;code:string;maxMarks:number;finalizedAt:string|null;sections:PaperSection[]};
   session:{id:string;name:string;status:"DRAFT"|"OPEN"|"LOCKED"};canEdit:boolean;candidates:Pupil[]};
 type Draft = {marks:string;absent:boolean};
 const style="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground";
@@ -36,6 +38,7 @@ export function InternalExaminationsWorkspace() {
   const [selectedPaper,setSelectedPaper]=useState("");
   const [selectedClass,setSelectedClass]=useState("");
   const [drafts,setDrafts]=useState<Record<string,Draft>>({});
+  const [selectedSectionId,setSelectedSectionId]=useState("");
   const [notice,setNotice]=useState<string|null>(null);
   const exams=sessions.data??[];
   const current=exams.find(v=>v.id===selectedSession)??exams[0];
@@ -46,10 +49,26 @@ export function InternalExaminationsWorkspace() {
     enabled:Boolean(paper?.id),retry:false});
   useEffect(()=>{
     if(!sheet.data)return;
-    setDrafts(Object.fromEntries(sheet.data.candidates.map(row=>[row.id,{
-      marks:row.marks===null?"":String(row.marks),
-      absent:row.status==="ABSENT",
-    }])));
+    const rows:Record<string,Draft>={};
+    if(sheet.data.paper.sections.length){
+      for(const pupil of sheet.data.candidates){
+        for(const section of sheet.data.paper.sections){
+          const mark=pupil.sectionMarks.find(item=>item.sectionId===section.id);
+          rows[`${pupil.id}:${section.id}`]={
+            marks:mark?.marks===null||mark?.marks===undefined?"":String(mark.marks),
+            absent:mark?.status==="ABSENT",
+          };
+        }
+      }
+      setSelectedSectionId(current=>sheet.data!.paper.sections.some(section=>section.id===current)
+        ?current:(sheet.data!.paper.sections.find(section=>section.canEdit)?.id??sheet.data!.paper.sections[0]?.id??""));
+    }else{
+      for(const pupil of sheet.data.candidates){
+        rows[pupil.id]={marks:pupil.marks===null?"":String(pupil.marks),absent:pupil.status==="ABSENT"};
+      }
+      setSelectedSectionId("");
+    }
+    setDrafts(rows);
   },[sheet.data]);
   const refresh=async()=>{
     await client.invalidateQueries({queryKey:["internal-exams"]});
