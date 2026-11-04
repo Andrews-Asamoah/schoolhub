@@ -32,7 +32,7 @@ export function SuperAdminLayout({
         />
         <div className="min-w-0 flex-1">
           {/* Top bar */}
-          <header className="superadmin-topbar sticky top-0 z-10 flex h-16 items-center gap-3 border-b border-border bg-card px-4 md:px-7 ">
+          <header className="superadmin-topbar sticky top-0 z-30 flex h-[4.5rem] items-center gap-3 border-b border-border px-4 md:px-7">
             <SidebarTrigger className="superadmin-button-secondary shrink-0" />
             <div className="h-4 w-px bg-border" />
             <div className="superadmin-breadcrumb flex min-w-0 items-center gap-2 text-sm">
