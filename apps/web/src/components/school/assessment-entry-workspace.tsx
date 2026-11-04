@@ -267,7 +267,7 @@ export function AssessmentEntryWorkspace({
                         {component.name}
                         {component.subjectStrandName && <span className="block font-semibold normal-case tracking-normal">{component.subjectStrandName}</span>}
                         <span className="block font-normal normal-case tracking-normal">out of {component.maxMarks} · {component.weight}%</span>
-                        {!component.canEdit && mode === "teacher" && <span className="block font-normal normal-case tracking-normal">Read only</span>
+                        {!component.canEdit && mode === "teacher" && <span className="block font-normal normal-case tracking-normal">Read only</span>}
                       </th>
                     ))}
                     <th scope="col" className="px-3 py-3 text-center text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70">Total</th>
