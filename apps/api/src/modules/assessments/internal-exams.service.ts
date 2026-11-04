@@ -5,36 +5,45 @@ import { PrismaService } from "../../prisma/prisma.service.js";
 import { TeacherScopeService } from "../../common/scope/teacher-scope.service.js";
 import { isSchoolManager } from "../../common/scope/teacher-access.js";
 import { mockPercent,validateMockMarks } from "./internal-exams.js";
-import type { mockMarkSchema } from "./internal-exams.schemas.js";
+import type { mockMarkSchema, mockSectionMarkSchema } from "./internal-exams.schemas.js";
 
 @Injectable()
 export class InternalExamsService {
   constructor(private readonly prisma: PrismaService,private readonly scope: TeacherScopeService){}
 
-  private async canRead(schoolId:string,userId:string,role:string|undefined,classId:string,subjectId?:string) {
+  private async canRead(
+    schoolId:string,userId:string,role:string|undefined,classId:string,subjectId?:string,sectionTeacherIds:string[]=[],
+  ) {
     if(isSchoolManager(role)) return;
     if(role!=="teacher") throw new ForbiddenException("Only authorised school staff may use internal examinations.");
     const a=await this.scope.getAssignments(schoolId,userId);
-    const eligible=subjectId ?
-      a.subjectAssignments.some(s=>s.classId===classId&&s.subjectId===subjectId)||
-        a.classTeacherClassIds.includes(classId) :
-      a.classTeacherClassIds.includes(classId)||a.subjectAssignments.some(s=>s.classId===classId);
+    const eligible=subjectId
+      ? a.subjectAssignments.some(s=>s.classId===classId&&s.subjectId===subjectId) ||
+        a.subjectStrandAssignments.some(s=>s.classId===classId&&s.subjectId===subjectId) ||
+        (a.teacherId !== null && sectionTeacherIds.includes(a.teacherId)) ||
+        a.classTeacherClassIds.includes(classId)
+      : a.classTeacherClassIds.includes(classId) ||
+        a.subjectAssignments.some(s=>s.classId===classId) ||
+        a.subjectStrandAssignments.some(s=>s.classId===classId);
     if(!eligible)throw new ForbiddenException("You do not teach this class or subject.");
   }
 
   private async canWrite(schoolId:string,userId:string,role:string|undefined,classId:string,subjectId:string) {
-    // Only the assigned SUBJECT teacher, not managers or class teachers without this subject.
     if(role!=="teacher")throw new ForbiddenException("Only the assigned subject teacher may enter mock marks.");
     const a=await this.scope.getAssignments(schoolId,userId);
-    if(!a.subjectAssignments.some(s=>s.classId===classId&&s.subjectId===subjectId)){
-      throw new ForbiddenException("You are not assigned to this class and subject.");
-    }
+    const eligible=a.subjectAssignments.some(s=>s.classId===classId&&s.subjectId===subjectId) ||
+      a.subjectStrandAssignments.some(s=>s.classId===classId&&s.subjectId===subjectId);
+    if(!eligible)throw new ForbiddenException("You are not assigned to this class and subject.");
   }
 
   async list(schoolId:string,userId:string,role:string|undefined){
     const assignments=role==="teacher" ? await this.scope.getAssignments(schoolId,userId):null;
     if(!isSchoolManager(role)&&role!=="teacher")throw new ForbiddenException();
-    const classes=assignments? [...new Set([...assignments.classTeacherClassIds,...assignments.subjectAssignments.map(x=>x.classId)])]:null;
+    const classes=assignments? [...new Set([
+      ...assignments.classTeacherClassIds,
+      ...assignments.subjectAssignments.map(x=>x.classId),
+      ...assignments.subjectStrandAssignments.map(x=>x.classId),
+    ])]:null;
     if(classes&&classes.length===0)return [];
     return this.prisma.client.internalExamSession.findMany({
       where:{schoolId,...(classes?{classId:{in:classes}}:{})},
@@ -45,7 +54,7 @@ export class InternalExamsService {
         academicYear:{select:{id:true,name:true}},
         term:{select:{id:true,name:true}},
         papers:{select:{id:true,subjectId:true,nameSnapshot:true,codeSnapshot:true,
-          maxMarks:true,finalizedAt:true}},
+          maxMarks:true,finalizedAt:true,sections:{select:{id:true,nameSnapshot:true,weightPercent:true}}}},
         _count:{select:{candidates:true}},
       },
     });
@@ -63,8 +72,16 @@ export class InternalExamsService {
         where:{id:classId,schoolId,deletedAt:null,isActive:true,
           OR:[{academicYearId:term.academicYearId},{academicYearId:null}]},
         select:{id:true,name:true,level:true,isGraduatingClass:true,
-          subjects:{where:{subject:{isActive:true,deletedAt:null}},
-            select:{subject:{select:{id:true,name:true,code:true}}}}},
+          subjects:{
+            where:{subject:{isActive:true,deletedAt:null}},
+            select:{
+              subject:{select:{id:true,name:true,code:true,strands:{
+                where:{isActive:true},orderBy:[{sortOrder:"asc"},{name:"asc"}],
+                select:{id:true,name:true,code:true,examWeightPercent:true},
+              }}},
+              strandAssignments:{where:{subjectStrand:{isActive:true},},select:{subjectStrandId:true,teacherId:true}},
+            },
+          }},
       }),
       this.prisma.client.enrollment.findMany({
         where:{classId,academicYearId:term.academicYearId,termId:term.id,
@@ -79,6 +96,18 @@ export class InternalExamsService {
     }
     if(!roster.length)throw new BadRequestException("Enrol pupils in this term before creating Mock 1.");
     if(!classroom.subjects.length)throw new BadRequestException("Assign class subjects before creating a mock.");
+    for (const offering of classroom.subjects) {
+      const strands=offering.subject.strands;
+      if (!strands.length) continue;
+      const totalWeight=strands.reduce((sum,strand)=>sum+Number(strand.examWeightPercent),0);
+      if (Math.abs(totalWeight-100)>0.01) {
+        throw new BadRequestException(`Configure examination contributions totalling 100% for ${offering.subject.name} before creating a mock.`);
+      }
+      const assignedIds=new Set(offering.strandAssignments.map(row=>row.subjectStrandId));
+      if (strands.some(strand=>!assignedIds.has(strand.id))) {
+        throw new BadRequestException(`Assign a teacher to every ${offering.subject.name} teaching area in this class before creating a mock.`);
+      }
+    }
     return this.prisma.client.$transaction(async tx=>{
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${schoolId}),hashtext(${classId}))`;
       const latest=await tx.internalExamSession.aggregate({
@@ -97,6 +126,16 @@ export class InternalExamsService {
           papers:{create:classroom.subjects.map(x=>({
             subjectId:x.subject.id,nameSnapshot:x.subject.name,
             codeSnapshot:x.subject.code,maxMarks:new Prisma.Decimal(100),
+            ...(x.subject.strands.length ? {
+              sections:{create:x.subject.strands.map(strand=>({
+                subjectStrandId:strand.id,
+                teacherId:x.strandAssignments.find(row=>row.subjectStrandId===strand.id)!.teacherId,
+                nameSnapshot:strand.name,
+                codeSnapshot:strand.code,
+                maxMarks:new Prisma.Decimal(100),
+                weightPercent:strand.examWeightPercent,
+              }))},
+            } : {}),
           }))},
         },
         select:{id:true,name:true,mockNumber:true,status:true,
