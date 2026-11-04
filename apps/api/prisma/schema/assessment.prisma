@@ -502,6 +502,7 @@ model InternalExamCandidate {
   session InternalExamSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
   student Student @relation(fields: [studentId], references: [id])
   marks InternalExamMark[]
+  sectionMarks InternalExamSectionMark[]
 
   correctionRequests InternalMockCorrection[]
   @@unique([sessionId, studentId])
@@ -523,11 +524,55 @@ model InternalExamPaper {
   session InternalExamSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
   subject Subject @relation(fields: [subjectId], references: [id])
   marks InternalExamMark[]
+  sections InternalExamPaperSection[]
   correctionRequests InternalMockCorrection[]
 
   @@unique([sessionId, subjectId])
   @@index([subjectId])
   @@map("internal_exam_papers")
+}
+
+model InternalExamPaperSection {
+  id              String   @id @default(cuid())
+  paperId         String
+  subjectStrandId String
+  teacherId       String?
+  nameSnapshot    String   @db.VarChar(160)
+  codeSnapshot    String?  @db.VarChar(40)
+  maxMarks        Decimal  @default(100) @db.Decimal(6, 2)
+  weightPercent   Decimal  @db.Decimal(5, 2)
+  createdAt       DateTime @default(now())
+
+  paper        InternalExamPaper @relation(fields: [paperId], references: [id], onDelete: Cascade)
+  subjectStrand SubjectStrand     @relation(fields: [subjectStrandId], references: [id], onDelete: Restrict)
+  teacher      Teacher?          @relation("InternalExamPaperSectionTeacher", fields: [teacherId], references: [id], onDelete: SetNull)
+  marks        InternalExamSectionMark[]
+
+  @@unique([paperId, subjectStrandId])
+  @@index([teacherId])
+  @@index([subjectStrandId])
+  @@map("internal_exam_paper_sections")
+}
+
+model InternalExamSectionMark {
+  id              String                @id @default(cuid())
+  candidateId     String
+  paperSectionId  String
+  marks           Decimal?              @db.Decimal(6, 2)
+  status          InternalExamMarkStatus @default(MARKED)
+  version         Int                   @default(1)
+  recordedById    String?
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+
+  candidate  InternalExamCandidate    @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  paperSection InternalExamPaperSection @relation(fields: [paperSectionId], references: [id], onDelete: Cascade)
+  recordedBy user?                   @relation("InternalExamSectionMarkRecorder", fields: [recordedById], references: [id], onDelete: SetNull)
+
+  @@unique([candidateId, paperSectionId])
+  @@index([paperSectionId])
+  @@index([recordedById])
+  @@map("internal_exam_section_marks")
 }
 
 model InternalExamMark {
