@@ -34,6 +34,22 @@ export function canEnterMarks(
   return assignments.subjectAssignments.some((row) => row.classId === classId && row.subjectId === subjectId);
 }
 
+/** Authorize an individual assessment component using strand-specific ownership. */
+export function canEnterComponentMarks(
+  role: string | undefined,
+  assignments: TeacherAssignments,
+  classId: string,
+  subjectId: string,
+  subjectStrandId?: string | null,
+): boolean {
+  if (isSchoolManager(role)) return true;
+  if (role !== "teacher") return false;
+  if (!subjectStrandId) return canEnterMarks(role, assignments, classId, subjectId);
+  return assignments.subjectStrandAssignments.some(
+    (row) => row.classId === classId && row.subjectId === subjectId && row.subjectStrandId === subjectStrandId,
+  );
+}
+
 export function canViewMarks(
   role: string | undefined,
   assignments: TeacherAssignments,
@@ -41,5 +57,8 @@ export function canViewMarks(
   subjectId: string,
 ): boolean {
   if (canEnterMarks(role, assignments, classId, subjectId)) return true;
-  return role === "teacher" && assignments.classTeacherClassIds.includes(classId);
+  return role === "teacher" && (
+    assignments.classTeacherClassIds.includes(classId) ||
+    assignments.subjectStrandAssignments.some((row) => row.classId === classId && row.subjectId === subjectId)
+  );
 }

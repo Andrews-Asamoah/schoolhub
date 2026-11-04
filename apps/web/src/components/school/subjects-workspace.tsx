@@ -5,6 +5,7 @@ import {
   saveSubjectSchema,
   type SaveSubjectInput,
   type SetSubjectClassesInput,
+  type SetSubjectStrandsInput,
 } from "@schoolhub/shared";
 import { FormField, FormInput, FormTextarea } from "@/components/forms/form-controls";
 import { useSchoolRole } from "@/components/school/school-role-switcher";
@@ -30,6 +31,16 @@ interface SubjectRow {
     teacherName: string | null;
   }[];
   teachers: { id: string; name: string }[];
+  strands: {
+    id: string;
+    name: string;
+    code: string | null;
+    description: string | null;
+    sortOrder: number;
+    examWeightPercent: number | string;
+    isActive: boolean;
+    assignments: { classId: string; className: string; teacherId: string; teacherName: string }[];
+  }[];
 }
 interface ClassOption { id: string; name: string; level: string }
 interface TeacherOption { id: string; firstName: string; lastName: string; isActive: boolean }
@@ -38,6 +49,7 @@ type Panel =
   | { type: "form"; subject?: SubjectRow }
   | { type: "classes"; subject: SubjectRow }
   | { type: "teachers"; subject: SubjectRow }
+  | { type: "strands"; subject: SubjectRow }
   | null;
 
 const linkButton =
@@ -62,12 +74,12 @@ export function SubjectsWorkspace() {
   const classesQuery = useQuery({
     queryKey: ["academics", "classes"],
     queryFn: () => apiFetch<ClassOption[]>("/academics/classes"),
-    enabled: canManage && panel?.type === "classes",
+    enabled: canManage && (panel?.type === "classes" || panel?.type === "strands"),
   });
   const teachersQuery = useQuery({
     queryKey: ["academics", "teachers"],
     queryFn: () => apiFetch<TeacherOption[]>("/academics/teachers"),
-    enabled: canManage && (panel?.type === "classes" || panel?.type === "teachers"),
+    enabled: canManage && (panel?.type === "classes" || panel?.type === "teachers" || panel?.type === "strands"),
   });
 
   const refresh = async () => {
@@ -115,6 +127,14 @@ export function SubjectsWorkspace() {
       await refresh();
     },
   });
+  const strandsMutation = useMutation({
+    mutationFn: ({ id, input }: { id: string; input: SetSubjectStrandsInput }) =>
+      apiFetch(`/subjects/${id}/strands`, { method: "PUT", body: JSON.stringify(input) }),
+    onSuccess: async () => {
+      setPanel(null);
+      await refresh();
+    },
+  });
   const teachersMutation = useMutation({
     mutationFn: ({ id, teacherIds }: { id: string; teacherIds: string[] }) =>
       apiFetch(`/subjects/${id}/teachers`, { method: "PUT", body: JSON.stringify({ teacherIds }) }),
@@ -137,7 +157,7 @@ export function SubjectsWorkspace() {
   if (subjectsQuery.error) return <Notice tone="error">{subjectsQuery.error.message}</Notice>;
 
   const actionError =
-    statusMutation.error ?? deleteMutation.error ?? classesMutation.error ?? teachersMutation.error;
+    statusMutation.error ?? deleteMutation.error ?? classesMutation.error ?? teachersMutation.error ?? strandsMutation.error;
 
   const columns: WorkspaceColumn<SubjectRow>[] = [
     {
@@ -203,6 +223,7 @@ export function SubjectsWorkspace() {
                 <button type="button" className={linkButton} onClick={() => setPanel({ type: "form", subject })}>Edit</button>
                 <button type="button" className={linkButton} onClick={() => setPanel({ type: "classes", subject })}>Classes</button>
                 <button type="button" className={linkButton} onClick={() => setPanel({ type: "teachers", subject })}>Teachers</button>
+                <button type="button" className={linkButton} onClick={() => setPanel({ type: "strands", subject })}>Teaching areas{subject.strands.length ? ` (${subject.strands.filter((strand) => strand.isActive).length})` : ""}</button>
                 <button type="button" className={linkButton} disabled={statusMutation.isPending} onClick={() => statusMutation.mutate(subject)}>
                   {subject.isActive ? "Deactivate" : "Activate"}
                 </button>
@@ -272,6 +293,18 @@ export function SubjectsWorkspace() {
           onManageTeachers={() => setPanel({ type: "teachers", subject: panel.subject })}
           onCancel={() => setPanel(null)}
           onSave={(input) => classesMutation.mutate({ id: panel.subject.id, input })}
+        />
+      )}
+      {canManage && panel?.type === "strands" && (
+        <StrandsPanel
+          key={panel.subject.id}
+          subject={panel.subject}
+          classes={classesQuery.data ?? []}
+          teachers={(teachersQuery.data ?? []).filter((teacher) => teacher.isActive)}
+          loading={classesQuery.isPending || teachersQuery.isPending}
+          pending={strandsMutation.isPending}
+          onCancel={() => setPanel(null)}
+          onSave={(input) => strandsMutation.mutate({ id: panel.subject.id, input })}
         />
       )}
       {canManage && panel?.type === "teachers" && (
@@ -531,6 +564,195 @@ function ClassAssignmentPanel({
         >
           {pending && <LoaderCircle className="size-3.5 animate-spin" />}
           Save assignments
+        </button>
+      </div>
+    </PanelShell>
+  );
+}
+
+
+interface StrandDraft {
+  key: string;
+  id?: string;
+  name: string;
+  code: string;
+  description: string;
+  examWeightPercent: string;
+  isActive: boolean;
+  assignments: Record<string, string>;
+}
+
+function StrandsPanel({
+  subject,
+  classes,
+  teachers,
+  loading,
+  pending,
+  onSave,
+  onCancel,
+}: {
+  subject: SubjectRow;
+  classes: ClassOption[];
+  teachers: TeacherOption[];
+  loading: boolean;
+  pending: boolean;
+  onSave: (input: SetSubjectStrandsInput) => void;
+  onCancel: () => void;
+}) {
+  const qualifiedIds = new Set(subject.teachers.map((teacher) => teacher.id));
+  const qualifiedTeachers = teachers.filter((teacher) => qualifiedIds.has(teacher.id));
+  const offeredClassIds = new Set(subject.classes.map((row) => row.classId));
+  const offeredClasses = classes.filter((row) => offeredClassIds.has(row.id));
+  const [strands, setStrands] = useState<StrandDraft[]>(() => subject.strands.map((strand) => ({
+    key: strand.id,
+    id: strand.id,
+    name: strand.name,
+    code: strand.code ?? "",
+    description: strand.description ?? "",
+    examWeightPercent: String(strand.examWeightPercent ?? 0),
+    isActive: strand.isActive,
+    assignments: Object.fromEntries(strand.assignments.map((assignment) => [assignment.classId, assignment.teacherId])),
+  })));
+  const [problem, setProblem] = useState<string | null>(null);
+
+  function update(key: string, change: Partial<StrandDraft>) {
+    setStrands((current) => current.map((strand) => strand.key === key ? { ...strand, ...change } : strand));
+  }
+
+  function submit() {
+    const active = strands.filter((strand) => strand.isActive);
+    if (!active.length && strands.length) {
+      setProblem("Keep at least one teaching area active, or deactivate the subject itself.");
+      return;
+    }
+    for (const strand of active) {
+      if (strand.name.trim().length < 2) {
+        setProblem("Every active teaching area needs a name.");
+        return;
+      }
+      if (!offeredClasses.length) {
+        setProblem("Assign this subject to at least one class before assigning teaching areas.");
+        return;
+      }
+      const assigned = Object.values(strand.assignments).filter(Boolean);
+      if (assigned.length !== offeredClasses.length) {
+        setProblem(`Assign a qualified teacher for ${strand.name} in every class that takes ${subject.code}.`);
+        return;
+      }
+    }
+    const weights = active.map((strand) => Number(strand.examWeightPercent) || 0);
+    if (weights.some((weight) => weight > 0) && Math.abs(weights.reduce((sum, weight) => sum + weight, 0) - 100) > 0.01) {
+      setProblem("When examination contributions are configured, teaching-area weights must add up to 100%.");
+      return;
+    }
+    setProblem(null);
+    onSave({
+      strands: strands.map((strand, sortOrder) => ({
+        ...(strand.id ? { id: strand.id } : {}),
+        name: strand.name.trim(),
+        code: strand.code.trim() || undefined,
+        description: strand.description.trim() || undefined,
+        sortOrder,
+        examWeightPercent: Number(strand.examWeightPercent) || 0,
+        isActive: strand.isActive,
+        assignments: strand.isActive ? offeredClasses.map((schoolClass) => ({
+          classId: schoolClass.id,
+          teacherId: strand.assignments[schoolClass.id] ?? "",
+        })).filter((assignment) => assignment.teacherId) : [],
+      })),
+    });
+  }
+
+  return (
+    <PanelShell
+      title={`Teaching areas for ${subject.name}`}
+      description={`Keep ${subject.code} as one reportable subject. Each teaching area has a class-specific teacher allocation and can own its assessment components.`}
+      onCancel={onCancel}
+    >
+      {!qualifiedTeachers.length && (
+        <p className="mb-3 rounded-lg border border-warning/20 bg-warning/10 px-3 py-2 text-xs text-warning">
+          First use the Teachers action to add qualified teachers to {subject.name}. Only qualified teachers can be assigned to a teaching area.
+        </p>
+      )}
+      {!offeredClasses.length && (
+        <p className="mb-3 rounded-lg border border-warning/20 bg-warning/10 px-3 py-2 text-xs text-warning">
+          Assign {subject.name} to classes first. Teaching-area responsibilities are set per class.
+        </p>
+      )}
+      {loading ? (
+        <p className="text-xs text-muted-foreground">Loading classes and teachers…</p>
+      ) : (
+        <div className="space-y-3">
+          {strands.map((strand, index) => (
+            <section key={strand.key} className="space-y-3 rounded-xl border border-border p-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <input
+                  className="h-9 min-w-[180px] flex-1 rounded-lg border border-border bg-card px-3 text-xs"
+                  aria-label={`Teaching area ${index + 1} name`}
+                  value={strand.name}
+                  onChange={(event) => update(strand.key, { name: event.target.value })}
+                  placeholder="e.g. Visual Arts"
+                  disabled={!strand.isActive}
+                />
+                <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <input type="checkbox" checked={strand.isActive} onChange={(event) => update(strand.key, { isActive: event.target.checked })} />
+                  Active
+                </label>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-3">
+                <FormField label="Code (optional)" htmlFor={`strand-code-${strand.key}`}>
+                  <FormInput id={`strand-code-${strand.key}`} value={strand.code} onChange={(event) => update(strand.key, { code: event.target.value.toUpperCase() })} disabled={!strand.isActive} placeholder="ART" />
+                </FormField>
+                <FormField label="Exam contribution (%)" htmlFor={`strand-weight-${strand.key}`} hint="Optional; active areas must total 100% when used.">
+                  <FormInput id={`strand-weight-${strand.key}`} type="number" min={0} max={100} step="0.01" value={strand.examWeightPercent} onChange={(event) => update(strand.key, { examWeightPercent: event.target.value })} disabled={!strand.isActive} />
+                </FormField>
+                <FormField label="Description (optional)" htmlFor={`strand-description-${strand.key}`}>
+                  <FormInput id={`strand-description-${strand.key}`} value={strand.description} onChange={(event) => update(strand.key, { description: event.target.value })} disabled={!strand.isActive} />
+                </FormField>
+              </div>
+              {strand.isActive && offeredClasses.map((schoolClass) => (
+                <div key={schoolClass.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-muted/40 px-3 py-2">
+                  <span className="text-xs font-semibold">{schoolClass.name}</span>
+                  <Select
+                    value={strand.assignments[schoolClass.id] || "__none__"}
+                    onValueChange={(teacherId) => update(strand.key, { assignments: { ...strand.assignments, [schoolClass.id]: teacherId === "__none__" ? "" : teacherId } })}
+                  >
+                    <SelectTrigger aria-label={`${strand.name} teacher for ${schoolClass.name}`} className="h-9 min-w-48 rounded-lg border border-border bg-card px-3 text-xs">
+                      <SelectValue placeholder="Choose teacher" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__">Choose teacher</SelectItem>
+                      {qualifiedTeachers.map((teacher) => (
+                        <SelectItem key={teacher.id} value={teacher.id}>{teacher.firstName} {teacher.lastName}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              ))}
+            </section>
+          ))}
+          {!strands.length && <p className="rounded-lg border border-dashed border-border p-4 text-xs text-muted-foreground">No teaching areas configured. Add one only when the subject is genuinely delivered by different specialists.</p>}
+          {strands.length < 50 && (
+            <button type="button" className={outline} onClick={() => setStrands((current) => [...current, {
+              key: `new-${Date.now()}-${current.length}`,
+              name: "",
+              code: "",
+              description: "",
+              examWeightPercent: "0",
+              isActive: true,
+              assignments: {},
+            }])}>
+              <Plus className="size-4" /> Add teaching area
+            </button>
+          )}
+        </div>
+      )}
+      {problem && <Notice tone="error">{problem}</Notice>}
+      <div className="mt-4 flex justify-end gap-2">
+        <button type="button" className={outline} onClick={onCancel}>Cancel</button>
+        <button type="button" className={primary} disabled={pending || loading || !qualifiedTeachers.length || !offeredClasses.length} onClick={submit}>
+          {pending && <LoaderCircle className="size-3.5 animate-spin" />}
+          Save teaching areas
         </button>
       </div>
     </PanelShell>

@@ -7,7 +7,7 @@ import { Roles } from "../../common/decorators/roles.decorator.js";
 import { CurrentSchool } from "../../common/decorators/current-school.decorator.js";
 import { CurrentSchoolRole } from "../../common/decorators/current-school-role.decorator.js";
 import { CurrentUser, type AuthenticatedUser } from "../../common/decorators/current-user.decorator.js";
-import { createMockSchema, mockMarkSchema } from "./internal-exams.schemas.js";
+import { createMockSchema, mockMarkSchema, mockSectionMarkSchema } from "./internal-exams.schemas.js";
 import { InternalExamsService } from "./internal-exams.service.js";
 import { MockReportService } from "./mock-report.service.js";
 import { MockCorrectionService } from "./mock-correction.service.js";
@@ -183,6 +183,14 @@ export class InternalExamsController {
     @CurrentSchoolRole() role:string|undefined,
     @Body(new ZodValidationPipe(mockMarkSchema)) body:z.infer<typeof mockMarkSchema>){
     return this.exams.save(school.id,user.id,role,body);
+  }
+
+  @Put("section-marks")
+  @Roles("teacher")
+  saveSectionMarks(@CurrentSchool() school:School,@CurrentUser() user:AuthenticatedUser,
+    @CurrentSchoolRole() role:string|undefined,
+    @Body(new ZodValidationPipe(mockSectionMarkSchema)) body:z.infer<typeof mockSectionMarkSchema>){
+    return this.exams.saveSectionMarks(school.id,user.id,role,body);
   }
 
   @Patch("papers/:id/finalize")

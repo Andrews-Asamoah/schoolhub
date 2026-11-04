@@ -16,6 +16,7 @@ import { findPlacementClash, periodsOverlap, planPeriodCopy } from './timetable-
 const entryInclude = {
   class: { select: { id: true, name: true } },
   subject: { select: { id: true, name: true, code: true } },
+  subjectStrand: { select: { id: true, name: true } },
   teacher: {
     select: {
       id: true,
@@ -68,7 +69,14 @@ export class TimetableService {
         db.subject.findMany({
           where: { schoolId, deletedAt: null, isActive: true },
           orderBy: { name: 'asc' },
-          select: { id: true, name: true, code: true, periodsPerWeek: true },
+          select: {
+            id: true, name: true, code: true, periodsPerWeek: true,
+            strands: {
+              where: { isActive: true },
+              orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
+              select: { id: true, name: true, code: true },
+            },
+          },
         }),
         db.teacher.findMany({
           where: { schoolId, deletedAt: null, isActive: true },
@@ -81,7 +89,13 @@ export class TimetableService {
         }),
         db.classSubject.findMany({
           where: { class: { schoolId, deletedAt: null }, subject: { deletedAt: null } },
-          select: { classId: true, subjectId: true, teacherId: true },
+          select: {
+            classId: true, subjectId: true, teacherId: true,
+            strandAssignments: {
+              where: { subjectStrand: { isActive: true } },
+              select: { subjectStrandId: true, teacherId: true },
+            },
+          },
         }),
         db.department.findMany({
           where: { schoolId, isActive: true },
@@ -370,24 +384,56 @@ export class TimetableService {
     }
 
     let subjectId: string | null = null;
+    let subjectStrandId: string | null = null;
     let teacherId: string | null = null;
     let classroomId: string | null = null;
     if (input.type === 'LESSON') {
       const subject = await db.subject.findFirst({
         where: { id: input.subjectId, schoolId, deletedAt: null, isActive: true },
-        select: { id: true },
+        select: {
+          id: true,
+          strands: { where: { isActive: true }, select: { id: true } },
+        },
       });
       if (!subject) throw new BadRequestException('Choose an active subject from this school.');
       subjectId = subject.id;
-      teacherId = input.teacherId
-        ? await this.requireTeacher(schoolId, input.teacherId)
-        : await this.inferTeacher(klass.id, subject.id);
+      if (subject.strands.length > 0) {
+        if (!input.subjectStrandId) {
+          throw new BadRequestException('Choose the teaching area for this lesson.');
+        }
+        const assignment = await db.classSubjectStrandAssignment.findFirst({
+          where: {
+            subjectStrandId: input.subjectStrandId,
+            classSubject: { classId: klass.id, subjectId: subject.id },
+            subjectStrand: { subjectId: subject.id, isActive: true },
+          },
+          select: { teacherId: true },
+        });
+        if (!assignment) {
+          throw new BadRequestException('This teaching area has no teacher assigned to the selected class.');
+        }
+        if (input.teacherId && input.teacherId !== assignment.teacherId) {
+          throw new BadRequestException('The timetable teacher must match the teacher assigned to this teaching area and class.');
+        }
+        subjectStrandId = input.subjectStrandId;
+        teacherId = assignment.teacherId;
+      } else {
+        if (input.subjectStrandId) {
+          throw new BadRequestException('This subject does not have teaching areas configured.');
+        }
+        teacherId = input.teacherId
+          ? await this.requireTeacher(schoolId, input.teacherId)
+          : await this.inferTeacher(klass.id, subject.id);
+      }
     } else if (input.subjectId) {
       const subject = await db.subject.findFirst({
         where: { id: input.subjectId, schoolId, deletedAt: null },
         select: { id: true },
       });
       subjectId = subject?.id ?? null;
+    }
+    if (input.type !== 'LESSON') {
+      subjectStrandId = null;
     }
     if (input.type !== 'BREAK' && input.classroomId) {
       classroomId = await this.requireClassroom(schoolId, input.classroomId).then((room) => room.id);
@@ -429,6 +475,7 @@ export class TimetableService {
       type: input.type,
       label: input.label || null,
       subjectId,
+      subjectStrandId,
       teacherId: input.type === 'BREAK' ? null : teacherId,
       classroomId,
       timeSlotId: slot.id,
@@ -473,6 +520,7 @@ export class TimetableService {
       endTime: row.timeSlot.endTime,
       class: row.class,
       subject: row.subject,
+      subjectStrand: row.subjectStrand,
       teacher: row.teacher ? { id: row.teacher.id, name: personName(row.teacher) } : null,
       classroom: row.classroom,
     };

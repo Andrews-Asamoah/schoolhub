@@ -253,6 +253,8 @@ model Teacher {
   remarks               Remark[]
   subjects              SubjectTeacher[]
   classSubjects         ClassSubject[]
+  classSubjectStrandAssignments ClassSubjectStrandAssignment[]
+  internalExamPaperSections InternalExamPaperSection[] @relation("InternalExamPaperSectionTeacher")
   clubs                 Club[]
   payslips              Payslip[]
   timetableEntries      TimetableEntry[]

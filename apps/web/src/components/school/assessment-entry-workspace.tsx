@@ -12,6 +12,9 @@ interface Component {
   weight: number;
   isRequired: boolean;
   slots: number;
+  subjectStrandId: string | null;
+  subjectStrandName: string | null;
+  canEdit: boolean;
 }
 interface SheetStudent {
   studentId: string;
@@ -262,7 +265,9 @@ export function AssessmentEntryWorkspace({
                     {components.map((component) => (
                       <th key={component.id} scope="col" colSpan={component.slots} className="px-2 py-3 text-center text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70">
                         {component.name}
+                        {component.subjectStrandName && <span className="block font-semibold normal-case tracking-normal">{component.subjectStrandName}</span>}
                         <span className="block font-normal normal-case tracking-normal">out of {component.maxMarks} · {component.weight}%</span>
+                        {!component.canEdit && mode === "teacher" && <span className="block font-normal normal-case tracking-normal">Read only</span>}
                       </th>
                     ))}
                     <th scope="col" className="px-3 py-3 text-center text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70">Total</th>
@@ -293,7 +298,7 @@ export function AssessmentEntryWorkspace({
                                 max={component.maxMarks}
                                 step="any"
                                 value={value}
-                                disabled={!editable}
+                                disabled={!editable || !component.canEdit}
                                 aria-invalid={bad || undefined}
                                 aria-label={`${student.name}, ${component.name}${component.slots > 1 ? ` ${slot + 1}` : ""}, out of ${component.maxMarks}`}
                                 onChange={(event) => { setNotice(null); setDraft((current) => ({ ...current, [key]: event.target.value })); }}

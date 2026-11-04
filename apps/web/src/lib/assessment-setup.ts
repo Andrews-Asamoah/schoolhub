@@ -9,6 +9,8 @@ export interface SetupComponent {
   isRequired: boolean;
   isRepeatable: boolean;
   expectedCount: number;
+  subjectStrandId: string | null;
+  subjectStrandName: string | null;
 }
 export interface SetupTemplate {
   id: string;
@@ -46,7 +48,7 @@ export interface SetupGradingSystem {
 export interface AssessmentSetup {
   term: { id: string; name: string; termNumber: number } | null;
   classes: { id: string; name: string; level: string }[];
-  subjects: { id: string; code: string; name: string }[];
+  subjects: { id: string; code: string; name: string; strands: { id: string; name: string; code: string | null; sortOrder: number }[] }[];
   templates: SetupTemplate[];
   gradingSystems: SetupGradingSystem[];
   uncovered: { classId: string; className: string; subjectId: string; subjectName: string }[];
@@ -64,8 +66,8 @@ export const STANDARD_BANDS: SetupBand[] = [
 
 /** Class assessment out of 30 plus an end-of-term exam out of 70. */
 export const STANDARD_COMPONENTS: Omit<SetupComponent, "id">[] = [
-  { name: "Class assessment", componentType: "CLASS_TEST", maxMarks: 30, weight: 30, isRequired: true, isRepeatable: false, expectedCount: 1 },
-  { name: "End-of-term exam", componentType: "FINAL_EXAM", maxMarks: 70, weight: 70, isRequired: true, isRepeatable: false, expectedCount: 1 },
+  { name: "Class assessment", componentType: "CLASS_TEST", maxMarks: 30, weight: 30, isRequired: true, isRepeatable: false, expectedCount: 1, subjectStrandId: null, subjectStrandName: null },
+  { name: "End-of-term exam", componentType: "FINAL_EXAM", maxMarks: 70, weight: 70, isRequired: true, isRepeatable: false, expectedCount: 1, subjectStrandId: null, subjectStrandName: null },
 ];
 
 /** The save payload for an existing assessment, so a quick change (on/off, lock) keeps everything else. */
@@ -80,7 +82,10 @@ export function templateToInput(template: SetupTemplate, changes: Partial<SaveAs
     deadline: template.deadline ? template.deadline.slice(0, 10) : null,
     isActive: template.isActive,
     isLocked: template.isLocked,
-    components: template.components,
+    components: template.components.map(({ subjectStrandId, subjectStrandName: _subjectStrandName, ...component }) => ({
+      ...component,
+      ...(subjectStrandId ? { subjectStrandId } : {}),
+    })),
     ...changes,
   };
 }
