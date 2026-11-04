@@ -55,18 +55,18 @@ export function TeacherPortalWorkspace({ defaultTab = "overview" }: TeacherPorta
 
   return (
     <div className="space-y-6">
-      <div className="relative overflow-hidden rounded-3xl bg-primary p-6 text-primary-foreground shadow-xl sm:p-8">
+      <div className="relative isolate overflow-hidden rounded-3xl bg-gradient-to-br from-brand via-brand-mid to-brand-soft p-6 text-brand-foreground shadow-xl shadow-brand/20 sm:p-8">
         <div className="pointer-events-none absolute right-0 top-0 -m-16 size-72 rounded-full bg-primary-foreground/10 blur-3xl" />
         <div className="relative flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
           <div className="space-y-2">
-            <div className="inline-flex items-center gap-2 rounded-full border border-primary-foreground/20 bg-primary-foreground/10 px-3 py-1 text-xs font-semibold uppercase tracking-wider backdrop-blur-md">
-              <GraduationCap className="size-3.5 text-primary-foreground/80" />
+            <div className="inline-flex items-center gap-2 rounded-full border border-brand-foreground/20 bg-brand-foreground/10 px-3 py-1 text-xs font-semibold uppercase tracking-wider backdrop-blur-md">
+              <GraduationCap className="size-3.5 text-brand-foreground/80" />
               Teacher workspace{overview.data?.term ? ` • ${overview.data.term.name}` : ""}
             </div>
             <h1 className="text-2xl font-black tracking-tight sm:text-3xl">
               {overview.data?.teacher?.name ? `Welcome, ${overview.data.teacher.name}` : "Teacher Instruction Hub"}
             </h1>
-            <p className="max-w-xl text-sm leading-relaxed text-primary-foreground/85">
+            <p className="max-w-xl text-sm leading-relaxed text-brand-foreground/85">
               Enter marks for the subjects you teach{ownClasses.length ? ", and take the register for the class you look after" : ""}.
             </p>
           </div>
@@ -84,7 +84,7 @@ export function TeacherPortalWorkspace({ defaultTab = "overview" }: TeacherPorta
             <button
               type="button"
               onClick={() => setActiveTab("gradebook")}
-              className="inline-flex items-center gap-2 rounded-xl border border-primary-foreground/30 bg-primary-foreground/10 px-4 py-2.5 text-xs font-bold text-primary-foreground backdrop-blur-md transition hover:bg-primary-foreground/20"
+              className="inline-flex items-center gap-2 rounded-xl border border-brand-foreground/25 bg-brand-foreground/10 px-4 py-2.5 text-xs font-bold text-brand-foreground backdrop-blur-md transition hover:bg-brand-foreground/20"
             >
               <FileSpreadsheet className="size-4" />
               Enter marks

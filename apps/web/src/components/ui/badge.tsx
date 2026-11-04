@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 
 /** Semantic status chips that remain legible in both colour schemes. */
 export const badgeVariants = cva(
-  "inline-flex max-w-full items-center gap-1 rounded-md border px-2.5 py-0.5 text-[11px] font-semibold leading-5 tracking-normal",
+  "inline-flex max-w-full items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-semibold leading-4 tracking-normal",
   { variants: { variant: {
     default: "border-primary/20 bg-primary/10 text-primary",
     secondary: "border-border bg-muted text-muted-foreground",

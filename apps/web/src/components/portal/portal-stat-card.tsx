@@ -75,7 +75,7 @@ export function PortalStatCard({
   const styles = variantStyles[variant];
 
   const cardClassName = cn(
-        "group relative min-w-0 overflow-hidden rounded-xl border bg-card p-4 shadow-sm transition-all duration-200 sm:p-5",
+        "group relative min-w-0 overflow-hidden rounded-2xl border bg-card p-5 shadow-sm transition-all duration-200 sm:p-6",
         styles.border,
         onClick && "cursor-pointer hover:-translate-y-0.5 hover:shadow-md",
         className,
@@ -84,11 +84,11 @@ export function PortalStatCard({
     <>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
             {label}
           </p>
           <div className="mt-2 flex items-baseline gap-2">
-            <span className="text-2xl font-bold tracking-tight tabular-nums text-foreground sm:text-3xl">
+            <span className="text-[1.75rem] font-semibold tracking-[-0.04em] tabular-nums text-foreground sm:text-[2rem]">
               {value}
             </span>
             {subValue && (
@@ -100,7 +100,7 @@ export function PortalStatCard({
         </div>
         <div
           className={cn(
-            "flex size-11 shrink-0 items-center justify-center rounded-xl transition-transform duration-200 group-hover:scale-105",
+            "flex size-11 shrink-0 items-center justify-center rounded-2xl transition-transform duration-200 group-hover:scale-105",
             styles.iconBg,
           )}
         >

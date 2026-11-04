@@ -88,20 +88,20 @@ export function WorkspaceStat({
   icon?: LucideIcon;
 }) {
   return (
-    <article className="group relative overflow-hidden rounded-xl border border-border bg-card p-4 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-md sm:p-5">
+    <article className="group relative min-w-0 overflow-hidden rounded-2xl border border-border/80 bg-card p-5 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-lg hover:shadow-foreground/[0.04] sm:p-6">
       <span aria-hidden="true" className="pointer-events-none absolute -right-6 -top-8 size-24 rounded-full bg-primary/5 blur-2xl transition group-hover:bg-primary/10" />
       <div className="relative flex items-start justify-between gap-3">
         <div>
-          <p className="text-xs font-medium text-muted-foreground">{label}</p>
-          <p className="mt-2 text-2xl font-bold tracking-tight text-foreground">{value}</p>
+          <p className="text-xs font-semibold tracking-wide text-muted-foreground">{label}</p>
+          <p className="mt-2.5 text-[1.75rem] font-semibold tracking-[-0.04em] text-foreground tabular-nums">{value}</p>
         </div>
         {Icon && (
-          <span className="flex size-9 shrink-0 items-center justify-center rounded-xl border border-primary/10 bg-primary/10 text-primary">
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-2xl border border-primary/10 bg-primary/10 text-primary">
             <Icon className="size-4" />
           </span>
         )}
       </div>
-      <div className="relative mt-3 flex items-center gap-1.5 border-t border-border/70 pt-3 text-[10px] font-medium text-muted-foreground">
+      <div className="relative mt-4 flex items-center gap-1.5 border-t border-border/70 pt-3.5 text-xs font-medium text-muted-foreground">
         <span className="size-1.5 rounded-full bg-primary/70" />
         {detail}
         <ArrowUpRight className="ml-auto size-3 opacity-70" />

@@ -51,12 +51,12 @@ function Initials({ name }: { name: string }) {
 
 function Metric({ label, value, detail, icon: Icon }: { label: string; value: string; detail: string; icon: typeof HeartHandshake }) {
   return (
-    <div className="group rounded-2xl border border-border bg-card p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md sm:p-5">
+    <div className="group rounded-2xl border border-border/80 bg-card p-5 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-md sm:p-6">
       <div className="flex items-center justify-between gap-3">
-        <span className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">{label}</span>
-        <span className="flex size-9 items-center justify-center rounded-xl bg-primary/10 text-primary"><Icon className="size-4" /></span>
+        <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">{label}</span>
+        <span className="flex size-10 items-center justify-center rounded-2xl bg-primary/10 text-primary"><Icon className="size-4" /></span>
       </div>
-      <p className="mt-4 text-2xl font-bold tracking-tight text-foreground">{value}</p>
+      <p className="mt-4 text-[1.75rem] font-semibold tracking-[-0.04em] text-foreground tabular-nums">{value}</p>
       <p className="mt-1 text-xs leading-5 text-muted-foreground">{detail}</p>
     </div>
   );
