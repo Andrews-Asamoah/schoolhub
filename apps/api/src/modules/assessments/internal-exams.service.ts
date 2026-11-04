@@ -228,7 +228,13 @@ export class InternalExamsService {
         session:{select:{id:true,classId:true,status:true}}},
     });
     if(!paper)throw new NotFoundException("Mock paper not found.");
-    await this.canWrite(schoolId,actorId,role,paper.session.classId,paper.subjectId);
+    if (role !== "teacher" || !(await this.scope.getAssignments(schoolId,actorId)).subjectAssignments.some(
+      assignment=>assignment.classId===paper.session.classId&&assignment.subjectId===paper.subjectId,
+    )) {
+      throw new ForbiddenException("Only the assigned whole-subject teacher may enter marks on a legacy single-mark paper.");
+    }
+    const hasSections=await this.prisma.client.internalExamPaperSection.count({where:{paperId:paper.id}});
+    if(hasSections)throw new BadRequestException("This combined subject paper is marked by teaching-area sections. Save marks through the relevant section.");
     try{validateMockMarks(Number(paper.maxMarks),input.entries);}
     catch(e){throw new BadRequestException((e as Error).message);}
     if(paper.session.status!=="OPEN"||paper.finalizedAt){
@@ -279,6 +285,133 @@ export class InternalExamsService {
       }
       return {saved:input.entries.length,paperId:paper.id};
     });
+  }
+
+  /** Saves one strand's candidate marks and recomputes the single parent subject mark when every section is complete. */
+  async saveSectionMarks(
+    schoolId:string,
+    actorId:string,
+    role:string|undefined,
+    input:z.infer<typeof mockSectionMarkSchema>,
+  ){
+    if(role!=="teacher")throw new ForbiddenException("Only the assigned teaching-area teacher may enter section marks.");
+    const section=await this.prisma.client.internalExamPaperSection.findFirst({
+      where:{id:input.sectionId,paper:{session:{schoolId}}},
+      select:{
+        id:true,paperId:true,teacherId:true,maxMarks:true,
+        paper:{select:{
+          subjectId:true,maxMarks:true,finalizedAt:true,
+          session:{select:{id:true,classId:true,status:true}},
+        }},
+      },
+    });
+    if(!section)throw new NotFoundException("Mock examination section not found.");
+    const assignments=await this.scope.getAssignments(schoolId,actorId);
+    if(!assignments.teacherId||!section.teacherId||assignments.teacherId!==section.teacherId){
+      throw new ForbiddenException("You are not the teacher assigned to this examination section.");
+    }
+    try{validateMockMarks(Number(section.maxMarks),input.entries);}
+    catch(error){throw new BadRequestException((error as Error).message);}
+    if(section.paper.session.status!=="OPEN"||section.paper.finalizedAt){
+      throw new ConflictException("This mock subject paper is locked.");
+    }
+
+    return this.prisma.client.$transaction(async tx=>{
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${schoolId}),hashtext(${section.paper.session.id}))`;
+      const current=await tx.internalExamPaperSection.findFirst({
+        where:{id:section.id,paper:{session:{schoolId,status:"OPEN"},finalizedAt:null}},
+        select:{id:true,paperId:true,teacherId:true,maxMarks:true,
+          paper:{select:{id:true,maxMarks:true,finalizedAt:true}}},
+      });
+      if(!current||current.finalizedAt||current.paper.finalizedAt||current.teacherId!==assignments.teacherId){
+        throw new ConflictException("This examination section is no longer open for your account.");
+      }
+      const candidates=await tx.internalExamCandidate.findMany({
+        where:{sessionId:section.paper.session.id,id:{in:input.entries.map(entry=>entry.candidateId)}},
+        select:{id:true},
+      });
+      if(candidates.length!==input.entries.length){
+        throw new BadRequestException("A selected candidate is not registered for this mock.");
+      }
+
+      for(const entry of input.entries){
+        const before=await tx.internalExamSectionMark.findUnique({
+          where:{candidateId_paperSectionId:{candidateId:entry.candidateId,paperSectionId:section.id}},
+          select:{id:true,version:true,marks:true,status:true},
+        });
+        if((before?.version??0)!==entry.expectedVersion){
+          throw new ConflictException("Section marks changed since this sheet was opened. Refresh before saving.");
+        }
+        const value=entry.status==="ABSENT"?null:new Prisma.Decimal(entry.marks!);
+        if(before){
+          await tx.internalExamSectionMark.update({
+            where:{id:before.id},
+            data:{marks:value,status:entry.status,version:{increment:1},recordedById:actorId},
+          });
+        }else{
+          await tx.internalExamSectionMark.create({data:{
+            candidateId:entry.candidateId,paperSectionId:section.id,
+            marks:value,status:entry.status,recordedById:actorId,
+          }});
+        }
+        await tx.auditLog.create({data:{
+          schoolId,userId:actorId,action:before?"UPDATE":"CREATE",
+          entityType:"INTERNAL_MOCK_SECTION_MARK",
+          entityId:before?.id??entry.candidateId+"|"+section.id,
+          oldValues:before?{status:before.status,marks:before.marks==null?null:String(before.marks),version:before.version}:Prisma.DbNull,
+          newValues:{sectionId:section.id,candidateId:entry.candidateId,status:entry.status,
+            marks:entry.marks,version:(before?.version??0)+1},
+        }});
+      }
+
+      const sections=await tx.internalExamPaperSection.findMany({
+        where:{paperId:section.paperId},
+        select:{id:true,maxMarks:true,weightPercent:true},
+      });
+      const totalWeight=sections.reduce((sum,row)=>sum+Number(row.weightPercent),0);
+      if(!sections.length||Math.abs(totalWeight-100)>0.01){
+        throw new ConflictException("The examination paper has an invalid teaching-area weighting configuration.");
+      }
+      let aggregatesCompleted=0;
+      for(const entry of input.entries){
+        const sectionMarks=await tx.internalExamSectionMark.findMany({
+          where:{candidateId:entry.candidateId,paperSectionId:{in:sections.map(row=>row.id)}},
+          select:{paperSectionId:true,marks:true,status:true,paperSection:{select:{maxMarks:true,weightPercent:true}}},
+        });
+        if(sectionMarks.length!==sections.length)continue;
+        const anyAbsent=sectionMarks.some(mark=>mark.status==="ABSENT");
+        let aggregate:Prisma.Decimal|null=null;
+        let status:"MARKED"|"ABSENT"="ABSENT";
+        if(!anyAbsent){
+          const weightedPercent=sectionMarks.reduce((sum,mark)=>{
+            if(mark.marks===null)throw new ConflictException("A recorded section is missing its marks.");
+            const sectionMaximum=Number(mark.paperSection.maxMarks);
+            if(sectionMaximum<=0)throw new ConflictException("A section has an invalid maximum mark.");
+            return sum+(Number(mark.marks)/sectionMaximum)*Number(mark.paperSection.weightPercent);
+          },0);
+          const rounded=Math.round((weightedPercent/100)*Number(section.paper.maxMarks)*100)/100;
+          aggregate=new Prisma.Decimal(rounded);
+          status="MARKED";
+        }
+        const previous=await tx.internalExamMark.findUnique({
+          where:{candidateId_paperId:{candidateId:entry.candidateId,paperId:section.paperId}},
+          select:{id:true},
+        });
+        if(previous){
+          await tx.internalExamMark.update({
+            where:{id:previous.id},
+            data:{marks:aggregate,status,version:{increment:1},recordedById:actorId},
+          });
+        }else{
+          await tx.internalExamMark.create({data:{
+            candidateId:entry.candidateId,paperId:section.paperId,
+            marks:aggregate,status,recordedById:actorId,
+          }});
+        }
+        aggregatesCompleted++;
+      }
+      return {saved:input.entries.length,sectionId:section.id,paperId:section.paperId,aggregatesUpdated:aggregatesCompleted};
+    },{timeout:30000});
   }
 
   async finalizePaper(schoolId:string,actorId:string,role:string|undefined,paperId:string){
