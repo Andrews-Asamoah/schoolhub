@@ -21,7 +21,7 @@ const Card = React.forwardRef<
   <div
     ref={ref}
     className={cn(
-      "min-w-0 rounded-xl border border-border bg-card text-card-foreground shadow-sm",
+      "min-w-0 rounded-2xl border border-border/80 bg-card text-card-foreground shadow-[0_1px_2px_color-mix(in_oklab,var(--foreground)_4%,transparent)]",
       className,
     )}
     {...props}
@@ -35,7 +35,7 @@ const CardHeader = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <div
     ref={ref}
-    className={cn("flex flex-col gap-1.5 p-4 sm:p-6", className)}
+    className={cn("flex flex-col gap-2 p-5 sm:p-6", className)}
     {...props}
   />
 ));
@@ -47,7 +47,7 @@ const CardTitle = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <div
     ref={ref}
-    className={cn("text-base font-semibold leading-tight tracking-tight sm:text-lg", className)}
+    className={cn("text-base font-semibold leading-tight tracking-tight sm:text-[1.05rem]", className)}
     {...props}
   />
 ));
