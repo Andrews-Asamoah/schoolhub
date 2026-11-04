@@ -82,7 +82,10 @@ export function templateToInput(template: SetupTemplate, changes: Partial<SaveAs
     deadline: template.deadline ? template.deadline.slice(0, 10) : null,
     isActive: template.isActive,
     isLocked: template.isLocked,
-    components: template.components.map(({ subjectStrandId, subjectStrandName: _subjectStrandName, ...component }) => ({\n      ...component,\n      ...(subjectStrandId ? { subjectStrandId } : {}),\n    })),
+    components: template.components.map(({ subjectStrandId, subjectStrandName: _subjectStrandName, ...component }) => ({
+      ...component,
+      ...(subjectStrandId ? { subjectStrandId } : {}),
+    })),
     ...changes,
   };
 }
