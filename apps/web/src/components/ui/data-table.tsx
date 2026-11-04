@@ -236,9 +236,9 @@ export function DataTable<T extends RowData>({
   const to = Math.min(filteredCount, (pageIndex + 1) * size);
 
   return (
-    <div className={cn("overflow-hidden text-card-foreground", embedded ? "border-t border-border" : "rounded-2xl border border-border bg-card shadow-sm")}>
+    <div className={cn("overflow-hidden text-card-foreground", embedded ? "border-t border-border" : "rounded-2xl border border-border/80 bg-card shadow-sm")}>
       {showToolbar && (
-        <div className="flex flex-wrap items-center gap-2 border-b border-border px-4 py-3">
+        <div className="flex flex-wrap items-center gap-2.5 border-b border-border/70 px-5 py-4">
           {searchable && <div className="relative min-w-[200px] max-w-xs flex-1">
             <label htmlFor={searchId} className="sr-only">Search table</label>
             <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
@@ -250,7 +250,7 @@ export function DataTable<T extends RowData>({
                 table.setPageIndex(0);
               }}
               placeholder={searchPlaceholder}
-              className="h-9 w-full rounded-lg border border-border bg-background pl-8 pr-3 text-xs text-foreground outline-none placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-ring/30"
+              className="h-11 w-full rounded-xl border border-input bg-background pl-9 pr-3.5 text-sm text-foreground shadow-sm outline-none placeholder:text-muted-foreground transition-[border-color,box-shadow] focus:border-ring focus:ring-4 focus:ring-ring/15"
             />
           </div>}
           <div className="ml-auto flex items-center gap-2">
@@ -346,7 +346,7 @@ export function DataTable<T extends RowData>({
       </Table>
 
       {!compact && paginate && (
-        <div className="flex min-w-0 flex-wrap items-center justify-between gap-3 border-t border-border px-4 py-3 text-[11px] text-muted-foreground">
+        <div className="flex min-w-0 flex-wrap items-center justify-between gap-3 border-t border-border/70 px-5 py-4 text-xs text-muted-foreground">
           <span role="status" aria-live="polite" aria-atomic="true">
             {filteredCount === 0 ? "0 rows" : `${from}–${to} of ${filteredCount}`}
             {filteredCount !== rows.length && ` (filtered from ${rows.length})`}
