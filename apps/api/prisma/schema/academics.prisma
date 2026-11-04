@@ -315,6 +315,7 @@ model SubjectStrand {
   subject            Subject                         @relation(fields: [subjectId], references: [id], onDelete: Cascade)
   classAssignments   ClassSubjectStrandAssignment[]
   assessmentComponents AssessmentComponent[]
+  internalExamPaperSections InternalExamPaperSection[]
   timetableEntries   TimetableEntry[]
 
   @@unique([subjectId, name])
