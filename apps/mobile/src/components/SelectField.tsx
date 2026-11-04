@@ -1,3 +1,4 @@
+import { ChevronDown } from "lucide-react-native";
 import { useState } from "react";
 import { Modal, Pressable, ScrollView, View } from "react-native";
 import { Text } from "@/components/Typography";
@@ -38,19 +39,24 @@ export function SelectField({
         disabled={disabled}
         onPress={() => setOpen(true)}
         style={{
-          minHeight: 52,
-          justifyContent: "center",
-          padding: 12,
+          minHeight: 54,
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 8,
+          paddingHorizontal: 16,
+          paddingVertical: 12,
           backgroundColor: colors.card,
-          borderWidth: 1,
-          borderColor: error ? colors.destructive : colors.border,
-          borderRadius: 14,
+          borderWidth: 1.5,
+          borderColor: error ? colors.destructive : colors.input,
+          borderRadius: 16,
         }}
       >
-        <Text style={[type.body, { color: colors.foreground }]}>
+        <Text style={[type.body, { color: colors.foreground, flexShrink: 1 }]}>
           {options.find((option) => option.value === value)?.label ??
             "Select an option"}
         </Text>
+        <ChevronDown size={20} color={colors.mutedForeground} />
       </Pressable>
       {error ? (
         <Text

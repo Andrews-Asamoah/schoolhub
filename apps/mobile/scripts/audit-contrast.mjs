@@ -10,10 +10,17 @@ const code = ts.transpileModule(source, {
     target: ts.ScriptTarget.ES2022,
   },
 }).outputText;
-const { modulePalette, hueValues, neutrals, contrast, brandPalette, blend } =
-  await import(
-    "data:text/javascript;base64," + Buffer.from(code).toString("base64")
-  );
+const {
+  modulePalette,
+  hueValues,
+  neutrals,
+  contrast,
+  brandPalette,
+  blend,
+  backdropWashes,
+} = await import(
+  "data:text/javascript;base64," + Buffer.from(code).toString("base64")
+);
 const tokenSource = readFileSync(
   new URL("../src/theme/tokens.generated.ts", import.meta.url),
   "utf8",
@@ -54,6 +61,16 @@ for (const scheme of ["light", "dark"]) {
   for (const surface of [n.background, n.card, n.elevated])
     for (const fg of [n.foreground, n.mutedForeground])
       check(`${scheme} neutral`, fg, surface);
+  // Mobile-only semantic overrides replace the generated web tokens at runtime.
+  check(`${scheme} primary label`, n.primaryForeground, n.primary);
+  check(`${scheme} accent label`, n.accentForeground, n.accent);
+  check(`${scheme} secondary label`, n.secondaryForeground, n.secondary);
+  for (const surface of [n.background, n.card, n.elevated])
+    check(`${scheme} primary text`, n.primary, surface);
+  for (const surface of [n.muted, n.secondary])
+    for (const fg of [n.foreground, n.mutedForeground])
+      check(`${scheme} muted surface`, fg, surface);
+  check(`${scheme} input outline`, n.input, n.card, 1.5);
   for (const hue of Object.keys(hueValues)) {
     const p = modulePalette(hue, scheme);
     for (const surface of [n.card, n.elevated, p.tint])
@@ -80,18 +97,11 @@ for (const scheme of ["light", "dark"]) {
   ]) {
     const b = brandPalette(primary, "#00FFFF", scheme);
     check(`${scheme} focus`, b.focus, n.card, 3);
-    // Worst overlapping static backdrop blobs at each opaque gradient stop.
-    const a = scheme === "dark" ? 0.06 : 0.025,
-      z = scheme === "dark" ? 0.04 : 0.02;
-    for (const stop of [
-      n.background,
-      blend(n.background, b.focus, a),
-      blend(n.background, b.gradient[1], z),
-    ]) {
-      const bg = blend(blend(stop, b.focus, a), b.gradient[1], z);
-      check(`${scheme} backdrop body`, n.foreground, bg);
-      check(`${scheme} backdrop muted`, n.mutedForeground, bg);
-    }
+    // Backdrop glows are dimmed per colour; text must stay readable on the
+    // worst case where the primary and secondary glows overlap.
+    const w = backdropWashes(b.focus, b.gradient[1], scheme);
+    check(`${scheme} backdrop body`, n.foreground, w.composite);
+    check(`${scheme} backdrop muted`, n.mutedForeground, w.composite);
 
     for (let i = 0; i <= 20; i++) {
       const bg = blend(...b.gradient, i / 20);

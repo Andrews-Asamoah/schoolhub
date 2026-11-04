@@ -1,13 +1,7 @@
 import { BlurView } from "expo-blur";
 import { LinearGradient } from "expo-linear-gradient";
 import { createContext, useContext, type ReactNode } from "react";
-import {
-  Platform,
-  StyleSheet,
-  View,
-  type StyleProp,
-  type ViewStyle,
-} from "react-native";
+import { StyleSheet, View, type StyleProp, type ViewStyle } from "react-native";
 import { radius as radii, useTheme } from "@/theme/theme";
 
 const GlassDepth = createContext(0);
@@ -54,11 +48,8 @@ export function GlassSurface({
         style={[
           { borderRadius: radius },
           !flat &&
-            Platform.OS === "ios" && {
-              shadowColor: glass.shadow,
-              shadowOpacity: 1,
-              shadowRadius: 24,
-              shadowOffset: { width: 0, height: 10 },
+            glass.shadow && {
+              boxShadow: `0px 10px 32px ${glass.shadow}`,
             },
           style,
         ]}
@@ -102,7 +93,7 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
-    height: 28,
-    opacity: 0.35,
+    height: 24,
+    opacity: 0.4,
   },
 });

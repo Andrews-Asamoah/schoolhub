@@ -51,6 +51,7 @@ export function GlassHeader({ title, scrollY, left, right }: Props) {
         >
           {null}
         </GlassSurface>
+        <View style={[styles.hairline, { backgroundColor: colors.border }]} />
       </Animated.View>
       <View
         style={[styles.row, { minHeight: height }]}
@@ -61,8 +62,9 @@ export function GlassHeader({ title, scrollY, left, right }: Props) {
           accessibilityRole="header"
           style={[
             {
-              fontFamily: fonts.semibold,
+              fontFamily: fonts.bold,
               fontSize: 17,
+              letterSpacing: -0.2,
               color: colors.foreground,
             },
             styles.title,
@@ -78,6 +80,13 @@ export function GlassHeader({ title, scrollY, left, right }: Props) {
 }
 
 const styles = StyleSheet.create({
+  hairline: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: StyleSheet.hairlineWidth,
+  },
   wrap: { position: "absolute", top: 0, left: 0, right: 0, zIndex: 10 },
   row: {
     flexDirection: "row",

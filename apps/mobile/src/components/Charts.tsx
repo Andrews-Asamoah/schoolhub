@@ -1,13 +1,20 @@
-import { useEffect } from "react";
+import { useEffect, useId } from "react";
 import { View } from "react-native";
 import { Text } from "@/components/Typography";
-import Svg, { Circle, Polyline, Rect } from "react-native-svg";
+import Svg, {
+  Circle,
+  Defs,
+  LinearGradient,
+  Polyline,
+  Rect,
+  Stop,
+} from "react-native-svg";
 import Animated, {
   useAnimatedProps,
   useSharedValue,
   withTiming,
 } from "react-native-reanimated";
-import { modulePalette, type Hue } from "@/theme/palette";
+import { blend, modulePalette, type Hue } from "@/theme/palette";
 import { type, useTheme } from "@/theme/theme";
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 export type ChartValue = { label: string; value: number; hue?: Hue };
@@ -60,6 +67,11 @@ export function ProgressRing({
     total > 0 && Number.isFinite(total) && Number.isFinite(value)
       ? Math.max(0, Math.min(1, value / total))
       : 0;
+  const p = modulePalette(hue, scheme);
+  const gradientId = useId().replace(/[^a-zA-Z0-9]/g, "");
+  // Dark canvases need a lighter sweep to keep the arc visible.
+  const arc: readonly [string, string] =
+    scheme === "dark" ? [p.ink, blend(p.ink, "#FFFFFF", 0.25)] : p.gradient;
   const amount = useSharedValue(progress);
   useEffect(() => {
     amount.set(
@@ -76,21 +88,27 @@ export function ProgressRing({
         importantForAccessibility="no-hide-descendants"
       >
         <Svg width={104} height={104} viewBox="0 0 104 104">
+          <Defs>
+            <LinearGradient id={gradientId} x1="0" y1="0" x2="1" y2="1">
+              <Stop offset="0" stopColor={arc[0]} />
+              <Stop offset="1" stopColor={arc[1]} />
+            </LinearGradient>
+          </Defs>
           <Circle
             cx={52}
             cy={52}
             r={40}
             fill="none"
-            stroke={colors.border}
-            strokeWidth={9}
+            stroke={p.tint}
+            strokeWidth={11}
           />
           <AnimatedCircle
             cx={52}
             cy={52}
             r={40}
             fill="none"
-            stroke={modulePalette(hue, scheme).ink}
-            strokeWidth={9}
+            stroke={`url(#${gradientId})`}
+            strokeWidth={11}
             strokeLinecap="round"
             strokeDasharray="251.327"
             rotation={-90}

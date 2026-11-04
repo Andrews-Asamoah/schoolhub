@@ -1,7 +1,7 @@
 import * as Haptics from "expo-haptics";
 import { Pressable, StyleSheet, View } from "react-native";
 import { Text } from "@/components/Typography";
-import { fonts, radius, useTheme } from "@/theme/theme";
+import { elevation, fonts, radius, useTheme } from "@/theme/theme";
 
 type Props<T extends string> = {
   options: readonly { value: T; label: string }[];
@@ -10,21 +10,19 @@ type Props<T extends string> = {
   accessibilityLabel?: string;
 };
 
+/** Sunken track with a raised thumb, the familiar iOS-style segmented switch. */
 export function SegmentedControl<T extends string>({
   options,
   value,
   onChange,
   accessibilityLabel,
 }: Props<T>) {
-  const { colors } = useTheme();
+  const { colors, scheme } = useTheme();
   return (
     <View
       accessibilityRole="tablist"
       accessibilityLabel={accessibilityLabel}
-      style={[
-        styles.track,
-        { backgroundColor: colors.card, borderColor: colors.border },
-      ]}
+      style={[styles.track, { backgroundColor: colors.muted }]}
     >
       {options.map((o) => {
         const selected = o.value === value;
@@ -42,16 +40,18 @@ export function SegmentedControl<T extends string>({
             }}
             style={[
               styles.item,
-              selected && { backgroundColor: colors.accent },
+              selected && {
+                backgroundColor:
+                  scheme === "dark" ? colors.popover : colors.card,
+                ...elevation(scheme, 1),
+              },
             ]}
           >
             <Text
               style={{
-                fontFamily: selected ? fonts.semibold : fonts.medium,
+                fontFamily: selected ? fonts.bold : fonts.medium,
                 fontSize: 14,
-                color: selected
-                  ? colors.accentForeground
-                  : colors.mutedForeground,
+                color: selected ? colors.primary : colors.mutedForeground,
               }}
             >
               {o.label}
@@ -67,13 +67,12 @@ const styles = StyleSheet.create({
   track: {
     flexDirection: "row",
     padding: 4,
-    borderRadius: radius.md,
-    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: radius.pill,
   },
   item: {
     flex: 1,
     minHeight: 44,
-    borderRadius: radius.sm,
+    borderRadius: radius.pill,
     alignItems: "center",
     justifyContent: "center",
   },

@@ -6,7 +6,7 @@ import {
   CalendarDays,
   ClipboardCheck,
   House,
-  MoreHorizontal,
+  LayoutGrid,
 } from "lucide-react-native";
 
 export default function StudentLayout() {
@@ -31,8 +31,12 @@ export default function StudentLayout() {
           name="index"
           options={{
             title: "Home",
-            tabBarIcon: ({ color, size }) => (
-              <House color={color} size={size} />
+            tabBarIcon: ({ color, size, focused }) => (
+              <House
+                color={color}
+                size={size}
+                strokeWidth={focused ? 2.4 : 1.9}
+              />
             ),
           }}
         />
@@ -40,8 +44,12 @@ export default function StudentLayout() {
           name="my-timetable"
           options={{
             title: "Timetable",
-            tabBarIcon: ({ color, size }) => (
-              <CalendarDays color={color} size={size} />
+            tabBarIcon: ({ color, size, focused }) => (
+              <CalendarDays
+                color={color}
+                size={size}
+                strokeWidth={focused ? 2.4 : 1.9}
+              />
             ),
           }}
         />
@@ -49,8 +57,12 @@ export default function StudentLayout() {
           name="my-learning"
           options={{
             title: "Learning",
-            tabBarIcon: ({ color, size }) => (
-              <BookOpen color={color} size={size} />
+            tabBarIcon: ({ color, size, focused }) => (
+              <BookOpen
+                color={color}
+                size={size}
+                strokeWidth={focused ? 2.4 : 1.9}
+              />
             ),
           }}
         />
@@ -58,8 +70,12 @@ export default function StudentLayout() {
           name="my-attendance"
           options={{
             title: "Attendance",
-            tabBarIcon: ({ color, size }) => (
-              <ClipboardCheck color={color} size={size} />
+            tabBarIcon: ({ color, size, focused }) => (
+              <ClipboardCheck
+                color={color}
+                size={size}
+                strokeWidth={focused ? 2.4 : 1.9}
+              />
             ),
           }}
         />
@@ -67,8 +83,12 @@ export default function StudentLayout() {
           name="resources"
           options={{
             title: "More",
-            tabBarIcon: ({ color, size }) => (
-              <MoreHorizontal color={color} size={size} />
+            tabBarIcon: ({ color, size, focused }) => (
+              <LayoutGrid
+                color={color}
+                size={size}
+                strokeWidth={focused ? 2.4 : 1.9}
+              />
             ),
           }}
         />

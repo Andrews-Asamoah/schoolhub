@@ -34,11 +34,11 @@ export const spacing = {
   huge: 48,
 } as const;
 export const radius = {
-  sm: 10,
-  md: 14,
+  sm: 12,
+  md: 16,
   lg: 20,
-  xl: 24,
-  sheet: 28,
+  xl: 28,
+  sheet: 32,
   pill: 999,
 } as const;
 
@@ -48,31 +48,42 @@ export const fonts = {
   medium: "Inter_500Medium",
   semibold: "Inter_600SemiBold",
   bold: "Inter_700Bold",
+  extrabold: "Inter_800ExtraBold",
 } as const;
 
 export const type = {
-  display: { fontFamily: fonts.bold, fontSize: 34, lineHeight: 40 },
+  display: {
+    fontFamily: fonts.extrabold,
+    fontSize: 36,
+    lineHeight: 42,
+    letterSpacing: -1,
+  },
   largeTitle: {
-    fontFamily: fonts.bold,
-    fontSize: 28,
-    lineHeight: 34,
-    letterSpacing: -0.6,
+    fontFamily: fonts.extrabold,
+    fontSize: 30,
+    lineHeight: 36,
+    letterSpacing: -0.8,
   },
   title: {
-    fontFamily: fonts.semibold,
+    fontFamily: fonts.bold,
     fontSize: 22,
     lineHeight: 28,
-    letterSpacing: -0.3,
+    letterSpacing: -0.4,
   },
-  headline: { fontFamily: fonts.semibold, fontSize: 17, lineHeight: 22 },
+  headline: {
+    fontFamily: fonts.semibold,
+    fontSize: 17,
+    lineHeight: 22,
+    letterSpacing: -0.2,
+  },
   body: { fontFamily: fonts.regular, fontSize: 15, lineHeight: 22 },
   bodyStrong: { fontFamily: fonts.medium, fontSize: 15, lineHeight: 22 },
   caption: { fontFamily: fonts.regular, fontSize: 13, lineHeight: 18 },
   overline: {
-    fontFamily: fonts.semibold,
+    fontFamily: fonts.bold,
     fontSize: 12,
     lineHeight: 16,
-    letterSpacing: 0.8,
+    letterSpacing: 1,
   },
 } as const;
 
@@ -93,23 +104,23 @@ export type GlassTokens = {
 };
 
 const glassLight: GlassTokens = {
-  surface: "rgba(255, 255, 255, 0.94)",
-  surfaceStrong: "rgba(255, 255, 255, 0.97)",
-  border: "rgba(255, 255, 255, 0.7)",
+  surface: "rgba(255, 255, 255, 0.86)",
+  surfaceStrong: "rgba(255, 255, 255, 0.92)",
+  border: "rgba(30, 34, 80, 0.08)",
   highlight: "rgba(255, 255, 255, 0.9)",
-  blur: 40,
-  fallbackSurface: "rgba(255, 255, 255, 0.94)",
-  shadow: "rgba(30, 41, 90, 0.14)",
+  blur: 60,
+  fallbackSurface: "rgba(255, 255, 255, 0.97)",
+  shadow: "rgba(24, 28, 70, 0.14)",
 };
 
 const glassDark: GlassTokens = {
-  surface: "rgba(20, 27, 49, 0.94)",
-  surfaceStrong: "rgba(20, 27, 49, 0.97)",
-  border: "rgba(255, 255, 255, 0.14)",
-  highlight: "rgba(255, 255, 255, 0.22)",
-  blur: 50,
-  fallbackSurface: "rgba(24, 30, 50, 0.96)",
-  shadow: "rgba(0, 0, 0, 0.5)",
+  surface: "rgba(19, 19, 46, 0.84)",
+  surfaceStrong: "rgba(24, 24, 56, 0.92)",
+  border: "rgba(255, 255, 255, 0.1)",
+  highlight: "rgba(255, 255, 255, 0.14)",
+  blur: 60,
+  fallbackSurface: "rgba(24, 24, 56, 0.97)",
+  shadow: "rgba(0, 0, 0, 0.6)",
 };
 
 export type TenantBranding = {
@@ -308,4 +319,35 @@ export function readableOn(hex: string): string {
   return contrast(hex, "#000000") >= contrast(hex, "#FFFFFF")
     ? "#000000"
     : "#FFFFFF";
+}
+
+/**
+ * Layered, tinted shadows (the depth system). Level 1 rests on the canvas,
+ * 2 floats above it (menus, toasts), 3 is chrome. Pass `glow` for a coloured
+ * halo under hero cards and primary buttons. Dark mode drops shadows for a
+ * faint top highlight, since shadows vanish on dark canvases.
+ */
+export function elevation(
+  scheme: Scheme,
+  level: 0 | 1 | 2 | 3 = 1,
+  glow?: string,
+): { boxShadow: string } | Record<string, never> {
+  if (level === 0 && !glow) return {};
+  if (glow)
+    return {
+      boxShadow: `0px ${6 + level * 4}px ${14 + level * 8}px ${withAlpha(glow, scheme === "dark" ? 0.4 : 0.34)}`,
+    };
+  if (scheme === "dark")
+    return {
+      boxShadow: [
+        "0px 1px 0px rgba(255,255,255,0.05) inset",
+        `0px ${level * 6}px ${level * 14}px rgba(0,0,0,${0.25 + level * 0.1})`,
+      ].join(", "),
+    };
+  return {
+    boxShadow: [
+      "0px 1px 2px rgba(40,30,120,0.05)",
+      `0px ${level * 4}px ${level * 12}px rgba(60,50,160,${0.05 + level * 0.025})`,
+    ].join(", "),
+  };
 }

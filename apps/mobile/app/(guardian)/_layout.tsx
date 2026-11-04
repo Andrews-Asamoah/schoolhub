@@ -6,7 +6,7 @@ import {
   Bell,
   CircleDollarSign,
   House,
-  MoreHorizontal,
+  LayoutGrid,
   UsersRound,
 } from "lucide-react-native";
 
@@ -33,8 +33,12 @@ export default function GuardianLayout() {
             name="index"
             options={{
               title: "Home",
-              tabBarIcon: ({ color, size }) => (
-                <House color={color} size={size} />
+              tabBarIcon: ({ color, size, focused }) => (
+                <House
+                  color={color}
+                  size={size}
+                  strokeWidth={focused ? 2.4 : 1.9}
+                />
               ),
             }}
           />
@@ -42,8 +46,12 @@ export default function GuardianLayout() {
             name="family"
             options={{
               title: "Children",
-              tabBarIcon: ({ color, size }) => (
-                <UsersRound color={color} size={size} />
+              tabBarIcon: ({ color, size, focused }) => (
+                <UsersRound
+                  color={color}
+                  size={size}
+                  strokeWidth={focused ? 2.4 : 1.9}
+                />
               ),
             }}
           />
@@ -51,8 +59,12 @@ export default function GuardianLayout() {
             name="account-fees"
             options={{
               title: "Fees",
-              tabBarIcon: ({ color, size }) => (
-                <CircleDollarSign color={color} size={size} />
+              tabBarIcon: ({ color, size, focused }) => (
+                <CircleDollarSign
+                  color={color}
+                  size={size}
+                  strokeWidth={focused ? 2.4 : 1.9}
+                />
               ),
             }}
           />
@@ -60,8 +72,12 @@ export default function GuardianLayout() {
             name="notices"
             options={{
               title: "Notices",
-              tabBarIcon: ({ color, size }) => (
-                <Bell color={color} size={size} />
+              tabBarIcon: ({ color, size, focused }) => (
+                <Bell
+                  color={color}
+                  size={size}
+                  strokeWidth={focused ? 2.4 : 1.9}
+                />
               ),
             }}
           />
@@ -69,8 +85,12 @@ export default function GuardianLayout() {
             name="more"
             options={{
               title: "More",
-              tabBarIcon: ({ color, size }) => (
-                <MoreHorizontal color={color} size={size} />
+              tabBarIcon: ({ color, size, focused }) => (
+                <LayoutGrid
+                  color={color}
+                  size={size}
+                  strokeWidth={focused ? 2.4 : 1.9}
+                />
               ),
             }}
           />

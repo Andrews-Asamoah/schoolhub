@@ -1,10 +1,11 @@
-import type { Hue } from "@/theme/palette";
+import { modulePalette, type Hue } from "@/theme/palette";
+import { Avatar } from "./Avatar";
 import { StatusPill } from "./ModulePrimitives";
 import { ChevronRight } from "lucide-react-native";
-import type { ReactNode } from "react";
+import { isValidElement, type ReactNode } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import { Text } from "@/components/Typography";
-import { spacing, type, useTheme } from "@/theme/theme";
+import { fonts, spacing, type, useTheme } from "@/theme/theme";
 
 type Props = {
   title: string;
@@ -29,7 +30,23 @@ export function ListRow({
   status,
   hue,
 }: Props) {
-  const { colors } = useTheme();
+  const { colors, scheme } = useTheme();
+  // Bare icons sit in a tinted squircle; avatars and custom nodes pass through.
+  const tile =
+    isValidElement(leading) && leading.type !== Avatar ? (
+      <View
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants"
+        style={[
+          styles.tile,
+          { backgroundColor: modulePalette(hue ?? "indigo", scheme).tint },
+        ]}
+      >
+        {leading}
+      </View>
+    ) : (
+      leading
+    );
   return (
     <Pressable
       accessibilityRole={onPress ? "button" : undefined}
@@ -42,12 +59,17 @@ export function ListRow({
           borderBottomColor: colors.border,
           borderBottomWidth: StyleSheet.hairlineWidth,
         },
-        pressed && { opacity: 0.6 },
+        pressed && { backgroundColor: colors.muted, opacity: 0.85 },
       ]}
     >
-      {leading}
+      {tile}
       <View style={{ flex: 1 }}>
-        <Text style={[type.bodyStrong, { color: colors.foreground }]}>
+        <Text
+          style={[
+            type.bodyStrong,
+            { color: colors.foreground, fontFamily: fonts.semibold },
+          ]}
+        >
           {title}
         </Text>
         {subtitle ? (
@@ -77,5 +99,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: spacing.md,
     paddingVertical: spacing.md,
+  },
+  tile: {
+    width: 44,
+    height: 44,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
   },
 });

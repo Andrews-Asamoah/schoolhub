@@ -2,7 +2,8 @@ import type { ReactNode } from "react";
 import { Pressable, ScrollView, View } from "react-native";
 import { Text } from "@/components/Typography";
 import { modulePalette, type Hue } from "@/theme/palette";
-import { type, useTheme } from "@/theme/theme";
+import { ChevronRight } from "lucide-react-native";
+import { elevation, fonts, type, useTheme } from "@/theme/theme";
 import { Card } from "./Surface";
 
 export function IconChip({
@@ -19,9 +20,9 @@ export function IconChip({
       accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants"
       style={{
-        width: 44,
-        height: 44,
-        borderRadius: 16,
+        width: 48,
+        height: 48,
+        borderRadius: 17,
         alignItems: "center",
         justifyContent: "center",
         backgroundColor: p.tint,
@@ -46,14 +47,39 @@ export function StatusPill({
     <View
       style={{
         alignSelf: "flex-start",
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 6,
         borderRadius: 999,
-        paddingHorizontal: 12,
-        paddingVertical: 6,
+        paddingHorizontal: 10,
+        paddingVertical: 5,
         backgroundColor: solid ? p.solid : p.tint,
         maxWidth: "100%",
       }}
     >
-      <Text style={[type.caption, { color: solid ? p.onSolid : p.ink }]}>
+      {solid ? null : (
+        <View
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
+          style={{
+            width: 6,
+            height: 6,
+            borderRadius: 3,
+            backgroundColor: p.ink,
+          }}
+        />
+      )}
+      <Text
+        numberOfLines={2}
+        style={[
+          type.caption,
+          {
+            flexShrink: 1,
+            fontFamily: fonts.semibold,
+            color: solid ? p.onSolid : p.ink,
+          },
+        ]}
+      >
         {label}
       </Text>
     </View>
@@ -88,12 +114,18 @@ export function ModuleTile({
         minWidth: 44,
         minHeight: 44,
         flex: 1,
-        opacity: disabled ? 0.6 : pressed ? 0.8 : 1,
+        opacity: disabled ? 0.6 : 1,
+        transform: [{ scale: pressed ? 0.97 : 1 }],
       })}
     >
       <Card style={{ gap: 12, flex: 1 }}>
         <IconChip hue={hue}>{icon}</IconChip>
-        <Text style={[type.headline, { color: colors.foreground }]}>
+        <Text
+          style={[
+            type.headline,
+            { color: colors.foreground, fontFamily: fonts.bold },
+          ]}
+        >
           {label}
         </Text>
         {detail ? (
@@ -135,15 +167,19 @@ export function Chip({
         paddingHorizontal: 16,
         borderRadius: 999,
         backgroundColor: selected ? p.solid : colors.card,
-        borderWidth: 1,
+        borderWidth: selected ? 0 : 1,
         borderColor: colors.border,
         opacity: disabled ? 0.6 : 1,
+        ...(selected ? elevation(scheme, 1, p.solid) : null),
       }}
     >
       <Text
         style={[
           type.bodyStrong,
-          { color: selected ? p.onSolid : colors.foreground },
+          {
+            fontFamily: selected ? fonts.bold : fonts.medium,
+            color: selected ? p.onSolid : colors.foreground,
+          },
         ]}
       >
         {label}
@@ -205,7 +241,15 @@ export function SectionHeader({
     >
       <Text
         accessibilityRole="header"
-        style={[type.headline, { color: colors.foreground, flexShrink: 1 }]}
+        style={[
+          type.title,
+          {
+            color: colors.foreground,
+            flexShrink: 1,
+            fontSize: 19,
+            lineHeight: 26,
+          },
+        ]}
       >
         {title}
       </Text>
@@ -214,11 +258,23 @@ export function SectionHeader({
           accessibilityRole="button"
           accessibilityLabel={`${actionLabel}: ${title}`}
           onPress={onPress}
-          style={{ minWidth: 44, minHeight: 44, justifyContent: "center" }}
+          style={{
+            minWidth: 44,
+            minHeight: 44,
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 2,
+          }}
         >
-          <Text style={[type.bodyStrong, { color: accent }]}>
+          <Text
+            style={[
+              type.bodyStrong,
+              { color: accent, fontFamily: fonts.semibold },
+            ]}
+          >
             {actionLabel}
           </Text>
+          <ChevronRight size={16} color={accent} />
         </Pressable>
       ) : null}
     </View>
@@ -238,23 +294,36 @@ export function Timeline({ items }: { items: readonly TimelineItem[] }) {
     <Card style={{ gap: 20 }}>
       {items.map((item, i) => (
         <View key={item.id} style={{ flexDirection: "row", gap: 12 }}>
-          <View style={{ alignItems: "center", width: 16 }}>
+          <View style={{ alignItems: "center", width: 20 }}>
             <View
               style={{
-                width: 12,
-                height: 12,
-                borderRadius: 6,
+                width: 20,
+                height: 20,
+                borderRadius: 10,
+                alignItems: "center",
+                justifyContent: "center",
                 backgroundColor: modulePalette(item.hue ?? "violet", scheme)
-                  .ink,
+                  .tint,
               }}
-            />
+            >
+              <View
+                style={{
+                  width: 10,
+                  height: 10,
+                  borderRadius: 5,
+                  backgroundColor: modulePalette(item.hue ?? "violet", scheme)
+                    .ink,
+                }}
+              />
+            </View>
             {i < items.length - 1 ? (
               <View
                 style={{
                   width: 2,
                   flex: 1,
+                  borderRadius: 1,
                   backgroundColor: colors.border,
-                  marginTop: 8,
+                  marginTop: 6,
                 }}
               />
             ) : null}
@@ -263,7 +332,12 @@ export function Timeline({ items }: { items: readonly TimelineItem[] }) {
             <Text style={[type.caption, { color: colors.mutedForeground }]}>
               {item.time}
             </Text>
-            <Text style={[type.headline, { color: colors.foreground }]}>
+            <Text
+              style={[
+                type.headline,
+                { color: colors.foreground, fontFamily: fonts.bold },
+              ]}
+            >
               {item.title}
             </Text>
             {item.detail ? (

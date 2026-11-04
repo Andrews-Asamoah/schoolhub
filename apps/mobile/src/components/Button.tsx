@@ -8,7 +8,7 @@ import Animated, {
   useSharedValue,
   withSpring,
 } from "react-native-reanimated";
-import { fonts, radius, useTheme } from "@/theme/theme";
+import { elevation, fonts, radius, useTheme } from "@/theme/theme";
 
 type Variant = "primary" | "secondary" | "ghost" | "destructive";
 
@@ -34,7 +34,7 @@ export function Button({
   block = true,
   haptic = true,
 }: Props) {
-  const { colors, accent, heroGradient, reduceMotion } = useTheme();
+  const { colors, accent, heroGradient, reduceMotion, scheme } = useTheme();
   const scale = useSharedValue(1);
   const style = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
@@ -53,7 +53,7 @@ export function Button({
   const content = (
     <View style={styles.row}>
       {loading ? <ActivityIndicator color={fg} /> : icon}
-      <Text style={[styles.label, { color: fg, fontFamily: fonts.semibold }]}>
+      <Text style={[styles.label, { color: fg, fontFamily: fonts.bold }]}>
         {label}
       </Text>
     </View>
@@ -63,6 +63,10 @@ export function Button({
     <Animated.View
       style={[
         block && { alignSelf: "stretch" },
+        { borderRadius: radius.xl },
+        variant === "primary" && !inactive
+          ? elevation(scheme, 1, heroGradient?.[0] ?? accent)
+          : null,
         style,
         inactive && { opacity: 0.5 },
       ]}
@@ -88,11 +92,11 @@ export function Button({
           styles.base,
           variant === "secondary" && {
             backgroundColor: colors.card,
-            borderColor: colors.border,
-            borderWidth: StyleSheet.hairlineWidth,
+            borderColor: colors.input,
+            borderWidth: 1.5,
           },
           variant === "destructive" && { backgroundColor: colors.destructive },
-          variant === "ghost" && { backgroundColor: colors.card },
+          variant === "ghost" && { backgroundColor: "transparent" },
         ]}
       >
         {variant === "primary" ? (
@@ -111,8 +115,8 @@ export function Button({
 
 const styles = StyleSheet.create({
   base: {
-    minHeight: 52,
-    borderRadius: radius.lg,
+    minHeight: 56,
+    borderRadius: radius.xl,
     alignItems: "center",
     justifyContent: "center",
     overflow: "hidden",
@@ -124,5 +128,10 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingVertical: 14,
   },
-  label: { fontSize: 16, flexShrink: 1, textAlign: "center" },
+  label: {
+    fontSize: 16,
+    letterSpacing: -0.1,
+    flexShrink: 1,
+    textAlign: "center",
+  },
 });

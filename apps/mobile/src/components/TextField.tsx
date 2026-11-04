@@ -8,7 +8,14 @@ import {
   type TextInputProps,
 } from "react-native";
 import { Text, usePreviewTextStyle } from "./Typography";
-import { fonts, radius, spacing, type, useTheme } from "@/theme/theme";
+import {
+  fonts,
+  radius,
+  spacing,
+  type,
+  useTheme,
+  withAlpha,
+} from "@/theme/theme";
 
 type Props = Omit<TextInputProps, "style"> & {
   label: string;
@@ -40,7 +47,7 @@ export const TextField = forwardRef<TextFieldHandle, Props>(function TextField(
       <Text
         style={[
           type.caption,
-          { color: colors.mutedForeground, fontFamily: fonts.medium },
+          { color: colors.foreground, fontFamily: fonts.semibold },
         ]}
       >
         {label}
@@ -51,7 +58,10 @@ export const TextField = forwardRef<TextFieldHandle, Props>(function TextField(
           {
             backgroundColor: colors.card,
             borderColor,
-            borderWidth: focused || error ? 1.5 : StyleSheet.hairlineWidth,
+            borderWidth: 1.5,
+            ...(focused && !error && accent
+              ? { boxShadow: `0px 0px 0px 4px ${withAlpha(accent, 0.18)}` }
+              : null),
           },
         ]}
       >
@@ -117,12 +127,12 @@ export const TextField = forwardRef<TextFieldHandle, Props>(function TextField(
 
 const styles = StyleSheet.create({
   box: {
-    minHeight: 52,
+    minHeight: 54,
     borderRadius: radius.md,
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
-    paddingHorizontal: 14,
+    paddingHorizontal: 16,
   },
   input: { flex: 1, fontSize: 16, paddingVertical: 12 },
 });

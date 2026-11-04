@@ -50,8 +50,8 @@ export function Dialog({
             padding: 24,
             paddingBottom: Math.max(24, insets.bottom),
             gap: 16,
-            borderTopLeftRadius: 28,
-            borderTopRightRadius: 28,
+            borderTopLeftRadius: 32,
+            borderTopRightRadius: 32,
             backgroundColor: colors.popover,
           }}
         >

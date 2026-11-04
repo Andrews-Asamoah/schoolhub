@@ -18,7 +18,7 @@
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-foreground.png",
         "backgroundImage": "./assets/adaptive-background.png",
-        "backgroundColor": "#4338CA"
+        "backgroundColor": "#5046E5"
       }
     },
     "plugins": [
@@ -34,7 +34,7 @@
           "image": "./assets/splash.png",
           "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#4338CA",
+          "backgroundColor": "#5046E5",
           "dark": {
             "backgroundColor": "#0B1020"
           }

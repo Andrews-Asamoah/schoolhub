@@ -3,7 +3,7 @@ import {} from "react-native";
 import { Text } from "./Typography";
 import Animated, { FadeIn } from "react-native-reanimated";
 import type { Hue } from "@/theme/palette";
-import { type, useTheme } from "@/theme/theme";
+import { fonts, type, useTheme } from "@/theme/theme";
 import { Card } from "./Surface";
 import { IconChip, StatusPill } from "./ModulePrimitives";
 const AnimatedText = Animated.createAnimatedComponent(Text);
@@ -39,7 +39,12 @@ export function StatTile({
   return (
     <Card style={{ flex: 1, gap: 12 }}>
       {icon ? <IconChip hue={colour}>{icon}</IconChip> : null}
-      <Text style={[type.caption, { color: colors.mutedForeground }]}>
+      <Text
+        style={[
+          type.caption,
+          { color: colors.mutedForeground, fontFamily: fonts.semibold },
+        ]}
+      >
         {label}
       </Text>
       <AnimatedText

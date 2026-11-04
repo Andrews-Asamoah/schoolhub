@@ -1,52 +1,63 @@
-import { LinearGradient } from "expo-linear-gradient";
+import { useId, useMemo } from "react";
 import { StyleSheet, View } from "react-native";
-import { mix, useTheme, withAlpha } from "@/theme/theme";
+import Svg, { Defs, RadialGradient, Rect, Stop } from "react-native-svg";
+import { backdropWashes } from "@/theme/palette";
+import { useTheme } from "@/theme/theme";
 
 /**
- * Atmospheric background that glass sits on. Tinted by the school's colours
- * when a tenant is set, otherwise by the platform primary.
+ * Atmospheric background that surfaces sit on: two soft radial glows (the
+ * school's primary top-right, its secondary mid-left) over the canvas colour.
+ * Strength is capped per colour by `backdropWashes`, so any tenant colour
+ * keeps text readable (the contrast audit exercises the same function).
  */
 export function Backdrop() {
-  const { colors, accent, accentSecondary, isDark } = useTheme();
-  const top = mix(colors.background, accent, isDark ? 0.06 : 0.025);
+  const { colors, accent, accentSecondary, scheme } = useTheme();
+  const id = useId().replace(/[^a-zA-Z0-9]/g, "");
+  const primary = accent ?? colors.primary;
+  const secondary = accentSecondary ?? primary;
+  const mode = scheme === "dark" ? "dark" : "light";
+  const alpha = useMemo(() => {
+    const w = backdropWashes(primary, secondary, mode);
+    return { primary: w.primary.alpha, secondary: w.secondary.alpha };
+  }, [primary, secondary, mode]);
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="none">
-      <LinearGradient
-        colors={[
-          top,
-          colors.background,
-          mix(colors.background, accentSecondary, isDark ? 0.04 : 0.02),
-        ]}
-        style={StyleSheet.absoluteFill}
-      />
-      <LinearGradient
-        colors={[
-          withAlpha(accent, isDark ? 0.06 : 0.025),
-          withAlpha(accent, 0),
-        ]}
-        start={{ x: 0.2, y: 0.1 }}
-        end={{ x: 0.8, y: 0.9 }}
-        style={[
-          styles.orb,
-          { top: -120, right: -100, width: 320, height: 320 },
-        ]}
-      />
-      <LinearGradient
-        colors={[
-          withAlpha(accentSecondary, isDark ? 0.04 : 0.02),
-          withAlpha(accentSecondary, 0),
-        ]}
-        start={{ x: 0.2, y: 0.1 }}
-        end={{ x: 0.8, y: 0.9 }}
-        style={[
-          styles.orb,
-          { bottom: 80, left: -140, width: 360, height: 360 },
-        ]}
-      />
+      <Svg width="100%" height={560} style={styles.top}>
+        <Defs>
+          <RadialGradient
+            id={`${id}a`}
+            cx="88%"
+            cy="0%"
+            r="80%"
+            fx="88%"
+            fy="0%"
+          >
+            <Stop offset="0" stopColor={primary} stopOpacity={alpha.primary} />
+            <Stop offset="1" stopColor={primary} stopOpacity={0} />
+          </RadialGradient>
+          <RadialGradient
+            id={`${id}b`}
+            cx="-5%"
+            cy="32%"
+            r="70%"
+            fx="-5%"
+            fy="32%"
+          >
+            <Stop
+              offset="0"
+              stopColor={secondary}
+              stopOpacity={alpha.secondary}
+            />
+            <Stop offset="1" stopColor={secondary} stopOpacity={0} />
+          </RadialGradient>
+        </Defs>
+        <Rect x="0" y="0" width="100%" height="100%" fill={`url(#${id}a)`} />
+        <Rect x="0" y="0" width="100%" height="100%" fill={`url(#${id}b)`} />
+      </Svg>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  orb: { position: "absolute", borderRadius: 999 },
+  top: { position: "absolute", top: 0, left: 0, right: 0 },
 });

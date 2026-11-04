@@ -1,7 +1,8 @@
 import * as Haptics from "expo-haptics";
+import { LinearGradient } from "expo-linear-gradient";
 import type { Tabs } from "expo-router";
 import type React from "react";
-import { useEffect, useState } from "react";
+import { cloneElement, isValidElement, useEffect } from "react";
 import { Pressable, StyleSheet, View, useWindowDimensions } from "react-native";
 import { Text } from "@/components/Typography";
 import Animated, {
@@ -13,17 +14,160 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { fonts, radius, useTheme } from "@/theme/theme";
 import { modulePalette, type Hue } from "@/theme/palette";
 import { useSetTabBarInset } from "./TabBarInset";
-import { GlassSurface } from "./GlassSurface";
 
 /** Props React Navigation hands to a custom `tabBar` renderer. */
 export type TabBarProps = Parameters<
   NonNullable<React.ComponentProps<typeof Tabs>["tabBar"]>
 >[0];
 
-const BAR_HEIGHT = 64;
 const SIDE_MARGIN = 16;
+const DOCK_PADDING = 6;
+const ITEM_HEIGHT = 52;
+/** How much wider the selected destination grows than an idle one. */
+const GROW = 1.45;
+const LABEL_MAX = 96;
 
-/** Floating chrome. Clearance is measured and shared through TabBarInsetProvider. */
+/** Idle icon colour on the dark dock (light theme). 7:1 on #14162B. */
+const DOCK_INK = "#14162B";
+const DOCK_IDLE = "#A9AECF";
+
+type ItemProps = {
+  focused: boolean;
+  label: string;
+  hue: Hue;
+  badge?: string | number;
+  icon?: React.ReactNode;
+  dockColor: string;
+  idleColor: string;
+  itemHeight: number;
+  onPress: () => void;
+  onLongPress: () => void;
+};
+
+/**
+ * One destination. Idle tabs are a single icon; the selected tab springs open
+ * into a gradient capsule that reveals its label, so the bar stays compact
+ * while the current location is always named. The accessible name is always
+ * the full label, whatever is visually shown.
+ */
+function TabItem({
+  focused,
+  label,
+  hue,
+  badge,
+  icon,
+  dockColor,
+  idleColor,
+  itemHeight,
+  onPress,
+  onLongPress,
+}: ItemProps) {
+  const { colors, scheme, reduceMotion } = useTheme();
+  const palette = modulePalette(hue, scheme);
+  const progress = useSharedValue(focused ? 1 : 0);
+  useEffect(() => {
+    progress.set(
+      reduceMotion
+        ? focused
+          ? 1
+          : 0
+        : withSpring(focused ? 1 : 0, { damping: 17, stiffness: 190 }),
+    );
+  }, [focused, reduceMotion, progress]);
+
+  const slot = useAnimatedStyle(() => ({
+    flexGrow: 1 + (GROW - 1) * progress.value,
+  }));
+  const capsule = useAnimatedStyle(() => ({
+    opacity: progress.value,
+    transform: [{ scale: 0.82 + 0.18 * progress.value }],
+  }));
+  const labelBox = useAnimatedStyle(() => ({
+    maxWidth: LABEL_MAX * progress.value,
+    marginLeft: 8 * progress.value,
+    opacity: progress.value,
+  }));
+  const shown = typeof badge === "number" && badge > 9 ? "9+" : badge;
+  const tinted =
+    focused && isValidElement(icon)
+      ? cloneElement(icon as React.ReactElement<{ strokeWidth?: number }>, {
+          strokeWidth: 2.4,
+        })
+      : icon;
+
+  return (
+    <Animated.View style={[styles.slot, slot]}>
+      <Pressable
+        accessibilityRole="tab"
+        accessibilityState={{ selected: focused }}
+        accessibilityLabel={badge ? `${label}, ${badge} unread` : label}
+        onLongPress={onLongPress}
+        onPress={onPress}
+        hitSlop={{ top: 8, bottom: 8 }}
+        style={[styles.pressable, { minHeight: itemHeight }]}
+      >
+        <Animated.View
+          pointerEvents="none"
+          style={[StyleSheet.absoluteFill, styles.capsule, capsule]}
+        >
+          <LinearGradient
+            colors={palette.gradient}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={StyleSheet.absoluteFill}
+          />
+        </Animated.View>
+        <View style={styles.content}>
+          <View>
+            {tinted}
+            {badge != null && badge !== "" ? (
+              <View
+                style={[
+                  styles.badge,
+                  {
+                    backgroundColor: colors.destructive,
+                    borderColor: dockColor,
+                  },
+                ]}
+              >
+                <Text
+                  style={{
+                    fontFamily: fonts.bold,
+                    fontSize: 10,
+                    lineHeight: 13,
+                    color: colors.destructiveForeground,
+                  }}
+                >
+                  {shown}
+                </Text>
+              </View>
+            ) : null}
+          </View>
+          <Animated.View style={[styles.labelBox, labelBox]}>
+            <Text
+              numberOfLines={1}
+              style={{
+                fontFamily: fonts.bold,
+                fontSize: 13,
+                lineHeight: 18,
+                letterSpacing: -0.1,
+                color: palette.onSolid,
+              }}
+            >
+              {label}
+            </Text>
+          </Animated.View>
+        </View>
+      </Pressable>
+    </Animated.View>
+  );
+}
+
+/**
+ * Floating dock. Dark ink in the light theme (a deliberate contrast against
+ * the bright canvas), raised navy in the dark theme. Clearance is measured and
+ * shared through TabBarInsetProvider so screens never hide content behind it.
+ */
 export function GlassTabBar({
   state,
   descriptors,
@@ -31,41 +175,21 @@ export function GlassTabBar({
   navigateToTab,
   hues = {},
 }: TabBarProps & { hues?: Readonly<Record<string, Hue>> }) {
-  const { colors, scheme, reduceMotion } = useTheme();
+  const { scheme, colors } = useTheme();
   const insets = useSafeAreaInsets();
   const { fontScale } = useWindowDimensions();
   const setInset = useSetTabBarInset();
-  const activeRoute = state.routes[state.index];
-  const height = Math.max(BAR_HEIGHT, 40 + 18 * fontScale);
+  const itemHeight = Math.max(ITEM_HEIGHT, 28 + 20 * fontScale);
+  const dark = scheme === "dark";
+  const dockColor = dark ? colors.popover : DOCK_INK;
+  const idleColor = dark ? colors.mutedForeground : DOCK_IDLE;
   useEffect(() => () => setInset(0), [setInset]);
-  const [width, setWidth] = useState(0);
 
   // Expo Router 58 normalises `href: null` to `hidden: true`.
   const visible = state.routes.filter(
     (r) => !descriptors[r.key]?.options.hidden,
   );
   const activeKey = state.routes[state.index]?.key;
-  const activeVisibleIndex = Math.max(
-    0,
-    visible.findIndex((r) => r.key === activeKey),
-  );
-  const itemWidth =
-    visible.length > 0 && width > 0 ? width / visible.length : 0;
-
-  const x = useSharedValue(0);
-  useEffect(() => {
-    x.set(
-      reduceMotion
-        ? activeVisibleIndex * itemWidth
-        : withSpring(activeVisibleIndex * itemWidth, {
-            damping: 20,
-            stiffness: 240,
-          }),
-    );
-  }, [activeVisibleIndex, itemWidth, reduceMotion, x]);
-  const pill = useAnimatedStyle(() => ({
-    transform: [{ translateX: x.value }],
-  }));
 
   return (
     <View
@@ -76,129 +200,100 @@ export function GlassTabBar({
       }
       pointerEvents="box-none"
     >
-      <GlassSurface
-        radius={radius.sheet}
-        strong
-        style={{ marginHorizontal: SIDE_MARGIN }}
+      <View
+        style={[
+          styles.dock,
+          {
+            marginHorizontal: SIDE_MARGIN,
+            backgroundColor: dockColor,
+            borderColor: dark
+              ? "rgba(255,255,255,0.1)"
+              : "rgba(255,255,255,0.06)",
+            boxShadow: dark
+              ? "0px 14px 32px rgba(0,0,0,0.55)"
+              : "0px 14px 30px rgba(20,22,43,0.38), 0px 2px 6px rgba(20,22,43,0.2)",
+          },
+        ]}
       >
-        <View
-          style={{ minHeight: height, padding: 6 }}
-          onLayout={(e) => setWidth(e.nativeEvent.layout.width - 12)}
-        >
-          {itemWidth > 0 ? (
-            <Animated.View
-              style={[
-                styles.pill,
-                {
-                  width: itemWidth,
-                  backgroundColor: modulePalette(
-                    hues[activeRoute?.name ?? ""] ?? "indigo",
-                    scheme,
-                  ).tint,
-                },
-                pill,
-              ]}
+        {visible.map((route) => {
+          const focused = route.key === activeKey;
+          const options = descriptors[route.key]?.options;
+          const hue = hues[route.name] ?? "indigo";
+          const label =
+            typeof options?.tabBarLabel === "string"
+              ? options.tabBarLabel
+              : (options?.title ?? route.name);
+          return (
+            <TabItem
+              key={route.key}
+              focused={focused}
+              label={label}
+              hue={hue}
+              badge={options?.tabBarBadge}
+              dockColor={dockColor}
+              idleColor={idleColor}
+              itemHeight={itemHeight}
+              icon={options?.tabBarIcon?.({
+                focused,
+                color: focused ? "#FFFFFF" : idleColor,
+                size: 22,
+              })}
+              onLongPress={() =>
+                emitter.emit({ type: "tabLongPress", target: route.key })
+              }
+              onPress={() => {
+                const event = emitter.emit({
+                  type: "tabPress",
+                  target: route.key,
+                  canPreventDefault: true,
+                });
+                if (!focused && !event.defaultPrevented) {
+                  void Haptics.selectionAsync();
+                  navigateToTab(route.key);
+                }
+              }}
             />
-          ) : null}
-          <View style={styles.row}>
-            {visible.map((route) => {
-              const focused = route.key === activeKey;
-              const options = descriptors[route.key]?.options;
-              const label =
-                typeof options?.tabBarLabel === "string"
-                  ? options.tabBarLabel
-                  : (options?.title ?? route.name);
-              const color = focused
-                ? modulePalette(hues[route.name] ?? "indigo", scheme).ink
-                : colors.mutedForeground;
-              return (
-                <Pressable
-                  key={route.key}
-                  accessibilityRole="tab"
-                  accessibilityState={{ selected: focused }}
-                  accessibilityLabel={
-                    options?.tabBarBadge
-                      ? `${label}, ${options.tabBarBadge} unread`
-                      : label
-                  }
-                  onLongPress={() =>
-                    emitter.emit({ type: "tabLongPress", target: route.key })
-                  }
-                  onPress={() => {
-                    const event = emitter.emit({
-                      type: "tabPress",
-                      target: route.key,
-                      canPreventDefault: true,
-                    });
-                    if (!focused && !event.defaultPrevented) {
-                      void Haptics.selectionAsync();
-                      navigateToTab(route.key);
-                    }
-                  }}
-                  style={styles.item}
-                >
-                  {options?.tabBarIcon?.({ focused, color, size: 22 })}
-                  {options?.tabBarBadge != null ? (
-                    <View
-                      style={{
-                        position: "absolute",
-                        top: 0,
-                        right: 4,
-                        paddingHorizontal: 5,
-                        borderRadius: 12,
-                        backgroundColor: colors.destructive,
-                      }}
-                    >
-                      <Text
-                        style={{
-                          fontFamily: fonts.bold,
-                          fontSize: 12,
-                          color: colors.destructiveForeground,
-                        }}
-                      >
-                        {options.tabBarBadge}
-                      </Text>
-                    </View>
-                  ) : null}
-                  <Text
-                    style={{
-                      fontFamily: focused ? fonts.semibold : fonts.medium,
-                      fontSize: 12,
-                      textAlign: "center",
-                      color,
-                    }}
-                  >
-                    {label}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
-        </View>
-      </GlassSurface>
+          );
+        })}
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   wrap: { position: "absolute", left: 0, right: 0 },
-  row: {
+  dock: {
     flexDirection: "row",
+    alignItems: "center",
+    padding: DOCK_PADDING,
+    gap: 4,
+    borderRadius: radius.pill,
+    borderWidth: StyleSheet.hairlineWidth,
   },
-  item: {
-    minHeight: 44,
-    minWidth: 44,
-    flex: 1,
+  slot: { flexBasis: 0, minWidth: 44 },
+  pressable: { alignItems: "center", justifyContent: "center" },
+  capsule: {
+    borderRadius: radius.pill,
+    overflow: "hidden",
+    boxShadow: "0px 6px 14px rgba(0,0,0,0.25)",
+  },
+  content: {
+    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 3,
-    paddingVertical: 8,
+    paddingHorizontal: 10,
   },
-  pill: {
+  labelBox: { overflow: "hidden" },
+  badge: {
     position: "absolute",
-    top: 6,
-    bottom: 6,
-    left: 6,
-    borderRadius: radius.lg,
+    top: -7,
+    right: -9,
+    minWidth: 17,
+    height: 17,
+    paddingHorizontal: 3,
+    borderRadius: 9,
+    borderWidth: 2,
+    alignItems: "center",
+    justifyContent: "center",
   },
 });

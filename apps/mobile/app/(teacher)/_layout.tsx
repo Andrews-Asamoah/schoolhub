@@ -4,7 +4,7 @@ import {
   UsersRound,
   ClipboardCheck,
   BookOpen,
-  MoreHorizontal,
+  LayoutGrid,
 } from "lucide-react-native";
 import { GlassTabBar } from "@/components/GlassTabBar";
 import { TabBarInsetProvider } from "@/components/TabBarInset";
@@ -32,8 +32,12 @@ export default function TeacherLayout() {
           name="index"
           options={{
             title: "Home",
-            tabBarIcon: ({ color, size }) => (
-              <House color={color} size={size} />
+            tabBarIcon: ({ color, size, focused }) => (
+              <House
+                color={color}
+                size={size}
+                strokeWidth={focused ? 2.4 : 1.9}
+              />
             ),
           }}
         />
@@ -41,8 +45,12 @@ export default function TeacherLayout() {
           name="teacher-classes"
           options={{
             title: "Classes",
-            tabBarIcon: ({ color, size }) => (
-              <UsersRound color={color} size={size} />
+            tabBarIcon: ({ color, size, focused }) => (
+              <UsersRound
+                color={color}
+                size={size}
+                strokeWidth={focused ? 2.4 : 1.9}
+              />
             ),
           }}
         />
@@ -50,8 +58,12 @@ export default function TeacherLayout() {
           name="teacher-assess"
           options={{
             title: "Assess",
-            tabBarIcon: ({ color, size }) => (
-              <ClipboardCheck color={color} size={size} />
+            tabBarIcon: ({ color, size, focused }) => (
+              <ClipboardCheck
+                color={color}
+                size={size}
+                strokeWidth={focused ? 2.4 : 1.9}
+              />
             ),
           }}
         />
@@ -59,8 +71,12 @@ export default function TeacherLayout() {
           name="teacher-assignments"
           options={{
             title: "Assignments",
-            tabBarIcon: ({ color, size }) => (
-              <BookOpen color={color} size={size} />
+            tabBarIcon: ({ color, size, focused }) => (
+              <BookOpen
+                color={color}
+                size={size}
+                strokeWidth={focused ? 2.4 : 1.9}
+              />
             ),
           }}
         />
@@ -69,8 +85,12 @@ export default function TeacherLayout() {
           options={{
             title: "More",
             tabBarBadge: q.data?.unreadCount || undefined,
-            tabBarIcon: ({ color, size }) => (
-              <MoreHorizontal color={color} size={size} />
+            tabBarIcon: ({ color, size, focused }) => (
+              <LayoutGrid
+                color={color}
+                size={size}
+                strokeWidth={focused ? 2.4 : 1.9}
+              />
             ),
           }}
         />
