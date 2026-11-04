@@ -323,7 +323,7 @@ export class InternalExamsService {
         select:{id:true,paperId:true,teacherId:true,maxMarks:true,
           paper:{select:{id:true,maxMarks:true,finalizedAt:true}}},
       });
-      if(!current||current.finalizedAt||current.paper.finalizedAt||current.teacherId!==assignments.teacherId){
+      if(!current||current.paper.finalizedAt||current.teacherId!==assignments.teacherId){
         throw new ConflictException("This examination section is no longer open for your account.");
       }
       const candidates=await tx.internalExamCandidate.findMany({
