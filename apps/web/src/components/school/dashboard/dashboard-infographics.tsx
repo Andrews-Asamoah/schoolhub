@@ -55,15 +55,15 @@ export function InfographicCard({
   title, description, icon: Icon, children, className, aside,
 }: InfographicCardProps) {
   return (
-    <article className={cn("min-w-0 rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-6", className)}>
-      <div className="mb-5 flex items-start justify-between gap-3">
+    <article className={cn("min-w-0 rounded-2xl border border-border/80 bg-card p-5 shadow-sm transition-shadow duration-200 hover:shadow-md sm:p-6", className)}>
+      <div className="mb-6 flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <h2 className="text-sm font-semibold text-foreground">{title}</h2>
+          <h2 className="text-base font-semibold tracking-tight text-foreground">{title}</h2>
           <p className="mt-1 text-xs leading-5 text-muted-foreground">{description}</p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
           {aside}
-          <span className="flex size-9 items-center justify-center rounded-xl bg-muted text-foreground"><Icon className="size-4" aria-hidden="true" /></span>
+          <span className="flex size-10 items-center justify-center rounded-2xl border border-border/70 bg-muted/70 text-foreground"><Icon className="size-4" aria-hidden="true" /></span>
         </div>
       </div>
       {children}
@@ -95,7 +95,7 @@ export function DashboardInfographics({
 }) {
   const periodSelect = (
     <Select value={String(selectedMonths)} onValueChange={(value) => onMonthsChange(Number(value))}>
-      <SelectTrigger className="h-8 w-[92px] text-xs" aria-label="Select chart period"><SelectValue /></SelectTrigger>
+      <SelectTrigger className="h-9 w-[100px] text-xs" aria-label="Select chart period"><SelectValue /></SelectTrigger>
       <SelectContent>
         <SelectItem value="3">3 months</SelectItem>
         <SelectItem value="6">6 months</SelectItem>
