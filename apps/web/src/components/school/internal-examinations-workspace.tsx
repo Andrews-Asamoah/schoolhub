@@ -85,25 +85,41 @@ export function InternalExaminationsWorkspace() {
     onSuccess:async()=>{setNotice("Mock examination status updated.");await refresh();},
   });
   const candidates=sheet.data?.candidates??[];
+  const sections=sheet.data?.paper.sections??[];
+  const sectionMode=sections.length>0;
+  const selectedSection=sections.find(section=>section.id===selectedSectionId)??sections.find(section=>section.canEdit)??sections[0];
+  const canEditSelected=sectionMode?Boolean(selectedSection?.canEdit):Boolean(sheet.data?.canEdit);
+  const maximum=selectedSection?.maxMarks??sheet.data?.paper.maxMarks??100;
   const changes=useMemo(()=>{
     return candidates.flatMap(row=>{
-      const item=drafts[row.id];
+      const key=sectionMode&&selectedSection?`${row.id}:${selectedSection.id}`:row.id;
+      const item=drafts[key];
       if(!item)return [];
+      const saved=sectionMode&&selectedSection
+        ?row.sectionMarks.find(mark=>mark.sectionId===selectedSection.id)
+        :undefined;
+      const beforeStatus=sectionMode?(saved?.status??null):row.status;
+      const beforeMarks=sectionMode?(saved?.marks??null):row.marks;
+      const beforeVersion=sectionMode?(saved?.version??0):row.version;
       const mark=item.absent?null:item.marks.trim()?Number(item.marks):null;
       if(!item.absent&&mark===null)return [];
       const status=item.absent?"ABSENT" as const:"MARKED" as const;
-      if(row.status===status && row.marks===mark)return [];
-      return [{candidateId:row.id,status,marks:mark,expectedVersion:row.version}];
+      if(beforeStatus===status && beforeMarks===mark)return [];
+      return [{candidateId:row.id,status,marks:mark,expectedVersion:beforeVersion}];
     });
-  },[candidates,drafts]);
+  },[candidates,drafts,sectionMode,selectedSection]);
   const invalid=changes.some(item=>item.marks!==null&&(
-    !Number.isFinite(item.marks)||item.marks<0||item.marks>(sheet.data?.paper.maxMarks??100)
+    !Number.isFinite(item.marks)||item.marks<0||item.marks>maximum
     ||Math.abs(Math.round(item.marks*100)-item.marks*100)>1e-7));
   const save=useMutation({
-    mutationFn:()=>apiFetch("/internal-exams/marks",{
-      method:"PUT",body:JSON.stringify({paperId:sheet.data!.paper.id,entries:changes}),
-    }),
-    onSuccess:async()=>{setNotice("Mock marks saved with an audit history.");await client.invalidateQueries({
+    mutationFn:()=>sectionMode
+      ?apiFetch("/internal-exams/section-marks",{
+        method:"PUT",body:JSON.stringify({sectionId:selectedSection!.id,entries:changes}),
+      })
+      :apiFetch("/internal-exams/marks",{
+        method:"PUT",body:JSON.stringify({paperId:sheet.data!.paper.id,entries:changes}),
+      }),
+    onSuccess:async()=>{setNotice(sectionMode?"Teaching-area marks saved. The single subject result is recalculated when all sections are complete.":"Mock marks saved with an audit history.");await client.invalidateQueries({
       queryKey:["internal-exams","paper",paper?.id],
     });},
   });
@@ -188,9 +204,25 @@ export function InternalExaminationsWorkspace() {
       {sheet.isPending&&paper&&<p className="text-sm text-muted-foreground">Loading pupil marks…</p>}
       {sheet.isError&&<p role="alert" className="text-xs text-destructive">{failure(sheet.error)}</p>}
       {sheet.data&&<div className="space-y-3">
+        {sectionMode&&(
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-muted/30 p-3">
+            <div>
+              <p className="text-xs font-semibold">Teaching area</p>
+              <p className="text-[11px] text-muted-foreground">Each specialist enters only their own section. SchoolHub combines the sections into one subject mark.</p>
+            </div>
+            <Select value={selectedSection?.id??"__none__"} onValueChange={setSelectedSectionId}>
+              <SelectTrigger aria-label="Teaching area section" className="min-w-52"><SelectValue placeholder="Choose section"/></SelectTrigger>
+              <SelectContent>
+                {sections.map(section=><SelectItem key={section.id} value={section.id}>
+                  {section.name} · {section.weightPercent}%{section.canEdit?" · Assigned to you":""}
+                </SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
         <p className="text-xs text-muted-foreground">
-          Maximum {sheet.data.paper.maxMarks} marks ·
-          {sheet.data.canEdit?" Entry open for your assigned subject.":" Read-only subject paper."}
+          {selectedSection? `${selectedSection.name} · contributes ${selectedSection.weightPercent}% · `:""}
+          Maximum {maximum} marks · {canEditSelected?"Entry open for your assigned teaching area.":"Read-only section."}
         </p>
         <div className="max-h-[600px] overflow-auto rounded-xl border border-border">
           <table className="w-full min-w-[540px] text-left text-xs">
@@ -199,31 +231,39 @@ export function InternalExaminationsWorkspace() {
               <th className="p-3">Percentage</th><th className="p-3">Saved</th>
             </tr></thead>
             <tbody>{candidates.map(row=>{
-              const draft=drafts[row.id]??{marks:"",absent:false};
+              const key=sectionMode&&selectedSection?`${row.id}:${selectedSection.id}`:row.id;
+              const draft=drafts[key]??{marks:"",absent:false};
+              const saved=sectionMode&&selectedSection?row.sectionMarks.find(mark=>mark.sectionId===selectedSection.id):undefined;
+              const savedStatus=sectionMode?(saved?.status??null):row.status;
+              const savedMarks=sectionMode?(saved?.marks??null):row.marks;
               return <tr key={row.id} className="border-t border-border">
                 <td className="p-3"><div className="font-semibold">{row.name}</div>
                   <div className="text-muted-foreground">{row.admissionNumber??"—"}</div></td>
                 <td className="p-3"><input aria-label={`Marks for ${row.name}`}
-                  className={style+" max-w-28"} type="number" min="0" max={sheet.data!.paper.maxMarks}
-                  step="0.01" disabled={!sheet.data!.canEdit||draft.absent}
+                  className={style+" max-w-28"} type="number" min="0" max={maximum}
+                  step="0.01" disabled={!canEditSelected||draft.absent}
                   value={draft.marks} onChange={e=>setDrafts(prev=>({
-                    ...prev,[row.id]:{...draft,marks:e.target.value},
+                    ...prev,[key]:{...draft,marks:e.target.value},
                   }))}/></td>
                 <td className="p-3"><input type="checkbox" aria-label={`Absent: ${row.name}`}
-                  checked={draft.absent} disabled={!sheet.data!.canEdit}
+                  checked={draft.absent} disabled={!canEditSelected}
                   onChange={e=>setDrafts(prev=>({
-                    ...prev,[row.id]:{marks:e.target.checked?"":draft.marks,absent:e.target.checked},
+                    ...prev,[key]:{marks:e.target.checked?"":draft.marks,absent:e.target.checked},
                   }))}/></td>
                 <td className="p-3">{draft.absent?"Absent":
-                  draft.marks.trim()? `${(Number(draft.marks)/sheet.data!.paper.maxMarks*100).toFixed(1)}%` : "—"}</td>
-                <td className="p-3">{row.status==="ABSENT"?"Absent":row.marks===null?"Unmarked":row.marks}</td>
+                  draft.marks.trim()? `${(Number(draft.marks)/maximum*100).toFixed(1)}%` : "—"}</td>
+                <td className="p-3">{savedStatus==="ABSENT"?"Absent":savedMarks===null?"Unmarked":savedMarks}</td>
               </tr>;
             })}</tbody>
           </table>
         </div>
-        {sheet.data.canEdit&&<div className="flex flex-wrap items-center justify-between gap-3">
+        {canEditSelected&&<div className="flex flex-wrap items-center justify-between gap-3">
           <div className="text-xs text-muted-foreground">
-            {changes.length} changes · {candidates.filter(row=>row.status===null).length} pupils not yet recorded.
+            {changes.length} unsaved changes · {candidates.filter(row=>
+              sectionMode&&selectedSection
+                ?row.sectionMarks.some(mark=>mark.sectionId===selectedSection.id)
+                :row.status!==null
+            ).length} pupils recorded in this section.
           </div>
           <div className="flex gap-2">
             <button type="button" className={button} disabled={finalize.isPending||save.isPending||
@@ -233,7 +273,7 @@ export function InternalExaminationsWorkspace() {
             </button>
             <button type="button" className={primary}
               disabled={save.isPending||finalize.isPending||invalid||!changes.length||changes.length>120}
-              onClick={()=>save.mutate()}>{save.isPending?"Saving…":"Save mock marks"}</button>
+              onClick={()=>save.mutate()}>{save.isPending?"Saving…":sectionMode?"Save section marks":"Save mock marks"}</button>
           </div>
         </div>}
         {invalid&&<p role="alert" className="text-xs text-destructive">
