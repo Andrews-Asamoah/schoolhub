@@ -458,22 +458,6 @@
   color: var(--foreground);
 }
 
-.school-sidebar-shell .school-sidebar-nav-item {
-  color: var(--muted-foreground);
-}
-
-.school-sidebar-shell .school-sidebar-nav-item:hover {
-  color: var(--foreground);
-}
-
-.school-sidebar-shell .school-sidebar-nav-item[aria-current="page"] {
-  color: var(--primary);
-}
-
-.school-sidebar-shell .school-sidebar-nav-item[aria-current="page"]:hover {
-  color: color-mix(in oklab, var(--primary) 85%, transparent);
-}
-
 .superadmin-app-shell .superadmin-tab[aria-pressed="true"] {
   background: var(--primary);
   color: var(--primary-foreground);
