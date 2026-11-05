@@ -1,3 +1,4 @@
+import { FormModal } from "@/components/ui/form-modal";
 import { DatePicker } from "@/components/ui/date-picker";
 import { useMutation, useQuery, useQueryClient, type UseQueryResult } from "@tanstack/react-query";
 import { useForm } from "@tanstack/react-form";
@@ -716,98 +717,68 @@ function ClassEditorForm({
   });
 
   return (
-    <section className="rounded-3xl border border-primary/20 bg-card p-5 shadow-sm sm:p-6">
-      <div className="mb-5 flex items-start justify-between gap-4">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-primary">Permanent class group</p>
-          <h2 className="mt-1 text-lg font-bold text-foreground">
-            {isEditing ? "Edit class details" : "Create a class"}
-          </h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Student placements change by academic year; the class itself remains available for future years.
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={onCancel}
-          aria-label="Close class form"
-          className="rounded-lg p-2 text-muted-foreground transition hover:bg-muted hover:text-foreground"
-        >
-          <X className="size-4" />
-        </button>
+    <FormModal
+      title={isEditing ? "Edit class details" : "Create a class"}
+      description="A permanent class group. Student placements change by academic year; the class itself remains available for future years."
+      onClose={onCancel}
+      onSubmit={() => form.handleSubmit()}
+      submitLabel={isEditing ? "Save changes" : "Create class"}
+      submitIcon={<Check className="size-4" />}
+      submitting={isSubmitting}
+      error={error?.message}
+    >
+      <div className="grid gap-4 sm:grid-cols-2">
+        <form.Field name="name">
+          {(field) => (
+            <FormField label="Class name" htmlFor={field.name} error={field.state.meta.errors}>
+              <FormInput id={field.name} name={field.name} value={field.state.value} onBlur={field.handleBlur} onChange={(event) => field.handleChange(event.target.value)} placeholder="e.g. JHS 1A" data-autofocus maxLength={100} required />
+            </FormField>
+          )}
+        </form.Field>
+        <form.Field name="level">
+          {(field) => (
+            <FormField label="Level / grade" htmlFor={field.name} error={field.state.meta.errors}>
+              <FormInput id={field.name} name={field.name} value={field.state.value} onBlur={field.handleBlur} onChange={(event) => field.handleChange(event.target.value)} placeholder="e.g. JHS 1" maxLength={60} required />
+            </FormField>
+          )}
+        </form.Field>
+        <form.Field name="departmentId">
+          {(field) => (
+            <FormField label="Department" htmlFor={field.name} error={field.state.meta.errors}>
+              <FormSelect id={field.name} name={field.name} value={field.state.value} onBlur={field.handleBlur} onChange={(event) => field.handleChange(event.target.value)} required>
+                <option value="">Select department</option>
+                {departments.map((department) => (
+                  <option key={department.id} value={department.id}>{department.name} ({department.code})</option>
+                ))}
+              </FormSelect>
+            </FormField>
+          )}
+        </form.Field>
+        <form.Field name="capacity">
+          {(field) => (
+            <FormField label="Class capacity (optional)" htmlFor={field.name} error={field.state.meta.errors}>
+              <FormInput id={field.name} name={field.name} type="number" min={1} step={1} value={field.state.value ?? ""} onBlur={field.handleBlur} onChange={(event) => field.handleChange(event.target.value ? Number(event.target.value) : undefined)} placeholder="e.g. 40" />
+            </FormField>
+          )}
+        </form.Field>
+        <form.Field name="isGraduatingClass">
+          {(field) => (
+            <label className="flex items-center gap-3 self-end rounded-xl border border-border bg-background px-3 py-3 text-sm text-secondary-foreground">
+              <input type="checkbox" checked={field.state.value} onBlur={field.handleBlur} onChange={(event) => field.handleChange(event.target.checked)} className="size-4 accent-primary" />
+              Mark as graduating class
+            </label>
+          )}
+        </form.Field>
+        <form.Field name="isActive">
+          {(field) => (
+            <label className="flex items-center gap-3 self-end rounded-xl border border-border bg-background px-3 py-3 text-sm text-secondary-foreground">
+              <input type="checkbox" checked={field.state.value} onBlur={field.handleBlur} onChange={(event) => field.handleChange(event.target.checked)} className="size-4 accent-primary" />
+              Class is active
+            </label>
+          )}
+        </form.Field>
       </div>
-      <form
-        noValidate
-        onSubmit={(event) => {
-          event.preventDefault();
-          event.stopPropagation();
-          void form.handleSubmit().catch(() => undefined);
-        }}
-        className="space-y-5"
-      >
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          <form.Field name="name">
-            {(field) => (
-              <FormField label="Class name" htmlFor={field.name} error={field.state.meta.errors}>
-                <FormInput id={field.name} name={field.name} value={field.state.value} onBlur={field.handleBlur} onChange={(event) => field.handleChange(event.target.value)} placeholder="e.g. JHS 1A" maxLength={100} required />
-              </FormField>
-            )}
-          </form.Field>
-          <form.Field name="level">
-            {(field) => (
-              <FormField label="Level / grade" htmlFor={field.name} error={field.state.meta.errors}>
-                <FormInput id={field.name} name={field.name} value={field.state.value} onBlur={field.handleBlur} onChange={(event) => field.handleChange(event.target.value)} placeholder="e.g. JHS 1" maxLength={60} required />
-              </FormField>
-            )}
-          </form.Field>
-          <form.Field name="departmentId">
-            {(field) => (
-              <FormField label="Department" htmlFor={field.name} error={field.state.meta.errors}>
-                <FormSelect id={field.name} name={field.name} value={field.state.value} onBlur={field.handleBlur} onChange={(event) => field.handleChange(event.target.value)} required>
-                  <option value="">Select department</option>
-                  {departments.map((department) => (
-                    <option key={department.id} value={department.id}>{department.name} ({department.code})</option>
-                  ))}
-                </FormSelect>
-              </FormField>
-            )}
-          </form.Field>
-          <form.Field name="capacity">
-            {(field) => (
-              <FormField label="Class capacity (optional)" htmlFor={field.name} error={field.state.meta.errors}>
-                <FormInput id={field.name} name={field.name} type="number" min={1} step={1} value={field.state.value ?? ""} onBlur={field.handleBlur} onChange={(event) => field.handleChange(event.target.value ? Number(event.target.value) : undefined)} placeholder="e.g. 40" />
-              </FormField>
-            )}
-          </form.Field>
-          <form.Field name="isGraduatingClass">
-            {(field) => (
-              <label className="flex items-center gap-3 self-end rounded-xl border border-border bg-background px-3 py-3 text-sm text-secondary-foreground">
-                <input type="checkbox" checked={field.state.value} onBlur={field.handleBlur} onChange={(event) => field.handleChange(event.target.checked)} className="size-4 accent-primary" />
-                Mark as graduating class
-              </label>
-            )}
-          </form.Field>
-          <form.Field name="isActive">
-            {(field) => (
-              <label className="flex items-center gap-3 self-end rounded-xl border border-border bg-background px-3 py-3 text-sm text-secondary-foreground">
-                <input type="checkbox" checked={field.state.value} onBlur={field.handleBlur} onChange={(event) => field.handleChange(event.target.checked)} className="size-4 accent-primary" />
-                Class is active
-              </label>
-            )}
-          </form.Field>
-        </div>
-        {error && <MutationError error={error} />}
-        <div className="flex justify-end gap-2">
-          <button type="button" onClick={onCancel} className="h-10 rounded-xl border border-border px-4 text-sm font-semibold text-secondary-foreground transition hover:bg-muted">
-            Cancel
-          </button>
-          <FormSubmitButton isSubmitting={isSubmitting}>
-            <Check className="size-4" />
-            {isEditing ? "Save changes" : "Create class"}
-          </FormSubmitButton>
-        </div>
-      </form>
-    </section>
+    </FormModal>
   );
 }
 
@@ -869,44 +840,25 @@ function ClassTeacherAssignmentsPanel({
   const today = new Date().toISOString().slice(0, 10);
 
   return (
-    <section className="rounded-3xl border border-border bg-card p-5 shadow-sm sm:p-6">
-      <div className="mb-5 flex items-start justify-between gap-4">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-primary">
-            Dated assignment history
-          </p>
-          <h2 className="mt-1 text-lg font-bold text-foreground">
-            Class teacher · {schoolClass.name}
-          </h2>
-          <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-            Changes take effect on the selected date. The previous assignment
-            is retained with its end date, including changes between terms.
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label="Close class teacher history"
-          className="rounded-lg p-2 text-muted-foreground transition hover:bg-muted hover:text-foreground"
-        >
-          <X className="size-4" />
-        </button>
-      </div>
-
-      <form
-        noValidate
-        onSubmit={(event) => {
-          event.preventDefault();
-          event.stopPropagation();
-          void form.handleSubmit().catch(() => undefined);
-        }}
-        className="grid gap-4 rounded-2xl border border-border bg-muted/30 p-4 sm:grid-cols-[1fr_200px_auto] sm:items-end"
-      >
+    <FormModal
+      title={`Class teacher · ${schoolClass.name}`}
+      description="Changes take effect on the selected date. The previous assignment is retained with its end date, including changes between terms."
+      size="2xl"
+      onClose={onClose}
+      onSubmit={() => form.handleSubmit()}
+      submitLabel="Save assignment"
+      submitIcon={<Check className="size-4" />}
+      submitting={mutation.isPending}
+      error={mutation.error?.message}
+      cancelLabel="Close"
+    >
+      <div className="grid gap-4 rounded-2xl border border-border bg-muted/30 p-4 sm:grid-cols-[1fr_200px]">
         <form.Field name="teacherId">
           {(field) => (
             <FormField label="Assign teacher" htmlFor={field.name} error={field.state.meta.errors}>
               <FormSelect
                 id={field.name}
+                data-autofocus
                 value={field.state.value}
                 onBlur={field.handleBlur}
                 onChange={(event) => field.handleChange(event.target.value)}
@@ -940,11 +892,7 @@ function ClassTeacherAssignmentsPanel({
             </FormField>
           )}
         </form.Field>
-        <FormSubmitButton isSubmitting={mutation.isPending}>
-          <Check className="size-4" />
-          Save assignment
-        </FormSubmitButton>
-      </form>
+      </div>
       {teachersLoading && (
         <p className="mt-3 text-xs text-muted-foreground">Loading teachers…</p>
       )}
@@ -953,12 +901,6 @@ function ClassTeacherAssignmentsPanel({
           <InlineError message={`Teachers could not be loaded: ${teachersError.message}`} />
         </div>
       )}
-      {mutation.error && (
-        <div className="mt-3">
-          <MutationError error={mutation.error} />
-        </div>
-      )}
-
       <div className="mt-6">
         <h3 className="text-sm font-semibold text-foreground">Assignment history</h3>
         {assignmentsQuery.isPending ? (
@@ -1011,7 +953,7 @@ function ClassTeacherAssignmentsPanel({
           </p>
         )}
       </div>
-    </section>
+    </FormModal>
   );
 }
 
