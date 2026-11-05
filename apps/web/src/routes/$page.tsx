@@ -23,6 +23,7 @@ import { useSchoolRole } from "@/components/school/school-role-switcher";
 import { useTeachingOverview } from "@/lib/teaching";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
+const AbsenceRequestsWorkspace = lazy(() => import("@/components/portal/absence-requests-workspace").then(module => ({default:module.AbsenceRequestsWorkspace})));
 const TicketWorkspace = lazy(() => import("@/components/support/ticket-workspace").then((m) => ({ default: m.TicketWorkspace })));
 const AcademicYearSetup = lazy(() => import("@/components/school/academic-year-setup").then((m) => ({ default: m.AcademicYearSetup })));
 const SchoolLogoUploader = lazy(() => import("@/components/school/school-logo-uploader").then((m) => ({ default: m.SchoolLogoUploader })));
@@ -324,7 +325,7 @@ function WorkspaceContent({ pageId }: { pageId: string }) {
             activeRole === "student" ? <StudentReportView /> : <SchoolReportsWorkspace />
           )}
           {pageId === "attendance" && (
-            activeRole === "student" ? <StudentAttendanceView /> : <AttendanceWorkspace query={classesQuery} />
+            activeRole === "student" ? <StudentAttendanceView /> : <><AttendanceWorkspace query={classesQuery} /><AbsenceRequestsWorkspace /></>
           )}
           {pageId === "concessions" && <ConcessionsWorkspace />}
           {pageId === "signatures" && <SignaturesWorkspace />}

@@ -1,0 +1,30 @@
+/// Guardian evidence and school review. Approval never changes the attendance register.
+model AttendanceExcuseRequest {
+  id String @id @default(cuid())
+  schoolId String
+  studentId String
+  guardianId String
+  fromDate DateTime @db.Date
+  toDate DateTime @db.Date
+  reason String @db.VarChar(2000)
+  status String @default("PENDING") @db.VarChar(16)
+  version Int @default(1)
+  reviewedById String?
+  reviewedAt DateTime?
+  decisionNote String? @db.VarChar(1000)
+  attachmentKey String?
+  attachmentMime String?
+  attachmentSize Int?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  school School @relation(fields:[schoolId],references:[id],onDelete:Cascade)
+  student Student @relation(fields:[studentId],references:[id],onDelete:Cascade)
+  guardian Guardian @relation(fields:[guardianId],references:[id],onDelete:Restrict)
+  reviewedBy user? @relation("ExcuseReviewer",fields:[reviewedById],references:[id],onDelete:Restrict)
+
+  @@index([schoolId,status,createdAt])
+  @@index([guardianId,createdAt])
+  @@index([studentId,fromDate,toDate])
+  @@map("attendance_excuse_requests")
+}

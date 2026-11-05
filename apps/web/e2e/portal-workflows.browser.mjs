@@ -18,6 +18,7 @@ try{for(const role of ['teacher','headteacher','admin','student','guardian'])for
   if(path.endsWith('/schools/roles'))return route.fulfill({json:{primaryRole:role,roles:[role]}});
   if(path.endsWith('/schools/academic-context'))return route.fulfill({json:null});
   if(path.includes('/schools/public/')||path.endsWith('/schools/current'))return route.fulfill({json:school});
+  if(path.endsWith('/attendance/excuse-requests'))return route.fulfill({json:{items:[],total:0,page:1,totalPages:0}});
   if(path.endsWith('/students/my-wards'))return route.fulfill({json:wards});
   if(path.endsWith('/students/me'))return route.fulfill({json:wards[0]});
   if(path.endsWith('/dashboard/work-queue'))return route.fulfill({json:{role,generatedAt:now,term:{id:'term',name:'Term 1'},items:[{id:'work',title:role==='headteacher'?'Awaiting headteacher review':role==='admin'?'Missing active guardian links':'Your pending tasks',detail:'Scoped live work',page:role==='student'?'assignments':'assessments',count:3}],lessons:role==='teacher'?[{id:'lesson',day:'MONDAY',start:'08:00',end:'09:00',className:'P5',subject:'Science'}]:[],upcoming:role==='student'?[{id:'task',title:'Science homework',dueAt:now,status:'TO_DO'}]:[]}});
