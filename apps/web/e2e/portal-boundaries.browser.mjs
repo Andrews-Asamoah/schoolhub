@@ -16,6 +16,7 @@ async function setup(role,roles=[role]){
   if(path.endsWith('/schools/roles'))return route.fulfill({json:{primaryRole:role,roles}});
   if(path.endsWith('/schools/academic-context'))return route.fulfill({json:null});
   if(path.includes('/schools/public/')||path.endsWith('/schools/current'))return route.fulfill({json:{id:'school',organizationId:'org',name:'Test school',code:'TEST',subdomain:'test-school',academicYears:[]}});
+  if(path.endsWith('/dashboard/work-queue'))return route.fulfill({json:{generatedAt:now,role,term:null,items:[],lessons:[],upcoming:[]}});
   if(path.endsWith('/dashboard/analytics')){
    const active=req.headers()['x-school-role'];
    if(active==='guardian')return route.fulfill({status:403,json:{message:'Insufficient permissions: guardian'}});
@@ -52,7 +53,7 @@ try {
  await page.getByRole('option',{name:'Teacher',exact:true}).click();
  await page.waitForFunction(()=>localStorage.getItem('schoolhub-active-role')==='teacher');
  assert.equal(await page.getByText('Fee collections this month',{exact:true}).count(),0);
- await page.getByText('Quick links for your workspace',{exact:true}).waitFor();
+ await page.getByRole('heading',{name:'Your teaching week',exact:true}).waitFor();
  assert.equal(await page.getByText('Fee collections this month',{exact:true}).count(),0);
  assert.deepEqual(errors,[]);await page.close();
  console.log('Portal boundary checks passed: guardian homepage, denied family route, honest attendance errors, and owner-to-teacher cache isolation.');

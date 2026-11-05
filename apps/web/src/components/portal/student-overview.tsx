@@ -1,3 +1,4 @@
+import { PortalWorkQueue } from "./portal-work-queue";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { ArrowRight, Bell, BookOpen, CalendarCheck, ClipboardList, FileText, GraduationCap, Megaphone, MessageSquare, UserRound } from "lucide-react";
@@ -63,6 +64,7 @@ export function StudentOverview() {
         </div>
       </section>
 
+      <PortalWorkQueue />
       <MyProfilePanel />
 
       <section className="space-y-3">

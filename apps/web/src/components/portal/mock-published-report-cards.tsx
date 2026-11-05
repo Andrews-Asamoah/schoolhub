@@ -1,12 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { apiFetch,downloadAcademicReport } from "@/lib/api";
-type Mock={id:string;version:number;publishedAt:string;snapshot:{
+type Mock={id:string;studentId:string;version:number;publishedAt:string;snapshot:{
   name:string;school:{name:string};year:string;term:string;className:string;
   pupil:{name:string};average:number|null;position:number|null;papers:{
     name:string;code:string;status:string;percentage:number|null;grade:string|null}[];
 }};
-export function MockPublishedReportCards({audience}:{audience:"student"|"guardian"}){
+export function MockPublishedReportCards({audience,studentId,year,term}:{audience:"student"|"guardian";studentId?:string;year?:string;term?:string}){
   const [error,setError]=useState("");
   const reports=useQuery({
     queryKey:["internal-exams","published",audience],
@@ -14,6 +14,7 @@ export function MockPublishedReportCards({audience}:{audience:"student"|"guardia
       "/internal-exams/published/me":"/internal-exams/published/guardian"),
     retry:false,
   });
+  const visible=(reports.data??[]).filter(row=>(!studentId||row.studentId===studentId)&&(!year||row.snapshot.year===year)&&(!term||row.snapshot.term===term));
   const download=(id:string)=>{
     setError("");
     void downloadAcademicReport("/internal-exams/published/"+(audience==="student"?"me":"guardian")+
@@ -27,10 +28,10 @@ export function MockPublishedReportCards({audience}:{audience:"student"|"guardia
     </div>
     {reports.isPending&&<p className="text-xs text-muted-foreground">Loading mock reports…</p>}
     {reports.isError&&<p role="alert" className="text-xs text-destructive">{reports.error.message}</p>}
-    {reports.data?.length===0&&<p className="text-xs text-muted-foreground">
+    {!reports.isPending&&!reports.isError&&visible.length===0&&<p className="text-xs text-muted-foreground">
       No mock reports have been published for {audience==="student"?"you":"your linked wards"}.</p>}
     {error&&<p role="alert" className="text-xs text-destructive">{error}</p>}
-    <div className="grid gap-3 md:grid-cols-2">{reports.data?.map(r=><article key={r.id}
+    <div className="grid gap-3 md:grid-cols-2">{visible.map(r=><article key={r.id}
       className="space-y-2 rounded-xl border border-border p-3">
       <h4 className="text-sm font-bold">{r.snapshot.name} · {r.snapshot.pupil.name}</h4>
       <p className="text-xs text-muted-foreground">{r.snapshot.year} · {r.snapshot.term} · {r.snapshot.className}</p>

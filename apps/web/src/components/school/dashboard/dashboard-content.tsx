@@ -1,3 +1,4 @@
+import { PortalWorkQueue } from "@/components/portal/portal-work-queue";
 import { lazy, Suspense, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
@@ -77,7 +78,7 @@ export function DashboardContent({ today, greetingName }: DashboardContentProps)
   const analyticsQuery = useQuery({
     queryKey: ["dashboard", "analytics", selectedMonths, activeOrganization?.id, session?.user.id, activeRole],
     queryFn: () => apiFetch<DashboardAnalytics>(`/dashboard/analytics?months=${selectedMonths}`),
-    enabled: Boolean(activeRole && !["student", "guardian"].includes(activeRole) && activeOrganization),
+    enabled: Boolean(activeRole && !["student", "guardian", "teacher"].includes(activeRole) && activeOrganization),
     retry: false,
     refetchInterval: 60_000,
   });
@@ -142,6 +143,7 @@ export function DashboardContent({ today, greetingName }: DashboardContentProps)
 
   if (!activeRole) return <p role="status">Loading your role…</p>;
   if (activeRole === "guardian") return <main className="px-4 py-7 sm:px-6"><Suspense fallback={<p role="status">Loading family hub…</p>}><GuardianPortalWorkspace showSectionNav={false} /></Suspense></main>;
+  if (activeRole === "teacher") return <main className="px-4 py-7 sm:px-6"><PortalWorkQueue /></main>;
   if (activeRole === "student") return <main className="mx-auto max-w-[1440px] px-4 py-7 sm:px-6 lg:px-9 lg:py-9"><StudentOverview /></main>;
 
   return (
@@ -152,7 +154,8 @@ export function DashboardContent({ today, greetingName }: DashboardContentProps)
         <p className="mt-1.5 text-sm text-muted-foreground">A live overview of your school&apos;s records and activity.</p>
       </div>
 
-      {isManagementRole && <section className="mb-6 overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+      {isManagementRole && <PortalWorkQueue />}
+      {isManagementRole && activeRole !== "headteacher" && <section className="mb-6 overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
         <div className="flex flex-wrap items-start justify-between gap-4 border-b border-border bg-muted/30 px-5 py-5 sm:px-6">
           <div><p className="text-[10px] font-bold uppercase tracking-[0.16em] text-primary">Getting started</p><h2 className="mt-1 text-lg font-bold tracking-tight text-foreground">Prepare your school to run</h2><p className="mt-1 max-w-2xl text-xs leading-5 text-muted-foreground">These checks reflect your current school configuration.</p></div>
           <div className="min-w-32 rounded-xl border border-border bg-card px-4 py-3"><p className="text-lg font-bold text-foreground">{completedSteps}<span className="text-muted-foreground">/{setupItems.length}</span></p><p className="text-[10px] font-medium text-muted-foreground">setup steps complete</p><div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-primary transition-all" style={{ width: `${(completedSteps / setupItems.length) * 100}%` }} /></div></div>
