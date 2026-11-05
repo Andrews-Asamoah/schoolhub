@@ -1,3 +1,4 @@
+import {useGuardianWard} from "@/hooks/use-guardian-ward";
 import { useQuery, type UseQueryResult } from "@tanstack/react-query";
 import { useState } from "react";
 import { AlertCircle, CalendarDays, CheckCircle2, Clock3, LoaderCircle, Printer, RefreshCw, UserRound, XCircle } from "lucide-react";
@@ -54,10 +55,9 @@ function EmptyState({ title, message }: { title: string; message: string }) {
   return <div className="rounded-2xl border border-dashed border-border bg-card px-6 py-12 text-center"><CalendarDays className="mx-auto size-8 text-muted-foreground" /><h3 className="mt-3 font-semibold text-foreground">{title}</h3><p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-muted-foreground">{message}</p></div>;
 }
 export function GuardianChildRecordsWorkspace({ view }: { view: View }) {
-  const [studentId, setStudentId] = useState("");
   const wardsQuery = useQuery({ queryKey: ["students", "my-wards"], queryFn: () => apiFetch<StudentProfileData[]>("/students/my-wards"), retry: false });
   const wards = wardsQuery.data ?? [];
-  const selectedId = wards.some((ward) => ward.id === studentId) ? studentId : wards[0]?.id ?? "";
+  const [selectedId, setStudentId] = useGuardianWard(wards);
   const selectedWard = wards.find((ward) => ward.id === selectedId);
   const attendanceQuery = useQuery({
     queryKey: ["guardian", "attendance", selectedId],

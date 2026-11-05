@@ -20,3 +20,13 @@ Web typecheck/build, theme check, 30 web unit tests, 572 API unit tests, existin
 ## Feature work
 
 The follow-on changes add role-specific work queues, shared family ward context, published-report history filters and per-school operations readiness. The absence-request proposal is a separate reviewed workflow: it must never directly mutate the attendance register.
+
+## Role-specific features implemented
+
+- Teacher dashboard shows assigned weekly lessons, class registers, owned ungraded submissions and assigned open mock papers; it does not call school-wide analytics.
+- Headteacher dashboard adds latest-version mock/term recommendations, publication queues, corrections and attendance-review entry points. Existing independent approval/publication controls remain authoritative.
+- Admin/owner/headteacher data-quality checks flag missing guardian links, missing current-term enrollment, unassigned teaching subjects and possible duplicate identities. Duplicate checks explicitly sample the first 5,000 records and require human review.
+- Student dashboard adds current-term upcoming assignments and feedback status, scoped to the authenticated pupil's enrollment.
+- Guardian selection is shared across attendance, timetable, fees and published reports, scoped to account/school and cleared on logout. Published SBA/mock history can be filtered by child, academic year and term.
+- SuperAdmin school detail adds configuration/migration readiness, notification-failure counts and worker incidents without exposing payloads. Only failed finance-integrity checks can be requeued; the school/job/status checks and audit reason are enforced server-side.
+- Add desktop/mobile portal-workflow and mark-draft recovery browser checks to CI. No schema migration is needed for these additions.

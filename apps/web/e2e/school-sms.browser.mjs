@@ -16,6 +16,7 @@ try{for(const role of ['owner','superAdmin'])for(const viewport of [{width:1440,
    if(path==='/api/super-admin/schools')return route.fulfill({json:{school:{id:'school'},credentials:{loginEmail:body.adminEmail,temporaryPassword:'SyntheticOnlyPass42!',role:'owner',mustChangePassword:true}}});
    return route.fulfill({json:{success:true}});
   }
+  if(path.endsWith('/readiness'))return route.fulfill({json:{checkedAt:now,configuration:{currentPeriod:true,subjects:true,classes:true},migrations:{status:'up_to_date'},deliveryFailures:[],incidents:[],incidentLimit:25}});
   if(path.includes('/auth/get-session'))return route.fulfill({json:session});
   if(path.includes('/auth/organization/list'))return route.fulfill({json:[org]});
   if(path.includes('/auth/organization/get-full-organization'))return route.fulfill({json:{...org,members:[],invitations:[]}});

@@ -1829,3 +1829,19 @@ export const importStudentBatchSchema = z.object({
   rows: z.array(normalizedStudentRowSchema).min(1).max(STUDENT_IMPORT_LIMITS.batchSize),
 });
 export type ImportStudentBatchInput = z.infer<typeof importStudentBatchSchema>;
+
+export interface PortalWorkItem {
+  id: string;
+  title: string;
+  detail: string;
+  page: string;
+  count: number;
+}
+export interface PortalWorkQueue {
+  generatedAt: string;
+  role: string;
+  term: { id: string; name: string } | null;
+  items: PortalWorkItem[];
+  lessons: { id: string; day: string; start: string; end: string; subject: string; className: string }[];
+  upcoming: { id: string; title: string; dueAt: string | null; status: string }[];
+}

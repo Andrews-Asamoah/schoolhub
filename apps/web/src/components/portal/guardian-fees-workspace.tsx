@@ -1,3 +1,4 @@
+import {useGuardianWard} from "@/hooks/use-guardian-ward";
 import { useQuery } from "@tanstack/react-query";
 import { FileSpreadsheet, FileText, LoaderCircle, Printer, ShieldCheck, UserRound } from "lucide-react";
 import { useMemo, useState } from "react";
@@ -20,7 +21,6 @@ function downloadBlob(blob: Blob, filename: string) {
 }
 
 export function GuardianFeesWorkspace() {
-  const [wardId, setWardId] = useState("");
   const [exporting, setExporting] = useState(false);
   const wardsQuery = useQuery({
     queryKey: ["students", "my-wards"],
@@ -28,7 +28,7 @@ export function GuardianFeesWorkspace() {
     retry: false,
   });
   const wards = wardsQuery.data ?? [];
-  const selectedId = wards.some((ward) => ward.id === wardId) ? wardId : wards[0]?.id ?? "";
+  const [selectedId, setWardId] = useGuardianWard(wards);
   const selected = wards.find((ward) => ward.id === selectedId);
   const statementQuery = useQuery({
     queryKey: ["students", "my-wards", selectedId, "fees"],

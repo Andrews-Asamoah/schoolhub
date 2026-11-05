@@ -1,3 +1,4 @@
+import { SchoolReadinessPanel } from "@/components/superadmin/school-readiness-panel";
 import { hasSchoolAdministrationRole } from "@schoolhub/shared";
 import { SchoolSmsAccountPanel } from "@/components/school/school-sms-account-panel";
 import { createFileRoute, Link } from "@tanstack/react-router";
@@ -380,6 +381,7 @@ function SchoolDetailPage() {
       {/* Tab content */}
       {activeTab === "overview" && (
         <div className="space-y-5">
+          <SchoolReadinessPanel schoolId={schoolId} />
           <SchoolSmsAccountPanel endpoint={`/super-admin/schools/${schoolId}/sms`} scopeKey={schoolId} />
           <form
             onSubmit={(event) => {
