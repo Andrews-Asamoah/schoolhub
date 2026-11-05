@@ -37,7 +37,7 @@ model StudentAttendanceExclusion {
   term    Term    @relation(fields: [termId], references: [id], onDelete: Cascade)
   approver user? @relation("AttendanceExclusionApprover", fields: [approvedById], references: [id], onDelete: SetNull)
 
-  @@unique([schoolId, studentId, termId, date])
+  @@unique([schoolId, studentId, termId, date], map: "student_attendance_exclusions_schoolId_studentId_termId_date_ke")
   @@index([schoolId, termId, date])
   @@index([studentId, termId])
   @@index([approvedById])

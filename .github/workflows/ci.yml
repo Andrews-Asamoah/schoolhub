@@ -148,6 +148,8 @@ jobs:
         run: pnpm --filter @schoolhub/api lint
       - name: Apply database migrations
         run: pnpm --filter @schoolhub/api exec prisma migrate deploy --config prisma.config.ts
+      - name: Check migration history matches Prisma schema
+        run: pnpm --filter @schoolhub/api exec prisma migrate diff --from-config-datasource --to-schema prisma/schema --exit-code
       - name: API tests (including PostgreSQL integration)
         run: pnpm --filter @schoolhub/api test
       - name: SuperAdmin dashboard browser E2E

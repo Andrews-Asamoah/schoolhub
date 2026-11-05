@@ -485,7 +485,7 @@ model InternalExamSession {
   reports InternalMockReport[]
   correctionRequests InternalMockCorrection[]
 
-  @@unique([schoolId, academicYearId, classId, mockNumber])
+  @@unique([schoolId, academicYearId, classId, mockNumber], map: "internal_exam_sessions_schoolId_academicYearId_classId_mockNumb")
   @@index([schoolId, status, createdAt])
   @@index([classId, academicYearId])
   @@map("internal_exam_sessions")
@@ -563,7 +563,7 @@ model InternalExamSectionMark {
   version         Int                   @default(1)
   recordedById    String?
   createdAt       DateTime              @default(now())
-  updatedAt       DateTime              @updatedAt
+  updatedAt       DateTime @default(now()) @updatedAt
 
   candidate  InternalExamCandidate    @relation(fields: [candidateId], references: [id], onDelete: Cascade)
   paperSection InternalExamPaperSection @relation(fields: [paperSectionId], references: [id], onDelete: Cascade)
@@ -621,12 +621,12 @@ model InternalMockReport {
   publishedAt DateTime?
   createdAt DateTime @default(now())
 
-  school School @relation(fields: [schoolId], references: [id], onDelete: Restrict)
-  session InternalExamSession @relation(fields: [sessionId], references: [id], onDelete: Restrict)
-  candidate InternalExamCandidate @relation(fields: [candidateId], references: [id], onDelete: Restrict)
-  student Student @relation(fields: [studentId], references: [id], onDelete: Restrict)
-  teacher user? @relation("MockReportTeacher", fields: [teacherActorId], references: [id], onDelete: SetNull)
-  head user? @relation("MockReportHead", fields: [headActorId], references: [id], onDelete: SetNull)
+  school School @relation(fields: [schoolId], references: [id], onDelete: Restrict, map: "internal_mock_reports_school_fkey")
+  session InternalExamSession @relation(fields: [sessionId], references: [id], onDelete: Restrict, map: "internal_mock_reports_session_fkey")
+  candidate InternalExamCandidate @relation(fields: [candidateId], references: [id], onDelete: Restrict, map: "internal_mock_reports_candidate_fkey")
+  student Student @relation(fields: [studentId], references: [id], onDelete: Restrict, map: "internal_mock_reports_student_fkey")
+  teacher user? @relation("MockReportTeacher", fields: [teacherActorId], references: [id], onDelete: SetNull, map: "internal_mock_reports_teacher_fkey")
+  head user? @relation("MockReportHead", fields: [headActorId], references: [id], onDelete: SetNull, map: "internal_mock_reports_head_fkey")
 
   @@unique([candidateId, version])
   @@index([schoolId, sessionId, stage])
@@ -659,13 +659,13 @@ model InternalMockCorrection {
   reviewedById String?
   reviewedAt DateTime?
   reviewReason String? @db.VarChar(2000)
-  school School @relation(fields: [schoolId], references: [id], onDelete: Restrict)
-  session InternalExamSession @relation(fields: [sessionId], references: [id], onDelete: Restrict)
-  candidate InternalExamCandidate @relation(fields: [candidateId], references: [id], onDelete: Restrict)
-  paper InternalExamPaper @relation(fields: [paperId], references: [id], onDelete: Restrict)
-  requester user? @relation("MockCorrectionRequester", fields: [requestedById], references: [id], onDelete: SetNull)
-  reviewer user? @relation("MockCorrectionReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
-  @@index([schoolId, sessionId, status, requestedAt])
+  school School @relation(fields: [schoolId], references: [id], onDelete: Restrict, map: "mock_correction_school_fk")
+  session InternalExamSession @relation(fields: [sessionId], references: [id], onDelete: Restrict, map: "mock_correction_session_fk")
+  candidate InternalExamCandidate @relation(fields: [candidateId], references: [id], onDelete: Restrict, map: "mock_correction_candidate_fk")
+  paper InternalExamPaper @relation(fields: [paperId], references: [id], onDelete: Restrict, map: "mock_correction_paper_fk")
+  requester user? @relation("MockCorrectionRequester", fields: [requestedById], references: [id], onDelete: SetNull, map: "mock_correction_requester_fk")
+  reviewer user? @relation("MockCorrectionReviewer", fields: [reviewedById], references: [id], onDelete: SetNull, map: "mock_correction_reviewer_fk")
+  @@index([schoolId, sessionId, status, requestedAt], map: "internal_mock_corrections_schoolId_sessionId_status_requestedAt")
   @@index([candidateId, paperId])
   @@map("internal_mock_corrections")
 }

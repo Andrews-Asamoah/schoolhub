@@ -1,3 +1,5 @@
+import { getTenantSubdomain as getClientSubdomain } from "./tenant-subdomain";
+
 /**
  * Typed API fetch utility.
  *
@@ -27,25 +29,7 @@ export class ApiError extends Error {
   }
 }
 
-export function getClientSubdomain(): string | null {
-  if (typeof window === "undefined") return null;
-  const params = new URLSearchParams(window.location.search);
-  const override = params.get("school") || params.get("subdomain");
-  if (override && override.trim().length > 0) return override.trim().toLowerCase();
-
-  const hostname = window.location.hostname.toLowerCase();
-  if (hostname.endsWith(".localhost")) {
-    const parts = hostname.split(".");
-    if (parts.length >= 2 && parts[0] && !["www", "app", "api", "admin"].includes(parts[0])) {
-      return parts[0];
-    }
-  }
-  const parts = hostname.split(".");
-  if (parts.length >= 3 && parts[0] && !["www", "app", "api", "admin"].includes(parts[0])) {
-    return parts[0];
-  }
-  return null;
-}
+export { getTenantSubdomain as getClientSubdomain } from "./tenant-subdomain";
 
 export async function apiFetch<T>(
   path: string,

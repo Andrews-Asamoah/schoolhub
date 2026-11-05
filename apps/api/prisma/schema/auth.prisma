@@ -4,6 +4,16 @@
 // ============================================================================
 
 model user {
+  reversedPromotions PromotionRecord[] @relation("PromotionRecord_reversedBy")
+  rolledBackByRolloverBatches AcademicRolloverBatch[] @relation("AcademicRolloverBatch_rolledBackBy")
+  rollbackRequestedByRolloverBatches AcademicRolloverBatch[] @relation("AcademicRolloverBatch_rollbackRequestedBy")
+  appliedByRolloverBatches AcademicRolloverBatch[] @relation("AcademicRolloverBatch_appliedBy")
+  approvedByRolloverBatches AcademicRolloverBatch[] @relation("AcademicRolloverBatch_approvedBy")
+  createdByRolloverBatches AcademicRolloverBatch[] @relation("AcademicRolloverBatch_createdBy")
+  decidedBankReconciliations FinanceBankReconciliation[] @relation("FinanceBankReconciliation_decidedBy")
+  createdFinanceBankReconciliations FinanceBankReconciliation[] @relation("FinanceBankReconciliation_createdBy")
+  createdFinanceBankMatchs FinanceBankMatch[] @relation("FinanceBankMatch_createdBy")
+  createdFinanceBankStatements FinanceBankStatement[] @relation("FinanceBankStatement_createdBy")
   passwordRecoveryRequests PasswordRecoveryRequest[]
   notificationPreferences NotificationPreference[]
   notificationDeliveries NotificationDelivery[]

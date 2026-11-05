@@ -1,4 +1,8 @@
 model FinanceBankStatement {
+  reconciliations FinanceBankReconciliation[] @relation("FinanceBankReconciliation_statement")
+  createdBy user @relation("FinanceBankStatement_createdBy", fields: [createdById], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  account ChartAccount @relation("FinanceBankStatement_account", fields: [accountId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  school School @relation("FinanceBankStatement_school", fields: [schoolId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   id String @id @default(cuid())
   schoolId String
   accountId String
@@ -27,37 +31,46 @@ model FinanceBankStatementLine {
   amount Decimal @db.Decimal(15,2)
   reference String?
   description String
-  statement FinanceBankStatement @relation(fields: [statementId], references: [id], onDelete: Restrict)
+  statement FinanceBankStatement @relation(fields: [statementId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   matches FinanceBankMatch[]
   @@unique([statementId, rowNumber])
   @@map("finance_bank_statement_lines")
 }
 
 model FinanceBankMatch {
+  transaction Transaction @relation("FinanceBankMatch_transaction", fields: [transactionId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  createdBy user @relation("FinanceBankMatch_createdBy", fields: [createdById], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  account ChartAccount @relation("FinanceBankMatch_account", fields: [accountId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  school School @relation("FinanceBankMatch_school", fields: [schoolId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   id String @id @default(cuid())
   schoolId String
   accountId String
   reconciliationId String
-  reconciliation FinanceBankReconciliation @relation(fields: [reconciliationId], references: [id], onDelete: Restrict)
+  reconciliation FinanceBankReconciliation @relation(fields: [reconciliationId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   statementLineId String
   transactionId String
   amount Decimal @db.Decimal(15,2)
   createdById String
   createdAt DateTime @default(now())
-  statementLine FinanceBankStatementLine @relation(fields: [statementLineId], references: [id], onDelete: Restrict)
+  statementLine FinanceBankStatementLine @relation(fields: [statementLineId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   @@unique([reconciliationId, statementLineId, transactionId])
   @@index([schoolId, accountId, transactionId])
   @@map("finance_bank_matches")
 }
 
 model FinanceBankReconciliation {
+  decidedBy user? @relation("FinanceBankReconciliation_decidedBy", fields: [decidedById], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  statement FinanceBankStatement @relation("FinanceBankReconciliation_statement", fields: [statementId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  createdBy user @relation("FinanceBankReconciliation_createdBy", fields: [createdById], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  account ChartAccount @relation("FinanceBankReconciliation_account", fields: [accountId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  school School @relation("FinanceBankReconciliation_school", fields: [schoolId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   id String @id @default(cuid())
   schoolId String
   accountId String
   statementId String
   version Int @default(1)
   supersedesId String? @unique
-  supersedes FinanceBankReconciliation? @relation("BankRevision", fields: [supersedesId], references: [id], onDelete: Restrict)
+  supersedes FinanceBankReconciliation? @relation("BankRevision", fields: [supersedesId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   supersededBy FinanceBankReconciliation? @relation("BankRevision")
   matches FinanceBankMatch[]
   @@unique([statementId, version])

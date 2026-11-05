@@ -1,3 +1,5 @@
+import { getTenantSubdomain } from "./tenant-subdomain";
+export { getTenantSubdomain } from "./tenant-subdomain";
 import { useQuery } from "@tanstack/react-query";
 import { apiFetch } from "./api";
 
@@ -15,64 +17,6 @@ export interface SchoolPublicInfo {
   email?: string | null;
   phone?: string | null;
   address?: string | null;
-}
-
-const RESERVED_SUBDOMAINS = new Set([
-  "www",
-  "app",
-  "api",
-  "admin",
-  "staging",
-  "demo",
-  "mail",
-  "docs",
-]);
-
-/**
- * Extracts the current school subdomain from hostname or query override.
- *
- * Supported formats:
- * - Production: `achimota.schoolhub.gh`, `presec.schoolhub.app`
- * - Localhost dev: `achimota.localhost:5173`
- * - Dev query override: `?school=achimota` or `?subdomain=achimota`
- */
-export function getTenantSubdomain(): string | null {
-  if (typeof window === "undefined") return null;
-
-  // 1. Check URL query override (handy for testing in development)
-  const params = new URLSearchParams(window.location.search);
-  const override = params.get("school") || params.get("subdomain");
-  if (override && override.trim().length > 0) {
-    const cleanOverride = override.trim().toLowerCase();
-    if (!RESERVED_SUBDOMAINS.has(cleanOverride)) {
-      return cleanOverride;
-    }
-  }
-
-  // 2. Parse hostname
-  const hostname = window.location.hostname.toLowerCase();
-
-  // Localhost subdomain: e.g. "achimota.localhost"
-  if (hostname.endsWith(".localhost")) {
-    const parts = hostname.split(".");
-    if (parts.length >= 2) {
-      const sub = parts[0]?.toLowerCase();
-      if (sub && !RESERVED_SUBDOMAINS.has(sub)) {
-        return sub;
-      }
-    }
-  }
-
-  // Multi-part domain: e.g. "achimota.schoolhub.gh" or "presec.schoolhub.app"
-  const parts = hostname.split(".");
-  if (parts.length >= 3) {
-    const sub = parts[0]?.toLowerCase();
-    if (sub && !RESERVED_SUBDOMAINS.has(sub)) {
-      return sub;
-    }
-  }
-
-  return null;
 }
 
 /**
@@ -113,7 +57,7 @@ export function buildSchoolPortalUrl(subdomain: string, path = "/"): string {
   const protocol = window.location.protocol;
 
   // If local development on localhost
-  if (hostname.includes("localhost")) {
+  if (hostname === "localhost" || hostname.endsWith(".localhost")) {
     return `${protocol}//${subdomain}.localhost${port}${path}`;
   }
 
@@ -125,5 +69,7 @@ export function buildSchoolPortalUrl(subdomain: string, path = "/"): string {
   }
 
   // Fallback query parameter
-  return `${protocol}//${hostname}${port}${path}?school=${subdomain}`;
+  const url = new URL(path, `${protocol}//${hostname}${port}`);
+  url.searchParams.set("school", subdomain);
+  return url.href;
 }

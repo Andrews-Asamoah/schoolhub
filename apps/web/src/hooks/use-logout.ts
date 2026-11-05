@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
+import { queryClient } from "@/lib/query-client";
 import { signOut } from "@/lib/auth-client";
 
 const LOGOUT_NOTICE_KEY = "schoolhub-logout-notice";
@@ -23,6 +24,12 @@ export function useLogout() {
         return;
       }
 
+      // Cancel in-flight reads before removing private data from the shared cache.
+      await queryClient.cancelQueries();
+      queryClient.clear();
+      window.localStorage.removeItem("schoolhub-active-role");
+      window.sessionStorage.removeItem("schoolhub-accountant-academic-view");
+      window.dispatchEvent(new Event("schoolhub-role-change"));
       window.sessionStorage.setItem(
         LOGOUT_NOTICE_KEY,
         "You have been logged out successfully.",

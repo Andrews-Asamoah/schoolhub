@@ -27,6 +27,8 @@ model House {
 }
 
 model AcademicYear {
+  toYearRolloverBatches AcademicRolloverBatch[] @relation("AcademicRolloverBatch_toYear")
+  fromYearRolloverBatches AcademicRolloverBatch[] @relation("AcademicRolloverBatch_fromYear")
   id        String   @id @default(cuid())
   schoolId  String
   name      String
@@ -64,6 +66,8 @@ model AcademicYear {
 }
 
 model Term {
+  toTermRolloverBatches AcademicRolloverBatch[] @relation("AcademicRolloverBatch_toTerm")
+  fromTermRolloverBatches AcademicRolloverBatch[] @relation("AcademicRolloverBatch_fromTerm")
   id             String   @id @default(cuid())
   academicYearId String
   name           String
@@ -310,7 +314,7 @@ model SubjectStrand {
   examWeightPercent  Decimal  @default(0) @db.Decimal(5, 2)
   isActive           Boolean  @default(true)
   createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+  updatedAt          DateTime @default(now()) @updatedAt
 
   subject            Subject                         @relation(fields: [subjectId], references: [id], onDelete: Cascade)
   classAssignments   ClassSubjectStrandAssignment[]
@@ -329,13 +333,13 @@ model ClassSubjectStrandAssignment {
   subjectStrandId  String
   teacherId        String
   createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  updatedAt        DateTime @default(now()) @updatedAt
 
   classSubject  ClassSubject  @relation(fields: [classSubjectId], references: [id], onDelete: Cascade)
   subjectStrand SubjectStrand @relation(fields: [subjectStrandId], references: [id], onDelete: Cascade)
   teacher       Teacher       @relation(fields: [teacherId], references: [id], onDelete: Restrict)
 
-  @@unique([classSubjectId, subjectStrandId])
+  @@unique([classSubjectId, subjectStrandId], map: "class_subject_strand_assignments_classSubjectId_subjectStrandId")
   @@index([teacherId])
   @@index([subjectStrandId])
   @@map("class_subject_strand_assignments")
