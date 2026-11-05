@@ -14,7 +14,7 @@ const aliases: Record<string, string[]> = {
   firstName: ["firstname", "givenname"], lastName: ["lastname", "surname", "familyname"],
   email: ["email", "emailaddress"], phone: ["phone", "phonenumber", "mobile"],
   gender: ["gender", "sex"], dateOfBirth: ["dateofbirth", "dob"],
-  staffNumber: ["staffnumber", "employeenumber"], hireDate: ["hiredate", "datehired", "startdate"],
+  hireDate: ["hiredate", "datehired", "startdate"],
   employmentType: ["employmenttype", "employment"], department: ["department", "departmentname"],
   staffType: ["stafftype", "role", "category"], jobTitle: ["jobtitle", "position"],
   qualification: ["qualification", "highestqualification"], specialization: ["specialization", "subjectspecialism"],
@@ -72,7 +72,7 @@ export class StaffImportService {
       if (kind === "teacher" && raw.department && !department) errors.push(`Department "${raw.department}" was not found in this school.`);
       if (kind === "staff" && raw.department && !department) errors.push(`Department "${raw.department}" was not found in this school.`);
       if (kind === "staff" && raw.staffType && !["ACCOUNTANT","HEADTEACHER","ADMIN","LIBRARIAN","DRIVER","SECURITY","NURSE","COUNSELOR","IT_SUPPORT","RECEPTIONIST","COOK","CLEANER","OTHER"].includes(raw.staffType.toUpperCase())) errors.push("staffType must be a supported staff category.");
-      const number = (raw.staffNumber || raw.staffId || "").toLowerCase();
+      const number = (raw.staffId || "").toLowerCase();
       const duplicate = Boolean(email && (existingEmails.has(email) || seenEmails.has(email))) || Boolean(number && existingNumbers.has(number));
       if (email) seenEmails.add(email);
       if (errors.length) return { rowNumber: record.rowNumber, name, status: "error" as const, errors, row: null };
@@ -84,11 +84,11 @@ export class StaffImportService {
       };
       if (department) row.departmentId = department.id;
       if (kind === "teacher") {
-        row.staffNumber = raw.staffNumber || undefined; row.qualification = raw.qualification || undefined;
+        row.qualification = raw.qualification || undefined;
         row.specialization = raw.specialization || undefined;
         if (raw.experience) row.experience = Number(raw.experience);
       } else {
-        row.staffId = raw.staffId || undefined; row.staffNumber = raw.staffNumber || undefined;
+        row.staffId = raw.staffId || undefined;
         row.staffType = (raw.staffType || "OTHER").toUpperCase(); row.jobTitle = raw.jobTitle || undefined;
       }
       const schema = kind === "teacher" ? createTeacherSchema : createStaffSchema;
@@ -97,7 +97,9 @@ export class StaffImportService {
       return { rowNumber: record.rowNumber, name, status: "ready" as const, errors: [], row: checked.data as Record<string, unknown> };
     });
     const count = (status: PreviewRow["status"]) => rows.filter(row => row.status === status).length;
-    return { file: { name: file.originalname, format, rows: rows.length }, summary: { total: rows.length, ready: count("ready"), duplicate: count("duplicate"), error: count("error") }, rows };
+    const ignoresNumber = sheet.headers.some(header => ["staffnumber", "employeenumber"].includes(normalize(header)));
+    const notices = ignoresNumber ? ["The staff number column in this file is ignored. New numbers are generated from each person's hire date."] : [];
+    return { file: { name: file.originalname, format, rows: rows.length }, notices, summary: { total: rows.length, ready: count("ready"), duplicate: count("duplicate"), error: count("error") }, rows };
   }
 
   async importBatch(school: Pick<School, "id" | "organizationId">, actorId: string, schoolRole: string | undefined, kind: Kind, batchId: string, rows: { rowNumber: number; row: Record<string, unknown> }[]) {
@@ -109,8 +111,8 @@ export class StaffImportService {
       if (!parsed.success) { results.push({ rowNumber: item.rowNumber, name, status: "failed", message: parsed.error.issues.map(issue => issue.message).join(" ") }); continue; }
       try {
         const created = kind === "teacher"
-          ? await this.people.createTeacher(school, actorId, parsed.data as any)
-          : await this.people.createStaff(school, { id: actorId, schoolRole }, parsed.data as any);
+          ? await this.people.createTeacher(school, actorId, { ...(parsed.data as any), staffNumber: undefined })
+          : await this.people.createStaff(school, { id: actorId, schoolRole }, { ...(parsed.data as any), staffNumber: undefined });
         results.push({ rowNumber: item.rowNumber, name, status: "created", credentials: created.credentials ?? null });
       } catch (error) {
         if (error instanceof HttpException) results.push({ rowNumber: item.rowNumber, name, status: "failed", message: error.message });

@@ -5,10 +5,10 @@ import { Download, FileSpreadsheet, FileUp, LoaderCircle, X } from "lucide-react
 
 type Kind = "teacher" | "staff";
 type PreviewRow = { rowNumber: number; name: string; status: "ready" | "duplicate" | "error"; errors: string[]; row: Record<string, unknown> | null };
-type Preview = { file: { name: string; format: string; rows: number }; summary: { total: number; ready: number; duplicate: number; error: number }; rows: PreviewRow[] };
+type Preview = { notices?: string[]; file: { name: string; format: string; rows: number }; summary: { total: number; ready: number; duplicate: number; error: number }; rows: PreviewRow[] };
 type Result = { rowNumber: number; name: string; status: "created" | "failed"; message?: string; credentials?: { loginEmail: string; temporaryPassword: string } | null };
-const teacherHeaders = ["firstName","lastName","email","phone","gender","dateOfBirth","department","qualification","specialization","experience","staffNumber","employmentType","hireDate"];
-const staffHeaders = ["firstName","lastName","email","phone","gender","dateOfBirth","staffType","jobTitle","department","staffId","staffNumber","employmentType","hireDate"];
+const teacherHeaders = ["firstName","lastName","email","phone","gender","dateOfBirth","department","qualification","specialization","experience","employmentType","hireDate"];
+const staffHeaders = ["firstName","lastName","email","phone","gender","dateOfBirth","staffType","jobTitle","department","staffId","employmentType","hireDate"];
 const employmentTypes = ["FULL_TIME", "PART_TIME", "CONTRACT", "TEMPORARY", "INTERN"];
 const staffTypes = ["ACCOUNTANT", "HEADTEACHER", "ADMIN", "LIBRARIAN", "DRIVER", "SECURITY", "NURSE", "COUNSELOR", "IT_SUPPORT", "RECEPTIONIST", "COOK", "CLEANER", "OTHER"];
 
@@ -82,7 +82,7 @@ export function StaffBulkImport({ kind, onClose, onComplete }: { kind: Kind; onC
       sheet.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: headers.length } };
       headers.forEach((header, index) => {
         sheet.getColumn(index + 1).width = Math.max(16, header.length + 4);
-        if (["phone", "dateOfBirth", "hireDate", "staffNumber", "staffId"].includes(header)) {
+        if (["phone", "dateOfBirth", "hireDate", "staffId"].includes(header)) {
           sheet.getColumn(index + 1).numFmt = "@";
         }
       });
@@ -168,6 +168,7 @@ export function StaffBulkImport({ kind, onClose, onComplete }: { kind: Kind; onC
         <label className="flex cursor-pointer flex-col items-center gap-2 rounded-xl border border-dashed border-border bg-muted/30 p-7 text-center"><FileUp className="size-7 text-primary"/><span className="text-sm font-semibold">{file?.name ?? "Choose a .csv or .xlsx file"}</span><span className="text-xs text-muted-foreground">Maximum 2 MB; up to 1,000 rows</span><input type="file" accept=".csv,.xlsx" className="sr-only" onChange={e => {setFile(e.target.files?.[0] ?? null);setPreview(null);setError(null);}}/></label>
         <div className="flex justify-end"><button type="button" disabled={!file || loading} onClick={() => void inspect()} className="rounded-lg bg-primary px-4 py-2.5 text-xs font-bold text-primary-foreground disabled:opacity-50">{loading ? "Checking…" : "Validate file"}</button></div>
         {preview && <div className="space-y-3 rounded-xl border border-border p-4">
+          {preview.notices?.map(notice => <p key={notice} className="rounded-lg bg-muted p-2 text-xs text-muted-foreground">{notice}</p>)}
           <div className="grid grid-cols-3 gap-2 text-center">{[["Ready",preview.summary.ready],["Duplicates",preview.summary.duplicate],["Errors",preview.summary.error]].map(([label,value])=><div key={String(label)} className="rounded-lg bg-muted p-3"><div className="text-xl font-bold">{value}</div><div className="text-xs text-muted-foreground">{label}</div></div>)}</div>
           <div className="max-h-64 overflow-auto rounded-lg border border-border"><table className="w-full text-left text-xs"><thead className="sticky top-0 bg-muted"><tr><th className="p-2">Row</th><th className="p-2">Name</th><th className="p-2">Status</th><th className="p-2">Details</th></tr></thead><tbody>{preview.rows.map(row=><tr key={row.rowNumber} className="border-t border-border"><td className="p-2">{row.rowNumber}</td><td className="p-2">{row.name}</td><td className="p-2">{row.status}</td><td className="p-2">{row.errors.join(" ") || "Ready to create"}</td></tr>)}</tbody></table></div>
           <div className="flex justify-end"><button type="button" disabled={loading || preview.summary.ready===0} onClick={() => void runImport()} className="rounded-lg bg-primary px-4 py-2.5 text-xs font-bold text-primary-foreground disabled:opacity-50">{loading ? progress || "Importing…" : `Create ${preview.summary.ready} records`}</button></div>

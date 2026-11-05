@@ -453,7 +453,13 @@ export class StudentsService {
         departmentId ??= classDepartmentId ?? undefined;
       }
 
-      const admissionYear = new Date().getUTCFullYear();
+      // The year in the admission number is the year of admission: the date
+      // supplied (e.g. a bulk-import row) or, failing that, today.
+      const dateYear = Number(options.admissionDate?.slice(0, 4));
+      const admissionYear =
+        Number.isInteger(dateYear) && dateYear >= 1900
+          ? dateYear
+          : new Date().getUTCFullYear();
       // pg_advisory_xact_lock() returns Postgres `void`, which Prisma cannot
       // deserialize through $queryRaw (it failed every student creation with
       // P2010). $executeRaw never reads result columns, so it is safe.

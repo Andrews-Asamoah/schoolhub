@@ -69,7 +69,7 @@ export function downloadCsvTemplate() {
 }
 
 const TEXT_FORMAT_FIELDS: StudentImportField[] = [
-  "dateOfBirth", "admissionDate", "admissionNumber", "emergencyContactPhone", "g1Phone", "g2Phone",
+  "dateOfBirth", "admissionDate", "emergencyContactPhone", "g1Phone", "g2Phone",
 ];
 
 /**

@@ -304,7 +304,7 @@ export function StudentImportWizard({
                 <ul className="mt-1 list-disc space-y-1 pl-4 text-xs text-muted-foreground">
                   <li>Required: first name, last name, gender and date of birth.</li>
                   <li>Dates are read day first, like 25/12/2012.</li>
-                  <li>Give an <strong>Admission number</strong> to keep a student&rsquo;s existing one. Leave it blank to have one made.</li>
+                  <li>Admission numbers are made for you from each student&rsquo;s <strong>Admission date</strong> (e.g. WIS20180039). Any admission number in the file is ignored.</li>
                   <li>Classes must already exist and be spelled as they are in the system.</li>
                   <li>Students already in the school are skipped, so a file can be uploaded again safely.</li>
                 </ul>
