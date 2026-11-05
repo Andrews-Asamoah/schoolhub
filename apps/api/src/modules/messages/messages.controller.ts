@@ -38,6 +38,20 @@ export class MessagesController {
     return this.messages.listMessages(school.id, user.id, "sent");
   }
 
+  @Get("inbox/page")
+  @Roles(...schoolRoles)
+  inboxPage(@CurrentSchool() school: School, @CurrentUser() user: AuthenticatedUser,
+    @Query() query: { cursor?: string; search?: string; limit?: string }) {
+    return this.messages.listMessagePage(school.id, user.id, "inbox", query);
+  }
+
+  @Get("sent/page")
+  @Roles(...schoolRoles)
+  sentPage(@CurrentSchool() school: School, @CurrentUser() user: AuthenticatedUser,
+    @Query() query: { cursor?: string; search?: string; limit?: string }) {
+    return this.messages.listMessagePage(school.id, user.id, "sent", query);
+  }
+
   @Post()
   @Roles(...schoolRoles)
   send(

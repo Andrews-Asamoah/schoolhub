@@ -1,3 +1,4 @@
+import { useLogout } from "@/hooks/use-logout";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { Check, Eye, EyeOff, KeyRound, ShieldCheck, X } from "lucide-react";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
@@ -8,7 +9,7 @@ import {
 } from "@schoolhub/shared";
 import { ThemeToggle } from "@/components/school/theme-toggle";
 import { ApiError, apiFetch } from "@/lib/api";
-import { authClient, signOut, useSession } from "@/lib/auth-client";
+import { authClient, useSession } from "@/lib/auth-client";
 
 export const Route = createFileRoute("/change-password")({
   component: ChangePasswordPage,
@@ -22,6 +23,7 @@ const rules = [
 ];
 
 function ChangePasswordPage() {
+  const { logout, error: logoutError, isSigningOut } = useLogout();
   const navigate = useNavigate();
   const { data: session, isPending } = useSession();
   const forced = Boolean(session?.user?.mustChangePassword);
@@ -82,7 +84,8 @@ function ChangePasswordPage() {
     return (
       <main className="flex min-h-screen items-center justify-center bg-background">
         <p role="status" className="text-sm text-muted-foreground">Checking your session…</p>
-      </main>
+        {logoutError && <p role="alert" className="p-4 text-sm text-destructive">{logoutError}</p>}
+    </main>
     );
   }
 
@@ -143,11 +146,12 @@ function ChangePasswordPage() {
 
         <div className="mt-6 flex items-center justify-between text-xs text-muted-foreground">
           <span className="flex items-center gap-1.5"><ShieldCheck className="size-3.5" /> Other devices are signed out when you save.</span>
-          <button type="button" className="font-medium text-muted-foreground underline-offset-2 hover:underline" onClick={() => void signOut().then(() => navigate({ to: "/login", replace: true }))}>
+          <button type="button" className="font-medium text-muted-foreground underline-offset-2 hover:underline" disabled={isSigningOut} onClick={() => void logout()}>
             Sign out
           </button>
         </div>
       </div>
+      {logoutError && <p role="alert" className="p-4 text-sm text-destructive">{logoutError}</p>}
     </main>
   );
 }

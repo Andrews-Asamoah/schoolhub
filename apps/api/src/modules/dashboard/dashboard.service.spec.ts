@@ -69,3 +69,24 @@ describe("DashboardService finance visibility", () => {
     expect(expenseFindMany).toHaveBeenCalledTimes(2);
   });
 });
+
+it("does not fetch or expose school-wide named student activity to teachers", async () => {
+  const students = vi.fn().mockResolvedValue([]);
+  const service = new DashboardService({ client: {
+    student: { findMany: students }, teacher: { count: vi.fn().mockResolvedValue(0) },
+  } } as unknown as PrismaService);
+  const result = await service.getAnalytics("school", "teacher", 3);
+  expect(students).toHaveBeenCalledTimes(1);
+  expect(result.recentActivities).toEqual([]);
+  expect(result.canViewFinance).toBe(false);
+});
+
+it("adds collection amounts as decimals before converting chart values", async () => {
+  const now = new Date();
+  const service = new DashboardService({ client: {
+    student: { findMany: vi.fn().mockResolvedValue([]) }, teacher: { count: vi.fn().mockResolvedValue(0) },
+    payment: { findMany: vi.fn().mockResolvedValue([{ amount: "0.10", paymentDate: now }, { amount: "0.20", paymentDate: now }]) },
+    expense: { findMany: vi.fn().mockResolvedValue([]) },
+  } } as unknown as PrismaService);
+  expect((await service.getAnalytics("school", "admin", 3)).metrics.revenueThisMonth).toBe(0.3);
+});

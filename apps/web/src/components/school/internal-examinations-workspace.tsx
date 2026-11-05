@@ -1,3 +1,4 @@
+import { useMarkDraft } from "@/hooks/use-mark-draft";
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { BookOpenCheck, CheckCheck, ClipboardList, LockKeyhole, Plus } from "lucide-react";
@@ -20,7 +21,7 @@ type Pupil = {id:string;name:string;admissionNumber:string|null;marks:number|nul
   status:"MARKED"|"ABSENT"|null;version:number;percentage:number|null;sectionMarks:SectionMark[]};
 type Sheet = {paper:{id:string;name:string;code:string;maxMarks:number;finalizedAt:string|null;sections:PaperSection[]};
   session:{id:string;name:string;status:"DRAFT"|"OPEN"|"LOCKED"};canEdit:boolean;candidates:Pupil[]};
-type Draft = {marks:string;absent:boolean};
+type Draft = {marks:string;absent:boolean;expectedVersion:number};
 const style="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground";
 const button="rounded-lg border border-border bg-card px-3 py-2 text-xs font-semibold hover:bg-muted disabled:opacity-40";
 const primary="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground disabled:opacity-40";
@@ -37,7 +38,6 @@ export function InternalExaminationsWorkspace() {
   const [selectedSession,setSelectedSession]=useState("");
   const [selectedPaper,setSelectedPaper]=useState("");
   const [selectedClass,setSelectedClass]=useState("");
-  const [drafts,setDrafts]=useState<Record<string,Draft>>({});
   const [selectedSectionId,setSelectedSectionId]=useState("");
   const [notice,setNotice]=useState<string|null>(null);
   const exams=sessions.data??[];
@@ -47,28 +47,18 @@ export function InternalExaminationsWorkspace() {
   const sheet=useQuery({queryKey:["internal-exams","paper",paper?.id],
     queryFn:()=>apiFetch<Sheet>("/internal-exams/papers/"+encodeURIComponent(paper!.id)),
     enabled:Boolean(paper?.id),retry:false});
+  const [drafts,setDrafts]=useMarkDraft<Draft>("mock:"+(paper?.id??""), (value): value is Draft => {
+    const row=value as Partial<Draft>|null;
+    return !!row&&typeof row.marks==="string"&&typeof row.absent==="boolean"&&Number.isInteger(row.expectedVersion);
+  });
   useEffect(()=>{
     if(!sheet.data)return;
-    const rows:Record<string,Draft>={};
     if(sheet.data.paper.sections.length){
-      for(const pupil of sheet.data.candidates){
-        for(const section of sheet.data.paper.sections){
-          const mark=pupil.sectionMarks.find(item=>item.sectionId===section.id);
-          rows[`${pupil.id}:${section.id}`]={
-            marks:mark?.marks===null||mark?.marks===undefined?"":String(mark.marks),
-            absent:mark?.status==="ABSENT",
-          };
-        }
-      }
       setSelectedSectionId(current=>sheet.data!.paper.sections.some(section=>section.id===current)
         ?current:(sheet.data!.paper.sections.find(section=>section.canEdit)?.id??sheet.data!.paper.sections[0]?.id??""));
     }else{
-      for(const pupil of sheet.data.candidates){
-        rows[pupil.id]={marks:pupil.marks===null?"":String(pupil.marks),absent:pupil.status==="ABSENT"};
-      }
       setSelectedSectionId("");
     }
-    setDrafts(rows);
   },[sheet.data]);
   const refresh=async()=>{
     await client.invalidateQueries({queryKey:["internal-exams"]});
@@ -105,7 +95,7 @@ export function InternalExaminationsWorkspace() {
       if(!item.absent&&mark===null)return [];
       const status=item.absent?"ABSENT" as const:"MARKED" as const;
       if(beforeStatus===status && beforeMarks===mark)return [];
-      return [{candidateId:row.id,status,marks:mark,expectedVersion:beforeVersion}];
+      return [{candidateId:row.id,status,marks:mark,expectedVersion:item.expectedVersion??beforeVersion}];
     });
   },[candidates,drafts,sectionMode,selectedSection]);
   const invalid=changes.some(item=>item.marks!==null&&(
@@ -119,7 +109,7 @@ export function InternalExaminationsWorkspace() {
       :apiFetch("/internal-exams/marks",{
         method:"PUT",body:JSON.stringify({paperId:sheet.data!.paper.id,entries:changes}),
       }),
-    onSuccess:async()=>{setNotice(sectionMode?"Teaching-area marks saved. The single subject result is recalculated when all sections are complete.":"Mock marks saved with an audit history.");await client.invalidateQueries({
+    onSuccess:async()=>{setDrafts({});setNotice(sectionMode?"Teaching-area marks saved. The single subject result is recalculated when all sections are complete.":"Mock marks saved with an audit history.");await client.invalidateQueries({
       queryKey:["internal-exams","paper",paper?.id],
     });},
   });
@@ -175,13 +165,13 @@ export function InternalExaminationsWorkspace() {
       {exams.length>0&&<>
         <div className="grid gap-2 md:grid-cols-2">
           <div><label className="mb-1 block text-xs font-semibold">Examination session</label>
-            <Select value={current?.id??""} onValueChange={v=>{setSelectedSession(v);setSelectedPaper("");setNotice(null)}}>
+            <Select value={current?.id??""} onValueChange={v=>{if(Object.keys(drafts).length&&!window.confirm("Keep your unsaved draft and switch examination?"))return;setSelectedSession(v);setSelectedPaper("");setNotice(null)}}>
               <SelectTrigger><SelectValue placeholder="Choose mock"/></SelectTrigger>
               <SelectContent>{exams.map(s=><SelectItem key={s.id} value={s.id}>
                 {s.name} · {s.class.name} · {s.academicYear.name}</SelectItem>)}</SelectContent>
             </Select></div>
           <div><label className="mb-1 block text-xs font-semibold">Subject paper</label>
-            <Select value={paper?.id??""} onValueChange={setSelectedPaper}>
+            <Select value={paper?.id??""} onValueChange={v=>{if(Object.keys(drafts).length&&!window.confirm("Keep your unsaved draft and switch paper?"))return;setSelectedPaper(v)}}>
               <SelectTrigger><SelectValue placeholder="Choose subject"/></SelectTrigger>
               <SelectContent>{papers.map(p=><SelectItem key={p.id} value={p.id}>
                 {p.codeSnapshot} · {p.nameSnapshot}{p.finalizedAt?" (Finalised)":""}</SelectItem>)}</SelectContent>
@@ -232,10 +222,10 @@ export function InternalExaminationsWorkspace() {
             </tr></thead>
             <tbody>{candidates.map(row=>{
               const key=sectionMode&&selectedSection?`${row.id}:${selectedSection.id}`:row.id;
-              const draft=drafts[key]??{marks:"",absent:false};
               const saved=sectionMode&&selectedSection?row.sectionMarks.find(mark=>mark.sectionId===selectedSection.id):undefined;
               const savedStatus=sectionMode?(saved?.status??null):row.status;
               const savedMarks=sectionMode?(saved?.marks??null):row.marks;
+              const draft=drafts[key]??{marks:savedMarks===null?"":String(savedMarks),absent:savedStatus==="ABSENT",expectedVersion:sectionMode?(saved?.version??0):row.version};
               return <tr key={row.id} className="border-t border-border">
                 <td className="p-3"><div className="font-semibold">{row.name}</div>
                   <div className="text-muted-foreground">{row.admissionNumber??"—"}</div></td>
@@ -248,7 +238,7 @@ export function InternalExaminationsWorkspace() {
                 <td className="p-3"><input type="checkbox" aria-label={`Absent: ${row.name}`}
                   checked={draft.absent} disabled={!canEditSelected}
                   onChange={e=>setDrafts(prev=>({
-                    ...prev,[key]:{marks:e.target.checked?"":draft.marks,absent:e.target.checked},
+                    ...prev,[key]:{...draft,marks:e.target.checked?"":draft.marks,absent:e.target.checked},
                   }))}/></td>
                 <td className="p-3">{draft.absent?"Absent":
                   draft.marks.trim()? `${(Number(draft.marks)/maximum*100).toFixed(1)}%` : "—"}</td>

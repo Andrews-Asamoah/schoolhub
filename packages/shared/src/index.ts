@@ -16,6 +16,13 @@ export const ROLES = [
 ] as const;
 export type Role = (typeof ROLES)[number];
 
+/** Effective school administration membership, including assigned additional roles. */
+export const SCHOOL_ADMIN_ROLES = ["owner", "admin", "headteacher"] as const;
+export function hasSchoolAdministrationRole(member: { role: string; roles?: readonly string[] | null }): boolean {
+  return [member.role, ...(member.roles ?? [])].some((role) =>
+    (SCHOOL_ADMIN_ROLES as readonly string[]).includes(role));
+}
+
 // ============================================================================
 // PASSWORD POLICY & CREDENTIALS
 // ============================================================================
@@ -598,6 +605,7 @@ export const saveAssessmentEntrySchema = z.object({
   classId: z.string().min(1),
   subjectId: z.string().min(1),
   templateId: z.string().min(1),
+  termId: z.string().min(1).optional(),
   entries: z
     .array(
       z.object({
@@ -605,6 +613,7 @@ export const saveAssessmentEntrySchema = z.object({
         componentId: z.string().min(1),
         occurrenceIndex: z.number().int().min(0).max(50).default(0),
         marks: z.number().min(0).max(10000).nullable(),
+        expectedMarks: z.number().min(0).max(10000).nullable().optional(),
       }),
     )
     .min(1, "There are no marks to save")

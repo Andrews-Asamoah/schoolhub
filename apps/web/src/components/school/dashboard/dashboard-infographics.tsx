@@ -134,7 +134,7 @@ export function DashboardInfographics({
         )}
       </InfographicCard>
 
-      <InfographicCard title="Enrollment growth" description="Active student population by admission date, with new admissions each month" icon={TrendingUp} aside={periodSelect}>
+      <InfographicCard title="Current students by admission date" description="Admission history of currently active students only; this is not historical enrollment. Graduated and withdrawn students are excluded." icon={TrendingUp} aside={periodSelect}>
         {isLoading ? <ChartLoading /> : isError ? <EmptyChart message={unavailable} /> : (data?.metrics.activeStudents ?? 0) === 0 ? <EmptyChart message="No active student enrollment history is available yet." /> : (
           <div className="h-64 w-full min-w-0" role="img" aria-label="Enrollment population and new admissions by month">
             <ResponsiveContainer width="100%" height="100%" minWidth={0}>
@@ -154,23 +154,23 @@ export function DashboardInfographics({
       </InfographicCard>
 
       {data?.canViewFinance && (
-        <InfographicCard title="Financial status" description="Recorded revenue from completed payments versus recorded expenditures" icon={WalletCards} className="lg:col-span-2">
+        <InfographicCard title="Financial status" description="Completed fee collections versus recorded expenses; this is a cash-collection overview, not accrual revenue." icon={WalletCards} className="lg:col-span-2">
           {isLoading ? <ChartLoading /> : isError ? <EmptyChart message={unavailable} /> : !data.hasFinancialRecords ? <EmptyChart message="No payment or expenditure records exist for this period." /> : (
             <>
               <div className="mb-4 grid gap-3 sm:grid-cols-3">
-                <div className="rounded-xl bg-muted/50 p-3"><p className="text-xs text-muted-foreground">Revenue this month</p><p className="mt-1 text-lg font-bold text-foreground">{money(data.metrics.revenueThisMonth ?? 0)}</p></div>
+                <div className="rounded-xl bg-muted/50 p-3"><p className="text-xs text-muted-foreground">Fee collections this month</p><p className="mt-1 text-lg font-bold text-foreground">{money(data.metrics.revenueThisMonth ?? 0)}</p></div>
                 <div className="rounded-xl bg-muted/50 p-3"><p className="text-xs text-muted-foreground">Expenditures this month</p><p className="mt-1 text-lg font-bold text-foreground">{money(data.metrics.expendituresThisMonth ?? 0)}</p></div>
                 <div className="rounded-xl bg-muted/50 p-3"><p className="text-xs text-muted-foreground">Net recorded movement</p><p className="mt-1 text-lg font-bold text-foreground">{money((data.metrics.revenueThisMonth ?? 0) - (data.metrics.expendituresThisMonth ?? 0))}</p></div>
               </div>
-              <div className="h-64 w-full min-w-0" role="img" aria-label="Monthly revenue versus expenditures in Ghana cedis">
+              <div className="h-64 w-full min-w-0" role="img" aria-label="Monthly fee collections versus expenditures in Ghana cedis">
                 <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                   <BarChart data={data.financialStatus} margin={{ top: 8, right: 8, left: 0, bottom: 0 }} barGap={6}>
                     <CartesianGrid stroke="var(--border)" strokeDasharray="3 3" vertical={false} />
                     <XAxis dataKey="month" tickLine={false} axisLine={false} tick={{ fill: "var(--muted-foreground)", fontSize: 11 }} />
                     <YAxis tickFormatter={(value: number) => value >= 1000 ? (value / 1000).toFixed(0) + "k" : String(value)} tickLine={false} axisLine={false} width={45} tick={{ fill: "var(--muted-foreground)", fontSize: 10 }} />
-                    <Tooltip contentStyle={chartTooltipStyle} formatter={(value, name) => [money(Number(value ?? 0)), name === "revenue" ? "Revenue" : "Expenditures"]} />
+                    <Tooltip contentStyle={chartTooltipStyle} formatter={(value, name) => [money(Number(value ?? 0)), name === "revenue" ? "Fee collections" : "Expenditures"]} />
                     <Legend wrapperStyle={{ fontSize: 11, paddingTop: 8 }} />
-                    <Bar dataKey="revenue" name="Revenue" fill="var(--chart-2)" radius={[5, 5, 0, 0]} maxBarSize={30} />
+                    <Bar dataKey="revenue" name="Fee collections" fill="var(--chart-2)" radius={[5, 5, 0, 0]} maxBarSize={30} />
                     <Bar dataKey="expenditures" name="Expenditures" fill="var(--chart-5)" radius={[5, 5, 0, 0]} maxBarSize={30} />
                   </BarChart>
                 </ResponsiveContainer>

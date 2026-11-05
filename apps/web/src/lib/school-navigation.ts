@@ -525,9 +525,14 @@ const adminRestrictedFinancePages = new Set([
   "finance-reports",
 ]);
 
+const personalPages = new Set(["guardian-portal", "guardian-attendance", "guardian-timetable", "guardian-reports", "guardian-notices", "guardian-fees", "student-portal", "teacher-portal", "classmates"]);
+const managementPages = schoolNavItems.filter((item) => !personalPages.has(item.id)).map((item) => item.id);
+
 const rolePages: Record<string, string[]> = {
+  owner: managementPages,
+  headteacher: managementPages,
   admin: schoolNavItems
-    .filter((item) => !adminRestrictedFinancePages.has(item.id))
+    .filter((item) => !adminRestrictedFinancePages.has(item.id) && !personalPages.has(item.id))
     .map((item) => item.id),
   teacher: [
     "external-exams",
@@ -619,13 +624,9 @@ const ownPortalByRole: Record<string, string> = {
 const studentOnlyPages = ["classmates"];
 
 export function getSchoolNavGroupsForRole(role?: string) {
-  const allowedPages = rolePages[role ?? ""];
+  const allowedPages = rolePages[role ?? ""] ?? [];
   const groups = schoolNavGroups.filter((group) => group.label !== "Portals" && group.label !== "Account");
-  if (!allowedPages) {
-    return groups
-      .map((group) => ({ ...group, items: group.items.filter((item) => !studentOnlyPages.includes(item.id)) }))
-      .filter((group) => group.items.length > 0);
-  }
+
 
   return groups
     .map((group) => ({
@@ -649,7 +650,7 @@ export function canRoleAccessPage(role: string | null | undefined, pageId: strin
   const item = schoolNavItems.find((entry) => entry.id === pageId);
   if (item?.section === "Account") return true;
   const allowed = rolePages[role ?? ""];
-  return !allowed || allowed.includes(pageId);
+  return Boolean(allowed?.includes(pageId));
 }
 
 export function getSchoolNavItem(id: string) {

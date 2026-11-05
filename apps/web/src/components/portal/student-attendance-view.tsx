@@ -63,9 +63,12 @@ export function StudentAttendanceView() {
         </p>
       </div>
 
+      {/* Unavailable data must not look like a genuine zero count. */}
+      {isError && <div role="alert" className="rounded-xl border border-destructive/20 p-4 text-sm text-destructive">Attendance statistics are unavailable. Use Try again below to reload.</div>}
+      {!isError && !isLoading && <>
       {/* Stats Cards */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="rounded-2xl border border-border/80 bg-card p-5 shadow-xs">
+      <div className="rounded-2xl border border-border/80 bg-card p-5 shadow-xs">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-muted-foreground">Attendance Rate</span>
             <span className="flex size-9 items-center justify-center rounded-xl bg-success/10 text-success">
@@ -117,6 +120,7 @@ export function StudentAttendanceView() {
         </div>
       </div>
 
+      </>}
       {/* Attendance History Table */}
       <div className="rounded-2xl border border-border/80 bg-card p-5 shadow-xs">
         <div className="flex items-center justify-between pb-3 border-b border-border/60">

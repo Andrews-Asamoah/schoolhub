@@ -1,3 +1,4 @@
+import { clearPrivateSessionPreferences } from "@/lib/private-session";
 import { useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { queryClient } from "@/lib/query-client";
@@ -27,8 +28,7 @@ export function useLogout() {
       // Cancel in-flight reads before removing private data from the shared cache.
       await queryClient.cancelQueries();
       queryClient.clear();
-      window.localStorage.removeItem("schoolhub-active-role");
-      window.sessionStorage.removeItem("schoolhub-accountant-academic-view");
+      clearPrivateSessionPreferences();
       window.dispatchEvent(new Event("schoolhub-role-change"));
       window.sessionStorage.setItem(
         LOGOUT_NOTICE_KEY,

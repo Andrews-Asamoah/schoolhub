@@ -1,3 +1,4 @@
+import { useMarkDraft } from "@/hooks/use-mark-draft";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CircleAlert, CircleCheck, Lock, LoaderCircle } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -94,7 +95,6 @@ export function AssessmentEntryWorkspace({
   const [classId, setClassId] = useState(initial?.classId ?? "");
   const [subjectId, setSubjectId] = useState(initial?.subjectId ?? "");
   const [templateId, setTemplateId] = useState("");
-  const [draft, setDraft] = useState<Record<string, string>>({});
   const [notice, setNotice] = useState<string | null>(null);
 
   useEffect(() => {
@@ -121,6 +121,7 @@ export function AssessmentEntryWorkspace({
     retry: false,
   });
   const sheet = sheetQuery.data;
+  const [draft, setDraft] = useMarkDraft<{value:string;expectedMarks:number|null}>(JSON.stringify(["sba", effectiveClassId, effectiveSubjectId, sheet?.term.id, sheet?.template?.id]), (value): value is {value:string;expectedMarks:number|null} => { const row=value as {value?:unknown;expectedMarks?:unknown}|null; return !!row && typeof row.value === "string" && (row.expectedMarks === null || typeof row.expectedMarks === "number"); });
 
   // Server values by cell, used to tell which cells the teacher has changed.
   const saved = useMemo(() => {
@@ -131,9 +132,6 @@ export function AssessmentEntryWorkspace({
     return map;
   }, [sheet]);
 
-  useEffect(() => {
-    setDraft({});
-  }, [sheet]);
 
   const maxByComponent = useMemo(
     () => new Map((sheet?.template?.components ?? []).map((component) => [component.id, component.maxMarks])),
@@ -141,16 +139,16 @@ export function AssessmentEntryWorkspace({
   );
 
   const changes = useMemo(() => {
-    const result: { studentId: string; componentId: string; occurrenceIndex: number; marks: number | null; valid: boolean }[] = [];
+    const result: { studentId: string; componentId: string; occurrenceIndex: number; marks: number | null; expectedMarks: number|null; valid: boolean }[] = [];
     for (const [key, raw] of Object.entries(draft)) {
       const [studentId = "", componentId = "", slot = "0"] = key.split("|");
       const before = saved.get(key) ?? "";
-      const value = raw.trim();
+      const value = raw.value.trim();
       if (value === before) continue;
       const marks = value === "" ? null : Number(value);
       const max = maxByComponent.get(componentId) ?? 0;
       const valid = marks === null || (Number.isFinite(marks) && marks >= 0 && marks <= max);
-      result.push({ studentId, componentId, occurrenceIndex: Number(slot), marks, valid });
+      result.push({ studentId, componentId, occurrenceIndex: Number(slot), marks, expectedMarks: raw.expectedMarks, valid });
     }
     return result;
   }, [draft, saved, maxByComponent]);
@@ -159,6 +157,7 @@ export function AssessmentEntryWorkspace({
   const save = useMutation({
     mutationFn: (body: unknown) => apiFetch<Sheet>("/assessments/entry", { method: "PUT", body: JSON.stringify(body) }),
     onSuccess: (result) => {
+      setDraft({});
       queryClient.setQueryData(sheetKey, result);
       setNotice("Marks saved.");
     },
@@ -167,6 +166,7 @@ export function AssessmentEntryWorkspace({
   function guard(action: () => void) {
     if (changes.length && !window.confirm("You have unsaved marks. Discard them?")) return;
     setNotice(null);
+    setDraft({});
     action();
   }
 
@@ -286,7 +286,7 @@ export function AssessmentEntryWorkspace({
                       {components.flatMap((component) =>
                         Array.from({ length: component.slots }, (_, slot) => {
                           const key = cellKey(student.studentId, component.id, slot);
-                          const value = draft[key] ?? saved.get(key) ?? "";
+                          const value = draft[key]?.value ?? saved.get(key) ?? "";
                           const number = value.trim() === "" ? null : Number(value);
                           const bad = number !== null && (!Number.isFinite(number) || number < 0 || number > component.maxMarks);
                           return (
@@ -301,7 +301,7 @@ export function AssessmentEntryWorkspace({
                                 disabled={!editable || !component.canEdit}
                                 aria-invalid={bad || undefined}
                                 aria-label={`${student.name}, ${component.name}${component.slots > 1 ? ` ${slot + 1}` : ""}, out of ${component.maxMarks}`}
-                                onChange={(event) => { setNotice(null); setDraft((current) => ({ ...current, [key]: event.target.value })); }}
+                                onChange={(event) => { setNotice(null); setDraft((current) => ({ ...current, [key]: {value:event.target.value, expectedMarks:current[key]?.expectedMarks !== undefined ? current[key]!.expectedMarks : saved.has(key) ? Number(saved.get(key)) : null} })); }}
                                 className={`h-9 w-16 rounded-lg border px-2 text-center text-xs tabular-nums outline-none focus:ring-2 disabled:bg-muted/50 disabled:text-muted-foreground ${
                                   bad
                                     ? "border-destructive/50 bg-destructive/10 text-destructive focus:ring-destructive/20"
@@ -339,7 +339,8 @@ export function AssessmentEntryWorkspace({
                     classId: effectiveClassId,
                     subjectId: effectiveSubjectId,
                     templateId: sheet.template!.id,
-                    entries: changes.map(({ studentId, componentId, occurrenceIndex, marks }) => ({ studentId, componentId, occurrenceIndex, marks })),
+                    termId: sheet.term.id,
+                    entries: changes.map(({ studentId, componentId, occurrenceIndex, marks, expectedMarks }) => ({ studentId, componentId, occurrenceIndex, marks, expectedMarks })),
                   })
                 }
                 className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary px-4 text-xs font-semibold text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
@@ -350,6 +351,7 @@ export function AssessmentEntryWorkspace({
             )}
             {invalid > 0 && <p role="alert" className="flex items-center gap-1.5 text-xs text-destructive"><CircleAlert className="size-3.5" /> {invalid} mark{invalid === 1 ? " is" : "s are"} outside the allowed range.</p>}
             {notice && <p role="status" className="flex items-center gap-1.5 text-xs text-success"><CircleCheck className="size-3.5" /> {notice}</p>}
+            {save.error && <button type="button" className="text-xs underline" onClick={() => { if(window.confirm("Discard your local draft and reload the latest saved marks?")) {setDraft({}); void sheetQuery.refetch();} }}>Discard draft and load latest marks</button>}
             {save.error && <p role="alert" className="flex items-center gap-1.5 text-xs text-destructive"><CircleAlert className="size-3.5" /> {save.error.message}</p>}
             <p className="ml-auto text-[11px] text-muted-foreground">
               Grades appear once every required column has a mark.

@@ -111,3 +111,24 @@ describe("MessagesService school and recipient guards", () => {
     }));
   });
 });
+
+it("pages all 250 owned messages stably, including equal timestamps", async () => {
+  const { service, client } = buildService();
+  Object.assign(client.schoolMessageRecipient, { count: vi.fn().mockResolvedValue(250) });
+  const rows = Array.from({ length: 250 }, (_, index) => ({ id: String(250-index).padStart(4,"0"), createdAt: new Date("2026-11-01T12:00:00Z"), recipients: [] }));
+  client.schoolMessage.findMany.mockImplementation(async (query: { where: { schoolId: string; recipients: unknown; AND: Array<{ OR: Array<{ id?: { lt: string } }> }> }; take: number }) => {
+    expect(query.where.schoolId).toBe("school-a");
+    expect(query.where.recipients).toEqual({ some: { recipientId: "user-a" } });
+    const cursor = query.where.AND.at(-1)?.OR.at(-1)?.id?.lt;
+    return rows.filter(row => !cursor || row.id < cursor).slice(0,query.take) as never;
+  });
+  const ids: string[] = []; let cursor: string | undefined;
+  do {
+    const page = await service.listMessagePage("school-a", "user-a", "inbox", { cursor, limit: "30" });
+    ids.push(...page.items.map(row => row.id)); cursor = page.nextCursor ?? undefined;
+    expect(page.unreadCount).toBe(250);
+  } while(cursor);
+  expect(ids).toHaveLength(250);expect(new Set(ids).size).toBe(250);
+  await expect(service.listMessagePage("school-a", "user-a", "inbox", { cursor:"invalid" })).rejects.toBeInstanceOf(BadRequestException);
+  await expect(service.listMessagePage("school-a", "user-a", "inbox", { limit:"10000" })).rejects.toBeInstanceOf(BadRequestException);
+});
