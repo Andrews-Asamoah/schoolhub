@@ -773,7 +773,7 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
                   <form.Field name="staffNumber">
                     {(field) => (
                       <TextField
-                        label="Staff number (optional)"
+                        label="Staff number (leave blank to auto-generate)"
                         value={field.state.value}
                         onChange={(value) => field.handleChange(value)}
                       />

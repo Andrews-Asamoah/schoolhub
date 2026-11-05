@@ -477,12 +477,14 @@ export class StudentsService {
         }
         admissionNumber = options.admissionNumber;
       } else {
+        // Format: <SUBDOMAIN><YYYY><NNNN>, e.g. WIS20180039. The sequence
+        // restarts at 0001 each calendar year, per school.
         const schoolPrefix =
-          schoolRow.code
+          school.subdomain
             .replace(/[^a-zA-Z0-9]/g, '')
             .toUpperCase()
             .slice(0, 8) || 'SCH';
-        const admissionPrefix = `${schoolPrefix}${String(admissionYear).slice(-2)}`;
+        const admissionPrefix = `${schoolPrefix}${admissionYear}`;
         const existingNumbers = await tx.student.findMany({
           where: {
             schoolId,
@@ -499,7 +501,7 @@ export class StudentsService {
         }, 0);
         if (lastSequence >= 9999) {
           throw new ConflictException(
-            'This school has reached the 9,999 admission numbers available for the current two-digit year code.',
+            'This school has reached the 9,999 admission numbers available for the current admission year.',
           );
         }
         admissionNumber = `${admissionPrefix}${String(lastSequence + 1).padStart(4, '0')}`;
