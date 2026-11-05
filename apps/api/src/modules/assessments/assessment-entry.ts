@@ -83,6 +83,14 @@ export interface GradeBand {
   gradePoint: number;
 }
 
+/** How a grading system turns marks into grades; mirrors the GradingMethod enum. */
+export type GradingMethod = "SCORE_BANDS" | "CLASS_RANK";
+
+/** A CLASS_RANK band: maxScore is the cumulative share of the class (from the top) it reaches. */
+export interface RankBand extends GradeBand {
+  maxScore: number;
+}
+
 export interface StudentResult {
   totalScore: number;
   percentage: number;
@@ -104,6 +112,7 @@ export function computeStudentResult(
   components: EntryComponent[],
   cells: MarkCell[],
   bands: GradeBand[],
+  method: GradingMethod = "SCORE_BANDS",
 ): StudentResult {
   let totalScore = 0;
   let totalWeight = 0;
@@ -123,7 +132,9 @@ export function computeStudentResult(
   const percentage = totalWeight > 0 ? round2((totalScore / totalWeight) * 100) : 0;
   let grade: string | null = null;
   let gradePoint: number | null = null;
-  if (complete) {
+  // A class-ranked grade depends on everyone else's marks, so it is assigned afterwards
+  // for the whole class by classRankGrades; a single pupil can't be graded in isolation.
+  if (complete && method === "SCORE_BANDS") {
     // Highest band whose minimum the percentage reaches, so gaps such as 79.5 still land somewhere.
     const band = [...bands].sort((a, b) => b.minScore - a.minScore).find((item) => percentage >= item.minScore);
     if (band) {
@@ -132,6 +143,41 @@ export function computeStudentResult(
     }
   }
   return { totalScore: round2(totalScore), percentage, complete, grade, gradePoint };
+}
+
+/**
+ * Class-ranked (stanine) grading. Each pupil's position is the share of their class
+ * that did better, counting half of any tied pupils (the percentile-rank midpoint), so
+ * pupils on equal marks always get the same grade and one tie never swallows a whole
+ * band. That share is then looked up in cumulative bands, e.g. 4, 11, 23, ... 100:
+ * a pupil with 3.3% of the class above them is in the top 4%, so grade 1.
+ *
+ * Pass only pupils who have a complete result; incomplete pupils get no grade and
+ * do not count towards the class size.
+ */
+export function classRankGrades<T extends string>(
+  rows: { id: T; percentage: number }[],
+  bands: RankBand[],
+): Map<T, { grade: string; gradePoint: number }> {
+  const result = new Map<T, { grade: string; gradePoint: number }>();
+  if (rows.length === 0 || bands.length === 0) return result;
+  const ordered = [...bands].sort((a, b) => a.maxScore - b.maxScore);
+  const sorted = [...rows].sort((a, b) => b.percentage - a.percentage);
+
+  let start = 0;
+  while (start < sorted.length) {
+    let end = start;
+    while (end + 1 < sorted.length && sorted[end + 1]!.percentage === sorted[start]!.percentage) end++;
+    const tied = end - start + 1;
+    const topShare = ((start + tied / 2) / sorted.length) * 100;
+    // Tiny tolerance so exact boundaries (e.g. 4% of 25 pupils) are not lost to float error.
+    const band = ordered.find((item) => topShare <= item.maxScore + 1e-9) ?? ordered[ordered.length - 1]!;
+    for (let index = start; index <= end; index++) {
+      result.set(sorted[index]!.id, { grade: band.grade, gradePoint: band.gradePoint });
+    }
+    start = end + 1;
+  }
+  return result;
 }
 
 /** Standard competition ranking (1, 2, 2, 4) among rows that have a percentage. */

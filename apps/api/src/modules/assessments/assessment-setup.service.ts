@@ -129,6 +129,7 @@ export class AssessmentSetupService {
         name: row.name,
         code: row.code,
         description: row.description,
+        method: row.method,
         shared: row.schoolId === null,
         usedBy: usage.get(row.id) ?? 0,
         hasMarks: (withMarks.get(row.id) ?? 0) > 0,

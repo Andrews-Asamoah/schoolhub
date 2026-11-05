@@ -14,12 +14,13 @@ import {
   type TeacherAssignments,
 } from "../../common/scope/teacher-scope.service.js";
 import {
+  classRankGrades,
   computeStudentResult,
   rankByPercentage,
   templateSpecificity,
   validateMarks,
   type EntryComponent,
-  type GradeBand,
+  type RankBand,
 } from "./assessment-entry.js";
 
 const NO_ASSIGNMENTS: TeacherAssignments = { teacherId: null, classTeacherClassIds: [], subjectAssignments: [], subjectStrandAssignments: [] };
@@ -84,7 +85,7 @@ export class AssessmentEntryService {
         occurrenceIndex: cell.occurrenceIndex,
         marks: Number(cell.marksObtained),
       }));
-      const result = computeStudentResult(selected.components, cells, selected.bands);
+      const result = computeStudentResult(selected.components, cells, selected.bands, selected.method);
       return {
         studentId: student.id,
         admissionNumber: student.admissionNumber,
@@ -101,6 +102,14 @@ export class AssessmentEntryService {
       students.map((student) => ({ id: student.studentId, percentage: student.complete ? student.percentage : null })),
     );
     for (const student of students) student.position = ranks.get(student.studentId) ?? null;
+    if (selected.method === "CLASS_RANK") {
+      // Graded against classmates: only pupils with a complete result count towards the class.
+      const graded = classRankGrades(
+        students.filter((student) => student.complete).map((student) => ({ id: student.studentId, percentage: student.percentage })),
+        selected.bands,
+      );
+      for (const student of students) student.grade = graded.get(student.studentId)?.grade ?? null;
+    }
 
     const deadlinePassed = Boolean(selected.deadline && selected.deadline < new Date() && !isSchoolManager(role));
     const assessmentLocked = selected.isLocked;
@@ -132,6 +141,7 @@ export class AssessmentEntryService {
           ),
         })),
         grades: selected.bands,
+        gradingMethod: selected.method,
       },
       students,
       canEdit: readOnlyReason === null,
@@ -276,8 +286,20 @@ export class AssessmentEntryService {
                 marks: Number(cell.marksObtained),
               })),
               template.bands,
+              template.method,
             ),
           );
+        }
+        if (template.method === "CLASS_RANK") {
+          // Every save re-grades the whole class: one pupil's marks move everyone else's position.
+          const graded = classRankGrades(
+            [...results].filter(([, result]) => result.complete).map(([id, result]) => ({ id, percentage: result.percentage })),
+            template.bands,
+          );
+          for (const [id, result] of results) {
+            const own = graded.get(id);
+            results.set(id, { ...result, grade: own?.grade ?? null, gradePoint: own?.gradePoint ?? null });
+          }
         }
         const ranks = rankByPercentage(
           [...results].map(([id, result]) => ({ id, percentage: result.complete ? result.percentage : null })),
@@ -373,6 +395,7 @@ export class AssessmentEntryService {
         name: row.name,
         isLocked: row.isLocked,
         deadline: row.deadline,
+        method: row.gradingSystem.method,
         components: row.components.map(
           (component): EntryComponent & { name: string } => ({
             id: component.id,
@@ -387,7 +410,7 @@ export class AssessmentEntryService {
           }),
         ),
         bands: row.gradingSystem.gradeScales.map(
-          (scale): GradeBand & { description: string; maxScore: number } => ({
+          (scale): RankBand & { description: string } => ({
             grade: scale.grade,
             description: scale.description,
             minScore: Number(scale.minScore),

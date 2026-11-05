@@ -13,6 +13,7 @@ import {
   type AssessmentSetup,
   type SetupGradingSystem,
   type SetupTemplate,
+  bandRangeLabel,
 } from "@/lib/assessment-setup";
 import { useCanExportTables } from "@/lib/table-export-policy";
 
@@ -275,7 +276,7 @@ export function AssessmentSetupWorkspace() {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h2 id="scales-heading" className="text-sm font-bold text-foreground">Grading scales</h2>
-            <p className="text-xs text-muted-foreground">Which scores earn which grade.</p>
+            <p className="text-xs text-muted-foreground">How marks turn into grades: by score, or by a pupil&rsquo;s position in their class.</p>
           </div>
           <button type="button" onClick={() => setScaleDialog("new")} className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-border px-4 text-xs font-semibold text-foreground/80 hover:bg-muted/50">
             <Plus className="size-4" /> New grading scale
@@ -296,10 +297,13 @@ export function AssessmentSetupWorkspace() {
                         {system.shared ? "Shared by all schools" : system.usedBy ? `Used by ${system.usedBy} assessment${system.usedBy === 1 ? "" : "s"}` : "Not used yet"}
                         {system.hasMarks && " · marks graded with it"}
                       </p>
+                      {system.method === "CLASS_RANK" && (
+                        <p className="mt-1 text-[11px] text-muted-foreground">Graded by position in the class, not by marks. Adopt it by choosing it as an assessment&rsquo;s grading scale.</p>
+                      )}
                     </div>
                     <div className="flex shrink-0 items-center">
                       {!readOnly && <button type="button" className={iconButton} aria-label={`Edit ${system.name}`} title="Edit" onClick={() => setScaleDialog({ system })}><Pencil className="size-4" /></button>}
-                      {readOnly && <button type="button" className={iconButton} aria-label={`Copy ${system.name}`} title="Copy as a new scale" onClick={() => setScaleDialog({ system, asCopy: true })}><Copy className="size-4" /></button>}
+                      {readOnly && system.method === "SCORE_BANDS" && <button type="button" className={iconButton} aria-label={`Copy ${system.name}`} title="Copy as a new scale" onClick={() => setScaleDialog({ system, asCopy: true })}><Copy className="size-4" /></button>}
                       {!system.shared && (
                         <button
                           type="button"
@@ -313,9 +317,9 @@ export function AssessmentSetupWorkspace() {
                     </div>
                   </div>
                   <ul className="mt-3 flex flex-wrap gap-1.5">
-                    {system.scales.map((band) => (
+                    {system.scales.map((band, index) => (
                       <li key={band.grade} className="rounded-lg bg-muted px-2.5 py-1 text-[11px] text-foreground/80" title={band.description}>
-                        <span className="font-bold">{band.grade}</span> {band.minScore}–{band.maxScore}
+                        <span className="font-bold">{band.grade}</span> {bandRangeLabel(system.method, band, index, system.scales.length)}
                       </li>
                     ))}
                   </ul>
@@ -325,7 +329,7 @@ export function AssessmentSetupWorkspace() {
           </ul>
         )}
         {ownScales.length === 0 && setup.gradingSystems.length > 0 && (
-          <p className="text-[11px] text-muted-foreground">Shared scales can&rsquo;t be edited. Copy one to make your own version.</p>
+          <p className="text-[11px] text-muted-foreground">Shared scales can&rsquo;t be edited. Copy a score-based one to make your own version.</p>
         )}
       </section>
 

@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { apiFetch } from "@/lib/api";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useTeachingOverview } from "@/lib/teaching";
+import { bandRangeLabel, type GradingMethod } from "@/lib/assessment-setup";
 
 interface Component {
   id: string;
@@ -33,7 +34,7 @@ interface Sheet {
   subject: { id: string; name: string };
   term: { id: string; name: string };
   templates: { id: string; name: string }[];
-  template: { id: string; name: string; deadline: string | null; components: Component[]; grades: { grade: string; description: string; minScore: number; maxScore: number }[] } | null;
+  template: { id: string; name: string; deadline: string | null; components: Component[]; grades: { grade: string; description: string; minScore: number; maxScore: number }[]; gradingMethod?: GradingMethod } | null;
   students: SheetStudent[];
   canEdit: boolean;
   readOnlyReason: string | null;
@@ -355,8 +356,11 @@ export function AssessmentEntryWorkspace({
             {save.error && <p role="alert" className="flex items-center gap-1.5 text-xs text-destructive"><CircleAlert className="size-3.5" /> {save.error.message}</p>}
             <p className="ml-auto text-[11px] text-muted-foreground">
               Grades appear once every required column has a mark.
+              {sheet.template.gradingMethod === "CLASS_RANK" && " They compare each pupil with the rest of this class, so they can change as marks are entered."}
               {sheet.template.grades.length > 0 && (
-                <> {[...sheet.template.grades].sort((a, b) => b.minScore - a.minScore).map((band) => `${band.grade} ${band.minScore}+`).join(" · ")}</>
+                sheet.template.gradingMethod === "CLASS_RANK"
+                  ? <> {sheet.template.grades.map((band, index) => `${band.grade} ${bandRangeLabel("CLASS_RANK", band, index, sheet.template!.grades.length)}`).join(" · ")}</>
+                  : <> {[...sheet.template.grades].sort((a, b) => b.minScore - a.minScore).map((band) => `${band.grade} ${band.minScore}+`).join(" · ")}</>
               )}
             </p>
           </div>

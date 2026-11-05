@@ -34,11 +34,15 @@ export interface SetupBand {
   maxScore: number;
   gradePoint: number;
 }
+/** SCORE_BANDS grades a percentage; CLASS_RANK grades a pupil's position within their own class. */
+export type GradingMethod = "SCORE_BANDS" | "CLASS_RANK";
+
 export interface SetupGradingSystem {
   id: string;
   name: string;
   code: string;
   description: string | null;
+  method: GradingMethod;
   /** A shared default: usable by every school, not editable here. */
   shared: boolean;
   usedBy: number;
@@ -52,6 +56,17 @@ export interface AssessmentSetup {
   templates: SetupTemplate[];
   gradingSystems: SetupGradingSystem[];
   uncovered: { classId: string; className: string; subjectId: string; subjectName: string }[];
+}
+
+/**
+ * How a band reads on screen. Score bands show their percentage range. Class-ranked
+ * bands hold cumulative class shares, so they read as the BECE does: Top 4%, Next 7%, ... Bottom 4%.
+ */
+export function bandRangeLabel(method: GradingMethod, band: Pick<SetupBand, "minScore" | "maxScore">, index: number, count: number): string {
+  if (method === "SCORE_BANDS") return `${band.minScore}–${band.maxScore}`;
+  const share = Math.round((band.maxScore - band.minScore) * 100) / 100;
+  if (index === 0) return `Top ${share}%`;
+  return index === count - 1 ? `Bottom ${share}%` : `Next ${share}%`;
 }
 
 /** A familiar six-grade scale, offered as a starting point. */

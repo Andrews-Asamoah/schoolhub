@@ -64,7 +64,10 @@ export function AssessmentTemplateDialog({
 }) {
   const queryClient = useQueryClient();
   const hasMarks = (template?.marksRecorded ?? 0) > 0;
-  const firstScale = setup.gradingSystems.find((system) => !system.shared) ?? setup.gradingSystems[0];
+  // Prefer a scale the school owns; never fall back to a class-ranked one by accident.
+  const firstScale = setup.gradingSystems.find((system) => !system.shared)
+    ?? setup.gradingSystems.find((system) => system.method === "SCORE_BANDS")
+    ?? setup.gradingSystems[0];
 
   const [name, setName] = useState(template?.name ?? "");
   const [description, setDescription] = useState(template?.description ?? "");
@@ -213,6 +216,9 @@ export function AssessmentTemplateDialog({
                       {setup.gradingSystems.map((system) => <SelectItem key={system.id} value={system.id}>{system.name}{system.shared ? " (shared)" : ""}</SelectItem>)}
                     </SelectContent>
                   </Select>
+                  {setup.gradingSystems.find((system) => system.id === gradingSystemId)?.method === "CLASS_RANK" && (
+                    <span className="text-[11px] font-normal text-muted-foreground">Grades come from each pupil&rsquo;s position in their class, so they can change as marks are entered.</span>
+                  )}
                 </label>
               ) : (
                 <div className={label}>

@@ -23,12 +23,22 @@ model Attendance {
   @@map("attendances")
 }
 
+/// How a grading system turns marks into grades.
+/// SCORE_BANDS: the pupil's percentage is looked up in score ranges (A = 80-100).
+/// CLASS_RANK: the pupil's position within their own class is looked up in cumulative
+/// class-percentage bands (a stanine: top 4% = 1, next 7% = 2, ...).
+enum GradingMethod {
+  SCORE_BANDS
+  CLASS_RANK
+}
+
 model GradingSystem {
   id              String   @id @default(cuid())
   schoolId        String?
   name            String
   code            String
   description     String?
+  method          GradingMethod @default(SCORE_BANDS)
   isSystemDefault Boolean  @default(false)
   isSchoolDefault Boolean  @default(false)
   isActive        Boolean  @default(true)
