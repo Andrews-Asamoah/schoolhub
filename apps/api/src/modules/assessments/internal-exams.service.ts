@@ -4,7 +4,7 @@ import type { z } from "zod";
 import { PrismaService } from "../../prisma/prisma.service.js";
 import { TeacherScopeService } from "../../common/scope/teacher-scope.service.js";
 import { isSchoolManager } from "../../common/scope/teacher-access.js";
-import { mockPercent,validateMockMarks } from "./internal-exams.js";
+import { assignedPaperFilter,mockPercent,validateMockMarks } from "./internal-exams.js";
 import type { mockMarkSchema, mockSectionMarkSchema } from "./internal-exams.schemas.js";
 
 @Injectable()
@@ -45,6 +45,9 @@ export class InternalExamsService {
       ...assignments.subjectStrandAssignments.map(x=>x.classId),
     ])]:null;
     if(classes&&classes.length===0)return [];
+    // Teachers keep every session of their classes (class teachers still need them for
+    // report remarks) but only receive the papers of the subjects they are assigned to.
+    const paperScope=assignments?{where:assignedPaperFilter(assignments)}:{};
     return this.prisma.client.internalExamSession.findMany({
       where:{schoolId,...(classes?{classId:{in:classes}}:{})},
       orderBy:[{createdAt:"desc"}],
@@ -53,7 +56,7 @@ export class InternalExamsService {
         class:{select:{id:true,name:true,level:true}},
         academicYear:{select:{id:true,name:true}},
         term:{select:{id:true,name:true}},
-        papers:{select:{id:true,subjectId:true,nameSnapshot:true,codeSnapshot:true,
+        papers:{...paperScope,select:{id:true,subjectId:true,nameSnapshot:true,codeSnapshot:true,
           maxMarks:true,finalizedAt:true,sections:{select:{id:true,nameSnapshot:true,weightPercent:true}}}},
         _count:{select:{candidates:true}},
       },

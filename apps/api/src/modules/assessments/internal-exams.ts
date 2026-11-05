@@ -1,3 +1,6 @@
+import type { Prisma } from "@prisma/client";
+import type { TeacherAssignments } from "../../common/scope/teacher-scope.service.js";
+
 /** No mock score is copied into a termly SBA record or a WAEC result. */
 export function validateMockMarks(maxMarks:number, entries:readonly {status:"MARKED"|"ABSENT";marks:number|null}[]) {
   if(!Number.isFinite(maxMarks)||maxMarks<=0) throw new Error("Invalid paper maximum.");
@@ -11,4 +14,26 @@ export function validateMockMarks(maxMarks:number, entries:readonly {status:"MAR
 }
 export function mockPercent(mark:number|null,maxMarks:number):number|null{
   return mark===null?null:Math.round(mark/maxMarks*10000)/100;
+}
+
+/**
+ * The subject papers a teacher is assigned to, as a database filter: the papers of
+ * a class's subjects they teach whole, or in which they teach a teaching area (strand).
+ * This is the same rule that lets a teacher finalise a paper, so the paper list a
+ * teacher sees is exactly the set they can act on. A teacher with no subject
+ * assignment gets an empty `OR`, which matches nothing.
+ */
+export function assignedPaperFilter(
+  assignments:Pick<TeacherAssignments,"subjectAssignments"|"subjectStrandAssignments">,
+):Prisma.InternalExamPaperWhereInput{
+  const subjectsByClass=new Map<string,Set<string>>();
+  for(const row of [...assignments.subjectAssignments,...assignments.subjectStrandAssignments]){
+    const subjects=subjectsByClass.get(row.classId)??new Set<string>();
+    subjects.add(row.subjectId);
+    subjectsByClass.set(row.classId,subjects);
+  }
+  return {OR:[...subjectsByClass].map(([classId,subjectIds])=>({
+    session:{classId},
+    subjectId:{in:[...subjectIds]},
+  }))};
 }

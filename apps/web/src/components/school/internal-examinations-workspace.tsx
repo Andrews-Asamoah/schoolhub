@@ -171,7 +171,7 @@ export function InternalExaminationsWorkspace() {
                 {s.name} · {s.class.name} · {s.academicYear.name}</SelectItem>)}</SelectContent>
             </Select></div>
           <div><label className="mb-1 block text-xs font-semibold">Subject paper</label>
-            <Select value={paper?.id??""} onValueChange={v=>{if(Object.keys(drafts).length&&!window.confirm("Keep your unsaved draft and switch paper?"))return;setSelectedPaper(v)}}>
+            <Select value={paper?.id??""} disabled={!papers.length} onValueChange={v=>{if(Object.keys(drafts).length&&!window.confirm("Keep your unsaved draft and switch paper?"))return;setSelectedPaper(v)}}>
               <SelectTrigger><SelectValue placeholder="Choose subject"/></SelectTrigger>
               <SelectContent>{papers.map(p=><SelectItem key={p.id} value={p.id}>
                 {p.codeSnapshot} · {p.nameSnapshot}{p.finalizedAt?" (Finalised)":""}</SelectItem>)}</SelectContent>
@@ -180,7 +180,7 @@ export function InternalExaminationsWorkspace() {
         {current&&<div className="flex flex-wrap items-center gap-3 rounded-lg bg-muted/40 p-3 text-xs">
           <span className="font-bold">{current.name} · {current.class.name}</span>
           <span>{current._count.candidates} candidates</span>
-          <span>{papers.filter(p=>p.finalizedAt).length}/{papers.length} finalised papers</span>
+          <span>{papers.filter(p=>p.finalizedAt).length}/{papers.length} {manager?"finalised papers":"of your papers finalised"}</span>
           <span className="font-semibold">{current.status}</span>
           {manager&&current.status==="DRAFT"&&<button type="button" className={primary}
             disabled={updateSession.isPending}
@@ -191,6 +191,8 @@ export function InternalExaminationsWorkspace() {
             <LockKeyhole className="mr-1 inline size-3.5"/> Lock completed mock</button>}
         </div>}
       </>}
+      {!manager&&current&&!papers.length&&<p className="rounded-lg border border-dashed border-border p-4 text-sm text-muted-foreground">
+        You are not assigned to any subject in {current.class.name}, so there is no paper for you to mark.</p>}
       {sheet.isPending&&paper&&<p className="text-sm text-muted-foreground">Loading pupil marks…</p>}
       {sheet.isError&&<p role="alert" className="text-xs text-destructive">{failure(sheet.error)}</p>}
       {sheet.data&&<div className="space-y-3">
