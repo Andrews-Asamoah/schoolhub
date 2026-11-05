@@ -23,6 +23,7 @@ import { Route as TwoFactorSetupRouteImport } from './routes/two-factor-setup'
 import { Route as AdminIndexRouteImport } from './routes/admin/index'
 import { Route as AdminDashboardRouteImport } from './routes/admin/dashboard'
 import { Route as AdminProfileRouteImport } from './routes/admin/profile'
+import { Route as AdminStudentDeletionsRouteImport } from './routes/admin/student-deletions'
 import { Route as AdminSupportRouteImport } from './routes/admin/support'
 import { Route as AdminAuditIndexRouteImport } from './routes/admin/audit/index'
 import { Route as AdminPlansIndexRouteImport } from './routes/admin/plans/index'
@@ -102,6 +103,11 @@ const AdminProfileRoute = AdminProfileRouteImport.update({
   path: '/profile',
   getParentRoute: () => AdminRouteRoute,
 } as any)
+const AdminStudentDeletionsRoute = AdminStudentDeletionsRouteImport.update({
+  id: '/student-deletions',
+  path: '/student-deletions',
+  getParentRoute: () => AdminRouteRoute,
+} as any)
 const AdminSupportRoute = AdminSupportRouteImport.update({
   id: '/support',
   path: '/support',
@@ -157,6 +163,7 @@ export interface FileRoutesByFullPath {
   '/two-factor-setup': typeof TwoFactorSetupRoute
   '/admin/dashboard': typeof AdminDashboardRoute
   '/admin/profile': typeof AdminProfileRoute
+  '/admin/student-deletions': typeof AdminStudentDeletionsRoute
   '/admin/support': typeof AdminSupportRoute
   '/admin/': typeof AdminIndexRoute
   '/admin/schools/$schoolId': typeof AdminSchoolsSchoolIdRoute
@@ -180,6 +187,7 @@ export interface FileRoutesByTo {
   '/two-factor-setup': typeof TwoFactorSetupRoute
   '/admin/dashboard': typeof AdminDashboardRoute
   '/admin/profile': typeof AdminProfileRoute
+  '/admin/student-deletions': typeof AdminStudentDeletionsRoute
   '/admin/support': typeof AdminSupportRoute
   '/admin': typeof AdminIndexRoute
   '/admin/schools/$schoolId': typeof AdminSchoolsSchoolIdRoute
@@ -205,6 +213,7 @@ export interface FileRoutesById {
   '/two-factor-setup': typeof TwoFactorSetupRoute
   '/admin/dashboard': typeof AdminDashboardRoute
   '/admin/profile': typeof AdminProfileRoute
+  '/admin/student-deletions': typeof AdminStudentDeletionsRoute
   '/admin/support': typeof AdminSupportRoute
   '/admin/': typeof AdminIndexRoute
   '/admin/schools/$schoolId': typeof AdminSchoolsSchoolIdRoute
@@ -231,6 +240,7 @@ export interface FileRouteTypes {
     | '/two-factor-setup'
     | '/admin/dashboard'
     | '/admin/profile'
+    | '/admin/student-deletions'
     | '/admin/support'
     | '/admin/'
     | '/admin/schools/$schoolId'
@@ -254,6 +264,7 @@ export interface FileRouteTypes {
     | '/two-factor-setup'
     | '/admin/dashboard'
     | '/admin/profile'
+    | '/admin/student-deletions'
     | '/admin/support'
     | '/admin'
     | '/admin/schools/$schoolId'
@@ -278,6 +289,7 @@ export interface FileRouteTypes {
     | '/two-factor-setup'
     | '/admin/dashboard'
     | '/admin/profile'
+    | '/admin/student-deletions'
     | '/admin/support'
     | '/admin/'
     | '/admin/schools/$schoolId'
@@ -403,6 +415,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminProfileRouteImport
       parentRoute: typeof AdminRouteRoute
     }
+    '/admin/student-deletions': {
+      id: '/admin/student-deletions'
+      path: '/student-deletions'
+      fullPath: '/admin/student-deletions'
+      preLoaderRoute: typeof AdminStudentDeletionsRouteImport
+      parentRoute: typeof AdminRouteRoute
+    }
     '/admin/support': {
       id: '/admin/support'
       path: '/support'
@@ -465,6 +484,7 @@ declare module '@tanstack/react-router' {
 interface AdminRouteRouteChildren {
   AdminDashboardRoute: typeof AdminDashboardRoute
   AdminProfileRoute: typeof AdminProfileRoute
+  AdminStudentDeletionsRoute: typeof AdminStudentDeletionsRoute
   AdminSupportRoute: typeof AdminSupportRoute
   AdminIndexRoute: typeof AdminIndexRoute
   AdminSchoolsSchoolIdRoute: typeof AdminSchoolsSchoolIdRoute
@@ -479,6 +499,7 @@ interface AdminRouteRouteChildren {
 const AdminRouteRouteChildren: AdminRouteRouteChildren = {
   AdminDashboardRoute: AdminDashboardRoute,
   AdminProfileRoute: AdminProfileRoute,
+  AdminStudentDeletionsRoute: AdminStudentDeletionsRoute,
   AdminSupportRoute: AdminSupportRoute,
   AdminIndexRoute: AdminIndexRoute,
   AdminSchoolsSchoolIdRoute: AdminSchoolsSchoolIdRoute,

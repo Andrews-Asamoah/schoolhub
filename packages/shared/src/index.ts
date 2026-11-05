@@ -1865,3 +1865,32 @@ export interface PortalWorkQueue {
   lessons: { id: string; day: string; start: string; end: string; subject: string; className: string }[];
   upcoming: { id: string; title: string; dueAt: string | null; status: string }[];
 }
+
+// ------------------------------------------------- permanent student deletion
+
+export const STUDENT_DELETION_STATUSES = ["PENDING", "APPROVED", "REJECTED", "CANCELLED"] as const;
+export type StudentDeletionStatus = (typeof STUDENT_DELETION_STATUSES)[number];
+
+/** A school admin asks the platform to permanently remove a wrongly created student. */
+export const requestStudentDeletionSchema = z.object({
+  studentId: z.string().min(1).max(128),
+  reason: z
+    .string()
+    .trim()
+    .min(10, "Say briefly why this record should be removed (at least 10 characters).")
+    .max(1000),
+});
+export type RequestStudentDeletionInput = z.infer<typeof requestStudentDeletionSchema>;
+
+/** The super admin turns a request down; the school sees the note. */
+export const rejectStudentDeletionSchema = z.object({
+  decisionNote: z.string().trim().min(3, "Tell the school why.").max(1000),
+});
+export type RejectStudentDeletionInput = z.infer<typeof rejectStudentDeletionSchema>;
+
+export const studentDeletionQuerySchema = z.object({
+  status: z.enum(STUDENT_DELETION_STATUSES).optional(),
+  page: z.coerce.number().int().min(1).max(10_000).default(1),
+  limit: z.coerce.number().int().min(1).max(100).default(20),
+});
+export type StudentDeletionQuery = z.infer<typeof studentDeletionQuerySchema>;

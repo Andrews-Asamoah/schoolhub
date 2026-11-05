@@ -2,6 +2,8 @@ import { useQuery } from "@tanstack/react-query";
 import { Check, Copy, X } from "lucide-react";
 import { useState } from "react";
 import { apiFetch } from "@/lib/api";
+import { useSchoolRole } from "@/components/school/school-role-switcher";
+import { StudentDeletionPanel } from "@/components/school/student-deletion-panel";
 
 export interface StudentProfileData {
   id: string;
@@ -175,6 +177,8 @@ export function StudentProfileCard({ data }: { data: StudentProfileData }) {
 
 /** Staff and teachers: open a student's profile from the directory. */
 export function StudentProfileModal({ studentId, onClose }: { studentId: string; onClose: () => void }) {
+  const { activeRole } = useSchoolRole();
+  const canRequestDeletion = activeRole === "owner" || activeRole === "admin";
   const query = useQuery({
     queryKey: ["students", "profile", studentId],
     queryFn: () => apiFetch<StudentProfileData>(`/students/${studentId}/profile`),
@@ -193,7 +197,10 @@ export function StudentProfileModal({ studentId, onClose }: { studentId: string;
         ) : query.error ? (
           <p role="alert" className="text-sm text-destructive">{query.error instanceof Error ? query.error.message : "Could not load the profile."}</p>
         ) : (
-          <StudentProfileCard data={query.data} />
+          <>
+            <StudentProfileCard data={query.data} />
+            {canRequestDeletion && <StudentDeletionPanel studentId={studentId} studentName={`${query.data.profile.firstName} ${query.data.profile.lastName}`.trim()} />}
+          </>
         )}
       </div>
     </div>

@@ -4,6 +4,7 @@
 
 model School {
   attendanceExcuseRequests AttendanceExcuseRequest[]
+  studentDeletionRequests StudentDeletionRequest[]
   schoolRolloverBatches AcademicRolloverBatch[] @relation("AcademicRolloverBatch_school")
   financeBankReconciliations FinanceBankReconciliation[] @relation("FinanceBankReconciliation_school")
   financeBankMatchs FinanceBankMatch[] @relation("FinanceBankMatch_school")
