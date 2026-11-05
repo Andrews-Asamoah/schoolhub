@@ -1,4 +1,15 @@
 model AcademicRolloverBatch {
+  promotionRecords PromotionRecord[] @relation("PromotionRecord_rolloverBatch")
+  rolledBackBy user? @relation("AcademicRolloverBatch_rolledBackBy", fields: [rolledBackById], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  rollbackRequestedBy user? @relation("AcademicRolloverBatch_rollbackRequestedBy", fields: [rollbackRequestedById], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  appliedBy user? @relation("AcademicRolloverBatch_appliedBy", fields: [appliedById], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  approvedBy user? @relation("AcademicRolloverBatch_approvedBy", fields: [approvedById], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  createdBy user @relation("AcademicRolloverBatch_createdBy", fields: [createdById], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  toTerm Term @relation("AcademicRolloverBatch_toTerm", fields: [toTermId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  fromTerm Term @relation("AcademicRolloverBatch_fromTerm", fields: [fromTermId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  toYear AcademicYear @relation("AcademicRolloverBatch_toYear", fields: [toYearId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  fromYear AcademicYear @relation("AcademicRolloverBatch_fromYear", fields: [fromYearId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  school School @relation("AcademicRolloverBatch_school", fields: [schoolId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   id String @id @default(cuid())
   schoolId String
   fromYearId String
@@ -22,6 +33,6 @@ model AcademicRolloverBatch {
   rolledBackAt DateTime?
   rolledBackById String?
   createdAt DateTime @default(now())
-  @@index([schoolId, status, createdAt])
+  @@index([schoolId, status, createdAt], map: "academic_rollover_school_status")
   @@map("academic_rollover_batches")
 }

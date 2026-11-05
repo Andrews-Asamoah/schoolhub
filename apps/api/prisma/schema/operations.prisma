@@ -205,10 +205,12 @@ model ClubMember {
 }
 
 model PromotionRecord {
+  reversedBy user? @relation("PromotionRecord_reversedBy", fields: [reversedById], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  rolloverBatch AcademicRolloverBatch? @relation("PromotionRecord_rolloverBatch", fields: [rolloverBatchId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   rolloverBatchId String?
   reversedAt DateTime?
   reversedById String?
-  @@unique([rolloverBatchId, studentId])
+  @@unique([rolloverBatchId, studentId], map: "promotion_rollover_student")
   id            String        @id @default(cuid())
   schoolId      String
   studentId     String

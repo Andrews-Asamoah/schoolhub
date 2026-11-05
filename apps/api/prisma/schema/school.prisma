@@ -3,6 +3,10 @@
 // ============================================================================
 
 model School {
+  schoolRolloverBatches AcademicRolloverBatch[] @relation("AcademicRolloverBatch_school")
+  financeBankReconciliations FinanceBankReconciliation[] @relation("FinanceBankReconciliation_school")
+  financeBankMatchs FinanceBankMatch[] @relation("FinanceBankMatch_school")
+  financeBankStatements FinanceBankStatement[] @relation("FinanceBankStatement_school")
   smsConnections SchoolSmsConnection[]
   notificationSettings SchoolNotificationSettings?
   notificationPreferences NotificationPreference[]

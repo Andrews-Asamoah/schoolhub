@@ -3,6 +3,9 @@
 // ============================================================================
 
 model ChartAccount {
+  financeBankReconciliations FinanceBankReconciliation[] @relation("FinanceBankReconciliation_account")
+  financeBankMatchs FinanceBankMatch[] @relation("FinanceBankMatch_account")
+  financeBankStatements FinanceBankStatement[] @relation("FinanceBankStatement_account")
   id          String          @id @default(cuid())
   schoolId    String
   code        String
@@ -250,6 +253,7 @@ model PaymentItem {
 }
 
 model Transaction {
+  bankMatches FinanceBankMatch[] @relation("FinanceBankMatch_transaction")
   id                String               @id @default(cuid())
   schoolId          String
   transactionNumber String
