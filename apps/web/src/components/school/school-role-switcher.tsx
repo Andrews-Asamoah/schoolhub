@@ -1,3 +1,4 @@
+import { confirmLeavingDrafts } from "@/hooks/use-mark-draft";
 import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { CircleAlert, UserRoundCog } from "lucide-react";
@@ -75,11 +76,12 @@ export function useSchoolRole() {
       : query.data?.primaryRole ?? null;
 
   async function selectRole(role: string) {
-    if (!query.data?.roles.includes(role)) return;
+    if (!query.data?.roles.includes(role) || !confirmLeavingDrafts()) return;
+    await queryClient.cancelQueries();
     window.localStorage.setItem(ACTIVE_ROLE_STORAGE_KEY, role);
     setStoredRole(role);
     window.dispatchEvent(new Event(ROLE_CHANGE_EVENT));
-    await queryClient.invalidateQueries();
+    // The root context boundary clears private queries before mounting this role.
   }
 
   return {

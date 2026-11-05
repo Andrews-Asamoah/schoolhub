@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Inbox, LoaderCircle, Mail, MailOpen, MessageSquare, Plus, Reply, Search, Send, UserRound, X } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { PortalModal } from "./portal-modal";
@@ -47,18 +47,20 @@ export function MessagesWorkspace() {
   const [messageNotice, setMessageNotice] = useState<{ ok: boolean; text: string } | null>(null);
   const [sendError, setSendError] = useState<string | null>(null);
 
-  const inboxQuery = useQuery({
-    queryKey: ["messages", "inbox"],
-    queryFn: () => apiFetch<SchoolMessage[]>("/messages/inbox"),
-    enabled: true,
-    retry: false,
+  const [historySearch, setHistorySearch] = useState("");
+  const pageOptions = (mailbox: Folder) => ({
+    queryKey: ["messages", mailbox, historySearch],
+    initialPageParam: null as string | null,
+    queryFn: ({ pageParam }: { pageParam: string | null }) => {
+      const params = new URLSearchParams({ search: historySearch, limit: "30" });
+      if (pageParam) params.set("cursor", pageParam);
+      return apiFetch<{ items: SchoolMessage[]; nextCursor: string | null; unreadCount: number }>(`/messages/${mailbox}/page?${params}`);
+    },
+    getNextPageParam: (last: { nextCursor: string | null }) => last.nextCursor,
+    retry: false as const,
   });
-  const sentQuery = useQuery({
-    queryKey: ["messages", "sent"],
-    queryFn: () => apiFetch<SchoolMessage[]>("/messages/sent"),
-    enabled: folder === "sent",
-    retry: false,
-  });
+  const inboxQuery = useInfiniteQuery(pageOptions("inbox"));
+  const sentQuery = useInfiniteQuery({ ...pageOptions("sent"), enabled: folder === "sent" });
   const contactsQuery = useQuery({
     queryKey: ["messages", "recipients", recipientSearch],
     queryFn: () => apiFetch<MessageContact[]>(`/messages/recipients?search=${encodeURIComponent(recipientSearch)}`),
@@ -91,11 +93,11 @@ export function MessagesWorkspace() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["messages", "inbox"] }),
   });
 
-  const items = folder === "inbox" ? inboxQuery.data ?? [] : sentQuery.data ?? [];
+  const items = (folder === "inbox" ? inboxQuery.data : sentQuery.data)?.pages.flatMap(page => page.items) ?? [];
   const query = folder === "inbox" ? inboxQuery : sentQuery;
   const selected = items.find((item) => item.id === selectedId) ?? items[0] ?? null;
   const contacts = contactsQuery.data ?? [];
-  const unreadCount = (inboxQuery.data ?? []).filter((item) => item.recipients.some((receipt) => !receipt.isRead)).length;
+  const unreadCount = inboxQuery.data?.pages[0]?.unreadCount ?? 0;
 
   function changeFolder(next: Folder) {
     setFolder(next);
@@ -145,11 +147,15 @@ export function MessagesWorkspace() {
             <button type="button" onClick={() => changeFolder("inbox")} aria-pressed={folder === "inbox"} className={`inline-flex flex-1 items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-xs font-semibold ${folder === "inbox" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"}`}><Inbox className="size-4" />Inbox{unreadCount > 0 && <span className={`rounded-full px-1.5 py-0.5 text-[10px] ${folder === "inbox" ? "bg-primary-foreground/15" : "bg-muted"}`}>{unreadCount}</span>}</button>
             <button type="button" onClick={() => changeFolder("sent")} aria-pressed={folder === "sent"} className={`inline-flex flex-1 items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-xs font-semibold ${folder === "sent" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"}`}><Send className="size-4" />Sent</button>
           </div>
+          <label className="block p-3 text-xs font-semibold">Search message history
+            <input aria-label="Search message history" value={historySearch} onChange={event => {setHistorySearch(event.target.value);setSelectedId(null);}} className="mt-1 w-full rounded-lg border border-input bg-background p-2" />
+          </label>
           <div className="max-h-[620px] overflow-y-auto">
             {query.isPending ? <div className="flex items-center justify-center gap-2 p-10 text-xs text-muted-foreground"><LoaderCircle className="size-4 animate-spin" />Loading messages…</div>
             : items.length === 0 ? <EmptyState icon={Mail} title={folder === "inbox" ? "Your inbox is empty" : "No sent messages"} description={folder === "inbox" ? "Messages sent to you by school members will appear here." : "Messages you send will be listed here."} compact className="m-3" />
             : items.map((item) => <button key={item.id} type="button" onClick={() => openMessage(item)} className={`block w-full border-b border-border px-4 py-3.5 text-left transition hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring ${selected?.id === item.id ? "bg-primary/5" : ""}`}><div className="flex items-start justify-between gap-2"><p className={`line-clamp-1 text-xs ${folder === "inbox" && item.recipients.some((receipt) => !receipt.isRead) ? "font-bold text-foreground" : "font-medium text-foreground"}`}>{folder === "inbox" ? item.sender.name : item.recipients.map((receipt) => receipt.recipient?.name).filter(Boolean).join(", ") || "Recipients"}</p><time className="shrink-0 text-[10px] text-muted-foreground">{new Intl.DateTimeFormat("en-GH", { dateStyle: "short" }).format(new Date(item.createdAt))}</time></div><p className="mt-1 truncate text-sm font-semibold text-foreground">{item.subject}</p><p className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">{item.body}</p></button>)}
           </div>
+          {query.hasNextPage && <button type="button" disabled={query.isFetchingNextPage} onClick={() => void query.fetchNextPage()} className="m-3 rounded-lg border border-border px-4 py-2 text-xs font-semibold">{query.isFetchingNextPage ? "Loading…" : "Load older messages"}</button>}
         </div>
 
         <div className="min-w-0 p-4 sm:p-6">

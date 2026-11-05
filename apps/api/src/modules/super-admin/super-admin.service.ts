@@ -16,6 +16,8 @@ import { PRIVATE_STORAGE_HEALTH_PROBE, STORAGE_HEALTH_PROBE, type StorageHealthP
 import { writeAudit, type AuditActor } from "../../common/audit/audit.js";
 import {
   evaluateSubscriptionAccess,
+  SCHOOL_ADMIN_ROLES,
+  hasSchoolAdministrationRole,
   SUBSCRIPTION_TRIAL_DAYS,
   type AddSchoolAdminInput,
   type EnrollSchoolInput,
@@ -590,7 +592,7 @@ export class SuperAdminService {
             where: {
               organizationId: member.organizationId,
               userId: { not: userId },
-              role: { in: ["owner", "admin"] },
+              OR: [{ role: { in: [...SCHOOL_ADMIN_ROLES] } }, { roles: { hasSome: [...SCHOOL_ADMIN_ROLES] } }],
               banned: false,
               user: { banned: false },
             },
@@ -635,7 +637,7 @@ export class SuperAdminService {
           where: {
             organizationId: member.organizationId,
             userId: { not: userId },
-            role: { in: ["owner", "admin"] },
+            OR: [{ role: { in: [...SCHOOL_ADMIN_ROLES] } }, { roles: { hasSome: [...SCHOOL_ADMIN_ROLES] } }],
             banned: false,
             user: { banned: false },
           },
@@ -705,7 +707,7 @@ export class SuperAdminService {
         },
       },
     });
-    if (!member || !["owner", "admin"].includes(member.role)) {
+    if (!member || !hasSchoolAdministrationRole(member)) {
       throw new NotFoundException("School administrator membership not found");
     }
 

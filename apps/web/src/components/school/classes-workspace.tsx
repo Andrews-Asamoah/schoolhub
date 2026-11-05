@@ -100,7 +100,7 @@ export function ClassesWorkspace({
 }: ClassesWorkspaceProps) {
   const queryClient = useQueryClient();
   const { activeRole } = useSchoolRole();
-  const canManage = activeRole === "owner" || activeRole === "admin";
+  const canManage = ["owner", "admin", "headteacher"].includes(activeRole ?? "");
   const [search, setSearch] = useState("");
   const [departmentFilter, setDepartmentFilter] = useState("all");
   const [showClassForm, setShowClassForm] = useState(false);

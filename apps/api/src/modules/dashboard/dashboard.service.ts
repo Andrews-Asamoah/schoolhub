@@ -1,8 +1,11 @@
+import { Prisma } from "@prisma/client";
 import { Injectable } from "@nestjs/common";
 import { PrismaService } from "../../prisma/prisma.service.js";
 import { FINANCE_READ_ROLES, FINANCE_SUMMARY_ROLES } from "../finance/finance.permissions.js";
 
 const FINANCE_SUMMARY_ROLE_SET = new Set<string>(FINANCE_SUMMARY_ROLES);
+const sumMoney = <T>(rows: T[], value: (row: T) => Prisma.Decimal | string | number) =>
+  rows.reduce((total, row) => total.plus(value(row)), new Prisma.Decimal(0)).toDecimalPlaces(2).toNumber();
 const FINANCE_DETAIL_ROLE_SET = new Set<string>(FINANCE_READ_ROLES);
 
 @Injectable()
@@ -37,11 +40,11 @@ export class DashboardService {
         where: { schoolId, date: { gte: firstMonth, lte: now } },
         select: { amount: true, date: true },
       }) : Promise.resolve([]),
-      this.prisma.client.student.findMany({
+      role !== "teacher" ? this.prisma.client.student.findMany({
         where: { schoolId, deletedAt: null, createdAt: { gte: firstMonth, lte: now } },
         orderBy: { createdAt: "desc" }, take: 8,
         select: { id: true, createdAt: true, admissionDate: true, profile: { select: { firstName: true, lastName: true } } },
-      }),
+      }) : Promise.resolve([]),
       canViewFinanceDetails ? this.prisma.client.payment.findMany({
         where: { schoolId, createdAt: { gte: firstMonth, lte: now }, status: "COMPLETED" },
         orderBy: { createdAt: "desc" }, take: 8,
@@ -76,14 +79,12 @@ export class DashboardService {
 
     const financialStatus = canViewFinance ? monthStarts.map((start, index) => {
       const end = monthEnds[index]!;
-      const revenue = monthlyPayments.reduce((sum, payment) =>
-        payment.paymentDate >= start && payment.paymentDate <= end ? sum + Number(payment.amount) : sum, 0);
-      const expenditures = monthlyExpenses.reduce((sum, expense) =>
-        expense.date >= start && expense.date <= end ? sum + Number(expense.amount) : sum, 0);
+      const revenue = sumMoney(monthlyPayments.filter(payment => payment.paymentDate >= start && payment.paymentDate <= end), payment => payment.amount);
+      const expenditures = sumMoney(monthlyExpenses.filter(expense => expense.date >= start && expense.date <= end), expense => expense.amount);
       return {
         month: new Intl.DateTimeFormat("en-GH", { month: "short", year: "2-digit", timeZone: "UTC" }).format(start),
-        revenue: Math.round(revenue * 100) / 100,
-        expenditures: Math.round(expenditures * 100) / 100,
+        revenue: revenue,
+        expenditures: expenditures,
       };
     }) : [];
 
@@ -106,8 +107,8 @@ export class DashboardService {
     ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).slice(0, 8);
 
     const hasFinancialRecords = canViewFinance && (monthlyPayments.length > 0 || monthlyExpenses.length > 0);
-    const currentMonthPayments = canViewFinance ? monthlyPayments.filter((payment) => payment.paymentDate >= currentMonthStart && payment.paymentDate <= now).reduce((sum, payment) => sum + Number(payment.amount), 0) : null;
-    const currentMonthExpenses = canViewFinance ? monthlyExpenses.filter((expense) => expense.date >= currentMonthStart && expense.date <= now).reduce((sum, expense) => sum + Number(expense.amount), 0) : null;
+    const currentMonthPayments = canViewFinance ? sumMoney(monthlyPayments.filter((payment) => payment.paymentDate >= currentMonthStart && payment.paymentDate <= now), payment => payment.amount) : null;
+    const currentMonthExpenses = canViewFinance ? sumMoney(monthlyExpenses.filter((expense) => expense.date >= currentMonthStart && expense.date <= now), expense => expense.amount) : null;
     const newThisMonth = students.filter((student) => student.admissionDate >= currentMonthStart && student.admissionDate <= now).length;
 
     return {

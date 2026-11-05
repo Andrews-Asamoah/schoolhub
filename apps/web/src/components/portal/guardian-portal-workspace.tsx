@@ -129,7 +129,7 @@ export function GuardianPortalWorkspace({ defaultTab = "overview", showSectionNa
       {wardsQuery.isError && (
         <div role="alert" className="flex items-start gap-3 rounded-xl border border-destructive/25 bg-destructive/5 p-4 text-sm text-foreground">
           <AlertCircle className="mt-0.5 size-4 shrink-0 text-destructive" />
-          <div><p className="font-semibold">We couldn't load your linked children.</p><p className="mt-1 text-muted-foreground">{wardsQuery.error instanceof Error ? wardsQuery.error.message : "Please try again or contact the school office."}</p></div>
+          <div><button type="button" onClick={() => void wardsQuery.refetch()} disabled={wardsQuery.isFetching} className="font-semibold underline">Try again</button><p className="font-semibold">We couldn't load your linked children.</p><p className="mt-1 text-muted-foreground">{wardsQuery.error instanceof Error ? wardsQuery.error.message : "Please try again or contact the school office."}</p></div>
         </div>
       )}
 

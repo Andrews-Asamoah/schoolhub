@@ -132,7 +132,7 @@ interface School {
 function WorkspaceRoute() {
   const { page } = useParams({ from: "/$page" });
   const navItem = getSchoolNavItem(page);
-  const { activeRole } = useSchoolRole();
+  const { activeRole, isPending: rolePending, error: roleError } = useSchoolRole();
   const navigate = useNavigate();
   const blocked = Boolean(navItem && activeRole && !canRoleAccessPage(activeRole, navItem.id));
 
@@ -141,6 +141,8 @@ function WorkspaceRoute() {
   useEffect(() => {
     if (blocked) void navigate({ to: "/dashboard", replace: true });
   }, [blocked, navigate]);
+  if (rolePending) return <p role="status" className="p-6">Loading your role…</p>;
+  if (roleError || !activeRole) return <p role="alert" className="p-6">Your role could not be verified. Please sign in again.</p>;
   if (blocked) return null;
 
   if (!navItem) {
@@ -182,7 +184,7 @@ function WorkspaceContent({ pageId }: { pageId: string }) {
   const { data: session } = useSession();
   const isSignedIn = !!session?.user;
   const { activeRole } = useSchoolRole();
-  const canManageClasses = activeRole === "owner" || activeRole === "admin";
+  const canManageClasses = ["owner", "admin", "headteacher"].includes(activeRole ?? "");
 
   const classesQuery = useQuery({
     queryKey: ["academics", "classes"],

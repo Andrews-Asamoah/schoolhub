@@ -36,7 +36,7 @@ const toValues = (school: SchoolDetails): Record<Field, string> => ({
  */
 export function SchoolSettingsForm({ school }: { school: SchoolDetails }) {
   const { activeRole } = useSchoolRole();
-  const canEdit = activeRole === "owner" || activeRole === "admin";
+  const canEdit = ["owner", "admin", "headteacher"].includes(activeRole ?? "");
   const queryClient = useQueryClient();
   const [editing, setEditing] = useState(false);
   const [values, setValues] = useState(() => toValues(school));

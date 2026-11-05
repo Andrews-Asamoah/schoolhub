@@ -1,4 +1,5 @@
 import { createRootRoute, Outlet, useRouterState } from "@tanstack/react-router";
+import { PrivateContextBoundary } from "@/components/auth/private-context-boundary";
 import { ThemeProvider } from "@/components/theme-provider";
 import { usePasswordChangeGate } from "@/hooks/use-password-gate";
 import { useSession } from "@/lib/auth-client";
@@ -20,7 +21,7 @@ function RootLayout() {
 
   return (
     <ThemeProvider>
-      <Outlet />
+      <PrivateContextBoundary><Outlet /></PrivateContextBoundary>
     </ThemeProvider>
   );
 }

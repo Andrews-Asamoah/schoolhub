@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { lazy, Suspense, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import {
@@ -11,6 +11,8 @@ import type { DashboardAnalytics } from "@/components/school/dashboard/dashboard
 import { apiFetch } from "@/lib/api";
 import { schoolRoleLabel, useSchoolRole } from "@/components/school/school-role-switcher";
 import { getSchoolNavGroupsForRole } from "@/lib/school-navigation";
+import { useSession } from "@/lib/auth-client";
+const GuardianPortalWorkspace = lazy(() => import("@/components/portal/guardian-portal-workspace").then(module => ({default:module.GuardianPortalWorkspace})));
 import { StudentOverview } from "@/components/portal/student-overview";
 import { AccountantFinanceCharts } from "@/components/portal/accountant-finance-charts";
 import { useSchoolOrganization } from "@/components/school/school-organization";
@@ -60,7 +62,7 @@ function Metrics({ data, isLoading, isError }: { data?: DashboardAnalytics; isLo
     { label: "New admissions", value: numberFormat.format(data.metrics.newAdmissionsThisMonth), detail: "Admitted this month", icon: UserRoundPlus, className: "bg-info/10 text-info" },
   ];
   if (data.canViewFinance) {
-    metrics.push({ label: "Revenue this month", value: moneyFormat.format(data.metrics.revenueThisMonth ?? 0), detail: "Completed payments recorded", icon: WalletCards, className: "bg-success/10 text-success" });
+    metrics.push({ label: "Fee collections this month", value: moneyFormat.format(data.metrics.revenueThisMonth ?? 0), detail: "Completed payments recorded", icon: WalletCards, className: "bg-success/10 text-success" });
     metrics.push({ label: "Expenditures this month", value: moneyFormat.format(data.metrics.expendituresThisMonth ?? 0), detail: "Recorded school expenses", icon: WalletCards, className: "bg-warning/10 text-warning" });
   }
   return <section aria-label="Live school statistics" className={`grid gap-3 sm:grid-cols-2 ${data.canViewFinance ? "xl:grid-cols-5" : "xl:grid-cols-3"}`}>{metrics.map((metric) => <MetricTile key={metric.label} metric={metric} />)}</section>;
@@ -68,13 +70,14 @@ function Metrics({ data, isLoading, isError }: { data?: DashboardAnalytics; isLo
 
 export function DashboardContent({ today, greetingName }: DashboardContentProps) {
   const { activeRole } = useSchoolRole();
+  const { data: session } = useSession();
   const { activeOrganization } = useSchoolOrganization();
   const [selectedMonths, setSelectedMonths] = useState(6);
   const isManagementRole = ["owner", "admin", "headteacher"].includes(activeRole ?? "");
   const analyticsQuery = useQuery({
-    queryKey: ["dashboard", "analytics", selectedMonths, activeOrganization?.id],
+    queryKey: ["dashboard", "analytics", selectedMonths, activeOrganization?.id, session?.user.id, activeRole],
     queryFn: () => apiFetch<DashboardAnalytics>(`/dashboard/analytics?months=${selectedMonths}`),
-    enabled: Boolean(activeRole && activeRole !== "student" && activeOrganization),
+    enabled: Boolean(activeRole && !["student", "guardian"].includes(activeRole) && activeOrganization),
     retry: false,
     refetchInterval: 60_000,
   });
@@ -137,6 +140,8 @@ export function DashboardContent({ today, greetingName }: DashboardContentProps)
   const roleLinks = getSchoolNavGroupsForRole(activeRole ?? undefined).flatMap((group) => group.items).slice(0, 6);
   const data = analyticsQuery.data;
 
+  if (!activeRole) return <p role="status">Loading your role…</p>;
+  if (activeRole === "guardian") return <main className="px-4 py-7 sm:px-6"><Suspense fallback={<p role="status">Loading family hub…</p>}><GuardianPortalWorkspace showSectionNav={false} /></Suspense></main>;
   if (activeRole === "student") return <main className="mx-auto max-w-[1440px] px-4 py-7 sm:px-6 lg:px-9 lg:py-9"><StudentOverview /></main>;
 
   return (

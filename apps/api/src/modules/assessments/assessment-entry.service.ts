@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -146,6 +147,7 @@ export class AssessmentEntryService {
     input: SaveAssessmentEntryInput,
   ) {
     const ctx = await this.loadContext(schoolId, userId, role, input.classId, input.subjectId);
+    if (input.termId && input.termId !== ctx.term.id) throw new ConflictException("The academic term changed. Your draft was preserved; return to its original term before saving.");
     const template = ctx.templates.find((item) => item.id === input.templateId);
     if (!template) throw new BadRequestException("That assessment does not apply to this class and subject.");
     if (template.isLocked) throw new ForbiddenException("This assessment has been locked.");
@@ -178,6 +180,7 @@ export class AssessmentEntryService {
 
     await this.prisma.client.$transaction(
       async (tx) => {
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${schoolId}), hashtext(${ctx.klass.id + ":" + ctx.subject.id + ":" + ctx.term.id}))`;
         for (const [studentId, entries] of byStudent) {
           let score = await tx.assessmentScore.findUnique({
             where: {
@@ -215,6 +218,11 @@ export class AssessmentEntryService {
                 occurrenceIndex: entry.occurrenceIndex,
               },
             };
+            if (entry.expectedMarks !== undefined) {
+              const existing = await tx.componentScore.findUnique({ where, select: { marksObtained: true } });
+              const current = existing ? Number(existing.marksObtained) : null;
+              if (current !== entry.expectedMarks) throw new ConflictException("Another user changed these marks. Your draft was preserved. Review the latest marks before retrying.");
+            }
             if (entry.marks == null) {
               await tx.componentScore.deleteMany({
                 where: { assessmentScoreId: score.id, componentId: entry.componentId, occurrenceIndex: entry.occurrenceIndex },
