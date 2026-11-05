@@ -1250,6 +1250,27 @@ export const saveTimetableEntrySchema = z
   });
 export type SaveTimetableEntryInput = z.infer<typeof saveTimetableEntrySchema>;
 
+/**
+ * One batch of lessons from a spreadsheet upload. Each row is the same payload
+ * the timetable editor saves, so an import is checked exactly like a hand-made
+ * lesson. `existingId` marks a period that already has a lesson to replace.
+ */
+export const importTimetableBatchSchema = z.object({
+  academicYearId: z.string().min(1).optional(),
+  rows: z
+    .array(
+      z.object({
+        rowNumber: z.number().int().positive(),
+        /** Shown back in the results table only. */
+        name: z.string().trim().max(120).optional(),
+        existingId: z.string().min(1).optional(),
+        row: saveTimetableEntrySchema,
+      }),
+    )
+    .min(1),
+});
+export type ImportTimetableBatchInput = z.infer<typeof importTimetableBatchSchema>;
+
 // ============================================================================
 // ADMISSIONS (enrollment windows, applications, entrance exam, admission)
 // ============================================================================

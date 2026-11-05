@@ -10,12 +10,14 @@ import {
   type SaveTimetableEntryInput,
   type TimetableDay,
 } from "@schoolhub/shared";
+import { BulkImportButton } from "@/components/bulk-import/bulk-import-button";
 import { FormField, FormInput } from "@/components/forms/form-controls";
 import { TableExportMenu } from "@/components/ui/data-table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCanExportTables } from "@/lib/table-export-policy";
 import type { ExportTable } from "@/lib/table-export";
 import { useSchoolRole } from "@/components/school/school-role-switcher";
+import { TimetableBulkImport } from "@/components/school/timetable-bulk-import";
 import { apiFetch } from "@/lib/api";
 
 interface Period { id: string; name: string; startTime: string; endTime: string; sortOrder: number; departmentId: string | null }
@@ -77,6 +79,7 @@ export function TimetableWorkspace() {
   const [yearId, setYearId] = useState("");
   const [editor, setEditor] = useState<Editor>(null);
   const [manage, setManage] = useState<"periods" | "rooms" | null>(null);
+  const [showImport, setShowImport] = useState(false);
 
   const setupQuery = useQuery({
     queryKey: ["timetable", "setup", yearId],
@@ -219,6 +222,7 @@ export function TimetableWorkspace() {
             <div className="ml-auto flex gap-2">
               {canExport && visiblePeriods.length > 0 && targetId && <TableExportMenu build={buildGridExport} />}
               {canEdit && (<>
+              <BulkImportButton className="h-9 text-xs" onClick={() => setShowImport(true)} disabled={setup.periods.length === 0} title={setup.periods.length === 0 ? "Set up periods first" : undefined} />
               <button type="button" className={outline} onClick={() => setManage(manage === "periods" ? null : "periods")}>
                 <CalendarClock className="size-4" /> Periods
               </button>
@@ -246,6 +250,21 @@ export function TimetableWorkspace() {
       )}
       {canEdit && manage === "rooms" && (
         <RoomManager rooms={setup.classrooms} onClose={() => setManage(null)} onChanged={refresh} />
+      )}
+      {canEdit && showImport && (
+        <TimetableBulkImport
+          academicYearId={setup.academicYear.id}
+          academicYearName={setup.academicYear.name}
+          lists={{
+            classes: setup.classes.map((c) => c.name),
+            periods: [...new Set(setup.periods.map((p) => p.name))],
+            subjects: setup.subjects.map((s) => s.name),
+            teachers: setup.teachers.map((t) => t.name),
+            rooms: setup.classrooms.map((r) => r.name),
+          }}
+          onClose={() => setShowImport(false)}
+          onComplete={() => void refresh()}
+        />
       )}
 
       {visiblePeriods.length === 0 ? (

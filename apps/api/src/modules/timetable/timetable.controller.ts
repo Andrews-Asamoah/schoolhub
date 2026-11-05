@@ -4,20 +4,26 @@ import {
   Controller,
   Delete,
   Get,
+  Header,
   Param,
   Patch,
   Post,
   Put,
   Query,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import type { School } from '@prisma/client';
 import {
   copyPeriodsSchema,
+  importTimetableBatchSchema,
   saveClassroomSchema,
   savePeriodSchema,
   saveTimetableEntrySchema,
   type CopyPeriodsInput,
+  type ImportTimetableBatchInput,
   type SaveClassroomInput,
   type SavePeriodInput,
   type SaveTimetableEntryInput,
@@ -31,6 +37,7 @@ import { Roles } from '../../common/decorators/roles.decorator.js';
 import { RolesGuard } from '../../common/guards/roles.guard.js';
 import { SchoolTenantGuard } from '../../common/guards/school-tenant.guard.js';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe.js';
+import { TimetableImportService } from './timetable-import.service.js';
 import { TimetableService } from './timetable.service.js';
 
 const READ = ['owner', 'admin', 'teacher', 'staff'] as const;
@@ -38,7 +45,10 @@ const READ = ['owner', 'admin', 'teacher', 'staff'] as const;
 @Controller('timetable')
 @UseGuards(SchoolTenantGuard, RolesGuard)
 export class TimetableController {
-  constructor(private readonly timetable: TimetableService) {}
+  constructor(
+    private readonly timetable: TimetableService,
+    private readonly imports: TimetableImportService,
+  ) {}
 
   @Get('setup')
   @Roles(...READ)
@@ -172,6 +182,32 @@ export class TimetableController {
   @Roles('owner', 'admin')
   deleteEntry(@CurrentSchool() school: School, @Param('id') id: string) {
     return this.timetable.deleteEntry(school.id, id);
+  }
+
+  // ---- bulk upload ---------------------------------------------------------
+  /** Checks an uploaded CSV/XLSX of lessons and returns a row-by-row preview. Saves nothing. */
+  @Post('import/preview')
+  @Roles('owner', 'admin')
+  @Header('Cache-Control', 'no-store')
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 2 * 1024 * 1024, files: 1 } }))
+  previewImport(
+    @CurrentSchool() school: School,
+    @UploadedFile() file: Express.Multer.File | undefined,
+    @Query('academicYearId') academicYearId?: string,
+  ) {
+    if (!file) throw new BadRequestException('Choose a CSV or XLSX file.');
+    return this.imports.preview(school, file, academicYearId);
+  }
+
+  /** Saves one batch of previewed rows; each row gets its own created/updated/failed result. */
+  @Post('import')
+  @Roles('owner', 'admin')
+  @Header('Cache-Control', 'no-store')
+  importBatch(
+    @CurrentSchool() school: School,
+    @Body(new ZodValidationPipe(importTimetableBatchSchema)) body: ImportTimetableBatchInput,
+  ) {
+    return this.imports.importBatch(school, body);
   }
 
   /** Weekly timetable for a child linked to the authenticated guardian. */

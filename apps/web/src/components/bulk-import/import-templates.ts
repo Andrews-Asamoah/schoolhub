@@ -16,6 +16,12 @@ export interface ImportTemplate {
   textColumns?: readonly string[];
   /** Columns that get a dropdown in the Excel template. */
   listColumns?: Readonly<Record<string, readonly string[]>>;
+  /**
+   * Columns whose dropdown choices come from the school's own records (teachers,
+   * classes …). They are written to a hidden "Lists" sheet and the dropdown points
+   * at that range, because an inline list is limited to 255 characters.
+   */
+  rangeColumns?: Readonly<Record<string, readonly string[]>>;
 }
 
 const csvCell = (value: string | number) => {
@@ -67,6 +73,31 @@ export async function downloadExcelTemplate(template: ImportTemplate) {
       }
     }
   });
+
+  const rangeEntries = Object.entries(template.rangeColumns ?? {}).filter(
+    ([header, values]) => values.length > 0 && template.headers.includes(header),
+  );
+  if (rangeEntries.length) {
+    const lists = workbook.addWorksheet("Lists", { state: "hidden" });
+    rangeEntries.forEach(([header, values], listIndex) => {
+      lists.getCell(1, listIndex + 1).value = header;
+      values.forEach((value, index) => { lists.getCell(index + 2, listIndex + 1).value = value; });
+      lists.getColumn(listIndex + 1).width = 28;
+      const letter = lists.getColumn(listIndex + 1).letter;
+      const column = template.headers.indexOf(header) + 1;
+      for (let row = 2; row <= 1001; row++) {
+        sheet.getCell(row, column).dataValidation = {
+          type: "list",
+          allowBlank: true,
+          formulae: [`Lists!$${letter}$2:$${letter}$${values.length + 1}`],
+          showErrorMessage: true,
+          errorStyle: "warning",
+          errorTitle: header,
+          error: "This is not in the list. Keep it only if it is exactly right.",
+        };
+      }
+    });
+  }
 
   const example = workbook.addWorksheet("Example");
   example.addRow([...template.headers]).font = { bold: true };

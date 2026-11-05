@@ -526,7 +526,8 @@ export class TimetableService {
     };
   }
 
-  private async resolveYearId(schoolId: string, academicYearId?: string) {
+  /** The academic year a timetable call applies to: the one asked for, else the current one. */
+  async resolveYearId(schoolId: string, academicYearId?: string) {
     const year = await this.prisma.client.academicYear.findFirst({
       where: academicYearId ? { id: academicYearId, schoolId } : { schoolId, isCurrent: true },
       select: { id: true },
