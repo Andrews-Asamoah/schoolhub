@@ -1,12 +1,13 @@
 import { clearPrivateSessionPreferences } from "@/lib/private-session";
 import { useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
-import { queryClient } from "@/lib/query-client";
+import { useQueryClient } from "@tanstack/react-query";
 import { signOut } from "@/lib/auth-client";
 
 const LOGOUT_NOTICE_KEY = "schoolhub-logout-notice";
 
 export function useLogout() {
+  const queryClient=useQueryClient();
   const navigate = useNavigate();
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [error, setError] = useState<string | null>(null);

@@ -55,3 +55,7 @@ Do not create an extra migration for these changes. Evidence uploads use the exi
 ### Performance verification
 
 The dashboard family hub remains lazy-loaded; production builds succeed. Main-entry bundle profiling remains visible through Vite's build report (approximately 1.3 MB minified; large-chunk warnings remain nonblocking). Do not hide these warnings or claim that a network/device-specific loading budget has been proven by a local build.
+
+### Delayed-response isolation
+
+Each private context now owns a fresh QueryClient. Retired mutation callbacks retain only their retired client, so they cannot refill a new account/role's cache. A request-generation check also rejects JSON responses and downloads from an expired account/role context. Browser regression coverage includes a delayed mutation response and an attempted write into a retired cache.
