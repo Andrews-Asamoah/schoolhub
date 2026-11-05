@@ -6,6 +6,7 @@ const browser=await chromium.launch({headless:true});
 async function setup(role,roles=[role]){
  const page=await browser.newPage({viewport:{width:1440,height:1000},locale:'en-GB'}), calls=[],errors=[];page.on('pageerror',e=>errors.push(e.stack));
  page.setDefaultTimeout(12000);
+ let releaseDelayedSave;const delayedSaveRelease=new Promise(resolve=>{releaseDelayedSave=resolve;});
  const now=new Date().toISOString(),org={id:'org',name:'Test school',slug:'test-school',createdAt:now};
  const session={user:{id:'audit',name:'Audit User',email:'audit@example.test',role:'user',mustChangePassword:false,twoFactorEnabled:true,createdAt:now,updatedAt:now},session:{id:'session',token:'token',userId:'audit',activeOrganizationId:'org',expiresAt:new Date(Date.now()+3600000).toISOString(),createdAt:now,updatedAt:now}};
  await page.addInitScript(role=>localStorage.setItem('schoolhub-active-role',role),role);
@@ -16,6 +17,7 @@ async function setup(role,roles=[role]){
   if(path.endsWith('/schools/roles'))return route.fulfill({json:{primaryRole:role,roles}});
   if(path.endsWith('/schools/academic-context'))return route.fulfill({json:null});
   if(path.includes('/schools/public/')||path.endsWith('/schools/current'))return route.fulfill({json:{id:'school',organizationId:'org',name:'Test school',code:'TEST',subdomain:'test-school',academicYears:[]}});
+  if(path.endsWith('/private-delayed-save')){await delayedSaveRelease;return route.fulfill({json:{privateData:'previous role'}});}
   if(path.endsWith('/dashboard/work-queue'))return route.fulfill({json:{generatedAt:now,role,term:null,items:[],lessons:[],upcoming:[]}});
   if(path.endsWith('/dashboard/analytics')){
    const active=req.headers()['x-school-role'];
@@ -27,10 +29,10 @@ async function setup(role,roles=[role]){
   if(path==='/attendance/me')return route.fulfill({status:503,json:{message:'Attendance unavailable'}});
   if(path==='/students/me')return route.fulfill({json:{id:'pupil',profile:{firstName:'Ama',lastName:'Mensah'},guardians:[],subjects:[]}});
   return route.fulfill({json:[]});
- });return {page,calls,errors};
+ });return {page,calls,errors,releaseDelayedSave};
 }
 try {
- let {page,calls,errors}=await setup('guardian');
+ let {page,calls,errors}=await setup('guardian');let releaseDelayedSave;
  await page.goto('http://127.0.0.1:5173/dashboard');
  await page.getByText('No children linked yet',{exact:true}).waitFor();
  assert.equal(calls.some(c=>c.path==='/dashboard/analytics'),false);
@@ -46,15 +48,27 @@ try {
  await page.getByRole('alert').filter({hasText:'Attendance statistics are unavailable'}).waitFor();
  assert.equal(await page.getByText('Days Present',{exact:true}).count(),0);
  assert.deepEqual(errors,[]);await page.close();
- ({page,calls,errors}=await setup('owner',['owner','teacher']));
+ ({page,calls,errors,releaseDelayedSave}=await setup('owner',['owner','teacher']));
  await page.goto('http://127.0.0.1:5173/dashboard');
  await page.getByText('Fee collections this month',{exact:true}).waitFor();
+ await page.evaluate(async()=>{
+  const {queryClient}=await import('/src/lib/query-client.ts');const {apiFetch}=await import('/src/lib/api.ts');
+  window.__retiredPrivateClient=queryClient;
+  window.__latePrivateSave=apiFetch('/private-delayed-save',{method:'POST',body:'{}'}).then(data=>{queryClient.setQueryData(['late-private-save'],data);return 'success';},error=>error.name);
+ });
  await page.getByRole('combobox',{name:'Switch school role'}).click();
  await page.getByRole('option',{name:'Teacher',exact:true}).click();
  await page.waitForFunction(()=>localStorage.getItem('schoolhub-active-role')==='teacher');
  assert.equal(await page.getByText('Fee collections this month',{exact:true}).count(),0);
  await page.getByRole('heading',{name:'Your teaching week',exact:true}).waitFor();
  assert.equal(await page.getByText('Fee collections this month',{exact:true}).count(),0);
+ releaseDelayedSave();
+ assert.equal(await page.evaluate(()=>window.__latePrivateSave),'AbortError');
+ assert.deepEqual(await page.evaluate(async()=>{
+  const {queryClient}=await import('/src/lib/query-client.ts');
+  window.__retiredPrivateClient.setQueryData(['retired-private-data'],{privateData:'previous role'});
+  return {sameClient:window.__retiredPrivateClient===queryClient,oldData:queryClient.getQueryData(['retired-private-data'])??null,lateSave:queryClient.getQueryData(['late-private-save'])??null};
+ }),{sameClient:false,oldData:null,lateSave:null});
  assert.deepEqual(errors,[]);await page.close();
  console.log('Portal boundary checks passed: guardian homepage, denied family route, honest attendance errors, and owner-to-teacher cache isolation.');
 } finally { await browser.close(); }

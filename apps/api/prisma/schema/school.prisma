@@ -3,6 +3,7 @@
 // ============================================================================
 
 model School {
+  attendanceExcuseRequests AttendanceExcuseRequest[]
   schoolRolloverBatches AcademicRolloverBatch[] @relation("AcademicRolloverBatch_school")
   financeBankReconciliations FinanceBankReconciliation[] @relation("FinanceBankReconciliation_school")
   financeBankMatchs FinanceBankMatch[] @relation("FinanceBankMatch_school")
@@ -162,6 +163,7 @@ model UserProfile {
 }
 
 model Student {
+  attendanceExcuseRequests AttendanceExcuseRequest[]
   id                 String        @id @default(cuid())
   profileId          String        @unique
   schoolId           String
@@ -321,6 +323,7 @@ model Staff {
 }
 
 model Guardian {
+  attendanceExcuseRequests AttendanceExcuseRequest[]
   id                 String       @id @default(cuid())
   profileId          String?
   schoolId           String

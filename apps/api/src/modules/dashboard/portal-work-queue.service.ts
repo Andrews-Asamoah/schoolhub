@@ -41,16 +41,18 @@ export class PortalWorkQueueService {
       return result;
     }
     if(role==="headteacher" || role==="owner"){
-      const [mocks,versions,pendingCorrections,classCount]=await Promise.all([
+      const [mocks,versions,pendingCorrections,classCount,pendingExcuses]=await Promise.all([
         db.internalMockReport.findMany({where:{schoolId,session:{termId:term.id}},distinct:["candidateId"],orderBy:[{candidateId:"asc"},{version:"desc"}],select:{stage:true}}),
         db.reportCardVersion.findMany({where:{schoolId,set:{termId:term.id}},distinct:["setId","studentId"],orderBy:[{setId:"asc"},{studentId:"asc"},{version:"desc"}],select:{stage:true}}),
         db.internalMockCorrection.count({where:{schoolId,status:"PENDING",session:{termId:term.id}}}),
         db.class.count({where:{schoolId,deletedAt:null,isActive:true,OR:[{academicYearId:term.academicYearId},{academicYearId:null}]}}),
+        db.attendanceExcuseRequest.count({where:{schoolId,status:"PENDING"}}),
       ]);
       add("mock-review","Mock recommendations awaiting headteacher review","Latest candidate reports already recommended by the class teacher.","internal-exams",mocks.filter(row=>row.stage==="TEACHER_REVIEWED").length);
       add("mock-publish","Approved mock reports awaiting publication","Release only after both independent recommendations and integrity checks.","internal-exams",mocks.filter(row=>row.stage==="APPROVED").length);
       add("term-review","Term report recommendations","Latest term reports awaiting independent leadership review.","reports",versions.filter(row=>row.stage==="TEACHER_REVIEWED").length);
       add("publish","Approved reports awaiting publication","Check integrity and release approved reports through the existing publication controls.","reports",versions.filter(row=>row.stage==="APPROVED").length);
+      add("excuses","Absence requests awaiting review","Review guardian explanations and private evidence; attendance marks remain a separate staff action.","attendance",pendingExcuses);
       add("coverage","Class attendance coverage","Classes available for instructional-day completeness review; this count is not a count of absent pupils.","attendance",classCount);
       add("corrections","Mock correction requests","Review reasons and supporting evidence before changing frozen results.","internal-exams",pendingCorrections);
     }

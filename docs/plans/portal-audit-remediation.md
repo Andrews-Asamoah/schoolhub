@@ -30,3 +30,32 @@ The follow-on changes add role-specific work queues, shared family ward context,
 - Guardian selection is shared across attendance, timetable, fees and published reports, scoped to account/school and cleared on logout. Published SBA/mock history can be filtered by child, academic year and term.
 - SuperAdmin school detail adds configuration/migration readiness, notification-failure counts and worker incidents without exposing payloads. Only failed finance-integrity checks can be requeued; the school/job/status checks and audit reason are enforced server-side.
 - Add desktop/mobile portal-workflow and mark-draft recovery browser checks to CI. No schema migration is needed for these additions.
+
+## Guardian absence requests implemented
+
+- Add `20261105020000_attendance_excuse_requests`, an additive request/evidence/review table with date/status/decision constraints and matching Prisma relations.
+- Guardians may submit a 1–31 day explanation for a currently linked ward, with one optional PDF/image up to 5 MB. Reuse private storage, existing PDF scanning/image sanitization, durable upload reservations and orphan cleanup. Object keys are never returned.
+- Guardian history/evidence is restricted to the submitting guardian and a still-linked ward in the active school. Teachers, students, accountants, other guardians and other schools cannot retrieve the evidence.
+- Owner/admin/headteacher review requires a decision reason and expected version. A dual-role guardian cannot review their own family's request. A second decision returns a conflict. Transactions commit the review, notification and audit together.
+- Request/decision notifications contain generic portal instructions, not medical reasons or evidence. Approval never writes attendance marks or exclusions; authorised register staff retain that responsibility.
+- Guardian Attendance and management Attendance include the workflow; headteacher/owner work queues include pending request counts. Histories are paginated and filterable, with explicit retry/conflict states.
+- Add real HTTP/PostgreSQL tests for ward/role/school evidence boundaries and decision consistency, unit privacy/review tests and desktop/mobile browser submission/download/review/conflict-retry tests.
+
+### Local update after pulling dev
+
+```bash
+pnpm install --frozen-lockfile
+pnpm db:deploy
+pnpm --filter @schoolhub/api prisma:generate
+pnpm --filter @schoolhub/api exec prisma migrate status
+```
+
+Do not create an extra migration for these changes. Evidence uploads use the existing private bucket and document-scanning configuration; text-only requests do not require an uploaded file. The migration chain was replayed in PGlite and Prisma reported an empty schema diff; GitHub CI additionally applies migrations and runs integration tests against PostgreSQL.
+
+### Performance verification
+
+The dashboard family hub remains lazy-loaded; production builds succeed. Main-entry bundle profiling remains visible through Vite's build report (approximately 1.3 MB minified; large-chunk warnings remain nonblocking). Do not hide these warnings or claim that a network/device-specific loading budget has been proven by a local build.
+
+### Delayed-response isolation
+
+Each private context now owns a fresh QueryClient. Retired mutation callbacks retain only their retired client, so they cannot refill a new account/role's cache. A request-generation check also rejects JSON responses and downloads from an expired account/role context. Browser regression coverage includes a delayed mutation response and an attempted write into a retired cache.

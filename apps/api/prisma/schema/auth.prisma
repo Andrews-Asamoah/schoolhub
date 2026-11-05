@@ -4,6 +4,7 @@
 // ============================================================================
 
 model user {
+  reviewedExcuseRequests AttendanceExcuseRequest[] @relation("ExcuseReviewer")
   reversedPromotions PromotionRecord[] @relation("PromotionRecord_reversedBy")
   rolledBackByRolloverBatches AcademicRolloverBatch[] @relation("AcademicRolloverBatch_rolledBackBy")
   rollbackRequestedByRolloverBatches AcademicRolloverBatch[] @relation("AcademicRolloverBatch_rollbackRequestedBy")

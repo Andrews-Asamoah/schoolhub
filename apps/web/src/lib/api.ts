@@ -1,3 +1,4 @@
+import { requestContextVersion, assertRequestContext } from "./request-context";
 import { getTenantSubdomain as getClientSubdomain } from "./tenant-subdomain";
 
 /**
@@ -35,6 +36,7 @@ export async function apiFetch<T>(
   path: string,
   init?: RequestInit,
 ): Promise<T> {
+  const contextVersion=requestContextVersion();
   const headers = new Headers(init?.headers);
   // Let the browser set the multipart boundary for file uploads.
   if (!(init?.body instanceof FormData)) {
@@ -84,8 +86,10 @@ export async function apiFetch<T>(
     headers,
   });
 
+  assertRequestContext(contextVersion);
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
+    assertRequestContext(contextVersion);
     // An administrator-issued password is still in force: every business
     // endpoint refuses until it is replaced, so send the user to do that.
     if (
@@ -128,7 +132,9 @@ export async function apiFetch<T>(
   // 204 No Content — return undefined cast to T
   if (res.status === 204) return undefined as T;
 
-  return res.json() as Promise<T>;
+  const data=await res.json() as T;
+  assertRequestContext(contextVersion);
+  return data;
 }
 
 /**
@@ -137,6 +143,7 @@ export async function apiFetch<T>(
  * Content-Disposition filename.
  */
 async function apiBinary(path: string): Promise<Response> {
+  const contextVersion=requestContextVersion();
   const headers = new Headers();
   const subdomain = getClientSubdomain();
   if (subdomain) headers.set("x-school-subdomain", subdomain);
@@ -166,8 +173,10 @@ async function apiBinary(path: string): Promise<Response> {
     cache: "no-store",
     headers,
   });
+  assertRequestContext(contextVersion);
   if (!response.ok) {
     const body = await response.json().catch(() => ({}));
+    assertRequestContext(contextVersion);
     if (response.status === 403 && (body as { error?: string }).error === "PASSWORD_CHANGE_REQUIRED" && typeof window !== "undefined" && window.location.pathname !== "/change-password") {
       window.location.assign("/change-password");
     }
@@ -186,16 +195,21 @@ async function apiBinary(path: string): Promise<Response> {
 }
 
 export async function apiBlob(path: string): Promise<Blob> {
-  return (await apiBinary(path)).blob();
+  const contextVersion=requestContextVersion();
+  const blob=await (await apiBinary(path)).blob();
+  assertRequestContext(contextVersion);
+  return blob;
 }
 
 export async function apiDownload(path: string, fallbackFileName?: string): Promise<void> {
+  const contextVersion=requestContextVersion();
   const response = await apiBinary(path);
   const disposition = response.headers.get("content-disposition") ?? "";
   const encodedName = /filename\*=UTF-8''([^;]+)/i.exec(disposition)?.[1];
   const plainName = /filename="?([^";]+)"?/i.exec(disposition)?.[1];
   const fileName = fallbackFileName ?? (encodedName ? decodeURIComponent(encodedName) : plainName) ?? "schoolhub-export";
   const blob = await response.blob();
+  assertRequestContext(contextVersion);
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
@@ -208,6 +222,7 @@ export async function apiDownload(path: string, fallbackFileName?: string): Prom
 
 /** Authenticated, private PDF download; no public file URL is created. */
 export async function downloadAcademicReport(path: string, filename: string): Promise<void> {
+  const contextVersion=requestContextVersion();
   const headers = new Headers();
   const school = getClientSubdomain();
   if (school) headers.set("x-school-subdomain", school);
@@ -226,6 +241,7 @@ export async function downloadAcademicReport(path: string, filename: string): Pr
     throw new Error("The server did not return a valid PDF.");
   }
   const file = await result.blob();
+  assertRequestContext(contextVersion);
   const url = URL.createObjectURL(file);
   try {
     const a = document.createElement("a"); a.href=url;a.download=filename;
@@ -235,6 +251,7 @@ export async function downloadAcademicReport(path: string, filename: string): Pr
 
 /** Authenticated Excel downloads. The file is never exposed on a public URL. */
 export async function downloadPrivateExcel(path:string,filename:string):Promise<void>{
+  const contextVersion=requestContextVersion();
   const headers=new Headers();
   const school=getClientSubdomain();
   if(school)headers.set("x-school-subdomain",school);
@@ -254,7 +271,9 @@ export async function downloadPrivateExcel(path:string,filename:string):Promise<
   if(!type.includes("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")){
     throw new Error("Server did not return a valid Excel workbook.");
   }
-  const url=URL.createObjectURL(await response.blob());
+  const blob=await response.blob();
+  assertRequestContext(contextVersion);
+  const url=URL.createObjectURL(blob);
   try{
     const a=document.createElement("a");
     a.href=url;a.download=filename;document.body.appendChild(a);a.click();a.remove();
