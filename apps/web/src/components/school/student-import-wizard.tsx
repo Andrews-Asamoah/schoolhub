@@ -9,10 +9,11 @@ import {
   LoaderCircle,
   Printer,
   TriangleAlert,
-  Upload,
-  X,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState, type DragEvent } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { BulkImportDialog } from "@/components/bulk-import/bulk-import-dialog";
+import { FileDropzone } from "@/components/bulk-import/file-dropzone";
+import { ImportStartPanels } from "@/components/bulk-import/import-start-panels";
 import { DataTable, type DataTableColumn } from "@/components/ui/data-table";
 import { apiFetch } from "@/lib/api";
 import {
@@ -61,7 +62,6 @@ export function StudentImportWizard({
   const [phase, setPhase] = useState<Phase>("upload");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [dragging, setDragging] = useState(false);
   const [preview, setPreview] = useState<PreviewResponse | null>(null);
   const [filter, setFilter] = useState<Filter>("all");
   const [createGuardianLogins, setCreateGuardianLogins] = useState(false);
@@ -77,7 +77,6 @@ export function StudentImportWizard({
   const stopRequested = useRef(false);
   const batchId = useRef(crypto.randomUUID());
   const sourceRows = useRef(new Map<number, NormalizedStudentRow>());
-  const panel = useRef<HTMLDivElement>(null);
 
   const created = results.filter((result) => result.status === "created");
   const unsavedLogins = phase === "done" && created.length > 0 && !credentialsSaved;
@@ -103,22 +102,9 @@ export function StudentImportWizard({
     }
     onClose();
   };
-  useEffect(() => {
-    const previous = document.activeElement as HTMLElement | null;
-    panel.current?.focus();
-    const onKey = (event: KeyboardEvent) => event.key === "Escape" && closeRef.current();
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("keydown", onKey);
-      previous?.focus();
-    };
-  }, []);
-
   async function readFile(file: File | undefined) {
     setError(null);
     if (!file) return;
-    if (!/\.(csv|xlsx)$/i.test(file.name)) return setError("Choose a .csv or .xlsx file. Old .xls files need to be saved as .xlsx first.");
-    if (file.size > STUDENT_IMPORT_LIMITS.maxFileBytes) return setError(`That file is larger than ${mb(STUDENT_IMPORT_LIMITS.maxFileBytes)} MB.`);
     setBusy(true);
     try {
       const form = new FormData();
@@ -244,77 +230,52 @@ export function StudentImportWizard({
   const remaining = progress.total - progress.done;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/50 p-4" onMouseDown={(event) => event.target === event.currentTarget && phase !== "importing" && closeRef.current()}>
-      <div
-        ref={panel}
-        tabIndex={-1}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="import-title"
-        className="max-h-[94vh] w-full max-w-5xl overflow-y-auto rounded-2xl border border-border bg-card p-5 text-card-foreground shadow-2xl outline-none sm:p-6"
-      >
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <h2 id="import-title" className="text-base font-bold text-foreground">Import students</h2>
-            <p className="mt-0.5 text-xs text-muted-foreground">
-              {phase === "upload" && "Step 1 of 3: choose a spreadsheet of your existing students."}
-              {phase === "review" && "Step 2 of 3: check what will be imported. Nothing has been added yet."}
-              {phase === "importing" && "Step 3 of 3: adding students. Please keep this window open."}
-              {phase === "done" && "Finished."}
-            </p>
-          </div>
-          <button type="button" onClick={() => closeRef.current()} aria-label="Close" className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted">
-            <X className="size-4" />
-          </button>
-        </div>
-
+    <BulkImportDialog
+      title="Import students"
+      description={
+        phase === "upload" ? "Step 1 of 3: choose a spreadsheet of your existing students."
+        : phase === "review" ? "Step 2 of 3: check what will be imported. Nothing has been added yet."
+        : phase === "importing" ? "Step 3 of 3: adding students. Please keep this window open."
+        : "Finished."
+      }
+      maxWidth="5xl"
+      onClose={() => closeRef.current()}
+    >
         {phase === "upload" && (
-          <div className="mt-5 space-y-5">
-            <label
-              onDragOver={(event: DragEvent) => { event.preventDefault(); setDragging(true); }}
-              onDragLeave={() => setDragging(false)}
-              onDrop={(event: DragEvent) => { event.preventDefault(); setDragging(false); void readFile(event.dataTransfer.files[0]); }}
-              className={`flex cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed px-6 py-12 text-center transition ${dragging ? "border-primary bg-primary/5" : "border-border hover:bg-muted/50"}`}
-            >
-              {busy ? <LoaderCircle className="size-8 animate-spin text-primary" /> : <Upload className="size-8 text-primary" />}
-              <span className="text-sm font-semibold text-foreground">{busy ? "Reading your file…" : "Drop a file here, or click to choose one"}</span>
-              <span className="text-xs text-muted-foreground">.csv or .xlsx, up to {STUDENT_IMPORT_LIMITS.maxRows} students and {mb(STUDENT_IMPORT_LIMITS.maxFileBytes)} MB</span>
-              <input type="file" accept=".csv,.xlsx" className="sr-only" aria-label="Choose a student file" disabled={busy} onChange={(event) => { void readFile(event.target.files?.[0]); event.target.value = ""; }} />
-            </label>
+          <div className="space-y-5">
+            <FileDropzone
+              extensions={[".csv", ".xlsx"]}
+              maxBytes={STUDENT_IMPORT_LIMITS.maxFileBytes}
+              busy={busy}
+              prompt="Drop a file here, or click to choose one"
+              hint={`.csv or .xlsx, up to ${STUDENT_IMPORT_LIMITS.maxRows} students and ${mb(STUDENT_IMPORT_LIMITS.maxFileBytes)} MB. Old .xls files need to be saved as .xlsx first.`}
+              ariaLabel="Choose a student file"
+              onFiles={([file]) => void readFile(file)}
+              onReject={setError}
+            />
             {error && (
               <p role="alert" className="flex items-start gap-2 rounded-xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive">
                 <CircleAlert className="mt-0.5 size-4 shrink-0" /> {error}
               </p>
             )}
-            <div className="grid gap-4 md:grid-cols-2">
-              <section className="rounded-xl border border-border p-4">
-                <h3 className="text-xs font-bold text-foreground">Start from the template</h3>
-                <p className="mt-1 text-xs text-muted-foreground">The Excel template has dropdowns for gender and class, and keeps dates and phone numbers exactly as you type them.</p>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <button type="button" disabled={templateBusy} onClick={() => void template("xlsx")} className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary px-3 text-xs font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-60">
-                    {templateBusy ? <LoaderCircle className="size-3.5 animate-spin" /> : <FileSpreadsheet className="size-3.5" />} Excel template
-                  </button>
-                  <button type="button" onClick={() => void template("csv")} className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-border px-3 text-xs font-semibold text-foreground hover:bg-muted">
-                    <Download className="size-3.5" /> CSV template
-                  </button>
-                </div>
-              </section>
-              <section className="rounded-xl border border-border p-4">
-                <h3 className="text-xs font-bold text-foreground">Good to know</h3>
-                <ul className="mt-1 list-disc space-y-1 pl-4 text-xs text-muted-foreground">
-                  <li>Required: first name, last name, gender and date of birth.</li>
-                  <li>Dates are read day first, like 25/12/2012.</li>
-                  <li>Admission numbers are made for you from each student&rsquo;s <strong>Admission date</strong> (e.g. WIS20180039). Any admission number in the file is ignored.</li>
-                  <li>Classes must already exist and be spelled as they are in the system.</li>
-                  <li>Students already in the school are skipped, so a file can be uploaded again safely.</li>
-                </ul>
-              </section>
-            </div>
+            <ImportStartPanels
+              templateText="The Excel template has dropdowns for gender and class, and keeps dates and phone numbers exactly as you type them."
+              templateBusy={templateBusy}
+              onExcel={() => void template("xlsx")}
+              onCsv={() => void template("csv")}
+              notes={[
+                "Required: first name, last name, gender and date of birth.",
+                "Dates are read day first, like 25/12/2012.",
+                <>Admission numbers are made for you from each student&rsquo;s <strong>Admission date</strong> (e.g. WIS20180039). Any admission number in the file is ignored.</>,
+                "Classes must already exist and be spelled as they are in the system.",
+                "Students already in the school are skipped, so a file can be uploaded again safely.",
+              ]}
+            />
           </div>
         )}
 
         {phase === "review" && preview && (
-          <div className="mt-5 space-y-4">
+          <div className="space-y-4">
             <p className="text-xs text-muted-foreground">{preview.file.name} · {preview.file.rows} row{preview.file.rows === 1 ? "" : "s"}</p>
             <div className="grid gap-3 sm:grid-cols-4">
               <Stat label="Will be imported" value={preview.summary.importable} tone="emerald" />
@@ -455,8 +416,7 @@ export function StudentImportWizard({
             </div>
           </div>
         )}
-      </div>
-    </div>
+    </BulkImportDialog>
   );
 }
 

@@ -4,11 +4,13 @@ import {
   createClassSchema,
   createDepartmentSchema,
   createHouseSchema,
+  saveSubjectSchema,
   STUDENT_IMPORT_LIMITS,
   type CreateClubInput,
   type CreateClassInput,
   type CreateDepartmentInput,
   type CreateHouseInput,
+  type SaveSubjectInput,
   updateHouseSchema,
   type UpdateHouseInput,
 } from "@schoolhub/shared";
@@ -16,9 +18,10 @@ import type { School } from "@prisma/client";
 import { AcademicsService } from "./academics.service.js";
 import { PrismaService } from "../../prisma/prisma.service.js";
 import { parseUpload } from "../students/import/import-parse.js";
+import { SubjectsService } from "../subjects/subjects.service.js";
 
-export type AcademicStructureKind = "departments" | "houses" | "clubs" | "classes";
-type RecordInput = CreateDepartmentInput | CreateHouseInput | CreateClubInput | CreateClassInput;
+export type AcademicStructureKind = "departments" | "houses" | "clubs" | "classes" | "subjects";
+type RecordInput = CreateDepartmentInput | CreateHouseInput | CreateClubInput | CreateClassInput | SaveSubjectInput;
 type PreviewStatus = "ready" | "duplicate" | "error";
 type PreviewRow = {
   rowNumber: number;
@@ -71,6 +74,13 @@ const fieldAliases: Record<AcademicStructureKind, Record<string, string[]>> = {
     isActive: ["isactive", "active", "status"],
     order: ["order", "sortorder", "displayorder"],
   },
+  subjects: {
+    name: ["name", "subject", "subjectname"],
+    code: ["code", "subjectcode"],
+    description: ["description", "details"],
+    periodsPerWeek: ["periodsperweek", "periods", "lessonsperweek"],
+    isActive: ["isactive", "active", "status"],
+  },
 };
 
 const requiredFields: Record<AcademicStructureKind, string[]> = {
@@ -78,6 +88,7 @@ const requiredFields: Record<AcademicStructureKind, string[]> = {
   houses: ["name", "code"],
   clubs: ["name"],
   classes: ["name", "level", "departmentCode"],
+  subjects: ["name", "code"],
 };
 
 const kindNames: Record<AcademicStructureKind, string> = {
@@ -85,10 +96,11 @@ const kindNames: Record<AcademicStructureKind, string> = {
   houses: "house",
   clubs: "club",
   classes: "class",
+  subjects: "subject",
 };
 
 function isKind(value: string): value is AcademicStructureKind {
-  return value === "departments" || value === "houses" || value === "clubs" || value === "classes";
+  return value === "departments" || value === "houses" || value === "clubs" || value === "classes" || value === "subjects";
 }
 
 function parseActive(value: string): boolean | undefined {
@@ -123,6 +135,7 @@ export class AcademicStructureImportService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly academics: AcademicsService,
+    private readonly subjects: SubjectsService,
   ) {}
 
   async preview(
@@ -130,7 +143,7 @@ export class AcademicStructureImportService {
     file: { buffer: Buffer; originalname: string },
     rawKind: string,
   ) {
-    if (!isKind(rawKind)) throw new BadRequestException("kind must be departments, houses, clubs or classes.");
+    if (!isKind(rawKind)) throw new BadRequestException("kind must be departments, houses, clubs, classes or subjects.");
     const kind = rawKind;
     const { format, sheet } = await parseUpload(file.buffer, file.originalname);
     const fieldByHeader = new Map(
@@ -179,7 +192,7 @@ export class AcademicStructureImportService {
       const displayName = raw.name || "(no name)";
       const input: Record<string, unknown> = {
         name: raw.name,
-        ...(kind === "departments" || kind === "houses" ? { code: raw.code } : {}),
+        ...(kind === "departments" || kind === "houses" || kind === "subjects" ? { code: raw.code } : {}),
         ...(raw.description ? { description: raw.description } : {}),
         ...(kind === "houses" ? {
           ...(raw.color ? { color: raw.color } : {}),
@@ -227,6 +240,16 @@ export class AcademicStructureImportService {
         if (raw.order) input.order = Number(raw.order);
       }
 
+      if (kind === "subjects") {
+        if (raw.periodsPerWeek) {
+          const periods = Number(raw.periodsPerWeek);
+          if (!Number.isInteger(periods)) errors.push("periodsPerWeek must be a whole number from 1 to 20.");
+          else input.periodsPerWeek = periods;
+        } else {
+          input.periodsPerWeek = 4;
+        }
+      }
+
       if (kind !== "classes") {
         try {
           const active = parseActive(raw.isActive ?? "");
@@ -258,7 +281,9 @@ export class AcademicStructureImportService {
           ? existingHouse ? updateHouseSchema : createHouseSchema
           : kind === "clubs"
             ? createClubSchema
-            : createClassSchema;
+            : kind === "subjects"
+              ? saveSubjectSchema
+              : createClassSchema;
       const checked = schema.safeParse(input);
       if (!checked.success) errors.push(...checked.error.issues.map((issue) => issue.message));
       if (errors.length) return { rowNumber: record.rowNumber, name: displayName, status: "error", errors, row: null };
@@ -280,7 +305,9 @@ export class AcademicStructureImportService {
         ? [normalize(data.name)]
         : kind === "houses"
           ? [normalize(data.name), normalize((data as CreateHouseInput).code)]
-          : [normalize((data as CreateDepartmentInput).code)];
+          : kind === "subjects"
+            ? [(data as SaveSubjectInput).code]
+            : [normalize((data as CreateDepartmentInput).code)];
       const duplicate = (kind === "houses" && existingHouse
         ? existing.some((item) =>
             item.id !== existingHouse?.id &&
@@ -333,7 +360,7 @@ export class AcademicStructureImportService {
     values: { rowNumber: number; row: Record<string, unknown>; existingId?: string; matchCode?: string }[],
     houseUpdateMode: string = "merge",
   ) {
-    if (!isKind(rawKind)) throw new BadRequestException("kind must be departments, houses, clubs or classes.");
+    if (!isKind(rawKind)) throw new BadRequestException("kind must be departments, houses, clubs, classes or subjects.");
     const kind = rawKind;
     if (kind !== "clubs" && role !== "owner" && role !== "admin") {
       throw new ForbiddenException(`Only school owners and administrators can import ${kind}.`);
@@ -417,7 +444,9 @@ export class AcademicStructureImportService {
             ? createHouseSchema
             : kind === "clubs"
               ? createClubSchema
-              : createClassSchema;
+              : kind === "subjects"
+                ? saveSubjectSchema
+                : createClassSchema;
         const checked = schema.safeParse(item.row);
         if (!checked.success) {
           results.push({
@@ -431,6 +460,7 @@ export class AcademicStructureImportService {
         if (kind === "departments") await this.academics.createDepartment(school.id, checked.data as CreateDepartmentInput);
         else if (kind === "houses") await this.academics.createHouse(school.id, checked.data as CreateHouseInput);
         else if (kind === "clubs") await this.academics.createClub(school.id, checked.data as CreateClubInput);
+        else if (kind === "subjects") await this.subjects.create(school.id, checked.data as SaveSubjectInput);
         else await this.academics.createClass(school.id, checked.data as CreateClassInput);
         results.push({ rowNumber, name, status: "created" });
       } catch (error) {
@@ -463,11 +493,19 @@ export class AcademicStructureImportService {
         select: { id: true, name: true, code: true, description: true, color: true, motto: true, houseTeacherId: true, isActive: true },
       });
     }
+    if (kind === "subjects") {
+      // Soft-deleted subjects still hold their code, exactly as in SubjectsService.
+      return this.prisma.client.subject.findMany({ where: { schoolId }, select: { name: true, code: true } });
+    }
     return this.prisma.client.club.findMany({ where: { schoolId }, select: { name: true } });
   }
 
   private isDuplicate(kind: AcademicStructureKind, data: RecordInput, existing: { name: string; code?: string }[]) {
     if (kind === "clubs" || kind === "classes") return existing.some((item) => normalize(item.name) === normalize(data.name));
+    if (kind === "subjects") {
+      const code = (data as SaveSubjectInput).code;
+      return existing.some((item) => item.code?.toUpperCase() === code);
+    }
     if (kind === "houses") {
       const house = data as CreateHouseInput;
       return existing.some((item) =>

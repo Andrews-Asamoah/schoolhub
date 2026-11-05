@@ -1,7 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   CircleAlert,
-  FileSpreadsheet,
   LoaderCircle,
   Pencil,
   Plus,
@@ -25,6 +24,7 @@ import { useSchoolRole } from "@/components/school/school-role-switcher";
 import { apiFetch } from "@/lib/api";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AcademicStructureBulkImport } from "@/components/school/academic-structure-bulk-import";
+import { BulkImportButton } from "@/components/bulk-import/bulk-import-button";
 
 interface ClubMemberRecord {
   id: string;
@@ -354,9 +354,7 @@ export function ClubsWorkspace() {
 
         {canManage && (
           <div className="flex flex-wrap gap-2">
-            <button type="button" onClick={() => setShowBulkImport(true)} className="inline-flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-2 text-xs font-semibold text-foreground hover:bg-muted">
-              <FileSpreadsheet className="size-4" /> Bulk import
-            </button>
+            <BulkImportButton onClick={() => setShowBulkImport(true)} />
             <button
               type="button"
               onClick={openCreate}

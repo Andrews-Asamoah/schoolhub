@@ -46,6 +46,7 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { apiFetch } from "@/lib/api";
 import { StaffBulkImport } from "@/components/school/staff-bulk-import";
+import { BulkImportButton } from "@/components/bulk-import/bulk-import-button";
 
 type PeopleKind = "teachers" | "staff" | "guardians";
 type Values = {
@@ -679,9 +680,7 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
           {canManage && (
             <div className="flex flex-wrap gap-2">
               {(kind === "teachers" || kind === "staff") && (
-                <button type="button" onClick={() => setShowBulkImport(true)} className="inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-card px-4 text-xs font-semibold text-foreground hover:bg-muted">
-                  <UsersRound className="size-4" /> Bulk upload
-                </button>
+                <BulkImportButton onClick={() => setShowBulkImport(true)} />
               )}
               <button
                 type="button"

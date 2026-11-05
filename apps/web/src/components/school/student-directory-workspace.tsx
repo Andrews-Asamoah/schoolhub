@@ -10,7 +10,6 @@ import {
   Check,
   LoaderCircle,
   Plus,
-  Upload,
   Search,
   SquarePen,
   Trash2,
@@ -40,6 +39,7 @@ import {
   CredentialsDialog,
   type CredentialEntry,
 } from "@/components/credentials/credentials-dialog";
+import { BulkImportButton } from "@/components/bulk-import/bulk-import-button";
 
 interface Student {
   id: string;
@@ -395,24 +395,10 @@ export function StudentDirectoryWorkspace() {
           {canManage && (
             <div className="flex flex-wrap gap-2">
               {canImport && (
-                <button
-                  type="button"
-                  onClick={() => setShowImport(true)}
-                  className="inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-card px-4 text-xs font-semibold text-foreground shadow-sm hover:bg-muted"
-                >
-                  <Upload className="size-4" />
-                  Import students
-                </button>
+                <BulkImportButton label="Bulk upload students" onClick={() => setShowImport(true)} />
               )}
               {canImport && (
-                <button
-                  type="button"
-                  onClick={() => setShowPhotoBulkUpload(true)}
-                  className="inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-card px-4 text-xs font-semibold text-foreground shadow-sm hover:bg-muted"
-                >
-                  <UserRound className="size-4" />
-                  Bulk photos
-                </button>
+                <BulkImportButton label="Bulk upload photos" onClick={() => setShowPhotoBulkUpload(true)} />
               )}
               <button
                 type="button"

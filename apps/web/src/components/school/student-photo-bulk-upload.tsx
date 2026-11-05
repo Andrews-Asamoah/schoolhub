@@ -1,6 +1,9 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { Check, FileImage, LoaderCircle, Upload, X } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { Check, LoaderCircle } from "lucide-react";
+import { useRef, useState } from "react";
+import { BulkImportDialog } from "@/components/bulk-import/bulk-import-dialog";
+import { FileDropzone } from "@/components/bulk-import/file-dropzone";
+import { Button } from "@/components/ui/button";
 import { apiFetch } from "@/lib/api";
 
 const MAX_IMAGE_BYTES = 2 * 1024 * 1024;
@@ -33,7 +36,6 @@ export function StudentPhotoBulkUpload({
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState("");
   const stopRequested = useRef(false);
-  const panel = useRef<HTMLElement>(null);
   const closeRef = useRef<() => void>(() => undefined);
   closeRef.current = () => {
     if (busy) {
@@ -45,42 +47,9 @@ export function StudentPhotoBulkUpload({
     onClose();
   };
 
-  useEffect(() => {
-    const previous = document.activeElement as HTMLElement | null;
-    panel.current?.focus();
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") closeRef.current();
-    };
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("keydown", onKey);
-      previous?.focus();
-    };
-  }, []);
-
-  function chooseFiles(selected: FileList | null) {
+  function chooseFiles(chosen: File[]) {
     setError("");
     setResults([]);
-    if (!selected) {
-      setFiles([]);
-      return;
-    }
-    const chosen = Array.from(selected);
-    if (!chosen.length) {
-      setFiles([]);
-      return;
-    }
-    if (chosen.length > MAX_FILES) {
-      setFiles([]);
-      setError(`Choose no more than ${MAX_FILES} photos at a time.`);
-      return;
-    }
-    const invalid = chosen.find((file) => !ACCEPTED_TYPES.has(file.type) || file.size > MAX_IMAGE_BYTES);
-    if (invalid) {
-      setFiles([]);
-      setError(`${invalid.name}: choose a JPEG, PNG or WebP photo up to 2 MB.`);
-      return;
-    }
     const seenIdentifiers = new Set<string>();
     for (const file of chosen) {
       const identifier = fileIdentifier(file.name);
@@ -141,67 +110,66 @@ export function StudentPhotoBulkUpload({
   const failed = results.length - uploaded;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay p-3 sm:p-6">
-      <section
-        ref={panel}
-        tabIndex={-1}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="student-photo-upload-title"
-        className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl border border-border bg-card p-5 shadow-xl outline-none sm:p-6"
-      >
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex items-start gap-3">
-            <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary"><FileImage className="size-5" /></span>
-            <div>
-              <h2 id="student-photo-upload-title" className="text-lg font-bold text-foreground">Bulk upload student photos</h2>
-              <p className="mt-1 text-sm leading-5 text-muted-foreground">Photos are matched to students by filename. Name each file with the student ID or admission number, for example <strong className="text-foreground">ABC260001.jpg</strong>.</p>
+    <BulkImportDialog
+      title="Bulk upload student photos"
+      description="Photos are matched to students by filename. Name each file with the student ID or admission number, for example ABC260001.jpg."
+      maxWidth="3xl"
+      onClose={() => closeRef.current()}
+      footer={
+        <>
+          {results.length > 0 && !busy && (
+            <Button type="button" variant="outline" size="sm" className="mr-auto" onClick={() => { setFiles([]); setResults([]); setProgress(""); setError(""); }}>
+              Start another upload
+            </Button>
+          )}
+          <Button type="button" variant="outline" size="sm" disabled={busy} onClick={() => closeRef.current()}>{results.length ? "Done" : "Cancel"}</Button>
+          {results.length === 0 && (
+            <Button type="button" size="sm" disabled={!files.length || busy} onClick={() => void uploadPhotos()}>
+              {busy && <LoaderCircle aria-hidden="true" className="size-4 animate-spin" />}
+              {busy ? "Uploading…" : `Upload ${files.length} photo${files.length === 1 ? "" : "s"}`}
+            </Button>
+          )}
+        </>
+      }
+    >
+      <div className="space-y-4">
+        <FileDropzone
+          multiple
+          mimeTypes={[...ACCEPTED_TYPES]}
+          maxFiles={MAX_FILES}
+          maxBytes={MAX_IMAGE_BYTES}
+          disabled={busy}
+          selection={files.length ? `${files.length} photos selected` : undefined}
+          prompt="Drop student photos here, or click to choose"
+          hint={`JPEG, PNG or WebP · up to 2 MB each · maximum ${MAX_FILES} files`}
+          ariaLabel="Choose student photo files"
+          onFiles={chooseFiles}
+          onReject={(message) => { setFiles([]); setResults([]); setError(message); }}
+        />
+
+        {files.length > 0 && (
+          <div className="max-h-36 overflow-y-auto rounded-xl border border-border">
+            <ul className="divide-y divide-border">
+              {files.map((file) => <li key={`${file.name}:${file.size}`} className="flex items-center justify-between gap-3 px-3 py-2 text-xs"><span className="min-w-0 truncate text-foreground">{file.name}</span><span className="shrink-0 text-muted-foreground">{(file.size / 1024).toFixed(0)} KB</span></li>)}
+            </ul>
+          </div>
+        )}
+
+        {error && <p role="alert" className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">{error}</p>}
+        {busy && <p role="status" className="text-sm text-muted-foreground">{progress}</p>}
+
+        {results.length > 0 && (
+          <div className="space-y-2">
+            <p className="text-sm font-semibold text-foreground">{uploaded} uploaded · {failed} failed</p>
+            <div className="max-h-60 overflow-auto rounded-xl border border-border">
+              <table className="w-full text-left text-xs">
+                <thead className="sticky top-0 bg-muted text-muted-foreground"><tr><th className="p-2">File</th><th className="p-2">Student ID</th><th className="p-2">Result</th><th className="p-2">Details</th></tr></thead>
+                <tbody>{results.map((result, index) => <tr key={`${result.fileName}:${index}`} className="border-t border-border"><td className="max-w-40 truncate p-2">{result.fileName}</td><td className="p-2">{result.studentId ?? result.identifier}</td><td className="p-2">{result.status === "uploaded" ? <span className="inline-flex items-center gap-1 text-success"><Check className="size-3" />Uploaded</span> : <span className="text-destructive">Failed</span>}</td><td className="p-2 text-muted-foreground">{result.message ?? ""}</td></tr>)}</tbody>
+              </table>
             </div>
           </div>
-          <button type="button" aria-label="Close bulk photo upload" onClick={() => closeRef.current()} className="rounded-lg p-2 text-muted-foreground hover:bg-muted"><X className="size-4" /></button>
-        </div>
-
-        <div className="mt-5 space-y-4">
-          <label className="flex cursor-pointer flex-col items-center gap-2 rounded-xl border border-dashed border-border bg-muted/30 p-6 text-center">
-            <Upload className="size-7 text-primary" />
-            <span className="text-sm font-semibold text-foreground">{files.length ? `${files.length} photos selected` : "Choose student photo files"}</span>
-            <span className="text-xs text-muted-foreground">JPEG, PNG or WebP · up to 2 MB each · maximum {MAX_FILES} files</span>
-            <input type="file" accept="image/jpeg,image/png,image/webp" multiple disabled={busy} className="sr-only" onChange={(event) => {
-              chooseFiles(event.target.files);
-              event.target.value = "";
-            }} />
-          </label>
-
-          {files.length > 0 && (
-            <div className="max-h-36 overflow-y-auto rounded-xl border border-border">
-              <ul className="divide-y divide-border">
-                {files.map((file) => <li key={`${file.name}:${file.size}`} className="flex items-center justify-between gap-3 px-3 py-2 text-xs"><span className="min-w-0 truncate text-foreground">{file.name}</span><span className="shrink-0 text-muted-foreground">{(file.size / 1024).toFixed(0)} KB</span></li>)}
-              </ul>
-            </div>
-          )}
-
-          {error && <p role="alert" className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">{error}</p>}
-          {busy && <p role="status" className="text-sm text-muted-foreground">{progress}</p>}
-
-          {results.length > 0 && (
-            <div className="space-y-2">
-              <p className="text-sm font-semibold text-foreground">{uploaded} uploaded · {failed} failed</p>
-              <div className="max-h-60 overflow-auto rounded-xl border border-border">
-                <table className="w-full text-left text-xs">
-                  <thead className="sticky top-0 bg-muted text-muted-foreground"><tr><th className="p-2">File</th><th className="p-2">Student ID</th><th className="p-2">Result</th><th className="p-2">Details</th></tr></thead>
-                  <tbody>{results.map((result, index) => <tr key={`${result.fileName}:${index}`} className="border-t border-border"><td className="max-w-40 truncate p-2">{result.fileName}</td><td className="p-2">{result.studentId ?? result.identifier}</td><td className="p-2">{result.status === "uploaded" ? <span className="inline-flex items-center gap-1 text-success"><Check className="size-3" />Uploaded</span> : <span className="text-destructive">Failed</span>}</td><td className="p-2 text-muted-foreground">{result.message ?? ""}</td></tr>)}</tbody>
-                </table>
-              </div>
-            </div>
-          )}
-
-          <div className="flex justify-end gap-2 border-t border-border pt-4">
-            {results.length > 0 && !busy && <button type="button" onClick={() => { setFiles([]); setResults([]); setProgress(""); setError(""); }} className="mr-auto rounded-lg border border-border px-3 py-2 text-xs font-semibold text-foreground hover:bg-muted">Start another upload</button>}
-            <button type="button" disabled={busy} onClick={() => closeRef.current()} className="rounded-lg border border-border px-4 py-2 text-xs font-semibold text-foreground hover:bg-muted disabled:opacity-50">{results.length ? "Done" : "Cancel"}</button>
-            {results.length === 0 && <button type="button" disabled={!files.length || busy} onClick={() => void uploadPhotos()} className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground disabled:opacity-50">{busy && <LoaderCircle className="size-3.5 animate-spin" />}{busy ? "Uploading…" : `Upload ${files.length} photo${files.length === 1 ? "" : "s"}`}</button>}
-          </div>
-        </div>
-      </section>
-    </div>
+        )}
+      </div>
+    </BulkImportDialog>
   );
 }

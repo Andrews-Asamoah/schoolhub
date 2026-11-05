@@ -3,6 +3,7 @@ import ExcelJS from "exceljs";
 import type { PrismaService } from "../../prisma/prisma.service.js";
 import { AcademicsService } from "./academics.service.js";
 import { AcademicStructureImportService } from "./academic-structure-import.service.js";
+import type { SubjectsService } from "../subjects/subjects.service.js";
 
 function createService(existing: {
   id?: string;
@@ -31,6 +32,7 @@ function createService(existing: {
         ),
       },
       club: { findMany: vi.fn().mockResolvedValue(existing.map(({ name }) => ({ name }))) },
+      subject: { findMany: vi.fn().mockResolvedValue(existing) },
       teacher: {
         findMany: vi.fn().mockResolvedValue([{ id: "teacher-1", invitationEmail: "teacher@example.test" }]),
       },
@@ -46,7 +48,9 @@ function createService(existing: {
     createHouse: vi.fn().mockResolvedValue({ id: "house-1" }),
     createClub: vi.fn().mockResolvedValue({ id: "club-1" }),
   } as unknown as AcademicsService;
-  return { service: new AcademicStructureImportService(prisma, academics), academics, createDepartment, createClass, updateHouse };
+  const createSubject = vi.fn().mockResolvedValue({ id: "subject-1" });
+  const subjects = { create: createSubject } as unknown as SubjectsService;
+  return { service: new AcademicStructureImportService(prisma, academics, subjects), academics, createDepartment, createClass, updateHouse, createSubject };
 }
 
 describe("AcademicStructureImportService preview", () => {
@@ -308,5 +312,77 @@ describe("AcademicStructureImportService import", () => {
     expect(result.results).toHaveLength(2);
     expect(result.results[0]).toMatchObject({ rowNumber: 2, status: "failed" });
     expect(result.results[1]).toMatchObject({ rowNumber: 3, status: "created" });
+  });
+});
+
+describe("AcademicStructureImportService subjects", () => {
+  const school = { id: "school-1" };
+  const csv = (body: string) => ({ buffer: Buffer.from(body), originalname: "subjects.csv" });
+
+  it("previews subjects, upper-cases codes and defaults periods per week", async () => {
+    const { service } = createService();
+    const result = await service.preview(
+      school,
+      csv("name,code,description,periodsPerWeek,isActive\nIntegrated Science,sci,Science for JHS,5,TRUE\nMathematics,math,,,"),
+      "subjects",
+    );
+    expect(result.summary).toEqual({ total: 2, ready: 2, update: 0, duplicate: 0, error: 0 });
+    expect(result.rows[0]?.row).toMatchObject({ name: "Integrated Science", code: "SCI", periodsPerWeek: 5, isActive: true });
+    expect(result.rows[1]?.row).toMatchObject({ code: "MATH", periodsPerWeek: 4 });
+  });
+
+  it("flags codes already used in the school or earlier in the file, ignoring case", async () => {
+    const { service } = createService([{ name: "English", code: "ENG" }]);
+    const result = await service.preview(
+      school,
+      csv("name,code\nEnglish Language,eng\nFrench,fre\nFrench Literature,FRE"),
+      "subjects",
+    );
+    expect(result.summary).toEqual({ total: 3, ready: 1, update: 0, duplicate: 2, error: 0 });
+    expect(result.rows[0]).toMatchObject({ status: "duplicate" });
+    expect(result.rows[2]).toMatchObject({ status: "duplicate", rowNumber: 4 });
+  });
+
+  it("keeps similar but distinct codes apart", async () => {
+    const { service } = createService([{ name: "Maths 1", code: "MATH-1" }]);
+    const result = await service.preview(school, csv("name,code\nMaths 2,MATH1"), "subjects");
+    expect(result.summary.ready).toBe(1);
+  });
+
+  it("reports invalid codes and periods per week", async () => {
+    const { service } = createService();
+    const result = await service.preview(
+      school,
+      csv("name,code,periodsPerWeek\nArt,A!,3\nMusic,MUS,many\nDrama,DRA,25"),
+      "subjects",
+    );
+    expect(result.summary).toEqual({ total: 3, ready: 0, update: 0, duplicate: 0, error: 3 });
+    expect(result.rows[1]?.errors[0]).toContain("periodsPerWeek");
+  });
+
+  it("requires the name and code columns", async () => {
+    const { service } = createService();
+    await expect(service.preview(school, csv("name,description\nArt,Drawing"), "subjects")).rejects.toThrow(
+      /Missing required columns: code/,
+    );
+  });
+
+  it("creates subjects through the subjects service and reports failures per row", async () => {
+    const { service, createSubject } = createService();
+    createSubject.mockRejectedValueOnce(Object.assign(new Error("clash"), { code: "P2002" }));
+    const result = await service.importBatch(school, "admin", "subjects", [
+      { rowNumber: 2, row: { name: "Integrated Science", code: "sci", periodsPerWeek: 4 } },
+      { rowNumber: 3, row: { name: "Mathematics", code: "MATH", periodsPerWeek: 5 } },
+    ]);
+    expect(result.results[0]).toMatchObject({ rowNumber: 2, status: "failed" });
+    expect(result.results[1]).toMatchObject({ rowNumber: 3, status: "created" });
+    expect(createSubject).toHaveBeenLastCalledWith("school-1", expect.objectContaining({ code: "MATH", periodsPerWeek: 5 }));
+  });
+
+  it("only lets owners and administrators import subjects", async () => {
+    const { service } = createService();
+    await expect(
+      service.importBatch(school, "staff", "subjects", [{ rowNumber: 2, row: { name: "Art", code: "ART", periodsPerWeek: 2 } }]),
+    ).rejects.toThrow(/Only school owners and administrators/);
   });
 });

@@ -7,7 +7,9 @@ import {
   type SetSubjectClassesInput,
   type SetSubjectStrandsInput,
 } from "@schoolhub/shared";
+import { BulkImportButton } from "@/components/bulk-import/bulk-import-button";
 import { FormField, FormInput, FormTextarea } from "@/components/forms/form-controls";
+import { AcademicStructureBulkImport } from "@/components/school/academic-structure-bulk-import";
 import { useSchoolRole } from "@/components/school/school-role-switcher";
 import {
   WorkspaceDataTable,
@@ -63,6 +65,9 @@ export function SubjectsWorkspace() {
   const queryClient = useQueryClient();
   const { activeRole } = useSchoolRole();
   const canManage = ["owner", "admin", "headteacher"].includes(activeRole ?? "");
+  // The server only lets owners and administrators create subjects in bulk.
+  const canBulkImport = ["owner", "admin"].includes(activeRole ?? "");
+  const [showImport, setShowImport] = useState(false);
   const [search, setSearch] = useState("");
   const [showInactive, setShowInactive] = useState(false);
   const [panel, setPanel] = useState<Panel>(null);
@@ -266,11 +271,22 @@ export function SubjectsWorkspace() {
           </label>
         </div>
         {canManage && (
-          <button type="button" className={primary} onClick={() => { saveMutation.reset(); setPanel({ type: "form" }); }}>
-            <Plus className="size-4" /> Add subject
-          </button>
+          <div className="flex flex-wrap gap-2">
+            {canBulkImport && <BulkImportButton onClick={() => setShowImport(true)} />}
+            <button type="button" className={primary} onClick={() => { saveMutation.reset(); setPanel({ type: "form" }); }}>
+              <Plus className="size-4" /> Add subject
+            </button>
+          </div>
         )}
       </section>
+
+      {canBulkImport && showImport && (
+        <AcademicStructureBulkImport
+          kind="subjects"
+          onClose={() => setShowImport(false)}
+          onComplete={() => void refresh()}
+        />
+      )}
 
       {actionError && <Notice tone="error">{actionError.message}</Notice>}
 

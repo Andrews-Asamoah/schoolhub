@@ -8,7 +8,6 @@ import {
   Check,
   CalendarClock,
   CircleAlert,
-  FileSpreadsheet,
   GraduationCap,
   Pencil,
   Plus,
@@ -38,6 +37,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { canExportTables } from "@/lib/table-export-policy";
 import { apiFetch } from "@/lib/api";
 import { AcademicStructureBulkImport } from "@/components/school/academic-structure-bulk-import";
+import { BulkImportButton } from "@/components/bulk-import/bulk-import-button";
 
 interface DepartmentOption {
   id: string;
@@ -352,16 +352,7 @@ export function ClassesWorkspace({
             </div>
             {canManage && (
               <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={() => setShowClassImport(true)}
-                  disabled={!availableDepartments.length}
-                  title={!availableDepartments.length ? "Create a department first" : undefined}
-                  className="inline-flex h-11 items-center gap-2 rounded-xl border border-border bg-card px-4 text-sm font-semibold text-foreground shadow-sm transition hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  <FileSpreadsheet className="size-4" />
-                  Bulk import classes
-                </button>
+                <BulkImportButton aria-label="Bulk upload classes" onClick={() => setShowClassImport(true)} disabled={!availableDepartments.length} title={!availableDepartments.length ? "Create a department first" : undefined} />
                 <button
                   type="button"
                   onClick={openClassForm}
@@ -400,9 +391,7 @@ export function ClassesWorkspace({
           </div>
           {canManage && (
             <div className="flex flex-wrap gap-2">
-              <button type="button" onClick={() => setShowDepartmentImport(true)} className="inline-flex h-10 items-center gap-2 rounded-xl border border-border bg-background px-3.5 text-sm font-semibold text-foreground transition hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                <FileSpreadsheet className="size-4" /> Bulk import
-              </button>
+              <BulkImportButton aria-label="Bulk upload departments" onClick={() => setShowDepartmentImport(true)} />
               <button
                 type="button"
                 onClick={() => {
