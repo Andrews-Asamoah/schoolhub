@@ -15,7 +15,7 @@ import {
   UserRound,
   X,
 } from "lucide-react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
   createStudentSchema,
   updateStudentRecordSchema,
@@ -161,6 +161,13 @@ export function StudentDirectoryWorkspace() {
   const [editing, setEditing] = useState<Student | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [viewingId, setViewingId] = useState<string | null>(null);
+  const profileButtons = useRef(new Map<string, HTMLButtonElement>());
+  function closeProfile() {
+    const studentId = viewingId;
+    setViewingId(null);
+    // Table cells may remount while opening/closing the dialog; restore to the live trigger.
+    requestAnimationFrame(() => { if (studentId) profileButtons.current.get(studentId)?.focus(); });
+  }
   const [issued, setIssued] = useState<CredentialEntry[]>([]);
   const [notice, setNotice] = useState<string | null>(null);
   const resetLoginMutation = useMutation({
@@ -227,6 +234,10 @@ export function StudentDirectoryWorkspace() {
       cell: (student: Student) => (
         <button
           type="button"
+          ref={(button) => {
+            if (button) profileButtons.current.set(student.id, button);
+            else profileButtons.current.delete(student.id);
+          }}
           onClick={() => setViewingId(student.id)}
           className="rounded-md px-2 py-1.5 text-xs font-semibold text-primary hover:bg-primary/10"
           aria-label={`View profile of ${student.profile.firstName} ${student.profile.lastName}`}
@@ -417,7 +428,7 @@ export function StudentDirectoryWorkspace() {
         <StudentPhotoBulkUpload onClose={() => setShowPhotoBulkUpload(false)} />
       )}
 
-      {viewingId && <StudentProfileModal studentId={viewingId} onClose={() => setViewingId(null)} />}
+      {viewingId && <StudentProfileModal studentId={viewingId} onClose={closeProfile} />}
 
       {showForm && canManage && (
         <StudentEditor

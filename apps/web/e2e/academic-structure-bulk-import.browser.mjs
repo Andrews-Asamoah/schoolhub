@@ -44,8 +44,8 @@ const session = {
 };
 
 const kinds = [
-  { route: "classes", kind: "departments", sheet: "Departments", headers: ["name", "code", "description"], name: "Science", button: "Bulk import" },
-  { route: "classes", kind: "classes", sheet: "Classes", headers: ["name", "level", "departmentCode", "capacity", "isGraduatingClass", "isActive", "order"], name: "JHS 1A", button: "Bulk import classes" },
+  { route: "classes", kind: "departments", sheet: "Departments", headers: ["name", "code", "description"], name: "Science", button: "Bulk upload departments" },
+  { route: "classes", kind: "classes", sheet: "Classes", headers: ["name", "level", "departmentCode", "capacity", "isGraduatingClass", "isActive", "order"], name: "JHS 1A", button: "Bulk upload classes" },
   { route: "houses", kind: "houses", sheet: "Houses", headers: ["name", "code", "description", "color", "motto", "houseTeacherEmail", "isActive"], name: "Red House" },
   { route: "clubs", kind: "clubs", sheet: "Clubs", headers: ["name", "description", "teacherInChargeEmail", "isActive"], name: "Science Club" },
 ];
@@ -129,11 +129,11 @@ try {
 
   for (const spec of kinds) {
     await page.goto(`${base}/${spec.route}?school=test-school`);
-    await page.getByRole("button", { name: spec.button ?? "Bulk import", exact: true }).click();
-    await page.getByRole("dialog", { name: `Bulk import ${spec.kind}` }).waitFor();
+    await page.getByRole("button", { name: spec.button ?? "Bulk upload", exact: true }).click();
+    await page.getByRole("dialog", { name: `Bulk upload ${spec.kind}` }).waitFor();
 
     const downloadPromise = page.waitForEvent("download");
-    await page.getByRole("button", { name: "Download Excel template", exact: true }).click();
+    await page.getByRole("button", { name: "Excel template", exact: true }).click();
     const templateDownload = await downloadPromise;
     assert.equal(templateDownload.suggestedFilename(), `${spec.kind}-import-template.xlsx`);
     const workbook = new ExcelJS.Workbook();
@@ -155,14 +155,13 @@ try {
       mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       buffer,
     });
-    await page.getByRole("button", { name: "Validate file", exact: true }).click();
     await page.getByText(spec.name, { exact: true }).waitFor();
     if (spec.kind === "houses") {
       assert.equal(await page.getByLabel("Update changed fields").isChecked(), true);
       await page.getByLabel("Replace all fields").check();
     }
     await page.getByRole("button", {
-      name: spec.kind === "houses" ? "Import 0 new · replace 1 existing" : "Create 1 records",
+      name: spec.kind === "houses" ? "Import 0 new · replace 1 existing" : `Create 1 ${spec.kind.replace(/s$/, "")}`,
       exact: true,
     }).click();
     await page.getByText(spec.kind === "houses" ? "0 created · 1 updated · 0 failed." : "1 created · 0 updated · 0 failed.", { exact: true }).waitFor();

@@ -116,7 +116,9 @@ try {
       await modal.getByRole("button", { name: "Close", exact: true }).waitFor();
       await page.keyboard.press("Escape");
       await modal.waitFor({ state: "detached" });
-      assert(await view.evaluate((element) => document.activeElement === element), "returns focus to View");
+      await view.evaluate((element) => new Promise((resolve, reject) => {
+        requestAnimationFrame(() => document.activeElement === element ? resolve() : reject(new Error("Focus did not return to View")));
+      }));
       await page.setViewportSize({ width: 390, height: 844 });
       await view.click();
       await modal.waitFor();
