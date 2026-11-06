@@ -36,6 +36,7 @@ const EnrollmentWorkspace = lazy(() => import("@/components/school/enrollment-wo
 const StudentDirectoryWorkspace = lazy(() => import("@/components/school/student-directory-workspace").then((m) => ({ default: m.StudentDirectoryWorkspace })));
 const PeopleWorkspace = lazy(() => import("@/components/school/people-workspace").then((m) => ({ default: m.PeopleWorkspace })));
 const AssessmentEntryWorkspace = lazy(() => import("@/components/school/assessment-entry-workspace").then((m) => ({ default: m.AssessmentEntryWorkspace })));
+const AssessmentTrackingWorkspace = lazy(() => import("@/components/school/assessment-tracking-workspace").then((m) => ({ default: m.AssessmentTrackingWorkspace })));
 const AssessmentsAdmin = lazy(() => import("@/components/school/assessments-admin").then((m) => ({ default: m.AssessmentsAdmin })));
 const ClassRegister = lazy(() => import("@/components/school/class-register").then((m) => ({ default: m.ClassRegister })));
 const AttendanceReviewWorkspace = lazy(() => import("@/components/school/attendance-review-workspace").then((m) => ({ default: m.AttendanceReviewWorkspace })));
@@ -321,6 +322,7 @@ function WorkspaceContent({ pageId }: { pageId: string }) {
               <AssessmentsAdmin />
             )
           )}
+          {pageId === "assessment-tracking" && <AssessmentTrackingWorkspace role={activeRole ?? undefined} />}
           {pageId === "reports" && (
             activeRole === "student" ? <StudentReportView /> : <SchoolReportsWorkspace />
           )}

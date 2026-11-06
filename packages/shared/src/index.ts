@@ -588,17 +588,6 @@ export type BatchAttendanceInput = z.infer<typeof batchAttendanceSchema>;
 // ASSESSMENT & SCORING SCHEMAS
 // ============================================================================
 
-export const recordScoreSchema = z.object({
-  studentId: z.string().min(1),
-  subjectId: z.string().min(1),
-  termId: z.string().min(1),
-  templateId: z.string().min(1),
-  componentId: z.string().min(1),
-  marksObtained: z.number().min(0),
-  maxMarks: z.number().min(0),
-  occurrenceIndex: z.number().int().default(0),
-});
-export type RecordScoreInput = z.infer<typeof recordScoreSchema>;
 
 /** Save a batch of marks for one class and subject. `marks: null` clears a mark. */
 export const saveAssessmentEntrySchema = z.object({
@@ -620,6 +609,68 @@ export const saveAssessmentEntrySchema = z.object({
     .max(5000),
 });
 export type SaveAssessmentEntryInput = z.infer<typeof saveAssessmentEntrySchema>;
+
+const sheetRef = {
+  classId: z.string().min(1),
+  subjectId: z.string().min(1),
+  templateId: z.string().min(1),
+};
+
+/** A teacher signs a sheet off. Pupils who could not be assessed are listed as excused. */
+export const submitAssessmentEntrySchema = z.object({
+  ...sheetRef,
+  excusedStudentIds: z.array(z.string().min(1)).max(500).default([]),
+  note: z.string().trim().max(500).optional(),
+});
+export type SubmitAssessmentEntryInput = z.infer<typeof submitAssessmentEntrySchema>;
+
+/** Ask for marks to change on a sheet that is locked, submitted or past its deadline. */
+export const requestMarkCorrectionSchema = z.object({
+  ...sheetRef,
+  reason: z.string().trim().min(10, "Give a reason of at least 10 characters").max(2000),
+  items: z
+    .array(
+      z.object({
+        studentId: z.string().min(1),
+        componentId: z.string().min(1),
+        occurrenceIndex: z.number().int().min(0).max(50).default(0),
+        marks: z.number().min(0).max(10000).nullable(),
+      }),
+    )
+    .min(1, "Choose at least one mark to correct")
+    .max(500),
+});
+export type RequestMarkCorrectionInput = z.infer<typeof requestMarkCorrectionSchema>;
+
+export const reviewMarkCorrectionSchema = z.object({
+  decision: z.enum(["APPROVE", "REJECT"]),
+  reason: z.string().trim().max(2000).optional(),
+});
+export type ReviewMarkCorrectionInput = z.infer<typeof reviewMarkCorrectionSchema>;
+
+/** Grant more time for one class, or for one teacher in that class. */
+export const extendAssessmentDeadlineSchema = z.object({
+  templateId: z.string().min(1),
+  classId: z.string().min(1),
+  teacherId: z.string().min(1).nullable().default(null),
+  /** A calendar date, YYYY-MM-DD; the extension runs to the end of that day. */
+  deadline: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use a date like 2026-12-18"),
+  reason: z.string().trim().max(500).optional(),
+});
+export type ExtendAssessmentDeadlineInput = z.infer<typeof extendAssessmentDeadlineSchema>;
+
+export const reopenAssessmentEntrySchema = z.object({
+  ...sheetRef,
+  reason: z.string().trim().min(10, "Give a reason of at least 10 characters").max(500),
+});
+export type ReopenAssessmentEntryInput = z.infer<typeof reopenAssessmentEntrySchema>;
+
+export const sendEntryRemindersSchema = z.object({
+  templateId: z.string().min(1),
+  /** Teacher ids to remind; omit to remind every teacher with unfinished sheets. */
+  teacherIds: z.array(z.string().min(1)).max(200).optional(),
+});
+export type SendEntryRemindersInput = z.infer<typeof sendEntryRemindersSchema>;
 
 // ============================================================================
 // FINANCE & BILLING SCHEMAS

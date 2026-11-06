@@ -104,6 +104,8 @@ model AssessmentTemplate {
   components       AssessmentComponent[]
   assessmentScores AssessmentScore[]
   extensions       AssessmentExtension[]
+  entrySubmissions AssessmentEntrySubmission[]
+  markCorrections  AssessmentMarkCorrection[]
 
   @@index([schoolId, isActive])
   @@index([gradingSystemId])

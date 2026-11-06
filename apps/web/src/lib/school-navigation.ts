@@ -29,6 +29,7 @@ import {
   UserRound,
   UsersRound,
   WalletCards,
+  ListChecks,
   type LucideIcon,
 } from "lucide-react";
 
@@ -145,6 +146,14 @@ export const schoolNavGroups: SchoolNavGroup[] = [
         label: "Assessments",
         icon: ClipboardCheck,
         description: "Grading templates, score entry, and student reports.",
+        section: "Academics",
+        apiStatus: "available",
+      },
+      {
+        id: "assessment-tracking",
+        label: "Marks tracking",
+        icon: ListChecks,
+        description: "Teacher completion of marks entry, deadline extensions and correction approvals.",
         section: "Academics",
         apiStatus: "available",
       },

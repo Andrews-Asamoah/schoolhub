@@ -75,6 +75,8 @@ model School {
   transactions                Transaction[]
   reportCardTemplates         ReportCardTemplate[]
   reportCardSets              ReportCardSet[]
+  assessmentEntrySubmissions  AssessmentEntrySubmission[]
+  assessmentMarkCorrections   AssessmentMarkCorrection[]
   schoolAssignments           SchoolAssignment[]
   notifications               Notification[]
   announcements               Announcement[]

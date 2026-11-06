@@ -2,7 +2,6 @@ import {
   BadRequestException,
   Controller,
   Get,
-  Post,
   Put,
   Param,
   Query,
@@ -18,9 +17,7 @@ import { CurrentSchoolRole } from "../../common/decorators/current-school-role.d
 import { CurrentUser, type AuthenticatedUser } from "../../common/decorators/current-user.decorator.js";
 import { ZodValidationPipe } from "../../common/pipes/zod-validation.pipe.js";
 import {
-  recordScoreSchema,
   saveAssessmentEntrySchema,
-  type RecordScoreInput,
   type SaveAssessmentEntryInput,
 } from "@schoolhub/shared";
 import { AssessmentEntryService } from "./assessment-entry.service.js";
@@ -36,7 +33,7 @@ export class AssessmentsController {
 
   /** The marks screen for one class and subject: roster, applicable assessments, marks and totals. */
   @Get("entry")
-  @Roles("owner", "admin", "teacher")
+  @Roles("owner", "admin", "headteacher", "teacher")
   getEntry(
     @CurrentSchool() school: School,
     @CurrentUser() user: AuthenticatedUser,
@@ -50,7 +47,7 @@ export class AssessmentsController {
   }
 
   @Put("entry")
-  @Roles("owner", "admin", "teacher")
+  @Roles("owner", "admin", "headteacher", "teacher")
   saveEntry(
     @CurrentSchool() school: School,
     @CurrentUser() user: AuthenticatedUser,
@@ -61,25 +58,9 @@ export class AssessmentsController {
   }
 
   @Get("templates")
-  @Roles("owner", "admin", "teacher")
+  @Roles("owner", "admin", "headteacher", "teacher")
   listTemplates(@CurrentSchool() school: School) {
     return this.assessmentsService.listAssessmentTemplates(school.id);
-  }
-
-  @Post("scores")
-  @Roles("owner", "admin", "teacher")
-  recordScore(
-    @CurrentSchool() school: School,
-    @CurrentUser() user: AuthenticatedUser,
-    @CurrentSchoolRole() role: string | undefined,
-    @Body(new ZodValidationPipe(recordScoreSchema)) body: RecordScoreInput,
-  ) {
-    return this.assessmentsService.recordComponentScore(
-      school.id,
-      user.id,
-      body,
-      role,
-    );
   }
 
   @Get("me/report")
@@ -93,7 +74,7 @@ export class AssessmentsController {
   }
 
   @Get("student/:studentId/report")
-  @Roles("owner", "admin", "teacher")
+  @Roles("owner", "admin", "headteacher", "teacher")
   getStudentReport(
     @CurrentSchool() school: School,
     @Param("studentId") studentId: string,

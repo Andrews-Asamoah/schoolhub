@@ -17,6 +17,7 @@ interface Component {
   subjectStrandId: string | null;
   subjectStrandName: string | null;
   canEdit: boolean;
+  canCorrect: boolean;
 }
 interface SheetStudent {
   studentId: string;
@@ -27,6 +28,7 @@ interface SheetStudent {
   percentage: number;
   grade: string | null;
   complete: boolean;
+  excused: boolean;
   position: number | null;
 }
 interface Sheet {
@@ -36,8 +38,14 @@ interface Sheet {
   templates: { id: string; name: string }[];
   template: { id: string; name: string; deadline: string | null; components: Component[]; grades: { grade: string; description: string; minScore: number; maxScore: number }[]; gradingMethod?: GradingMethod } | null;
   students: SheetStudent[];
+  stats: { count: number; mean: number | null; median: number | null; highest: number | null; lowest: number | null; passRate: number | null };
   canEdit: boolean;
   readOnlyReason: string | null;
+  lock: "TEMPLATE_LOCKED" | "SUBMITTED" | "DEADLINE_PASSED" | "NO_TEACHING_AREA" | null;
+  submission: { submittedAt: string; note: string | null; excusedCount: number } | null;
+  canSubmit: boolean;
+  canRequestCorrection: boolean;
+  pendingCorrection: { id: string; requestedAt: string } | null;
 }
 interface SubjectRow {
   id: string;
@@ -97,6 +105,10 @@ export function AssessmentEntryWorkspace({
   const [subjectId, setSubjectId] = useState(initial?.subjectId ?? "");
   const [templateId, setTemplateId] = useState("");
   const [notice, setNotice] = useState<string | null>(null);
+  // Pupils the teacher marks as absent or exempt before signing the sheet off.
+  const [excusedIds, setExcusedIds] = useState<Set<string>>(new Set());
+  const [correcting, setCorrecting] = useState(false);
+  const [reason, setReason] = useState("");
 
   useEffect(() => {
     if (initial) {
@@ -134,6 +146,12 @@ export function AssessmentEntryWorkspace({
   }, [sheet]);
 
 
+  useEffect(() => {
+    setExcusedIds(new Set((sheet?.students ?? []).filter((student) => student.excused).map((student) => student.studentId)));
+    setCorrecting(false);
+    setReason("");
+  }, [sheet]);
+
   const maxByComponent = useMemo(
     () => new Map((sheet?.template?.components ?? []).map((component) => [component.id, component.maxMarks])),
     [sheet],
@@ -154,6 +172,13 @@ export function AssessmentEntryWorkspace({
     return result;
   }, [draft, saved, maxByComponent]);
   const invalid = changes.filter((change) => !change.valid).length;
+  const unsaved = changes.length > 0;
+  useEffect(() => {
+    if (!unsaved) return;
+    const warn = (event: BeforeUnloadEvent) => { event.preventDefault(); };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [unsaved]);
 
   const save = useMutation({
     mutationFn: (body: unknown) => apiFetch<Sheet>("/assessments/entry", { method: "PUT", body: JSON.stringify(body) }),
@@ -161,6 +186,40 @@ export function AssessmentEntryWorkspace({
       setDraft({});
       queryClient.setQueryData(sheetKey, result);
       setNotice("Marks saved.");
+    },
+  });
+
+  const submit = useMutation({
+    mutationFn: () =>
+      apiFetch<Sheet>("/assessments/entry/submit", {
+        method: "POST",
+        body: JSON.stringify({ classId: effectiveClassId, subjectId: effectiveSubjectId, templateId: sheet?.template?.id, excusedStudentIds: [...excusedIds] }),
+      }),
+    onSuccess: (result) => {
+      queryClient.setQueryData(sheetKey, result);
+      void queryClient.invalidateQueries({ queryKey: ["assessments", "tracking"] });
+      setNotice("Marks submitted.");
+    },
+  });
+  const requestCorrection = useMutation({
+    mutationFn: () =>
+      apiFetch<{ id: string }>("/assessments/corrections", {
+        method: "POST",
+        body: JSON.stringify({
+          classId: effectiveClassId,
+          subjectId: effectiveSubjectId,
+          templateId: sheet?.template?.id,
+          reason: reason.trim(),
+          items: changes.map(({ studentId, componentId, occurrenceIndex, marks }) => ({ studentId, componentId, occurrenceIndex, marks })),
+        }),
+      }),
+    onSuccess: () => {
+      setDraft({});
+      setCorrecting(false);
+      setReason("");
+      void sheetQuery.refetch();
+      void queryClient.invalidateQueries({ queryKey: ["assessments", "corrections"] });
+      setNotice("Correction sent for approval. The marks will change once it is approved.");
     },
   });
 
@@ -255,6 +314,19 @@ export function AssessmentEntryWorkspace({
             )}
           </div>
 
+          {sheet.submission && (
+            <p className="border-b border-border/60 bg-success/10 px-4 py-2 text-xs text-success">
+              Submitted on {new Date(sheet.submission.submittedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
+              {sheet.submission.excusedCount > 0 && ` · ${sheet.submission.excusedCount} pupil${sheet.submission.excusedCount === 1 ? "" : "s"} excused`}.
+            </p>
+          )}
+          {sheet.pendingCorrection && (
+            <p className="border-b border-border/60 bg-warning/10 px-4 py-2 text-xs text-warning">A correction for this sheet is waiting for approval. Marks will change once it is approved.</p>
+          )}
+          {correcting && (
+            <p className="border-b border-border/60 bg-info/10 px-4 py-2 text-xs text-info">Correction mode: change the marks that are wrong, explain why, then send for approval. Nothing changes until it is approved.</p>
+          )}
+
           {sheet.students.length === 0 ? (
             <p className="p-5 text-xs text-muted-foreground">No pupils are enrolled in this class this term.</p>
           ) : (
@@ -275,10 +347,11 @@ export function AssessmentEntryWorkspace({
                     <th scope="col" className="px-3 py-3 text-center text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70">%</th>
                     <th scope="col" className="px-3 py-3 text-center text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70">Grade</th>
                     <th scope="col" className="px-3 py-3 text-center text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70">Pos.</th>
+                    {sheet.canSubmit && <th scope="col" className="px-3 py-3 text-center text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70">Absent / excused</th>}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border/60">
-                  {sheet.students.map((student) => (
+                  {sheet.students.map((student, rowIndex) => (
                     <tr key={student.studentId}>
                       <th scope="row" className="px-4 py-2 text-left font-semibold text-foreground">
                         {student.name}
@@ -299,7 +372,17 @@ export function AssessmentEntryWorkspace({
                                 max={component.maxMarks}
                                 step="any"
                                 value={value}
-                                disabled={!editable || !component.canEdit}
+                                disabled={correcting ? !component.canCorrect : !editable || !component.canEdit}
+                                data-col={`${component.id}|${slot}`}
+                                data-row={rowIndex}
+                                onKeyDown={(event) => {
+                                  // Enter moves down the column like a spreadsheet.
+                                  if (event.key !== "Enter") return;
+                                  event.preventDefault();
+                                  const next = document.querySelector<HTMLInputElement>(`input[data-col="${component.id}|${slot}"][data-row="${rowIndex + (event.shiftKey ? -1 : 1)}"]:not(:disabled)`);
+                                  next?.focus();
+                                  next?.select();
+                                }}
                                 aria-invalid={bad || undefined}
                                 aria-label={`${student.name}, ${component.name}${component.slots > 1 ? ` ${slot + 1}` : ""}, out of ${component.maxMarks}`}
                                 onChange={(event) => { setNotice(null); setDraft((current) => ({ ...current, [key]: {value:event.target.value, expectedMarks:current[key]?.expectedMarks !== undefined ? current[key]!.expectedMarks : saved.has(key) ? Number(saved.get(key)) : null} })); }}
@@ -323,6 +406,19 @@ export function AssessmentEntryWorkspace({
                         )}
                       </td>
                       <td className="px-3 py-2 text-center tabular-nums text-muted-foreground">{student.position ?? "—"}</td>
+                      {sheet.canSubmit && (
+                        <td className="px-3 py-2 text-center">
+                          {student.complete ? <span className="text-muted-foreground/50">—</span> : (
+                            <input
+                              type="checkbox"
+                              aria-label={`${student.name} is absent or excused`}
+                              checked={excusedIds.has(student.studentId)}
+                              onChange={(event) => setExcusedIds((current) => { const next = new Set(current); if (event.target.checked) next.add(student.studentId); else next.delete(student.studentId); return next; })}
+                              className="size-4 accent-primary"
+                            />
+                          )}
+                        </td>
+                      )}
                     </tr>
                   ))}
                 </tbody>
@@ -330,8 +426,16 @@ export function AssessmentEntryWorkspace({
             </div>
           )}
 
+          {sheet.stats.count > 0 && (
+            <dl className="flex flex-wrap gap-x-6 gap-y-1 border-t border-border/60 px-4 py-3 text-[11px] text-muted-foreground">
+              {([["Class mean", sheet.stats.mean, "%"], ["Median", sheet.stats.median, "%"], ["Highest", sheet.stats.highest, "%"], ["Lowest", sheet.stats.lowest, "%"], ["Pass rate (50%+)", sheet.stats.passRate, "%"]] as const).map(([name, value, unit]) => (
+                <div key={name} className="flex gap-1.5"><dt>{name}</dt><dd className="font-semibold tabular-nums text-foreground">{value}{unit}</dd></div>
+              ))}
+              <div className="flex gap-1.5"><dt>Complete</dt><dd className="font-semibold tabular-nums text-foreground">{sheet.stats.count}/{sheet.students.length}</dd></div>
+            </dl>
+          )}
           <div className="flex flex-wrap items-center gap-3 border-t border-border/60 p-4">
-            {editable && (
+            {editable && !correcting && (
               <button
                 type="button"
                 disabled={changes.length === 0 || invalid > 0 || save.isPending}
@@ -350,6 +454,40 @@ export function AssessmentEntryWorkspace({
                 Save marks{changes.length ? ` (${changes.length})` : ""}
               </button>
             )}
+            {sheet.canSubmit && !correcting && (() => {
+              const waiting = sheet.students.filter((student) => !student.complete && !excusedIds.has(student.studentId)).length;
+              return (
+                <button
+                  type="button"
+                  disabled={unsaved || waiting > 0 || submit.isPending}
+                  title={unsaved ? "Save your marks first" : waiting > 0 ? `${waiting} pupil${waiting === 1 ? "" : "s"} still need marks or an excuse` : undefined}
+                  onClick={() => { if (window.confirm("Submit these marks? You will not be able to edit them directly afterwards; changes will need approval.")) submit.mutate(); }}
+                  className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-border px-4 text-xs font-semibold hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {submit.isPending && <LoaderCircle className="size-3.5 animate-spin" />}
+                  Submit marks{waiting > 0 ? ` (${waiting} to finish)` : ""}
+                </button>
+              );
+            })()}
+            {sheet.canRequestCorrection && !correcting && (
+              <button type="button" onClick={() => setCorrecting(true)} className="inline-flex h-9 items-center rounded-lg border border-border px-4 text-xs font-semibold hover:bg-muted">Request correction</button>
+            )}
+            {correcting && (
+              <div className="flex w-full flex-wrap items-end gap-3">
+                <label className="grid min-w-64 flex-1 gap-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70">
+                  Reason for the correction
+                  <textarea rows={2} maxLength={2000} value={reason} onChange={(event) => setReason(event.target.value)}
+                    className="rounded-lg border border-border bg-card px-3 py-2 text-xs normal-case tracking-normal text-foreground outline-none focus:border-primary/50" />
+                </label>
+                <button type="button" disabled={changes.length === 0 || invalid > 0 || reason.trim().length < 10 || requestCorrection.isPending} onClick={() => requestCorrection.mutate()}
+                  className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary px-4 text-xs font-semibold text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50">
+                  {requestCorrection.isPending && <LoaderCircle className="size-3.5 animate-spin" />}
+                  Send for approval{changes.length ? ` (${changes.length})` : ""}
+                </button>
+                <button type="button" onClick={() => { setCorrecting(false); setDraft({}); setReason(""); }} className="h-9 rounded-lg px-3 text-xs font-semibold text-muted-foreground hover:bg-muted">Cancel</button>
+              </div>
+            )}
+            {(submit.error || requestCorrection.error) && <p role="alert" className="flex items-center gap-1.5 text-xs text-destructive"><CircleAlert className="size-3.5" /> {(submit.error ?? requestCorrection.error)?.message}</p>}
             {invalid > 0 && <p role="alert" className="flex items-center gap-1.5 text-xs text-destructive"><CircleAlert className="size-3.5" /> {invalid} mark{invalid === 1 ? " is" : "s are"} outside the allowed range.</p>}
             {notice && <p role="status" className="flex items-center gap-1.5 text-xs text-success"><CircleCheck className="size-3.5" /> {notice}</p>}
             {save.error && <button type="button" className="text-xs underline" onClick={() => { if(window.confirm("Discard your local draft and reload the latest saved marks?")) {setDraft({}); void sheetQuery.refetch();} }}>Discard draft and load latest marks</button>}
