@@ -55,3 +55,19 @@ export const mockCorrectionRequestSchema = z.object({
 export const mockCorrectionDecisionSchema = z.object({
   reason:z.string().trim().min(10).max(2000),
 }).strict();
+
+
+export const mockMarksImportRefSchema = z.object({
+  paperId: z.string().min(1), sectionId: z.string().min(1).optional(),
+}).strict();
+export const mockMarksImportBatchSchema = mockMarksImportRefSchema.extend({
+  rows: z.array(z.object({
+    rowNumber: z.number().int().positive(), name: z.string().max(200),
+    row: mockMarkSchema.shape.entries.element,
+  }).strict()).min(1).max(120),
+}).superRefine((batch, ctx) => {
+  const result = mockMarkSchema.shape.entries.safeParse(batch.rows.map((item) => item.row));
+  if (!result.success) for (const issue of result.error.issues) {
+    ctx.addIssue({ code: "custom", path: ["rows"], message: issue.message });
+  }
+});
