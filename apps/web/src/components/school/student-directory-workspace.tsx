@@ -10,13 +10,12 @@ import {
   Check,
   LoaderCircle,
   Plus,
-  Search,
   SquarePen,
   Trash2,
   UserRound,
   X,
 } from "lucide-react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
   createStudentSchema,
   updateStudentRecordSchema,
@@ -35,6 +34,7 @@ import { useSchoolRole } from "@/components/school/school-role-switcher";
 import { StudentImportWizard } from "@/components/school/student-import-wizard";
 import { StudentPhotoBulkUpload } from "@/components/school/student-photo-bulk-upload";
 import { apiFetch } from "@/lib/api";
+import { loadDirectoryPages } from "@/lib/directory-pages";
 import {
   CredentialsDialog,
   type CredentialEntry,
@@ -156,13 +156,18 @@ export function StudentDirectoryWorkspace() {
   const canImport = ["owner", "admin", "headteacher"].includes(activeRole ?? "");
   const [showImport, setShowImport] = useState(false);
   const [showPhotoBulkUpload, setShowPhotoBulkUpload] = useState(false);
-  const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
   const [classId, setClassId] = useState("");
-  const [page, setPage] = useState(1);
   const [editing, setEditing] = useState<Student | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [viewingId, setViewingId] = useState<string | null>(null);
+  const profileButtons = useRef(new Map<string, HTMLButtonElement>());
+  function closeProfile() {
+    const studentId = viewingId;
+    setViewingId(null);
+    // Table cells may remount while opening/closing the dialog; restore to the live trigger.
+    requestAnimationFrame(() => { if (studentId) profileButtons.current.get(studentId)?.focus(); });
+  }
   const [issued, setIssued] = useState<CredentialEntry[]>([]);
   const [notice, setNotice] = useState<string | null>(null);
   const resetLoginMutation = useMutation({
@@ -200,15 +205,14 @@ export function StudentDirectoryWorkspace() {
     queryKey: [
       "students",
       "directory",
-      { search, status, classId, page, periodKey },
+      { status, classId, periodKey },
     ],
-    queryFn: () => {
-      const params = new URLSearchParams({ page: String(page), limit: "20" });
-      if (search.trim()) params.set("search", search.trim());
+    queryFn: ({ signal }) => loadDirectoryPages<Student>((page) => {
+      const params = new URLSearchParams({ page: String(page), limit: "100" });
       if (status) params.set("status", status);
       if (classId) params.set("classId", classId);
-      return apiFetch<StudentPage>(`/students?${params.toString()}`);
-    },
+      return apiFetch<StudentPage>(`/students?${params.toString()}`, { signal });
+    }, signal),
     retry: false,
   });
 
@@ -230,6 +234,10 @@ export function StudentDirectoryWorkspace() {
       cell: (student: Student) => (
         <button
           type="button"
+          ref={(button) => {
+            if (button) profileButtons.current.set(student.id, button);
+            else profileButtons.current.delete(student.id);
+          }}
           onClick={() => setViewingId(student.id)}
           className="rounded-md px-2 py-1.5 text-xs font-semibold text-primary hover:bg-primary/10"
           aria-label={`View profile of ${student.profile.firstName} ${student.profile.lastName}`}
@@ -365,12 +373,8 @@ export function StudentDirectoryWorkspace() {
 
   const rows = studentsQuery.data?.data ?? [];
   const total = studentsQuery.data?.meta.total ?? 0;
-  const activeCount = rows.filter(
-    (student) => student.status === "ACTIVE",
-  ).length;
-  const needsEnrollment = rows.filter(
-    (student) => student.status === "ACTIVE" && !student.class,
-  ).length;
+  const enrolledCount = rows.filter((student) => student.class !== null).length;
+  const needsEnrollment = rows.filter((student) => student.status === "ACTIVE" && !student.class).length;
 
   return (
     <div className="space-y-5">
@@ -424,7 +428,7 @@ export function StudentDirectoryWorkspace() {
         <StudentPhotoBulkUpload onClose={() => setShowPhotoBulkUpload(false)} />
       )}
 
-      {viewingId && <StudentProfileModal studentId={viewingId} onClose={() => setViewingId(null)} />}
+      {viewingId && <StudentProfileModal studentId={viewingId} onClose={closeProfile} />}
 
       {showForm && canManage && (
         <StudentEditor
@@ -452,40 +456,26 @@ export function StudentDirectoryWorkspace() {
         <WorkspaceStat
           label="Directory records"
           value={String(total)}
-          detail="matching filters"
+          detail="matching status and class filters"
         />
         <WorkspaceStat
-          label="Active on this page"
-          value={String(activeCount)}
-          detail="student profiles"
+          label="Currently enrolled"
+          value={String(enrolledCount)}
+          detail="with a class in the selected term"
         />
         <WorkspaceStat
           label="Needs placement"
           value={String(needsEnrollment)}
-          detail="active, no current class"
+          detail="active students without a current class"
         />
       </div>
 
       <section className="rounded-2xl border border-border bg-card p-4 shadow-sm sm:p-5">
-        <div className="grid gap-3 md:grid-cols-[minmax(220px,1fr)_180px_200px]">
-          <label className="relative">
-            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-            <input
-              value={search}
-              onChange={(event) => {
-                setSearch(event.target.value);
-                setPage(1);
-              }}
-              placeholder="Search name or admission number"
-              aria-label="Search students"
-              className={`${inputClasses} mt-0 pl-9`}
-            />
-          </label>
+        <div className="grid gap-3 sm:grid-cols-2">
           <label>
             <span className="sr-only">Filter by status</span>
             <Select value={status || "__all__"} onValueChange={(value) => {
               setStatus(value === "__all__" ? "" : value);
-              setPage(1);
             }}>
               <SelectTrigger aria-label="Filter by status" className={`${inputClasses} mt-0`}><SelectValue placeholder="All statuses" /></SelectTrigger>
               <SelectContent>
@@ -498,7 +488,6 @@ export function StudentDirectoryWorkspace() {
             <span className="sr-only">Filter by current class</span>
             <Select value={classId || "__all__"} onValueChange={(value) => {
               setClassId(value === "__all__" ? "" : value);
-              setPage(1);
             }}>
               <SelectTrigger aria-label="Filter by current class" className={`${inputClasses} mt-0`}><SelectValue placeholder="All current classes" /></SelectTrigger>
               <SelectContent>
@@ -530,32 +519,6 @@ export function StudentDirectoryWorkspace() {
         emptyTitle="No students match these filters"
         emptyDescription="Clear a filter or add a student record to start building your school directory."
       />
-      {studentsQuery.data && studentsQuery.data.meta.totalPages > 1 && (
-        <div className="flex items-center justify-between rounded-xl border border-border bg-card px-4 py-3">
-          <p className="text-xs text-muted-foreground">
-            Page {studentsQuery.data.meta.page} of{" "}
-            {studentsQuery.data.meta.totalPages} · {total} records
-          </p>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              disabled={page <= 1}
-              onClick={() => setPage((value) => Math.max(1, value - 1))}
-              className="rounded-md border border-border px-3 py-1.5 text-xs font-medium text-foreground disabled:opacity-40"
-            >
-              Previous
-            </button>
-            <button
-              type="button"
-              disabled={page >= studentsQuery.data.meta.totalPages}
-              onClick={() => setPage((value) => value + 1)}
-              className="rounded-md border border-border px-3 py-1.5 text-xs font-medium text-foreground disabled:opacity-40"
-            >
-              Next
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

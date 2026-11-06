@@ -102,9 +102,11 @@ try {
     await page.getByRole("button", { name: "Bulk upload", exact: true }).click();
     await page.getByRole("dialog", { name: `Bulk upload ${kind === "teachers" ? "teachers" : "non-teaching staff"}` }).waitFor();
 
-    const downloadPromise = page.waitForEvent("download");
-    await page.getByRole("button", { name: "Download Excel template", exact: true }).click();
-    const templateDownload = await downloadPromise;
+    const downloadPromise = page.waitForEvent("download").then((download) => ({ download }), (error) => ({ error }));
+    await page.getByRole("button", { name: "Excel template", exact: true }).click();
+    const event = await downloadPromise;
+    if (event.error) throw new Error(`${kind} template download failed. Browser errors: ${errors.join("; ")}. Page: ${await page.locator("body").innerText()}`, { cause: event.error });
+    const templateDownload = event.download;
     assert.equal(templateDownload.suggestedFilename(), `${kind === "teachers" ? "teacher" : "staff"}-import-template.xlsx`);
     const workbook = new ExcelJS.Workbook();
     await workbook.xlsx.load(await readFile(await templateDownload.path()));
@@ -114,15 +116,14 @@ try {
     assert.equal(headerRow[0], "firstName");
     assert.equal(headerRow[1], "lastName");
     dataSheet.addRow(kind === "teachers"
-      ? ["Test", "User", "test@example.test", "0240000000", "FEMALE", "1995-04-12", "Mathematics", "B.Ed", "Mathematics", 4, "TCH-001", "FULL_TIME", "2026-01-05"]
-      : ["Test", "User", "test@example.test", "0240000000", "FEMALE", "1995-04-12", "LIBRARIAN", "Librarian", "Library", "STF-001", "", "FULL_TIME", "2026-01-05"]);
+      ? ["Test", "User", "test@example.test", "0240000000", "FEMALE", "1995-04-12", "Mathematics", "B.Ed", "Mathematics", 4, "FULL_TIME", "2026-01-05"]
+      : ["Test", "User", "test@example.test", "0240000000", "FEMALE", "1995-04-12", "LIBRARIAN", "Librarian", "Library", "STF-001", "FULL_TIME", "2026-01-05"]);
     const completedWorkbook = await workbook.xlsx.writeBuffer();
     await page.locator('input[type="file"]').setInputFiles({
       name: templateDownload.suggestedFilename(),
       mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       buffer: Buffer.from(completedWorkbook),
     });
-    await page.getByRole("button", { name: "Validate file", exact: true }).click();
     await page.getByText("Test User", { exact: true }).waitFor();
     assert.deepEqual(uploadedFiles.at(-1), {
       kind: kind === "teachers" ? "teacher" : "staff",
@@ -133,7 +134,7 @@ try {
     await page.getByRole("dialog").waitFor({ state: "detached" });
 
     await page.getByRole("button", { name: "Bulk upload", exact: true }).click();
-    await page.getByRole("button", { name: "Close bulk upload", exact: true }).click();
+    await page.getByRole("button", { name: "Close dialog", exact: true }).click();
     await page.getByRole("dialog").waitFor({ state: "detached" });
   }
 
