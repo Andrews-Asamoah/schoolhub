@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
+  classRankGrades,
   computeStudentResult,
   rankByPercentage,
   templateSpecificity,
   validateMarks,
   type EntryComponent,
   type GradeBand,
+  type RankBand,
   type TemplateScope,
 } from "./assessment-entry.js";
 
@@ -111,5 +113,66 @@ describe("validateMarks", () => {
     expect(validateMarks([entry("nope", 1)], components)).toHaveLength(1);
     expect(validateMarks([entry("cw", 1, 1)], components)).toHaveLength(1);     // not repeatable
     expect(validateMarks([entry("q", 1, 3)], components)).toHaveLength(1);      // only 0..2
+  });
+});
+
+describe("classRankGrades (BECE stanine)", () => {
+  const cumulative = [4, 11, 23, 40, 60, 77, 89, 96, 100];
+  const stanine: RankBand[] = cumulative.map((maxScore, index) => ({
+    grade: String(index + 1),
+    minScore: index === 0 ? 0 : cumulative[index - 1]!,
+    maxScore,
+    gradePoint: 9 - index,
+  }));
+  const pupils = (count: number) =>
+    Array.from({ length: count }, (_, index) => ({ id: `s${index + 1}`, percentage: 100 - index * 0.5 }));
+
+  it("fills each grade with the stanine share of the class", () => {
+    const grades = classRankGrades(pupils(100), stanine);
+    const counts = Array.from({ length: 9 }, (_, index) => [...grades.values()].filter((g) => g.grade === String(index + 1)).length);
+    expect(counts).toEqual([4, 7, 12, 17, 20, 17, 12, 7, 4]);
+  });
+
+  it("gives the best pupil grade 1 and the weakest grade 9", () => {
+    const grades = classRankGrades(pupils(30), stanine);
+    expect(grades.get("s1")).toEqual({ grade: "1", gradePoint: 9 });
+    expect(grades.get("s30")).toEqual({ grade: "9", gradePoint: 1 });
+  });
+
+  it("grades by position in the class, not by the marks themselves", () => {
+    const weakClass = classRankGrades([{ id: "a", percentage: 41 }, { id: "b", percentage: 38 }, { id: "c", percentage: 12 }], stanine);
+    const strongClass = classRankGrades([{ id: "a", percentage: 99 }, { id: "b", percentage: 95 }, { id: "c", percentage: 91 }], stanine);
+    expect(weakClass.get("a")!.grade).toBe(strongClass.get("a")!.grade);
+    expect(weakClass.get("c")!.grade).toBe(strongClass.get("c")!.grade);
+  });
+
+  it("gives pupils on equal marks the same grade", () => {
+    const grades = classRankGrades<string>(
+      [{ id: "a", percentage: 90 }, { id: "b", percentage: 70 }, { id: "c", percentage: 70 }, { id: "d", percentage: 70 }, { id: "e", percentage: 20 }],
+      stanine,
+    );
+    expect(new Set(["b", "c", "d"].map((id) => grades.get(id)!.grade)).size).toBe(1);
+  });
+
+  it("puts a class of one, or a class tied on everything, in the middle band", () => {
+    expect(classRankGrades([{ id: "only", percentage: 55 }], stanine).get("only")!.grade).toBe("5");
+    const allTied = classRankGrades([{ id: "a", percentage: 60 }, { id: "b", percentage: 60 }, { id: "c", percentage: 60 }], stanine);
+    expect([...allTied.values()].every((g) => g.grade === "5")).toBe(true);
+  });
+
+  it("returns nothing for an empty class or no bands", () => {
+    expect(classRankGrades([], stanine).size).toBe(0);
+    expect(classRankGrades(pupils(3), []).size).toBe(0);
+  });
+
+  it("is not affected by the order pupils are supplied in", () => {
+    const forward = classRankGrades(pupils(40), stanine);
+    const reversed = classRankGrades([...pupils(40)].reverse(), stanine);
+    for (const [id, grade] of forward) expect(reversed.get(id)).toEqual(grade);
+  });
+
+  it("leaves per-pupil grading empty for class-ranked scales so the class pass can fill it in", () => {
+    const r = computeStudentResult([classwork30, exam70], [{ componentId: "cw", occurrenceIndex: 0, marks: 24 }, { componentId: "ex", occurrenceIndex: 0, marks: 56 }], stanine, "CLASS_RANK");
+    expect(r).toMatchObject({ percentage: 80, complete: true, grade: null, gradePoint: null });
   });
 });

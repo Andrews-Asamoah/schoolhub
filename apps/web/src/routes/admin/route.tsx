@@ -69,6 +69,7 @@ function AdminLayout() {
   else if (pathname.startsWith("/admin/subscriptions")) activePage = "subscriptions";
   else if (pathname.startsWith("/admin/plans")) activePage = "plans";
   else if (pathname.startsWith("/admin/support")) activePage = "support";
+  else if (pathname.startsWith("/admin/student-deletions")) activePage = "student-deletions";
   else if (pathname.startsWith("/admin/audit")) activePage = "audit";
   else if (pathname.startsWith("/admin/profile")) activePage = "profile";
   const breadcrumb = {
@@ -78,6 +79,7 @@ function AdminLayout() {
     subscriptions: "Subscriptions",
     plans: "Subscription plans",
     support: "Support desk",
+    "student-deletions": "Student deletion requests",
     audit: "Audit log",
     profile: "Account & security",
   }[activePage];

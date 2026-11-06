@@ -1,0 +1,99 @@
+import { BlurView } from "expo-blur";
+import { LinearGradient } from "expo-linear-gradient";
+import { createContext, useContext, type ReactNode } from "react";
+import { StyleSheet, View, type StyleProp, type ViewStyle } from "react-native";
+import { radius as radii, useTheme } from "@/theme/theme";
+
+const GlassDepth = createContext(0);
+
+type Props = {
+  children?: ReactNode;
+  radius?: number;
+  /** Denser fill for content-heavy glass (cards that hold text blocks). */
+  strong?: boolean;
+  /** Drop the outer shadow (e.g. for glass nested inside glass). */
+  flat?: boolean;
+  style?: StyleProp<ViewStyle>;
+  contentStyle?: StyleProp<ViewStyle>;
+};
+
+/**
+ * The one glass primitive. With blur enabled: blurred backdrop + translucent
+ * fill + hairline border + top highlight. Without blur (low-end Android, Reduce
+ * Transparency, or the user's setting): a near-opaque tinted fill, same shape.
+ * Never nest more than two GlassSurface layers.
+ */
+export function GlassSurface({
+  children,
+  radius = radii.lg,
+  strong,
+  flat,
+  style,
+  contentStyle,
+}: Props) {
+  const { colors, glass, isDark, blurEnabled } = useTheme();
+  const depth = useContext(GlassDepth);
+  const renderBlur = blurEnabled && depth < 2;
+  const fill = renderBlur
+    ? strong
+      ? glass.surfaceStrong
+      : glass.surface
+    : depth >= 2
+      ? colors.card
+      : glass.fallbackSurface;
+
+  return (
+    <GlassDepth.Provider value={depth + 1}>
+      <View
+        style={[
+          { borderRadius: radius },
+          !flat &&
+            glass.shadow && {
+              boxShadow: `0px 10px 32px ${glass.shadow}`,
+            },
+          style,
+        ]}
+      >
+        <View
+          style={[
+            styles.clip,
+            { borderRadius: radius, borderColor: glass.border },
+          ]}
+        >
+          {renderBlur ? (
+            <BlurView
+              testID="glass-blur"
+              intensity={glass.blur}
+              tint={isDark ? "dark" : "light"}
+              style={StyleSheet.absoluteFill}
+            />
+          ) : null}
+          <View
+            style={[StyleSheet.absoluteFill, { backgroundColor: fill }]}
+            pointerEvents="none"
+          />
+          <LinearGradient
+            colors={[glass.highlight, "transparent"]}
+            start={{ x: 0.5, y: 0 }}
+            end={{ x: 0.5, y: 1 }}
+            style={styles.highlight}
+            pointerEvents="none"
+          />
+          <View style={contentStyle}>{children}</View>
+        </View>
+      </View>
+    </GlassDepth.Provider>
+  );
+}
+
+const styles = StyleSheet.create({
+  clip: { overflow: "hidden", borderWidth: StyleSheet.hairlineWidth },
+  highlight: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 24,
+    opacity: 0.4,
+  },
+});

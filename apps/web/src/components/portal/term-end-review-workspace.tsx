@@ -1,6 +1,6 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, CheckCircle2, LoaderCircle, Users, WalletCards } from "lucide-react";
+import { AlertTriangle, CheckCircle2, LoaderCircle, Users } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
@@ -40,7 +40,6 @@ export function TermEndReviewWorkspace() {
     enabled:view==="former",
     retry:false,
   });
-  const activeReviewStudents=useMemo(()=>reviewQuery.data?.students.filter((student)=>!student.formerStudent)??[],[reviewQuery.data]);
   const markMutation=useMutation({
     mutationFn:()=>apiFetch<{updatedCount:number;studentIds:string[];status:string}>("/finance/term-end-review/former-students",{method:"POST",body:JSON.stringify({studentIds:selectedIds,reason:reason.trim()})}),
     onSuccess:async(result)=>{

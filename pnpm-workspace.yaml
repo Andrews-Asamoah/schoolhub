@@ -4,6 +4,7 @@ packages:
 
 # pnpm 10 blocks install scripts by default; allow the ones we need
 allowBuilds:
+  '@parcel/watcher': false
   '@prisma/engines': true
   '@scarf/scarf': false
   core-js: false
@@ -11,6 +12,35 @@ allowBuilds:
   prisma: true
   sharp: true
   workerd: false
+
+# Expo SDK 58 compatibility patches required by Expo Doctor (2026-11-03).
+# Exact versions only; pnpm's release-age policy remains active for other releases.
+minimumReleaseAgeExclude:
+  - '@expo/cli@58.1.19'
+  - '@expo/config-plugins@58.0.12'
+  - '@expo/config@58.0.11'
+  - '@expo/env@2.5.4'
+  - '@expo/fingerprint@0.21.9'
+  - '@expo/inline-modules@0.2.9'
+  - '@expo/local-build-cache-provider@58.0.11'
+  - '@expo/log-box@58.0.15'
+  - '@expo/metro-config@58.0.21'
+  - '@expo/metro-runtime@58.0.17'
+  - '@expo/prebuild-config@58.0.19'
+  - '@expo/router-server@58.0.21'
+  - 'babel-preset-expo@58.0.24'
+  - 'expo-asset@58.0.20'
+  - 'expo-constants@58.0.15'
+  - 'expo-linking@58.0.16'
+  - 'expo-modules-autolinking@58.0.17'
+  - 'expo-modules-core@58.0.30'
+  - 'expo-modules-jsi@58.0.22'
+  - 'expo-router@58.0.30'
+  - 'expo-sharing@58.0.22'
+  - 'expo-splash-screen@58.0.13'
+  - 'expo@58.0.23'
+  - 'jest-expo@58.0.14'
+  - 'react-native-safe-area-context@5.11.1'
 
 # Security patches for transitive runtime/config dependencies. Remove selectors
 # after upstream ranges no longer resolve the vulnerable versions.

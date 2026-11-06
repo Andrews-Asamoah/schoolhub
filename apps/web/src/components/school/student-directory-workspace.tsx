@@ -1,6 +1,6 @@
 import { PersonPhotoPicker, uploadPersonPhoto } from "./person-photo-picker";
-import { DatePicker } from "@/components/ui/date-picker";
 import { StudentProfileModal } from "@/components/school/student-profile-panel";
+import { UserAvatar } from "@/components/ui/user-avatar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useForm } from "@tanstack/react-form";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -9,35 +9,35 @@ import {
   Check,
   LoaderCircle,
   Plus,
-  Upload,
-  Search,
   SquarePen,
   Trash2,
   UserRound,
   X,
 } from "lucide-react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
   createStudentSchema,
   updateStudentRecordSchema,
   type CreateStudentInput,
   type IssuedCredentials,
   type StudentGuardianInput,
-  type UpdateStudentInput,
 } from "@schoolhub/shared";
 import {
   WorkspaceDataTable,
-  WorkspaceEmptyState,
   WorkspaceStat,
   type WorkspaceColumn,
 } from "@/components/school/workspace-ui";
 import { useSchoolRole } from "@/components/school/school-role-switcher";
 import { StudentImportWizard } from "@/components/school/student-import-wizard";
+import { StudentPhotoBulkUpload } from "@/components/school/student-photo-bulk-upload";
 import { apiFetch } from "@/lib/api";
+import { loadDirectoryPages } from "@/lib/directory-pages";
 import {
   CredentialsDialog,
   type CredentialEntry,
 } from "@/components/credentials/credentials-dialog";
+import { BulkImportButton } from "@/components/bulk-import/bulk-import-button";
+import { LabeledTextField, labeledInputClasses } from "@/components/forms/labeled-controls";
 
 interface Student {
   id: string;
@@ -51,6 +51,7 @@ interface Student {
     gender: string;
     dateOfBirth: string;
     phone: string | null;
+    user?: { image: string | null };
   };
   class: { id: string; name: string; level: string } | null;
   department?: { id: string; name: string } | null;
@@ -132,8 +133,6 @@ const emptyStudent: CreateStudentInput = {
   guardians: [],
 };
 
-const inputClasses =
-  "mt-1.5 h-10 w-full rounded-lg border border-border bg-background px-3 text-sm text-foreground outline-none placeholder:text-muted-foreground focus:border-ring focus:ring-2 focus:ring-ring/20";
 const statuses = [
   "ACTIVE",
   "SUSPENDED",
@@ -152,13 +151,19 @@ export function StudentDirectoryWorkspace() {
   );
   const canImport = ["owner", "admin", "headteacher"].includes(activeRole ?? "");
   const [showImport, setShowImport] = useState(false);
-  const [search, setSearch] = useState("");
+  const [showPhotoBulkUpload, setShowPhotoBulkUpload] = useState(false);
   const [status, setStatus] = useState("");
   const [classId, setClassId] = useState("");
-  const [page, setPage] = useState(1);
   const [editing, setEditing] = useState<Student | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [viewingId, setViewingId] = useState<string | null>(null);
+  const profileButtons = useRef(new Map<string, HTMLButtonElement>());
+  function closeProfile() {
+    const studentId = viewingId;
+    setViewingId(null);
+    // Table cells may remount while opening/closing the dialog; restore to the live trigger.
+    requestAnimationFrame(() => { if (studentId) profileButtons.current.get(studentId)?.focus(); });
+  }
   const [issued, setIssued] = useState<CredentialEntry[]>([]);
   const [notice, setNotice] = useState<string | null>(null);
   const resetLoginMutation = useMutation({
@@ -196,15 +201,14 @@ export function StudentDirectoryWorkspace() {
     queryKey: [
       "students",
       "directory",
-      { search, status, classId, page, periodKey },
+      { status, classId, periodKey },
     ],
-    queryFn: () => {
-      const params = new URLSearchParams({ page: String(page), limit: "20" });
-      if (search.trim()) params.set("search", search.trim());
+    queryFn: ({ signal }) => loadDirectoryPages<Student>((page) => {
+      const params = new URLSearchParams({ page: String(page), limit: "100" });
       if (status) params.set("status", status);
       if (classId) params.set("classId", classId);
-      return apiFetch<StudentPage>(`/students?${params.toString()}`);
-    },
+      return apiFetch<StudentPage>(`/students?${params.toString()}`, { signal });
+    }, signal),
     retry: false,
   });
 
@@ -226,6 +230,10 @@ export function StudentDirectoryWorkspace() {
       cell: (student: Student) => (
         <button
           type="button"
+          ref={(button) => {
+            if (button) profileButtons.current.set(student.id, button);
+            else profileButtons.current.delete(student.id);
+          }}
           onClick={() => setViewingId(student.id)}
           className="rounded-md px-2 py-1.5 text-xs font-semibold text-primary hover:bg-primary/10"
           aria-label={`View profile of ${student.profile.firstName} ${student.profile.lastName}`}
@@ -241,10 +249,11 @@ export function StudentDirectoryWorkspace() {
         `${student.profile.firstName} ${student.profile.lastName}${student.profile.otherNames ? ` ${student.profile.otherNames}` : ""} (${student.studentId})`,
       cell: (student) => (
         <div className="flex items-center gap-3">
-          <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
-            {student.profile.firstName.slice(0, 1)}
-            {student.profile.lastName.slice(0, 1)}
-          </span>
+          <UserAvatar
+            name={`${student.profile.firstName} ${student.profile.lastName}`}
+            image={student.profile.user?.image}
+            className="size-9 text-xs"
+          />
           <span className="min-w-0">
             <span className="block font-semibold text-foreground">
               {student.profile.firstName} {student.profile.lastName}
@@ -360,12 +369,8 @@ export function StudentDirectoryWorkspace() {
 
   const rows = studentsQuery.data?.data ?? [];
   const total = studentsQuery.data?.meta.total ?? 0;
-  const activeCount = rows.filter(
-    (student) => student.status === "ACTIVE",
-  ).length;
-  const needsEnrollment = rows.filter(
-    (student) => student.status === "ACTIVE" && !student.class,
-  ).length;
+  const enrolledCount = rows.filter((student) => student.class !== null).length;
+  const needsEnrollment = rows.filter((student) => student.status === "ACTIVE" && !student.class).length;
 
   return (
     <div className="space-y-5">
@@ -390,14 +395,10 @@ export function StudentDirectoryWorkspace() {
           {canManage && (
             <div className="flex flex-wrap gap-2">
               {canImport && (
-                <button
-                  type="button"
-                  onClick={() => setShowImport(true)}
-                  className="inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-card px-4 text-xs font-semibold text-foreground shadow-sm hover:bg-muted"
-                >
-                  <Upload className="size-4" />
-                  Import students
-                </button>
+                <BulkImportButton label="Bulk upload students" onClick={() => setShowImport(true)} />
+              )}
+              {canImport && (
+                <BulkImportButton label="Bulk upload photos" onClick={() => setShowPhotoBulkUpload(true)} />
               )}
               <button
                 type="button"
@@ -419,8 +420,11 @@ export function StudentDirectoryWorkspace() {
           onClose={() => setShowImport(false)}
         />
       )}
+      {showPhotoBulkUpload && canImport && (
+        <StudentPhotoBulkUpload onClose={() => setShowPhotoBulkUpload(false)} />
+      )}
 
-      {viewingId && <StudentProfileModal studentId={viewingId} onClose={() => setViewingId(null)} />}
+      {viewingId && <StudentProfileModal studentId={viewingId} onClose={closeProfile} />}
 
       {showForm && canManage && (
         <StudentEditor
@@ -429,6 +433,7 @@ export function StudentDirectoryWorkspace() {
           classes={classesQuery.data ?? []}
           departments={departmentsQuery.data ?? []}
           houses={housesQuery.data ?? []}
+          canManagePhotos={canImport}
           onIssued={setIssued}
           onNotice={setNotice}
           onCancel={() => {
@@ -447,42 +452,28 @@ export function StudentDirectoryWorkspace() {
         <WorkspaceStat
           label="Directory records"
           value={String(total)}
-          detail="matching filters"
+          detail="matching status and class filters"
         />
         <WorkspaceStat
-          label="Active on this page"
-          value={String(activeCount)}
-          detail="student profiles"
+          label="Currently enrolled"
+          value={String(enrolledCount)}
+          detail="with a class in the selected term"
         />
         <WorkspaceStat
           label="Needs placement"
           value={String(needsEnrollment)}
-          detail="active, no current class"
+          detail="active students without a current class"
         />
       </div>
 
       <section className="rounded-2xl border border-border bg-card p-4 shadow-sm sm:p-5">
-        <div className="grid gap-3 md:grid-cols-[minmax(220px,1fr)_180px_200px]">
-          <label className="relative">
-            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-            <input
-              value={search}
-              onChange={(event) => {
-                setSearch(event.target.value);
-                setPage(1);
-              }}
-              placeholder="Search name or admission number"
-              aria-label="Search students"
-              className={`${inputClasses} mt-0 pl-9`}
-            />
-          </label>
+        <div className="grid gap-3 sm:grid-cols-2">
           <label>
             <span className="sr-only">Filter by status</span>
             <Select value={status || "__all__"} onValueChange={(value) => {
               setStatus(value === "__all__" ? "" : value);
-              setPage(1);
             }}>
-              <SelectTrigger aria-label="Filter by status" className={`${inputClasses} mt-0`}><SelectValue placeholder="All statuses" /></SelectTrigger>
+              <SelectTrigger aria-label="Filter by status" className={`${labeledInputClasses} mt-0`}><SelectValue placeholder="All statuses" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="__all__">All statuses</SelectItem>
                 {statuses.map((value) => <SelectItem key={value} value={value}>{formatStatus(value)}</SelectItem>)}
@@ -493,9 +484,8 @@ export function StudentDirectoryWorkspace() {
             <span className="sr-only">Filter by current class</span>
             <Select value={classId || "__all__"} onValueChange={(value) => {
               setClassId(value === "__all__" ? "" : value);
-              setPage(1);
             }}>
-              <SelectTrigger aria-label="Filter by current class" className={`${inputClasses} mt-0`}><SelectValue placeholder="All current classes" /></SelectTrigger>
+              <SelectTrigger aria-label="Filter by current class" className={`${labeledInputClasses} mt-0`}><SelectValue placeholder="All current classes" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="__all__">All current classes</SelectItem>
                 {(classesQuery.data ?? []).map((schoolClass) => <SelectItem key={schoolClass.id} value={schoolClass.id}>{schoolClass.name}</SelectItem>)}
@@ -525,32 +515,6 @@ export function StudentDirectoryWorkspace() {
         emptyTitle="No students match these filters"
         emptyDescription="Clear a filter or add a student record to start building your school directory."
       />
-      {studentsQuery.data && studentsQuery.data.meta.totalPages > 1 && (
-        <div className="flex items-center justify-between rounded-xl border border-border bg-card px-4 py-3">
-          <p className="text-xs text-muted-foreground">
-            Page {studentsQuery.data.meta.page} of{" "}
-            {studentsQuery.data.meta.totalPages} · {total} records
-          </p>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              disabled={page <= 1}
-              onClick={() => setPage((value) => Math.max(1, value - 1))}
-              className="rounded-md border border-border px-3 py-1.5 text-xs font-medium text-foreground disabled:opacity-40"
-            >
-              Previous
-            </button>
-            <button
-              type="button"
-              disabled={page >= studentsQuery.data.meta.totalPages}
-              onClick={() => setPage((value) => value + 1)}
-              className="rounded-md border border-border px-3 py-1.5 text-xs font-medium text-foreground disabled:opacity-40"
-            >
-              Next
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
@@ -560,6 +524,7 @@ function StudentEditor({
   classes,
   departments,
   houses,
+  canManagePhotos,
   onCancel,
   onSaved,
   onIssued,
@@ -569,6 +534,7 @@ function StudentEditor({
   classes: SchoolClass[];
   departments: DepartmentOption[];
   houses: HouseOption[];
+  canManagePhotos: boolean;
   onIssued: (entries: CredentialEntry[]) => void;
   onNotice: (text: string | null) => void;
   onCancel: () => void;
@@ -607,9 +573,12 @@ function StudentEditor({
           ? `${linked.map((g) => g.name).join(", ")} already ${linked.length === 1 ? "has" : "have"} an account at this school. ${linked.length === 1 ? "It now also has" : "They now also have"} the parent role and sign in with the existing password, so no new parent password was created.`
           : null,
       );
-      if (photo) {
-        try { await uploadPersonPhoto("student", saved.id, photo); }
-        catch { onNotice("Student saved, but the image upload failed. Edit the student to try uploading the image again."); }
+      if (photo && canManagePhotos) {
+        try {
+          await uploadPersonPhoto("student", saved.id, photo);
+        } catch (error) {
+          onNotice(`Student saved, but the photo upload failed: ${error instanceof Error ? error.message : "unknown error"}. Edit the student to try again.`);
+        }
       }
       if (saved.credentials) {
         const name = `${saved.profile.firstName} ${saved.profile.lastName}`;
@@ -684,11 +653,17 @@ function StudentEditor({
           void form.handleSubmit();
         }}
       >
-        <PersonPhotoPicker file={photo} onChange={setPhoto} />
+        {canManagePhotos ? (
+          <PersonPhotoPicker file={photo} onChange={setPhoto} />
+        ) : (
+          <p role="note" className="mb-4 rounded-lg border border-border bg-muted/40 p-3 text-xs text-muted-foreground">
+            Only school owners, administrators, and headteachers can add or change a student photo.
+          </p>
+        )}
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <form.Field name="firstName">
             {(field) => (
-              <StudentTextField
+              <LabeledTextField
                 label="First name"
                 required
                 value={field.state.value}
@@ -698,7 +673,7 @@ function StudentEditor({
           </form.Field>
           <form.Field name="lastName">
             {(field) => (
-              <StudentTextField
+              <LabeledTextField
                 label="Last name"
                 required
                 value={field.state.value}
@@ -708,7 +683,7 @@ function StudentEditor({
           </form.Field>
           <form.Field name="otherNames">
             {(field) => (
-              <StudentTextField
+              <LabeledTextField
                 label="Other names"
                 value={field.state.value ?? ""}
                 onChange={field.handleChange}
@@ -720,7 +695,7 @@ function StudentEditor({
               <label className="text-xs font-semibold text-foreground">
                 Gender
                 <Select value={field.state.value} onValueChange={(value) => field.handleChange(value as CreateStudentInput["gender"])}>
-                  <SelectTrigger aria-label="Gender" className={inputClasses}><SelectValue /></SelectTrigger>
+                  <SelectTrigger aria-label="Gender" className={labeledInputClasses}><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="MALE">Male</SelectItem>
                     <SelectItem value="FEMALE">Female</SelectItem>
@@ -732,7 +707,7 @@ function StudentEditor({
           </form.Field>
           <form.Field name="dateOfBirth">
             {(field) => (
-              <StudentTextField
+              <LabeledTextField
                 label="Date of birth"
                 type="date"
                 required
@@ -743,7 +718,7 @@ function StudentEditor({
           </form.Field>
           <form.Field name="nationality">
             {(field) => (
-              <StudentTextField
+              <LabeledTextField
                 label="Nationality"
                 value={field.state.value ?? ""}
                 onChange={field.handleChange}
@@ -752,7 +727,7 @@ function StudentEditor({
           </form.Field>
           <form.Field name="residentialAddress">
             {(field) => (
-              <StudentTextField
+              <LabeledTextField
                 label="Residential address"
                 value={field.state.value ?? ""}
                 onChange={field.handleChange}
@@ -761,7 +736,7 @@ function StudentEditor({
           </form.Field>
           <form.Field name="city">
             {(field) => (
-              <StudentTextField
+              <LabeledTextField
                 label="City"
                 value={field.state.value ?? ""}
                 onChange={field.handleChange}
@@ -770,7 +745,7 @@ function StudentEditor({
           </form.Field>
           <form.Field name="region">
             {(field) => (
-              <StudentTextField
+              <LabeledTextField
                 label="Region"
                 value={field.state.value ?? ""}
                 onChange={field.handleChange}
@@ -779,7 +754,7 @@ function StudentEditor({
           </form.Field>
           <form.Field name="emergencyContactName">
             {(field) => (
-              <StudentTextField
+              <LabeledTextField
                 label="Emergency contact"
                 value={field.state.value ?? ""}
                 onChange={field.handleChange}
@@ -788,7 +763,7 @@ function StudentEditor({
           </form.Field>
           <form.Field name="emergencyContactPhone">
             {(field) => (
-              <StudentTextField
+              <LabeledTextField
                 label="Emergency phone"
                 value={field.state.value ?? ""}
                 onChange={field.handleChange}
@@ -797,7 +772,7 @@ function StudentEditor({
           </form.Field>
           <form.Field name="emergencyRelationship">
             {(field) => (
-              <StudentTextField
+              <LabeledTextField
                 label="Emergency relationship"
                 value={field.state.value ?? ""}
                 onChange={field.handleChange}
@@ -806,7 +781,7 @@ function StudentEditor({
           </form.Field>
           <form.Field name="bloodGroup">
             {(field) => (
-              <StudentTextField
+              <LabeledTextField
                 label="Blood group"
                 value={field.state.value ?? ""}
                 onChange={field.handleChange}
@@ -815,7 +790,7 @@ function StudentEditor({
           </form.Field>
           <form.Field name="allergies">
             {(field) => (
-              <StudentTextField
+              <LabeledTextField
                 label="Allergies"
                 value={field.state.value ?? ""}
                 onChange={field.handleChange}
@@ -824,7 +799,7 @@ function StudentEditor({
           </form.Field>
           <form.Field name="medicalConditions">
             {(field) => (
-              <StudentTextField
+              <LabeledTextField
                 label="Medical conditions"
                 value={field.state.value ?? ""}
                 onChange={field.handleChange}
@@ -844,7 +819,7 @@ function StudentEditor({
                     form.setFieldValue("classId", "");
                   }
                 }}>
-                  <SelectTrigger aria-label="Department" className={inputClasses}><SelectValue /></SelectTrigger>
+                  <SelectTrigger aria-label="Department" className={labeledInputClasses}><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="__none__">No department</SelectItem>
                     {departments.map((department) => <SelectItem key={department.id} value={department.id}>{department.name}</SelectItem>)}
@@ -877,7 +852,7 @@ function StudentEditor({
                             form.setFieldValue("departmentId", picked.departmentId);
                           }
                         }}>
-                          <SelectTrigger aria-label="Class (current term)" className={inputClasses}><SelectValue placeholder="Place in a class later" /></SelectTrigger>
+                          <SelectTrigger aria-label="Class (current term)" className={labeledInputClasses}><SelectValue placeholder="Place in a class later" /></SelectTrigger>
                           <SelectContent>
                             <SelectItem value="__none__">Place in a class later</SelectItem>
                             {options.map((schoolClass) => {
@@ -900,7 +875,7 @@ function StudentEditor({
               <label className="text-xs font-semibold text-foreground">
                 House (optional)
                 <Select value={field.state.value || "__none__"} onValueChange={(value) => field.handleChange(value === "__none__" ? "" : value)}>
-                  <SelectTrigger aria-label="House (optional)" className={inputClasses}><SelectValue /></SelectTrigger>
+                  <SelectTrigger aria-label="House (optional)" className={labeledInputClasses}><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="__none__">No house assigned</SelectItem>
                     {houses.filter((house) => house.isActive || house.id === student?.house?.id).map((house) => <SelectItem key={house.id} value={house.id}>{house.name}</SelectItem>)}
@@ -916,7 +891,7 @@ function StudentEditor({
                 value={(form.getFieldValue("status" as never) as string) ?? student.status}
                 onValueChange={(value) => form.setFieldValue("status" as never, value as never)}
               >
-                <SelectTrigger aria-label="Student status" className={inputClasses}><SelectValue /></SelectTrigger>
+                <SelectTrigger aria-label="Student status" className={labeledInputClasses}><SelectValue /></SelectTrigger>
                 <SelectContent>{statuses.map((value) => <SelectItem key={value} value={value}>{formatStatus(value)}</SelectItem>)}</SelectContent>
               </Select>
             </label>
@@ -1046,39 +1021,6 @@ function StudentEditor({
   );
 }
 
-function StudentTextField({
-  label,
-  type = "text",
-  required = false,
-  value,
-  onChange,
-}: {
-  label: string;
-  type?: string;
-  required?: boolean;
-  value: string;
-  onChange: (value: string) => void;
-}) {
-  return (
-    <label className="text-xs font-semibold text-foreground">
-      {label}
-      {required ? " *" : ""}
-      {type === "date" ? (
-        <DatePicker value={value} onChange={onChange} required={required}
-          ariaLabel={label} buttonClassName={inputClasses} />
-      ) : (
-        <input
-          type={type}
-          required={required}
-          className={inputClasses}
-          value={value}
-          onChange={(event) => onChange(event.target.value)}
-        />
-      )}
-    </label>
-  );
-}
-
 function createGuardianDraft(isPrimary: boolean): GuardianDraft {
   return {
     key: crypto.randomUUID(),
@@ -1150,19 +1092,19 @@ function GuardianDraftEditor({
         </div>
       </div>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        <StudentTextField
+        <LabeledTextField
           label="First name"
           required
           value={guardian.firstName}
           onChange={(value) => update("firstName", value)}
         />
-        <StudentTextField
+        <LabeledTextField
           label="Last name"
           required
           value={guardian.lastName}
           onChange={(value) => update("lastName", value)}
         />
-        <StudentTextField
+        <LabeledTextField
           label="Other names"
           value={guardian.otherNames ?? ""}
           onChange={(value) => update("otherNames", value)}
@@ -1170,7 +1112,7 @@ function GuardianDraftEditor({
         <label className="text-xs font-semibold text-foreground">
           Relationship *
           <Select value={guardian.relationshipType} onValueChange={(value) => update("relationshipType", value as StudentGuardianInput["relationshipType"])}>
-            <SelectTrigger aria-label="Relationship" className={inputClasses}><SelectValue /></SelectTrigger>
+            <SelectTrigger aria-label="Relationship" className={labeledInputClasses}><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="FATHER">Father</SelectItem>
               <SelectItem value="MOTHER">Mother</SelectItem>
@@ -1183,20 +1125,20 @@ function GuardianDraftEditor({
             </SelectContent>
           </Select>
         </label>
-        <StudentTextField
+        <LabeledTextField
           label="Phone"
           type="tel"
           required
           value={guardian.phone}
           onChange={(value) => update("phone", value)}
         />
-        <StudentTextField
+        <LabeledTextField
           label="Alternate phone"
           type="tel"
           value={guardian.alternatePhone ?? ""}
           onChange={(value) => update("alternatePhone", value)}
         />
-        <StudentTextField
+        <LabeledTextField
           label="Email"
           type="email"
           value={guardian.email ?? ""}
@@ -1219,12 +1161,12 @@ function GuardianDraftEditor({
             </span>
           </span>
         </label>
-        <StudentTextField
+        <LabeledTextField
           label="Occupation"
           value={guardian.occupation ?? ""}
           onChange={(value) => update("occupation", value)}
         />
-        <StudentTextField
+        <LabeledTextField
           label="Employer"
           value={guardian.employer ?? ""}
           onChange={(value) => update("employer", value)}

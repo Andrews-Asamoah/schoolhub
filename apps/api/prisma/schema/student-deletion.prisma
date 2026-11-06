@@ -1,0 +1,31 @@
+/// A school's request to permanently remove a wrongly created student. Only the
+/// platform super admin can approve it. The row outlives the student, so the
+/// student is kept as a plain id plus a snapshot, never as a relation.
+model StudentDeletionRequest {
+  id              String    @id @default(cuid())
+  schoolId        String
+  studentId       String
+  studentName     String
+  admissionNumber String?
+  className       String?
+  reason          String    @db.VarChar(1000)
+  /// PENDING | APPROVED | REJECTED | CANCELLED
+  status          String    @default("PENDING") @db.VarChar(16)
+  requestedById   String
+  requestedByName String
+  reviewedById    String?
+  reviewedByName  String?
+  reviewedAt      DateTime?
+  decisionNote    String?   @db.VarChar(1000)
+  /// What was removed, written when the request is approved.
+  result          Json?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  school School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@index([status, createdAt])
+  @@index([schoolId, status])
+  @@index([studentId])
+  @@map("student_deletion_requests")
+}

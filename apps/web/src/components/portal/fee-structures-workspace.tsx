@@ -1,10 +1,11 @@
 import { useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Archive, CheckCircle2, CircleAlert, Copy, FileText, LoaderCircle, Pencil, Plus, RefreshCw, Search, Settings2, Tags, X } from "lucide-react";
+import { Archive, CheckCircle2, CircleAlert, Copy, FileText, LoaderCircle, Pencil, Plus, RefreshCw, Search, Tags, X } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { FinanceReadOnlyNotice, useFinanceAccess } from "@/components/portal/finance-access";
+import { LabeledField } from "@/components/forms/labeled-controls";
 
 interface FeeRegistryItem {
   id: string;
@@ -324,10 +325,10 @@ export function FeeStructuresWorkspace() {
       {createOpen && <Modal title={editingStructure ? "Edit fee structure" : draftMode === "duplicate" ? "Duplicate fee structure" : "Create fee structure"} description={editingStructure ? "Changes are allowed only before student bills have been generated from this structure." : draftMode === "duplicate" ? "A new draft has been copied from the original. Change the figures or details, then save it as a separate fee structure." : "Create a reusable template. Invoices are generated separately from the Invoices & Billing page."} onClose={closeStructureForm}>
         <form onSubmit={submitStructure} className="space-y-5">
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Structure name"><input className={fieldClass} required minLength={2} maxLength={120} value={draft.name} onChange={(event) => updateDraft("name", event.target.value)} placeholder="e.g. JHS 1 Term Fees" /></Field>
-            <Field label="Class level (optional)"><input className={fieldClass} value={draft.classLevel} onChange={(event) => updateDraft("classLevel", event.target.value)} placeholder="e.g. Junior High School" /></Field>
+            <LabeledField label="Structure name"><input className={fieldClass} required minLength={2} maxLength={120} value={draft.name} onChange={(event) => updateDraft("name", event.target.value)} placeholder="e.g. JHS 1 Term Fees" /></LabeledField>
+            <LabeledField label="Class level (optional)"><input className={fieldClass} value={draft.classLevel} onChange={(event) => updateDraft("classLevel", event.target.value)} placeholder="e.g. Junior High School" /></LabeledField>
           </div>
-          <Field label="Description (optional)"><textarea className={cn(fieldClass, "h-20 py-2")} maxLength={500} value={draft.description} onChange={(event) => updateDraft("description", event.target.value)} placeholder="What this fee structure covers" /></Field>
+          <LabeledField label="Description (optional)"><textarea className={cn(fieldClass, "h-20 py-2")} maxLength={500} value={draft.description} onChange={(event) => updateDraft("description", event.target.value)} placeholder="What this fee structure covers" /></LabeledField>
           <div className="flex flex-col gap-3 rounded-xl border border-border p-3 sm:flex-row sm:items-center sm:justify-between">
             <div><p className="text-sm font-semibold text-foreground">Term-based billing</p><p className="mt-1 text-xs text-muted-foreground">Turn off for a one-off or non-term fee template.</p></div>
             <label className="inline-flex items-center gap-2 text-sm"><input type="checkbox" checked={draft.termBased} onChange={(event) => updateDraft("termBased", event.target.checked)} className="size-4 accent-primary" /> Apply per term</label>
@@ -342,10 +343,10 @@ export function FeeStructuresWorkspace() {
             {draft.items.map((item,index) => <div key={item.rowId} className="space-y-3 rounded-xl border border-border bg-muted/20 p-3">
               <div className="flex items-start gap-3"><div className="grid min-w-0 flex-1 gap-3 sm:grid-cols-[1fr_140px]">
                 <div className="grid gap-1.5"><label className="text-xs font-medium text-muted-foreground">Standard category (optional)</label><Select value={item.registryItemId || "custom"} onValueChange={(value) => { const registry = registryItems.find(candidate => candidate.id === value); updateItem(item.rowId, value === "custom" ? { registryItemId: "", name: "" } : { registryItemId: value, name: registry?.name ?? item.name }); }}><SelectTrigger className="w-full"><SelectValue placeholder="Choose category" /></SelectTrigger><SelectContent><SelectItem value="custom">Custom fee item</SelectItem>{registryItems.map(registry => <SelectItem key={registry.id} value={registry.id}>{registry.name}</SelectItem>)}</SelectContent></Select></div>
-                <Field label="Amount (GHS)"><input type="number" required min="0" step="0.01" className={fieldClass} value={item.amount} onChange={(event) => updateItem(item.rowId, { amount: event.target.value })} placeholder="0.00" /></Field>
+                <LabeledField label="Amount (GHS)"><input type="number" required min="0" step="0.01" className={fieldClass} value={item.amount} onChange={(event) => updateItem(item.rowId, { amount: event.target.value })} placeholder="0.00" /></LabeledField>
               </div><button type="button" aria-label={`Remove fee item ${index + 1}`} disabled={draft.items.length === 1} onClick={() => updateDraft("items", draft.items.filter(row => row.rowId !== item.rowId))} className="mt-5 rounded-lg p-2 text-muted-foreground hover:bg-muted disabled:opacity-30"><X className="size-4" /></button></div>
-              <div className="grid gap-3 sm:grid-cols-[1fr_auto]"><Field label="Item name"><input className={fieldClass} required value={item.name} onChange={(event) => updateItem(item.rowId, { name: event.target.value })} placeholder="e.g. Tuition" /></Field><label className="flex items-center gap-2 text-sm text-foreground sm:mt-6"><input type="checkbox" checked={item.isOptional} onChange={(event) => updateItem(item.rowId, { isOptional: event.target.checked })} className="size-4 accent-primary" /> Optional item</label></div>
-              <Field label="Item description (optional)"><input className={fieldClass} value={item.description} onChange={(event) => updateItem(item.rowId, { description: event.target.value })} placeholder="Additional detail for the item" /></Field>
+              <div className="grid gap-3 sm:grid-cols-[1fr_auto]"><LabeledField label="Item name"><input className={fieldClass} required value={item.name} onChange={(event) => updateItem(item.rowId, { name: event.target.value })} placeholder="e.g. Tuition" /></LabeledField><label className="flex items-center gap-2 text-sm text-foreground sm:mt-6"><input type="checkbox" checked={item.isOptional} onChange={(event) => updateItem(item.rowId, { isOptional: event.target.checked })} className="size-4 accent-primary" /> Optional item</label></div>
+              <LabeledField label="Item description (optional)"><input className={fieldClass} value={item.description} onChange={(event) => updateItem(item.rowId, { description: event.target.value })} placeholder="Additional detail for the item" /></LabeledField>
             </div>)}
             <div className="flex items-center justify-between rounded-xl bg-primary/5 p-3"><span className="text-sm font-semibold text-foreground">Structure total</span><span className="text-lg font-bold tabular-nums text-foreground">{money(draftTotal)}</span></div>
           </div>
@@ -356,7 +357,7 @@ export function FeeStructuresWorkspace() {
 
       {registryOpen && <Modal title="Fee item categories" description="Maintain standard fee item names to reuse across fee structures." onClose={() => { if (!createRegistryItem.isPending) setRegistryOpen(false); }}>
         <form onSubmit={(event) => { event.preventDefault(); createRegistryItem.mutate({ name: registryName.trim(), description: registryDescription.trim() || undefined }); }} className="space-y-4">
-          <div className="grid gap-3 sm:grid-cols-2"><Field label="Category name"><input className={fieldClass} required minLength={2} maxLength={120} value={registryName} onChange={(event) => setRegistryName(event.target.value)} placeholder="e.g. Tuition, ICT, Transport" /></Field><Field label="Description (optional)"><input className={fieldClass} maxLength={500} value={registryDescription} onChange={(event) => setRegistryDescription(event.target.value)} placeholder="Short description" /></Field></div>
+          <div className="grid gap-3 sm:grid-cols-2"><LabeledField label="Category name"><input className={fieldClass} required minLength={2} maxLength={120} value={registryName} onChange={(event) => setRegistryName(event.target.value)} placeholder="e.g. Tuition, ICT, Transport" /></LabeledField><LabeledField label="Description (optional)"><input className={fieldClass} maxLength={500} value={registryDescription} onChange={(event) => setRegistryDescription(event.target.value)} placeholder="Short description" /></LabeledField></div>
           {createRegistryItem.error && <ErrorState message={createRegistryItem.error.message} />}
           <div className="flex justify-end"><button type="submit" className={primaryButton} disabled={createRegistryItem.isPending || registryName.trim().length < 2}>{createRegistryItem.isPending && <LoaderCircle className="size-4 animate-spin" />} Add category</button></div>
         </form>
@@ -402,9 +403,6 @@ function FeeStructureCard({
 }
 function Metric({ label, value, detail, icon: Icon }: { label: string; value: string; detail: string; icon: typeof FileText }) {
   return <div className="rounded-2xl border border-border bg-card p-4 shadow-sm"><div className="flex items-center justify-between gap-3"><p className="text-xs font-semibold text-muted-foreground">{label}</p><Icon className="size-4 text-primary" /></div><p className="mt-3 text-2xl font-bold tracking-tight text-foreground">{value}</p><p className="mt-1 text-xs text-muted-foreground">{detail}</p></div>;
-}
-function Field({ label, children }: { label: string; children: ReactNode }) {
-  return <label className="grid gap-1.5 text-sm font-medium text-foreground">{label}{children}</label>;
 }
 function Modal({ title, description, onClose, children }: { title: string; description: string; onClose: () => void; children: ReactNode }) {
   return <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay/70 p-3 sm:p-6" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) onClose(); }}><section role="dialog" aria-modal="true" aria-label={title} className="max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-2xl border border-border bg-card p-5 text-foreground shadow-2xl sm:p-6"><div className="mb-5 flex items-start justify-between gap-4"><div><h2 className="text-lg font-semibold">{title}</h2><p className="mt-1 text-sm text-muted-foreground">{description}</p></div><button type="button" onClick={onClose} aria-label="Close dialog" className="rounded-lg p-2 text-muted-foreground hover:bg-muted"><X className="size-4" /></button></div>{children}</section></div>;

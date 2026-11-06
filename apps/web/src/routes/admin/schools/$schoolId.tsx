@@ -1,3 +1,6 @@
+import { SchoolReadinessPanel } from "@/components/superadmin/school-readiness-panel";
+import { hasSchoolAdministrationRole } from "@schoolhub/shared";
+import { SchoolSmsAccountPanel } from "@/components/school/school-sms-account-panel";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState, type ReactNode } from "react";
@@ -378,6 +381,8 @@ function SchoolDetailPage() {
       {/* Tab content */}
       {activeTab === "overview" && (
         <div className="space-y-5">
+          <SchoolReadinessPanel schoolId={schoolId} />
+          <SchoolSmsAccountPanel endpoint={`/super-admin/schools/${schoolId}/sms`} scopeKey={schoolId} />
           <form
             onSubmit={(event) => {
               event.preventDefault();
@@ -585,16 +590,16 @@ function SchoolDetailPage() {
                 Ban or remove access for this school only. At least one active administrator must remain.
               </p>
             </div>
-            {school.organization.members.filter((member) => ["owner", "admin"].includes(member.role)).length === 0 ? (
+            {school.organization.members.filter((member) => hasSchoolAdministrationRole(member)).length === 0 ? (
               <p className="p-6 text-sm text-muted-foreground">No administrators found.</p>
             ) : (
               <ul className="divide-y divide-border/60">
                 {school.organization.members
-                  .filter((member) => ["owner", "admin"].includes(member.role))
+                  .filter((member) => hasSchoolAdministrationRole(member))
                   .map((member) => {
                     const activeAdmins = school.organization.members.filter(
                       (candidate) =>
-                        ["owner", "admin"].includes(candidate.role) &&
+                        hasSchoolAdministrationRole(candidate) &&
                         !candidate.banned &&
                         !candidate.user.banned,
                     ).length;

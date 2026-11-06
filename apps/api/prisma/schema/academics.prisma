@@ -27,6 +27,8 @@ model House {
 }
 
 model AcademicYear {
+  toYearRolloverBatches AcademicRolloverBatch[] @relation("AcademicRolloverBatch_toYear")
+  fromYearRolloverBatches AcademicRolloverBatch[] @relation("AcademicRolloverBatch_fromYear")
   id        String   @id @default(cuid())
   schoolId  String
   name      String
@@ -64,6 +66,8 @@ model AcademicYear {
 }
 
 model Term {
+  toTermRolloverBatches AcademicRolloverBatch[] @relation("AcademicRolloverBatch_toTerm")
+  fromTermRolloverBatches AcademicRolloverBatch[] @relation("AcademicRolloverBatch_fromTerm")
   id             String   @id @default(cuid())
   academicYearId String
   name           String
@@ -256,6 +260,7 @@ model Subject {
   classSubjects    ClassSubject[]
   schoolAssignments SchoolAssignment[]
   teachers         SubjectTeacher[]
+  strands           SubjectStrand[]
   timetableEntries TimetableEntry[]
 
   @@unique([code, schoolId])
@@ -275,6 +280,7 @@ model ClassSubject {
   class   Class    @relation(fields: [classId], references: [id], onDelete: Cascade)
   subject Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
   teacher Teacher? @relation(fields: [teacherId], references: [id])
+  strandAssignments ClassSubjectStrandAssignment[]
 
   @@unique([classId, subjectId])
   @@index([classId])
@@ -296,6 +302,47 @@ model SubjectTeacher {
   @@index([subjectId])
   @@index([teacherId])
   @@map("subject_teachers")
+}
+
+model SubjectStrand {
+  id                 String   @id @default(cuid())
+  subjectId          String
+  name               String
+  code               String?
+  description        String?
+  sortOrder          Int      @default(0)
+  examWeightPercent  Decimal  @default(0) @db.Decimal(5, 2)
+  isActive           Boolean  @default(true)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @default(now()) @updatedAt
+
+  subject            Subject                         @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  classAssignments   ClassSubjectStrandAssignment[]
+  assessmentComponents AssessmentComponent[]
+  internalExamPaperSections InternalExamPaperSection[]
+  timetableEntries   TimetableEntry[]
+
+  @@unique([subjectId, name])
+  @@index([subjectId, isActive, sortOrder])
+  @@map("subject_strands")
+}
+
+model ClassSubjectStrandAssignment {
+  id               String   @id @default(cuid())
+  classSubjectId   String
+  subjectStrandId  String
+  teacherId        String
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @default(now()) @updatedAt
+
+  classSubject  ClassSubject  @relation(fields: [classSubjectId], references: [id], onDelete: Cascade)
+  subjectStrand SubjectStrand @relation(fields: [subjectStrandId], references: [id], onDelete: Cascade)
+  teacher       Teacher       @relation(fields: [teacherId], references: [id], onDelete: Restrict)
+
+  @@unique([classSubjectId, subjectStrandId], map: "class_subject_strand_assignments_classSubjectId_subjectStrandId")
+  @@index([teacherId])
+  @@index([subjectStrandId])
+  @@map("class_subject_strand_assignments")
 }
 
 model Enrollment {
@@ -384,6 +431,7 @@ model TimetableEntry {
   type           TimetableEntryType @default(LESSON)
   label          String?
   subjectId      String?
+  subjectStrandId String?
   teacherId      String?
   timeSlotId     String
   classroomId    String?
@@ -394,6 +442,7 @@ model TimetableEntry {
   class        Class?       @relation(fields: [classId], references: [id], onDelete: Cascade)
   department   Department?  @relation(fields: [departmentId], references: [id], onDelete: Cascade)
   subject      Subject?     @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  subjectStrand SubjectStrand? @relation(fields: [subjectStrandId], references: [id], onDelete: SetNull)
   teacher      Teacher?     @relation(fields: [teacherId], references: [id], onDelete: SetNull)
   timeSlot     TimeSlot     @relation(fields: [timeSlotId], references: [id], onDelete: Cascade)
   classroom    Classroom?   @relation(fields: [classroomId], references: [id], onDelete: SetNull)
@@ -405,6 +454,7 @@ model TimetableEntry {
   @@index([classId])
   @@index([departmentId])
   @@index([teacherId])
+  @@index([subjectStrandId])
   @@index([timeSlotId])
   @@map("timetable_entries")
 }

@@ -1,4 +1,8 @@
-import { BadRequestException, Body, Controller, Get, Param, Patch, Post, Put, Res, UseGuards } from "@nestjs/common";
+import { BadRequestException, Body, Controller, Get, Param, Patch, Post, Put, Res, UseGuards, Header, Query, UploadedFile, UseInterceptors } from "@nestjs/common";
+import { FileInterceptor } from "@nestjs/platform-express";
+import { STUDENT_IMPORT_LIMITS } from "@schoolhub/shared";
+import { InternalExamMarksImportService } from "./internal-exam-marks-import.service.js";
+import { mockMarksImportBatchSchema, mockMarksImportRefSchema } from "./internal-exams.schemas.js";
 import type { School } from "@prisma/client";
 import type { z } from "zod";
 import { SchoolTenantGuard } from "../../common/guards/school-tenant.guard.js";
@@ -7,7 +11,7 @@ import { Roles } from "../../common/decorators/roles.decorator.js";
 import { CurrentSchool } from "../../common/decorators/current-school.decorator.js";
 import { CurrentSchoolRole } from "../../common/decorators/current-school-role.decorator.js";
 import { CurrentUser, type AuthenticatedUser } from "../../common/decorators/current-user.decorator.js";
-import { createMockSchema, mockMarkSchema } from "./internal-exams.schemas.js";
+import { createMockSchema, mockMarkSchema, mockSectionMarkSchema } from "./internal-exams.schemas.js";
 import { InternalExamsService } from "./internal-exams.service.js";
 import { MockReportService } from "./mock-report.service.js";
 import { MockCorrectionService } from "./mock-correction.service.js";
@@ -21,7 +25,8 @@ import type { Response } from "express";
 export class InternalExamsController {
   constructor(private readonly exams:InternalExamsService,
     private readonly mockReports:MockReportService,
-    private readonly corrections:MockCorrectionService){}
+    private readonly corrections:MockCorrectionService,
+    private readonly marksImport:InternalExamMarksImportService){}
 
   private recommendation(body:unknown){
     const remark=body&&typeof body==="object"&&"remark" in body
@@ -177,12 +182,41 @@ export class InternalExamsController {
     return this.exams.sheet(school.id,user.id,role,id);
   }
 
+  @Post("marks/import/preview")
+  @Roles("teacher")
+  @Header("Cache-Control", "no-store")
+  @UseInterceptors(FileInterceptor("file", { limits: { fileSize: STUDENT_IMPORT_LIMITS.maxFileBytes, files: 1 } }))
+  previewMarksImport(@CurrentSchool() school:School,@CurrentUser() user:AuthenticatedUser,
+    @CurrentSchoolRole() role:string|undefined,
+    @Query(new ZodValidationPipe(mockMarksImportRefSchema)) query:z.infer<typeof mockMarksImportRefSchema>,
+    @UploadedFile() file:Express.Multer.File|undefined) {
+    if (!file) throw new BadRequestException("Choose a CSV or XLSX file.");
+    return this.marksImport.preview(school.id,user.id,role,query,file);
+  }
+
+  @Post("marks/import")
+  @Roles("teacher")
+  @Header("Cache-Control", "no-store")
+  importMarks(@CurrentSchool() school:School,@CurrentUser() user:AuthenticatedUser,
+    @CurrentSchoolRole() role:string|undefined,
+    @Body(new ZodValidationPipe(mockMarksImportBatchSchema)) body:z.infer<typeof mockMarksImportBatchSchema>) {
+    return this.marksImport.importBatch(school.id,user.id,role,body);
+  }
+
   @Put("marks")
   @Roles("teacher")
   save(@CurrentSchool() school:School,@CurrentUser() user:AuthenticatedUser,
     @CurrentSchoolRole() role:string|undefined,
     @Body(new ZodValidationPipe(mockMarkSchema)) body:z.infer<typeof mockMarkSchema>){
     return this.exams.save(school.id,user.id,role,body);
+  }
+
+  @Put("section-marks")
+  @Roles("teacher")
+  saveSectionMarks(@CurrentSchool() school:School,@CurrentUser() user:AuthenticatedUser,
+    @CurrentSchoolRole() role:string|undefined,
+    @Body(new ZodValidationPipe(mockSectionMarkSchema)) body:z.infer<typeof mockSectionMarkSchema>){
+    return this.exams.saveSectionMarks(school.id,user.id,role,body);
   }
 
   @Patch("papers/:id/finalize")

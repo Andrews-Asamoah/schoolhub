@@ -1,13 +1,12 @@
+import {useGuardianWard} from "@/hooks/use-guardian-ward";
 import { useQuery } from "@tanstack/react-query";
 import { FileSpreadsheet, FileText, LoaderCircle, Printer, ShieldCheck, UserRound } from "lucide-react";
 import { useMemo, useState } from "react";
-import ExcelJS from "exceljs";
-import { jsPDF } from "jspdf";
-import autoTable from "jspdf-autotable";
 import type { StudentStatementResponse } from "@schoolhub/shared";
 import type { StudentProfileData } from "@/components/school/student-profile-panel";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { apiFetch } from "@/lib/api";
+import { downloadXlsx } from "@/lib/download";
 
 function fullName(ward: StudentProfileData) {
   return [ward.profile.firstName, ward.profile.otherNames, ward.profile.lastName].filter(Boolean).join(" ") || ward.admissionNumber || "Student";
@@ -15,15 +14,7 @@ function fullName(ward: StudentProfileData) {
 const money = (value: string | number) => new Intl.NumberFormat("en-GH", { style: "currency", currency: "GHS", maximumFractionDigits: 2 }).format(Number(value) || 0);
 const secondaryButton = "inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-border bg-card px-4 py-2 text-sm font-semibold text-foreground transition hover:bg-muted disabled:opacity-50";
 
-function downloadBlob(blob: Blob, filename: string) {
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url; link.download = filename;
-  document.body.appendChild(link); link.click(); link.remove(); URL.revokeObjectURL(url);
-}
-
 export function GuardianFeesWorkspace() {
-  const [wardId, setWardId] = useState("");
   const [exporting, setExporting] = useState(false);
   const wardsQuery = useQuery({
     queryKey: ["students", "my-wards"],
@@ -31,7 +22,7 @@ export function GuardianFeesWorkspace() {
     retry: false,
   });
   const wards = wardsQuery.data ?? [];
-  const selectedId = wards.some((ward) => ward.id === wardId) ? wardId : wards[0]?.id ?? "";
+  const [selectedId, setWardId] = useGuardianWard(wards);
   const selected = wards.find((ward) => ward.id === selectedId);
   const statementQuery = useQuery({
     queryKey: ["students", "my-wards", selectedId, "fees"],
@@ -43,8 +34,12 @@ export function GuardianFeesWorkspace() {
   const rows = useMemo(() => statement?.entries ?? [], [statement?.entries]);
   const filename = (statement?.student.admissionNumber || selectedId || "ward").replace(/[^a-zA-Z0-9_-]/g, "-");
 
-  const exportPdf = () => {
+  const exportPdf = async () => {
     if (!statement) return;
+    const [{ jsPDF }, { default: autoTable }] = await Promise.all([
+      import("jspdf"),
+      import("jspdf-autotable"),
+    ]);
     const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
     pdf.setFontSize(16); pdf.text("Student statement of account", 14, 18);
     pdf.setFontSize(10);
@@ -66,6 +61,7 @@ export function GuardianFeesWorkspace() {
     if (!statement) return;
     setExporting(true);
     try {
+      const { default: ExcelJS } = await import("exceljs");
       const workbook = new ExcelJS.Workbook();
       workbook.creator = "SchoolHub";
       workbook.created = new Date();
@@ -95,7 +91,7 @@ export function GuardianFeesWorkspace() {
       sheet.getRow(1).font = { bold: true };
       sheet.autoFilter = { from: "A1", to: "F1" };
       const bytes = await workbook.xlsx.writeBuffer();
-      downloadBlob(new Blob([bytes], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), `ward-statement-${filename}.xlsx`);
+      downloadXlsx(bytes, `ward-statement-${filename}.xlsx`);
     } finally {
       setExporting(false);
     }

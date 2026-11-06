@@ -1,7 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
-import { Check, Copy, X } from "lucide-react";
+import { Check, Copy, LoaderCircle } from "lucide-react";
 import { useState } from "react";
 import { apiFetch } from "@/lib/api";
+import { FormModal } from "@/components/ui/form-modal";
+import { useSchoolRole } from "@/components/school/school-role-switcher";
+import { StudentDeletionPanel } from "@/components/school/student-deletion-panel";
 
 export interface StudentProfileData {
   id: string;
@@ -79,18 +82,18 @@ function CopyField({ label, value }: { label: string; value: string | null }) {
 const card = "rounded-2xl border border-border bg-card p-4";
 const heading = "mb-3 text-xs font-bold uppercase tracking-wide text-muted-foreground";
 
-export function StudentProfileCard({ data }: { data: StudentProfileData }) {
+export function StudentProfileCard({ data, showSubjects = true }: { data: StudentProfileData; showSubjects?: boolean }) {
   const p = data.profile;
   const fullName = [p.firstName, p.otherNames, p.lastName].filter(Boolean).join(" ");
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-4 rounded-xl border border-primary/15 bg-primary/5 p-4">
         <div className="flex size-14 items-center justify-center rounded-2xl bg-primary text-lg font-bold text-primary-foreground">
           {p.firstName.charAt(0)}
           {p.lastName.charAt(0)}
         </div>
-        <div>
-          <h3 className="text-lg font-bold text-foreground">{fullName}</h3>
+        <div className="min-w-0">
+          <h3 className="break-words text-lg font-bold text-foreground">{fullName}</h3>
           <p className="text-xs text-muted-foreground">
             {data.class?.name ?? "No class this term"}
             {data.admissionNumber ? ` · Admission no. ${data.admissionNumber}` : ""} · {nice(data.status)}
@@ -152,7 +155,7 @@ export function StudentProfileCard({ data }: { data: StudentProfileData }) {
         )}
       </section>
 
-      <section className={card}>
+      {showSubjects && <section className={card}>
         <h4 className={heading}>Subjects (inherited from {data.class?.name ?? "the class"})</h4>
         {data.subjects.length === 0 ? (
           <p className="text-sm text-muted-foreground">No subjects are linked to this class yet.</p>
@@ -168,73 +171,43 @@ export function StudentProfileCard({ data }: { data: StudentProfileData }) {
             ))}
           </ul>
         )}
-      </section>
+      </section>}
     </div>
   );
 }
 
 /** Staff and teachers: open a student's profile from the directory. */
 export function StudentProfileModal({ studentId, onClose }: { studentId: string; onClose: () => void }) {
+  const { activeRole } = useSchoolRole();
+  const canRequestDeletion = activeRole === "owner" || activeRole === "admin";
   const query = useQuery({
     queryKey: ["students", "profile", studentId],
     queryFn: () => apiFetch<StudentProfileData>(`/students/${studentId}/profile`),
     retry: false,
   });
   return (
-    <div role="dialog" aria-modal="true" className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-overlay p-4">
-      <div className="my-6 w-full max-w-2xl rounded-2xl bg-muted/50 p-5 shadow-xl">
-        <div className="mb-3 flex justify-end">
-          <button type="button" aria-label="Close" onClick={onClose} className="rounded-lg p-1.5 hover:bg-muted-foreground/20">
-            <X className="size-4" />
-          </button>
-        </div>
-        {query.isPending ? (
-          <p className="text-sm text-muted-foreground">Loading profile…</p>
-        ) : query.error ? (
-          <p role="alert" className="text-sm text-destructive">{query.error instanceof Error ? query.error.message : "Could not load the profile."}</p>
-        ) : (
-          <StudentProfileCard data={query.data} />
-        )}
-      </div>
-    </div>
-  );
-}
-
-/** Parent / guardian portal: live records for each linked child. */
-export function MyWardsPanel() {
-  const query = useQuery({
-    queryKey: ["students", "my-wards"],
-    queryFn: () => apiFetch<StudentProfileData[]>("/students/my-wards"),
-    retry: false,
-  });
-  const [openId, setOpenId] = useState<string | null>(null);
-  if (query.isPending || query.error || query.data.length === 0) return null;
-  const selected = query.data.find((w) => w.id === openId) ?? null;
-  return (
-    <section className="rounded-3xl border border-border bg-card p-5 shadow-sm">
-      <h2 className="text-sm font-bold text-foreground">My children: school records</h2>
-      <p className="mt-0.5 text-xs text-muted-foreground">Details held by the school. Contact the school office to correct anything.</p>
-      <div className="mt-3 flex flex-wrap gap-2">
-        {query.data.map((ward) => (
-          <button
-            key={ward.id}
-            type="button"
-            onClick={() => setOpenId(openId === ward.id ? null : ward.id)}
-            className={`rounded-xl border px-3 py-2 text-left text-sm ${openId === ward.id ? "border-primary bg-primary/10" : "border-border"}`}
-          >
-            <span className="font-semibold text-foreground">
-              {ward.profile.firstName} {ward.profile.lastName}
-            </span>
-            <span className="block text-xs text-muted-foreground">{ward.class?.name ?? "No class this term"}</span>
-          </button>
-        ))}
-      </div>
-      {selected && (
-        <div className="mt-4">
-          <StudentProfileCard data={selected} />
-        </div>
+    <FormModal
+      title="Student profile"
+      description="Personal details, school records and family contacts."
+      size="3xl"
+      onClose={onClose}
+    >
+      {query.isPending ? (
+        <p role="status" className="flex items-center gap-2 py-8 text-sm text-muted-foreground">
+          <LoaderCircle className="size-4 animate-spin" aria-hidden="true" />
+          Loading profile…
+        </p>
+      ) : query.error ? (
+        <p role="alert" className="rounded-lg border border-destructive/20 bg-destructive/10 p-4 text-sm text-destructive">
+          {query.error instanceof Error ? query.error.message : "Could not load the profile."}
+        </p>
+      ) : (
+        <>
+          <StudentProfileCard data={query.data} showSubjects={false} />
+          {canRequestDeletion && <StudentDeletionPanel studentId={studentId} studentName={[query.data.profile.firstName, query.data.profile.otherNames, query.data.profile.lastName].filter(Boolean).join(" ")} />}
+        </>
       )}
-    </section>
+    </FormModal>
   );
 }
 

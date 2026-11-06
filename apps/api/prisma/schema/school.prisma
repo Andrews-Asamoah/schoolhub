@@ -3,6 +3,17 @@
 // ============================================================================
 
 model School {
+  attendanceExcuseRequests AttendanceExcuseRequest[]
+  studentDeletionRequests StudentDeletionRequest[]
+  schoolRolloverBatches AcademicRolloverBatch[] @relation("AcademicRolloverBatch_school")
+  financeBankReconciliations FinanceBankReconciliation[] @relation("FinanceBankReconciliation_school")
+  financeBankMatchs FinanceBankMatch[] @relation("FinanceBankMatch_school")
+  financeBankStatements FinanceBankStatement[] @relation("FinanceBankStatement_school")
+  smsConnections SchoolSmsConnection[]
+  notificationSettings SchoolNotificationSettings?
+  notificationPreferences NotificationPreference[]
+  notificationDeliveries NotificationDelivery[]
+  notificationDailyUsage NotificationDailyUsage[]
   id             String   @id @default(cuid())
   organizationId String   @unique
   name           String
@@ -30,6 +41,7 @@ model School {
   academicYears               AcademicYear[]
   calendarDays                AcademicCalendarDay[]
   attendanceExclusions        StudentAttendanceExclusion[]
+  attendanceBatchReplays      AttendanceBatchReplay[]
   assessmentTemplates         AssessmentTemplate[]
   reportCardVersions          ReportCardVersion[]
   internalExamSessions       InternalExamSession[]
@@ -63,6 +75,8 @@ model School {
   transactions                Transaction[]
   reportCardTemplates         ReportCardTemplate[]
   reportCardSets              ReportCardSet[]
+  assessmentEntrySubmissions  AssessmentEntrySubmission[]
+  assessmentMarkCorrections   AssessmentMarkCorrection[]
   schoolAssignments           SchoolAssignment[]
   notifications               Notification[]
   announcements               Announcement[]
@@ -152,6 +166,7 @@ model UserProfile {
 }
 
 model Student {
+  attendanceExcuseRequests AttendanceExcuseRequest[]
   id                 String        @id @default(cuid())
   profileId          String        @unique
   schoolId           String
@@ -247,6 +262,8 @@ model Teacher {
   remarks               Remark[]
   subjects              SubjectTeacher[]
   classSubjects         ClassSubject[]
+  classSubjectStrandAssignments ClassSubjectStrandAssignment[]
+  internalExamPaperSections InternalExamPaperSection[] @relation("InternalExamPaperSectionTeacher")
   clubs                 Club[]
   payslips              Payslip[]
   timetableEntries      TimetableEntry[]
@@ -309,6 +326,7 @@ model Staff {
 }
 
 model Guardian {
+  attendanceExcuseRequests AttendanceExcuseRequest[]
   id                 String       @id @default(cuid())
   profileId          String?
   schoolId           String

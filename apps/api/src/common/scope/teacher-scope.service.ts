@@ -15,8 +15,10 @@ export interface TeacherAssignments {
   teacherId: string | null;
   /** Classes this teacher is the current class teacher of. */
   classTeacherClassIds: string[];
-  /** The subjects this teacher is the assigned teacher of, per class. */
+  /** The subjects this teacher is the legacy whole-subject teacher of, per class. */
   subjectAssignments: { classId: string; subjectId: string }[];
+  /** The specific subject strands this teacher is assigned to, per class. */
+  subjectStrandAssignments: { classId: string; subjectId: string; subjectStrandId: string }[];
 }
 
 @Injectable()
@@ -34,7 +36,7 @@ export class TeacherScopeService {
       where: { schoolId, deletedAt: null, profile: { userId } },
       select: { id: true },
     });
-    if (!teacher) return { teacherId: null, classTeacherClassIds: [], subjectAssignments: [] };
+    if (!teacher) return { teacherId: null, classTeacherClassIds: [], subjectAssignments: [], subjectStrandAssignments: [] };
 
     const today = new Date();
     const currentYear = await db.academicYear.findFirst({
@@ -48,7 +50,7 @@ export class TeacherScopeService {
       ...(currentYear ? { OR: [{ academicYearId: currentYear.id }, { academicYearId: null }] } : {}),
     };
 
-    const [classTeacher, subjects] = await Promise.all([
+    const [classTeacher, subjects, strandAssignments] = await Promise.all([
       db.classTeacherAssignment.findMany({
         where: {
           schoolId,
@@ -63,12 +65,28 @@ export class TeacherScopeService {
         where: { teacherId: teacher.id, class: classInScope },
         select: { classId: true, subjectId: true },
       }),
+      db.classSubjectStrandAssignment.findMany({
+        where: {
+          teacherId: teacher.id,
+          classSubject: { class: classInScope },
+          subjectStrand: { isActive: true, subject: { isActive: true, deletedAt: null } },
+        },
+        select: {
+          subjectStrandId: true,
+          classSubject: { select: { classId: true, subjectId: true } },
+        },
+      }),
     ]);
 
     return {
       teacherId: teacher.id,
       classTeacherClassIds: [...new Set(classTeacher.map((row) => row.classId))],
       subjectAssignments: subjects,
+      subjectStrandAssignments: strandAssignments.map((row) => ({
+        classId: row.classSubject.classId,
+        subjectId: row.classSubject.subjectId,
+        subjectStrandId: row.subjectStrandId,
+      })),
     };
   }
 
@@ -95,7 +113,7 @@ export class TeacherScopeService {
         : {}),
     };
 
-    const [classTeacher, subjectTeacher, timetable] = await Promise.all([
+    const [classTeacher, subjectTeacher, strandTeacher, timetable] = await Promise.all([
       db.classTeacherAssignment.findMany({
         where: {
           schoolId,
@@ -109,6 +127,14 @@ export class TeacherScopeService {
       db.classSubject.findMany({
         where: { teacherId: teacher.id, class: classInScope },
         select: { classId: true },
+      }),
+      db.classSubjectStrandAssignment.findMany({
+        where: {
+          teacherId: teacher.id,
+          classSubject: { class: classInScope },
+          subjectStrand: { isActive: true, subject: { isActive: true, deletedAt: null } },
+        },
+        select: { classSubject: { select: { classId: true } } },
       }),
       currentYear
         ? db.timetableEntry.findMany({
@@ -125,7 +151,7 @@ export class TeacherScopeService {
 
     return [
       ...new Set(
-        [...classTeacher, ...subjectTeacher, ...timetable]
+        [...classTeacher, ...subjectTeacher, ...strandTeacher.map((row) => row.classSubject), ...timetable]
           .map((row) => row.classId)
           .filter((id): id is string => Boolean(id)),
       ),

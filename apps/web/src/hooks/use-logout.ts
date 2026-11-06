@@ -1,10 +1,13 @@
+import { clearPrivateSessionPreferences } from "@/lib/private-session";
 import { useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
+import { useQueryClient } from "@tanstack/react-query";
 import { signOut } from "@/lib/auth-client";
 
 const LOGOUT_NOTICE_KEY = "schoolhub-logout-notice";
 
 export function useLogout() {
+  const queryClient=useQueryClient();
   const navigate = useNavigate();
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -23,6 +26,11 @@ export function useLogout() {
         return;
       }
 
+      // Cancel in-flight reads before removing private data from the shared cache.
+      await queryClient.cancelQueries();
+      queryClient.clear();
+      clearPrivateSessionPreferences();
+      window.dispatchEvent(new Event("schoolhub-role-change"));
       window.sessionStorage.setItem(
         LOGOUT_NOTICE_KEY,
         "You have been logged out successfully.",

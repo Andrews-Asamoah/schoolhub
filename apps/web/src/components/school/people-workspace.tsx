@@ -1,5 +1,4 @@
 import { PersonPhotoPicker, uploadPersonPhoto } from "./person-photo-picker";
-import { DatePicker } from "@/components/ui/date-picker";
 import { useForm } from "@tanstack/react-form";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -45,7 +44,10 @@ import { TeacherBiodataDialog } from "@/components/school/teacher-biodata-dialog
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { apiFetch } from "@/lib/api";
+import { loadDirectoryPages } from "@/lib/directory-pages";
 import { StaffBulkImport } from "@/components/school/staff-bulk-import";
+import { BulkImportButton } from "@/components/bulk-import/bulk-import-button";
+import { LabeledTextField, labeledInputClasses } from "@/components/forms/labeled-controls";
 
 type PeopleKind = "teachers" | "staff" | "guardians";
 type Values = {
@@ -183,8 +185,6 @@ interface Row {
   hasLogin?: boolean;
 }
 
-const inputClasses =
-  "mt-1.5 h-10 w-full rounded-lg border border-border bg-background px-3 text-sm text-foreground outline-none placeholder:text-muted-foreground focus:border-ring focus:ring-2 focus:ring-ring/20";
 const staffTypes = [
   "ACCOUNTANT",
   "HEADTEACHER",
@@ -249,9 +249,7 @@ function initialValues(): Values {
 export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
   const queryClient = useQueryClient();
   const { activeRole } = useSchoolRole();
-  const [search, setSearch] = useState("");
   const [activeFilter, setActiveFilter] = useState("");
-  const [page, setPage] = useState(1);
   const [photo, setPhoto] = useState<File | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [showBulkImport, setShowBulkImport] = useState(false);
@@ -260,7 +258,6 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
   const [confirmingLogin, setConfirmingLogin] = useState<{ id: string; name: string; hasLogin: boolean } | null>(null);
   const [issued, setIssued] = useState<CredentialEntry[]>([]);
   const [notice, setNotice] = useState<string | null>(null);
-  const deferredSearch = useDeferredValue(search.trim());
   const isGuardianPage = kind === "guardians";
   const canManage =
     ["owner", "admin", "headteacher"].includes(activeRole ?? "") ||
@@ -282,48 +279,15 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
     queryKey: [
       "people",
       kind,
-      isGuardianPage ? { activeFilter } : { page, search: deferredSearch, activeFilter },
+      { activeFilter },
     ],
-    queryFn: async () => {
-      const params = new URLSearchParams({
-        page: isGuardianPage ? "1" : String(page),
-        limit: isGuardianPage ? "100" : "20",
-      });
-      if (!isGuardianPage && deferredSearch) params.set("search", deferredSearch);
+    queryFn: ({ signal }) => loadDirectoryPages<Teacher | Staff | Guardian>((page) => {
+      const params = new URLSearchParams({ page: String(page), limit: "100" });
       if (activeFilter) params.set("active", activeFilter);
-
-      if (!isGuardianPage) {
-        return apiFetch<DirectoryPage<Teacher | Staff | Guardian>>(
-          `/people/${kind}?${params.toString()}`,
-        );
-      }
-
-      // The API caps page size at 100. Fetch every guardian page so the
-      // directory table can search and paginate across the complete record set.
-      const firstPage = await apiFetch<DirectoryPage<Guardian>>(
-        `/people/guardians?${params.toString()}`,
+      return apiFetch<DirectoryPage<Teacher | Staff | Guardian>>(
+        `/people/${kind}?${params.toString()}`, { signal },
       );
-      const remainingPages = await Promise.all(
-        Array.from(
-          { length: Math.max(0, firstPage.meta.totalPages - 1) },
-          (_, index) => {
-            const pageParams = new URLSearchParams(params);
-            pageParams.set("page", String(index + 2));
-            return apiFetch<DirectoryPage<Guardian>>(
-              `/people/guardians?${pageParams.toString()}`,
-            );
-          },
-        ),
-      );
-      const allGuardians = [
-        ...firstPage.data,
-        ...remainingPages.flatMap((result) => result.data),
-      ];
-      return {
-        data: allGuardians,
-        meta: { ...firstPage.meta, page: 1, limit: allGuardians.length, totalPages: 1 },
-      } satisfies DirectoryPage<Teacher | Staff | Guardian>;
-    },
+    }, signal),
     retry: false,
   });
   const departmentsQuery = useQuery({
@@ -679,9 +643,7 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
           {canManage && (
             <div className="flex flex-wrap gap-2">
               {(kind === "teachers" || kind === "staff") && (
-                <button type="button" onClick={() => setShowBulkImport(true)} className="inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-card px-4 text-xs font-semibold text-foreground hover:bg-muted">
-                  <UsersRound className="size-4" /> Bulk upload
-                </button>
+                <BulkImportButton onClick={() => setShowBulkImport(true)} />
               )}
               <button
                 type="button"
@@ -739,7 +701,7 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               <form.Field name="firstName">
                 {(field) => (
-                  <TextField
+                  <LabeledTextField
                     label="First name"
                     required
                     value={field.state.value}
@@ -749,7 +711,7 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
               </form.Field>
               <form.Field name="lastName">
                 {(field) => (
-                  <TextField
+                  <LabeledTextField
                     label="Last name"
                     required
                     value={field.state.value}
@@ -760,7 +722,7 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
               {isGuardianPage && (
                 <form.Field name="otherNames">
                   {(field) => (
-                    <TextField
+                    <LabeledTextField
                       label="Other names"
                       value={field.state.value}
                       onChange={(value) => field.handleChange(value)}
@@ -772,8 +734,8 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
                 <>
                   <form.Field name="staffNumber">
                     {(field) => (
-                      <TextField
-                        label="Staff number (optional)"
+                      <LabeledTextField
+                        label="Staff number (leave blank to auto-generate)"
                         value={field.state.value}
                         onChange={(value) => field.handleChange(value)}
                       />
@@ -781,7 +743,7 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
                   </form.Field>
                   <form.Field name="email">
                     {(field) => (
-                      <TextField
+                      <LabeledTextField
                         label="Sign-in email"
                         required
                         type="email"
@@ -792,7 +754,7 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
                   </form.Field>
                   <form.Field name="qualification">
                     {(field) => (
-                      <TextField
+                      <LabeledTextField
                         label="Qualification"
                         value={field.state.value}
                         onChange={(value) => field.handleChange(value)}
@@ -801,7 +763,7 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
                   </form.Field>
                   <form.Field name="specialization">
                     {(field) => (
-                      <TextField
+                      <LabeledTextField
                         label="Specialization"
                         value={field.state.value}
                         onChange={(value) => field.handleChange(value)}
@@ -810,7 +772,7 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
                   </form.Field>
                   <form.Field name="experience">
                     {(field) => (
-                      <TextField
+                      <LabeledTextField
                         label="Years of experience"
                         type="number"
                         value={field.state.value}
@@ -835,39 +797,13 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
                       </SelectField>
                     )}
                   </form.Field>
-                  <form.Field name="employmentType">
-                    {(field) => (
-                      <SelectField
-                        label="Employment type"
-                        value={field.state.value}
-                        onChange={(value) => field.handleChange(value)}
-                      >
-                        {employmentTypes.map((value) => (
-                          <option key={value} value={value}>
-                            {formatLabel(value)}
-                          </option>
-                        ))}
-                      </SelectField>
-                    )}
-                  </form.Field>
-                  <form.Field name="hireDate">
-                    {(field) => (
-                      <TextField
-                        label="Hire date"
-                        type="date"
-                        required
-                        value={field.state.value}
-                        onChange={(value) => field.handleChange(value)}
-                      />
-                    )}
-                  </form.Field>
                 </>
               )}
               {kind === "staff" && (
                 <>
                   <form.Field name="email">
                     {(field) => (
-                      <TextField
+                      <LabeledTextField
                         label="Email"
                         type="email"
                         required
@@ -878,7 +814,7 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
                   </form.Field>
                   <form.Field name="phone">
                     {(field) => (
-                      <TextField
+                      <LabeledTextField
                         label="Phone"
                         type="tel"
                         required
@@ -903,7 +839,7 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
                   </form.Field>
                   <form.Field name="dateOfBirth">
                     {(field) => (
-                      <TextField
+                      <LabeledTextField
                         label="Date of birth"
                         type="date"
                         required
@@ -930,7 +866,7 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
                   </form.Field>
                   <form.Field name="jobTitle">
                     {(field) => (
-                      <TextField
+                      <LabeledTextField
                         label="Job title"
                         value={field.state.value}
                         onChange={(value) => field.handleChange(value)}
@@ -953,6 +889,10 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
                       </SelectField>
                     )}
                   </form.Field>
+                </>
+              )}
+              {(kind === "teachers" || kind === "staff") && (
+                <>
                   <form.Field name="employmentType">
                     {(field) => (
                       <SelectField
@@ -970,7 +910,7 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
                   </form.Field>
                   <form.Field name="hireDate">
                     {(field) => (
-                      <TextField
+                      <LabeledTextField
                         label="Hire date"
                         type="date"
                         required
@@ -985,7 +925,7 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
                 <>
                   <form.Field name="phone">
                     {(field) => (
-                      <TextField
+                      <LabeledTextField
                         label="Phone"
                         type="tel"
                         required
@@ -996,7 +936,7 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
                   </form.Field>
                   <form.Field name="alternatePhone">
                     {(field) => (
-                      <TextField
+                      <LabeledTextField
                         label="Alternate phone"
                         type="tel"
                         value={field.state.value}
@@ -1006,7 +946,7 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
                   </form.Field>
                   <form.Field name="email">
                     {(field) => (
-                      <TextField
+                      <LabeledTextField
                         label="Email"
                         type="email"
                         value={field.state.value}
@@ -1052,7 +992,7 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
                   </form.Field>
                   <form.Field name="occupation">
                     {(field) => (
-                      <TextField
+                      <LabeledTextField
                         label="Occupation"
                         value={field.state.value}
                         onChange={(value) => field.handleChange(value)}
@@ -1061,7 +1001,7 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
                   </form.Field>
                   <form.Field name="employer">
                     {(field) => (
-                      <TextField
+                      <LabeledTextField
                         label="Employer"
                         value={field.state.value}
                         onChange={(value) => field.handleChange(value)}
@@ -1137,35 +1077,20 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
           icon={UsersRound}
         />
         <WorkspaceStat
-          label={isGuardianPage ? "Active guardians" : "Active on this page"}
+          label={isGuardianPage ? "Active guardians" : "Active records"}
           value={String(activeCount)}
-          detail={isGuardianPage ? "active records" : title.toLowerCase()}
+          detail="in the filtered directory"
           icon={CheckCircle2}
         />
         <WorkspaceStat
-          label={isGuardianPage ? "Portal access" : "Page"}
-          value={isGuardianPage ? String(rows.filter((row) => row.hasLogin).length) : String(directoryQuery.data?.meta.page ?? 1) + " / " + String(directoryQuery.data?.meta.totalPages || 1)}
-          detail={isGuardianPage ? "guardians with a login" : "directory pagination"}
-          icon={isGuardianPage ? ShieldCheck : undefined}
+          label="Portal access"
+          value={String(rows.filter((row) => row.hasLogin).length)}
+          detail={`${title.toLowerCase()} with a login`}
+          icon={ShieldCheck}
         />
       </div>
 
-      <section className={`rounded-2xl border border-border bg-card/80 p-4 shadow-sm backdrop-blur-sm ${isGuardianPage ? "flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between" : "grid gap-3 md:grid-cols-[minmax(220px,1fr)_180px]"}`}>
-        {!isGuardianPage && (
-          <label className="relative">
-            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-            <input
-              value={search}
-              onChange={(event) => {
-                setSearch(event.target.value);
-                setPage(1);
-              }}
-              placeholder={`Search ${title.toLowerCase()} by name, ID or contact`}
-              aria-label={`Search ${title.toLowerCase()}`}
-              className={`${inputClasses} mt-0 pl-9`}
-            />
-          </label>
-        )}
+      <section className={`rounded-2xl border border-border bg-card/80 p-4 shadow-sm backdrop-blur-sm ${isGuardianPage ? "flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between" : "flex flex-wrap items-center justify-end gap-3"}`}>
         {isGuardianPage && (
           <div className="flex items-center gap-2.5">
             <span className="flex size-9 items-center justify-center rounded-lg bg-muted text-muted-foreground">
@@ -1177,13 +1102,12 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
             </div>
           </div>
         )}
-        <label className={isGuardianPage ? "w-full sm:w-52" : ""}>
+        <label className="w-full sm:w-52">
           <span className="sr-only">Filter by status</span>
           <Select value={activeFilter || "__all__"} onValueChange={(value) => {
             setActiveFilter(value === "__all__" ? "" : value);
-            setPage(1);
           }}>
-            <SelectTrigger aria-label="Filter by status" className={`${inputClasses} mt-0 ${isGuardianPage ? "sm:h-11 sm:px-3" : ""}`}><SelectValue placeholder="All statuses" /></SelectTrigger>
+            <SelectTrigger aria-label="Filter by status" className={`${labeledInputClasses} mt-0 ${isGuardianPage ? "sm:h-11 sm:px-3" : ""}`}><SelectValue placeholder="All statuses" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="__all__">All statuses</SelectItem>
               <SelectItem value="true">Active</SelectItem>
@@ -1213,32 +1137,6 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
         emptyTitle={`No ${title.toLowerCase()} match these filters`}
         emptyDescription={`Clear a filter or add a ${resourceName} to build the directory.`}
       />
-      {!isGuardianPage && (directoryQuery.data?.meta.totalPages ?? 0) > 1 && (
-        <div className="flex items-center justify-between rounded-xl border border-border bg-card px-4 py-3">
-          <p className="text-xs text-muted-foreground">
-            Page {directoryQuery.data?.meta.page} of{" "}
-            {directoryQuery.data?.meta.totalPages} · {total} records
-          </p>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              disabled={page <= 1}
-              onClick={() => setPage((value) => Math.max(1, value - 1))}
-              className="rounded-md border border-border px-3 py-1.5 text-xs font-medium text-foreground disabled:opacity-40"
-            >
-              Previous
-            </button>
-            <button
-              type="button"
-              disabled={page >= (directoryQuery.data?.meta.totalPages ?? 1)}
-              onClick={() => setPage((value) => value + 1)}
-              className="rounded-md border border-border px-3 py-1.5 text-xs font-medium text-foreground disabled:opacity-40"
-            >
-              Next
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
@@ -1385,6 +1283,7 @@ function toRow(person: Teacher | Staff | Guardian): Row {
       department: teacher.department.name,
       relatedStudents: "",
       isActive: teacher.isActive,
+      hasLogin: Boolean(teacher.profile?.user),
     };
   }
   if ("staffId" in person) {
@@ -1400,6 +1299,7 @@ function toRow(person: Teacher | Staff | Guardian): Row {
       department: staff.department?.name ?? "",
       relatedStudents: "",
       isActive: staff.isActive,
+      hasLogin: Boolean(staff.profile.user),
     };
   }
   const guardian = person;
@@ -1421,40 +1321,6 @@ function toRow(person: Teacher | Staff | Guardian): Row {
     isActive: guardian.isActive,
     hasLogin: guardian.canLogin ?? Boolean(guardian.profile?.user.email),
   };
-}
-
-function TextField({
-  label,
-  type = "text",
-  required = false,
-  value,
-  onChange,
-}: {
-  label: string;
-  type?: string;
-  required?: boolean;
-  value: string;
-  onChange: (value: string) => void;
-}) {
-  return (
-    <label className="text-xs font-semibold text-foreground">
-      {label}
-      {required ? " *" : ""}
-      {type === "date" ? (
-        <DatePicker value={value} onChange={onChange} required={required}
-          ariaLabel={label} buttonClassName={inputClasses} />
-      ) : (
-        <input
-          type={type}
-          value={value}
-          required={required}
-          min={type === "number" ? 0 : undefined}
-          onChange={(event) => onChange(event.target.value)}
-          className={inputClasses}
-        />
-      )}
-    </label>
-  );
 }
 
 function SelectField({
@@ -1492,7 +1358,7 @@ function SelectField({
       {label}
       {required ? " *" : ""}
       <Select value={value || "__none__"} onValueChange={(nextValue) => onChange(nextValue === "__none__" ? "" : nextValue)} required={required}>
-        <SelectTrigger aria-label={label} className={inputClasses}><SelectValue placeholder={label} /></SelectTrigger>
+        <SelectTrigger aria-label={label} className={labeledInputClasses}><SelectValue placeholder={label} /></SelectTrigger>
         <SelectContent>
           {options.map((option) => (
             <SelectItem key={option.key} value={option.value} disabled={option.disabled}>{option.label}</SelectItem>
@@ -1570,12 +1436,12 @@ function StudentSearchPicker({
             onChange={(event) => setSearch(event.target.value)}
             placeholder="Type at least 2 characters"
             aria-label="Search students by name or admission number"
-            className={`${inputClasses} mt-0 pl-9`}
+            className={`${labeledInputClasses} mt-0 pl-9`}
           />
         </span>
         <span className="relative">
           <Select value={classId || "__all__"} onValueChange={(value) => setClassId(value === "__all__" ? "" : value)}>
-            <SelectTrigger aria-label="Filter students by class" className={`${inputClasses} mt-0`}><SelectValue placeholder="All current classes" /></SelectTrigger>
+            <SelectTrigger aria-label="Filter students by class" className={`${labeledInputClasses} mt-0`}><SelectValue placeholder="All current classes" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="__all__">All current classes</SelectItem>
               {classes.filter((schoolClass) => schoolClass.isActive).map((schoolClass) => (

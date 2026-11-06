@@ -342,6 +342,7 @@ function LoginPage() {
                 >
                   Password
                 </label>
+                <a href={"/forgot-password" + (subdomain ? "?school=" + encodeURIComponent(subdomain) : "")} className="text-xs font-semibold text-primary">Forgot password?</a>
               </div>
               <div className="group relative">
                 <LockKeyhole className="pointer-events-none absolute left-3.5 top-1/2 size-4.25 -translate-y-1/2 text-muted-foreground/70 transition group-focus-within:text-primary" />

@@ -31,14 +31,12 @@ interface School {
 interface SchoolWorkspaceLayoutProps {
   activePage: string;
   title: string;
-  section: string;
   children: ReactNode;
 }
 
 export function SchoolWorkspaceLayout({
   activePage,
   title,
-  section,
   children,
 }: SchoolWorkspaceLayoutProps) {
   const { data: session, isPending: sessionLoading } = useSession();

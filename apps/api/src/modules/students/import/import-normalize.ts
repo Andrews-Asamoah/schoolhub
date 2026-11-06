@@ -294,7 +294,6 @@ export function normalizeRecord(
     otherNames: otherNames || undefined,
     gender: gender ?? undefined,
     dateOfBirth,
-    admissionNumber: optional("admissionNumber"),
     admissionDate,
     className: optional("className"),
     houseName: optional("houseName"),

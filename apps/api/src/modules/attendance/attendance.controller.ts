@@ -129,6 +129,7 @@ export class AttendanceController {
     @CurrentSchool() school: School,
     @CurrentUser() user: AuthenticatedUser,
     @CurrentSchoolRole() role: string | undefined,
+    @Headers("idempotency-key") idempotencyKey: string | undefined,
     @Body(new ZodValidationPipe(batchAttendanceSchema))
     body: BatchAttendanceInput,
   ) {
@@ -137,6 +138,7 @@ export class AttendanceController {
       user.id,
       body,
       role,
+      idempotencyKey,
     );
   }
 

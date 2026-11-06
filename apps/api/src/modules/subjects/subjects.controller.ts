@@ -15,9 +15,11 @@ import {
   saveSubjectSchema,
   setSubjectClassesSchema,
   setSubjectTeachersSchema,
+  setSubjectStrandsSchema,
   type SaveSubjectInput,
   type SetSubjectClassesInput,
   type SetSubjectTeachersInput,
+  type SetSubjectStrandsInput,
 } from "@schoolhub/shared";
 import { CurrentSchool } from "../../common/decorators/current-school.decorator.js";
 import { Roles } from "../../common/decorators/roles.decorator.js";
@@ -70,6 +72,16 @@ export class SubjectsController {
     @Body(new ZodValidationPipe(setSubjectClassesSchema)) body: SetSubjectClassesInput,
   ) {
     return this.subjects.setClasses(school.id, id, body);
+  }
+
+  @Put(":id/strands")
+  @Roles("owner", "admin")
+  setStrands(
+    @CurrentSchool() school: School,
+    @Param("id") id: string,
+    @Body(new ZodValidationPipe(setSubjectStrandsSchema)) body: SetSubjectStrandsInput,
+  ) {
+    return this.subjects.setStrands(school.id, id, body);
   }
 
   @Put(":id/teachers")

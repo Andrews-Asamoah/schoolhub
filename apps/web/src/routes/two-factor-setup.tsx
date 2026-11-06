@@ -1,9 +1,10 @@
+import { useLogout } from "@/hooks/use-logout";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { LogOut, ShieldCheck } from "lucide-react";
 import { useEffect } from "react";
 import { TwoFactorPanel } from "@/components/auth/two-factor-panel";
 import { ThemeToggle } from "@/components/school/theme-toggle";
-import { signOut, useSession } from "@/lib/auth-client";
+import { useSession } from "@/lib/auth-client";
 
 interface Search {
   audience?: "super-admin" | "school-admin";
@@ -17,6 +18,7 @@ export const Route = createFileRoute("/two-factor-setup")({
 });
 
 function TwoFactorSetupPage() {
+  const { logout, error: logoutError, isSigningOut } = useLogout();
   const { audience } = Route.useSearch();
   const { data: session, isPending } = useSession();
   const navigate = useNavigate();
@@ -56,11 +58,12 @@ function TwoFactorSetupPage() {
             <TwoFactorPanel required onEnabled={proceed} />
           )}
 
-          <button type="button" onClick={() => void signOut().then(() => window.location.assign("/login"))} className="mt-8 inline-flex items-center gap-2 text-sm font-semibold text-muted-foreground hover:text-foreground">
+          <button type="button" disabled={isSigningOut} onClick={() => void logout()} className="mt-8 inline-flex items-center gap-2 text-sm font-semibold text-muted-foreground hover:text-foreground">
             <LogOut className="size-4" /> Sign out
           </button>
         </div>
       </div>
+      {logoutError && <p role="alert" className="p-4 text-sm text-destructive">{logoutError}</p>}
     </main>
   );
 }

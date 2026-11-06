@@ -120,6 +120,11 @@ export class StudentImportService {
         notices.push(`${load.name} holds ${load.capacity} pupils and already has ${load.taken}. This file adds ${added}, so some will be refused. Raise the class capacity first if that's wrong.`);
       }
     }
+    if (mapping.ignored.some((header) => /^admission(no|num|number|id)?$|^admno$/.test(header.toLowerCase().replace(/[^a-z0-9]/g, "")))) {
+      notices.push("The admission number column in this file is ignored. New numbers are generated from each student's admission date.");
+    }
+    const undated = importable.filter((row) => !row.row?.admissionDate).length;
+    if (undated) notices.push(`${undated} student${undated === 1 ? " has" : "s have"} no admission date, so this year is used in the admission number${undated === 1 ? "" : "s"}.`);
     if (mapping.duplicated.length) notices.push(`These headings appear more than once and only the first was used: ${mapping.duplicated.join(", ")}.`);
 
     return {
@@ -155,7 +160,6 @@ export class StudentImportService {
       try {
         const created = await this.students.createStudent(school, actorId, this.toCreateInput(row, verdict, input.createGuardianLogins), {
           role,
-          admissionNumber: row.admissionNumber,
           admissionDate: row.admissionDate,
         });
         remember(ctx, row);
@@ -251,15 +255,13 @@ export class StudentImportService {
       }),
       db.student.findMany({
         where: { schoolId, deletedAt: null },
-        select: { admissionNumber: true, profile: { select: { firstName: true, lastName: true, dateOfBirth: true } } },
+        select: { profile: { select: { firstName: true, lastName: true, dateOfBirth: true } } },
       }),
     ]);
     const term = year?.terms[0];
 
-    const admissionNumbers = new Set<string>();
     const studentKeys = new Set<string>();
     for (const student of existing) {
-      if (student.admissionNumber) admissionNumbers.add(student.admissionNumber.trim().toLowerCase());
       const dob = student.profile.dateOfBirth;
       if (dob) studentKeys.add(studentKey(student.profile.firstName, student.profile.lastName, dob.toISOString().slice(0, 10)));
     }
@@ -278,7 +280,6 @@ export class StudentImportService {
       classes: classes.map(({ id, name }) => ({ id, name })),
       houses,
       hasCurrentTerm: !!term,
-      admissionNumbers,
       studentKeys,
       classLoad: new Map(classes.map((item) => [item.id, { name: item.name, capacity: item.capacity, taken: taken.get(item.id) ?? 0 }])),
     };

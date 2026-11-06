@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import type {
   AnnouncementCategory,
   AnnouncementStatus,
@@ -81,4 +82,50 @@ export function announcementCategoryLabel(category: AnnouncementCategory) {
 export function announcementQueryRoleKey() {
   if (typeof window === "undefined") return "server";
   return window.localStorage.getItem("schoolhub-active-role") ?? "default";
+}
+
+export type CategoryFilter = "ALL" | AnnouncementCategory;
+
+/** The real categories, in display order. "All" is added by the view that shows it. */
+export const ANNOUNCEMENT_CATEGORIES: { value: AnnouncementCategory; label: string }[] = [
+  { value: "ACADEMIC", label: "Academic" },
+  { value: "EVENT", label: "Events" },
+  { value: "HOUSE", label: "House" },
+  { value: "GENERAL", label: "General" },
+];
+
+export function announcementErrorText(error: unknown) {
+  return error instanceof Error ? error.message : "The request failed. Please try again.";
+}
+
+/** Keeps announcements in the chosen category that match the search in title, content or author. */
+export function filterAnnouncements(items: AnnouncementItem[], filter: CategoryFilter, search: string) {
+  const needle = search.trim().toLowerCase();
+  return items.filter((item) => {
+    if (filter !== "ALL" && item.category !== filter) return false;
+    return (
+      !needle ||
+      item.title.toLowerCase().includes(needle) ||
+      item.content.toLowerCase().includes(needle) ||
+      item.author.name.toLowerCase().includes(needle)
+    );
+  });
+}
+
+/**
+ * A notification link carries ?announcementId=…; open that announcement once the
+ * list has loaded, then drop the parameter so a refresh does not reopen it.
+ */
+export function useAnnouncementDeepLink(announcements: AnnouncementItem[], onFound: (item: AnnouncementItem) => void) {
+  useEffect(() => {
+    const id = new URLSearchParams(window.location.search).get("announcementId");
+    const match = id ? announcements.find((item) => item.id === id) : undefined;
+    if (!match) return;
+    onFound(match);
+    const url = new URL(window.location.href);
+    url.searchParams.delete("announcementId");
+    window.history.replaceState(window.history.state, "", url.pathname + url.search + url.hash);
+    // Runs when the list changes, as before; the callbacks passed in are stable state setters.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [announcements]);
 }

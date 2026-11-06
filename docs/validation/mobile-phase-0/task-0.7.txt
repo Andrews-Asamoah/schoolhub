@@ -1,0 +1,189 @@
+
+$ pnpm install --frozen-lockfile
+(cwd: .)
+Scope: all 6 workspace projects
+Already up to date
+Done in 415ms using pnpm v11.25.0
+
+exit: 0
+
+$ pnpm --filter @schoolhub/shared build
+(cwd: .)
+$ tsdown
+ℹ tsdown v0.23.4 powered by rolldown v1.2.16
+ℹ config file: /workspace/scratch/8ce198452ebc/schoolhub/packages/shared/tsdown.config.ts 
+ℹ entry: src/index.ts
+ℹ tsconfig: tsconfig.json
+ℹ Build start
+ℹ Cleaning 4 files
+
+ WARN  TypeScript 7.0 does not yet have a stable API and is experimental. Some options will be unavailable.
+
+ℹ Emit types with typescript@7.0.2
+ℹ [CJS] dist/index.cjs  61.97 kB │ gzip: 15.34 kB
+ℹ [CJS] 1 files, total: 61.97 kB
+ℹ [CJS] dist/index.d.cts  55.36 kB │ gzip: 9.89 kB
+ℹ [CJS] 1 files, total: 55.36 kB
+✔ Build complete in 544ms
+ℹ [ESM] dist/index.mjs    56.14 kB │ gzip: 14.78 kB
+ℹ [ESM] dist/index.d.mts  55.36 kB │ gzip:  9.89 kB
+ℹ [ESM] 2 files, total: 111.50 kB
+✔ Build complete in 560ms
+
+exit: 0
+
+$ pnpm --filter @schoolhub/mobile typecheck
+(cwd: .)
+$ tsc --noEmit
+
+exit: 0
+
+$ pnpm --filter @schoolhub/mobile lint
+(cwd: .)
+$ expo lint --max-warnings 0
+
+exit: 0
+
+$ pnpm --filter @schoolhub/mobile test:release
+(cwd: .)
+$ node --test scripts/verify-release.test.mjs
+✔ accepts the production entry sources (71.551449ms)
+✔ rejects bundled route dev-gallery.tsx (66.757572ms)
+✔ rejects bundled route dev-tabs/index.tsx (69.84061ms)
+✔ rejects bundled route (tabs)/profile.tsx (67.760778ms)
+✔ rejects bundled route (workspace)/fees.tsx (62.118864ms)
+✔ rejects bundled route (superadmin)/index.tsx (75.553567ms)
+✔ rejects Windows development paths too (62.558282ms)
+✔ fails closed without source maps or app sources (128.752849ms)
+ℹ tests 8
+ℹ suites 0
+ℹ pass 8
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 707.169038
+
+exit: 0
+
+$ npx expo-doctor
+(cwd: apps/mobile)
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
+Running 20 checks on your project...
+20/20 checks passed. No issues detected!
+
+exit: 0
+
+$ npx expo export --platform android --source-maps
+(cwd: apps/mobile)
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
+Expo Autolinking module resolution enabled
+Starting Metro Bundler
+
+| (node:529) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:529) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:529) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:529) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:529) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:529) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+Android Bundled 31974ms node_modules/.pnpm/expo-router@58.0.29_691a03b90785e5d0405ee7454ee17d80/node_modules/expo-router/entry.js (4057 modules)
+
+› Assets (30):
+../../node_modules/.pnpm/@expo-google-fonts+inter@0.4.2/node_modules/@expo-google-fonts/inter/400Regular/Inter_400Regular.ttf (342KB)
+../../node_modules/.pnpm/@expo-google-fonts+inter@0.4.2/node_modules/@expo-google-fonts/inter/500Medium/Inter_500Medium.ttf (343KB)
+../../node_modules/.pnpm/@expo-google-fonts+inter@0.4.2/node_modules/@expo-google-fonts/inter/600SemiBold/Inter_600SemiBold.ttf (344KB)
+../../node_modules/.pnpm/@expo-google-fonts+inter@0.4.2/node_modules/@expo-google-fonts/inter/700Bold/Inter_700Bold.ttf (344KB)
+../../node_modules/.pnpm/expo-router@58.0.29_691a03b90785e5d0405ee7454ee17d80/node_modules/expo-router/assets/arrow_down.png (9.5KB)
+../../node_modules/.pnpm/expo-router@58.0.29_691a03b90785e5d0405ee7454ee17d80/node_modules/expo-router/assets/arrow_right.xml (307B)
+../../node_modules/.pnpm/expo-router@58.0.29_691a03b90785e5d0405ee7454ee17d80/node_modules/expo-router/assets/checkmark.xml (312B)
+../../node_modules/.pnpm/expo-router@58.0.29_691a03b90785e5d0405ee7454ee17d80/node_modules/expo-router/assets/error.png (469B)
+../../node_modules/.pnpm/expo-router@58.0.29_691a03b90785e5d0405ee7454ee17d80/node_modules/expo-router/assets/file.png (138B)
+../../node_modules/.pnpm/expo-router@58.0.29_691a03b90785e5d0405ee7454ee17d80/node_modules/expo-router/assets/forward.png (188B)
+../../node_modules/.pnpm/expo-router@58.0.29_691a03b90785e5d0405ee7454ee17d80/node_modules/expo-router/assets/pkg.png (364B)
+../../node_modules/.pnpm/expo-router@58.0.29_691a03b90785e5d0405ee7454ee17d80/node_modules/expo-router/assets/react-navigation/elements/back-icon-mask.png (653B)
+../../node_modules/.pnpm/expo-router@58.0.29_691a03b90785e5d0405ee7454ee17d80/node_modules/expo-router/assets/react-navigation/elements/back-icon.png (4 variations | 152B)
+../../node_modules/.pnpm/expo-router@58.0.29_691a03b90785e5d0405ee7454ee17d80/node_modules/expo-router/assets/react-navigation/elements/clear-icon.png (4 variations | 425B)
+../../node_modules/.pnpm/expo-router@58.0.29_691a03b90785e5d0405ee7454ee17d80/node_modules/expo-router/assets/react-navigation/elements/close-icon.png (4 variations | 235B)
+../../node_modules/.pnpm/expo-router@58.0.29_691a03b90785e5d0405ee7454ee17d80/node_modules/expo-router/assets/react-navigation/elements/search-icon.png (4 variations | 599B)
+../../node_modules/.pnpm/expo-router@58.0.29_691a03b90785e5d0405ee7454ee17d80/node_modules/expo-router/assets/sitemap.png (465B)
+../../node_modules/.pnpm/expo-router@58.0.29_691a03b90785e5d0405ee7454ee17d80/node_modules/expo-router/assets/unmatched.png (4.8KB)
+
+› android bundles (2):
+_expo/static/js/android/entry-93f03f173e71cb0c6fe53fead40c455b.hbc (5.4MB)
+_expo/static/js/android/entry-93f03f173e71cb0c6fe53fead40c455b.hbc.map (13MB)
+
+› Files (1):
+metadata.json (2KB)
+
+Exported: dist
+
+exit: 0
+
+$ node scripts/verify-release.mjs dist
+(cwd: apps/mobile)
+entry-93f03f173e71cb0c6fe53fead40c455b.hbc: 5403356 bytes (Hermes)
+PASS: 1 source map(s), 3 app sources; no development, mock or Super Admin routes.
+
+exit: 0
+
+$ npx expo export --platform ios --source-maps
+(cwd: apps/mobile)
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
+Expo Autolinking module resolution enabled
+Starting Metro Bundler
+
+| (node:580) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:580) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:580) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:580) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:580) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:580) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+iOS Bundled 34682ms node_modules/.pnpm/expo-router@58.0.29_691a03b90785e5d0405ee7454ee17d80/node_modules/expo-router/entry.js (4058 modules)
+
+› Assets (27):
+../../node_modules/.pnpm/@expo-google-fonts+inter@0.4.2/node_modules/@expo-google-fonts/inter/400Regular/Inter_400Regular.ttf (342KB)
+../../node_modules/.pnpm/@expo-google-fonts+inter@0.4.2/node_modules/@expo-google-fonts/inter/500Medium/Inter_500Medium.ttf (343KB)
+../../node_modules/.pnpm/@expo-google-fonts+inter@0.4.2/node_modules/@expo-google-fonts/inter/600SemiBold/Inter_600SemiBold.ttf (344KB)
+../../node_modules/.pnpm/@expo-google-fonts+inter@0.4.2/node_modules/@expo-google-fonts/inter/700Bold/Inter_700Bold.ttf (344KB)
+../../node_modules/.pnpm/expo-router@58.0.29_691a03b90785e5d0405ee7454ee17d80/node_modules/expo-router/assets/arrow_down.png (9.5KB)
+../../node_modules/.pnpm/expo-router@58.0.29_691a03b90785e5d0405ee7454ee17d80/node_modules/expo-router/assets/error.png (469B)
+../../node_modules/.pnpm/expo-router@58.0.29_691a03b90785e5d0405ee7454ee17d80/node_modules/expo-router/assets/file.png (138B)
+../../node_modules/.pnpm/expo-router@58.0.29_691a03b90785e5d0405ee7454ee17d80/node_modules/expo-router/assets/forward.png (188B)
+../../node_modules/.pnpm/expo-router@58.0.29_691a03b90785e5d0405ee7454ee17d80/node_modules/expo-router/assets/pkg.png (364B)
+../../node_modules/.pnpm/expo-router@58.0.29_691a03b90785e5d0405ee7454ee17d80/node_modules/expo-router/assets/react-navigation/elements/back-icon-mask.png (653B)
+../../node_modules/.pnpm/expo-router@58.0.29_691a03b90785e5d0405ee7454ee17d80/node_modules/expo-router/assets/react-navigation/elements/back-icon.png (4 variations | 566B)
+../../node_modules/.pnpm/expo-router@58.0.29_691a03b90785e5d0405ee7454ee17d80/node_modules/expo-router/assets/react-navigation/elements/clear-icon.png (4 variations | 425B)
+../../node_modules/.pnpm/expo-router@58.0.29_691a03b90785e5d0405ee7454ee17d80/node_modules/expo-router/assets/react-navigation/elements/close-icon.png (4 variations | 235B)
+../../node_modules/.pnpm/expo-router@58.0.29_691a03b90785e5d0405ee7454ee17d80/node_modules/expo-router/assets/react-navigation/elements/search-icon.png (3 variations | 582B)
+../../node_modules/.pnpm/expo-router@58.0.29_691a03b90785e5d0405ee7454ee17d80/node_modules/expo-router/assets/sitemap.png (465B)
+../../node_modules/.pnpm/expo-router@58.0.29_691a03b90785e5d0405ee7454ee17d80/node_modules/expo-router/assets/unmatched.png (4.8KB)
+
+› ios bundles (2):
+_expo/static/js/ios/entry-a5021e7553bcf5d3c2ba4b5ea7a9a5b6.hbc (5.4MB)
+_expo/static/js/ios/entry-a5021e7553bcf5d3c2ba4b5ea7a9a5b6.hbc.map (13MB)
+
+› Files (1):
+metadata.json (1.8KB)
+
+Exported: dist
+
+exit: 0
+
+$ node scripts/verify-release.mjs dist
+(cwd: apps/mobile)
+entry-a5021e7553bcf5d3c2ba4b5ea7a9a5b6.hbc: 5410352 bytes (Hermes)
+PASS: 1 source map(s), 3 app sources; no development, mock or Super Admin routes.
+
+exit: 0

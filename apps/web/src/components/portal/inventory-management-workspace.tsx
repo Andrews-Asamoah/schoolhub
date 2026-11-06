@@ -7,6 +7,8 @@ import { apiFetch } from "@/lib/api";
 import { PortalModal } from "@/components/portal/portal-modal";
 import { cn } from "@/lib/utils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useFinanceAccess } from "@/components/portal/finance-access";
+import { LabeledField } from "@/components/forms/labeled-controls";
 
 interface InventoryItem {
   id: string;
@@ -18,6 +20,11 @@ interface InventoryItem {
   minQuantity: number;
   updatedAt: string;
   transactions?: InventoryMovement[];
+}
+interface InventoryCategory {
+  id: string;
+  name: string;
+  description?: string | null;
 }
 interface InventoryMovement {
   id: string;
@@ -74,6 +81,7 @@ const displayType = (type: string) => type === "IN" ? "Stock in" : type === "OUT
 
 export function InventoryManagementWorkspace() {
   const queryClient = useQueryClient();
+  const { canWrite: canManageCategories } = useFinanceAccess();
   const [search, setSearch] = useState("");
   const [lowStockOnly, setLowStockOnly] = useState(false);
   const [categoryFilter, setCategoryFilter] = useState("ALL");
@@ -82,6 +90,8 @@ export function InventoryManagementWorkspace() {
   const [movementItemId, setMovementItemId] = useState("ALL");
   const [movementType, setMovementType] = useState("ALL");
   const [createOpen, setCreateOpen] = useState(false);
+  const [categoriesOpen, setCategoriesOpen] = useState(false);
+  const [categoryDraft, setCategoryDraft] = useState("");
   const [editTarget, setEditTarget] = useState<InventoryItem | null>(null);
   const [editDraft, setEditDraft] = useState<EditItemDraft | null>(null);
   const [movementOpen, setMovementOpen] = useState(false);
@@ -95,7 +105,13 @@ export function InventoryManagementWorkspace() {
     queryFn:()=>apiFetch<InventoryItem[]>("/inventory/items"),
     retry:false,
   });
+  const categoriesQuery = useQuery({
+    queryKey: ["inventory", "categories"],
+    queryFn: () => apiFetch<InventoryCategory[]>("/inventory/categories"),
+    retry: false,
+  });
   const itemList = itemsQuery.data ?? [];
+  const inventoryCategories = categoriesQuery.data ?? [];
   const transactionQuery = useQuery({
     queryKey:["inventory","transactions",fromDate,toDate,movementItemId,movementType],
     queryFn:()=>{
@@ -111,7 +127,10 @@ export function InventoryManagementWorkspace() {
     retry:false,
   });
   const transactions = transactionQuery.data ?? [];
-  const categoryNames = [...new Set(itemList.map(item => item.category?.trim()).filter((value):value is string=>Boolean(value)))].sort((a,b)=>a.localeCompare(b));
+  const categoryNames = [...new Set([
+    ...inventoryCategories.map(category => category.name),
+    ...itemList.map(item => item.category?.trim()).filter((value):value is string=>Boolean(value)),
+  ])].sort((a,b)=>a.localeCompare(b));
   const lowCount = itemList.filter(item=>item.quantity<=item.minQuantity).length;
   const totalUnits = itemList.reduce((sum,item)=>sum+item.quantity,0);
   const visibleItems = useMemo(()=>itemList.filter(item=>{
@@ -130,6 +149,18 @@ export function InventoryManagementWorkspace() {
       await Promise.all([queryClient.invalidateQueries({queryKey:["inventory","items"]}),queryClient.invalidateQueries({queryKey:["inventory","transactions"]})]);
     },
     onError:(error:Error)=>setFeedback({kind:"error",text:error.message}),
+  });
+  const createCategory = useMutation({
+    mutationFn: (name: string) => apiFetch<InventoryCategory>("/inventory/categories", {
+      method: "POST",
+      body: JSON.stringify({ name: name.trim() }),
+    }),
+    onSuccess: async (category) => {
+      setFeedback({ kind: "success", text: `Inventory category “${category.name}” added.` });
+      setCategoryDraft("");
+      await queryClient.invalidateQueries({ queryKey: ["inventory", "categories"] });
+    },
+    onError: (error: Error) => setFeedback({ kind: "error", text: error.message }),
   });
   const updateItem = useMutation({
     mutationFn: ({ id, input }: { id: string; input: EditItemDraft }) =>
@@ -170,6 +201,15 @@ export function InventoryManagementWorkspace() {
     }
     createItem.mutate(itemDraft);
   }
+  function submitCategory(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const name = categoryDraft.trim();
+    if (name.length < 2 || name.length > 100) {
+      setFeedback({ kind: "error", text: "Category names must contain 2–100 characters." });
+      return;
+    }
+    createCategory.mutate(name);
+  }
   function submitEditItem(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!editTarget || !editDraft) return;
@@ -191,9 +231,10 @@ export function InventoryManagementWorkspace() {
   return <div className="mx-auto w-full min-w-0 max-w-screen-2xl space-y-6">
     <section className="flex flex-col gap-4 rounded-2xl border border-border bg-card p-5 shadow-sm sm:flex-row sm:items-end sm:justify-between sm:p-6">
       <div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">Finance & bursary</p><h1 className="mt-1 text-2xl font-bold tracking-tight text-foreground">Inventory & supplies</h1><p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">Track quantities, flag low stock, and review an auditable history of stock received and issued.</p></div>
-      <div className="flex flex-wrap gap-2"><TableExportMenu build={() => ({ title: "Inventory register", headers: ["Item","Category","Description","Quantity on hand","Unit","Minimum quantity","Stock status","Last updated"], columnTypes: ["text","text","text","number","text","number","text","date"], rows: visibleItems.map(item => [item.name,item.category ?? "",item.description ?? "",item.quantity,item.unit ?? "pcs",item.minQuantity,item.quantity <= item.minQuantity ? "LOW STOCK" : "IN STOCK",dateLabel(item.updatedAt)]), reportInfo: { filters: { search, category: categoryFilter, lowStockOnly } } })} note="Exports reflect the visible stock register." /><button type="button" className={primaryButton} onClick={()=>{setFeedback(null);setItemDraft(itemFresh());setCreateOpen(true);}}><Plus className="size-4"/>Add item</button></div>
+      <div className="flex flex-wrap gap-2"><TableExportMenu build={() => ({ title: "Inventory register", headers: ["Item","Category","Description","Quantity on hand","Unit","Minimum quantity","Stock status","Last updated"], columnTypes: ["text","text","text","number","text","number","text","date"], rows: visibleItems.map(item => [item.name,item.category ?? "",item.description ?? "",item.quantity,item.unit ?? "pcs",item.minQuantity,item.quantity <= item.minQuantity ? "LOW STOCK" : "IN STOCK",dateLabel(item.updatedAt)]), reportInfo: { filters: { search, category: categoryFilter, lowStockOnly } } })} note="Exports reflect the visible stock register." />{canManageCategories&&<button type="button" className={secondaryButton} onClick={()=>{setFeedback(null);setCategoriesOpen(true);}}>Manage categories</button>}<button type="button" className={primaryButton} onClick={()=>{setFeedback(null);setItemDraft(itemFresh());setCreateOpen(true);}}><Plus className="size-4"/>Add item</button></div>
     </section>
     {feedback&&<div role={feedback.kind==="error"?"alert":"status"} className={cn("flex items-start gap-3 rounded-xl border p-3 text-sm",feedback.kind==="error"?"border-destructive/30 bg-destructive/5 text-destructive":"border-success/30 bg-success/5 text-foreground")}><span className="min-w-0 flex-1">{feedback.text}</span><button type="button" aria-label="Dismiss" onClick={()=>setFeedback(null)}><X className="size-4"/></button></div>}
+    {categoriesQuery.isError&&<ErrorState message={"Inventory categories could not be loaded: "+categoriesQuery.error.message}/>}
     <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"><Metric label="Stocked items" value={itemsQuery.isPending?"—":String(itemList.length)} detail="Items in the register" icon={Package}/><Metric label="Low stock alerts" value={itemsQuery.isPending?"—":String(lowCount)} detail="At or below minimum quantity" icon={AlertTriangle}/><Metric label="Total quantity recorded" value={itemsQuery.isPending?"—":String(totalUnits)} detail="Quantities across mixed units" icon={Warehouse}/><Metric label="Movements in period" value={transactionQuery.isPending?"—":String(transactions.length)} detail="History is filtered by dates below" icon={History}/></div>
 
     <section className="rounded-2xl border border-border bg-card p-4 shadow-sm sm:p-5">
@@ -211,7 +252,7 @@ export function InventoryManagementWorkspace() {
 
     <section className="rounded-2xl border border-border bg-card p-4 shadow-sm sm:p-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between"><div><h2 className="text-lg font-semibold text-foreground">Stock movement history</h2><p className="mt-1 text-sm text-muted-foreground">Latest 1,000 matching transactions. Each movement updates on-hand quantities.</p></div><TableExportMenu build={() => ({ title: "Inventory movement history", headers: ["Date","Item","Movement","Quantity","Unit","Description","Recipient","Recorded by"], columnTypes: ["date","text","text","number","text","text","text","text"], rows: transactions.map(tx => [dateLabel(tx.date),tx.item?.name ?? "",displayType(tx.type),tx.quantity,tx.item?.unit ?? "pcs",tx.description ?? "",tx.recipientName ?? "",tx.performedBy?.name ?? ""]), reportInfo: { period: (fromDate || "Any date") + " to " + (toDate || "Any date"), filters: { item: movementItemId, movementType } } })} note="Movement export contains the currently loaded history." /></div>
-      <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4"><Field label="From date"><DatePicker buttonClassName={fieldClass} value={fromDate} max={toDate||undefined} onChange={(value) =>setFromDate(value)}/></Field><Field label="To date"><DatePicker buttonClassName={fieldClass} value={toDate} min={fromDate||undefined} onChange={(value) =>setToDate(value)}/></Field><Field label="Stock item"><Select value={movementItemId} onValueChange={setMovementItemId}><SelectTrigger className="w-full"><SelectValue/></SelectTrigger><SelectContent><SelectItem value="ALL">All items</SelectItem>{itemList.map(item=><SelectItem key={item.id} value={item.id}>{item.name}</SelectItem>)}</SelectContent></Select></Field><Field label="Movement type"><Select value={movementType} onValueChange={setMovementType}><SelectTrigger className="w-full"><SelectValue/></SelectTrigger><SelectContent><SelectItem value="ALL">All movements</SelectItem><SelectItem value="IN">Stock in</SelectItem><SelectItem value="OUT">Stock out</SelectItem><SelectItem value="ADJUSTMENT">Adjustment</SelectItem></SelectContent></Select></Field></div>
+      <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4"><LabeledField label="From date"><DatePicker buttonClassName={fieldClass} value={fromDate} max={toDate||undefined} onChange={(value) =>setFromDate(value)}/></LabeledField><LabeledField label="To date"><DatePicker buttonClassName={fieldClass} value={toDate} min={fromDate||undefined} onChange={(value) =>setToDate(value)}/></LabeledField><LabeledField label="Stock item"><Select value={movementItemId} onValueChange={setMovementItemId}><SelectTrigger className="w-full"><SelectValue/></SelectTrigger><SelectContent><SelectItem value="ALL">All items</SelectItem>{itemList.map(item=><SelectItem key={item.id} value={item.id}>{item.name}</SelectItem>)}</SelectContent></Select></LabeledField><LabeledField label="Movement type"><Select value={movementType} onValueChange={setMovementType}><SelectTrigger className="w-full"><SelectValue/></SelectTrigger><SelectContent><SelectItem value="ALL">All movements</SelectItem><SelectItem value="IN">Stock in</SelectItem><SelectItem value="OUT">Stock out</SelectItem><SelectItem value="ADJUSTMENT">Adjustment</SelectItem></SelectContent></Select></LabeledField></div>
       {rangeInvalid?<ErrorState message="The start date must be on or before the end date."/>:transactionQuery.isPending?<LoadingState/>:transactionQuery.error?<ErrorState message={transactionQuery.error.message}/>:transactions.length?<div className="mt-4"><DataTable rows={transactions} columns={[
 { id: "date", header: "Date", cell: (tx) => dateLabel(tx.date), value: (tx) => tx.date },
 { id: "item", header: "Item", cell: (tx) => tx.item?.name ?? "Unknown item", value: (tx) => tx.item?.name ?? "" },
@@ -222,15 +263,36 @@ export function InventoryManagementWorkspace() {
 ] satisfies DataTableColumn<InventoryMovement>[]} getRowId={(tx) => tx.id} emptyTitle="No stock movements" emptyDescription="No movements match the current selection." exportTitle="Stock movements" searchable={false} embedded /></div>:<p className="py-8 text-center text-sm text-muted-foreground">No stock movements match these filters.</p>}
     </section>
 
-    {createOpen&&<Modal title="Add inventory item" description="Create a stock record and optionally record opening stock." onClose={()=>!createItem.isPending&&setCreateOpen(false)}><form className="space-y-4" onSubmit={submitItem}><div className="grid gap-4 sm:grid-cols-2"><Field label="Item name"><input required minLength={2} maxLength={150} className={fieldClass} value={itemDraft.name} onChange={event=>setItemDraft(current=>({...current,name:event.target.value}))} placeholder="e.g. Exercise books"/></Field><Field label="Category"><input maxLength={100} className={fieldClass} value={itemDraft.category} onChange={event=>setItemDraft(current=>({...current,category:event.target.value}))} placeholder="Stationery, ICT, cleaning…"/></Field></div><Field label="Description (optional)"><textarea maxLength={500} className={cn(fieldClass,"h-20 py-2")} value={itemDraft.description} onChange={event=>setItemDraft(current=>({...current,description:event.target.value}))}/></Field><div className="grid gap-4 sm:grid-cols-3"><Field label="Unit"><input required maxLength={20} className={fieldClass} value={itemDraft.unit} onChange={event=>setItemDraft(current=>({...current,unit:event.target.value}))}/></Field><Field label="Opening quantity"><input type="number" required min="0" step="1" className={fieldClass} value={itemDraft.initialQuantity} onChange={event=>setItemDraft(current=>({...current,initialQuantity:event.target.value}))}/></Field><Field label="Minimum stock"><input type="number" required min="0" step="1" className={fieldClass} value={itemDraft.minQuantity} onChange={event=>setItemDraft(current=>({...current,minQuantity:event.target.value}))}/></Field></div>{createItem.error&&<ErrorState message={createItem.error.message}/>}<div className="flex justify-end gap-2 border-t border-border pt-4"><button type="button" className={secondaryButton} onClick={()=>setCreateOpen(false)} disabled={createItem.isPending}>Cancel</button><button type="submit" className={primaryButton} disabled={createItem.isPending}>{createItem.isPending&&<LoaderCircle className="size-4 animate-spin"/>}Save item</button></div></form></Modal>}
+    {categoriesOpen&&<Modal title="Inventory categories" description="Create consistent categories that can be selected on every inventory item." onClose={()=>!createCategory.isPending&&setCategoriesOpen(false)}>
+      <form className="flex flex-col gap-3 sm:flex-row sm:items-end" onSubmit={submitCategory}>
+        <LabeledField label="New category"><input autoFocus required minLength={2} maxLength={100} className={fieldClass} value={categoryDraft} onChange={event=>setCategoryDraft(event.target.value)} placeholder="e.g. Learning materials"/></LabeledField>
+        <button type="submit" className={primaryButton} disabled={createCategory.isPending}>{createCategory.isPending?<LoaderCircle className="size-4 animate-spin"/>:<Plus className="size-4"/>}Add category</button>
+      </form>
+      {createCategory.error&&<div className="mt-3"><ErrorState message={createCategory.error.message}/></div>}
+      <div className="mt-5 space-y-2">
+        <h3 className="text-sm font-semibold text-foreground">Available categories</h3>
+        {categoriesQuery.isPending?<LoadingState/>:categoriesQuery.isError?<ErrorState message={categoriesQuery.error.message}/>:inventoryCategories.length===0?<p className="rounded-xl border border-dashed border-border p-4 text-sm text-muted-foreground">No categories yet. Add one above to make it available in the inventory forms.</p>:<ul className="divide-y divide-border rounded-xl border border-border">{inventoryCategories.map(category=><li key={category.id} className="px-4 py-3"><p className="text-sm font-medium text-foreground">{category.name}</p>{category.description&&<p className="mt-1 text-xs text-muted-foreground">{category.description}</p>}</li>)}</ul>}
+      </div>
+    </Modal>}
+    {createOpen&&<Modal title="Add inventory item" description="Create a stock record and optionally record opening stock." onClose={()=>!createItem.isPending&&setCreateOpen(false)}><form className="space-y-4" onSubmit={submitItem}><div className="grid gap-4 sm:grid-cols-2"><LabeledField label="Item name"><input required minLength={2} maxLength={150} className={fieldClass} value={itemDraft.name} onChange={event=>setItemDraft(current=>({...current,name:event.target.value}))} placeholder="e.g. Exercise books"/></LabeledField><CategoryField categories={categoryNames} value={itemDraft.category} onChange={category=>setItemDraft(current=>({...current,category}))}/></div><LabeledField label="Description (optional)"><textarea maxLength={500} className={cn(fieldClass,"h-20 py-2")} value={itemDraft.description} onChange={event=>setItemDraft(current=>({...current,description:event.target.value}))}/></LabeledField><div className="grid gap-4 sm:grid-cols-3"><LabeledField label="Unit"><input required maxLength={20} className={fieldClass} value={itemDraft.unit} onChange={event=>setItemDraft(current=>({...current,unit:event.target.value}))}/></LabeledField><LabeledField label="Opening quantity"><input type="number" required min="0" step="1" className={fieldClass} value={itemDraft.initialQuantity} onChange={event=>setItemDraft(current=>({...current,initialQuantity:event.target.value}))}/></LabeledField><LabeledField label="Minimum stock"><input type="number" required min="0" step="1" className={fieldClass} value={itemDraft.minQuantity} onChange={event=>setItemDraft(current=>({...current,minQuantity:event.target.value}))}/></LabeledField></div>{categoryNames.length===0&&<p className="text-xs text-muted-foreground">Ask the accountant to add inventory categories before classifying items.</p>}{createItem.error&&<ErrorState message={createItem.error.message}/>}<div className="flex justify-end gap-2 border-t border-border pt-4"><button type="button" className={secondaryButton} onClick={()=>setCreateOpen(false)} disabled={createItem.isPending}>Cancel</button><button type="submit" className={primaryButton} disabled={createItem.isPending}>{createItem.isPending&&<LoaderCircle className="size-4 animate-spin"/>}Save item</button></div></form></Modal>}
 
-    {editTarget&&editDraft&&<Modal title="Edit inventory item" description="Update item details and the low-stock threshold. On-hand quantity is maintained by stock movements and will not be changed here." onClose={()=>!updateItem.isPending&&(setEditTarget(null),setEditDraft(null))}><form className="space-y-4" onSubmit={submitEditItem}><div className="grid gap-4 sm:grid-cols-2"><Field label="Item name"><input required minLength={2} maxLength={150} className={fieldClass} value={editDraft.name} onChange={event=>setEditDraft(current=>current?({...current,name:event.target.value}):current)} /></Field><Field label="Category"><input maxLength={100} className={fieldClass} value={editDraft.category} onChange={event=>setEditDraft(current=>current?({...current,category:event.target.value}):current)} placeholder="Stationery, ICT, cleaning…" /></Field></div><Field label="Description (optional)"><textarea maxLength={500} className={cn(fieldClass,"h-20 py-2")} value={editDraft.description} onChange={event=>setEditDraft(current=>current?({...current,description:event.target.value}):current)} /></Field><div className="grid gap-4 sm:grid-cols-2"><Field label="Unit"><input required maxLength={20} className={fieldClass} value={editDraft.unit} onChange={event=>setEditDraft(current=>current?({...current,unit:event.target.value}):current)} /></Field><Field label="Minimum stock"><input type="number" required min="0" step="1" className={fieldClass} value={editDraft.minQuantity} onChange={event=>setEditDraft(current=>current?({...current,minQuantity:event.target.value}):current)} /></Field></div><div className="rounded-xl bg-muted/40 p-3 text-xs leading-5 text-muted-foreground">Current on-hand quantity: <strong className="text-foreground">{editTarget.quantity} {editTarget.unit||"pcs"}</strong>. Use Record movement to change stock quantities so the inventory history remains auditable.</div>{updateItem.error&&<ErrorState message={updateItem.error.message}/>}<div className="flex justify-end gap-2 border-t border-border pt-4"><button type="button" className={secondaryButton} onClick={()=>{setEditTarget(null);setEditDraft(null);}} disabled={updateItem.isPending}>Cancel</button><button type="submit" className={primaryButton} disabled={updateItem.isPending}>{updateItem.isPending&&<LoaderCircle className="size-4 animate-spin"/>}Save changes</button></div></form></Modal>}
-    {movementOpen&&<Modal title="Record stock movement" description={itemList.find(item=>item.id===movementDraft.itemId)?.name??"Update stock"} onClose={()=>!recordMovement.isPending&&setMovementOpen(false)}><form className="space-y-4" onSubmit={submitMovement}><Field label="Inventory item"><Select value={movementDraft.itemId} onValueChange={value=>setMovementDraft(current=>({...current,itemId:value}))}><SelectTrigger className="w-full"><SelectValue placeholder="Choose an item"/></SelectTrigger><SelectContent>{itemList.map(item=><SelectItem key={item.id} value={item.id}>{item.name} — {item.quantity} {item.unit||"pcs"} on hand</SelectItem>)}</SelectContent></Select></Field><div className="grid gap-4 sm:grid-cols-2"><Field label="Movement type"><Select value={movementDraft.type} onValueChange={value=>setMovementDraft(current=>({...current,type:value as "IN"|"OUT"}))}><SelectTrigger className="w-full"><SelectValue/></SelectTrigger><SelectContent><SelectItem value="IN">Stock in — received</SelectItem><SelectItem value="OUT">Stock out — issued</SelectItem></SelectContent></Select></Field><Field label="Quantity"><input type="number" min="1" step="1" required className={fieldClass} value={movementDraft.quantity} onChange={event=>setMovementDraft(current=>({...current,quantity:event.target.value}))}/></Field></div><div className="grid gap-4 sm:grid-cols-2"><Field label="Date"><DatePicker required buttonClassName={fieldClass} value={movementDraft.date} onChange={(value) =>setMovementDraft(current=>({...current,date:value}))}/></Field><Field label="Recipient (optional)"><input maxLength={150} className={fieldClass} value={movementDraft.recipientName} onChange={event=>setMovementDraft(current=>({...current,recipientName:event.target.value}))} placeholder="Department or staff member"/></Field></div><Field label="Description / reason"><textarea maxLength={500} className={cn(fieldClass,"h-20 py-2")} value={movementDraft.description} onChange={event=>setMovementDraft(current=>({...current,description:event.target.value}))} placeholder="Delivery note, issue reason, invoice reference…"/></Field>{recordMovement.error&&<ErrorState message={recordMovement.error.message}/>}<div className="flex justify-end gap-2 border-t border-border pt-4"><button type="button" className={secondaryButton} onClick={()=>setMovementOpen(false)} disabled={recordMovement.isPending}>Cancel</button><button type="submit" className={primaryButton} disabled={recordMovement.isPending}>{recordMovement.isPending&&<LoaderCircle className="size-4 animate-spin"/>}Save movement</button></div></form></Modal>}
+    {editTarget&&editDraft&&<Modal title="Edit inventory item" description="Update item details and the low-stock threshold. On-hand quantity is maintained by stock movements and will not be changed here." onClose={()=>!updateItem.isPending&&(setEditTarget(null),setEditDraft(null))}><form className="space-y-4" onSubmit={submitEditItem}><div className="grid gap-4 sm:grid-cols-2"><LabeledField label="Item name"><input required minLength={2} maxLength={150} className={fieldClass} value={editDraft.name} onChange={event=>setEditDraft(current=>current?({...current,name:event.target.value}):current)} /></LabeledField><CategoryField categories={categoryNames} value={editDraft.category} onChange={category=>setEditDraft(current=>current?({...current,category}):current)}/></div><LabeledField label="Description (optional)"><textarea maxLength={500} className={cn(fieldClass,"h-20 py-2")} value={editDraft.description} onChange={event=>setEditDraft(current=>current?({...current,description:event.target.value}):current)} /></LabeledField><div className="grid gap-4 sm:grid-cols-2"><LabeledField label="Unit"><input required maxLength={20} className={fieldClass} value={editDraft.unit} onChange={event=>setEditDraft(current=>current?({...current,unit:event.target.value}):current)} /></LabeledField><LabeledField label="Minimum stock"><input type="number" required min="0" step="1" className={fieldClass} value={editDraft.minQuantity} onChange={event=>setEditDraft(current=>current?({...current,minQuantity:event.target.value}):current)} /></LabeledField></div><div className="rounded-xl bg-muted/40 p-3 text-xs leading-5 text-muted-foreground">Current on-hand quantity: <strong className="text-foreground">{editTarget.quantity} {editTarget.unit||"pcs"}</strong>. Use Record movement to change stock quantities so the inventory history remains auditable.</div>{updateItem.error&&<ErrorState message={updateItem.error.message}/>}<div className="flex justify-end gap-2 border-t border-border pt-4"><button type="button" className={secondaryButton} onClick={()=>{setEditTarget(null);setEditDraft(null);}} disabled={updateItem.isPending}>Cancel</button><button type="submit" className={primaryButton} disabled={updateItem.isPending}>{updateItem.isPending&&<LoaderCircle className="size-4 animate-spin"/>}Save changes</button></div></form></Modal>}
+    {movementOpen&&<Modal title="Record stock movement" description={itemList.find(item=>item.id===movementDraft.itemId)?.name??"Update stock"} onClose={()=>!recordMovement.isPending&&setMovementOpen(false)}><form className="space-y-4" onSubmit={submitMovement}><LabeledField label="Inventory item"><Select value={movementDraft.itemId} onValueChange={value=>setMovementDraft(current=>({...current,itemId:value}))}><SelectTrigger className="w-full"><SelectValue placeholder="Choose an item"/></SelectTrigger><SelectContent>{itemList.map(item=><SelectItem key={item.id} value={item.id}>{item.name} — {item.quantity} {item.unit||"pcs"} on hand</SelectItem>)}</SelectContent></Select></LabeledField><div className="grid gap-4 sm:grid-cols-2"><LabeledField label="Movement type"><Select value={movementDraft.type} onValueChange={value=>setMovementDraft(current=>({...current,type:value as "IN"|"OUT"}))}><SelectTrigger className="w-full"><SelectValue/></SelectTrigger><SelectContent><SelectItem value="IN">Stock in — received</SelectItem><SelectItem value="OUT">Stock out — issued</SelectItem></SelectContent></Select></LabeledField><LabeledField label="Quantity"><input type="number" min="1" step="1" required className={fieldClass} value={movementDraft.quantity} onChange={event=>setMovementDraft(current=>({...current,quantity:event.target.value}))}/></LabeledField></div><div className="grid gap-4 sm:grid-cols-2"><LabeledField label="Date"><DatePicker required buttonClassName={fieldClass} value={movementDraft.date} onChange={(value) =>setMovementDraft(current=>({...current,date:value}))}/></LabeledField><LabeledField label="Recipient (optional)"><input maxLength={150} className={fieldClass} value={movementDraft.recipientName} onChange={event=>setMovementDraft(current=>({...current,recipientName:event.target.value}))} placeholder="Department or staff member"/></LabeledField></div><LabeledField label="Description / reason"><textarea maxLength={500} className={cn(fieldClass,"h-20 py-2")} value={movementDraft.description} onChange={event=>setMovementDraft(current=>({...current,description:event.target.value}))} placeholder="Delivery note, issue reason, invoice reference…"/></LabeledField>{recordMovement.error&&<ErrorState message={recordMovement.error.message}/>}<div className="flex justify-end gap-2 border-t border-border pt-4"><button type="button" className={secondaryButton} onClick={()=>setMovementOpen(false)} disabled={recordMovement.isPending}>Cancel</button><button type="submit" className={primaryButton} disabled={recordMovement.isPending}>{recordMovement.isPending&&<LoaderCircle className="size-4 animate-spin"/>}Save movement</button></div></form></Modal>}
   </div>;
 }
 
 function Metric({ label, value, detail, icon: Icon }: { label: string; value: string; detail: string; icon: typeof Package }) { return <div className="rounded-2xl border border-border bg-card p-4 shadow-sm"><div className="flex items-center justify-between gap-3"><p className="text-xs font-semibold text-muted-foreground">{label}</p><Icon className="size-4 text-primary"/></div><p className="mt-3 text-2xl font-bold tracking-tight text-foreground">{value}</p><p className="mt-1 text-xs text-muted-foreground">{detail}</p></div>; }
-function Field({ label, children }: { label: string; children: ReactNode }) { return <label className="grid min-w-0 gap-1.5 text-sm font-medium text-foreground"><span>{label}</span>{children}</label>; }
+function CategoryField({ categories, value, onChange }: { categories: string[]; value: string; onChange: (value: string) => void }) {
+  return <LabeledField label="Category">
+    <Select value={value || "__none__"} onValueChange={selected => onChange(selected === "__none__" ? "" : selected)}>
+      <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+      <SelectContent>
+        <SelectItem value="__none__">No category</SelectItem>
+        {categories.map(category => <SelectItem key={category} value={category}>{category}</SelectItem>)}
+      </SelectContent>
+    </Select>
+  </LabeledField>;
+}
 function Modal({ title, description, onClose, children }: { title: string; description: string; onClose: () => void; children: ReactNode }) {
   return <PortalModal isOpen onClose={onClose} title={title} description={description} maxWidth="3xl">{children}</PortalModal>;
 }

@@ -1,3 +1,4 @@
+import { PasswordRecoveryModule } from "./modules/accounts/password-recovery/password-recovery.module.js";
 import { Module } from "@nestjs/common";
 import { APP_FILTER } from "@nestjs/core";
 import { ThrottlerModule } from "@nestjs/throttler";
@@ -13,6 +14,7 @@ import { JobsModule } from "./common/jobs/jobs.module.js";
 import { StorageModule } from "./modules/storage/storage.module.js";
 import { SchoolsModule } from "./modules/schools/schools.module.js";
 import { StudentsModule } from "./modules/students/students.module.js";
+import { StudentDeletionModule } from "./modules/student-deletion/student-deletion.module.js";
 import { AcademicsModule } from "./modules/academics/academics.module.js";
 import { AttendanceModule } from "./modules/attendance/attendance.module.js";
 import { TeachingModule } from "./modules/teaching/teaching.module.js";
@@ -42,9 +44,11 @@ import { DashboardModule } from "./modules/dashboard/dashboard.module.js";
     PrismaModule,
     JobsModule,
     StorageModule,
-    AuthModule.forRoot({ auth }),
+    // Bounded payloads for reviewed rollover batches (up to 2,000 decisions).
+    AuthModule.forRoot({ auth, bodyParser: { rawBody: true, json: { limit: "4mb" } } }),
     SchoolsModule,
     StudentsModule,
+    StudentDeletionModule,
     AcademicsModule,
     AttendanceModule,
     TeachingModule,
@@ -54,6 +58,7 @@ import { DashboardModule } from "./modules/dashboard/dashboard.module.js";
     SupportModule,
     PeopleModule,
     AccountsModule,
+    PasswordRecoveryModule,
     TeacherScopeModule,
     SubjectsModule,
     TimetableModule,

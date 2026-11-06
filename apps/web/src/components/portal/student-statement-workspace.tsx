@@ -1,14 +1,13 @@
 import { DatePicker } from "@/components/ui/date-picker";
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import ExcelJS from "exceljs";
-import { jsPDF } from "jspdf";
-import autoTable from "jspdf-autotable";
-import { Download, FileSpreadsheet, FileText, LoaderCircle, Printer, Search, UserRound } from "lucide-react";
+import type { jsPDF as JsPDF } from "jspdf";
+import { FileSpreadsheet, FileText, LoaderCircle, Printer, Search, UserRound } from "lucide-react";
 import type { StudentStatementResponse } from "@schoolhub/shared";
 import { apiFetch } from "@/lib/api";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
+import { downloadXlsx } from "@/lib/download";
 
 interface StudentOption {
   id: string;
@@ -46,17 +45,6 @@ const primaryButton = "inline-flex min-h-10 items-center justify-center gap-2 ro
 function nameOf(student: StudentOption) {
   return [student.profile?.firstName, student.profile?.otherNames, student.profile?.lastName].filter(Boolean).join(" ").trim()
     || student.admissionNumber || student.studentId || "Student";
-}
-
-function downloadBlob(blob: Blob, filename: string) {
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = filename;
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 export function StudentStatementWorkspace() {
@@ -111,6 +99,10 @@ export function StudentStatementWorkspace() {
     if (!statement) return;
     setExporting("pdf");
     try {
+      const [{ jsPDF }, { default: autoTable }] = await Promise.all([
+        import("jspdf"),
+        import("jspdf-autotable"),
+      ]);
       const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
       pdf.setFontSize(16);
       pdf.text("Student Statement of Account", 14, 18);
@@ -139,7 +131,7 @@ export function StudentStatementWorkspace() {
           pdf.text(`Page ${pageNumber}`, 194, 287, { align: "right" });
         },
       });
-      const finalY = (pdf as jsPDF & { lastAutoTable?: { finalY?: number } }).lastAutoTable?.finalY ?? 55;
+      const finalY = (pdf as JsPDF & { lastAutoTable?: { finalY?: number } }).lastAutoTable?.finalY ?? 55;
       pdf.setFontSize(10);
       pdf.text(`Closing balance: GHS ${statement.closingBalance}`, 14, Math.min(280, finalY + 8));
       pdf.save(`student-statement-${filenamePart}.pdf`);
@@ -152,6 +144,7 @@ export function StudentStatementWorkspace() {
     if (!statement) return;
     setExporting("excel");
     try {
+      const { default: ExcelJS } = await import("exceljs");
       const workbook = new ExcelJS.Workbook();
       workbook.creator = "SchoolHub";
       workbook.created = new Date();
@@ -196,7 +189,7 @@ export function StudentStatementWorkspace() {
       sheet.getRow(1).font = { bold: true };
       sheet.autoFilter = { from: "A1", to: "F1" };
       const output = await workbook.xlsx.writeBuffer();
-      downloadBlob(new Blob([output], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), `student-statement-${filenamePart}.xlsx`);
+      downloadXlsx(output, `student-statement-${filenamePart}.xlsx`);
     } finally {
       setExporting(null);
     }

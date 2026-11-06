@@ -24,4 +24,15 @@ else
   curl --fail -D /tmp/headers http://127.0.0.1:8080/ -o /tmp/index.html
   grep -qi 'x-content-type-options: nosniff' /tmp/headers
   grep -qi 'x-frame-options: DENY' /tmp/headers
+  # A synthetic verification token must stay out of proxy logs even when the
+  # deliberately unavailable upstream returns 502.
+  VERIFY_STATUS=$(curl --silent --show-error --connect-timeout 2 --max-time 5 -D /tmp/verify-headers -o /dev/null -w '%{http_code}' 'http://127.0.0.1:8080/api/auth/verify-email?token=SCHOOLHUB_SYNTHETIC_TOKEN')
+  test "$VERIFY_STATUS" = 502
+  grep -qi 'referrer-policy: no-referrer' /tmp/verify-headers
+  grep -qi 'cache-control: no-store' /tmp/verify-headers
+  if docker logs smoke-web 2>&1 | grep -Fq 'SCHOOLHUB_SYNTHETIC_TOKEN'; then
+    echo 'Verification token leaked to proxy logs'
+    exit 1
+  fi
+
 fi

@@ -1,8 +1,10 @@
 import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from "@nestjs/common";
 import {
+  createInventoryCategorySchema,
   createInventoryItemSchema,
   inventoryStockMovementSchema,
   updateInventoryItemSchema,
+  type CreateInventoryCategoryInput,
   type UpdateInventoryItemInput,
   type CreateInventoryItemInput,
   type InventoryStockMovementInput,
@@ -20,6 +22,21 @@ import { InventoryService } from "./inventory.service.js";
 @UseGuards(SchoolTenantGuard, RolesGuard)
 export class InventoryController {
   constructor(private readonly inventoryService: InventoryService) {}
+
+  @Get("categories")
+  @Roles("owner", "admin", "headteacher", "accountant")
+  listCategories(@CurrentSchool() school: School) {
+    return this.inventoryService.listCategories(school.id);
+  }
+
+  @Post("categories")
+  @Roles("accountant")
+  createCategory(
+    @CurrentSchool() school: School,
+    @Body(new ZodValidationPipe(createInventoryCategorySchema)) body: CreateInventoryCategoryInput,
+  ) {
+    return this.inventoryService.createCategory(school.id, body);
+  }
 
   @Get("items")
   @Roles("owner", "admin", "headteacher", "accountant")

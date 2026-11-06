@@ -1,0 +1,260 @@
+
+$ pnpm install --frozen-lockfile
+(cwd: .)
+Scope: all 6 workspace projects
+✓ Lockfile passes supply-chain policies (verified 5m ago)
+Lockfile is up to date, resolution step is skipped
+Packages: +5
++++++
+Progress: resolved 5, reused 5, downloaded 0, added 5, done
+.../node_modules/@prisma/engines postinstall$ node scripts/postinstall.js
+.../node_modules/@prisma/engines postinstall$ node scripts/postinstall.js
+.../esbuild@0.28.2/node_modules/esbuild postinstall$ node install.js
+.../esbuild@0.28.2/node_modules/esbuild postinstall: Done
+.../node_modules/@prisma/engines postinstall: Done
+.../node_modules/@prisma/engines postinstall: Done
+.../node_modules/prisma preinstall$ node scripts/preinstall-entry.js
+.../node_modules/prisma preinstall$ node scripts/preinstall-entry.js
+.../node_modules/prisma preinstall$ node scripts/preinstall-entry.js
+.../node_modules/prisma preinstall: Done
+.../node_modules/prisma preinstall: Done
+.../node_modules/prisma preinstall: Done
+Done in 845ms using pnpm v12.4.1
+
+exit: 0
+
+$ pnpm --filter @schoolhub/shared build
+(cwd: .)
+$ tsdown
+ℹ tsdown v0.23.4 powered by rolldown v1.2.16
+ℹ config file: /workspace/scratch/8ce198452ebc/schoolhub/packages/shared/tsdown.config.ts 
+ℹ entry: src/index.ts
+ℹ tsconfig: tsconfig.json
+ℹ Build start
+ℹ Cleaning 4 files
+
+ WARN  TypeScript 7.0 does not yet have a stable API and is experimental. Some options will be unavailable.
+
+ℹ Emit types with typescript@7.0.2
+ℹ [CJS] dist/index.cjs  61.97 kB │ gzip: 15.34 kB
+ℹ [CJS] 1 files, total: 61.97 kB
+ℹ [CJS] dist/index.d.cts  55.36 kB │ gzip: 9.89 kB
+ℹ [CJS] 1 files, total: 55.36 kB
+✔ Build complete in 518ms
+ℹ [ESM] dist/index.mjs    56.14 kB │ gzip: 14.78 kB
+ℹ [ESM] dist/index.d.mts  55.36 kB │ gzip:  9.89 kB
+ℹ [ESM] 2 files, total: 111.50 kB
+✔ Build complete in 596ms
+
+exit: 0
+
+$ pnpm --filter @schoolhub/mobile typecheck
+(cwd: .)
+$ tsc --noEmit
+
+exit: 0
+
+$ pnpm --filter @schoolhub/mobile lint
+(cwd: .)
+$ expo lint --max-warnings 0
+
+exit: 0
+
+$ pnpm --filter @schoolhub/mobile audit:contrast
+(cwd: .)
+$ node scripts/audit-contrast.mjs
+PASS: 1624 text, icon, gradient and composited chrome contrast pairs across light/dark themes.
+
+exit: 0
+
+$ pnpm --filter @schoolhub/mobile format:check
+(cwd: .)
+$ prettier --check .
+Checking formatting...
+All matched files use Prettier code style!
+
+exit: 0
+
+$ pnpm --filter @schoolhub/mobile test
+(cwd: .)
+$ jest --runInBand
+
+Test Suites: 13 passed, 13 total
+Tests:       73 passed, 73 total
+Snapshots:   0 total
+Time:        2.77 s, estimated 4 s
+Ran all test suites.
+Jest did not exit one second after the test run has completed.
+
+'This usually means that there are asynchronous operations that weren't stopped in your tests. Consider running Jest with `--detectOpenHandles` to troubleshoot this issue.
+
+exit: 0
+
+$ pnpm --filter @schoolhub/mobile verify:endpoints
+(cwd: .)
+$ node scripts/verify-endpoints.mjs
+PASS: 2 endpoint declarations match inventory methods, paths and mobile roles.
+
+exit: 0
+
+$ pnpm --filter @schoolhub/mobile test:release
+(cwd: .)
+$ node --test scripts/verify-release.test.mjs scripts/verify-endpoints.test.mjs scripts/auth-transport.test.mjs
+✔ real Better Auth client preserves request and response ownership (13.753155ms)
+✔ real Better Auth response cannot restore a logged-out token (1.382487ms)
+✔ real Better Auth revocation uses the captured pre-logout credential (1.462557ms)
+✔ normalises inventory parameter names (250.377666ms)
+✔ rejects unsupported endpoint configuration defineEndpoint({ method:'GET', path:'/missing', roles:['teacher'], response:schema }); (239.995453ms)
+✔ rejects unsupported endpoint configuration defineEndpoint({ method:'GET', path:'/announcements', roles:['admin'], response:schema }); (266.99602ms)
+✔ rejects unsupported endpoint configuration defineEndpoint({ method:'GET', path:'/students/me', roles:['guardian'], response:schema }); (266.99318ms)
+✔ rejects unsupported endpoint configuration defineEndpoint({ method:'DELETE', path:'/announcements', roles:['teacher'], response:schema }); (254.424289ms)
+✔ rejects unsupported endpoint configuration defineEndpoint({ method:'GET', path:'/external-exams/results', roles:['teacher'], response:schema }); (239.783837ms)
+✔ rejects unsupported endpoint configuration defineEndpoint(config) (228.479619ms)
+✔ rejects unsupported endpoint configuration apiFetch(path) (227.816844ms)
+✔ rejects unsupported endpoint configuration fetch(path) (224.274682ms)
+✔ rejects unsupported endpoint configuration defineEndpoint({ method:method, path:"/announcements", roles:["teacher"] }) (223.374942ms)
+✔ fails closed for an empty registry (227.094187ms)
+✔ accepts the production entry sources (84.426478ms)
+✔ rejects bundled route dev-gallery.tsx (72.598039ms)
+✔ rejects bundled route dev-tabs/index.tsx (76.233987ms)
+✔ rejects bundled route (tabs)/profile.tsx (70.361669ms)
+✔ rejects bundled route (workspace)/fees.tsx (62.42051ms)
+✔ rejects bundled route (superadmin)/index.tsx (64.04457ms)
+✔ rejects bundled route (management)/index.tsx (71.862664ms)
+✔ rejects bundled route (accountant)/index.tsx (67.429364ms)
+✔ rejects bundled route (admin)/index.tsx (60.984674ms)
+✔ rejects bundled route (student)/bece.tsx (60.76018ms)
+✔ rejects Windows development paths too (69.989721ms)
+✔ fails closed without source maps or app sources (131.928968ms)
+ℹ tests 26
+ℹ suites 0
+ℹ pass 26
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2740.555259
+
+exit: 0
+
+$ npx expo-doctor
+(cwd: apps/mobile)
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
+Running 20 checks on your project...
+20/20 checks passed. No issues detected!
+
+exit: 0
+
+$ npx expo export --platform android --source-maps
+(cwd: apps/mobile)
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
+Expo Autolinking module resolution enabled
+Starting Metro Bundler
+
+| (node:1051) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:1051) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:1051) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:1051) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:1051) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:1051) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+Android Bundled 33657ms node_modules/.pnpm/expo-router@58.0.29_fb6324e0c1d8956cb9285cdd7bad210d/node_modules/expo-router/entry.js (4273 modules)
+
+› Assets (30):
+../../node_modules/.pnpm/@expo-google-fonts+inter@0.4.2/node_modules/@expo-google-fonts/inter/400Regular/Inter_400Regular.ttf (342KB)
+../../node_modules/.pnpm/@expo-google-fonts+inter@0.4.2/node_modules/@expo-google-fonts/inter/500Medium/Inter_500Medium.ttf (343KB)
+../../node_modules/.pnpm/@expo-google-fonts+inter@0.4.2/node_modules/@expo-google-fonts/inter/600SemiBold/Inter_600SemiBold.ttf (344KB)
+../../node_modules/.pnpm/@expo-google-fonts+inter@0.4.2/node_modules/@expo-google-fonts/inter/700Bold/Inter_700Bold.ttf (344KB)
+../../node_modules/.pnpm/expo-router@58.0.29_fb6324e0c1d8956cb9285cdd7bad210d/node_modules/expo-router/assets/arrow_down.png (9.5KB)
+../../node_modules/.pnpm/expo-router@58.0.29_fb6324e0c1d8956cb9285cdd7bad210d/node_modules/expo-router/assets/arrow_right.xml (307B)
+../../node_modules/.pnpm/expo-router@58.0.29_fb6324e0c1d8956cb9285cdd7bad210d/node_modules/expo-router/assets/checkmark.xml (312B)
+../../node_modules/.pnpm/expo-router@58.0.29_fb6324e0c1d8956cb9285cdd7bad210d/node_modules/expo-router/assets/error.png (469B)
+../../node_modules/.pnpm/expo-router@58.0.29_fb6324e0c1d8956cb9285cdd7bad210d/node_modules/expo-router/assets/file.png (138B)
+../../node_modules/.pnpm/expo-router@58.0.29_fb6324e0c1d8956cb9285cdd7bad210d/node_modules/expo-router/assets/forward.png (188B)
+../../node_modules/.pnpm/expo-router@58.0.29_fb6324e0c1d8956cb9285cdd7bad210d/node_modules/expo-router/assets/pkg.png (364B)
+../../node_modules/.pnpm/expo-router@58.0.29_fb6324e0c1d8956cb9285cdd7bad210d/node_modules/expo-router/assets/react-navigation/elements/back-icon-mask.png (653B)
+../../node_modules/.pnpm/expo-router@58.0.29_fb6324e0c1d8956cb9285cdd7bad210d/node_modules/expo-router/assets/react-navigation/elements/back-icon.png (4 variations | 152B)
+../../node_modules/.pnpm/expo-router@58.0.29_fb6324e0c1d8956cb9285cdd7bad210d/node_modules/expo-router/assets/react-navigation/elements/clear-icon.png (4 variations | 425B)
+../../node_modules/.pnpm/expo-router@58.0.29_fb6324e0c1d8956cb9285cdd7bad210d/node_modules/expo-router/assets/react-navigation/elements/close-icon.png (4 variations | 235B)
+../../node_modules/.pnpm/expo-router@58.0.29_fb6324e0c1d8956cb9285cdd7bad210d/node_modules/expo-router/assets/react-navigation/elements/search-icon.png (4 variations | 599B)
+../../node_modules/.pnpm/expo-router@58.0.29_fb6324e0c1d8956cb9285cdd7bad210d/node_modules/expo-router/assets/sitemap.png (465B)
+../../node_modules/.pnpm/expo-router@58.0.29_fb6324e0c1d8956cb9285cdd7bad210d/node_modules/expo-router/assets/unmatched.png (4.8KB)
+
+› android bundles (2):
+_expo/static/js/android/entry-d1945af92ca6021ac582afe1629c55e6.hbc (6.3MB)
+_expo/static/js/android/entry-d1945af92ca6021ac582afe1629c55e6.hbc.map (15MB)
+
+› Files (1):
+metadata.json (2KB)
+
+Exported: dist
+
+exit: 0
+
+$ node scripts/verify-release.mjs dist
+(cwd: apps/mobile)
+entry-d1945af92ca6021ac582afe1629c55e6.hbc: 6260076 bytes (Hermes)
+PASS: 1 source map(s), 9 app sources; no development, mock or Super Admin routes.
+
+exit: 0
+
+$ npx expo export --platform ios --source-maps
+(cwd: apps/mobile)
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
+Expo Autolinking module resolution enabled
+Starting Metro Bundler
+
+| (node:1102) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:1102) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:1102) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:1102) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:1102) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:1102) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+iOS Bundled 33425ms node_modules/.pnpm/expo-router@58.0.29_fb6324e0c1d8956cb9285cdd7bad210d/node_modules/expo-router/entry.js (4274 modules)
+
+› Assets (27):
+../../node_modules/.pnpm/@expo-google-fonts+inter@0.4.2/node_modules/@expo-google-fonts/inter/400Regular/Inter_400Regular.ttf (342KB)
+../../node_modules/.pnpm/@expo-google-fonts+inter@0.4.2/node_modules/@expo-google-fonts/inter/500Medium/Inter_500Medium.ttf (343KB)
+../../node_modules/.pnpm/@expo-google-fonts+inter@0.4.2/node_modules/@expo-google-fonts/inter/600SemiBold/Inter_600SemiBold.ttf (344KB)
+../../node_modules/.pnpm/@expo-google-fonts+inter@0.4.2/node_modules/@expo-google-fonts/inter/700Bold/Inter_700Bold.ttf (344KB)
+../../node_modules/.pnpm/expo-router@58.0.29_fb6324e0c1d8956cb9285cdd7bad210d/node_modules/expo-router/assets/arrow_down.png (9.5KB)
+../../node_modules/.pnpm/expo-router@58.0.29_fb6324e0c1d8956cb9285cdd7bad210d/node_modules/expo-router/assets/error.png (469B)
+../../node_modules/.pnpm/expo-router@58.0.29_fb6324e0c1d8956cb9285cdd7bad210d/node_modules/expo-router/assets/file.png (138B)
+../../node_modules/.pnpm/expo-router@58.0.29_fb6324e0c1d8956cb9285cdd7bad210d/node_modules/expo-router/assets/forward.png (188B)
+../../node_modules/.pnpm/expo-router@58.0.29_fb6324e0c1d8956cb9285cdd7bad210d/node_modules/expo-router/assets/pkg.png (364B)
+../../node_modules/.pnpm/expo-router@58.0.29_fb6324e0c1d8956cb9285cdd7bad210d/node_modules/expo-router/assets/react-navigation/elements/back-icon-mask.png (653B)
+../../node_modules/.pnpm/expo-router@58.0.29_fb6324e0c1d8956cb9285cdd7bad210d/node_modules/expo-router/assets/react-navigation/elements/back-icon.png (4 variations | 566B)
+../../node_modules/.pnpm/expo-router@58.0.29_fb6324e0c1d8956cb9285cdd7bad210d/node_modules/expo-router/assets/react-navigation/elements/clear-icon.png (4 variations | 425B)
+../../node_modules/.pnpm/expo-router@58.0.29_fb6324e0c1d8956cb9285cdd7bad210d/node_modules/expo-router/assets/react-navigation/elements/close-icon.png (4 variations | 235B)
+../../node_modules/.pnpm/expo-router@58.0.29_fb6324e0c1d8956cb9285cdd7bad210d/node_modules/expo-router/assets/react-navigation/elements/search-icon.png (3 variations | 582B)
+../../node_modules/.pnpm/expo-router@58.0.29_fb6324e0c1d8956cb9285cdd7bad210d/node_modules/expo-router/assets/sitemap.png (465B)
+../../node_modules/.pnpm/expo-router@58.0.29_fb6324e0c1d8956cb9285cdd7bad210d/node_modules/expo-router/assets/unmatched.png (4.8KB)
+
+› ios bundles (2):
+_expo/static/js/ios/entry-b59118f4f5b0ec0bae0d361b0b776622.hbc (6.3MB)
+_expo/static/js/ios/entry-b59118f4f5b0ec0bae0d361b0b776622.hbc.map (15MB)
+
+› Files (1):
+metadata.json (1.8KB)
+
+Exported: dist
+
+exit: 0
+
+$ node scripts/verify-release.mjs dist
+(cwd: apps/mobile)
+entry-b59118f4f5b0ec0bae0d361b0b776622.hbc: 6266944 bytes (Hermes)
+PASS: 1 source map(s), 9 app sources; no development, mock or Super Admin routes.
+
+exit: 0

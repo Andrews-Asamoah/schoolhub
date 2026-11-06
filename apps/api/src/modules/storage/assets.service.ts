@@ -5,6 +5,7 @@ import {
   NotFoundException,
   ServiceUnavailableException,
   ConflictException,
+  HttpException,
 } from "@nestjs/common";
 import type { School } from "@prisma/client";
 import { PrismaService } from "../../prisma/prisma.service.js";
@@ -106,6 +107,112 @@ export class AssetsService {
     const result = await this.setAvatar(school, profile.userId, file);
     await writeAudit(this.prisma.client, actor, { action: "UPDATE", entityType: "person.photo", entityId: personId, schoolId: school.id });
     return result;
+  }
+
+  async setStudentAvatars(school: School, files: Express.Multer.File[], actor: AuditActor) {
+    if (!files.length) throw new BadRequestException("Choose at least one student photo.");
+    if (files.length > 25) throw new BadRequestException("Upload no more than 25 photos per batch.");
+
+    const uploads = files.map((file) => {
+      const fileName = (file.originalname ?? "").replaceAll("\\", "/").split("/").pop() ?? "";
+      const extension = fileName.lastIndexOf(".");
+      const identifier = (extension > 0 ? fileName.slice(0, extension) : fileName).trim();
+      return { file, fileName, identifier };
+    });
+    const identifiers = [...new Set(uploads.map((upload) => upload.identifier.toLowerCase()).filter(Boolean))];
+    const students = identifiers.length
+      ? await this.prisma.client.student.findMany({
+          where: {
+            schoolId: school.id,
+            deletedAt: null,
+            OR: [
+              { studentId: { in: identifiers, mode: "insensitive" } },
+              { admissionNumber: { in: identifiers, mode: "insensitive" } },
+            ],
+          },
+          select: {
+            id: true,
+            studentId: true,
+            admissionNumber: true,
+          },
+        })
+      : [];
+    const uploadedStudents = new Set<string>();
+
+    const results: {
+      fileName: string;
+      identifier: string;
+      status: "uploaded" | "failed";
+      studentId?: string;
+      message?: string;
+    }[] = [];
+
+    for (const upload of uploads) {
+      if (!upload.identifier) {
+        results.push({
+          fileName: upload.fileName || "(unnamed file)",
+          identifier: "",
+          status: "failed",
+          message: "Name the photo file with the student's student ID or admission number.",
+        });
+        continue;
+      }
+
+      const normalizedIdentifier = upload.identifier.toLowerCase();
+      const matches = students.filter((student) =>
+        student.studentId.toLowerCase() === normalizedIdentifier ||
+        student.admissionNumber?.toLowerCase() === normalizedIdentifier,
+      );
+      if (matches.length !== 1) {
+        results.push({
+          fileName: upload.fileName,
+          identifier: upload.identifier,
+          status: "failed",
+          message: matches.length ? "This filename matches more than one student." : "No active student matches this student ID or admission number.",
+        });
+        continue;
+      }
+
+      const student = matches[0]!;
+      if (uploadedStudents.has(student.id)) {
+        results.push({
+          fileName: upload.fileName,
+          identifier: upload.identifier,
+          studentId: student.studentId,
+          status: "failed",
+          message: "A photo for this student was already included in this upload.",
+        });
+        continue;
+      }
+      uploadedStudents.add(student.id);
+
+      try {
+        await this.setPersonAvatar(school, "student", student.id, upload.file, actor);
+        results.push({
+          fileName: upload.fileName,
+          identifier: upload.identifier,
+          studentId: student.studentId,
+          status: "uploaded",
+        });
+      } catch (error) {
+        if (!(error instanceof HttpException)) throw error;
+        const response = error.getResponse();
+        const message = typeof response === "string"
+          ? response
+          : typeof response === "object" && response !== null && "message" in response
+            ? Array.isArray(response.message) ? response.message.join(" ") : String(response.message)
+            : error.message;
+        results.push({
+          fileName: upload.fileName,
+          identifier: upload.identifier,
+          studentId: student.studentId,
+          status: "failed",
+          message,
+        });
+      }
+    }
+
+    return { results };
   }
 
   private async signatureProfile(school: School, kind: string, personId: string) {

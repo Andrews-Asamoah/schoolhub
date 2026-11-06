@@ -23,6 +23,9 @@ import {
 import { useSchoolRole } from "@/components/school/school-role-switcher";
 import { apiFetch } from "@/lib/api";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { AcademicStructureBulkImport } from "@/components/school/academic-structure-bulk-import";
+import { BulkImportButton } from "@/components/bulk-import/bulk-import-button";
+import { labeledInputClasses } from "@/components/forms/labeled-controls";
 
 interface ClubMemberRecord {
   id: string;
@@ -86,8 +89,6 @@ const emptyForm: ClubFormValues = {
   isActive: true,
 };
 
-const inputClasses =
-  "mt-1.5 h-10 w-full rounded-lg border border-border bg-background px-3 text-sm text-foreground outline-none placeholder:text-muted-foreground focus:border-ring focus:ring-2 focus:ring-ring/20";
 
 export function ClubsWorkspace() {
   const queryClient = useQueryClient();
@@ -96,6 +97,7 @@ export function ClubsWorkspace() {
   
   const [editing, setEditing] = useState<ClubRecord | null>(null);
   const [showForm, setShowForm] = useState(false);
+  const [showBulkImport, setShowBulkImport] = useState(false);
   const [values, setValues] = useState<ClubFormValues>(emptyForm);
   const [selectedClubForMembers, setSelectedClubForMembers] = useState<ClubRecord | null>(null);
   const [searchFilter, setSearchFilter] = useState("");
@@ -104,7 +106,6 @@ export function ClubsWorkspace() {
   // New Member Modal State
   const [memberStudentId, setMemberStudentId] = useState("");
   const [memberRole, setMemberRole] = useState("Member");
-  const [memberSearch, setMemberSearch] = useState("");
 
   const clubsQuery = useQuery({
     queryKey: ["academics", "clubs"],
@@ -275,6 +276,13 @@ export function ClubsWorkspace() {
 
   return (
     <div className="space-y-6">
+      {showBulkImport && (
+        <AcademicStructureBulkImport
+          kind="clubs"
+          onClose={() => setShowBulkImport(false)}
+          onComplete={() => void queryClient.invalidateQueries({ queryKey: ["academics", "clubs"] })}
+        />
+      )}
       {/* Overview Stat Cards */}
       <div className="grid gap-4 sm:grid-cols-3">
         <div className="rounded-2xl border border-border/80 bg-card p-5 shadow-xs">
@@ -343,13 +351,17 @@ export function ClubsWorkspace() {
         </div>
 
         {canManage && (
-          <button
-            onClick={openCreate}
-            className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-xs font-bold text-primary-foreground shadow-sm transition hover:bg-primary/90"
-          >
-            <Plus className="size-4" />
-            New Club
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <BulkImportButton onClick={() => setShowBulkImport(true)} />
+            <button
+              type="button"
+              onClick={openCreate}
+              className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-xs font-bold text-primary-foreground shadow-sm transition hover:bg-primary/90"
+            >
+              <Plus className="size-4" />
+              New Club
+            </button>
+          </div>
         )}
       </div>
 
@@ -504,7 +516,7 @@ export function ClubsWorkspace() {
                   placeholder="e.g. Science & Robotics Club"
                   value={values.name}
                   onChange={(e) => setValues({ ...values, name: e.target.value })}
-                  className={inputClasses}
+                  className={labeledInputClasses}
                 />
               </div>
 
@@ -526,7 +538,7 @@ export function ClubsWorkspace() {
                   Patron / Teacher in Charge
                 </label>
                 <Select value={values.teacherInChargeId || "__none__"} onValueChange={(value) => setValues({ ...values, teacherInChargeId: value === "__none__" ? "" : value })}>
-                  <SelectTrigger aria-label="Patron / teacher in charge" className={inputClasses}><SelectValue /></SelectTrigger>
+                  <SelectTrigger aria-label="Patron / teacher in charge" className={labeledInputClasses}><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="__none__">No patron assigned</SelectItem>
                     {(teachersQuery.data ?? []).map((teacher) => <SelectItem key={teacher.id} value={teacher.id}>{teacher.firstName} {teacher.lastName}</SelectItem>)}

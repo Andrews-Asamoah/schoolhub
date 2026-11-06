@@ -15,12 +15,15 @@ import { Route as AdminRouteRouteImport } from './routes/admin/route'
 import { Route as ApplyRouteImport } from './routes/apply'
 import { Route as ChangePasswordRouteImport } from './routes/change-password'
 import { Route as DashboardRouteImport } from './routes/dashboard'
+import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as SubscriptionInactiveRouteImport } from './routes/subscription-inactive'
 import { Route as TwoFactorSetupRouteImport } from './routes/two-factor-setup'
 import { Route as AdminIndexRouteImport } from './routes/admin/index'
 import { Route as AdminDashboardRouteImport } from './routes/admin/dashboard'
 import { Route as AdminProfileRouteImport } from './routes/admin/profile'
+import { Route as AdminStudentDeletionsRouteImport } from './routes/admin/student-deletions'
 import { Route as AdminSupportRouteImport } from './routes/admin/support'
 import { Route as AdminAuditIndexRouteImport } from './routes/admin/audit/index'
 import { Route as AdminPlansIndexRouteImport } from './routes/admin/plans/index'
@@ -60,9 +63,19 @@ const DashboardRoute = DashboardRouteImport.update({
   path: '/dashboard',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ForgotPasswordRoute = ForgotPasswordRouteImport.update({
+  id: '/forgot-password',
+  path: '/forgot-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ResetPasswordRoute = ResetPasswordRouteImport.update({
+  id: '/reset-password',
+  path: '/reset-password',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SubscriptionInactiveRoute = SubscriptionInactiveRouteImport.update({
@@ -88,6 +101,11 @@ const AdminDashboardRoute = AdminDashboardRouteImport.update({
 const AdminProfileRoute = AdminProfileRouteImport.update({
   id: '/profile',
   path: '/profile',
+  getParentRoute: () => AdminRouteRoute,
+} as any)
+const AdminStudentDeletionsRoute = AdminStudentDeletionsRouteImport.update({
+  id: '/student-deletions',
+  path: '/student-deletions',
   getParentRoute: () => AdminRouteRoute,
 } as any)
 const AdminSupportRoute = AdminSupportRouteImport.update({
@@ -138,11 +156,14 @@ export interface FileRoutesByFullPath {
   '/apply': typeof ApplyRoute
   '/change-password': typeof ChangePasswordRoute
   '/dashboard': typeof DashboardRoute
+  '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/subscription-inactive': typeof SubscriptionInactiveRoute
   '/two-factor-setup': typeof TwoFactorSetupRoute
   '/admin/dashboard': typeof AdminDashboardRoute
   '/admin/profile': typeof AdminProfileRoute
+  '/admin/student-deletions': typeof AdminStudentDeletionsRoute
   '/admin/support': typeof AdminSupportRoute
   '/admin/': typeof AdminIndexRoute
   '/admin/schools/$schoolId': typeof AdminSchoolsSchoolIdRoute
@@ -159,11 +180,14 @@ export interface FileRoutesByTo {
   '/apply': typeof ApplyRoute
   '/change-password': typeof ChangePasswordRoute
   '/dashboard': typeof DashboardRoute
+  '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/subscription-inactive': typeof SubscriptionInactiveRoute
   '/two-factor-setup': typeof TwoFactorSetupRoute
   '/admin/dashboard': typeof AdminDashboardRoute
   '/admin/profile': typeof AdminProfileRoute
+  '/admin/student-deletions': typeof AdminStudentDeletionsRoute
   '/admin/support': typeof AdminSupportRoute
   '/admin': typeof AdminIndexRoute
   '/admin/schools/$schoolId': typeof AdminSchoolsSchoolIdRoute
@@ -182,11 +206,14 @@ export interface FileRoutesById {
   '/apply': typeof ApplyRoute
   '/change-password': typeof ChangePasswordRoute
   '/dashboard': typeof DashboardRoute
+  '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/subscription-inactive': typeof SubscriptionInactiveRoute
   '/two-factor-setup': typeof TwoFactorSetupRoute
   '/admin/dashboard': typeof AdminDashboardRoute
   '/admin/profile': typeof AdminProfileRoute
+  '/admin/student-deletions': typeof AdminStudentDeletionsRoute
   '/admin/support': typeof AdminSupportRoute
   '/admin/': typeof AdminIndexRoute
   '/admin/schools/$schoolId': typeof AdminSchoolsSchoolIdRoute
@@ -206,11 +233,14 @@ export interface FileRouteTypes {
     | '/apply'
     | '/change-password'
     | '/dashboard'
+    | '/forgot-password'
     | '/login'
+    | '/reset-password'
     | '/subscription-inactive'
     | '/two-factor-setup'
     | '/admin/dashboard'
     | '/admin/profile'
+    | '/admin/student-deletions'
     | '/admin/support'
     | '/admin/'
     | '/admin/schools/$schoolId'
@@ -227,11 +257,14 @@ export interface FileRouteTypes {
     | '/apply'
     | '/change-password'
     | '/dashboard'
+    | '/forgot-password'
     | '/login'
+    | '/reset-password'
     | '/subscription-inactive'
     | '/two-factor-setup'
     | '/admin/dashboard'
     | '/admin/profile'
+    | '/admin/student-deletions'
     | '/admin/support'
     | '/admin'
     | '/admin/schools/$schoolId'
@@ -249,11 +282,14 @@ export interface FileRouteTypes {
     | '/apply'
     | '/change-password'
     | '/dashboard'
+    | '/forgot-password'
     | '/login'
+    | '/reset-password'
     | '/subscription-inactive'
     | '/two-factor-setup'
     | '/admin/dashboard'
     | '/admin/profile'
+    | '/admin/student-deletions'
     | '/admin/support'
     | '/admin/'
     | '/admin/schools/$schoolId'
@@ -272,7 +308,9 @@ export interface RootRouteChildren {
   ApplyRoute: typeof ApplyRoute
   ChangePasswordRoute: typeof ChangePasswordRoute
   DashboardRoute: typeof DashboardRoute
+  ForgotPasswordRoute: typeof ForgotPasswordRoute
   LoginRoute: typeof LoginRoute
+  ResetPasswordRoute: typeof ResetPasswordRoute
   SubscriptionInactiveRoute: typeof SubscriptionInactiveRoute
   TwoFactorSetupRoute: typeof TwoFactorSetupRoute
 }
@@ -321,11 +359,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/forgot-password': {
+      id: '/forgot-password'
+      path: '/forgot-password'
+      fullPath: '/forgot-password'
+      preLoaderRoute: typeof ForgotPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/login': {
       id: '/login'
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reset-password': {
+      id: '/reset-password'
+      path: '/reset-password'
+      fullPath: '/reset-password'
+      preLoaderRoute: typeof ResetPasswordRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/subscription-inactive': {
@@ -361,6 +413,13 @@ declare module '@tanstack/react-router' {
       path: '/profile'
       fullPath: '/admin/profile'
       preLoaderRoute: typeof AdminProfileRouteImport
+      parentRoute: typeof AdminRouteRoute
+    }
+    '/admin/student-deletions': {
+      id: '/admin/student-deletions'
+      path: '/student-deletions'
+      fullPath: '/admin/student-deletions'
+      preLoaderRoute: typeof AdminStudentDeletionsRouteImport
       parentRoute: typeof AdminRouteRoute
     }
     '/admin/support': {
@@ -425,6 +484,7 @@ declare module '@tanstack/react-router' {
 interface AdminRouteRouteChildren {
   AdminDashboardRoute: typeof AdminDashboardRoute
   AdminProfileRoute: typeof AdminProfileRoute
+  AdminStudentDeletionsRoute: typeof AdminStudentDeletionsRoute
   AdminSupportRoute: typeof AdminSupportRoute
   AdminIndexRoute: typeof AdminIndexRoute
   AdminSchoolsSchoolIdRoute: typeof AdminSchoolsSchoolIdRoute
@@ -439,6 +499,7 @@ interface AdminRouteRouteChildren {
 const AdminRouteRouteChildren: AdminRouteRouteChildren = {
   AdminDashboardRoute: AdminDashboardRoute,
   AdminProfileRoute: AdminProfileRoute,
+  AdminStudentDeletionsRoute: AdminStudentDeletionsRoute,
   AdminSupportRoute: AdminSupportRoute,
   AdminIndexRoute: AdminIndexRoute,
   AdminSchoolsSchoolIdRoute: AdminSchoolsSchoolIdRoute,
@@ -461,7 +522,9 @@ const rootRouteChildren: RootRouteChildren = {
   ApplyRoute: ApplyRoute,
   ChangePasswordRoute: ChangePasswordRoute,
   DashboardRoute: DashboardRoute,
+  ForgotPasswordRoute: ForgotPasswordRoute,
   LoginRoute: LoginRoute,
+  ResetPasswordRoute: ResetPasswordRoute,
   SubscriptionInactiveRoute: SubscriptionInactiveRoute,
   TwoFactorSetupRoute: TwoFactorSetupRoute,
 }

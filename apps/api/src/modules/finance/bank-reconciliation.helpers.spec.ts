@@ -16,6 +16,15 @@ describe("P5 reconciliation foundation", () => {
     expect(result.difference.toFixed(2)).toBe("-0.01");
     expect(result.canSubmit).toBe(false);
   });
+  it.each(["NaN", "Infinity", "-Infinity", "100.001"])("rejects invalid balance %s instead of rounding it into agreement", value => {
+    expect(() => calculateBankReconciliation(value, "100.00", [])).toThrow();
+    expect(() => calculateBankReconciliation("100.00", value, [])).toThrow();
+  });
+  it("rejects sub-pesewa reconciling items", () => {
+    expect(() => calculateBankReconciliation("100", "100", [
+      { kind: "UNCLEARED_RECEIPT", amount: D("0.001") },
+    ])).toThrow();
+  });
   it("accepts only a zero bridge difference", () => {
     const result = calculateBankReconciliation("1000.00", "1090.00", [
       { kind: "UNCLEARED_RECEIPT", amount: D("100.00") },

@@ -60,10 +60,11 @@ Text on a coloured banner must use that banner's `*-foreground` token
 
 ## Changing the colour scheme
 
-Edit the values in `:root` (light) and `.dark` (dark). Colours are
-[OKLCH](https://oklch.com): `oklch(lightness chroma hue)`. For example, to
-re-brand from indigo to green change the hue (`276`) of `--primary`,
-`--ring`, `--accent`, `--sidebar-primary` and `--chart-1` in both blocks.
+The current palette pairs deep teal and mint accents with ink-blue text and
+cool, lightly tinted surfaces. Edit the values in `:root` (light) and `.dark`
+(dark) to evolve it. Colours are [OKLCH](https://oklch.com):
+`oklch(lightness chroma hue)`. Keep related tokens coordinated across both
+blocks, and run the contrast audit after changing them.
 
 Then run:
 

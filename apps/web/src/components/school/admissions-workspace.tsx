@@ -11,7 +11,7 @@ import {
 import { CredentialsDialog, type CredentialEntry } from "@/components/credentials/credentials-dialog";
 import { useSchoolRole } from "@/components/school/school-role-switcher";
 import { WorkspaceEmptyState } from "@/components/school/workspace-ui";
-import { apiFetch } from "@/lib/api";
+import { apiFetch, errorText } from "@/lib/api";
 import { getTenantSubdomain, useTenantSchool } from "@/lib/tenant";
 
 interface ClassOption {
@@ -125,12 +125,11 @@ function Badge({ value }: { value: string }) {
     </span>
   );
 }
-const errorText = (e: unknown) => (e instanceof Error ? e.message : "Something went wrong.");
 
 export function AdmissionsWorkspace() {
   const [tab, setTab] = useState<"applications" | "intakes">("applications");
   const { activeRole } = useSchoolRole();
-  const canDecide = activeRole === "owner" || activeRole === "admin";
+  const canDecide = ["owner", "admin", "headteacher"].includes(activeRole ?? "");
   const subdomain = getTenantSubdomain();
   const cyclesQuery = useQuery({
     queryKey: ["admissions", "cycles"],
@@ -422,8 +421,8 @@ function ApplicationsPanel({ cycles, canDecide }: { cycles: Cycle[]; canDecide: 
   const [receipt, setReceipt] = useState<{ receiptNumber: string; amount: string; name: string } | null>(null);
   const { activeRole } = useSchoolRole();
   const money = useMoney();
-  const canCollect = ["owner", "admin", "staff", "accountant"].includes(activeRole ?? "");
-  const canEditExam = ["owner", "admin", "staff"].includes(activeRole ?? "");
+  const canCollect = ["owner", "admin", "headteacher", "staff", "accountant"].includes(activeRole ?? "");
+  const canEditExam = ["owner", "admin", "headteacher", "staff"].includes(activeRole ?? "");
   const summaryQuery = useQuery({
     queryKey: ["admissions", "fees", cycleId],
     queryFn: () => apiFetch<FeeSummary>(`/admissions/fees/summary${cycleId ? `?cycleId=${cycleId}` : ""}`),

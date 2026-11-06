@@ -21,4 +21,44 @@ describe("immutable academic report sources", () => {
     expect(pdf.subarray(0,4).toString("utf8")).toBe("%PDF");
     expect(pdf.byteLength).toBeGreaterThan(800);
   });
+
+  const PNG = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
+  const richSnapshot = (): AcademicSnapshot => ({
+    schemaVersion: 2,
+    report: {
+      student: { class: { id: "c1", name: "JHS 2A", level: "JHS" } },
+      summary: { average: 74.5, subjectsGraded: 2, overallPosition: 3, classSize: 38 },
+      attendance: { present: 52, total: 56, rate: 93 },
+      subjects: [
+        { subject: { name: "Mathematics", code: "MTH" }, totalScore: 82, percentage: 82, grade: "1", position: 2, classScore: 40, classWeight: 50, examScore: 42, examWeight: 50, totalWeight: 100, gradeRemark: "Highly proficient" },
+        { subject: { name: "English Language", code: "ENG" }, totalScore: 67, percentage: 67, grade: "3", position: 11, classScore: 30, classWeight: 50, examScore: 37, examWeight: 50, totalWeight: 100, gradeRemark: "Proficient" },
+      ],
+    },
+    school: { name: "Synthetic School", code: "TST" }, template: { name: "Terminal", layout: { accentColor: "#0f766e", showPosition: true } },
+    student: { name: "Synthetic Student", admissionNumber: "TEST-001" },
+    year: "2026/27", term: "Term 1", set: "Terminal Reports", capturedAt: "2026-10-27T12:00:00Z",
+  });
+  const approval = (extra = {}) => ({ version: 1, snapshotHash: "h", teacherName: "Teacher A", teacherRemark: "Good progress", teacherApprovedAt: new Date("2026-10-27T12:00:00Z"), headName: "Head B", headRemark: "Promising", headApprovedAt: new Date("2026-10-27T13:00:00Z"), publishedAt: new Date("2026-10-27T14:00:00Z"), ...extra });
+
+  it("renders the new layout with signature images, and without them", () => {
+    const signed = academicReportPdf(richSnapshot(), approval({ teacherSignature: PNG, headSignature: PNG }));
+    const unsigned = academicReportPdf(richSnapshot(), approval());
+    expect(signed.subarray(0, 4).toString("utf8")).toBe("%PDF");
+    expect(signed.byteLength).toBeGreaterThan(unsigned.byteLength); // the images are embedded
+  });
+  it("survives an unreadable signature and a pre-split (older) snapshot", () => {
+    const old = richSnapshot();
+    old.schemaVersion = 1;
+    delete old.report.summary; delete old.report.attendance;
+    old.report.subjects = [{ subject: { name: "Science", code: "SCI" }, totalScore: 78, percentage: 78, grade: "B" }];
+    const pdf = academicReportPdf(old, approval({ teacherSignature: "data:image/png;base64,not-an-image" }));
+    expect(pdf.subarray(0, 4).toString("utf8")).toBe("%PDF");
+  });
+  it("breaks a long subject list across pages", () => {
+    const long = richSnapshot();
+    long.report.subjects = Array.from({ length: 60 }, (_, i) => ({ ...long.report.subjects![0]!, subject: { name: "Subject " + i, code: "S" + i } }));
+    const pdf = academicReportPdf(long, approval());
+    const pages = (pdf.toString("latin1").match(/\/Type\s*\/Page[^s]/g) ?? []).length;
+    expect(pages).toBeGreaterThan(1);
+  });
 });

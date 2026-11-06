@@ -186,10 +186,11 @@ describe("normalizeRecord", () => {
     expect(out.row!.guardians[0]).not.toHaveProperty("email");
     expect(out.warnings).toHaveLength(2);
   });
-  it("rejects an admission number with odd characters", () => {
-    const out = normalizeRecord(record({ ...good, admissionNumber: "<script>" }), 2, NOW);
-    expect(out.row).toBeNull();
-    expect(out.errors.join()).toMatch(/Admission numbers use letters/);
+  it("ignores any admission number in the file so one is generated from the admission date", () => {
+    const out = normalizeRecord(record({ ...good, admissionNumber: "ADM-001", admissionDate: "03/09/2018" }), 2, NOW);
+    expect(out.errors).toEqual([]);
+    expect(out.row!.admissionNumber).toBeUndefined();
+    expect(out.row!.admissionDate).toBe("2018-09-03");
   });
 });
 
@@ -197,7 +198,6 @@ const ctx = (over: Partial<ImportContext> = {}): ImportContext => ({
   classes: [{ id: "c1", name: "JHS 1A" }, { id: "c2", name: "JHS 1B" }, { id: "c3", name: "Class 6" }],
   houses: [{ id: "h1", name: "Red House" }],
   hasCurrentTerm: true,
-  admissionNumbers: new Set(["adm-001"]),
   studentKeys: new Set([studentKey("Old", "Pupil", "2010-01-01")]),
   ...over,
 });
@@ -223,7 +223,6 @@ describe("evaluateRow", () => {
     expect(evaluateRow(row(), ctx({ hasCurrentTerm: false })).status).toBe("ready");
   });
   it("treats students the school already has as duplicates, not errors", () => {
-    expect(evaluateRow(row({ admissionNumber: "ADM-001" }), ctx()).status).toBe("duplicate");
     expect(evaluateRow(row({ firstName: "Old", lastName: "Pupil", dateOfBirth: "01/01/2010" }), ctx()).status).toBe("duplicate");
     expect(evaluateRow(row({ firstName: "OLD", lastName: "pupil", dateOfBirth: "1 Jan 2010", className: "Nowhere" }), ctx()).status).toBe("duplicate");
   });
@@ -233,14 +232,11 @@ describe("evaluateRow", () => {
     expect(evaluateRow(first, ctx(), [], seen).status).toBe("ready");
     const again = { ...row(), rowNumber: 9 };
     expect(evaluateRow(again, ctx(), [], seen).errors).toEqual(["Same name and date of birth as row 2."]);
-    const s2 = newSeen();
-    evaluateRow({ ...row({ admissionNumber: "X1", firstName: "A" }), rowNumber: 3 }, ctx(), [], s2);
-    expect(evaluateRow({ ...row({ admissionNumber: "x1", firstName: "B" }), rowNumber: 4 }, ctx(), [], s2).errors).toEqual(["Same admission number as row 3."]);
   });
   it("carries warnings through and remembers created students", () => {
     expect(evaluateRow(row(), ctx(), ["Check the phone number."]).status).toBe("warning");
     const c = ctx();
-    const r = row({ admissionNumber: "NEW-1" });
+    const r = row({ firstName: "Newly", lastName: "Added" });
     remember(c, r);
     expect(evaluateRow(r, c).status).toBe("duplicate");
   });

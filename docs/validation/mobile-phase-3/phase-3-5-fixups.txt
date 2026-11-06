@@ -1,0 +1,91 @@
+SchoolHub Mobile Phase 3.5 validation
+Branch: fix/mobile-phase-3-5-fixups
+
+--- Frozen install ---
+$ pnpm install --frozen-lockfile
+Scope: all 6 workspace projects
+Lockfile is up to date, resolution step is skipped
+Packages: +5 (all reused; 0 downloaded)
+Done in 38.8s using pnpm v12.4.1
+exit: 0
+
+--- Shared build ---
+$ pnpm --filter @schoolhub/shared build
+Build complete (CJS and ESM)
+exit: 0
+
+--- Mobile typecheck ---
+$ pnpm --filter @schoolhub/mobile typecheck
+$ tsc --noEmit
+exit: 0
+
+--- Mobile lint ---
+$ pnpm --filter @schoolhub/mobile lint
+$ expo lint --max-warnings 0
+exit: 0
+
+--- Mobile format check ---
+$ pnpm --filter @schoolhub/mobile format:check
+Checking formatting...
+All matched files use Prettier code style!
+exit: 0
+
+--- Mobile Jest suite ---
+$ pnpm --filter @schoolhub/mobile test
+Test Suites: 17 passed, 17 total
+Tests:       90 passed, 90 total
+exit: 0
+Note: Jest reported open asynchronous operations after the successful test run.
+
+--- Session-expiry routing regression ---
+$ pnpm --filter @schoolhub/mobile exec jest --runInBand src/test/session.test.ts
+Test Suites: 1 passed, 1 total
+Tests:       10 passed, 10 total
+exit: 0
+
+--- Contrast audit ---
+$ pnpm --filter @schoolhub/mobile audit:contrast
+PASS: 1624 text, icon, gradient and composited chrome contrast pairs across
+light/dark themes.
+exit: 0
+
+--- Endpoint verification ---
+$ pnpm --filter @schoolhub/mobile verify:endpoints
+PASS: 7 endpoint declarations match inventory methods, paths and mobile roles.
+exit: 0
+
+--- Release and route regressions ---
+$ pnpm --filter @schoolhub/mobile test:release
+ℹ tests 41
+ℹ pass 41
+ℹ fail 0
+exit: 0
+Includes the Expo Router route-tree duplicate-URL regression.
+
+--- Expo Doctor ---
+$ cd apps/mobile && npx expo-doctor
+Running 20 checks on your project...
+20/20 checks passed. No issues detected!
+exit: 0
+
+--- Android export and release verification ---
+$ cd apps/mobile && npx expo export --platform android --source-maps --output-dir dist/android
+Android Bundled 35096ms (4355 modules)
+Hermes bundle: 6498724 bytes
+$ node scripts/verify-release.mjs dist/android
+PASS: 1 source map(s), 16 app sources; no development, mock or Super Admin routes.
+exit: 0
+
+--- iOS export and release verification ---
+$ cd apps/mobile && npx expo export --platform ios --source-maps --output-dir dist/ios
+iOS Bundled 35125ms (4356 modules)
+Hermes bundle: 6504496 bytes
+$ node scripts/verify-release.mjs dist/ios
+PASS: 1 source map(s), 16 app sources; no development, mock or Super Admin routes.
+exit: 0
+
+--- Manual checks ---
+Not run: seeded-account sign-in, physical-device/emulator accessibility and
+visual acceptance, and light/dark screenshots. The device checklist is at
+docs/validation/mobile-device-acceptance.md. Native two-factor remains deferred;
+no API changes were made.

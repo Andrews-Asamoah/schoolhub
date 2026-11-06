@@ -1,12 +1,16 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { BookOpen, CircleAlert, LoaderCircle, Plus, Search, X } from "lucide-react";
-import { useMemo, useState, type FormEvent } from "react";
+import { CircleAlert, Plus, Search } from "lucide-react";
+import { useMemo, useState } from "react";
 import {
   saveSubjectSchema,
   type SaveSubjectInput,
   type SetSubjectClassesInput,
+  type SetSubjectStrandsInput,
 } from "@schoolhub/shared";
+import { FormModal } from "@/components/ui/form-modal";
+import { BulkImportButton } from "@/components/bulk-import/bulk-import-button";
 import { FormField, FormInput, FormTextarea } from "@/components/forms/form-controls";
+import { AcademicStructureBulkImport } from "@/components/school/academic-structure-bulk-import";
 import { useSchoolRole } from "@/components/school/school-role-switcher";
 import {
   WorkspaceDataTable,
@@ -30,6 +34,16 @@ interface SubjectRow {
     teacherName: string | null;
   }[];
   teachers: { id: string; name: string }[];
+  strands: {
+    id: string;
+    name: string;
+    code: string | null;
+    description: string | null;
+    sortOrder: number;
+    examWeightPercent: number | string;
+    isActive: boolean;
+    assignments: { classId: string; className: string; teacherId: string; teacherName: string }[];
+  }[];
 }
 interface ClassOption { id: string; name: string; level: string }
 interface TeacherOption { id: string; firstName: string; lastName: string; isActive: boolean }
@@ -38,6 +52,7 @@ type Panel =
   | { type: "form"; subject?: SubjectRow }
   | { type: "classes"; subject: SubjectRow }
   | { type: "teachers"; subject: SubjectRow }
+  | { type: "strands"; subject: SubjectRow }
   | null;
 
 const linkButton =
@@ -51,6 +66,9 @@ export function SubjectsWorkspace() {
   const queryClient = useQueryClient();
   const { activeRole } = useSchoolRole();
   const canManage = ["owner", "admin", "headteacher"].includes(activeRole ?? "");
+  // The server only lets owners and administrators create subjects in bulk.
+  const canBulkImport = ["owner", "admin"].includes(activeRole ?? "");
+  const [showImport, setShowImport] = useState(false);
   const [search, setSearch] = useState("");
   const [showInactive, setShowInactive] = useState(false);
   const [panel, setPanel] = useState<Panel>(null);
@@ -62,12 +80,12 @@ export function SubjectsWorkspace() {
   const classesQuery = useQuery({
     queryKey: ["academics", "classes"],
     queryFn: () => apiFetch<ClassOption[]>("/academics/classes"),
-    enabled: canManage && panel?.type === "classes",
+    enabled: canManage && (panel?.type === "classes" || panel?.type === "strands"),
   });
   const teachersQuery = useQuery({
     queryKey: ["academics", "teachers"],
     queryFn: () => apiFetch<TeacherOption[]>("/academics/teachers"),
-    enabled: canManage && (panel?.type === "classes" || panel?.type === "teachers"),
+    enabled: canManage && (panel?.type === "classes" || panel?.type === "teachers" || panel?.type === "strands"),
   });
 
   const refresh = async () => {
@@ -115,6 +133,14 @@ export function SubjectsWorkspace() {
       await refresh();
     },
   });
+  const strandsMutation = useMutation({
+    mutationFn: ({ id, input }: { id: string; input: SetSubjectStrandsInput }) =>
+      apiFetch(`/subjects/${id}/strands`, { method: "PUT", body: JSON.stringify(input) }),
+    onSuccess: async () => {
+      setPanel(null);
+      await refresh();
+    },
+  });
   const teachersMutation = useMutation({
     mutationFn: ({ id, teacherIds }: { id: string; teacherIds: string[] }) =>
       apiFetch(`/subjects/${id}/teachers`, { method: "PUT", body: JSON.stringify({ teacherIds }) }),
@@ -123,6 +149,15 @@ export function SubjectsWorkspace() {
       await refresh();
     },
   });
+
+  // Opening a panel starts clean: a failure from an earlier attempt must not greet the next one.
+  function openPanel(next: Panel) {
+    saveMutation.reset();
+    classesMutation.reset();
+    strandsMutation.reset();
+    teachersMutation.reset();
+    setPanel(next);
+  }
 
   const subjects = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -137,7 +172,7 @@ export function SubjectsWorkspace() {
   if (subjectsQuery.error) return <Notice tone="error">{subjectsQuery.error.message}</Notice>;
 
   const actionError =
-    statusMutation.error ?? deleteMutation.error ?? classesMutation.error ?? teachersMutation.error;
+    statusMutation.error ?? deleteMutation.error;
 
   const columns: WorkspaceColumn<SubjectRow>[] = [
     {
@@ -200,9 +235,10 @@ export function SubjectsWorkspace() {
             className: "text-right",
             cell: (subject: SubjectRow) => (
               <span className="inline-flex flex-wrap justify-end gap-0.5">
-                <button type="button" className={linkButton} onClick={() => setPanel({ type: "form", subject })}>Edit</button>
-                <button type="button" className={linkButton} onClick={() => setPanel({ type: "classes", subject })}>Classes</button>
-                <button type="button" className={linkButton} onClick={() => setPanel({ type: "teachers", subject })}>Teachers</button>
+                <button type="button" className={linkButton} onClick={() => openPanel({ type: "form", subject })}>Edit</button>
+                <button type="button" className={linkButton} onClick={() => openPanel({ type: "classes", subject })}>Classes</button>
+                <button type="button" className={linkButton} onClick={() => openPanel({ type: "teachers", subject })}>Teachers</button>
+                <button type="button" className={linkButton} onClick={() => openPanel({ type: "strands", subject })}>Teaching areas{subject.strands.length ? ` (${subject.strands.filter((strand) => strand.isActive).length})` : ""}</button>
                 <button type="button" className={linkButton} disabled={statusMutation.isPending} onClick={() => statusMutation.mutate(subject)}>
                   {subject.isActive ? "Deactivate" : "Activate"}
                 </button>
@@ -245,11 +281,22 @@ export function SubjectsWorkspace() {
           </label>
         </div>
         {canManage && (
-          <button type="button" className={primary} onClick={() => { saveMutation.reset(); setPanel({ type: "form" }); }}>
-            <Plus className="size-4" /> Add subject
-          </button>
+          <div className="flex flex-wrap gap-2">
+            {canBulkImport && <BulkImportButton onClick={() => setShowImport(true)} />}
+            <button type="button" className={primary} onClick={() => openPanel({ type: "form" })}>
+              <Plus className="size-4" /> Add subject
+            </button>
+          </div>
         )}
       </section>
+
+      {canBulkImport && showImport && (
+        <AcademicStructureBulkImport
+          kind="subjects"
+          onClose={() => setShowImport(false)}
+          onComplete={() => void refresh()}
+        />
+      )}
 
       {actionError && <Notice tone="error">{actionError.message}</Notice>}
 
@@ -269,9 +316,23 @@ export function SubjectsWorkspace() {
           teachers={(teachersQuery.data ?? []).filter((teacher) => teacher.isActive)}
           loading={classesQuery.isPending || teachersQuery.isPending}
           pending={classesMutation.isPending}
-          onManageTeachers={() => setPanel({ type: "teachers", subject: panel.subject })}
+          error={classesMutation.error?.message}
+          onManageTeachers={() => openPanel({ type: "teachers", subject: panel.subject })}
           onCancel={() => setPanel(null)}
           onSave={(input) => classesMutation.mutate({ id: panel.subject.id, input })}
+        />
+      )}
+      {canManage && panel?.type === "strands" && (
+        <StrandsPanel
+          key={panel.subject.id}
+          subject={panel.subject}
+          classes={classesQuery.data ?? []}
+          teachers={(teachersQuery.data ?? []).filter((teacher) => teacher.isActive)}
+          loading={classesQuery.isPending || teachersQuery.isPending}
+          pending={strandsMutation.isPending}
+          error={strandsMutation.error?.message}
+          onCancel={() => setPanel(null)}
+          onSave={(input) => strandsMutation.mutate({ id: panel.subject.id, input })}
         />
       )}
       {canManage && panel?.type === "teachers" && (
@@ -280,6 +341,7 @@ export function SubjectsWorkspace() {
           teachers={(teachersQuery.data ?? []).filter((teacher) => teacher.isActive)}
           loading={teachersQuery.isPending}
           pending={teachersMutation.isPending}
+          error={teachersMutation.error?.message}
           onCancel={() => setPanel(null)}
           onSave={(teacherIds) => teachersMutation.mutate({ id: panel.subject.id, teacherIds })}
         />
@@ -317,34 +379,6 @@ function Notice({ children, tone = "info" }: { children: React.ReactNode; tone?:
   );
 }
 
-function PanelShell({
-  title,
-  description,
-  onCancel,
-  children,
-}: {
-  title: string;
-  description?: string;
-  onCancel: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <section className="rounded-2xl border border-primary/20 bg-card p-5 shadow-sm">
-      <div className="mb-4 flex items-start justify-between gap-3">
-        <div className="flex items-start gap-3">
-          <span className="flex size-9 items-center justify-center rounded-xl bg-primary/15 text-primary"><BookOpen className="size-4" /></span>
-          <div>
-            <h3 className="text-sm font-bold text-foreground">{title}</h3>
-            {description && <p className="mt-0.5 text-xs text-muted-foreground">{description}</p>}
-          </div>
-        </div>
-        <button type="button" onClick={onCancel} aria-label="Close" className="rounded-lg p-1.5 text-muted-foreground/70 hover:bg-muted"><X className="size-4" /></button>
-      </div>
-      {children}
-    </section>
-  );
-}
-
 function SubjectForm({
   subject,
   pending,
@@ -364,8 +398,7 @@ function SubjectForm({
   const [periods, setPeriods] = useState(String(subject?.periodsPerWeek ?? 4));
   const [problem, setProblem] = useState<string | null>(null);
 
-  function submit(event: FormEvent) {
-    event.preventDefault();
+  function submit() {
     const parsed = saveSubjectSchema.safeParse({
       name,
       code,
@@ -382,32 +415,29 @@ function SubjectForm({
   }
 
   return (
-    <PanelShell title={subject ? `Edit ${subject.name}` : "Add subject"} onCancel={onCancel}>
-      <form onSubmit={submit} className="space-y-4" noValidate>
-        <div className="grid gap-4 sm:grid-cols-3">
-          <FormField label="Subject name" htmlFor="subject-name">
-            <FormInput id="subject-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Mathematics" />
-          </FormField>
-          <FormField label="Code" htmlFor="subject-code" hint="Letters and numbers, e.g. MATH">
-            <FormInput id="subject-code" value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} placeholder="MATH" />
-          </FormField>
-          <FormField label="Periods per week" htmlFor="subject-periods">
-            <FormInput id="subject-periods" type="number" min={1} max={20} value={periods} onChange={(e) => setPeriods(e.target.value)} />
-          </FormField>
-        </div>
-        <FormField label="Description (optional)" htmlFor="subject-description">
-          <FormTextarea id="subject-description" rows={2} value={description} onChange={(e) => setDescription(e.target.value)} />
+    <FormModal
+      title={subject ? `Edit ${subject.name}` : "Add subject"}
+      onClose={onCancel}
+      onSubmit={submit}
+      submitLabel={subject ? "Save changes" : "Add subject"}
+      submitting={pending}
+      error={problem ?? error}
+    >
+      <div className="grid gap-4 sm:grid-cols-3">
+        <FormField label="Subject name" htmlFor="subject-name">
+          <FormInput id="subject-name" data-autofocus value={name} onChange={(e) => setName(e.target.value)} placeholder="Mathematics" />
         </FormField>
-        {(problem || error) && <Notice tone="error">{problem ?? error}</Notice>}
-        <div className="flex justify-end gap-2">
-          <button type="button" className={outline} onClick={onCancel}>Cancel</button>
-          <button type="submit" className={primary} disabled={pending}>
-            {pending && <LoaderCircle className="size-3.5 animate-spin" />}
-            {subject ? "Save changes" : "Add subject"}
-          </button>
-        </div>
-      </form>
-    </PanelShell>
+        <FormField label="Code" htmlFor="subject-code" hint="Letters and numbers, e.g. MATH">
+          <FormInput id="subject-code" value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} placeholder="MATH" />
+        </FormField>
+        <FormField label="Periods per week" htmlFor="subject-periods">
+          <FormInput id="subject-periods" type="number" min={1} max={20} value={periods} onChange={(e) => setPeriods(e.target.value)} />
+        </FormField>
+      </div>
+      <FormField label="Description (optional)" htmlFor="subject-description">
+        <FormTextarea id="subject-description" rows={2} value={description} onChange={(e) => setDescription(e.target.value)} />
+      </FormField>
+    </FormModal>
   );
 }
 
@@ -417,6 +447,7 @@ function ClassAssignmentPanel({
   teachers,
   loading,
   pending,
+  error,
   onSave,
   onManageTeachers,
   onCancel,
@@ -426,6 +457,7 @@ function ClassAssignmentPanel({
   teachers: TeacherOption[];
   loading: boolean;
   pending: boolean;
+  error?: string;
   onSave: (input: SetSubjectClassesInput) => void;
   onManageTeachers: () => void;
   onCancel: () => void;
@@ -459,11 +491,27 @@ function ClassAssignmentPanel({
     });
   }
 
+  function save() {
+    onSave({
+      assignments: [...selected].map(([classId, row]) => ({
+        classId,
+        teacherId: row.teacherId || null,
+        isCompulsory: row.isCompulsory,
+      })),
+    });
+  }
+
   return (
-    <PanelShell
+    <FormModal
       title={`Classes studying ${subject.name}`}
       description="Tick the classes that take this subject and optionally choose who teaches it in each. Only teachers assigned to this subject are listed."
-      onCancel={onCancel}
+      size="3xl"
+      onClose={onCancel}
+      onSubmit={save}
+      submitLabel="Save assignments"
+      submitting={pending}
+      submitDisabled={loading}
+      error={error}
     >
       {!loading && subjectTeachers.length === 0 && (
         <p className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-warning/20 bg-warning/10 px-3 py-2 text-xs text-warning">
@@ -513,27 +561,196 @@ function ClassAssignmentPanel({
           })}
         </ul>
       )}
-      <div className="mt-4 flex justify-end gap-2">
-        <button type="button" className={outline} onClick={onCancel}>Cancel</button>
-        <button
-          type="button"
-          className={primary}
-          disabled={pending || loading}
-          onClick={() =>
-            onSave({
-              assignments: [...selected].map(([classId, row]) => ({
-                classId,
-                teacherId: row.teacherId || null,
-                isCompulsory: row.isCompulsory,
-              })),
-            })
-          }
-        >
-          {pending && <LoaderCircle className="size-3.5 animate-spin" />}
-          Save assignments
-        </button>
-      </div>
-    </PanelShell>
+    </FormModal>
+  );
+}
+
+
+interface StrandDraft {
+  key: string;
+  id?: string;
+  name: string;
+  code: string;
+  description: string;
+  examWeightPercent: string;
+  isActive: boolean;
+  assignments: Record<string, string>;
+}
+
+function StrandsPanel({
+  subject,
+  classes,
+  teachers,
+  loading,
+  pending,
+  error,
+  onSave,
+  onCancel,
+}: {
+  subject: SubjectRow;
+  classes: ClassOption[];
+  teachers: TeacherOption[];
+  loading: boolean;
+  pending: boolean;
+  error?: string;
+  onSave: (input: SetSubjectStrandsInput) => void;
+  onCancel: () => void;
+}) {
+  const qualifiedIds = new Set(subject.teachers.map((teacher) => teacher.id));
+  const qualifiedTeachers = teachers.filter((teacher) => qualifiedIds.has(teacher.id));
+  const offeredClassIds = new Set(subject.classes.map((row) => row.classId));
+  const offeredClasses = classes.filter((row) => offeredClassIds.has(row.id));
+  const [strands, setStrands] = useState<StrandDraft[]>(() => subject.strands.map((strand) => ({
+    key: strand.id,
+    id: strand.id,
+    name: strand.name,
+    code: strand.code ?? "",
+    description: strand.description ?? "",
+    examWeightPercent: String(strand.examWeightPercent ?? 0),
+    isActive: strand.isActive,
+    assignments: Object.fromEntries(strand.assignments.map((assignment) => [assignment.classId, assignment.teacherId])),
+  })));
+  const [problem, setProblem] = useState<string | null>(null);
+
+  function update(key: string, change: Partial<StrandDraft>) {
+    setStrands((current) => current.map((strand) => strand.key === key ? { ...strand, ...change } : strand));
+  }
+
+  function submit() {
+    const active = strands.filter((strand) => strand.isActive);
+    if (!active.length && strands.length) {
+      setProblem("Keep at least one teaching area active, or deactivate the subject itself.");
+      return;
+    }
+    for (const strand of active) {
+      if (strand.name.trim().length < 2) {
+        setProblem("Every active teaching area needs a name.");
+        return;
+      }
+      if (!offeredClasses.length) {
+        setProblem("Assign this subject to at least one class before assigning teaching areas.");
+        return;
+      }
+      const assigned = Object.values(strand.assignments).filter(Boolean);
+      if (assigned.length !== offeredClasses.length) {
+        setProblem(`Assign a qualified teacher for ${strand.name} in every class that takes ${subject.code}.`);
+        return;
+      }
+    }
+    const weights = active.map((strand) => Number(strand.examWeightPercent) || 0);
+    if (weights.some((weight) => weight > 0) && Math.abs(weights.reduce((sum, weight) => sum + weight, 0) - 100) > 0.01) {
+      setProblem("When examination contributions are configured, teaching-area weights must add up to 100%.");
+      return;
+    }
+    setProblem(null);
+    onSave({
+      strands: strands.map((strand, sortOrder) => ({
+        ...(strand.id ? { id: strand.id } : {}),
+        name: strand.name.trim(),
+        code: strand.code.trim() || undefined,
+        description: strand.description.trim() || undefined,
+        sortOrder,
+        examWeightPercent: Number(strand.examWeightPercent) || 0,
+        isActive: strand.isActive,
+        assignments: strand.isActive ? offeredClasses.map((schoolClass) => ({
+          classId: schoolClass.id,
+          teacherId: strand.assignments[schoolClass.id] ?? "",
+        })).filter((assignment) => assignment.teacherId) : [],
+      })),
+    });
+  }
+
+  return (
+    <FormModal
+      title={`Teaching areas for ${subject.name}`}
+      description={`Keep ${subject.code} as one reportable subject. Each teaching area has a class-specific teacher allocation and can own its assessment components.`}
+      size="4xl"
+      onClose={onCancel}
+      onSubmit={submit}
+      submitLabel="Save teaching areas"
+      submitting={pending}
+      submitDisabled={loading || !qualifiedTeachers.length || !offeredClasses.length}
+      error={problem ?? error}
+    >
+      {!qualifiedTeachers.length && (
+        <p className="mb-3 rounded-lg border border-warning/20 bg-warning/10 px-3 py-2 text-xs text-warning">
+          First use the Teachers action to add qualified teachers to {subject.name}. Only qualified teachers can be assigned to a teaching area.
+        </p>
+      )}
+      {!offeredClasses.length && (
+        <p className="mb-3 rounded-lg border border-warning/20 bg-warning/10 px-3 py-2 text-xs text-warning">
+          Assign {subject.name} to classes first. Teaching-area responsibilities are set per class.
+        </p>
+      )}
+      {loading ? (
+        <p className="text-xs text-muted-foreground">Loading classes and teachers…</p>
+      ) : (
+        <div className="space-y-3">
+          {strands.map((strand, index) => (
+            <section key={strand.key} className="space-y-3 rounded-xl border border-border p-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <input
+                  className="h-9 min-w-[180px] flex-1 rounded-lg border border-border bg-card px-3 text-xs"
+                  aria-label={`Teaching area ${index + 1} name`}
+                  value={strand.name}
+                  onChange={(event) => update(strand.key, { name: event.target.value })}
+                  placeholder="e.g. Visual Arts"
+                  disabled={!strand.isActive}
+                />
+                <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <input type="checkbox" checked={strand.isActive} onChange={(event) => update(strand.key, { isActive: event.target.checked })} />
+                  Active
+                </label>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-3">
+                <FormField label="Code (optional)" htmlFor={`strand-code-${strand.key}`}>
+                  <FormInput id={`strand-code-${strand.key}`} value={strand.code} onChange={(event) => update(strand.key, { code: event.target.value.toUpperCase() })} disabled={!strand.isActive} placeholder="ART" />
+                </FormField>
+                <FormField label="Exam contribution (%)" htmlFor={`strand-weight-${strand.key}`} hint="Optional; active areas must total 100% when used.">
+                  <FormInput id={`strand-weight-${strand.key}`} type="number" min={0} max={100} step="0.01" value={strand.examWeightPercent} onChange={(event) => update(strand.key, { examWeightPercent: event.target.value })} disabled={!strand.isActive} />
+                </FormField>
+                <FormField label="Description (optional)" htmlFor={`strand-description-${strand.key}`}>
+                  <FormInput id={`strand-description-${strand.key}`} value={strand.description} onChange={(event) => update(strand.key, { description: event.target.value })} disabled={!strand.isActive} />
+                </FormField>
+              </div>
+              {strand.isActive && offeredClasses.map((schoolClass) => (
+                <div key={schoolClass.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-muted/40 px-3 py-2">
+                  <span className="text-xs font-semibold">{schoolClass.name}</span>
+                  <Select
+                    value={strand.assignments[schoolClass.id] || "__none__"}
+                    onValueChange={(teacherId) => update(strand.key, { assignments: { ...strand.assignments, [schoolClass.id]: teacherId === "__none__" ? "" : teacherId } })}
+                  >
+                    <SelectTrigger aria-label={`${strand.name} teacher for ${schoolClass.name}`} className="h-9 min-w-48 rounded-lg border border-border bg-card px-3 text-xs">
+                      <SelectValue placeholder="Choose teacher" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__">Choose teacher</SelectItem>
+                      {qualifiedTeachers.map((teacher) => (
+                        <SelectItem key={teacher.id} value={teacher.id}>{teacher.firstName} {teacher.lastName}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              ))}
+            </section>
+          ))}
+          {!strands.length && <p className="rounded-lg border border-dashed border-border p-4 text-xs text-muted-foreground">No teaching areas configured. Add one only when the subject is genuinely delivered by different specialists.</p>}
+          {strands.length < 50 && (
+            <button type="button" className={outline} onClick={() => setStrands((current) => [...current, {
+              key: `new-${Date.now()}-${current.length}`,
+              name: "",
+              code: "",
+              description: "",
+              examWeightPercent: "0",
+              isActive: true,
+              assignments: {},
+            }])}>
+              <Plus className="size-4" /> Add teaching area
+            </button>
+          )}
+        </div>
+      )}
+    </FormModal>
   );
 }
 
@@ -542,6 +759,7 @@ function TeacherPanel({
   teachers,
   loading,
   pending,
+  error,
   onSave,
   onCancel,
 }: {
@@ -549,15 +767,22 @@ function TeacherPanel({
   teachers: TeacherOption[];
   loading: boolean;
   pending: boolean;
+  error?: string;
   onSave: (teacherIds: string[]) => void;
   onCancel: () => void;
 }) {
   const [selected, setSelected] = useState(() => new Set(subject.teachers.map((teacher) => teacher.id)));
   return (
-    <PanelShell
+    <FormModal
       title={`Teachers qualified for ${subject.name}`}
       description="These teachers can be suggested when this subject is placed on the timetable."
-      onCancel={onCancel}
+      size="3xl"
+      onClose={onCancel}
+      onSubmit={() => onSave([...selected])}
+      submitLabel="Save teachers"
+      submitting={pending}
+      submitDisabled={loading}
+      error={error}
     >
       {loading ? (
         <p className="text-xs text-muted-foreground">Loading teachers…</p>
@@ -586,13 +811,6 @@ function TeacherPanel({
           {teachers.length === 0 && <li className="text-xs text-muted-foreground">No active teachers yet.</li>}
         </ul>
       )}
-      <div className="mt-4 flex justify-end gap-2">
-        <button type="button" className={outline} onClick={onCancel}>Cancel</button>
-        <button type="button" className={primary} disabled={pending || loading} onClick={() => onSave([...selected])}>
-          {pending && <LoaderCircle className="size-3.5 animate-spin" />}
-          Save teachers
-        </button>
-      </div>
-    </PanelShell>
+    </FormModal>
   );
 }

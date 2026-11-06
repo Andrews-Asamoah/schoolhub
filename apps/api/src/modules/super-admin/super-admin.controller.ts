@@ -71,6 +71,20 @@ export class SuperAdminController {
   constructor(private readonly superAdminService: SuperAdminService) {}
 
 
+  @Get("schools/:id/readiness")
+  @Header("Cache-Control", "no-store")
+  schoolReadiness(@Param("id") id: string) {
+    return this.superAdminService.getSchoolReadiness(id);
+  }
+
+  @Post("schools/:id/jobs/:jobId/retry")
+  @Throttle(WRITE_LIMIT)
+  retrySchoolJob(@Param("id") id: string, @Param("jobId") jobId: string,
+    @Body(new ZodValidationPipe(z.object({reason:z.string().trim().min(10).max(500)}))) body:{reason:string},
+    @AuditActorParam() actor:AuditActor) {
+    return this.superAdminService.retrySchoolIntegrityJob(id,jobId,body.reason,actor);
+  }
+
   @Patch("schools/:id/plan")
   @Throttle(WRITE_LIMIT)
   @Header("Cache-Control", "no-store")

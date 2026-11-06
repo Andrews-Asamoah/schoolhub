@@ -2,6 +2,26 @@ import { BadRequestException, ConflictException, Injectable, NotFoundException }
 import { Prisma } from "@prisma/client";
 import { PrismaService } from "../../prisma/prisma.service.js";
 import { snapshotHash } from "./report-version.js";
+import { buildSubjectRow, buildSummary, overallPositions, summariseAttendance } from "./report-card-data.js";
+
+const APPROVAL_FIELDS = { teacherName: true, teacherRemark: true, teacherSignature: true, headName: true, headRemark: true, headSignature: true } as const;
+type ApprovalVersion = { setId: string; teacherName: string | null; teacherRemark: string | null; teacherSignature: string | null; headName: string | null; headRemark: string | null; headSignature: string | null };
+
+/** The newest published version per key; rows must already be ordered newest first. */
+function latestBySet<T extends { setId: string }>(rows: T[]): Map<string, T> {
+  const map = new Map<string, T>();
+  for (const row of rows) if (!map.has(row.setId)) map.set(row.setId, row);
+  return map;
+}
+
+/** The class teacher's and headteacher's remarks and signatures, as families see them. */
+function approvalOf(version: ApprovalVersion | undefined) {
+  if (!version) return null;
+  return {
+    teacher: { name: version.teacherName, remark: version.teacherRemark, signature: version.teacherSignature },
+    head: { name: version.headName, remark: version.headRemark, signature: version.headSignature },
+  };
+}
 
 @Injectable()
 export class ReportPublicationService {
@@ -59,10 +79,11 @@ export class ReportPublicationService {
     });
     const published = await this.prisma.client.reportCardVersion.findMany({
       where: { schoolId, studentId: student.id, stage: "PUBLISHED", publishedAt: { not: null } },
-      select: { setId: true },
+      orderBy: { version: "desc" },
+      select: { setId: true, ...APPROVAL_FIELDS },
     });
-    const available = new Set(published.map(v => v.setId));
-    return reports.map(report => ({ ...report, pdfAvailable: available.has(report.setId) }));
+    const bySet = latestBySet(published);
+    return reports.map(report => ({ ...report, pdfAvailable: bySet.has(report.setId), approval: approvalOf(bySet.get(report.setId)) }));
   }
 
   async getGuardianPublishedReports(schoolId: string, userId: string) {
@@ -81,11 +102,14 @@ export class ReportPublicationService {
     const published = await this.prisma.client.reportCardVersion.findMany({
       where: { schoolId, studentId: { in: studentIds }, stage: "PUBLISHED",
         publishedAt: { not: null } },
-      select: { setId: true, studentId: true },
+      orderBy: { version: "desc" },
+      select: { setId: true, studentId: true, ...APPROVAL_FIELDS },
     });
-    const available = new Set(published.map(v => v.setId + ":" + v.studentId));
-    return reports.map(report => ({ ...report,
-      pdfAvailable: available.has(report.setId + ":" + report.studentId) }));
+    const byReport = latestBySet(published.map(v => ({ ...v, setId: v.setId + ":" + v.studentId })));
+    return reports.map(report => {
+      const version = byReport.get(report.setId + ":" + report.studentId);
+      return { ...report, pdfAvailable: !!version, approval: approvalOf(version) };
+    });
   }
 
   async createSet(schoolId: string, actorId: string, input: { name: string; templateId: string; academicYearId: string; termId: string; classIds: string[]; publishAt: string | null }) {
@@ -112,7 +136,7 @@ export class ReportPublicationService {
       include: { targetClasses: { select: { classId: true } },
         school: { select: { name: true, code: true, motto: true } },
         template: { select: { name: true, layout: true } },
-        academicYear: { select: { name: true } }, term: { select: { name: true } } } });
+        academicYear: { select: { name: true } }, term: { select: { name: true, startDate: true, endDate: true } } } });
     if (!set) throw new NotFoundException("Report batch not found.");
     if (set.status === "PUBLISHED" || set.status === "ARCHIVED") throw new ConflictException("Published or archived reports cannot be regenerated.");
     if (set.status === "GENERATING") throw new ConflictException("This report batch is already being generated.");
@@ -130,11 +154,40 @@ export class ReportPublicationService {
           id: true, admissionNumber: true,
           profile: { select: { firstName: true, lastName: true } },
           enrollments: { where: { academicYearId: set.academicYearId, termId: set.termId, status: { in: ["ACTIVE", "COMPLETED"] }, classId: { in: classIds } }, select: { class: { select: { id: true, name: true, level: true } } }, take: 1 },
-          assessmentScores: { where: { termId: set.termId, status: "FINAL" }, include: { subject: { select: { id: true, name: true, code: true } }, componentScores: { include: { component: { select: { id: true, name: true, weight: true, maxMarks: true } } }, orderBy: { createdAt: "asc" } } } },
+          assessmentScores: { where: { termId: set.termId, status: "FINAL" }, include: { subject: { select: { id: true, name: true, code: true } }, template: { select: { components: { select: { id: true, componentType: true, maxMarks: true, weight: true } }, gradingSystem: { select: { gradeScales: { select: { grade: true, description: true } } } } } }, componentScores: { include: { component: { select: { id: true, name: true, weight: true, maxMarks: true } } }, orderBy: { createdAt: "asc" } } } },
           remarks: { where: { termId: set.termId }, include: { teacher: { include: { profile: true } } } },
         },
       });
       const reportableStudents = students.filter((student) => student.assessmentScores.length > 0);
+      const [classSizes, attendanceRows] = await Promise.all([
+        db.enrollment.groupBy({
+          by: ["classId"],
+          where: { academicYearId: set.academicYearId, termId: set.termId, classId: { in: classIds }, status: { in: ["ACTIVE", "COMPLETED"] }, student: { schoolId, deletedAt: null } },
+          _count: { _all: true },
+        }),
+        db.attendance.findMany({
+          where: { studentId: { in: reportableStudents.map((student) => student.id) }, date: { gte: set.term.startDate, lte: set.term.endDate } },
+          select: { studentId: true, status: true },
+        }),
+      ]);
+      const sizeByClass = new Map(classSizes.map((row) => [row.classId, row._count._all]));
+      const statusesByStudent = new Map<string, string[]>();
+      for (const row of attendanceRows) statusesByStudent.set(row.studentId, [...(statusesByStudent.get(row.studentId) ?? []), row.status]);
+      const subjectsByStudent = new Map(reportableStudents.map((student) => [
+        student.id,
+        student.assessmentScores.map((score) => buildSubjectRow({
+          subject: score.subject, totalScore: Number(score.totalScore), percentage: Number(score.percentage), grade: score.grade, position: score.position, remarks: score.remarks,
+          template: {
+            components: score.template.components.map((c) => ({ id: c.id, componentType: c.componentType, maxMarks: Number(c.maxMarks), weight: Number(c.weight) })),
+            gradeScales: score.template.gradingSystem.gradeScales,
+          },
+          cells: score.componentScores.map((c) => ({ componentId: c.componentId, componentName: c.component.name, weight: Number(c.component.weight), marksObtained: Number(c.marksObtained), maxMarks: Number(c.maxMarks), percentage: Number(c.percentage) })),
+        })),
+      ]));
+      const positions = overallPositions(reportableStudents.flatMap((student) => {
+        const classId = student.enrollments[0]?.class.id;
+        return classId ? [{ id: student.id, classId, subjectPercentages: subjectsByStudent.get(student.id)!.map((row) => row.percentage) }] : [];
+      }));
       if (!reportableStudents.length) {
         throw new BadRequestException("No finalized assessment scores were found for the selected classes and term. Finalize marks before generating reports.");
       }
@@ -151,7 +204,19 @@ export class ReportPublicationService {
           where: { setId: set.id, studentId: { notIn: reportableStudents.map((student) => student.id) } },
         });
         for (const student of reportableStudents) {
-          const data = { schemaVersion: 1, student: { id: student.id, class: student.enrollments[0]?.class ?? null }, academicYearId: set.academicYearId, termId: set.termId, subjects: student.assessmentScores.map((score) => ({ subject: score.subject, totalScore: Number(score.totalScore), percentage: Number(score.percentage), grade: score.grade, position: score.position, remarks: score.remarks, components: score.componentScores.map((c) => ({ name: c.component.name, marksObtained: Number(c.marksObtained), maxMarks: Number(c.maxMarks), percentage: Number(c.percentage), weight: Number(c.component.weight) })) })), remarks: student.remarks.map((r) => ({ type: r.remarkType, content: r.content, teacher: [r.teacher.profile?.firstName, r.teacher.profile?.lastName].filter(Boolean).join(" ") })), generatedAt: new Date().toISOString() };
+          const subjects = subjectsByStudent.get(student.id)!;
+          const classRow = student.enrollments[0]?.class ?? null;
+          const data = {
+            schemaVersion: 2,
+            student: { id: student.id, class: classRow },
+            academicYearId: set.academicYearId,
+            termId: set.termId,
+            summary: buildSummary(subjects, positions.get(student.id) ?? null, classRow ? (sizeByClass.get(classRow.id) ?? 0) : 0),
+            attendance: summariseAttendance(statusesByStudent.get(student.id) ?? []),
+            subjects,
+            remarks: student.remarks.map((r) => ({ type: r.remarkType, content: r.content, teacher: [r.teacher.profile?.firstName, r.teacher.profile?.lastName].filter(Boolean).join(" ") })),
+            generatedAt: new Date().toISOString(),
+          };
           await tx.reportCard.upsert({ where: { setId_studentId: { setId: set.id, studentId: student.id } }, create: { setId: set.id, studentId: student.id, data: data as Prisma.InputJsonValue }, update: { data: data as Prisma.InputJsonValue, publishedAt: null } });
           const classId = student.enrollments[0]?.class.id;
           if (!classId) throw new BadRequestException("Student's class enrolment is required for report approval.");

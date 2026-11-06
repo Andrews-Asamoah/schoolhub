@@ -4,7 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
-import type { School } from "@prisma/client";
+import type { School, Prisma } from "@prisma/client";
 import { PrismaService } from "../../prisma/prisma.service.js";
 import type { AuthenticatedUser } from "../../common/decorators/current-user.decorator.js";
 import { TeacherScopeService } from "../../common/scope/teacher-scope.service.js";
@@ -127,6 +127,38 @@ export class MessagesService {
           : { where: { recipientId: userId }, select: { id: true, recipientId: true, isRead: true, readAt: true } },
       },
     });
+  }
+
+  /** Cursor history is additive: legacy mobile clients retain their array contract. */
+  async listMessagePage(schoolId: string, userId: string, folder: "inbox" | "sent", query: { cursor?: string; search?: string; limit?: string }) {
+    const limit = query.limit === undefined ? 30 : Number(query.limit);
+    if (!Number.isInteger(limit) || limit < 1 || limit > 100) throw new BadRequestException("Choose a page size from 1 to 100.");
+    let cursor: { createdAt: string; id: string } | null = null;
+    if (query.cursor) {
+      try {
+        if (query.cursor.length > 1000) throw new Error();
+        const value = JSON.parse(Buffer.from(query.cursor, "base64url").toString()) as { createdAt?: unknown; id?: unknown };
+        if (typeof value.id !== "string" || !value.id || typeof value.createdAt !== "string" || !Number.isFinite(Date.parse(value.createdAt))) throw new Error();
+        cursor = { id: value.id, createdAt: value.createdAt };
+      } catch { throw new BadRequestException("Invalid message cursor."); }
+    }
+    const search = query.search?.trim().slice(0, 100);
+    const scope: Prisma.SchoolMessageWhereInput = folder === "sent" ? { schoolId, senderId: userId } : { schoolId, recipients: { some: { recipientId: userId } } };
+    const rows = await this.prisma.client.schoolMessage.findMany({
+      where: { ...scope, AND: [
+        ...(search ? [{ OR: [{ subject: { contains: search, mode: "insensitive" as const } }, { body: { contains: search, mode: "insensitive" as const } }] }] : []),
+        ...(cursor ? [{ OR: [{ createdAt: { lt: new Date(cursor.createdAt) } }, { createdAt: new Date(cursor.createdAt), id: { lt: cursor.id } }] }] : []),
+      ] },
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: limit + 1,
+      include: {
+        sender: { select: { id: true, name: true, email: true, image: true } },
+        recipients: folder === "sent" ? { include: { recipient: { select: { id: true, name: true, email: true } } } }
+          : { where: { recipientId: userId }, select: { id: true, recipientId: true, isRead: true, readAt: true } },
+      },
+    });
+    const items = rows.slice(0, limit), last = items.at(-1);
+    const unreadCount = await this.prisma.client.schoolMessageRecipient.count({ where: { recipientId: userId, isRead: false, message: { schoolId } } });
+    return { items, unreadCount, nextCursor: rows.length > limit && last ? Buffer.from(JSON.stringify({ createdAt: last.createdAt.toISOString(), id: last.id })).toString("base64url") : null };
   }
 
   async send(

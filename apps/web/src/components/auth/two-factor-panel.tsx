@@ -3,6 +3,7 @@ import QRCode from "qrcode";
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { authClient, useSession } from "@/lib/auth-client";
 import { cn } from "@/lib/utils";
+import { downloadBlob } from "@/lib/download";
 
 type Step = "idle" | "password" | "scan" | "done" | "codes-password" | "codes" | "disable";
 
@@ -41,12 +42,7 @@ function BackupCodes({ codes }: { codes: string[] }) {
 
   function download() {
     const blob = new Blob([`SchoolHub backup codes\nEach code works once. Keep this file somewhere safe and private.\n\n${text}\n`], { type: "text/plain" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = "schoolhub-backup-codes.txt";
-    link.click();
-    URL.revokeObjectURL(url);
+    downloadBlob(blob, "schoolhub-backup-codes.txt");
   }
 
   return (

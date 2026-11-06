@@ -10,12 +10,14 @@ import {
   type SaveTimetableEntryInput,
   type TimetableDay,
 } from "@schoolhub/shared";
+import { BulkImportButton } from "@/components/bulk-import/bulk-import-button";
 import { FormField, FormInput } from "@/components/forms/form-controls";
 import { TableExportMenu } from "@/components/ui/data-table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCanExportTables } from "@/lib/table-export-policy";
 import type { ExportTable } from "@/lib/table-export";
 import { useSchoolRole } from "@/components/school/school-role-switcher";
+import { TimetableBulkImport } from "@/components/school/timetable-bulk-import";
 import { apiFetch } from "@/lib/api";
 
 interface Period { id: string; name: string; startTime: string; endTime: string; sortOrder: number; departmentId: string | null }
@@ -28,9 +30,14 @@ interface Setup {
   classrooms: Room[];
   classes: { id: string; name: string; level: string; departmentId: string | null }[];
   departments: Department[];
-  subjects: { id: string; name: string; code: string; periodsPerWeek: number }[];
+  subjects: { id: string; name: string; code: string; periodsPerWeek: number; strands: { id: string; name: string; code: string | null }[] }[];
   teachers: { id: string; name: string }[];
-  classSubjects: { classId: string; subjectId: string; teacherId: string | null }[];
+  classSubjects: {
+    classId: string;
+    subjectId: string;
+    teacherId: string | null;
+    strandAssignments: { subjectStrandId: string; teacherId: string }[];
+  }[];
 }
 interface Entry {
   id: string;
@@ -41,6 +48,7 @@ interface Entry {
   endTime: string;
   class: { id: string; name: string } | null;
   subject: { id: string; name: string; code: string } | null;
+  subjectStrand: { id: string; name: string } | null;
   teacher: { id: string; name: string } | null;
   classroom: { id: string; name: string } | null;
 }
@@ -71,6 +79,7 @@ export function TimetableWorkspace() {
   const [yearId, setYearId] = useState("");
   const [editor, setEditor] = useState<Editor>(null);
   const [manage, setManage] = useState<"periods" | "rooms" | null>(null);
+  const [showImport, setShowImport] = useState(false);
 
   const setupQuery = useQuery({
     queryKey: ["timetable", "setup", yearId],
@@ -213,6 +222,7 @@ export function TimetableWorkspace() {
             <div className="ml-auto flex gap-2">
               {canExport && visiblePeriods.length > 0 && targetId && <TableExportMenu build={buildGridExport} />}
               {canEdit && (<>
+              <BulkImportButton className="h-9 text-xs" onClick={() => setShowImport(true)} disabled={setup.periods.length === 0} title={setup.periods.length === 0 ? "Set up periods first" : undefined} />
               <button type="button" className={outline} onClick={() => setManage(manage === "periods" ? null : "periods")}>
                 <CalendarClock className="size-4" /> Periods
               </button>
@@ -240,6 +250,21 @@ export function TimetableWorkspace() {
       )}
       {canEdit && manage === "rooms" && (
         <RoomManager rooms={setup.classrooms} onClose={() => setManage(null)} onChanged={refresh} />
+      )}
+      {canEdit && showImport && (
+        <TimetableBulkImport
+          academicYearId={setup.academicYear.id}
+          academicYearName={setup.academicYear.name}
+          lists={{
+            classes: setup.classes.map((c) => c.name),
+            periods: [...new Set(setup.periods.map((p) => p.name))],
+            subjects: setup.subjects.map((s) => s.name),
+            teachers: setup.teachers.map((t) => t.name),
+            rooms: setup.classrooms.map((r) => r.name),
+          }}
+          onClose={() => setShowImport(false)}
+          onComplete={() => void refresh()}
+        />
       )}
 
       {visiblePeriods.length === 0 ? (
@@ -345,6 +370,7 @@ function EntryCard({ entry, view, onClick }: { entry: Entry; view: View; onClick
   const content = (
     <>
       <span className="block truncate text-xs font-semibold">{title}</span>
+      {entry.subjectStrand && <span className="block truncate text-[10px] font-semibold opacity-90">{entry.subjectStrand.name}</span>}
       {second && <span className="block truncate text-[10px] opacity-80">{second}</span>}
       {view !== "room" && entry.classroom && <span className="block truncate text-[10px] opacity-70">{entry.classroom.name}</span>}
       {view === "room" && entry.teacher && <span className="block truncate text-[10px] opacity-70">{entry.teacher.name}</span>}
@@ -376,6 +402,7 @@ function EntryEditor({
   const { entry, day, period } = editor;
   const [type, setType] = useState<Entry["type"]>(entry?.type ?? "LESSON");
   const [subjectId, setSubjectId] = useState(entry?.subject?.id ?? "");
+  const [subjectStrandId, setSubjectStrandId] = useState(entry?.subjectStrand?.id ?? "");
   const [teacherId, setTeacherId] = useState(entry?.teacher?.id ?? "");
   const [classroomId, setClassroomId] = useState(entry?.classroom?.id ?? "");
   const [label, setLabel] = useState(entry?.label ?? "");
@@ -386,7 +413,12 @@ function EntryEditor({
   const subjectChoices = classSubjectIds.length
     ? setup.subjects.filter((subject) => classSubjectIds.some((row) => row.subjectId === subject.id))
     : setup.subjects;
-  const suggestedTeacher = classSubjectIds.find((row) => row.subjectId === subjectId)?.teacherId ?? "";
+  const currentClassSubject = classSubjectIds.find((row) => row.subjectId === subjectId);
+  const selectedSubject = subjectChoices.find((subject) => subject.id === subjectId);
+  const isStrandSubject = Boolean(selectedSubject?.strands.length);
+  const selectedStrand = selectedSubject?.strands.find((strand) => strand.id === subjectStrandId);
+  const strandTeacherId = currentClassSubject?.strandAssignments.find((row) => row.subjectStrandId === subjectStrandId)?.teacherId ?? "";
+  const suggestedTeacher = isStrandSubject ? strandTeacherId : currentClassSubject?.teacherId ?? "";
 
   const mutation = useMutation({
     mutationFn: (input: SaveTimetableEntryInput) =>
@@ -409,7 +441,8 @@ function EntryEditor({
       periodId: period.id,
       type,
       subjectId: subjectId || undefined,
-      teacherId: type === "LESSON" ? teacherId || undefined : undefined,
+      subjectStrandId: type === "LESSON" ? subjectStrandId || undefined : undefined,
+      teacherId: type === "LESSON" ? (isStrandSubject ? strandTeacherId || undefined : teacherId || undefined) : undefined,
       classroomId: type === "BREAK" ? undefined : classroomId || undefined,
       label: label || undefined,
     });
@@ -448,8 +481,9 @@ function EntryEditor({
               <Select value={subjectId || "__none__"} onValueChange={(value) => {
                 const nextSubjectId = value === "__none__" ? "" : value;
                 setSubjectId(nextSubjectId);
+                setSubjectStrandId("");
                 const suggestion = classSubjectIds.find((row) => row.subjectId === nextSubjectId)?.teacherId;
-                if (suggestion && !teacherId) setTeacherId(suggestion);
+                setTeacherId(suggestion ?? "");
               }}>
                 <SelectTrigger id="entry-subject" className={selectClass}><SelectValue placeholder="Choose…" /></SelectTrigger>
                 <SelectContent>
@@ -459,9 +493,26 @@ function EntryEditor({
               </Select>
             </FormField>
           )}
+          {type === "LESSON" && isStrandSubject && (
+            <FormField label="Teaching area" htmlFor="entry-strand">
+              <Select value={subjectStrandId || "__none__"} onValueChange={(value) => {
+                const nextId = value === "__none__" ? "" : value;
+                setSubjectStrandId(nextId);
+                const assignment = currentClassSubject?.strandAssignments.find((row) => row.subjectStrandId === nextId);
+                setTeacherId(assignment?.teacherId ?? "");
+              }}>
+                <SelectTrigger id="entry-strand" className={selectClass}><SelectValue placeholder="Choose teaching area…" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">Choose teaching area…</SelectItem>
+                  {selectedSubject?.strands.map((strand) => <SelectItem key={strand.id} value={strand.id}>{strand.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              {selectedStrand && !strandTeacherId && <p className="mt-1 text-[11px] text-destructive">No teacher is assigned to this teaching area in this class.</p>}
+            </FormField>
+          )}
           {type === "LESSON" && (
-            <FormField label="Teacher" htmlFor="entry-teacher" hint={suggestedTeacher ? "Assigned teacher pre-selected" : "Leave blank to use the assigned teacher"}>
-              <Select value={teacherId || "__automatic__"} onValueChange={(value) => setTeacherId(value === "__automatic__" ? "" : value)}>
+            <FormField label="Teacher" htmlFor="entry-teacher" hint={isStrandSubject ? "Teacher is fixed by the class teaching-area assignment" : suggestedTeacher ? "Assigned teacher pre-selected" : "Leave blank to use the assigned teacher"}>
+              <Select value={isStrandSubject ? (strandTeacherId || "__automatic__") : teacherId || "__automatic__"} onValueChange={(value) => setTeacherId(value === "__automatic__" ? "" : value)} disabled={isStrandSubject}>
                 <SelectTrigger id="entry-teacher" className={selectClass}><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__automatic__">Automatic</SelectItem>
