@@ -181,6 +181,26 @@ export class AssessmentEntryService {
     role: string | undefined,
     input: SaveAssessmentEntryInput,
   ) {
+    await this.persistEntries(schoolId, userId, role, input);
+    return this.getSheet(schoolId, userId, role, {
+      classId: input.classId,
+      subjectId: input.subjectId,
+      templateId: input.templateId,
+    });
+  }
+
+  /**
+   * The one write path for typed and uploaded marks: access, lock, roster and range
+   * checks, then a single transaction that stores the marks and rebuilds the
+   * class's results. `via` is recorded in the audit trail.
+   */
+  async persistEntries(
+    schoolId: string,
+    userId: string,
+    role: string | undefined,
+    input: SaveAssessmentEntryInput,
+    via: "ENTRY" | "IMPORT" = "ENTRY",
+  ) {
     const ctx = await this.loadContext(schoolId, userId, role, input.classId, input.subjectId);
     if (input.termId && input.termId !== ctx.term.id) throw new ConflictException("The academic term changed. Your draft was preserved; return to its original term before saving.");
     const template = ctx.templates.find((item) => item.id === input.templateId);
@@ -219,16 +239,10 @@ export class AssessmentEntryService {
           roster: roster.map((student) => student.id),
           changes: input.entries,
           allowLockedScores: isSchoolManager(role),
-          source: { kind: "ENTRY" },
+          source: { kind: via },
         }),
       { timeout: 30_000 },
     );
-
-    return this.getSheet(schoolId, userId, role, {
-      classId: input.classId,
-      subjectId: input.subjectId,
-      templateId: template.id,
-    });
   }
 
   /**
@@ -310,7 +324,7 @@ export class AssessmentEntryService {
   }
 
   /** Throws the reason a sheet can't be edited directly (locked, submitted or past its deadline). */
-  private assertEditable(
+  assertEditable(
     template: { isLocked: boolean; deadline: Date | null; extensions: { teacherId: string | null; deadline: Date }[]; submission: unknown },
     teacherId: string | null,
   ) {

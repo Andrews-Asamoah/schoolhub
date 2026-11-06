@@ -41,7 +41,7 @@ export interface ApplyArgs {
   /** Only a reviewed correction may change a pupil's individually locked marks. */
   allowLockedScores: boolean;
   /** Recorded in the audit trail so late changes can be traced to their approval. */
-  source: { kind: "ENTRY" } | { kind: "CORRECTION"; correctionId: string };
+  source: { kind: "ENTRY" | "IMPORT" } | { kind: "CORRECTION"; correctionId: string };
 }
 
 const num = (value: Prisma.Decimal | number | null | undefined) => (value == null ? null : Number(value));

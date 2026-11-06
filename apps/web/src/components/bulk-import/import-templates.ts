@@ -8,8 +8,18 @@ export interface ImportTemplate {
   /** Name of the data sheet. */
   sheetName: string;
   headers: readonly string[];
-  /** One example row, the same length and order as `headers`. */
-  example: readonly (string | number)[];
+  /** One example row, the same length and order as `headers`. Not needed when `rows` is given. */
+  example?: readonly (string | number)[];
+  /**
+   * Rows already filled in from the school's own records (for example the class
+   * list for a marks upload). When given they replace the example row in both the
+   * Excel and CSV templates.
+   */
+  rows?: readonly (readonly (string | number)[])[];
+  /** Columns that identify a record and are not meant to be edited; shaded grey in the Excel template. */
+  identityColumns?: readonly string[];
+  /** Columns that only accept a number in this range; Excel rejects anything else as it is typed. */
+  numberColumns?: Readonly<Record<string, { min: number; max: number }>>;
   /** Label and text rows for the Instructions sheet. */
   instructions: readonly (readonly [string, string])[];
   /** Columns stored as text so phone numbers, dates and IDs keep their exact form. */
@@ -31,8 +41,10 @@ const csvCell = (value: string | number) => {
 
 const columnWidth = (header: string) => Math.max(16, header.length + 5);
 
+const sampleRows = (template: ImportTemplate) => template.rows ?? (template.example ? [template.example] : []);
+
 export function downloadCsvTemplate(template: ImportTemplate) {
-  const csv = [template.headers, template.example].map((row) => row.map(csvCell).join(",")).join("\r\n");
+  const csv = [template.headers, ...sampleRows(template)].map((row) => row.map(csvCell).join(",")).join("\r\n");
   download(new Blob(["\uFEFF", csv], { type: "text/csv;charset=utf-8" }), `${template.fileBase}-import-template.csv`);
 }
 
@@ -52,6 +64,9 @@ export async function downloadExcelTemplate(template: ImportTemplate) {
 
   const sheet = workbook.addWorksheet(template.sheetName, { views: [{ state: "frozen", ySplit: 1 }] });
   sheet.addRow([...template.headers]);
+  for (const row of template.rows ?? []) sheet.addRow([...row]);
+  // Validation covers only the rows that exist when the template was built from the school's records.
+  const lastRow = template.rows ? Math.max(template.rows.length + 1, 2) : 1001;
   sheet.getRow(1).font = { bold: true, color: { argb: "FFFFFFFF" } };
   sheet.getRow(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF0F766E" } };
   sheet.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: template.headers.length } };
@@ -59,9 +74,28 @@ export async function downloadExcelTemplate(template: ImportTemplate) {
     const column = sheet.getColumn(index + 1);
     column.width = columnWidth(header);
     if (template.textColumns?.includes(header)) column.numFmt = "@";
+    if (template.identityColumns?.includes(header)) {
+      for (let row = 2; row <= lastRow; row++) {
+        sheet.getCell(row, index + 1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF1F5F9" } };
+      }
+    }
+    const range = template.numberColumns?.[header];
+    if (range) {
+      for (let row = 2; row <= lastRow; row++) {
+        sheet.getCell(row, index + 1).dataValidation = {
+          type: "decimal",
+          operator: "between",
+          allowBlank: true,
+          formulae: [range.min, range.max],
+          showErrorMessage: true,
+          errorTitle: header,
+          error: `Enter a number from ${range.min} to ${range.max}, or leave the cell empty.`,
+        };
+      }
+    }
     const options = template.listColumns?.[header];
     if (options) {
-      for (let row = 2; row <= 1001; row++) {
+      for (let row = 2; row <= lastRow; row++) {
         sheet.getCell(row, index + 1).dataValidation = {
           type: "list",
           allowBlank: true,
@@ -85,7 +119,7 @@ export async function downloadExcelTemplate(template: ImportTemplate) {
       lists.getColumn(listIndex + 1).width = 28;
       const letter = lists.getColumn(listIndex + 1).letter;
       const column = template.headers.indexOf(header) + 1;
-      for (let row = 2; row <= 1001; row++) {
+      for (let row = 2; row <= lastRow; row++) {
         sheet.getCell(row, column).dataValidation = {
           type: "list",
           allowBlank: true,
@@ -99,10 +133,12 @@ export async function downloadExcelTemplate(template: ImportTemplate) {
     });
   }
 
-  const example = workbook.addWorksheet("Example");
-  example.addRow([...template.headers]).font = { bold: true };
-  example.addRow([...template.example]);
-  example.columns = template.headers.map((header) => ({ width: columnWidth(header) }));
+  if (template.example) {
+    const example = workbook.addWorksheet("Example");
+    example.addRow([...template.headers]).font = { bold: true };
+    example.addRow([...template.example]);
+    example.columns = template.headers.map((header) => ({ width: columnWidth(header) }));
+  }
 
   const buffer = await workbook.xlsx.writeBuffer();
   download(

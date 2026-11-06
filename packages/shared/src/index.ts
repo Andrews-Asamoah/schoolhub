@@ -610,6 +610,70 @@ export const saveAssessmentEntrySchema = z.object({
 });
 export type SaveAssessmentEntryInput = z.infer<typeof saveAssessmentEntrySchema>;
 
+// ---- bulk upload of marks ---------------------------------------------------
+
+/** Headings of the two columns that identify a pupil in the marks upload sheet. */
+export const MARKS_IMPORT_IDENTITY_HEADERS = {
+  admissionNumber: "Admission No",
+  name: "Pupil name",
+} as const;
+
+export interface MarksImportComponent {
+  id: string;
+  name: string;
+  maxMarks: number;
+  /** How many marks the component takes per pupil (1 unless it is repeatable). */
+  slots: number;
+  subjectStrandName?: string | null;
+}
+
+export interface MarksImportColumn {
+  componentId: string;
+  /** Zero-based entry position within a repeatable component. */
+  occurrenceIndex: number;
+  maxMarks: number;
+  /** The label without the "(out of N)" suffix. Unique within one assessment. */
+  label: string;
+  /** The exact heading written into the template. */
+  header: string;
+}
+
+/**
+ * One column per mark a pupil can receive: a repeatable component such as three
+ * quizzes gets one column per entry. The template writer and the upload parser
+ * both build their columns here, so the headings can never drift apart.
+ */
+export function marksImportColumns(components: readonly MarksImportComponent[]): MarksImportColumn[] {
+  return components.flatMap((component) =>
+    Array.from({ length: Math.max(component.slots, 1) }, (_, occurrenceIndex) => {
+      const label = [
+        component.name.trim(),
+        component.subjectStrandName ? `– ${component.subjectStrandName.trim()}` : "",
+        component.slots > 1 ? String(occurrenceIndex + 1) : "",
+      ]
+        .filter(Boolean)
+        .join(" ");
+      return {
+        componentId: component.id,
+        occurrenceIndex,
+        maxMarks: component.maxMarks,
+        label,
+        header: `${label} (out of ${component.maxMarks})`,
+      };
+    }),
+  );
+}
+
+/** Lower-case, accent-free, letters and digits only, so "Class Test 1 (out of 20)" matches "class test 1". */
+export function normalizeMarksImportKey(value: string): string {
+  return value
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s*\(\s*out of\s*[\d.,]+\s*\)\s*$/i, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "");
+}
+
 const sheetRef = {
   classId: z.string().min(1),
   subjectId: z.string().min(1),
@@ -1773,6 +1837,44 @@ export const STUDENT_IMPORT_LIMITS = {
   batchSize: 25,
   maxFileBytes: 2 * 1024 * 1024,
 } as const;
+
+/**
+ * One batch of previewed rows. Each row carries only the cells that change; the
+ * server re-checks every one exactly as it would a hand-typed mark, and
+ * `expectedMarks` makes a row fail instead of overwriting marks someone else
+ * changed after the preview.
+ */
+export const importAssessmentMarksBatchSchema = z.object({
+  classId: z.string().min(1),
+  subjectId: z.string().min(1),
+  templateId: z.string().min(1),
+  termId: z.string().min(1).optional(),
+  rows: z
+    .array(
+      z.object({
+        rowNumber: z.number().int().positive(),
+        /** Shown back in the results table only. */
+        name: z.string().trim().max(160).optional(),
+        row: z.object({
+          studentId: z.string().min(1),
+          entries: z
+            .array(
+              z.object({
+                componentId: z.string().min(1),
+                occurrenceIndex: z.number().int().min(0).max(50),
+                marks: z.number().min(0).max(10000),
+                expectedMarks: z.number().min(0).max(10000).nullable(),
+              }),
+            )
+            .min(1)
+            .max(200),
+        }),
+      }),
+    )
+    .min(1)
+    .max(STUDENT_IMPORT_LIMITS.batchSize),
+});
+export type ImportAssessmentMarksBatchInput = z.infer<typeof importAssessmentMarksBatchSchema>;
 
 export const STUDENT_IMPORT_FIELDS = [
   "firstName",

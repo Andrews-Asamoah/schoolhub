@@ -3,6 +3,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CircleAlert, CircleCheck, Lock, LoaderCircle } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { apiFetch } from "@/lib/api";
+import { BulkImportButton } from "@/components/bulk-import/bulk-import-button";
+import { AssessmentMarksBulkImport } from "@/components/school/assessment-marks-bulk-import";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useTeachingOverview } from "@/lib/teaching";
 import { bandRangeLabel, type GradingMethod } from "@/lib/assessment-setup";
@@ -109,6 +111,7 @@ export function AssessmentEntryWorkspace({
   const [excusedIds, setExcusedIds] = useState<Set<string>>(new Set());
   const [correcting, setCorrecting] = useState(false);
   const [reason, setReason] = useState("");
+  const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
     if (initial) {
@@ -454,6 +457,14 @@ export function AssessmentEntryWorkspace({
                 Save marks{changes.length ? ` (${changes.length})` : ""}
               </button>
             )}
+            {editable && !correcting && sheet.students.length > 0 && components.some((component) => component.canEdit) && (
+              <BulkImportButton
+                className="h-9 text-xs"
+                disabled={unsaved}
+                title={unsaved ? "Save or discard the marks you have typed first" : undefined}
+                onClick={() => { setNotice(null); setUploading(true); }}
+              />
+            )}
             {sheet.canSubmit && !correcting && (() => {
               const waiting = sheet.students.filter((student) => !student.complete && !excusedIds.has(student.studentId)).length;
               return (
@@ -503,6 +514,37 @@ export function AssessmentEntryWorkspace({
             </p>
           </div>
         </section>
+      )}
+
+      {uploading && sheet?.template && (
+        <AssessmentMarksBulkImport
+          sheet={{
+            classId: sheet.class.id,
+            className: sheet.class.name,
+            subjectId: sheet.subject.id,
+            subjectName: sheet.subject.name,
+            templateId: sheet.template.id,
+            templateName: sheet.template.name,
+            termId: sheet.term.id,
+            termName: sheet.term.name,
+            components: components
+              .filter((component) => component.canEdit)
+              .map((component) => ({
+                id: component.id,
+                name: component.name,
+                maxMarks: component.maxMarks,
+                slots: component.slots,
+                subjectStrandName: component.subjectStrandName,
+              })),
+            students: sheet.students,
+          }}
+          onClose={() => setUploading(false)}
+          onComplete={() => {
+            setNotice("Marks uploaded. The table now shows the saved marks.");
+            void sheetQuery.refetch();
+            void queryClient.invalidateQueries({ queryKey: ["assessments", "tracking"] });
+          }}
+        />
       )}
     </div>
   );
