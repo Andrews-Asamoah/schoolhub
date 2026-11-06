@@ -107,8 +107,6 @@ export function AssessmentEntryWorkspace({
   const [subjectId, setSubjectId] = useState(initial?.subjectId ?? "");
   const [templateId, setTemplateId] = useState("");
   const [notice, setNotice] = useState<string | null>(null);
-  // Pupils the teacher marks as absent or exempt before signing the sheet off.
-  const [excusedIds, setExcusedIds] = useState<Set<string>>(new Set());
   const [correcting, setCorrecting] = useState(false);
   const [reason, setReason] = useState("");
   const [uploading, setUploading] = useState(false);
@@ -139,6 +137,20 @@ export function AssessmentEntryWorkspace({
   const sheet = sheetQuery.data;
   const [draft, setDraft] = useMarkDraft<{value:string;expectedMarks:number|null}>(JSON.stringify(["sba", effectiveClassId, effectiveSubjectId, sheet?.term.id, sheet?.template?.id]), (value): value is {value:string;expectedMarks:number|null} => { const row=value as {value?:unknown;expectedMarks?:unknown}|null; return !!row && typeof row.value === "string" && (row.expectedMarks === null || typeof row.expectedMarks === "number"); });
 
+  // Keep absence choices in the same principal/role/term/sheet-scoped tab storage as marks.
+  // Uploads and background refetches must not discard an unsubmitted choice.
+  const [excuseDraft, setExcuseDraft] = useMarkDraft<boolean>(
+    JSON.stringify(["sba-excuses", effectiveClassId, effectiveSubjectId, sheet?.term.id, sheet?.template?.id]),
+    (value): value is boolean => typeof value === "boolean",
+  );
+  const excusedIds = new Set((sheet?.students ?? [])
+    .filter((student) => excuseDraft[student.studentId] ?? student.excused)
+    .map((student) => student.studentId));
+  const excuseConflicts = (sheet?.students ?? []).filter((student) => excusedIds.has(student.studentId) && student.marks.length > 0 && !student.excused).length;
+  const hasExcuseChanges = (sheet?.students ?? []).some((student) =>
+    excuseDraft[student.studentId] !== undefined && excuseDraft[student.studentId] !== student.excused,
+  );
+
   // Server values by cell, used to tell which cells the teacher has changed.
   const saved = useMemo(() => {
     const map = new Map<string, string>();
@@ -150,7 +162,6 @@ export function AssessmentEntryWorkspace({
 
 
   useEffect(() => {
-    setExcusedIds(new Set((sheet?.students ?? []).filter((student) => student.excused).map((student) => student.studentId)));
     setCorrecting(false);
     setReason("");
   }, [sheet]);
@@ -192,6 +203,37 @@ export function AssessmentEntryWorkspace({
     },
   });
 
+  const clearForExcuse = useMutation({
+    mutationFn: (student: SheetStudent) => apiFetch<Sheet>("/assessments/entry", {
+      method: "PUT",
+      body: JSON.stringify({
+        classId: effectiveClassId,
+        subjectId: effectiveSubjectId,
+        templateId: sheet?.template?.id,
+        termId: sheet?.term.id,
+        entries: student.marks.map((mark) => ({
+          studentId: student.studentId,
+          componentId: mark.componentId,
+          occurrenceIndex: mark.occurrenceIndex,
+          marks: null,
+          expectedMarks: mark.marks,
+        })),
+      }),
+    }),
+    onSuccess: (result, student) => {
+      queryClient.setQueryData(sheetKey, result);
+      setExcuseDraft((current) => ({ ...current, [student.studentId]: true }));
+      void queryClient.invalidateQueries({ queryKey: ["assessments", "tracking"] });
+      setNotice(`Recorded marks cleared for ${student.name}. Submit marks to save the absent / excused selection.`);
+    },
+  });
+
+  function clearMarksForAbsence(student: SheetStudent) {
+    if (window.confirm(`Mark ${student.name} absent / excused? This will clear all their saved marks for this assessment, including zeros, and recalculate grades and positions. Submit marks afterwards to save the absence selection.`)) {
+      clearForExcuse.mutate(student);
+    }
+  }
+
   const submit = useMutation({
     mutationFn: () =>
       apiFetch<Sheet>("/assessments/entry/submit", {
@@ -199,6 +241,7 @@ export function AssessmentEntryWorkspace({
         body: JSON.stringify({ classId: effectiveClassId, subjectId: effectiveSubjectId, templateId: sheet?.template?.id, excusedStudentIds: [...excusedIds] }),
       }),
     onSuccess: (result) => {
+      setExcuseDraft({});
       queryClient.setQueryData(sheetKey, result);
       void queryClient.invalidateQueries({ queryKey: ["assessments", "tracking"] });
       setNotice("Marks submitted.");
@@ -227,9 +270,9 @@ export function AssessmentEntryWorkspace({
   });
 
   function guard(action: () => void) {
-    if (changes.length && !window.confirm("You have unsaved marks. Discard them?")) return;
+    if (clearForExcuse.isPending || save.isPending || submit.isPending) return;
+    if ((changes.length || hasExcuseChanges) && !window.confirm("You have unsaved marks or absence selections. Switch sheets? Your draft will remain available in this tab.")) return;
     setNotice(null);
-    setDraft({});
     action();
   }
 
@@ -253,6 +296,7 @@ export function AssessmentEntryWorkspace({
 
   const components = sheet?.template?.components ?? [];
   const editable = !!sheet?.canEdit;
+  const editableComponentIds = new Set(components.filter((component) => component.canEdit).map((component) => component.id));
 
   return (
     <div className="space-y-4">
@@ -346,15 +390,17 @@ export function AssessmentEntryWorkspace({
                         {!component.canEdit && mode === "teacher" && <span className="block font-normal normal-case tracking-normal">Read only</span>}
                       </th>
                     ))}
-                    <th scope="col" className="px-3 py-3 text-center text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70">Total</th>
-                    <th scope="col" className="px-3 py-3 text-center text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70">%</th>
+                    <th scope="col" className="px-3 py-3 text-center text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70">Total (%)</th>
                     <th scope="col" className="px-3 py-3 text-center text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70">Grade</th>
+                    <th scope="col" className="px-3 py-3 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70">Description</th>
                     <th scope="col" className="px-3 py-3 text-center text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70">Pos.</th>
-                    {sheet.canSubmit && <th scope="col" className="px-3 py-3 text-center text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70">Absent / excused</th>}
+                    <th scope="col" className="px-3 py-3 text-center text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70">Absent / excused</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border/60">
-                  {sheet.students.map((student, rowIndex) => (
+                  {sheet.students.map((student, rowIndex) => {
+                    const hasRestrictedMarks = student.marks.some((mark) => !editableComponentIds.has(mark.componentId));
+                    return (
                     <tr key={student.studentId}>
                       <th scope="row" className="px-4 py-2 text-left font-semibold text-foreground">
                         {student.name}
@@ -375,7 +421,7 @@ export function AssessmentEntryWorkspace({
                                 max={component.maxMarks}
                                 step="any"
                                 value={value}
-                                disabled={correcting ? !component.canCorrect : !editable || !component.canEdit}
+                                disabled={clearForExcuse.isPending || (correcting ? !component.canCorrect : !editable || !component.canEdit)}
                                 data-col={`${component.id}|${slot}`}
                                 data-row={rowIndex}
                                 onKeyDown={(event) => {
@@ -399,8 +445,7 @@ export function AssessmentEntryWorkspace({
                           );
                         }),
                       )}
-                      <td className="px-3 py-2 text-center font-semibold tabular-nums text-foreground">{student.marks.length ? student.totalScore : "—"}</td>
-                      <td className="px-3 py-2 text-center tabular-nums text-muted-foreground">{student.marks.length ? `${student.percentage}%` : "—"}</td>
+                      <td className="px-3 py-2 text-center font-semibold tabular-nums text-foreground">{student.marks.length ? `${student.percentage}%` : "—"}</td>
                       <td className="px-3 py-2 text-center">
                         {student.grade ? (
                           <span className="rounded-md bg-primary/10 px-2 py-0.5 font-bold text-primary">{student.grade}</span>
@@ -408,25 +453,61 @@ export function AssessmentEntryWorkspace({
                           <span className="text-muted-foreground/70" title={student.marks.length ? "Waiting for the remaining marks" : undefined}>{student.marks.length ? "Incomplete" : "—"}</span>
                         )}
                       </td>
+                      <td className="px-3 py-2 text-muted-foreground">
+                        {student.grade ? sheet.template?.grades.find((band) => band.grade === student.grade)?.description || "—" : "—"}
+                      </td>
                       <td className="px-3 py-2 text-center tabular-nums text-muted-foreground">{student.position ?? "—"}</td>
-                      {sheet.canSubmit && (
-                        <td className="px-3 py-2 text-center">
-                          {student.complete ? <span className="text-muted-foreground/50">—</span> : (
-                            <input
-                              type="checkbox"
-                              aria-label={`${student.name} is absent or excused`}
-                              checked={excusedIds.has(student.studentId)}
-                              onChange={(event) => setExcusedIds((current) => { const next = new Set(current); if (event.target.checked) next.add(student.studentId); else next.delete(student.studentId); return next; })}
-                              className="size-4 accent-primary"
-                            />
-                          )}
-                        </td>
-                      )}
+                      <td className="px-3 py-2 text-center">
+                        <input
+                          type="checkbox"
+                          aria-label={`${student.name} is absent or excused`}
+                          aria-describedby="assessment-excuse-help"
+                          disabled={!sheet.canSubmit || correcting || unsaved || submit.isPending || save.isPending || clearForExcuse.isPending || (!excusedIds.has(student.studentId) && hasRestrictedMarks)}
+                          title={!sheet.canSubmit ? "This sheet is read only." : unsaved ? "Save or discard your typed marks first." : hasRestrictedMarks && !excusedIds.has(student.studentId) ? "Only a teacher who can edit all recorded components, or a school manager, can clear these marks for an absence." : student.marks.length ? "Selecting absent / excused asks before clearing this pupil’s recorded marks." : undefined}
+                          checked={student.excused || excusedIds.has(student.studentId)}
+                          onChange={(event) => {
+                            const checked = event.target.checked;
+                            if (checked && student.marks.length > 0) {
+                              clearMarksForAbsence(student);
+                              return;
+                            }
+                            setExcuseDraft((current) => {
+                              const next = { ...current };
+                              if (checked === student.excused) delete next[student.studentId];
+                              else next[student.studentId] = checked;
+                              return next;
+                            });
+                          }}
+                          className="size-4 accent-primary disabled:cursor-not-allowed disabled:opacity-50"
+                        />
+                        {sheet.canSubmit && excusedIds.has(student.studentId) && student.marks.length > 0 && (
+                          <button type="button"
+                            aria-label={`Clear recorded marks for absent pupil ${student.name}`}
+                            disabled={unsaved || submit.isPending || save.isPending || clearForExcuse.isPending || hasRestrictedMarks}
+                            onClick={() => clearMarksForAbsence(student)}
+                            className="mt-1 block text-[11px] font-semibold text-warning underline disabled:opacity-50">
+                            Clear recorded marks
+                          </button>
+                        )}
+                      </td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
+          )}
+
+          <p id="assessment-excuse-help" className="border-t border-border/60 px-4 py-3 text-xs leading-5 text-muted-foreground">
+            {sheet.submission
+              ? "Absent / excused selections shown here were saved with this submission."
+              : "Select absent or excused pupils, then Submit marks to save those selections. Choices stay selected through uploads and refreshes in this tab. If a pupil has recorded marks, you will be asked before those marks are cleared. In uploads, leave absent pupils’ marks empty; zero is a recorded mark."}
+          </p>
+
+          {excuseConflicts > 0 && sheet.canSubmit && (
+            <p role="alert" className="border-t border-border/60 px-4 py-3 text-xs text-warning">
+              {excuseConflicts} selected pupil{excuseConflicts === 1 ? " has" : "s have"} recorded marks. Use Clear recorded marks in their absence column, or uncheck the absence, before submitting.
+            </p>
           )}
 
           {sheet.stats.count > 0 && (
@@ -441,7 +522,7 @@ export function AssessmentEntryWorkspace({
             {editable && !correcting && (
               <button
                 type="button"
-                disabled={changes.length === 0 || invalid > 0 || save.isPending}
+                disabled={changes.length === 0 || invalid > 0 || save.isPending || clearForExcuse.isPending}
                 onClick={() =>
                   save.mutate({
                     classId: effectiveClassId,
@@ -460,7 +541,7 @@ export function AssessmentEntryWorkspace({
             {editable && !correcting && sheet.students.length > 0 && components.some((component) => component.canEdit) && (
               <BulkImportButton
                 className="h-9 text-xs"
-                disabled={unsaved}
+                disabled={unsaved || clearForExcuse.isPending}
                 title={unsaved ? "Save or discard the marks you have typed first" : undefined}
                 onClick={() => { setNotice(null); setUploading(true); }}
               />
@@ -470,8 +551,8 @@ export function AssessmentEntryWorkspace({
               return (
                 <button
                   type="button"
-                  disabled={unsaved || waiting > 0 || submit.isPending}
-                  title={unsaved ? "Save your marks first" : waiting > 0 ? `${waiting} pupil${waiting === 1 ? "" : "s"} still need marks or an excuse` : undefined}
+                  disabled={unsaved || waiting > 0 || excuseConflicts > 0 || submit.isPending || clearForExcuse.isPending}
+                  title={unsaved ? "Save your marks first" : excuseConflicts > 0 ? "Clear recorded marks for the selected absent pupils, or uncheck their absence." : waiting > 0 ? `${waiting} pupil${waiting === 1 ? "" : "s"} still need marks or an excuse` : undefined}
                   onClick={() => { if (window.confirm("Submit these marks? You will not be able to edit them directly afterwards; changes will need approval.")) submit.mutate(); }}
                   className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-border px-4 text-xs font-semibold hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
                 >
@@ -498,6 +579,7 @@ export function AssessmentEntryWorkspace({
                 <button type="button" onClick={() => { setCorrecting(false); setDraft({}); setReason(""); }} className="h-9 rounded-lg px-3 text-xs font-semibold text-muted-foreground hover:bg-muted">Cancel</button>
               </div>
             )}
+            {clearForExcuse.error && <p role="alert" className="text-xs text-destructive">Could not mark the pupil absent / excused: {clearForExcuse.error.message} No absence selection was applied. Reload the latest marks before retrying.</p>}
             {(submit.error || requestCorrection.error) && <p role="alert" className="flex items-center gap-1.5 text-xs text-destructive"><CircleAlert className="size-3.5" /> {(submit.error ?? requestCorrection.error)?.message}</p>}
             {invalid > 0 && <p role="alert" className="flex items-center gap-1.5 text-xs text-destructive"><CircleAlert className="size-3.5" /> {invalid} mark{invalid === 1 ? " is" : "s are"} outside the allowed range.</p>}
             {notice && <p role="status" className="flex items-center gap-1.5 text-xs text-success"><CircleCheck className="size-3.5" /> {notice}</p>}
