@@ -1,5 +1,6 @@
 import { requestContextVersion, assertRequestContext } from "./request-context";
 import { getTenantSubdomain as getClientSubdomain } from "./tenant-subdomain";
+import { downloadBlob, XLSX_MIME } from "./download";
 
 /**
  * Typed API fetch utility.
@@ -28,6 +29,11 @@ export class ApiError extends Error {
     super(message);
     this.name = "ApiError";
   }
+}
+
+/** The message to show for a failed request or action. */
+export function errorText(error: unknown, fallback = "Something went wrong.") {
+  return error instanceof Error ? error.message : fallback;
 }
 
 export { getTenantSubdomain as getClientSubdomain } from "./tenant-subdomain";
@@ -210,14 +216,7 @@ export async function apiDownload(path: string, fallbackFileName?: string): Prom
   const fileName = fallbackFileName ?? (encodedName ? decodeURIComponent(encodedName) : plainName) ?? "schoolhub-export";
   const blob = await response.blob();
   assertRequestContext(contextVersion);
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = fileName.replace(/[\\/:*?"<>|]/g, "_");
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  downloadBlob(blob, fileName.replace(/[\\/:*?"<>|]/g, "_"));
 }
 
 /** Authenticated, private PDF download; no public file URL is created. */
@@ -268,14 +267,10 @@ export async function downloadPrivateExcel(path:string,filename:string):Promise<
       (detail as {message?:string}).message??"Excel download rejected.",detail);
   }
   const type=response.headers.get("content-type")??"";
-  if(!type.includes("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")){
+  if(!type.includes(XLSX_MIME)){
     throw new Error("Server did not return a valid Excel workbook.");
   }
   const blob=await response.blob();
   assertRequestContext(contextVersion);
-  const url=URL.createObjectURL(blob);
-  try{
-    const a=document.createElement("a");
-    a.href=url;a.download=filename;document.body.appendChild(a);a.click();a.remove();
-  }finally{URL.revokeObjectURL(url);}
+  downloadBlob(blob,filename);
 }

@@ -2,9 +2,13 @@ import ExcelJS from "exceljs";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const saved = vi.hoisted(() => ({ blob: null as Blob | null, name: "" }));
-vi.mock("@/lib/table-export", () => ({
-  download: (blob: Blob, name: string) => {
+vi.mock("@/lib/download", () => ({
+  downloadBlob: (blob: Blob, name: string) => {
     saved.blob = blob;
+    saved.name = name;
+  },
+  downloadXlsx: (buffer: BlobPart, name: string) => {
+    saved.blob = new Blob([buffer]);
     saved.name = name;
   },
 }));

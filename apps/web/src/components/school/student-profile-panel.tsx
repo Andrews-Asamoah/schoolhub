@@ -211,44 +211,6 @@ export function StudentProfileModal({ studentId, onClose }: { studentId: string;
   );
 }
 
-/** Parent / guardian portal: live records for each linked child. */
-export function MyWardsPanel() {
-  const query = useQuery({
-    queryKey: ["students", "my-wards"],
-    queryFn: () => apiFetch<StudentProfileData[]>("/students/my-wards"),
-    retry: false,
-  });
-  const [openId, setOpenId] = useState<string | null>(null);
-  if (query.isPending || query.error || query.data.length === 0) return null;
-  const selected = query.data.find((w) => w.id === openId) ?? null;
-  return (
-    <section className="rounded-3xl border border-border bg-card p-5 shadow-sm">
-      <h2 className="text-sm font-bold text-foreground">My children: school records</h2>
-      <p className="mt-0.5 text-xs text-muted-foreground">Details held by the school. Contact the school office to correct anything.</p>
-      <div className="mt-3 flex flex-wrap gap-2">
-        {query.data.map((ward) => (
-          <button
-            key={ward.id}
-            type="button"
-            onClick={() => setOpenId(openId === ward.id ? null : ward.id)}
-            className={`rounded-xl border px-3 py-2 text-left text-sm ${openId === ward.id ? "border-primary bg-primary/10" : "border-border"}`}
-          >
-            <span className="font-semibold text-foreground">
-              {ward.profile.firstName} {ward.profile.lastName}
-            </span>
-            <span className="block text-xs text-muted-foreground">{ward.class?.name ?? "No class this term"}</span>
-          </button>
-        ))}
-      </div>
-      {selected && (
-        <div className="mt-4">
-          <StudentProfileCard data={selected} />
-        </div>
-      )}
-    </section>
-  );
-}
-
 /** Student portal: my own sign-in details and record. */
 export function MyProfilePanel() {
   const query = useQuery({

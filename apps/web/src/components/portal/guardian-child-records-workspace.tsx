@@ -1,7 +1,6 @@
 import {AbsenceRequestsWorkspace} from "./absence-requests-workspace";
 import {useGuardianWard} from "@/hooks/use-guardian-ward";
 import { useQuery, type UseQueryResult } from "@tanstack/react-query";
-import { useState } from "react";
 import { AlertCircle, CalendarDays, CheckCircle2, Clock3, LoaderCircle, Printer, RefreshCw, UserRound, XCircle } from "lucide-react";
 import type { StudentProfileData } from "@/components/school/student-profile-panel";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -39,8 +38,6 @@ interface TimetableData {
   term: { id: string; name: string } | null;
   entries: Lesson[];
 }
-const days = ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"] as const;
-const dayLabels: Record<string, string> = { MONDAY: "Monday", TUESDAY: "Tuesday", WEDNESDAY: "Wednesday", THURSDAY: "Thursday", FRIDAY: "Friday", SATURDAY: "Saturday", SUNDAY: "Sunday" };
 const statusStyles: Record<string, string> = {
   PRESENT: "bg-success/10 text-success",
   LATE: "bg-warning/10 text-warning",

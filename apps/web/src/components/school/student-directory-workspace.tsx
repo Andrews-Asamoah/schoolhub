@@ -1,5 +1,4 @@
 import { PersonPhotoPicker, uploadPersonPhoto } from "./person-photo-picker";
-import { DatePicker } from "@/components/ui/date-picker";
 import { StudentProfileModal } from "@/components/school/student-profile-panel";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -22,11 +21,9 @@ import {
   type CreateStudentInput,
   type IssuedCredentials,
   type StudentGuardianInput,
-  type UpdateStudentInput,
 } from "@schoolhub/shared";
 import {
   WorkspaceDataTable,
-  WorkspaceEmptyState,
   WorkspaceStat,
   type WorkspaceColumn,
 } from "@/components/school/workspace-ui";
@@ -40,6 +37,7 @@ import {
   type CredentialEntry,
 } from "@/components/credentials/credentials-dialog";
 import { BulkImportButton } from "@/components/bulk-import/bulk-import-button";
+import { LabeledTextField, labeledInputClasses } from "@/components/forms/labeled-controls";
 
 interface Student {
   id: string;
@@ -135,8 +133,6 @@ const emptyStudent: CreateStudentInput = {
   guardians: [],
 };
 
-const inputClasses =
-  "mt-1.5 h-10 w-full rounded-lg border border-border bg-background px-3 text-sm text-foreground outline-none placeholder:text-muted-foreground focus:border-ring focus:ring-2 focus:ring-ring/20";
 const statuses = [
   "ACTIVE",
   "SUSPENDED",
@@ -477,7 +473,7 @@ export function StudentDirectoryWorkspace() {
             <Select value={status || "__all__"} onValueChange={(value) => {
               setStatus(value === "__all__" ? "" : value);
             }}>
-              <SelectTrigger aria-label="Filter by status" className={`${inputClasses} mt-0`}><SelectValue placeholder="All statuses" /></SelectTrigger>
+              <SelectTrigger aria-label="Filter by status" className={`${labeledInputClasses} mt-0`}><SelectValue placeholder="All statuses" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="__all__">All statuses</SelectItem>
                 {statuses.map((value) => <SelectItem key={value} value={value}>{formatStatus(value)}</SelectItem>)}
@@ -489,7 +485,7 @@ export function StudentDirectoryWorkspace() {
             <Select value={classId || "__all__"} onValueChange={(value) => {
               setClassId(value === "__all__" ? "" : value);
             }}>
-              <SelectTrigger aria-label="Filter by current class" className={`${inputClasses} mt-0`}><SelectValue placeholder="All current classes" /></SelectTrigger>
+              <SelectTrigger aria-label="Filter by current class" className={`${labeledInputClasses} mt-0`}><SelectValue placeholder="All current classes" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="__all__">All current classes</SelectItem>
                 {(classesQuery.data ?? []).map((schoolClass) => <SelectItem key={schoolClass.id} value={schoolClass.id}>{schoolClass.name}</SelectItem>)}
@@ -667,7 +663,7 @@ function StudentEditor({
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <form.Field name="firstName">
             {(field) => (
-              <StudentTextField
+              <LabeledTextField
                 label="First name"
                 required
                 value={field.state.value}
@@ -677,7 +673,7 @@ function StudentEditor({
           </form.Field>
           <form.Field name="lastName">
             {(field) => (
-              <StudentTextField
+              <LabeledTextField
                 label="Last name"
                 required
                 value={field.state.value}
@@ -687,7 +683,7 @@ function StudentEditor({
           </form.Field>
           <form.Field name="otherNames">
             {(field) => (
-              <StudentTextField
+              <LabeledTextField
                 label="Other names"
                 value={field.state.value ?? ""}
                 onChange={field.handleChange}
@@ -699,7 +695,7 @@ function StudentEditor({
               <label className="text-xs font-semibold text-foreground">
                 Gender
                 <Select value={field.state.value} onValueChange={(value) => field.handleChange(value as CreateStudentInput["gender"])}>
-                  <SelectTrigger aria-label="Gender" className={inputClasses}><SelectValue /></SelectTrigger>
+                  <SelectTrigger aria-label="Gender" className={labeledInputClasses}><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="MALE">Male</SelectItem>
                     <SelectItem value="FEMALE">Female</SelectItem>
@@ -711,7 +707,7 @@ function StudentEditor({
           </form.Field>
           <form.Field name="dateOfBirth">
             {(field) => (
-              <StudentTextField
+              <LabeledTextField
                 label="Date of birth"
                 type="date"
                 required
@@ -722,7 +718,7 @@ function StudentEditor({
           </form.Field>
           <form.Field name="nationality">
             {(field) => (
-              <StudentTextField
+              <LabeledTextField
                 label="Nationality"
                 value={field.state.value ?? ""}
                 onChange={field.handleChange}
@@ -731,7 +727,7 @@ function StudentEditor({
           </form.Field>
           <form.Field name="residentialAddress">
             {(field) => (
-              <StudentTextField
+              <LabeledTextField
                 label="Residential address"
                 value={field.state.value ?? ""}
                 onChange={field.handleChange}
@@ -740,7 +736,7 @@ function StudentEditor({
           </form.Field>
           <form.Field name="city">
             {(field) => (
-              <StudentTextField
+              <LabeledTextField
                 label="City"
                 value={field.state.value ?? ""}
                 onChange={field.handleChange}
@@ -749,7 +745,7 @@ function StudentEditor({
           </form.Field>
           <form.Field name="region">
             {(field) => (
-              <StudentTextField
+              <LabeledTextField
                 label="Region"
                 value={field.state.value ?? ""}
                 onChange={field.handleChange}
@@ -758,7 +754,7 @@ function StudentEditor({
           </form.Field>
           <form.Field name="emergencyContactName">
             {(field) => (
-              <StudentTextField
+              <LabeledTextField
                 label="Emergency contact"
                 value={field.state.value ?? ""}
                 onChange={field.handleChange}
@@ -767,7 +763,7 @@ function StudentEditor({
           </form.Field>
           <form.Field name="emergencyContactPhone">
             {(field) => (
-              <StudentTextField
+              <LabeledTextField
                 label="Emergency phone"
                 value={field.state.value ?? ""}
                 onChange={field.handleChange}
@@ -776,7 +772,7 @@ function StudentEditor({
           </form.Field>
           <form.Field name="emergencyRelationship">
             {(field) => (
-              <StudentTextField
+              <LabeledTextField
                 label="Emergency relationship"
                 value={field.state.value ?? ""}
                 onChange={field.handleChange}
@@ -785,7 +781,7 @@ function StudentEditor({
           </form.Field>
           <form.Field name="bloodGroup">
             {(field) => (
-              <StudentTextField
+              <LabeledTextField
                 label="Blood group"
                 value={field.state.value ?? ""}
                 onChange={field.handleChange}
@@ -794,7 +790,7 @@ function StudentEditor({
           </form.Field>
           <form.Field name="allergies">
             {(field) => (
-              <StudentTextField
+              <LabeledTextField
                 label="Allergies"
                 value={field.state.value ?? ""}
                 onChange={field.handleChange}
@@ -803,7 +799,7 @@ function StudentEditor({
           </form.Field>
           <form.Field name="medicalConditions">
             {(field) => (
-              <StudentTextField
+              <LabeledTextField
                 label="Medical conditions"
                 value={field.state.value ?? ""}
                 onChange={field.handleChange}
@@ -823,7 +819,7 @@ function StudentEditor({
                     form.setFieldValue("classId", "");
                   }
                 }}>
-                  <SelectTrigger aria-label="Department" className={inputClasses}><SelectValue /></SelectTrigger>
+                  <SelectTrigger aria-label="Department" className={labeledInputClasses}><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="__none__">No department</SelectItem>
                     {departments.map((department) => <SelectItem key={department.id} value={department.id}>{department.name}</SelectItem>)}
@@ -856,7 +852,7 @@ function StudentEditor({
                             form.setFieldValue("departmentId", picked.departmentId);
                           }
                         }}>
-                          <SelectTrigger aria-label="Class (current term)" className={inputClasses}><SelectValue placeholder="Place in a class later" /></SelectTrigger>
+                          <SelectTrigger aria-label="Class (current term)" className={labeledInputClasses}><SelectValue placeholder="Place in a class later" /></SelectTrigger>
                           <SelectContent>
                             <SelectItem value="__none__">Place in a class later</SelectItem>
                             {options.map((schoolClass) => {
@@ -879,7 +875,7 @@ function StudentEditor({
               <label className="text-xs font-semibold text-foreground">
                 House (optional)
                 <Select value={field.state.value || "__none__"} onValueChange={(value) => field.handleChange(value === "__none__" ? "" : value)}>
-                  <SelectTrigger aria-label="House (optional)" className={inputClasses}><SelectValue /></SelectTrigger>
+                  <SelectTrigger aria-label="House (optional)" className={labeledInputClasses}><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="__none__">No house assigned</SelectItem>
                     {houses.filter((house) => house.isActive || house.id === student?.house?.id).map((house) => <SelectItem key={house.id} value={house.id}>{house.name}</SelectItem>)}
@@ -895,7 +891,7 @@ function StudentEditor({
                 value={(form.getFieldValue("status" as never) as string) ?? student.status}
                 onValueChange={(value) => form.setFieldValue("status" as never, value as never)}
               >
-                <SelectTrigger aria-label="Student status" className={inputClasses}><SelectValue /></SelectTrigger>
+                <SelectTrigger aria-label="Student status" className={labeledInputClasses}><SelectValue /></SelectTrigger>
                 <SelectContent>{statuses.map((value) => <SelectItem key={value} value={value}>{formatStatus(value)}</SelectItem>)}</SelectContent>
               </Select>
             </label>
@@ -1025,39 +1021,6 @@ function StudentEditor({
   );
 }
 
-function StudentTextField({
-  label,
-  type = "text",
-  required = false,
-  value,
-  onChange,
-}: {
-  label: string;
-  type?: string;
-  required?: boolean;
-  value: string;
-  onChange: (value: string) => void;
-}) {
-  return (
-    <label className="text-xs font-semibold text-foreground">
-      {label}
-      {required ? " *" : ""}
-      {type === "date" ? (
-        <DatePicker value={value} onChange={onChange} required={required}
-          ariaLabel={label} buttonClassName={inputClasses} />
-      ) : (
-        <input
-          type={type}
-          required={required}
-          className={inputClasses}
-          value={value}
-          onChange={(event) => onChange(event.target.value)}
-        />
-      )}
-    </label>
-  );
-}
-
 function createGuardianDraft(isPrimary: boolean): GuardianDraft {
   return {
     key: crypto.randomUUID(),
@@ -1129,19 +1092,19 @@ function GuardianDraftEditor({
         </div>
       </div>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        <StudentTextField
+        <LabeledTextField
           label="First name"
           required
           value={guardian.firstName}
           onChange={(value) => update("firstName", value)}
         />
-        <StudentTextField
+        <LabeledTextField
           label="Last name"
           required
           value={guardian.lastName}
           onChange={(value) => update("lastName", value)}
         />
-        <StudentTextField
+        <LabeledTextField
           label="Other names"
           value={guardian.otherNames ?? ""}
           onChange={(value) => update("otherNames", value)}
@@ -1149,7 +1112,7 @@ function GuardianDraftEditor({
         <label className="text-xs font-semibold text-foreground">
           Relationship *
           <Select value={guardian.relationshipType} onValueChange={(value) => update("relationshipType", value as StudentGuardianInput["relationshipType"])}>
-            <SelectTrigger aria-label="Relationship" className={inputClasses}><SelectValue /></SelectTrigger>
+            <SelectTrigger aria-label="Relationship" className={labeledInputClasses}><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="FATHER">Father</SelectItem>
               <SelectItem value="MOTHER">Mother</SelectItem>
@@ -1162,20 +1125,20 @@ function GuardianDraftEditor({
             </SelectContent>
           </Select>
         </label>
-        <StudentTextField
+        <LabeledTextField
           label="Phone"
           type="tel"
           required
           value={guardian.phone}
           onChange={(value) => update("phone", value)}
         />
-        <StudentTextField
+        <LabeledTextField
           label="Alternate phone"
           type="tel"
           value={guardian.alternatePhone ?? ""}
           onChange={(value) => update("alternatePhone", value)}
         />
-        <StudentTextField
+        <LabeledTextField
           label="Email"
           type="email"
           value={guardian.email ?? ""}
@@ -1198,12 +1161,12 @@ function GuardianDraftEditor({
             </span>
           </span>
         </label>
-        <StudentTextField
+        <LabeledTextField
           label="Occupation"
           value={guardian.occupation ?? ""}
           onChange={(value) => update("occupation", value)}
         />
-        <StudentTextField
+        <LabeledTextField
           label="Employer"
           value={guardian.employer ?? ""}
           onChange={(value) => update("employer", value)}

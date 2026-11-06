@@ -1,4 +1,5 @@
 import { isValidElement, type ReactNode } from "react";
+import { downloadXlsx } from "./download";
 
 export type ExportColumnType = "text" | "number" | "money" | "date";
 export interface ExportReportInfo {
@@ -111,16 +112,6 @@ export function exportFileName(title: string, extension: string) {
   const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "export";
   return slug + "-" + new Date().toISOString().slice(0, 10) + "." + extension;
 }
-export function download(blob: Blob, fileName: string) {
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = fileName;
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
-}
 function reportInfoEntries(table: ExportTable): [string, string][] {
   const info = table.reportInfo;
   const generatedAt = info?.generatedAt ?? new Date();
@@ -190,7 +181,7 @@ export async function exportXlsx(table: ExportTable) {
   info.columns = [{ width: 24 }, { width: 55 }];
   info.views = [{ state: "frozen", ySplit: 1 }];
   const buffer = await workbook.xlsx.writeBuffer();
-  download(new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), exportFileName(table.title, "xlsx"));
+  downloadXlsx(buffer, exportFileName(table.title, "xlsx"));
 }
 export async function exportPdf(table: ExportTable) {
   const modules = await Promise.all([import("jspdf"), import("jspdf-autotable")]);

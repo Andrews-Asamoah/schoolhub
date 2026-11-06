@@ -1,37 +1,28 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Bell, LoaderCircle, Megaphone, Pin, Plus, RefreshCw, Search, Send, Trash2, X } from "lucide-react";
-import type {
-  AnnouncementCategory,
-  AnnouncementStatus,
-  CreateAnnouncementInput,
-} from "@schoolhub/shared";
+import { Bell, LoaderCircle, Pin, Plus, RefreshCw, Send, Trash2, X } from "lucide-react";
+import type { AnnouncementCategory, AnnouncementStatus, CreateAnnouncementInput } from "@schoolhub/shared";
 import { apiFetch } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PortalModal } from "./portal-modal";
 import {
+  ANNOUNCEMENT_CATEGORIES,
   ANNOUNCEMENT_CATEGORY_STYLES,
   ANNOUNCEMENT_TARGET_OPTIONS,
   announcementCategoryLabel,
   announcementDate,
+  announcementErrorText,
   announcementQueryRoleKey,
   announcementTargetLabel,
+  useAnnouncementDeepLink,
   type AnnouncementItem,
 } from "./announcement-utils";
+import { AnnouncementBrowser } from "./announcement-browser";
 
-type CategoryFilter = "ALL" | AnnouncementCategory;
 type Notice = { kind: "success" | "error"; message: string };
 type AnnouncementWorkspaceMode = "admin" | "teacher" | "accountant" | "viewer";
 type AnnouncementClassOption = { id: string; name: string; level: string };
-
-const filterOptions: { value: CategoryFilter; label: string }[] = [
-  { value: "ALL", label: "All" },
-  { value: "ACADEMIC", label: "Academic" },
-  { value: "EVENT", label: "Events" },
-  { value: "HOUSE", label: "House" },
-  { value: "GENERAL", label: "General" },
-];
 
 const emptyForm = (mode: AnnouncementWorkspaceMode = "admin"): CreateAnnouncementInput => ({
   title: "",
@@ -43,14 +34,8 @@ const emptyForm = (mode: AnnouncementWorkspaceMode = "admin"): CreateAnnouncemen
   status: "PUBLISHED",
 });
 
-function errorText(error: unknown) {
-  return error instanceof Error ? error.message : "The request failed. Please try again.";
-}
-
 export function AdminAnnouncementsWorkspace({ mode = "admin" }: { mode?: AnnouncementWorkspaceMode }) {
   const queryClient = useQueryClient();
-  const [filter, setFilter] = useState<CategoryFilter>("ALL");
-  const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<AnnouncementItem | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<AnnouncementItem | null>(null);
@@ -101,7 +86,7 @@ export function AdminAnnouncementsWorkspace({ mode = "admin" }: { mode?: Announc
         message: input.status === "DRAFT" ? "Draft saved." : "Announcement published.",
       });
     },
-    onError: (error) => setNotice({ kind: "error", message: errorText(error) }),
+    onError: (error) => setNotice({ kind: "error", message: announcementErrorText(error) }),
   });
 
   const pinMutation = useMutation({
@@ -117,7 +102,7 @@ export function AdminAnnouncementsWorkspace({ mode = "admin" }: { mode?: Announc
         message: variables.isPinned ? "Announcement pinned." : "Announcement unpinned.",
       });
     },
-    onError: (error) => setNotice({ kind: "error", message: errorText(error) }),
+    onError: (error) => setNotice({ kind: "error", message: announcementErrorText(error) }),
   });
 
   const statusMutation = useMutation({
@@ -136,7 +121,7 @@ export function AdminAnnouncementsWorkspace({ mode = "admin" }: { mode?: Announc
         message: variables.status === "PUBLISHED" ? "Announcement published." : "Announcement moved to drafts.",
       });
     },
-    onError: (error) => setNotice({ kind: "error", message: errorText(error) }),
+    onError: (error) => setNotice({ kind: "error", message: announcementErrorText(error) }),
   });
 
   const deleteMutation = useMutation({
@@ -148,32 +133,12 @@ export function AdminAnnouncementsWorkspace({ mode = "admin" }: { mode?: Announc
       setSelected(null);
       setNotice({ kind: "success", message: "Announcement deleted." });
     },
-    onError: (error) => setNotice({ kind: "error", message: errorText(error) }),
+    onError: (error) => setNotice({ kind: "error", message: announcementErrorText(error) }),
   });
 
   const announcements = announcementsQuery.data ?? [];
 
-  useEffect(() => {
-    const announcementId = new URLSearchParams(window.location.search).get("announcementId");
-    if (!announcementId) return;
-    const matchingAnnouncement = announcements.find((item) => item.id === announcementId);
-    if (!matchingAnnouncement) return;
-    setSelected(matchingAnnouncement);
-    const url = new URL(window.location.href);
-    url.searchParams.delete("announcementId");
-    window.history.replaceState(window.history.state, "", url.pathname + url.search + url.hash);
-  }, [announcements]);
-
-  const normalizedSearch = search.trim().toLowerCase();
-  const filtered = announcements.filter((item) => {
-    const matchesCategory = filter === "ALL" || item.category === filter;
-    const matchesSearch =
-      !normalizedSearch ||
-      item.title.toLowerCase().includes(normalizedSearch) ||
-      item.content.toLowerCase().includes(normalizedSearch) ||
-      item.author.name.toLowerCase().includes(normalizedSearch);
-    return matchesCategory && matchesSearch;
-  });
+  useAnnouncementDeepLink(announcements, setSelected);
 
   const publishedCount = announcements.filter((item) => item.status === "PUBLISHED").length;
   const pinnedCount = announcements.filter((item) => item.isPinned).length;
@@ -259,184 +224,118 @@ export function AdminAnnouncementsWorkspace({ mode = "admin" }: { mode?: Announc
         </div>
       )}
 
-      <div className="relative">
-        <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-        <input
-          type="search"
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
-          placeholder="Search by title, content, or author…"
-          className="h-11 w-full rounded-xl border border-input bg-background pl-10 pr-10 text-sm text-foreground outline-none placeholder:text-muted-foreground focus:ring-2 focus:ring-ring"
-        />
-        {search && (
-          <button
-            type="button"
-            onClick={() => setSearch("")}
-            aria-label="Clear search"
-            className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md p-1 text-muted-foreground hover:bg-muted"
-          >
-            <X className="size-4" />
-          </button>
-        )}
-      </div>
-
-      <div className="flex items-center gap-1 overflow-x-auto rounded-2xl border border-border bg-card p-1.5">
-        {filterOptions.map((option) => (
-          <button
-            key={option.value}
-            type="button"
-            onClick={() => setFilter(option.value)}
-            aria-pressed={filter === option.value}
-            className={cn(
-              "shrink-0 rounded-xl px-4 py-2 text-sm font-semibold transition",
-              filter === option.value
-                ? "bg-primary text-primary-foreground"
-                : "text-muted-foreground hover:bg-muted hover:text-foreground",
-            )}
-          >
-            {option.label}
-          </button>
-        ))}
-      </div>
-
-      {announcementsQuery.isPending ? (
-        <div className="flex items-center justify-center gap-2 rounded-2xl border border-border bg-card p-12 text-sm text-muted-foreground">
-          <LoaderCircle className="size-5 animate-spin" />
-          Loading announcements…
-        </div>
-      ) : announcementsQuery.isError ? (
-        <div role="alert" className="rounded-2xl border border-destructive/30 bg-destructive/10 p-6">
-          <p className="font-semibold text-destructive">Announcements could not be loaded.</p>
-          <p className="mt-1 text-sm text-muted-foreground">{errorText(announcementsQuery.error)}</p>
-          <button
-            type="button"
-            onClick={() => void announcementsQuery.refetch()}
-            className="mt-4 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground"
-          >
-            Try again
-          </button>
-        </div>
-      ) : filtered.length === 0 ? (
-        <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-card px-5 py-14 text-center">
-          <Megaphone className="size-10 text-muted-foreground" />
-          <h3 className="mt-4 text-sm font-bold text-foreground">
-            {announcements.length === 0 ? "No announcements yet" : "No announcements found"}
-          </h3>
-          <p className="mt-1 max-w-sm text-sm text-muted-foreground">
-            {search || filter !== "ALL"
-              ? "Try a different search or category filter."
-              : "Create your first announcement to share an official notice with your school community."}
-          </p>
-          {(search || filter !== "ALL") && (
-            <button
-              type="button"
-              onClick={() => { setSearch(""); setFilter("ALL"); }}
-              className="mt-4 rounded-lg border border-border px-3 py-2 text-sm font-semibold hover:bg-muted"
-            >
-              Clear filters
-            </button>
-          )}
-        </div>
-      ) : (
-        <div className="grid gap-4 sm:grid-cols-2">
-          {filtered.map((item) => {
-            const colors = ANNOUNCEMENT_CATEGORY_STYLES[item.category];
-            return (
-              <article
-                key={item.id}
-                className={cn(
-                  "rounded-2xl border bg-card p-5 shadow-sm",
-                  item.isPinned ? "border-primary/40" : "border-border",
-                )}
-              >
-                <div className="flex flex-wrap items-center gap-2">
-                  {item.isPinned && (
-                    <span className="inline-flex items-center gap-1 rounded-md bg-primary/10 px-2 py-1 text-xs font-semibold text-primary">
-                      <Pin className="size-3" /> Pinned
-                    </span>
+      <AnnouncementBrowser
+        query={announcementsQuery}
+        announcements={announcements}
+        allLabel="All"
+        copy={{
+          searchPlaceholder: "Search by title, content, or author…",
+          noMatchTitle: "No announcements found",
+          noMatchHint: "Try a different search or category filter.",
+          emptyHint: "Create your first announcement to share an official notice with your school community.",
+        }}
+      >
+        {(filtered) => (
+          <div className="grid gap-4 sm:grid-cols-2">
+            {filtered.map((item) => {
+              const colors = ANNOUNCEMENT_CATEGORY_STYLES[item.category];
+              return (
+                <article
+                  key={item.id}
+                  className={cn(
+                    "rounded-2xl border bg-card p-5 shadow-sm",
+                    item.isPinned ? "border-primary/40" : "border-border",
                   )}
-                  <span className={cn("rounded-md px-2 py-1 text-xs font-semibold", colors.background, colors.foreground)}>
-                    {announcementCategoryLabel(item.category)}
-                  </span>
-                  <span className={cn(
-                    "rounded-md px-2 py-1 text-xs font-semibold",
-                    item.status === "PUBLISHED" ? "bg-success/10 text-success" : "bg-warning/10 text-warning",
-                  )}>
-                    {item.status === "PUBLISHED" ? "Published" : "Draft"}
-                  </span>
-                </div>
-                <h3 className="mt-3 text-base font-bold text-foreground">{item.title}</h3>
-                <p className="mt-1.5 line-clamp-3 whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">{item.content}</p>
-                <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-border pt-3 text-xs text-muted-foreground">
-                  <span>{announcementDate(item.createdAt)}</span>
-                  <span>{item.author.name}</span>
-                </div>
-                <p className="mt-2 text-xs text-muted-foreground">Audience: {announcementTargetLabel(item.target)}</p>
-                {item.targetClassIds.length > 0 && (
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Classes: {classOptions.filter((klass) => item.targetClassIds.includes(klass.id)).map((klass) => klass.name).join(", ") || item.targetClassIds.length + " selected"}
-                  </p>
-                )}
-                <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
-                  <div className="flex gap-1">
+                >
+                  <div className="flex flex-wrap items-center gap-2">
+                    {item.isPinned && (
+                      <span className="inline-flex items-center gap-1 rounded-md bg-primary/10 px-2 py-1 text-xs font-semibold text-primary">
+                        <Pin className="size-3" /> Pinned
+                      </span>
+                    )}
+                    <span className={cn("rounded-md px-2 py-1 text-xs font-semibold", colors.background, colors.foreground)}>
+                      {announcementCategoryLabel(item.category)}
+                    </span>
+                    <span className={cn(
+                      "rounded-md px-2 py-1 text-xs font-semibold",
+                      item.status === "PUBLISHED" ? "bg-success/10 text-success" : "bg-warning/10 text-warning",
+                    )}>
+                      {item.status === "PUBLISHED" ? "Published" : "Draft"}
+                    </span>
+                  </div>
+                  <h3 className="mt-3 text-base font-bold text-foreground">{item.title}</h3>
+                  <p className="mt-1.5 line-clamp-3 whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">{item.content}</p>
+                  <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-border pt-3 text-xs text-muted-foreground">
+                    <span>{announcementDate(item.createdAt)}</span>
+                    <span>{item.author.name}</span>
+                  </div>
+                  <p className="mt-2 text-xs text-muted-foreground">Audience: {announcementTargetLabel(item.target)}</p>
+                  {item.targetClassIds.length > 0 && (
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Classes: {classOptions.filter((klass) => item.targetClassIds.includes(klass.id)).map((klass) => klass.name).join(", ") || item.targetClassIds.length + " selected"}
+                    </p>
+                  )}
+                  <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex gap-1">
+                      {mode === "admin" && (
+                        <button
+                          type="button"
+                          onClick={() => pinMutation.mutate({ id: item.id, isPinned: !item.isPinned })}
+                          disabled={isSaving}
+                          title={item.isPinned ? "Unpin announcement" : "Pin announcement"}
+                          aria-label={item.isPinned ? "Unpin announcement" : "Pin announcement"}
+                          className="rounded-lg p-2 text-muted-foreground hover:bg-muted hover:text-primary disabled:opacity-50"
+                        >
+                          <Pin className="size-4" />
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => setSelected(item)}
+                        className="rounded-lg border border-border px-3 py-2 text-xs font-semibold text-foreground hover:bg-muted"
+                      >
+                        View
+                      </button>
+                      {mode === "admin" && (
+                        item.status === "DRAFT" ? (
+                          <button
+                            type="button"
+                            onClick={() => statusMutation.mutate({ id: item.id, status: "PUBLISHED" })}
+                            disabled={isSaving}
+                            className="rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground disabled:opacity-50"
+                          >
+                            Publish
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => statusMutation.mutate({ id: item.id, status: "DRAFT" })}
+                            disabled={isSaving}
+                            className="rounded-lg border border-border px-3 py-2 text-xs font-semibold text-foreground hover:bg-muted disabled:opacity-50"
+                          >
+                            Move to draft
+                          </button>
+                        )
+                      )}
+                    </div>
                     {mode === "admin" && (
                       <button
                         type="button"
-                        onClick={() => pinMutation.mutate({ id: item.id, isPinned: !item.isPinned })}
+                        onClick={() => setDeleteTarget(item)}
                         disabled={isSaving}
-                        title={item.isPinned ? "Unpin announcement" : "Pin announcement"}
-                        aria-label={item.isPinned ? "Unpin announcement" : "Pin announcement"}
-                        className="rounded-lg p-2 text-muted-foreground hover:bg-muted hover:text-primary disabled:opacity-50"
+                        aria-label={"Delete " + item.title}
+                        className="rounded-lg p-2 text-destructive hover:bg-destructive/10 disabled:opacity-50"
                       >
-                        <Pin className="size-4" />
+                        <Trash2 className="size-4" />
                       </button>
                     )}
-                    <button
-                      type="button"
-                      onClick={() => setSelected(item)}
-                      className="rounded-lg border border-border px-3 py-2 text-xs font-semibold text-foreground hover:bg-muted"
-                    >
-                      View
-                    </button>
-                    {mode === "admin" && (
-                      item.status === "DRAFT" ? (
-                        <button
-                          type="button"
-                          onClick={() => statusMutation.mutate({ id: item.id, status: "PUBLISHED" })}
-                          disabled={isSaving}
-                          className="rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground disabled:opacity-50"
-                        >
-                          Publish
-                        </button>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => statusMutation.mutate({ id: item.id, status: "DRAFT" })}
-                          disabled={isSaving}
-                          className="rounded-lg border border-border px-3 py-2 text-xs font-semibold text-foreground hover:bg-muted disabled:opacity-50"
-                        >
-                          Move to draft
-                        </button>
-                      )
-                    )}
                   </div>
-                  {mode === "admin" && (
-                    <button
-                      type="button"
-                      onClick={() => setDeleteTarget(item)}
-                      disabled={isSaving}
-                      aria-label={"Delete " + item.title}
-                      className="rounded-lg p-2 text-destructive hover:bg-destructive/10 disabled:opacity-50"
-                    >
-                      <Trash2 className="size-4" />
-                    </button>
-                  )}
-                </div>
-              </article>
-            );
-          })}
-        </div>
-      )}
+                </article>
+              );
+            })}
+          </div>
+        )}
+      </AnnouncementBrowser>
 
       <PortalModal
         isOpen={isCreateOpen}
@@ -467,7 +366,7 @@ export function AdminAnnouncementsWorkspace({ mode = "admin" }: { mode?: Announc
                   <SelectValue placeholder="Choose a category" />
                 </SelectTrigger>
                 <SelectContent>
-                  {filterOptions.filter((option) => option.value !== "ALL").map((option) => (
+                  {ANNOUNCEMENT_CATEGORIES.map((option) => (
                     <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
                   ))}
                 </SelectContent>
@@ -573,7 +472,7 @@ export function AdminAnnouncementsWorkspace({ mode = "admin" }: { mode?: Announc
           </label>
           )}
           {createMutation.isError && (
-            <p role="alert" className="text-sm text-destructive">{errorText(createMutation.error)}</p>
+            <p role="alert" className="text-sm text-destructive">{announcementErrorText(createMutation.error)}</p>
           )}
           <div className="flex justify-end gap-2 border-t border-border pt-4">
             <button
@@ -635,7 +534,7 @@ export function AdminAnnouncementsWorkspace({ mode = "admin" }: { mode?: Announc
           <p className="text-sm text-muted-foreground">
             Delete <strong className="text-foreground">{deleteTarget?.title}</strong>? This action cannot be undone.
           </p>
-          {deleteMutation.isError && <p role="alert" className="text-sm text-destructive">{errorText(deleteMutation.error)}</p>}
+          {deleteMutation.isError && <p role="alert" className="text-sm text-destructive">{announcementErrorText(deleteMutation.error)}</p>}
           <div className="flex justify-end gap-2 border-t border-border pt-4">
             <button
               type="button"

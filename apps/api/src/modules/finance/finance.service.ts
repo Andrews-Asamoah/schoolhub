@@ -2395,7 +2395,6 @@ export class FinanceService {
     query: Pick<FinanceListQuery, "from" | "to" | "yearId" | "termId"> = {},
   ) {
     const today = new Date();
-    const todayDate = today.toISOString().slice(0, 10);
     const { yearId, termId } = await this.resolveAcademicFilter(schoolId, query.yearId, query.termId);
     const academicYear = yearId
       ? await this.prisma.client.academicYear.findFirst({
@@ -4412,7 +4411,6 @@ export class FinanceService {
     let skippedNoLogin = 0;
     let failed = 0;
     let alreadySentCount = 0;
-    const today = new Date();
 
     for (const target of targets) {
       const balanceText = new Intl.NumberFormat("en-GH", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(target.balance);

@@ -4,7 +4,8 @@ import {
   type StudentImportColumn,
   type StudentImportField,
 } from "@schoolhub/shared";
-import { download, exportXlsx, type ExportTable } from "@/lib/table-export";
+import { downloadBlob, downloadXlsx } from "@/lib/download";
+import { exportXlsx, type ExportTable } from "@/lib/table-export";
 
 export type RowStatus = "ready" | "warning" | "duplicate" | "error";
 
@@ -65,7 +66,7 @@ const csvCell = (value: string) => (/[",\r\n]/.test(value) ? `"${value.replace(/
 /** A CSV with just the headings, ready to fill in. */
 export function downloadCsvTemplate() {
   const text = `${headers.map(csvCell).join(",")}\r\n`;
-  download(new Blob(["\uFEFF" + text], { type: "text/csv;charset=utf-8" }), "student-import-template.csv");
+  downloadBlob(new Blob(["\uFEFF" + text], { type: "text/csv;charset=utf-8" }), "student-import-template.csv");
 }
 
 const TEXT_FORMAT_FIELDS: StudentImportField[] = [
@@ -127,7 +128,7 @@ export async function downloadXlsxTemplate(classNames: string[], houseNames: str
 
   workbook.views = [{ activeTab: 1, x: 0, y: 0, width: 10000, height: 20000, firstSheet: 0, visibility: "visible" }];
   const buffer = await workbook.xlsx.writeBuffer();
-  download(new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), "student-import-template.xlsx");
+  downloadXlsx(buffer, "student-import-template.xlsx");
 }
 
 // ---------------------------------------------------------------- reports

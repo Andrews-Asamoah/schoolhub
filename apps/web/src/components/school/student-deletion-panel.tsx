@@ -3,13 +3,9 @@ import { Trash2 } from "lucide-react";
 import { useState } from "react";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Button } from "@/components/ui/button";
-import { apiFetch } from "@/lib/api";
-import {
-  blockerSentence, formatRequestDate, removalSummary,
-  type DeletionImpact, type DeletionRequest,
-} from "@/lib/student-deletion";
-
-const errorText = (error: unknown) => (error instanceof Error ? error.message : "Something went wrong.");
+import { apiFetch, errorText } from "@/lib/api";
+import { DeletionImpactSummary } from "@/components/school/deletion-impact-summary";
+import { formatRequestDate, type DeletionImpact, type DeletionRequest } from "@/lib/student-deletion";
 
 /**
  * For wrongly created students: ask the platform administrator to remove the
@@ -87,20 +83,10 @@ function RequestDialog({ studentId, studentName, onClose }: { studentId: string;
 
         {impact.isPending && <p className="mt-3 text-sm text-muted-foreground">Checking what would be removed…</p>}
         {impact.error && <p role="alert" className="mt-3 text-sm text-destructive">{errorText(impact.error)}</p>}
-        {impact.data && blocked && (
-          <p role="alert" className="mt-3 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
-            This student has {blockerSentence(impact.data.blockers)}, so the record cannot be deleted. Withdraw the student instead.
-          </p>
-        )}
-        {impact.data && !blocked && (
-          <div className="mt-3 rounded-lg bg-muted/50 p-3 text-sm">
-            <p className="font-medium text-foreground">This will remove:</p>
-            <ul className="mt-1 list-disc space-y-0.5 pl-5 text-muted-foreground">
-              {removalSummary(impact.data).map((item) => <li key={item}>{item}</li>)}
-            </ul>
-            {impact.data.guardiansKept.length > 0 && (
-              <p className="mt-2 text-xs text-muted-foreground">Kept, because they have another child here: {impact.data.guardiansKept.join(", ")}.</p>
-            )}
+        {impact.data && (
+          <div className="mt-3">
+            <DeletionImpactSummary impact={impact.data} heading="This will remove:"
+              blockedMessage={(blockers) => `This student has ${blockers}, so the record cannot be deleted. Withdraw the student instead.`} />
           </div>
         )}
 

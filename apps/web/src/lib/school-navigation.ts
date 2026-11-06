@@ -630,7 +630,6 @@ const ownPortalByRole: Record<string, string> = {
  * administrator, headteacher) see everything else, so these are left out of
  * their sidebar.
  */
-const studentOnlyPages = ["classmates"];
 
 export function getSchoolNavGroupsForRole(role?: string) {
   const allowedPages = rolePages[role ?? ""] ?? [];

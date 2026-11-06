@@ -1,4 +1,4 @@
-import {BadRequestException,ConflictException,ForbiddenException,Injectable,NotFoundException} from "@nestjs/common";
+import {ConflictException,ForbiddenException,Injectable,NotFoundException} from "@nestjs/common";
 import {Prisma} from "@prisma/client";
 import {PrismaService} from "../../prisma/prisma.service.js";
 import {parseBeceWorkbook,createBeceTemplate,type ParsedBeceUpload} from "./external-bece-import.xlsx.js";
@@ -114,7 +114,7 @@ export class ExternalBeceImportService {
     });
     if(!session||!session.papers[0])throw new NotFoundException("BECE paper not found in this school.");
     if(session.status!=="OPEN")throw new ConflictException("Only an open BECE register may generate a results template.");
-    return createBeceTemplate(session.name,session.papers[0],session.candidates);
+    return createBeceTemplate(session.papers[0],session.candidates);
   }
 
   async preview(schoolId:string,role:string|undefined,sessionId:string,file:{buffer:Buffer;originalname:string}){

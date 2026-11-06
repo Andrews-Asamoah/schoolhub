@@ -933,7 +933,7 @@ export function StudentTimetableView() {
                         key={day}
                         className={cn(
                           "student-timetable-print-cell",
-                          slotEntries.some((entry) =>
+                          slotEntries.some(() =>
                             isSchoolDayToday && day === todayKey &&
                             nowMinutes >= slot.startMinutes &&
                             nowMinutes < slot.endMinutes,

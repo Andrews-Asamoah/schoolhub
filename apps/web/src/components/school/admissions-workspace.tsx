@@ -11,7 +11,7 @@ import {
 import { CredentialsDialog, type CredentialEntry } from "@/components/credentials/credentials-dialog";
 import { useSchoolRole } from "@/components/school/school-role-switcher";
 import { WorkspaceEmptyState } from "@/components/school/workspace-ui";
-import { apiFetch } from "@/lib/api";
+import { apiFetch, errorText } from "@/lib/api";
 import { getTenantSubdomain, useTenantSchool } from "@/lib/tenant";
 
 interface ClassOption {
@@ -125,7 +125,6 @@ function Badge({ value }: { value: string }) {
     </span>
   );
 }
-const errorText = (e: unknown) => (e instanceof Error ? e.message : "Something went wrong.");
 
 export function AdmissionsWorkspace() {
   const [tab, setTab] = useState<"applications" | "intakes">("applications");

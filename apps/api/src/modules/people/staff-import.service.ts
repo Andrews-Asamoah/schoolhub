@@ -6,7 +6,6 @@ import { PrismaService } from "../../prisma/prisma.service.js";
 import { parseUpload } from "../students/import/import-parse.js";
 
 type Kind = "teacher" | "staff";
-type ImportRow = Record<string, string> & { rowNumber: number };
 type PreviewRow = { rowNumber: number; name: string; status: "ready" | "duplicate" | "error"; errors: string[]; row: Record<string, unknown> | null };
 
 const normalize = (value: string) => value.toLowerCase().replace(/[^a-z0-9]/g, "");

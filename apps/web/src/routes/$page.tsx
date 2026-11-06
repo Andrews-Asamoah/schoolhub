@@ -1,20 +1,16 @@
 import {
-  useMutation,
   useQuery,
-  useQueryClient,
   type UseQueryResult,
 } from "@tanstack/react-query";
-import { createFileRoute, Link, useNavigate, useParams } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, useParams } from "@tanstack/react-router";
 import { CircleAlert, LoaderCircle } from "lucide-react";
 import { lazy, Suspense, useEffect, useState } from "react";
 import { SchoolWorkspaceLayout } from "@/components/school/school-workspace-layout";
 import {
   PreviewDataNotice,
-  WorkspaceDataTable,
   WorkspaceEmptyState,
   WorkspacePageHeading,
   WorkspaceStat,
-  type WorkspaceColumn,
 } from "@/components/school/workspace-ui";
 import { apiFetch, ApiError } from "@/lib/api";
 import { useSession } from "@/lib/auth-client";
@@ -152,7 +148,6 @@ function WorkspaceRoute() {
       <SchoolWorkspaceLayout
         activePage=""
         title="Page not found"
-        section="Workspace"
       >
         <WorkspaceEmptyState
           title="We couldn’t find that page"
@@ -166,7 +161,6 @@ function WorkspaceRoute() {
     <SchoolWorkspaceLayout
       activePage={navItem.id}
       title={navItem.label}
-      section={navItem.section}
     >
       <Suspense
         fallback={

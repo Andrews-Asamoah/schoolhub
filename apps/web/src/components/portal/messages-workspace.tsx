@@ -1,9 +1,8 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Inbox, LoaderCircle, Mail, MailOpen, MessageSquare, Plus, Reply, Search, Send, UserRound, X } from "lucide-react";
+import { Inbox, LoaderCircle, Mail, MailOpen, MessageSquare, Plus, Reply, Search, Send, UserRound } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { PortalModal } from "./portal-modal";
 import { EmptyState, ErrorState } from "@/components/ui/empty-state";
-import { useSchoolRole } from "@/components/school/school-role-switcher";
 import { apiFetch } from "@/lib/api";
 
 interface MessageContact {
@@ -36,7 +35,6 @@ const dateTime = (date: string) => new Intl.DateTimeFormat("en-GH", { dateStyle:
 
 export function MessagesWorkspace() {
   const queryClient = useQueryClient();
-  const { activeRole } = useSchoolRole();
   const [folder, setFolder] = useState<Folder>("inbox");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [composeOpen, setComposeOpen] = useState(false);

@@ -45,31 +45,3 @@ export function useTenantSchool() {
     error: query.error,
   };
 }
-
-/**
- * Builds the canonical portal URL for a school.
- */
-export function buildSchoolPortalUrl(subdomain: string, path = "/"): string {
-  if (typeof window === "undefined") return path;
-
-  const hostname = window.location.hostname;
-  const port = window.location.port ? `:${window.location.port}` : "";
-  const protocol = window.location.protocol;
-
-  // If local development on localhost
-  if (hostname === "localhost" || hostname.endsWith(".localhost")) {
-    return `${protocol}//${subdomain}.localhost${port}${path}`;
-  }
-
-  // If on schoolhub root domain
-  if (hostname.includes("schoolhub.")) {
-    const domainParts = hostname.split(".");
-    const baseDomain = domainParts.slice(-2).join("."); // e.g. "schoolhub.gh"
-    return `${protocol}//${subdomain}.${baseDomain}${port}${path}`;
-  }
-
-  // Fallback query parameter
-  const url = new URL(path, `${protocol}//${hostname}${port}`);
-  url.searchParams.set("school", subdomain);
-  return url.href;
-}

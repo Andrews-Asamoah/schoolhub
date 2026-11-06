@@ -1273,7 +1273,6 @@ export class StudentsService {
         _sum: { balanceAmount: true },
       }),
     ]);
-    const totalBilled = currentAgg._sum.totalAmount ?? new Prisma.Decimal(0);
     const totalPaid = currentAgg._sum.paidAmount ?? new Prisma.Decimal(0);
     const currentOutstanding = currentAgg._sum.balanceAmount ?? new Prisma.Decimal(0);
     const allOutstanding = allOpenAgg._sum.balanceAmount ?? new Prisma.Decimal(0);

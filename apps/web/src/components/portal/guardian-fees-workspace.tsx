@@ -6,19 +6,13 @@ import type { StudentStatementResponse } from "@schoolhub/shared";
 import type { StudentProfileData } from "@/components/school/student-profile-panel";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { apiFetch } from "@/lib/api";
+import { downloadXlsx } from "@/lib/download";
 
 function fullName(ward: StudentProfileData) {
   return [ward.profile.firstName, ward.profile.otherNames, ward.profile.lastName].filter(Boolean).join(" ") || ward.admissionNumber || "Student";
 }
 const money = (value: string | number) => new Intl.NumberFormat("en-GH", { style: "currency", currency: "GHS", maximumFractionDigits: 2 }).format(Number(value) || 0);
 const secondaryButton = "inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-border bg-card px-4 py-2 text-sm font-semibold text-foreground transition hover:bg-muted disabled:opacity-50";
-
-function downloadBlob(blob: Blob, filename: string) {
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url; link.download = filename;
-  document.body.appendChild(link); link.click(); link.remove(); URL.revokeObjectURL(url);
-}
 
 export function GuardianFeesWorkspace() {
   const [exporting, setExporting] = useState(false);
@@ -97,7 +91,7 @@ export function GuardianFeesWorkspace() {
       sheet.getRow(1).font = { bold: true };
       sheet.autoFilter = { from: "A1", to: "F1" };
       const bytes = await workbook.xlsx.writeBuffer();
-      downloadBlob(new Blob([bytes], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), `ward-statement-${filename}.xlsx`);
+      downloadXlsx(bytes, `ward-statement-${filename}.xlsx`);
     } finally {
       setExporting(false);
     }

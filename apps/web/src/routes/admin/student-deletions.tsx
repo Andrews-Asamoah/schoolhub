@@ -2,17 +2,15 @@ import { createFileRoute } from "@tanstack/react-router";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Trash2, UserX } from "lucide-react";
-import { apiFetch } from "@/lib/api";
+import { apiFetch, errorText } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { PageHeader } from "@/components/superadmin/page-header";
 import { FilterChips } from "@/components/superadmin/filter-chips";
 import { Pagination } from "@/components/superadmin/pagination";
 import { EmptyPanel, ErrorPanel, LoadingPanel } from "@/components/superadmin/state-panels";
-import {
-  blockerSentence, formatRequestDate, removalSummary,
-  type DeletionImpact, type DeletionStatus, type PlatformDeletionRequest,
-} from "@/lib/student-deletion";
+import { DeletionImpactSummary } from "@/components/school/deletion-impact-summary";
+import { formatRequestDate, type DeletionImpact, type DeletionStatus, type PlatformDeletionRequest } from "@/lib/student-deletion";
 
 export const Route = createFileRoute("/admin/student-deletions")({
   component: StudentDeletionsPage,
@@ -27,7 +25,6 @@ type ImpactResponse = DeletionImpact | { alreadyHandled: true } | { studentRemov
 type Filter = "PENDING" | "all" | DeletionStatus;
 
 const LIMIT = 20;
-const errorText = (error: unknown) => (error instanceof Error ? error.message : "Something went wrong.");
 
 function StudentDeletionsPage() {
   const [filter, setFilter] = useState<Filter>("PENDING");
@@ -113,19 +110,9 @@ function RequestCard({ request }: { request: PlatformDeletionRequest }) {
           {impact.isPending && <p className="text-muted-foreground">Checking what would be removed…</p>}
           {impact.error && <p role="alert" className="text-destructive">{errorText(impact.error)}</p>}
           {studentGone && <p className="text-muted-foreground">This student is already gone. Approving simply closes the request.</p>}
-          {detail && blocked && (
-            <p role="alert" className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-destructive">
-              This student now has {blockerSentence(detail.blockers)}, so it cannot be deleted. Decline the request and ask the school to withdraw the student.
-            </p>
-          )}
-          {detail && !blocked && (
-            <div className="rounded-lg bg-muted/50 p-3">
-              <p className="font-medium text-foreground">Approving permanently removes:</p>
-              <ul className="mt-1 list-disc space-y-0.5 pl-5 text-muted-foreground">
-                {removalSummary(detail).map((item) => <li key={item}>{item}</li>)}
-              </ul>
-              {detail.guardiansKept.length > 0 && <p className="mt-2 text-xs text-muted-foreground">Kept, because they have another child there: {detail.guardiansKept.join(", ")}.</p>}
-            </div>
+          {detail && (
+            <DeletionImpactSummary impact={detail} heading="Approving permanently removes:"
+              blockedMessage={(blockers) => `This student now has ${blockers}, so it cannot be deleted. Decline the request and ask the school to withdraw the student.`} />
           )}
           {(approve.error || reject.error) && <p role="alert" className="mt-2 text-destructive">{errorText(approve.error ?? reject.error)}</p>}
           <div className="mt-3 flex flex-wrap gap-2">

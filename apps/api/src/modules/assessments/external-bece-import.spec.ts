@@ -10,7 +10,7 @@ function session(){
   } as never;
 }
 async function file(status:string="GRADED",grade:string|number=2){
-  const original=await createBeceTemplate("BECE 2026",{nameSnapshot:"Computing",codeSnapshot:"CMP"},
+  const original=await createBeceTemplate({nameSnapshot:"Computing",codeSnapshot:"CMP"},
     [{indexNumber:"0001234567",nameSnapshot:"Synthetic Candidate",
       admissionNumberSnapshot:"A-001",results:[]}]);
   const wb=new ExcelJS.Workbook();await wb.xlsx.load(original as unknown as ArrayBuffer);

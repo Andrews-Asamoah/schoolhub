@@ -36,7 +36,6 @@ export function GuardianPublishedReports({wards=[]}:{wards?:{id:string;profile:{
   const layout = selected?.set.template.layout;
   const accent = layout?.accentColor ?? selected?.set.school.primaryColor ?? "#4f46e5";
   const accentForeground = accessibleAccentForeground(accent);
-  const average = subjects.length ? subjects.reduce((sum, subject) => sum + subject.percentage, 0) / subjects.length : null;
   if (reports.isPending) return <div className="flex items-center gap-2 rounded-xl border border-border bg-card p-4 text-sm text-muted-foreground"><LoaderCircle className="size-4 animate-spin" />Loading published ward reports…</div>;
   if (reports.isError) return <div role="alert" className="rounded-xl border border-destructive/20 bg-destructive/10 p-4 text-sm text-destructive">Unable to load published reports: {reports.error.message}</div>;
   return <section className="space-y-4 rounded-2xl border border-border bg-card p-5">

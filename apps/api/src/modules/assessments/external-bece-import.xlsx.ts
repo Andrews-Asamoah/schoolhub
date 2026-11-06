@@ -75,7 +75,7 @@ export type BeceTemplateCandidate={
   results:{status:string;grade:number|null;version:number;sourceReference:string}[];
 };
 export async function createBeceTemplate(
-  examName:string,paper:{nameSnapshot:string;codeSnapshot:string},
+  paper:{nameSnapshot:string;codeSnapshot:string},
   candidates:readonly BeceTemplateCandidate[],
 ):Promise<Buffer>{
   if(candidates.length===0||candidates.length>BECE_IMPORT_MAX_ROWS){

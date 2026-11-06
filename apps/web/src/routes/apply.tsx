@@ -4,7 +4,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { GUARDIAN_RELATIONSHIPS, submitApplicationSchema } from "@schoolhub/shared";
-import { apiFetch } from "@/lib/api";
+import { apiFetch, errorText } from "@/lib/api";
 import { getTenantSubdomain } from "@/lib/tenant";
 
 export const Route = createFileRoute("/apply")({
@@ -51,7 +51,6 @@ interface Tracked {
 const field =
   "mt-1.5 h-11 w-full rounded-lg border border-input bg-card px-3 text-sm text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/20";
 const lbl = "block text-xs font-semibold text-foreground/80";
-const errorText = (e: unknown) => (e instanceof Error ? e.message : "Something went wrong. Please try again.");
 
 const STATUS_MESSAGE: Record<string, string> = {
   SUBMITTED: "We have received your application. The school will review it shortly.",

@@ -1,4 +1,4 @@
-import { download } from "@/lib/table-export";
+import { downloadBlob, downloadXlsx } from "@/lib/download";
 
 export interface ImportTemplate {
   /** File name stem: "subjects" downloads subjects-import-template.xlsx. */
@@ -45,7 +45,7 @@ const sampleRows = (template: ImportTemplate) => template.rows ?? (template.exam
 
 export function downloadCsvTemplate(template: ImportTemplate) {
   const csv = [template.headers, ...sampleRows(template)].map((row) => row.map(csvCell).join(",")).join("\r\n");
-  download(new Blob(["\uFEFF", csv], { type: "text/csv;charset=utf-8" }), `${template.fileBase}-import-template.csv`);
+  downloadBlob(new Blob(["\uFEFF", csv], { type: "text/csv;charset=utf-8" }), `${template.fileBase}-import-template.csv`);
 }
 
 export async function downloadExcelTemplate(template: ImportTemplate) {
@@ -141,8 +141,5 @@ export async function downloadExcelTemplate(template: ImportTemplate) {
   }
 
   const buffer = await workbook.xlsx.writeBuffer();
-  download(
-    new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }),
-    `${template.fileBase}-import-template.xlsx`,
-  );
+  downloadXlsx(buffer, `${template.fileBase}-import-template.xlsx`);
 }

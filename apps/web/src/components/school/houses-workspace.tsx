@@ -19,6 +19,7 @@ import { apiFetch } from "@/lib/api";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AcademicStructureBulkImport } from "@/components/school/academic-structure-bulk-import";
 import { BulkImportButton } from "@/components/bulk-import/bulk-import-button";
+import { labeledInputClasses } from "@/components/forms/labeled-controls";
 
 interface HouseRecord {
   id: string;
@@ -65,8 +66,6 @@ const emptyForm: HouseFormValues = {
   isActive: true,
 };
 
-const inputClasses =
-  "mt-1.5 h-10 w-full rounded-lg border border-border bg-background px-3 text-sm text-foreground outline-none placeholder:text-muted-foreground focus:border-ring focus:ring-2 focus:ring-ring/20";
 
 export function HousesWorkspace() {
   const queryClient = useQueryClient();
@@ -273,7 +272,7 @@ export function HousesWorkspace() {
                 <input
                   required
                   maxLength={100}
-                  className={inputClasses}
+                  className={labeledInputClasses}
                   value={values.name}
                   onChange={(event) =>
                     setValues({ ...values, name: event.target.value })
@@ -287,7 +286,7 @@ export function HousesWorkspace() {
                   required
                   maxLength={20}
                   pattern="[A-Za-z0-9-]+"
-                  className={inputClasses}
+                  className={labeledInputClasses}
                   value={values.code}
                   onChange={(event) =>
                     setValues({ ...values, code: event.target.value })
@@ -315,7 +314,7 @@ export function HousesWorkspace() {
               <label className="text-xs font-semibold text-foreground">
                 Lead teacher
                 <Select value={values.houseTeacherId || "__none__"} onValueChange={(value) => setValues({ ...values, houseTeacherId: value === "__none__" ? "" : value })}>
-                  <SelectTrigger aria-label="Lead teacher" className={inputClasses}><SelectValue /></SelectTrigger>
+                  <SelectTrigger aria-label="Lead teacher" className={labeledInputClasses}><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="__none__">No lead teacher assigned</SelectItem>
                     {teachers.filter((teacher) => teacher.isActive || teacher.id === values.houseTeacherId).map((teacher) => (
@@ -328,7 +327,7 @@ export function HousesWorkspace() {
                 Motto
                 <input
                   maxLength={200}
-                  className={inputClasses}
+                  className={labeledInputClasses}
                   value={values.motto}
                   onChange={(event) =>
                     setValues({ ...values, motto: event.target.value })
@@ -341,7 +340,7 @@ export function HousesWorkspace() {
                 <textarea
                   maxLength={500}
                   rows={3}
-                  className={`${inputClasses} h-auto min-h-20 py-2.5`}
+                  className={`${labeledInputClasses} h-auto min-h-20 py-2.5`}
                   value={values.description}
                   onChange={(event) =>
                     setValues({ ...values, description: event.target.value })

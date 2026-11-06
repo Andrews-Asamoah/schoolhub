@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { Home, RefreshCw, Sparkles, Trophy, Users } from "lucide-react";
+import { Home, RefreshCw, Sparkles, Users } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { cn } from "@/lib/utils";
 

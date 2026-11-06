@@ -6,7 +6,6 @@ import {
   Download,
   FileSpreadsheet,
   FileText,
-  LoaderCircle,
   Printer,
   TriangleAlert,
 } from "lucide-react";

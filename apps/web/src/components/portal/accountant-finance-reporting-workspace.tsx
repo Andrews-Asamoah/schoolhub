@@ -9,6 +9,7 @@ import type { jsPDF as JsPDF } from "jspdf";
 import { FileSpreadsheet, FileText, LoaderCircle, Printer } from "lucide-react";
 import { apiFetch, getClientSubdomain } from "@/lib/api";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { downloadXlsx } from "@/lib/download";
 
 interface AcademicTerm { id: string; name: string; isCurrent: boolean; startDate?: string; endDate?: string; }
 interface AcademicYear { id: string; name: string; isCurrent: boolean; startDate?: string; endDate?: string; terms: AcademicTerm[]; }
@@ -244,11 +245,7 @@ export function AccountantFinanceReportingWorkspace() {
     summary.byMethod.forEach((row) => methods.addRow({ method: row.method, amount: Number(row.amount), receiptCount: row.receiptCount }));
     methods.getRow(1).font = { bold: true };
     const bytes = await workbook.xlsx.writeBuffer();
-    const blob = new Blob([bytes], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url; link.download = "school-finance-report.xlsx";
-    document.body.appendChild(link); link.click(); link.remove(); URL.revokeObjectURL(url);
+    downloadXlsx(bytes, "school-finance-report.xlsx");
   };
 
   return <section className="space-y-5">

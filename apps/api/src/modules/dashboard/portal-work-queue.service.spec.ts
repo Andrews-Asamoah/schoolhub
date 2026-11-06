@@ -1,4 +1,4 @@
-import {describe,expect,it,vi} from "vitest";
+import {expect,it,vi} from "vitest";
 import {PortalWorkQueueService} from "./portal-work-queue.service.js";
 const term={id:"term",name:"Term 1",academicYearId:"year"};
 it("denies roles without an academic queue before querying school data",async()=>{

@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
-import { Activity, TrendingUp, UsersRound, WalletCards } from "lucide-react";
+import { TrendingUp, UsersRound, WalletCards } from "lucide-react";
 import {
   Bar,
   BarChart,
