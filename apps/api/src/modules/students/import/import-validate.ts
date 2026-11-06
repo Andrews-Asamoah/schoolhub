@@ -15,8 +15,6 @@ export interface ImportContext {
   houses: NamedItem[];
   /** Placing students in a class needs a current academic year and term. */
   hasCurrentTerm: boolean;
-  /** Lowercased admission numbers already in the school. */
-  admissionNumbers: Set<string>;
   /** studentKey() of every student already in the school. */
   studentKeys: Set<string>;
 }
@@ -33,10 +31,9 @@ export interface RowVerdict {
 
 /** Earlier rows of the same file, so a student listed twice is caught. */
 export interface SeenInFile {
-  admissions: Map<string, number>;
   keys: Map<string, number>;
 }
-export const newSeen = (): SeenInFile => ({ admissions: new Map(), keys: new Map() });
+export const newSeen = (): SeenInFile => ({ keys: new Map() });
 
 function distance(a: string, b: string): number {
   const row = Array.from({ length: b.length + 1 }, (_, i) => i);
@@ -81,21 +78,13 @@ export function evaluateRow(
   const errors: string[] = [];
   const warnings = [...carriedWarnings];
   const key = studentKey(row.firstName, row.lastName, row.dateOfBirth);
-  const admission = row.admissionNumber?.trim().toLowerCase();
-
-  if (admission && ctx.admissionNumbers.has(admission)) {
-    return { status: "duplicate", errors, warnings, classId: null, houseId: null };
-  }
   if (ctx.studentKeys.has(key)) {
     return { status: "duplicate", errors, warnings, classId: null, houseId: null };
   }
 
   if (seen) {
-    const sameAdmission = admission ? seen.admissions.get(admission) : undefined;
-    if (sameAdmission) errors.push(`Same admission number as row ${sameAdmission}.`);
     const sameKey = seen.keys.get(key);
     if (sameKey) errors.push(`Same name and date of birth as row ${sameKey}.`);
-    if (admission && !sameAdmission) seen.admissions.set(admission, row.rowNumber);
     if (!sameKey) seen.keys.set(key, row.rowNumber);
   }
 
@@ -124,6 +113,5 @@ export function evaluateRow(
 
 /** After a student is created, later rows in the same run see them as already present. */
 export function remember(ctx: ImportContext, row: NormalizedStudentRow) {
-  if (row.admissionNumber) ctx.admissionNumbers.add(row.admissionNumber.trim().toLowerCase());
   ctx.studentKeys.add(studentKey(row.firstName, row.lastName, row.dateOfBirth));
 }

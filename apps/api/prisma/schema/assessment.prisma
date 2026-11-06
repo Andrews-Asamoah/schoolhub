@@ -23,12 +23,22 @@ model Attendance {
   @@map("attendances")
 }
 
+/// How a grading system turns marks into grades.
+/// SCORE_BANDS: the pupil's percentage is looked up in score ranges (A = 80-100).
+/// CLASS_RANK: the pupil's position within their own class is looked up in cumulative
+/// class-percentage bands (a stanine: top 4% = 1, next 7% = 2, ...).
+enum GradingMethod {
+  SCORE_BANDS
+  CLASS_RANK
+}
+
 model GradingSystem {
   id              String   @id @default(cuid())
   schoolId        String?
   name            String
   code            String
   description     String?
+  method          GradingMethod @default(SCORE_BANDS)
   isSystemDefault Boolean  @default(false)
   isSchoolDefault Boolean  @default(false)
   isActive        Boolean  @default(true)
@@ -94,6 +104,8 @@ model AssessmentTemplate {
   components       AssessmentComponent[]
   assessmentScores AssessmentScore[]
   extensions       AssessmentExtension[]
+  entrySubmissions AssessmentEntrySubmission[]
+  markCorrections  AssessmentMarkCorrection[]
 
   @@index([schoolId, isActive])
   @@index([gradingSystemId])
@@ -111,14 +123,17 @@ model AssessmentComponent {
   isRequired    Boolean        @default(true)
   isRepeatable  Boolean        @default(false)
   expectedCount Int            @default(1)
+  subjectStrandId String?
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
 
   template AssessmentTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  subjectStrand SubjectStrand? @relation(fields: [subjectStrandId], references: [id], onDelete: SetNull)
   scores   ComponentScore[]
 
   @@index([templateId])
   @@index([componentType])
+  @@index([subjectStrandId])
   @@map("assessment_components")
 }
 
@@ -428,6 +443,9 @@ model ReportCardVersion {
   headName          String?  @db.VarChar(160)
   headRemark        String?  @db.VarChar(2000)
   headApprovedAt    DateTime?
+  /// The approver's signature image (a data URL) as it was when they approved, so the report never changes later.
+  teacherSignature  String?  @db.Text
+  headSignature     String?  @db.Text
   publishedAt       DateTime?
   createdAt         DateTime @default(now())
 
@@ -482,7 +500,7 @@ model InternalExamSession {
   reports InternalMockReport[]
   correctionRequests InternalMockCorrection[]
 
-  @@unique([schoolId, academicYearId, classId, mockNumber])
+  @@unique([schoolId, academicYearId, classId, mockNumber], map: "internal_exam_sessions_schoolId_academicYearId_classId_mockNumb")
   @@index([schoolId, status, createdAt])
   @@index([classId, academicYearId])
   @@map("internal_exam_sessions")
@@ -499,6 +517,7 @@ model InternalExamCandidate {
   session InternalExamSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
   student Student @relation(fields: [studentId], references: [id])
   marks InternalExamMark[]
+  sectionMarks InternalExamSectionMark[]
 
   correctionRequests InternalMockCorrection[]
   @@unique([sessionId, studentId])
@@ -520,11 +539,55 @@ model InternalExamPaper {
   session InternalExamSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
   subject Subject @relation(fields: [subjectId], references: [id])
   marks InternalExamMark[]
+  sections InternalExamPaperSection[]
   correctionRequests InternalMockCorrection[]
 
   @@unique([sessionId, subjectId])
   @@index([subjectId])
   @@map("internal_exam_papers")
+}
+
+model InternalExamPaperSection {
+  id              String   @id @default(cuid())
+  paperId         String
+  subjectStrandId String
+  teacherId       String?
+  nameSnapshot    String   @db.VarChar(160)
+  codeSnapshot    String?  @db.VarChar(40)
+  maxMarks        Decimal  @default(100) @db.Decimal(6, 2)
+  weightPercent   Decimal  @db.Decimal(5, 2)
+  createdAt       DateTime @default(now())
+
+  paper        InternalExamPaper @relation(fields: [paperId], references: [id], onDelete: Cascade)
+  subjectStrand SubjectStrand     @relation(fields: [subjectStrandId], references: [id], onDelete: Restrict)
+  teacher      Teacher?          @relation("InternalExamPaperSectionTeacher", fields: [teacherId], references: [id], onDelete: SetNull)
+  marks        InternalExamSectionMark[]
+
+  @@unique([paperId, subjectStrandId])
+  @@index([teacherId])
+  @@index([subjectStrandId])
+  @@map("internal_exam_paper_sections")
+}
+
+model InternalExamSectionMark {
+  id              String                @id @default(cuid())
+  candidateId     String
+  paperSectionId  String
+  marks           Decimal?              @db.Decimal(6, 2)
+  status          InternalExamMarkStatus @default(MARKED)
+  version         Int                   @default(1)
+  recordedById    String?
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime @default(now()) @updatedAt
+
+  candidate  InternalExamCandidate    @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  paperSection InternalExamPaperSection @relation(fields: [paperSectionId], references: [id], onDelete: Cascade)
+  recordedBy user?                   @relation("InternalExamSectionMarkRecorder", fields: [recordedById], references: [id], onDelete: SetNull)
+
+  @@unique([candidateId, paperSectionId])
+  @@index([paperSectionId])
+  @@index([recordedById])
+  @@map("internal_exam_section_marks")
 }
 
 model InternalExamMark {
@@ -573,12 +636,12 @@ model InternalMockReport {
   publishedAt DateTime?
   createdAt DateTime @default(now())
 
-  school School @relation(fields: [schoolId], references: [id], onDelete: Restrict)
-  session InternalExamSession @relation(fields: [sessionId], references: [id], onDelete: Restrict)
-  candidate InternalExamCandidate @relation(fields: [candidateId], references: [id], onDelete: Restrict)
-  student Student @relation(fields: [studentId], references: [id], onDelete: Restrict)
-  teacher user? @relation("MockReportTeacher", fields: [teacherActorId], references: [id], onDelete: SetNull)
-  head user? @relation("MockReportHead", fields: [headActorId], references: [id], onDelete: SetNull)
+  school School @relation(fields: [schoolId], references: [id], onDelete: Restrict, map: "internal_mock_reports_school_fkey")
+  session InternalExamSession @relation(fields: [sessionId], references: [id], onDelete: Restrict, map: "internal_mock_reports_session_fkey")
+  candidate InternalExamCandidate @relation(fields: [candidateId], references: [id], onDelete: Restrict, map: "internal_mock_reports_candidate_fkey")
+  student Student @relation(fields: [studentId], references: [id], onDelete: Restrict, map: "internal_mock_reports_student_fkey")
+  teacher user? @relation("MockReportTeacher", fields: [teacherActorId], references: [id], onDelete: SetNull, map: "internal_mock_reports_teacher_fkey")
+  head user? @relation("MockReportHead", fields: [headActorId], references: [id], onDelete: SetNull, map: "internal_mock_reports_head_fkey")
 
   @@unique([candidateId, version])
   @@index([schoolId, sessionId, stage])
@@ -611,13 +674,33 @@ model InternalMockCorrection {
   reviewedById String?
   reviewedAt DateTime?
   reviewReason String? @db.VarChar(2000)
-  school School @relation(fields: [schoolId], references: [id], onDelete: Restrict)
-  session InternalExamSession @relation(fields: [sessionId], references: [id], onDelete: Restrict)
-  candidate InternalExamCandidate @relation(fields: [candidateId], references: [id], onDelete: Restrict)
-  paper InternalExamPaper @relation(fields: [paperId], references: [id], onDelete: Restrict)
-  requester user? @relation("MockCorrectionRequester", fields: [requestedById], references: [id], onDelete: SetNull)
-  reviewer user? @relation("MockCorrectionReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
-  @@index([schoolId, sessionId, status, requestedAt])
+  school School @relation(fields: [schoolId], references: [id], onDelete: Restrict, map: "mock_correction_school_fk")
+  session InternalExamSession @relation(fields: [sessionId], references: [id], onDelete: Restrict, map: "mock_correction_session_fk")
+  candidate InternalExamCandidate @relation(fields: [candidateId], references: [id], onDelete: Restrict, map: "mock_correction_candidate_fk")
+  paper InternalExamPaper @relation(fields: [paperId], references: [id], onDelete: Restrict, map: "mock_correction_paper_fk")
+  requester user? @relation("MockCorrectionRequester", fields: [requestedById], references: [id], onDelete: SetNull, map: "mock_correction_requester_fk")
+  reviewer user? @relation("MockCorrectionReviewer", fields: [reviewedById], references: [id], onDelete: SetNull, map: "mock_correction_reviewer_fk")
+  @@index([schoolId, sessionId, status, requestedAt], map: "internal_mock_corrections_schoolId_sessionId_status_requestedAt")
   @@index([candidateId, paperId])
   @@map("internal_mock_corrections")
+}
+
+
+/// Server-side replay guard for offline attendance batch retries.
+model AttendanceBatchReplay {
+  id          String   @id @default(cuid())
+  schoolId    String
+  userId      String
+  key         String
+  inputHash   String
+  date        DateTime @db.Date
+  recordCount Int
+  createdAt   DateTime @default(now())
+
+  school School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  user   user   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([schoolId, userId, key])
+  @@index([schoolId, createdAt])
+  @@map("attendance_batch_replays")
 }

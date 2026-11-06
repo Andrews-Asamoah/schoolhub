@@ -1,5 +1,6 @@
+import {AbsenceRequestsWorkspace} from "./absence-requests-workspace";
+import {useGuardianWard} from "@/hooks/use-guardian-ward";
 import { useQuery, type UseQueryResult } from "@tanstack/react-query";
-import { useState } from "react";
 import { AlertCircle, CalendarDays, CheckCircle2, Clock3, LoaderCircle, Printer, RefreshCw, UserRound, XCircle } from "lucide-react";
 import type { StudentProfileData } from "@/components/school/student-profile-panel";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -37,8 +38,6 @@ interface TimetableData {
   term: { id: string; name: string } | null;
   entries: Lesson[];
 }
-const days = ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"] as const;
-const dayLabels: Record<string, string> = { MONDAY: "Monday", TUESDAY: "Tuesday", WEDNESDAY: "Wednesday", THURSDAY: "Thursday", FRIDAY: "Friday", SATURDAY: "Saturday", SUNDAY: "Sunday" };
 const statusStyles: Record<string, string> = {
   PRESENT: "bg-success/10 text-success",
   LATE: "bg-warning/10 text-warning",
@@ -54,10 +53,9 @@ function EmptyState({ title, message }: { title: string; message: string }) {
   return <div className="rounded-2xl border border-dashed border-border bg-card px-6 py-12 text-center"><CalendarDays className="mx-auto size-8 text-muted-foreground" /><h3 className="mt-3 font-semibold text-foreground">{title}</h3><p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-muted-foreground">{message}</p></div>;
 }
 export function GuardianChildRecordsWorkspace({ view }: { view: View }) {
-  const [studentId, setStudentId] = useState("");
   const wardsQuery = useQuery({ queryKey: ["students", "my-wards"], queryFn: () => apiFetch<StudentProfileData[]>("/students/my-wards"), retry: false });
   const wards = wardsQuery.data ?? [];
-  const selectedId = wards.some((ward) => ward.id === studentId) ? studentId : wards[0]?.id ?? "";
+  const [selectedId, setStudentId] = useGuardianWard(wards);
   const selectedWard = wards.find((ward) => ward.id === selectedId);
   const attendanceQuery = useQuery({
     queryKey: ["guardian", "attendance", selectedId],
@@ -84,6 +82,7 @@ export function GuardianChildRecordsWorkspace({ view }: { view: View }) {
       wardsQuery.isError ? <div role="alert" className="rounded-xl border border-destructive/25 bg-destructive/5 p-4 text-sm text-destructive"><AlertCircle className="mr-2 inline size-4" /> Your linked children could not be loaded. Please try again later.</div> :
       wards.length === 0 ? <EmptyState title="No children linked yet" message="Contact the school office to verify your guardian record and link your child or children." /> :
       view === "attendance" ? <AttendancePanel query={attendanceQuery} /> : <TimetablePanel query={timetableQuery} childName={selectedWard ? wardName(selectedWard) : ""} />}
+    {view === "attendance" && <AbsenceRequestsWorkspace />}
   </div>;
 }
 function AttendancePanel({ query }: { query: UseQueryResult<AttendanceData, Error> }) {

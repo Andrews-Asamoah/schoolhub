@@ -9,7 +9,7 @@
  * its own uniquely-named rows and removes them afterwards.
  */
 import { createHmac, randomBytes } from "node:crypto";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import type { INestApplication } from "@nestjs/common";
 import request from "supertest";
 
@@ -394,5 +394,85 @@ describe.skipIf(!DB)("two-factor authentication (real database)", () => {
       const res = await post(a, `/super-admin/schools/${ids.school}/admins/${ids.owner}/reset-two-factor`, {}, nextIp());
       expect(res.status).toBe(403);
     });
+  });
+  it("verifies a provisioned account email through a requested Resend link without granting school alert consent", async () => {
+    vi.stubEnv("NOTIFICATION_DELIVERY_ENABLED", "false");
+    vi.stubEnv("RESEND_API_KEY", "test-only-not-a-real-key");
+    vi.stubEnv("RESEND_FROM_EMAIL", "alerts@example.test");
+    vi.stubEnv("RESEND_WEBHOOK_SECRET", "");
+    const send = vi.fn().mockResolvedValue(new Response(JSON.stringify({id:"test-verification"}), {status:200}));
+    vi.stubGlobal("fetch", send);
+    try {
+      await prisma.user.update({where:{id:ids.owner},data:{emailVerified:false}});
+      const a=agent(); await signIn(a,emails.owner);
+      await post(agent(), "/auth/send-verification-email", {email:emails.owner,callbackURL:ORIGIN+"/notifications"}).expect(401);
+      await post(a, "/auth/send-verification-email", {email:emails.admin,callbackURL:ORIGIN+"/notifications"}).expect(400);
+      await post(a, "/auth/send-verification-email", {email:emails.owner,callbackURL:ORIGIN+"/notifications"}).expect(200);
+      expect(send).toHaveBeenCalledTimes(1);
+      const payload=JSON.parse(send.mock.calls[0][1].body);expect(payload.to).toEqual([emails.owner]);
+      const url=new URL(payload.text.match(/https?:\/\/\S+/)[0]);
+      const tampered=new URL(url);tampered.searchParams.set("token", "invalid-token");
+      await request(app.getHttpServer()).get(tampered.pathname+tampered.search);
+      expect((await prisma.user.findUnique({where:{id:ids.owner}})).emailVerified).toBe(false);
+      const response=await request(app.getHttpServer()).get(url.pathname+url.search);
+      expect(response.status).toBeGreaterThanOrEqual(300);expect(response.status).toBeLessThan(400);
+      expect((await prisma.user.findUnique({where:{id:ids.owner}})).emailVerified).toBe(true);
+      expect(await prisma.notificationPreference.count({where:{userId:ids.owner}})).toBe(0);
+    } finally {vi.unstubAllGlobals();vi.unstubAllEnvs();}
+  });
+  it('verifies Resend signatures against the exact raw body through the production auth parser', async () => {
+    const { Webhook } = await import('svix');
+    const secret =
+      'whsec_' +
+      Buffer.from('test-webhook-signing-secret-only').toString('base64');
+    const previous = process.env.RESEND_WEBHOOK_SECRET;
+    process.env.RESEND_WEBHOOK_SECRET = secret;
+    const eventId = `e2e-${RUN}-resend`,
+      date = new Date();
+    const raw = JSON.stringify(
+      {
+        type: 'email.delivered',
+        created_at: date.toISOString(),
+        data: { email_id: `unmatched-${RUN}` },
+      },
+      null,
+      2,
+    );
+    const headers = {
+      'svix-id': eventId,
+      'svix-timestamp': String(Math.floor(date.getTime() / 1000)),
+      'svix-signature': new Webhook(secret).sign(eventId, date, raw),
+    };
+    try {
+      await request(app.getHttpServer())
+        .post('/api/webhooks/resend')
+        .set('Content-Type', 'application/json')
+        .set(headers)
+        .send(raw)
+        .expect(201);
+      await request(app.getHttpServer())
+        .post('/api/webhooks/resend')
+        .set('Content-Type', 'application/json')
+        .set(headers)
+        .send(raw)
+        .expect(201);
+      expect(
+        await prisma.notificationProviderEvent.count({
+          where: { id: 'resend:' + eventId },
+        }),
+      ).toBe(1);
+      await request(app.getHttpServer())
+        .post('/api/webhooks/resend')
+        .set('Content-Type', 'application/json')
+        .set(headers)
+        .send(raw.replace('delivered', 'bounced'))
+        .expect(400);
+    } finally {
+      await prisma.notificationProviderEvent.deleteMany({
+        where: { id: 'resend:' + eventId },
+      });
+      if (previous === undefined) delete process.env.RESEND_WEBHOOK_SECRET;
+      else process.env.RESEND_WEBHOOK_SECRET = previous;
+    }
   });
 });

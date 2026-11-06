@@ -36,7 +36,18 @@ export class AssessmentSetupService {
         where: { schoolId, deletedAt: null, isActive: true },
         select: { id: true, name: true, level: true, departmentId: true },
       }),
-      db.subject.findMany({ where: { schoolId, isActive: true }, select: { id: true, code: true, name: true }, orderBy: { name: "asc" } }),
+      db.subject.findMany({
+        where: { schoolId, isActive: true, deletedAt: null },
+        select: {
+          id: true, code: true, name: true,
+          strands: {
+            where: { isActive: true },
+            orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
+            select: { id: true, name: true, code: true, sortOrder: true },
+          },
+        },
+        orderBy: { name: "asc" },
+      }),
       db.classSubject.findMany({
         where: { class: { schoolId, deletedAt: null, isActive: true }, subject: { schoolId, isActive: true } },
         select: { classId: true, subjectId: true },
@@ -46,7 +57,10 @@ export class AssessmentSetupService {
         orderBy: { createdAt: "desc" },
         include: {
           classes: { select: { classId: true } },
-          components: { orderBy: { displayOrder: "asc" } },
+          components: {
+            orderBy: { displayOrder: "asc" },
+            include: { subjectStrand: { select: { id: true, name: true, subjectId: true } } },
+          },
           gradingSystem: { select: { id: true, name: true } },
           _count: { select: { assessmentScores: true } },
         },
@@ -105,6 +119,8 @@ export class AssessmentSetupService {
             isRequired: component.isRequired,
             isRepeatable: component.isRepeatable,
             expectedCount: component.expectedCount,
+            subjectStrandId: component.subjectStrandId,
+            subjectStrandName: component.subjectStrand?.name ?? null,
           })),
         };
       }),
@@ -113,6 +129,7 @@ export class AssessmentSetupService {
         name: row.name,
         code: row.code,
         description: row.description,
+        method: row.method,
         shared: row.schoolId === null,
         usedBy: usage.get(row.id) ?? 0,
         hasMarks: (withMarks.get(row.id) ?? 0) > 0,
@@ -162,6 +179,7 @@ export class AssessmentSetupService {
               isRequired: component.isRequired,
               isRepeatable: component.isRepeatable,
               expectedCount: component.isRepeatable ? component.expectedCount : 1,
+              subjectStrandId: component.subjectStrandId ?? null,
             })),
           },
           classes: { create: input.classIds.map((classId) => ({ classId })) },
@@ -199,6 +217,7 @@ export class AssessmentSetupService {
           isRequired: component.isRequired,
           isRepeatable: component.isRepeatable,
           expectedCount: component.expectedCount,
+          subjectStrandId: component.subjectStrandId,
         })),
         input.components.map((component) => ({ ...component, expectedCount: component.isRepeatable ? component.expectedCount : 1 })),
       );
@@ -272,6 +291,7 @@ export class AssessmentSetupService {
           isRequired: component.isRequired,
           isRepeatable: component.isRepeatable,
           expectedCount: component.isRepeatable ? component.expectedCount : 1,
+          subjectStrandId: component.subjectStrandId ?? null,
         };
         if (component.id && known.has(component.id)) {
           await tx.assessmentComponent.update({ where: { id: component.id }, data: values });
@@ -337,6 +357,7 @@ export class AssessmentSetupService {
               isRequired: component.isRequired,
               isRepeatable: component.isRepeatable,
               expectedCount: component.expectedCount,
+              subjectStrandId: component.subjectStrandId,
             })),
           },
           classes: { create: source.classes.map((item) => ({ classId: item.classId })) },
@@ -445,7 +466,12 @@ export class AssessmentSetupService {
       input.classIds.length
         ? db.class.count({ where: { id: { in: input.classIds }, schoolId, deletedAt: null } })
         : Promise.resolve(0),
-      input.subjectCode ? db.subject.findFirst({ where: { schoolId, code: { equals: input.subjectCode, mode: "insensitive" } }, select: { id: true } }) : Promise.resolve(true),
+      input.subjectCode
+        ? db.subject.findFirst({
+            where: { schoolId, code: { equals: input.subjectCode, mode: "insensitive" }, deletedAt: null },
+            select: { id: true, strands: { where: { isActive: true }, select: { id: true } } },
+          })
+        : Promise.resolve(true),
       db.assessmentTemplate.findFirst({
         where: { schoolId, name: { equals: input.name, mode: "insensitive" }, ...(exceptId ? { NOT: { id: exceptId } } : {}) },
         select: { id: true },
@@ -456,6 +482,20 @@ export class AssessmentSetupService {
       throw new BadRequestException("Choose classes that belong to this school.");
     }
     if (!subject) throw new BadRequestException("Choose a subject that belongs to this school.");
+    if (!input.subjectCode && input.components.some((component) => component.subjectStrandId)) {
+      throw new BadRequestException("Teaching-area components must belong to a subject-specific assessment.");
+    }
+    if (input.subjectCode && subject !== true) {
+      const strandIds = new Set(subject.strands.map((strand) => strand.id));
+      for (const component of input.components) {
+        if (strandIds.size > 0 && !component.subjectStrandId) {
+          throw new BadRequestException("Every component for a subject with teaching areas must be assigned to one of those areas.");
+        }
+        if (component.subjectStrandId && !strandIds.has(component.subjectStrandId)) {
+          throw new BadRequestException("Choose a teaching area belonging to the selected subject.");
+        }
+      }
+    }
     if (sameName) throw new ConflictException("An assessment with this name already exists.");
   }
 

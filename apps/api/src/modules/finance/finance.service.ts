@@ -159,8 +159,14 @@ export class FinanceService {
       }
     }
     await this.prisma.client.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${schoolId}), hashtext('finance-posting-boundary'))`;
       const current = await tx.financePeriodLock.findUnique({ where: { schoolId } });
       const reopening = !!current && (!next || next.getTime() < current.lockedThrough.getTime());
+      const approvedClosed = await tx.financeAccountingPeriod.findFirst({ where: { schoolId, status: "CLOSED" }, orderBy: { endDate: "desc" } });
+      if (approvedClosed && (!next || next < approvedClosed.endDate)) {
+        throw new ForbiddenException("Use the independent period-reopening approval workflow to change an approved close.");
+      }
+
       if (reopening && !actorIsSuperAdmin) {
         throw new ForbiddenException("Only a platform administrator can reopen a closed period.");
       }
@@ -2389,7 +2395,6 @@ export class FinanceService {
     query: Pick<FinanceListQuery, "from" | "to" | "yearId" | "termId"> = {},
   ) {
     const today = new Date();
-    const todayDate = today.toISOString().slice(0, 10);
     const { yearId, termId } = await this.resolveAcademicFilter(schoolId, query.yearId, query.termId);
     const academicYear = yearId
       ? await this.prisma.client.academicYear.findFirst({
@@ -2714,6 +2719,265 @@ export class FinanceService {
         ageingReconciled,
         status: reconciliationStatus,
       },
+    };
+  }
+
+  async getDetailedFinanceReport(
+    schoolId: string,
+    query: Pick<FinanceListQuery, "from" | "to" | "classId" | "studentId"> = {},
+  ) {
+    const now = new Date();
+    const from = parseIsoDate(query.from, "start date");
+    const toStart = parseIsoDate(query.to, "end date");
+    const requestedTo = parseIsoDate(query.to, "end date", true);
+    if (from && toStart && from > toStart) {
+      throw new BadRequestException("The start date must be on or before the end date.");
+    }
+
+    const to = new Date(Math.min(requestedTo?.getTime() ?? now.getTime(), now.getTime()));
+    if (from && from > to) {
+      throw new BadRequestException("The reporting period has no dates on or before today.");
+    }
+    if (query.classId) {
+      const schoolClass = await this.prisma.client.class.findFirst({
+        where: { id: query.classId, schoolId },
+        select: { id: true },
+      });
+      if (!schoolClass) throw new NotFoundException("Class not found in this school.");
+    }
+    if (query.studentId) {
+      const student = await this.prisma.client.student.findFirst({
+        where: { id: query.studentId, schoolId },
+        select: { id: true },
+      });
+      if (!student) throw new NotFoundException("Student not found in this school.");
+    }
+
+    const activeBillWhere: Prisma.BillWhereInput = {
+      schoolId,
+      status: { notIn: ["CANCELLED", "WAIVED"] },
+      issuedAt: { ...(from ? { gte: from } : {}), lte: to },
+      ...(query.classId ? { classId: query.classId } : {}),
+      ...(query.studentId ? { studentId: query.studentId } : {}),
+    };
+    const openBillWhere: Prisma.BillWhereInput = {
+      schoolId,
+      status: { notIn: ["CANCELLED", "WAIVED"] },
+      balanceAmount: { gt: new Prisma.Decimal(0) },
+      ...(query.classId ? { classId: query.classId } : {}),
+      ...(query.studentId ? { studentId: query.studentId } : {}),
+    };
+    const paymentDate: Prisma.DateTimeFilter = {};
+    if (from) paymentDate.gte = from;
+    paymentDate.lte = to;
+    const studentPaymentWhere: Prisma.PaymentWhereInput = {
+      schoolId,
+      status: "COMPLETED",
+      paymentDate,
+      ...(query.studentId ? { studentId: query.studentId } : {}),
+    };
+
+    const [billed, outstanding, allPayments, studentPayments, billedClasses, openClasses, classes] = await Promise.all([
+      this.prisma.client.bill.aggregate({
+        where: activeBillWhere,
+        _sum: { totalAmount: true },
+        _count: { _all: true },
+      }),
+      this.prisma.client.bill.aggregate({
+        where: openBillWhere,
+        _sum: { balanceAmount: true },
+        _count: { _all: true },
+      }),
+      query.classId || query.studentId
+        ? Promise.resolve(null)
+        : this.prisma.client.payment.aggregate({
+            where: studentPaymentWhere,
+            _sum: { amount: true },
+            _count: { _all: true },
+          }),
+      query.studentId
+        ? this.prisma.client.payment.aggregate({
+            where: studentPaymentWhere,
+            _sum: { amount: true },
+            _count: { _all: true },
+          })
+        : Promise.resolve(null),
+      this.prisma.client.bill.groupBy({
+        by: ["classId"],
+        where: activeBillWhere,
+        _sum: { totalAmount: true },
+        _count: { _all: true },
+      }),
+      this.prisma.client.bill.groupBy({
+        by: ["classId"],
+        where: openBillWhere,
+        _sum: { balanceAmount: true },
+      }),
+      this.prisma.client.class.findMany({
+        where: { schoolId },
+        select: { id: true, name: true },
+      }),
+    ]);
+
+    const allocationFilters: Prisma.Sql[] = [
+      Prisma.sql`p."schoolId" = ${schoolId}`,
+      Prisma.sql`b."schoolId" = ${schoolId}`,
+      Prisma.sql`p."status" = 'COMPLETED'`,
+      Prisma.sql`p."paymentDate" <= ${to}`,
+    ];
+    if (from) allocationFilters.push(Prisma.sql`p."paymentDate" >= ${from}`);
+    if (query.classId) allocationFilters.push(Prisma.sql`b."classId" = ${query.classId}`);
+    if (query.studentId) allocationFilters.push(Prisma.sql`p."studentId" = ${query.studentId}`);
+    const reportAllocations = Prisma.sql`
+      WITH report_allocations AS (
+        SELECT pba."paymentId", pba."billId", pba."amount"
+        FROM "payment_bill_allocations" pba
+        UNION ALL
+        SELECT pi."paymentId", bi."billId", SUM(pi."amount") AS "amount"
+        FROM "payment_items" pi
+        INNER JOIN "bill_items" bi ON bi."id" = pi."billItemId"
+        WHERE NOT EXISTS (
+          SELECT 1 FROM "payment_bill_allocations" existing
+          WHERE existing."paymentId" = pi."paymentId"
+        )
+        GROUP BY pi."paymentId", bi."billId"
+        UNION ALL
+        SELECT p.id AS "paymentId", p."billId", p.amount
+        FROM "payments" p
+        WHERE p."billId" IS NOT NULL
+          AND NOT EXISTS (
+            SELECT 1 FROM "payment_bill_allocations" existing
+            WHERE existing."paymentId" = p.id
+          )
+          AND NOT EXISTS (
+            SELECT 1
+            FROM "payment_items" pi
+            INNER JOIN "bill_items" bi ON bi."id" = pi."billItemId"
+            WHERE pi."paymentId" = p.id
+          )
+      )
+    `;
+    const [classCollections, unallocatedCollections] = await Promise.all([
+      this.prisma.client.$queryRaw<Array<{ classId: string | null; collected: Prisma.Decimal; receiptCount: number }>>(
+      Prisma.sql`
+        ${reportAllocations}
+        SELECT b."classId" AS "classId",
+               COALESCE(SUM(ra."amount"), 0)::numeric AS "collected",
+               COUNT(DISTINCT p."id")::int AS "receiptCount"
+        FROM report_allocations ra
+        INNER JOIN "bills" b ON b."id" = ra."billId"
+        INNER JOIN "payments" p ON p."id" = ra."paymentId"
+        WHERE ${Prisma.join(allocationFilters, " AND ")}
+        GROUP BY b."classId"
+      `,
+      ),
+      !query.classId && !query.studentId
+        ? this.prisma.client.$queryRaw<Array<{ collected: Prisma.Decimal; receiptCount: number }>>(
+            Prisma.sql`
+              ${reportAllocations}
+              , payment_allocations AS (
+                SELECT p.id, p.amount, COALESCE(SUM(ra."amount"), 0)::numeric AS allocated
+                FROM "payments" p
+                LEFT JOIN report_allocations ra ON ra."paymentId" = p.id
+                WHERE p."schoolId" = ${schoolId}
+                  AND p."status" = 'COMPLETED'
+                  AND p."paymentDate" <= ${to}
+                  ${from ? Prisma.sql`AND p."paymentDate" >= ${from}` : Prisma.empty}
+                GROUP BY p.id, p.amount
+              )
+              SELECT COALESCE(SUM(GREATEST("amount" - allocated, 0)), 0)::numeric AS "collected",
+                     COUNT(*) FILTER (WHERE "amount" > allocated)::int AS "receiptCount"
+              FROM payment_allocations
+            `,
+          )
+        : Promise.resolve([] as Array<{ collected: Prisma.Decimal; receiptCount: number }>),
+    ]);
+
+    const classNames = new Map(classes.map((schoolClass) => [schoolClass.id, schoolClass.name]));
+    const byClass = new Map<string, {
+      classId: string | null;
+      className: string;
+      billed: Prisma.Decimal;
+      collected: Prisma.Decimal;
+      outstanding: Prisma.Decimal;
+      billCount: number;
+      receiptCount: number;
+    }>();
+    const ensureClass = (classId: string | null) => {
+      const key = classId ?? "__unassigned";
+      const existing = byClass.get(key);
+      if (existing) return existing;
+      const entry = {
+        classId,
+        className: classId ? classNames.get(classId) ?? "Unrecognised class" : "Class not recorded",
+        billed: new Prisma.Decimal(0),
+        collected: new Prisma.Decimal(0),
+        outstanding: new Prisma.Decimal(0),
+        billCount: 0,
+        receiptCount: 0,
+      };
+      byClass.set(key, entry);
+      return entry;
+    };
+    for (const row of billedClasses) {
+      const entry = ensureClass(row.classId);
+      entry.billed = row._sum.totalAmount ?? new Prisma.Decimal(0);
+      entry.billCount = row._count._all;
+    }
+    for (const row of openClasses) {
+      ensureClass(row.classId).outstanding = row._sum.balanceAmount ?? new Prisma.Decimal(0);
+    }
+    for (const row of classCollections) {
+      const entry = ensureClass(row.classId);
+      entry.collected = row.collected;
+      entry.receiptCount = row.receiptCount;
+    }
+
+    const collected = query.classId
+      ? classCollections[0]?.collected ?? new Prisma.Decimal(0)
+      : studentPayments?._sum.amount ?? allPayments?._sum.amount ?? new Prisma.Decimal(0);
+    const receiptCount = query.classId
+      ? classCollections[0]?.receiptCount ?? 0
+      : studentPayments?._count._all ?? allPayments?._count._all ?? 0;
+
+    const classSummaryRows = [...byClass.values()];
+    const unallocated = unallocatedCollections[0];
+    if (unallocated && unallocated.collected.gt(0)) {
+      classSummaryRows.push({
+        classId: null,
+        className: "Unallocated receipts",
+        billed: new Prisma.Decimal(0),
+        collected: unallocated.collected,
+        outstanding: new Prisma.Decimal(0),
+        billCount: 0,
+        receiptCount: unallocated.receiptCount,
+      });
+    }
+
+    return {
+      asOf: now.toISOString().slice(0, 10),
+      period: {
+        from: from?.toISOString().slice(0, 10) ?? null,
+        to: to.toISOString().slice(0, 10),
+        basis: "ISSUE_AND_PAYMENT_DATE",
+      },
+      billed: moneyString(billed._sum.totalAmount),
+      billedCount: billed._count._all,
+      collected: moneyString(collected),
+      receiptCount,
+      outstanding: moneyString(outstanding._sum.balanceAmount),
+      outstandingBillCount: outstanding._count._all,
+      byClass: classSummaryRows
+        .sort((a, b) => b.billed.comparedTo(a.billed))
+        .map((row) => ({
+          classId: row.classId,
+          className: row.className,
+          billed: moneyString(row.billed),
+          collected: moneyString(row.collected),
+          outstanding: moneyString(row.outstanding),
+          billCount: row.billCount,
+          receiptCount: row.receiptCount,
+        })),
     };
   }
 
@@ -4147,7 +4411,6 @@ export class FinanceService {
     let skippedNoLogin = 0;
     let failed = 0;
     let alreadySentCount = 0;
-    const today = new Date();
 
     for (const target of targets) {
       const balanceText = new Intl.NumberFormat("en-GH", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(target.balance);

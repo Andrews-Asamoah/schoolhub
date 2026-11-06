@@ -40,6 +40,7 @@ import { apiFetch } from "@/lib/api";
 import { PortalModal } from "@/components/portal/portal-modal";
 import { cn } from "@/lib/utils";
 import { useFinanceAccess } from "@/components/portal/finance-access";
+import { LabeledField } from "@/components/forms/labeled-controls";
 
 type AccountantTab =
   | "overview"
@@ -323,6 +324,7 @@ export function AccountantPortalWorkspace({
       if (activeTab === "debtors") params.set("outstanding", "true");
       return apiFetch<FinancePage<ApiBill>>(`/finance/bills?${params.toString()}`);
     },
+    enabled: ["overview", "invoices", "debtors", "payments"].includes(activeTab),
     retry: false,
   });
   const paymentsQuery = useQuery({
@@ -333,30 +335,40 @@ export function AccountantPortalWorkspace({
       if (search.trim()) params.set("search", search.trim());
       return apiFetch<FinancePage<ApiPayment>>(`/finance/payments?${params.toString()}`);
     },
+    enabled: ["overview", "payments"].includes(activeTab),
     retry: false,
   });
   const expensesQuery = useQuery({
     queryKey: ["finance", "expenses"],
     queryFn: () => apiFetch<ApiExpense[]>("/finance/expenses"),
+    enabled: ["overview", "expenses"].includes(activeTab),
     retry: false,
   });
   const feeStructuresQuery = useQuery({
     queryKey: ["finance", "fee-structures"],
     queryFn: () => apiFetch<ApiFeeStructure[]>("/finance/fee-structures"),
+    enabled: activeTab === "invoices" && canWrite,
     retry: false,
   });
   const classesQuery = useQuery({
     queryKey: ["academics", "classes"],
     queryFn: () => apiFetch<ApiClass[]>("/academics/classes"),
+    enabled: ["overview", "invoices"].includes(activeTab),
     retry: false,
   });
   const yearsQuery = useQuery({
     queryKey: ["schools", "academic-years"],
     queryFn: () => apiFetch<ApiAcademicYear[]>("/schools/academic-years"),
+    enabled: ["overview", "invoices"].includes(activeTab),
     retry: false,
   });
   const currentYear = (yearsQuery.data ?? []).find((year) => year.isCurrent);
   const currentTerm = currentYear?.terms.find((term) => term.isCurrent);
+  const summaryPeriodReady =
+    reportPeriod === "all" ||
+    (yearsQuery.isSuccess &&
+      Boolean(currentYear?.startDate) &&
+      (reportPeriod === "year" || Boolean(currentTerm?.startDate)));
   const summaryQuery = useQuery({
     queryKey: ["finance", "summary", reportPeriod, currentYear?.id ?? null, currentTerm?.id ?? null],
     queryFn: () => {
@@ -365,6 +377,7 @@ export function AccountantPortalWorkspace({
       if (reportPeriod === "term" && currentTerm) params.set("termId", currentTerm.id);
       return apiFetch<FinanceSummary>(`/finance/summary${params.size ? `?${params.toString()}` : ""}`);
     },
+    enabled: activeTab === "overview" && summaryPeriodReady,
     retry: false,
   });
   const overdueBillsQuery = useQuery({
@@ -388,6 +401,7 @@ export function AccountantPortalWorkspace({
   const payrollQuery = useQuery({
     queryKey: ["finance", "payroll"],
     queryFn: () => apiFetch<ApiPayroll[]>("/finance/payroll"),
+    enabled: ["overview", "payroll"].includes(activeTab),
     retry: false,
   });
 
@@ -397,6 +411,8 @@ export function AccountantPortalWorkspace({
   const feeStructures = feeStructuresQuery.data ?? [];
   const classes = (classesQuery.data ?? []).filter((schoolClass) => schoolClass.isActive);
   const payroll = payrollQuery.data ?? [];
+  const summaryUnavailable =
+    !summaryPeriodReady || summaryQuery.isError;
   const selectedPayroll = payroll.find((run) => run.id === selectedPayrollId);
   const inventoryItems = inventoryQuery.data ?? [];
 
@@ -431,9 +447,6 @@ export function AccountantPortalWorkspace({
   // from a paginated page of receipt or bill rows.
   const collected = Number(summaryQuery.data?.collected ?? 0);
   const outstanding = Number(summaryQuery.data?.outstanding ?? 0);
-  const expenseTotal = sumCurrency(expenses, (expense) => expense.amount);
-  const paidPayroll = payroll.filter((run) => run.status === "PAID");
-  const payrollNet = sumCurrency(paidPayroll, (run) => run.totalNet);
   const reportStartDate = useMemo(() => {
     if (reportPeriod === "all") return null;
     if (reportPeriod === "year" && currentYear?.startDate) return new Date(currentYear.startDate);
@@ -446,6 +459,7 @@ export function AccountantPortalWorkspace({
     return new Date();
   }, [reportPeriod, currentYear?.endDate, currentTerm?.endDate]);
   const isInReportPeriod = (value?: string | null) => {
+    if (!summaryPeriodReady) return false;
     if (!reportStartDate) return true;
     if (!value) return false;
     const date = new Date(value);
@@ -453,16 +467,17 @@ export function AccountantPortalWorkspace({
   };
   const reportExpenses = useMemo(
     () => expenses.filter((expense) => isInReportPeriod(expense.date)),
-    [expenses, reportStartDate, reportEndDate],
+    [expenses, reportStartDate, reportEndDate, summaryPeriodReady],
   );
   const reportExpenseTotal = sumCurrency(reportExpenses, (expense) => expense.amount);
   const reportPayroll = useMemo(() => {
+    if (!summaryPeriodReady) return [];
     if (!reportStartDate) return payroll;
     return payroll.filter((run) => {
       const periodDate = new Date(run.year, run.month - 1, 1);
       return periodDate >= reportStartDate && periodDate <= reportEndDate;
     });
-  }, [payroll, reportStartDate, reportEndDate]);
+  }, [payroll, reportStartDate, reportEndDate, summaryPeriodReady]);
   const reportPayrollPaid = reportPayroll.filter((run) => run.status === "PAID");
   const reportPayrollNet = sumCurrency(reportPayrollPaid, (run) => run.totalNet);
   const todayStart = new Date();
@@ -523,7 +538,6 @@ export function AccountantPortalWorkspace({
         queryClient.invalidateQueries({ queryKey: ["finance", "payments"] }),
         queryClient.invalidateQueries({ queryKey: ["finance", "complete-report-dataset"] }),
         queryClient.invalidateQueries({ queryKey: ["finance", "bills"] }),
-        queryClient.invalidateQueries({ queryKey: ["finance", "complete-report-dataset"] }),
         queryClient.invalidateQueries({ queryKey: ["students"] }),
       ]);
     },
@@ -553,7 +567,6 @@ export function AccountantPortalWorkspace({
         queryClient.invalidateQueries({ queryKey: ["finance", "payments"] }),
         queryClient.invalidateQueries({ queryKey: ["finance", "complete-report-dataset"] }),
         queryClient.invalidateQueries({ queryKey: ["finance", "bills"] }),
-        queryClient.invalidateQueries({ queryKey: ["finance", "complete-report-dataset"] }),
         queryClient.invalidateQueries({ queryKey: ["students"] }),
       ]);
     },
@@ -681,12 +694,26 @@ export function AccountantPortalWorkspace({
   }
 
   const loading =
-    (activeTab === "overview" && (summaryQuery.isPending || overdueBillsQuery.isPending)) ||
+    (activeTab === "overview" && (
+      summaryQuery.isFetching ||
+      overdueBillsQuery.isPending ||
+      expensesQuery.isPending ||
+      payrollQuery.isPending ||
+      paymentsQuery.isPending ||
+      classesQuery.isPending ||
+      billsQuery.isPending ||
+      yearsQuery.isPending
+    )) ||
     (["invoices", "debtors"].includes(activeTab) && billsQuery.isPending) ||
-    (activeTab === "payments" && paymentsQuery.isPending) ||
-    expensesQuery.isPending ||
-    feeStructuresQuery.isPending || classesQuery.isPending || yearsQuery.isPending ||
-    payrollQuery.isPending || (activeTab === "inventory" && inventoryQuery.isPending);
+    (activeTab === "invoices" && (
+      feeStructuresQuery.isPending ||
+      classesQuery.isPending ||
+      yearsQuery.isPending
+    )) ||
+    (activeTab === "payments" && (paymentsQuery.isPending || billsQuery.isPending)) ||
+    (activeTab === "expenses" && expensesQuery.isPending) ||
+    (activeTab === "payroll" && payrollQuery.isPending) ||
+    (activeTab === "inventory" && inventoryQuery.isPending);
 
   return (
     <div className="space-y-6"><style>{`@media print {
@@ -749,22 +776,33 @@ export function AccountantPortalWorkspace({
               </Select>
             </label>
           </div>
+          {summaryUnavailable && (
+            <p role="alert" className="rounded-xl border border-warning/30 bg-warning/5 p-3 text-sm text-foreground">
+              {yearsQuery.error
+                ? `Academic periods could not be loaded. ${yearsQuery.error.message}`
+                : !currentYear?.startDate
+                  ? "A current academic year with a start date is required. Select all available records or configure the current year in School Settings."
+                  : reportPeriod === "term" && !currentTerm?.startDate
+                    ? "A current academic term with a start date is required. Select another reporting period or configure the current term in School Settings."
+                    : summaryQuery.error?.message ?? "The selected reporting period is unavailable."}
+            </p>
+          )}
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-            <DashboardMetricLink to="payments" label="Fees collected" value={summaryQuery.error ? "Unavailable" : currency(reportCollected)} detail={summaryQuery.error ? "Collection data unavailable" : `${reportSettledPaymentCount} completed receipts in period`} icon={ArrowUpRight} />
-            <DashboardMetricLink to="invoices" label="Fees billed" value={summaryQuery.error ? "Unavailable" : currency(billedInPeriod)} detail={summaryQuery.error ? "Billing data unavailable" : "Bills issued in selected period"} icon={Receipt} />
-            <DashboardMetricLink to="debtors" label="Outstanding fees" value={summaryQuery.error ? "Unavailable" : currency(outstanding)} detail={summaryQuery.error ? "Receivable data unavailable" : `${summaryQuery.data?.outstandingBillCount ?? 0} bills with balances`} icon={AlertCircle} />
-            <DashboardMetricLink to="debtors" label="Overdue balances" value={summaryQuery.error ? "Unavailable" : currency(overdueTotal)} detail={summaryQuery.error ? "Receivable data unavailable" : `${summaryQuery.data?.overdueBillCount ?? 0} overdue bills`} icon={ArrowDownRight} />
-            <DashboardMetricLink to="expenses" label="Operating expenses" value={expensesQuery.error ? "Unavailable" : currency(reportExpenseTotal)} detail={expensesQuery.error ? "Expense data unavailable" : `${reportExpenses.length} expense records in period`} icon={Wallet} />
+            <DashboardMetricLink to="payments" label="Fees collected" value={summaryUnavailable ? "Unavailable" : currency(reportCollected)} detail={summaryUnavailable ? "Collection data unavailable" : `${reportSettledPaymentCount} completed receipts in period`} icon={ArrowUpRight} />
+            <DashboardMetricLink to="invoices" label="Fees billed" value={summaryUnavailable ? "Unavailable" : currency(billedInPeriod)} detail={summaryUnavailable ? "Billing data unavailable" : "Bills issued in selected period"} icon={Receipt} />
+            <DashboardMetricLink to="debtors" label="Outstanding fees" value={summaryUnavailable ? "Unavailable" : currency(outstanding)} detail={summaryUnavailable ? "Receivable data unavailable" : `${summaryQuery.data?.outstandingBillCount ?? 0} bills with balances`} icon={AlertCircle} />
+            <DashboardMetricLink to="debtors" label="Overdue balances" value={summaryUnavailable ? "Unavailable" : currency(overdueTotal)} detail={summaryUnavailable ? "Receivable data unavailable" : `${summaryQuery.data?.overdueBillCount ?? 0} overdue bills`} icon={ArrowDownRight} />
+            <DashboardMetricLink to="expenses" label="Operating expenses" value={summaryUnavailable || expensesQuery.error ? "Unavailable" : currency(reportExpenseTotal)} detail={summaryUnavailable || expensesQuery.error ? "Expense data unavailable" : `${reportExpenses.length} expense records in period`} icon={Wallet} />
           </div>
           <div className="grid gap-3 md:grid-cols-2">
             <div className="rounded-2xl border border-border bg-card p-4">
-              <div className="flex items-center justify-between gap-3"><span className="text-sm font-medium text-muted-foreground">Collection rate</span><span className="text-lg font-bold tabular-nums text-foreground">{collectionRate === null ? "—" : `${collectionRate.toFixed(1)}%`}</span></div>
+              <div className="flex items-center justify-between gap-3"><span className="text-sm font-medium text-muted-foreground">Collection rate</span><span className="text-lg font-bold tabular-nums text-foreground">{summaryUnavailable || collectionRate === null ? "—" : `${collectionRate.toFixed(1)}%`}</span></div>
               <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-primary transition-all" style={{ width: `${Math.min(100, Math.max(0, collectionRate ?? 0))}%` }} /></div>
-              <p className="mt-2 text-xs leading-5 text-muted-foreground">{collectionRate === null ? "No bills were issued in this reporting period, so a collection rate cannot be calculated." : "Completed collections divided by bills issued in the selected period; collections may include payments against earlier bills, so this is an operational indicator rather than a cohort collection rate."}</p>
+              <p className="mt-2 text-xs leading-5 text-muted-foreground">{summaryUnavailable ? "Collection-rate data is unavailable for the selected reporting period." : collectionRate === null ? "No bills were issued in this reporting period, so a collection rate cannot be calculated." : "Completed collections divided by bills issued in the selected period; collections may include payments against earlier bills, so this is an operational indicator rather than a cohort collection rate."}</p>
             </div>
             <div className="rounded-2xl border border-border bg-card p-4">
-              <div className="flex items-center justify-between gap-3"><span className="text-sm font-medium text-muted-foreground">Payroll paid (net)</span><span className="text-lg font-bold tabular-nums text-foreground">{payrollQuery.error ? "Unavailable" : currency(reportPayrollNet)}</span></div>
-              <p className="mt-2 text-xs text-muted-foreground">{payrollQuery.error ? "Payroll data unavailable" : `${reportPayrollPaid.length} paid payroll run(s) in the selected period`}</p>
+              <div className="flex items-center justify-between gap-3"><span className="text-sm font-medium text-muted-foreground">Payroll paid (net)</span><span className="text-lg font-bold tabular-nums text-foreground">{summaryUnavailable || payrollQuery.error ? "Unavailable" : currency(reportPayrollNet)}</span></div>
+              <p className="mt-2 text-xs text-muted-foreground">{summaryUnavailable || payrollQuery.error ? "Payroll data unavailable" : `${reportPayrollPaid.length} paid payroll run(s) in the selected period`}</p>
               <Link to="/$page" params={{ page: "payroll" }} className="mt-3 inline-flex text-xs font-semibold text-primary hover:underline">Review payroll records →</Link>
             </div>
           </div>
@@ -783,7 +821,7 @@ export function AccountantPortalWorkspace({
           <section className="rounded-2xl border border-border bg-card p-5">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div><h2 className="text-lg font-semibold text-foreground">Overdue-fees management</h2><p className="mt-1 text-sm text-muted-foreground">Prioritise bills past their due date with an outstanding balance, then open the bill or record a payment.</p></div>
-              <div className="rounded-xl bg-destructive/5 px-4 py-3 text-right"><p className="text-xs text-muted-foreground">Overdue balance</p><p className="mt-1 text-lg font-bold tabular-nums text-destructive">{summaryQuery.error ? "Unavailable" : currency(overdueTotal)}</p><p className="text-xs text-muted-foreground">{summaryQuery.data?.overdueBillCount ?? 0} overdue bill(s)</p></div>
+              <div className="rounded-xl bg-destructive/5 px-4 py-3 text-right"><p className="text-xs text-muted-foreground">Overdue balance</p><p className="mt-1 text-lg font-bold tabular-nums text-destructive">{summaryUnavailable ? "Unavailable" : currency(overdueTotal)}</p><p className="text-xs text-muted-foreground">{summaryUnavailable ? "Period totals unavailable" : `${summaryQuery.data?.overdueBillCount ?? 0} overdue bill(s)`}</p></div>
             </div>
             <div className="my-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_220px]">
               <div className="relative"><Search className="absolute left-3 top-3 size-4 text-muted-foreground" /><input className={cn(inputClass, "pl-9")} value={overdueSearch} onChange={(event) => setOverdueSearch(event.target.value)} placeholder="Search student, admission no., bill or class" aria-label="Search overdue bills" /></div>
@@ -807,7 +845,7 @@ export function AccountantPortalWorkspace({
             </section>
             <section className="rounded-2xl border border-border bg-card p-5">
               <h2 className="font-semibold text-foreground">Finance activity</h2><p className="mt-1 text-sm text-muted-foreground">Quick access to records that need attention.</p>
-              <div className="mt-4 space-y-3"><AttentionItem title="Bills with balances" value={summaryQuery.error ? "—" : String(summaryQuery.data?.outstandingBillCount ?? 0)} detail={summaryQuery.error ? "Could not load receivables" : currency(outstanding)} to="debtors" /><AttentionItem title="Overdue bills" value={summaryQuery.error ? "—" : String(summaryQuery.data?.overdueBillCount ?? 0)} detail={summaryQuery.error ? "Could not load receivables" : currency(overdueTotal)} to="debtors" /><AttentionItem title="Expense records" value={expensesQuery.error ? "—" : String(reportExpenses.length)} detail={expensesQuery.error ? "Could not load expense records" : currency(reportExpenseTotal)} to="expenses" /></div>
+              <div className="mt-4 space-y-3"><AttentionItem title="Bills with balances" value={summaryUnavailable ? "—" : String(summaryQuery.data?.outstandingBillCount ?? 0)} detail={summaryUnavailable ? "Could not load receivables" : currency(outstanding)} to="debtors" /><AttentionItem title="Overdue bills" value={summaryUnavailable ? "—" : String(summaryQuery.data?.overdueBillCount ?? 0)} detail={summaryUnavailable ? "Could not load receivables" : currency(overdueTotal)} to="debtors" /><AttentionItem title="Expense records" value={summaryUnavailable || expensesQuery.error ? "—" : String(reportExpenses.length)} detail={summaryUnavailable || expensesQuery.error ? "Could not load expense records" : currency(reportExpenseTotal)} to="expenses" /></div>
             </section>
           </div>
         </div>
@@ -987,12 +1025,12 @@ export function AccountantPortalWorkspace({
                 reversePayment.mutate({ id: reverseTarget.id, kind: reverseKind, reason: reverseReason.trim() });
               }}
             >
-              <Field label="Reason for reversal">
+              <LabeledField label="Reason for reversal">
                 <Select value={reverseKind} onValueChange={(value) => setReverseKind(value as "VOID" | "REFUND")}><SelectTrigger aria-label="Reversal type" className={inputClass}><SelectValue /></SelectTrigger><SelectContent><SelectItem value="VOID">Recorded in error (void)</SelectItem><SelectItem value="REFUND">Money returned to the payer (refund)</SelectItem></SelectContent></Select>
-              </Field>
-              <Field label="Explain what happened (kept in the audit trail)">
+              </LabeledField>
+              <LabeledField label="Explain what happened (kept in the audit trail)">
                 <textarea className={inputClass} rows={3} minLength={10} maxLength={500} required value={reverseReason} onChange={(event) => setReverseReason(event.target.value)} />
-              </Field>
+              </LabeledField>
               <ModalActions onCancel={() => setReverseTarget(null)} busy={reversePayment.isPending} submitLabel="Reverse payment" />
             </form>
           </Modal>
@@ -1006,21 +1044,21 @@ export function AccountantPortalWorkspace({
             {feeStructuresQuery.error && <QueryError message={feeStructuresQuery.error.message} />}
             {classesQuery.error && <QueryError message={classesQuery.error.message} />}
             {!currentYear || !currentTerm ? <div role="alert" className="rounded-xl border border-warning/30 bg-warning/5 p-3 text-sm text-foreground">A current academic year and term must be selected in School Settings before billing.</div> : <p className="rounded-xl bg-muted p-3 text-sm text-muted-foreground">Billing period: <span className="font-semibold text-foreground">{currentYear.name} · {currentTerm.name}</span></p>}
-            <Field label="Fee structure">
+            <LabeledField label="Fee structure">
               <Select name="feeStructureId" required value={selectedFeeStructureId} onValueChange={(value) => { setSelectedFeeStructureId(value); setSelectedClassId(""); setSelectedOptionalItemIds([]); }}>
                 <SelectTrigger aria-label="Fee structure" className={inputClass}><SelectValue placeholder="Select a fee structure…" /></SelectTrigger>
                 <SelectContent>{feeStructures.map((fee) => <SelectItem key={fee.id} value={fee.id}>{fee.name} · {currency(fee.items.filter((item) => !item.isOptional).reduce((sum, item) => sum + Number(item.amount), 0))}{fee.items.some((item) => item.isOptional) ? " + optional items" : ""}</SelectItem>)}</SelectContent>
               </Select>
-            </Field>
+            </LabeledField>
             {selectedFeeStructure?.items.some((item) => item.isOptional) && <fieldset className="space-y-2 rounded-xl border border-border p-3"><legend className="px-1 text-sm font-semibold text-foreground">Optional fee items</legend><p className="text-xs text-muted-foreground">Optional items are excluded unless you select them. They will be included on every bill in this batch.</p>{selectedFeeStructure.items.filter((item) => item.isOptional).map((item) => <label key={item.id} className="flex cursor-pointer items-start gap-3 rounded-lg p-2 hover:bg-muted/50"><input type="checkbox" className="mt-1 size-4 accent-primary" checked={selectedOptionalItemIds.includes(item.id)} onChange={(event) => setSelectedOptionalItemIds((current) => event.target.checked ? [...current, item.id] : current.filter((id) => id !== item.id))} /><span className="flex-1 text-sm text-foreground">{item.name}</span><span className="text-sm font-semibold tabular-nums">{currency(item.amount)}</span></label>)}</fieldset>}
-            <Field label="Class">
+            <LabeledField label="Class">
               <Select name="classId" required value={selectedClassId} onValueChange={setSelectedClassId}>
                 <SelectTrigger aria-label="Class to bill" className={inputClass}><SelectValue placeholder="Select a class…" /></SelectTrigger>
                 <SelectContent>{billTargetClasses.map((schoolClass) => <SelectItem key={schoolClass.id} value={schoolClass.id}>{schoolClass.name}{typeof schoolClass._count?.students === "number" ? ` · ${schoolClass._count.students} students` : ""}</SelectItem>)}</SelectContent>
               </Select>
-            </Field>
-            <Field label="Due date (optional)"><DatePicker name="dueDate" buttonClassName={inputClass} /></Field>
-            <Field label="Notes (optional)"><textarea name="notes" className={cn(inputClass, "h-20 py-2")} placeholder="Optional note shown on generated bills" /></Field>
+            </LabeledField>
+            <LabeledField label="Due date (optional)"><DatePicker name="dueDate" buttonClassName={inputClass} /></LabeledField>
+            <LabeledField label="Notes (optional)"><textarea name="notes" className={cn(inputClass, "h-20 py-2")} placeholder="Optional note shown on generated bills" /></LabeledField>
             <p className="text-xs leading-5 text-muted-foreground">The operation is performed by the server using the selected class roster and current term. Review the count and total in the confirmation message after generation.</p>
             <ModalActions onCancel={() => { setShowBillForm(false); setSelectedFeeStructureId(""); setSelectedClassId(""); }} busy={generateBills.isPending} submitLabel="Generate bills" />
           </form>
@@ -1051,14 +1089,14 @@ export function AccountantPortalWorkspace({
         <Modal title="Add inventory item" description="Create a stock item with a minimum quantity threshold and optional opening stock." onClose={() => setShowInventoryForm(false)}>
           <form onSubmit={submitInventoryItem} className="space-y-4">
             {message?.kind === "error" && <QueryError message={message.text} />}
-            <Field label="Item name"><input name="name" required minLength={2} maxLength={150} className={inputClass} placeholder="e.g. Exercise books, lab glassware" /></Field>
+            <LabeledField label="Item name"><input name="name" required minLength={2} maxLength={150} className={inputClass} placeholder="e.g. Exercise books, lab glassware" /></LabeledField>
             <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Category"><input name="category" className={inputClass} placeholder="Books, stationery, equipment…" /></Field>
-              <Field label="Unit"><input name="unit" required defaultValue="pcs" className={inputClass} placeholder="pcs, boxes, litres…" /></Field>
-              <Field label="Opening quantity"><input name="initialQuantity" type="number" min="0" step="1" required defaultValue="0" className={inputClass} /></Field>
-              <Field label="Minimum quantity"><input name="minQuantity" type="number" min="0" step="1" required defaultValue="0" className={inputClass} /></Field>
+              <LabeledField label="Category"><input name="category" className={inputClass} placeholder="Books, stationery, equipment…" /></LabeledField>
+              <LabeledField label="Unit"><input name="unit" required defaultValue="pcs" className={inputClass} placeholder="pcs, boxes, litres…" /></LabeledField>
+              <LabeledField label="Opening quantity"><input name="initialQuantity" type="number" min="0" step="1" required defaultValue="0" className={inputClass} /></LabeledField>
+              <LabeledField label="Minimum quantity"><input name="minQuantity" type="number" min="0" step="1" required defaultValue="0" className={inputClass} /></LabeledField>
             </div>
-            <Field label="Description (optional)"><textarea name="description" maxLength={500} className={cn(inputClass, "h-20 py-2")} placeholder="Storage location or item details" /></Field>
+            <LabeledField label="Description (optional)"><textarea name="description" maxLength={500} className={cn(inputClass, "h-20 py-2")} placeholder="Storage location or item details" /></LabeledField>
             <ModalActions onCancel={() => setShowInventoryForm(false)} busy={createInventoryItem.isPending} submitLabel="Create item" />
           </form>
         </Modal>
@@ -1069,12 +1107,12 @@ export function AccountantPortalWorkspace({
           <form onSubmit={submitStockMovement} className="space-y-4">
             {message?.kind === "error" && <QueryError message={message.text} />}
             <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Movement type"><Select name="type" required defaultValue="IN"><SelectTrigger aria-label="Movement type" className={inputClass}><SelectValue /></SelectTrigger><SelectContent><SelectItem value="IN">Stock in — received</SelectItem><SelectItem value="OUT">Stock out — issued</SelectItem></SelectContent></Select></Field>
-              <Field label="Quantity"><input name="quantity" type="number" required min="1" step="1" className={inputClass} /></Field>
-              <Field label="Movement date"><DatePicker name="date" required defaultValue={new Date().toISOString().slice(0, 10)} buttonClassName={inputClass} /></Field>
-              <Field label="Recipient (optional)"><input name="recipientName" maxLength={150} className={inputClass} placeholder="Staff member / department" /></Field>
+              <LabeledField label="Movement type"><Select name="type" required defaultValue="IN"><SelectTrigger aria-label="Movement type" className={inputClass}><SelectValue /></SelectTrigger><SelectContent><SelectItem value="IN">Stock in — received</SelectItem><SelectItem value="OUT">Stock out — issued</SelectItem></SelectContent></Select></LabeledField>
+              <LabeledField label="Quantity"><input name="quantity" type="number" required min="1" step="1" className={inputClass} /></LabeledField>
+              <LabeledField label="Movement date"><DatePicker name="date" required defaultValue={new Date().toISOString().slice(0, 10)} buttonClassName={inputClass} /></LabeledField>
+              <LabeledField label="Recipient (optional)"><input name="recipientName" maxLength={150} className={inputClass} placeholder="Staff member / department" /></LabeledField>
             </div>
-            <Field label="Description (optional)"><textarea name="description" maxLength={500} className={cn(inputClass, "h-20 py-2")} placeholder="Reason or reference" /></Field>
+            <LabeledField label="Description (optional)"><textarea name="description" maxLength={500} className={cn(inputClass, "h-20 py-2")} placeholder="Reason or reference" /></LabeledField>
             <ModalActions onCancel={() => setStockItemId("")} busy={recordStockMovement.isPending} submitLabel="Save movement" />
           </form>
         </Modal>
@@ -1085,14 +1123,14 @@ export function AccountantPortalWorkspace({
           <form onSubmit={submitExpense} className="space-y-4">
             {message?.kind === "error" && <QueryError message={message.text} />}
             <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Date"><DatePicker name="date" required defaultValue={new Date().toISOString().slice(0, 10)} buttonClassName={inputClass} /></Field>
-              <Field label="Amount (GHS)"><input name="amount" type="number" required min="0.01" step="0.01" className={inputClass} placeholder="0.00" /></Field>
-              <Field label="Payee (optional)"><input name="payee" className={inputClass} placeholder="Supplier or recipient" /></Field>
-              <Field label="Category"><Select name="category" required defaultValue="OTHER"><SelectTrigger aria-label="Expense category" className={inputClass}><SelectValue /></SelectTrigger><SelectContent>{["UTILITIES", "SUPPLIES", "MAINTENANCE", "TRANSPORT", "RENT", "INSURANCE", "TAXES", "SALARY", "OTHER"].map((category) => <SelectItem key={category} value={category}>{category.replaceAll("_", " ")}</SelectItem>)}</SelectContent></Select></Field>
-              <Field label="Payment method"><Select name="paymentMethod" required defaultValue="BANK_TRANSFER"><SelectTrigger aria-label="Payment method" className={inputClass}><SelectValue /></SelectTrigger><SelectContent>{["BANK_TRANSFER", "CASH", "CHEQUE", "MOBILE_MONEY", "CARD", "ONLINE", "OTHER"].map((method) => <SelectItem key={method} value={method}>{method.replaceAll("_", " ")}</SelectItem>)}</SelectContent></Select></Field>
-              <Field label="Reference number (optional)"><input name="referenceNumber" className={inputClass} placeholder="Voucher / transaction reference" /></Field>
+              <LabeledField label="Date"><DatePicker name="date" required defaultValue={new Date().toISOString().slice(0, 10)} buttonClassName={inputClass} /></LabeledField>
+              <LabeledField label="Amount (GHS)"><input name="amount" type="number" required min="0.01" step="0.01" className={inputClass} placeholder="0.00" /></LabeledField>
+              <LabeledField label="Payee (optional)"><input name="payee" className={inputClass} placeholder="Supplier or recipient" /></LabeledField>
+              <LabeledField label="Category"><Select name="category" required defaultValue="OTHER"><SelectTrigger aria-label="Expense category" className={inputClass}><SelectValue /></SelectTrigger><SelectContent>{["UTILITIES", "SUPPLIES", "MAINTENANCE", "TRANSPORT", "RENT", "INSURANCE", "TAXES", "SALARY", "OTHER"].map((category) => <SelectItem key={category} value={category}>{category.replaceAll("_", " ")}</SelectItem>)}</SelectContent></Select></LabeledField>
+              <LabeledField label="Payment method"><Select name="paymentMethod" required defaultValue="BANK_TRANSFER"><SelectTrigger aria-label="Payment method" className={inputClass}><SelectValue /></SelectTrigger><SelectContent>{["BANK_TRANSFER", "CASH", "CHEQUE", "MOBILE_MONEY", "CARD", "ONLINE", "OTHER"].map((method) => <SelectItem key={method} value={method}>{method.replaceAll("_", " ")}</SelectItem>)}</SelectContent></Select></LabeledField>
+              <LabeledField label="Reference number (optional)"><input name="referenceNumber" className={inputClass} placeholder="Voucher / transaction reference" /></LabeledField>
             </div>
-            <Field label="Description"><textarea name="description" required minLength={3} className={cn(inputClass, "h-20 py-2")} placeholder="What was purchased or paid for?" /></Field>
+            <LabeledField label="Description"><textarea name="description" required minLength={3} className={cn(inputClass, "h-20 py-2")} placeholder="What was purchased or paid for?" /></LabeledField>
             <ModalActions onCancel={() => setShowExpenseForm(false)} busy={createExpense.isPending} submitLabel="Save expense" />
           </form>
         </Modal>
@@ -1107,10 +1145,6 @@ function DashboardMetricLink({ to, label, value, detail, icon: Icon }: { to: str
     <p className="mt-3 break-words text-xl font-bold tracking-tight text-foreground sm:text-2xl">{value}</p><p className="mt-1 text-xs text-muted-foreground">{detail}</p>
     <span className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-primary">View records <span aria-hidden="true">→</span></span>
   </Link>;
-}
-
-function MetricCard({ label, value, detail, icon: Icon }: { label: string; value: string; detail: string; icon: typeof Wallet }) {
-  return <div className="rounded-2xl border border-border bg-card p-4"><div className="flex items-center justify-between gap-3"><p className="text-sm text-muted-foreground">{label}</p><span className="rounded-xl bg-muted p-2"><Icon className="size-4 text-foreground" /></span></div><p className="mt-3 text-2xl font-bold tracking-tight text-foreground">{value}</p><p className="mt-1 text-xs text-muted-foreground">{detail}</p></div>;
 }
 
 function SectionHeader({ title, description, action }: { title: string; description: string; action?: ReactNode }) {
@@ -1170,10 +1204,6 @@ function StatusBadge({ value }: { value: string }) {
 
 function AttentionItem({ title, value, detail, to }: { title: string; value: string; detail: string; to: string }) {
   return <Link to="/$page" params={{ page: to }} className="flex w-full items-center justify-between gap-3 rounded-xl border border-border p-3 text-left transition hover:bg-muted/50"><span><span className="block text-sm font-medium text-foreground">{title}</span><span className="mt-1 block text-xs text-muted-foreground">{detail}</span></span><span className="text-lg font-bold tabular-nums text-foreground">{value}</span></Link>;
-}
-
-function Field({ label, children }: { label: string; children: ReactNode }) {
-  return <label className="grid gap-1.5 text-sm font-medium text-foreground">{label}{children}</label>;
 }
 
 function Modal({ title, description, onClose, children }: { title: string; description: string; onClose: () => void; children: ReactNode }) {

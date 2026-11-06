@@ -22,6 +22,11 @@ describe.skipIf(!enabled)("versioned academic reports (PostgreSQL)",{timeout:90_
   beforeAll(async()=>{
     process.env.DATABASE_URL=url;
     const {prisma}=await import("../../prisma/prisma.client.js");db=prisma;
+    // The service now reads approvers' signatures through private storage, whose module validates
+    // the app environment when it loads. Real values are not needed: storage is stubbed below.
+    process.env.BETTER_AUTH_SECRET??="integration-test-secret-0123456789abcdef";
+    process.env.BETTER_AUTH_URL??="http://localhost:3000";
+    process.env.WEB_ORIGIN??="http://localhost:5173";
     const {ReportVersionService}=await import("./report-version.service.js");
     const {ReportPublicationService}=await import("./report-publication.service.js");
     await db.organization.create({data:{id:orgA,name:"Synthetic A",slug:orgA}});
@@ -57,7 +62,7 @@ describe.skipIf(!enabled)("versioned academic reports (PostgreSQL)",{timeout:90_
         teacherId:actor===teacher?actor:null,
         classTeacherClassIds:actor===teacher?[classId]:[],subjectAssignments:[],
       }),
-    } as never);
+    } as never,{read:async()=>{throw new Error("no storage in this test");}} as never);
     publisher=new ReportPublicationService({client:db} as never);
   });
   afterAll(async()=>{

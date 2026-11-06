@@ -1,0 +1,231 @@
+
+$ pnpm install --frozen-lockfile
+(cwd: .)
+Scope: all 6 workspace projects
+✓ Lockfile passes supply-chain policies (verified 14s ago)
+Lockfile is up to date, resolution step is skipped
+Already up to date
+
+Done in 2.3s using pnpm v11.25.0
+
+exit: 0
+
+$ pnpm --filter @schoolhub/shared build
+(cwd: .)
+$ tsdown
+ℹ tsdown v0.23.4 powered by rolldown v1.2.16
+ℹ config file: /workspace/scratch/8ce198452ebc/schoolhub/packages/shared/tsdown.config.ts 
+ℹ entry: src/index.ts
+ℹ tsconfig: tsconfig.json
+ℹ Build start
+ℹ Cleaning 4 files
+
+ WARN  TypeScript 7.0 does not yet have a stable API and is experimental. Some options will be unavailable.
+
+ℹ Emit types with typescript@7.0.2
+ℹ [CJS] dist/index.cjs  61.97 kB │ gzip: 15.34 kB
+ℹ [CJS] 1 files, total: 61.97 kB
+ℹ [CJS] dist/index.d.cts  55.36 kB │ gzip: 9.89 kB
+ℹ [CJS] 1 files, total: 55.36 kB
+✔ Build complete in 606ms
+ℹ [ESM] dist/index.mjs    56.14 kB │ gzip: 14.78 kB
+ℹ [ESM] dist/index.d.mts  55.36 kB │ gzip:  9.89 kB
+ℹ [ESM] 2 files, total: 111.50 kB
+✔ Build complete in 642ms
+
+exit: 0
+
+$ pnpm --filter @schoolhub/mobile typecheck
+(cwd: .)
+$ tsc --noEmit
+
+exit: 0
+
+$ pnpm --filter @schoolhub/mobile lint
+(cwd: .)
+$ expo lint
+
+exit: 0
+
+$ npx expo-doctor
+(cwd: apps/mobile)
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
+Running 20 checks on your project...
+19/20 checks passed. 1 checks failed. Possible issues detected:
+Use the --verbose flag to see more details about passed checks.
+
+✖ Check that no duplicate dependencies are installed
+Your project contains duplicate native module dependencies, which should be de-duplicated.
+Native builds may only contain one version of any given native module, and having multiple versions of a single Native module installed may lead to unexpected build errors.
+Found duplicates for expo:
+  ├─ expo@58.0.22 (at: node_modules/expo)
+  │  └─ linked to: ../../node_modules/.pnpm/expo@58.0.22_@babel+core@7.29.7_supports-color@8.1.1__@expo+dom-webview@58.0.2_@expo+me_f58fd7a1588ff41034d99c667bf764ca/node_modules/expo
+  └─ expo@58.0.22 (at: ../../node_modules/.pnpm/expo-device@58.0.5_expo@58.0.22/node_modules/expo)
+     └─ linked to a different installation
+Found duplicates for expo-constants:
+  ├─ expo-constants@58.0.14 (at: node_modules/expo-constants)
+  │  └─ linked to: ../../node_modules/.pnpm/expo-constants@58.0.14_expo@58.0.22_react-native@0.88.1_@babel+core@7.29.7_supports-col_12269208916254366b1107bc450f981d/node_modules/expo-constants
+  └─ expo-constants@58.0.14 (at: ../../node_modules/.pnpm/expo@58.0.22_@babel+core@7.29.7_supports-color@7.2.0__@expo+dom-webview@58.0.2_@expo+me_c00bda0d4066f628eab5913e8d4b76e4/node_modules/expo-constants)
+     └─ linked to a different installation
+Found duplicates for expo-file-system:
+  ├─ expo-file-system@58.0.13 (at: node_modules/expo-file-system)
+  │  └─ linked to: ../../node_modules/.pnpm/expo-file-system@58.0.13_expo@58.0.22_react-native@0.88.1_@babel+core@7.29.7_supports-c_c40e6a57d93e65fd4d340d2cd22851eb/node_modules/expo-file-system
+  └─ expo-file-system@58.0.13 (at: ../../node_modules/.pnpm/expo@58.0.22_@babel+core@7.29.7_supports-color@7.2.0__@expo+dom-webview@58.0.2_@expo+me_c00bda0d4066f628eab5913e8d4b76e4/node_modules/expo-file-system)
+     └─ linked to a different installation
+Found duplicates for expo-font:
+  ├─ expo-font@58.0.11 (at: node_modules/expo-font)
+  │  └─ linked to: ../../node_modules/.pnpm/expo-font@58.0.11_expo@58.0.22_react-native@0.88.1_@babel+core@7.29.7_supports-color@8._66f5dfff6833c4c7012745074e48658b/node_modules/expo-font
+  └─ expo-font@58.0.11 (at: ../../node_modules/.pnpm/expo@58.0.22_@babel+core@7.29.7_supports-color@7.2.0__@expo+dom-webview@58.0.2_@expo+me_c00bda0d4066f628eab5913e8d4b76e4/node_modules/expo-font)
+     └─ linked to a different installation
+Found duplicates for react:
+  ├─ react@19.3.0 (at: node_modules/react)
+  │  └─ linked to: ../../node_modules/.pnpm/react@19.3.0/node_modules/react
+  └─ react@19.3.1 (at: ../../node_modules/.pnpm/expo@58.0.22_@babel+core@7.29.7_supports-color@7.2.0__@expo+dom-webview@58.0.2_@expo+me_c00bda0d4066f628eab5913e8d4b76e4/node_modules/react)
+     └─ linked to a different installation
+Found duplicates for react-native:
+  ├─ react-native@0.88.1 (at: node_modules/react-native)
+  │  └─ linked to: ../../node_modules/.pnpm/react-native@0.88.1_@babel+core@7.29.7_supports-color@8.1.1__@react-native+metro-config_029b8f7899b25e626d9b5e83ec508386/node_modules/react-native
+  └─ react-native@0.88.1 (at: ../../node_modules/.pnpm/expo@58.0.22_@babel+core@7.29.7_supports-color@7.2.0__@expo+dom-webview@58.0.2_@expo+me_c00bda0d4066f628eab5913e8d4b76e4/node_modules/react-native)
+     └─ linked to a different installation
+Found duplicates for @expo/dom-webview:
+  ├─ @expo/dom-webview@58.0.2 (at: ../../node_modules/.pnpm/expo@58.0.22_@babel+core@7.29.7_supports-color@8.1.1__@expo+dom-webview@58.0.2_@expo+me_f58fd7a1588ff41034d99c667bf764ca/node_modules/@expo/dom-webview)
+  │  └─ linked to a different installation
+  └─ @expo/dom-webview@58.0.2 (at: ../../node_modules/.pnpm/expo@58.0.22_@babel+core@7.29.7_supports-color@7.2.0__@expo+dom-webview@58.0.2_@expo+me_c00bda0d4066f628eab5913e8d4b76e4/node_modules/@expo/dom-webview)
+     └─ linked to a different installation
+Found duplicates for @expo/fingerprint:
+  ├─ @expo/fingerprint@0.21.8 (at: ../../node_modules/.pnpm/expo@58.0.22_@babel+core@7.29.7_supports-color@8.1.1__@expo+dom-webview@58.0.2_@expo+me_f58fd7a1588ff41034d99c667bf764ca/node_modules/@expo/fingerprint)
+  │  └─ linked to a different installation
+  └─ @expo/fingerprint@0.21.8 (at: ../../node_modules/.pnpm/expo@58.0.22_@babel+core@7.29.7_supports-color@7.2.0__@expo+dom-webview@58.0.2_@expo+me_c00bda0d4066f628eab5913e8d4b76e4/node_modules/@expo/fingerprint)
+     └─ linked to a different installation
+Found duplicates for @expo/log-box:
+  ├─ @expo/log-box@58.0.14 (at: ../../node_modules/.pnpm/expo-router@58.0.29_691a03b90785e5d0405ee7454ee17d80/node_modules/@expo/log-box)
+  │  └─ linked to a different installation
+  └─ @expo/log-box@58.0.14 (at: ../../node_modules/.pnpm/expo@58.0.22_@babel+core@7.29.7_supports-color@7.2.0__@expo+dom-webview@58.0.2_@expo+me_c00bda0d4066f628eab5913e8d4b76e4/node_modules/@expo/log-box)
+     └─ linked to a different installation
+Found duplicates for expo-asset:
+  ├─ expo-asset@58.0.19 (at: ../../node_modules/.pnpm/expo@58.0.22_@babel+core@7.29.7_supports-color@8.1.1__@expo+dom-webview@58.0.2_@expo+me_f58fd7a1588ff41034d99c667bf764ca/node_modules/expo-asset)
+  │  └─ linked to a different installation
+  └─ expo-asset@58.0.19 (at: ../../node_modules/.pnpm/expo@58.0.22_@babel+core@7.29.7_supports-color@7.2.0__@expo+dom-webview@58.0.2_@expo+me_c00bda0d4066f628eab5913e8d4b76e4/node_modules/expo-asset)
+     └─ linked to a different installation
+Found duplicates for expo-keep-awake:
+  ├─ expo-keep-awake@58.0.3 (at: ../../node_modules/.pnpm/expo@58.0.22_@babel+core@7.29.7_supports-color@8.1.1__@expo+dom-webview@58.0.2_@expo+me_f58fd7a1588ff41034d99c667bf764ca/node_modules/expo-keep-awake)
+  │  └─ linked to a different installation
+  └─ expo-keep-awake@58.0.3 (at: ../../node_modules/.pnpm/expo@58.0.22_@babel+core@7.29.7_supports-color@7.2.0__@expo+dom-webview@58.0.2_@expo+me_c00bda0d4066f628eab5913e8d4b76e4/node_modules/expo-keep-awake)
+     └─ linked to a different installation
+Found duplicates for expo-modules-core:
+  ├─ expo-modules-core@58.0.29 (at: ../../node_modules/.pnpm/expo@58.0.22_@babel+core@7.29.7_supports-color@8.1.1__@expo+dom-webview@58.0.2_@expo+me_f58fd7a1588ff41034d99c667bf764ca/node_modules/expo-modules-core)
+  │  └─ linked to a different installation
+  └─ expo-modules-core@58.0.29 (at: ../../node_modules/.pnpm/expo@58.0.22_@babel+core@7.29.7_supports-color@7.2.0__@expo+dom-webview@58.0.2_@expo+me_c00bda0d4066f628eab5913e8d4b76e4/node_modules/expo-modules-core)
+     └─ linked to a different installation
+Found duplicates for expo-modules-jsi:
+  ├─ expo-modules-jsi@58.0.21 (at: ../../node_modules/.pnpm/expo-modules-core@58.0.29_react-native-worklets@0.13.0_@babel+core@7.29.7_supports-colo_ce10b939b1bc388344a11cafb305dc68/node_modules/expo-modules-jsi)
+  │  └─ linked to a different installation
+  └─ expo-modules-jsi@58.0.21 (at: ../../node_modules/.pnpm/expo-modules-core@58.0.29_react-native-worklets@0.13.0_@babel+core@7.29.7_supports-colo_db7b241b9f2a92ebc5f843f6fa22d4cc/node_modules/expo-modules-jsi)
+     └─ linked to a different installation
+Advice:
+Your node_modules folder may be corrupted. Multiple copies of the same version exist for: expo, expo-constants, expo-file-system, expo-font, react-native, @expo/dom-webview, @expo/fingerprint, @expo/log-box, expo-asset, expo-keep-awake, expo-modules-core, expo-modules-jsi.
+- Try deleting your node_modules folders and reinstall your dependencies after.
+- If this error persists, delete your node_modules as well as your lockfile and reinstall.
+Resolve your dependency issues and deduplicate your dependencies. Learn more: https://expo.fyi/resolving-dependency-issues
+
+1 check failed, indicating possible issues with the project.
+
+exit: 1
+
+$ npx expo export --platform android
+(cwd: apps/mobile)
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
+Expo Autolinking module resolution enabled
+Starting Metro Bundler
+
+| (node:406) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:406) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:406) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:406) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:406) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:406) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+Android Bundled 33107ms node_modules/.pnpm/expo-router@58.0.29_691a03b90785e5d0405ee7454ee17d80/node_modules/expo-router/entry.js (4185 modules)
+
+› Assets (30):
+../../node_modules/.pnpm/@expo-google-fonts+inter@0.4.2/node_modules/@expo-google-fonts/inter/400Regular/Inter_400Regular.ttf (342KB)
+../../node_modules/.pnpm/@expo-google-fonts+inter@0.4.2/node_modules/@expo-google-fonts/inter/500Medium/Inter_500Medium.ttf (343KB)
+../../node_modules/.pnpm/@expo-google-fonts+inter@0.4.2/node_modules/@expo-google-fonts/inter/600SemiBold/Inter_600SemiBold.ttf (344KB)
+../../node_modules/.pnpm/@expo-google-fonts+inter@0.4.2/node_modules/@expo-google-fonts/inter/700Bold/Inter_700Bold.ttf (344KB)
+../../node_modules/.pnpm/expo-router@58.0.29_691a03b90785e5d0405ee7454ee17d80/node_modules/expo-router/assets/arrow_down.png (9.5KB)
+../../node_modules/.pnpm/expo-router@58.0.29_691a03b90785e5d0405ee7454ee17d80/node_modules/expo-router/assets/arrow_right.xml (307B)
+../../node_modules/.pnpm/expo-router@58.0.29_691a03b90785e5d0405ee7454ee17d80/node_modules/expo-router/assets/checkmark.xml (312B)
+../../node_modules/.pnpm/expo-router@58.0.29_691a03b90785e5d0405ee7454ee17d80/node_modules/expo-router/assets/error.png (469B)
+../../node_modules/.pnpm/expo-router@58.0.29_691a03b90785e5d0405ee7454ee17d80/node_modules/expo-router/assets/file.png (138B)
+../../node_modules/.pnpm/expo-router@58.0.29_691a03b90785e5d0405ee7454ee17d80/node_modules/expo-router/assets/forward.png (188B)
+../../node_modules/.pnpm/expo-router@58.0.29_691a03b90785e5d0405ee7454ee17d80/node_modules/expo-router/assets/pkg.png (364B)
+../../node_modules/.pnpm/expo-router@58.0.29_691a03b90785e5d0405ee7454ee17d80/node_modules/expo-router/assets/react-navigation/elements/back-icon-mask.png (653B)
+../../node_modules/.pnpm/expo-router@58.0.29_691a03b90785e5d0405ee7454ee17d80/node_modules/expo-router/assets/react-navigation/elements/back-icon.png (4 variations | 152B)
+../../node_modules/.pnpm/expo-router@58.0.29_691a03b90785e5d0405ee7454ee17d80/node_modules/expo-router/assets/react-navigation/elements/clear-icon.png (4 variations | 425B)
+../../node_modules/.pnpm/expo-router@58.0.29_691a03b90785e5d0405ee7454ee17d80/node_modules/expo-router/assets/react-navigation/elements/close-icon.png (4 variations | 235B)
+../../node_modules/.pnpm/expo-router@58.0.29_691a03b90785e5d0405ee7454ee17d80/node_modules/expo-router/assets/react-navigation/elements/search-icon.png (4 variations | 599B)
+../../node_modules/.pnpm/expo-router@58.0.29_691a03b90785e5d0405ee7454ee17d80/node_modules/expo-router/assets/sitemap.png (465B)
+../../node_modules/.pnpm/expo-router@58.0.29_691a03b90785e5d0405ee7454ee17d80/node_modules/expo-router/assets/unmatched.png (4.8KB)
+
+› android bundles (1):
+_expo/static/js/android/entry-7f0946037e3ec6b0bdee3939ce3f681c.hbc (7.2MB)
+
+› Files (1):
+metadata.json (2KB)
+
+Exported: dist
+
+exit: 0
+
+$ npx expo export --platform ios
+(cwd: apps/mobile)
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
+Expo Autolinking module resolution enabled
+Starting Metro Bundler
+
+| (node:444) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:444) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:444) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:444) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:444) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:444) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+iOS Bundled 32410ms node_modules/.pnpm/expo-router@58.0.29_691a03b90785e5d0405ee7454ee17d80/node_modules/expo-router/entry.js (4186 modules)
+
+› Assets (27):
+../../node_modules/.pnpm/@expo-google-fonts+inter@0.4.2/node_modules/@expo-google-fonts/inter/400Regular/Inter_400Regular.ttf (342KB)
+../../node_modules/.pnpm/@expo-google-fonts+inter@0.4.2/node_modules/@expo-google-fonts/inter/500Medium/Inter_500Medium.ttf (343KB)
+../../node_modules/.pnpm/@expo-google-fonts+inter@0.4.2/node_modules/@expo-google-fonts/inter/600SemiBold/Inter_600SemiBold.ttf (344KB)
+../../node_modules/.pnpm/@expo-google-fonts+inter@0.4.2/node_modules/@expo-google-fonts/inter/700Bold/Inter_700Bold.ttf (344KB)
+../../node_modules/.pnpm/expo-router@58.0.29_691a03b90785e5d0405ee7454ee17d80/node_modules/expo-router/assets/arrow_down.png (9.5KB)
+../../node_modules/.pnpm/expo-router@58.0.29_691a03b90785e5d0405ee7454ee17d80/node_modules/expo-router/assets/error.png (469B)
+../../node_modules/.pnpm/expo-router@58.0.29_691a03b90785e5d0405ee7454ee17d80/node_modules/expo-router/assets/file.png (138B)
+../../node_modules/.pnpm/expo-router@58.0.29_691a03b90785e5d0405ee7454ee17d80/node_modules/expo-router/assets/forward.png (188B)
+../../node_modules/.pnpm/expo-router@58.0.29_691a03b90785e5d0405ee7454ee17d80/node_modules/expo-router/assets/pkg.png (364B)
+../../node_modules/.pnpm/expo-router@58.0.29_691a03b90785e5d0405ee7454ee17d80/node_modules/expo-router/assets/react-navigation/elements/back-icon-mask.png (653B)
+../../node_modules/.pnpm/expo-router@58.0.29_691a03b90785e5d0405ee7454ee17d80/node_modules/expo-router/assets/react-navigation/elements/back-icon.png (4 variations | 566B)
+../../node_modules/.pnpm/expo-router@58.0.29_691a03b90785e5d0405ee7454ee17d80/node_modules/expo-router/assets/react-navigation/elements/clear-icon.png (4 variations | 425B)
+../../node_modules/.pnpm/expo-router@58.0.29_691a03b90785e5d0405ee7454ee17d80/node_modules/expo-router/assets/react-navigation/elements/close-icon.png (4 variations | 235B)
+../../node_modules/.pnpm/expo-router@58.0.29_691a03b90785e5d0405ee7454ee17d80/node_modules/expo-router/assets/react-navigation/elements/search-icon.png (3 variations | 582B)
+../../node_modules/.pnpm/expo-router@58.0.29_691a03b90785e5d0405ee7454ee17d80/node_modules/expo-router/assets/sitemap.png (465B)
+../../node_modules/.pnpm/expo-router@58.0.29_691a03b90785e5d0405ee7454ee17d80/node_modules/expo-router/assets/unmatched.png (4.8KB)
+
+› ios bundles (1):
+_expo/static/js/ios/entry-e64e09fd6397c6512fb52d375efd42e8.hbc (7.2MB)
+
+› Files (1):
+metadata.json (1.8KB)
+
+Exported: dist
+
+exit: 0

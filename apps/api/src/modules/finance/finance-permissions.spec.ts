@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import type { ExecutionContext } from "@nestjs/common";
 import { RolesGuard } from "../../common/guards/roles.guard.js";
-import { FINANCE_PAYROLL_EXPORT_ROLES, FINANCE_READ_ROLES, FINANCE_WRITE_ROLES, PAYROLL_SETTINGS_APPROVE_ROLES, canExportFinancePayroll, isFinancePayrollExportRole } from "./finance.permissions.js";
+import { FINANCE_PAYROLL_EXPORT_ROLES, FINANCE_READ_ROLES, FINANCE_SUMMARY_ROLES, FINANCE_WRITE_ROLES, PAYROLL_SETTINGS_APPROVE_ROLES, canExportFinancePayroll, isFinancePayrollExportRole } from "./finance.permissions.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 // Normalise line endings so the checks behave the same on Windows (CRLF) checkouts.
@@ -28,6 +28,11 @@ function check(requiredRoles: readonly string[], user: { role?: string }, school
 describe("finance policy constants", () => {
   it("only the accountant role may write financial data", () => {
     expect([...FINANCE_WRITE_ROLES]).toEqual(["accountant"]);
+  });
+
+  it("limits administrators to finance summaries, not detailed records", () => {
+    expect([...FINANCE_SUMMARY_ROLES]).toContain("admin");
+    expect([...FINANCE_READ_ROLES]).not.toContain("admin");
   });
 
   it("restricts salary and payroll exports to accountant, owner and headteacher", () => {
@@ -66,9 +71,11 @@ describe("RolesGuard with the finance write policy", () => {
   it("allows a headteacher only when acting under the accountant role", () => {
     expect(check(FINANCE_WRITE_ROLES, { role: "user" }, "accountant", "headteacher")()).toBe(true);
   });
-  it("still lets owners and admins read finance data", () => {
+  it("allows owners, accountants and headteachers to read detailed finance data", () => {
     expect(check(FINANCE_READ_ROLES, { role: "user" }, "owner")()).toBe(true);
-    expect(check(FINANCE_READ_ROLES, { role: "user" }, "admin")()).toBe(true);
+    expect(check(FINANCE_READ_ROLES, { role: "user" }, "accountant")()).toBe(true);
+    expect(check(FINANCE_READ_ROLES, { role: "user" }, "headteacher")()).toBe(true);
+    expect(check(FINANCE_READ_ROLES, { role: "user" }, "admin")).toThrow();
     expect(check(FINANCE_READ_ROLES, { role: "user" }, "teacher")).toThrow();
   });
 });

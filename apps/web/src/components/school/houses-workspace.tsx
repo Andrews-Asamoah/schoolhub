@@ -17,6 +17,9 @@ import {
 import { useSchoolRole } from "@/components/school/school-role-switcher";
 import { apiFetch } from "@/lib/api";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { AcademicStructureBulkImport } from "@/components/school/academic-structure-bulk-import";
+import { BulkImportButton } from "@/components/bulk-import/bulk-import-button";
+import { labeledInputClasses } from "@/components/forms/labeled-controls";
 
 interface HouseRecord {
   id: string;
@@ -63,8 +66,6 @@ const emptyForm: HouseFormValues = {
   isActive: true,
 };
 
-const inputClasses =
-  "mt-1.5 h-10 w-full rounded-lg border border-border bg-background px-3 text-sm text-foreground outline-none placeholder:text-muted-foreground focus:border-ring focus:ring-2 focus:ring-ring/20";
 
 export function HousesWorkspace() {
   const queryClient = useQueryClient();
@@ -72,6 +73,7 @@ export function HousesWorkspace() {
   const canManage = activeRole === "owner" || activeRole === "admin";
   const [editing, setEditing] = useState<HouseRecord | null>(null);
   const [showForm, setShowForm] = useState(false);
+  const [showBulkImport, setShowBulkImport] = useState(false);
   const [values, setValues] = useState<HouseFormValues>(emptyForm);
 
   const housesQuery = useQuery({
@@ -187,6 +189,16 @@ export function HousesWorkspace() {
 
   return (
     <div className="space-y-5">
+      {showBulkImport && (
+        <AcademicStructureBulkImport
+          kind="houses"
+          onClose={() => setShowBulkImport(false)}
+          onComplete={() => {
+            void queryClient.invalidateQueries({ queryKey: ["academics", "houses"] });
+            void queryClient.invalidateQueries({ queryKey: ["students"] });
+          }}
+        />
+      )}
       <section className="rounded-2xl border border-border bg-gradient-to-br from-primary/10 via-card to-warning/5 p-5 sm:p-6">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="flex items-start gap-3">
@@ -204,14 +216,17 @@ export function HousesWorkspace() {
               </p>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={openCreate}
-            className="inline-flex h-10 items-center gap-2 rounded-lg bg-primary px-4 text-xs font-semibold text-primary-foreground shadow-sm hover:opacity-90"
-          >
-            <Plus className="size-4" />
-            Add house
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <BulkImportButton onClick={() => setShowBulkImport(true)} />
+            <button
+              type="button"
+              onClick={openCreate}
+              className="inline-flex h-10 items-center gap-2 rounded-lg bg-primary px-4 text-xs font-semibold text-primary-foreground shadow-sm hover:opacity-90"
+            >
+              <Plus className="size-4" />
+              Add house
+            </button>
+          </div>
         </div>
       </section>
 
@@ -257,7 +272,7 @@ export function HousesWorkspace() {
                 <input
                   required
                   maxLength={100}
-                  className={inputClasses}
+                  className={labeledInputClasses}
                   value={values.name}
                   onChange={(event) =>
                     setValues({ ...values, name: event.target.value })
@@ -271,7 +286,7 @@ export function HousesWorkspace() {
                   required
                   maxLength={20}
                   pattern="[A-Za-z0-9-]+"
-                  className={inputClasses}
+                  className={labeledInputClasses}
                   value={values.code}
                   onChange={(event) =>
                     setValues({ ...values, code: event.target.value })
@@ -299,7 +314,7 @@ export function HousesWorkspace() {
               <label className="text-xs font-semibold text-foreground">
                 Lead teacher
                 <Select value={values.houseTeacherId || "__none__"} onValueChange={(value) => setValues({ ...values, houseTeacherId: value === "__none__" ? "" : value })}>
-                  <SelectTrigger aria-label="Lead teacher" className={inputClasses}><SelectValue /></SelectTrigger>
+                  <SelectTrigger aria-label="Lead teacher" className={labeledInputClasses}><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="__none__">No lead teacher assigned</SelectItem>
                     {teachers.filter((teacher) => teacher.isActive || teacher.id === values.houseTeacherId).map((teacher) => (
@@ -312,7 +327,7 @@ export function HousesWorkspace() {
                 Motto
                 <input
                   maxLength={200}
-                  className={inputClasses}
+                  className={labeledInputClasses}
                   value={values.motto}
                   onChange={(event) =>
                     setValues({ ...values, motto: event.target.value })
@@ -325,7 +340,7 @@ export function HousesWorkspace() {
                 <textarea
                   maxLength={500}
                   rows={3}
-                  className={`${inputClasses} h-auto min-h-20 py-2.5`}
+                  className={`${labeledInputClasses} h-auto min-h-20 py-2.5`}
                   value={values.description}
                   onChange={(event) =>
                     setValues({ ...values, description: event.target.value })

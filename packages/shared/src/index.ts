@@ -16,6 +16,13 @@ export const ROLES = [
 ] as const;
 export type Role = (typeof ROLES)[number];
 
+/** Effective school administration membership, including assigned additional roles. */
+export const SCHOOL_ADMIN_ROLES = ["owner", "admin", "headteacher"] as const;
+export function hasSchoolAdministrationRole(member: { role: string; roles?: readonly string[] | null }): boolean {
+  return [member.role, ...(member.roles ?? [])].some((role) =>
+    (SCHOOL_ADMIN_ROLES as readonly string[]).includes(role));
+}
+
 // ============================================================================
 // PASSWORD POLICY & CREDENTIALS
 // ============================================================================
@@ -412,7 +419,12 @@ export const createHouseSchema = z.object({
   isActive: z.boolean().default(true),
 });
 export type CreateHouseInput = z.infer<typeof createHouseSchema>;
-export const updateHouseSchema = createHouseSchema.partial();
+export const updateHouseSchema = createHouseSchema.partial().extend({
+  description: z.string().trim().max(500).nullable().optional(),
+  color: z.string().regex(/^#[0-9A-Fa-f]{6}$/, "Choose a valid hex color").nullable().optional(),
+  motto: z.string().trim().max(200).nullable().optional(),
+  houseTeacherId: z.string().nullable().optional(),
+});
 export type UpdateHouseInput = z.infer<typeof updateHouseSchema>;
 
 export const createClubSchema = z.object({
@@ -576,24 +588,111 @@ export type BatchAttendanceInput = z.infer<typeof batchAttendanceSchema>;
 // ASSESSMENT & SCORING SCHEMAS
 // ============================================================================
 
-export const recordScoreSchema = z.object({
-  studentId: z.string().min(1),
-  subjectId: z.string().min(1),
-  termId: z.string().min(1),
-  templateId: z.string().min(1),
-  componentId: z.string().min(1),
-  marksObtained: z.number().min(0),
-  maxMarks: z.number().min(0),
-  occurrenceIndex: z.number().int().default(0),
-});
-export type RecordScoreInput = z.infer<typeof recordScoreSchema>;
 
 /** Save a batch of marks for one class and subject. `marks: null` clears a mark. */
 export const saveAssessmentEntrySchema = z.object({
   classId: z.string().min(1),
   subjectId: z.string().min(1),
   templateId: z.string().min(1),
+  termId: z.string().min(1).optional(),
   entries: z
+    .array(
+      z.object({
+        studentId: z.string().min(1),
+        componentId: z.string().min(1),
+        occurrenceIndex: z.number().int().min(0).max(50).default(0),
+        marks: z.number().min(0).max(10000).nullable(),
+        expectedMarks: z.number().min(0).max(10000).nullable().optional(),
+      }),
+    )
+    .min(1, "There are no marks to save")
+    .max(5000),
+});
+export type SaveAssessmentEntryInput = z.infer<typeof saveAssessmentEntrySchema>;
+
+// ---- bulk upload of marks ---------------------------------------------------
+
+/** Headings of the two columns that identify a pupil in the marks upload sheet. */
+export const MARKS_IMPORT_IDENTITY_HEADERS = {
+  admissionNumber: "Admission No",
+  name: "Pupil name",
+} as const;
+
+export interface MarksImportComponent {
+  id: string;
+  name: string;
+  maxMarks: number;
+  /** How many marks the component takes per pupil (1 unless it is repeatable). */
+  slots: number;
+  subjectStrandName?: string | null;
+}
+
+export interface MarksImportColumn {
+  componentId: string;
+  /** Zero-based entry position within a repeatable component. */
+  occurrenceIndex: number;
+  maxMarks: number;
+  /** The label without the "(out of N)" suffix. Unique within one assessment. */
+  label: string;
+  /** The exact heading written into the template. */
+  header: string;
+}
+
+/**
+ * One column per mark a pupil can receive: a repeatable component such as three
+ * quizzes gets one column per entry. The template writer and the upload parser
+ * both build their columns here, so the headings can never drift apart.
+ */
+export function marksImportColumns(components: readonly MarksImportComponent[]): MarksImportColumn[] {
+  return components.flatMap((component) =>
+    Array.from({ length: Math.max(component.slots, 1) }, (_, occurrenceIndex) => {
+      const label = [
+        component.name.trim(),
+        component.subjectStrandName ? `– ${component.subjectStrandName.trim()}` : "",
+        component.slots > 1 ? String(occurrenceIndex + 1) : "",
+      ]
+        .filter(Boolean)
+        .join(" ");
+      return {
+        componentId: component.id,
+        occurrenceIndex,
+        maxMarks: component.maxMarks,
+        label,
+        header: `${label} (out of ${component.maxMarks})`,
+      };
+    }),
+  );
+}
+
+/** Lower-case, accent-free, letters and digits only, so "Class Test 1 (out of 20)" matches "class test 1". */
+export function normalizeMarksImportKey(value: string): string {
+  return value
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s*\(\s*out of\s*[\d.,]+\s*\)\s*$/i, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "");
+}
+
+const sheetRef = {
+  classId: z.string().min(1),
+  subjectId: z.string().min(1),
+  templateId: z.string().min(1),
+};
+
+/** A teacher signs a sheet off. Pupils who could not be assessed are listed as excused. */
+export const submitAssessmentEntrySchema = z.object({
+  ...sheetRef,
+  excusedStudentIds: z.array(z.string().min(1)).max(500).default([]),
+  note: z.string().trim().max(500).optional(),
+});
+export type SubmitAssessmentEntryInput = z.infer<typeof submitAssessmentEntrySchema>;
+
+/** Ask for marks to change on a sheet that is locked, submitted or past its deadline. */
+export const requestMarkCorrectionSchema = z.object({
+  ...sheetRef,
+  reason: z.string().trim().min(10, "Give a reason of at least 10 characters").max(2000),
+  items: z
     .array(
       z.object({
         studentId: z.string().min(1),
@@ -602,10 +701,40 @@ export const saveAssessmentEntrySchema = z.object({
         marks: z.number().min(0).max(10000).nullable(),
       }),
     )
-    .min(1, "There are no marks to save")
-    .max(5000),
+    .min(1, "Choose at least one mark to correct")
+    .max(500),
 });
-export type SaveAssessmentEntryInput = z.infer<typeof saveAssessmentEntrySchema>;
+export type RequestMarkCorrectionInput = z.infer<typeof requestMarkCorrectionSchema>;
+
+export const reviewMarkCorrectionSchema = z.object({
+  decision: z.enum(["APPROVE", "REJECT"]),
+  reason: z.string().trim().max(2000).optional(),
+});
+export type ReviewMarkCorrectionInput = z.infer<typeof reviewMarkCorrectionSchema>;
+
+/** Grant more time for one class, or for one teacher in that class. */
+export const extendAssessmentDeadlineSchema = z.object({
+  templateId: z.string().min(1),
+  classId: z.string().min(1),
+  teacherId: z.string().min(1).nullable().default(null),
+  /** A calendar date, YYYY-MM-DD; the extension runs to the end of that day. */
+  deadline: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use a date like 2026-12-18"),
+  reason: z.string().trim().max(500).optional(),
+});
+export type ExtendAssessmentDeadlineInput = z.infer<typeof extendAssessmentDeadlineSchema>;
+
+export const reopenAssessmentEntrySchema = z.object({
+  ...sheetRef,
+  reason: z.string().trim().min(10, "Give a reason of at least 10 characters").max(500),
+});
+export type ReopenAssessmentEntryInput = z.infer<typeof reopenAssessmentEntrySchema>;
+
+export const sendEntryRemindersSchema = z.object({
+  templateId: z.string().min(1),
+  /** Teacher ids to remind; omit to remind every teacher with unfinished sheets. */
+  teacherIds: z.array(z.string().min(1)).max(200).optional(),
+});
+export type SendEntryRemindersInput = z.infer<typeof sendEntryRemindersSchema>;
 
 // ============================================================================
 // FINANCE & BILLING SCHEMAS
@@ -731,6 +860,12 @@ export const updateInventoryItemSchema = z.object({
 });
 export type UpdateInventoryItemInput = z.infer<typeof updateInventoryItemSchema>;
 
+export const createInventoryCategorySchema = z.object({
+  name: z.string().trim().min(2, "Category name must contain at least 2 characters").max(100),
+  description: z.string().trim().max(300).optional(),
+});
+export type CreateInventoryCategoryInput = z.infer<typeof createInventoryCategorySchema>;
+
 export const inventoryStockMovementSchema = z.object({
   type: z.enum(["IN", "OUT"]),
   quantity: z.number().int().positive("Quantity must be a positive whole number"),
@@ -763,6 +898,15 @@ export const subdomainSchema = z
   .regex(/^[a-z0-9]([a-z0-9-]*[a-z0-9])$/, "Lowercase letters, numbers and hyphens; cannot start or end with a hyphen")
   .refine((value) => !(RESERVED_SUBDOMAINS as readonly string[]).includes(value), "This subdomain is reserved");
 
+// Schools fund their own Hubtel Programmable SMS account. Never use query-string credentials.
+export const schoolHubtelConnectionSchema = z.object({
+  senderId: z.string().trim().min(1).max(11).regex(/^[A-Za-z0-9]+$/, "Use 1–11 letters/numbers from your approved Hubtel sender ID"),
+  clientId: z.string().trim().min(1).max(128).regex(/^[^\s:]+$/, "Invalid Hubtel Client ID"),
+  clientSecret: z.string().trim().min(1).max(256).regex(/^[^\s]+$/, "Invalid Hubtel Client secret"),
+  apiBaseUrl: z.enum(["https://sms.hubtel.com/v1/messages", "https://smsc.hubtel.com/v1/messages"]).default("https://sms.hubtel.com/v1/messages"),
+});
+export type SchoolHubtelConnectionInput = z.infer<typeof schoolHubtelConnectionSchema>;
+
 export const enrollSchoolSchema = z.object({
   // School details
   schoolName: z.string().min(2),
@@ -776,6 +920,9 @@ export const enrollSchoolSchema = z.object({
   schoolAddress: z.string().optional(),
   subdomain: subdomainSchema,
   region: z.string().optional(),
+
+  // Optional: encrypted school-funded SMS connection. Channels start disabled.
+  smsConnection: schoolHubtelConnectionSchema.optional(),
 
   // Admin account
   adminName: z.string().min(2),
@@ -1123,6 +1270,37 @@ export const setSubjectTeachersSchema = z.object({
 });
 export type SetSubjectTeachersInput = z.infer<typeof setSubjectTeachersSchema>;
 
+/** Replace a subject's strand metadata and its class-specific teacher allocations. */
+export const setSubjectStrandsSchema = z.object({
+  strands: z.array(z.object({
+    id: z.string().min(1).optional(),
+    name: z.string().trim().min(2).max(80),
+    code: z.string().trim().max(20).optional(),
+    description: z.string().trim().max(500).optional(),
+    sortOrder: z.number().int().min(0).max(100).default(0),
+    examWeightPercent: z.number().min(0).max(100).default(0),
+    isActive: z.boolean().default(true),
+    assignments: z.array(z.object({
+      classId: z.string().min(1),
+      teacherId: z.string().min(1),
+    })).max(200).default([]),
+  })).max(50),
+}).superRefine((value, ctx) => {
+  const names = new Set<string>();
+  for (const strand of value.strands) {
+    const name = strand.name.toLocaleLowerCase();
+    if (names.has(name)) {
+      ctx.addIssue({ code: "custom", path: ["strands"], message: "Strand names must be unique within a subject." });
+    }
+    names.add(name);
+    const classes = strand.assignments.map((assignment) => assignment.classId);
+    if (new Set(classes).size !== classes.length) {
+      ctx.addIssue({ code: "custom", path: ["strands"], message: `A class can only have one teacher for ${strand.name}.` });
+    }
+  }
+});
+export type SetSubjectStrandsInput = z.infer<typeof setSubjectStrandsSchema>;
+
 // ============================================================================
 // TIMETABLE
 // ============================================================================
@@ -1172,6 +1350,7 @@ export const saveTimetableEntrySchema = z
     periodId: z.string().min(1, "Choose a period"),
     type: z.enum(["LESSON", "BREAK", "ACTIVITY"]).default("LESSON"),
     subjectId: z.string().min(1).optional(),
+    subjectStrandId: z.string().min(1).optional(),
     teacherId: z.string().min(1).optional(),
     classroomId: z.string().min(1).optional(),
     label: z.string().trim().max(60).optional(),
@@ -1185,6 +1364,27 @@ export const saveTimetableEntrySchema = z
     }
   });
 export type SaveTimetableEntryInput = z.infer<typeof saveTimetableEntrySchema>;
+
+/**
+ * One batch of lessons from a spreadsheet upload. Each row is the same payload
+ * the timetable editor saves, so an import is checked exactly like a hand-made
+ * lesson. `existingId` marks a period that already has a lesson to replace.
+ */
+export const importTimetableBatchSchema = z.object({
+  academicYearId: z.string().min(1).optional(),
+  rows: z
+    .array(
+      z.object({
+        rowNumber: z.number().int().positive(),
+        /** Shown back in the results table only. */
+        name: z.string().trim().max(120).optional(),
+        existingId: z.string().min(1).optional(),
+        row: saveTimetableEntrySchema,
+      }),
+    )
+    .min(1),
+});
+export type ImportTimetableBatchInput = z.infer<typeof importTimetableBatchSchema>;
 
 // ============================================================================
 // ADMISSIONS (enrollment windows, applications, entrance exam, admission)
@@ -1515,6 +1715,7 @@ export const assessmentComponentInputSchema = z.object({
   isRequired: z.boolean().default(true),
   isRepeatable: z.boolean().default(false),
   expectedCount: z.number().int().min(1).max(10).default(1),
+  subjectStrandId: z.string().min(1).optional(),
 });
 export type AssessmentComponentInput = z.infer<typeof assessmentComponentInputSchema>;
 
@@ -1555,8 +1756,8 @@ export type SaveAssessmentTemplateInput = z.infer<typeof saveAssessmentTemplateS
  * grades already recorded depend on them. Returns a reason, or null if fine.
  */
 export function lockedStructureProblem(
-  existing: { id: string; maxMarks: number; weight: number; componentType: string; isRequired: boolean; isRepeatable: boolean; expectedCount: number }[],
-  incoming: { id?: string; maxMarks: number; weight: number; componentType: string; isRequired: boolean; isRepeatable: boolean; expectedCount: number }[],
+  existing: { id: string; maxMarks: number; weight: number; componentType: string; isRequired: boolean; isRepeatable: boolean; expectedCount: number; subjectStrandId?: string | null }[],
+  incoming: { id?: string; maxMarks: number; weight: number; componentType: string; isRequired: boolean; isRepeatable: boolean; expectedCount: number; subjectStrandId?: string | null }[],
 ): string | null {
   const message =
     "Marks have already been recorded, so the components, their maximum marks and weights can't change. You can rename components, or duplicate this assessment to start a new one.";
@@ -1571,7 +1772,8 @@ export function lockedStructureProblem(
       before.componentType !== component.componentType ||
       before.isRequired !== component.isRequired ||
       before.isRepeatable !== component.isRepeatable ||
-      before.expectedCount !== component.expectedCount
+      before.expectedCount !== component.expectedCount ||
+      (before.subjectStrandId ?? null) !== (component.subjectStrandId ?? null)
     ) {
       return message;
     }
@@ -1636,6 +1838,44 @@ export const STUDENT_IMPORT_LIMITS = {
   maxFileBytes: 2 * 1024 * 1024,
 } as const;
 
+/**
+ * One batch of previewed rows. Each row carries only the cells that change; the
+ * server re-checks every one exactly as it would a hand-typed mark, and
+ * `expectedMarks` makes a row fail instead of overwriting marks someone else
+ * changed after the preview.
+ */
+export const importAssessmentMarksBatchSchema = z.object({
+  classId: z.string().min(1),
+  subjectId: z.string().min(1),
+  templateId: z.string().min(1),
+  termId: z.string().min(1).optional(),
+  rows: z
+    .array(
+      z.object({
+        rowNumber: z.number().int().positive(),
+        /** Shown back in the results table only. */
+        name: z.string().trim().max(160).optional(),
+        row: z.object({
+          studentId: z.string().min(1),
+          entries: z
+            .array(
+              z.object({
+                componentId: z.string().min(1),
+                occurrenceIndex: z.number().int().min(0).max(50),
+                marks: z.number().min(0).max(10000),
+                expectedMarks: z.number().min(0).max(10000).nullable(),
+              }),
+            )
+            .min(1)
+            .max(200),
+        }),
+      }),
+    )
+    .min(1)
+    .max(STUDENT_IMPORT_LIMITS.batchSize),
+});
+export type ImportAssessmentMarksBatchInput = z.infer<typeof importAssessmentMarksBatchSchema>;
+
 export const STUDENT_IMPORT_FIELDS = [
   "firstName",
   "lastName",
@@ -1699,8 +1939,7 @@ export const STUDENT_IMPORT_COLUMNS: StudentImportColumn[] = [
   { key: "otherNames", label: "Other names", aliases: ["othernames", "middlename", "middlenames", "othername"], help: "", example: "Serwaa" },
   { key: "gender", label: "Gender", required: true, aliases: ["gender", "sex"], help: "Male or Female (M or F also works).", example: "Female" },
   { key: "dateOfBirth", label: "Date of birth", required: true, aliases: ["dateofbirth", "dob", "birthdate", "birthday", "dateborn"], help: "Day first: 25/12/2012 or 25 Dec 2012. Year-first 2012-12-25 also works.", example: "25/12/2012" },
-  { key: "admissionNumber", label: "Admission number", aliases: ["admissionnumber", "admissionno", "admissionnum", "admno", "admission", "admissionid"], help: "The number the student already has. Leave blank to have one generated.", example: "" },
-  { key: "admissionDate", label: "Admission date", aliases: ["admissiondate", "dateadmitted", "dateofadmission", "enrolmentdate", "enrollmentdate"], help: "When the student joined the school. Leave blank for today.", example: "" },
+  { key: "admissionDate", label: "Admission date", aliases: ["admissiondate", "dateadmitted", "dateofadmission", "enrolmentdate", "enrollmentdate"], help: "When the student joined the school. Its year becomes the year in the admission number (e.g. WIS2018…). Leave blank for today.", example: "" },
   { key: "className", label: "Class", aliases: ["class", "classname", "grade", "form", "level", "currentclass"], help: "Must match a class you have already created, such as JHS 1A.", example: "JHS 1A" },
   { key: "houseName", label: "House", aliases: ["house", "housename"], help: "Must match an existing house. Optional.", example: "" },
   { key: "nationality", label: "Nationality", aliases: ["nationality", "citizenship"], help: "Blank means Ghanaian.", example: "Ghanaian" },
@@ -1763,3 +2002,63 @@ export const importStudentBatchSchema = z.object({
   rows: z.array(normalizedStudentRowSchema).min(1).max(STUDENT_IMPORT_LIMITS.batchSize),
 });
 export type ImportStudentBatchInput = z.infer<typeof importStudentBatchSchema>;
+
+export interface PortalWorkItem {
+  id: string;
+  title: string;
+  detail: string;
+  page: string;
+  count: number;
+}
+export interface PortalWorkQueue {
+  generatedAt: string;
+  role: string;
+  term: { id: string; name: string } | null;
+  items: PortalWorkItem[];
+  lessons: { id: string; day: string; start: string; end: string; subject: string; className: string }[];
+  upcoming: { id: string; title: string; dueAt: string | null; status: string }[];
+}
+
+// ------------------------------------------------- permanent student deletion
+
+export const STUDENT_DELETION_STATUSES = ["PENDING", "APPROVED", "REJECTED", "CANCELLED"] as const;
+export type StudentDeletionStatus = (typeof STUDENT_DELETION_STATUSES)[number];
+
+/** A school admin asks the platform to permanently remove a wrongly created student. */
+export const requestStudentDeletionSchema = z.object({
+  studentId: z.string().min(1).max(128),
+  reason: z
+    .string()
+    .trim()
+    .min(10, "Say briefly why this record should be removed (at least 10 characters).")
+    .max(1000),
+});
+export type RequestStudentDeletionInput = z.infer<typeof requestStudentDeletionSchema>;
+
+/** The super admin turns a request down; the school sees the note. */
+export const rejectStudentDeletionSchema = z.object({
+  decisionNote: z.string().trim().min(3, "Tell the school why.").max(1000),
+});
+export type RejectStudentDeletionInput = z.infer<typeof rejectStudentDeletionSchema>;
+
+export const studentDeletionQuerySchema = z.object({
+  status: z.enum(STUDENT_DELETION_STATUSES).optional(),
+  page: z.coerce.number().int().min(1).max(10_000).default(1),
+  limit: z.coerce.number().int().min(1).max(100).default(20),
+});
+export type StudentDeletionQuery = z.infer<typeof studentDeletionQuerySchema>;
+
+/** 1 → { n: 1, suffix: "st" }, 12 → "th", 23 → "rd". For positions like 3rd, shown with a raised suffix. */
+export function ordinalParts(value: number): { n: number; suffix: "st" | "nd" | "rd" | "th" } {
+  const n = Math.trunc(value);
+  const lastTwo = Math.abs(n) % 100;
+  if (lastTwo >= 11 && lastTwo <= 13) return { n, suffix: "th" };
+  const suffix = ({ 1: "st", 2: "nd", 3: "rd" } as const)[(Math.abs(n) % 10) as 1 | 2 | 3] ?? "th";
+  return { n, suffix };
+}
+
+/** The weight every subject shares (for a column heading like "Class Score (50%)"), or null when they differ or none is known. */
+export function commonWeight(weights: readonly (number | null | undefined)[]): number | null {
+  const known = weights.filter((weight): weight is number => typeof weight === "number" && weight > 0);
+  return known.length > 0 && known.length === weights.length && known.every((weight) => weight === known[0]) ? known[0]! : null;
+}

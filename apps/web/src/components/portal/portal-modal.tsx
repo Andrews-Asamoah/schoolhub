@@ -11,6 +11,8 @@ interface PortalModalProps {
   children: ReactNode;
   footer?: ReactNode;
   maxWidth?: "sm" | "md" | "lg" | "xl" | "2xl" | "3xl" | "4xl" | "5xl";
+  /** Clicking the dimmed backdrop closes the modal. Turn off for forms so a stray click never discards input. */
+  closeOnBackdrop?: boolean;
 }
 
 const maxWidthMap = {
@@ -20,7 +22,7 @@ const maxWidthMap = {
 
 /** Shared accessible modal for school, accountant, teacher and guardian forms. */
 export function PortalModal({
-  isOpen, onClose, title, description, children, footer, maxWidth = "lg",
+  isOpen, onClose, title, description, children, footer, maxWidth = "lg", closeOnBackdrop = true,
 }: PortalModalProps) {
   const titleId = useId();
   const descriptionId = useId();
@@ -71,7 +73,7 @@ export function PortalModal({
   if (!isOpen || typeof document === "undefined") return null;
   return createPortal(
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-overlay p-3 backdrop-blur-[2px] sm:p-6"
-      onMouseDown={event => { if (event.target === event.currentTarget) onClose(); }}>
+      onMouseDown={event => { if (closeOnBackdrop && event.target === event.currentTarget) onClose(); }}>
       <section ref={contentRef} role="dialog" aria-modal="true" aria-labelledby={titleId}
         aria-describedby={description ? descriptionId : undefined}
         className={cn(

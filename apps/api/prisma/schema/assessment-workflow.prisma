@@ -1,0 +1,70 @@
+enum AssessmentCorrectionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+/// A teacher's sign-off that a class's marks for one assessment and subject are complete.
+/// Pupils who could not be assessed (absent, exempt) are listed in excusedStudentIds.
+/// Removing the row reopens the sheet; every sign-off and reopening is audited.
+model AssessmentEntrySubmission {
+  id               String   @id @default(cuid())
+  schoolId         String
+  templateId       String
+  classId          String
+  subjectId        String
+  termId           String
+  submittedById    String
+  submittedAt      DateTime @default(now())
+  note             String?  @db.VarChar(500)
+  excusedStudentIds String[]
+
+  school   School             @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  template AssessmentTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@unique([templateId, classId, subjectId, termId], map: "assessment_submission_sheet_key")
+  @@index([schoolId, termId], map: "assessment_submissions_school_term_idx")
+  @@map("assessment_entry_submissions")
+}
+
+/// Request to change marks once a sheet is locked, submitted or past its deadline.
+/// The request and its before/after values are immutable evidence; approving applies them.
+model AssessmentMarkCorrection {
+  id           String                     @id @default(cuid())
+  schoolId     String
+  templateId   String
+  classId      String
+  subjectId    String
+  termId       String
+  reason       String                     @db.VarChar(2000)
+  status       AssessmentCorrectionStatus @default(PENDING)
+  requestedById String
+  requestedAt  DateTime                   @default(now())
+  reviewedById String?
+  reviewedAt   DateTime?
+  reviewReason String?                    @db.VarChar(2000)
+
+  school   School                        @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  template AssessmentTemplate             @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  items    AssessmentMarkCorrectionItem[]
+
+  @@index([schoolId, status, requestedAt(sort: Desc)], map: "assessment_corrections_school_status_idx")
+  @@index([templateId, classId, subjectId, status], map: "assessment_corrections_sheet_status_idx")
+  @@map("assessment_mark_corrections")
+}
+
+model AssessmentMarkCorrectionItem {
+  id              String   @id @default(cuid())
+  correctionId    String
+  studentId       String
+  componentId     String
+  occurrenceIndex Int      @default(0)
+  previousMarks   Decimal? @db.Decimal(6, 2)
+  requestedMarks  Decimal? @db.Decimal(6, 2)
+
+  correction AssessmentMarkCorrection @relation(fields: [correctionId], references: [id], onDelete: Cascade)
+
+  @@unique([correctionId, studentId, componentId, occurrenceIndex], map: "assessment_correction_item_cell_key")
+  @@map("assessment_mark_correction_items")
+}

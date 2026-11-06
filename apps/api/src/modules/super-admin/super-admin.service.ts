@@ -1,3 +1,4 @@
+import { storeSchoolSmsConnection } from "../notifications/school-sms.service.js";
 import { temporaryPasswordExpiry } from "../../common/guards/password-change.js";
 import {
   Injectable,
@@ -15,6 +16,8 @@ import { PRIVATE_STORAGE_HEALTH_PROBE, STORAGE_HEALTH_PROBE, type StorageHealthP
 import { writeAudit, type AuditActor } from "../../common/audit/audit.js";
 import {
   evaluateSubscriptionAccess,
+  SCHOOL_ADMIN_ROLES,
+  hasSchoolAdministrationRole,
   SUBSCRIPTION_TRIAL_DAYS,
   type AddSchoolAdminInput,
   type EnrollSchoolInput,
@@ -589,7 +592,7 @@ export class SuperAdminService {
             where: {
               organizationId: member.organizationId,
               userId: { not: userId },
-              role: { in: ["owner", "admin"] },
+              OR: [{ role: { in: [...SCHOOL_ADMIN_ROLES] } }, { roles: { hasSome: [...SCHOOL_ADMIN_ROLES] } }],
               banned: false,
               user: { banned: false },
             },
@@ -634,7 +637,7 @@ export class SuperAdminService {
           where: {
             organizationId: member.organizationId,
             userId: { not: userId },
-            role: { in: ["owner", "admin"] },
+            OR: [{ role: { in: [...SCHOOL_ADMIN_ROLES] } }, { roles: { hasSome: [...SCHOOL_ADMIN_ROLES] } }],
             banned: false,
             user: { banned: false },
           },
@@ -704,7 +707,7 @@ export class SuperAdminService {
         },
       },
     });
-    if (!member || !["owner", "admin"].includes(member.role)) {
+    if (!member || !hasSchoolAdministrationRole(member)) {
       throw new NotFoundException("School administrator membership not found");
     }
 
@@ -799,6 +802,7 @@ export class SuperAdminService {
             address: input.schoolAddress,
           },
         });
+        if (input.smsConnection) await storeSchoolSmsConnection(tx, school.id, actor, input.smsConnection);
         await tx.subscription.create({
           data: {
             schoolId: school.id,
@@ -1069,6 +1073,36 @@ export class SuperAdminService {
    * Operational health is intentionally limited to checks we can verify here.
    * Unknown dependencies are not reported as healthy without instrumentation.
    */
+  async getSchoolReadiness(schoolId: string) {
+    const db=this.prisma.client;
+    const school=await db.school.findUnique({where:{id:schoolId},select:{id:true,name:true}});
+    if(!school)throw new NotFoundException("School not found");
+    const now=new Date();
+    const [years,subjects,classes,failures,jobs,health]=await Promise.all([
+      db.academicYear.count({where:{schoolId,isCurrent:true,terms:{some:{isCurrent:true}}}}),
+      db.subject.count({where:{schoolId,isActive:true,deletedAt:null}}),
+      db.class.count({where:{schoolId,isActive:true,deletedAt:null}}),
+      db.notificationDelivery.groupBy({by:["status","channel"],where:{schoolId,status:{in:["FAILED","BOUNCED","COMPLAINED","EXPIRED"]}},_count:{_all:true}}),
+      db.backgroundJob.findMany({where:{schoolId,OR:[{status:"DEAD"},{status:"RUNNING",leaseUntil:{lt:now}}]},orderBy:{createdAt:"desc"},take:25,select:{id:true,kind:true,status:true,attempts:true,createdAt:true}}),
+      this.getOperationsHealth(),
+    ]);
+    return {schoolId,checkedAt:now.toISOString(),configuration:{currentPeriod:years===1,subjects:subjects>0,classes:classes>0},
+      migrations:health.migrations,deliveryFailures:failures.map(row=>({status:row.status,channel:row.channel,count:row._count._all})),
+      incidents:jobs.map(row=>({...row,canRetry:row.kind==="finance-integrity"&&row.status==="DEAD"})),incidentLimit:25};
+  }
+
+  async retrySchoolIntegrityJob(schoolId: string, jobId: string, reason: string, actor: AuditActor) {
+    const note=reason.trim();
+    if(note.length<10||note.length>500)throw new BadRequestException("Use an audit reason of 10 to 500 characters.");
+    return this.prisma.client.$transaction(async tx=>{
+      const result=await tx.backgroundJob.updateMany({where:{id:jobId,schoolId,kind:"finance-integrity",status:"DEAD"},
+        data:{status:"PENDING",attempts:0,nextAttempt:new Date(),leaseToken:null,leaseUntil:null,heartbeatAt:null,completedAt:null,lastError:null}});
+      if(!result.count)throw new ConflictException("Only a failed integrity job in this school can be retried.");
+      await writeAudit(tx,actor,{action:"UPDATE",entityType:"super-admin.school-integrity.retry",entityId:jobId,schoolId,newValues:{status:"PENDING",reason:note}});
+      return {success:true};
+    });
+  }
+
   async getOperationsHealth() {
     const checkedAt = new Date().toISOString();
     let database: { status: "healthy" | "unavailable"; latencyMs: number | null };

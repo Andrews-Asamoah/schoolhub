@@ -113,7 +113,13 @@ function ProfileForm({ data }: { data: ProfileResponse }) {
         <p className="mb-4 mt-1 text-xs text-muted-foreground">
           {data.user.name} · {schoolRoleLabel(activeRole)}
         </p>
-        <ProfilePhotoControls avatarClassName="size-20 text-2xl" />
+        {activeRole === "student" ? (
+          <p role="note" className="rounded-xl border border-border bg-muted/40 p-3 text-sm text-muted-foreground">
+            Student profile photos are managed by the school office. Contact an administrator if your photo needs updating.
+          </p>
+        ) : (
+          <ProfilePhotoControls avatarClassName="size-20 text-2xl" />
+        )}
       </section>
 
       <form onSubmit={submit} noValidate className="space-y-5">

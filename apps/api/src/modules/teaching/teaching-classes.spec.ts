@@ -22,6 +22,7 @@ describe("buildTeachingClasses", () => {
           { classId: "c1", subjectId: "math" },
           { classId: "c2", subjectId: "math" },
         ],
+        subjectStrandAssignments: [],
       },
       classes,
       subjects,
@@ -33,7 +34,7 @@ describe("buildTeachingClasses", () => {
     expect(result[1].isClassTeacher).toBe(false);
   });
   it("shows a class teacher's class even when they teach no subject in it", () => {
-    const result = buildTeachingClasses({ teacherId: "t1", classTeacherClassIds: ["c3"], subjectAssignments: [] }, [classes[2]], subjects, new Map());
+    const result = buildTeachingClasses({ teacherId: "t1", classTeacherClassIds: ["c3"], subjectAssignments: [], subjectStrandAssignments: [] }, [classes[2]], subjects, new Map());
     expect(result).toEqual([{ id: "c3", name: "JHS 2A", level: "JHS2", isClassTeacher: true, studentCount: 0, subjects: [] }]);
   });
 });

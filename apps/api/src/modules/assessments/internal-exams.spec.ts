@@ -1,6 +1,6 @@
 import { describe,expect,it } from "vitest";
 import { mockMarkSchema } from "./internal-exams.schemas.js";
-import { mockPercent,validateMockMarks } from "./internal-exams.js";
+import { assignedPaperFilter,mockPercent,validateMockMarks } from "./internal-exams.js";
 describe("internal mock marks",()=>{
   it("distinguishes an explicit absence from an actual score of zero",()=>{
     expect(()=>validateMockMarks(100,[{status:"ABSENT",marks:null},{status:"MARKED",marks:0}])).not.toThrow();
@@ -23,5 +23,25 @@ describe("internal mock marks",()=>{
     expect(mockMarkSchema.safeParse({paperId:"p",entries:[{
       candidateId:"a",status:"ABSENT",marks:0,expectedVersion:0,
     }]}).success).toBe(false);
+  });
+});
+
+describe("assigned subject papers",()=>{
+  it("selects the subjects a teacher teaches whole or by teaching area, grouped per class",()=>{
+    const filter=assignedPaperFilter({
+      subjectAssignments:[{classId:"c1",subjectId:"math"},{classId:"c1",subjectId:"eng"}],
+      subjectStrandAssignments:[
+        {classId:"c1",subjectId:"ict",subjectStrandId:"hw"},
+        {classId:"c1",subjectId:"ict",subjectStrandId:"sw"},
+        {classId:"c2",subjectId:"math",subjectStrandId:"x"},
+      ],
+    });
+    expect(filter).toEqual({OR:[
+      {session:{classId:"c1"},subjectId:{in:["math","eng","ict"]}},
+      {session:{classId:"c2"},subjectId:{in:["math"]}},
+    ]});
+  });
+  it("matches nothing for a teacher without a subject assignment",()=>{
+    expect(assignedPaperFilter({subjectAssignments:[],subjectStrandAssignments:[]})).toEqual({OR:[]});
   });
 });

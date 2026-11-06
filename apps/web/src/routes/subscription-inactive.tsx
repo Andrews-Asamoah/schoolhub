@@ -1,10 +1,11 @@
+import { useLogout } from "@/hooks/use-logout";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation } from "@tanstack/react-query";
 import { Check, CircleAlert, LoaderCircle, LogOut, PauseCircle } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { ThemeToggle } from "@/components/school/theme-toggle";
 import { apiFetch } from "@/lib/api";
-import { signOut } from "@/lib/auth-client";
+
 
 interface Search {
   reason?: string;
@@ -33,6 +34,7 @@ const COPY: Record<string, { title: string; body: string }> = {
 };
 
 function SubscriptionInactivePage() {
+  const { logout, error: logoutError, isSigningOut } = useLogout();
   const { reason } = Route.useSearch();
   const copy = COPY[reason ?? ""] ?? COPY.EXPIRED!;
   const [subject, setSubject] = useState("Please restore our school’s access");
@@ -92,11 +94,12 @@ function SubscriptionInactivePage() {
             </form>
           )}
 
-          <button type="button" onClick={() => void signOut().then(() => window.location.assign("/login"))} className="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-muted-foreground hover:text-foreground">
+          <button type="button" disabled={isSigningOut} onClick={() => void logout()} className="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-muted-foreground hover:text-foreground">
             <LogOut className="size-4" /> Sign out
           </button>
         </div>
       </div>
+      {logoutError && <p role="alert" className="p-4 text-sm text-destructive">{logoutError}</p>}
     </main>
   );
 }

@@ -48,6 +48,9 @@ export function buildPeriodSnapshot(inputs: readonly PeriodMovementInput[], scop
       closing: opening.plus(movement).toFixed(2),
     };
   }).sort((a, b) => a.code.localeCompare(b.code) || a.accountId.localeCompare(b.accountId));
+  const openingDebit = inputs.reduce((sum, entry) => sum.plus(entry.openingDebits), zero);
+  const openingCredit = inputs.reduce((sum, entry) => sum.plus(entry.openingCredits), zero);
+  if (!openingDebit.eq(openingCredit)) throw new Error("An unbalanced opening ledger cannot be snapshotted.");
   const totalDebit = inputs.reduce((sum, entry) => sum.plus(entry.periodDebits), zero);
   const totalCredit = inputs.reduce((sum, entry) => sum.plus(entry.periodCredits), zero);
   if (!totalDebit.eq(totalCredit)) throw new Error("An unbalanced ledger cannot be snapshotted.");

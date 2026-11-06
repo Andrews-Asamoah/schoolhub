@@ -1,16 +1,18 @@
+import { ReconciliationJournalsWorkspace } from "./reconciliation-journals-workspace";
+import { PeriodCloseWorkspace } from "./period-close-workspace";
+import { BankReconciliationWorkspace } from "./bank-reconciliation-workspace";
 import { DatePicker } from "@/components/ui/date-picker";
 import { DataTable, type DataTableColumn } from "@/components/ui/data-table";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import ExcelJS from "exceljs";
-import { jsPDF } from "jspdf";
-import autoTable from "jspdf-autotable";
+import type { jsPDF as JsPDF } from "jspdf";
 import { FileSpreadsheet, FileText, LoaderCircle, Printer } from "lucide-react";
-import { apiFetch } from "@/lib/api";
+import { apiFetch, getClientSubdomain } from "@/lib/api";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { downloadXlsx } from "@/lib/download";
 
-interface AcademicTerm { id: string; name: string; isCurrent: boolean; }
-interface AcademicYear { id: string; name: string; isCurrent: boolean; terms: AcademicTerm[]; }
+interface AcademicTerm { id: string; name: string; isCurrent: boolean; startDate?: string; endDate?: string; }
+interface AcademicYear { id: string; name: string; isCurrent: boolean; startDate?: string; endDate?: string; terms: AcademicTerm[]; }
 interface FinanceSummary {
   asOf: string;
   balanceAsOf: string;
@@ -92,12 +94,13 @@ const inputClass = "h-10 w-full rounded-xl border border-border bg-background px
 const secondaryButton = "inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-border bg-card px-4 py-2 text-sm font-semibold text-foreground transition hover:bg-muted disabled:opacity-50";
 
 export function AccountantFinanceReportingWorkspace() {
+  const schoolScope = getClientSubdomain();
   const [yearId, setYearId] = useState("");
   const [termId, setTermId] = useState("");
   const [scope, setScope] = useState<"term" | "year" | "all">("term");
   const [cutoverVisible, setCutoverVisible] = useState(false);
   const cutoverQuery = useQuery({
-    queryKey: ["finance", "accrual-cutover-preflight"],
+    queryKey: ["finance", "accrual-cutover-preflight", schoolScope],
     queryFn: () => apiFetch<AccrualCutoverPreflight>("/finance/ledger/accrual-cutover"),
     enabled: cutoverVisible,
     staleTime: 0,
@@ -105,7 +108,7 @@ export function AccountantFinanceReportingWorkspace() {
   });
   const [closeReadinessVisible, setCloseReadinessVisible] = useState(false);
   const closeReadinessQuery = useQuery({
-    queryKey: ["finance", "receivables-close-readiness"],
+    queryKey: ["finance", "receivables-close-readiness", schoolScope],
     queryFn: () => apiFetch<CloseReadiness>("/finance/ledger/close-readiness"),
     enabled: closeReadinessVisible,
     staleTime: 0,
@@ -113,14 +116,14 @@ export function AccountantFinanceReportingWorkspace() {
   });
   const [trialBalanceVisible, setTrialBalanceVisible] = useState(false);
   const trialBalanceQuery = useQuery({
-    queryKey: ["finance", "journal-trial-balance"],
+    queryKey: ["finance", "journal-trial-balance", schoolScope],
     queryFn: () => apiFetch<TrialBalance>("/finance/ledger/trial-balance"),
     enabled: trialBalanceVisible,
     retry: false,
   });
   const [historyDate, setHistoryDate] = useState("");
   const historicalQuery = useQuery({
-    queryKey: ["finance", "historical-receivables", historyDate],
+    queryKey: ["finance", "historical-receivables", schoolScope, historyDate],
     queryFn: () => apiFetch<HistoricalReceivables>("/finance/receivables/history?asOf=" + encodeURIComponent(historyDate)),
     enabled: Boolean(historyDate),
     staleTime: 0,
@@ -128,8 +131,9 @@ export function AccountantFinanceReportingWorkspace() {
   });
 
   const yearsQuery = useQuery({
-    queryKey: ["schools", "academic-years"],
+    queryKey: ["schools", "academic-years", schoolScope],
     queryFn: () => apiFetch<AcademicYear[]>("/schools/academic-years"),
+    enabled: scope !== "all",
     retry: false,
   });
   const years = yearsQuery.data ?? [];
@@ -137,20 +141,32 @@ export function AccountantFinanceReportingWorkspace() {
   const selectedYearId = yearId || currentYear?.id || "";
   const selectedYear = years.find((year) => year.id === selectedYearId);
   const selectedTermId = termId || selectedYear?.terms.find((term) => term.isCurrent)?.id || selectedYear?.terms[0]?.id || "";
+  const selectedTerm = selectedYear?.terms.find((term) => term.id === selectedTermId);
+  const summaryPeriodReady =
+    scope === "all" ||
+    (yearsQuery.isSuccess &&
+      (scope === "year"
+        ? Boolean(selectedYear?.startDate && selectedYear.endDate)
+        : Boolean(selectedYear && selectedTerm?.startDate && selectedTerm.endDate)));
   const summaryQuery = useQuery({
-    queryKey: ["finance", "report-summary", scope, selectedYearId, selectedTermId],
+    queryKey: ["finance", "report-summary", schoolScope, scope, selectedYearId, selectedTermId],
     queryFn: () => {
       const params = new URLSearchParams();
       if (scope !== "all" && selectedYearId) params.set("yearId", selectedYearId);
       if (scope === "term" && selectedTermId) params.set("termId", selectedTermId);
       return apiFetch<FinanceSummary>(`/finance/summary${params.size ? `?${params.toString()}` : ""}`);
     },
+    enabled: summaryPeriodReady,
     retry: false,
   });
-  const summary = summaryQuery.data;
+  const summary = summaryPeriodReady ? summaryQuery.data : undefined;
 
-  const exportPdf = () => {
+  const exportPdf = async () => {
     if (!summary) return;
+    const [{ jsPDF }, { default: autoTable }] = await Promise.all([
+      import("jspdf"),
+      import("jspdf-autotable"),
+    ]);
     const pdf = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
     pdf.setFontSize(16);
     pdf.text("School finance report", 14, 16);
@@ -170,8 +186,8 @@ export function AccountantFinanceReportingWorkspace() {
       styles: { fontSize: 9 },
     });
     autoTable(pdf, {
-      startY: (pdf as jsPDF & { lastAutoTable?: { finalY?: number } }).lastAutoTable?.finalY
-        ? ((pdf as jsPDF & { lastAutoTable?: { finalY?: number } }).lastAutoTable?.finalY ?? 35) + 7
+      startY: (pdf as JsPDF & { lastAutoTable?: { finalY?: number } }).lastAutoTable?.finalY
+        ? ((pdf as JsPDF & { lastAutoTable?: { finalY?: number } }).lastAutoTable?.finalY ?? 35) + 7
         : 70,
       head: [["Class", "Billed", "Collected", "Outstanding", "Bills"]],
       body: summary.byClass.map((row) => [row.className, row.billed, row.collected, row.outstanding, String(row.billCount)]),
@@ -187,6 +203,7 @@ export function AccountantFinanceReportingWorkspace() {
 
   const exportExcel = async () => {
     if (!summary) return;
+    const { default: ExcelJS } = await import("exceljs");
     const workbook = new ExcelJS.Workbook();
     workbook.creator = "SchoolHub";
     workbook.created = new Date();
@@ -228,30 +245,37 @@ export function AccountantFinanceReportingWorkspace() {
     summary.byMethod.forEach((row) => methods.addRow({ method: row.method, amount: Number(row.amount), receiptCount: row.receiptCount }));
     methods.getRow(1).font = { bold: true };
     const bytes = await workbook.xlsx.writeBuffer();
-    const blob = new Blob([bytes], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url; link.download = "school-finance-report.xlsx";
-    document.body.appendChild(link); link.click(); link.remove(); URL.revokeObjectURL(url);
+    downloadXlsx(bytes, "school-finance-report.xlsx");
   };
 
   return <section className="space-y-5">
+    <BankReconciliationWorkspace />
+    <ReconciliationJournalsWorkspace />
+    <PeriodCloseWorkspace />
     <div className="rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-6">
-      <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-xs font-bold uppercase tracking-[0.14em] text-primary">Finance</p><h2 className="mt-1 text-2xl font-bold tracking-tight text-foreground">Finance reports</h2><p className="mt-2 text-sm text-muted-foreground">Reports are calculated on the server using all matching school records, not the currently displayed page.</p></div><div className="flex gap-2"><button type="button" className={secondaryButton} onClick={() => window.print()}><Printer className="size-4" /> Print</button><button type="button" className={secondaryButton} onClick={exportPdf} disabled={!summary}><FileText className="size-4" /> PDF</button><button type="button" className={secondaryButton} onClick={() => void exportExcel()} disabled={!summary}><FileSpreadsheet className="size-4" /> Excel</button></div></div>
-      <div className="mt-5 grid gap-3 md:grid-cols-[190px_1fr_1fr]">
-        <Select value={scope} onValueChange={(value) => setScope(value as typeof scope)}>
-          <SelectTrigger aria-label="Report scope" className={inputClass}><SelectValue /></SelectTrigger>
-          <SelectContent><SelectItem value="term">Academic term</SelectItem><SelectItem value="year">Academic year</SelectItem><SelectItem value="all">All time</SelectItem></SelectContent>
-        </Select>
-        {scope !== "all" ? <Select value={selectedYearId || "__none__"} onValueChange={(value) => { setYearId(value === "__none__" ? "" : value); setTermId(""); }}>
-          <SelectTrigger aria-label="Academic year" className={inputClass}><SelectValue placeholder="Select year" /></SelectTrigger>
-          <SelectContent>{years.length ? years.map((year) => <SelectItem key={year.id} value={year.id}>{year.name}</SelectItem>) : <SelectItem value="__none__" disabled>No academic years</SelectItem>}</SelectContent>
-        </Select> : <div />}
-        {scope === "term" ? <Select value={selectedTermId || "__none__"} onValueChange={(value) => setTermId(value === "__none__" ? "" : value)}>
-          <SelectTrigger aria-label="Academic term" className={inputClass}><SelectValue placeholder="Select term" /></SelectTrigger>
-          <SelectContent>{(selectedYear?.terms ?? []).length ? (selectedYear?.terms ?? []).map((term) => <SelectItem key={term.id} value={term.id}>{term.name}</SelectItem>) : <SelectItem value="__none__" disabled>No terms available</SelectItem>}</SelectContent>
-        </Select> : <div />}
-      </div>
+      <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-xs font-bold uppercase tracking-[0.14em] text-primary">Finance</p><h2 className="mt-1 text-2xl font-bold tracking-tight text-foreground">Finance reports</h2><p className="mt-2 text-sm text-muted-foreground">Reports are calculated on the server using all matching school records, not the currently displayed page.</p></div><div className="flex gap-2"><button type="button" className={secondaryButton} onClick={() => window.print()}><Printer className="size-4" /> Print</button><button type="button" className={secondaryButton} onClick={exportPdf} disabled={!summary || summaryQuery.isFetching}><FileText className="size-4" /> PDF</button><button type="button" className={secondaryButton} onClick={() => void exportExcel()} disabled={!summary || summaryQuery.isFetching}><FileSpreadsheet className="size-4" /> Excel</button></div></div>
+      <fieldset className="mt-5 space-y-2">
+        <legend className="text-sm font-semibold text-foreground">Summary period</legend>
+        <p className="text-xs text-muted-foreground">Choose an academic period for the server-calculated summary below. The detailed report uses its own transaction-date range.</p>
+        <div className="grid gap-3 md:grid-cols-[190px_1fr_1fr]">
+          <Select value={scope} onValueChange={(value) => setScope(value as typeof scope)}>
+            <SelectTrigger aria-label="Report scope" className={inputClass}><SelectValue /></SelectTrigger>
+            <SelectContent><SelectItem value="term">Academic term</SelectItem><SelectItem value="year">Academic year</SelectItem><SelectItem value="all">All time</SelectItem></SelectContent>
+          </Select>
+          {scope !== "all" ? <Select value={selectedYearId || "__none__"} onValueChange={(value) => { setYearId(value === "__none__" ? "" : value); setTermId(""); }}>
+            <SelectTrigger aria-label="Academic year" className={inputClass}><SelectValue placeholder="Select year" /></SelectTrigger>
+            <SelectContent>{years.length ? years.map((year) => <SelectItem key={year.id} value={year.id}>{year.name}</SelectItem>) : <SelectItem value="__none__" disabled>No academic years</SelectItem>}</SelectContent>
+          </Select> : <div />}
+          {scope === "term" ? <Select value={selectedTermId || "__none__"} onValueChange={(value) => setTermId(value === "__none__" ? "" : value)}>
+            <SelectTrigger aria-label="Academic term" className={inputClass}><SelectValue placeholder="Select academic term" /></SelectTrigger>
+            <SelectContent>{(selectedYear?.terms ?? []).length ? (selectedYear?.terms ?? []).map((term) => <SelectItem key={term.id} value={term.id}>{term.name}</SelectItem>) : <SelectItem value="__none__" disabled>No terms available</SelectItem>}</SelectContent>
+          </Select> : <div />}
+        </div>
+      </fieldset>
+      {yearsQuery.isError && scope !== "all" && <div role="alert" className="mt-3 rounded-xl border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">Academic periods could not be loaded. {yearsQuery.error.message}<button type="button" className="ml-2 font-semibold underline" onClick={() => { void yearsQuery.refetch(); }}>Retry</button></div>}
+      {!yearsQuery.isPending && !yearsQuery.isError && !summaryPeriodReady && <p role="alert" className="mt-3 rounded-xl border border-warning/30 bg-warning/5 p-3 text-sm text-foreground">
+        {!selectedYear ? "Select an academic year to calculate this report." : scope === "year" ? "The selected academic year needs valid start and end dates." : !selectedTerm ? "No academic term is configured for this year. Add a term in School Settings to calculate this report." : "The selected academic term needs valid start and end dates."}
+      </p>}
     </div>
     <section className="rounded-2xl border border-border bg-card p-5">
       <h3 className="text-lg font-semibold text-foreground">Historical receivables ledger</h3>
@@ -362,8 +386,8 @@ export function AccountantFinanceReportingWorkspace() {
         ] satisfies DataTableColumn<TrialBalance["accounts"][number]>[]} getRowId={(row) => row.accountId} embedded searchable={false} exportTitle="Posted journal trial balance" emptyTitle="No journal accounts" emptyDescription="No chart-of-accounts records exist yet."/>
       </div>}
     </section>
-    {summaryQuery.isPending || yearsQuery.isPending ? <div role="status" className="flex items-center justify-center gap-2 rounded-xl border border-border bg-card py-12 text-sm text-muted-foreground"><LoaderCircle className="size-4 animate-spin" /> Calculating report from saved records…</div> : null}
-    {summaryQuery.isError ? <div role="alert" className="rounded-xl border border-destructive/25 bg-destructive/5 p-4 text-sm text-destructive">The finance report could not be loaded. {summaryQuery.error.message}</div> : null}
+    {(summaryQuery.isFetching || (scope !== "all" && yearsQuery.isFetching)) ? <div role="status" className="flex items-center justify-center gap-2 rounded-xl border border-border bg-card py-12 text-sm text-muted-foreground"><LoaderCircle className="size-4 animate-spin" /> Calculating report from saved records…</div> : null}
+    {summaryPeriodReady && summaryQuery.isError ? <div role="alert" className="rounded-xl border border-destructive/25 bg-destructive/5 p-4 text-sm text-destructive">The finance report could not be loaded. {summaryQuery.error.message}<button type="button" className="ml-2 font-semibold underline" onClick={() => { void summaryQuery.refetch(); }}>Retry</button></div> : null}
     {summary && <div className="finance-report-print space-y-5">
       <section className="rounded-2xl border border-border bg-card p-4 text-sm">
         <p className="font-semibold text-foreground">Reporting basis</p>
@@ -388,14 +412,14 @@ export function AccountantFinanceReportingWorkspace() {
         <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">{[["Not due",summary.ageing.notDue],["0–30 days",summary.ageing.days0To30],["31–60 days",summary.ageing.days31To60],["61–90 days",summary.ageing.days61To90],["90+ days",summary.ageing.days90Plus]].map(([label,value])=><div key={label} className="rounded-xl bg-muted/40 p-3"><p className="text-xs text-muted-foreground">{label}</p><p className="mt-1 font-semibold tabular-nums text-foreground">{money(value ?? "0.00")}</p></div>)}</div>
       </section>
       <section className="grid gap-5 xl:grid-cols-2">
-        <div className="rounded-2xl border border-border bg-card p-5"><h3 className="text-lg font-semibold text-foreground">Totals by class</h3><div className="mt-4"><DataTable rows={summary.byClass} columns={[
+        <div className="min-w-0 rounded-2xl border border-border bg-card p-5"><h3 className="text-lg font-semibold text-foreground">Totals by class</h3><div className="mt-4"><DataTable rows={summary.byClass} columns={[
 { id: "class", header: "Class", cell: (row) => row.className, value: (row) => row.className },
 { id: "billed", header: "Billed", cell: (row) => money(row.billed), value: (row) => Number(row.billed), className: "text-right tabular-nums" },
 { id: "collected", header: "Collected", cell: (row) => money(row.collected), value: (row) => Number(row.collected), className: "text-right tabular-nums" },
 { id: "outstanding", header: "Outstanding", cell: (row) => money(row.outstanding), value: (row) => Number(row.outstanding), className: "text-right tabular-nums" },
 { id: "bills", header: "Bills", cell: (row) => row.billCount, value: (row) => row.billCount, className: "text-right tabular-nums" }
 ] satisfies DataTableColumn<(typeof summary.byClass)[number]>[]} getRowId={(row) => row.classId ?? "__unassigned"} emptyTitle="No bill records" emptyDescription="No bill records in this scope." embedded searchable={false} exportTitle="Totals by class" /></div></div>
-        <div className="rounded-2xl border border-border bg-card p-5"><h3 className="text-lg font-semibold text-foreground">Collections by method</h3><div className="mt-4"><DataTable rows={summary.byMethod} columns={[
+        <div className="min-w-0 rounded-2xl border border-border bg-card p-5"><h3 className="text-lg font-semibold text-foreground">Collections by method</h3><div className="mt-4"><DataTable rows={summary.byMethod} columns={[
 { id: "method", header: "Method", cell: (row) => row.method.replaceAll("_", " "), value: (row) => row.method },
 { id: "collected", header: "Collected", cell: (row) => money(row.amount), value: (row) => Number(row.amount), className: "text-right tabular-nums" },
 { id: "receipts", header: "Receipts", cell: (row) => row.receiptCount, value: (row) => row.receiptCount, className: "text-right tabular-nums" }

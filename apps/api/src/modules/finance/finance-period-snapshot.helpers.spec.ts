@@ -31,6 +31,12 @@ describe("P4 period snapshots", () => {
     expect(first).not.toBe(buildPeriodSnapshot(rows, { ...scope, endDate: "2026-10-31" }).contentHash);
   });
 
+  it("rejects an unbalanced opening even when current-period movements balance", () => {
+    const corrupted = rows.map(row => ({ ...row }));
+    corrupted[0]!.openingDebits = D("200.01");
+    expect(() => buildPeriodSnapshot(corrupted, scope)).toThrow(/unbalanced opening/);
+  });
+
   it("blocks unbalanced snapshots and duplicate accounts", () => {
     expect(() => buildPeriodSnapshot([rows[0]!], scope)).toThrow(/unbalanced/);
     expect(() => buildPeriodSnapshot([...rows, rows[0]!], scope)).toThrow(/duplicate/);

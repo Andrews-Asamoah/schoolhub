@@ -1,4 +1,5 @@
 import { createRootRoute, Outlet, useRouterState } from "@tanstack/react-router";
+import { PrivateContextBoundary } from "@/components/auth/private-context-boundary";
 import { ThemeProvider } from "@/components/theme-provider";
 import { usePasswordChangeGate } from "@/hooks/use-password-gate";
 import { useSession } from "@/lib/auth-client";
@@ -12,7 +13,7 @@ function RootLayout() {
   const { data: session, isPending } = useSession();
   const pathname = useRouterState({ select: (state) => state.location.pathname });
   // One place guards every screen: a temporary password must be replaced first.
-  const onChangePasswordPage = pathname === "/change-password";
+  const onChangePasswordPage = ["/change-password", "/forgot-password", "/reset-password"].includes(pathname);
   usePasswordChangeGate(
     onChangePasswordPage ? null : session?.user,
     isPending,
@@ -20,7 +21,7 @@ function RootLayout() {
 
   return (
     <ThemeProvider>
-      <Outlet />
+      <PrivateContextBoundary><Outlet /></PrivateContextBoundary>
     </ThemeProvider>
   );
 }

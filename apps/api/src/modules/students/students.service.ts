@@ -163,7 +163,7 @@ export class StudentsService {
         take: limit,
         orderBy: { createdAt: 'desc' },
         include: {
-          profile: true,
+          profile: { include: { user: { select: { image: true } } } },
           class: { select: { id: true, name: true, level: true } },
           house: { select: { id: true, name: true, color: true } },
           guardians: {
@@ -453,7 +453,13 @@ export class StudentsService {
         departmentId ??= classDepartmentId ?? undefined;
       }
 
-      const admissionYear = new Date().getUTCFullYear();
+      // The year in the admission number is the year of admission: the date
+      // supplied (e.g. a bulk-import row) or, failing that, today.
+      const dateYear = Number(options.admissionDate?.slice(0, 4));
+      const admissionYear =
+        Number.isInteger(dateYear) && dateYear >= 1900
+          ? dateYear
+          : new Date().getUTCFullYear();
       // pg_advisory_xact_lock() returns Postgres `void`, which Prisma cannot
       // deserialize through $queryRaw (it failed every student creation with
       // P2010). $executeRaw never reads result columns, so it is safe.
@@ -477,12 +483,14 @@ export class StudentsService {
         }
         admissionNumber = options.admissionNumber;
       } else {
+        // Format: <SUBDOMAIN><YYYY><NNNN>, e.g. WIS20180039. The sequence
+        // restarts at 0001 each calendar year, per school.
         const schoolPrefix =
-          schoolRow.code
+          school.subdomain
             .replace(/[^a-zA-Z0-9]/g, '')
             .toUpperCase()
             .slice(0, 8) || 'SCH';
-        const admissionPrefix = `${schoolPrefix}${String(admissionYear).slice(-2)}`;
+        const admissionPrefix = `${schoolPrefix}${admissionYear}`;
         const existingNumbers = await tx.student.findMany({
           where: {
             schoolId,
@@ -499,7 +507,7 @@ export class StudentsService {
         }, 0);
         if (lastSequence >= 9999) {
           throw new ConflictException(
-            'This school has reached the 9,999 admission numbers available for the current two-digit year code.',
+            'This school has reached the 9,999 admission numbers available for the current admission year.',
           );
         }
         admissionNumber = `${admissionPrefix}${String(lastSequence + 1).padStart(4, '0')}`;
@@ -1265,7 +1273,6 @@ export class StudentsService {
         _sum: { balanceAmount: true },
       }),
     ]);
-    const totalBilled = currentAgg._sum.totalAmount ?? new Prisma.Decimal(0);
     const totalPaid = currentAgg._sum.paidAmount ?? new Prisma.Decimal(0);
     const currentOutstanding = currentAgg._sum.balanceAmount ?? new Prisma.Decimal(0);
     const allOutstanding = allOpenAgg._sum.balanceAmount ?? new Prisma.Decimal(0);

@@ -5,19 +5,14 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import { PrismaService } from "../../prisma/prisma.service.js";
-import type { RecordScoreInput } from "@schoolhub/shared";
-import { Prisma } from "@prisma/client";
 import {
   canManageAcademicContext,
 } from "../../common/academic-context.js";
-import { canEnterMarks } from "../../common/scope/teacher-access.js";
-import { TeacherScopeService } from "../../common/scope/teacher-scope.service.js";
 
 @Injectable()
 export class AssessmentsService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly teacherScope: TeacherScopeService,
   ) {}
 
   async listAssessmentTemplates(schoolId: string) {
@@ -27,146 +22,6 @@ export class AssessmentsService {
         components: { orderBy: { displayOrder: "asc" } },
         gradingSystem: { include: { gradeScales: { orderBy: { displayOrder: "asc" } } } },
       },
-    });
-  }
-
-  async recordComponentScore(
-    _schoolId: string,
-    recordedById: string,
-    input: RecordScoreInput,
-    _role?: string,
-  ) {
-    // Looked up before the transaction so it does not hold a second connection open.
-    const assignments = await this.teacherScope.getAssignments(_schoolId, recordedById);
-    return this.prisma.client.$transaction(async (tx) => {
-      const term = await tx.term.findFirst({
-        where: {
-          id: input.termId,
-          isCurrent: true,
-          academicYear: { schoolId: _schoolId, isCurrent: true },
-        },
-        select: { id: true, academicYearId: true },
-      });
-      if (!term) {
-        throw new ForbiddenException(
-          "Scores can only be recorded for the currently selected academic term.",
-        );
-      }
-      const [student, subject, template, enrollment] = await Promise.all([
-        tx.student.findFirst({
-          where: { id: input.studentId, schoolId: _schoolId, deletedAt: null },
-          select: { id: true },
-        }),
-        tx.subject.findFirst({
-          where: { id: input.subjectId, schoolId: _schoolId, isActive: true },
-          select: { id: true },
-        }),
-        tx.assessmentTemplate.findFirst({
-          where: { id: input.templateId, schoolId: _schoolId, isActive: true },
-          select: { id: true },
-        }),
-        tx.enrollment.findFirst({
-          where: {
-            studentId: input.studentId,
-            academicYearId: term.academicYearId,
-            termId: term.id,
-            status: "ACTIVE",
-            student: { schoolId: _schoolId },
-          },
-          select: { id: true, classId: true },
-        }),
-      ]);
-      if (!student || !subject || !template || !enrollment) {
-        throw new BadRequestException(
-          "Scores require an active student enrolled at this school for the current term, a school subject, and a school assessment template.",
-        );
-      }
-      // A teacher may only record marks for the subject they are assigned to in the pupil's class.
-      if (!canEnterMarks(_role, assignments, enrollment.classId, input.subjectId)) {
-        throw new ForbiddenException(
-          "Only the teacher assigned to this subject in the pupil's class can record marks.",
-        );
-      }
-      // 1. Find or create the parent AssessmentScore
-      const assessmentScore = await tx.assessmentScore.upsert({
-        where: {
-          studentId_subjectId_termId_templateId: {
-            studentId: input.studentId,
-            subjectId: input.subjectId,
-            termId: input.termId,
-            templateId: input.templateId,
-          },
-        },
-        update: {},
-        create: {
-          studentId: input.studentId,
-          subjectId: input.subjectId,
-          termId: input.termId,
-          templateId: input.templateId,
-          totalScore: new Prisma.Decimal(0),
-          percentage: new Prisma.Decimal(0),
-        },
-      });
-
-      // 2. Upsert the ComponentScore
-      const percentage =
-        input.maxMarks > 0 ? (input.marksObtained / input.maxMarks) * 100 : 0;
-
-      await tx.componentScore.upsert({
-        where: {
-          assessmentScoreId_componentId_occurrenceIndex: {
-            assessmentScoreId: assessmentScore.id,
-            componentId: input.componentId,
-            occurrenceIndex: input.occurrenceIndex,
-          },
-        },
-        update: {
-          marksObtained: new Prisma.Decimal(input.marksObtained),
-          maxMarks: new Prisma.Decimal(input.maxMarks),
-          percentage: new Prisma.Decimal(percentage),
-          weightedScore: new Prisma.Decimal(input.marksObtained),
-          recordedById,
-          recordedAt: new Date(),
-        },
-        create: {
-          assessmentScoreId: assessmentScore.id,
-          componentId: input.componentId,
-          occurrenceIndex: input.occurrenceIndex,
-          marksObtained: new Prisma.Decimal(input.marksObtained),
-          maxMarks: new Prisma.Decimal(input.maxMarks),
-          percentage: new Prisma.Decimal(percentage),
-          weightedScore: new Prisma.Decimal(input.marksObtained),
-          recordedById,
-          recordedAt: new Date(),
-        },
-      });
-
-      // 3. Recalculate total score
-      const allComponentScores = await tx.componentScore.findMany({
-        where: { assessmentScoreId: assessmentScore.id },
-      });
-
-      const totalObtained = allComponentScores.reduce(
-        (sum, c) => sum + Number(c.marksObtained),
-        0,
-      );
-      const totalMax = allComponentScores.reduce(
-        (sum, c) => sum + Number(c.maxMarks),
-        0,
-      );
-      const totalPercentage = totalMax > 0 ? (totalObtained / totalMax) * 100 : 0;
-
-      return tx.assessmentScore.update({
-        where: { id: assessmentScore.id },
-        data: {
-          totalScore: new Prisma.Decimal(totalObtained),
-          percentage: new Prisma.Decimal(totalPercentage),
-        },
-        include: {
-          componentScores: true,
-          subject: { select: { id: true, name: true, code: true } },
-        },
-      });
     });
   }
 

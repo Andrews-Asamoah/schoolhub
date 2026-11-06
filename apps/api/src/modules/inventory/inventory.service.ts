@@ -1,10 +1,45 @@
-import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
-import type { CreateInventoryItemInput, InventoryStockMovementInput, UpdateInventoryItemInput } from "@schoolhub/shared";
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from "@nestjs/common";
+import { Prisma } from "@prisma/client";
+import type {
+  CreateInventoryCategoryInput,
+  CreateInventoryItemInput,
+  InventoryStockMovementInput,
+  UpdateInventoryItemInput,
+} from "@schoolhub/shared";
 import { PrismaService } from "../../prisma/prisma.service.js";
 
 @Injectable()
 export class InventoryService {
   constructor(private readonly prisma: PrismaService) {}
+
+  listCategories(schoolId: string) {
+    return this.prisma.client.inventoryCategory.findMany({
+      where: { schoolId },
+      orderBy: { name: "asc" },
+      select: { id: true, name: true, description: true },
+    });
+  }
+
+  async createCategory(schoolId: string, input: CreateInventoryCategoryInput) {
+    const name = input.name.trim();
+    const existing = await this.prisma.client.inventoryCategory.findFirst({
+      where: { schoolId, name: { equals: name, mode: "insensitive" } },
+      select: { id: true },
+    });
+    if (existing) throw new ConflictException("An inventory category with this name already exists.");
+
+    try {
+      return await this.prisma.client.inventoryCategory.create({
+        data: { schoolId, name, description: input.description?.trim() || null },
+        select: { id: true, name: true, description: true },
+      });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+        throw new ConflictException("An inventory category with this name already exists.");
+      }
+      throw error;
+    }
+  }
 
   listItems(schoolId: string) {
     return this.prisma.client.inventoryItem.findMany({
@@ -84,13 +119,17 @@ export class InventoryService {
   }
 
   async createItem(schoolId: string, performedById: string, input: CreateInventoryItemInput) {
+    const category = input.category?.trim()
+      ? await this.assertCategoryExists(schoolId, input.category.trim())
+      : null;
+
     return this.prisma.client.$transaction(async (tx) => {
       const item = await tx.inventoryItem.create({
         data: {
           schoolId,
           name: input.name,
           description: input.description || null,
-          category: input.category || null,
+          category,
           unit: input.unit || "pcs",
           minQuantity: input.minQuantity,
           quantity: input.initialQuantity,
@@ -115,12 +154,16 @@ export class InventoryService {
   }
 
   async updateItem(schoolId: string, itemId: string, input: UpdateInventoryItemInput) {
+    const category = input.category?.trim()
+      ? await this.assertCategoryExists(schoolId, input.category.trim())
+      : null;
+
     const updated = await this.prisma.client.inventoryItem.updateMany({
       where: { id: itemId, schoolId },
       data: {
         name: input.name.trim(),
         description: input.description?.trim() || null,
-        category: input.category?.trim() || null,
+        category,
         unit: input.unit.trim(),
         minQuantity: input.minQuantity,
       },
@@ -136,6 +179,17 @@ export class InventoryService {
         },
       },
     });
+  }
+
+  private async assertCategoryExists(schoolId: string, name: string) {
+    const category = await this.prisma.client.inventoryCategory.findFirst({
+      where: { schoolId, name: { equals: name, mode: "insensitive" } },
+      select: { name: true },
+    });
+    if (!category) {
+      throw new BadRequestException("Choose a category from this school's inventory category list.");
+    }
+    return category.name;
   }
 
   async recordMovement(

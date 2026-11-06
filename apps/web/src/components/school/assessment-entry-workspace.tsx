@@ -1,9 +1,13 @@
+import { useMarkDraft } from "@/hooks/use-mark-draft";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CircleAlert, CircleCheck, Lock, LoaderCircle } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { apiFetch } from "@/lib/api";
+import { BulkImportButton } from "@/components/bulk-import/bulk-import-button";
+import { AssessmentMarksBulkImport } from "@/components/school/assessment-marks-bulk-import";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useTeachingOverview } from "@/lib/teaching";
+import { bandRangeLabel, type GradingMethod } from "@/lib/assessment-setup";
 
 interface Component {
   id: string;
@@ -12,6 +16,10 @@ interface Component {
   weight: number;
   isRequired: boolean;
   slots: number;
+  subjectStrandId: string | null;
+  subjectStrandName: string | null;
+  canEdit: boolean;
+  canCorrect: boolean;
 }
 interface SheetStudent {
   studentId: string;
@@ -22,6 +30,7 @@ interface SheetStudent {
   percentage: number;
   grade: string | null;
   complete: boolean;
+  excused: boolean;
   position: number | null;
 }
 interface Sheet {
@@ -29,10 +38,16 @@ interface Sheet {
   subject: { id: string; name: string };
   term: { id: string; name: string };
   templates: { id: string; name: string }[];
-  template: { id: string; name: string; deadline: string | null; components: Component[]; grades: { grade: string; description: string; minScore: number; maxScore: number }[] } | null;
+  template: { id: string; name: string; deadline: string | null; components: Component[]; grades: { grade: string; description: string; minScore: number; maxScore: number }[]; gradingMethod?: GradingMethod } | null;
   students: SheetStudent[];
+  stats: { count: number; mean: number | null; median: number | null; highest: number | null; lowest: number | null; passRate: number | null };
   canEdit: boolean;
   readOnlyReason: string | null;
+  lock: "TEMPLATE_LOCKED" | "SUBMITTED" | "DEADLINE_PASSED" | "NO_TEACHING_AREA" | null;
+  submission: { submittedAt: string; note: string | null; excusedCount: number } | null;
+  canSubmit: boolean;
+  canRequestCorrection: boolean;
+  pendingCorrection: { id: string; requestedAt: string } | null;
 }
 interface SubjectRow {
   id: string;
@@ -91,8 +106,10 @@ export function AssessmentEntryWorkspace({
   const [classId, setClassId] = useState(initial?.classId ?? "");
   const [subjectId, setSubjectId] = useState(initial?.subjectId ?? "");
   const [templateId, setTemplateId] = useState("");
-  const [draft, setDraft] = useState<Record<string, string>>({});
   const [notice, setNotice] = useState<string | null>(null);
+  const [correcting, setCorrecting] = useState(false);
+  const [reason, setReason] = useState("");
+  const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
     if (initial) {
@@ -118,6 +135,21 @@ export function AssessmentEntryWorkspace({
     retry: false,
   });
   const sheet = sheetQuery.data;
+  const [draft, setDraft] = useMarkDraft<{value:string;expectedMarks:number|null}>(JSON.stringify(["sba", effectiveClassId, effectiveSubjectId, sheet?.term.id, sheet?.template?.id]), (value): value is {value:string;expectedMarks:number|null} => { const row=value as {value?:unknown;expectedMarks?:unknown}|null; return !!row && typeof row.value === "string" && (row.expectedMarks === null || typeof row.expectedMarks === "number"); });
+
+  // Keep absence choices in the same principal/role/term/sheet-scoped tab storage as marks.
+  // Uploads and background refetches must not discard an unsubmitted choice.
+  const [excuseDraft, setExcuseDraft] = useMarkDraft<boolean>(
+    JSON.stringify(["sba-excuses", effectiveClassId, effectiveSubjectId, sheet?.term.id, sheet?.template?.id]),
+    (value): value is boolean => typeof value === "boolean",
+  );
+  const excusedIds = new Set((sheet?.students ?? [])
+    .filter((student) => excuseDraft[student.studentId] ?? student.excused)
+    .map((student) => student.studentId));
+  const excuseConflicts = (sheet?.students ?? []).filter((student) => excusedIds.has(student.studentId) && student.marks.length > 0 && !student.excused).length;
+  const hasExcuseChanges = (sheet?.students ?? []).some((student) =>
+    excuseDraft[student.studentId] !== undefined && excuseDraft[student.studentId] !== student.excused,
+  );
 
   // Server values by cell, used to tell which cells the teacher has changed.
   const saved = useMemo(() => {
@@ -128,8 +160,10 @@ export function AssessmentEntryWorkspace({
     return map;
   }, [sheet]);
 
+
   useEffect(() => {
-    setDraft({});
+    setCorrecting(false);
+    setReason("");
   }, [sheet]);
 
   const maxByComponent = useMemo(
@@ -138,31 +172,106 @@ export function AssessmentEntryWorkspace({
   );
 
   const changes = useMemo(() => {
-    const result: { studentId: string; componentId: string; occurrenceIndex: number; marks: number | null; valid: boolean }[] = [];
+    const result: { studentId: string; componentId: string; occurrenceIndex: number; marks: number | null; expectedMarks: number|null; valid: boolean }[] = [];
     for (const [key, raw] of Object.entries(draft)) {
       const [studentId = "", componentId = "", slot = "0"] = key.split("|");
       const before = saved.get(key) ?? "";
-      const value = raw.trim();
+      const value = raw.value.trim();
       if (value === before) continue;
       const marks = value === "" ? null : Number(value);
       const max = maxByComponent.get(componentId) ?? 0;
       const valid = marks === null || (Number.isFinite(marks) && marks >= 0 && marks <= max);
-      result.push({ studentId, componentId, occurrenceIndex: Number(slot), marks, valid });
+      result.push({ studentId, componentId, occurrenceIndex: Number(slot), marks, expectedMarks: raw.expectedMarks, valid });
     }
     return result;
   }, [draft, saved, maxByComponent]);
   const invalid = changes.filter((change) => !change.valid).length;
+  const unsaved = changes.length > 0;
+  useEffect(() => {
+    if (!unsaved) return;
+    const warn = (event: BeforeUnloadEvent) => { event.preventDefault(); };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [unsaved]);
 
   const save = useMutation({
     mutationFn: (body: unknown) => apiFetch<Sheet>("/assessments/entry", { method: "PUT", body: JSON.stringify(body) }),
     onSuccess: (result) => {
+      setDraft({});
       queryClient.setQueryData(sheetKey, result);
       setNotice("Marks saved.");
     },
   });
 
+  const clearForExcuse = useMutation({
+    mutationFn: (student: SheetStudent) => apiFetch<Sheet>("/assessments/entry", {
+      method: "PUT",
+      body: JSON.stringify({
+        classId: effectiveClassId,
+        subjectId: effectiveSubjectId,
+        templateId: sheet?.template?.id,
+        termId: sheet?.term.id,
+        entries: student.marks.map((mark) => ({
+          studentId: student.studentId,
+          componentId: mark.componentId,
+          occurrenceIndex: mark.occurrenceIndex,
+          marks: null,
+          expectedMarks: mark.marks,
+        })),
+      }),
+    }),
+    onSuccess: (result, student) => {
+      queryClient.setQueryData(sheetKey, result);
+      setExcuseDraft((current) => ({ ...current, [student.studentId]: true }));
+      void queryClient.invalidateQueries({ queryKey: ["assessments", "tracking"] });
+      setNotice(`Recorded marks cleared for ${student.name}. Submit marks to save the absent / excused selection.`);
+    },
+  });
+
+  function clearMarksForAbsence(student: SheetStudent) {
+    if (window.confirm(`Mark ${student.name} absent / excused? This will clear all their saved marks for this assessment, including zeros, and recalculate grades and positions. Submit marks afterwards to save the absence selection.`)) {
+      clearForExcuse.mutate(student);
+    }
+  }
+
+  const submit = useMutation({
+    mutationFn: () =>
+      apiFetch<Sheet>("/assessments/entry/submit", {
+        method: "POST",
+        body: JSON.stringify({ classId: effectiveClassId, subjectId: effectiveSubjectId, templateId: sheet?.template?.id, excusedStudentIds: [...excusedIds] }),
+      }),
+    onSuccess: (result) => {
+      setExcuseDraft({});
+      queryClient.setQueryData(sheetKey, result);
+      void queryClient.invalidateQueries({ queryKey: ["assessments", "tracking"] });
+      setNotice("Marks submitted.");
+    },
+  });
+  const requestCorrection = useMutation({
+    mutationFn: () =>
+      apiFetch<{ id: string }>("/assessments/corrections", {
+        method: "POST",
+        body: JSON.stringify({
+          classId: effectiveClassId,
+          subjectId: effectiveSubjectId,
+          templateId: sheet?.template?.id,
+          reason: reason.trim(),
+          items: changes.map(({ studentId, componentId, occurrenceIndex, marks }) => ({ studentId, componentId, occurrenceIndex, marks })),
+        }),
+      }),
+    onSuccess: () => {
+      setDraft({});
+      setCorrecting(false);
+      setReason("");
+      void sheetQuery.refetch();
+      void queryClient.invalidateQueries({ queryKey: ["assessments", "corrections"] });
+      setNotice("Correction sent for approval. The marks will change once it is approved.");
+    },
+  });
+
   function guard(action: () => void) {
-    if (changes.length && !window.confirm("You have unsaved marks. Discard them?")) return;
+    if (clearForExcuse.isPending || save.isPending || submit.isPending) return;
+    if ((changes.length || hasExcuseChanges) && !window.confirm("You have unsaved marks or absence selections. Switch sheets? Your draft will remain available in this tab.")) return;
     setNotice(null);
     action();
   }
@@ -187,6 +296,7 @@ export function AssessmentEntryWorkspace({
 
   const components = sheet?.template?.components ?? [];
   const editable = !!sheet?.canEdit;
+  const editableComponentIds = new Set(components.filter((component) => component.canEdit).map((component) => component.id));
 
   return (
     <div className="space-y-4">
@@ -251,6 +361,19 @@ export function AssessmentEntryWorkspace({
             )}
           </div>
 
+          {sheet.submission && (
+            <p className="border-b border-border/60 bg-success/10 px-4 py-2 text-xs text-success">
+              Submitted on {new Date(sheet.submission.submittedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
+              {sheet.submission.excusedCount > 0 && ` · ${sheet.submission.excusedCount} pupil${sheet.submission.excusedCount === 1 ? "" : "s"} excused`}.
+            </p>
+          )}
+          {sheet.pendingCorrection && (
+            <p className="border-b border-border/60 bg-warning/10 px-4 py-2 text-xs text-warning">A correction for this sheet is waiting for approval. Marks will change once it is approved.</p>
+          )}
+          {correcting && (
+            <p className="border-b border-border/60 bg-info/10 px-4 py-2 text-xs text-info">Correction mode: change the marks that are wrong, explain why, then send for approval. Nothing changes until it is approved.</p>
+          )}
+
           {sheet.students.length === 0 ? (
             <p className="p-5 text-xs text-muted-foreground">No pupils are enrolled in this class this term.</p>
           ) : (
@@ -262,17 +385,22 @@ export function AssessmentEntryWorkspace({
                     {components.map((component) => (
                       <th key={component.id} scope="col" colSpan={component.slots} className="px-2 py-3 text-center text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70">
                         {component.name}
+                        {component.subjectStrandName && <span className="block font-semibold normal-case tracking-normal">{component.subjectStrandName}</span>}
                         <span className="block font-normal normal-case tracking-normal">out of {component.maxMarks} · {component.weight}%</span>
+                        {!component.canEdit && mode === "teacher" && <span className="block font-normal normal-case tracking-normal">Read only</span>}
                       </th>
                     ))}
-                    <th scope="col" className="px-3 py-3 text-center text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70">Total</th>
-                    <th scope="col" className="px-3 py-3 text-center text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70">%</th>
+                    <th scope="col" className="px-3 py-3 text-center text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70">Total (%)</th>
                     <th scope="col" className="px-3 py-3 text-center text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70">Grade</th>
+                    <th scope="col" className="px-3 py-3 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70">Description</th>
                     <th scope="col" className="px-3 py-3 text-center text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70">Pos.</th>
+                    <th scope="col" className="px-3 py-3 text-center text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70">Absent / excused</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border/60">
-                  {sheet.students.map((student) => (
+                  {sheet.students.map((student, rowIndex) => {
+                    const hasRestrictedMarks = student.marks.some((mark) => !editableComponentIds.has(mark.componentId));
+                    return (
                     <tr key={student.studentId}>
                       <th scope="row" className="px-4 py-2 text-left font-semibold text-foreground">
                         {student.name}
@@ -281,7 +409,7 @@ export function AssessmentEntryWorkspace({
                       {components.flatMap((component) =>
                         Array.from({ length: component.slots }, (_, slot) => {
                           const key = cellKey(student.studentId, component.id, slot);
-                          const value = draft[key] ?? saved.get(key) ?? "";
+                          const value = draft[key]?.value ?? saved.get(key) ?? "";
                           const number = value.trim() === "" ? null : Number(value);
                           const bad = number !== null && (!Number.isFinite(number) || number < 0 || number > component.maxMarks);
                           return (
@@ -293,10 +421,20 @@ export function AssessmentEntryWorkspace({
                                 max={component.maxMarks}
                                 step="any"
                                 value={value}
-                                disabled={!editable}
+                                disabled={clearForExcuse.isPending || (correcting ? !component.canCorrect : !editable || !component.canEdit)}
+                                data-col={`${component.id}|${slot}`}
+                                data-row={rowIndex}
+                                onKeyDown={(event) => {
+                                  // Enter moves down the column like a spreadsheet.
+                                  if (event.key !== "Enter") return;
+                                  event.preventDefault();
+                                  const next = document.querySelector<HTMLInputElement>(`input[data-col="${component.id}|${slot}"][data-row="${rowIndex + (event.shiftKey ? -1 : 1)}"]:not(:disabled)`);
+                                  next?.focus();
+                                  next?.select();
+                                }}
                                 aria-invalid={bad || undefined}
                                 aria-label={`${student.name}, ${component.name}${component.slots > 1 ? ` ${slot + 1}` : ""}, out of ${component.maxMarks}`}
-                                onChange={(event) => { setNotice(null); setDraft((current) => ({ ...current, [key]: event.target.value })); }}
+                                onChange={(event) => { setNotice(null); setDraft((current) => ({ ...current, [key]: {value:event.target.value, expectedMarks:current[key]?.expectedMarks !== undefined ? current[key]!.expectedMarks : saved.has(key) ? Number(saved.get(key)) : null} })); }}
                                 className={`h-9 w-16 rounded-lg border px-2 text-center text-xs tabular-nums outline-none focus:ring-2 disabled:bg-muted/50 disabled:text-muted-foreground ${
                                   bad
                                     ? "border-destructive/50 bg-destructive/10 text-destructive focus:ring-destructive/20"
@@ -307,8 +445,7 @@ export function AssessmentEntryWorkspace({
                           );
                         }),
                       )}
-                      <td className="px-3 py-2 text-center font-semibold tabular-nums text-foreground">{student.marks.length ? student.totalScore : "—"}</td>
-                      <td className="px-3 py-2 text-center tabular-nums text-muted-foreground">{student.marks.length ? `${student.percentage}%` : "—"}</td>
+                      <td className="px-3 py-2 text-center font-semibold tabular-nums text-foreground">{student.marks.length ? `${student.percentage}%` : "—"}</td>
                       <td className="px-3 py-2 text-center">
                         {student.grade ? (
                           <span className="rounded-md bg-primary/10 px-2 py-0.5 font-bold text-primary">{student.grade}</span>
@@ -316,25 +453,83 @@ export function AssessmentEntryWorkspace({
                           <span className="text-muted-foreground/70" title={student.marks.length ? "Waiting for the remaining marks" : undefined}>{student.marks.length ? "Incomplete" : "—"}</span>
                         )}
                       </td>
+                      <td className="px-3 py-2 text-muted-foreground">
+                        {student.grade ? sheet.template?.grades.find((band) => band.grade === student.grade)?.description || "—" : "—"}
+                      </td>
                       <td className="px-3 py-2 text-center tabular-nums text-muted-foreground">{student.position ?? "—"}</td>
+                      <td className="px-3 py-2 text-center">
+                        <input
+                          type="checkbox"
+                          aria-label={`${student.name} is absent or excused`}
+                          aria-describedby="assessment-excuse-help"
+                          disabled={!sheet.canSubmit || correcting || unsaved || submit.isPending || save.isPending || clearForExcuse.isPending || (!excusedIds.has(student.studentId) && hasRestrictedMarks)}
+                          title={!sheet.canSubmit ? "This sheet is read only." : unsaved ? "Save or discard your typed marks first." : hasRestrictedMarks && !excusedIds.has(student.studentId) ? "Only a teacher who can edit all recorded components, or a school manager, can clear these marks for an absence." : student.marks.length ? "Selecting absent / excused asks before clearing this pupil’s recorded marks." : undefined}
+                          checked={student.excused || excusedIds.has(student.studentId)}
+                          onChange={(event) => {
+                            const checked = event.target.checked;
+                            if (checked && student.marks.length > 0) {
+                              clearMarksForAbsence(student);
+                              return;
+                            }
+                            setExcuseDraft((current) => {
+                              const next = { ...current };
+                              if (checked === student.excused) delete next[student.studentId];
+                              else next[student.studentId] = checked;
+                              return next;
+                            });
+                          }}
+                          className="size-4 accent-primary disabled:cursor-not-allowed disabled:opacity-50"
+                        />
+                        {sheet.canSubmit && excusedIds.has(student.studentId) && student.marks.length > 0 && (
+                          <button type="button"
+                            aria-label={`Clear recorded marks for absent pupil ${student.name}`}
+                            disabled={unsaved || submit.isPending || save.isPending || clearForExcuse.isPending || hasRestrictedMarks}
+                            onClick={() => clearMarksForAbsence(student)}
+                            className="mt-1 block text-[11px] font-semibold text-warning underline disabled:opacity-50">
+                            Clear recorded marks
+                          </button>
+                        )}
+                      </td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
           )}
 
+          <p id="assessment-excuse-help" className="border-t border-border/60 px-4 py-3 text-xs leading-5 text-muted-foreground">
+            {sheet.submission
+              ? "Absent / excused selections shown here were saved with this submission."
+              : "Select absent or excused pupils, then Submit marks to save those selections. Choices stay selected through uploads and refreshes in this tab. If a pupil has recorded marks, you will be asked before those marks are cleared. In uploads, leave absent pupils’ marks empty; zero is a recorded mark."}
+          </p>
+
+          {excuseConflicts > 0 && sheet.canSubmit && (
+            <p role="alert" className="border-t border-border/60 px-4 py-3 text-xs text-warning">
+              {excuseConflicts} selected pupil{excuseConflicts === 1 ? " has" : "s have"} recorded marks. Use Clear recorded marks in their absence column, or uncheck the absence, before submitting.
+            </p>
+          )}
+
+          {sheet.stats.count > 0 && (
+            <dl className="flex flex-wrap gap-x-6 gap-y-1 border-t border-border/60 px-4 py-3 text-[11px] text-muted-foreground">
+              {([["Class mean", sheet.stats.mean, "%"], ["Median", sheet.stats.median, "%"], ["Highest", sheet.stats.highest, "%"], ["Lowest", sheet.stats.lowest, "%"], ["Pass rate (50%+)", sheet.stats.passRate, "%"]] as const).map(([name, value, unit]) => (
+                <div key={name} className="flex gap-1.5"><dt>{name}</dt><dd className="font-semibold tabular-nums text-foreground">{value}{unit}</dd></div>
+              ))}
+              <div className="flex gap-1.5"><dt>Complete</dt><dd className="font-semibold tabular-nums text-foreground">{sheet.stats.count}/{sheet.students.length}</dd></div>
+            </dl>
+          )}
           <div className="flex flex-wrap items-center gap-3 border-t border-border/60 p-4">
-            {editable && (
+            {editable && !correcting && (
               <button
                 type="button"
-                disabled={changes.length === 0 || invalid > 0 || save.isPending}
+                disabled={changes.length === 0 || invalid > 0 || save.isPending || clearForExcuse.isPending}
                 onClick={() =>
                   save.mutate({
                     classId: effectiveClassId,
                     subjectId: effectiveSubjectId,
                     templateId: sheet.template!.id,
-                    entries: changes.map(({ studentId, componentId, occurrenceIndex, marks }) => ({ studentId, componentId, occurrenceIndex, marks })),
+                    termId: sheet.term.id,
+                    entries: changes.map(({ studentId, componentId, occurrenceIndex, marks, expectedMarks }) => ({ studentId, componentId, occurrenceIndex, marks, expectedMarks })),
                   })
                 }
                 className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary px-4 text-xs font-semibold text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
@@ -343,17 +538,95 @@ export function AssessmentEntryWorkspace({
                 Save marks{changes.length ? ` (${changes.length})` : ""}
               </button>
             )}
+            {editable && !correcting && sheet.students.length > 0 && components.some((component) => component.canEdit) && (
+              <BulkImportButton
+                className="h-9 text-xs"
+                disabled={unsaved || clearForExcuse.isPending}
+                title={unsaved ? "Save or discard the marks you have typed first" : undefined}
+                onClick={() => { setNotice(null); setUploading(true); }}
+              />
+            )}
+            {sheet.canSubmit && !correcting && (() => {
+              const waiting = sheet.students.filter((student) => !student.complete && !excusedIds.has(student.studentId)).length;
+              return (
+                <button
+                  type="button"
+                  disabled={unsaved || waiting > 0 || excuseConflicts > 0 || submit.isPending || clearForExcuse.isPending}
+                  title={unsaved ? "Save your marks first" : excuseConflicts > 0 ? "Clear recorded marks for the selected absent pupils, or uncheck their absence." : waiting > 0 ? `${waiting} pupil${waiting === 1 ? "" : "s"} still need marks or an excuse` : undefined}
+                  onClick={() => { if (window.confirm("Submit these marks? You will not be able to edit them directly afterwards; changes will need approval.")) submit.mutate(); }}
+                  className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-border px-4 text-xs font-semibold hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {submit.isPending && <LoaderCircle className="size-3.5 animate-spin" />}
+                  Submit marks{waiting > 0 ? ` (${waiting} to finish)` : ""}
+                </button>
+              );
+            })()}
+            {sheet.canRequestCorrection && !correcting && (
+              <button type="button" onClick={() => setCorrecting(true)} className="inline-flex h-9 items-center rounded-lg border border-border px-4 text-xs font-semibold hover:bg-muted">Request correction</button>
+            )}
+            {correcting && (
+              <div className="flex w-full flex-wrap items-end gap-3">
+                <label className="grid min-w-64 flex-1 gap-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70">
+                  Reason for the correction
+                  <textarea rows={2} maxLength={2000} value={reason} onChange={(event) => setReason(event.target.value)}
+                    className="rounded-lg border border-border bg-card px-3 py-2 text-xs normal-case tracking-normal text-foreground outline-none focus:border-primary/50" />
+                </label>
+                <button type="button" disabled={changes.length === 0 || invalid > 0 || reason.trim().length < 10 || requestCorrection.isPending} onClick={() => requestCorrection.mutate()}
+                  className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary px-4 text-xs font-semibold text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50">
+                  {requestCorrection.isPending && <LoaderCircle className="size-3.5 animate-spin" />}
+                  Send for approval{changes.length ? ` (${changes.length})` : ""}
+                </button>
+                <button type="button" onClick={() => { setCorrecting(false); setDraft({}); setReason(""); }} className="h-9 rounded-lg px-3 text-xs font-semibold text-muted-foreground hover:bg-muted">Cancel</button>
+              </div>
+            )}
+            {clearForExcuse.error && <p role="alert" className="text-xs text-destructive">Could not mark the pupil absent / excused: {clearForExcuse.error.message} No absence selection was applied. Reload the latest marks before retrying.</p>}
+            {(submit.error || requestCorrection.error) && <p role="alert" className="flex items-center gap-1.5 text-xs text-destructive"><CircleAlert className="size-3.5" /> {(submit.error ?? requestCorrection.error)?.message}</p>}
             {invalid > 0 && <p role="alert" className="flex items-center gap-1.5 text-xs text-destructive"><CircleAlert className="size-3.5" /> {invalid} mark{invalid === 1 ? " is" : "s are"} outside the allowed range.</p>}
             {notice && <p role="status" className="flex items-center gap-1.5 text-xs text-success"><CircleCheck className="size-3.5" /> {notice}</p>}
+            {save.error && <button type="button" className="text-xs underline" onClick={() => { if(window.confirm("Discard your local draft and reload the latest saved marks?")) {setDraft({}); void sheetQuery.refetch();} }}>Discard draft and load latest marks</button>}
             {save.error && <p role="alert" className="flex items-center gap-1.5 text-xs text-destructive"><CircleAlert className="size-3.5" /> {save.error.message}</p>}
             <p className="ml-auto text-[11px] text-muted-foreground">
               Grades appear once every required column has a mark.
+              {sheet.template.gradingMethod === "CLASS_RANK" && " They compare each pupil with the rest of this class, so they can change as marks are entered."}
               {sheet.template.grades.length > 0 && (
-                <> {[...sheet.template.grades].sort((a, b) => b.minScore - a.minScore).map((band) => `${band.grade} ${band.minScore}+`).join(" · ")}</>
+                sheet.template.gradingMethod === "CLASS_RANK"
+                  ? <> {sheet.template.grades.map((band, index) => `${band.grade} ${bandRangeLabel("CLASS_RANK", band, index, sheet.template!.grades.length)}`).join(" · ")}</>
+                  : <> {[...sheet.template.grades].sort((a, b) => b.minScore - a.minScore).map((band) => `${band.grade} ${band.minScore}+`).join(" · ")}</>
               )}
             </p>
           </div>
         </section>
+      )}
+
+      {uploading && sheet?.template && (
+        <AssessmentMarksBulkImport
+          sheet={{
+            classId: sheet.class.id,
+            className: sheet.class.name,
+            subjectId: sheet.subject.id,
+            subjectName: sheet.subject.name,
+            templateId: sheet.template.id,
+            templateName: sheet.template.name,
+            termId: sheet.term.id,
+            termName: sheet.term.name,
+            components: components
+              .filter((component) => component.canEdit)
+              .map((component) => ({
+                id: component.id,
+                name: component.name,
+                maxMarks: component.maxMarks,
+                slots: component.slots,
+                subjectStrandName: component.subjectStrandName,
+              })),
+            students: sheet.students,
+          }}
+          onClose={() => setUploading(false)}
+          onComplete={() => {
+            setNotice("Marks uploaded. The table now shows the saved marks.");
+            void sheetQuery.refetch();
+            void queryClient.invalidateQueries({ queryKey: ["assessments", "tracking"] });
+          }}
+        />
       )}
     </div>
   );

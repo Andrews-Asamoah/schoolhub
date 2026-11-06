@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { PortalWorkQueue } from "@/components/portal/portal-work-queue";
+import { lazy, Suspense, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import {
   ArrowRight, BookOpen, Building2, CalendarDays, CircleAlert, GraduationCap,
-  UsersRound, WalletCards, UserRoundPlus, type LucideIcon,
+  Lock, UsersRound, WalletCards, UserRoundPlus, type LucideIcon,
 } from "lucide-react";
 import { DashboardInfographics } from "@/components/school/dashboard/dashboard-infographics";
 import { RecentActivityCard, SchoolYearCard } from "@/components/school/dashboard/dashboard-activity";
@@ -11,6 +12,8 @@ import type { DashboardAnalytics } from "@/components/school/dashboard/dashboard
 import { apiFetch } from "@/lib/api";
 import { schoolRoleLabel, useSchoolRole } from "@/components/school/school-role-switcher";
 import { getSchoolNavGroupsForRole } from "@/lib/school-navigation";
+import { useSession } from "@/lib/auth-client";
+const GuardianPortalWorkspace = lazy(() => import("@/components/portal/guardian-portal-workspace").then(module => ({default:module.GuardianPortalWorkspace})));
 import { StudentOverview } from "@/components/portal/student-overview";
 import { AccountantFinanceCharts } from "@/components/portal/accountant-finance-charts";
 import { useSchoolOrganization } from "@/components/school/school-organization";
@@ -60,7 +63,7 @@ function Metrics({ data, isLoading, isError }: { data?: DashboardAnalytics; isLo
     { label: "New admissions", value: numberFormat.format(data.metrics.newAdmissionsThisMonth), detail: "Admitted this month", icon: UserRoundPlus, className: "bg-info/10 text-info" },
   ];
   if (data.canViewFinance) {
-    metrics.push({ label: "Revenue this month", value: moneyFormat.format(data.metrics.revenueThisMonth ?? 0), detail: "Completed payments recorded", icon: WalletCards, className: "bg-success/10 text-success" });
+    metrics.push({ label: "Fee collections this month", value: moneyFormat.format(data.metrics.revenueThisMonth ?? 0), detail: "Completed payments recorded", icon: WalletCards, className: "bg-success/10 text-success" });
     metrics.push({ label: "Expenditures this month", value: moneyFormat.format(data.metrics.expendituresThisMonth ?? 0), detail: "Recorded school expenses", icon: WalletCards, className: "bg-warning/10 text-warning" });
   }
   return <section aria-label="Live school statistics" className={`grid gap-3 sm:grid-cols-2 ${data.canViewFinance ? "xl:grid-cols-5" : "xl:grid-cols-3"}`}>{metrics.map((metric) => <MetricTile key={metric.label} metric={metric} />)}</section>;
@@ -68,13 +71,14 @@ function Metrics({ data, isLoading, isError }: { data?: DashboardAnalytics; isLo
 
 export function DashboardContent({ today, greetingName }: DashboardContentProps) {
   const { activeRole } = useSchoolRole();
+  const { data: session } = useSession();
   const { activeOrganization } = useSchoolOrganization();
   const [selectedMonths, setSelectedMonths] = useState(6);
   const isManagementRole = ["owner", "admin", "headteacher"].includes(activeRole ?? "");
   const analyticsQuery = useQuery({
-    queryKey: ["dashboard", "analytics", selectedMonths, activeOrganization?.id],
+    queryKey: ["dashboard", "analytics", selectedMonths, activeOrganization?.id, session?.user.id, activeRole],
     queryFn: () => apiFetch<DashboardAnalytics>(`/dashboard/analytics?months=${selectedMonths}`),
-    enabled: Boolean(activeRole && activeRole !== "student" && activeOrganization),
+    enabled: Boolean(activeRole && !["student", "guardian", "teacher"].includes(activeRole) && activeOrganization),
     retry: false,
     refetchInterval: 60_000,
   });
@@ -137,6 +141,9 @@ export function DashboardContent({ today, greetingName }: DashboardContentProps)
   const roleLinks = getSchoolNavGroupsForRole(activeRole ?? undefined).flatMap((group) => group.items).slice(0, 6);
   const data = analyticsQuery.data;
 
+  if (!activeRole) return <p role="status">Loading your role…</p>;
+  if (activeRole === "guardian") return <main className="px-4 py-7 sm:px-6"><Suspense fallback={<p role="status">Loading family hub…</p>}><GuardianPortalWorkspace showSectionNav={false} /></Suspense></main>;
+  if (activeRole === "teacher") return <main className="px-4 py-7 sm:px-6"><PortalWorkQueue /></main>;
   if (activeRole === "student") return <main className="mx-auto max-w-[1440px] px-4 py-7 sm:px-6 lg:px-9 lg:py-9"><StudentOverview /></main>;
 
   return (
@@ -147,7 +154,8 @@ export function DashboardContent({ today, greetingName }: DashboardContentProps)
         <p className="mt-1.5 text-sm text-muted-foreground">A live overview of your school&apos;s records and activity.</p>
       </div>
 
-      {isManagementRole && <section className="mb-6 overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+      {isManagementRole && <PortalWorkQueue />}
+      {isManagementRole && activeRole !== "headteacher" && <section className="mb-6 overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
         <div className="flex flex-wrap items-start justify-between gap-4 border-b border-border bg-muted/30 px-5 py-5 sm:px-6">
           <div><p className="text-[10px] font-bold uppercase tracking-[0.16em] text-primary">Getting started</p><h2 className="mt-1 text-lg font-bold tracking-tight text-foreground">Prepare your school to run</h2><p className="mt-1 max-w-2xl text-xs leading-5 text-muted-foreground">These checks reflect your current school configuration.</p></div>
           <div className="min-w-32 rounded-xl border border-border bg-card px-4 py-3"><p className="text-lg font-bold text-foreground">{completedSteps}<span className="text-muted-foreground">/{setupItems.length}</span></p><p className="text-[10px] font-medium text-muted-foreground">setup steps complete</p><div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-primary transition-all" style={{ width: `${(completedSteps / setupItems.length) * 100}%` }} /></div></div>
@@ -159,6 +167,12 @@ export function DashboardContent({ today, greetingName }: DashboardContentProps)
       {!isManagementRole && <section className="mb-5 rounded-2xl border border-border bg-card p-5"><p className="text-xs font-semibold uppercase tracking-wide text-primary">{schoolRoleLabel(activeRole)}</p><p className="mt-1 text-sm text-muted-foreground">Quick links for your workspace</p><div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{roleLinks.map((item) => <Link key={item.id} to="/$page" params={{ page: item.id }} className="flex items-center gap-3 rounded-xl border border-border p-3 transition hover:bg-muted/50"><span className="flex size-9 items-center justify-center rounded-lg bg-primary/10 text-primary"><item.icon className="size-4" /></span><span><span className="block text-sm font-semibold text-foreground">{item.label}</span><span className="mt-0.5 block text-xs text-muted-foreground">{item.description}</span></span></Link>)}</div></section>}
 
       <Metrics data={data} isLoading={analyticsQuery.isPending} isError={analyticsQuery.isError} />
+      {activeRole === "admin" && data?.canViewFinance && (
+        <div role="note" className="mt-4 flex items-start gap-3 rounded-xl border border-border bg-muted/40 p-3 text-sm text-muted-foreground">
+          <Lock className="mt-0.5 size-4 shrink-0" />
+          <span><strong className="font-semibold text-foreground">Read-only finance overview.</strong> This dashboard shows school-wide totals and trends only. Detailed payment, expense, student-account and payroll records are restricted to authorized finance roles.</span>
+        </div>
+      )}
       <DashboardInfographics data={data} isLoading={analyticsQuery.isPending} isError={analyticsQuery.isError} selectedMonths={selectedMonths} onMonthsChange={setSelectedMonths} />
       {activeRole === "accountant" && (
         <section className="mt-6 space-y-3" aria-label="Accountant finance dashboard">

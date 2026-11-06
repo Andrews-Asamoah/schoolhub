@@ -213,9 +213,51 @@ async function runHealthErrorRecovery() {
   await context.close();
 }
 
+async function runLogoutCacheIsolation() {
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  await installApiMocks(page);
+  let signedOut = false;
+  let rejectLogout = true;
+  await page.route("**/api/auth/get-session**", route => route.fulfill({ json: signedOut ? null : session }));
+  await page.route("**/api/auth/sign-out", route => {
+    if (rejectLogout) return route.fulfill({ status: 503, json: { message: "Please retry sign out." } });
+    signedOut = true;
+    return route.fulfill({ json: { success: true } });
+  });
+  await page.goto(`${baseUrl}/admin/dashboard`);
+  await page.getByRole("heading", { name: "Platform overview" }).waitFor();
+  await page.evaluate(async () => {
+    const { queryClient } = await import("/src/lib/query-client.ts");
+    queryClient.setQueryData(["private-logout-regression"], { student: "First user's private record" });
+    localStorage.setItem("schoolhub-active-role", "accountant");
+    sessionStorage.setItem("schoolhub-accountant-academic-view", "previous-user-period");
+  });
+  await page.getByRole("button", { name: "Account menu for E2E Super Admin" }).click();
+  await page.getByRole("menuitem").filter({ hasText: "Sign out" }).click();
+  await page.getByRole("alert").filter({ hasText: "Please retry sign out." }).waitFor();
+  assert.equal(await page.evaluate(async () => {
+    const { queryClient } = await import("/src/lib/query-client.ts");
+    return !!queryClient.getQueryData(["private-logout-regression"]);
+  }), true, "failed sign-out must retain the current user's data");
+  rejectLogout = false;
+  await page.getByRole("menuitem").filter({ hasText: "Sign out" }).click();
+  await page.waitForURL("**/login");
+  assert.deepEqual(await page.evaluate(async () => {
+    const { queryClient } = await import("/src/lib/query-client.ts");
+    return {
+      privateData: queryClient.getQueryData(["private-logout-regression"]) ?? null,
+      role: localStorage.getItem("schoolhub-active-role"),
+      period: sessionStorage.getItem("schoolhub-accountant-academic-view"),
+    };
+  }), { privateData: null, role: null, period: null });
+  await context.close();
+}
+
 try {
   await runDashboardHappyPath();
   await runHealthErrorRecovery();
+  await runLogoutCacheIsolation();
   process.stdout.write("SuperAdmin browser E2E passed: authenticated dashboard, loading/data states, manual refresh, migration status, and health-error recovery.\n");
 } finally {
   await browser.close();

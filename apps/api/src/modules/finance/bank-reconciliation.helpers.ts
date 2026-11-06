@@ -21,7 +21,13 @@ export type StatementMovement = {
 };
 
 const ZERO = new Prisma.Decimal(0);
-const money = (value: Prisma.Decimal.Value) => new Prisma.Decimal(value).toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP);
+const money = (value: Prisma.Decimal.Value) => {
+  const amount = new Prisma.Decimal(value);
+  if (!amount.isFinite() || amount.decimalPlaces() > 2) {
+    throw new Error("Reconciliation amounts must be finite currency values with at most two decimal places");
+  }
+  return amount;
+};
 
 /** Deterministic file fingerprint for exact duplicate-file rejection (hash raw bytes before decoding). */
 export function statementFileHash(bytes: Uint8Array): string {

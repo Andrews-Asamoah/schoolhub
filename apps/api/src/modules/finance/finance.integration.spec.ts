@@ -691,6 +691,59 @@ describe.skipIf(!enabled)("finance (database)", { timeout: 60_000 }, () => {
       expect(secondAfterReverse.balanceAmount.toFixed(2)).toBe("300.00");
       expect((await prisma.student.findUniqueOrThrow({ where: { id: student.id } })).outstandingBalance.toFixed(2)).toBe("1300.00");
     });
+
+    it("aggregates class and student reports from scoped records and allocated receipts", async () => {
+      const schoolClass = await prisma.class.create({
+        data: {
+          schoolId,
+          academicYearId: yearId,
+          name: `Report class ${run}`,
+          level: "Primary 1",
+        },
+      });
+      const { student, bill } = await studentWithBill(300);
+      await prisma.bill.update({
+        where: { id: bill.id },
+        data: { classId: schoolClass.id, issuedAt: new Date(day(-1)) },
+      });
+      await pay(student.id, bill.id, 100, { paymentDate: day(0) });
+
+      const classReport = await service.getDetailedFinanceReport(schoolId, {
+        from: day(-1),
+        to: day(0),
+        classId: schoolClass.id,
+      });
+      expect(classReport.billed).toBe("300.00");
+      expect(classReport.billedCount).toBe(1);
+      expect(classReport.collected).toBe("100.00");
+      expect(classReport.receiptCount).toBe(1);
+      expect(classReport.outstanding).toBe("200.00");
+      expect(classReport.byClass).toMatchObject([
+        {
+          classId: schoolClass.id,
+          billed: "300.00",
+          collected: "100.00",
+          outstanding: "200.00",
+          billCount: 1,
+          receiptCount: 1,
+        },
+      ]);
+
+      const studentReport = await service.getDetailedFinanceReport(schoolId, {
+        from: day(-1),
+        to: day(0),
+        studentId: student.id,
+      });
+      expect(studentReport.billed).toBe("300.00");
+      expect(studentReport.collected).toBe("100.00");
+      expect(studentReport.outstanding).toBe("200.00");
+
+      await expect(service.getDetailedFinanceReport("other-school", {
+        from: day(-1),
+        to: day(0),
+        studentId: student.id,
+      })).rejects.toThrow(/not found/i);
+    });
   });
 
 });

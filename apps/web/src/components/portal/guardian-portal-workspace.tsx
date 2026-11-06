@@ -1,3 +1,4 @@
+import {useGuardianWard} from "@/hooks/use-guardian-ward";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
@@ -92,6 +93,7 @@ export function GuardianPortalWorkspace({ defaultTab = "overview", showSectionNa
   });
 
   const wards = wardsQuery.data ?? [];
+  const [, selectWard] = useGuardianWard(wards);
   const announcements = (announcementsQuery.data ?? [])
     .filter((item) => !item.expiresAt || new Date(item.expiresAt).getTime() >= Date.now())
     .sort((a, b) => Number(b.isPinned) - Number(a.isPinned) || new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
@@ -129,13 +131,13 @@ export function GuardianPortalWorkspace({ defaultTab = "overview", showSectionNa
       {wardsQuery.isError && (
         <div role="alert" className="flex items-start gap-3 rounded-xl border border-destructive/25 bg-destructive/5 p-4 text-sm text-foreground">
           <AlertCircle className="mt-0.5 size-4 shrink-0 text-destructive" />
-          <div><p className="font-semibold">We couldn't load your linked children.</p><p className="mt-1 text-muted-foreground">{wardsQuery.error instanceof Error ? wardsQuery.error.message : "Please try again or contact the school office."}</p></div>
+          <div><button type="button" onClick={() => void wardsQuery.refetch()} disabled={wardsQuery.isFetching} className="font-semibold underline">Try again</button><p className="font-semibold">We couldn't load your linked children.</p><p className="mt-1 text-muted-foreground">{wardsQuery.error instanceof Error ? wardsQuery.error.message : "Please try again or contact the school office."}</p></div>
         </div>
       )}
 
       {activeTab === "overview" && (
         <div className="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          <Metric label="Linked children" value={wardsQuery.isPending ? "—" : String(wards.length)} detail="Children currently linked to this guardian account" icon={UsersRound} />
+          <Metric label="Linked children" value={wardsQuery.isPending || wardsQuery.isError ? "—" : String(wards.length)} detail="Children currently linked to this guardian account" icon={UsersRound} />
           <Metric label="Published reports" value="View reports" detail="Official report cards released by the school" icon={GraduationCap} />
           <Metric label="School updates" value={announcementsQuery.isPending || announcementsQuery.isError ? "—" : String(announcements.length)} detail={announcementsQuery.isError ? "School updates could not be loaded" : "Current notices available to your account"} icon={BellRing} />
         </div>
@@ -166,7 +168,7 @@ export function GuardianPortalWorkspace({ defaultTab = "overview", showSectionNa
                 return <article key={ward.id} className="flex flex-col gap-4 rounded-2xl border border-border bg-background/60 p-4 transition hover:border-primary/30 sm:flex-row sm:items-center">
                   <Initials name={name} />
                   <div className="min-w-0 flex-1"><h3 className="font-semibold text-foreground">{name}</h3><p className="mt-1 text-xs text-muted-foreground">{ward.class?.name ?? "Class not assigned"}{ward.admissionNumber ? ` · Admission no. ${ward.admissionNumber}` : ""}</p><div className="mt-2 flex flex-wrap gap-2">{ward.house?.name && <span className="rounded-full bg-primary/10 px-2.5 py-1 text-[11px] font-medium text-primary">{ward.house.name}</span>}<span className="rounded-full bg-muted px-2.5 py-1 text-[11px] font-medium text-muted-foreground">{ward.subjects.length} subjects</span></div></div>
-                  <Link to="/$page" params={{ page: "guardian-reports" }} className="inline-flex h-9 items-center justify-center gap-2 self-start rounded-lg border border-border px-3 text-xs font-semibold text-foreground transition hover:bg-accent sm:self-center">View reports <ChevronRight className="size-3.5" /></Link>
+                  <Link onClick={() => selectWard(ward.id)} to="/$page" params={{ page: "guardian-reports" }} className="inline-flex h-9 items-center justify-center gap-2 self-start rounded-lg border border-border px-3 text-xs font-semibold text-foreground transition hover:bg-accent sm:self-center">View reports <ChevronRight className="size-3.5" /></Link>
                 </article>;
               })}</div>}
           </section>
@@ -180,7 +182,7 @@ export function GuardianPortalWorkspace({ defaultTab = "overview", showSectionNa
         </div>
       )}
 
-      {activeTab === "academics" && <GuardianPublishedReports />}
+      {activeTab === "academics" && <GuardianPublishedReports wards={wards} />}
 
       {activeTab === "attendance" && <EmptyFeature icon={CalendarDays} title="Attendance records" description="Attendance is not yet connected to the guardian-facing live records in this portal. Once the school publishes attendance data for linked children, daily status, absence history and term attendance summaries will appear here." />}
 

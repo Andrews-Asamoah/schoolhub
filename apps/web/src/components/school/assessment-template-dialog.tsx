@@ -22,6 +22,7 @@ interface Row {
   isRequired: boolean;
   isRepeatable: boolean;
   expectedCount: string;
+  subjectStrandId: string;
 }
 
 const box =
@@ -30,7 +31,7 @@ const label = "grid gap-1 text-[11px] font-medium text-muted-foreground";
 const heading = "text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/70";
 
 let rowKey = 0;
-const rowFrom = (component: { id?: string; name: string; componentType: AssessmentTypeName; maxMarks: number; weight: number; isRequired: boolean; isRepeatable: boolean; expectedCount: number }): Row => ({
+const rowFrom = (component: { id?: string; name: string; componentType: AssessmentTypeName; maxMarks: number; weight: number; isRequired: boolean; isRepeatable: boolean; expectedCount: number; subjectStrandId?: string | null }): Row => ({
   key: ++rowKey,
   id: component.id,
   name: component.name,
@@ -40,6 +41,7 @@ const rowFrom = (component: { id?: string; name: string; componentType: Assessme
   isRequired: component.isRequired,
   isRepeatable: component.isRepeatable,
   expectedCount: String(component.expectedCount),
+  subjectStrandId: component.subjectStrandId ?? "",
 });
 
 /**
@@ -62,7 +64,10 @@ export function AssessmentTemplateDialog({
 }) {
   const queryClient = useQueryClient();
   const hasMarks = (template?.marksRecorded ?? 0) > 0;
-  const firstScale = setup.gradingSystems.find((system) => !system.shared) ?? setup.gradingSystems[0];
+  // Prefer a scale the school owns; never fall back to a class-ranked one by accident.
+  const firstScale = setup.gradingSystems.find((system) => !system.shared)
+    ?? setup.gradingSystems.find((system) => system.method === "SCORE_BANDS")
+    ?? setup.gradingSystems[0];
 
   const [name, setName] = useState(template?.name ?? "");
   const [description, setDescription] = useState(template?.description ?? "");
@@ -92,6 +97,8 @@ export function AssessmentTemplateDialog({
     };
   }, []);
 
+  const selectedSubject = setup.subjects.find((subject) => subject.code === subjectCode);
+  const subjectStrands = selectedSubject?.strands ?? [];
   const totalWeight = Math.round(rows.reduce((sum, row) => sum + (Number(row.weight) || 0), 0) * 100) / 100;
   const weightOk = Math.abs(totalWeight - 100) <= 0.01;
 
@@ -114,6 +121,7 @@ export function AssessmentTemplateDialog({
       isRequired: row.isRequired,
       isRepeatable: row.isRepeatable,
       expectedCount: row.isRepeatable ? Number(row.expectedCount) || 1 : 1,
+      subjectStrandId: row.subjectStrandId || undefined,
     })),
   };
   const parsed = saveAssessmentTemplateSchema.safeParse(candidate);
@@ -208,6 +216,9 @@ export function AssessmentTemplateDialog({
                       {setup.gradingSystems.map((system) => <SelectItem key={system.id} value={system.id}>{system.name}{system.shared ? " (shared)" : ""}</SelectItem>)}
                     </SelectContent>
                   </Select>
+                  {setup.gradingSystems.find((system) => system.id === gradingSystemId)?.method === "CLASS_RANK" && (
+                    <span className="text-[11px] font-normal text-muted-foreground">Grades come from each pupil&rsquo;s position in their class, so they can change as marks are entered.</span>
+                  )}
                 </label>
               ) : (
                 <div className={label}>
@@ -235,7 +246,10 @@ export function AssessmentTemplateDialog({
             <div className="grid gap-3 sm:grid-cols-2">
               <label className={label}>
                 Subject
-                <Select value={subjectCode || "__all__"} onValueChange={(value) => setSubjectCode(value === "__all__" ? "" : value)}>
+                <Select value={subjectCode || "__all__"} onValueChange={(value) => {
+                  setSubjectCode(value === "__all__" ? "" : value);
+                  setRows((current) => current.map((row) => ({ ...row, subjectStrandId: "" })));
+                }}>
                   <SelectTrigger aria-label="Apply to subject" className={box}><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="__all__">All subjects</SelectItem>
@@ -340,6 +354,28 @@ export function AssessmentTemplateDialog({
                       <button type="button" aria-label={`Remove ${row.name || `component ${index + 1}`}`} disabled={structureLocked || rows.length <= 1} onClick={() => setRows((current) => current.filter((item) => item.key !== row.key))} className="rounded-md p-1.5 text-destructive hover:bg-destructive/10 disabled:opacity-30"><Trash2 className="size-3.5" /></button>
                     </div>
                   </div>
+                  {subjectStrands.length > 0 && (
+                    <div className="mt-3 max-w-sm">
+                      <label className={label}>
+                        Teaching area
+                        <Select
+                          value={row.subjectStrandId || "__none__"}
+                          onValueChange={(value) => update(row.key, { subjectStrandId: value === "__none__" ? "" : value })}
+                          disabled={structureLocked}
+                        >
+                          <SelectTrigger aria-label={`Teaching area for ${row.name || `component ${index + 1}`}`} className={box}>
+                            <SelectValue placeholder="Choose teaching area" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="__none__" disabled>Choose teaching area</SelectItem>
+                            {subjectStrands.map((strand) => (
+                              <SelectItem key={strand.id} value={strand.id}>{strand.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </label>
+                    </div>
+                  )}
                   <div className="mt-2 flex flex-wrap items-center gap-x-5 gap-y-1 text-[11px] text-muted-foreground">
                     <label className="inline-flex items-center gap-1.5">
                       <input type="checkbox" checked={row.isRequired} disabled={structureLocked} onChange={(event) => update(row.key, { isRequired: event.target.checked })} className="accent-primary" />

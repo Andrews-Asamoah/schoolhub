@@ -1,78 +1,77 @@
 import {
-  useMutation,
   useQuery,
-  useQueryClient,
   type UseQueryResult,
 } from "@tanstack/react-query";
-import { createFileRoute, Link, useNavigate, useParams } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, useParams } from "@tanstack/react-router";
 import { CircleAlert, LoaderCircle } from "lucide-react";
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { SchoolWorkspaceLayout } from "@/components/school/school-workspace-layout";
 import {
   PreviewDataNotice,
-  WorkspaceDataTable,
   WorkspaceEmptyState,
   WorkspacePageHeading,
   WorkspaceStat,
-  type WorkspaceColumn,
 } from "@/components/school/workspace-ui";
 import { apiFetch, ApiError } from "@/lib/api";
-import { SubjectsWorkspace } from "@/components/school/subjects-workspace";
-import { TimetableWorkspace } from "@/components/school/timetable-workspace";
 import { useSession } from "@/lib/auth-client";
 import { canRoleAccessPage, getSchoolNavItem } from "@/lib/school-navigation";
-import { TicketWorkspace } from "@/components/support/ticket-workspace";
-import { AcademicYearSetup } from "@/components/school/academic-year-setup";
-import { TeamRoleWorkspace } from "@/components/school/team-role-workspace";
-import { ClassesWorkspace } from "@/components/school/classes-workspace";
 import { useSchoolRole } from "@/components/school/school-role-switcher";
 import { useTeachingOverview } from "@/lib/teaching";
-import { AdmissionsWorkspace } from "@/components/school/admissions-workspace";
-import { EnrollmentWorkspace } from "@/components/school/enrollment-workspace";
-import { StudentDirectoryWorkspace } from "@/components/school/student-directory-workspace";
-import { PeopleWorkspace } from "@/components/school/people-workspace";
-import { SchoolLogoUploader } from "@/components/school/school-logo-uploader";
-import { AssessmentEntryWorkspace } from "@/components/school/assessment-entry-workspace";
-import { AssessmentsAdmin } from "@/components/school/assessments-admin";
-import { ClassRegister } from "@/components/school/class-register";
-import { AttendanceReviewWorkspace } from "@/components/school/attendance-review-workspace";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { SchoolSettingsForm } from "@/components/school/school-settings-form";
-import { ProfileWorkspace } from "@/components/school/profile-workspace";
-import { HousesWorkspace } from "@/components/school/houses-workspace";
-import { ClubsWorkspace } from "@/components/school/clubs-workspace";
-import { TeacherPortalWorkspace } from "@/components/portal/teacher-portal-workspace";
-import { AccountantPortalWorkspace } from "@/components/portal/accountant-portal-workspace";
-import { ExpenseManagementWorkspace } from "@/components/portal/expense-management-workspace";
-import { PayrollManagementWorkspace } from "@/components/portal/payroll-management-workspace";
-import { FeeReminderWorkspace } from "@/components/portal/fee-reminder-workspace";
-import { InventoryManagementWorkspace } from "@/components/portal/inventory-management-workspace";
-import { FeeStructuresWorkspace } from "@/components/portal/fee-structures-workspace";
-import { ConcessionsWorkspace } from "@/components/portal/concessions-workspace";
-import { FinanceAuditWorkspace } from "@/components/portal/finance-audit-workspace";
-import { StudentStatementWorkspace } from "@/components/portal/student-statement-workspace";
-import { TermEndReviewWorkspace } from "@/components/portal/term-end-review-workspace";
-import { SignaturesWorkspace } from "@/components/school/signatures-workspace";
-import { GuardianPortalWorkspace } from "@/components/portal/guardian-portal-workspace";
-import { GuardianChildRecordsWorkspace } from "@/components/portal/guardian-child-records-workspace";
-import { GuardianFeesWorkspace } from "@/components/portal/guardian-fees-workspace";
-import { StudentPortalWorkspace } from "@/components/portal/student-portal-workspace";
-import { StudentSubjectsView } from "@/components/portal/student-subjects-view";
-import { StudentAttendanceView } from "@/components/portal/student-attendance-view";
-import { StudentReportView } from "@/components/portal/student-report-view";
-import { StudentClassmatesView } from "@/components/portal/student-classmates-view";
-import { StudentHouseClubsView } from "@/components/portal/student-house-clubs-view";
-import { StudentAssignmentsView } from "@/components/portal/student-assignments-view";
-import { TeacherAssignmentsWorkspace } from "@/components/portal/teacher-assignments-workspace";
-import { StudentAnnouncementsView } from "@/components/portal/student-announcements-view";
-import { AdminAnnouncementsWorkspace } from "@/components/portal/admin-announcements-workspace";
-import { DocumentsWorkspace } from "@/components/portal/documents-workspace";
-import { MessagesWorkspace } from "@/components/portal/messages-workspace";
-import { NotificationsHistoryWorkspace } from "@/components/portal/notifications-history-workspace";
-import { SchoolReportsWorkspace } from "@/components/school/reports-workspace";
-import { InternalExaminationsWorkspace } from "@/components/school/internal-examinations-workspace";
-import { ExternalExaminationsWorkspace } from "@/components/school/external-examinations-workspace";
-import { TeacherReportReviewWorkspace } from "@/components/school/teacher-report-review-workspace";
+
+const AbsenceRequestsWorkspace = lazy(() => import("@/components/portal/absence-requests-workspace").then(module => ({default:module.AbsenceRequestsWorkspace})));
+const TicketWorkspace = lazy(() => import("@/components/support/ticket-workspace").then((m) => ({ default: m.TicketWorkspace })));
+const AcademicYearSetup = lazy(() => import("@/components/school/academic-year-setup").then((m) => ({ default: m.AcademicYearSetup })));
+const SchoolLogoUploader = lazy(() => import("@/components/school/school-logo-uploader").then((m) => ({ default: m.SchoolLogoUploader })));
+const SubjectsWorkspace = lazy(() => import("@/components/school/subjects-workspace").then((m) => ({ default: m.SubjectsWorkspace })));
+const TimetableWorkspace = lazy(() => import("@/components/school/timetable-workspace").then((m) => ({ default: m.TimetableWorkspace })));
+const TeamRoleWorkspace = lazy(() => import("@/components/school/team-role-workspace").then((m) => ({ default: m.TeamRoleWorkspace })));
+const ClassesWorkspace = lazy(() => import("@/components/school/classes-workspace").then((m) => ({ default: m.ClassesWorkspace })));
+const AdmissionsWorkspace = lazy(() => import("@/components/school/admissions-workspace").then((m) => ({ default: m.AdmissionsWorkspace })));
+const EnrollmentWorkspace = lazy(() => import("@/components/school/enrollment-workspace").then((m) => ({ default: m.EnrollmentWorkspace })));
+const StudentDirectoryWorkspace = lazy(() => import("@/components/school/student-directory-workspace").then((m) => ({ default: m.StudentDirectoryWorkspace })));
+const PeopleWorkspace = lazy(() => import("@/components/school/people-workspace").then((m) => ({ default: m.PeopleWorkspace })));
+const AssessmentEntryWorkspace = lazy(() => import("@/components/school/assessment-entry-workspace").then((m) => ({ default: m.AssessmentEntryWorkspace })));
+const AssessmentTrackingWorkspace = lazy(() => import("@/components/school/assessment-tracking-workspace").then((m) => ({ default: m.AssessmentTrackingWorkspace })));
+const AssessmentsAdmin = lazy(() => import("@/components/school/assessments-admin").then((m) => ({ default: m.AssessmentsAdmin })));
+const ClassRegister = lazy(() => import("@/components/school/class-register").then((m) => ({ default: m.ClassRegister })));
+const AttendanceReviewWorkspace = lazy(() => import("@/components/school/attendance-review-workspace").then((m) => ({ default: m.AttendanceReviewWorkspace })));
+const SchoolSettingsForm = lazy(() => import("@/components/school/school-settings-form").then((m) => ({ default: m.SchoolSettingsForm })));
+const ProfileWorkspace = lazy(() => import("@/components/school/profile-workspace").then((m) => ({ default: m.ProfileWorkspace })));
+const HousesWorkspace = lazy(() => import("@/components/school/houses-workspace").then((m) => ({ default: m.HousesWorkspace })));
+const ClubsWorkspace = lazy(() => import("@/components/school/clubs-workspace").then((m) => ({ default: m.ClubsWorkspace })));
+const TeacherPortalWorkspace = lazy(() => import("@/components/portal/teacher-portal-workspace").then((m) => ({ default: m.TeacherPortalWorkspace })));
+const AccountantPortalWorkspace = lazy(() => import("@/components/portal/accountant-portal-workspace").then((m) => ({ default: m.AccountantPortalWorkspace })));
+const ExpenseManagementWorkspace = lazy(() => import("@/components/portal/expense-management-workspace").then((m) => ({ default: m.ExpenseManagementWorkspace })));
+const PayrollManagementWorkspace = lazy(() => import("@/components/portal/payroll-management-workspace").then((m) => ({ default: m.PayrollManagementWorkspace })));
+const FeeReminderWorkspace = lazy(() => import("@/components/portal/fee-reminder-workspace").then((m) => ({ default: m.FeeReminderWorkspace })));
+const InventoryManagementWorkspace = lazy(() => import("@/components/portal/inventory-management-workspace").then((m) => ({ default: m.InventoryManagementWorkspace })));
+const FeeStructuresWorkspace = lazy(() => import("@/components/portal/fee-structures-workspace").then((m) => ({ default: m.FeeStructuresWorkspace })));
+const ConcessionsWorkspace = lazy(() => import("@/components/portal/concessions-workspace").then((m) => ({ default: m.ConcessionsWorkspace })));
+const FinanceAuditWorkspace = lazy(() => import("@/components/portal/finance-audit-workspace").then((m) => ({ default: m.FinanceAuditWorkspace })));
+const StudentStatementWorkspace = lazy(() => import("@/components/portal/student-statement-workspace").then((m) => ({ default: m.StudentStatementWorkspace })));
+const TermEndReviewWorkspace = lazy(() => import("@/components/portal/term-end-review-workspace").then((m) => ({ default: m.TermEndReviewWorkspace })));
+const SignaturesWorkspace = lazy(() => import("@/components/school/signatures-workspace").then((m) => ({ default: m.SignaturesWorkspace })));
+const GuardianPortalWorkspace = lazy(() => import("@/components/portal/guardian-portal-workspace").then((m) => ({ default: m.GuardianPortalWorkspace })));
+const GuardianChildRecordsWorkspace = lazy(() => import("@/components/portal/guardian-child-records-workspace").then((m) => ({ default: m.GuardianChildRecordsWorkspace })));
+const GuardianFeesWorkspace = lazy(() => import("@/components/portal/guardian-fees-workspace").then((m) => ({ default: m.GuardianFeesWorkspace })));
+const StudentPortalWorkspace = lazy(() => import("@/components/portal/student-portal-workspace").then((m) => ({ default: m.StudentPortalWorkspace })));
+const StudentSubjectsView = lazy(() => import("@/components/portal/student-subjects-view").then((m) => ({ default: m.StudentSubjectsView })));
+const StudentAttendanceView = lazy(() => import("@/components/portal/student-attendance-view").then((m) => ({ default: m.StudentAttendanceView })));
+const StudentReportView = lazy(() => import("@/components/portal/student-report-view").then((m) => ({ default: m.StudentReportView })));
+const StudentClassmatesView = lazy(() => import("@/components/portal/student-classmates-view").then((m) => ({ default: m.StudentClassmatesView })));
+const StudentHouseClubsView = lazy(() => import("@/components/portal/student-house-clubs-view").then((m) => ({ default: m.StudentHouseClubsView })));
+const StudentAssignmentsView = lazy(() => import("@/components/portal/student-assignments-view").then((m) => ({ default: m.StudentAssignmentsView })));
+const TeacherAssignmentsWorkspace = lazy(() => import("@/components/portal/teacher-assignments-workspace").then((m) => ({ default: m.TeacherAssignmentsWorkspace })));
+const StudentAnnouncementsView = lazy(() => import("@/components/portal/student-announcements-view").then((m) => ({ default: m.StudentAnnouncementsView })));
+const AdminAnnouncementsWorkspace = lazy(() => import("@/components/portal/admin-announcements-workspace").then((m) => ({ default: m.AdminAnnouncementsWorkspace })));
+const DocumentsWorkspace = lazy(() => import("@/components/portal/documents-workspace").then((m) => ({ default: m.DocumentsWorkspace })));
+const MessagesWorkspace = lazy(() => import("@/components/portal/messages-workspace").then((m) => ({ default: m.MessagesWorkspace })));
+const NotificationsHistoryWorkspace = lazy(() => import("@/components/portal/notifications-history-workspace").then((m) => ({ default: m.NotificationsHistoryWorkspace })));
+const SchoolReportsWorkspace = lazy(() => import("@/components/school/reports-workspace").then((m) => ({ default: m.SchoolReportsWorkspace })));
+const InternalExaminationsWorkspace = lazy(() => import("@/components/school/internal-examinations-workspace").then((m) => ({ default: m.InternalExaminationsWorkspace })));
+const ExternalExaminationsWorkspace = lazy(() => import("@/components/school/external-examinations-workspace").then((m) => ({ default: m.ExternalExaminationsWorkspace })));
+const TeacherReportReviewWorkspace = lazy(() => import("@/components/school/teacher-report-review-workspace").then((m) => ({ default: m.TeacherReportReviewWorkspace })));
 
 export const Route = createFileRoute("/$page")({
   component: WorkspaceRoute,
@@ -131,7 +130,7 @@ interface School {
 function WorkspaceRoute() {
   const { page } = useParams({ from: "/$page" });
   const navItem = getSchoolNavItem(page);
-  const { activeRole } = useSchoolRole();
+  const { activeRole, isPending: rolePending, error: roleError } = useSchoolRole();
   const navigate = useNavigate();
   const blocked = Boolean(navItem && activeRole && !canRoleAccessPage(activeRole, navItem.id));
 
@@ -140,6 +139,8 @@ function WorkspaceRoute() {
   useEffect(() => {
     if (blocked) void navigate({ to: "/dashboard", replace: true });
   }, [blocked, navigate]);
+  if (rolePending) return <p role="status" className="p-6">Loading your role…</p>;
+  if (roleError || !activeRole) return <p role="alert" className="p-6">Your role could not be verified. Please sign in again.</p>;
   if (blocked) return null;
 
   if (!navItem) {
@@ -147,7 +148,6 @@ function WorkspaceRoute() {
       <SchoolWorkspaceLayout
         activePage=""
         title="Page not found"
-        section="Workspace"
       >
         <WorkspaceEmptyState
           title="We couldn’t find that page"
@@ -161,9 +161,17 @@ function WorkspaceRoute() {
     <SchoolWorkspaceLayout
       activePage={navItem.id}
       title={navItem.label}
-      section={navItem.section}
     >
-      <WorkspaceContent pageId={navItem.id} />
+      <Suspense
+        fallback={
+          <div role="status" className="flex items-center gap-2 rounded-xl border border-border bg-card p-6 text-sm text-muted-foreground">
+            <LoaderCircle className="size-4 animate-spin" />
+            Loading workspace…
+          </div>
+        }
+      >
+        <WorkspaceContent pageId={navItem.id} />
+      </Suspense>
     </SchoolWorkspaceLayout>
   );
 }
@@ -172,7 +180,7 @@ function WorkspaceContent({ pageId }: { pageId: string }) {
   const { data: session } = useSession();
   const isSignedIn = !!session?.user;
   const { activeRole } = useSchoolRole();
-  const canManageClasses = activeRole === "owner" || activeRole === "admin";
+  const canManageClasses = ["owner", "admin", "headteacher"].includes(activeRole ?? "");
 
   const classesQuery = useQuery({
     queryKey: ["academics", "classes"],
@@ -308,11 +316,12 @@ function WorkspaceContent({ pageId }: { pageId: string }) {
               <AssessmentsAdmin />
             )
           )}
+          {pageId === "assessment-tracking" && <AssessmentTrackingWorkspace role={activeRole ?? undefined} />}
           {pageId === "reports" && (
             activeRole === "student" ? <StudentReportView /> : <SchoolReportsWorkspace />
           )}
           {pageId === "attendance" && (
-            activeRole === "student" ? <StudentAttendanceView /> : <AttendanceWorkspace query={classesQuery} />
+            activeRole === "student" ? <StudentAttendanceView /> : <><AttendanceWorkspace query={classesQuery} /><AbsenceRequestsWorkspace /></>
           )}
           {pageId === "concessions" && <ConcessionsWorkspace />}
           {pageId === "signatures" && <SignaturesWorkspace />}

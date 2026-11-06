@@ -9,6 +9,8 @@ export interface SetupComponent {
   isRequired: boolean;
   isRepeatable: boolean;
   expectedCount: number;
+  subjectStrandId: string | null;
+  subjectStrandName: string | null;
 }
 export interface SetupTemplate {
   id: string;
@@ -32,11 +34,15 @@ export interface SetupBand {
   maxScore: number;
   gradePoint: number;
 }
+/** SCORE_BANDS grades a percentage; CLASS_RANK grades a pupil's position within their own class. */
+export type GradingMethod = "SCORE_BANDS" | "CLASS_RANK";
+
 export interface SetupGradingSystem {
   id: string;
   name: string;
   code: string;
   description: string | null;
+  method: GradingMethod;
   /** A shared default: usable by every school, not editable here. */
   shared: boolean;
   usedBy: number;
@@ -46,10 +52,21 @@ export interface SetupGradingSystem {
 export interface AssessmentSetup {
   term: { id: string; name: string; termNumber: number } | null;
   classes: { id: string; name: string; level: string }[];
-  subjects: { id: string; code: string; name: string }[];
+  subjects: { id: string; code: string; name: string; strands: { id: string; name: string; code: string | null; sortOrder: number }[] }[];
   templates: SetupTemplate[];
   gradingSystems: SetupGradingSystem[];
   uncovered: { classId: string; className: string; subjectId: string; subjectName: string }[];
+}
+
+/**
+ * How a band reads on screen. Score bands show their percentage range. Class-ranked
+ * bands hold cumulative class shares, so they read as the BECE does: Top 4%, Next 7%, ... Bottom 4%.
+ */
+export function bandRangeLabel(method: GradingMethod, band: Pick<SetupBand, "minScore" | "maxScore">, index: number, count: number): string {
+  if (method === "SCORE_BANDS") return `${band.minScore}–${band.maxScore}`;
+  const share = Math.round((band.maxScore - band.minScore) * 100) / 100;
+  if (index === 0) return `Top ${share}%`;
+  return index === count - 1 ? `Bottom ${share}%` : `Next ${share}%`;
 }
 
 /** A familiar six-grade scale, offered as a starting point. */
@@ -64,8 +81,8 @@ export const STANDARD_BANDS: SetupBand[] = [
 
 /** Class assessment out of 30 plus an end-of-term exam out of 70. */
 export const STANDARD_COMPONENTS: Omit<SetupComponent, "id">[] = [
-  { name: "Class assessment", componentType: "CLASS_TEST", maxMarks: 30, weight: 30, isRequired: true, isRepeatable: false, expectedCount: 1 },
-  { name: "End-of-term exam", componentType: "FINAL_EXAM", maxMarks: 70, weight: 70, isRequired: true, isRepeatable: false, expectedCount: 1 },
+  { name: "Class assessment", componentType: "CLASS_TEST", maxMarks: 30, weight: 30, isRequired: true, isRepeatable: false, expectedCount: 1, subjectStrandId: null, subjectStrandName: null },
+  { name: "End-of-term exam", componentType: "FINAL_EXAM", maxMarks: 70, weight: 70, isRequired: true, isRepeatable: false, expectedCount: 1, subjectStrandId: null, subjectStrandName: null },
 ];
 
 /** The save payload for an existing assessment, so a quick change (on/off, lock) keeps everything else. */
@@ -80,7 +97,10 @@ export function templateToInput(template: SetupTemplate, changes: Partial<SaveAs
     deadline: template.deadline ? template.deadline.slice(0, 10) : null,
     isActive: template.isActive,
     isLocked: template.isLocked,
-    components: template.components,
+    components: template.components.map(({ subjectStrandId, subjectStrandName: _subjectStrandName, ...component }) => ({
+      ...component,
+      ...(subjectStrandId ? { subjectStrandId } : {}),
+    })),
     ...changes,
   };
 }

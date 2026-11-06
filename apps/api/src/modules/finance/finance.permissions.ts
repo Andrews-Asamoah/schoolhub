@@ -13,8 +13,14 @@
 /** Roles that may change financial data (bills, payments, expenses, payroll, concessions...). */
 export const FINANCE_WRITE_ROLES = ["accountant"] as const;
 
-/** Roles that may view financial data and reports. */
-export const FINANCE_READ_ROLES = ["owner", "admin", "accountant", "headteacher"] as const;
+/**
+ * Roles that may view detailed financial records and reports. Administrators
+ * receive aggregate-only totals from the school dashboard, not these routes.
+ */
+export const FINANCE_READ_ROLES = ["owner", "accountant", "headteacher"] as const;
+
+/** Roles allowed aggregate-only finance metrics on the school dashboard. */
+export const FINANCE_SUMMARY_ROLES = ["owner", "admin", "accountant", "headteacher"] as const;
 
 /** Payroll and salary exports are confidential: only accountant, owner and headteacher may export. */
 export const FINANCE_PAYROLL_EXPORT_ROLES = ["accountant", "owner", "headteacher"] as const;

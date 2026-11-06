@@ -14,6 +14,7 @@ import {
 } from '../accounts/credentials.service.js';
 import { roleForStaffType } from '../accounts/staff-roles.js';
 import { toTeacherBiodata } from './teacher-biodata.js';
+import { nextStaffNumber } from './staff-number.js';
 import type { Prisma } from '@prisma/client';
 import { guardianEmailDomain } from '@schoolhub/shared';
 import { assertSubscriptionCapacity } from '../../common/subscription-capacity.js';
@@ -141,12 +142,20 @@ export class PeopleService {
             : null,
         },
       });
+      // A number typed in (e.g. imported from the old system) is kept as is.
+      const staffNumber =
+        input.staffNumber?.trim() ||
+        (await nextStaffNumber(tx, {
+          schoolId: school.id,
+          kind: 'teacher',
+          hireDate: input.hireDate,
+        }));
       const created = await tx.teacher.create({
         data: {
           schoolId: school.id,
           profileId: login.profileId,
           teacherId,
-          staffNumber: input.staffNumber?.trim() || null,
+          staffNumber,
           invitationEmail: login.email,
           firstName: input.firstName,
           lastName: input.lastName,
@@ -328,12 +337,19 @@ export class PeopleService {
           phone: input.phone,
         },
       });
+      const staffNumber =
+        input.staffNumber?.trim() ||
+        (await nextStaffNumber(tx, {
+          schoolId: school.id,
+          kind: 'staff',
+          hireDate: input.hireDate,
+        }));
       const staff = await tx.staff.create({
         data: {
           schoolId: school.id,
           profileId: login.profileId!,
           staffId: input.staffId?.trim() || newPublicId('STF'),
-          staffNumber: input.staffNumber?.trim() || null,
+          staffNumber,
           staffType: input.staffType,
           departmentId: input.departmentId || null,
           jobTitle: input.jobTitle || null,

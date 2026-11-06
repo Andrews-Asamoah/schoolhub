@@ -12,12 +12,30 @@ Requirements: Node.js 22+, pnpm 12.4.1, Docker.
 pnpm install
 cp .env.example .env            # then set BETTER_AUTH_SECRET (openssl rand -base64 48)
 docker compose up -d db         # PostgreSQL on localhost:5433
-pnpm db:migrate                 # development migrations (prisma migrate dev)
+pnpm db:deploy                  # apply the committed migrations; keeps existing data
+pnpm --filter @schoolhub/api prisma:generate
 pnpm --filter @schoolhub/api seed   # optional: creates the super admin from SUPER_ADMIN_* env vars
 pnpm dev                        # web :5173, API :3001
 ```
 
 Open `http://localhost:5173`. To exercise a school subdomain locally, use `http://<subdomain>.localhost:5173`.
+
+## Updating an existing local database
+
+After pulling `dev`, apply the committed migrations and regenerate the client:
+
+```bash
+pnpm install --frozen-lockfile
+pnpm db:deploy
+pnpm --filter @schoolhub/api prisma:generate
+pnpm --filter @schoolhub/api exec prisma migrate status
+pnpm --filter @schoolhub/api exec prisma migrate diff --from-config-datasource --to-schema prisma/schema --exit-code
+```
+
+The status should report that the database is up to date and the diff should be empty (exit code 0).
+`db:migrate` runs `prisma migrate dev`, which also **creates** migrations when the schema differs from the migration history. Use it intentionally when developing a database change, with a descriptive name, for example `pnpm db:migrate --name add_example_field`.
+
+If an ordinary update unexpectedly asks for a migration name, cancel with Ctrl+C and inspect the diff before creating anything. Do not reset the database, delete migration history, or mark migrations as applied to dismiss the prompt. If you already created a local migration, review its SQL and `git status` before proceeding; an applied migration must not simply be deleted. CI checks the migrated database against the schema to catch this mismatch before merge.
 
 ## Checks
 

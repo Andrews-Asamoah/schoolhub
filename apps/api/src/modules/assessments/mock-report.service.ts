@@ -37,7 +37,7 @@ export class MockReportService {
   async gradingSystems(schoolId:string,role:string|undefined){
     if(!isSchoolManager(role))throw new ForbiddenException();
     const systems=await this.prisma.client.gradingSystem.findMany({
-      where:{isActive:true,OR:[{schoolId},{schoolId:null,isSystemDefault:true}]},
+      where:{isActive:true,method:"SCORE_BANDS",OR:[{schoolId},{schoolId:null,isSystemDefault:true}]},
       include:{gradeScales:{orderBy:{displayOrder:"asc"}}},
       orderBy:{name:"asc"},
     });
@@ -75,7 +75,7 @@ export class MockReportService {
       const already=await tx.internalMockReport.count({where:{schoolId,sessionId}});
       if(already)throw new ConflictException("Reports already generated. Corrections require a controlled new version.");
       const gradeSystem=await tx.gradingSystem.findFirst({
-        where:{id:gradingSystemId,isActive:true,
+        where:{id:gradingSystemId,isActive:true,method:"SCORE_BANDS",
           OR:[{schoolId},{schoolId:null,isSystemDefault:true}]},
         include:{gradeScales:{orderBy:{displayOrder:"asc"}}},
       });

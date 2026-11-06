@@ -42,7 +42,7 @@ describe("Phase 1 browser export contract", () => {
     const wizard = readWeb("components/school/student-import-wizard.tsx");
     expect(importer).toContain("downloadCsvTemplate");
     expect(importer).toContain('type: "text/csv;charset=utf-8"');
-    expect(wizard).toContain('accept=".csv,.xlsx"');
+    expect(wizard).toContain('extensions={[".csv", ".xlsx"]}');
     expect(wizard).not.toMatch(/\bexportCsv\b|\btoCsv\b|\bdownloadCsv\s*\(/i);
     expect(wizard).not.toMatch(/Download CSV|Export CSV/i);
   });

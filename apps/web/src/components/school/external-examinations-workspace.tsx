@@ -41,7 +41,7 @@ const label=(error:unknown)=>error instanceof Error?error.message:"Unable to com
 
 export function ExternalExaminationsWorkspace(){
   const {activeRole}=useSchoolRole();
-  const manager=activeRole==="owner"||activeRole==="admin";
+  const manager=["owner","admin","headteacher"].includes(activeRole??"");
   const headteacher=activeRole==="headteacher";
   const client=useQueryClient();
   const [yearId,setYearId]=useState("");

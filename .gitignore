@@ -42,3 +42,7 @@ Thumbs.db
 playwright-report/
 test-results/
 .tmp/
+
+# Expo-generated local state
+apps/mobile/.expo/
+apps/mobile/expo-env.d.ts

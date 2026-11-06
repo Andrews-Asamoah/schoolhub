@@ -29,6 +29,7 @@ import {
   UserRound,
   UsersRound,
   WalletCards,
+  ListChecks,
   type LucideIcon,
 } from "lucide-react";
 
@@ -145,6 +146,14 @@ export const schoolNavGroups: SchoolNavGroup[] = [
         label: "Assessments",
         icon: ClipboardCheck,
         description: "Grading templates, score entry, and student reports.",
+        section: "Academics",
+        apiStatus: "available",
+      },
+      {
+        id: "assessment-tracking",
+        label: "Marks tracking",
+        icon: ListChecks,
+        description: "Teacher completion of marks entry, deadline extensions and correction approvals.",
         section: "Academics",
         apiStatus: "available",
       },
@@ -509,7 +518,31 @@ schoolNavGroups.push({
 
 export const schoolNavItems = schoolNavGroups.flatMap((group) => group.items);
 
+const adminRestrictedFinancePages = new Set([
+  "accountant-portal",
+  "concessions",
+  "fees",
+  "payments",
+  "invoices",
+  "expenses",
+  "payroll",
+  "fee-reminders",
+  "outstanding",
+  "finance-audit",
+  "student-statements",
+  "term-end-review",
+  "finance-reports",
+]);
+
+const personalPages = new Set(["guardian-portal", "guardian-attendance", "guardian-timetable", "guardian-reports", "guardian-notices", "guardian-fees", "student-portal", "teacher-portal", "classmates"]);
+const managementPages = schoolNavItems.filter((item) => !personalPages.has(item.id)).map((item) => item.id);
+
 const rolePages: Record<string, string[]> = {
+  owner: managementPages,
+  headteacher: managementPages,
+  admin: schoolNavItems
+    .filter((item) => !adminRestrictedFinancePages.has(item.id) && !personalPages.has(item.id))
+    .map((item) => item.id),
   teacher: [
     "external-exams",
     "internal-exams",
@@ -597,16 +630,11 @@ const ownPortalByRole: Record<string, string> = {
  * administrator, headteacher) see everything else, so these are left out of
  * their sidebar.
  */
-const studentOnlyPages = ["classmates"];
 
 export function getSchoolNavGroupsForRole(role?: string) {
-  const allowedPages = rolePages[role ?? ""];
+  const allowedPages = rolePages[role ?? ""] ?? [];
   const groups = schoolNavGroups.filter((group) => group.label !== "Portals" && group.label !== "Account");
-  if (!allowedPages) {
-    return groups
-      .map((group) => ({ ...group, items: group.items.filter((item) => !studentOnlyPages.includes(item.id)) }))
-      .filter((group) => group.items.length > 0);
-  }
+
 
   return groups
     .map((group) => ({
@@ -630,7 +658,7 @@ export function canRoleAccessPage(role: string | null | undefined, pageId: strin
   const item = schoolNavItems.find((entry) => entry.id === pageId);
   if (item?.section === "Account") return true;
   const allowed = rolePages[role ?? ""];
-  return !allowed || allowed.includes(pageId);
+  return Boolean(allowed?.includes(pageId));
 }
 
 export function getSchoolNavItem(id: string) {
