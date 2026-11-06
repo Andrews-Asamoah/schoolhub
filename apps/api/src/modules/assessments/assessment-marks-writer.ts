@@ -108,9 +108,19 @@ export async function applyMarkChanges(tx: Prisma.TransactionClient, args: Apply
         totalScore: new Prisma.Decimal(0),
         percentage: new Prisma.Decimal(0),
       })),
-      select: { id: true, studentId: true, isLocked: true, componentScores: { select: { id: true, componentId: true, occurrenceIndex: true, marksObtained: true } } },
+      select: {
+        id: true,
+        studentId: true,
+        isLocked: true,
+      },
     });
-    for (const row of created) scoreByStudent.set(row.studentId, row);
+
+    for (const row of created) {
+      scoreByStudent.set(row.studentId, {
+        ...row,
+        componentScores: [],
+      });
+    }
   }
 
   const now = new Date();
