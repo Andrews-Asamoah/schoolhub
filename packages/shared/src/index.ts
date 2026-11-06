@@ -1945,3 +1945,18 @@ export const studentDeletionQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(20),
 });
 export type StudentDeletionQuery = z.infer<typeof studentDeletionQuerySchema>;
+
+/** 1 → { n: 1, suffix: "st" }, 12 → "th", 23 → "rd". For positions like 3rd, shown with a raised suffix. */
+export function ordinalParts(value: number): { n: number; suffix: "st" | "nd" | "rd" | "th" } {
+  const n = Math.trunc(value);
+  const lastTwo = Math.abs(n) % 100;
+  if (lastTwo >= 11 && lastTwo <= 13) return { n, suffix: "th" };
+  const suffix = ({ 1: "st", 2: "nd", 3: "rd" } as const)[(Math.abs(n) % 10) as 1 | 2 | 3] ?? "th";
+  return { n, suffix };
+}
+
+/** The weight every subject shares (for a column heading like "Class Score (50%)"), or null when they differ or none is known. */
+export function commonWeight(weights: readonly (number | null | undefined)[]): number | null {
+  const known = weights.filter((weight): weight is number => typeof weight === "number" && weight > 0);
+  return known.length > 0 && known.length === weights.length && known.every((weight) => weight === known[0]) ? known[0]! : null;
+}

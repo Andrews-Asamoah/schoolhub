@@ -57,7 +57,7 @@ describe.skipIf(!enabled)("versioned academic reports (PostgreSQL)",{timeout:90_
         teacherId:actor===teacher?actor:null,
         classTeacherClassIds:actor===teacher?[classId]:[],subjectAssignments:[],
       }),
-    } as never);
+    } as never,{read:async()=>{throw new Error("no storage in this test");}} as never);
     publisher=new ReportPublicationService({client:db} as never);
   });
   afterAll(async()=>{

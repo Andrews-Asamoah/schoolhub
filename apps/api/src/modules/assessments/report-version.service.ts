@@ -4,12 +4,35 @@ import {
 } from "@nestjs/common";
 import { PrismaService } from "../../prisma/prisma.service.js";
 import { TeacherScopeService } from "../../common/scope/teacher-scope.service.js";
+import { PrivateStorageService } from "../storage/private-storage.service.js";
+import { sniffImage } from "../storage/image-validation.js";
 import { academicReportPdf, snapshotHash, type AcademicSnapshot } from "./report-version.js";
+
+const MAX_SIGNATURE_BYTES = 400 * 1024;
 
 @Injectable()
 export class ReportVersionService {
   constructor(private readonly prisma: PrismaService,
-    private readonly teacherScope: TeacherScopeService) {}
+    private readonly teacherScope: TeacherScopeService,
+    private readonly storage: PrivateStorageService) {}
+
+  /**
+   * The approver's signature image as a data URL, copied onto the report at the
+   * moment they approve so the report never changes if they later replace it.
+   * Null when they have none, it is too large to embed, or it can't be read:
+   * the report then shows their name only.
+   */
+  private async signatureFor(schoolId: string, userId: string): Promise<string | null> {
+    try {
+      const profile = await this.prisma.client.userProfile.findUnique({ where: { userId }, select: { signatureStorageKey: true } });
+      if (!profile?.signatureStorageKey) return null;
+      const bytes = await this.storage.read(schoolId, profile.signatureStorageKey, MAX_SIGNATURE_BYTES);
+      const image = sniffImage(bytes);
+      return image ? `data:${image.mime};base64,${bytes.toString("base64")}` : null;
+    } catch {
+      return null;
+    }
+  }
 
   async teacherQueue(schoolId: string, userId: string) {
     const assignments = await this.teacherScope.getAssignments(schoolId, userId);
@@ -49,6 +72,7 @@ export class ReportVersionService {
       where: { id: userId }, select: { id: true, name: true },
     });
     if (!actor) throw new ForbiddenException("The approving staff account is not available.");
+    const signature = await this.signatureFor(schoolId, userId);
     return this.prisma.client.$transaction(async tx => {
       const v = await tx.reportCardVersion.findFirst({
         where: { id: versionId, schoolId }, include: { set: { select: { status: true, schoolId: true } } },
@@ -71,7 +95,7 @@ export class ReportVersionService {
       const result = await tx.reportCardVersion.updateMany({
         where: { id: v.id, schoolId, stage: "GENERATED" },
         data: { stage: "TEACHER_REVIEWED", teacherActorId: actor.id,
-          teacherName: actor.name.slice(0,160), teacherRemark: remark.trim(), teacherApprovedAt: time },
+          teacherName: actor.name.slice(0,160), teacherRemark: remark.trim(), teacherApprovedAt: time, teacherSignature: signature },
       });
       if (result.count !== 1) throw new ConflictException("This report changed while being reviewed.");
       await tx.auditLog.create({ data: { schoolId, userId: actor.id, action: "UPDATE",
@@ -87,6 +111,7 @@ export class ReportVersionService {
       where: { id: userId }, select: { id: true, name: true },
     });
     if (!actor) throw new ForbiddenException("The headteacher account is not available.");
+    const signature = await this.signatureFor(schoolId, userId);
     return this.prisma.client.$transaction(async tx => {
       const v = await tx.reportCardVersion.findFirst({
         where: { id: versionId, schoolId }, include: { set: { select: { status: true } } },
@@ -107,7 +132,7 @@ export class ReportVersionService {
       const updated = await tx.reportCardVersion.updateMany({
         where: { id: v.id, schoolId, stage: "TEACHER_REVIEWED" },
         data: { stage: "APPROVED", headActorId: actor.id, headName: actor.name.slice(0,160),
-          headRemark: remark.trim(), headApprovedAt: time },
+          headRemark: remark.trim(), headApprovedAt: time, headSignature: signature },
       });
       if (updated.count !== 1) throw new ConflictException("This report changed while being approved.");
       await tx.auditLog.create({ data: { schoolId, userId, action: "UPDATE",
@@ -164,6 +189,7 @@ export class ReportVersionService {
         teacherApprovedAt: version.teacherApprovedAt,
         headName: version.headName, headRemark: version.headRemark,
         headApprovedAt: version.headApprovedAt, publishedAt: version.publishedAt,
+        teacherSignature: version.teacherSignature, headSignature: version.headSignature,
       }),
     };
   }
