@@ -1,4 +1,8 @@
-import { BadRequestException, Body, Controller, Get, Param, Patch, Post, Put, Res, UseGuards } from "@nestjs/common";
+import { BadRequestException, Body, Controller, Get, Param, Patch, Post, Put, Res, UseGuards, Header, Query, UploadedFile, UseInterceptors } from "@nestjs/common";
+import { FileInterceptor } from "@nestjs/platform-express";
+import { STUDENT_IMPORT_LIMITS } from "@schoolhub/shared";
+import { InternalExamMarksImportService } from "./internal-exam-marks-import.service.js";
+import { mockMarksImportBatchSchema, mockMarksImportRefSchema } from "./internal-exams.schemas.js";
 import type { School } from "@prisma/client";
 import type { z } from "zod";
 import { SchoolTenantGuard } from "../../common/guards/school-tenant.guard.js";
@@ -21,7 +25,8 @@ import type { Response } from "express";
 export class InternalExamsController {
   constructor(private readonly exams:InternalExamsService,
     private readonly mockReports:MockReportService,
-    private readonly corrections:MockCorrectionService){}
+    private readonly corrections:MockCorrectionService,
+    private readonly marksImport:InternalExamMarksImportService){}
 
   private recommendation(body:unknown){
     const remark=body&&typeof body==="object"&&"remark" in body
@@ -175,6 +180,27 @@ export class InternalExamsController {
   sheet(@CurrentSchool() school:School,@CurrentUser() user:AuthenticatedUser,
     @CurrentSchoolRole() role:string|undefined,@Param("id") id:string){
     return this.exams.sheet(school.id,user.id,role,id);
+  }
+
+  @Post("marks/import/preview")
+  @Roles("teacher")
+  @Header("Cache-Control", "no-store")
+  @UseInterceptors(FileInterceptor("file", { limits: { fileSize: STUDENT_IMPORT_LIMITS.maxFileBytes, files: 1 } }))
+  previewMarksImport(@CurrentSchool() school:School,@CurrentUser() user:AuthenticatedUser,
+    @CurrentSchoolRole() role:string|undefined,
+    @Query(new ZodValidationPipe(mockMarksImportRefSchema)) query:z.infer<typeof mockMarksImportRefSchema>,
+    @UploadedFile() file:Express.Multer.File|undefined) {
+    if (!file) throw new BadRequestException("Choose a CSV or XLSX file.");
+    return this.marksImport.preview(school.id,user.id,role,query,file);
+  }
+
+  @Post("marks/import")
+  @Roles("teacher")
+  @Header("Cache-Control", "no-store")
+  importMarks(@CurrentSchool() school:School,@CurrentUser() user:AuthenticatedUser,
+    @CurrentSchoolRole() role:string|undefined,
+    @Body(new ZodValidationPipe(mockMarksImportBatchSchema)) body:z.infer<typeof mockMarksImportBatchSchema>) {
+    return this.marksImport.importBatch(school.id,user.id,role,body);
   }
 
   @Put("marks")

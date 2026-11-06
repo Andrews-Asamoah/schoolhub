@@ -12,6 +12,7 @@ import { ReportPublicationController } from "./report-publication.controller.js"
 import { ReportPublicationService } from "./report-publication.service.js";
 import { ReportVersionService } from "./report-version.service.js";
 import { InternalExamsController } from "./internal-exams.controller.js";
+import { InternalExamMarksImportService } from "./internal-exam-marks-import.service.js";
 import { InternalExamsService } from "./internal-exams.service.js";
 import { MockReportService } from "./mock-report.service.js";
 import { MockCorrectionService } from "./mock-correction.service.js";
@@ -22,7 +23,7 @@ import { ReportTemplatePresetsService } from "./report-template-presets.service.
 
 @Module({
   controllers: [AssessmentsController, AssessmentWorkflowController, AssessmentSetupController, ReportPublicationController, InternalExamsController, ExternalExamsController],
-  providers: [AssessmentsService, AssessmentEntryService, AssessmentMarksImportService, AssessmentTrackingService, AssessmentCorrectionService, AssessmentSetupService, ReportPublicationService, ReportVersionService, InternalExamsService, MockReportService, MockCorrectionService, ExternalExamsService, ExternalBeceImportService, ReportTemplatePresetsService],
+  providers: [AssessmentsService, AssessmentEntryService, AssessmentMarksImportService, AssessmentTrackingService, AssessmentCorrectionService, AssessmentSetupService, ReportPublicationService, ReportVersionService, InternalExamsService, InternalExamMarksImportService, MockReportService, MockCorrectionService, ExternalExamsService, ExternalBeceImportService, ReportTemplatePresetsService],
   exports: [AssessmentsService],
 })
 export class AssessmentsModule {}

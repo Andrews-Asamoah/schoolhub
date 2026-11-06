@@ -2,6 +2,8 @@ import { useMarkDraft } from "@/hooks/use-mark-draft";
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { BookOpenCheck, CheckCheck, ClipboardList, LockKeyhole, Plus } from "lucide-react";
+import { BulkImportButton } from "@/components/bulk-import/bulk-import-button";
+import { InternalExamMarksBulkImport } from "./internal-exam-marks-bulk-import";
 import { apiFetch } from "@/lib/api";
 import { MockReportReviewWorkspace } from "./mock-report-review-workspace";
 import { useSchoolRole } from "@/components/school/school-role-switcher";
@@ -18,9 +20,10 @@ type MockClass = {id:string;name:string;level:string;isGraduatingClass:boolean;i
 type PaperSection = {id:string;subjectStrandId:string;name:string;code:string|null;maxMarks:number;weightPercent:number;canEdit:boolean};
 type SectionMark = {sectionId:string;marks:number|null;status:"MARKED"|"ABSENT";version:number};
 type Pupil = {id:string;name:string;admissionNumber:string|null;marks:number|null;
-  status:"MARKED"|"ABSENT"|null;version:number;percentage:number|null;sectionMarks:SectionMark[]};
+  status:"MARKED"|"ABSENT"|null;version:number;percentage:number|null;grade?:string|null;remark?:string|null;sectionMarks:SectionMark[]};
 type Sheet = {paper:{id:string;name:string;code:string;maxMarks:number;finalizedAt:string|null;sections:PaperSection[]};
-  session:{id:string;name:string;status:"DRAFT"|"OPEN"|"LOCKED"};canEdit:boolean;candidates:Pupil[]};
+  session:{id:string;name:string;status:"DRAFT"|"OPEN"|"LOCKED"};canEdit:boolean;candidates:Pupil[];
+  grading?:{name:string;source:"REPORT"|"SCHOOL_DEFAULT"|"SYSTEM_DEFAULT"}|null;gradingMessage?:string|null};
 type Draft = {marks:string;absent:boolean;expectedVersion:number};
 const style="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground";
 const button="rounded-lg border border-border bg-card px-3 py-2 text-xs font-semibold hover:bg-muted disabled:opacity-40";
@@ -39,6 +42,7 @@ export function InternalExaminationsWorkspace() {
   const [selectedPaper,setSelectedPaper]=useState("");
   const [selectedClass,setSelectedClass]=useState("");
   const [selectedSectionId,setSelectedSectionId]=useState("");
+  const [showImport,setShowImport]=useState(false);
   const [notice,setNotice]=useState<string|null>(null);
   const exams=sessions.data??[];
   const current=exams.find(v=>v.id===selectedSession)??exams[0];
@@ -216,11 +220,17 @@ export function InternalExaminationsWorkspace() {
           {selectedSection? `${selectedSection.name} · contributes ${selectedSection.weightPercent}% · `:""}
           Maximum {maximum} marks · {canEditSelected?"Entry open for your assigned teaching area.":"Read-only section."}
         </p>
+        <p className="text-xs leading-5 text-muted-foreground">
+          Totals, grades and remarks reflect the saved whole-subject result{sectionMode?", after every teaching-area section is recorded":""}.
+          {sheet.data.grading ? <> Scale: <span className="font-semibold">{sheet.data.grading.name}</span>.
+            {sheet.data.grading.source==="REPORT" ? " Uses the frozen report scale." : " Preview using the default scale; school management selects the final scale when generating reports."}
+            {" Grades use the nearest whole percentage, matching mock reports."}</> : ` ${sheet.data.gradingMessage??"No grading scale is available for preview."}`}
+        </p>
         <div className="max-h-[600px] overflow-auto rounded-xl border border-border">
           <table className="w-full min-w-[540px] text-left text-xs">
             <thead className="sticky top-0 bg-muted"><tr>
-              <th className="p-3">Pupil</th><th className="p-3">Marks</th><th className="p-3">Absent</th>
-              <th className="p-3">Percentage</th><th className="p-3">Saved</th>
+              <th scope="col" className="p-3">Pupil</th><th scope="col" className="p-3">Marks</th><th scope="col" className="p-3">Absent</th>
+              <th scope="col" className="p-3">Total (%)</th><th scope="col" className="p-3">Grade</th><th scope="col" className="p-3">Remarks</th>
             </tr></thead>
             <tbody>{candidates.map(row=>{
               const key=sectionMode&&selectedSection?`${row.id}:${selectedSection.id}`:row.id;
@@ -242,9 +252,9 @@ export function InternalExaminationsWorkspace() {
                   onChange={e=>setDrafts(prev=>({
                     ...prev,[key]:{...draft,marks:e.target.checked?"":draft.marks,absent:e.target.checked},
                   }))}/></td>
-                <td className="p-3">{draft.absent?"Absent":
-                  draft.marks.trim()? `${(Number(draft.marks)/maximum*100).toFixed(1)}%` : "—"}</td>
-                <td className="p-3">{savedStatus==="ABSENT"?"Absent":savedMarks===null?"Unmarked":savedMarks}</td>
+                <td className="p-3 font-semibold tabular-nums">{row.status==="ABSENT"?"Absent":row.percentage===null?"—":`${row.percentage}%`}</td>
+                <td className="p-3 font-semibold">{row.grade??"—"}</td>
+                <td className="p-3 text-muted-foreground">{row.status==="ABSENT"?"Absent":row.remark||"—"}</td>
               </tr>;
             })}</tbody>
           </table>
@@ -257,12 +267,18 @@ export function InternalExaminationsWorkspace() {
                 :row.status!==null
             ).length} pupils recorded in this section.
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
+            <BulkImportButton disabled={Object.keys(drafts).length>0||save.isPending||finalize.isPending}
+              title={Object.keys(drafts).length?"Save or discard your typed draft first":undefined}
+              onClick={()=>setShowImport(true)} />
             <button type="button" className={button} disabled={finalize.isPending||save.isPending||
-              changes.length>0||candidates.some(row=>row.status===null)}
+              Object.keys(drafts).length>0||candidates.some(row=>row.status===null)}
               onClick={()=>finalize.mutate()}>
               <CheckCheck className="mr-1 inline size-3"/> Finalise subject paper
             </button>
+            {Object.keys(drafts).length>0&&<button type="button" className={button}
+              disabled={save.isPending||finalize.isPending}
+              onClick={()=>{if(window.confirm("Discard your unsaved mock marks for this paper, including other teaching-area sections?"))setDrafts({});}}>Discard draft</button>}
             <button type="button" className={primary}
               disabled={save.isPending||finalize.isPending||invalid||!changes.length||changes.length>120}
               onClick={()=>save.mutate()}>{save.isPending?"Saving…":sectionMode?"Save section marks":"Save mock marks"}</button>
@@ -276,6 +292,23 @@ export function InternalExaminationsWorkspace() {
       {updateSession.isError&&<p role="alert" className="text-xs text-destructive">{failure(updateSession.error)}</p>}
       {notice&&<p role="status" className="rounded-lg bg-muted p-3 text-xs">{notice}</p>}
     </section>
+    {showImport && sheet.data && canEditSelected && <InternalExamMarksBulkImport
+      sheet={{
+        paperId:sheet.data.paper.id,paperName:sheet.data.paper.name,
+        sessionName:`${sheet.data.session.name}${current?.class.name?` · ${current.class.name}`:""}`,
+        ...(sectionMode&&selectedSection?{sectionId:selectedSection.id,sectionName:selectedSection.name}:{}),
+        maxMarks:maximum,
+        candidates:candidates.map(row=>{
+          const mark=sectionMode&&selectedSection?row.sectionMarks.find(item=>item.sectionId===selectedSection.id):undefined;
+          return {id:row.id,name:row.name,admissionNumber:row.admissionNumber,
+            marks:sectionMode?(mark?.marks??null):row.marks,
+            status:sectionMode?(mark?.status??null):row.status,
+            version:sectionMode?(mark?.version??0):row.version};
+        }),
+      }}
+      onClose={()=>setShowImport(false)}
+      onComplete={()=>{setNotice("Mock marks uploaded. Saved results and remarks have been refreshed.");void client.invalidateQueries({queryKey:["internal-exams","paper",paper?.id]});}}
+    />}
     {current && (manager || activeRole==="teacher") &&
       <MockReportReviewWorkspace key={current.id} sessionId={current.id} status={current.status} />}
     <p className="text-xs text-muted-foreground">Internal mock examination marks are recorded separately and locked before report generation.

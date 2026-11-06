@@ -4,6 +4,7 @@ import type { z } from "zod";
 import { PrismaService } from "../../prisma/prisma.service.js";
 import { TeacherScopeService } from "../../common/scope/teacher-scope.service.js";
 import { isSchoolManager } from "../../common/scope/teacher-access.js";
+import { resolveMockEntryGrading, mockEntryGrade } from "./internal-exam-grading.js";
 import { assignedPaperFilter,mockPercent,validateMockMarks } from "./internal-exams.js";
 import type { mockMarkSchema, mockSectionMarkSchema } from "./internal-exams.schemas.js";
 
@@ -200,6 +201,7 @@ export class InternalExamsService {
       weightPercent:Number(section.weightPercent),
       canEdit:Boolean(editablePaper&&role==="teacher"&&assignments?.teacherId&&section.teacherId===assignments.teacherId),
     }));
+    const grading = await resolveMockEntryGrading(this.prisma.client, schoolId, paper.session.id);
     const legacyCanEdit=Boolean(editablePaper&&role==="teacher"&&assignments?.subjectAssignments.some(x=>
       x.classId===paper.session.classId&&x.subjectId===paper.subjectId));
     return {
@@ -207,12 +209,14 @@ export class InternalExamsService {
         maxMarks:Number(paper.maxMarks),finalizedAt:paper.finalizedAt,sections},
       session:{id:paper.session.id,name:paper.session.name,status:paper.session.status},
       canEdit:sections.length?sections.some(section=>section.canEdit):legacyCanEdit,
+      ...grading,
       candidates:paper.session.candidates.map(c=>{
         const m=c.marks[0];
         return {
           id:c.id,studentId:c.studentId,name:c.nameSnapshot,admissionNumber:c.admissionNumberSnapshot,
           marks:m?.marks==null?null:Number(m.marks),status:m?.status??null,version:m?.version??0,
           percentage:mockPercent(m?.marks==null?null:Number(m.marks),Number(paper.maxMarks)),
+          ...mockEntryGrade(m?.status === "MARKED" ? mockPercent(m.marks==null?null:Number(m.marks),Number(paper.maxMarks)) : null, grading.grading),
           sectionMarks:c.sectionMarks.map(mark=>({
             sectionId:mark.paperSectionId,
             marks:mark.marks==null?null:Number(mark.marks),
@@ -224,7 +228,7 @@ export class InternalExamsService {
     };
   }
 
-  async save(schoolId:string,actorId:string,role:string|undefined,input:z.infer<typeof mockMarkSchema>){
+  async save(schoolId:string,actorId:string,role:string|undefined,input:z.infer<typeof mockMarkSchema>, via: "ENTRY" | "IMPORT" = "ENTRY"){
     const paper=await this.prisma.client.internalExamPaper.findFirst({
       where:{id:input.paperId,session:{schoolId}},
       select:{id:true,maxMarks:true,subjectId:true,finalizedAt:true,
@@ -282,7 +286,7 @@ export class InternalExamsService {
           entityType:"INTERNAL_MOCK_MARK",entityId:before?.id??row.candidateId+"|"+paper.id,
           oldValues:before?{status:before.status,marks:before.marks==null?null:String(before.marks),
             version:before.version}:Prisma.DbNull,
-          newValues:{paperId:paper.id,candidateId:row.candidateId,status:row.status,
+          newValues:{via,paperId:paper.id,candidateId:row.candidateId,status:row.status,
             marks:row.marks,version:(before?.version??0)+1},
         }});
       }
@@ -296,6 +300,7 @@ export class InternalExamsService {
     actorId:string,
     role:string|undefined,
     input:z.infer<typeof mockSectionMarkSchema>,
+    via: "ENTRY" | "IMPORT" = "ENTRY",
   ){
     if(role!=="teacher")throw new ForbiddenException("Only the assigned teaching-area teacher may enter section marks.");
     const section=await this.prisma.client.internalExamPaperSection.findFirst({
@@ -362,7 +367,7 @@ export class InternalExamsService {
           entityType:"INTERNAL_MOCK_SECTION_MARK",
           entityId:before?.id??entry.candidateId+"|"+section.id,
           oldValues:before?{status:before.status,marks:before.marks==null?null:String(before.marks),version:before.version}:Prisma.DbNull,
-          newValues:{sectionId:section.id,candidateId:entry.candidateId,status:entry.status,
+          newValues:{via,sectionId:section.id,candidateId:entry.candidateId,status:entry.status,
             marks:entry.marks,version:(before?.version??0)+1},
         }});
       }
