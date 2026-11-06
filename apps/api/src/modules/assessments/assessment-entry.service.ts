@@ -449,7 +449,7 @@ export class AssessmentEntryService {
       where: { classId, termId, status: "ACTIVE", student: { deletedAt: null } },
       select: {
         student: {
-          select: { id: true, admissionNumber: true, profile: { select: { firstName: true, lastName: true } } },
+          select: { id: true, admissionNumber: true, profile: { select: { firstName: true, otherNames: true, lastName: true } } },
         },
       },
     });
@@ -457,7 +457,7 @@ export class AssessmentEntryService {
       .map(({ student }) => ({
         id: student.id,
         admissionNumber: student.admissionNumber,
-        name: `${student.profile.firstName} ${student.profile.lastName}`.trim(),
+        name: [student.profile.firstName, student.profile.otherNames, student.profile.lastName].filter(Boolean).join(" "),
         sort: `${student.profile.lastName} ${student.profile.firstName}`.toLowerCase(),
       }))
       .sort((a, b) => a.sort.localeCompare(b.sort));

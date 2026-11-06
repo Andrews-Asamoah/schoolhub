@@ -45,6 +45,7 @@ import { TeacherBiodataDialog } from "@/components/school/teacher-biodata-dialog
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { apiFetch } from "@/lib/api";
+import { loadDirectoryPages } from "@/lib/directory-pages";
 import { StaffBulkImport } from "@/components/school/staff-bulk-import";
 import { BulkImportButton } from "@/components/bulk-import/bulk-import-button";
 
@@ -250,9 +251,7 @@ function initialValues(): Values {
 export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
   const queryClient = useQueryClient();
   const { activeRole } = useSchoolRole();
-  const [search, setSearch] = useState("");
   const [activeFilter, setActiveFilter] = useState("");
-  const [page, setPage] = useState(1);
   const [photo, setPhoto] = useState<File | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [showBulkImport, setShowBulkImport] = useState(false);
@@ -261,7 +260,6 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
   const [confirmingLogin, setConfirmingLogin] = useState<{ id: string; name: string; hasLogin: boolean } | null>(null);
   const [issued, setIssued] = useState<CredentialEntry[]>([]);
   const [notice, setNotice] = useState<string | null>(null);
-  const deferredSearch = useDeferredValue(search.trim());
   const isGuardianPage = kind === "guardians";
   const canManage =
     ["owner", "admin", "headteacher"].includes(activeRole ?? "") ||
@@ -283,48 +281,15 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
     queryKey: [
       "people",
       kind,
-      isGuardianPage ? { activeFilter } : { page, search: deferredSearch, activeFilter },
+      { activeFilter },
     ],
-    queryFn: async () => {
-      const params = new URLSearchParams({
-        page: isGuardianPage ? "1" : String(page),
-        limit: isGuardianPage ? "100" : "20",
-      });
-      if (!isGuardianPage && deferredSearch) params.set("search", deferredSearch);
+    queryFn: ({ signal }) => loadDirectoryPages<Teacher | Staff | Guardian>((page) => {
+      const params = new URLSearchParams({ page: String(page), limit: "100" });
       if (activeFilter) params.set("active", activeFilter);
-
-      if (!isGuardianPage) {
-        return apiFetch<DirectoryPage<Teacher | Staff | Guardian>>(
-          `/people/${kind}?${params.toString()}`,
-        );
-      }
-
-      // The API caps page size at 100. Fetch every guardian page so the
-      // directory table can search and paginate across the complete record set.
-      const firstPage = await apiFetch<DirectoryPage<Guardian>>(
-        `/people/guardians?${params.toString()}`,
+      return apiFetch<DirectoryPage<Teacher | Staff | Guardian>>(
+        `/people/${kind}?${params.toString()}`, { signal },
       );
-      const remainingPages = await Promise.all(
-        Array.from(
-          { length: Math.max(0, firstPage.meta.totalPages - 1) },
-          (_, index) => {
-            const pageParams = new URLSearchParams(params);
-            pageParams.set("page", String(index + 2));
-            return apiFetch<DirectoryPage<Guardian>>(
-              `/people/guardians?${pageParams.toString()}`,
-            );
-          },
-        ),
-      );
-      const allGuardians = [
-        ...firstPage.data,
-        ...remainingPages.flatMap((result) => result.data),
-      ];
-      return {
-        data: allGuardians,
-        meta: { ...firstPage.meta, page: 1, limit: allGuardians.length, totalPages: 1 },
-      } satisfies DirectoryPage<Teacher | Staff | Guardian>;
-    },
+    }, signal),
     retry: false,
   });
   const departmentsQuery = useQuery({
@@ -1136,35 +1101,20 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
           icon={UsersRound}
         />
         <WorkspaceStat
-          label={isGuardianPage ? "Active guardians" : "Active on this page"}
+          label={isGuardianPage ? "Active guardians" : "Active records"}
           value={String(activeCount)}
-          detail={isGuardianPage ? "active records" : title.toLowerCase()}
+          detail="in the filtered directory"
           icon={CheckCircle2}
         />
         <WorkspaceStat
-          label={isGuardianPage ? "Portal access" : "Page"}
-          value={isGuardianPage ? String(rows.filter((row) => row.hasLogin).length) : String(directoryQuery.data?.meta.page ?? 1) + " / " + String(directoryQuery.data?.meta.totalPages || 1)}
-          detail={isGuardianPage ? "guardians with a login" : "directory pagination"}
-          icon={isGuardianPage ? ShieldCheck : undefined}
+          label="Portal access"
+          value={String(rows.filter((row) => row.hasLogin).length)}
+          detail={`${title.toLowerCase()} with a login`}
+          icon={ShieldCheck}
         />
       </div>
 
-      <section className={`rounded-2xl border border-border bg-card/80 p-4 shadow-sm backdrop-blur-sm ${isGuardianPage ? "flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between" : "grid gap-3 md:grid-cols-[minmax(220px,1fr)_180px]"}`}>
-        {!isGuardianPage && (
-          <label className="relative">
-            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-            <input
-              value={search}
-              onChange={(event) => {
-                setSearch(event.target.value);
-                setPage(1);
-              }}
-              placeholder={`Search ${title.toLowerCase()} by name, ID or contact`}
-              aria-label={`Search ${title.toLowerCase()}`}
-              className={`${inputClasses} mt-0 pl-9`}
-            />
-          </label>
-        )}
+      <section className={`rounded-2xl border border-border bg-card/80 p-4 shadow-sm backdrop-blur-sm ${isGuardianPage ? "flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between" : "flex flex-wrap items-center justify-end gap-3"}`}>
         {isGuardianPage && (
           <div className="flex items-center gap-2.5">
             <span className="flex size-9 items-center justify-center rounded-lg bg-muted text-muted-foreground">
@@ -1176,11 +1126,10 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
             </div>
           </div>
         )}
-        <label className={isGuardianPage ? "w-full sm:w-52" : ""}>
+        <label className="w-full sm:w-52">
           <span className="sr-only">Filter by status</span>
           <Select value={activeFilter || "__all__"} onValueChange={(value) => {
             setActiveFilter(value === "__all__" ? "" : value);
-            setPage(1);
           }}>
             <SelectTrigger aria-label="Filter by status" className={`${inputClasses} mt-0 ${isGuardianPage ? "sm:h-11 sm:px-3" : ""}`}><SelectValue placeholder="All statuses" /></SelectTrigger>
             <SelectContent>
@@ -1212,32 +1161,6 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
         emptyTitle={`No ${title.toLowerCase()} match these filters`}
         emptyDescription={`Clear a filter or add a ${resourceName} to build the directory.`}
       />
-      {!isGuardianPage && (directoryQuery.data?.meta.totalPages ?? 0) > 1 && (
-        <div className="flex items-center justify-between rounded-xl border border-border bg-card px-4 py-3">
-          <p className="text-xs text-muted-foreground">
-            Page {directoryQuery.data?.meta.page} of{" "}
-            {directoryQuery.data?.meta.totalPages} · {total} records
-          </p>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              disabled={page <= 1}
-              onClick={() => setPage((value) => Math.max(1, value - 1))}
-              className="rounded-md border border-border px-3 py-1.5 text-xs font-medium text-foreground disabled:opacity-40"
-            >
-              Previous
-            </button>
-            <button
-              type="button"
-              disabled={page >= (directoryQuery.data?.meta.totalPages ?? 1)}
-              onClick={() => setPage((value) => value + 1)}
-              className="rounded-md border border-border px-3 py-1.5 text-xs font-medium text-foreground disabled:opacity-40"
-            >
-              Next
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
@@ -1384,6 +1307,7 @@ function toRow(person: Teacher | Staff | Guardian): Row {
       department: teacher.department.name,
       relatedStudents: "",
       isActive: teacher.isActive,
+      hasLogin: Boolean(teacher.profile?.user),
     };
   }
   if ("staffId" in person) {
@@ -1399,6 +1323,7 @@ function toRow(person: Teacher | Staff | Guardian): Row {
       department: staff.department?.name ?? "",
       relatedStudents: "",
       isActive: staff.isActive,
+      hasLogin: Boolean(staff.profile.user),
     };
   }
   const guardian = person;
