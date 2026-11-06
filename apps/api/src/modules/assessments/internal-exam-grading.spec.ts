@@ -30,7 +30,7 @@ describe("mock entry grading", () => {
   it("uses the school's default score bands first, then the shared system default", async () => {
     const school = db();
     expect((await resolveMockEntryGrading(school as never, "school", "mock")).grading?.source).toBe("SCHOOL_DEFAULT");
-    expect(school.gradingSystem.findFirst.mock.calls[0]?.[0]).toMatchObject({ where: { schoolId: "school", isActive: true, isSchoolDefault: true, method: "SCORE_BANDS" } });
+    expect(school.gradingSystem.findFirst.mock.calls[0]?.[0]).toMatchObject({ where: { schoolId: "school", isActive: true, isSchoolDefault: true, method: "SCORE_BANDS" }, orderBy: [{ name: "asc" }, { id: "asc" }] });
     const system = db(null, [null, stored]);
     expect((await resolveMockEntryGrading(system as never, "school", "mock")).grading?.source).toBe("SYSTEM_DEFAULT");
   });

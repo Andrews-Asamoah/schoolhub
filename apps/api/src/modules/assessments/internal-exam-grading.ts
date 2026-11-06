@@ -34,10 +34,10 @@ export async function resolveMockEntryGrading(
       grade: true, minScore: true, maxScore: true, description: true,
     } } };
     const school = await db.gradingSystem.findFirst({
-      where: { schoolId, isActive: true, isSchoolDefault: true, method: "SCORE_BANDS" }, select,
+      where: { schoolId, isActive: true, isSchoolDefault: true, method: "SCORE_BANDS" }, orderBy: [{ name: "asc" }, { id: "asc" }], select,
     });
     const system = school ? null : await db.gradingSystem.findFirst({
-      where: { schoolId: null, isActive: true, isSystemDefault: true, method: "SCORE_BANDS" }, select,
+      where: { schoolId: null, isActive: true, isSystemDefault: true, method: "SCORE_BANDS" }, orderBy: [{ name: "asc" }, { id: "asc" }], select,
     });
     const policy = school ?? system;
     if (!policy) return { grading: null, gradingMessage: "School management must configure a default score-based grading scale to preview mock grades and remarks." };
