@@ -1,3 +1,5 @@
+> **Superseded (2026-11-07):** the standalone internal mock module this plan describes was removed. Mocks are now an assessment category; see `docs/architecture/academic-platform-current-state.md`.
+
 # Internal Examinations — numbered JHS 3 mocks (first implementation slice)
 
 **Target:** `dev`. Builds upon the academic platform and separate versioned term report engine. No `main` changes.

@@ -1,3 +1,5 @@
+> **Superseded (2026-11-07):** the standalone internal mock module this plan describes was removed. Mocks are now an assessment category; see `docs/architecture/academic-platform-current-state.md`.
+
 # Controlled Internal Mock Corrections and Reissues
 
 Target and merge branch: **dev** (never main). No real WIS data was imported.

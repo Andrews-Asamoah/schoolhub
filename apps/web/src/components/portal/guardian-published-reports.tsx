@@ -3,7 +3,6 @@ import { useQuery } from "@tanstack/react-query";
 import { FileText, LoaderCircle, Printer } from "lucide-react";
 import { useState } from "react";
 import { apiFetch, downloadAcademicReport } from "@/lib/api";
-import { MockPublishedReportCards } from "@/components/portal/mock-published-report-cards";
 import { ReportCardDocument, type ReportDocApproval, type ReportDocLayout, type ReportDocSubject, type ReportDocumentProps } from "@/components/reports/report-card-document";
 import { accessibleAccentForeground } from "@/lib/accent-foreground";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -69,7 +68,6 @@ export function GuardianPublishedReports({wards=[]}:{wards?:{id:string;profile:{
         approval={selected.approval}
         published={{ publishedAt: selected.publishedAt }}
       />}
-    <MockPublishedReportCards studentId={wardId} year={year} term={term} audience="guardian" />
     <style>{`@media print { body * { visibility: hidden; } .guardian-report-print-area, .guardian-report-print-area * { visibility: visible; } .guardian-report-print-area { position: absolute; inset: 0; width: 100%; border: 0; box-shadow: none; padding: 0; background: white !important; color: black !important; } .guardian-report-print-area section { break-inside: avoid; } @page { size: A4; margin: 12mm; } }`}</style>
   </section>;
 }

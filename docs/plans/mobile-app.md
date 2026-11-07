@@ -36,7 +36,7 @@ After every task: run pnpm typecheck (and the mobile app's lint and tests once t
 If anything in this brief conflicts with the actual repo, trust the repo, tell me exactly what differs, and wait for my decision.
 5. Decisions (edit these if you disagree)
 Guardian fees are view-only in v1. No in-app payment.
-Teacher BECE/external-exam entry is deferred (not in v1). Internal mock exams are in scope.
+Teacher BECE/external-exam entry is deferred (not in v1). Mock exams are entered through the normal assessment entry screens (a mock is an assessment category); the standalone internal mock screens were removed.
 Glass with a fallback: frosted glass on capable devices; on low-end Android, GlassSurface falls back to a translucent solid colour (no blur).
 Offline: only the teacher attendance register queues offline in v1. Everything else is online with cached reads.
 Platforms: Android first (Play Store), then iOS.
@@ -93,7 +93,7 @@ Route	Screen	Endpoints
 children/[wardId]/index	Ward hub	/students/my-wards/:id
 children/[wardId]/attendance	Attendance history	/attendance/guardian/:studentId
 children/[wardId]/timetable	Weekly timetable	/timetable/guardian/:studentId
-children/[wardId]/reports	Published reports and mock results with PDF	/assessments/report-cards/guardian, .../guardian/:reportId/pdf, /internal-exams/published/guardian, .../guardian/:id/pdf
+children/[wardId]/reports	Published reports and mock results with PDF	/assessments/report-cards/guardian, .../guardian/:reportId/pdf, .../guardian/:id/pdf
 fees/[wardId]	Balance and history (view-only)	/students/my-wards/:id/fees
 notices/[id]	Announcement	/announcements
 
@@ -104,7 +104,7 @@ Route	Screen	Endpoints
 timetable	Weekly timetable	/timetable/me
 learning/subjects	Subjects	/students/me/subjects
 learning/assignments/[id]	List, detail, submit	/assignments, /assignments/:id/submission
-learning/reports	Report, published reports, mock results with PDF	/assessments/me/report, /assessments/report-cards/me, .../me/:reportId/pdf, /internal-exams/published/me, .../me/:id/pdf
+learning/reports	Report, published reports, mock results with PDF	/assessments/me/report, /assessments/report-cards/me, .../me/:reportId/pdf, .../me/:id/pdf
 attendance	Attendance	/attendance/me
 more/classmates, more/house-clubs, more/announcements	Classmates, house and clubs, notices	/students/me/classmates, /students/me/clubs, /academics/houses, /announcements
 
@@ -116,8 +116,7 @@ classes/[classId]/roster	Roster	/academics/classes/:id/students
 classes/[classId]/register	Mark attendance (offline-tolerant)	/attendance/class/:id, .../dates, .../gaps, POST /attendance/batch
 classes/[classId]/students/[studentId]	Student profile	/students/:id/profile
 assess/index	Score entry	GET/PUT /assessments/entry
-assess/mocks/[paperId]	Mock marks, finalize	/internal-exams/papers/:id, PUT /internal-exams/marks, PATCH /internal-exams/papers/:id/finalize
-assess/reports	Report review and recommend	/assessments/report-cards/teacher-queue, POST .../versions/:id/recommend, POST /internal-exams/reports/:id/recommend
+assess/reports	Report review and recommend	/assessments/report-cards/teacher-queue, POST .../versions/:id/recommend
 assignments/index, new, [id]	Create, view submissions, grade	/assignments/manage, POST /assignments, PATCH .../grade
 
 Accountant, light (tabs: Home, Payments, Outstanding, Statements, More) Home uses /finance/summary. Payments lists and records via POST /finance/payments with .../receipt.pdf. Outstanding uses /finance/students/outstanding. Statements use /finance/students/:id/statement and .pdf. More has fee reminders and admission fee receipt. Payroll, journals, periods and audit are web-only.

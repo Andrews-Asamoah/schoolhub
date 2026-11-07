@@ -3,7 +3,6 @@ import { FileText, LoaderCircle, Printer, Sparkles } from "lucide-react";
 import { useState } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { apiFetch, downloadAcademicReport } from "@/lib/api";
-import { MockPublishedReportCards } from "@/components/portal/mock-published-report-cards";
 import { ReportCardDocument, type ReportDocApproval, type ReportDocLayout, type ReportDocSubject, type ReportDocumentProps } from "@/components/reports/report-card-document";
 import { accessibleAccentForeground } from "@/lib/accent-foreground";
 
@@ -65,7 +64,6 @@ export function StudentReportView() {
       approval={active.approval}
       published={{ publishedAt: active.publishedAt }}
     />}
-    <MockPublishedReportCards audience="student" />
     <style>{`@media print { body * { visibility: hidden; } .report-print-area, .report-print-area * { visibility: visible; } .report-print-area { position: absolute; inset: 0; width: 100%; border: 0; box-shadow: none; padding: 0; background: white !important; color: black !important; } .report-print-area section { break-inside: avoid; } @page { size: A4; margin: 12mm; } }`}</style>
   </div>;
 }

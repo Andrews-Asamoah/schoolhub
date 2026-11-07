@@ -175,14 +175,6 @@ export const schoolNavGroups: SchoolNavGroup[] = [
         apiStatus: "available",
       },
       {
-        id: "internal-exams",
-        label: "Legacy mocks",
-        icon: BookOpenCheck,
-        description: "Old standalone mock sessions. New mocks are set up under Assessments.",
-        section: "Academics",
-        apiStatus: "available",
-      },
-      {
         id: "assignments",
         label: "Assignments",
         icon: FileText,
@@ -559,7 +551,6 @@ const rolePages: Record<string, string[]> = {
     .map((item) => item.id),
   teacher: [
     "external-exams",
-    "internal-exams",
     "mock-analysis",
     "students",
     "classes",

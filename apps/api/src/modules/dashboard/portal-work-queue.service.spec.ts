@@ -15,9 +15,9 @@ it("scopes student assignments to the authenticated pupil and current enrollment
  expect(result.upcoming[0]?.status).toBe("TO_DO");expect(result.items[0]?.count).toBe(1);
 });
 it("uses assigned teaching areas and the actor's submissions for the teacher agenda",async()=>{
- const papers=vi.fn().mockResolvedValue(2),submissions=vi.fn().mockResolvedValue(3),lessons=vi.fn().mockResolvedValue([]);
+ const submissions=vi.fn().mockResolvedValue(3),lessons=vi.fn().mockResolvedValue([]);
  const getAssignments=vi.fn().mockResolvedValue({teacherId:"teacher",classTeacherClassIds:["class"],subjectAssignments:[{classId:"class",subjectId:"subject"}],subjectStrandAssignments:[]});
- const service=new PortalWorkQueueService({client:{term:{findFirst:vi.fn().mockResolvedValue(term)},timetableEntry:{findMany:lessons},schoolAssignmentSubmission:{count:submissions},internalExamPaper:{count:papers}}} as never,{getAssignments} as never);
+ const service=new PortalWorkQueueService({client:{term:{findFirst:vi.fn().mockResolvedValue(term)},timetableEntry:{findMany:lessons},schoolAssignmentSubmission:{count:submissions}}} as never,{getAssignments} as never);
  const result=await service.get("school","user","teacher");
  expect(getAssignments).toHaveBeenCalledWith("school","user");
  expect(submissions).toHaveBeenCalledWith(expect.objectContaining({where:expect.objectContaining({assignment:expect.objectContaining({schoolId:"school",createdById:"user",classId:{in:["class"]}})})}));

@@ -6,10 +6,9 @@ import { ListRow } from "@/components/ListRow";
 import { Screen } from "@/components/Screen";
 import { SkeletonRow } from "@/components/Skeleton";
 import { Text } from "@/components/Typography";
-import { downloadMyMock, downloadMyReport } from "@/api/student";
+import { downloadMyReport } from "@/api/student";
 import {
   useMyAssessmentReportQuery,
-  useMyPublishedMocksQuery,
   useMyPublishedReportsQuery,
 } from "@/features/student/queries";
 import { StudentBackButton } from "@/features/student/BackButton";
@@ -31,26 +30,18 @@ async function download(action: () => Promise<void>, title: string) {
 export default function StudentReportsScreen() {
   const assessment = useMyAssessmentReportQuery();
   const reports = useMyPublishedReportsQuery();
-  const mocks = useMyPublishedMocksQuery();
   const { colors } = useTheme();
   const retry = () => {
-    void Promise.all([
-      assessment.refetch(),
-      reports.refetch(),
-      mocks.refetch(),
-    ]);
+    void Promise.all([assessment.refetch(), reports.refetch()]);
   };
-  const hasPublishedReports =
-    (reports.data?.length ?? 0) + (mocks.data?.length ?? 0) > 0;
+  const hasPublishedReports = (reports.data?.length ?? 0) > 0;
 
   return (
     <Screen
       title="Reports"
       subtitle="Assessment progress and published results"
       left={<StudentBackButton />}
-      refreshing={
-        assessment.isRefetching || reports.isRefetching || mocks.isRefetching
-      }
+      refreshing={assessment.isRefetching || reports.isRefetching}
       onRefresh={retry}
     >
       <View style={{ gap: spacing.lg }}>
@@ -172,55 +163,7 @@ export default function StudentReportsScreen() {
           )}
         </Card>
 
-        <Card>
-          <Text
-            accessibilityRole="header"
-            style={[
-              type.headline,
-              { color: colors.foreground, marginBottom: spacing.sm },
-            ]}
-          >
-            Published internal mock results
-          </Text>
-          {mocks.isPending ? (
-            <>
-              <SkeletonRow />
-              <SkeletonRow />
-            </>
-          ) : mocks.isError ? (
-            <ErrorState
-              title="Mock results unavailable"
-              message="The report list could not be loaded."
-              actionLabel="Retry"
-              onAction={() => void mocks.refetch()}
-              hue="violet"
-            />
-          ) : mocks.data?.length ? (
-            mocks.data.map((report, index, entries) => (
-              <ListRow
-                key={report.id}
-                title={report.snapshot.name}
-                subtitle={`${report.snapshot.year} · ${report.snapshot.term}${report.snapshot.average === null ? "" : ` · ${report.snapshot.average}% average`}`}
-                leading={<ClipboardList size={20} color={colors.primary} />}
-                trailing={<Download size={18} color={colors.primary} />}
-                status="PDF"
-                divider={index < entries.length - 1}
-                onPress={() =>
-                  void download(
-                    () => downloadMyMock({ params: { id: report.id } }),
-                    "Mock report",
-                  )
-                }
-                hue="violet"
-              />
-            ))
-          ) : (
-            <Text style={[type.body, { color: colors.mutedForeground }]}>
-              No published internal mock results yet.
-            </Text>
-          )}
-        </Card>
-        {!hasPublishedReports && !reports.isPending && !mocks.isPending ? (
+        {!hasPublishedReports && !reports.isPending ? (
           <Text style={[type.caption, { color: colors.mutedForeground }]}>
             Only results published for student viewing are listed. Downloads are
             shared securely from this device.

@@ -5,7 +5,6 @@ import {
   getWardTimetable,
   listGuardianClubs,
   listGuardianHouses,
-  listGuardianMocks,
   listGuardianReports,
   listMyWards,
 } from "@/api/guardian";
@@ -145,11 +144,6 @@ test("guardian publishing and community adapters use only inventoried routes", a
   await listGuardianReports();
   expect(apiFetch).toHaveBeenLastCalledWith(
     "/assessments/report-cards/guardian",
-    expect.any(Object),
-  );
-  await listGuardianMocks();
-  expect(apiFetch).toHaveBeenLastCalledWith(
-    "/internal-exams/published/guardian",
     expect.any(Object),
   );
   await listGuardianClubs();

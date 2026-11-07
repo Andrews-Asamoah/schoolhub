@@ -17,15 +17,13 @@ export class PortalWorkQueueService {
       const assignments=await this.scope.getAssignments(schoolId,userId);
       if(!assignments.teacherId)return result;
       const classIds=[...new Set([...assignments.classTeacherClassIds,...assignments.subjectAssignments.map(row=>row.classId),...assignments.subjectStrandAssignments.map(row=>row.classId)])];
-      const [lessons,ungraded,openPapers]=await Promise.all([
+      const [lessons,ungraded]=await Promise.all([
         db.timetableEntry.findMany({where:{schoolId,teacherId:assignments.teacherId,academicYearId:term.academicYearId,OR:[{termId:term.id},{termId:null}]},include:{timeSlot:true,subject:{select:{name:true}},class:{select:{name:true}}},orderBy:[{timeSlot:{dayOfWeek:"asc"}},{timeSlot:{startTime:"asc"}}],take:100}),
         db.schoolAssignmentSubmission.count({where:{status:"SUBMITTED",assignment:{schoolId,termId:term.id,createdById:userId,classId:{in:classIds},status:"PUBLISHED"}}}),
-        db.internalExamPaper.count({where:{finalizedAt:null,session:{schoolId,termId:term.id,status:"OPEN"},OR:[...assignments.subjectAssignments.map(row=>({subjectId:row.subjectId,session:{classId:row.classId}})),{sections:{some:{teacherId:assignments.teacherId}}}]}}),
       ]);
       result.lessons=lessons.map(row=>({id:row.id,day:row.timeSlot.dayOfWeek,start:row.timeSlot.startTime,end:row.timeSlot.endTime,subject:row.subject?.name??row.label??"Lesson",className:row.class?.name??"School activity"}));
       add("register","Class registers","Open the current-term register for classes where you are class teacher.","attendance",assignments.classTeacherClassIds.length);
       add("grading","Submissions awaiting feedback","Published assignments created by you in your assigned classes.","assignments",ungraded);
-      add("marks","Open mock papers","Assigned subject papers that have not been finalised.","internal-exams",openPapers);
       add("sba","SBA mark entry","Review current-term marks for your assigned classes and subjects.","assessments",classIds.length);
       return result;
     }
@@ -41,20 +39,15 @@ export class PortalWorkQueueService {
       return result;
     }
     if(role==="headteacher" || role==="owner"){
-      const [mocks,versions,pendingCorrections,classCount,pendingExcuses]=await Promise.all([
-        db.internalMockReport.findMany({where:{schoolId,session:{termId:term.id}},distinct:["candidateId"],orderBy:[{candidateId:"asc"},{version:"desc"}],select:{stage:true}}),
+      const [versions,classCount,pendingExcuses]=await Promise.all([
         db.reportCardVersion.findMany({where:{schoolId,set:{termId:term.id}},distinct:["setId","studentId"],orderBy:[{setId:"asc"},{studentId:"asc"},{version:"desc"}],select:{stage:true}}),
-        db.internalMockCorrection.count({where:{schoolId,status:"PENDING",session:{termId:term.id}}}),
         db.class.count({where:{schoolId,deletedAt:null,isActive:true,OR:[{academicYearId:term.academicYearId},{academicYearId:null}]}}),
         db.attendanceExcuseRequest.count({where:{schoolId,status:"PENDING"}}),
       ]);
-      add("mock-review","Mock recommendations awaiting headteacher review","Latest candidate reports already recommended by the class teacher.","internal-exams",mocks.filter(row=>row.stage==="TEACHER_REVIEWED").length);
-      add("mock-publish","Approved mock reports awaiting publication","Release only after both independent recommendations and integrity checks.","internal-exams",mocks.filter(row=>row.stage==="APPROVED").length);
       add("term-review","Term report recommendations","Latest term reports awaiting independent leadership review.","reports",versions.filter(row=>row.stage==="TEACHER_REVIEWED").length);
       add("publish","Approved reports awaiting publication","Check integrity and release approved reports through the existing publication controls.","reports",versions.filter(row=>row.stage==="APPROVED").length);
       add("excuses","Absence requests awaiting review","Review guardian explanations and private evidence; attendance marks remain a separate staff action.","attendance",pendingExcuses);
       add("coverage","Class attendance coverage","Classes available for instructional-day completeness review; this count is not a count of absent pupils.","attendance",classCount);
-      add("corrections","Mock correction requests","Review reasons and supporting evidence before changing frozen results.","internal-exams",pendingCorrections);
     }
     const active={schoolId,status:"ACTIVE" as const,deletedAt:null};
     const [unlinked,unenrolled,unassigned,identities]=await Promise.all([

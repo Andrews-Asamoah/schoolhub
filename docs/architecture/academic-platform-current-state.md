@@ -63,4 +63,4 @@ A mock exam (Mock 1, 2, 3 of a JHS 3 year) is an `AssessmentTemplate` with `cate
 - Reports: a `ReportCardSet` may carry `assessmentTemplateId` to report one mock through the existing generate, review and publish flow.
 - Analysis: `GET /mock-analytics` compares a class's mocks (class trend, subjects, grade distribution, per-pupil trend and status). Thresholds live in `mock-analytics.ts`.
 - External (BECE) results stay a separate model: they are WAEC-issued grades, not marks.
-- The older `InternalExam*` tables and page are untouched and labelled "Legacy mocks" until their data is confirmed empty or migrated.
+- The standalone internal mock module (`InternalExam*` tables, `/internal-exams` API, web pages and mobile screens) was removed in migration `20261107100000_drop_legacy_internal_exams`. Published mock reports now flow through the normal report batches (`ReportCardSet.assessmentTemplateId`).

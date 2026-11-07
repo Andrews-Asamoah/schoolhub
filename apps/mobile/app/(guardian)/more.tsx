@@ -55,7 +55,7 @@ export default function GuardianMoreScreen() {
           />
           <ListRow
             title="Published reports"
-            subtitle="Academic report cards and internal mocks"
+            subtitle="Academic and mock report cards"
             leading={<ClipboardList size={20} color={colors.primary} />}
             onPress={() => router.push("/(guardian)/reports" as Href)}
           />

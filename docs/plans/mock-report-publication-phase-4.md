@@ -1,3 +1,5 @@
+> **Superseded (2026-11-07):** the standalone internal mock module this plan describes was removed. Mocks are now an assessment category; see `docs/architecture/academic-platform-current-state.md`.
+
 # SchoolHub — Internal Mock Report Publication
 
 ## Scope and branch

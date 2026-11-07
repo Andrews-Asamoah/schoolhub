@@ -117,7 +117,7 @@ export default function WardProfileScreen() {
               />
               <ListRow
                 title="Published reports"
-                subtitle="Academic reports and internal mock results"
+                subtitle="Academic and mock report cards"
                 leading={<ClipboardList size={20} color={colors.primary} />}
                 onPress={() => router.push("/(guardian)/reports" as Href)}
               />
