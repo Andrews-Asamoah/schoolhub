@@ -20,6 +20,11 @@ const maxWidthMap = {
   xl: "max-w-xl", "2xl": "max-w-2xl", "3xl": "max-w-3xl", "4xl": "max-w-4xl", "5xl": "max-w-5xl",
 };
 
+// Only the topmost shared modal handles focus and dismissal. A child dialog must
+// not close its parent or release the page's scroll lock when it closes.
+const modalStack: HTMLElement[] = [];
+let unlockedOverflow = "";
+
 /** Shared accessible modal for school, accountant, teacher and guardian forms. */
 export function PortalModal({
   isOpen, onClose, title, description, children, footer, maxWidth = "lg", closeOnBackdrop = true,
@@ -33,16 +38,20 @@ export function PortalModal({
 
   useEffect(() => {
     if (!isOpen) return;
-    const previousOverflow = document.body.style.overflow;
+    const content = contentRef.current;
+    if (!content) return;
+    if (modalStack.length === 0) unlockedOverflow = document.body.style.overflow;
+    modalStack.push(content);
     const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     document.body.style.overflow = "hidden";
     closeRef.current?.focus();
 
     const handleKeys = (event: KeyboardEvent) => {
+      if (modalStack.at(-1) !== content || event.defaultPrevented) return;
       if (event.key === "Escape") {
         // Dismiss the nested calendar or Radix dropdown first, not the form.
         if (event.defaultPrevented || document.querySelector('[role="dialog"][aria-label="Choose a date"]')
-          || document.querySelector('[data-radix-select-content]')) return;
+          || document.querySelector('[role="listbox"]')) return;
         event.preventDefault();
         closeCallback.current();
         return;
@@ -50,11 +59,14 @@ export function PortalModal({
       if (event.key !== "Tab") return;
       const items = Array.from(contentRef.current?.querySelectorAll<HTMLElement>(
         'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
-      ) ?? []);
+      ) ?? []).filter(item => item.getClientRects().length > 0 && !item.closest("[hidden], [inert]"));
       if (!items.length) { event.preventDefault(); return; }
       const first = items[0]!;
       const last = items[items.length - 1]!;
-      if (event.shiftKey && document.activeElement === first) {
+      if (!content.contains(document.activeElement)) {
+        event.preventDefault();
+        (event.shiftKey ? last : first).focus();
+      } else if (event.shiftKey && document.activeElement === first) {
         event.preventDefault();
         last.focus();
       } else if (!event.shiftKey && document.activeElement === last) {
@@ -65,15 +77,18 @@ export function PortalModal({
     document.addEventListener("keydown", handleKeys);
     return () => {
       document.removeEventListener("keydown", handleKeys);
-      document.body.style.overflow = previousOverflow;
-      previousFocus?.focus();
+      const wasTop = modalStack.at(-1) === content;
+      const index = modalStack.indexOf(content);
+      if (index !== -1) modalStack.splice(index, 1);
+      if (modalStack.length === 0) document.body.style.overflow = unlockedOverflow;
+      if (wasTop && previousFocus?.isConnected) previousFocus.focus();
     };
   }, [isOpen]);
 
   if (!isOpen || typeof document === "undefined") return null;
   return createPortal(
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-overlay p-3 backdrop-blur-[2px] sm:p-6"
-      onMouseDown={event => { if (closeOnBackdrop && event.target === event.currentTarget) onClose(); }}>
+      onMouseDown={event => { if (closeOnBackdrop && modalStack.at(-1) === contentRef.current && event.target === event.currentTarget) onClose(); }}>
       <section ref={contentRef} role="dialog" aria-modal="true" aria-labelledby={titleId}
         aria-describedby={description ? descriptionId : undefined}
         className={cn(

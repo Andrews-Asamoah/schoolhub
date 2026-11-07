@@ -1,3 +1,4 @@
+import { sessionPreferences } from "@/lib/browser-storage";
 import { PersonPhotoPicker, uploadPersonPhoto } from "./person-photo-picker";
 import { StudentProfileModal } from "@/components/school/student-profile-panel";
 import { UserAvatar } from "@/components/ui/user-avatar";
@@ -178,7 +179,7 @@ export function StudentDirectoryWorkspace() {
   const periodKey =
     typeof window === "undefined"
       ? ""
-      : (window.sessionStorage.getItem("schoolhub-accountant-academic-view") ??
+      : (sessionPreferences.getItem("schoolhub-accountant-academic-view") ??
         "");
   const classesQuery = useQuery({
     queryKey: ["academics", "classes"],
@@ -271,6 +272,7 @@ export function StudentDirectoryWorkspace() {
     {
       id: "admission",
       header: "Admission no.",
+      exportType: "text",
       cell: (student) => student.admissionNumber ?? "—",
     },
     {

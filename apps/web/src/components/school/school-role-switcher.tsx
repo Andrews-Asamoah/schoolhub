@@ -1,3 +1,4 @@
+import { localPreferences } from "@/lib/browser-storage";
 import { confirmLeavingDrafts } from "@/hooks/use-mark-draft";
 import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -41,7 +42,7 @@ export function useSchoolRole() {
   const [storedRole, setStoredRole] = useState<string | null>(() =>
     typeof window === "undefined"
       ? null
-      : window.localStorage.getItem(ACTIVE_ROLE_STORAGE_KEY),
+      : localPreferences.getItem(ACTIVE_ROLE_STORAGE_KEY),
   );
   const query = useQuery({
     queryKey: ["schools", "roles"],
@@ -52,7 +53,7 @@ export function useSchoolRole() {
 
   useEffect(() => {
     const syncRole = () =>
-      setStoredRole(window.localStorage.getItem(ACTIVE_ROLE_STORAGE_KEY));
+      setStoredRole(localPreferences.getItem(ACTIVE_ROLE_STORAGE_KEY));
     window.addEventListener(ROLE_CHANGE_EVENT, syncRole);
     window.addEventListener("storage", syncRole);
     return () => {
@@ -64,7 +65,7 @@ export function useSchoolRole() {
   useEffect(() => {
     if (!query.data) return;
     if (storedRole && !query.data.roles.includes(storedRole)) {
-      window.localStorage.removeItem(ACTIVE_ROLE_STORAGE_KEY);
+      localPreferences.removeItem(ACTIVE_ROLE_STORAGE_KEY);
       setStoredRole(null);
       window.dispatchEvent(new Event(ROLE_CHANGE_EVENT));
     }
@@ -78,7 +79,7 @@ export function useSchoolRole() {
   async function selectRole(role: string) {
     if (!query.data?.roles.includes(role) || !confirmLeavingDrafts()) return;
     await queryClient.cancelQueries();
-    window.localStorage.setItem(ACTIVE_ROLE_STORAGE_KEY, role);
+    localPreferences.setItem(ACTIVE_ROLE_STORAGE_KEY, role);
     setStoredRole(role);
     window.dispatchEvent(new Event(ROLE_CHANGE_EVENT));
     // The root context boundary clears private queries before mounting this role.
