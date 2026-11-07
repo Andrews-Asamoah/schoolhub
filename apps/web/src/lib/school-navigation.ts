@@ -1,4 +1,5 @@
 import {
+  BarChart3,
   ShieldCheck,
   Activity,
   AlertCircle,
@@ -158,6 +159,30 @@ export const schoolNavGroups: SchoolNavGroup[] = [
         apiStatus: "available",
       },
       {
+        id: "mock-analysis",
+        label: "Mock analysis",
+        icon: BarChart3,
+        description: "Compare a class's mock exams, subjects and pupils across Mock 1, 2, 3 with charts.",
+        section: "Academics",
+        apiStatus: "available",
+      },
+      {
+        id: "external-exams",
+        label: "BECE results",
+        icon: ClipboardCheck,
+        description: "Staff-only BECE candidate register, WAEC grades and analysis.",
+        section: "Academics",
+        apiStatus: "available",
+      },
+      {
+        id: "internal-exams",
+        label: "Legacy mocks",
+        icon: BookOpenCheck,
+        description: "Old standalone mock sessions. New mocks are set up under Assessments.",
+        section: "Academics",
+        apiStatus: "available",
+      },
+      {
         id: "assignments",
         label: "Assignments",
         icon: FileText,
@@ -165,17 +190,6 @@ export const schoolNavGroups: SchoolNavGroup[] = [
         section: "Academics",
         apiStatus: "available",
       },
-    ],
-  },
-  {
-    label: "Examinations",
-    items: [
-      { id: "internal-exams", label: "Internal", icon: BookOpenCheck,
-        description: "Numbered JHS 3 mock examinations, subjects and staff mark entry.",
-        section: "Examinations", apiStatus: "available" },
-      { id: "external-exams", label: "External", icon: ClipboardCheck,
-        description: "Staff-only BECE candidate register, grades and analysis.",
-        section: "Examinations", apiStatus: "available" },
     ],
   },
   {
@@ -546,6 +560,7 @@ const rolePages: Record<string, string[]> = {
   teacher: [
     "external-exams",
     "internal-exams",
+    "mock-analysis",
     "students",
     "classes",
     "subjects",

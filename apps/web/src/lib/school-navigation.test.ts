@@ -31,6 +31,15 @@ describe("all-role portal boundaries", () => {
     expect(getSchoolNavGroupsForRole("unexpected")).toEqual([]);
     expect(canRoleAccessPage(null, "students")).toBe(false);
   });
+  it("keeps every examination page under Academics, with no separate Examinations group", () => {
+    const groups = getSchoolNavGroupsForRole("headteacher");
+    expect(groups.some((group) => group.label === "Examinations")).toBe(false);
+    const academics = groups.find((group) => group.label === "Academics")!;
+    for (const id of ["assessments", "mock-analysis", "external-exams"]) expect(academics.items.map((item) => item.id)).toContain(id);
+    expect(canRoleAccessPage("teacher", "mock-analysis")).toBe(true);
+    expect(canRoleAccessPage("guardian", "mock-analysis")).toBe(false);
+    expect(canRoleAccessPage("student", "mock-analysis")).toBe(false);
+  });
   it("permits the learner and family destinations only in their own role", () => {
     expect(canRoleAccessPage("guardian", "guardian-fees")).toBe(true);
     expect(canRoleAccessPage("student", "classmates")).toBe(true);

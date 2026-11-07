@@ -1,7 +1,7 @@
 import { DatePicker } from "@/components/ui/date-picker";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { ASSESSMENT_TYPES, ASSESSMENT_TYPE_LABELS, saveAssessmentTemplateSchema, type AssessmentTypeName } from "@schoolhub/shared";
+import { ASSESSMENT_TYPES, ASSESSMENT_TYPE_LABELS, MOCK_COMPONENT_DEFAULT, saveAssessmentTemplateSchema, type AssessmentTypeName } from "@schoolhub/shared";
 import { ArrowDown, ArrowUp, CircleAlert, CircleCheck, Lock, LoaderCircle, Plus, Trash2, Wand2, X } from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { apiFetch } from "@/lib/api";
@@ -51,12 +51,15 @@ const rowFrom = (component: { id?: string; name: string; componentType: Assessme
 export function AssessmentTemplateDialog({
   setup,
   template,
+  category: newCategory,
   onClose,
   onSaved,
   onCreateStandardScale,
 }: {
   setup: AssessmentSetup;
   template?: SetupTemplate;
+  /** The kind of assessment being created; an existing assessment keeps its own. */
+  category?: "TERMLY" | "MOCK";
   onClose: () => void;
   onSaved: (message: string) => void;
   /** Creates the standard grading scale and returns its id (used when the school has none yet). */
@@ -65,11 +68,23 @@ export function AssessmentTemplateDialog({
   const queryClient = useQueryClient();
   const hasMarks = (template?.marksRecorded ?? 0) > 0;
   // Prefer a scale the school owns; never fall back to a class-ranked one by accident.
-  const firstScale = setup.gradingSystems.find((system) => !system.shared)
-    ?? setup.gradingSystems.find((system) => system.method === "SCORE_BANDS")
-    ?? setup.gradingSystems[0];
+  const category = template?.category ?? newCategory ?? "TERMLY";
+  const isMock = category === "MOCK";
+  // A mock defaults to the BECE stanine scale when the school has it; termly never defaults to a class-ranked one.
+  const firstScale = isMock
+    ? setup.gradingSystems.find((system) => /stanine/i.test(system.name))
+      ?? setup.gradingSystems.find((system) => system.method === "CLASS_RANK")
+      ?? setup.gradingSystems[0]
+    : setup.gradingSystems.find((system) => !system.shared)
+      ?? setup.gradingSystems.find((system) => system.method === "SCORE_BANDS")
+      ?? setup.gradingSystems[0];
+  const currentYear = setup.years.find((year) => year.isCurrent) ?? setup.years[0];
+  const nextMockNumber = Math.max(0, ...setup.templates.filter((item) => item.category === "MOCK" && item.academicYearId === (currentYear?.id ?? null)).map((item) => item.sequence ?? 0)) + 1;
 
-  const [name, setName] = useState(template?.name ?? "");
+  const [academicYearId, setAcademicYearId] = useState(template?.academicYearId ?? currentYear?.id ?? "");
+  const [sequence, setSequence] = useState(template?.sequence ? String(template.sequence) : isMock ? String(nextMockNumber) : "");
+  const [nameTouched, setNameTouched] = useState(!!template);
+  const [name, setName] = useState(template?.name ?? (isMock ? `Mock ${nextMockNumber}` : ""));
   const [description, setDescription] = useState(template?.description ?? "");
   const [gradingSystemId, setGradingSystemId] = useState(template?.gradingSystem.id ?? firstScale?.id ?? "");
   const [allClasses, setAllClasses] = useState(template ? template.allClasses : true);
@@ -79,7 +94,7 @@ export function AssessmentTemplateDialog({
   const [deadline, setDeadline] = useState(template?.deadline?.slice(0, 10) ?? "");
   const [isActive, setIsActive] = useState(template?.isActive ?? true);
   const [isLocked, setIsLocked] = useState(template?.isLocked ?? false);
-  const [rows, setRows] = useState<Row[]>(() => (template?.components ?? STANDARD_COMPONENTS).map(rowFrom));
+  const [rows, setRows] = useState<Row[]>(() => (template?.components ?? (isMock ? [MOCK_COMPONENT_DEFAULT] : STANDARD_COMPONENTS)).map(rowFrom));
   const [attempted, setAttempted] = useState(false);
   const [creatingScale, setCreatingScale] = useState(false);
 
@@ -102,9 +117,14 @@ export function AssessmentTemplateDialog({
   const totalWeight = Math.round(rows.reduce((sum, row) => sum + (Number(row.weight) || 0), 0) * 100) / 100;
   const weightOk = Math.abs(totalWeight - 100) <= 0.01;
 
+  // A standard mock is one total out of 100, so the component editor stays out of the way.
+  const showComponents = !isMock || rows.length !== 1;
   const candidate = {
     name,
     description,
+    category,
+    academicYearId: isMock ? academicYearId : undefined,
+    sequence: isMock && sequence.trim() ? Number(sequence) : null,
     gradingSystemId,
     classIds: allClasses ? [] : classIds,
     subjectCode,
@@ -184,9 +204,9 @@ export function AssessmentTemplateDialog({
         <div className="flex items-start justify-between gap-3">
           <div>
             <h2 id="assessment-title" className="text-sm font-bold text-foreground">
-              {template ? "Edit assessment" : "New assessment"}
+              {template ? (isMock ? "Edit mock exam" : "Edit assessment") : isMock ? "New mock exam" : "New assessment"}
             </h2>
-            <p className="mt-0.5 text-xs text-muted-foreground">Set what teachers mark and how it adds up to a pupil&rsquo;s grade.</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">{isMock ? "A practice exam recorded as one total out of 100. It never appears on the termly report card." : "Set what teachers mark and how it adds up to a pupil’s grade."}</p>
           </div>
           <button type="button" onClick={onClose} aria-label="Close" className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted">
             <X className="size-4" />
@@ -205,8 +225,25 @@ export function AssessmentTemplateDialog({
             <div className="grid gap-3 sm:grid-cols-2">
               <label className={label}>
                 Name
-                <input className={box} value={name} onChange={(event) => setName(event.target.value)} placeholder="e.g. Termly assessment" />
+                <input className={box} value={name} onChange={(event) => { setName(event.target.value); setNameTouched(true); }} placeholder={isMock ? "e.g. Mock 1" : "e.g. Termly assessment"} />
               </label>
+              {isMock && (
+                <>
+                  <label className={label}>
+                    Academic year
+                    <Select value={academicYearId} onValueChange={setAcademicYearId} disabled={hasMarks}>
+                      <SelectTrigger aria-label="Academic year" className={box}><SelectValue placeholder="Choose a year" /></SelectTrigger>
+                      <SelectContent>{setup.years.map((year) => <SelectItem key={year.id} value={year.id}>{year.name}</SelectItem>)}</SelectContent>
+                    </Select>
+                    <span className="text-[11px] font-normal text-muted-foreground">“Mock 1” can exist once in every academic year.</span>
+                  </label>
+                  <label className={label}>
+                    Mock number
+                    <input className={box} type="number" min={1} max={50} value={sequence} onChange={(event) => { setSequence(event.target.value); if (!nameTouched) setName(`Mock ${event.target.value}`); }} />
+                    <span className="text-[11px] font-normal text-muted-foreground">Sets the order of the mocks in comparison charts.</span>
+                  </label>
+                </>
+              )}
               {setup.gradingSystems.length > 0 ? (
                 <label className={label}>
                   Grading scale
@@ -323,7 +360,7 @@ export function AssessmentTemplateDialog({
             </fieldset>
           </section>
 
-          <section className="space-y-3" aria-label="Components">
+          {showComponents && <section className="space-y-3" aria-label="Components">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <h3 className={heading}>What is marked</h3>
               <p
@@ -410,7 +447,7 @@ export function AssessmentTemplateDialog({
                 </button>
               </div>
             )}
-          </section>
+          </section>}
 
           <section className="space-y-3" aria-label="Deadline and status">
             <h3 className={heading}>Deadline and status</h3>

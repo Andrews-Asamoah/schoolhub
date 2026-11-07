@@ -28,7 +28,7 @@ const iconButton =
 export function AssessmentSetupWorkspace() {
   const queryClient = useQueryClient();
   const canExport = useCanExportTables();
-  const [editing, setEditing] = useState<SetupTemplate | "new" | null>(null);
+  const [editing, setEditing] = useState<SetupTemplate | "new" | "new-mock" | null>(null);
   const [scaleDialog, setScaleDialog] = useState<{ system?: SetupGradingSystem; asCopy?: boolean } | "new" | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [showAllUncovered, setShowAllUncovered] = useState(false);
@@ -88,7 +88,10 @@ export function AssessmentSetupWorkspace() {
       value: (template) => template.name,
       cell: (template) => (
         <div>
-          <p className="text-sm font-semibold text-foreground">{template.name}</p>
+          <p className="text-sm font-semibold text-foreground">
+            {template.name}
+            {template.category === "MOCK" && <span className="ml-2 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">Mock · {setup.years.find((year) => year.id === template.academicYearId)?.name ?? "year"}</span>}
+          </p>
           {template.description && <p className="mt-0.5 max-w-xs truncate text-xs text-muted-foreground">{template.description}</p>}
         </div>
       ),
@@ -254,9 +257,14 @@ export function AssessmentSetupWorkspace() {
             <h2 id="assessments-heading" className="text-sm font-bold text-foreground">Assessments</h2>
             <p className="text-xs text-muted-foreground">{setup.term ? `Current term: ${setup.term.name}` : "No academic term is selected, so coverage can't be checked."}</p>
           </div>
-          <button type="button" onClick={() => setEditing("new")} className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary px-4 text-xs font-semibold text-primary-foreground hover:bg-primary/90">
-            <Plus className="size-4" /> New assessment
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <button type="button" onClick={() => setEditing("new-mock")} className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-border px-4 text-xs font-semibold text-foreground/80 hover:bg-muted/50">
+              <Plus className="size-4" /> New mock exam
+            </button>
+            <button type="button" onClick={() => setEditing("new")} className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary px-4 text-xs font-semibold text-primary-foreground hover:bg-primary/90">
+              <Plus className="size-4" /> New assessment
+            </button>
+          </div>
         </div>
         {setup.templates.length > 0 && (
           <DataTable
@@ -335,9 +343,10 @@ export function AssessmentSetupWorkspace() {
 
       {editing && (
         <AssessmentTemplateDialog
-          key={editing === "new" ? "new" : editing.id}
+          key={typeof editing === "string" ? editing : editing.id}
           setup={setup}
-          template={editing === "new" ? undefined : editing}
+          category={editing === "new-mock" ? "MOCK" : undefined}
+          template={typeof editing === "string" ? undefined : editing}
           onClose={() => setEditing(null)}
           onSaved={(message) => { setEditing(null); setNotice(message); }}
           onCreateStandardScale={createStandardScale}

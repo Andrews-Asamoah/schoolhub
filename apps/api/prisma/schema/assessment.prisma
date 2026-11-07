@@ -79,12 +79,25 @@ model GradeScale {
   @@map("grade_scales")
 }
 
+/// What an assessment is for. TERMLY feeds the termly report card (class score + exam).
+/// MOCK is a practice examination (for example the JHS 3 Mock 1, 2, 3 series): it is
+/// entered, graded and ranked by the same engine, but it never feeds a termly report card.
+enum AssessmentCategory {
+  TERMLY
+  MOCK
+}
+
 model AssessmentTemplate {
   id              String    @id @default(cuid())
   schoolId        String
   gradingSystemId String
   name            String
   description     String?
+  /// MOCK assessments belong to one academic year, so "Mock 1" can exist once per year.
+  category        AssessmentCategory @default(TERMLY)
+  academicYearId  String?
+  /// Order inside the academic year (Mock 1 = 1, Mock 2 = 2) so results chart in sitting order.
+  sequence        Int?
   termNumber      Int?
   isActive        Boolean   @default(true)
   deadline        DateTime?
@@ -94,6 +107,8 @@ model AssessmentTemplate {
 
   school           School                    @relation(fields: [schoolId], references: [id], onDelete: Cascade)
   gradingSystem    GradingSystem             @relation(fields: [gradingSystemId], references: [id])
+  academicYear     AcademicYear?             @relation(fields: [academicYearId], references: [id], onDelete: Restrict)
+  reportCardSets   ReportCardSet[]
   classId          String?
   classLevel       String?
   subjectCode      String?
@@ -109,6 +124,8 @@ model AssessmentTemplate {
 
   @@index([schoolId, isActive])
   @@index([gradingSystemId])
+  @@index([schoolId, category, academicYearId])
+  @@index([academicYearId])
   @@map("assessment_templates")
 }
 
@@ -293,6 +310,8 @@ model ReportCardSet {
   academicYearId String
   termId         String
   classId        String?
+  /// When set, this batch reports one MOCK assessment instead of the termly results.
+  assessmentTemplateId String?
   name           String
   status         ReportCardStatus     @default(DRAFT)
   targetClasses  ReportCardSetClass[]
@@ -308,9 +327,11 @@ model ReportCardSet {
   academicYear AcademicYear       @relation(fields: [academicYearId], references: [id])
   term         Term               @relation(fields: [termId], references: [id])
   class        Class?             @relation(fields: [classId], references: [id])
+  assessmentTemplate AssessmentTemplate? @relation(fields: [assessmentTemplateId], references: [id], onDelete: Restrict)
   reportCards  ReportCard[]
   versions      ReportCardVersion[]
 
+  @@index([assessmentTemplateId])
   @@index([schoolId])
   @@index([academicYearId])
   @@index([termId])

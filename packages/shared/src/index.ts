@@ -1719,10 +1719,23 @@ export const assessmentComponentInputSchema = z.object({
 });
 export type AssessmentComponentInput = z.infer<typeof assessmentComponentInputSchema>;
 
+/** What an assessment is for. Mirrors the AssessmentCategory enum in the API schema. */
+export const ASSESSMENT_CATEGORIES = ["TERMLY", "MOCK"] as const;
+export type AssessmentCategoryValue = (typeof ASSESSMENT_CATEGORIES)[number];
+
+/** The one component a standard mock exam is recorded against: a single total out of 100. */
+export const MOCK_COMPONENT_DEFAULT = { name: "Mock exam", componentType: "MOCK_EXAM", maxMarks: 100, weight: 100, isRequired: true, isRepeatable: false, expectedCount: 1 } as const;
+
 export const saveAssessmentTemplateSchema = z
   .object({
     name: z.string().trim().min(2, "Give the assessment a name").max(120),
     description: clearable(z.string().trim().max(500)),
+    /** TERMLY feeds termly report cards. MOCK is a practice exam that never does. */
+    category: z.enum(ASSESSMENT_CATEGORIES).default("TERMLY"),
+    /** Required for a mock (so "Mock 1" can exist once per academic year); ignored for termly. */
+    academicYearId: clearable(z.string().min(1)),
+    /** Sitting order inside the academic year: Mock 1 is 1, Mock 2 is 2. */
+    sequence: z.number().int().min(1).max(50).nullable().optional(),
     gradingSystemId: z.string().min(1, "Choose a grading scale"),
     /** Empty means every class. */
     classIds: z.array(z.string().min(1)).max(300).default([]),
@@ -1740,6 +1753,12 @@ export const saveAssessmentTemplateSchema = z
     const total = value.components.reduce((sum, component) => sum + component.weight, 0);
     if (Math.abs(total - 100) > 0.01) {
       ctx.addIssue({ code: "custom", path: ["components"], message: `Component weights must add up to 100%. They add up to ${Math.round(total * 100) / 100}%.` });
+    }
+    if (value.category === "MOCK") {
+      if (!value.academicYearId) ctx.addIssue({ code: "custom", path: ["academicYearId"], message: "Choose the academic year this mock belongs to." });
+      if (value.components.some((component) => component.isRepeatable)) {
+        ctx.addIssue({ code: "custom", path: ["components"], message: "A mock exam is one sitting, so its components cannot repeat." });
+      }
     }
     const names = new Set<string>();
     for (const component of value.components) {

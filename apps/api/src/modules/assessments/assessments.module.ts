@@ -16,14 +16,16 @@ import { InternalExamMarksImportService } from "./internal-exam-marks-import.ser
 import { InternalExamsService } from "./internal-exams.service.js";
 import { MockReportService } from "./mock-report.service.js";
 import { MockCorrectionService } from "./mock-correction.service.js";
+import { MockAnalyticsController } from "./mock-analytics.controller.js";
+import { MockAnalyticsService } from "./mock-analytics.service.js";
 import { ExternalExamsController } from "./external-exams.controller.js";
 import { ExternalExamsService } from "./external-exams.service.js";
 import { ExternalBeceImportService } from "./external-bece-import.service.js";
 import { ReportTemplatePresetsService } from "./report-template-presets.service.js";
 
 @Module({
-  controllers: [AssessmentsController, AssessmentWorkflowController, AssessmentSetupController, ReportPublicationController, InternalExamsController, ExternalExamsController],
-  providers: [AssessmentsService, AssessmentEntryService, AssessmentMarksImportService, AssessmentTrackingService, AssessmentCorrectionService, AssessmentSetupService, ReportPublicationService, ReportVersionService, InternalExamsService, InternalExamMarksImportService, MockReportService, MockCorrectionService, ExternalExamsService, ExternalBeceImportService, ReportTemplatePresetsService],
+  controllers: [AssessmentsController, AssessmentWorkflowController, AssessmentSetupController, ReportPublicationController, InternalExamsController, ExternalExamsController, MockAnalyticsController],
+  providers: [AssessmentsService, AssessmentEntryService, AssessmentMarksImportService, AssessmentTrackingService, AssessmentCorrectionService, AssessmentSetupService, ReportPublicationService, ReportVersionService, InternalExamsService, InternalExamMarksImportService, MockReportService, MockCorrectionService, ExternalExamsService, ExternalBeceImportService, MockAnalyticsService, ReportTemplatePresetsService],
   exports: [AssessmentsService],
 })
 export class AssessmentsModule {}

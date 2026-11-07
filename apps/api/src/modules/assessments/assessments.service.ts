@@ -77,7 +77,8 @@ export class AssessmentsService {
     }
 
     const scores = await this.prisma.client.assessmentScore.findMany({
-      where: { studentId, termId },
+      // Mock exams have their own results and reports; they never appear on the termly report card.
+      where: { studentId, termId, template: { category: "TERMLY" } },
       include: {
         subject: true,
         componentScores: { include: { component: true } },

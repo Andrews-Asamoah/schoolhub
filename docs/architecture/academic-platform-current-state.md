@@ -53,3 +53,14 @@ The earlier successful workflow on a different branch is not accepted as proof o
 ## Next action
 
 Finish the service/controller/test inventory and record the policy decisions required for the first vertical slice. Then implement the smallest complete internal-examination workflow using existing models wherever possible, with any schema addition justified by a documented gap.
+
+## Mock exams are an assessment category (2026-11-07)
+
+A mock exam (Mock 1, 2, 3 of a JHS 3 year) is an `AssessmentTemplate` with `category = MOCK`, an `academicYearId` and a `sequence`. It reuses marks entry, import, deadlines, corrections, tracking and grading (including the class-ranked BECE Stanine scale) and is recorded as a single total out of 100.
+
+- Names: mock names are unique per academic year (partial unique index), termly names stay unique school-wide. "Mock 1" can exist once per year.
+- Isolation: mocks never feed termly report cards or the student report card; the entry sheet lists termly assessments first and only this year's mocks.
+- Reports: a `ReportCardSet` may carry `assessmentTemplateId` to report one mock through the existing generate, review and publish flow.
+- Analysis: `GET /mock-analytics` compares a class's mocks (class trend, subjects, grade distribution, per-pupil trend and status). Thresholds live in `mock-analytics.ts`.
+- External (BECE) results stay a separate model: they are WAEC-issued grades, not marks.
+- The older `InternalExam*` tables and page are untouched and labelled "Legacy mocks" until their data is confirmed empty or migrated.

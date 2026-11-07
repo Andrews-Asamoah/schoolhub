@@ -117,6 +117,7 @@ export class ReportPublicationController {
       name: input.name.trim(), templateId: input.templateId, academicYearId: input.academicYearId,
       termId: input.termId, classIds: [...new Set(input.classIds as string[])],
       publishAt: typeof input.publishAt === "string" && input.publishAt.trim() ? input.publishAt : null,
+      assessmentTemplateId: typeof input.assessmentTemplateId === "string" && input.assessmentTemplateId.trim() ? input.assessmentTemplateId : null,
     });
   }
 

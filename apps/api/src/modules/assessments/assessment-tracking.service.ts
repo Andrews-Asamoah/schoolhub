@@ -38,7 +38,7 @@ export class AssessmentTrackingService {
   private async currentTerm(schoolId: string) {
     const term = await this.prisma.client.term.findFirst({
       where: { isCurrent: true, academicYear: { schoolId, isCurrent: true } },
-      select: { id: true, name: true, termNumber: true },
+      select: { id: true, name: true, termNumber: true, academicYearId: true },
     });
     if (!term) throw new BadRequestException("No academic term is currently selected for this school.");
     return term;
@@ -52,16 +52,22 @@ export class AssessmentTrackingService {
     const db = this.prisma.client;
     const term = await this.currentTerm(schoolId);
     const templates = await db.assessmentTemplate.findMany({
-      where: { schoolId, isActive: true, OR: [{ termNumber: null }, { termNumber: term.termNumber }] },
+      where: {
+        schoolId, isActive: true,
+        AND: [
+          { OR: [{ termNumber: null }, { termNumber: term.termNumber }] },
+          { OR: [{ academicYearId: null }, { academicYearId: term.academicYearId }] },
+        ],
+      },
       select: {
-        id: true, name: true, deadline: true, isLocked: true, termNumber: true, classId: true, classLevel: true, subjectCode: true, departmentId: true,
+        id: true, name: true, category: true, sequence: true, deadline: true, isLocked: true, termNumber: true, classId: true, classLevel: true, subjectCode: true, departmentId: true,
         classes: { select: { classId: true } },
         components: { select: { id: true, isRequired: true, subjectStrand: { select: { subjectId: true } } } },
       },
       orderBy: [{ createdAt: "desc" }],
-    });
+    }).then((rows) => [...rows].sort((a, b) => Number(a.category === "MOCK") - Number(b.category === "MOCK") || (a.category === "MOCK" ? (a.sequence ?? 0) - (b.sequence ?? 0) : 0)));
     const selected = templates.find((item) => item.id === query.templateId) ?? templates[0] ?? null;
-    const templateOptions = templates.map((item) => ({ id: item.id, name: item.name }));
+    const templateOptions = templates.map((item) => ({ id: item.id, name: item.name, category: item.category }));
     const pendingCorrections = await db.assessmentMarkCorrection.count({ where: { schoolId, status: "PENDING" } });
     const empty = { term, templates: templateOptions, template: null, summary: null, sheets: [], teachers: [], pendingCorrections };
     if (!selected) return empty;

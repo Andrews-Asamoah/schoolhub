@@ -16,6 +16,10 @@ export interface SetupTemplate {
   id: string;
   name: string;
   description: string | null;
+  /** TERMLY feeds termly report cards; MOCK is a practice exam kept to one academic year. */
+  category: "TERMLY" | "MOCK";
+  academicYearId: string | null;
+  sequence: number | null;
   isActive: boolean;
   isLocked: boolean;
   deadline: string | null;
@@ -51,6 +55,7 @@ export interface SetupGradingSystem {
 }
 export interface AssessmentSetup {
   term: { id: string; name: string; termNumber: number } | null;
+  years: { id: string; name: string; isCurrent: boolean }[];
   classes: { id: string; name: string; level: string }[];
   subjects: { id: string; code: string; name: string; strands: { id: string; name: string; code: string | null; sortOrder: number }[] }[];
   templates: SetupTemplate[];
@@ -90,6 +95,9 @@ export function templateToInput(template: SetupTemplate, changes: Partial<SaveAs
   return {
     name: template.name,
     description: template.description,
+    category: template.category,
+    academicYearId: template.academicYearId,
+    sequence: template.sequence,
     gradingSystemId: template.gradingSystem.id,
     classIds: template.allClasses ? [] : template.classIds,
     subjectCode: template.subjectCode,

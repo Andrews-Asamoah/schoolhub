@@ -69,6 +69,7 @@ const DocumentsWorkspace = lazy(() => import("@/components/portal/documents-work
 const MessagesWorkspace = lazy(() => import("@/components/portal/messages-workspace").then((m) => ({ default: m.MessagesWorkspace })));
 const NotificationsHistoryWorkspace = lazy(() => import("@/components/portal/notifications-history-workspace").then((m) => ({ default: m.NotificationsHistoryWorkspace })));
 const SchoolReportsWorkspace = lazy(() => import("@/components/school/reports-workspace").then((m) => ({ default: m.SchoolReportsWorkspace })));
+const MockAnalysisWorkspace = lazy(() => import("@/components/school/mock-analysis-workspace").then((m) => ({ default: m.MockAnalysisWorkspace })));
 const InternalExaminationsWorkspace = lazy(() => import("@/components/school/internal-examinations-workspace").then((m) => ({ default: m.InternalExaminationsWorkspace })));
 const ExternalExaminationsWorkspace = lazy(() => import("@/components/school/external-examinations-workspace").then((m) => ({ default: m.ExternalExaminationsWorkspace })));
 const TeacherReportReviewWorkspace = lazy(() => import("@/components/school/teacher-report-review-workspace").then((m) => ({ default: m.TeacherReportReviewWorkspace })));
@@ -305,6 +306,7 @@ function WorkspaceContent({ pageId }: { pageId: string }) {
             activeRole === "student" ? <StudentSubjectsView /> : <SubjectsWorkspace />
           )}
           {pageId === "academic-years" && <AcademicYears query={yearsQuery} />}
+          {pageId === "mock-analysis" && <MockAnalysisWorkspace />}
           {pageId === "internal-exams" && <InternalExaminationsWorkspace />}
           {pageId === "external-exams" && <ExternalExaminationsWorkspace />}
           {pageId === "assessments" && (

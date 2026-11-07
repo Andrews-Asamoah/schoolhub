@@ -112,7 +112,11 @@ export class ReportPublicationService {
     });
   }
 
-  async createSet(schoolId: string, actorId: string, input: { name: string; templateId: string; academicYearId: string; termId: string; classIds: string[]; publishAt: string | null }) {
+  async createSet(schoolId: string, actorId: string, input: { name: string; templateId: string; academicYearId: string; termId: string; classIds: string[]; publishAt: string | null; assessmentTemplateId?: string | null }) {
+    const mock = input.assessmentTemplateId
+      ? await this.prisma.client.assessmentTemplate.findFirst({ where: { id: input.assessmentTemplateId, schoolId, category: "MOCK", academicYearId: input.academicYearId }, select: { id: true } })
+      : null;
+    if (input.assessmentTemplateId && !mock) throw new BadRequestException("Choose a mock exam from the selected academic year.");
     const [template, year, term, classes] = await Promise.all([
       this.prisma.client.reportCardTemplate.findFirst({ where: { id: input.templateId, schoolId, isActive: true }, select: { id: true } }),
       this.prisma.client.academicYear.findFirst({ where: { id: input.academicYearId, schoolId }, select: { id: true } }),
@@ -124,7 +128,7 @@ export class ReportPublicationService {
     const publishAt = input.publishAt ? new Date(input.publishAt) : null;
     if (publishAt && Number.isNaN(publishAt.getTime())) throw new BadRequestException("The scheduled publication date is invalid.");
     return this.prisma.client.$transaction(async (tx) => {
-      const set = await tx.reportCardSet.create({ data: { schoolId, templateId: template.id, academicYearId: year.id, termId: term.id, name: input.name, publishAt, targetClasses: { create: classes.map(({ id }) => ({ classId: id })) } }, select: { id: true, name: true, status: true, publishAt: true } });
+      const set = await tx.reportCardSet.create({ data: { schoolId, templateId: template.id, assessmentTemplateId: mock?.id ?? null, academicYearId: year.id, termId: term.id, name: input.name, publishAt, targetClasses: { create: classes.map(({ id }) => ({ classId: id })) } }, select: { id: true, name: true, status: true, publishAt: true } });
       await tx.auditLog.create({ data: { schoolId, userId: actorId, action: "CREATE", entityType: "REPORT_CARD_SET", entityId: set.id, newValues: { name: set.name, classIds: classes.map(({ id }) => id) } } });
       return set;
     });
@@ -154,7 +158,9 @@ export class ReportPublicationService {
           id: true, admissionNumber: true,
           profile: { select: { firstName: true, lastName: true } },
           enrollments: { where: { academicYearId: set.academicYearId, termId: set.termId, status: { in: ["ACTIVE", "COMPLETED"] }, classId: { in: classIds } }, select: { class: { select: { id: true, name: true, level: true } } }, take: 1 },
-          assessmentScores: { where: { termId: set.termId, status: "FINAL" }, include: { subject: { select: { id: true, name: true, code: true } }, template: { select: { components: { select: { id: true, componentType: true, maxMarks: true, weight: true } }, gradingSystem: { select: { gradeScales: { select: { grade: true, description: true } } } } } }, componentScores: { include: { component: { select: { id: true, name: true, weight: true, maxMarks: true } } }, orderBy: { createdAt: "asc" } } } },
+          // A mock batch reports that one mock once its marks are submitted; a termly batch only
+          // ever reports finalized termly scores, never a mock.
+          assessmentScores: { where: set.assessmentTemplateId ? { termId: set.termId, templateId: set.assessmentTemplateId, status: { in: ["SUBMITTED", "REVIEWED", "FINAL"] } } : { termId: set.termId, status: "FINAL", template: { category: "TERMLY" } }, include: { subject: { select: { id: true, name: true, code: true } }, template: { select: { components: { select: { id: true, componentType: true, maxMarks: true, weight: true } }, gradingSystem: { select: { gradeScales: { select: { grade: true, description: true } } } } } }, componentScores: { include: { component: { select: { id: true, name: true, weight: true, maxMarks: true } } }, orderBy: { createdAt: "asc" } } } },
           remarks: { where: { termId: set.termId }, include: { teacher: { include: { profile: true } } } },
         },
       });

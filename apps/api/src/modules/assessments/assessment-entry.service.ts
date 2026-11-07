@@ -35,6 +35,8 @@ import {
 
 const NO_ASSIGNMENTS: TeacherAssignments = { teacherId: null, classTeacherClassIds: [], subjectAssignments: [], subjectStrandAssignments: [] };
 
+const categoryRank = (category: "TERMLY" | "MOCK") => (category === "TERMLY" ? 0 : 1);
+
 /** Entering and reading a class's marks for one subject, with the access rules applied. */
 @Injectable()
 export class AssessmentEntryService {
@@ -61,7 +63,7 @@ export class AssessmentEntryService {
       class: ctx.klass,
       subject: ctx.subject,
       term: { id: ctx.term.id, name: ctx.term.name },
-      templates: templates.map((template) => ({ id: template.id, name: template.name })),
+      templates: templates.map((template) => ({ id: template.id, name: template.name, category: template.category })),
     };
     if (!selected) {
       return {
@@ -350,7 +352,7 @@ export class AssessmentEntryService {
     const db = this.prisma.client;
     const term = await db.term.findFirst({
       where: { isCurrent: true, academicYear: { schoolId, isCurrent: true } },
-      select: { id: true, name: true, termNumber: true },
+      select: { id: true, name: true, termNumber: true, academicYearId: true },
     });
     if (!term) throw new BadRequestException("No academic term is currently selected for this school.");
 
@@ -369,7 +371,8 @@ export class AssessmentEntryService {
 
     const [rows, extensionRows, submissionRows] = await Promise.all([
       db.assessmentTemplate.findMany({
-      where: { schoolId, isActive: true },
+      // A mock belongs to one academic year, so only this year's mocks are open for entry.
+      where: { schoolId, isActive: true, OR: [{ academicYearId: null }, { academicYearId: term.academicYearId }] },
       include: {
         classes: { select: { classId: true } },
         components: {
@@ -408,10 +411,12 @@ export class AssessmentEntryService {
       .filter(({ row }) => row.components.every((component) =>
         !component.subjectStrand || component.subjectStrand.subjectId === subjectId,
       ))
-      .sort((a, b) => b.score - a.score || a.row.name.localeCompare(b.row.name))
+      // Termly assessments always come first so a mock never becomes the default sheet.
+      .sort((a, b) => categoryRank(a.row.category) - categoryRank(b.row.category) || (a.row.category === "MOCK" ? (a.row.sequence ?? 0) - (b.row.sequence ?? 0) : b.score - a.score) || a.row.name.localeCompare(b.row.name))
       .map(({ row }) => ({
         id: row.id,
         name: row.name,
+        category: row.category,
         isLocked: row.isLocked,
         deadline: row.deadline,
         extensions: extensionRows.filter((item) => item.templateId === row.id).map((item) => ({ teacherId: item.teacherId, deadline: item.deadline })),

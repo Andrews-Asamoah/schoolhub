@@ -1,3 +1,4 @@
+import { setupKey, type AssessmentSetup } from "@/lib/assessment-setup";
 import { DateTimePicker } from "@/components/ui/date-picker";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -80,6 +81,7 @@ export function ReportPublicationWorkspace({ onOpenSetup }: { onOpenSetup?: () =
   const [previewing, setPreviewing] = useState<Template | null>(null);
   const [classIds, setClassIds] = useState<string[]>([]);
   const [publishAt, setPublishAt] = useState("");
+  const [mockId, setMockId] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [expandedSetId, setExpandedSetId] = useState<string | null>(null);
 
@@ -95,6 +97,10 @@ export function ReportPublicationWorkspace({ onOpenSetup }: { onOpenSetup?: () =
   const effectiveTemplateId = selectedTemplate?.id ?? "";
   const readyToCreate = !!effectiveYearId && !!effectiveTermId && !!effectiveTemplateId && classes.length > 0;
 
+  const setupQuery = useQuery({ queryKey: setupKey, queryFn: () => apiFetch<AssessmentSetup>("/assessments/setup"), retry: false });
+  const mocks = (setupQuery.data?.templates ?? []).filter((item) => item.category === "MOCK" && item.isActive && item.academicYearId === effectiveYearId);
+  const effectiveMockId = mocks.some((item) => item.id === mockId) ? mockId : "";
+
   const reportPreview = useQuery({
     queryKey: ["assessments", "report-cards", "review", expandedSetId],
     queryFn: () => apiFetch<ReportPreview[]>(`/assessments/report-cards/sets/${expandedSetId}/reports`),
@@ -107,7 +113,7 @@ export function ReportPublicationWorkspace({ onOpenSetup }: { onOpenSetup?: () =
       if (args.kind === "create") {
         return apiFetch<{ id: string }>("/assessments/report-cards/sets", {
           method: "POST",
-          body: JSON.stringify({ name: name.trim(), templateId: effectiveTemplateId, academicYearId: effectiveYearId, termId: effectiveTermId, classIds, publishAt: publishAt || null }),
+          body: JSON.stringify({ name: name.trim(), templateId: effectiveTemplateId, academicYearId: effectiveYearId, termId: effectiveTermId, classIds, publishAt: publishAt || null, assessmentTemplateId: effectiveMockId || null }),
         });
       }
       return apiFetch("/assessments/report-cards/sets/" + args.id + (args.kind === "generate" ? "/generate" : "/publish"), { method: args.kind === "generate" ? "POST" : "PATCH" });
@@ -194,7 +200,7 @@ export function ReportPublicationWorkspace({ onOpenSetup }: { onOpenSetup?: () =
             </Select></label><label className="space-y-1.5 text-xs font-semibold">Term<Select value={effectiveTermId} onValueChange={setTermId} required>
               <SelectTrigger aria-label="Term" className="h-11 w-full rounded-xl border border-input bg-background px-3 text-sm font-normal"><SelectValue /></SelectTrigger>
               <SelectContent>{terms.map((term) => <SelectItem key={term.id} value={term.id}>{term.name}{term.isCurrent ? " · Current" : ""}</SelectItem>)}</SelectContent>
-            </Select></label><label className="space-y-1.5 text-xs font-semibold sm:col-span-2 xl:col-span-1">Report design<Select value={effectiveTemplateId} onValueChange={setTemplateId} required>
+            </Select></label>{mocks.length > 0 && <label className="space-y-1.5 text-xs font-semibold sm:col-span-2 xl:col-span-1">Results to report<Select value={effectiveMockId || "__termly__"} onValueChange={(value) => setMockId(value === "__termly__" ? "" : value)}><SelectTrigger aria-label="Results to report"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="__termly__">Termly results</SelectItem>{mocks.map((item) => <SelectItem key={item.id} value={item.id}>{item.name}</SelectItem>)}</SelectContent></Select></label>}<label className="space-y-1.5 text-xs font-semibold sm:col-span-2 xl:col-span-1">Report design<Select value={effectiveTemplateId} onValueChange={setTemplateId} required>
               <SelectTrigger aria-label="Report design" className="h-11 w-full rounded-xl border border-input bg-background px-3 text-sm font-normal"><SelectValue /></SelectTrigger>
               <SelectContent>{activeTemplates.map((template) => <SelectItem key={template.id} value={template.id}>{template.name}</SelectItem>)}</SelectContent>
             </Select><span className="block text-[11px] font-normal text-muted-foreground">{selectedTemplate?.description}</span></label><label className="space-y-1.5 text-xs font-semibold sm:col-span-2">Earliest publication date/time (optional)<DateTimePicker value={publishAt} onChange={(value) => setPublishAt(value)} buttonClassName="h-11 w-full rounded-xl border border-input bg-background px-3 text-sm font-normal outline-none focus:border-primary" /><span className="block text-[11px] font-normal text-muted-foreground">An administrator must still publish the batch manually after this time.</span></label></div>
