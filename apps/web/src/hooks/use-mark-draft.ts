@@ -1,3 +1,4 @@
+import { localPreferences, sessionPreferences } from "@/lib/browser-storage";
 import { useEffect, useRef, useState, type SetStateAction } from "react";
 import { useBlocker } from "@tanstack/react-router";
 import { useSession } from "@/lib/auth-client";
@@ -11,10 +12,10 @@ export function confirmLeavingDrafts() {
 export function useMarkDraft<T>(sheetKey: string, valid: (value: unknown) => value is T) {
   const { data: session } = useSession();
   const key = "schoolhub-draft:" + JSON.stringify([session?.user.id, session?.session.activeOrganizationId,
-    window.localStorage.getItem("schoolhub-active-role"), sheetKey]);
+    localPreferences.getItem("schoolhub-active-role"), sheetKey]);
   const load = (): Record<string, T> => {
     try {
-      const raw = JSON.parse(sessionStorage.getItem(key) ?? "null") as { at?: number; value?: Record<string, unknown> } | null;
+      const raw = JSON.parse(sessionPreferences.getItem(key) ?? "null") as { at?: number; value?: Record<string, unknown> } | null;
       if (!raw || typeof raw.at !== "number" || Date.now() - raw.at > 86400000 || !raw.value ||
         !Object.values(raw.value).every(valid)) return {};
       return raw.value as Record<string, T>;
@@ -31,8 +32,8 @@ export function useMarkDraft<T>(sheetKey: string, valid: (value: unknown) => val
   useEffect(() => {
     if (state.key !== key) { setState({ key, value: load() }); return; }
     try {
-      if (Object.keys(state.value).length) sessionStorage.setItem(key, JSON.stringify({ at: Date.now(), value: state.value }));
-      else sessionStorage.removeItem(key);
+      if (Object.keys(state.value).length) sessionPreferences.setItem(key, JSON.stringify({ at: Date.now(), value: state.value }));
+      else sessionPreferences.removeItem(key);
     } catch { /* A storage quota failure must not prevent in-memory mark entry. */ }
   }, [key, state]);
   const dirty = Object.keys(value).length > 0;

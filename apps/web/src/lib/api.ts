@@ -1,3 +1,4 @@
+import { localPreferences, sessionPreferences } from "@/lib/browser-storage";
 import { requestContextVersion, assertRequestContext } from "./request-context";
 import { getTenantSubdomain as getClientSubdomain } from "./tenant-subdomain";
 import { downloadBlob, XLSX_MIME } from "./download";
@@ -58,10 +59,10 @@ export async function apiFetch<T>(
     typeof window !== "undefined" &&
     path !== "/schools/roles"
   ) {
-    const activeRole = window.localStorage.getItem("schoolhub-active-role");
+    const activeRole = localPreferences.getItem("schoolhub-active-role");
     if (activeRole) headers.set("x-school-role", activeRole);
     if (activeRole === "accountant") {
-      const period = window.sessionStorage.getItem(
+      const period = sessionPreferences.getItem(
         "schoolhub-accountant-academic-view",
       );
       if (period) {
@@ -78,7 +79,7 @@ export async function apiFetch<T>(
             headers.set("x-academic-term-id", parsed.termId);
           }
         } catch {
-          window.sessionStorage.removeItem(
+          sessionPreferences.removeItem(
             "schoolhub-accountant-academic-view",
           );
         }
@@ -155,10 +156,10 @@ async function apiBinary(path: string): Promise<Response> {
   if (subdomain) headers.set("x-school-subdomain", subdomain);
 
   if (typeof window !== "undefined" && path !== "/schools/roles") {
-    const activeRole = window.localStorage.getItem("schoolhub-active-role");
+    const activeRole = localPreferences.getItem("schoolhub-active-role");
     if (activeRole) headers.set("x-school-role", activeRole);
     if (activeRole === "accountant") {
-      const period = window.sessionStorage.getItem("schoolhub-accountant-academic-view");
+      const period = sessionPreferences.getItem("schoolhub-accountant-academic-view");
       if (period) {
         try {
           const parsed = JSON.parse(period) as { academicYearId?: unknown; termId?: unknown };
@@ -167,7 +168,7 @@ async function apiBinary(path: string): Promise<Response> {
             headers.set("x-academic-term-id", parsed.termId);
           }
         } catch {
-          window.sessionStorage.removeItem("schoolhub-accountant-academic-view");
+          sessionPreferences.removeItem("schoolhub-accountant-academic-view");
         }
       }
     }
@@ -226,7 +227,7 @@ export async function downloadAcademicReport(path: string, filename: string): Pr
   const school = getClientSubdomain();
   if (school) headers.set("x-school-subdomain", school);
   const role = typeof window !== "undefined" ?
-    window.localStorage.getItem("schoolhub-active-role") : null;
+    localPreferences.getItem("schoolhub-active-role") : null;
   if (role) headers.set("x-school-role", role);
   const result = await fetch(`${API_BASE}${path}`,{
     method:"GET",credentials:"include",headers,cache:"no-store",
@@ -255,7 +256,7 @@ export async function downloadPrivateExcel(path:string,filename:string):Promise<
   const school=getClientSubdomain();
   if(school)headers.set("x-school-subdomain",school);
   if(typeof window!=="undefined"){
-    const role=window.localStorage.getItem("schoolhub-active-role");
+    const role=localPreferences.getItem("schoolhub-active-role");
     if(role)headers.set("x-school-role",role);
   }
   const response=await fetch(`${API_BASE}${path}`,{

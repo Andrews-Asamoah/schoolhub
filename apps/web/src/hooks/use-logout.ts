@@ -1,3 +1,4 @@
+import { sessionPreferences } from "@/lib/browser-storage";
 import { clearPrivateSessionPreferences } from "@/lib/private-session";
 import { useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
@@ -31,7 +32,7 @@ export function useLogout() {
       queryClient.clear();
       clearPrivateSessionPreferences();
       window.dispatchEvent(new Event("schoolhub-role-change"));
-      window.sessionStorage.setItem(
+      sessionPreferences.setItem(
         LOGOUT_NOTICE_KEY,
         "You have been logged out successfully.",
       );
@@ -46,9 +47,9 @@ export function useLogout() {
 }
 
 export function consumeLogoutNotice() {
-  const message = window.sessionStorage.getItem(LOGOUT_NOTICE_KEY);
+  const message = sessionPreferences.getItem(LOGOUT_NOTICE_KEY);
   if (message) {
-    window.sessionStorage.removeItem(LOGOUT_NOTICE_KEY);
+    sessionPreferences.removeItem(LOGOUT_NOTICE_KEY);
   }
   return message;
 }

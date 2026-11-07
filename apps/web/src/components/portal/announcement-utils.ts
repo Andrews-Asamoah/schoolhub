@@ -1,3 +1,4 @@
+import { localPreferences } from "@/lib/browser-storage";
 import { useEffect } from "react";
 import type {
   AnnouncementCategory,
@@ -81,7 +82,7 @@ export function announcementCategoryLabel(category: AnnouncementCategory) {
 /** Includes the active portal role so role-specific announcement results never share a cache. */
 export function announcementQueryRoleKey() {
   if (typeof window === "undefined") return "server";
-  return window.localStorage.getItem("schoolhub-active-role") ?? "default";
+  return localPreferences.getItem("schoolhub-active-role") ?? "default";
 }
 
 export type CategoryFilter = "ALL" | AnnouncementCategory;

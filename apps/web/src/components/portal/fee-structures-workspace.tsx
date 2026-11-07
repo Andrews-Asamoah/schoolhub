@@ -1,3 +1,4 @@
+import { PortalModal } from "@/components/portal/portal-modal";
 import { useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Archive, CheckCircle2, CircleAlert, Copy, FileText, LoaderCircle, Pencil, Plus, RefreshCw, Search, Tags, X } from "lucide-react";
@@ -405,7 +406,8 @@ function Metric({ label, value, detail, icon: Icon }: { label: string; value: st
   return <div className="rounded-2xl border border-border bg-card p-4 shadow-sm"><div className="flex items-center justify-between gap-3"><p className="text-xs font-semibold text-muted-foreground">{label}</p><Icon className="size-4 text-primary" /></div><p className="mt-3 text-2xl font-bold tracking-tight text-foreground">{value}</p><p className="mt-1 text-xs text-muted-foreground">{detail}</p></div>;
 }
 function Modal({ title, description, onClose, children }: { title: string; description: string; onClose: () => void; children: ReactNode }) {
-  return <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay/70 p-3 sm:p-6" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) onClose(); }}><section role="dialog" aria-modal="true" aria-label={title} className="max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-2xl border border-border bg-card p-5 text-foreground shadow-2xl sm:p-6"><div className="mb-5 flex items-start justify-between gap-4"><div><h2 className="text-lg font-semibold">{title}</h2><p className="mt-1 text-sm text-muted-foreground">{description}</p></div><button type="button" onClick={onClose} aria-label="Close dialog" className="rounded-lg p-2 text-muted-foreground hover:bg-muted"><X className="size-4" /></button></div>{children}</section></div>;
+  return <PortalModal isOpen onClose={onClose} title={title} description={description}
+    maxWidth="3xl" closeOnBackdrop={false}>{children}</PortalModal>;
 }
 function Badge({ children, tone = "muted" }: { children: ReactNode; tone?: "muted" | "success" }) {
   return <span className={cn("inline-flex rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide", tone === "success" ? "bg-success/10 text-success" : "bg-muted text-muted-foreground")}>{children}</span>;

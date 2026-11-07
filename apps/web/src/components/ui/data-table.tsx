@@ -51,6 +51,7 @@ import {
   nodeToText,
   printTable,
   type ExportTable,
+  type ExportColumnType,
 } from "@/lib/table-export";
 import { cn } from "@/lib/utils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -78,6 +79,8 @@ export interface DataTableColumn<T> {
   value?: (row: T) => string | number | null | undefined;
   /** Include in downloads and print. Defaults to false for blank or "Actions" columns. */
   exportable?: boolean;
+  /** Preserve identifiers as text or declare numeric/date export cells explicitly. */
+  exportType?: ExportColumnType;
   /** Allow sorting by this column. Defaults to true except for action columns. */
   sortable?: boolean;
 }
@@ -148,7 +151,7 @@ export function DataTable<T extends RowData>({
       enableSorting: column.sortable ?? !isActionColumn(column),
       enableGlobalFilter: !isActionColumn(column) || column.value !== undefined,
       sortFn: (a, b, id) => compareValues(a.getValue(id), b.getValue(id)),
-      meta: { className: column.className, exportable: column.exportable ?? !isActionColumn(column) },
+      meta: { exportType: column.exportType, className: column.className, exportable: column.exportable ?? !isActionColumn(column) },
     }));
     if (!canExport) return data;
     return [
@@ -226,6 +229,7 @@ export function DataTable<T extends RowData>({
     return {
       title: exportTitle,
       headers: visible.map((column) => String(column.columnDef.header)),
+      columnTypes: visible.map((column) => (column.columnDef.meta as { exportType?: ExportColumnType } | undefined)?.exportType),
       rows: source.map((row) => visible.map((column) => toExportCell(row.getValue<string | number>(column.id)))),
     };
   }
