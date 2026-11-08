@@ -13,7 +13,7 @@ import type {
 } from "./assignments.schemas.js";
 import { PrismaService } from "../../prisma/prisma.service.js";
 import { TeacherScopeService } from "../../common/scope/teacher-scope.service.js";
-import { canEnterMarks } from "../../common/scope/teacher-access.js";
+import { canEnterMarks, teachingPairs } from "../../common/scope/teacher-access.js";
 
 @Injectable()
 export class AssignmentsService {
@@ -127,10 +127,11 @@ export class AssignmentsService {
 
     if (role === "teacher") {
       const scope = await this.teacherScope.getAssignments(schoolId, userId);
-      if (!scope.subjectAssignments.length) {
+      const taught = teachingPairs(scope);
+      if (!taught.length) {
         return { academicYear: current.academicYear, term: current.term, assignments: [] };
       }
-      baseWhere.OR = scope.subjectAssignments.map(({ classId, subjectId }) => ({ classId, subjectId }));
+      baseWhere.OR = taught.map(({ classId, subjectId }) => ({ classId, subjectId }));
     }
 
     const rows = await this.prisma.client.schoolAssignment.findMany({

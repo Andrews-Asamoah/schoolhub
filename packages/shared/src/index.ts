@@ -1719,6 +1719,22 @@ export const assessmentComponentInputSchema = z.object({
 });
 export type AssessmentComponentInput = z.infer<typeof assessmentComponentInputSchema>;
 
+/**
+ * A report batch reports one assessment. The classes come from that assessment's own class
+ * scope, so `classIds` is only ever a narrowing (for example publishing 3A before 3B).
+ */
+export const createReportSetSchema = z.object({
+  name: z.string().trim().min(1, "Give the batch a name").max(120),
+  /** The report design (layout), not the assessment. */
+  templateId: z.string().min(1, "Choose a report design"),
+  assessmentTemplateId: z.string().min(1, "Choose the assessment to report"),
+  academicYearId: z.string().min(1, "Choose an academic year"),
+  termId: z.string().min(1, "Choose a term"),
+  classIds: z.array(z.string().min(1)).optional(),
+  publishAt: z.string().trim().nullish().transform((value) => value || null),
+});
+export type CreateReportSetInput = z.infer<typeof createReportSetSchema>;
+
 /** What an assessment is for. Mirrors the AssessmentCategory enum in the API schema. */
 export const ASSESSMENT_CATEGORIES = ["TERMLY", "MOCK"] as const;
 export type AssessmentCategoryValue = (typeof ASSESSMENT_CATEGORIES)[number];

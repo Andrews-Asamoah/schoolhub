@@ -1,6 +1,8 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
 import { PrismaService } from "../../prisma/prisma.service.js";
+import type { CreateReportSetInput } from "@schoolhub/shared";
+import { coveredClasses, REPORTABLE_SCORE_STATUSES } from "./assessment-entry.js";
 import { snapshotHash } from "./report-version.js";
 import { buildSubjectRow, buildSummary, overallPositions, summariseAttendance } from "./report-card-data.js";
 
@@ -29,12 +31,18 @@ export class ReportPublicationService {
 
   async getWorkspace(schoolId: string) {
     const db = this.prisma.client;
-    const [years, templates, sets] = await Promise.all([
+    const [years, templates, sets, assessments, classes] = await Promise.all([
       db.academicYear.findMany({ where: { schoolId }, orderBy: { startDate: "desc" }, select: { id: true, name: true, isCurrent: true, terms: { orderBy: { termNumber: "asc" }, select: { id: true, name: true, termNumber: true, isCurrent: true } } } }),
       db.reportCardTemplate.findMany({ where: { schoolId }, orderBy: { name: "asc" }, select: { id: true, name: true, description: true, isActive: true, layout: true } }),
-      db.reportCardSet.findMany({ where: { schoolId }, orderBy: { updatedAt: "desc" }, take: 50, include: { template: { select: { id: true, name: true } }, academicYear: { select: { id: true, name: true } }, term: { select: { id: true, name: true, termNumber: true } }, targetClasses: { include: { class: { select: { id: true, name: true } } } }, _count: { select: { reportCards: true } } } }),
+      db.reportCardSet.findMany({ where: { schoolId }, orderBy: { updatedAt: "desc" }, take: 50, include: { assessmentTemplate: { select: { name: true } }, template: { select: { id: true, name: true } }, academicYear: { select: { id: true, name: true } }, term: { select: { id: true, name: true, termNumber: true } }, targetClasses: { include: { class: { select: { id: true, name: true } } } }, _count: { select: { reportCards: true } } } }),
+      db.assessmentTemplate.findMany({
+        where: { schoolId, isActive: true },
+        orderBy: [{ category: "asc" }, { academicYearId: "asc" }, { sequence: "asc" }, { name: "asc" }],
+        select: { id: true, name: true, category: true, academicYearId: true, sequence: true, termNumber: true, classId: true, classLevel: true, departmentId: true, classes: { select: { classId: true } } },
+      }),
+      db.class.findMany({ where: { schoolId, deletedAt: null, isActive: true }, orderBy: { name: "asc" }, select: { id: true, name: true, level: true, departmentId: true, academicYearId: true } }),
     ]);
-    return { years, templates, sets: sets.map((s) => ({ id: s.id, name: s.name, status: s.status, template: s.template, academicYear: s.academicYear, term: s.term, classes: s.targetClasses.map((r) => r.class), reportCount: s._count.reportCards, publishAt: s.publishAt, publishedAt: s.publishedAt, isReviewed: s.isReviewed, reviewedAt: s.reviewedAt, updatedAt: s.updatedAt })) };
+    return { years, templates, assessments: assessments.map(({ classes: rows, classId, classLevel, departmentId, ...assessment }) => ({ ...assessment, classes: coveredClasses({ classId, classIds: rows.map((row) => row.classId), classLevel, departmentId }, classes).map(({ id, name, academicYearId }) => ({ id, name, academicYearId })) })), sets: sets.map((s) => ({ id: s.id, name: s.name, status: s.status, assessment: s.assessmentTemplate?.name ?? null, template: s.template, academicYear: s.academicYear, term: s.term, classes: s.targetClasses.map((r) => r.class), reportCount: s._count.reportCards, publishAt: s.publishAt, publishedAt: s.publishedAt, isReviewed: s.isReviewed, reviewedAt: s.reviewedAt, updatedAt: s.updatedAt })) };
   }
 
   async getSetReports(schoolId: string, setId: string) {
@@ -112,24 +120,39 @@ export class ReportPublicationService {
     });
   }
 
-  async createSet(schoolId: string, actorId: string, input: { name: string; templateId: string; academicYearId: string; termId: string; classIds: string[]; publishAt: string | null; assessmentTemplateId?: string | null }) {
-    const mock = input.assessmentTemplateId
-      ? await this.prisma.client.assessmentTemplate.findFirst({ where: { id: input.assessmentTemplateId, schoolId, category: "MOCK", academicYearId: input.academicYearId }, select: { id: true } })
-      : null;
-    if (input.assessmentTemplateId && !mock) throw new BadRequestException("Choose a mock exam from the selected academic year.");
-    const [template, year, term, classes] = await Promise.all([
-      this.prisma.client.reportCardTemplate.findFirst({ where: { id: input.templateId, schoolId, isActive: true }, select: { id: true } }),
-      this.prisma.client.academicYear.findFirst({ where: { id: input.academicYearId, schoolId }, select: { id: true } }),
-      this.prisma.client.term.findFirst({ where: { id: input.termId, academicYearId: input.academicYearId }, select: { id: true } }),
-      this.prisma.client.class.findMany({ where: { id: { in: input.classIds }, schoolId, deletedAt: null, isActive: true }, select: { id: true } }),
+  async createSet(schoolId: string, actorId: string, input: CreateReportSetInput) {
+    const db = this.prisma.client;
+    const [template, assessment, year, term, classes] = await Promise.all([
+      db.reportCardTemplate.findFirst({ where: { id: input.templateId, schoolId, isActive: true }, select: { id: true } }),
+      db.assessmentTemplate.findFirst({
+        where: { id: input.assessmentTemplateId, schoolId, isActive: true },
+        select: { id: true, category: true, academicYearId: true, termNumber: true, classId: true, classLevel: true, departmentId: true, classes: { select: { classId: true } } },
+      }),
+      db.academicYear.findFirst({ where: { id: input.academicYearId, schoolId }, select: { id: true } }),
+      db.term.findFirst({ where: { id: input.termId, academicYearId: input.academicYearId }, select: { id: true, termNumber: true } }),
+      db.class.findMany({ where: { schoolId, deletedAt: null, isActive: true }, select: { id: true, level: true, departmentId: true, academicYearId: true } }),
     ]);
-    if (!template || !year || !term) throw new BadRequestException("Choose a report template, academic year, and term belonging to this school.");
-    if (classes.length !== input.classIds.length) throw new BadRequestException("One or more selected classes are not available in this school.");
+    if (!template || !year || !term) throw new BadRequestException("Choose a report design, academic year, and term belonging to this school.");
+    if (!assessment) throw new BadRequestException("Choose an active assessment from this school.");
+    if (assessment.academicYearId && assessment.academicYearId !== year.id) throw new BadRequestException("This assessment belongs to a different academic year.");
+    if (assessment.termNumber && assessment.termNumber !== term.termNumber) throw new BadRequestException(`This assessment is only taken in term ${assessment.termNumber}.`);
+
+    // The assessment decides which classes are reported; a narrowing may only name some of them.
+    const covered = coveredClasses({ ...assessment, classIds: assessment.classes.map((row) => row.classId) }, classes, year.id);
+    const chosen = input.classIds?.length ? covered.filter((klass) => input.classIds!.includes(klass.id)) : covered;
+    if (!covered.length) throw new BadRequestException("This assessment doesn't cover any active class in the selected academic year.");
+    if (input.classIds?.length && chosen.length !== new Set(input.classIds).size) throw new BadRequestException("One or more selected classes are not covered by this assessment.");
+
     const publishAt = input.publishAt ? new Date(input.publishAt) : null;
     if (publishAt && Number.isNaN(publishAt.getTime())) throw new BadRequestException("The scheduled publication date is invalid.");
-    return this.prisma.client.$transaction(async (tx) => {
-      const set = await tx.reportCardSet.create({ data: { schoolId, templateId: template.id, assessmentTemplateId: mock?.id ?? null, academicYearId: year.id, termId: term.id, name: input.name, publishAt, targetClasses: { create: classes.map(({ id }) => ({ classId: id })) } }, select: { id: true, name: true, status: true, publishAt: true } });
-      await tx.auditLog.create({ data: { schoolId, userId: actorId, action: "CREATE", entityType: "REPORT_CARD_SET", entityId: set.id, newValues: { name: set.name, classIds: classes.map(({ id }) => id) } } });
+    return db.$transaction(async (tx) => {
+      const set = await tx.reportCardSet.create({
+        data: {
+          schoolId, templateId: template.id, assessmentTemplateId: assessment.id, academicYearId: year.id, termId: term.id, name: input.name, publishAt,
+          targetClasses: { create: chosen.map(({ id }) => ({ classId: id })) },
+        },
+      });
+      await tx.auditLog.create({ data: { schoolId, userId: actorId, action: "CREATE", entityType: "REPORT_CARD_SET", entityId: set.id, newValues: { name: set.name, assessmentTemplateId: assessment.id, classIds: chosen.map(({ id }) => id) } } });
       return set;
     });
   }
@@ -158,9 +181,9 @@ export class ReportPublicationService {
           id: true, admissionNumber: true,
           profile: { select: { firstName: true, lastName: true } },
           enrollments: { where: { academicYearId: set.academicYearId, termId: set.termId, status: { in: ["ACTIVE", "COMPLETED"] }, classId: { in: classIds } }, select: { class: { select: { id: true, name: true, level: true } } }, take: 1 },
-          // A mock batch reports that one mock once its marks are submitted; a termly batch only
-          // ever reports finalized termly scores, never a mock.
-          assessmentScores: { where: set.assessmentTemplateId ? { termId: set.termId, templateId: set.assessmentTemplateId, status: { in: ["SUBMITTED", "REVIEWED", "FINAL"] } } : { termId: set.termId, status: "FINAL", template: { category: "TERMLY" } }, include: { subject: { select: { id: true, name: true, code: true } }, template: { select: { components: { select: { id: true, componentType: true, maxMarks: true, weight: true } }, gradingSystem: { select: { gradeScales: { select: { grade: true, description: true } } } } } }, componentScores: { include: { component: { select: { id: true, name: true, weight: true, maxMarks: true } } }, orderBy: { createdAt: "asc" } } } },
+          // A batch reports its one assessment. Batches made before reports were assessment-based
+          // fall back to the signed-off termly scores of the term.
+          assessmentScores: { where: { termId: set.termId, status: { in: [...REPORTABLE_SCORE_STATUSES] }, ...(set.assessmentTemplateId ? { templateId: set.assessmentTemplateId } : { template: { category: "TERMLY" } }) }, include: { subject: { select: { id: true, name: true, code: true } }, template: { select: { components: { select: { id: true, componentType: true, maxMarks: true, weight: true } }, gradingSystem: { select: { gradeScales: { select: { grade: true, description: true } } } } } }, componentScores: { include: { component: { select: { id: true, name: true, weight: true, maxMarks: true } } }, orderBy: { createdAt: "asc" } } } },
           remarks: { where: { termId: set.termId }, include: { teacher: { include: { profile: true } } } },
         },
       });
@@ -195,7 +218,7 @@ export class ReportPublicationService {
         return classId ? [{ id: student.id, classId, subjectPercentages: subjectsByStudent.get(student.id)!.map((row) => row.percentage) }] : [];
       }));
       if (!reportableStudents.length) {
-        throw new BadRequestException("No finalized assessment scores were found for the selected classes and term. Finalize marks before generating reports.");
+        throw new BadRequestException("No submitted marks were found for this assessment in the selected classes and term. Teachers must submit their mark sheets before reports can be generated.");
       }
 
       await db.$transaction(async (tx) => {
@@ -253,7 +276,7 @@ export class ReportPublicationService {
         await tx.reportCardSet.update({ where: { id: set.id }, data: { status: "GENERATED", isReviewed: false, reviewedAt: null } });
         await tx.auditLog.create({ data: { schoolId, userId: actorId, action: "UPDATE", entityType: "REPORT_CARD_SET", entityId: set.id, newValues: { operation: "GENERATE", reportCount: reportableStudents.length } } });
       });
-      return { id: set.id, status: "GENERATED", reportCount: reportableStudents.length, isReviewed: false };
+      return { id: set.id, status: "GENERATED", reportCount: reportableStudents.length, skippedCount: students.length - reportableStudents.length, isReviewed: false };
     } catch (error) {
       await db.reportCardSet.update({ where: { id: set.id }, data: { status: "DRAFT" } }).catch(() => undefined);
       throw error;

@@ -10,7 +10,7 @@ export function isSchoolManager(role: string | undefined) {
 /**
  * Who may do what with a class, in one place.
  *  - Marking the register: only the class teacher of every class involved.
- *  - Entering marks: managers, or the teacher assigned to that subject in that class.
+ *  - Entering marks: managers, or a teacher who teaches that subject in that class (whole subject or a teaching area).
  *  - Viewing marks: the above, plus the class teacher (who compiles the class's reports).
  */
 export function canMarkRegister(
@@ -23,6 +23,31 @@ export function canMarkRegister(
   return classIds.every((classId) => owned.has(classId));
 }
 
+export interface TeachingPair { classId: string; subjectId: string }
+
+/**
+ * Every (class, subject) a teacher teaches: as the whole-subject teacher, or through one or more
+ * teaching areas (strands) of a subject that is shared between teachers. This is the single
+ * definition of "teaches this subject", so a teacher who only owns a teaching area is never
+ * treated as unattached to the class.
+ */
+export function teachingPairs(assignments: TeacherAssignments): TeachingPair[] {
+  const pairs = new Map<string, TeachingPair>();
+  for (const { classId, subjectId } of [...assignments.subjectAssignments, ...assignments.subjectStrandAssignments]) {
+    pairs.set(`${classId}:${subjectId}`, { classId, subjectId });
+  }
+  return [...pairs.values()];
+}
+
+export function teachesSubject(assignments: TeacherAssignments, classId: string, subjectId: string): boolean {
+  return teachingPairs(assignments).some((row) => row.classId === classId && row.subjectId === subjectId);
+}
+
+/** Every class a teacher is responsible for through the class-teacher or subject-teacher role. */
+export function assignedClassIds(assignments: TeacherAssignments): string[] {
+  return [...new Set([...assignments.classTeacherClassIds, ...teachingPairs(assignments).map((row) => row.classId)])];
+}
+
 export function canEnterMarks(
   role: string | undefined,
   assignments: TeacherAssignments,
@@ -30,8 +55,7 @@ export function canEnterMarks(
   subjectId: string,
 ): boolean {
   if (isSchoolManager(role)) return true;
-  if (role !== "teacher") return false;
-  return assignments.subjectAssignments.some((row) => row.classId === classId && row.subjectId === subjectId);
+  return role === "teacher" && teachesSubject(assignments, classId, subjectId);
 }
 
 /** Authorize an individual assessment component using strand-specific ownership. */
@@ -56,9 +80,5 @@ export function canViewMarks(
   classId: string,
   subjectId: string,
 ): boolean {
-  if (canEnterMarks(role, assignments, classId, subjectId)) return true;
-  return role === "teacher" && (
-    assignments.classTeacherClassIds.includes(classId) ||
-    assignments.subjectStrandAssignments.some((row) => row.classId === classId && row.subjectId === subjectId)
-  );
+  return canEnterMarks(role, assignments, classId, subjectId) || (role === "teacher" && assignments.classTeacherClassIds.includes(classId));
 }

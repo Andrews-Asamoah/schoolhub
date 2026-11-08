@@ -2,6 +2,7 @@ import { ForbiddenException, Injectable } from "@nestjs/common";
 import type { PortalWorkQueue } from "@schoolhub/shared";
 import { PrismaService } from "../../prisma/prisma.service.js";
 import { TeacherScopeService } from "../../common/scope/teacher-scope.service.js";
+import { assignedClassIds } from "../../common/scope/teacher-access.js";
 
 @Injectable()
 export class PortalWorkQueueService {
@@ -16,7 +17,7 @@ export class PortalWorkQueueService {
     if(role==="teacher"){
       const assignments=await this.scope.getAssignments(schoolId,userId);
       if(!assignments.teacherId)return result;
-      const classIds=[...new Set([...assignments.classTeacherClassIds,...assignments.subjectAssignments.map(row=>row.classId),...assignments.subjectStrandAssignments.map(row=>row.classId)])];
+      const classIds=assignedClassIds(assignments);
       const [lessons,ungraded]=await Promise.all([
         db.timetableEntry.findMany({where:{schoolId,teacherId:assignments.teacherId,academicYearId:term.academicYearId,OR:[{termId:term.id},{termId:null}]},include:{timeSlot:true,subject:{select:{name:true}},class:{select:{name:true}}},orderBy:[{timeSlot:{dayOfWeek:"asc"}},{timeSlot:{startTime:"asc"}}],take:100}),
         db.schoolAssignmentSubmission.count({where:{status:"SUBMITTED",assignment:{schoolId,termId:term.id,createdById:userId,classId:{in:classIds},status:"PUBLISHED"}}}),

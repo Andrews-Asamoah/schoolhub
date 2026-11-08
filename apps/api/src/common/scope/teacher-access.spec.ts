@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canEnterComponentMarks, canEnterMarks, canMarkRegister, canViewMarks } from "./teacher-access.js";
+import { assignedClassIds, canEnterComponentMarks, canEnterMarks, canMarkRegister, canViewMarks, teachesSubject, teachingPairs } from "./teacher-access.js";
 import type { TeacherAssignments } from "./teacher-scope.service.js";
 
 const ama: TeacherAssignments = {
@@ -38,7 +38,11 @@ describe("strand-level assessment permissions", () => {
     expect(canEnterComponentMarks("teacher", ama, "c-1a", "cad", "arts")).toBe(true);
     expect(canEnterComponentMarks("teacher", ama, "c-1a", "cad", "music")).toBe(false);
     expect(canEnterComponentMarks("teacher", ama, "c-1b", "cad", "arts")).toBe(false);
-    expect(canEnterComponentMarks("teacher", ama, "c-1a", "cad", null)).toBe(false);
+  });
+
+  it("lets a teaching-area teacher enter whole-subject components, since nobody else owns them", () => {
+    expect(canEnterComponentMarks("teacher", ama, "c-1a", "cad", null)).toBe(true);
+    expect(canEnterComponentMarks("teacher", ama, "c-1b", "cad", null)).toBe(false); // does not teach cad in 1B
   });
 
   it("retains manager permissions and legacy single-teacher subjects", () => {
@@ -64,5 +68,38 @@ describe("canEnterMarks / canViewMarks", () => {
     expect(canViewMarks("owner", none, "c-1a", "art")).toBe(true);
     expect(canEnterMarks("staff", ama, "c-1a", "math")).toBe(false);
     expect(canViewMarks("student", ama, "c-1a", "math")).toBe(false);
+  });
+});
+
+describe("teaching a subject through a teaching area", () => {
+  const specialist: TeacherAssignments = {
+    teacherId: "t-kofi",
+    classTeacherClassIds: [],
+    subjectAssignments: [],
+    subjectStrandAssignments: [
+      { classId: "c-2a", subjectId: "cad", subjectStrandId: "arts" },
+      { classId: "c-2a", subjectId: "cad", subjectStrandId: "design" },
+      { classId: "c-2b", subjectId: "cad", subjectStrandId: "arts" },
+    ],
+  };
+
+  it("counts a teaching-area teacher as teaching the subject, once per class", () => {
+    expect(teachingPairs(specialist)).toEqual([
+      { classId: "c-2a", subjectId: "cad" },
+      { classId: "c-2b", subjectId: "cad" },
+    ]);
+    expect(teachesSubject(specialist, "c-2a", "cad")).toBe(true);
+    expect(teachesSubject(specialist, "c-2a", "math")).toBe(false);
+  });
+
+  it("attaches the teacher to every class they teach a teaching area in", () => {
+    expect(assignedClassIds(specialist).sort()).toEqual(["c-2a", "c-2b"]);
+    expect(assignedClassIds(ama).sort()).toEqual(["c-1a", "c-1b"]);
+  });
+
+  it("lets them view and enter their class's marks without owning the whole subject", () => {
+    expect(canViewMarks("teacher", specialist, "c-2a", "cad")).toBe(true);
+    expect(canEnterMarks("teacher", specialist, "c-2a", "cad")).toBe(true);
+    expect(canEnterMarks("teacher", specialist, "c-3a", "cad")).toBe(false);
   });
 });

@@ -1,5 +1,7 @@
 import { BadRequestException, Body, Controller, Get, Param, Patch, Post, Res, UseGuards } from "@nestjs/common";
 import type { School } from "@prisma/client";
+import { createReportSetSchema, type CreateReportSetInput } from "@schoolhub/shared";
+import { ZodValidationPipe } from "../../common/pipes/zod-validation.pipe.js";
 import { CurrentSchool } from "../../common/decorators/current-school.decorator.js";
 import { CurrentUser, type AuthenticatedUser } from "../../common/decorators/current-user.decorator.js";
 import { Roles } from "../../common/decorators/roles.decorator.js";
@@ -107,18 +109,8 @@ export class ReportPublicationController {
 
   @Post("sets")
   @Roles("owner", "admin", "headteacher")
-  createSet(@CurrentSchool() school: School, @CurrentUser() user: AuthenticatedUser, @Body() body: unknown) {
-    if (!body || typeof body !== "object") throw new BadRequestException("Provide report-set details.");
-    const input = body as Record<string, unknown>;
-    if (typeof input.name !== "string" || !input.name.trim() || typeof input.templateId !== "string" || typeof input.academicYearId !== "string" || typeof input.termId !== "string" || !Array.isArray(input.classIds) || input.classIds.length === 0 || !input.classIds.every((id) => typeof id === "string")) {
-      throw new BadRequestException("A name, report template, academic year, term, and at least one class are required.");
-    }
-    return this.reports.createSet(school.id, user.id, {
-      name: input.name.trim(), templateId: input.templateId, academicYearId: input.academicYearId,
-      termId: input.termId, classIds: [...new Set(input.classIds as string[])],
-      publishAt: typeof input.publishAt === "string" && input.publishAt.trim() ? input.publishAt : null,
-      assessmentTemplateId: typeof input.assessmentTemplateId === "string" && input.assessmentTemplateId.trim() ? input.assessmentTemplateId : null,
-    });
+  createSet(@CurrentSchool() school: School, @CurrentUser() user: AuthenticatedUser, @Body(new ZodValidationPipe(createReportSetSchema)) body: CreateReportSetInput) {
+    return this.reports.createSet(school.id, user.id, body);
   }
 
   @Post("sets/:id/generate")

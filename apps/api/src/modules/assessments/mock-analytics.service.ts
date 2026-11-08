@@ -1,6 +1,8 @@
 import { BadRequestException, ForbiddenException, Injectable } from "@nestjs/common";
 import { PrismaService } from "../../prisma/prisma.service.js";
 import { TeacherScopeService } from "../../common/scope/teacher-scope.service.js";
+import { teachingPairs } from "../../common/scope/teacher-access.js";
+import { REPORTABLE_SCORE_STATUSES } from "./assessment-entry.js";
 import { buildMockAnalytics, type MockScoreRow } from "./mock-analytics.js";
 
 const MANAGEMENT = new Set(["owner", "admin", "headteacher"]);
@@ -40,7 +42,7 @@ export class MockAnalyticsService {
       const assigned = await this.scope.getAssignments(schoolId, userId);
       if (!assigned.teacherId) throw new ForbiddenException("You don't have access to mock analysis.");
       if (!assigned.classTeacherClassIds.includes(klass.id)) {
-        const subjects = [...assigned.subjectAssignments, ...assigned.subjectStrandAssignments].filter((a) => a.classId === klass.id).map((a) => a.subjectId);
+        const subjects = teachingPairs(assigned).filter((a) => a.classId === klass.id).map((a) => a.subjectId);
         if (!subjects.length) throw new ForbiddenException("You don't teach this class.");
         allowedSubjects = new Set(subjects);
       }
@@ -66,7 +68,7 @@ export class MockAnalyticsService {
         where: {
           templateId: { in: templates.map((t) => t.id) },
           studentId: { in: students.map((s) => s.id) },
-          status: input.includeDrafts ? undefined : { in: ["SUBMITTED", "REVIEWED", "FINAL"] },
+          status: input.includeDrafts ? undefined : { in: [...REPORTABLE_SCORE_STATUSES] },
           ...(allowedSubjects ? { subjectId: { in: [...allowedSubjects] } } : {}),
         },
         select: { studentId: true, templateId: true, subjectId: true, percentage: true, grade: true, gradePoint: true, subject: { select: { name: true } } },

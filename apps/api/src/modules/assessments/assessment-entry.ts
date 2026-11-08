@@ -37,6 +37,26 @@ export function classScopeScore(
 }
 
 /**
+ * The classes an assessment is aimed at. A class that belongs to a year only counts in that year;
+ * a year-agnostic class counts in every year.
+ */
+export function coveredClasses<C extends TargetClass & { academicYearId: string | null }>(
+  template: Pick<TemplateScope, "classId" | "classIds" | "classLevel" | "departmentId">,
+  classes: readonly C[],
+  academicYearId?: string,
+): C[] {
+  return classes.filter(
+    (klass) => (!academicYearId || !klass.academicYearId || klass.academicYearId === academicYearId) && classScopeScore(template, klass) !== null,
+  );
+}
+
+/**
+ * Marks that count towards reports and analysis. A sheet is signed off (SUBMITTED) by its
+ * teacher; the later states are the same marks after review. Drafts are still being typed.
+ */
+export const REPORTABLE_SCORE_STATUSES = ["SUBMITTED", "REVIEWED", "FINAL"] as const;
+
+/**
  * How specifically a template is meant for this class, subject and term, or
  * null if it does not apply. A template with no class/subject/term limits
  * applies to everything but is the least specific.
