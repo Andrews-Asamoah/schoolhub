@@ -50,7 +50,6 @@ let cleared = false;
 let includeAbsentMark = false;
 let clearedAbsent = false;
 let rejectClear = true;
-let acceptClear = false;
 let submission = null;
 const writes = [];
 const grades = [
@@ -90,7 +89,13 @@ function sheet(subjectId) {
 try {
   const page = await browser.newPage({ viewport: { width: 1440, height: 1000 }, locale: "en-GB" });
   page.on("pageerror", (error) => errors.push(error.message));
-  page.on("dialog", (dialog) => dialog.message().startsWith("Mark Kojo") && !acceptClear ? dialog.dismiss() : dialog.accept());
+  // Confirmations on this screen are the app's own modal now. A native confirm() is a regression.
+  page.on("dialog", (dialog) => {
+    if (dialog.type() === "confirm") errors.push(`Unexpected native confirm: ${dialog.message()}`);
+    return dialog.accept();
+  });
+  const modal = () => page.getByRole("dialog");
+  const confirmIn = async (name) => { await modal().getByRole("button", { name, exact: true }).click(); await modal().waitFor({ state: "detached" }); };
   await page.route("**/api/**", async (route) => {
     const request = route.request(), url = new URL(request.url()), path = url.pathname;
     const json = (data) => route.fulfill({ json: data });
@@ -170,23 +175,30 @@ try {
   assert(await page.getByRole("button", { name: "Submit marks", exact: true }).isDisabled());
   rejectClear = false;
   await clearEsi.click();
+  await modal().getByRole("heading", { name: "Mark Esi Boateng absent / excused?" }).waitFor();
+  await confirmIn("Clear marks and mark absent");
   await clearEsi.waitFor({ state: "detached" });
   assert(await esi.isChecked());
   assert.deepEqual(writes.at(-1).entries, [{ studentId: "p2", componentId: "exam", occurrenceIndex: 0, marks: null, expectedMarks: 0 }]);
   const previousWrites = writes.length;
   rejectClear = true;
   await kojo.click(); // Cancel clearing recorded zero marks.
+  await modal().getByRole("button", { name: "Cancel", exact: true }).click();
+  await modal().waitFor({ state: "detached" });
   assert.equal(writes.length, previousWrites); assert.equal(await kojo.isChecked(), false);
-  acceptClear = true;
   await kojo.click(); // A conflict must not mark the pupil absent or silently clear marks.
+  await confirmIn("Clear marks and mark absent");
   await page.getByRole("alert").filter({ hasText: "Another user changed these marks" }).waitFor();
   assert.equal(await kojo.isChecked(), false);
   rejectClear = false;
   await kojo.click();
+  await confirmIn("Clear marks and mark absent");
   await page.getByRole("status").filter({ hasText: "Recorded marks cleared for Kojo Owusu" }).waitFor();
   assert(await kojo.isChecked());
   assert.deepEqual(writes.at(-1).entries, [{ studentId: "p3", componentId: "exam", occurrenceIndex: 0, marks: null, expectedMarks: 0 }]);
   await page.getByRole("button", { name: "Submit marks", exact: true }).click();
+  await modal().getByRole("heading", { name: "Submit these marks?" }).waitFor();
+  await confirmIn("Submit marks");
   await page.getByText("These marks were submitted.", { exact: true }).waitFor();
   assert.deepEqual(submission.excusedStudentIds.sort(), ["p2", "p3"]);
   assert(await esi.isChecked()); assert(await esi.isDisabled());

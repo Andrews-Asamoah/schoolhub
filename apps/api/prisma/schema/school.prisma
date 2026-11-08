@@ -74,6 +74,7 @@ model School {
   reportCardSets              ReportCardSet[]
   assessmentEntrySubmissions  AssessmentEntrySubmission[]
   assessmentMarkCorrections   AssessmentMarkCorrection[]
+  assessmentGradeBoundaries   AssessmentGradeBoundary[]
   schoolAssignments           SchoolAssignment[]
   notifications               Notification[]
   announcements               Announcement[]

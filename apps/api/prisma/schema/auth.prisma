@@ -67,6 +67,7 @@ model user {
   sentSchoolMessages    SchoolMessage[]             @relation("SchoolMessageSent")
   receivedMessageItems  SchoolMessageRecipient[]    @relation("SchoolMessageRecipientUser")
   createdSchoolAssignments SchoolAssignment[] @relation("SchoolAssignmentCreator")
+  createdGradeBoundaries AssessmentGradeBoundary[] @relation("GradeBoundaryCreatedBy")
   submittedSchoolAssignmentSubmissions SchoolAssignmentSubmission[] @relation("SchoolAssignmentSubmitter")
   gradedSchoolAssignmentSubmissions SchoolAssignmentSubmission[] @relation("SchoolAssignmentGrader")
   announcementsSent    Announcement[]         @relation("AnnouncementsSent")

@@ -83,6 +83,7 @@ model Term {
 
   academicYear          AcademicYear           @relation(fields: [academicYearId], references: [id], onDelete: Cascade)
   assessmentScores      AssessmentScore[]
+  gradeBoundaries       AssessmentGradeBoundary[]
   bills                 Bill[]
   enrollments           Enrollment[]
   remarks               Remark[]
@@ -253,6 +254,7 @@ model Subject {
   school           School            @relation(fields: [schoolId], references: [id], onDelete: Cascade)
   departments      Department[]      @relation("DepartmentSubjects")
   assessmentScores AssessmentScore[]
+  gradeBoundaries  AssessmentGradeBoundary[]
   externalExamPapers ExternalExamPaper[]
   classSubjects    ClassSubject[]
   schoolAssignments SchoolAssignment[]

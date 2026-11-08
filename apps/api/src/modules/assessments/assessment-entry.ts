@@ -2,6 +2,7 @@
  * Rules for entering and totalling marks. Pure functions, no database, so the
  * arithmetic that decides a pupil's grade can be tested directly.
  */
+import { gradeFromBoundaries } from "@schoolhub/shared";
 
 export interface TemplateScope {
   isActive: boolean;
@@ -196,6 +197,31 @@ export function classRankGrades<T extends string>(
       result.set(sorted[index]!.id, { grade: band.grade, gradePoint: band.gradePoint });
     }
     start = end + 1;
+  }
+  return result;
+}
+
+/** Minimum percentage for each grade except the lowest, as set for one assessment, subject and term. */
+export type GradeBoundaries = Readonly<Record<string, number>>;
+
+/**
+ * Grades a class-ranked (stanine) sheet. WAEC publishes no fixed BECE boundaries; it sets
+ * mark cut-offs per subject and year. When the school has set boundaries for this sheet,
+ * every pupil is graded by the mark alone, so one pupil's marks never move another's grade.
+ * Without boundaries, grades come from each pupil's position in the class (classRankGrades).
+ */
+export function rankedGrades<T extends string>(
+  rows: { id: T; percentage: number }[],
+  bands: RankBand[],
+  boundaries?: GradeBoundaries | null,
+): Map<T, { grade: string; gradePoint: number }> {
+  if (!boundaries || Object.keys(boundaries).length === 0) return classRankGrades(rows, bands);
+  const result = new Map<T, { grade: string; gradePoint: number }>();
+  if (bands.length === 0) return result;
+  const best = [...bands].sort((a, b) => a.maxScore - b.maxScore);
+  for (const row of rows) {
+    const band = gradeFromBoundaries(row.percentage, best, boundaries);
+    result.set(row.id, { grade: band.grade, gradePoint: band.gradePoint });
   }
   return result;
 }

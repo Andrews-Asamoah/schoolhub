@@ -1,9 +1,11 @@
-import { Body, Controller, Delete, Get, Param, Post, Put, UseGuards } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Param, Post, Put, Query, UseGuards } from "@nestjs/common";
 import type { School } from "@prisma/client";
 import {
   saveAssessmentTemplateSchema,
+  saveGradeBoundariesSchema,
   saveGradingSystemSchema,
   type SaveAssessmentTemplateInput,
+  type SaveGradeBoundariesInput,
   type SaveGradingSystemInput,
 } from "@schoolhub/shared";
 import { CurrentSchool } from "../../common/decorators/current-school.decorator.js";
@@ -12,6 +14,7 @@ import { Roles } from "../../common/decorators/roles.decorator.js";
 import { RolesGuard } from "../../common/guards/roles.guard.js";
 import { SchoolTenantGuard } from "../../common/guards/school-tenant.guard.js";
 import { ZodValidationPipe } from "../../common/pipes/zod-validation.pipe.js";
+import { AssessmentBoundariesService } from "./assessment-boundaries.service.js";
 import { AssessmentSetupService } from "./assessment-setup.service.js";
 
 /** Setting up assessments is for the people who run the school. */
@@ -19,7 +22,10 @@ import { AssessmentSetupService } from "./assessment-setup.service.js";
 @UseGuards(SchoolTenantGuard, RolesGuard)
 @Roles("owner", "admin", "headteacher")
 export class AssessmentSetupController {
-  constructor(private readonly setup: AssessmentSetupService) {}
+  constructor(
+    private readonly setup: AssessmentSetupService,
+    private readonly boundaries: AssessmentBoundariesService,
+  ) {}
 
   @Get()
   getSetup(@CurrentSchool() school: School) {
@@ -53,6 +59,38 @@ export class AssessmentSetupController {
   @Delete("templates/:id")
   deleteTemplate(@CurrentSchool() school: School, @CurrentUser() user: AuthenticatedUser, @Param("id") id: string) {
     return this.setup.deleteTemplate(school.id, user.id, id);
+  }
+
+  /** Mark boundaries for a class-ranked (stanine) assessment, for one subject and term. */
+  @Get("templates/:id/boundaries")
+  getBoundaries(
+    @CurrentSchool() school: School,
+    @Param("id") id: string,
+    @Query("subjectId") subjectId: string,
+    @Query("termId") termId: string,
+  ) {
+    return this.boundaries.get(school.id, id, subjectId ?? "", termId ?? "");
+  }
+
+  @Put("templates/:id/boundaries")
+  saveBoundaries(
+    @CurrentSchool() school: School,
+    @CurrentUser() user: AuthenticatedUser,
+    @Param("id") id: string,
+    @Body(new ZodValidationPipe(saveGradeBoundariesSchema)) body: SaveGradeBoundariesInput,
+  ) {
+    return this.boundaries.save(school.id, user.id, id, body);
+  }
+
+  @Delete("templates/:id/boundaries")
+  clearBoundaries(
+    @CurrentSchool() school: School,
+    @CurrentUser() user: AuthenticatedUser,
+    @Param("id") id: string,
+    @Query("subjectId") subjectId: string,
+    @Query("termId") termId: string,
+  ) {
+    return this.boundaries.clear(school.id, user.id, id, subjectId ?? "", termId ?? "");
   }
 
   @Post("grading-systems")

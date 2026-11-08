@@ -121,12 +121,43 @@ model AssessmentTemplate {
   extensions       AssessmentExtension[]
   entrySubmissions AssessmentEntrySubmission[]
   markCorrections  AssessmentMarkCorrection[]
+  gradeBoundaries  AssessmentGradeBoundary[]
 
   @@index([schoolId, isActive])
   @@index([gradingSystemId])
   @@index([schoolId, category, academicYearId])
   @@index([academicYearId])
   @@map("assessment_templates")
+}
+
+/// Minimum-mark cut-offs for a class-ranked (stanine) scale. WAEC publishes no fixed boundaries
+/// for the BECE: they are set per subject, per year, from how candidates scored. So a school sets
+/// them per assessment, subject and term. A row holds the lowest percentage that earns `grade`;
+/// the scale's lowest grade has no row because it takes everything below the grade above.
+/// With no rows, grades fall back to each pupil's position in their class.
+model AssessmentGradeBoundary {
+  id          String   @id @default(cuid())
+  schoolId    String
+  templateId  String
+  subjectId   String
+  termId      String
+  grade       String
+  minScore    Decimal  @db.Decimal(5, 2)
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  school    School             @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  template  AssessmentTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  subject   Subject            @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  term      Term               @relation(fields: [termId], references: [id], onDelete: Cascade)
+  createdBy user?              @relation("GradeBoundaryCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@unique([templateId, subjectId, termId, grade])
+  @@index([schoolId])
+  @@index([subjectId, termId])
+  @@index([createdById])
+  @@map("assessment_grade_boundaries")
 }
 
 model AssessmentComponent {

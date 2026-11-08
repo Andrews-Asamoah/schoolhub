@@ -1,7 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CircleAlert, Copy, GraduationCap, Lock, LockOpen, LoaderCircle, Pencil, Plus, Power, Rocket, Trash2 } from "lucide-react";
+import { CircleAlert, Copy, GraduationCap, Lock, LockOpen, LoaderCircle, Pencil, Plus, Power, Rocket, SlidersHorizontal, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { AssessmentTemplateDialog } from "@/components/school/assessment-template-dialog";
+import { GradeBoundariesDialog } from "@/components/school/grade-boundaries-dialog";
 import { GradingSystemDialog } from "@/components/school/grading-system-dialog";
 import { DataTable, type DataTableColumn } from "@/components/ui/data-table";
 import { apiFetch } from "@/lib/api";
@@ -30,6 +31,7 @@ export function AssessmentSetupWorkspace() {
   const canExport = useCanExportTables();
   const [editing, setEditing] = useState<SetupTemplate | "new" | "new-mock" | null>(null);
   const [scaleDialog, setScaleDialog] = useState<{ system?: SetupGradingSystem; asCopy?: boolean } | "new" | null>(null);
+  const [boundariesFor, setBoundariesFor] = useState<SetupTemplate | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [showAllUncovered, setShowAllUncovered] = useState(false);
 
@@ -79,6 +81,8 @@ export function AssessmentSetupWorkspace() {
   const classNames = new Map(setup.classes.map((klass) => [klass.id, klass.name]));
   const ownScales = setup.gradingSystems.filter((system) => !system.shared);
   const subjectName = (code: string | null) => (code ? setup.subjects.find((subject) => subject.code.toLowerCase() === code.toLowerCase())?.name ?? code : "All subjects");
+  // Stanine (class-ranked) scales have no fixed marks, so their assessments get a boundaries screen.
+  const classRanked = new Set(setup.gradingSystems.filter((system) => system.method === "CLASS_RANK").map((system) => system.id));
   const shownUncovered = showAllUncovered ? setup.uncovered : setup.uncovered.slice(0, 6);
 
   const columns: DataTableColumn<SetupTemplate>[] = [
@@ -160,6 +164,9 @@ export function AssessmentSetupWorkspace() {
       cell: (template) => (
         <div className="inline-flex items-center">
           <button type="button" className={iconButton} aria-label={`Edit ${template.name}`} title="Edit" onClick={() => setEditing(template)}><Pencil className="size-4" /></button>
+          {classRanked.has(template.gradingSystem.id) && (
+            <button type="button" className={iconButton} aria-label={`Grade boundaries for ${template.name}`} title="Set grade boundaries" onClick={() => setBoundariesFor(template)}><SlidersHorizontal className="size-4" /></button>
+          )}
           <button type="button" className={iconButton} aria-label={`Duplicate ${template.name}`} title="Duplicate" disabled={change.isPending} onClick={() => change.mutate({ path: `templates/${template.id}/duplicate`, method: "POST", message: `Copied “${template.name}”. The copy is off until you turn it on.` })}><Copy className="size-4" /></button>
           <button type="button" className={iconButton} aria-label={`${template.isActive ? "Turn off" : "Turn on"} ${template.name}`} title={template.isActive ? "Turn off" : "Turn on"} disabled={change.isPending} onClick={() => change.mutate({ path: `templates/${template.id}`, method: "PUT", body: templateToInput(template, { isActive: !template.isActive }), message: `${template.name} is now ${template.isActive ? "off" : "on"}.` })}><Power className="size-4" /></button>
           <button type="button" className={iconButton} aria-label={`${template.isLocked ? "Unlock" : "Lock"} ${template.name}`} title={template.isLocked ? "Unlock marks" : "Lock marks"} disabled={change.isPending} onClick={() => change.mutate({ path: `templates/${template.id}`, method: "PUT", body: templateToInput(template, { isLocked: !template.isLocked }), message: `${template.name} is now ${template.isLocked ? "unlocked" : "locked"}.` })}>{template.isLocked ? <LockOpen className="size-4" /> : <Lock className="size-4" />}</button>
@@ -306,7 +313,7 @@ export function AssessmentSetupWorkspace() {
                         {system.hasMarks && " · marks graded with it"}
                       </p>
                       {system.method === "CLASS_RANK" && (
-                        <p className="mt-1 text-[11px] text-muted-foreground">Graded by position in the class, not by marks. Adopt it by choosing it as an assessment&rsquo;s grading scale.</p>
+                        <p className="mt-1 text-[11px] text-muted-foreground">Graded by position in the class until you set mark boundaries, as WAEC does each year for each subject. Adopt it by choosing it as an assessment&rsquo;s grading scale, then use the sliders button on that assessment to set the boundaries.</p>
                       )}
                     </div>
                     <div className="flex shrink-0 items-center">
@@ -350,6 +357,15 @@ export function AssessmentSetupWorkspace() {
           onClose={() => setEditing(null)}
           onSaved={(message) => { setEditing(null); setNotice(message); }}
           onCreateStandardScale={createStandardScale}
+        />
+      )}
+      {boundariesFor && (
+        <GradeBoundariesDialog
+          key={boundariesFor.id}
+          template={boundariesFor}
+          setup={setup}
+          onClose={() => setBoundariesFor(null)}
+          onSaved={(message) => { setBoundariesFor(null); setNotice(message); }}
         />
       )}
       {scaleDialog && (

@@ -1706,6 +1706,139 @@ export const saveGradingSystemSchema = z
   });
 export type SaveGradingSystemInput = z.infer<typeof saveGradingSystemSchema>;
 
+// ---------------------------------------------------------------------------
+// Stanine mark boundaries
+//
+// WAEC grades the BECE with the nine-point stanine scale (top 4% = grade 1, next 7% = 2, ...
+// bottom 4% = 9). It publishes no fixed mark boundaries: for each subject, each year, the
+// cut-off marks are set after marking so the grades fall close to those shares. A school
+// does the same here: the minimum mark for each grade (except the lowest, which takes
+// everything below) is set per assessment, subject and term, either typed in or suggested
+// from the pupils' actual results.
+// ---------------------------------------------------------------------------
+
+/** The share of candidates each stanine grade covers, best grade first. */
+export const STANINE_SHARES = [4, 7, 12, 17, 20, 17, 12, 7, 4] as const;
+
+/** The minimum mark (percentage) a pupil needs for each grade. The lowest grade has none. */
+export interface GradeBoundary {
+  grade: string;
+  minScore: number;
+}
+
+/**
+ * Problems with a set of boundaries. `grades` lists every grade of the scale, best first.
+ * Boundaries must cover every grade except the lowest, and each must sit strictly below the
+ * one before it, so a mark can only ever belong to one grade.
+ */
+export function gradeBoundaryProblems(grades: readonly string[], boundaries: readonly GradeBoundary[]): string[] {
+  const problems: string[] = [];
+  if (grades.length < 2) return ["This grading scale has too few grades to set boundaries."];
+  const expected = grades.slice(0, -1);
+  const seen = new Set<string>();
+  for (const boundary of boundaries) {
+    if (!expected.includes(boundary.grade)) problems.push(`Grade ${boundary.grade} does not take a boundary.`);
+    if (seen.has(boundary.grade)) problems.push(`Grade ${boundary.grade} appears more than once.`);
+    seen.add(boundary.grade);
+  }
+  for (const grade of expected) if (!seen.has(grade)) problems.push(`Enter the minimum mark for grade ${grade}.`);
+  if (problems.length) return problems;
+
+  const byGrade = new Map(boundaries.map((boundary) => [boundary.grade, boundary.minScore]));
+  let previous: { grade: string; min: number } | null = null;
+  for (const grade of expected) {
+    const min = byGrade.get(grade)!;
+    if (!Number.isFinite(min) || min <= 0 || min > 100) {
+      problems.push(`Grade ${grade}: the minimum mark must be more than 0 and at most 100.`);
+      continue;
+    }
+    if (previous && min >= previous.min) {
+      problems.push(`Grade ${grade} (${min}) must need fewer marks than grade ${previous.grade} (${previous.min}).`);
+    }
+    previous = { grade, min };
+  }
+  return problems;
+}
+
+/**
+ * The grade for a mark under fixed boundaries. `bands` are best grade first; the lowest
+ * band takes every mark that no boundary above it claims.
+ */
+export function gradeFromBoundaries<B extends { grade: string }>(
+  percentage: number,
+  bands: readonly B[],
+  minimums: Readonly<Record<string, number>>,
+): B {
+  for (let index = 0; index < bands.length - 1; index++) {
+    const min = minimums[bands[index]!.grade];
+    if (min !== undefined && percentage >= min) return bands[index]!;
+  }
+  return bands[bands.length - 1]!;
+}
+
+/**
+ * Suggests boundaries from how a cohort actually scored, the way WAEC arrives at its yearly
+ * cut-offs. `cumulativeShares` is each grade's cumulative share of the cohort, best first
+ * (4, 11, 23, ... 100). For every grade it picks the mark that leaves the number of pupils
+ * at or above it closest to that share of the cohort. Working from cumulative shares, never
+ * from each grade's own rounded share, keeps the grades adding up to exactly the cohort size.
+ * Marks tied on a cut-off always stay together. Returns one boundary per grade except the last.
+ */
+export function suggestBoundaries(
+  percentages: readonly number[],
+  grades: readonly string[],
+  cumulativeShares: readonly number[],
+): GradeBoundary[] {
+  if (percentages.length === 0 || grades.length < 2 || grades.length !== cumulativeShares.length) return [];
+  const sorted = [...percentages].sort((a, b) => b - a);
+  const total = sorted.length;
+  const distinct = [...new Set(sorted)];
+  const above = (mark: number) => sorted.filter((value) => value >= mark).length;
+  const counts = new Map(distinct.map((mark) => [mark, above(mark)]));
+  const top = sorted[0]!;
+  // A cut-off just above the best mark lets a grade stay empty in a very small cohort.
+  const candidates: { mark: number; count: number }[] = distinct.map((mark) => ({ mark, count: counts.get(mark)! }));
+  if (top < 100) candidates.push({ mark: Math.min(100, Math.round((top + 0.01) * 100) / 100), count: 0 });
+
+  const result: GradeBoundary[] = [];
+  let ceiling = Infinity;
+  for (let index = 0; index < grades.length - 1; index++) {
+    const target = (cumulativeShares[index]! / 100) * total;
+    let best = candidates[0]!;
+    for (const candidate of candidates) {
+      const gap = Math.abs(candidate.count - target);
+      const bestGap = Math.abs(best.count - target);
+      // On an exact tie take the stricter (higher) mark.
+      if (gap < bestGap || (gap === bestGap && candidate.mark > best.mark)) best = candidate;
+    }
+    // Boundaries must strictly fall; an empty grade takes a cent below the one above. Each one
+    // also leaves a cent of room for every boundary still to come, so a cohort that all scored
+    // 0 still gets a valid set instead of collapsing onto the floor.
+    const room = Math.round((grades.length - 2 - index) * 0.01 * 100) / 100;
+    let mark = Math.min(best.mark, Math.round((ceiling - 0.01) * 100) / 100);
+    mark = Math.max(mark, Math.round((room + 0.01) * 100) / 100);
+    result.push({ grade: grades[index]!, minScore: mark });
+    ceiling = mark;
+  }
+  return result;
+}
+
+/** Saves the boundaries for one assessment, subject and term. */
+export const saveGradeBoundariesSchema = z.object({
+  subjectId: z.string().min(1, "Choose a subject"),
+  termId: z.string().min(1, "Choose a term"),
+  boundaries: z
+    .array(
+      z.object({
+        grade: z.string().trim().min(1).max(4),
+        minScore: z.number("Enter a minimum mark").min(0).max(100),
+      }),
+    )
+    .min(1, "Enter the minimum marks")
+    .max(14),
+});
+export type SaveGradeBoundariesInput = z.infer<typeof saveGradeBoundariesSchema>;
+
 export const assessmentComponentInputSchema = z.object({
   id: z.string().min(1).optional(),
   name: z.string().trim().min(1, "Give every component a name").max(60),

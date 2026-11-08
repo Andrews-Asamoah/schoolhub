@@ -2,6 +2,7 @@ import { Module } from "@nestjs/common";
 import { AssessmentsController } from "./assessments.controller.js";
 import { AssessmentSetupController } from "./assessment-setup.controller.js";
 import { AssessmentSetupService } from "./assessment-setup.service.js";
+import { AssessmentBoundariesService } from "./assessment-boundaries.service.js";
 import { AssessmentEntryService } from "./assessment-entry.service.js";
 import { AssessmentMarksImportService } from "./assessment-marks-import.service.js";
 import { AssessmentTrackingService } from "./assessment-tracking.service.js";
@@ -20,7 +21,7 @@ import { ReportTemplatePresetsService } from "./report-template-presets.service.
 
 @Module({
   controllers: [AssessmentsController, AssessmentWorkflowController, AssessmentSetupController, ReportPublicationController, ExternalExamsController, MockAnalyticsController],
-  providers: [AssessmentsService, AssessmentEntryService, AssessmentMarksImportService, AssessmentTrackingService, AssessmentCorrectionService, AssessmentSetupService, ReportPublicationService, ReportVersionService, ExternalExamsService, ExternalBeceImportService, MockAnalyticsService, ReportTemplatePresetsService],
+  providers: [AssessmentsService, AssessmentEntryService, AssessmentMarksImportService, AssessmentTrackingService, AssessmentCorrectionService, AssessmentSetupService, AssessmentBoundariesService, ReportPublicationService, ReportVersionService, ExternalExamsService, ExternalBeceImportService, MockAnalyticsService, ReportTemplatePresetsService],
   exports: [AssessmentsService],
 })
 export class AssessmentsModule {}

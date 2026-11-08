@@ -14,12 +14,12 @@ import {
   type TeacherAssignments,
 } from "../../common/scope/teacher-scope.service.js";
 import {
-  classRankGrades,
   computeStudentResult,
   rankByPercentage,
   templateSpecificity,
   validateMarks,
   type EntryComponent,
+  rankedGrades,
   type RankBand,
 } from "./assessment-entry.js";
 import { applyMarkChanges } from "./assessment-marks-writer.js";
@@ -119,10 +119,11 @@ export class AssessmentEntryService {
     );
     for (const student of students) student.position = ranks.get(student.studentId) ?? null;
     if (selected.method === "CLASS_RANK") {
-      // Graded against classmates: only pupils with a complete result count towards the class.
-      const graded = classRankGrades(
+      // Graded against set boundaries, or else against classmates (only complete results count towards the class).
+      const graded = rankedGrades(
         students.filter((student) => student.complete).map((student) => ({ id: student.studentId, percentage: student.percentage })),
         selected.bands,
+        selected.boundaries,
       );
       for (const student of students) student.grade = graded.get(student.studentId)?.grade ?? null;
     }
@@ -161,6 +162,9 @@ export class AssessmentEntryService {
         })),
         grades: selected.bands,
         gradingMethod: selected.method,
+        boundaries: selected.boundaries
+          ? selected.bands.slice(0, -1).flatMap((band) => selected.boundaries![band.grade] === undefined ? [] : [{ grade: band.grade, minScore: selected.boundaries![band.grade]! }])
+          : null,
       },
       students,
       stats: classStats(students.filter((student) => student.complete).map((student) => student.percentage)),
@@ -369,7 +373,7 @@ export class AssessmentEntryService {
     if (!subject) throw new NotFoundException("Subject not found.");
     if (!link) throw new BadRequestException(`${klass.name} does not take ${subject.name}.`);
 
-    const [rows, extensionRows, submissionRows] = await Promise.all([
+    const [rows, extensionRows, submissionRows, boundaryRows] = await Promise.all([
       db.assessmentTemplate.findMany({
       // A mock belongs to one academic year, so only this year's mocks are open for entry.
       where: { schoolId, isActive: true, OR: [{ academicYearId: null }, { academicYearId: term.academicYearId }] },
@@ -387,7 +391,18 @@ export class AssessmentEntryService {
         where: { schoolId, classId, subjectId, termId: term.id },
         select: { templateId: true, submittedAt: true, note: true, excusedStudentIds: true },
       }),
+      // Mark boundaries are set per assessment, subject and term (WAEC resets them every year).
+      db.assessmentGradeBoundary.findMany({
+        where: { schoolId, subjectId, termId: term.id },
+        select: { templateId: true, grade: true, minScore: true },
+      }),
     ]);
+    const boundariesByTemplate = new Map<string, Record<string, number>>();
+    for (const row of boundaryRows) {
+      const own = boundariesByTemplate.get(row.templateId) ?? {};
+      own[row.grade] = Number(row.minScore);
+      boundariesByTemplate.set(row.templateId, own);
+    }
     const submissionByTemplate = new Map(submissionRows.map((row) => [row.templateId, row]));
     const templates = rows
       .map((row) => ({
@@ -422,6 +437,7 @@ export class AssessmentEntryService {
         extensions: extensionRows.filter((item) => item.templateId === row.id).map((item) => ({ teacherId: item.teacherId, deadline: item.deadline })),
         submission: submissionByTemplate.get(row.id) ?? null,
         method: row.gradingSystem.method,
+        boundaries: row.gradingSystem.method === "CLASS_RANK" ? boundariesByTemplate.get(row.id) ?? null : null,
         components: row.components.map(
           (component): EntryComponent & { name: string } => ({
             id: component.id,
