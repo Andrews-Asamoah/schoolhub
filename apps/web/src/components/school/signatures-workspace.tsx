@@ -20,6 +20,8 @@ type Person = {
 };
 type ListResponse = { data: Person[] };
 type PersonKind = "teacher" | "staff";
+const MAX_SIGNATURE_BYTES = 2 * 1024 * 1024;
+const SIGNATURE_TYPES = ["image/png", "image/jpeg", "image/webp"];
 const button = "inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-border bg-card px-3 py-2 text-sm font-semibold text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50";
 const personName = (person: Person) => [person.profile?.firstName ?? person.firstName, person.profile?.lastName ?? person.lastName].filter(Boolean).join(" ").trim() || person.teacherId || person.staffNumber || "Staff member";
 
@@ -27,6 +29,8 @@ export function SignaturesWorkspace() {
   const client = useQueryClient();
   const [kind, setKind] = useState<PersonKind>("teacher");
   const [feedback, setFeedback] = useState<{ kind: "success" | "error"; text: string } | null>(null);
+  // The card a file is currently being dragged over, so it can light up as a drop target.
+  const [dragOverKey, setDragOverKey] = useState<string | null>(null);
   const [uploadingKeys, setUploadingKeys] = useState<Set<string>>(() => new Set());
   const signatureKey = (personKind: PersonKind, personId: string) => personKind + ":" + personId;
   const teachersQuery = useQuery({
@@ -82,6 +86,15 @@ export function SignaturesWorkspace() {
     onError: (error: Error) => setFeedback({ kind: "error", text: error.message }),
   });
 
+  /** Shared by the file picker and drag and drop. A dropped file skips the picker's `accept` filter, so it is checked here. */
+  function chooseFile(person: Person, file: File | undefined) {
+    if (!file) return;
+    if (!SIGNATURE_TYPES.includes(file.type)) { setFeedback({ kind: "error", text: "Choose a PNG, JPEG or WebP image." }); return; }
+    if (file.size > MAX_SIGNATURE_BYTES) { setFeedback({ kind: "error", text: "Choose an image no larger than 2 MB." }); return; }
+    setFeedback(null);
+    upload.mutate({ person, file, personKind: kind });
+  }
+
   const query = kind === "teacher" ? teachersQuery : staffQuery;
   const people = query.data?.data ?? [];
 
@@ -109,15 +122,22 @@ export function SignaturesWorkspace() {
         const signatureUrl = person.profile?.signatureUrl;
         const inputId = "signature-" + kind + "-" + person.id;
         const isUploading = uploadingKeys.has(signatureKey(kind, person.id));
+        const dropKey = signatureKey(kind, person.id);
+        const dragging = dragOverKey === dropKey && !isUploading;
         return <article key={person.id} className="flex min-w-0 flex-col rounded-2xl border border-border bg-card p-4 shadow-sm">
           <div className="flex items-start gap-3"><div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground"><UserRoundPen className="size-5" /></div><div className="min-w-0 flex-1"><h3 className="truncate font-semibold">{personName(person)}</h3><p className="truncate text-xs text-muted-foreground">{person.profile?.user?.email || person.staffType || person.staffNumber || person.teacherId || (kind === "teacher" ? "Teacher" : "Staff member")}</p></div>{signatureUrl && <CheckCircle2 className="size-5 shrink-0 text-success" aria-label="Signature uploaded" />}</div>
-          <div className="mt-4 flex h-32 items-center justify-center overflow-hidden rounded-xl border border-dashed border-border bg-muted/30 p-3">{signatureUrl ? <PrivateSignature key={signatureUrl + person.id} path={"/schools/current/signatures/" + kind + "/" + person.id} name={personName(person)} version={kind === "teacher" ? teachersQuery.dataUpdatedAt : staffQuery.dataUpdatedAt} /> : <div className="text-center text-muted-foreground"><ImagePlus className="mx-auto size-6" /><p className="mt-2 text-xs">No signature uploaded</p></div>}</div>
+          <div
+            onDragOver={(event) => { if (isUploading || !event.dataTransfer.types.includes("Files")) return; event.preventDefault(); event.dataTransfer.dropEffect = "copy"; setDragOverKey(dropKey); }}
+            onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDragOverKey((current) => (current === dropKey ? null : current)); }}
+            onDrop={(event) => { event.preventDefault(); setDragOverKey(null); if (isUploading) return; const files = event.dataTransfer.files; if (files.length > 1) { setFeedback({ kind: "error", text: "Drop one image at a time." }); return; } chooseFile(person, files[0]); }}
+            className={cn("relative mt-4 flex h-32 items-center justify-center overflow-hidden rounded-xl border border-dashed p-3 transition-colors", dragging ? "border-primary bg-primary/10" : "border-border bg-muted/30")}
+          >{dragging && <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center gap-2 bg-primary/10 text-sm font-semibold text-primary"><UploadCloud className="size-5" /> Drop to {signatureUrl ? "replace" : "upload"}</div>}{signatureUrl ? <PrivateSignature key={signatureUrl + person.id} path={"/schools/current/signatures/" + kind + "/" + person.id} name={personName(person)} version={kind === "teacher" ? teachersQuery.dataUpdatedAt : staffQuery.dataUpdatedAt} /> : <div className="text-center text-muted-foreground"><ImagePlus className="mx-auto size-6" /><p className="mt-2 text-xs">No signature uploaded</p><p className="text-[11px]">Drop an image here</p></div>}</div>
           <div className="mt-4 flex flex-wrap gap-2">
             <label htmlFor={inputId} className={cn(button, "cursor-pointer")}>{isUploading ? <LoaderCircle className="size-4 animate-spin" /> : <UploadCloud className="size-4" />}{isUploading ? "Uploading…" : signatureUrl ? "Replace signature" : "Upload signature"}</label>
-            <input id={inputId} type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" disabled={isUploading} onChange={(event) => { const file = event.currentTarget.files?.[0]; event.currentTarget.value = ""; if (!file) return; if (file.size > 2 * 1024 * 1024) { setFeedback({ kind: "error", text: "Choose an image no larger than 2 MB." }); return; } setFeedback(null); upload.mutate({ person, file, personKind: kind }); }} />
+            <input id={inputId} type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" disabled={isUploading} onChange={(event) => { const file = event.currentTarget.files?.[0]; event.currentTarget.value = ""; chooseFile(person, file); }} />
             {signatureUrl && <button type="button" className={button} disabled={remove.isPending} onClick={() => { if (window.confirm("Remove the stored signature for " + personName(person) + "?")) remove.mutate(person); }}><Trash2 className="size-4" /> Remove</button>}
           </div>
-          <p className="mt-3 text-xs leading-5 text-muted-foreground">PNG, JPEG or WebP · maximum 2 MB</p>
+          <p className="mt-3 text-xs leading-5 text-muted-foreground">PNG, JPEG or WebP · maximum 2 MB · drag an image onto the box above or use the button</p>
         </article>;
       })}</div>}
       <p className="text-xs leading-5 text-muted-foreground">Signatures are stored under this school's isolated Cloudflare R2 prefix. Uploading a signature makes it available on the person's profile; individual forms and printouts must explicitly render that profile signature when they support it.</p>
