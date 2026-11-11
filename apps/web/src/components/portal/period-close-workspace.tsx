@@ -2,15 +2,13 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api";
 import { useSchoolRole } from "@/components/school/school-role-switcher";
+import { useFinanceApproval } from "@/lib/finance-approval";
 const control = "rounded-lg border border-input bg-background p-2 text-sm";
 export function PeriodCloseWorkspace() {
   const { activeRole }=useSchoolRole(),client=useQueryClient();
   const [month,setMonth]=useState(""),[reason,setReason]=useState(""),[message,setMessage]=useState(""),[report,setReport]=useState<{failed:string[];canRequest:boolean;snapshot:{lines:{accountId:string;code:string;name:string;opening:string;debit:string;credit:string;closing:string}[]}}|null>(null);
-  const approvalSettings=useQuery({queryKey:['finance-approval-settings'],queryFn:()=>apiFetch<{control:string;required:boolean;approverRoles:string[]}[]>('/finance/approval-settings')});
-  const periodSetting=approvalSettings.data?.find(item=>item.control==='PERIOD_CONTROL');
-  // Until the setting loads, assume a second approver is needed (the stricter reading).
-  const approvalRequired=periodSetting?.required??true;
-  const deciderRoles=approvalRequired&&periodSetting?.approverRoles.length?periodSetting.approverRoles:['owner','headteacher'];
+  const periodApproval=useFinanceApproval('PERIOD_CONTROL');
+  const approvalRequired=periodApproval.required;
   const periods=useQuery({queryKey:['close-periods'],queryFn:()=>apiFetch<{id:string;name:string;status:string;reopenCount:number}[]>('/finance/periods')});
   const requests=useQuery({queryKey:['close-requests'],queryFn:()=>apiFetch<{id:string;entityId:string;subject:string;requestedById:string}[]>('/finance/period-controls/requests')});
   const action=useMutation({mutationFn:async(run:()=>Promise<unknown>)=>run(),onSuccess:async()=>{setMessage('Saved.');await client.invalidateQueries({queryKey:['close-periods']});await client.invalidateQueries({queryKey:['close-requests']});},onError:(error:Error)=>setMessage(error.message)});
@@ -25,6 +23,6 @@ export function PeriodCloseWorkspace() {
     <label className="block">Request or decision reason<textarea className={control+" block w-full"} minLength={10} maxLength={1000} value={reason} onChange={event=>setReason(event.target.value)} /></label>
     {activeRole==='accountant'&&<button className={control} disabled={!report?.canRequest||reason.trim().length<10||action.isPending} onClick={()=>action.mutate(()=>post('request-close',{year,month:monthNumber,reason}))}>{approvalRequired?'Request independent close approval':'Close period'}</button>}
     <ul className="space-y-2">{periods.data?.map(period=><li key={period.id}>{period.name} · {period.status} · {period.reopenCount} reopenings {activeRole==='accountant'&&period.status==='CLOSED'&&<button className={control} disabled={reason.trim().length<10||action.isPending} onClick={()=>action.mutate(()=>post(`${period.id}/request-reopen`,{reason}))}>{approvalRequired?'Request reopening':'Reopen period'}</button>}</li>)}</ul>
-    <h3 className="font-medium">Pending approvals</h3><ul className="space-y-2">{requests.data?.map(request=><li key={request.id}>{request.subject} · {periods.data?.find(period=>period.id===request.entityId)?.name??request.entityId}{deciderRoles.includes(activeRole??'')&&[true,false].map(approve=><button key={String(approve)} className={control} disabled={reason.trim().length<10||action.isPending} onClick={()=>action.mutate(()=>post(`${request.id}/decide`,{approve,note:reason}))}>{approve?'Approve':'Reject'}</button>)}</li>)}</ul>
+    <h3 className="font-medium">Pending approvals</h3><ul className="space-y-2">{requests.data?.map(request=><li key={request.id}>{request.subject} · {periods.data?.find(period=>period.id===request.entityId)?.name??request.entityId}{periodApproval.canDecide(activeRole)&&[true,false].map(approve=><button key={String(approve)} className={control} disabled={reason.trim().length<10||action.isPending} onClick={()=>action.mutate(()=>post(`${request.id}/decide`,{approve,note:reason}))}>{approve?'Approve':'Reject'}</button>)}</li>)}</ul>
   </section>;
 }
