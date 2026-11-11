@@ -1,4 +1,5 @@
 import { ConflictException, ForbiddenException, Injectable, BadRequestException } from "@nestjs/common";
+import { POLICY_WAIVER_NOTE, loadApprovalSetting, mayDecide } from './finance-approval-settings.js';
 import { Prisma } from "@prisma/client";
 import { createHash } from "node:crypto";
 import { PrismaService } from "../../prisma/prisma.service.js";
@@ -67,17 +68,27 @@ export class FinanceCloseService {
       if(pending) throw new ConflictException('A close request is already pending.');
       const approval=await tx.financeApprovalRequest.create({data:{schoolId,subject:'PERIOD_CLOSE',entityType:'FINANCE_PERIOD',entityId:period.id,requestedById:actorId,payloadHash:digest(evidence)}});
       await tx.financePeriodEvent.create({data:{periodId:period.id,kind:'CLOSE_REQUESTED',actorId,reason,approvalRequestId:approval.id}});
+      if(!(await loadApprovalSetting(tx,schoolId,'PERIOD_CONTROL')).required){
+        await this.applyDecision(tx,schoolId,actorId,approval,true,POLICY_WAIVER_NOTE,true);
+        return tx.financeApprovalRequest.findUniqueOrThrow({where:{id:approval.id}});
+      }
       return approval;
     },{timeout:60000});
   }
   async decide(schoolId:string,actorId:string,role:string|undefined,requestId:string,approve:boolean,note:string){
-    if(!['owner','headteacher'].includes(role??''))throw new ForbiddenException('An owner or headteacher must decide period controls.');
     if(note.trim().length<10)throw new BadRequestException('A meaningful decision reason is required.');
     return this.prisma.client.$transaction(async tx=>{
       await this.lock(tx,schoolId);
+      const setting=await loadApprovalSetting(tx,schoolId,'PERIOD_CONTROL');
+      if(!mayDecide(setting,{id:actorId,role,isSuperAdmin:false}))throw new ForbiddenException('Only the approver chosen by the school can decide period controls.');
       const request=await tx.financeApprovalRequest.findFirst({where:{id:requestId,schoolId,entityType:'FINANCE_PERIOD',subject:{in:['PERIOD_CLOSE','PERIOD_REOPEN']},status:'PENDING'}});
       if(!request)throw new ConflictException('Pending period request not found.');
       if(request.requestedById===actorId)throw new ForbiddenException('The requester cannot approve their own period change.');
+      return this.applyDecision(tx,schoolId,actorId,request,approve,note,false);
+    },{timeout:60000});
+  }
+  /** Applies an approval or rejection. `waived` marks a request the school's policy let the requester complete. */
+  private async applyDecision(tx:Prisma.TransactionClient,schoolId:string,actorId:string,request:{id:string;subject:string;entityId:string;payloadHash:string},approve:boolean,note:string,waived:boolean){
       const period=await tx.financeAccountingPeriod.findFirstOrThrow({where:{id:request.entityId,schoolId}});
       const priorLock=await tx.financePeriodLock.findUnique({where:{schoolId}});
       if(approve&&request.subject==='PERIOD_CLOSE'){
@@ -104,10 +115,9 @@ export class FinanceCloseService {
         if(boundary)await tx.financePeriodLock.update({where:{schoolId},data:{lockedThrough:boundary,updatedById:actorId,reason:note}});
         else await tx.financePeriodLock.deleteMany({where:{schoolId}});
       }
-      await tx.financeApprovalRequest.update({where:{id:request.id},data:{status:approve?'APPROVED':'REJECTED',decidedById:actorId,decidedAt:new Date(),decisionNote:note}});
+      await tx.financeApprovalRequest.update({where:{id:request.id},data:{status:approve?'APPROVED':'REJECTED',decidedById:actorId,decidedAt:new Date(),decisionNote:note,waivedByPolicy:waived}});
       await tx.financePeriodEvent.create({data:{periodId:period.id,kind:approve?request.subject:request.subject+'_REJECTED',actorId,reason:JSON.stringify({note,priorLockedThrough:priorLock?.lockedThrough.toISOString().slice(0,10)??null}),approvalRequestId:request.id}});
       return {periodId:period.id,approved:approve};
-    },{timeout:60000});
   }
   async reopen(schoolId:string,actorId:string,periodId:string,reason:string){
     if(reason.trim().length<10)throw new BadRequestException('A meaningful reopening reason is required.');
@@ -117,7 +127,12 @@ export class FinanceCloseService {
       if(latest?.id!==periodId)throw new ConflictException('Only the latest closed period can be requested for reopening.');
       if(await tx.financeApprovalRequest.count({where:{schoolId,entityId:periodId,subject:'PERIOD_REOPEN',status:'PENDING'}}))throw new ConflictException('A reopen request is pending.');
       const request=await tx.financeApprovalRequest.create({data:{schoolId,subject:'PERIOD_REOPEN',entityType:'FINANCE_PERIOD',entityId:periodId,requestedById:actorId,payloadHash:digest({periodId,reopenCount:latest.reopenCount})}});
-      await tx.financePeriodEvent.create({data:{periodId,kind:'REOPEN_REQUESTED',actorId,reason,approvalRequestId:request.id}});return request;
+      await tx.financePeriodEvent.create({data:{periodId,kind:'REOPEN_REQUESTED',actorId,reason,approvalRequestId:request.id}});
+      if(!(await loadApprovalSetting(tx,schoolId,'PERIOD_CONTROL')).required){
+        await this.applyDecision(tx,schoolId,actorId,request,true,POLICY_WAIVER_NOTE,true);
+        return tx.financeApprovalRequest.findUniqueOrThrow({where:{id:request.id}});
+      }
+      return request;
     });
   }
   async history(schoolId:string,periodId:string){

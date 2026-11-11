@@ -1,4 +1,5 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
+import { loadApprovalSetting, mayApproveStep } from "./finance-approval-settings.js";
 import { Prisma, type FinanceAccountPurpose } from "@prisma/client";
 import { PrismaService } from "../../prisma/prisma.service.js";
 import { withSerializableRetry } from "./finance.helpers.js";
@@ -73,17 +74,18 @@ export class FinanceAccountPurposeService {
     schoolId: string, actorId: string, mappingId: string,
     schoolRole: string | undefined, isSuperAdmin: boolean,
   ) {
-    if (!isSuperAdmin && schoolRole !== "owner" && schoolRole !== "headteacher") {
-      throw new ForbiddenException("A school owner or headteacher must verify system account mappings.");
-    }
     return withSerializableRetry(() => this.prisma.client.$transaction(async tx => {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${schoolId}), hashtext('finance-account-purpose'))`;
+      const setting = await loadApprovalSetting(tx, schoolId, "ACCOUNT_MAPPING");
+      if (!mayApproveStep(setting, { id: actorId, role: schoolRole, isSuperAdmin })) {
+        throw new ForbiddenException("Only the approver chosen by the school can verify system account mappings.");
+      }
       const mapping = await tx.financeAccountMapping.findFirst({
         where: { schoolId, id: mappingId }, include: { account: true },
       });
       if (!mapping) throw new NotFoundException("Finance account mapping not found.");
       if (mapping.status !== "DRAFT") throw new ConflictException("Only a draft mapping may be approved.");
-      if (mapping.createdById === actorId) throw new ForbiddenException("The preparer cannot approve their own account mapping.");
+      if (setting.required && mapping.createdById === actorId) throw new ForbiddenException("The preparer cannot approve their own account mapping.");
       if (!mapping.account.isActive || mapping.account.schoolId !== schoolId ||
         mapping.account.accountType !== accountTypes[mapping.purpose]) {
         throw new ConflictException("The mapped chart account is no longer eligible.");
@@ -101,7 +103,7 @@ export class FinanceAccountPurposeService {
       if (overlap) throw new ConflictException("An active account mapping already covers the proposed dates.");
       return tx.financeAccountMapping.update({
         where: { id: mapping.id },
-        data: { status: "ACTIVE", approvedById: actorId, approvedAt: new Date() },
+        data: { status: "ACTIVE", approvedById: actorId, approvedAt: new Date(), waivedByPolicy: mapping.createdById === actorId },
       });
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }));
   }

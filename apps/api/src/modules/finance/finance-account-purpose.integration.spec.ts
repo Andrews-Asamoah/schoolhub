@@ -24,6 +24,7 @@ describe.skipIf(!enabled)("P2 verified account purposes (PostgreSQL)", { timeout
     schoolId = (await db.school.create({
       data: { organizationId: run + "-org", name: run, code: run.toUpperCase(), subdomain: run },
     })).id;
+    await db.financeApprovalSetting.createMany({ data: ["PAYROLL_SETTINGS","BANK_RECONCILIATION","PERIOD_CONTROL","MANUAL_JOURNAL","INVOICE_ADJUSTMENT","ACCOUNT_MAPPING"].map(control => ({ schoolId, control: control as never, required: true, approverRoles: ["owner","headteacher"] })) });
     arAccountId = (await db.chartAccount.create({
       data: { schoolId, name: "Student receivables", code: "1200",
         accountType: "ASSET", category: "ACCOUNTS_RECEIVABLE" },
@@ -67,7 +68,7 @@ describe.skipIf(!enabled)("P2 verified account purposes (PostgreSQL)", { timeout
     await expect(db.$transaction(tx => service.resolve(tx, schoolId, "STUDENT_RECEIVABLE", new Date())))
       .rejects.toThrow(/independently approved/);
     await expect(service.approve(schoolId, "accountant", mappingId, "accountant", false))
-      .rejects.toThrow(/owner or headteacher/);
+      .rejects.toThrow(/approver chosen by the school/);
     await expect(service.approve(schoolId, "accountant", mappingId, "owner", false))
       .rejects.toThrow(/preparer cannot approve/);
     const mapping = await service.approve(schoolId, "owner", mappingId, "owner", false);
@@ -83,5 +84,26 @@ describe.skipIf(!enabled)("P2 verified account purposes (PostgreSQL)", { timeout
     });
     await expect(service.approve(schoolId, "owner", next.id, "owner", false)).rejects.toThrow(/already covers/);
     expect((await db.financeAccountMapping.findUniqueOrThrow({ where: { id: next.id } })).status).toBe("DRAFT");
+  });
+
+  it("lets the accountant verify a mapping only when the school does not require a second approver", async () => {
+    const revenueId = (await db.chartAccount.create({
+      data: { schoolId, name: "Fee revenue", code: "4000", accountType: "REVENUE", category: "SCHOOL_FEES" },
+    })).id;
+    const draft = await service.propose(schoolId, "accountant", {
+      purpose: "FEE_REVENUE", accountId: revenueId,
+      effectiveFrom: day(), sourceNote: "Revenue account confirmed from the chart of accounts",
+    });
+    await expect(service.approve(schoolId, "accountant", draft.id, "accountant", false))
+      .rejects.toThrow(/approver chosen by the school/);
+    await db.financeApprovalSetting.update({
+      where: { schoolId_control: { schoolId, control: "ACCOUNT_MAPPING" } },
+      data: { required: false, approverRoles: [] },
+    });
+    // Only the accountant role may complete the step on its own; other staff still cannot.
+    await expect(service.approve(schoolId, "teacher", draft.id, "teacher", false))
+      .rejects.toThrow(/approver chosen by the school/);
+    const mapping = await service.approve(schoolId, "accountant", draft.id, "accountant", false);
+    expect(mapping.status).toBe("ACTIVE");
   });
 });

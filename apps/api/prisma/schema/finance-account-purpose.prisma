@@ -27,6 +27,8 @@ model FinanceAccountMapping {
   createdById  String
   approvedById String?
   approvedAt   DateTime?
+  /// True when the school's setting let the preparer verify their own mapping.
+  waivedByPolicy Boolean @default(false)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 

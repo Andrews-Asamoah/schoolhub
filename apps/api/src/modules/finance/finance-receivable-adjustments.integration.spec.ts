@@ -33,6 +33,7 @@ describe.skipIf(!enabled)("P3 approved receivable adjustments (PostgreSQL)", { t
     schoolId = (await db.school.create({
       data: { organizationId: run + "-org", name: run, subdomain: run, code: run.toUpperCase() },
     })).id;
+    await db.financeApprovalSetting.createMany({ data: ["PAYROLL_SETTINGS","BANK_RECONCILIATION","PERIOD_CONTROL","MANUAL_JOURNAL","INVOICE_ADJUSTMENT","ACCOUNT_MAPPING"].map(control => ({ schoolId, control: control as never, required: true, approverRoles: ["owner","headteacher"] })) });
     for (const id of [accountantId, ownerId, studentUserId]) {
       await db.user.create({ data: { id, name: id, email: id + "@example.test" } });
     }
@@ -145,7 +146,7 @@ describe.skipIf(!enabled)("P3 approved receivable adjustments (PostgreSQL)", { t
     await expect(approved.decide(schoolId, accountantId, "owner", false,
       creditId, "APPROVED", "I reviewed the invoice")).rejects.toThrow(/preparer/i);
     await expect(approved.decide(schoolId, ownerId, "accountant", false,
-      creditId, "APPROVED", "I reviewed the invoice")).rejects.toThrow(/owner or headteacher/i);
+      creditId, "APPROVED", "I reviewed the invoice")).rejects.toThrow(/approver chosen by the school/i);
     await approved.decide(schoolId, ownerId, "owner", false,
       creditId, "APPROVED", "I independently reviewed the invoice");
   });
@@ -163,16 +164,23 @@ describe.skipIf(!enabled)("P3 approved receivable adjustments (PostgreSQL)", { t
     expect((await db.student.findUniqueOrThrow({ where: { id: studentId } })).outstandingBalance.toFixed(2)).toBe("70.00");
   });
 
-  it("posts an approved bad-debt write-off without changing receipt records or classifying the invoice as PAID", async () => {
+  it("posts a write-off completed without a second approver, without changing receipt records or classifying the invoice as PAID", async () => {
+    const { POLICY_WAIVER_NOTE } = await import("./finance-approval-settings.js");
+    await db.financeApprovalSetting.update({
+      where: { schoolId_control: { schoolId, control: "INVOICE_ADJUSTMENT" } },
+      data: { required: false, approverRoles: [] },
+    });
     const writeoff = await draft.createDraft(schoolId, accountantId, {
       billId, kind: "WRITE_OFF", reasonCode: "UNCOLLECTIBLE",
       reason: "Reviewed aged debt declared uncollectible", effectiveDate: date(),
       lines: [{ billItemId: itemId, amount: "70.00" }],
     });
     writeoffId = writeoff.id;
-    await approved.submit(schoolId, accountantId, writeoffId);
-    await approved.decide(schoolId, ownerId, "owner", false,
-      writeoffId, "APPROVED", "Owner approved evidence of uncollectibility");
+    const submitted = await approved.submit(schoolId, accountantId, writeoffId);
+    expect(submitted.status).toBe("APPROVED");
+    const approval = await db.financeApprovalRequest.findUniqueOrThrow({ where: { id: submitted.approvalRequestId } });
+    expect(approval).toMatchObject({ waivedByPolicy: true, requestedById: accountantId, decidedById: accountantId });
+    expect(approval.decisionNote).toBe(POLICY_WAIVER_NOTE);
     expect((await approved.post(schoolId, accountantId, writeoffId)).status).toBe("POSTED");
     const bill = await db.bill.findUniqueOrThrow({ where: { id: billId } });
     expect(bill.status).toBe("ADJUSTED");

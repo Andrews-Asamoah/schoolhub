@@ -35,7 +35,19 @@ export function canExportFinancePayroll(actorPlatformRole: string | null | undef
 }
 
 /**
- * Activating or retiring statutory payroll settings (PAYE bands, SSNIT/tier rates) is a
- * second-person decision: the accountant prepares drafts, the owner or headteacher approves.
+ * Routes where the approval step is its own call (activating payroll settings, verifying an
+ * account mapping, deciding a reconciliation or period control). The route lets the possible
+ * deciders in; the service then enforces the school's own approval setting
+ * (finance-approval-settings.ts): the owner or headteacher decide when approval is required,
+ * and the accountant may complete the step only when the school has switched approval off.
  */
-export const PAYROLL_SETTINGS_APPROVE_ROLES = ["owner", "headteacher"] as const;
+export const FINANCE_APPROVAL_ACTION_ROLES = ["owner", "headteacher", "accountant"] as const;
+
+/** Anyone who needs to know whether a second approver is required can read the setting. */
+export const FINANCE_APPROVAL_SETTINGS_READ_ROLES = ["owner", "admin", "accountant", "headteacher"] as const;
+
+/**
+ * Who may change the setting. RolesGuard also admits a headteacher as an "admin", so the service
+ * re-checks that the active role is owner or admin.
+ */
+export const FINANCE_APPROVAL_SETTINGS_WRITE_ROLES = ["owner", "admin"] as const;

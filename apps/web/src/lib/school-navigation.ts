@@ -488,6 +488,14 @@ export const schoolNavGroups: SchoolNavGroup[] = [
         apiStatus: "available",
       },
       {
+        id: "finance-approvals",
+        label: "Finance approvals",
+        icon: ShieldCheck,
+        description: "Choose which finance steps need a second approver, and who approves.",
+        section: "Administration",
+        apiStatus: "available",
+      },
+      {
         id: "settings",
         label: "School settings",
         icon: Settings2,
@@ -541,11 +549,14 @@ const adminRestrictedFinancePages = new Set([
 ]);
 
 const personalPages = new Set(["guardian-portal", "guardian-attendance", "guardian-timetable", "guardian-reports", "guardian-notices", "guardian-fees", "student-portal", "teacher-portal", "classmates"]);
+/** Pages the owner and admin use that a headteacher must not see (the API refuses them too). */
+const headteacherHiddenPages = new Set(["finance-approvals"]);
+
 const managementPages = schoolNavItems.filter((item) => !personalPages.has(item.id)).map((item) => item.id);
 
 const rolePages: Record<string, string[]> = {
   owner: managementPages,
-  headteacher: managementPages,
+  headteacher: managementPages.filter((id) => !headteacherHiddenPages.has(id)),
   admin: schoolNavItems
     .filter((item) => !adminRestrictedFinancePages.has(item.id) && !personalPages.has(item.id))
     .map((item) => item.id),

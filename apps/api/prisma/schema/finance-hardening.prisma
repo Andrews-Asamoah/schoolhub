@@ -69,6 +69,30 @@ model FinanceApprovalPolicy {
   @@map("finance_approval_policies")
 }
 
+/// Controls whose second-person approval a school can switch on or off and assign (see
+/// finance-approval-settings.ts). A school with no row for a control has approval switched off.
+enum FinanceApprovalControl {
+  PAYROLL_SETTINGS
+  BANK_RECONCILIATION
+  PERIOD_CONTROL
+  MANUAL_JOURNAL
+  INVOICE_ADJUSTMENT
+  ACCOUNT_MAPPING
+}
+
+model FinanceApprovalSetting {
+  id String @id @default(cuid())
+  schoolId String
+  control FinanceApprovalControl
+  required Boolean @default(false)
+  approverRoles String[] @default([])
+  updatedById String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@unique([schoolId, control])
+  @@map("finance_approval_settings")
+}
+
 model FinanceApprovalRequest {
   id String @id @default(cuid())
   schoolId String
@@ -83,6 +107,10 @@ model FinanceApprovalRequest {
   decidedById String?
   decidedAt DateTime?
   decisionNote String?
+  /// True when the school policy did not require a second approver and the preparer's own
+  /// submission completed the approval step. Such rows are the only ones allowed to have
+  /// decidedById equal to requestedById.
+  waivedByPolicy Boolean @default(false)
   @@index([schoolId, status, subject])
   @@index([entityType, entityId])
   @@map("finance_approval_requests")

@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import type { ExecutionContext } from "@nestjs/common";
 import { RolesGuard } from "../../common/guards/roles.guard.js";
-import { FINANCE_PAYROLL_EXPORT_ROLES, FINANCE_READ_ROLES, FINANCE_SUMMARY_ROLES, FINANCE_WRITE_ROLES, PAYROLL_SETTINGS_APPROVE_ROLES, canExportFinancePayroll, isFinancePayrollExportRole } from "./finance.permissions.js";
+import { FINANCE_PAYROLL_EXPORT_ROLES, FINANCE_READ_ROLES, FINANCE_SUMMARY_ROLES, FINANCE_WRITE_ROLES, FINANCE_APPROVAL_ACTION_ROLES, FINANCE_APPROVAL_SETTINGS_READ_ROLES, FINANCE_APPROVAL_SETTINGS_WRITE_ROLES, canExportFinancePayroll, isFinancePayrollExportRole } from "./finance.permissions.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 // Normalise line endings so the checks behave the same on Windows (CRLF) checkouts.
@@ -97,14 +97,24 @@ describe("finance controller routes", () => {
       expect(route.decorators, `${route.verb} ${route.route}`).toContain("@Roles(...FINANCE_WRITE_ROLES)");
     }
   });
-  it("gives statutory payroll setting approval to owner and headteacher only, never the preparer role", () => {
-    expect([...PAYROLL_SETTINGS_APPROVE_ROLES]).toEqual(["owner", "headteacher"]);
+  it("lets owner, headteacher and accountant reach the payroll setting approval routes and leaves the decision to the school's approval setting", () => {
+    expect([...FINANCE_APPROVAL_ACTION_ROLES]).toEqual(["owner", "headteacher", "accountant"]);
     const approvals = routes.filter((r) => /payroll\/settings\/:kind\/:id\/(activate|end)/.test(r.route));
     expect(approvals).toHaveLength(2);
-    for (const route of approvals) expect(route.decorators, route.route).toContain("@Roles(...PAYROLL_SETTINGS_APPROVE_ROLES)");
-    expect(check(PAYROLL_SETTINGS_APPROVE_ROLES, { role: "user" }, "accountant")).toThrow();
-    expect(check(PAYROLL_SETTINGS_APPROVE_ROLES, { role: "user" }, "owner")()).toBe(true);
-    expect(check(PAYROLL_SETTINGS_APPROVE_ROLES, { role: "user" }, "headteacher")()).toBe(true);
+    for (const route of approvals) expect(route.decorators, route.route).toContain("@Roles(...FINANCE_APPROVAL_ACTION_ROLES)");
+    // The route only lets possible deciders in; the service then applies the school's setting.
+    expect(controllerSource.match(/assertMayApprove\(school\.id, "PAYROLL_SETTINGS"/g)).toHaveLength(2);
+    expect(check(FINANCE_APPROVAL_ACTION_ROLES, { role: "user" }, "teacher")).toThrow();
+    expect(check(FINANCE_APPROVAL_ACTION_ROLES, { role: "user" }, "admin")).toThrow();
+    for (const role of ["owner", "headteacher", "accountant"]) {
+      expect(check(FINANCE_APPROVAL_ACTION_ROLES, { role: "user" }, role)()).toBe(true);
+    }
+  });
+  it("lets only the owner and admin change approval settings, while the accountant and headteacher can read them", () => {
+    expect([...FINANCE_APPROVAL_SETTINGS_WRITE_ROLES]).toEqual(["owner", "admin"]);
+    expect([...FINANCE_APPROVAL_SETTINGS_READ_ROLES]).toEqual(["owner", "admin", "accountant", "headteacher"]);
+    expect(check(FINANCE_APPROVAL_SETTINGS_WRITE_ROLES, { role: "user" }, "accountant")).toThrow();
+    expect(check(FINANCE_APPROVAL_SETTINGS_WRITE_ROLES, { role: "user" }, "teacher")).toThrow();
   });
   it("gives payroll and salary exports the stricter export roles", () => {
     for (const route of routes.filter((r) => r.verb === "Get" && (

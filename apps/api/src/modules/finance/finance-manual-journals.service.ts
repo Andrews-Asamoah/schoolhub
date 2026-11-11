@@ -1,4 +1,5 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
+import { POLICY_WAIVER_NOTE, loadApprovalSetting, mayDecide } from "./finance-approval-settings.js";
 import { Prisma, type FinanceManualJournal, type FinanceManualJournalLine } from "@prisma/client";
 import { PrismaService } from "../../prisma/prisma.service.js";
 import { FinancePostingService } from "./finance-posting.service.js";
@@ -139,17 +140,29 @@ export class FinanceManualJournalsService {
         throw new ConflictException("A supported independent manual-journal approval policy is required.");
       }
       const hash = manualJournalHash(payload);
+      // When the school does not require a second approver, the preparer's own submission
+      // completes the approval step. The request is marked so the audit trail shows it.
+      const waived = !(await loadApprovalSetting(tx, schoolId, "MANUAL_JOURNAL")).required;
+      const now = new Date();
       const approval = await tx.financeApprovalRequest.create({
         data: {
           schoolId, subject: "MANUAL_JOURNAL", entityType: "FINANCE_MANUAL_JOURNAL",
           entityId: journal.id, requestedById: journal.createdById,
           payloadHash: hash, amount: journal.totalAmount,
+          ...(waived ? {
+            status: "APPROVED" as const, decidedById: actorId, decidedAt: now,
+            decisionNote: POLICY_WAIVER_NOTE, waivedByPolicy: true,
+          } : {}),
         },
       });
       await tx.financeManualJournal.update({
-        where: { id: journalId }, data: { status: "PENDING_APPROVAL", approvalHash: hash, submittedAt: new Date() },
+        where: { id: journalId },
+        data: {
+          status: waived ? "APPROVED" : "PENDING_APPROVAL", approvalHash: hash, submittedAt: now,
+          ...(waived ? { approvalNote: POLICY_WAIVER_NOTE, approvedById: actorId, approvedAt: now } : {}),
+        },
       });
-      return { journalId, approvalRequestId: approval.id, status: "PENDING_APPROVAL" as const };
+      return { journalId, approvalRequestId: approval.id, status: waived ? "APPROVED" as const : "PENDING_APPROVAL" as const };
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }));
   }
 
@@ -158,10 +171,11 @@ export class FinanceManualJournalsService {
     decision: "APPROVED" | "REJECTED", note: string,
   ) {
     if (note.trim().length < 10) throw new BadRequestException("Approval decisions require a reason of at least 10 characters.");
-    if (!isSuperAdmin && actorSchoolRole !== "owner" && actorSchoolRole !== "headteacher") {
-      throw new ForbiddenException("An owner or headteacher must independently decide manual journals.");
-    }
     return withSerializableRetry(() => this.prisma.client.$transaction(async tx => {
+      const setting = await loadApprovalSetting(tx, schoolId, "MANUAL_JOURNAL");
+      if (!mayDecide(setting, { id: actorId, role: actorSchoolRole, isSuperAdmin })) {
+        throw new ForbiddenException("Only the approver chosen by the school can decide manual journals.");
+      }
       const journal = await this.lock(tx, schoolId, journalId);
       if (journal.status !== "PENDING_APPROVAL" || !journal.approvalHash) {
         throw new ConflictException("Journal is not pending approval.");
@@ -209,9 +223,6 @@ export class FinanceManualJournalsService {
       if (journal.status !== "APPROVED" || !journal.approvedById || !journal.approvalHash) {
         throw new ForbiddenException("An independently approved journal is required to post.");
       }
-      if (actorId === journal.approvedById) {
-        throw new ForbiddenException("The approver cannot also post the manual journal.");
-      }
       const hash = manualJournalHash(checkedPayload(journal));
       if (hash !== journal.approvalHash) throw new ConflictException("Journal details no longer match the approved payload.");
       const approval = await tx.financeApprovalRequest.findFirst({
@@ -219,6 +230,9 @@ export class FinanceManualJournalsService {
           payloadHash: hash, decidedById: journal.approvedById },
       });
       if (!approval) throw new ConflictException("Approved journal lacks a matching approval record.");
+      if (!approval.waivedByPolicy && actorId === journal.approvedById) {
+        throw new ForbiddenException("The approver cannot also post the manual journal.");
+      }
       const { lines, total } = prepareManualJournal(journal.lines.map(l => ({
         accountId: l.accountId, side: l.side, amount: l.amount.toFixed(2),
       })));
