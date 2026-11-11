@@ -1,7 +1,12 @@
 //! Native, origin-pinned HTTP. No caller-supplied URL, cookie or bearer token.
+use crate::credentials::{
+    credential_key, school_code, CredentialStore, CredentialVault, OsCredentialStore,
+    SavedCredential,
+};
 use reqwest::{redirect::Policy, Client, Method, Url};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::sync::Arc;
 use std::{collections::BTreeMap, time::Duration};
 use tokio::sync::Mutex;
 
@@ -26,10 +31,13 @@ pub struct HttpResponse {
 struct Session {
     client: Client,
     bearer: Option<String>,
+    school: Option<String>,
+    saved_key: Option<String>,
 }
 
 pub struct DesktopHttp {
     origin: Url,
+    vault: CredentialVault,
     session: Mutex<Session>,
 }
 
@@ -131,6 +139,13 @@ fn scrub_tokens(value: &mut Value) {
 
 impl DesktopHttp {
     pub fn new(origin: &str, allow_loopback_http: bool) -> Result<Self, String> {
+        Self::with_store(origin, allow_loopback_http, Arc::new(OsCredentialStore))
+    }
+    pub fn with_store(
+        origin: &str,
+        allow_loopback_http: bool,
+        store: Arc<dyn CredentialStore>,
+    ) -> Result<Self, String> {
         let origin = Url::parse(origin).map_err(|_| "Configure a valid SchoolHub API origin.")?;
         let loopback = matches!(origin.host_str(), Some("localhost" | "127.0.0.1" | "[::1]"));
         if !origin.username().is_empty()
@@ -148,9 +163,12 @@ impl DesktopHttp {
         }
         Ok(Self {
             origin,
+            vault: CredentialVault::new(store),
             session: Mutex::new(Session {
                 client: client()?,
                 bearer: None,
+                school: None,
+                saved_key: None,
             }),
         })
     }
@@ -179,8 +197,14 @@ impl DesktopHttp {
         if pathname == "/api/auth/sign-in/email" {
             session.client = client()?;
             session.bearer = None;
+            session.saved_key = None;
         }
         let signing_out = pathname == "/api/auth/sign-out";
+        if signing_out {
+            if let Some(key) = &session.saved_key {
+                self.vault.remove(key)?;
+            }
+        }
         let mut request = session
             .client
             .request(method, url.clone())
@@ -188,18 +212,39 @@ impl DesktopHttp {
             .header("x-schoolhub-client-version", env!("CARGO_PKG_VERSION"));
         for (name, value) in input.headers {
             let name = name.to_ascii_lowercase();
-            if allowed_header(&name) {
+            if allowed_header(&name) && !(name == "x-school-subdomain" && session.school.is_some())
+            {
                 request = request.header(name, value);
             }
+        }
+        if let Some(school) = &session.school {
+            request = request.header("x-school-subdomain", school);
         }
         if let Some(token) = &session.bearer {
             request = request.bearer_auth(token);
         }
+        if signing_out {
+            request = request.timeout(Duration::from_secs(10));
+        }
         let sent = request.body(input.body).send().await;
-        // Local logout clears the cookie jar even if the network is unavailable.
+        // A completed local logout must also let the UI discard its private
+        // query/session caches when the server cannot be reached.
         if signing_out {
             session.client = client()?;
             session.bearer = None;
+            session.saved_key = None;
+            let confirmed = sent
+                .as_ref()
+                .is_ok_and(|response| response.status().is_success());
+            let mut headers = BTreeMap::from([("content-type".into(), "application/json".into())]);
+            if !confirmed {
+                headers.insert("x-schoolhub-local-logout".into(), "true".into());
+            }
+            return Ok(HttpResponse {
+                status: 200,
+                headers,
+                body: br#"{"success":true}"#.to_vec(),
+            });
         }
         let response =
             sent.map_err(|_| "Could not reach SchoolHub. Check the connection and retry.")?;
@@ -209,9 +254,23 @@ impl DesktopHttp {
             .and_then(|v| v.to_str().ok())
             .map(str::to_owned);
         let mut output = read_limited(response).await?;
-        if output.status == 401 {
+        let expired_session = pathname == "/api/auth/get-session"
+            && output.status == 200
+            && !serde_json::from_slice::<Value>(&output.body)
+                .ok()
+                .is_some_and(|value| {
+                    value.get("user").is_some_and(Value::is_object)
+                        && value.get("session").is_some_and(Value::is_object)
+                });
+        // A failed TOTP attempt is not a rejected authenticated session. Keep
+        // its short-lived cookie so the user can retry the same challenge.
+        if session.bearer.is_some() && (output.status == 401 || expired_session) {
             session.client = client()?;
             session.bearer = None;
+            if let Some(key) = &session.saved_key {
+                self.vault.remove(key)?;
+            }
+            session.saved_key = None;
         }
         if !signing_out && (200..300).contains(&output.status) {
             if let Some(token) = token {
@@ -265,6 +324,19 @@ impl DesktopHttp {
                             .unwrap(),
                     });
                 }
+                if let (Some(school), Some(address)) = (
+                    &session.school,
+                    identity
+                        .as_ref()
+                        .and_then(|v| v.pointer("/user/email"))
+                        .and_then(Value::as_str),
+                ) {
+                    session.saved_key = Some(credential_key(
+                        &self.origin.origin().ascii_serialization(),
+                        school,
+                        address,
+                    )?);
+                }
                 session.bearer = Some(token);
             }
         }
@@ -281,3 +353,5 @@ impl DesktopHttp {
 
 #[cfg(test)]
 mod tests;
+
+mod session;

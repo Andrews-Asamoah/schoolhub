@@ -1,4 +1,4 @@
-import { clearPrivateSessionPreferences } from "@/lib/private-session";
+import { clearPrivateSessionPreferences, hasPendingPrivateDrafts } from "@/lib/private-session";
 import { useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
@@ -19,6 +19,14 @@ export function useLogout() {
     setError(null);
 
     try {
+      if (import.meta.env.VITE_TARGET === "desktop") {
+        const { hasUnsavedMarks } = await import("./use-mark-draft");
+        if (hasUnsavedMarks() || hasPendingPrivateDrafts()) {
+          setError("Save or discard your pending marks in Assessments before signing out.");
+          setIsSigningOut(false);
+          return;
+        }
+      }
       const result = await signOut();
       if (result.error) {
         setError(result.error.message ?? "Could not sign out. Please try again.");

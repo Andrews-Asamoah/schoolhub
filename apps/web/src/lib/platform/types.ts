@@ -7,5 +7,8 @@ export interface Platform {
     fetchOptions?: { customFetchImpl: typeof fetch };
   };
   fetch: typeof fetch;
+  prepareSignIn?(school: string): Promise<void>;
+  rememberSession?(): Promise<void>;
+  savedSignInWarning?(): void;
   tenantSubdomain(): string | null;
 }

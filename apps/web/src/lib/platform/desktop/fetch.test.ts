@@ -83,3 +83,13 @@ describe("desktop native transport", () => {
     expect(args.request.body).toContain(255);
   });
 });
+
+it("reports local-only logout so the normal successful logout can clear private UI caches", async () => {
+  setup();
+  const dispatchEvent = vi.fn();
+  vi.stubGlobal("window", { dispatchEvent });
+  native.mockResolvedValue({ status: 200, headers: { "x-schoolhub-local-logout": "true" }, body: [123, 125] });
+  const response = await desktopFetch("/api/auth/sign-out", { method: "POST" });
+  expect(response.status).toBe(200);
+  expect(dispatchEvent).toHaveBeenCalledOnce();
+});

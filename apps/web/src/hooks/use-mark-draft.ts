@@ -3,6 +3,7 @@ import { useBlocker } from "@tanstack/react-router";
 import { useSession } from "@/lib/auth-client";
 
 const dirtyEditors = new Set<symbol>();
+export function hasUnsavedMarks() { return dirtyEditors.size > 0; }
 export function confirmLeavingDrafts() {
   return dirtyEditors.size === 0 || window.confirm("You have unsaved marks. Continue? Your draft will remain available in this tab for 24 hours.");
 }

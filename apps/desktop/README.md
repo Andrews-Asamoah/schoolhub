@@ -46,8 +46,11 @@ binary is a compile check, not a runnable deployment for a school.
 
 At launch, select the school code and sign in online. Rust handles the HTTP
 connection, bearer token and short-lived 2FA cookie jar. Redirects and
-SuperAdmin access are refused. Sessions live only in memory, so restarting
-requires signing in again. Real API and Windows runtime sign-in remain to be
+SuperAdmin access are refused. Sign-in can optionally be saved in Windows Credential Manager on a personal
+Windows account. At launch, enter the school and your email, then choose Use
+saved sign-in to validate it online. Forget saved sign-in removes only that
+account's saved credential. Passwords and challenge cookies are never saved.
+Other operating systems have no persistence backend in this increment. Real API and Windows runtime sign-in remain to be
 validated. The server now enforces persisted desktop session channels, plan/school desktop entitlements and a minimum client version. Apply the session-channel migration before deploying the new API; enable desktop access in the web SuperAdmin plan or subscription editor.
 Downloads/printing still use browser helpers and are not accepted native
 features yet. No installer or updater is produced.
@@ -69,7 +72,7 @@ node --test apps/desktop/spike/*.test.mjs
 The outbox experiment uses plain SQLite, synthetic data and a synthetic server
 model. Its 100 seeded child-process terminations test commit/retry boundaries;
 it does not prove encrypted-store or real API crash safety. Separate Rust tests
-cover native SQLCipher reopen, wrong-key handling and atomic outbox rollback,
+cover native saved-session isolation and revocation, Windows credential storage, SQLCipher reopen, wrong-key handling and atomic outbox rollback,
 plus native HTTP/cookie/header/token boundaries using a local fixture.
 
 To exercise the candidate serialized cursor, install `psql` and use a disposable

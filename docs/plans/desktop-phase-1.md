@@ -101,6 +101,52 @@ Transport tests run against a synthetic local HTTP fixture, not the live
 SchoolHub API. They prove the transport mechanisms but do not prove production
 Better Auth compatibility or Windows WebView behavior.
 
+## Saved sign-in increment — 11 November 2026
+
+The preceding source run 43022401747 has now passed all jobs, including the
+Windows native build. The new credential work below requires its own CI run.
+
+- Desktop sign-in offers an unchecked-by-default option to save this sign-in on
+  a personal Windows account. The UI explains the shared-account consequence.
+- Rust stores only the verified bearer credential and its scope metadata in
+  Windows Credential Manager. The entry name hashes the API origin, school and
+  email; the record also binds the verified server user ID. No password, TOTP
+  secret, challenge cookie, plaintext credential file or secret-returning IPC
+  command is introduced. Other operating systems explicitly lack this backend.
+- Restoring requires entering the school and email and explicitly choosing Use
+  saved sign-in. There is no automatic sign-in after launch. Rust validates the
+  current desktop identity and school entitlement online before activating it;
+  wrong identities, expired sessions and access revocations never activate.
+- Transient connection failures retain the stored credential for a later retry
+  but grant no session. Invalid or revoked credentials are removed. Old client
+  versions retain their record and display the existing update-required state.
+- Forget removes only the chosen API/school/account entry. Changing schools is
+  refused while an authenticated native session is active. Selected-school
+  headers are pinned in Rust rather than trusting an overriding webview header.
+- Logout removes the scoped saved credential and clears the in-memory token and
+  cookie jar. If the server is unreachable, a successful local logout lets the
+  existing UI clear its private caches and displays that remote sign-out could
+  not be confirmed. Failed credential deletion is not reported as successful.
+- A desktop-only logout check protects existing in-memory and restorable mark
+  drafts from being deleted by normal cache cleanup. Phase 2 must additionally
+  guard the real native outbox before logout/school removal is allowed.
+- A wrong TOTP code keeps the pending challenge cookie available for retry.
+  A null get-session response clears a previously authenticated native session.
+- Missing/locked credential storage produces visible failures or a save warning;
+  it never falls back to plaintext. Remembering cannot finish before password
+  changes, 2FA and licensed school access have been confirmed.
+
+Local evidence: 9 native non-listening tests passed, 18 Linux native tests
+compiled, and 75 frontend tests passed. The remaining HTTP fixture tests cannot
+run locally because this environment blocks listening sockets. Windows CI runs
+all native tests without exclusions, including a synthetic write/read/delete
+round trip through the real Windows Credential Manager. Its result is pending
+for this increment. Native IPC/build boundary checks and both frontend targets
+are also part of validation.
+
+This is online session restoration, not offline password unlock, an offline
+lease or an encrypted database key-custody implementation. Those remain Phase 2.
+
 ## Server CI evidence
 
 [Run 43022401747](https://github.com/Andrews-Asamoah/schoolhub/actions/runs/43022401747)
@@ -123,7 +169,7 @@ the verified session ID, not by assuming that bearer text is a raw DB token.
 | Server SuperAdmin exclusion | Implemented and verified by real PostgreSQL/authentication CI; deployment must apply migration |
 | Desktop entitlement | Implemented: plan checkbox, school override, tenant checks and refusal UI; deployment must apply migration and configure licenses |
 | Client version gate | Implemented: stable minimum policy, 426 API/auth responses and desktop update screen |
-| Credential persistence | OS-protected storage and restart/lock/account isolation; current sessions are in memory only |
+| Credential persistence | Opt-in Windows storage and online restore implemented; current native backend/runtime CI validation pending; offline unlock remains Phase 2 |
 | Downloads and printing | Native save-dialog/file handling and WebView2 print/PDF validation; browser download helpers remain in place |
 | Signed distribution | Signing owner/certificates, installer, gated download and authorized updater manifest |
 | Release checks | Windows 10+ runtime, performance, low-bandwidth behavior, dependency/security audits and remaining Phase 0 gates |
@@ -137,6 +183,7 @@ Do not distribute the current unsigned shell to schools or mark R1 complete.
    account on the real API.
 2. Review the new API/database CI checks and deploy the session-channel migration
    alongside the configured desktop entitlements and minimum client version.
-3. Add secure persistence, native file/print handling, About/update-required UI.
+3. Validate saved sign-in on real shared/personal Windows profiles; add native
+   file/print handling and About UI. Offline identity remains Phase 2.
 4. Implement gated installer/updater endpoints and sign pilot installers after
    the signing identity is provided; then complete all release acceptance gates.

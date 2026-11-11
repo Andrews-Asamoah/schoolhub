@@ -5,7 +5,7 @@ const capability = JSON.parse(readFileSync(new URL('../src-tauri/capabilities/ma
 assert.equal(config.build.frontendDist, '../../web/dist-desktop');
 assert.equal(config.bundle.active, false, 'The spike must not publish an installer');
 assert.equal(config.app.windows[0].devtools, false);
-assert.deepEqual(capability.permissions, ["allow-desktop-request"]);
+assert.deepEqual(capability.permissions, ["allow-desktop-request", "allow-desktop-select-school", "allow-desktop-remember-session", "allow-desktop-resume-session", "allow-desktop-forget-session"]);
 assert(!config.app.security.csp.includes('unsafe-eval'));
 assert(!config.app.security.csp.includes('https:'));
 console.log('Desktop configuration checks passed');

@@ -83,7 +83,7 @@ jobs:
           pnpm --filter @schoolhub/web build
           pnpm --filter @schoolhub/web test
           pnpm --filter @schoolhub/web build:desktop
-      - name: Test encrypted storage, wrong keys and atomic outbox
+      - name: Test SQLCipher, session lifecycle and Windows Credential Manager
         working-directory: apps/desktop/src-tauri
         run: cargo test --locked --lib
       - name: Build the native shell with the actual web assets

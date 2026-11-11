@@ -1,3 +1,4 @@
+import { selectDesktopSchool, rememberDesktopSession, savedSignInWarning } from "./session";
 import type { Platform } from "../types";
 import { resolveTenantSubdomain } from "../../tenant-subdomain-resolution";
 import { desktopFetch, DESKTOP_REQUEST_ORIGIN } from "./fetch";
@@ -13,6 +14,9 @@ export const platform: Platform = {
     fetchOptions: { customFetchImpl: desktopFetch },
   },
   fetch: desktopFetch,
+  prepareSignIn: selectDesktopSchool,
+  rememberSession: rememberDesktopSession,
+  savedSignInWarning,
   tenantSubdomain() {
     try {
       const code = window.sessionStorage.getItem(DESKTOP_SCHOOL_KEY);
