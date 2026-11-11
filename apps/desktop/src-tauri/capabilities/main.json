@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "main",
+  "description": "Feasibility shell: no privileged IPC permissions.",
+  "windows": ["main"],
+  "permissions": []
+}

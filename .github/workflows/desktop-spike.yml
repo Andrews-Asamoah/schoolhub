@@ -1,0 +1,84 @@
+name: Desktop feasibility spike
+
+on:
+  pull_request:
+    branches: [dev]
+    paths:
+      - 'apps/desktop/**'
+      - 'apps/web/**'
+      - 'packages/shared/**'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/desktop-spike.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: desktop-spike-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  protocol:
+    name: Synthetic outbox crash and retry
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: schoolhub_desktop_spike
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - run: node apps/desktop/spike/check-config.mjs
+      - run: node --test apps/desktop/spike/*.test.mjs
+      - name: Prove serialized cursor commit and rollback ordering
+        env:
+          DESKTOP_SPIKE_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/schoolhub_desktop_spike
+        run: python3 apps/desktop/spike/cursor-postgres.py
+
+  windows:
+    name: Windows SQLCipher and Tauri shell
+    runs-on: windows-2022
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 12.4.1
+          run_install: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install web build dependencies
+        run: pnpm install --frozen-lockfile --filter @schoolhub/web...
+      - name: Build shared package and existing web UI
+        run: |
+          pnpm --filter @schoolhub/shared build
+          pnpm --filter @schoolhub/web build
+      - name: Test encrypted storage, wrong keys and atomic outbox
+        working-directory: apps/desktop/src-tauri
+        run: cargo test --locked --lib
+      - name: Build the native shell with the actual web assets
+        working-directory: apps/desktop/src-tauri
+        run: cargo build --locked --release --features shell,custom-protocol
+      - name: Report executable size (not installer size)
+        shell: pwsh
+        run: |
+          $binary = Get-Item apps/desktop/src-tauri/target/release/schoolhub-desktop-spike.exe
+          "Native executable bytes: $($binary.Length)" >> $env:GITHUB_STEP_SUMMARY
+          "Unsigned feasibility binary only; installer, startup, RAM and runtime validation remain pending." >> $env:GITHUB_STEP_SUMMARY

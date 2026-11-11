@@ -1,0 +1,355 @@
+SchoolHub Desktop App: Offline-First Implementation Plan
+Draft for review · 9 November 2026 · Based on dev at b1faa81
+The desktop app is offline-first: it works fully with no internet, keeps its data in an encrypted local database, and pushes changes to the web when a connection exists. That makes sync the core of the product and raises the estimate from 7 to 9 weeks to about 23 to 27 weeks for one full-time developer, with a first signed online release around week 6.
+Your schools' connections are usually slow and only occasionally good, so the design treats slow as the normal case: every screen works from the local database, and sync is small, resumable and never blocks a teacher. Desktop access is sold per school and tied to the school's subscription, and superadmin pages never ship in the desktop app. I read purely offline as offline-first, with the server staying the system of record for every school and device.
+What the repo tells us
+The API already has most of the safety features sync needs, but not a change feed, device records or an offline identity. These facts were checked in the code on dev at b1faa81.
+• Auth. Better Auth with bearer() and twoFactor(). Tauri origins are allowed only outside production in origin-policy.ts. Requests with no Origin header are allowed but still pass auth, tenant and role guards.
+• Marks. The writer returns a 409 ConflictException when another user changed the marks, and the web keeps the draft. Sheets can be locked, submitted, past a deadline, or covered by a per-teacher extension.
+• Attendance. The batch endpoint already takes an idempotency-key header and rejects reuse for a different batch.
+• Finance. Manual journals use idempotency keys, and a FinanceIntegrityJob runs daily. Money has the strictest controls in the system.
+• Tombstones. Only 12 deletedAt columns exist, so most tables cannot tell a client that a row was removed.
+• Reusable logic. Grading, totals, ranking and the stanine boundary functions are pure TypeScript (assessment-entry.ts and packages/shared), so the desktop app can run the same code as the server.
+• Mobile precedent. apps/mobile stores the bearer token securely and has a logout tombstone, but does not support accounts that need a 2FA challenge, because the challenge cookie is not persisted.
+• Browser assumptions in apps/web. Tenant from window.location, localStorage for drafts and theme, anchor downloads, and window.print.
+Decisions
+The shell and web reuse choices from the earlier draft stand. Everything about data and identity changes.
+Decision
+Choice
+Why
+Revisit if
+Shell
+Tauri v2, bundling the apps/web build
+Small installers and low RAM suit school PCs and slow downloads. Tauri origins are already anticipated in the API.
+The spike finds a blocking WebView difference (print, 2FA cookie).
+Local database
+SQLite with SQLCipher, opened and keyed only from Rust
+Encryption at rest is mandatory for minors' data. One file per school and user.
+SQLCipher will not build on the Windows CI runner. Fallback: field-level encryption of sensitive columns.
+Query layer
+TypeScript (Kysely or similar) over a narrow Rust db command set
+Keeps product logic in TypeScript and key custody in Rust.
+n/a
+Offline reads and writes
+Local API facade: allow-listed routes answered from SQLite, same JSON shapes
+The web UI barely changes. Everything else stays online-only.
+The facade drifts from the real API. Contract tests are the control.
+Sync model
+Pull change feed plus push outbox of commands, built for slow links
+Domain is narrow and mostly single-writer, so no CRDTs. Server services stay the authority.
+An off-the-shelf sync engine measurably cuts weeks without moving authorization out of the API (time-boxed spike).
+Business rules
+Pure logic moved to packages/shared, used by server and desktop
+One implementation of grading, totals and deadlines.
+n/a
+Network from the app
+Rust-side HTTP, scoped to the API origin, bearer token
+No browser Origin, so no production CORS change.
+The spike shows streaming problems. Fallback: allow explicit desktop origins in production.
+Entitlement
+A desktop feature on the existing plan (SubscriptionPlan.features), with an optional per-school override
+Reuses billing and the tenant guard that already blocks inactive schools. A superadmin switches it on in the web portal.
+Sales needs per-device pricing or seat caps.
+Offline identity
+Signed offline lease, capped by the school's paid period, plus a local password verifier
+Offline sign-in with bounded trust, revocable at the next sync.
+Schools need longer offline periods than the lease allows.
+Late entries
+Accepted: a command captured before the deadline is applied however late it syncs
+Decided with you. Locks still apply.
+Disputes show the rule needs an administrator review step.
+Platforms
+Windows 10+ first, macOS next, Linux later
+Most likely school fleet. WebView2 does not run on older Windows.
+Pilot schools run older systems: the web app stays their fallback.
+Roles and superadmin
+School roles as on the web. Superadmin is never in the desktop app (not built in, refused at sign-in, rejected by the API)
+Smallest attack surface. Platform control stays on the web.
+n/a
+What works offline
+Attendance and marks entry are the offline v1, because they are the daily jobs that suffer most from poor connectivity and they write to rows that already exist. Anything that needs a server-assigned number, money or a publish step stays online.
+Area
+Offline in v1
+Rule
+Class rosters, subjects, assessment setup
+Read
+Replicated from the server, scoped to the user's role and assignments. A teacher gets only assigned classes.
+Attendance registers
+Read and write
+Queued as one command per class and day with an idempotency key. Rejected if the register is locked.
+Marks entry, absent or excused, submit
+Read and write
+Grades, totals and ranks computed locally with the shared code and marked provisional until synced.
+Grade boundaries and scales
+Read
+Set online by an administrator, arrive on the next pull.
+Report cards and receipts
+View and print what was already downloaded
+Encrypted cache of published PDFs. Generating or publishing needs the server.
+Student directory
+Read
+Staff see a school-wide list only if their role allows it online.
+Fees, ledgers
+Read-only snapshot, labelled as of the last sync
+Recording payments offline is a separate, later phase with finance sign-off.
+Creating students, admissions, users, roles, subscriptions, report publication
+Online only
+They need server-assigned numbers or approvals. The screen shows a clear needs internet state.
+Offline writes in v1 touch only rows that already exist or have a natural key (student and date, student and assessment component). That avoids client-generated ids, duplicate admission numbers and ordering problems between dependent creates.
+Superadmin pages (schools, plans, subscriptions, platform users, audit, support) are not in the desktop app at all. See Licensing and provisioning.
+Architecture
+Offline screens use the same HTTP-shaped calls as online ones, answered from a local database. A sync engine moves changes in the background.
+Webview (apps/web built with VITE_TARGET=desktop)
+  UI + TanStack Query -> apiFetch -> lib/platform.fetch
+      route on the offline allow-list?
+        yes -> Local API facade (TypeScript)
+                 |- shared domain code (grading, totals, deadlines)
+                 '- query layer -> Rust db commands -> SQLCipher file
+        no, and online -> Rust HTTP (scoped, bearer token) -> apps/api
+        no, and offline -> needs-internet state
+
+Sync engine (TypeScript, runs while the app is open)
+  outbox  --push-->  POST /sync/push
+  cursor  <--pull--  GET  /sync/pull
+  status: Offline | Syncing | Synced 2 min ago | N pending | N need attention
+Local database
+• SQLCipher through rusqlite, WAL mode, one connection owned by Rust. The webview never opens the file; it calls three commands: db_query, db_exec, db_transaction.
+• A random 256-bit key per database, held in the OS credential store (Windows Credential Manager, macOS Keychain, Secret Service).
+• One file per school and user under the OS user's app data folder, so staff sharing a PC cannot read each other's data.
+• Tables: replicated mirrors with a serverVersion column, outbox, sync_state (cursor, device id, lease), needs_attention, and an encrypted file cache.
+• Forward-only numbered migrations, each in a transaction after an automatic backup. The app refuses to open a database newer than itself.
+• Scale is small: a school is thousands of students and roughly 10^5 mark cells, well within SQLite.
+Local API facade
+• A route manifest maps method and path pattern to a handler. Unlisted routes go to the server when online and show a needs-internet state when offline, through one shared hook.
+• Handlers return the same JSON as the API, validated by the same Zod schemas in packages/shared. Contract tests run identical fixtures against the real API and the facade, which is the control against drift.
+• Local authorization is a convenience only. The server re-checks every pushed command.
+Shared domain code
+Any rule that decides a number or a lock moves from apps/api into packages/shared, with its tests: totals and ranking in assessment-entry.ts (the stanine boundary functions are already shared), effectiveDeadline, and attendance summaries. The server and the desktop then run one implementation. Derived values the desktop computes are marked provisional until the next pull replaces them with the server's.
+Platform seam
+Browser assumptions in apps/web (tenant from window.location, localStorage, anchor downloads, window.print) move behind lib/platform, which has a web and a desktop implementation chosen at build time. No @tauri-apps/* import is allowed outside lib/platform/desktop/ (an ESLint rule enforces it), and the web build must stay behaviour-neutral, proven by the existing tests and a bundle check.
+Sync protocol
+The desktop pulls changes it is allowed to see and pushes commands it recorded offline. The server applies commands by calling the existing domain services, so validation, authorization, locks and audit stay in one place.
+1. Register a device. After an online sign-in the app calls POST /sync/devices and gets a device id. An administrator can revoke a device, and the server then rejects its pushes.
+2. Pull. GET /sync/pull?cursor=… returns changes (upsert or delete, with a version) limited to the user's scope, plus a new cursor and the server time. The first sync, or a cursor older than the retention window, downloads a paged snapshot instead.
+3. Record offline. Every offline write updates the local rows and appends a command to the outbox in one transaction: a UUIDv7 opId, a per-device sequence number, the command type, a payload, the version it was based on, and capturedAt.
+4. Push. POST /sync/push sends commands in order. Each command is applied in its own transaction, so one failure never blocks the rest. The result per command is applied, duplicate, conflict (with the current server state) or rejected (with a code and message).
+5. Settle. Applied and duplicate commands leave the outbox. Conflicts and rejections move to a Needs attention list. Nothing is ever dropped silently.
+Design rules:
+• Idempotent. A sync_operation ledger keyed by device and opId stores each result, so a retry after a dropped connection returns the same answer and never applies twice. Attendance already supports this pattern.
+• Commit-safe cursor. A plain auto-increment can expose a later row before an earlier uncommitted one and make clients skip changes. The change log is written in the same transaction as the domain write, and the feed only exposes rows older than the oldest open transaction. A concurrency test must prove it.
+• Commands, not row diffs. The desktop sends intent (record these marks, submit this sheet) rather than table rows, so server rules apply as they do online.
+• Server-side scoping. The pull filters by role and assignments. A teacher never receives classes they do not teach.
+• Triggers. Sync runs at launch, on reconnect, every minute or so with jittered back-off, on Sync now, and when the app closes if there is something to send. Connectivity is decided by a lightweight health request, not navigator.onLine.
+• Versioned protocol. Commands carry a protocol version and the server converts older ones, for at least as long as the longest offline lease, so a laptop that was offline for weeks can still push after the API has been updated.
+Slow connections
+Because your schools' links are usually slow, these rules are part of the protocol, not tuning for later.
+• Small on the wire. Commands carry only the changed cells, pull responses carry only changed fields, and every sync response is compressed (gzip or Brotli). Proposed starting targets, to confirm in Phase 0: a class register under 5 KB and a 40-pupil, 6-component marks sheet under 20 KB uncompressed.
+• Resumable. Pull is paged and the cursor is saved after each page, so a dropped connection resumes where it stopped. The first snapshot can pause and resume. Push returns a result per command, so only unconfirmed commands are resent.
+• Never blocks the screen. Every read and write is local. Sync runs in the background with a visible status, and a teacher can pause it.
+• Pushes first. Unsent work goes before downloads. Large optional downloads, such as cached report PDFs, wait until the essentials are synced and can be cancelled.
+• Patient and polite. Timeouts and back-off adapt to measured throughput, with one connection at a time and no fast polling. Configuration such as grading scales uses ETags, so unchanged data costs a few bytes.
+• Tested on a bad link. Phase 0 and the hardening phase run every sync scenario on a throttled profile, for example 64 kbps, 1 second latency and 10% packet loss.
+• Installing and updating. The updater downloads a full installer package (size to be measured in Phase 0), so schools can also install an update from an installer file copied by USB. An installer with the WebView2 runtime included avoids a second download on first install.
+Conflicts, deadlines and clocks
+The server decides every outcome, and the desktop never overwrites someone else's data silently. A command that cannot be applied goes to Needs attention with the reason and the current server value, and the teacher resolves it on screen.
+Entity and command
+Normal case
+Conflict or rejection rule
+Marks, one cell (student and component)
+Applied if the server value still matches the version the teacher saw
+Mismatch returns the existing 409 behaviour. The teacher keeps their draft, sees the other value, and chooses.
+Marks, sheet submit
+Applied if all required cells are complete
+Rejected if the sheet is locked or already submitted. A locked sheet uses the existing reviewed-correction workflow.
+Attendance, register for a class and day
+Applied once, idempotent
+Rejected if the register is locked. If the register changed on the server, the teacher reviews per pupil.
+Absent or excused flags
+Applied with the marks command
+Same rules as marks.
+Derived values (totals, ranks, grades)
+Never pushed
+Recomputed by the server, and the next pull replaces the provisional local values.
+Late arrivals are accepted. A command captured before the effective deadline (including any per-teacher extension) is applied however late it syncs, and the audit record notes that it arrived late. To prevent back-dating, the app derives capture time from the last server time it saw plus a monotonic counter, so changing the PC clock does not reopen a closed sheet, and the server rejects a command whose capturedAt is earlier than that device's previous sync. A lock or an earlier submission still wins: a deadline rule never overrides them.
+Clocks. Client time is never an authority for ordering. The app records the server time at each sync, tracks the offset with a monotonic counter, and flags a device whose clock jumps backwards or far ahead. Ordering comes from the per-device sequence number and server-assigned versions. Attendance dates are the school's calendar day, not a timestamp.
+Identity, security and data-loss protection
+A laptop that can be offline for weeks holds students' data and may be shared, lost or stolen. The design trusts the device only for a bounded time and protects unsent work.
+Offline identity
+• First sign-in is online, including any 2FA challenge. The HTTP plugin keeps the short-lived challenge cookie in memory, which is a Phase 0 test item. If it fails, the API issues a bearer-friendly challenge token instead.
+• Offline lease. The server returns a signed lease (user, school, roles, scope hash, expiry) verified in the app with an embedded public key, so editing local files cannot extend it. Every successful sync renews it. The lease is the shorter of 30 days and the end of the school's paid subscription period.
+• Offline unlock uses the account password, checked against a local Argon2id verifier set during the online sign-in, plus the device-bound database key in the OS credential store. TOTP is not checked offline because the secret stays on the server.
+• After the lease expires the app becomes read-only for existing data, allows Sync now and backup export, and blocks new edits until the user signs in online.
+• Revocation (a removed teacher, a changed role, a lost device) takes effect at the next sync: the server rejects pushes from that user or device, and the app wipes its local database when it learns of it. The lease length is therefore the exposure window.
+Security controls
+• Capabilities follow least privilege: no shell plugin, opener limited to https:, HTTP scope pinned to the API origin, file access limited to user-chosen paths and the downloads folder.
+• A strict Content-Security-Policy with connect-src limited to the API origin, no remote scripts and no unsafe-eval. Remote pages are never loaded into a window with IPC access.
+• Devtools off in release builds, no shipped source maps, and pnpm audit, cargo audit and cargo deny in CI.
+• No personal data in logs, diagnostics or crash reports. Every applied command is audited with its device id and capturedAt.
+• The staff-only BECE rule is enforced in the facade and the sync scope, and has its own automated test, not only hidden navigation.
+Protecting unsent work
+• Lock, don't sign out. The default action locks the app. Signing out or removing a school from this computer is blocked while commands are pending, unless the user exports a backup and confirms.
+• Always-visible sync status with a pending count. Closing the app with pending changes offers to sync first, and warns after a set number of days without a sync.
+• Encrypted backup export. One file holding the outbox and the data needed to re-send it, encrypted with a passphrase the user chooses. It can be imported on another install of the same account, so a dead laptop does not mean lost marks.
+• Crash safety. WAL mode with durable writes. The outbox is written in the same transaction as the data it describes, so a power cut cannot leave data without its command.
+• Shared PCs. One database per user, an idle lock, and a short data-handling note for schools explaining what is stored on the machine.
+Licensing and provisioning
+Desktop access is sold per school, so entitlement is enforced by the server, never by the installer.
+• Entitlement. A desktop flag in the plan's existing features data (SubscriptionPlan.features), with an optional per-school override in Subscription.settings. A superadmin switches it on in the existing Plans and Subscriptions pages on the web. There is no new billing mechanism.
+• Server enforcement. Device registration, pull, push and lease renewal check the flag and the subscription through the same tenant guard that already blocks inactive schools. A school without the entitlement gets a clear message that desktop access is not enabled.
+• Accounts. The superadmin creates the school and its owner and admin accounts on the web, as today. The desktop app has no sign-up and no school-creation screen. A new account's forced password change happens at its first sign-in, which is online.
+• Superadmin is excluded in three layers. (1) Build: the /admin/* routes, the superadmin components and the public /apply route are left out of the desktop build, not just hidden. (2) Sign-in: a superAdmin account is refused on the desktop with a message to use the web portal. (3) API: sessions created by the desktop app are marked as such, and the super-admin module rejects them. Each layer has an automated test, plus a bundle check that no superadmin code is present.
+• If a subscription lapses. The lease cannot renew, so after it expires the app becomes read-only. Commands already recorded still need to reach the server, so the push endpoint stays open for a grace period using the existing allow-inactive escape hatch, and backup export always works. The length of that grace period needs your decision.
+• Device seats. Optional: a per-plan device limit, with an administrator screen to see and revoke devices.
+• Downloads and updates. The installer link appears in the web portal only for entitled schools and uses a short-lived signed URL. The updater checks a manifest served by the API, so schools without the entitlement receive no updates. Confirm in the spike that the updater can send an authorization header.
+Phases and releases
+Three releases ship along the way, so schools get value early and the signing, updater and support machinery are proven before offline data is at stake. Estimates assume one full-time developer comfortable in TypeScript and willing to learn Rust. A second developer on the API sync module could save 4 to 6 weeks.
+Phase
+Weeks
+Done by week
+Scope
+Exit criteria
+0. Feasibility spike
+2
+2
+Tauri shell loads the web build. Sign-in including 2FA over Rust HTTP. SQLCipher builds on the Windows CI runner. Vertical slice: one class's attendance entered offline, queued, pushed with idempotency and pulled back. Prototype of the commit-safe cursor. A time-boxed look at one off-the-shelf sync engine. PDF save and print. Measurements on a low-end Windows 10 PC and on a throttled network profile.
+Go or no-go. Cold start under 3 s, idle memory under 250 MB, installer under 20 MB. The slice survives 100 randomized kill-and-retry runs with no lost or duplicated records, including on the throttled link.
+1. Online desktop foundation and licensing
+4
+6
+Platform seam and desktop build. School-code screen, bearer sign-in, role switching. Strict CSP and capabilities. Client-version gate (426). The desktop plan feature, tenant-guard check and superadmin switch on the web. Superadmin exclusion in all three layers. Gated installer download and update manifest. Signed installer, updater, CI.
+Release R1: signed online desktop app for entitled schools only, with the same school-role permissions as the web, in the hands of pilot schools.
+2. Sync platform
+6
+12
+API sync module: devices, change log, tombstones, pull, push, operation ledger, lease signing. Local database layer and migrations. Outbox, sync engine tuned for slow links, status bar, Needs attention screen. Offline unlock. Backup export. Contract-test harness. Shared domain code extracted.
+Role-scoped replication of rosters and assessment setup. Round-trip, retry, revocation and lapsed-subscription tests pass against real PostgreSQL.
+3. Offline attendance
+3
+15
+Attendance read and write through the facade, locked-register handling, per-pupil conflict review.
+Release R2: a class register taken fully offline and synced with no duplicates.
+4. Offline marks
+4
+19
+Marks entry, absent or excused, submit, local grading with provisional values, late-arrival rule, conflict screen.
+Release R3: a full term-end marks flow works offline, including a sheet that arrives after an administrator changed it online.
+5. Hardening
+3
+22
+Chaos and property tests on throttled links, security review, low-end performance, sync endpoint load test, data-handling note, support runbook.
+No open high-severity findings. Every Needs-attention reason is understandable to a teacher.
+6. Pilot and v1.0
+3
+25
+Two to three schools on slow connections for at least two weeks. Fixes from the pilot.
+Two weeks with no lost or duplicated marks or attendance, and the update path proven end to end.
+The realistic range is 23 to 27 weeks. Not in v1: recording payments offline (needs device-scoped provisional receipt numbers, server-assigned final numbers and finance sign-off), creating students offline, deep links and Linux packages.
+Testing, CI/CD and distribution
+Sync bugs lose data quietly, so testing weight moves from the screens to the protocol.
+Testing
+• Protocol tests on real PostgreSQL: duplicate pushes, out-of-order retries, a push cut off mid-batch, conflicts, locked sheets, revoked devices, expired leases, and the cursor under concurrent transactions.
+• Property and chaos tests: random sequences of offline edits, kills, network flaps and clock jumps across two or three simulated devices, asserting that the final server state equals the expected state and nothing is applied twice.
+• Contract tests: the same fixtures against the real API and the local facade, so the two cannot drift.
+• Migration tests: every local database version upgrades to the latest, and an old pending outbox still pushes after an API update.
+• Required checks: staff-only BECE rules, role and tenant headers, lock-not-sign-out with pending commands, and the update-required screen.
+• End to end: extend the existing Playwright scripts against the desktop web build, plus a thin tauri-driver smoke test on Windows (install, launch, sign in, save a file). macOS has no WebDriver for its web view, so it relies on a manual release checklist.
+CI/CD
+• Each pull request: pnpm typecheck, web and API tests, cargo fmt --check, cargo clippy -D warnings, cargo test, dependency audits, and a check that the web build contains no Tauri code.
+• Releases: tags desktop-vX.Y.Z run tauri-apps/tauri-action on Windows and macOS runners, sign the installers, and publish a draft release plus the updater manifest for manual approval.
+• Updater: tauri-plugin-updater with minisign-signed artifacts, stable and beta channels, and the previous two releases kept available for rollback.
+• Compatibility gate: the app sends its version, and the API answers 426 Upgrade Required below a configured minimum. Sync protocol versions stay supported for at least the lease length (see the sync protocol).
+Distribution
+• Per-user NSIS installer by default, so staff without admin rights can install it. An MSI for school IT, and an installer variant with the WebView2 runtime included for schools with poor connectivity (a much larger download).
+• Code signing avoids SmartScreen warnings and affects adoption. Confirm which Windows signing options your legal entity and country can use, and start verification in Phase 1, because it can take weeks. macOS needs an Apple Developer account.
+• Release files and manifests on GitHub Releases or R2, linked from a Download page in the web app. An About screen shows the version and a copy-diagnostics button with no personal data.
+• When it ships, update ARCHITECTURE.md (diagram and the apps/desktop section) and the notes on production origins.
+Risks
+The first four risks can lose or corrupt school records, so they get the earliest tests and the most review.
+Risk
+Impact
+Mitigation
+Sync loses, duplicates or reorders changes
+Lost marks or attendance, hard to detect
+Idempotent ledger, commit-safe cursor, chaos tests from Phase 0, Needs attention instead of silent drops
+Two devices or an online admin change the same data
+Wrong marks overwrite right ones
+Version-checked commands, visible conflict review, no automatic overwrite
+Slow or dropping links stall sync or time out
+Teachers think marks are saved when they are not, or sync never finishes
+Small compressed commands, resumable paged pull, per-command results, throttled-link tests, always-visible pending count
+Subscription lapses while changes are unsent
+A school loses marks over a late payment
+Push stays open for a grace period, backup export always works, read-only rather than locked out
+Laptop dies or is stolen before syncing
+Lost work, or exposed student data
+Frequent-sync prompts, encrypted backup export, SQLCipher, lease expiry, remote wipe at the next sync
+Local data drifts from the server (rules, schema, protocol)
+Offline results differ from online ones
+Shared domain code, contract tests, versioned protocol supported for the lease length
+Late entries are abused by changing the PC clock
+Closed sheets reopened
+Capture time from last server time plus a monotonic counter, server rejects a time before the device's previous sync, audit flags late arrivals
+Revoked staff keep working offline
+Unauthorized access to cached data
+Bounded lease, per-user encrypted databases, server rejects their pushes
+Superadmin code or access reaches the desktop
+Platform control exposed on school PCs
+Three-layer exclusion with a test and bundle check for each
+Unlicensed copies of the installer
+Lost revenue
+Entitlement checked by the server on every sync and update, installer link gated in the web portal
+2FA challenge cookie fails over Rust HTTP
+2FA accounts cannot sign in
+Phase 0 test, fallback bearer-friendly challenge token on the API
+SQLCipher will not build or perform on school PCs
+Encryption or startup problems
+Phase 0 CI build and low-end measurement, fallback field-level encryption
+Old school PCs cannot run WebView2
+Part of the fleet excluded
+State a minimum OS, keep the web app as the fallback
+Signing delays or cost
+SmartScreen warnings, low trust
+Start verification in Phase 1
+Scope creep into offline payments or student creation
+Schedule blows up
+Both are outside v1 and need their own design review
+One developer carries Rust, sync and API
+Slow, single point of failure
+Second developer on the API sync module, or accept the upper end of the range
+Changes outside apps/desktop
+The API and database take most of the new work, so these changes are listed in full for review before Phase 2 starts.
+apps/api (new sync module)
+• Endpoints: POST /sync/devices, device revoke, GET /sync/pull, POST /sync/push, lease issue and renewal. Add all of them to docs/architecture/route-inventory.json with their allowed roles.
+• Command handlers that call the existing marks and attendance services, so locks, deadlines, conflict checks and audit stay in one place.
+• Pull scoping from role and assignments, including the staff-only BECE rule.
+• Lease signing key (EdDSA) in secrets, with a rotation procedure.
+• Client-version check returning 426, with a configurable minimum.
+• Only if the spike requires it: explicit production desktop origins in origin-policy.ts, or a bearer-friendly 2FA challenge token.
+• Entitlement and licensing: the desktop plan feature, a check in the tenant guard for device, pull, push and lease endpoints, push allowed during a lapsed-subscription grace period, and gated installer and updater-manifest endpoints.
+• Superadmin exclusion: sessions created by the desktop app are marked as such, and the super-admin module rejects them. A superAdmin sign-in from the desktop is refused.
+Database (new Prisma migrations)
+• sync_device, sync_operation (unique on device and opId, stores each result), and sync_change (the change log, written in the same transaction as the domain write).
+• deletedAt tombstones on every replicated table that lacks one, with queries updated to respect them. Only 12 columns exist today.
+• Audit fields for deviceId and capturedAt on applied commands.
+• Retention and compaction rules for the change log, and the snapshot path for clients behind the retention window.
+packages/shared
+• Domain code moved from the API: totals, ranking, stanine boundaries, effectiveDeadline, attendance summaries, with their tests.
+• Zod schemas for sync commands and results, and the route-contract fixtures used by both the API and facade tests.
+• The client-version header constant.
+apps/web
+• src/lib/platform/ (web and desktop implementations), the build:desktop target, and edits to api.ts, tenant-subdomain.ts, auth-client.ts, download.ts and print call sites, with no behaviour change on the web.
+• Desktop-only screens: school code, sync status and Needs attention, update-required, backup export and import, About.
+• Web-only superadmin work: a desktop toggle in the existing Plans and Subscriptions pages, and a per-school device list with revoke.
+Repo and CI
+• apps/desktop in the Turbo graph, new GitHub Actions workflows, updated ARCHITECTURE.md, and docs/plans/desktop-phase-N.md records matching the mobile plan's format.
+Decisions I need from you
+You have answered three questions and the plan above reflects them: connections are usually slow and only occasionally good, so the full offline plan stands; late entries are accepted; and desktop access is sold per school, with superadmin staying on the web. These are still open:
+1. Offline window. I tied the lease to licensing: the shorter of 30 days and the paid period. Is 30 days right for how long a school may work between syncs?
+2. After a subscription lapses. How long should unsent changes still be accepted, for example 30 days, so a late payment never costs a school its marks?
+3. Device seats. Should each school get a device limit tied to the plan, or unlimited devices once it has paid?
+4. Who creates staff. Teachers and other staff are created by the owner or admin. On the web only, or also on the desktop when online?
+5. Machines. Which Windows versions do your schools run, and is macOS needed at v1?
+6. Distribution and signing. Who installs the app, and which legal entity will hold the code-signing certificates?
+7. Crash reports. Acceptable with all personal data scrubbed, or must the app send nothing?
+8. Staffing. One developer, or can a second take the API sync module?
+Once you answer, I can turn Phase 0 into a concrete task list and start on the spike scaffold in the repo.
