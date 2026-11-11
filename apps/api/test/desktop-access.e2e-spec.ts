@@ -79,9 +79,10 @@ describe.skipIf(!database)("desktop session and entitlement (real database)", ()
     expect(response.status).toBe(200);
     token = response.headers.get("set-auth-token")!;
     expect(token).toBeTruthy();
-    const stored = await prisma.session.findUnique({ where: { token } });
+    const identity = await session();
+    const stored = await prisma.session.findUnique({ where: { id: identity.session.id } });
     expect(stored.clientPlatform).toBe("desktop");
-    expect((await session()).session.clientPlatform).toBe("desktop");
+    expect(identity.session.clientPlatform).toBe("desktop");
   });
 
   it("checks plan changes and school overrides on the persisted desktop session", async () => {
@@ -100,7 +101,8 @@ describe.skipIf(!database)("desktop session and entitlement (real database)", ()
     expect((await call("/sign-in/email", { email, password }, true, "0.0.1")).status).toBe(426);
     const web = await call("/sign-in/email", { email, password }, false);
     expect(web.status).toBe(200);
-    const stored = await prisma.session.findUnique({ where: { token: web.headers.get("set-auth-token") } });
+    const identity = await session(web.headers.get("set-auth-token")!);
+    const stored = await prisma.session.findUnique({ where: { id: identity.session.id } });
     expect(stored.clientPlatform).toBe("web");
   });
 
