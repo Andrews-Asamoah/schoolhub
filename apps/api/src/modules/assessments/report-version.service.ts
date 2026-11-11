@@ -4,11 +4,9 @@ import {
 } from "@nestjs/common";
 import { PrismaService } from "../../prisma/prisma.service.js";
 import { TeacherScopeService } from "../../common/scope/teacher-scope.service.js";
-import { PrivateStorageService } from "../storage/private-storage.service.js";
-import { sniffImage } from "../storage/image-validation.js";
+import { ReportAssetsService } from "./report-assets.service.js";
 import { academicReportPdf, snapshotHash, type AcademicSnapshot } from "./report-version.js";
 
-const MAX_SIGNATURE_BYTES = 400 * 1024;
 /** Upper bound for one bulk sign-off; each row is its own transaction. */
 export const MAX_BULK_RECOMMENDATIONS = 100;
 
@@ -16,25 +14,7 @@ export const MAX_BULK_RECOMMENDATIONS = 100;
 export class ReportVersionService {
   constructor(private readonly prisma: PrismaService,
     private readonly teacherScope: TeacherScopeService,
-    private readonly storage: PrivateStorageService) {}
-
-  /**
-   * The approver's signature image as a data URL, copied onto the report at the
-   * moment they approve so the report never changes if they later replace it.
-   * Null when they have none, it is too large to embed, or it can't be read:
-   * the report then shows their name only.
-   */
-  private async signatureFor(schoolId: string, userId: string): Promise<string | null> {
-    try {
-      const profile = await this.prisma.client.userProfile.findUnique({ where: { userId }, select: { signatureStorageKey: true } });
-      if (!profile?.signatureStorageKey) return null;
-      const bytes = await this.storage.read(schoolId, profile.signatureStorageKey, MAX_SIGNATURE_BYTES);
-      const image = sniffImage(bytes);
-      return image ? `data:${image.mime};base64,${bytes.toString("base64")}` : null;
-    } catch {
-      return null;
-    }
-  }
+    private readonly assets: ReportAssetsService) {}
 
   async teacherQueue(schoolId: string, userId: string) {
     const assignments = await this.teacherScope.getAssignments(schoolId, userId);
@@ -151,7 +131,7 @@ export class ReportVersionService {
       where: { id: userId }, select: { id: true, name: true },
     });
     if (!actor) throw new ForbiddenException("The approving staff account is not available.");
-    const signature = await this.signatureFor(schoolId, userId);
+    const signature = await this.assets.signatureFor(schoolId, userId);
     return this.prisma.client.$transaction(async tx => {
       const v = await tx.reportCardVersion.findFirst({
         where: { id: versionId, schoolId }, include: { set: { select: { status: true, schoolId: true } } },
@@ -191,7 +171,7 @@ export class ReportVersionService {
       where: { id: userId }, select: { id: true, name: true },
     });
     if (!actor) throw new ForbiddenException("The headteacher account is not available.");
-    const signature = await this.signatureFor(schoolId, userId);
+    const signature = await this.assets.signatureFor(schoolId, userId);
     return this.prisma.client.$transaction(async tx => {
       const v = await tx.reportCardVersion.findFirst({
         where: { id: versionId, schoolId }, include: { set: { select: { status: true } } },
@@ -261,6 +241,13 @@ export class ReportVersionService {
     if (!version.teacherApprovedAt || !version.headApprovedAt || !version.teacherName || !version.headName) {
       throw new ConflictException("Both report approvals are required for PDF delivery.");
     }
+    // Approval signatures fall back to the approver's current one when none was captured, and the
+    // pupil's photo and the school's letterhead are read now, so the printed copy is never bare.
+    const [signatures, photo, letterhead] = await Promise.all([
+      this.assets.approvalSignatures(schoolId, version),
+      this.assets.studentPhoto(schoolId, report.studentId),
+      this.assets.letterhead(schoolId),
+    ]);
     return {
       filename: "academic-report-v" + version.version + ".pdf",
       pdf: academicReportPdf(version.snapshot as unknown as AcademicSnapshot, {
@@ -269,8 +256,8 @@ export class ReportVersionService {
         teacherApprovedAt: version.teacherApprovedAt,
         headName: version.headName, headRemark: version.headRemark,
         headApprovedAt: version.headApprovedAt, publishedAt: version.publishedAt,
-        teacherSignature: version.teacherSignature, headSignature: version.headSignature,
-      }),
+        teacherSignature: signatures.teacher, headSignature: signatures.head,
+      }, { letterhead, photo }),
     };
   }
 }

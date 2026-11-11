@@ -4,10 +4,11 @@ import { PrismaService } from "../../prisma/prisma.service.js";
 import type { CreateReportSetInput } from "@schoolhub/shared";
 import { coveredClasses, REPORTABLE_SCORE_STATUSES } from "./assessment-entry.js";
 import { snapshotHash } from "./report-version.js";
+import { ReportAssetsService } from "./report-assets.service.js";
 import { buildSubjectRow, buildSummary, overallPositions, summariseAttendance } from "./report-card-data.js";
 
-const APPROVAL_FIELDS = { teacherName: true, teacherRemark: true, teacherSignature: true, headName: true, headRemark: true, headSignature: true } as const;
-type ApprovalVersion = { setId: string; teacherName: string | null; teacherRemark: string | null; teacherSignature: string | null; headName: string | null; headRemark: string | null; headSignature: string | null };
+const APPROVAL_FIELDS = { teacherActorId: true, teacherName: true, teacherRemark: true, teacherSignature: true, headActorId: true, headName: true, headRemark: true, headSignature: true } as const;
+type ApprovalVersion = { setId: string; teacherActorId: string | null; headActorId: string | null; teacherName: string | null; teacherRemark: string | null; teacherSignature: string | null; headName: string | null; headRemark: string | null; headSignature: string | null };
 
 /** The newest published version per key; rows must already be ordered newest first. */
 function latestBySet<T extends { setId: string }>(rows: T[]): Map<string, T> {
@@ -17,17 +18,17 @@ function latestBySet<T extends { setId: string }>(rows: T[]): Map<string, T> {
 }
 
 /** The class teacher's and headteacher's remarks and signatures, as families see them. */
-function approvalOf(version: ApprovalVersion | undefined) {
+function approvalOf(version: ApprovalVersion | undefined, signatures?: { teacher: string | null; head: string | null }) {
   if (!version) return null;
   return {
-    teacher: { name: version.teacherName, remark: version.teacherRemark, signature: version.teacherSignature },
-    head: { name: version.headName, remark: version.headRemark, signature: version.headSignature },
+    teacher: { name: version.teacherName, remark: version.teacherRemark, signature: signatures ? signatures.teacher : version.teacherSignature },
+    head: { name: version.headName, remark: version.headRemark, signature: signatures ? signatures.head : version.headSignature },
   };
 }
 
 @Injectable()
 export class ReportPublicationService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService, private readonly assets: ReportAssetsService) {}
 
   async getWorkspace(schoolId: string) {
     const db = this.prisma.client;
@@ -83,7 +84,7 @@ export class ReportPublicationService {
     const reports = await this.prisma.client.reportCard.findMany({
       where: { studentId: student.id, publishedAt: { not: null }, set: { schoolId, status: "PUBLISHED" } },
       orderBy: { publishedAt: "desc" },
-      select: { id: true, setId: true, studentId: true, data: true, publishedAt: true, student: { select: { admissionNumber: true, profile: { select: { firstName: true, lastName: true } } } }, set: { select: { name: true, academicYear: { select: { name: true } }, term: { select: { name: true, termNumber: true } }, template: { select: { name: true, layout: true } }, school: { select: { name: true, code: true, email: true, phone: true, address: true, logo: true, motto: true, website: true, primaryColor: true, secondaryColor: true } } } } },
+      select: { id: true, setId: true, studentId: true, data: true, publishedAt: true, student: { select: { admissionNumber: true, profile: { select: { firstName: true, lastName: true, user: { select: { image: true } } } } } }, set: { select: { name: true, academicYear: { select: { name: true } }, term: { select: { name: true, termNumber: true } }, template: { select: { name: true, layout: true } }, school: { select: { name: true, code: true, email: true, phone: true, address: true, logo: true, motto: true, website: true, primaryColor: true, secondaryColor: true } } } } },
     });
     const published = await this.prisma.client.reportCardVersion.findMany({
       where: { schoolId, studentId: student.id, stage: "PUBLISHED", publishedAt: { not: null } },
@@ -91,7 +92,13 @@ export class ReportPublicationService {
       select: { setId: true, ...APPROVAL_FIELDS },
     });
     const bySet = latestBySet(published);
-    return reports.map(report => ({ ...report, pdfAvailable: bySet.has(report.setId), approval: approvalOf(bySet.get(report.setId)) }));
+    // Where a signature was not captured when the report was approved, show the approver's current one.
+    const signatureCache = new Map<string, Promise<string | null>>();
+    return Promise.all(reports.map(async report => {
+      const version = bySet.get(report.setId);
+      const signatures = version ? await this.assets.approvalSignatures(schoolId, version, signatureCache) : undefined;
+      return { ...report, pdfAvailable: !!version, approval: approvalOf(version, signatures) };
+    }));
   }
 
   async getGuardianPublishedReports(schoolId: string, userId: string) {
@@ -105,7 +112,7 @@ export class ReportPublicationService {
     const reports = await this.prisma.client.reportCard.findMany({
       where: { studentId: { in: studentIds }, publishedAt: { not: null }, set: { schoolId, status: "PUBLISHED" } },
       orderBy: { publishedAt: "desc" },
-      select: { id: true, setId: true, studentId: true, data: true, publishedAt: true, student: { select: { admissionNumber: true, profile: { select: { firstName: true, lastName: true } } } }, set: { select: { name: true, academicYear: { select: { name: true } }, term: { select: { name: true, termNumber: true } }, template: { select: { name: true, layout: true } }, school: { select: { name: true, code: true, email: true, phone: true, address: true, logo: true, motto: true, website: true, primaryColor: true, secondaryColor: true } } } } },
+      select: { id: true, setId: true, studentId: true, data: true, publishedAt: true, student: { select: { admissionNumber: true, profile: { select: { firstName: true, lastName: true, user: { select: { image: true } } } } } }, set: { select: { name: true, academicYear: { select: { name: true } }, term: { select: { name: true, termNumber: true } }, template: { select: { name: true, layout: true } }, school: { select: { name: true, code: true, email: true, phone: true, address: true, logo: true, motto: true, website: true, primaryColor: true, secondaryColor: true } } } } },
     });
     const published = await this.prisma.client.reportCardVersion.findMany({
       where: { schoolId, studentId: { in: studentIds }, stage: "PUBLISHED",
@@ -114,10 +121,12 @@ export class ReportPublicationService {
       select: { setId: true, studentId: true, ...APPROVAL_FIELDS },
     });
     const byReport = latestBySet(published.map(v => ({ ...v, setId: v.setId + ":" + v.studentId })));
-    return reports.map(report => {
+    const signatureCache = new Map<string, Promise<string | null>>();
+    return Promise.all(reports.map(async report => {
       const version = byReport.get(report.setId + ":" + report.studentId);
-      return { ...report, pdfAvailable: !!version, approval: approvalOf(version) };
-    });
+      const signatures = version ? await this.assets.approvalSignatures(schoolId, version, signatureCache) : undefined;
+      return { ...report, pdfAvailable: !!version, approval: approvalOf(version, signatures) };
+    }));
   }
 
   async createSet(schoolId: string, actorId: string, input: CreateReportSetInput) {

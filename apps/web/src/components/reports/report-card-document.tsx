@@ -1,6 +1,6 @@
 import { commonWeight, ordinalParts } from "@schoolhub/shared";
-import { CheckCircle2, GraduationCap } from "lucide-react";
-import type { ReactNode } from "react";
+import { CheckCircle2, GraduationCap, UserRound } from "lucide-react";
+import { useState, type ReactNode } from "react";
 import { accessibleAccentForeground } from "@/lib/accent-foreground";
 
 export interface ReportDocSubject {
@@ -37,7 +37,8 @@ export interface ReportDocApproval {
 export interface ReportDocumentProps {
   school: { name: string; code: string; logo: string | null; motto: string | null; address?: string | null; phone?: string | null; email?: string | null; website?: string | null; primaryColor?: string | null };
   layout: ReportDocLayout | null | undefined;
-  pupil: { name: string; admissionNumber: string | null; className: string | null };
+  /** `photo` is the pupil's picture URL. Without one, or if it will not load, a placeholder is shown. */
+  pupil: { name: string; admissionNumber: string | null; className: string | null; photo?: string | null };
   setName: string;
   academicYear: string;
   term: string;
@@ -53,6 +54,15 @@ export interface ReportDocumentProps {
   sample?: boolean;
   printClass: string;
   footer?: ReactNode;
+}
+
+/** The pupil's photo, or a plain placeholder so every report has the same layout. */
+function PupilPhoto({ src, name }: { src?: string | null; name: string }) {
+  const [failed, setFailed] = useState(false);
+  const frame = "h-24 w-20 shrink-0 rounded-xl border border-border bg-muted";
+  return src && !failed
+    ? <img src={src} alt={`Photo of ${name}`} onError={() => setFailed(true)} className={`${frame} object-cover`} />
+    : <span role="img" aria-label={`No photo available for ${name}`} className={`${frame} flex items-center justify-center text-muted-foreground`}><UserRound className="size-9" /></span>;
 }
 
 const REPORT_LABEL: Record<string, string> = { primary: "Primary terminal report", jhs: "JHS performance report", classic: "Classic academic report" };
@@ -130,7 +140,9 @@ export function ReportCardDocument(props: ReportDocumentProps) {
         </div>
 
         <div className="mt-5 grid gap-4 border-t border-border/70 pt-4 sm:grid-cols-[1fr_auto] sm:items-center">
-          <div>
+          <div className="flex min-w-0 items-start gap-4">
+            <PupilPhoto key={pupil.photo ?? "none"} src={pupil.photo} name={pupil.name} />
+            <div className="min-w-0">
             <p className="text-xs font-semibold text-muted-foreground">Prepared for</p>
             <p className="mt-1 text-xl font-black">{pupil.name}</p>
             <div className="mt-2 flex flex-wrap gap-2">
@@ -144,6 +156,7 @@ export function ReportCardDocument(props: ReportDocumentProps) {
                 {props.published.publishedAt && <span>Published {new Date(props.published.publishedAt).toLocaleDateString()}</span>}
               </p>
             )}
+            </div>
           </div>
           <dl className="grid grid-cols-3 gap-3 text-center sm:min-w-80">
             <div className="rounded-2xl border border-border bg-background/80 p-3">

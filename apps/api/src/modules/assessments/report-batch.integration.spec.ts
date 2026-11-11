@@ -33,7 +33,7 @@ describe.skipIf(!enabled)("assessment-driven report batches (PostgreSQL)", { tim
     const { AssessmentSetupService } = await import("./assessment-setup.service.js");
     const { ReportPublicationService } = await import("./report-publication.service.js");
     setup = new AssessmentSetupService({ client: db } as never);
-    reports = new ReportPublicationService({ client: db } as never);
+    reports = new ReportPublicationService({ client: db } as never, {} as never);
 
     await db.organization.create({ data: { id: tag + "o", name: "Synthetic", slug: tag + "o" } });
     schoolId = (await db.school.create({ data: { organizationId: tag + "o", name: "Batch School", code: (tag + "A").toUpperCase(), subdomain: tag + "a" } })).id;

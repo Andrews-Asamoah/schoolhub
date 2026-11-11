@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { jsPDF } from "jspdf";
 import { commonWeight as sharedWeight, ordinalParts } from "@schoolhub/shared";
+import { pdfImageFormat } from "./report-images.js";
 
 /** Stable across object key order; integrity seal for the immutable source JSON. */
 export function canonicalJson(value: unknown): string {
@@ -60,6 +61,16 @@ export type ReportApproval = {
   headSignature?: string | null;
 };
 
+/** Presentation read when the PDF is made; deliberately not part of the sealed snapshot. */
+export type ReportPdfExtras = {
+  letterhead?: {
+    name: string; motto: string | null; address: string | null;
+    phone: string | null; email: string | null; website: string | null; logo: string | null;
+  } | null;
+  /** The pupil's photo as a PNG or JPEG data URL. Without one, a placeholder is drawn. */
+  photo?: string | null;
+};
+
 type Layout = { accentColor?: string; showPosition?: boolean; showExamScore?: boolean };
 type Rgb = [number, number, number];
 
@@ -77,7 +88,7 @@ const num = (value: number | null | undefined, digits = 1) => (value == null ? "
  * cryptographic PDF signatures. A signature image, when the approver had one on
  * file, is the picture they uploaded, shown beside their recorded approval.
  */
-export function academicReportPdf(snapshot: AcademicSnapshot, approval: ReportApproval): Buffer {
+export function academicReportPdf(snapshot: AcademicSnapshot, approval: ReportApproval, extras: ReportPdfExtras = {}): Buffer {
   const layout = (snapshot.template.layout ?? {}) as Layout;
   const accent = hexToRgb(layout.accentColor, [31, 41, 55]);
   const showPosition = layout.showPosition !== false;
@@ -102,20 +113,45 @@ export function academicReportPdf(snapshot: AcademicSnapshot, approval: ReportAp
     return doc.splitTextToSize(value || "—", maxWidth) as string[];
   };
 
-  // Header band
-  doc.setFillColor(...accent);
-  doc.rect(0, 0, pageWidth, 70, "F");
+  // Header band: the school's logo, name and contact details on the left, the report title on the right.
+  const letterhead = extras.letterhead ?? null;
   const headerInk = onAccent(accent);
-  text(snapshot.school.name, margin, 34, { bold: true, size: 17, color: headerInk });
-  text("SCHOOL-GENERATED ACADEMIC REPORT", margin, 52, { bold: true, size: 9, color: headerInk });
-  text(`${snapshot.set} · ${snapshot.year} · ${snapshot.term}`, pageWidth - margin, 34, { size: 10, color: headerInk, align: "right" });
-  y = 96;
+  const hasLogo = !!pdfImageFormat(letterhead?.logo);
+  const textLeft = hasLogo ? margin + 58 : margin;
+  const titleRight = pageWidth - margin;
+  const leftWidth = titleRight - textLeft - 185;
+  const nameLines = wrap(letterhead?.name ?? snapshot.school.name, leftWidth, 15, true).slice(0, 2);
+  const detailLines = [
+    letterhead ? letterhead.motto : snapshot.school.motto,
+    letterhead?.address,
+    [letterhead?.phone, letterhead?.email, letterhead?.website].filter(Boolean).join("  ·  "),
+  ].filter((line): line is string => !!line).map((line) => wrap(line, leftWidth, 8.5)[0]!).slice(0, 3);
+  const detailsTop = 28 + (nameLines.length - 1) * 16 + 14;
+  const bandHeight = Math.max(70, detailsTop + detailLines.length * 11 + 8);
+  doc.setFillColor(...accent);
+  doc.rect(0, 0, pageWidth, bandHeight, "F");
+  if (hasLogo) {
+    doc.setFillColor(255, 255, 255);
+    doc.roundedRect(margin, 12, 46, 46, 6, 6, "F");
+    drawImageFit(doc, letterhead?.logo, margin + 3, 15, 40, 40, "center");
+  }
+  nameLines.forEach((line, index) => text(line, textLeft, 28 + index * 16, { bold: true, size: 15, color: headerInk }));
+  detailLines.forEach((line, index) => text(line, textLeft, detailsTop + index * 11, { size: 8.5, color: headerInk }));
+  text(`${snapshot.set} · ${snapshot.year} · ${snapshot.term}`, titleRight, 30, { size: 10, color: headerInk, align: "right" });
+  text("SCHOOL-GENERATED ACADEMIC REPORT", titleRight, 46, { bold: true, size: 8.5, color: headerInk, align: "right" });
+  y = bandHeight + 28;
 
   // Pupil details (left) and standing (right)
   const cls = snapshot.report.student?.class?.name ?? "—";
-  text(snapshot.student.name, margin, y, { bold: true, size: 15 });
-  text(`Admission number: ${snapshot.student.admissionNumber ?? "—"}`, margin, y + 18);
-  text(`Class: ${cls}`, margin, y + 33);
+  const photoW = 58;
+  const photoH = 72;
+  drawPhoto(doc, extras.photo, margin, y - 14, photoW, photoH);
+  const infoX = margin + photoW + 14;
+  const pupilLines = wrap(snapshot.student.name, titleRight - 150 - infoX, 15, true).slice(0, 2);
+  pupilLines.forEach((line, index) => text(line, infoX, y + index * 17, { bold: true, size: 15 }));
+  const infoY = y + (pupilLines.length - 1) * 17;
+  text(`Admission number: ${snapshot.student.admissionNumber ?? "—"}`, infoX, infoY + 18);
+  text(`Class: ${cls}`, infoX, infoY + 33);
   const summary = snapshot.report.summary;
   const rightX = pageWidth - margin;
   let ry = y;
@@ -142,7 +178,7 @@ export function academicReportPdf(snapshot: AcademicSnapshot, approval: ReportAp
     text(`Attendance: ${attendance.present} of ${attendance.total} days${attendance.rate != null ? ` (${attendance.rate}%)` : ""}`, rightX, ry + 4, { size: 10, align: "right" });
     ry += 15;
   }
-  y = Math.max(y + 48, ry + 10);
+  y = Math.max(y + 68, ry + 10);
 
   // Results table
   const subjects = snapshot.report.subjects ?? [];
@@ -223,15 +259,39 @@ function ordinalSuffix(value: number): string {
   return ordinalParts(value).suffix;
 }
 
-/** Draws a signature image inside a box, keeping its proportions; skips quietly if it can't be drawn. */
-function drawSignature(doc: jsPDF, dataUrl: string | null | undefined, x: number, y: number, maxWidth: number, maxHeight: number) {
-  const format = /^data:image\/(png|jpeg);base64,/.exec(dataUrl ?? "")?.[1]?.toUpperCase();
+/**
+ * Draws an image inside a box, keeping its proportions. Skips quietly if it can't be drawn: a bad
+ * picture never blocks the report (the callers read and log the reason before getting here).
+ */
+function drawImageFit(doc: jsPDF, dataUrl: string | null | undefined, x: number, y: number, maxWidth: number, maxHeight: number, align: "bottom" | "center" = "bottom") {
+  const format = pdfImageFormat(dataUrl);
   if (!dataUrl || !format) return;
   try {
     const props = doc.getImageProperties(dataUrl);
     const scale = Math.min(maxWidth / props.width, maxHeight / props.height);
-    doc.addImage(dataUrl, format, x, y + (maxHeight - props.height * scale), props.width * scale, props.height * scale);
+    const w = props.width * scale;
+    const h = props.height * scale;
+    doc.addImage(dataUrl, format, x + (align === "center" ? (maxWidth - w) / 2 : 0), y + (align === "center" ? (maxHeight - h) / 2 : maxHeight - h), w, h);
   } catch {
     /* a bad image never blocks the report */
   }
+}
+
+const drawSignature = drawImageFit;
+
+/** The pupil's photo in a bordered frame, or a plain head-and-shoulders placeholder when there is none. */
+function drawPhoto(doc: jsPDF, dataUrl: string | null | undefined, x: number, y: number, w: number, h: number) {
+  doc.setFillColor(236, 238, 241);
+  doc.roundedRect(x, y, w, h, 4, 4, "F");
+  if (pdfImageFormat(dataUrl)) {
+    drawImageFit(doc, dataUrl, x + 1, y + 1, w - 2, h - 2, "center");
+  } else {
+    doc.setFillColor(176, 182, 191);
+    doc.circle(x + w / 2, y + h * 0.36, w * 0.2, "F");
+    doc.ellipse(x + w / 2, y + h * 0.8, w * 0.36, h * 0.17, "F");
+  }
+  doc.setDrawColor(200, 204, 210);
+  doc.setLineWidth(0.75);
+  doc.roundedRect(x, y, w, h, 4, 4, "S");
+  doc.setLineWidth(1);
 }

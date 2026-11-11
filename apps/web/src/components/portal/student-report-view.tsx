@@ -11,7 +11,7 @@ interface PublishedReport {
   pdfAvailable?: boolean;
   data: { student?: { class?: { name?: string; level?: string } | null }; subjects?: ReportDocSubject[]; remarks?: { type: string; content: string; teacher: string }[]; summary?: ReportDocumentProps["summary"]; attendance?: ReportDocumentProps["attendance"] };
   approval?: ReportDocApproval | null;
-  student: { admissionNumber: string | null; profile: { firstName: string; lastName: string } };
+  student: { admissionNumber: string | null; profile: { firstName: string; lastName: string; user?: { image: string | null } | null } };
   publishedAt: string | null;
   set: { name: string; academicYear: { name: string }; term: { name: string; termNumber: number }; template: { name: string; layout: ReportDocLayout | null }; school: { name: string; code: string; email: string | null; phone: string | null; address: string | null; logo: string | null; motto: string | null; website: string | null; primaryColor: string; secondaryColor: string } };
 }
@@ -52,7 +52,7 @@ export function StudentReportView() {
       printClass="report-print-area"
       school={active.set.school}
       layout={layout}
-      pupil={{ name: `${active.student.profile.firstName} ${active.student.profile.lastName}`, admissionNumber: active.student.admissionNumber, className: active.data.student?.class?.name ?? null }}
+      pupil={{ name: `${active.student.profile.firstName} ${active.student.profile.lastName}`, admissionNumber: active.student.admissionNumber, className: active.data.student?.class?.name ?? null, photo: active.student.profile.user?.image ?? null }}
       setName={active.set.name}
       academicYear={active.set.academicYear.name}
       term={active.set.term.name}

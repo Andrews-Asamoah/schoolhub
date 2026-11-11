@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("../../prisma/prisma.service.js", () => ({ PrismaService: class {} }));
 vi.mock("../../common/scope/teacher-scope.service.js", () => ({ TeacherScopeService: class {} }));
 vi.mock("../storage/private-storage.service.js", () => ({ PrivateStorageService: class {} }));
+vi.mock("./report-assets.service.js", () => ({ ReportAssetsService: class {} }));
 
 import { MAX_BULK_RECOMMENDATIONS, ReportVersionService } from "./report-version.service.js";
 

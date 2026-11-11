@@ -14,7 +14,7 @@ type Report = {
   data: { student?: { class?: { name?: string } | null }; subjects?: ReportDocSubject[]; remarks?: { type: string; content: string; teacher: string }[]; summary?: ReportDocumentProps["summary"]; attendance?: ReportDocumentProps["attendance"] };
   approval?: ReportDocApproval | null;
   publishedAt: string | null;
-  student: { admissionNumber: string | null; profile: { firstName: string; lastName: string } };
+  student: { admissionNumber: string | null; profile: { firstName: string; lastName: string; user?: { image: string | null } | null } };
   set: { name: string; academicYear: { name: string }; term: { name: string }; template: { name: string; layout: ReportDocLayout | null }; school: { name: string; code: string; email: string | null; phone: string | null; address: string | null; logo: string | null; motto: string | null; website: string | null; primaryColor: string; secondaryColor: string } };
 };
 
@@ -56,7 +56,7 @@ export function GuardianPublishedReports({wards=[]}:{wards?:{id:string;profile:{
         printClass="guardian-report-print-area"
         school={selected.set.school}
         layout={layout}
-        pupil={{ name: `${selected.student.profile.firstName} ${selected.student.profile.lastName}`, admissionNumber: selected.student.admissionNumber, className: selected.data.student?.class?.name ?? null }}
+        pupil={{ name: `${selected.student.profile.firstName} ${selected.student.profile.lastName}`, admissionNumber: selected.student.admissionNumber, className: selected.data.student?.class?.name ?? null, photo: selected.student.profile.user?.image ?? null }}
         setName={selected.set.name}
         academicYear={selected.set.academicYear.name}
         term={selected.set.term.name}
