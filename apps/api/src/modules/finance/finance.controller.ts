@@ -765,7 +765,7 @@ export class FinanceController {
   private assertPayrollExportAllowed(user: AuthenticatedUser, schoolRole: string | undefined) {
     // RolesGuard grants platform superAdmins a global bypass. Confidential payroll exports intentionally do not.
     if (!canExportFinancePayroll(user.role, schoolRole)) {
-      throw new ForbiddenException("Payroll and salary exports are limited to the accountant, owner and headteacher roles.");
+      throw new ForbiddenException("Payroll and salary exports are limited to the accountant and owner roles.");
     }
   }
 

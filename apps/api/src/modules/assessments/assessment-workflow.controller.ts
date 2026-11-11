@@ -121,9 +121,9 @@ export class AssessmentWorkflowController {
     return this.corrections.request(school, user.id, role, body);
   }
 
-  /** Only the owner or headteacher decides; the service re-checks and blocks self-approval. */
+  /** Only the owner, an administrator or the headteacher decides; the service re-checks and blocks self-approval. */
   @Post("corrections/:id/review")
-  @Roles("owner", "headteacher")
+  @Roles("owner", "admin", "headteacher")
   reviewCorrection(
     @CurrentSchool() school: School,
     @CurrentUser() user: AuthenticatedUser,

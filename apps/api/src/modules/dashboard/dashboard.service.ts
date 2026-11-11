@@ -1,7 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { Injectable } from "@nestjs/common";
 import { PrismaService } from "../../prisma/prisma.service.js";
-import { FINANCE_READ_ROLES, FINANCE_SUMMARY_ROLES } from "../finance/finance.permissions.js";
+import { FINANCE_READ_ROLES, FINANCE_SUMMARY_ROLES, isFinancePayrollExportRole } from "../finance/finance.permissions.js";
 
 const FINANCE_SUMMARY_ROLE_SET = new Set<string>(FINANCE_SUMMARY_ROLES);
 const sumMoney = <T>(rows: T[], value: (row: T) => Prisma.Decimal | string | number) =>
@@ -19,6 +19,8 @@ export class DashboardService {
     const firstMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - months + 1, 1));
     const canViewFinance = FINANCE_SUMMARY_ROLE_SET.has(role ?? "");
     const canViewFinanceDetails = FINANCE_DETAIL_ROLE_SET.has(role ?? "");
+    // Salary spending is confidential: only the roles that may export payroll see it in dashboard totals.
+    const salaryFilter = isFinancePayrollExportRole(role) ? {} : { OR: [{ category: null }, { category: { not: "SALARY" as const } }] };
     const monthEnds = Array.from({ length: months }, (_, index) =>
       new Date(Date.UTC(firstMonth.getUTCFullYear(), firstMonth.getUTCMonth() + index + 1, 0, 23, 59, 59, 999)),
     );
@@ -37,7 +39,7 @@ export class DashboardService {
         select: { amount: true, paymentDate: true },
       }) : Promise.resolve([]),
       canViewFinance ? this.prisma.client.expense.findMany({
-        where: { schoolId, date: { gte: firstMonth, lte: now } },
+        where: { schoolId, date: { gte: firstMonth, lte: now }, ...salaryFilter },
         select: { amount: true, date: true },
       }) : Promise.resolve([]),
       role !== "teacher" ? this.prisma.client.student.findMany({
@@ -51,7 +53,7 @@ export class DashboardService {
         select: { id: true, amount: true, createdAt: true, paymentNumber: true, student: { select: { profile: { select: { firstName: true, lastName: true } } } } },
       }) : Promise.resolve([]),
       canViewFinanceDetails ? this.prisma.client.expense.findMany({
-        where: { schoolId, createdAt: { gte: firstMonth, lte: now } },
+        where: { schoolId, createdAt: { gte: firstMonth, lte: now }, ...salaryFilter },
         orderBy: { createdAt: "desc" }, take: 8,
         select: { id: true, amount: true, createdAt: true, description: true, payee: true },
       }) : Promise.resolve([]),

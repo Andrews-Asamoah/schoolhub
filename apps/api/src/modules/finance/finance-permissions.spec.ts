@@ -35,8 +35,8 @@ describe("finance policy constants", () => {
     expect([...FINANCE_READ_ROLES]).not.toContain("admin");
   });
 
-  it("restricts salary and payroll exports to accountant, owner and headteacher", () => {
-    expect([...FINANCE_PAYROLL_EXPORT_ROLES]).toEqual(["accountant", "owner", "headteacher"]);
+  it("restricts salary and payroll exports to the accountant and owner", () => {
+    expect([...FINANCE_PAYROLL_EXPORT_ROLES]).toEqual(["accountant", "owner"]);
   });
 
   it("does not accept admin, teacher, staff, guardian, student or platform superAdmin for payroll exports", () => {
@@ -50,7 +50,7 @@ describe("finance policy constants", () => {
     expect(canExportFinancePayroll("superAdmin", "accountant")).toBe(false);
     expect(canExportFinancePayroll("user", "accountant")).toBe(true);
     expect(canExportFinancePayroll("user", "owner")).toBe(true);
-    expect(canExportFinancePayroll("user", "headteacher")).toBe(true);
+    expect(canExportFinancePayroll("user", "headteacher")).toBe(false);
     expect(canExportFinancePayroll("user", "admin")).toBe(false);
   });
 });

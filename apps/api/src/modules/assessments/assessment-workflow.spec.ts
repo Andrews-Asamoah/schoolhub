@@ -117,12 +117,14 @@ describe("effectiveChanges", () => {
 });
 
 describe("approvalProblem and reasonProblem", () => {
-  it("allows only owner and headteacher to decide", () => {
-    expect(approvalProblem({ role: "admin", reviewerId: "u1", requesterId: "u2" })).not.toBeNull();
+  it("allows only owner, admin and headteacher to decide", () => {
+    expect(approvalProblem({ role: "admin", reviewerId: "u1", requesterId: "u2" })).toBeNull();
+    expect(approvalProblem({ role: "accountant", reviewerId: "u1", requesterId: "u2" })).not.toBeNull();
     expect(approvalProblem({ role: "teacher", reviewerId: "u1", requesterId: "u2" })).not.toBeNull();
     expect(approvalProblem({ role: "headteacher", reviewerId: "u1", requesterId: "u2" })).toBeNull();
   });
   it("blocks self-approval except for the owner", () => {
+    expect(approvalProblem({ role: "admin", reviewerId: "u1", requesterId: "u1" })).not.toBeNull();
     expect(approvalProblem({ role: "headteacher", reviewerId: "u1", requesterId: "u1" })).not.toBeNull();
     expect(approvalProblem({ role: "owner", reviewerId: "u1", requesterId: "u1" })).toBeNull();
   });

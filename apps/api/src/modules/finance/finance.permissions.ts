@@ -22,8 +22,8 @@ export const FINANCE_READ_ROLES = ["owner", "accountant", "headteacher"] as cons
 /** Roles allowed aggregate-only finance metrics on the school dashboard. */
 export const FINANCE_SUMMARY_ROLES = ["owner", "admin", "accountant", "headteacher"] as const;
 
-/** Payroll and salary exports are confidential: only accountant, owner and headteacher may export. */
-export const FINANCE_PAYROLL_EXPORT_ROLES = ["accountant", "owner", "headteacher"] as const;
+/** Payroll and salary exports are confidential: only the accountant and owner may export. */
+export const FINANCE_PAYROLL_EXPORT_ROLES = ["accountant", "owner"] as const;
 
 export function isFinancePayrollExportRole(role: string | null | undefined): boolean {
   return !!role && (FINANCE_PAYROLL_EXPORT_ROLES as readonly string[]).includes(role);

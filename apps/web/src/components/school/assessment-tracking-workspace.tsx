@@ -25,7 +25,7 @@ const ALL = "__all__";
 const field = "h-9 min-w-40 rounded-lg border border-border bg-card px-3 text-xs font-medium text-foreground/80 outline-none focus:border-primary/50";
 const label = "grid gap-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70";
 const post = <T,>(path: string, body: unknown) => apiFetch<T>(path, { method: "POST", body: JSON.stringify(body) });
-const APPROVER_ROLES = ["owner", "headteacher"];
+const APPROVER_ROLES = ["owner", "admin", "headteacher"];
 
 type Tab = "sheets" | "teachers" | "corrections";
 
@@ -33,7 +33,7 @@ type Tab = "sheets" | "teachers" | "corrections";
  * Admin view of marks entry. For one assessment it shows how much of each
  * class and subject is done, who is behind, and lets managers extend a
  * deadline, reopen a signed-off sheet or send reminders. The Corrections tab is
- * where late changes to marks are reviewed; only the owner or headteacher decides.
+ * where late changes to marks are reviewed; only the owner, an administrator or the headteacher decides.
  */
 export function AssessmentTrackingWorkspace({ role }: { role?: string }) {
   const queryClient = useQueryClient();
@@ -373,7 +373,7 @@ function Corrections({ canDecide, onDecided }: { canDecide: boolean; onDecided: 
                   <button type="button" onClick={() => setRejecting(row)} className="h-9 rounded-lg border border-border px-4 text-xs font-semibold hover:bg-muted">Reject</button>
                   <button type="button" onClick={() => setApproving(row)} className="h-9 rounded-lg bg-primary px-4 text-xs font-semibold text-primary-foreground hover:bg-primary/90">Approve</button>
                 </>
-              ) : <p className="text-xs text-muted-foreground">Only the owner or headteacher can decide this request.</p>}
+              ) : <p className="text-xs text-muted-foreground">Only the owner, an administrator or the headteacher can decide this request.</p>}
             </footer>
           )}
         </article>

@@ -25,7 +25,7 @@ const PAGE = 50;
 /**
  * Corrections to marks on a sheet that is locked, signed off or past its
  * deadline. A teacher (or manager) proposes the new marks with a reason; the
- * owner or headteacher approves or rejects. Approval applies the marks through
+ * owner, an administrator or the headteacher approves or rejects. Approval applies the marks through
  * the same writer as normal entry, so totals, grades and positions stay right,
  * and the old and new values are kept in the audit trail.
  */

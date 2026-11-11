@@ -27,6 +27,16 @@ describe("all-role portal boundaries", () => {
       expect(canRoleAccessPage(role, page)).toBe(false);
     }
   });
+  it("shows the headteacher only the allowlisted pages, with no payroll or ledger pages", () => {
+    const pages = getSchoolNavGroupsForRole("headteacher").flatMap((group) => group.items.map((item) => item.id));
+    for (const id of ["payroll", "payments", "invoices", "expenses", "finance-audit", "finance-reports", "student-statements", "term-end-review", "concessions", "fee-reminders", "finance-approvals"]) {
+      expect(pages).not.toContain(id);
+      expect(canRoleAccessPage("headteacher", id)).toBe(false);
+    }
+    for (const id of ["assessments", "students", "attendance", "fees", "outstanding", "inventory", "announcements"]) {
+      expect(pages).toContain(id);
+    }
+  });
   it("denies unknown and unresolved roles", () => {
     expect(getSchoolNavGroupsForRole("unexpected")).toEqual([]);
     expect(canRoleAccessPage(null, "students")).toBe(false);
