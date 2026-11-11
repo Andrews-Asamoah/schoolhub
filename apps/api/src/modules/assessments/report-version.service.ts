@@ -267,7 +267,11 @@ export class ReportVersionService {
   }
 
   /** Authorisation for PDF downloads is checked on every request, never via public R2 URLs. */
-  async publishedPdf(schoolId: string, userId: string, reportId: string, audience: "student"|"guardian") {
+  /**
+   * `audience` "staff" skips the pupil/guardian ownership check because the caller (the archive
+   * service) has already authorised the person against their role and scope; nothing else should use it.
+   */
+  async publishedPdf(schoolId: string, userId: string, reportId: string, audience: "student"|"guardian"|"staff") {
     const db = this.prisma.client;
     const report = await db.reportCard.findFirst({
       where: { id: reportId, publishedAt: { not: null },
@@ -281,7 +285,7 @@ export class ReportVersionService {
         select: { id: true },
       });
       if (!student) throw new NotFoundException("Published report not found.");
-    } else {
+    } else if (audience === "guardian") {
       const guardian = await db.guardian.findFirst({
         where: { schoolId, deletedAt: null, isActive: true, profile: { userId },
           students: { some: { studentId: report.studentId, receiveReports: true,

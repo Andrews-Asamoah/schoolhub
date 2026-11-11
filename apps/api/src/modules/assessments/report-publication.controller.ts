@@ -1,23 +1,36 @@
-import { BadRequestException, Body, Controller, Get, Param, Patch, Post, Put, Res, UseGuards } from "@nestjs/common";
+import { BadRequestException, Body, Controller, Get, Param, Patch, Post, Put, Query, Res, UseGuards } from "@nestjs/common";
 import type { School } from "@prisma/client";
 import { createReportSetSchema, type CreateReportSetInput } from "@schoolhub/shared";
+import { z } from "zod";
 import { ZodValidationPipe } from "../../common/pipes/zod-validation.pipe.js";
 import { CurrentSchool } from "../../common/decorators/current-school.decorator.js";
+import { CurrentSchoolRole } from "../../common/decorators/current-school-role.decorator.js";
 import { CurrentUser, type AuthenticatedUser } from "../../common/decorators/current-user.decorator.js";
 import { Roles } from "../../common/decorators/roles.decorator.js";
 import { RolesGuard } from "../../common/guards/roles.guard.js";
 import { SchoolTenantGuard } from "../../common/guards/school-tenant.guard.js";
 import { ReportPublicationService } from "./report-publication.service.js";
 import { ReportVersionService } from "./report-version.service.js";
+import { ARCHIVE_DEFAULT_PAGE_SIZE, ARCHIVE_MAX_PAGE_SIZE, ReportArchiveService } from "./report-archive.service.js";
 import type { Response } from "express";
 import { ReportTemplatePresetsService } from "./report-template-presets.service.js";
+
+const archiveQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).max(10_000).default(1),
+  pageSize: z.coerce.number().int().min(1).max(ARCHIVE_MAX_PAGE_SIZE).default(ARCHIVE_DEFAULT_PAGE_SIZE),
+  academicYearId: z.string().trim().min(1).max(64).optional(),
+  termId: z.string().trim().min(1).max(64).optional(),
+  classId: z.string().trim().min(1).max(64).optional(),
+  q: z.string().trim().max(100).optional(),
+});
 
 @Controller("assessments/report-cards")
 @UseGuards(SchoolTenantGuard, RolesGuard)
 export class ReportPublicationController {
   constructor(private readonly reports: ReportPublicationService,
     private readonly templatePresets: ReportTemplatePresetsService,
-    private readonly versions: ReportVersionService) {}
+    private readonly versions: ReportVersionService,
+    private readonly archive: ReportArchiveService) {}
 
   private recommendation(body: unknown): string {
     const remark = (body && typeof body === "object" && "remark" in body)
@@ -100,6 +113,31 @@ export class ReportPublicationController {
     const file = await this.versions.publishedPdf(school.id, user.id, reportId, "student");
     res.setHeader("Content-Type","application/pdf");
     res.setHeader("Cache-Control","private, no-store");
+    res.setHeader("Content-Disposition", 'attachment; filename="' + file.filename + '"');
+    res.setHeader("Content-Length", file.pdf.length);
+    res.end(file.pdf);
+  }
+
+  /** Filter choices for the archive page: years and terms with published reports, and classes. */
+  @Get("archive/filters")
+  @Roles("owner", "admin", "headteacher", "teacher")
+  archiveFilters(@CurrentSchool() school: School) { return this.archive.filters(school.id); }
+
+  /** Published report cards, paginated on the server. A teacher only sees pupils in classes they teach. */
+  @Get("archive")
+  @Roles("owner", "admin", "headteacher", "teacher")
+  archiveList(@CurrentSchool() school: School, @CurrentUser() user: AuthenticatedUser, @CurrentSchoolRole() role: string,
+    @Query(new ZodValidationPipe(archiveQuerySchema)) query: z.infer<typeof archiveQuerySchema>) {
+    return this.archive.list(school.id, user.id, role, query);
+  }
+
+  @Get("archive/:reportId/pdf")
+  @Roles("owner", "admin", "headteacher", "teacher")
+  async archivePdf(@CurrentSchool() school: School, @CurrentUser() user: AuthenticatedUser, @CurrentSchoolRole() role: string,
+    @Param("reportId") reportId: string, @Res() res: Response) {
+    const file = await this.archive.pdf(school.id, user, role, reportId);
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Cache-Control", "private, no-store");
     res.setHeader("Content-Disposition", 'attachment; filename="' + file.filename + '"');
     res.setHeader("Content-Length", file.pdf.length);
     res.end(file.pdf);

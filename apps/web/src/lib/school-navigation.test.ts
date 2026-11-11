@@ -46,6 +46,17 @@ describe("all-role portal boundaries", () => {
     expect(pages).toContain("report-approvals");
   });
 
+  it("offers the report card archive to owner, admin, headteacher and teachers only", () => {
+    for (const role of ["owner", "admin", "headteacher", "teacher"]) {
+      expect(canRoleAccessPage(role, "report-cards")).toBe(true);
+      const pages = getSchoolNavGroupsForRole(role).flatMap((group) => group.items.map((item) => item.id));
+      expect(pages).toContain("report-cards");
+    }
+    for (const role of ["accountant", "student", "guardian"]) {
+      expect(canRoleAccessPage(role, "report-cards")).toBe(false);
+    }
+  });
+
   it("denies unknown and unresolved roles", () => {
     expect(getSchoolNavGroupsForRole("unexpected")).toEqual([]);
     expect(canRoleAccessPage(null, "students")).toBe(false);

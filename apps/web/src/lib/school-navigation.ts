@@ -1,5 +1,6 @@
 import {
   BarChart3,
+  FolderArchive,
   ShieldCheck,
   Activity,
   AlertCircle,
@@ -163,6 +164,14 @@ export const schoolNavGroups: SchoolNavGroup[] = [
         label: "Report approvals",
         icon: ShieldCheck,
         description: "Review class teacher recommendations and approve pupils’ report cards for publication.",
+        section: "Academics",
+        apiStatus: "available",
+      },
+      {
+        id: "report-cards",
+        label: "Report card archive",
+        icon: FolderArchive,
+        description: "Find and open published report cards from any year or term.",
         section: "Academics",
         apiStatus: "available",
       },
@@ -567,7 +576,7 @@ const personalPages = new Set(["guardian-portal", "guardian-attendance", "guardi
 const headteacherPages = new Set([
   "students", "admissions", "enrollments", "teachers", "staff", "guardians",
   "classes", "subjects", "academic-years", "timetable",
-  "assessments", "assessment-tracking", "mock-analysis", "external-exams", "assignments", "reports",
+  "assessments", "assessment-tracking", "mock-analysis", "external-exams", "assignments", "reports", "report-cards",
   "attendance", "houses", "clubs",
   "fees", "outstanding", "inventory",
   "announcements", "messages", "notifications", "documents",
@@ -599,6 +608,7 @@ const rolePages: Record<string, string[]> = {
     "assignments",
     "attendance",
     "reports",
+    "report-cards",
     "documents",
     "messages",
     "notifications",
