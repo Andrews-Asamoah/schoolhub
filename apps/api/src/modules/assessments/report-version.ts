@@ -48,6 +48,23 @@ export type AcademicSnapshot = {
   capturedAt: string;
 };
 
+/**
+ * The recommendations a regenerated report starts with. A regenerated version is a new, unsigned version,
+ * so the previous sign-off cannot be reused (it vouched for the old marks), but the text people wrote
+ * must not be lost. We take what was signed on the previous version, or, when that version was itself
+ * never signed, what it was carrying from the version before it, so repeated regenerations keep the text.
+ */
+export function carriedRecommendations(previous: {
+  teacherRemark: string | null; headRemark: string | null;
+  carriedTeacherRemark: string | null; carriedHeadRemark: string | null;
+} | null | undefined) {
+  const text = (value: string | null | undefined) => (value && value.trim() ? value : null);
+  return {
+    carriedTeacherRemark: text(previous?.teacherRemark) ?? text(previous?.carriedTeacherRemark),
+    carriedHeadRemark: text(previous?.headRemark) ?? text(previous?.carriedHeadRemark),
+  };
+}
+
 export type ReportApproval = {
   version: number;
   snapshotHash: string;

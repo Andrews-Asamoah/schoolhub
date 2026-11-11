@@ -499,6 +499,10 @@ model ReportCardVersion {
   /// The approver's signature image (a data URL) as it was when they approved, so the report never changes later.
   teacherSignature  String?  @db.Text
   headSignature     String?  @db.Text
+  /// Recommendation text carried over from the previous version when the batch is regenerated. It is
+  /// only a prefill for the next sign-off: it is never part of the report until someone approves it.
+  carriedTeacherRemark String? @db.VarChar(2000)
+  carriedHeadRemark    String? @db.VarChar(2000)
   publishedAt       DateTime?
   createdAt         DateTime @default(now())
 

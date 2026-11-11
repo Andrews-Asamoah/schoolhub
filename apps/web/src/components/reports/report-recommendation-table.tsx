@@ -17,11 +17,13 @@ export type RecommendationTableRow = {
   subjects: RecommendationSubject[];
   /** A short status label for the row (for example "Waiting for headteacher"). */
   statusLabel?: string;
-  /** Text recorded earlier by someone else (the teacher's recommendation on the headteacher page). */
-  recordedRemark?: { label: string; text: string | null } | null;
+  /** Text already recorded on the report, shown read-only above any editable box (for example the class teacher's recommendation). */
+  recordedRemark?: RecordedRemark | RecordedRemark[] | null;
   /** When true the recommendation box is editable; otherwise the recorded text is shown. */
   editable: boolean;
 };
+
+export type RecordedRemark = { label: string; text: string | null };
 
 export type RecommendationRowState = {
   pending?: boolean;
@@ -91,6 +93,7 @@ export function ReportRecommendationTable({
         const text = remarks[row.id] ?? "";
         const trimmed = text.trim().length;
         const expanded = open.has(row.id);
+        const recorded = row.recordedRemark ? [row.recordedRemark].flat() : [];
         const tooShort = trimmed < MIN_RECOMMENDATION_LENGTH;
         return <Fragment key={row.id}>
           <TableRow data-state={selected.has(row.id) ? "selected" : undefined}>
@@ -117,9 +120,9 @@ export function ReportRecommendationTable({
               {row.position == null ? "—" : <>{ordinal(row.position)}{row.classSize ? <span className="text-muted-foreground"> / {row.classSize}</span> : null}</>}
             </TableCell>
             <TableCell className="align-top">
-              {row.recordedRemark && <p className="mb-2 text-xs text-muted-foreground">
-                <span className="font-semibold">{row.recordedRemark.label}:</span> {row.recordedRemark.text ?? "—"}
-              </p>}
+              {recorded.map((remark) => <p key={remark.label} className="mb-2 text-xs text-muted-foreground">
+                <span className="font-semibold">{remark.label}:</span> {remark.text ?? "—"}
+              </p>)}
               {row.editable
                 ? <>
                     <textarea aria-label={`${remarkColumnLabel} for ${row.pupilName}`} rows={2} maxLength={MAX_RECOMMENDATION_LENGTH}
@@ -130,7 +133,7 @@ export function ReportRecommendationTable({
                       {state?.error ?? state?.note ?? (trimmed > 0 && tooShort ? `At least ${MIN_RECOMMENDATION_LENGTH} characters to sign off.` : "")}
                     </p>
                   </>
-                : !row.recordedRemark && <p className="text-xs text-muted-foreground">—</p>}
+                : recorded.length === 0 && <p className="text-xs text-muted-foreground">—</p>}
             </TableCell>
             <TableCell className="align-top">
               {row.editable && <button type="button"

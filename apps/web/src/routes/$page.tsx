@@ -25,6 +25,7 @@ const AcademicYearSetup = lazy(() => import("@/components/school/academic-year-s
 const SchoolLogoUploader = lazy(() => import("@/components/school/school-logo-uploader").then((m) => ({ default: m.SchoolLogoUploader })));
 const SubjectsWorkspace = lazy(() => import("@/components/school/subjects-workspace").then((m) => ({ default: m.SubjectsWorkspace })));
 const TimetableWorkspace = lazy(() => import("@/components/school/timetable-workspace").then((m) => ({ default: m.TimetableWorkspace })));
+const HeadteacherReportApprovalsWorkspace = lazy(() => import("@/components/school/headteacher-report-approvals-workspace").then((m) => ({ default: m.HeadteacherReportApprovalsWorkspace })));
 const FinanceApprovalSettingsWorkspace = lazy(() => import("@/components/school/finance-approval-settings-workspace").then((m) => ({ default: m.FinanceApprovalSettingsWorkspace })));
 const TeamRoleWorkspace = lazy(() => import("@/components/school/team-role-workspace").then((m) => ({ default: m.TeamRoleWorkspace })));
 const ClassesWorkspace = lazy(() => import("@/components/school/classes-workspace").then((m) => ({ default: m.ClassesWorkspace })));
@@ -318,6 +319,7 @@ function WorkspaceContent({ pageId }: { pageId: string }) {
             )
           )}
           {pageId === "assessment-tracking" && <AssessmentTrackingWorkspace role={activeRole ?? undefined} />}
+          {pageId === "report-approvals" && <HeadteacherReportApprovalsWorkspace />}
           {pageId === "reports" && (
             activeRole === "student" ? <StudentReportView /> : <SchoolReportsWorkspace />
           )}

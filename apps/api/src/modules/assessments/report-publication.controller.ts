@@ -65,6 +65,27 @@ export class ReportPublicationController {
     return this.versions.recommend(school.id, user.id, id, this.recommendation(body));
   }
 
+  /** Every pupil in an unpublished batch that the headteacher can act on, across all batches. */
+  @Get("head-queue")
+  @Roles("headteacher")
+  getHeadteacherQueue(@CurrentSchool() school: School, @CurrentUser() user: AuthenticatedUser) {
+    return this.versions.headQueue(school.id, user.id);
+  }
+
+  @Post("versions/bulk-head-approve")
+  @Roles("headteacher")
+  bulkHeadteacherApprove(@CurrentSchool() school: School, @CurrentUser() user: AuthenticatedUser, @Body() body: unknown) {
+    const raw = body && typeof body === "object" && "items" in body ? (body as { items: unknown }).items : undefined;
+    if (!Array.isArray(raw)) throw new BadRequestException("Send the pupils to approve as a list called items.");
+    const items = raw.map((row) => {
+      const id = row && typeof row === "object" ? (row as { id?: unknown }).id : undefined;
+      const remark = row && typeof row === "object" ? (row as { remark?: unknown }).remark : undefined;
+      if (typeof id !== "string" || !id || typeof remark !== "string") throw new BadRequestException("Each item needs an id and a remark.");
+      return { id, remark };
+    });
+    return this.versions.bulkHeadApprove(school.id, user.id, items);
+  }
+
   @Patch("versions/:id/head-approve")
   @Roles("headteacher")
   headteacherApprove(@CurrentSchool() school: School, @CurrentUser() user: AuthenticatedUser,

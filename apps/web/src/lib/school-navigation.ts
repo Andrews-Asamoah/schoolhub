@@ -159,6 +159,14 @@ export const schoolNavGroups: SchoolNavGroup[] = [
         apiStatus: "available",
       },
       {
+        id: "report-approvals",
+        label: "Report approvals",
+        icon: ShieldCheck,
+        description: "Review class teacher recommendations and approve pupils’ report cards for publication.",
+        section: "Academics",
+        apiStatus: "available",
+      },
+      {
         id: "mock-analysis",
         label: "Mock analysis",
         icon: BarChart3,
@@ -567,13 +575,18 @@ const headteacherPages = new Set([
   "accountant-portal",
 ]);
 
-const managementPages = schoolNavItems.filter((item) => !personalPages.has(item.id)).map((item) => item.id);
+/** Pages only the headteacher may use: the API refuses everyone else, so the menu does not offer them. */
+const headteacherOnlyPages = new Set(["report-approvals"]);
+
+const managementPages = schoolNavItems
+  .filter((item) => !personalPages.has(item.id) && !headteacherOnlyPages.has(item.id))
+  .map((item) => item.id);
 
 const rolePages: Record<string, string[]> = {
   owner: managementPages,
-  headteacher: managementPages.filter((id) => headteacherPages.has(id)),
+  headteacher: [...managementPages.filter((id) => headteacherPages.has(id)), ...headteacherOnlyPages],
   admin: schoolNavItems
-    .filter((item) => !adminRestrictedFinancePages.has(item.id) && !personalPages.has(item.id))
+    .filter((item) => !adminRestrictedFinancePages.has(item.id) && !personalPages.has(item.id) && !headteacherOnlyPages.has(item.id))
     .map((item) => item.id),
   teacher: [
     "external-exams",

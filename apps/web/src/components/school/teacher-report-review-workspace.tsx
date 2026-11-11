@@ -11,6 +11,8 @@ import { apiFetch, errorText } from "@/lib/api";
 type QueueRow = {
   id: string; stage: string; version: number; teacherRemark: string | null;
   average: number | null; position: number | null; classSize: number | null; draftRemark: string | null;
+  /** True when draftRemark is the recommendation carried over from a regenerated version, not text typed this time. */
+  carriedOver: boolean;
   student: { admissionNumber: string | null; profile: { firstName: string; lastName: string } };
   set: { name: string; term: { name: string } };
   subjects: { name: string; grade: string | null; percentage: number }[];
@@ -108,6 +110,14 @@ export function TeacherReportReviewWorkspace() {
   }));
 
   const remarks = useMemo(() => Object.fromEntries(rows.map((row) => [row.id, remarkFor(row)])), [rows, remarkFor]);
+  // Until the teacher edits it, a carried-over recommendation says where it came from.
+  const displayStates = useMemo(() => {
+    const merged: Record<string, RecommendationRowState | undefined> = {};
+    for (const row of rows) {
+      if (row.carriedOver && typed[row.id] === undefined) merged[row.id] = { note: "Carried over from the previous version of this report. Check it still applies, then sign off." };
+    }
+    return { ...merged, ...Object.fromEntries(Object.entries(rowStates).filter(([, state]) => state !== undefined)) };
+  }, [rows, typed, rowStates]);
   const readyIds = [...selected].filter((id) => (remarks[id] ?? "").trim().length >= MIN_RECOMMENDATION_LENGTH);
 
   const submitBulk = async () => {
@@ -171,7 +181,7 @@ export function TeacherReportReviewWorkspace() {
       {rows.length === 0
         ? <p className="text-sm text-muted-foreground">No pupils match.</p>
         : <ReportRecommendationTable
-            rows={tableRows} remarks={remarks} onRemarkChange={onRemarkChange} rowStates={rowStates}
+            rows={tableRows} remarks={remarks} onRemarkChange={onRemarkChange} rowStates={displayStates}
             selected={selected}
             onToggleRow={(id) => setSelected((prev) => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next; })}
             onToggleAll={(ids, checked) => setSelected((prev) => { const next = new Set(prev); for (const id of ids) { if (checked) next.add(id); else next.delete(id); } return next; })}

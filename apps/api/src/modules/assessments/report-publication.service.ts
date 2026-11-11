@@ -3,7 +3,7 @@ import { Prisma } from "@prisma/client";
 import { PrismaService } from "../../prisma/prisma.service.js";
 import type { CreateReportSetInput } from "@schoolhub/shared";
 import { coveredClasses, REPORTABLE_SCORE_STATUSES } from "./assessment-entry.js";
-import { snapshotHash } from "./report-version.js";
+import { carriedRecommendations, snapshotHash } from "./report-version.js";
 import { ReportAssetsService } from "./report-assets.service.js";
 import { buildSubjectRow, buildSummary, overallPositions, summariseAttendance } from "./report-card-data.js";
 
@@ -71,7 +71,8 @@ export class ReportPublicationService {
       orderBy: { version: "desc" },
       select: { id: true, studentId: true, stage: true, version: true,
         teacherName: true, teacherRemark: true, teacherApprovedAt: true,
-        headName: true, headRemark: true, headApprovedAt: true, snapshotHash: true },
+        headName: true, headRemark: true, headApprovedAt: true, snapshotHash: true,
+        carriedTeacherRemark: true, carriedHeadRemark: true },
     });
     const latest = new Map<string, typeof versions[number]>();
     for (const version of versions) if (!latest.has(version.studentId)) latest.set(version.studentId, version);
@@ -230,7 +231,9 @@ export class ReportPublicationService {
         throw new BadRequestException("No submitted marks were found for this assessment in the selected classes and term. Teachers must submit their mark sheets before reports can be generated.");
       }
 
+      let carriedCount = 0;
       await db.$transaction(async (tx) => {
+        carriedCount = 0; // a retried transaction must not double count
         // Older snapshots survive regeneration even if the student is no longer
         // reportable: they are independent of the mutable ReportCard row.
         await tx.reportCardVersion.updateMany({
@@ -260,8 +263,10 @@ export class ReportPublicationService {
           if (!classId) throw new BadRequestException("Student's class enrolment is required for report approval.");
           const previous = await tx.reportCardVersion.findFirst({
             where: { setId: set.id, studentId: student.id }, orderBy: { version: "desc" },
-            select: { version: true },
+            select: { version: true, teacherRemark: true, headRemark: true, carriedTeacherRemark: true, carriedHeadRemark: true },
           });
+          const carried = carriedRecommendations(previous);
+          if (carried.carriedTeacherRemark || carried.carriedHeadRemark) carriedCount += 1;
           const snapshot = {
             schemaVersion: 1, report: data,
             school: set.school, template: set.template,
@@ -280,10 +285,11 @@ export class ReportPublicationService {
             version: (previous?.version ?? 0) + 1,
             snapshot: snapshot as Prisma.InputJsonValue,
             snapshotHash: snapshotHash(snapshot),
+            ...carried,
           } });
         }
         await tx.reportCardSet.update({ where: { id: set.id }, data: { status: "GENERATED", isReviewed: false, reviewedAt: null } });
-        await tx.auditLog.create({ data: { schoolId, userId: actorId, action: "UPDATE", entityType: "REPORT_CARD_SET", entityId: set.id, newValues: { operation: "GENERATE", reportCount: reportableStudents.length } } });
+        await tx.auditLog.create({ data: { schoolId, userId: actorId, action: "UPDATE", entityType: "REPORT_CARD_SET", entityId: set.id, newValues: { operation: "GENERATE", reportCount: reportableStudents.length, recommendationsCarriedOver: carriedCount } } });
       });
       return { id: set.id, status: "GENERATED", reportCount: reportableStudents.length, skippedCount: students.length - reportableStudents.length, isReviewed: false };
     } catch (error) {

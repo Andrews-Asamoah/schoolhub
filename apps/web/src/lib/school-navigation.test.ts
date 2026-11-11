@@ -37,6 +37,15 @@ describe("all-role portal boundaries", () => {
       expect(pages).toContain(id);
     }
   });
+  it("offers Report approvals to the headteacher only", () => {
+    expect(canRoleAccessPage("headteacher", "report-approvals")).toBe(true);
+    for (const role of ["owner", "admin", "teacher", "accountant", "student", "guardian", "staff"]) {
+      expect(canRoleAccessPage(role, "report-approvals")).toBe(false);
+    }
+    const pages = getSchoolNavGroupsForRole("headteacher").flatMap((group) => group.items.map((item) => item.id));
+    expect(pages).toContain("report-approvals");
+  });
+
   it("denies unknown and unresolved roles", () => {
     expect(getSchoolNavGroupsForRole("unexpected")).toEqual([]);
     expect(canRoleAccessPage(null, "students")).toBe(false);

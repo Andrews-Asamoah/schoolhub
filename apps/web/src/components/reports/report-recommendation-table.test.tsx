@@ -49,6 +49,26 @@ describe("ReportRecommendationTable", () => {
     expect(render([base], { v1: "Works hard and improves." })).not.toMatch(/<button[^>]*\sdisabled=""[^>]*>Sign off/);
   });
 
+  it("shows the class teacher and headteacher text together on an approved row", () => {
+    const html = render([{
+      ...base, editable: false,
+      recordedRemark: [
+        { label: "Class teacher (Ms Owusu)", text: "Steady progress." },
+        { label: "Headteacher (Mr Addo)", text: "Approved with commendation." },
+      ],
+    }]);
+    expect(html).toContain("Class teacher (Ms Owusu)");
+    expect(html).toContain("Steady progress.");
+    expect(html).toContain("Headteacher (Mr Addo)");
+    expect(html).toContain("Approved with commendation.");
+    expect(html).not.toContain("<textarea");
+  });
+
+  it("shows the class teacher's text read-only above the headteacher's own box", () => {
+    const html = render([{ ...base, recordedRemark: { label: "Class teacher", text: "Steady progress." } }], { v1: "" });
+    expect(html.indexOf("Steady progress.")).toBeLessThan(html.indexOf("<textarea"));
+  });
+
   it("shows an error on the row that failed without disabling other rows", () => {
     const other = { ...base, id: "v2", pupilName: "Kofi Boateng" };
     const html = render([base, other], { v1: "Works hard and improves.", v2: "Works hard and improves." }, { v1: { error: "Superseded." } });

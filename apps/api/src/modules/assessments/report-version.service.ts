@@ -25,7 +25,7 @@ export class ReportVersionService {
         stage: { in: ["GENERATED", "TEACHER_REVIEWED", "APPROVED"] } },
       select: { id: true, setId: true, studentId: true, classId: true,
         version: true, stage: true, teacherRemark: true, teacherActorId: true,
-        snapshot: true, createdAt: true,
+        carriedTeacherRemark: true, snapshot: true, createdAt: true,
         student: { select: { admissionNumber: true, profile: {
           select: { firstName: true, lastName: true },
         } } },
@@ -48,14 +48,18 @@ export class ReportVersionService {
         })
       : [];
     const draftByKey = new Map(drafts.map(d => [d.setId + ":" + d.studentId, d.remark]));
-    return latest.map(({ snapshot, ...v }) => {
+    return latest.map(({ snapshot, carriedTeacherRemark, ...v }) => {
       const report = (snapshot as unknown as AcademicSnapshot).report;
+      // An unsent draft is newer work than text carried over from a regenerated version, so it wins.
+      const draft = v.stage === "GENERATED" ? (draftByKey.get(v.setId + ":" + v.studentId) ?? null) : null;
+      const carried = v.stage === "GENERATED" && !draft ? carriedTeacherRemark : null;
       return {
         ...v,
         average: report.summary?.average ?? null,
         position: report.summary?.overallPosition ?? null,
         classSize: report.summary?.classSize ?? null,
-        draftRemark: v.stage === "GENERATED" ? (draftByKey.get(v.setId + ":" + v.studentId) ?? null) : null,
+        draftRemark: draft ?? carried,
+        carriedOver: carried !== null,
         subjects: report.subjects?.map(item => ({
           name: item.subject.name, grade: item.grade, percentage: item.percentage,
         })) ?? [],
@@ -100,11 +104,13 @@ export class ReportVersionService {
   }
 
   /**
-   * Sign off several recommendations at once. Each row goes through recommend() in its own
-   * transaction, so one pupil's failure (a superseded version, a missing remark) never blocks the rest,
-   * and the result says what happened to each.
+   * Run one action per row, each in its own transaction (the action opens it), so one pupil's failure
+   * never blocks the rest, and report what happened to every row.
    */
-  async bulkRecommend(schoolId: string, userId: string, items: { id: string; remark: string }[]) {
+  private async runBulk(
+    items: { id: string; remark: string }[],
+    action: (id: string, remark: string) => Promise<unknown>,
+  ) {
     if (!items.length) throw new BadRequestException("Choose at least one pupil.");
     if (items.length > MAX_BULK_RECOMMENDATIONS) {
       throw new BadRequestException(`Sign off at most ${MAX_BULK_RECOMMENDATIONS} recommendations at a time.`);
@@ -115,13 +121,70 @@ export class ReportVersionService {
       try {
         const remark = item.remark.trim();
         if (remark.length < 10 || remark.length > 2000) throw new BadRequestException("Write a recommendation of 10–2000 characters.");
-        await this.recommend(schoolId, userId, item.id, remark);
+        await action(item.id, remark);
         results.push({ id: item.id, ok: true });
       } catch (error) {
         results.push({ id: item.id, ok: false, error: error instanceof HttpException ? error.message : "This recommendation could not be saved." });
       }
     }
     return { total: items.length, succeeded: results.filter(r => r.ok).length, results };
+  }
+
+  /** Sign off several class-teacher recommendations at once; see runBulk. */
+  bulkRecommend(schoolId: string, userId: string, items: { id: string; remark: string }[]) {
+    return this.runBulk(items, (id, remark) => this.recommend(schoolId, userId, id, remark));
+  }
+
+  /** Approve several pupils' reports at once as the headteacher; every row keeps the single-row rules. */
+  bulkHeadApprove(schoolId: string, userId: string, items: { id: string; remark: string }[]) {
+    return this.runBulk(items, (id, remark) => this.headteacherApprove(schoolId, userId, id, remark));
+  }
+
+  /**
+   * Everything waiting for the headteacher across all unpublished report batches: pupils whose class
+   * teacher has recommended (ready to approve) and pupils already approved. `canApprove` is false
+   * where the same person gave the class-teacher recommendation, because one person cannot approve
+   * both stages.
+   */
+  async headQueue(schoolId: string, userId: string) {
+    const versions = await this.prisma.client.reportCardVersion.findMany({
+      where: { schoolId, set: { status: "GENERATED", schoolId }, stage: { in: ["GENERATED", "TEACHER_REVIEWED", "APPROVED"] } },
+      select: { id: true, setId: true, studentId: true, classId: true, version: true, stage: true,
+        teacherActorId: true, teacherName: true, teacherRemark: true, teacherApprovedAt: true,
+        headName: true, headRemark: true, headApprovedAt: true, carriedHeadRemark: true, snapshot: true,
+        student: { select: { admissionNumber: true, profile: { select: { firstName: true, lastName: true } } } },
+        set: { select: { name: true, term: { select: { name: true } } } } },
+      orderBy: [{ setId: "asc" }, { studentId: "asc" }, { version: "desc" }],
+      take: 5000,
+    });
+    const seen = new Set<string>();
+    const latest = versions.filter(v => {
+      const key = v.setId + ":" + v.studentId;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+    const classes = latest.length
+      ? await this.prisma.client.class.findMany({
+          where: { schoolId, id: { in: [...new Set(latest.map(v => v.classId))] } },
+          select: { id: true, name: true },
+        })
+      : [];
+    const className = new Map(classes.map(c => [c.id, c.name]));
+    return latest.map(({ snapshot, teacherActorId, ...v }) => {
+      const report = (snapshot as unknown as AcademicSnapshot).report;
+      return {
+        ...v,
+        className: className.get(v.classId) ?? "Class",
+        average: report.summary?.average ?? null,
+        position: report.summary?.overallPosition ?? null,
+        classSize: report.summary?.classSize ?? null,
+        canApprove: v.stage === "TEACHER_REVIEWED" && !!teacherActorId && teacherActorId !== userId,
+        subjects: report.subjects?.map(item => ({
+          name: item.subject.name, grade: item.grade, percentage: item.percentage,
+        })) ?? [],
+      };
+    });
   }
 
   async recommend(schoolId: string, userId: string, versionId: string, remark: string) {
