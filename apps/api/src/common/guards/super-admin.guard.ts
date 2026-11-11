@@ -1,3 +1,4 @@
+import { isDesktopRequest } from "../desktop-policy.js";
 import {
   Injectable,
   type CanActivate,
@@ -20,6 +21,10 @@ export class SuperAdminGuard implements CanActivate {
 
     if (!user) {
       throw new UnauthorizedException("Authentication required");
+    }
+
+    if (isDesktopRequest(request)) {
+      throw new ForbiddenException("Platform administration is available only on the web portal.");
     }
 
     if (user.banned === true) {

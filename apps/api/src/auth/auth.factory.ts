@@ -1,3 +1,4 @@
+import { desktopVersionError } from "../common/desktop-policy.js";
 import { sendAccountVerification } from "./verification-mail.js";
 import { originPolicy } from "../common/origin-policy.js";
 import { betterAuth } from "better-auth";
@@ -97,6 +98,9 @@ export function createAuth(prisma: PrismaLike) {
     session: {
       expiresIn: 60 * 60 * 24 * 7, // 7 days
       updateAge: 60 * 60 * 24, // refresh once a day
+      additionalFields: {
+        clientPlatform: { type: "string", required: false, defaultValue: "web", input: false },
+      },
     },
     // Throttle credential-guessing. Better Auth keeps counters in memory by
     // default; switch `storage` to "database" or secondary storage (Redis)
@@ -121,6 +125,11 @@ export function createAuth(prisma: PrismaLike) {
     // Enforce the same complexity rules on any endpoint that sets a password.
     hooks: {
       before: createAuthMiddleware(async (ctx) => {
+        const headers = ctx.request?.headers ?? ctx.headers;
+        if (headers?.get("x-schoolhub-client") === "desktop" && ctx.path !== "/sign-out") {
+          const message = desktopVersionError(headers.get("x-schoolhub-client-version"));
+          if (message) throw new APIError("UPGRADE_REQUIRED", { code: "DESKTOP_UPDATE_REQUIRED", message });
+        }
         if (ctx.path === "/send-verification-email") {
           const session = await getSessionFromCtx(ctx);
           if (!session || (session.user as { banned?: boolean }).banned) {
@@ -342,7 +351,9 @@ export function createAuth(prisma: PrismaLike) {
     databaseHooks: {
       session: {
         create: {
-          before: async (session) => {
+          before: async (session, context) => {
+            const headers = context?.request?.headers ?? context?.headers;
+            const clientPlatform = headers?.get("x-schoolhub-client") === "desktop" ? "desktop" : "web";
             const account = await (prisma as unknown as {
               user: {
                 findUnique: (args: unknown) => Promise<{ banned: boolean; role: string } | null>;
@@ -354,13 +365,16 @@ export function createAuth(prisma: PrismaLike) {
             if (account?.banned) {
               throw new APIError("FORBIDDEN", { message: "This account has been suspended." });
             }
+            if (account?.role === "superAdmin" && clientPlatform === "desktop") {
+              throw new APIError("FORBIDDEN", { code: "DESKTOP_SUPERADMIN_FORBIDDEN", message: "Platform administrators must use the web portal." });
+            }
             if (account?.role === "superAdmin") {
               const cap = new Date(Date.now() + SUPER_ADMIN_SESSION_SECONDS * 1000);
               const expiresAt =
                 session.expiresAt && session.expiresAt < cap ? session.expiresAt : cap;
-              return { data: { ...session, expiresAt } };
+              return { data: { ...session, expiresAt, clientPlatform } };
             }
-            return { data: session };
+            return { data: { ...session, clientPlatform } };
           },
         },
       },

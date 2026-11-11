@@ -1,3 +1,4 @@
+import { DESKTOP_ACCESS_EVENT, desktopAccessIssue } from "./access";
 import { invoke } from "@tauri-apps/api/core";
 
 // Used only to construct Request objects; Rust alone chooses the network origin.
@@ -41,6 +42,12 @@ export const desktopFetch: typeof fetch = async (input, init) => {
   // deliver their response into a cancelled or changed application context.
   if (request.signal.aborted)
     throw new DOMException("Request cancelled.", "AbortError");
+  if (result.status === 426 || result.status === 403) {
+    try {
+      const issue = desktopAccessIssue(result.status, JSON.parse(new TextDecoder().decode(new Uint8Array(result.body))));
+      if (issue) window.dispatchEvent(new CustomEvent(DESKTOP_ACCESS_EVENT, { detail: issue }));
+    } catch { /* Preserve the original HTTP error when a response is not JSON. */ }
+  }
   return new Response(
     [204, 205, 304].includes(result.status)
       ? null

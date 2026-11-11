@@ -6,6 +6,7 @@ on:
     paths:
       - 'apps/desktop/**'
       - 'apps/web/**'
+      - 'apps/api/**'
       - 'packages/shared/**'
       - 'pnpm-lock.yaml'
       - '.github/workflows/desktop-spike.yml'
@@ -14,6 +15,7 @@ on:
     paths:
       - 'apps/desktop/**'
       - 'apps/web/**'
+      - 'apps/api/**'
       - 'packages/shared/**'
       - 'pnpm-lock.yaml'
       - '.github/workflows/desktop-spike.yml'
@@ -95,3 +97,41 @@ jobs:
           $binary = Get-Item apps/desktop/src-tauri/target/release/schoolhub-desktop-spike.exe
           "Native executable bytes: $($binary.Length)" >> $env:GITHUB_STEP_SUMMARY
           "Unsigned feasibility binary only; installer, startup, RAM and runtime validation remain pending." >> $env:GITHUB_STEP_SUMMARY
+
+  server:
+    name: Desktop API policy and real authentication
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: schoolhub_desktop_api
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/schoolhub_desktop_api
+      TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/schoolhub_desktop_api
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 12.4.1
+          run_install: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @schoolhub/api typecheck
+      - run: pnpm --filter @schoolhub/api exec prisma migrate deploy --config prisma.config.ts
+      - run: pnpm --filter @schoolhub/api test
+      - run: pnpm --filter @schoolhub/api exec vitest run --config vitest.config.e2e.ts test/desktop-access.e2e-spec.ts
+      - run: node apps/api/scripts/route-inventory.mjs --check

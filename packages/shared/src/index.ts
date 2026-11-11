@@ -1064,7 +1064,12 @@ export function evaluateSubscriptionAccess(
 /** Machine-readable marker in the `error` field when a school's access is blocked. */
 export const SUBSCRIPTION_INACTIVE = "SUBSCRIPTION_INACTIVE";
 
+/** Reserved plan feature key used to license the desktop app. */
+export const DESKTOP_PLAN_FEATURE = "desktop";
+
 export const updateSubscriptionSchema = z.object({
+  /** null inherits the assigned plan, undefined preserves the current override. */
+  desktopEnabled: z.boolean().nullable().optional(),
   status: z.enum(SUBSCRIPTION_STATUSES),
   /** ISO date (YYYY-MM-DD) or full ISO timestamp. `null` clears the expiry. */
   expiresAt: z

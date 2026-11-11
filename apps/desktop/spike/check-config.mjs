@@ -9,3 +9,8 @@ assert.deepEqual(capability.permissions, ["allow-desktop-request"]);
 assert(!config.app.security.csp.includes('unsafe-eval'));
 assert(!config.app.security.csp.includes('https:'));
 console.log('Desktop configuration checks passed');
+
+const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url)));
+const cargo = readFileSync(new URL('../src-tauri/Cargo.toml', import.meta.url), 'utf8');
+assert.equal(config.version, pkg.version);
+assert.equal(cargo.match(/^version = "([^"]+)"/m)?.[1], pkg.version);

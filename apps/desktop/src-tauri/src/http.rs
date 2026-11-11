@@ -220,6 +220,8 @@ impl DesktopHttp {
                 let check = session
                     .client
                     .get(self.origin.join("/api/auth/get-session").unwrap())
+                    .header("x-schoolhub-client", "desktop")
+                    .header("x-schoolhub-client-version", env!("CARGO_PKG_VERSION"))
                     .bearer_auth(&token)
                     .send()
                     .await;

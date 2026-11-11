@@ -48,7 +48,7 @@ At launch, select the school code and sign in online. Rust handles the HTTP
 connection, bearer token and short-lived 2FA cookie jar. Redirects and
 SuperAdmin access are refused. Sessions live only in memory, so restarting
 requires signing in again. Real API and Windows runtime sign-in remain to be
-validated. The server does not yet enforce desktop licensing/session channels.
+validated. The server now enforces persisted desktop session channels, plan/school desktop entitlements and a minimum client version. Apply the session-channel migration before deploying the new API; enable desktop access in the web SuperAdmin plan or subscription editor.
 Downloads/printing still use browser helpers and are not accepted native
 features yet. No installer or updater is produced.
 

@@ -1,3 +1,4 @@
+import { desktopOverride, withDesktopOverride } from "../../common/desktop-policy.js";
 import { storeSchoolSmsConnection } from "../notifications/school-sms.service.js";
 import { temporaryPasswordExpiry } from "../../common/guards/password-change.js";
 import {
@@ -108,7 +109,7 @@ export class SuperAdminService {
           },
           subscription: {
             select: { planId: true, planName: true, amount: true, currency: true, billingCycle: true,
-              maxStudents: true, maxTeachers: true, maxGuardians: true, maxStaff: true },
+              maxStudents: true, maxTeachers: true, maxGuardians: true, maxStaff: true, settings: true },
           },
           _count: {
           select: {
@@ -335,6 +336,7 @@ export class SuperAdminService {
     const school = await this.prisma.client.school.findUnique({
       where: { id },
       include: {
+        subscription: { select: { planId: true, planName: true, amount: true, currency: true, billingCycle: true, settings: true } },
         organization: {
           include: {
             members: {
@@ -901,12 +903,17 @@ export class SuperAdminService {
         canceledAt: input.status === "CANCELLED" ? new Date() : null,
         cancelAtPeriodEnd: false,
       };
-      await tx.subscription.upsert({
+      const billing = await tx.subscription.upsert({
         where: { schoolId: id },
         update: common,
         create: { schoolId: id, ...common },
       });
 
+      // The upsert holds the row lock, so preserve unrelated settings under it.
+      if (input.desktopEnabled !== undefined) {
+        await tx.subscription.update({ where: { schoolId: id },
+          data: { settings: withDesktopOverride(billing.settings, input.desktopEnabled) as Prisma.InputJsonValue } });
+      }
       await writeAudit(tx, actor, {
         action: "SUBSCRIPTION_CHANGED",
         entityType: "super-admin.subscription.update",
@@ -914,9 +921,11 @@ export class SuperAdminService {
         schoolId: id,
         oldValues: {
           status: school.organization.subscriptionStatus,
+          desktopEnabled: desktopOverride(billing.settings),
           expiresAt: school.organization.expiresAt,
         },
-        newValues: { status: input.status, expiresAt: nextExpiry, note: input.note ?? null },
+        newValues: { status: input.status, expiresAt: nextExpiry, note: input.note ?? null,
+          desktopEnabled: input.desktopEnabled === undefined ? desktopOverride(billing.settings) : input.desktopEnabled },
       });
     });
 

@@ -119,6 +119,8 @@ model session {
   activeOrganizationId String?
   // Required by impersonation (admin plugin)
   impersonatedBy       String?
+  // Server-owned origin channel; never writable by auth request bodies.
+  clientPlatform       String   @default("web")
 
   user user @relation(fields: [userId], references: [id], onDelete: Cascade)
 

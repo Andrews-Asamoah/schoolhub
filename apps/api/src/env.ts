@@ -8,6 +8,7 @@ export const env = z
     BETTER_AUTH_SECRET: z.string().min(32),
     BETTER_AUTH_URL: z.url(),
     WEB_ORIGIN: z.url(),
+    DESKTOP_MIN_VERSION: z.string().regex(/^(0|[1-9]\d{0,8})\.(0|[1-9]\d{0,8})\.(0|[1-9]\d{0,8})$/).default("0.1.0"),
     PORT: z.coerce.number().default(3001),
     NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
     // Number of reverse proxies in front of the API ("1" for one load balancer).
