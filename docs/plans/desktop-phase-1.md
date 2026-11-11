@@ -92,7 +92,7 @@ SuperAdmin portal; the migration does not grant access to any school.
 | Native import and shell-config checks | Passed |
 | API typecheck and unit suite | Passed; 754 tests passed, 171 database-dependent tests skipped locally |
 | API lint | Passed with existing warnings outside this change |
-| Real desktop authentication/database test | Added to CI; local server startup is blocked by socket restrictions |
+| Real desktop authentication/database test | 4 tests passed in PostgreSQL CI; local server startup is blocked by socket restrictions |
 | Standard web production bundle | Passed, native modules excluded by build guard |
 | Desktop production bundle | Passed, SuperAdmin/application modules excluded by build guard |
 | Existing 100-round outbox model | Passed in Phase 0; unchanged |
@@ -101,12 +101,26 @@ Transport tests run against a synthetic local HTTP fixture, not the live
 SchoolHub API. They prove the transport mechanisms but do not prove production
 Better Auth compatibility or Windows WebView behavior.
 
+## Server CI evidence
+
+[Run 43022401747](https://github.com/Andrews-Asamoah/schoolhub/actions/runs/43022401747)
+validates source commit `201c17d`. The API job passed migrations, typecheck,
+754 API unit tests, all 4 real Better Auth/PostgreSQL tests and the route
+inventory check. The outbox/cursor job also passed. The Windows job is still
+running at this checkpoint; this document does not mark it passed.
+
+The real-session tests verify persisted channels, live plan/override checks,
+old-version refusal, normal browser sign-in, SuperAdmin API rejection after
+role changes, and refusal to issue native SuperAdmin sessions. Tests resolve
+signed bearer credentials through Better Auth and inspect persisted rows by
+the verified session ID, not by assuming that bearer text is a raw DB token.
+
 ## Remaining before R1
 
 | Requirement | Work still required |
 | --- | --- |
 | Production authentication | Test real API password change, TOTP, backup codes, expired/revoked sessions and tenant selection on Windows |
-| Server SuperAdmin exclusion | Implemented; real PostgreSQL/authentication CI verification required |
+| Server SuperAdmin exclusion | Implemented and verified by real PostgreSQL/authentication CI; deployment must apply migration |
 | Desktop entitlement | Implemented: plan checkbox, school override, tenant checks and refusal UI; deployment must apply migration and configure licenses |
 | Client version gate | Implemented: stable minimum policy, 426 API/auth responses and desktop update screen |
 | Credential persistence | OS-protected storage and restart/lock/account isolation; current sessions are in memory only |
