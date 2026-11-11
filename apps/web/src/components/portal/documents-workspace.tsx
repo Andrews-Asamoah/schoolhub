@@ -8,7 +8,7 @@ import { useSchoolRole } from "@/components/school/school-role-switcher";
 import { apiDownload, apiFetch } from "@/lib/api";
 
 import { useSchoolOrganization } from "@/components/school/school-organization";
-import { useDebouncedValue } from "@/components/superadmin/use-debounced-value";
+import { useDebouncedValue } from "@/lib/use-debounced-value";
 
 interface SchoolDocument {
   id: string;

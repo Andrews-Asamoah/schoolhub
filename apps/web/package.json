@@ -10,7 +10,9 @@
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "lint:theme": "node scripts/check-theme.mjs",
-    "audit:theme": "node scripts/audit-theme-contrast.mjs"
+    "audit:theme": "node scripts/audit-theme-contrast.mjs",
+    "build:desktop": "node scripts/build-desktop.mjs",
+    "dev:desktop": "node scripts/build-desktop.mjs --dev"
   },
   "dependencies": {
     "@radix-ui/react-select": "^2.4.1",
@@ -21,6 +23,7 @@
     "@tanstack/react-query-devtools": "^5.105.0",
     "@tanstack/react-router": "^1.170.46",
     "@tanstack/react-table": "^9.3.1",
+    "@tauri-apps/api": "^2.12.4",
     "better-auth": "^1.7.14",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
@@ -44,7 +47,7 @@
     "@vitejs/plugin-react": "^6.1.2",
     "tailwindcss": "^4.3.3",
     "typescript": "^7.0.2",
-    "vitest": "^5.0.5",
-    "vite": "^8.3.5"
+    "vite": "^8.3.5",
+    "vitest": "^5.0.5"
   }
 }

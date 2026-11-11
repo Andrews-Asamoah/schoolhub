@@ -2,7 +2,15 @@ name: Desktop feasibility spike
 
 on:
   pull_request:
-    branches: [dev]
+    branches: [dev, desktop-version]
+    paths:
+      - 'apps/desktop/**'
+      - 'apps/web/**'
+      - 'packages/shared/**'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/desktop-spike.yml'
+  push:
+    branches: [desktop-version]
     paths:
       - 'apps/desktop/**'
       - 'apps/web/**'
@@ -43,6 +51,7 @@ jobs:
         with:
           node-version: 24
       - run: node apps/desktop/spike/check-config.mjs
+      - run: node apps/desktop/spike/check-boundaries.mjs
       - run: node --test apps/desktop/spike/*.test.mjs
       - name: Prove serialized cursor commit and rollback ordering
         env:
@@ -70,10 +79,14 @@ jobs:
         run: |
           pnpm --filter @schoolhub/shared build
           pnpm --filter @schoolhub/web build
+          pnpm --filter @schoolhub/web test
+          pnpm --filter @schoolhub/web build:desktop
       - name: Test encrypted storage, wrong keys and atomic outbox
         working-directory: apps/desktop/src-tauri
         run: cargo test --locked --lib
       - name: Build the native shell with the actual web assets
+        env:
+          SCHOOLHUB_API_ORIGIN: https://api.schoolhub.invalid
         working-directory: apps/desktop/src-tauri
         run: cargo build --locked --release --features shell,custom-protocol
       - name: Report executable size (not installer size)

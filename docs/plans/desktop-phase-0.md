@@ -3,6 +3,10 @@
 Started 11 November 2026 from dev `d3ed87c4ccf4c889eba65fd7a36b9209afc33a91`.
 Status: **in progress; no go/no-go decision yet**.
 
+Phase 1 foundation work has started at the user’s request; see
+[desktop-phase-1.md](desktop-phase-1.md). The descriptions below record the
+original Phase 0 increment, rather than the latest shell capabilities.
+
 Desktop work targets the `desktop-version` branch.
 
 The source plan is the [9 November offline-first desktop proposal](desktop-offline-first-proposal.txt). This first

@@ -4,16 +4,16 @@
   "version": "0.0.0",
   "identifier": "com.schoolhub.desktop.spike",
   "build": {
-    "beforeBuildCommand": "pnpm --filter @schoolhub/web build",
-    "beforeDevCommand": "pnpm --filter @schoolhub/web dev",
+    "beforeBuildCommand": "pnpm --filter @schoolhub/web build:desktop",
+    "beforeDevCommand": "pnpm --filter @schoolhub/web dev:desktop",
     "devUrl": "http://localhost:5173",
-    "frontendDist": "../../web/dist"
+    "frontendDist": "../../web/dist-desktop"
   },
   "app": {
     "windows": [
       {
         "label": "main",
-        "title": "SchoolHub — Feasibility Spike (synthetic data only)",
+        "title": "SchoolHub \u2014 Feasibility Spike (synthetic data only)",
         "width": 1280,
         "height": 800,
         "minWidth": 960,
@@ -23,7 +23,9 @@
     ],
     "security": {
       "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' ipc: http://ipc.localhost; object-src 'none'; base-uri 'self'; frame-src 'none'; form-action 'none'",
-      "capabilities": ["main"]
+      "capabilities": [
+        "main"
+      ]
     }
   },
   "bundle": {

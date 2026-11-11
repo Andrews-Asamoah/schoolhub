@@ -3,6 +3,7 @@ node_modules/
 
 # Build outputs and framework caches
 dist/
+dist-desktop/
 build/
 .next/
 out/

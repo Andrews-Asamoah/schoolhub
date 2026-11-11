@@ -1,3 +1,4 @@
+import { platform } from "@schoolhub/platform";
 import { requestContextVersion, assertRequestContext } from "./request-context";
 import { getTenantSubdomain as getClientSubdomain } from "./tenant-subdomain";
 import { downloadBlob, XLSX_MIME } from "./download";
@@ -18,7 +19,7 @@ import { downloadBlob, XLSX_MIME } from "./download";
  *   });
  */
 
-const API_BASE = import.meta.env.VITE_API_URL ?? "/api";
+const API_BASE = platform.apiBase;
 
 export class ApiError extends Error {
   constructor(
@@ -86,7 +87,7 @@ export async function apiFetch<T>(
     }
   }
 
-  const res = await fetch(`${API_BASE}${path}`, {
+  const res = await platform.fetch(`${API_BASE}${path}`, {
     ...init,
     credentials: "include", // send session cookie
     headers,
@@ -173,7 +174,7 @@ async function apiBinary(path: string): Promise<Response> {
     }
   }
 
-  const response = await fetch(`${API_BASE}${path}`, {
+  const response = await platform.fetch(`${API_BASE}${path}`, {
     method: "GET",
     credentials: "include",
     cache: "no-store",
@@ -228,7 +229,7 @@ export async function downloadAcademicReport(path: string, filename: string): Pr
   const role = typeof window !== "undefined" ?
     window.localStorage.getItem("schoolhub-active-role") : null;
   if (role) headers.set("x-school-role", role);
-  const result = await fetch(`${API_BASE}${path}`,{
+  const result = await platform.fetch(`${API_BASE}${path}`,{
     method:"GET",credentials:"include",headers,cache:"no-store",
   });
   if (!result.ok) {
@@ -258,7 +259,7 @@ export async function downloadPrivateExcel(path:string,filename:string):Promise<
     const role=window.localStorage.getItem("schoolhub-active-role");
     if(role)headers.set("x-school-role",role);
   }
-  const response=await fetch(`${API_BASE}${path}`,{
+  const response=await platform.fetch(`${API_BASE}${path}`,{
     credentials:"include",headers,cache:"no-store",
   });
   if(!response.ok){
