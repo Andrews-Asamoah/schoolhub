@@ -21,6 +21,8 @@ import {
 type Status = "PENDING" | "APPROVED" | "REJECTED" | "CANCELLED";
 const STATUSES: readonly Status[] = ["PENDING", "APPROVED", "REJECTED", "CANCELLED"];
 const PAGE = 50;
+/** Roles that may apply a correction without a second person approving it. */
+const DIRECT_CORRECTION_ROLES: readonly string[] = ["owner", "admin"];
 
 /**
  * Corrections to marks on a sheet that is locked, signed off or past its
@@ -38,6 +40,9 @@ export class AssessmentCorrectionService {
 
   async request(school: School, userId: string, role: string | undefined, input: RequestMarkCorrectionInput) {
     const db = this.prisma.client;
+    if (input.applyNow && !DIRECT_CORRECTION_ROLES.includes(role ?? "")) {
+      throw new ForbiddenException("Only the owner or an administrator can apply a correction straight away.");
+    }
     const ctx = await this.entry.loadContext(school.id, userId, role, input.classId, input.subjectId);
     const template = ctx.templates.find((item) => item.id === input.templateId);
     if (!template) throw new BadRequestException("That assessment does not apply to this class and subject.");
@@ -76,8 +81,9 @@ export class AssessmentCorrectionService {
     const changes = effectiveChanges(input.items, current);
     if (changes.length === 0) throw new BadRequestException("Those marks are already what is recorded. Nothing to correct.");
 
+    let outcome: { id: string; cells: number; lock: string | null };
     try {
-      return await db.$transaction(async (tx) => {
+      outcome = await db.$transaction(async (tx) => {
         const created = await tx.assessmentMarkCorrection.create({
           data: {
             schoolId: school.id,
@@ -109,7 +115,7 @@ export class AssessmentCorrectionService {
           select: { userId: true },
         });
         const recipients = approvers.filter((member) => member.userId !== userId);
-        if (recipients.length) {
+        if (recipients.length && !input.applyNow) {
           await tx.notification.createMany({
             data: recipients.map((member) => ({
               schoolId: school.id,
@@ -124,7 +130,7 @@ export class AssessmentCorrectionService {
         await tx.auditLog.create({
           data: {
             schoolId: school.id, userId, action: "CREATE", entityType: "AssessmentMarkCorrection", entityId: created.id,
-            newValues: { cells: changes.length, reason: input.reason, lock },
+            newValues: { cells: changes.length, reason: input.reason, lock, applyNow: input.applyNow },
           },
         });
         return { id: created.id, cells: changes.length, lock: lock ? LOCK_MESSAGES[lock] : null };
@@ -133,6 +139,21 @@ export class AssessmentCorrectionService {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
         throw new ConflictException("A correction for this sheet is already waiting for review. Ask an approver to decide it first.");
       }
+      throw error;
+    }
+    if (!input.applyNow) return { ...outcome, applied: false, publishedReports: [] as { id: string; name: string }[] };
+
+    // The same writer and audit trail as an approved request, so totals, grades and positions
+    // stay right and the old and new marks are kept. Only the second-person step is skipped.
+    try {
+      const decided = await this.review(school, userId, role, outcome.id, { decision: "APPROVE", reason: input.reason }, { allowSelf: true });
+      return { ...outcome, applied: true, publishedReports: decided.publishedReports };
+    } catch (error) {
+      // Nothing was applied, so do not leave a request hanging for someone else to approve.
+      await db.assessmentMarkCorrection.updateMany({
+        where: { id: outcome.id, schoolId: school.id, status: "PENDING" },
+        data: { status: "CANCELLED", reviewedById: userId, reviewedAt: new Date() },
+      });
       throw error;
     }
   }
@@ -206,12 +227,12 @@ export class AssessmentCorrectionService {
     }));
   }
 
-  async review(school: School, reviewerId: string, role: string | undefined, id: string, input: ReviewMarkCorrectionInput) {
+  async review(school: School, reviewerId: string, role: string | undefined, id: string, input: ReviewMarkCorrectionInput, options: { allowSelf?: boolean } = {}) {
     const db = this.prisma.client;
     const correction = await db.assessmentMarkCorrection.findFirst({ where: { id, schoolId: school.id }, include: { items: true } });
     if (!correction) throw new NotFoundException("Correction request not found.");
     if (correction.status !== "PENDING") throw new ConflictException("This request has already been decided.");
-    const problem = approvalProblem({ role, reviewerId, requesterId: correction.requestedById });
+    const problem = approvalProblem({ role, reviewerId, requesterId: correction.requestedById, allowSelf: options.allowSelf });
     if (problem) throw new ForbiddenException(problem);
 
     const rejecting = input.decision === "REJECT";

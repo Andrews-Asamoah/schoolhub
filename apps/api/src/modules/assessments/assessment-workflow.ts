@@ -178,6 +178,8 @@ export interface ApprovalCheck {
   role: string | undefined;
   reviewerId: string;
   requesterId: string | null;
+  /** An owner or administrator applying their own correction directly. */
+  allowSelf?: boolean;
 }
 
 /** Only approvers decide, and nobody but an owner approves their own request. */
@@ -185,7 +187,7 @@ export function approvalProblem(input: ApprovalCheck): string | null {
   if (!(CORRECTION_APPROVER_ROLES as readonly string[]).includes(input.role ?? "")) {
     return "Only the owner, an administrator or the headteacher can decide a correction.";
   }
-  if (input.requesterId === input.reviewerId && input.role !== "owner") {
+  if (input.requesterId === input.reviewerId && input.role !== "owner" && !input.allowSelf) {
     return "You cannot approve a correction you requested. Ask the owner or another approver.";
   }
   return null;

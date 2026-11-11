@@ -1,6 +1,6 @@
 import { BadRequestException, Body, Controller, Get, Param, Patch, Post, Put, Query, Res, UseGuards } from "@nestjs/common";
 import type { School } from "@prisma/client";
-import { createReportSetSchema, type CreateReportSetInput } from "@schoolhub/shared";
+import { createReportSetSchema, reopenReportSetSchema, type CreateReportSetInput, type ReopenReportSetInput } from "@schoolhub/shared";
 import { z } from "zod";
 import { ZodValidationPipe } from "../../common/pipes/zod-validation.pipe.js";
 import { CurrentSchool } from "../../common/decorators/current-school.decorator.js";
@@ -200,6 +200,13 @@ export class ReportPublicationController {
   @Roles("owner", "admin", "headteacher")
   generate(@CurrentSchool() school: School, @CurrentUser() user: AuthenticatedUser, @Param("id") id: string) {
     return this.reports.generate(school.id, user.id, id);
+  }
+
+  /** Owner or administrator only: a published batch has wrong marks and must be regenerated. */
+  @Post("sets/:id/reopen")
+  @Roles("owner", "admin")
+  reopen(@CurrentSchool() school: School, @CurrentUser() user: AuthenticatedUser, @Param("id") id: string, @Body(new ZodValidationPipe(reopenReportSetSchema)) body: ReopenReportSetInput) {
+    return this.reports.reopen(school.id, user.id, id, body.reason);
   }
 
   @Patch("sets/:id/review")

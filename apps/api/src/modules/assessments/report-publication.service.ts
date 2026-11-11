@@ -340,6 +340,28 @@ export class ReportPublicationService {
     });
   }
 
+  /**
+   * Takes a published batch back to "generated" so corrected marks can be regenerated.
+   * Families stop seeing the old reports until the batch is approved and published again.
+   * The published snapshots are kept as history (superseded), never edited or deleted.
+   */
+  async reopen(schoolId: string, actorId: string, setId: string, reason: string) {
+    return this.prisma.client.$transaction(async (tx) => {
+      const set = await tx.reportCardSet.findFirst({ where: { id: setId, schoolId }, select: { id: true, name: true, status: true } });
+      if (!set) throw new NotFoundException("Report batch not found.");
+      if (set.status !== "PUBLISHED") throw new ConflictException("Only a published batch can be reopened.");
+      const claimed = await tx.reportCardSet.updateMany({
+        where: { id: set.id, schoolId, status: "PUBLISHED" },
+        data: { status: "GENERATED", isReviewed: false, reviewedAt: null, publishedAt: null },
+      });
+      if (claimed.count !== 1) throw new ConflictException("The report batch changed; reload and try again.");
+      const superseded = await tx.reportCardVersion.updateMany({ where: { setId: set.id, schoolId, stage: "PUBLISHED" }, data: { stage: "SUPERSEDED" } });
+      await tx.reportCard.updateMany({ where: { setId: set.id }, data: { publishedAt: null } });
+      await tx.auditLog.create({ data: { schoolId, userId: actorId, action: "UPDATE", entityType: "REPORT_CARD_SET", entityId: set.id, newValues: { operation: "REOPEN", reason, supersededVersions: superseded.count } } });
+      return { id: set.id, name: set.name, status: "GENERATED" as const };
+    });
+  }
+
   async publish(schoolId: string, actorId: string, setId: string) {
     return this.prisma.client.$transaction(async (tx) => {
       const set = await tx.reportCardSet.findFirst({ where: { id: setId, schoolId }, include: { _count: { select: { reportCards: true } } } });
