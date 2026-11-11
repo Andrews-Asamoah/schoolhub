@@ -44,6 +44,7 @@ model School {
   attendanceBatchReplays      AttendanceBatchReplay[]
   assessmentTemplates         AssessmentTemplate[]
   reportCardVersions          ReportCardVersion[]
+  reportRecommendationDrafts  ReportRecommendationDraft[]
   externalExamSessions ExternalExamSession[]
   externalExamImports ExternalExamImport[]
   bills                       Bill[]
@@ -221,6 +222,7 @@ model Student {
   @@index([schoolId, deletedAt])
   @@map("students")
   reportCardVersions ReportCardVersion[]
+  reportRecommendationDrafts ReportRecommendationDraft[]
   externalExamCandidates ExternalExamCandidate[]
 }
 

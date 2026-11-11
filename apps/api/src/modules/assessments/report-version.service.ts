@@ -1,5 +1,5 @@
 import {
-  ConflictException, ForbiddenException, Injectable,
+  BadRequestException, ConflictException, ForbiddenException, HttpException, Injectable,
   NotFoundException,
 } from "@nestjs/common";
 import { PrismaService } from "../../prisma/prisma.service.js";
@@ -9,6 +9,8 @@ import { sniffImage } from "../storage/image-validation.js";
 import { academicReportPdf, snapshotHash, type AcademicSnapshot } from "./report-version.js";
 
 const MAX_SIGNATURE_BYTES = 400 * 1024;
+/** Upper bound for one bulk sign-off; each row is its own transaction. */
+export const MAX_BULK_RECOMMENDATIONS = 100;
 
 @Injectable()
 export class ReportVersionService {
@@ -52,17 +54,94 @@ export class ReportVersionService {
       take: 2000,
     });
     const seen = new Set<string>();
-    return versions.filter(v => {
+    const latest = versions.filter(v => {
       const key = v.setId + ":" + v.studentId;
       if (seen.has(key)) return false;
       seen.add(key);
       return true;
-    }).map(({ snapshot, ...v }) => ({
-      ...v,
-      subjects: (snapshot as unknown as AcademicSnapshot).report.subjects?.map(item => ({
-        name: item.subject.name, grade: item.grade, percentage: item.percentage,
-      })) ?? [],
-    }));
+    });
+    const drafts = latest.length
+      ? await this.prisma.client.reportRecommendationDraft.findMany({
+          where: { schoolId, setId: { in: [...new Set(latest.map(v => v.setId))] },
+            studentId: { in: [...new Set(latest.map(v => v.studentId))] } },
+          select: { setId: true, studentId: true, remark: true },
+        })
+      : [];
+    const draftByKey = new Map(drafts.map(d => [d.setId + ":" + d.studentId, d.remark]));
+    return latest.map(({ snapshot, ...v }) => {
+      const report = (snapshot as unknown as AcademicSnapshot).report;
+      return {
+        ...v,
+        average: report.summary?.average ?? null,
+        position: report.summary?.overallPosition ?? null,
+        classSize: report.summary?.classSize ?? null,
+        draftRemark: v.stage === "GENERATED" ? (draftByKey.get(v.setId + ":" + v.studentId) ?? null) : null,
+        subjects: report.subjects?.map(item => ({
+          name: item.subject.name, grade: item.grade, percentage: item.percentage,
+        })) ?? [],
+      };
+    });
+  }
+
+  /**
+   * Autosave a recommendation while the class teacher is still writing it. A draft never changes
+   * the report; an empty text removes it. Only the appointed class teacher of the pupil's class may
+   * save one, and only while the latest version is still waiting for a recommendation.
+   */
+  async saveDraft(schoolId: string, userId: string, versionId: string, remark: string) {
+    const text = remark.trim();
+    if (text.length > 2000) throw new BadRequestException("A recommendation can be at most 2000 characters.");
+    const assignments = await this.teacherScope.getAssignments(schoolId, userId);
+    const v = await this.prisma.client.reportCardVersion.findFirst({
+      where: { id: versionId, schoolId },
+      select: { id: true, setId: true, studentId: true, classId: true, stage: true, set: { select: { status: true } } },
+    });
+    if (!v) throw new NotFoundException("Student report version not found.");
+    if (!assignments.teacherId || !assignments.classTeacherClassIds.includes(v.classId)) {
+      throw new ForbiddenException("Only the assigned class teacher may write a recommendation for this pupil.");
+    }
+    if (v.set.status !== "GENERATED" || v.stage !== "GENERATED") {
+      throw new ConflictException("This report is no longer waiting for a recommendation.");
+    }
+    const newest = await this.prisma.client.reportCardVersion.findFirst({
+      where: { setId: v.setId, studentId: v.studentId }, orderBy: { version: "desc" }, select: { id: true },
+    });
+    if (newest?.id !== v.id) throw new ConflictException("This version has been superseded. Reload the list.");
+    if (!text) {
+      await this.prisma.client.reportRecommendationDraft.deleteMany({ where: { schoolId, setId: v.setId, studentId: v.studentId } });
+      return { id: v.id, saved: false };
+    }
+    await this.prisma.client.reportRecommendationDraft.upsert({
+      where: { setId_studentId: { setId: v.setId, studentId: v.studentId } },
+      create: { schoolId, setId: v.setId, studentId: v.studentId, authorId: userId, remark: text, source: "MANUAL" },
+      update: { authorId: userId, remark: text, source: "MANUAL" },
+    });
+    return { id: v.id, saved: true };
+  }
+
+  /**
+   * Sign off several recommendations at once. Each row goes through recommend() in its own
+   * transaction, so one pupil's failure (a superseded version, a missing remark) never blocks the rest,
+   * and the result says what happened to each.
+   */
+  async bulkRecommend(schoolId: string, userId: string, items: { id: string; remark: string }[]) {
+    if (!items.length) throw new BadRequestException("Choose at least one pupil.");
+    if (items.length > MAX_BULK_RECOMMENDATIONS) {
+      throw new BadRequestException(`Sign off at most ${MAX_BULK_RECOMMENDATIONS} recommendations at a time.`);
+    }
+    if (new Set(items.map(i => i.id)).size !== items.length) throw new BadRequestException("A pupil appears more than once.");
+    const results: { id: string; ok: boolean; error?: string }[] = [];
+    for (const item of items) {
+      try {
+        const remark = item.remark.trim();
+        if (remark.length < 10 || remark.length > 2000) throw new BadRequestException("Write a recommendation of 10–2000 characters.");
+        await this.recommend(schoolId, userId, item.id, remark);
+        results.push({ id: item.id, ok: true });
+      } catch (error) {
+        results.push({ id: item.id, ok: false, error: error instanceof HttpException ? error.message : "This recommendation could not be saved." });
+      }
+    }
+    return { total: items.length, succeeded: results.filter(r => r.ok).length, results };
   }
 
   async recommend(schoolId: string, userId: string, versionId: string, remark: string) {
@@ -98,6 +177,7 @@ export class ReportVersionService {
           teacherName: actor.name.slice(0,160), teacherRemark: remark.trim(), teacherApprovedAt: time, teacherSignature: signature },
       });
       if (result.count !== 1) throw new ConflictException("This report changed while being reviewed.");
+      await tx.reportRecommendationDraft.deleteMany({ where: { schoolId, setId: v.setId, studentId: v.studentId } });
       await tx.auditLog.create({ data: { schoolId, userId: actor.id, action: "UPDATE",
         entityType: "REPORT_CARD_VERSION", entityId: v.id,
         newValues: { stage: "TEACHER_REVIEWED", version: v.version,

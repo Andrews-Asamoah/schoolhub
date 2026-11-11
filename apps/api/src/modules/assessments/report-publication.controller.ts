@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Get, Param, Patch, Post, Res, UseGuards } from "@nestjs/common";
+import { BadRequestException, Body, Controller, Get, Param, Patch, Post, Put, Res, UseGuards } from "@nestjs/common";
 import type { School } from "@prisma/client";
 import { createReportSetSchema, type CreateReportSetInput } from "@schoolhub/shared";
 import { ZodValidationPipe } from "../../common/pipes/zod-validation.pipe.js";
@@ -32,6 +32,30 @@ export class ReportPublicationController {
   @Roles("teacher")
   getTeacherReviewQueue(@CurrentSchool() school: School, @CurrentUser() user: AuthenticatedUser) {
     return this.versions.teacherQueue(school.id, user.id);
+  }
+
+  /** Autosave: the text may be unfinished, and an empty text clears the draft. */
+  @Put("versions/:id/draft")
+  @Roles("teacher")
+  saveDraft(@CurrentSchool() school: School, @CurrentUser() user: AuthenticatedUser,
+    @Param("id") id: string, @Body() body: unknown) {
+    const remark = body && typeof body === "object" && "remark" in body ? (body as { remark: unknown }).remark : undefined;
+    if (typeof remark !== "string") throw new BadRequestException("Send the recommendation text.");
+    return this.versions.saveDraft(school.id, user.id, id, remark);
+  }
+
+  @Post("versions/bulk-recommend")
+  @Roles("teacher")
+  bulkRecommend(@CurrentSchool() school: School, @CurrentUser() user: AuthenticatedUser, @Body() body: unknown) {
+    const raw = body && typeof body === "object" && "items" in body ? (body as { items: unknown }).items : undefined;
+    if (!Array.isArray(raw)) throw new BadRequestException("Send the pupils to sign off as a list called items.");
+    const items = raw.map((row) => {
+      const id = row && typeof row === "object" ? (row as { id?: unknown }).id : undefined;
+      const remark = row && typeof row === "object" ? (row as { remark?: unknown }).remark : undefined;
+      if (typeof id !== "string" || !id || typeof remark !== "string") throw new BadRequestException("Each item needs an id and a remark.");
+      return { id, remark };
+    });
+    return this.versions.bulkRecommend(school.id, user.id, items);
   }
 
   @Post("versions/:id/recommend")

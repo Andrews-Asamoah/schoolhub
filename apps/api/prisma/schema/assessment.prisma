@@ -361,6 +361,7 @@ model ReportCardSet {
   assessmentTemplate AssessmentTemplate? @relation(fields: [assessmentTemplateId], references: [id], onDelete: Restrict)
   reportCards  ReportCard[]
   versions      ReportCardVersion[]
+  recommendationDrafts ReportRecommendationDraft[]
 
   @@index([assessmentTemplateId])
   @@index([schoolId])
@@ -512,6 +513,29 @@ model ReportCardVersion {
   @@index([schoolId, classId, stage])
   @@index([studentId, publishedAt])
   @@map("report_card_versions")
+}
+
+/// A class teacher's unsent recommendation for one pupil in one report batch, autosaved while they work.
+/// It is not part of the report: signing off writes the recommendation onto the report version and
+/// removes the draft. `source` records where the text came from so generated drafts can be told apart later.
+model ReportRecommendationDraft {
+  id        String   @id @default(cuid())
+  schoolId  String
+  setId     String
+  studentId String
+  authorId  String
+  remark    String   @db.VarChar(2000)
+  source    String   @default("MANUAL") @db.VarChar(16)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  school  School        @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  set     ReportCardSet @relation(fields: [setId], references: [id], onDelete: Cascade)
+  student Student       @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([setId, studentId])
+  @@index([schoolId, authorId])
+  @@map("report_recommendation_drafts")
 }
 
 /// Server-side replay guard for offline attendance batch retries.
