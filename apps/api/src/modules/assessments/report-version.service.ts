@@ -269,6 +269,91 @@ export class ReportVersionService {
     });
   }
 
+  /**
+   * A generated report as the school's own staff see it, before or after approval. School management
+   * may open any pupil's report; a class teacher only their own class's. Signatories who have not
+   * approved yet are shown with their uploaded signature and flagged as awaiting approval.
+   */
+  private async loadPreview(schoolId: string, actor: { id: string; role: string }, versionId: string) {
+    const db = this.prisma.client;
+    const version = await db.reportCardVersion.findFirst({
+      where: { id: versionId, schoolId },
+      include: {
+        set: { select: { name: true } },
+        student: { select: { admissionNumber: true, profile: { select: { user: { select: { image: true } } } } } },
+      },
+    });
+    if (!version) throw new NotFoundException("Student report version not found.");
+    if (actor.role === "teacher") {
+      const assignments = await this.teacherScope.getAssignments(schoolId, actor.id);
+      if (!assignments.classTeacherClassIds.includes(version.classId)) {
+        throw new ForbiddenException("Only the class teacher or school management may open this report.");
+      }
+    }
+    if (snapshotHash(version.snapshot) !== version.snapshotHash) {
+      throw new ConflictException("Stored academic report failed integrity verification.");
+    }
+    const bothApproved = !!version.teacherApprovedAt && !!version.headApprovedAt;
+    const designated = bothApproved ? null : await this.assets.designatedSignatories(schoolId, version.classId);
+    const signatures = await this.assets.approvalSignatures(schoolId, {
+      teacherActorId: version.teacherActorId ?? designated?.teacher?.userId ?? null,
+      teacherSignature: version.teacherSignature,
+      headActorId: version.headActorId ?? designated?.head?.userId ?? null,
+      headSignature: version.headSignature,
+    });
+    return {
+      version,
+      snapshot: version.snapshot as unknown as AcademicSnapshot,
+      teacher: { name: version.teacherName ?? designated?.teacher?.name ?? null, signature: signatures.teacher },
+      head: { name: version.headName ?? designated?.head?.name ?? null, signature: signatures.head },
+    };
+  }
+
+  /** Everything the report screen needs to draw one pupil's report, with signatures and photo. */
+  async previewVersion(schoolId: string, actor: { id: string; role: string }, versionId: string) {
+    const { version, snapshot, teacher, head } = await this.loadPreview(schoolId, actor, versionId);
+    const school = await this.prisma.client.school.findUnique({
+      where: { id: schoolId },
+      select: { name: true, code: true, logo: true, motto: true, address: true, phone: true, email: true, website: true, primaryColor: true },
+    });
+    return {
+      version: { id: version.id, version: version.version, stage: version.stage, publishedAt: version.publishedAt },
+      school,
+      set: { name: snapshot.set, academicYear: snapshot.year, term: snapshot.term, template: snapshot.template },
+      pupil: {
+        name: snapshot.student.name,
+        admissionNumber: snapshot.student.admissionNumber,
+        className: snapshot.report.student?.class?.name ?? null,
+        photo: version.student.profile?.user?.image ?? null,
+      },
+      report: { summary: snapshot.report.summary ?? null, attendance: snapshot.report.attendance ?? null, subjects: snapshot.report.subjects ?? [], remarks: snapshot.report.remarks ?? [] },
+      approval: {
+        teacher: { name: teacher.name, remark: version.teacherRemark, signature: teacher.signature, approved: !!version.teacherApprovedAt },
+        head: { name: head.name, remark: version.headRemark, signature: head.signature, approved: !!version.headApprovedAt },
+      },
+    };
+  }
+
+  /** The same report as a PDF with the school's letterhead, the pupil's photo and both signatures. */
+  async previewPdf(schoolId: string, actor: { id: string; role: string }, versionId: string) {
+    const { version, snapshot, teacher, head } = await this.loadPreview(schoolId, actor, versionId);
+    const [photo, letterhead] = await Promise.all([
+      this.assets.studentPhoto(schoolId, version.studentId),
+      this.assets.letterhead(schoolId),
+    ]);
+    const final = !!version.teacherApprovedAt && !!version.headApprovedAt && !!version.publishedAt;
+    return {
+      filename: `academic-report-${(version.student.admissionNumber ?? version.studentId).replace(/[^A-Za-z0-9_-]/g, "_")}-v${version.version}.pdf`,
+      pdf: academicReportPdf(snapshot, {
+        version: version.version, snapshotHash: version.snapshotHash,
+        teacherName: teacher.name, teacherRemark: version.teacherRemark, teacherApprovedAt: version.teacherApprovedAt,
+        headName: head.name, headRemark: version.headRemark, headApprovedAt: version.headApprovedAt,
+        publishedAt: version.publishedAt, teacherSignature: teacher.signature, headSignature: head.signature,
+        preview: !final,
+      }, { letterhead, photo }),
+    };
+  }
+
   /** Authorisation for PDF downloads is checked on every request, never via public R2 URLs. */
   /**
    * `audience` "staff" skips the pupil/guardian ownership check because the caller (the archive

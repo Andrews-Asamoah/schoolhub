@@ -70,6 +70,40 @@ export class ReportAssetsService {
     return { teacher, head };
   }
 
+  /**
+   * Who signs reports for a class: its current class teacher and the school's headteacher.
+   * Used to show their uploaded signatures on reports that are generated but not yet approved,
+   * so a school can see and print the report as it will look. If the school has more than one
+   * headteacher account, the earliest created one is used.
+   */
+  async designatedSignatories(schoolId: string, classId: string): Promise<{
+    teacher: { userId: string; name: string } | null;
+    head: { userId: string; name: string } | null;
+  }> {
+    const db = this.prisma.client;
+    const today = new Date();
+    const [assignment, school] = await Promise.all([
+      db.classTeacherAssignment.findFirst({
+        where: { schoolId, classId, effectiveFrom: { lte: today }, OR: [{ effectiveTo: null }, { effectiveTo: { gte: today } }] },
+        orderBy: { effectiveFrom: "desc" },
+        select: { teacher: { select: { profile: { select: { userId: true, user: { select: { name: true } } } } } } },
+      }),
+      db.school.findUnique({ where: { id: schoolId }, select: { organizationId: true } }),
+    ]);
+    const head = school
+      ? await db.member.findFirst({
+          where: { organizationId: school.organizationId, banned: false, OR: [{ role: "headteacher" }, { roles: { has: "headteacher" } }] },
+          orderBy: { createdAt: "asc" },
+          select: { userId: true, user: { select: { name: true } } },
+        })
+      : null;
+    const teacherProfile = assignment?.teacher.profile;
+    return {
+      teacher: teacherProfile ? { userId: teacherProfile.userId, name: teacherProfile.user.name } : null,
+      head: head ? { userId: head.userId, name: head.user.name } : null,
+    };
+  }
+
   /** The pupil's photo for the PDF, or null so the report draws a placeholder. */
   async studentPhoto(schoolId: string, studentId: string): Promise<string | null> {
     try {

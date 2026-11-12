@@ -30,8 +30,9 @@ export interface ReportDocLayout {
 }
 
 export interface ReportDocApproval {
-  teacher: { name: string | null; remark: string | null; signature: string | null };
-  head: { name: string | null; remark: string | null; signature: string | null };
+  /** `approved: false` marks a preview of a report whose signatory has not approved it yet. */
+  teacher: { name: string | null; remark: string | null; signature: string | null; approved?: boolean };
+  head: { name: string | null; remark: string | null; signature: string | null; approved?: boolean };
 }
 
 export interface ReportDocumentProps {
@@ -251,7 +252,10 @@ export function ReportCardDocument(props: ReportDocumentProps) {
                     <div className="flex h-14 items-end">
                       {entry.signature ? <img src={entry.signature} alt={`Signature of ${entry.name ?? "approver"}`} className="max-h-14 max-w-44 object-contain" /> : null}
                     </div>
-                    <div className="border-t border-foreground/40 pt-1 text-xs font-semibold text-muted-foreground">{entry.name ?? "—"}</div>
+                    <div className="border-t border-foreground/40 pt-1 text-xs font-semibold text-muted-foreground">
+                      {entry.name ?? "—"}
+                      {entry.approved === false && <span className="ml-2 font-normal italic">Awaiting approval</span>}
+                    </div>
                   </div>
                 </div>
               ))}

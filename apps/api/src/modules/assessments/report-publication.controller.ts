@@ -106,6 +106,25 @@ export class ReportPublicationController {
     return this.versions.headteacherApprove(school.id, user.id, id, this.recommendation(body));
   }
 
+  /** One pupil's generated report, for school management and the pupil's class teacher. */
+  @Get("versions/:id/preview")
+  @Roles("owner", "admin", "headteacher", "teacher")
+  previewVersion(@CurrentSchool() school: School, @CurrentUser() user: AuthenticatedUser, @Param("id") id: string) {
+    return this.versions.previewVersion(school.id, user, id);
+  }
+
+  @Get("versions/:id/pdf")
+  @Roles("owner", "admin", "headteacher", "teacher")
+  async previewVersionPdf(@CurrentSchool() school: School, @CurrentUser() user: AuthenticatedUser,
+    @Param("id") id: string, @Res() res: Response) {
+    const file = await this.versions.previewPdf(school.id, user, id);
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Cache-Control", "private, no-store");
+    res.setHeader("Content-Disposition", 'attachment; filename="' + file.filename + '"');
+    res.setHeader("Content-Length", file.pdf.length);
+    res.end(file.pdf);
+  }
+
   @Get("me/:reportId/pdf")
   @Roles("student")
   async studentReportPdf(@CurrentSchool() school: School, @CurrentUser() user: AuthenticatedUser,

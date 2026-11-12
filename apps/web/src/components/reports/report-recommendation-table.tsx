@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { ChevronDown, ChevronRight, Eye } from "lucide-react";
 import { Fragment, useState } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
@@ -48,7 +48,7 @@ function ordinal(n: number) {
  */
 export function ReportRecommendationTable({
   rows, remarks, onRemarkChange, rowStates, selected, onToggleRow, onToggleAll,
-  onSubmitRow, submitLabel, remarkColumnLabel = "Recommendation", remarkPlaceholder,
+  onSubmitRow, submitLabel, remarkColumnLabel = "Recommendation", remarkPlaceholder, onViewReport,
 }: {
   rows: RecommendationTableRow[];
   /** The text currently in each editable row's box, keyed by row id. */
@@ -62,6 +62,8 @@ export function ReportRecommendationTable({
   submitLabel: string;
   remarkColumnLabel?: string;
   remarkPlaceholder?: string;
+  /** When given, each row gets a View report button that opens that pupil's full report. */
+  onViewReport?: (id: string) => void;
 }) {
   const [open, setOpen] = useState<ReadonlySet<string>>(new Set());
   const editableIds = rows.filter((row) => row.editable).map((row) => row.id);
@@ -136,6 +138,7 @@ export function ReportRecommendationTable({
                 : recorded.length === 0 && <p className="text-xs text-muted-foreground">—</p>}
             </TableCell>
             <TableCell className="align-top">
+              {onViewReport && <button type="button" onClick={() => onViewReport(row.id)} className="mb-2 inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-xs font-semibold hover:bg-muted"><Eye className="size-3.5" />View report</button>}
               {row.editable && <button type="button"
                 className="rounded-lg bg-primary px-3 py-2 text-xs font-bold text-primary-foreground disabled:opacity-40"
                 disabled={state?.pending || tooShort} onClick={() => onSubmitRow(row.id)}>

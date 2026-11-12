@@ -76,6 +76,11 @@ export type ReportApproval = {
   /** Approver signature images (data URLs) captured when they approved. */
   teacherSignature?: string | null;
   headSignature?: string | null;
+  /**
+   * True for a preview of a report that is not fully approved or published yet. The signatories'
+   * uploaded signatures are shown, marked "Awaiting approval", and the footer says it is a preview.
+   */
+  preview?: boolean;
 };
 
 /** Presentation read when the PDF is made; deliberately not part of the sealed snapshot. */
@@ -258,14 +263,20 @@ export function academicReportPdf(snapshot: AcademicSnapshot, approval: ReportAp
     drawSignature(doc, signature, margin + 8, y, 130, 40);
     doc.setDrawColor(150, 150, 150);
     doc.line(margin + 8, y + 44, margin + 178, y + 44);
-    text(`${name ?? "—"}${approvedAt ? ` · ${approvedAt.toISOString().slice(0, 10)}` : ""}`, margin + 8, y + 56, { size: 8.5, color: [90, 90, 90] });
+    const status = approvedAt ? ` · ${approvedAt.toISOString().slice(0, 10)}` : approval.preview ? " · Awaiting approval" : "";
+    text(`${name ?? "—"}${status}`, margin + 8, y + 56, { size: 8.5, color: [90, 90, 90] });
     y += signatureHeight + 30;
   };
   remarkBlock("CLASS TEACHER'S REMARKS", approval.teacherRemark, approval.teacherName, approval.teacherApprovedAt, approval.teacherSignature);
   remarkBlock("HEADTEACHER'S REMARKS", approval.headRemark, approval.headName, approval.headApprovedAt, approval.headSignature);
 
   ensure(40);
-  text(`Report version ${approval.version} | Published ${approval.publishedAt?.toISOString() ?? "—"}`, margin, y, { size: 8, color: [110, 110, 110] });
+  text(
+    approval.preview
+      ? `Report version ${approval.version} | Preview: not yet fully approved or published`
+      : `Report version ${approval.version} | Published ${approval.publishedAt?.toISOString() ?? "—"}`,
+    margin, y, { size: 8, color: [110, 110, 110] },
+  );
   text(`Source SHA-256: ${approval.snapshotHash}`, margin, y + 11, { size: 7, color: [110, 110, 110] });
   text("Approval records are electronic workflow attestations; this document does not use a certificate-based digital signature.", margin, y + 22, { size: 7, color: [110, 110, 110] });
   doc.setProperties({ title: "Academic report — " + snapshot.student.name, subject: "School-generated academic report" });

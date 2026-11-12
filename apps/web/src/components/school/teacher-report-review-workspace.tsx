@@ -6,6 +6,7 @@ import {
   type RecommendationRowState, type RecommendationTableRow,
 } from "@/components/reports/report-recommendation-table";
 import { useDebouncedValue } from "@/components/superadmin/use-debounced-value";
+import { ReportVersionViewer } from "@/components/school/report-version-viewer";
 import { apiFetch, errorText } from "@/lib/api";
 
 type QueueRow = {
@@ -36,6 +37,7 @@ export function TeacherReportReviewWorkspace() {
   });
 
   // What the teacher has typed this session. A row not in here shows its saved draft.
+  const [viewingVersionId, setViewingVersionId] = useState<string | null>(null);
   const [typed, setTyped] = useState<Record<string, string>>({});
   const [rowStates, setRowStates] = useState<Record<string, RecommendationRowState | undefined>>({});
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
@@ -148,6 +150,7 @@ export function TeacherReportReviewWorkspace() {
   const pendingCount = (reports.data ?? []).filter((row) => row.stage === "GENERATED").length;
 
   return <section className="mt-6 space-y-4 rounded-2xl border border-border bg-card p-5">
+    {viewingVersionId && <ReportVersionViewer versionId={viewingVersionId} onClose={() => setViewingVersionId(null)} />}
     <div>
       <h2 className="flex items-center gap-2 text-base font-bold"><ClipboardCheck className="size-5 text-primary" /> Class teacher report recommendations</h2>
       <p className="mt-1 text-xs text-muted-foreground">
@@ -187,6 +190,7 @@ export function TeacherReportReviewWorkspace() {
             onToggleAll={(ids, checked) => setSelected((prev) => { const next = new Set(prev); for (const id of ids) { if (checked) next.add(id); else next.delete(id); } return next; })}
             onSubmitRow={(id) => void submitRow(id)}
             submitLabel="Sign off"
+            onViewReport={setViewingVersionId}
             remarkPlaceholder="Academic development, strengths and next steps" />}
     </>}
   </section>;
