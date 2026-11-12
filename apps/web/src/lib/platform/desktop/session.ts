@@ -39,3 +39,12 @@ export function savedSignInWarning() {
     }),
   );
 }
+
+export async function registerDesktopDevice() {
+  const response = await invoke<{ status: number; body: number[] }>("desktop_register_device", { name: "SchoolHub Desktop" });
+  const data = JSON.parse(new TextDecoder().decode(new Uint8Array(response.body))) as { id?: string; message?: string };
+  const issue = desktopAccessIssue(response.status, data);
+  if (issue) window.dispatchEvent(new CustomEvent(DESKTOP_ACCESS_EVENT, { detail: issue }));
+  if (response.status < 200 || response.status >= 300 || !data.id) throw new Error(data.message ?? "Installation registration failed. Try again when connected.");
+  return data.id;
+}

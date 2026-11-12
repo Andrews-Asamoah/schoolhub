@@ -37,6 +37,7 @@ const AssessmentTrackingWorkspace = lazy(() => import("@/components/school/asses
 const AssessmentsAdmin = lazy(() => import("@/components/school/assessments-admin").then((m) => ({ default: m.AssessmentsAdmin })));
 const ClassRegister = lazy(() => import("@/components/school/class-register").then((m) => ({ default: m.ClassRegister })));
 const AttendanceReviewWorkspace = lazy(() => import("@/components/school/attendance-review-workspace").then((m) => ({ default: m.AttendanceReviewWorkspace })));
+const SyncDevicesPanel = lazy(() => import("@/components/school/sync-devices-panel").then((m) => ({ default: m.SyncDevicesPanel })));
 const SchoolSettingsForm = lazy(() => import("@/components/school/school-settings-form").then((m) => ({ default: m.SchoolSettingsForm })));
 const ProfileWorkspace = lazy(() => import("@/components/school/profile-workspace").then((m) => ({ default: m.ProfileWorkspace })));
 const HousesWorkspace = lazy(() => import("@/components/school/houses-workspace").then((m) => ({ default: m.HousesWorkspace })));
@@ -464,6 +465,7 @@ function SchoolSettings({ query }: { query: UseQueryResult<School, Error> }) {
     <div className="rounded-2xl border border-border/80 bg-card p-5 sm:p-6">
       <SchoolLogoUploader logo={school.logo} />
       <SchoolSettingsForm school={school} />
+      <SyncDevicesPanel scope="school" />
     </div>
   );
 }

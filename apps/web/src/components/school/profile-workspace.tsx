@@ -1,3 +1,4 @@
+import { SyncDevicesPanel } from "./sync-devices-panel";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { updateMyProfileSchema } from "@schoolhub/shared";
 import { LoaderCircle, Lock } from "lucide-react";
@@ -196,6 +197,8 @@ function ProfileForm({ data }: { data: ProfileResponse }) {
           {save.error && <p role="alert" className="text-xs text-destructive">{save.error.message}</p>}
         </div>
       </form>
+
+      <SyncDevicesPanel />
 
       {/* Students and guardians sign in with simple credentials; staff accounts can add a second step. */}
       {!["student", "guardian", "parent"].includes(activeRole ?? "") && (

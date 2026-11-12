@@ -20,6 +20,77 @@ fn identity_fields(value: &Value) -> Option<(&str, &str)> {
 }
 
 impl DesktopHttp {
+    /// The webview supplies a display name only. Scope and installation ID are
+    /// derived from the server identity and the native application data path.
+    pub async fn register_device(&self, name: String) -> Result<HttpResponse, String> {
+        if name.trim().is_empty() || name.chars().count() > 80 || name.chars().any(char::is_control)
+        {
+            return Err("Use a device name of up to 80 characters.".into());
+        }
+        let root = self
+            .installation_root
+            .as_ref()
+            .ok_or("Installation storage is unavailable.")?;
+        let mut session = self.session.lock().await;
+        let school = session.school.clone().ok_or("Choose a school first.")?;
+        let bearer = session
+            .bearer
+            .clone()
+            .ok_or("Sign in before registering this installation.")?;
+        let checked = self
+            .inspect(&session.client, &bearer, &school, "/api/auth/get-session")
+            .await?;
+        let identity: Value = serde_json::from_slice(&checked.body)
+            .map_err(|_| "Could not confirm the current sign-in.")?;
+        if checked.status != 200 {
+            return Ok(message(
+                checked.status,
+                "Could not confirm the current sign-in.",
+            ));
+        }
+        if identity.get("user").is_none_or(Value::is_null) {
+            session.client = client()?;
+            session.bearer = None;
+            if let Some(key) = &session.saved_key {
+                self.vault.remove(key)?;
+            }
+            session.saved_key = None;
+            return Ok(message(
+                401,
+                "Sign in again before registering this installation.",
+            ));
+        }
+        let (user_id, _) = identity_fields(&identity)
+            .ok_or("Finish signing in before registering this installation.")?;
+        let installation_id = crate::installation::identity(
+            root,
+            &self.origin.origin().ascii_serialization(),
+            &school,
+            user_id,
+        )?;
+        let platform = match std::env::consts::OS {
+            "windows" => "windows",
+            "macos" => "macos",
+            "linux" => "linux",
+            _ => return Err("Unsupported desktop platform.".into()),
+        };
+        let response = session.client.post(endpoint(&self.origin, "/api/sync/devices")?)
+            .header("x-schoolhub-client", "desktop")
+            .header("x-schoolhub-client-version", env!("CARGO_PKG_VERSION"))
+            .header("x-school-subdomain", &school).bearer_auth(&bearer)
+            .json(&serde_json::json!({ "installationId": installation_id, "name": name, "platform": platform }))
+            .send().await.map_err(|_| "Connect to SchoolHub to register this installation.")?;
+        let output = read_limited(response).await?;
+        if output.status == 401 {
+            session.client = client()?;
+            session.bearer = None;
+            if let Some(key) = &session.saved_key {
+                self.vault.remove(key)?;
+            }
+            session.saved_key = None;
+        }
+        Ok(output)
+    }
     pub async fn select_school(&self, school: String) -> Result<(), String> {
         let code = school_code(&school)?;
         let mut session = self.session.lock().await;

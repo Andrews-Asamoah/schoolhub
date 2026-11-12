@@ -38,6 +38,7 @@ struct Session {
 pub struct DesktopHttp {
     origin: Url,
     vault: CredentialVault,
+    installation_root: Option<std::path::PathBuf>,
     session: Mutex<Session>,
 }
 
@@ -164,6 +165,7 @@ impl DesktopHttp {
         Ok(Self {
             origin,
             vault: CredentialVault::new(store),
+            installation_root: None,
             session: Mutex::new(Session {
                 client: client()?,
                 bearer: None,
@@ -171,6 +173,11 @@ impl DesktopHttp {
                 saved_key: None,
             }),
         })
+    }
+
+    pub fn with_installation_root(mut self, root: std::path::PathBuf) -> Self {
+        self.installation_root = Some(root);
+        self
     }
 
     pub async fn request(&self, input: HttpRequest) -> Result<HttpResponse, String> {

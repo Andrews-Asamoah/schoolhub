@@ -3,6 +3,7 @@
 // ============================================================================
 
 model School {
+  syncDevices SyncDevice[]
   attendanceExcuseRequests AttendanceExcuseRequest[]
   studentDeletionRequests StudentDeletionRequest[]
   schoolRolloverBatches AcademicRolloverBatch[] @relation("AcademicRolloverBatch_school")

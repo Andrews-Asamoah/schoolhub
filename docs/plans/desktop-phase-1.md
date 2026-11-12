@@ -140,8 +140,10 @@ Local evidence: 9 native non-listening tests passed, 18 Linux native tests
 compiled, and 75 frontend tests passed. The remaining HTTP fixture tests cannot
 run locally because this environment blocks listening sockets. Windows CI runs
 all native tests without exclusions, including a synthetic write/read/delete
-round trip through the real Windows Credential Manager. Its result is pending
-for this increment. Native IPC/build boundary checks and both frontend targets
+round trip through the real Windows Credential Manager.
+[Run 43028127947](https://github.com/Andrews-Asamoah/schoolhub/actions/runs/43028127947)
+passed all jobs for saved-sign-in commit `da16e58`, including Windows native
+tests and the release shell build. Native IPC/build boundary checks and both frontend targets
 are also part of validation.
 
 This is online session restoration, not offline password unlock, an offline
@@ -152,8 +154,7 @@ lease or an encrypted database key-custody implementation. Those remain Phase 2.
 [Run 43022401747](https://github.com/Andrews-Asamoah/schoolhub/actions/runs/43022401747)
 validates source commit `201c17d`. The API job passed migrations, typecheck,
 754 API unit tests, all 4 real Better Auth/PostgreSQL tests and the route
-inventory check. The outbox/cursor job also passed. The Windows job is still
-running at this checkpoint; this document does not mark it passed.
+inventory check. The outbox/cursor job also passed. The later saved-sign-in run linked above passed every job, including Windows.
 
 The real-session tests verify persisted channels, live plan/override checks,
 old-version refusal, normal browser sign-in, SuperAdmin API rejection after
@@ -169,7 +170,7 @@ the verified session ID, not by assuming that bearer text is a raw DB token.
 | Server SuperAdmin exclusion | Implemented and verified by real PostgreSQL/authentication CI; deployment must apply migration |
 | Desktop entitlement | Implemented: plan checkbox, school override, tenant checks and refusal UI; deployment must apply migration and configure licenses |
 | Client version gate | Implemented: stable minimum policy, 426 API/auth responses and desktop update screen |
-| Credential persistence | Opt-in Windows storage and online restore implemented; current native backend/runtime CI validation pending; offline unlock remains Phase 2 |
+| Credential persistence | Opt-in Windows storage and online restore implemented; native tests and shell build passed Windows CI; interactive acceptance and offline unlock remain |
 | Downloads and printing | Native save-dialog/file handling and WebView2 print/PDF validation; browser download helpers remain in place |
 | Signed distribution | Signing owner/certificates, installer, gated download and authorized updater manifest |
 | Release checks | Windows 10+ runtime, performance, low-bandwidth behavior, dependency/security audits and remaining Phase 0 gates |
@@ -187,3 +188,9 @@ Do not distribute the current unsigned shell to schools or mark R1 complete.
    file/print handling and About UI. Offline identity remains Phase 2.
 4. Implement gated installer/updater endpoints and sign pilot installers after
    the signing identity is provided; then complete all release acceptance gates.
+
+## Phase 2 continuation
+
+The user requested the next phase. Device lifecycle work begins in
+[desktop-phase-2.md](desktop-phase-2.md); the R1 release gates above remain open.
+The desktop status strip now displays the compiled application version.

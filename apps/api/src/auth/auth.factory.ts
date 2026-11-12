@@ -100,6 +100,7 @@ export function createAuth(prisma: PrismaLike) {
       updateAge: 60 * 60 * 24, // refresh once a day
       additionalFields: {
         clientPlatform: { type: "string", required: false, defaultValue: "web", input: false },
+        desktopDeviceId: { type: "string", required: false, input: false },
       },
     },
     // Throttle credential-guessing. Better Auth keeps counters in memory by

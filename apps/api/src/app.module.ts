@@ -1,4 +1,5 @@
 import { PasswordRecoveryModule } from "./modules/accounts/password-recovery/password-recovery.module.js";
+import { SyncModule } from "./modules/sync/sync.module.js";
 import { Module } from "@nestjs/common";
 import { APP_FILTER } from "@nestjs/core";
 import { ThrottlerModule } from "@nestjs/throttler";
@@ -70,6 +71,7 @@ import { DashboardModule } from "./modules/dashboard/dashboard.module.js";
     AssignmentsModule,
     InventoryModule,
     DashboardModule,
+    SyncModule,
   ],
   controllers: [HealthController],
   providers: [

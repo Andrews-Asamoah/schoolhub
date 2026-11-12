@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
 import { invoke } from "@tauri-apps/api/core";
 import {
+  registerDesktopDevice,
   forgetDesktopSession,
   rememberDesktopSession,
   resumeDesktopSession,
@@ -54,5 +55,17 @@ describe("native saved sign-in boundary", () => {
       resumeDesktopSession("wesley", "teacher@example.test"),
     ).rejects.toThrow("Disabled");
     expect(dispatchEvent).toHaveBeenCalledOnce();
+  });
+});
+
+describe("native device registration boundary", () => {
+  it("leaves account, installation ID and credentials to native code", async () => {
+    native.mockResolvedValue(response(201, { id: "device" }));
+    await expect(registerDesktopDevice()).resolves.toBe("device");
+    expect(native).toHaveBeenCalledWith("desktop_register_device", { name: "SchoolHub Desktop" });
+  });
+  it("does not report revoked installations as registered", async () => {
+    native.mockResolvedValue(response(403, { error: "SYNC_DEVICE_REVOKED", message: "Installation revoked." }));
+    await expect(registerDesktopDevice()).rejects.toThrow("Installation revoked.");
   });
 });

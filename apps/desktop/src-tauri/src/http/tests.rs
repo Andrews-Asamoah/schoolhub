@@ -504,3 +504,59 @@ async fn null_server_session_clears_an_active_remembered_session() {
     assert!(store.0.lock().unwrap().is_empty());
     task.await.unwrap();
 }
+
+#[tokio::test]
+async fn registration_uses_native_identity_and_retains_installation_across_retries() {
+    use crate::credentials::tests::MemoryStore;
+    let body = r#"{"session":{"clientPlatform":"desktop"},"user":{"id":"synthetic-user","email":"teacher@example.test","role":"teacher"}}"#;
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let origin = format!("http://{}", listener.local_addr().unwrap());
+    let task = tokio::spawn(async move {
+        let mut installation = None;
+        for _ in 0..2 {
+            for path in ["/api/auth/get-session", "/api/sync/devices"] {
+                let (mut socket, _) = listener.accept().await.unwrap();
+                let text = read_request(&mut socket).await;
+                assert!(text.contains(path));
+                assert!(text.contains("authorization: Bearer synthetic-bearer"));
+                assert!(text.contains("x-school-subdomain: wesley"));
+                assert!(text.contains("x-schoolhub-client: desktop"));
+                let response = if path.ends_with("devices") {
+                    let payload: Value =
+                        serde_json::from_str(text.split("\r\n\r\n").nth(1).unwrap()).unwrap();
+                    assert_eq!(payload["name"], "Synthetic PC");
+                    assert_eq!(payload.as_object().unwrap().len(), 3);
+                    let id = payload["installationId"].as_str().unwrap().to_owned();
+                    assert_eq!(uuid::Uuid::parse_str(&id).unwrap().get_version_num(), 4);
+                    if let Some(previous) = &installation {
+                        assert_eq!(previous, &id);
+                    }
+                    installation = Some(id);
+                    r#"{"id":"synthetic-device"}"#
+                } else {
+                    body
+                };
+                socket.write_all(format!("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{response}", response.len()).as_bytes()).await.unwrap();
+            }
+        }
+    });
+    let dir = tempfile::tempdir().unwrap();
+    let http = DesktopHttp::with_store(&origin, true, Arc::new(MemoryStore::default()))
+        .unwrap()
+        .with_installation_root(dir.path().to_path_buf());
+    http.select_school("wesley".into()).await.unwrap();
+    assert!(http.register_device("Synthetic PC".into()).await.is_err());
+    assert_eq!(std::fs::read_dir(dir.path()).unwrap().count(), 0);
+    http.session.lock().await.bearer = Some("synthetic-bearer".into());
+    for _ in 0..2 {
+        assert_eq!(
+            http.register_device("Synthetic PC".into())
+                .await
+                .unwrap()
+                .status,
+            200
+        );
+    }
+    assert_eq!(std::fs::read_dir(dir.path()).unwrap().count(), 1);
+    task.await.unwrap();
+}

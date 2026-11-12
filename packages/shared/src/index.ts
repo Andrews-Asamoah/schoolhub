@@ -2235,3 +2235,5 @@ export function commonWeight(weights: readonly (number | null | undefined)[]): n
   const known = weights.filter((weight): weight is number => typeof weight === "number" && weight > 0);
   return known.length > 0 && known.length === weights.length && known.every((weight) => weight === known[0]) ? known[0]! : null;
 }
+
+export * from "./sync.js";

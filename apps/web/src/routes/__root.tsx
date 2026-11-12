@@ -1,8 +1,12 @@
+import { lazy, Suspense } from "react";
 import { createRootRoute, Outlet, useRouterState } from "@tanstack/react-router";
 import { PrivateContextBoundary } from "@/components/auth/private-context-boundary";
 import { ThemeProvider } from "@/components/theme-provider";
 import { usePasswordChangeGate } from "@/hooks/use-password-gate";
 import { useSession } from "@/lib/auth-client";
+
+const DesktopDeviceStatus = import.meta.env.VITE_TARGET === "desktop"
+  ? lazy(() => import("@/lib/platform/desktop/device-status")) : null;
 
 /** Root route outlet; feature routes own their page layouts. */
 export const Route = createRootRoute({
@@ -21,7 +25,10 @@ function RootLayout() {
 
   return (
     <ThemeProvider>
-      <PrivateContextBoundary><Outlet /></PrivateContextBoundary>
+      <PrivateContextBoundary>
+        {DesktopDeviceStatus && <Suspense fallback={null}><DesktopDeviceStatus /></Suspense>}
+        <Outlet />
+      </PrivateContextBoundary>
     </ThemeProvider>
   );
 }
