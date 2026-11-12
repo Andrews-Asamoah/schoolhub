@@ -1,3 +1,4 @@
+import { canUseBrowserStorage, localPreferences } from "@/lib/browser-storage";
 import { clearPrivateSessionPreferences } from "@/lib/private-session";
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { useSession } from "@/lib/auth-client";
@@ -15,7 +16,7 @@ function subscribe(listener: () => void) {
     window.removeEventListener("storage", listener);
   };
 }
-const roleSnapshot = () => window.localStorage.getItem("schoolhub-active-role") ?? "";
+const roleSnapshot = () => localPreferences.getItem("schoolhub-active-role") ?? "";
 
 /** Never mount a new principal/role against the previous context's private cache. */
 export function PrivateContextBoundary({ children }: { children: ReactNode }) {
@@ -49,5 +50,5 @@ export function PrivateContextBoundary({ children }: { children: ReactNode }) {
   if (isPending || ready?.identity !== identity) {
     return <p role="status" className="p-6 text-sm text-muted-foreground">Loading your workspace…</p>;
   }
-  return <QueryClientProvider key={identity} client={ready.client}><div className="contents">{children}</div>{import.meta.env.DEV&&<ReactQueryDevtools initialIsOpen={false}/>}</QueryClientProvider>;
+  return <QueryClientProvider key={identity} client={ready.client}><div className="contents">{children}</div>{import.meta.env.DEV&&canUseBrowserStorage("localStorage")&&<ReactQueryDevtools initialIsOpen={false}/>}</QueryClientProvider>;
 }

@@ -60,6 +60,31 @@ try{
    await page.getByLabel('Request or decision reason',{exact:true}).fill('Independently reviewed period evidence');await Promise.all([page.waitForResponse(response=>new URL(response.url()).pathname.endsWith('/close-request/decide')),page.getByRole('button',{name:'Approve',exact:true}).click()]);
    assert(writes.some(write=>write.path.endsWith('/close-request/decide')));
   }
+  if(role==='accountant'){
+   await page.goto(base+'/fees?school=test-school');
+   const trigger=page.getByRole('button',{name:'Create fee structure',exact:true}).first();
+   await trigger.click();
+   const parent=page.getByRole('dialog',{name:'Create fee structure',exact:true});
+   await parent.waitFor();
+   assert(await parent.getByRole('button',{name:'Close dialog',exact:true}).evaluate(el=>el===document.activeElement));
+   await page.keyboard.press('Shift+Tab');
+   assert(await parent.getByRole('button',{name:'Save fee structure',exact:true}).evaluate(el=>el===document.activeElement));
+   await page.keyboard.press('Tab');
+   assert(await parent.getByRole('button',{name:'Close dialog',exact:true}).evaluate(el=>el===document.activeElement));
+   const nestedTrigger=parent.getByRole('button',{name:'Fee item categories',exact:true});
+   await nestedTrigger.click();
+   const nested=page.getByRole('dialog',{name:'Fee item categories',exact:true});
+   await nested.waitFor();
+   await page.keyboard.press('Escape');
+   await nested.waitFor({state:'detached'});
+   await parent.waitFor();
+   assert(await nestedTrigger.evaluate(el=>el===document.activeElement));
+   assert.equal(await page.evaluate(()=>document.body.style.overflow),'hidden');
+   await page.keyboard.press('Escape');
+   await parent.waitFor({state:'detached'});
+   assert(await trigger.evaluate(el=>el===document.activeElement));
+   assert.notEqual(await page.evaluate(()=>document.body.style.overflow),'hidden');
+  }
   assert.deepEqual(errors,[]);await page.close();
  }
  console.log('Financial controls browser checks passed for accountant/owner on desktop/mobile.');

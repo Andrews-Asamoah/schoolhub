@@ -1,7 +1,7 @@
 import {useGuardianWard} from "@/hooks/use-guardian-ward";
 import { useQuery } from "@tanstack/react-query";
 import { FileText, LoaderCircle, Printer } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { apiFetch, downloadAcademicReport } from "@/lib/api";
 import { ReportCardDocument, type ReportDocApproval, type ReportDocLayout, type ReportDocSubject, type ReportDocumentProps } from "@/components/reports/report-card-document";
 import { accessibleAccentForeground } from "@/lib/accent-foreground";
@@ -19,13 +19,21 @@ type Report = {
 };
 
 export function GuardianPublishedReports({wards=[]}:{wards?:{id:string;profile:{firstName:string;lastName:string}}[]}) {
-  const [selectedId, setSelectedId] = useState("");
   const [downloadError,setDownloadError]=useState<string | null>(null);
   const reports = useQuery({ queryKey: ["assessments", "report-cards", "guardian"], queryFn: () => apiFetch<Report[]>("/assessments/report-cards/guardian"), retry: false });
   const allRows = reports.data ?? [];
   const [wardId,selectWard]=useGuardianWard(wards.length?wards:allRows.map(row=>({id:row.studentId})));
-  const [year,setYear]=useState("");
-  const [term,setTerm]=useState("");
+  const [filters, setFilters] = useState({ wardId, year: "", term: "", selectedId: "" });
+  const { year, term, selectedId } = filters.wardId === wardId
+    ? filters : { year: "", term: "", selectedId: "" };
+  useEffect(() => {
+    setFilters(current => current.wardId === wardId ? current : { wardId, year: "", term: "", selectedId: "" });
+    setDownloadError(null);
+  }, [wardId]);
+  function updateFilters(patch: Partial<{ year: string; term: string; selectedId: string }>) {
+    setFilters({ wardId, year, term, selectedId, ...patch });
+  }
+  const setSelectedId = (id: string) => updateFilters({ selectedId: id });
   const wardRows=allRows.filter(row=>!wardId||row.studentId===wardId);
   const years=[...new Set(wardRows.map(row=>row.set.academicYear.name))].sort().reverse();
   const terms=[...new Set(wardRows.filter(row=>!year||row.set.academicYear.name===year).map(row=>row.set.term.name))];
@@ -39,9 +47,9 @@ export function GuardianPublishedReports({wards=[]}:{wards?:{id:string;profile:{
   if (reports.isError) return <div role="alert" className="rounded-xl border border-destructive/20 bg-destructive/10 p-4 text-sm text-destructive">Unable to load published reports: {reports.error.message}</div>;
   return <section className="space-y-4 rounded-2xl border border-border bg-card p-5">
     <div className="grid gap-3 sm:grid-cols-3 print:hidden">
-      {wards.length>0&&<label className="text-xs font-semibold">Child<select aria-label="Report child" value={wardId} onChange={event=>{selectWard(event.target.value);setSelectedId("");}} className="mt-1 block w-full rounded-lg border border-input bg-background p-2">{wards.map(ward=><option key={ward.id} value={ward.id}>{ward.profile.firstName} {ward.profile.lastName}</option>)}</select></label>}
-      <label className="text-xs font-semibold">Academic year<select aria-label="Report academic year" value={year} onChange={event=>{setYear(event.target.value);setTerm("");setSelectedId("");}} className="mt-1 block w-full rounded-lg border border-input bg-background p-2"><option value="">All published years</option>{years.map(name=><option key={name}>{name}</option>)}</select></label>
-      <label className="text-xs font-semibold">Term<select aria-label="Report term" value={term} onChange={event=>{setTerm(event.target.value);setSelectedId("");}} className="mt-1 block w-full rounded-lg border border-input bg-background p-2"><option value="">All published terms</option>{terms.map(name=><option key={name}>{name}</option>)}</select></label>
+      {wards.length>0&&<label className="text-xs font-semibold">Child<select aria-label="Report child" value={wardId} onChange={event=>{selectWard(event.target.value);}} className="mt-1 block w-full rounded-lg border border-input bg-background p-2">{wards.map(ward=><option key={ward.id} value={ward.id}>{ward.profile.firstName} {ward.profile.lastName}</option>)}</select></label>}
+      <label className="text-xs font-semibold">Academic year<select aria-label="Report academic year" value={year} onChange={event=>{updateFilters({year:event.target.value,term:"",selectedId:""});}} className="mt-1 block w-full rounded-lg border border-input bg-background p-2"><option value="">All published years</option>{years.map(name=><option key={name}>{name}</option>)}</select></label>
+      <label className="text-xs font-semibold">Term<select aria-label="Report term" value={term} onChange={event=>{updateFilters({term:event.target.value,selectedId:""});}} className="mt-1 block w-full rounded-lg border border-input bg-background p-2"><option value="">All published terms</option>{terms.map(name=><option key={name}>{name}</option>)}</select></label>
     </div>
     <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between print:hidden"><div><div className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.16em] text-primary"><FileText className="size-4" />Family portal</div><h2 className="flex items-center gap-2 text-xl font-black tracking-tight">Published report cards</h2><p className="mt-1 text-sm text-muted-foreground">Reports released by your school for linked wards.</p></div>{rows.length > 0 && <div className="flex flex-col gap-2 sm:flex-row"><Select value={selected?.id ?? rows[0]?.id ?? "__none__"} onValueChange={setSelectedId}><SelectTrigger aria-label="Select ward report" className="h-10 min-w-0 sm:max-w-72"><SelectValue placeholder="Choose a report" /></SelectTrigger><SelectContent>{rows.map((row) => <SelectItem key={row.id} value={row.id}>{row.student.profile.firstName} {row.student.profile.lastName} · {row.set.term.name}</SelectItem>)}</SelectContent></Select><button type="button" onClick={() => {
   if (!selected) return;

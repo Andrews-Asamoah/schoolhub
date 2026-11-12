@@ -1,3 +1,4 @@
+import { sessionPreferences } from "@/lib/browser-storage";
 import { confirmLeavingDrafts } from "@/hooks/use-mark-draft";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CalendarRange, CircleAlert, RotateCcw } from "lucide-react";
@@ -63,7 +64,7 @@ export function AcademicContextSwitcher() {
 
   useEffect(() => {
     if (!isAccountant || !yearsQuery.data) return;
-    const stored = window.sessionStorage.getItem(ACCOUNTANT_VIEW_STORAGE_KEY);
+    const stored = sessionPreferences.getItem(ACCOUNTANT_VIEW_STORAGE_KEY);
     if (stored) {
       try {
         const parsed = JSON.parse(stored) as {
@@ -85,9 +86,9 @@ export function AcademicContextSwitcher() {
           );
           return;
         }
-        window.sessionStorage.removeItem(ACCOUNTANT_VIEW_STORAGE_KEY);
+        sessionPreferences.removeItem(ACCOUNTANT_VIEW_STORAGE_KEY);
       } catch {
-        window.sessionStorage.removeItem(ACCOUNTANT_VIEW_STORAGE_KEY);
+        sessionPreferences.removeItem(ACCOUNTANT_VIEW_STORAGE_KEY);
       }
     }
     setHasPersonalOverride(false);
@@ -273,9 +274,9 @@ export function AcademicContextSwitcher() {
                   selectedYear.id === current.academicYear.id &&
                   selectedTerm.id === current.term.id;
                 if (isSchoolCurrent) {
-                  window.sessionStorage.removeItem(ACCOUNTANT_VIEW_STORAGE_KEY);
+                  sessionPreferences.removeItem(ACCOUNTANT_VIEW_STORAGE_KEY);
                 } else {
-                  window.sessionStorage.setItem(
+                  sessionPreferences.setItem(
                     ACCOUNTANT_VIEW_STORAGE_KEY,
                     JSON.stringify({
                       academicYearId: selectedYear.id,
@@ -295,7 +296,7 @@ export function AcademicContextSwitcher() {
                 type="button"
                 title="Return to current school period"
                 onClick={() => {
-                  window.sessionStorage.removeItem(ACCOUNTANT_VIEW_STORAGE_KEY);
+                  sessionPreferences.removeItem(ACCOUNTANT_VIEW_STORAGE_KEY);
                   setHasPersonalOverride(false);
                   setAcademicYearId(current.academicYear.id);
                   setTermId(current.term.id);

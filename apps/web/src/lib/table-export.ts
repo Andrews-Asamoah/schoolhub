@@ -13,7 +13,7 @@ export interface ExportTable {
   title: string;
   headers: string[];
   rows: (string | number | Date | null)[][];
-  columnTypes?: ExportColumnType[];
+  columnTypes?: (ExportColumnType | undefined)[];
   totals?: (string | number | null)[];
   totalLabel?: string;
   reportInfo?: ExportReportInfo;
@@ -29,7 +29,8 @@ export function nodeToText(node: ReactNode): string {
 }
 const SAFE_NUMBER = /^-?(?:\d+\.?\d*|\.\d+)$/;
 const MONEY_HEADER = /(amount|money|gross|net|balance|paid|billed|collected|salary|tax|ssnit|deduction|cost|price|fee|outstanding|discount|revenue|expense|total due|receivable)/i;
-const DATE_HEADER = /(^date$|date|issued|due|period|created|updated|when|timestamp|paid at)/i;
+const DATE_HEADER = /\b(date|issued|due|period|created|updated|when|timestamp|paid at)\b/i;
+const IDENTIFIER_HEADER = /\b(id|identifier|admission|phone|telephone|mobile|contact|code|reference|account number)\b/i;
 function escapeCellText(value: string | number | Date | null | undefined): string {
   if (value == null) return "";
   if (value instanceof Date) return Number.isNaN(value.getTime()) ? "" : value.toISOString();
@@ -48,10 +49,11 @@ function numericValue(value: string | number | Date | null | undefined): number 
   return Number.isFinite(n) ? n : null;
 }
 function inferColumnType(header: string, values: (string | number | Date | null)[]): ExportColumnType {
+  if (IDENTIFIER_HEADER.test(header)) return "text";
   if (MONEY_HEADER.test(header)) return "money";
   if (DATE_HEADER.test(header)) return "date";
   const nonEmpty = values.filter((value) => value != null && String(value).trim() !== "");
-  if (nonEmpty.length && nonEmpty.every((value) => typeof value === "number" || (typeof value === "string" && SAFE_NUMBER.test(value.trim())))) return "number";
+  if (nonEmpty.length && nonEmpty.every((value) => typeof value === "number")) return "number";
   return "text";
 }
 function columnType(table: ExportTable, index: number): ExportColumnType {
