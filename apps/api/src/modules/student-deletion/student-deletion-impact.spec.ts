@@ -8,9 +8,9 @@ describe("buildImpact", () => {
     expect(impact.willDelete.map((line) => line.key)).toEqual(["enrollments", "attendances"]);
   });
   it("blocks on payments, bills, adjustments, credit and exam records", () => {
-    const impact = buildImpact({ payments: 2, bills: 1, billAdjustments: 1, creditEntries: 1, internalExamCandidates: 1, externalExamCandidates: 1, internalMockReports: 1 });
+    const impact = buildImpact({ payments: 2, bills: 1, billAdjustments: 1, creditEntries: 1, externalExamCandidates: 1 });
     expect(impact.canDelete).toBe(false);
-    expect(impact.blockers).toHaveLength(7);
+    expect(impact.blockers).toHaveLength(5);
   });
   it("describes blockers in plain words", () => {
     const text = describeBlockers(buildImpact({ payments: 3, bills: 1 }).blockers);

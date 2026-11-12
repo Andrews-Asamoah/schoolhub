@@ -81,6 +81,8 @@ model FinanceBankReconciliation {
   decidedById String?
   decidedAt DateTime?
   decisionNote String?
+  /// True when the school's setting let the preparer complete the approval step.
+  waivedByPolicy Boolean @default(false)
   snapshot Json?
   contentHash String?
   createdAt DateTime @default(now())

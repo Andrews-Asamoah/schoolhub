@@ -3,7 +3,6 @@ import { useQuery } from "@tanstack/react-query";
 import { FileText, LoaderCircle, Printer } from "lucide-react";
 import { useState } from "react";
 import { apiFetch, downloadAcademicReport } from "@/lib/api";
-import { MockPublishedReportCards } from "@/components/portal/mock-published-report-cards";
 import { ReportCardDocument, type ReportDocApproval, type ReportDocLayout, type ReportDocSubject, type ReportDocumentProps } from "@/components/reports/report-card-document";
 import { accessibleAccentForeground } from "@/lib/accent-foreground";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -15,7 +14,7 @@ type Report = {
   data: { student?: { class?: { name?: string } | null }; subjects?: ReportDocSubject[]; remarks?: { type: string; content: string; teacher: string }[]; summary?: ReportDocumentProps["summary"]; attendance?: ReportDocumentProps["attendance"] };
   approval?: ReportDocApproval | null;
   publishedAt: string | null;
-  student: { admissionNumber: string | null; profile: { firstName: string; lastName: string } };
+  student: { admissionNumber: string | null; profile: { firstName: string; lastName: string; user?: { image: string | null } | null } };
   set: { name: string; academicYear: { name: string }; term: { name: string }; template: { name: string; layout: ReportDocLayout | null }; school: { name: string; code: string; email: string | null; phone: string | null; address: string | null; logo: string | null; motto: string | null; website: string | null; primaryColor: string; secondaryColor: string } };
 };
 
@@ -57,7 +56,7 @@ export function GuardianPublishedReports({wards=[]}:{wards?:{id:string;profile:{
         printClass="guardian-report-print-area"
         school={selected.set.school}
         layout={layout}
-        pupil={{ name: `${selected.student.profile.firstName} ${selected.student.profile.lastName}`, admissionNumber: selected.student.admissionNumber, className: selected.data.student?.class?.name ?? null }}
+        pupil={{ name: `${selected.student.profile.firstName} ${selected.student.profile.lastName}`, admissionNumber: selected.student.admissionNumber, className: selected.data.student?.class?.name ?? null, photo: selected.student.profile.user?.image ?? null }}
         setName={selected.set.name}
         academicYear={selected.set.academicYear.name}
         term={selected.set.term.name}
@@ -69,7 +68,6 @@ export function GuardianPublishedReports({wards=[]}:{wards?:{id:string;profile:{
         approval={selected.approval}
         published={{ publishedAt: selected.publishedAt }}
       />}
-    <MockPublishedReportCards studentId={wardId} year={year} term={term} audience="guardian" />
     <style>{`@media print { body * { visibility: hidden; } .guardian-report-print-area, .guardian-report-print-area * { visibility: visible; } .guardian-report-print-area { position: absolute; inset: 0; width: 100%; border: 0; box-shadow: none; padding: 0; background: white !important; color: black !important; } .guardian-report-print-area section { break-inside: avoid; } @page { size: A4; margin: 12mm; } }`}</style>
   </section>;
 }

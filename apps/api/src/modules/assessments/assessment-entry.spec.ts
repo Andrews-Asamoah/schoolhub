@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   classRankGrades,
+  coveredClasses,
+  REPORTABLE_SCORE_STATUSES,
   computeStudentResult,
   rankByPercentage,
   templateSpecificity,
@@ -174,5 +176,33 @@ describe("classRankGrades (BECE stanine)", () => {
   it("leaves per-pupil grading empty for class-ranked scales so the class pass can fill it in", () => {
     const r = computeStudentResult([classwork30, exam70], [{ componentId: "cw", occurrenceIndex: 0, marks: 24 }, { componentId: "ex", occurrenceIndex: 0, marks: 56 }], stanine, "CLASS_RANK");
     expect(r).toMatchObject({ percentage: 80, complete: true, grade: null, gradePoint: null });
+  });
+});
+
+describe("coveredClasses", () => {
+  const classes = [
+    { id: "a", level: "JHS3", departmentId: null, academicYearId: "y1" },
+    { id: "b", level: "JHS3", departmentId: null, academicYearId: "y1" },
+    { id: "c", level: "JHS2", departmentId: null, academicYearId: "y1" },
+    { id: "old", level: "JHS3", departmentId: null, academicYearId: "y0" },
+    { id: "any", level: "JHS3", departmentId: null, academicYearId: null },
+  ];
+  const scope = { classId: null, classIds: [] as string[], classLevel: null, departmentId: null };
+
+  it("uses exactly the classes an assessment names", () => {
+    expect(coveredClasses({ ...scope, classIds: ["a", "c"] }, classes, "y1").map((k) => k.id)).toEqual(["a", "c"]);
+  });
+  it("covers every class when the assessment names none", () => {
+    expect(coveredClasses(scope, classes, "y1").map((k) => k.id)).toEqual(["a", "b", "c", "any"]);
+  });
+  it("covers a class level, and ignores classes of other years", () => {
+    expect(coveredClasses({ ...scope, classLevel: "JHS3" }, classes, "y1").map((k) => k.id)).toEqual(["a", "b", "any"]);
+    expect(coveredClasses({ ...scope, classLevel: "JHS3" }, classes).map((k) => k.id)).toContain("old");
+  });
+});
+
+describe("REPORTABLE_SCORE_STATUSES", () => {
+  it("counts signed-off marks but never drafts", () => {
+    expect(REPORTABLE_SCORE_STATUSES).toEqual(["SUBMITTED", "REVIEWED", "FINAL"]);
   });
 });

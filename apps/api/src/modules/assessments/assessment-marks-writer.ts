@@ -1,10 +1,11 @@
 import { ConflictException, ForbiddenException } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
 import {
-  classRankGrades,
   computeStudentResult,
   rankByPercentage,
+  rankedGrades,
   type EntryComponent,
+  type GradeBoundaries,
   type GradingMethod,
   type RankBand,
 } from "./assessment-entry.js";
@@ -17,6 +18,8 @@ export interface WriterTemplate {
   components: EntryComponent[];
   bands: RankBand[];
   method: GradingMethod;
+  /** Set mark boundaries for this subject and term, or none to grade by class position. */
+  boundaries?: GradeBoundaries | null;
 }
 
 export interface MarkChange {
@@ -207,10 +210,11 @@ async function rebuildClassResults(tx: Prisma.TransactionClient, args: ApplyArgs
     ]),
   );
   if (template.method === "CLASS_RANK") {
-    // One pupil's marks move everyone else's band, so the whole class is regraded.
-    const graded = classRankGrades(
+    // Without set boundaries one pupil's marks move everyone else's band, so the whole class is regraded.
+    const graded = rankedGrades(
       [...results].filter(([, result]) => result.complete).map(([id, result]) => ({ id, percentage: result.percentage })),
       template.bands,
+      template.boundaries,
     );
     for (const [id, result] of results) {
       const own = graded.get(id);

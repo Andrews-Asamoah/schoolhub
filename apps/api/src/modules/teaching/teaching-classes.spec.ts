@@ -37,4 +37,13 @@ describe("buildTeachingClasses", () => {
     const result = buildTeachingClasses({ teacherId: "t1", classTeacherClassIds: ["c3"], subjectAssignments: [], subjectStrandAssignments: [] }, [classes[2]], subjects, new Map());
     expect(result).toEqual([{ id: "c3", name: "JHS 2A", level: "JHS2", isClassTeacher: true, studentCount: 0, subjects: [] }]);
   });
+
+  it("lists a class for a teacher who only owns a teaching area of a shared subject", () => {
+    const result = buildTeachingClasses(
+      { teacherId: "t2", classTeacherClassIds: [], subjectAssignments: [], subjectStrandAssignments: [{ classId: "c1", subjectId: "math", subjectStrandId: "strand" }] },
+      [classes[0]], subjects, new Map(),
+    );
+    expect(result).toHaveLength(1);
+    expect(result[0]!.subjects.map((subject) => subject.id)).toEqual(["math"]);
+  });
 });

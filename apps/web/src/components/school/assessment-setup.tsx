@@ -1,7 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CircleAlert, Copy, GraduationCap, Lock, LockOpen, LoaderCircle, Pencil, Plus, Power, Rocket, Trash2 } from "lucide-react";
+import { CircleAlert, Copy, GraduationCap, Lock, LockOpen, LoaderCircle, Pencil, Plus, Power, Rocket, SlidersHorizontal, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { AssessmentTemplateDialog } from "@/components/school/assessment-template-dialog";
+import { GradeBoundariesDialog } from "@/components/school/grade-boundaries-dialog";
 import { GradingSystemDialog } from "@/components/school/grading-system-dialog";
 import { DataTable, type DataTableColumn } from "@/components/ui/data-table";
 import { apiFetch } from "@/lib/api";
@@ -28,8 +29,9 @@ const iconButton =
 export function AssessmentSetupWorkspace() {
   const queryClient = useQueryClient();
   const canExport = useCanExportTables();
-  const [editing, setEditing] = useState<SetupTemplate | "new" | null>(null);
+  const [editing, setEditing] = useState<SetupTemplate | "new" | "new-mock" | null>(null);
   const [scaleDialog, setScaleDialog] = useState<{ system?: SetupGradingSystem; asCopy?: boolean } | "new" | null>(null);
+  const [boundariesFor, setBoundariesFor] = useState<SetupTemplate | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [showAllUncovered, setShowAllUncovered] = useState(false);
 
@@ -79,6 +81,8 @@ export function AssessmentSetupWorkspace() {
   const classNames = new Map(setup.classes.map((klass) => [klass.id, klass.name]));
   const ownScales = setup.gradingSystems.filter((system) => !system.shared);
   const subjectName = (code: string | null) => (code ? setup.subjects.find((subject) => subject.code.toLowerCase() === code.toLowerCase())?.name ?? code : "All subjects");
+  // Stanine (class-ranked) scales have no fixed marks, so their assessments get a boundaries screen.
+  const classRanked = new Set(setup.gradingSystems.filter((system) => system.method === "CLASS_RANK").map((system) => system.id));
   const shownUncovered = showAllUncovered ? setup.uncovered : setup.uncovered.slice(0, 6);
 
   const columns: DataTableColumn<SetupTemplate>[] = [
@@ -88,7 +92,10 @@ export function AssessmentSetupWorkspace() {
       value: (template) => template.name,
       cell: (template) => (
         <div>
-          <p className="text-sm font-semibold text-foreground">{template.name}</p>
+          <p className="text-sm font-semibold text-foreground">
+            {template.name}
+            {template.category === "MOCK" && <span className="ml-2 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">Mock · {setup.years.find((year) => year.id === template.academicYearId)?.name ?? "year"}</span>}
+          </p>
           {template.description && <p className="mt-0.5 max-w-xs truncate text-xs text-muted-foreground">{template.description}</p>}
         </div>
       ),
@@ -157,6 +164,9 @@ export function AssessmentSetupWorkspace() {
       cell: (template) => (
         <div className="inline-flex items-center">
           <button type="button" className={iconButton} aria-label={`Edit ${template.name}`} title="Edit" onClick={() => setEditing(template)}><Pencil className="size-4" /></button>
+          {classRanked.has(template.gradingSystem.id) && (
+            <button type="button" className={iconButton} aria-label={`Grade boundaries for ${template.name}`} title="Set grade boundaries" onClick={() => setBoundariesFor(template)}><SlidersHorizontal className="size-4" /></button>
+          )}
           <button type="button" className={iconButton} aria-label={`Duplicate ${template.name}`} title="Duplicate" disabled={change.isPending} onClick={() => change.mutate({ path: `templates/${template.id}/duplicate`, method: "POST", message: `Copied “${template.name}”. The copy is off until you turn it on.` })}><Copy className="size-4" /></button>
           <button type="button" className={iconButton} aria-label={`${template.isActive ? "Turn off" : "Turn on"} ${template.name}`} title={template.isActive ? "Turn off" : "Turn on"} disabled={change.isPending} onClick={() => change.mutate({ path: `templates/${template.id}`, method: "PUT", body: templateToInput(template, { isActive: !template.isActive }), message: `${template.name} is now ${template.isActive ? "off" : "on"}.` })}><Power className="size-4" /></button>
           <button type="button" className={iconButton} aria-label={`${template.isLocked ? "Unlock" : "Lock"} ${template.name}`} title={template.isLocked ? "Unlock marks" : "Lock marks"} disabled={change.isPending} onClick={() => change.mutate({ path: `templates/${template.id}`, method: "PUT", body: templateToInput(template, { isLocked: !template.isLocked }), message: `${template.name} is now ${template.isLocked ? "unlocked" : "locked"}.` })}>{template.isLocked ? <LockOpen className="size-4" /> : <Lock className="size-4" />}</button>
@@ -254,9 +264,14 @@ export function AssessmentSetupWorkspace() {
             <h2 id="assessments-heading" className="text-sm font-bold text-foreground">Assessments</h2>
             <p className="text-xs text-muted-foreground">{setup.term ? `Current term: ${setup.term.name}` : "No academic term is selected, so coverage can't be checked."}</p>
           </div>
-          <button type="button" onClick={() => setEditing("new")} className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary px-4 text-xs font-semibold text-primary-foreground hover:bg-primary/90">
-            <Plus className="size-4" /> New assessment
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <button type="button" onClick={() => setEditing("new-mock")} className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-border px-4 text-xs font-semibold text-foreground/80 hover:bg-muted/50">
+              <Plus className="size-4" /> New mock exam
+            </button>
+            <button type="button" onClick={() => setEditing("new")} className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary px-4 text-xs font-semibold text-primary-foreground hover:bg-primary/90">
+              <Plus className="size-4" /> New assessment
+            </button>
+          </div>
         </div>
         {setup.templates.length > 0 && (
           <DataTable
@@ -298,7 +313,7 @@ export function AssessmentSetupWorkspace() {
                         {system.hasMarks && " · marks graded with it"}
                       </p>
                       {system.method === "CLASS_RANK" && (
-                        <p className="mt-1 text-[11px] text-muted-foreground">Graded by position in the class, not by marks. Adopt it by choosing it as an assessment&rsquo;s grading scale.</p>
+                        <p className="mt-1 text-[11px] text-muted-foreground">Graded by position in the class until you set mark boundaries, as WAEC does each year for each subject. Adopt it by choosing it as an assessment&rsquo;s grading scale, then use the sliders button on that assessment to set the boundaries.</p>
                       )}
                     </div>
                     <div className="flex shrink-0 items-center">
@@ -335,12 +350,22 @@ export function AssessmentSetupWorkspace() {
 
       {editing && (
         <AssessmentTemplateDialog
-          key={editing === "new" ? "new" : editing.id}
+          key={typeof editing === "string" ? editing : editing.id}
           setup={setup}
-          template={editing === "new" ? undefined : editing}
+          category={editing === "new-mock" ? "MOCK" : undefined}
+          template={typeof editing === "string" ? undefined : editing}
           onClose={() => setEditing(null)}
           onSaved={(message) => { setEditing(null); setNotice(message); }}
           onCreateStandardScale={createStandardScale}
+        />
+      )}
+      {boundariesFor && (
+        <GradeBoundariesDialog
+          key={boundariesFor.id}
+          template={boundariesFor}
+          setup={setup}
+          onClose={() => setBoundariesFor(null)}
+          onSaved={(message) => { setBoundariesFor(null); setNotice(message); }}
         />
       )}
       {scaleDialog && (

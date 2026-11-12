@@ -99,10 +99,6 @@ export default function TeacherLayout() {
         <Tabs.Screen name="teacher-timetable" options={{ href: null }} />
         <Tabs.Screen name="teacher-register" options={{ href: null }} />
         <Tabs.Screen name="teacher-score-entry" options={{ href: null }} />
-        <Tabs.Screen name="teacher-mocks" options={{ href: null }} />
-        <Tabs.Screen name="teacher-mock-paper" options={{ href: null }} />
-        <Tabs.Screen name="teacher-mock-corrections" options={{ href: null }} />
-        <Tabs.Screen name="teacher-mock-reports" options={{ href: null }} />
         <Tabs.Screen name="teacher-report-review" options={{ href: null }} />
         <Tabs.Screen name="teacher-assignment-new" options={{ href: null }} />
         <Tabs.Screen name="teacher-assignment" options={{ href: null }} />

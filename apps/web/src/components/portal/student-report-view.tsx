@@ -3,7 +3,6 @@ import { FileText, LoaderCircle, Printer, Sparkles } from "lucide-react";
 import { useState } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { apiFetch, downloadAcademicReport } from "@/lib/api";
-import { MockPublishedReportCards } from "@/components/portal/mock-published-report-cards";
 import { ReportCardDocument, type ReportDocApproval, type ReportDocLayout, type ReportDocSubject, type ReportDocumentProps } from "@/components/reports/report-card-document";
 import { accessibleAccentForeground } from "@/lib/accent-foreground";
 
@@ -12,7 +11,7 @@ interface PublishedReport {
   pdfAvailable?: boolean;
   data: { student?: { class?: { name?: string; level?: string } | null }; subjects?: ReportDocSubject[]; remarks?: { type: string; content: string; teacher: string }[]; summary?: ReportDocumentProps["summary"]; attendance?: ReportDocumentProps["attendance"] };
   approval?: ReportDocApproval | null;
-  student: { admissionNumber: string | null; profile: { firstName: string; lastName: string } };
+  student: { admissionNumber: string | null; profile: { firstName: string; lastName: string; user?: { image: string | null } | null } };
   publishedAt: string | null;
   set: { name: string; academicYear: { name: string }; term: { name: string; termNumber: number }; template: { name: string; layout: ReportDocLayout | null }; school: { name: string; code: string; email: string | null; phone: string | null; address: string | null; logo: string | null; motto: string | null; website: string | null; primaryColor: string; secondaryColor: string } };
 }
@@ -53,7 +52,7 @@ export function StudentReportView() {
       printClass="report-print-area"
       school={active.set.school}
       layout={layout}
-      pupil={{ name: `${active.student.profile.firstName} ${active.student.profile.lastName}`, admissionNumber: active.student.admissionNumber, className: active.data.student?.class?.name ?? null }}
+      pupil={{ name: `${active.student.profile.firstName} ${active.student.profile.lastName}`, admissionNumber: active.student.admissionNumber, className: active.data.student?.class?.name ?? null, photo: active.student.profile.user?.image ?? null }}
       setName={active.set.name}
       academicYear={active.set.academicYear.name}
       term={active.set.term.name}
@@ -65,7 +64,6 @@ export function StudentReportView() {
       approval={active.approval}
       published={{ publishedAt: active.publishedAt }}
     />}
-    <MockPublishedReportCards audience="student" />
     <style>{`@media print { body * { visibility: hidden; } .report-print-area, .report-print-area * { visibility: visible; } .report-print-area { position: absolute; inset: 0; width: 100%; border: 0; box-shadow: none; padding: 0; background: white !important; color: black !important; } .report-print-area section { break-inside: avoid; } @page { size: A4; margin: 12mm; } }`}</style>
   </div>;
 }

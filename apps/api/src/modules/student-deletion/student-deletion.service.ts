@@ -76,9 +76,7 @@ export class StudentDeletionService {
           select: {
             bills: true,
             payments: true,
-            internalExamCandidates: true,
             externalExamCandidates: true,
-            internalMockReports: true,
             enrollments: true,
             attendances: true,
             assessmentScores: true,

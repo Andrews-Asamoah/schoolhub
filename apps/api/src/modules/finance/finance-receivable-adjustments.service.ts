@@ -1,4 +1,5 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
+import { POLICY_WAIVER_NOTE, loadApprovalSetting, mayDecide } from "./finance-approval-settings.js";
 import { Prisma, type FinanceBillAdjustment, type FinanceBillAdjustmentLine } from "@prisma/client";
 import { createHash } from "node:crypto";
 import { PrismaService } from "../../prisma/prisma.service.js";
@@ -76,18 +77,26 @@ export class FinanceReceivableAdjustmentsService {
       if (policy?.requiredApprovals !== 1 || policy.approverPermission !== subject + "_APPROVE") {
         throw new ConflictException("A supported, independent adjustment approval policy is required.");
       }
+      // No second approver required by the school: the preparer's submission completes the step.
+      const waived = !(await loadApprovalSetting(tx, schoolId, "INVOICE_ADJUSTMENT")).required;
       const approval = await tx.financeApprovalRequest.create({
         data: {
           schoolId, subject, entityType: "FINANCE_BILL_ADJUSTMENT",
           entityId: item.id, requestedById: item.createdById,
           amount: item.amount, payloadHash: hash(item),
+          ...(waived ? {
+            status: "APPROVED" as const, decidedById: actorId, decidedAt: new Date(),
+            decisionNote: POLICY_WAIVER_NOTE, waivedByPolicy: true,
+          } : {}),
         },
       });
+      // The database only allows DRAFT -> PENDING_APPROVAL -> APPROVED, so a waived approval takes both steps.
       await tx.financeBillAdjustment.update({
         where: { id: item.id },
         data: { status: "PENDING_APPROVAL", approvalRequestId: approval.id },
       });
-      return { adjustmentId: id, approvalRequestId: approval.id, status: "PENDING_APPROVAL" as const };
+      if (waived) await tx.financeBillAdjustment.update({ where: { id: item.id }, data: { status: "APPROVED" } });
+      return { adjustmentId: id, approvalRequestId: approval.id, status: waived ? "APPROVED" as const : "PENDING_APPROVAL" as const };
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }));
   }
 
@@ -95,10 +104,11 @@ export class FinanceReceivableAdjustmentsService {
     isSuperAdmin: boolean, id: string, decision: "APPROVED" | "REJECTED", note: string,
   ) {
     if (note.trim().length < 10) throw new BadRequestException("Explain the approval decision in at least 10 characters.");
-    if (!isSuperAdmin && schoolRole !== "owner" && schoolRole !== "headteacher") {
-      throw new ForbiddenException("A school owner or headteacher must authorise invoice adjustments.");
-    }
     return withSerializableRetry(() => this.prisma.client.$transaction(async tx => {
+      const setting = await loadApprovalSetting(tx, schoolId, "INVOICE_ADJUSTMENT");
+      if (!mayDecide(setting, { id: actorId, role: schoolRole, isSuperAdmin })) {
+        throw new ForbiddenException("Only the approver chosen by the school can authorise invoice adjustments.");
+      }
       const item = await this.lock(tx, schoolId, id);
       if (item.status !== "PENDING_APPROVAL" || !item.approvalRequestId) {
         throw new ConflictException("Adjustment is not pending independent approval.");
@@ -147,7 +157,7 @@ export class FinanceReceivableAdjustmentsService {
         },
       });
       if (!approval || approval.requestedById !== item.createdById || !approval.decidedById ||
-        approval.decidedById === item.createdById || approval.decidedById === actorId) {
+        (!approval.waivedByPolicy && (approval.decidedById === item.createdById || approval.decidedById === actorId))) {
         throw new ForbiddenException("Approved adjustment must have an independent approver who does not post it.");
       }
       const settings = await tx.financeSettings.findUnique({ where: { schoolId } });

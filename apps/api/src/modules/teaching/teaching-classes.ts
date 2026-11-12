@@ -1,3 +1,4 @@
+import { teachingPairs } from "../../common/scope/teacher-access.js";
 import type { TeacherAssignments } from "../../common/scope/teacher-scope.service.js";
 
 export interface TeachingClass {
@@ -28,7 +29,7 @@ export function buildTeachingClasses(
       level: klass.level,
       isClassTeacher: classTeacherOf.has(klass.id),
       studentCount: studentCounts.get(klass.id) ?? 0,
-      subjects: assignments.subjectAssignments
+      subjects: teachingPairs(assignments)
         .filter((row) => row.classId === klass.id)
         .map((row) => subjectById.get(row.subjectId))
         .filter((subject): subject is NonNullable<typeof subject> => subject !== undefined)

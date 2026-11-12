@@ -22,12 +22,7 @@ import {
   NewTeacherAssignment,
   TeacherAssignment,
 } from "@/features/teacher/Assignments";
-import {
-  TeacherMocks,
-  TeacherMockPaper,
-  TeacherMockCorrections,
-} from "@/features/teacher/Mocks";
-import { TeacherReports, TeacherMockReports } from "@/features/teacher/Reports";
+import { TeacherReports } from "@/features/teacher/Reports";
 import TeacherClubs from "@/features/teacher/Clubs";
 import { ApiError } from "@/lib/api-error";
 import * as registerQueue from "@/lib/register-queue";
@@ -332,21 +327,6 @@ const fixture: Record<string, unknown> = {
       ],
     },
   ],
-  "mock-paper": {
-    paper: { id: "paper", name: "Math", maxMarks: 100, finalizedAt: null },
-    session: { id: "exam", name: "Mock 1", status: "OPEN" },
-    canEdit: true,
-    candidates: [
-      {
-        id: "candidate",
-        studentId: "p",
-        name: "Pupil Fixture",
-        marks: null,
-        status: null,
-        version: 0,
-      },
-    ],
-  },
   "report-queue": [
     {
       id: "report",
@@ -357,18 +337,6 @@ const fixture: Record<string, unknown> = {
       subjects: [],
     },
   ],
-  "mock-corrections": [],
-  "mock-reports": {
-    reports: [
-      {
-        id: "mock-report",
-        stage: "GENERATED",
-        integrityOk: true,
-        teacherRemark: null,
-        snapshot: { pupil: { name: "Pupil Fixture" }, average: 70, papers: [] },
-      },
-    ],
-  },
   clubs: [{ id: "club", name: "STEM club", isActive: true, description: null }],
   pupil: {
     id: "p",
@@ -402,12 +370,8 @@ const screens = [
   TeacherAssignments,
   NewTeacherAssignment,
   TeacherAssignment,
-  TeacherMocks,
-  TeacherMockPaper,
-  TeacherMockCorrections,
   TeacherReports,
   TeacherClubs,
-  TeacherMockReports,
 ];
 test.each(screens.map((Component, i) => [i, Component] as const))(
   "teacher screen %s renders loading and retryable errors",
@@ -490,32 +454,6 @@ test("score entry rejects a value above the component maximum", async () => {
   );
   expect(mockMutate).not.toHaveBeenCalled();
 });
-test("mock save sends the captured expectedVersion and never finalizes unsaved changes", async () => {
-  await render(<TeacherMockPaper />);
-  await fireEvent.changeText(
-    screen.getByLabelText("Pupil Fixture: marks / 100"),
-    "52.25",
-  );
-  expect(screen.getByRole("button", { name: "Finalize paper" })).toBeDisabled();
-  await fireEvent.press(
-    screen.getByRole("button", { name: "Save mock marks" }),
-  );
-  await waitFor(() =>
-    expect(mockMutate).toHaveBeenCalledWith({
-      request: {
-        paperId: "paper",
-        entries: [
-          {
-            candidateId: "candidate",
-            status: "MARKED",
-            marks: 52.25,
-            expectedVersion: 0,
-          },
-        ],
-      },
-    }),
-  );
-});
 test("report recommendations validate before transport", async () => {
   await render(<TeacherReports />);
   await fireEvent.press(
@@ -542,7 +480,6 @@ test.each([
   TeacherRoster,
   TeacherTimetable,
   TeacherAssignments,
-  TeacherMocks,
   TeacherReports,
   TeacherClubs,
 ])(
@@ -586,52 +523,6 @@ test("closed school day disables marking", async () => {
     screen.getByRole("button", { name: "Pupil Fixture: PRESENT" }),
   ).toBeDisabled();
 });
-test("a background refresh cannot silently advance a pending mock edit's version", async () => {
-  const r = await render(<TeacherMockPaper />);
-  await fireEvent.changeText(
-    screen.getByLabelText("Pupil Fixture: marks / 100"),
-    "52",
-  );
-  mockQuery.mockImplementation((parts: string[]) => ({
-    ...baseQuery,
-    data:
-      parts[0] === "mock-paper"
-        ? {
-            ...(fixture["mock-paper"] as Record<string, unknown>),
-            candidates: [
-              {
-                id: "candidate",
-                studentId: "p",
-                name: "Pupil Fixture",
-                marks: 70,
-                status: "MARKED",
-                version: 8,
-              },
-            ],
-          }
-        : fixture[parts[0]!],
-  }));
-  await r.rerender(<TeacherMockPaper />);
-  await fireEvent.press(
-    screen.getByRole("button", { name: "Save mock marks" }),
-  );
-  await waitFor(() =>
-    expect(mockMutate).toHaveBeenCalledWith({
-      request: {
-        paperId: "paper",
-        entries: [
-          {
-            candidateId: "candidate",
-            status: "MARKED",
-            marks: 52,
-            expectedVersion: 0,
-          },
-        ],
-      },
-    }),
-  );
-});
-
 describe("offline register saves", () => {
   beforeEach(() => {
     jest.spyOn(session, "useSession").mockReturnValue({

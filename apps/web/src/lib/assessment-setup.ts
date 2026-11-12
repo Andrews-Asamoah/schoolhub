@@ -16,6 +16,10 @@ export interface SetupTemplate {
   id: string;
   name: string;
   description: string | null;
+  /** TERMLY feeds termly report cards; MOCK is a practice exam kept to one academic year. */
+  category: "TERMLY" | "MOCK";
+  academicYearId: string | null;
+  sequence: number | null;
   isActive: boolean;
   isLocked: boolean;
   deadline: string | null;
@@ -49,8 +53,31 @@ export interface SetupGradingSystem {
   hasMarks: boolean;
   scales: SetupBand[];
 }
+/** One grade of a class-ranked scale as the boundaries screen shows it. */
+export interface BoundaryBand {
+  grade: string;
+  description: string;
+  /** This grade's own share of the cohort, e.g. 7 for "Next 7%". */
+  share: number;
+  /** Cumulative share from the top, e.g. 11 for grade 2 of the BECE stanine. */
+  cumulativeShare: number;
+}
+export interface BoundaryInfo {
+  template: { id: string; name: string };
+  subject: { id: string; name: string };
+  term: { id: string; name: string };
+  bands: BoundaryBand[];
+  /** The minimum mark per grade (except the lowest) once set, or null while grading by class position. */
+  boundaries: { grade: string; minScore: number }[] | null;
+  /** Percentages of every finished result for this assessment, subject and term, across all classes. */
+  percentages: number[];
+  /** Only after a save or a clear: how many pupils' grades changed. */
+  regraded?: number;
+}
+
 export interface AssessmentSetup {
   term: { id: string; name: string; termNumber: number } | null;
+  years: { id: string; name: string; isCurrent: boolean }[];
   classes: { id: string; name: string; level: string }[];
   subjects: { id: string; code: string; name: string; strands: { id: string; name: string; code: string | null; sortOrder: number }[] }[];
   templates: SetupTemplate[];
@@ -90,6 +117,9 @@ export function templateToInput(template: SetupTemplate, changes: Partial<SaveAs
   return {
     name: template.name,
     description: template.description,
+    category: template.category,
+    academicYearId: template.academicYearId,
+    sequence: template.sequence,
     gradingSystemId: template.gradingSystem.id,
     classIds: template.allClasses ? [] : template.classIds,
     subjectCode: template.subjectCode,

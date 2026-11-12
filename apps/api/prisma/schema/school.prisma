@@ -44,11 +44,9 @@ model School {
   attendanceBatchReplays      AttendanceBatchReplay[]
   assessmentTemplates         AssessmentTemplate[]
   reportCardVersions          ReportCardVersion[]
-  internalExamSessions       InternalExamSession[]
+  reportRecommendationDrafts  ReportRecommendationDraft[]
   externalExamSessions ExternalExamSession[]
   externalExamImports ExternalExamImport[]
-  internalMockReports        InternalMockReport[]
-  internalMockCorrections    InternalMockCorrection[]
   bills                       Bill[]
   siblingDiscountPolicies     SiblingDiscountPolicy[]
   studentScholarships         StudentScholarship[]
@@ -77,6 +75,7 @@ model School {
   reportCardSets              ReportCardSet[]
   assessmentEntrySubmissions  AssessmentEntrySubmission[]
   assessmentMarkCorrections   AssessmentMarkCorrection[]
+  assessmentGradeBoundaries   AssessmentGradeBoundary[]
   schoolAssignments           SchoolAssignment[]
   notifications               Notification[]
   announcements               Announcement[]
@@ -223,9 +222,8 @@ model Student {
   @@index([schoolId, deletedAt])
   @@map("students")
   reportCardVersions ReportCardVersion[]
-  internalExamCandidates InternalExamCandidate[]
+  reportRecommendationDrafts ReportRecommendationDraft[]
   externalExamCandidates ExternalExamCandidate[]
-  internalMockReports InternalMockReport[]
 }
 
 model Teacher {
@@ -263,7 +261,6 @@ model Teacher {
   subjects              SubjectTeacher[]
   classSubjects         ClassSubject[]
   classSubjectStrandAssignments ClassSubjectStrandAssignment[]
-  internalExamPaperSections InternalExamPaperSection[] @relation("InternalExamPaperSectionTeacher")
   clubs                 Club[]
   payslips              Payslip[]
   timetableEntries      TimetableEntry[]

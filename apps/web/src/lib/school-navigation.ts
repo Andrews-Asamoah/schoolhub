@@ -1,4 +1,6 @@
 import {
+  BarChart3,
+  FolderArchive,
   ShieldCheck,
   Activity,
   AlertCircle,
@@ -158,6 +160,38 @@ export const schoolNavGroups: SchoolNavGroup[] = [
         apiStatus: "available",
       },
       {
+        id: "report-approvals",
+        label: "Report approvals",
+        icon: ShieldCheck,
+        description: "Review class teacher recommendations and approve pupils’ report cards for publication.",
+        section: "Academics",
+        apiStatus: "available",
+      },
+      {
+        id: "report-cards",
+        label: "Report card archive",
+        icon: FolderArchive,
+        description: "Find and open published report cards from any year or term.",
+        section: "Academics",
+        apiStatus: "available",
+      },
+      {
+        id: "mock-analysis",
+        label: "Mock analysis",
+        icon: BarChart3,
+        description: "Compare a class's mock exams, subjects and pupils across Mock 1, 2, 3 with charts.",
+        section: "Academics",
+        apiStatus: "available",
+      },
+      {
+        id: "external-exams",
+        label: "BECE results",
+        icon: ClipboardCheck,
+        description: "Staff-only BECE candidate register, WAEC grades and analysis.",
+        section: "Academics",
+        apiStatus: "available",
+      },
+      {
         id: "assignments",
         label: "Assignments",
         icon: FileText,
@@ -165,17 +199,6 @@ export const schoolNavGroups: SchoolNavGroup[] = [
         section: "Academics",
         apiStatus: "available",
       },
-    ],
-  },
-  {
-    label: "Examinations",
-    items: [
-      { id: "internal-exams", label: "Internal", icon: BookOpenCheck,
-        description: "Numbered JHS 3 mock examinations, subjects and staff mark entry.",
-        section: "Examinations", apiStatus: "available" },
-      { id: "external-exams", label: "External", icon: ClipboardCheck,
-        description: "Staff-only BECE candidate register, grades and analysis.",
-        section: "Examinations", apiStatus: "available" },
     ],
   },
   {
@@ -482,6 +505,14 @@ export const schoolNavGroups: SchoolNavGroup[] = [
         apiStatus: "available",
       },
       {
+        id: "finance-approvals",
+        label: "Finance approvals",
+        icon: ShieldCheck,
+        description: "Choose which finance steps need a second approver, and who approves.",
+        section: "Administration",
+        apiStatus: "available",
+      },
+      {
         id: "settings",
         label: "School settings",
         icon: Settings2,
@@ -535,17 +566,40 @@ const adminRestrictedFinancePages = new Set([
 ]);
 
 const personalPages = new Set(["guardian-portal", "guardian-attendance", "guardian-timetable", "guardian-reports", "guardian-notices", "guardian-fees", "student-portal", "teacher-portal", "classmates"]);
-const managementPages = schoolNavItems.filter((item) => !personalPages.has(item.id)).map((item) => item.id);
+/**
+ * The headteacher sees an explicit allowlist, so a page added later is hidden from them until it is
+ * listed here. Payroll, payments, invoices, expenses, the ledger and audit trail, finance reports,
+ * statements, term-end review, concessions, fee reminders and finance approvals are deliberately absent.
+ * "accountant-portal" stays for now because the reconciliation, journal and period-close approval
+ * screens a headteacher decides on live inside it (see finance-approval-settings).
+ */
+const headteacherPages = new Set([
+  "students", "admissions", "enrollments", "teachers", "staff", "guardians",
+  "classes", "subjects", "academic-years", "timetable",
+  "assessments", "assessment-tracking", "mock-analysis", "external-exams", "assignments", "reports", "report-cards",
+  "attendance", "houses", "clubs",
+  "fees", "outstanding", "inventory",
+  "announcements", "messages", "notifications", "documents",
+  "team", "signatures", "settings", "support", "profile",
+  "accountant-portal",
+]);
+
+/** Pages only the headteacher may use: the API refuses everyone else, so the menu does not offer them. */
+const headteacherOnlyPages = new Set(["report-approvals"]);
+
+const managementPages = schoolNavItems
+  .filter((item) => !personalPages.has(item.id) && !headteacherOnlyPages.has(item.id))
+  .map((item) => item.id);
 
 const rolePages: Record<string, string[]> = {
   owner: managementPages,
-  headteacher: managementPages,
+  headteacher: [...managementPages.filter((id) => headteacherPages.has(id)), ...headteacherOnlyPages],
   admin: schoolNavItems
-    .filter((item) => !adminRestrictedFinancePages.has(item.id) && !personalPages.has(item.id))
+    .filter((item) => !adminRestrictedFinancePages.has(item.id) && !personalPages.has(item.id) && !headteacherOnlyPages.has(item.id))
     .map((item) => item.id),
   teacher: [
     "external-exams",
-    "internal-exams",
+    "mock-analysis",
     "students",
     "classes",
     "subjects",
@@ -554,6 +608,7 @@ const rolePages: Record<string, string[]> = {
     "assignments",
     "attendance",
     "reports",
+    "report-cards",
     "documents",
     "messages",
     "notifications",

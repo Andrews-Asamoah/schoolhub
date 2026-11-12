@@ -19,9 +19,7 @@ const BLOCKERS: ReadonlyArray<readonly [string, string]> = [
   ["payments", "payments"],
   ["billAdjustments", "fee bill adjustments"],
   ["creditEntries", "credit balance entries"],
-  ["internalExamCandidates", "internal exam registrations"],
   ["externalExamCandidates", "external exam (such as BECE) registrations"],
-  ["internalMockReports", "mock exam reports"],
 ];
 
 /** Records that are removed together with the student. */

@@ -284,28 +284,6 @@ export const downloadMyReport = defineDownload({
   roles: ["student"],
 });
 
-const mockSnapshotSchema = z.object({
-  name: z.string(),
-  year: z.string(),
-  term: z.string(),
-  average: z.number().nullable(),
-});
-const publishedMockSchema = z.object({
-  id: z.string(),
-  snapshot: mockSnapshotSchema,
-});
-export const listMyPublishedMocks = defineEndpoint({
-  method: "GET",
-  path: "/internal-exams/published/me",
-  roles: ["student"],
-  response: z.array(publishedMockSchema),
-});
-export const downloadMyMock = defineDownload({
-  method: "GET",
-  path: "/internal-exams/published/me/:id/pdf",
-  roles: ["student"],
-});
-
 export const getSchoolHousesForStudents = defineEndpoint({
   method: "GET",
   path: "/academics/houses",

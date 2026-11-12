@@ -1,4 +1,5 @@
 import { withSerializableRetry } from "./finance.helpers.js";
+import { POLICY_WAIVER_NOTE, loadApprovalSetting, mayDecide } from "./finance-approval-settings.js";
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
 import { createHash } from "node:crypto";
@@ -156,15 +157,26 @@ export class FinanceBankReconciliationService {
       await this.lock(tx, schoolId); const record = await this.record(tx, schoolId, id);
       if (record.status !== "DRAFT" || record.createdById !== actorId) throw new ForbiddenException("Only the preparer can submit a draft.");
       const snapshot = await this.closeEvidence(tx, schoolId, id);
-      const result = await tx.financeBankReconciliation.update({ where: { id }, data: { status: "PENDING", submittedAt: new Date(), snapshot, contentHash: hash(snapshot) } });
-      await this.audit(tx, schoolId, actorId, id, "SUBMITTED"); return result;
+      // No second approver required by the school: the evidence just gathered is the evidence
+      // that is approved, and the preparer's submission completes the step.
+      const waived = !(await loadApprovalSetting(tx, schoolId, "BANK_RECONCILIATION")).required;
+      const now = new Date();
+      const result = await tx.financeBankReconciliation.update({ where: { id }, data: {
+        status: waived ? "APPROVED" : "PENDING", submittedAt: now, snapshot, contentHash: hash(snapshot),
+        ...(waived ? { decidedById: actorId, decidedAt: now, decisionNote: POLICY_WAIVER_NOTE, waivedByPolicy: true } : {}),
+      } });
+      await this.audit(tx, schoolId, actorId, id, "SUBMITTED");
+      if (waived) await this.audit(tx, schoolId, actorId, id, "APPROVED_NO_SECOND_APPROVER");
+      return result;
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
   }
   async decide(schoolId: string, actorId: string, role: string | undefined, id: string, approve: boolean, note: string) {
-    if (!["owner", "headteacher"].includes(role ?? "")) throw new ForbiddenException("An owner or headteacher must review reconciliations.");
     if (note.trim().length < 10) throw new BadRequestException("Provide a decision reason of at least 10 characters.");
     return this.transact(async tx => {
-      await this.lock(tx, schoolId); const record = await this.record(tx, schoolId, id);
+      await this.lock(tx, schoolId);
+      const setting = await loadApprovalSetting(tx, schoolId, "BANK_RECONCILIATION");
+      if (!mayDecide(setting, { id: actorId, role, isSuperAdmin: false })) throw new ForbiddenException("Only the approver chosen by the school can review reconciliations.");
+      const record = await this.record(tx, schoolId, id);
       if (record.status !== "PENDING") throw new ConflictException("Reconciliation is not pending approval.");
       if (record.createdById === actorId) throw new ForbiddenException("The preparer cannot approve their own reconciliation.");
       if (approve && hash(await this.closeEvidence(tx, schoolId, id)) !== record.contentHash) throw new ConflictException("Ledger or matching changed after submission; reject and prepare again.");

@@ -16,6 +16,7 @@ describe.skipIf(!enabled)('bank reconciliation workflow (PostgreSQL)',{timeout:6
   await db.user.createMany({data:[maker,reviewer].map(id=>({id,name:id,email:id+'@test.invalid',emailVerified:true}))});
   await db.organization.create({data:{id:run,slug:run,name:run}});
   schoolId=(await db.school.create({data:{organizationId:run,name:run,subdomain:run,code:run.toUpperCase()}})).id;
+  await db.financeApprovalSetting.createMany({ data: ["PAYROLL_SETTINGS","BANK_RECONCILIATION","PERIOD_CONTROL","MANUAL_JOURNAL","INVOICE_ADJUSTMENT","ACCOUNT_MAPPING"].map(control => ({ schoolId, control: control as never, required: true, approverRoles: ["owner","headteacher"] })) });
   bankId=(await db.chartAccount.create({data:{schoolId,code:'1000',name:'Test bank',accountType:'ASSET',category:'BANK'}})).id;
   revenueId=(await db.chartAccount.create({data:{schoolId,code:'4000',name:'Fees',accountType:'REVENUE',category:'OTHER_INCOME'}})).id;
   const posting=new FinancePostingService({client:db} as never);
@@ -43,7 +44,7 @@ describe.skipIf(!enabled)('bank reconciliation workflow (PostgreSQL)',{timeout:6
  it('requires independent approval and freezes approved evidence',async()=>{
   await service.submit(schoolId,maker,recordId);
   await expect(service.decide(schoolId,maker,'owner',recordId,true,'Reviewed statement evidence')).rejects.toThrow(/own reconciliation/);
-  await expect(service.decide(schoolId,reviewer,'accountant',recordId,true,'Reviewed statement evidence')).rejects.toThrow(/owner or headteacher/);
+  await expect(service.decide(schoolId,reviewer,'accountant',recordId,true,'Reviewed statement evidence')).rejects.toThrow(/approver chosen by the school/);
   const result=await service.decide(schoolId,reviewer,'owner',recordId,true,'Reviewed statement evidence');
   expect(result.status).toBe('APPROVED');expect(result.contentHash).toHaveLength(64);
   await expect(db.financeBankReconciliation.update({where:{id:recordId},data:{status:'DRAFT'}})).rejects.toThrow(/immutable|append-only/);

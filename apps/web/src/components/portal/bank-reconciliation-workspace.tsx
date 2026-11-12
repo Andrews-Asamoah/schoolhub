@@ -1,3 +1,4 @@
+import { useFinanceApproval } from "@/lib/finance-approval";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiFetch, apiDownload } from "@/lib/api";
@@ -32,10 +33,11 @@ export function BankReconciliationWorkspace() {
     if (commit) { select(result.id); setPreview(null); } else setPreview(result);
   }
   const canPrepare = activeRole === "accountant";
-  const canApprove = activeRole === "owner" || activeRole === "headteacher";
+  const approval = useFinanceApproval("BANK_RECONCILIATION");
+  const canApprove = approval.canDecide(activeRole);
   return <section className="space-y-4 rounded-xl border border-border bg-card p-5">
     <h2 className="text-lg font-semibold">Bank and cash reconciliation</h2>
-    <p className="text-sm text-muted-foreground">Import statement evidence, match existing ledger postings and submit a zero-difference bridge for independent approval. Imports never create receipts or journals.</p>
+    <p className="text-sm text-muted-foreground">Import statement evidence, match existing ledger postings and submit a zero-difference bridge{approval.required ? " for independent approval" : " (your school does not require a second approver, so submitting completes it)"}. Imports never create receipts or journals.</p>
     {notice && <p role="status" className="text-sm">{notice}</p>}
     {[accounts.error,records.error,detail.error,candidates.error].filter(Boolean).map((error,index) => <p role="alert" key={index} className="text-destructive">{(error as Error).message}</p>)}
     {canPrepare && <details><summary className="cursor-pointer font-medium">Import a statement</summary><div className="mt-3 grid gap-3 sm:grid-cols-2">

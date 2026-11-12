@@ -1,5 +1,4 @@
 import {
-  downloadMyMock,
   downloadMyReport,
   getMyFeeStatus,
   getMyStudentProfile,
@@ -112,7 +111,6 @@ test("published report downloads are student-only authenticated routes", async (
   await expect(
     downloadMyReport({ params: { reportId: "report-1" } }),
   ).rejects.toThrow();
-  await expect(downloadMyMock({ params: { id: "mock-1" } })).rejects.toThrow();
   expect(apiBytes).not.toHaveBeenCalled();
 
   jest

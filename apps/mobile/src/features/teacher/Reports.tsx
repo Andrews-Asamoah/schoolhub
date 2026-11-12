@@ -1,24 +1,17 @@
 import { useForm } from "@tanstack/react-form";
-import { useLocalSearchParams } from "expo-router";
 import {
   getTeacherReportQueue,
   recommendTeacherReport,
   recommendationSchema,
 } from "@/api/teacher";
-import {
-  getTeacherMockReports,
-  recommendTeacherMock,
-} from "@/api/teacher-mocks";
 import { useTeacherQuery } from "./queries";
 import { useScopedMutation } from "@/features/shared/mutations";
 import { TeacherPage, QueryState, Panel, Copy, MutationState } from "./ui";
 import { FormField } from "@/components/FormField";
 import { Button } from "@/components/Button";
 import { useState } from "react";
-function Recommendation({ id, mock = false }: { id: string; mock?: boolean }) {
-  const mutation = useScopedMutation(
-    mock ? recommendTeacherMock : recommendTeacherReport,
-  );
+function Recommendation({ id }: { id: string }) {
+  const mutation = useScopedMutation(recommendTeacherReport);
   const [error, setError] = useState("");
   const form = useForm({
     defaultValues: { remark: "" },
@@ -90,42 +83,6 @@ export function TeacherReports() {
             ))}
             {r.stage === "GENERATED" ? (
               <Recommendation id={r.id} />
-            ) : (
-              <Copy>{r.teacherRemark ?? "Recommendation recorded."}</Copy>
-            )}
-          </Panel>
-        ))}
-      </QueryState>
-    </TeacherPage>
-  );
-}
-export function TeacherMockReports() {
-  const { id = "" } = useLocalSearchParams<{ id: string }>();
-  const q = useTeacherQuery(
-    ["mock-reports", id],
-    (signal) => getTeacherMockReports({ signal, params: { id } }),
-    !!id,
-  );
-  return (
-    <TeacherPage title="Mock report review" query={q} back>
-      <QueryState query={q} empty={!q.data?.reports.length}>
-        {q.data?.reports.map((r) => (
-          <Panel key={r.id} title={r.snapshot.pupil.name}>
-            <Copy>
-              {r.stage} · Average {r.snapshot.average ?? "Unavailable"}
-            </Copy>
-            {r.snapshot.papers.map((p, i) => (
-              <Copy key={i}>
-                {p.name}: {p.percentage ?? "Absent"} · {p.grade ?? "No grade"}
-              </Copy>
-            ))}
-            {!r.integrityOk ? (
-              <Copy alert>
-                Report integrity could not be verified. Ask the school to review
-                it.
-              </Copy>
-            ) : r.stage === "GENERATED" ? (
-              <Recommendation id={r.id} mock />
             ) : (
               <Copy>{r.teacherRemark ?? "Recommendation recorded."}</Copy>
             )}

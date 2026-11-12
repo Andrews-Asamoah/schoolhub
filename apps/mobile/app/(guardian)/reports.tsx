@@ -7,11 +7,10 @@ import { Screen } from "@/components/Screen";
 import { SkeletonRow } from "@/components/Skeleton";
 import { Text } from "@/components/Typography";
 import { GuardianBackButton } from "@/features/guardian/BackButton";
-import { downloadGuardianMock, downloadGuardianReport } from "@/api/guardian";
+import { downloadGuardianReport } from "@/api/guardian";
 import { useGuardian } from "@/features/guardian/context";
 import { WardSwitcher } from "@/features/guardian/WardSwitcher";
 import {
-  useGuardianMocksQuery,
   useGuardianReportsQuery,
 } from "@/features/guardian/queries";
 import { spacing, type, useTheme } from "@/theme/theme";
@@ -32,13 +31,12 @@ async function download(action: () => Promise<void>, title: string) {
 export default function GuardianReportsScreen() {
   const { activeWard } = useGuardian();
   const reports = useGuardianReportsQuery();
-  const mocks = useGuardianMocksQuery();
   const { colors } = useTheme();
-  const hasData = (reports.data?.length ?? 0) + (mocks.data?.length ?? 0) > 0;
-  const loading = reports.isPending || mocks.isPending;
-  const failed = reports.isError || mocks.isError;
+  const hasData = (reports.data?.length ?? 0) > 0;
+  const loading = reports.isPending;
+  const failed = reports.isError;
   const retry = () => {
-    void Promise.all([reports.refetch(), mocks.refetch()]);
+    void reports.refetch();
   };
   return (
     <Screen
@@ -46,7 +44,7 @@ export default function GuardianReportsScreen() {
       subtitle={activeWard?.profile.firstName ?? "Published academic reports"}
       left={<GuardianBackButton />}
       right={<WardSwitcher />}
-      refreshing={reports.isRefetching || mocks.isRefetching}
+      refreshing={reports.isRefetching}
       onRefresh={retry}
     >
       <View style={{ gap: spacing.lg }}>
@@ -72,7 +70,7 @@ export default function GuardianReportsScreen() {
         ) : !hasData ? (
           <EmptyState
             title="No published reports yet"
-            message="Published report cards and internal mock results will appear here."
+            message="Published report cards, including mock results, will appear here."
             icon={<ClipboardList size={32} color={colors.mutedForeground} />}
             hue="indigo"
           />
@@ -119,43 +117,6 @@ export default function GuardianReportsScreen() {
               ).length === 0 ? (
                 <Text style={[type.body, { color: colors.mutedForeground }]}>
                   No published academic reports for this child.
-                </Text>
-              ) : null}
-            </Card>
-            <Card>
-              <Text
-                style={[
-                  type.headline,
-                  { color: colors.foreground, marginBottom: spacing.sm },
-                ]}
-              >
-                Internal mock results
-              </Text>
-              {(mocks.data ?? [])
-                .filter((report) => report.studentId === activeWard.id)
-                .map((report, index, entries) => (
-                  <ListRow
-                    key={report.id}
-                    title={report.snapshot.name}
-                    subtitle={`${report.snapshot.year} · ${report.snapshot.term}${report.snapshot.average === null ? "" : ` · ${report.snapshot.average}% average`}`}
-                    leading={<ClipboardList size={20} color={colors.primary} />}
-                    trailing={<Download size={18} color={colors.primary} />}
-                    status="PDF"
-                    divider={index < entries.length - 1}
-                    onPress={() =>
-                      void download(
-                        () => downloadGuardianMock(report.id),
-                        "Mock report",
-                      )
-                    }
-                    hue="indigo"
-                  />
-                ))}
-              {(mocks.data ?? []).filter(
-                (report) => report.studentId === activeWard.id,
-              ).length === 0 ? (
-                <Text style={[type.body, { color: colors.mutedForeground }]}>
-                  No published internal mock results for this child.
                 </Text>
               ) : null}
             </Card>

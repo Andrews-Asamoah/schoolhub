@@ -2,6 +2,7 @@
  * Rules for entering and totalling marks. Pure functions, no database, so the
  * arithmetic that decides a pupil's grade can be tested directly.
  */
+import { gradeFromBoundaries } from "@schoolhub/shared";
 
 export interface TemplateScope {
   isActive: boolean;
@@ -35,6 +36,26 @@ export function classScopeScore(
   if (template.departmentId != null && template.departmentId === target.departmentId) return 2;
   return null;
 }
+
+/**
+ * The classes an assessment is aimed at. A class that belongs to a year only counts in that year;
+ * a year-agnostic class counts in every year.
+ */
+export function coveredClasses<C extends TargetClass & { academicYearId: string | null }>(
+  template: Pick<TemplateScope, "classId" | "classIds" | "classLevel" | "departmentId">,
+  classes: readonly C[],
+  academicYearId?: string,
+): C[] {
+  return classes.filter(
+    (klass) => (!academicYearId || !klass.academicYearId || klass.academicYearId === academicYearId) && classScopeScore(template, klass) !== null,
+  );
+}
+
+/**
+ * Marks that count towards reports and analysis. A sheet is signed off (SUBMITTED) by its
+ * teacher; the later states are the same marks after review. Drafts are still being typed.
+ */
+export const REPORTABLE_SCORE_STATUSES = ["SUBMITTED", "REVIEWED", "FINAL"] as const;
 
 /**
  * How specifically a template is meant for this class, subject and term, or
@@ -176,6 +197,31 @@ export function classRankGrades<T extends string>(
       result.set(sorted[index]!.id, { grade: band.grade, gradePoint: band.gradePoint });
     }
     start = end + 1;
+  }
+  return result;
+}
+
+/** Minimum percentage for each grade except the lowest, as set for one assessment, subject and term. */
+export type GradeBoundaries = Readonly<Record<string, number>>;
+
+/**
+ * Grades a class-ranked (stanine) sheet. WAEC publishes no fixed BECE boundaries; it sets
+ * mark cut-offs per subject and year. When the school has set boundaries for this sheet,
+ * every pupil is graded by the mark alone, so one pupil's marks never move another's grade.
+ * Without boundaries, grades come from each pupil's position in the class (classRankGrades).
+ */
+export function rankedGrades<T extends string>(
+  rows: { id: T; percentage: number }[],
+  bands: RankBand[],
+  boundaries?: GradeBoundaries | null,
+): Map<T, { grade: string; gradePoint: number }> {
+  if (!boundaries || Object.keys(boundaries).length === 0) return classRankGrades(rows, bands);
+  const result = new Map<T, { grade: string; gradePoint: number }>();
+  if (bands.length === 0) return result;
+  const best = [...bands].sort((a, b) => a.maxScore - b.maxScore);
+  for (const row of rows) {
+    const band = gradeFromBoundaries(row.percentage, best, boundaries);
+    result.set(row.id, { grade: band.grade, gradePoint: band.gradePoint });
   }
   return result;
 }

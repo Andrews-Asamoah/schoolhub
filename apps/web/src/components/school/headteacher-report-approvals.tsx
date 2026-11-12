@@ -7,7 +7,8 @@ type HeadRow = {
   id: string;
   student: { profile: { firstName: string; lastName: string } };
   version?: { id: string; stage: string; version: number; teacherName: string | null;
-    teacherRemark: string | null; headName: string | null; headRemark: string | null } | null;
+    teacherRemark: string | null; headName: string | null; headRemark: string | null;
+    carriedHeadRemark?: string | null } | null;
 };
 
 export function HeadteacherReportApprovals({ setId, reports }: {setId: string; reports: HeadRow[]}) {
@@ -24,6 +25,8 @@ export function HeadteacherReportApprovals({ setId, reports }: {setId: string; r
       await qc.invalidateQueries({queryKey:["assessments","report-cards","workspace"]});
     },
   });
+  // Text typed here, else the recommendation carried over when the batch was regenerated.
+  const remarkOf = (row: HeadRow) => remarks[row.version?.id ?? ""] ?? row.version?.carriedHeadRemark ?? "";
   const approved = reports.filter(r=>r.version?.stage==="APPROVED"||r.version?.stage==="PUBLISHED").length;
   return <div className="mt-4 space-y-3 rounded-xl border border-border bg-muted/20 p-4">
     <h4 className="text-sm font-bold">Per-student academic approvals · {approved} / {reports.length}</h4>
@@ -43,12 +46,12 @@ export function HeadteacherReportApprovals({ setId, reports }: {setId: string; r
       {activeRole === "headteacher" && row.version?.stage === "TEACHER_REVIEWED" && <>
         <textarea rows={2} maxLength={2000} aria-label={`Headteacher recommendation for ${row.student.profile.firstName} ${row.student.profile.lastName}`}
           className="w-full rounded-lg border border-input bg-background p-2 text-sm"
-          value={remarks[row.version.id] ?? ""}
+          value={remarkOf(row)}
           onChange={e=>setRemarks(prev=>({...prev,[row.version!.id]:e.target.value}))}
           placeholder="Headteacher recommendation and conclusion"/>
         <button type="button" className="rounded-lg bg-primary px-3 py-2 text-xs font-bold text-primary-foreground disabled:opacity-40"
-          disabled={mutation.isPending || (remarks[row.version.id]??"").trim().length<10}
-          onClick={()=>mutation.mutate({id:row.version!.id,remark:(remarks[row.version!.id]??"").trim()})}>
+          disabled={mutation.isPending || remarkOf(row).trim().length<10}
+          onClick={()=>mutation.mutate({id:row.version!.id,remark:remarkOf(row).trim()})}>
           {mutation.isPending?"Approving…":"Approve pupil report"}
         </button>
       </>}

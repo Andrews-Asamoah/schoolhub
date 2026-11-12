@@ -1,10 +1,11 @@
 import { useMarkDraft } from "@/hooks/use-mark-draft";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CircleAlert, CircleCheck, Lock, LoaderCircle } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { apiFetch } from "@/lib/api";
 import { BulkImportButton } from "@/components/bulk-import/bulk-import-button";
 import { AssessmentMarksBulkImport } from "@/components/school/assessment-marks-bulk-import";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useTeachingOverview } from "@/lib/teaching";
 import { bandRangeLabel, type GradingMethod } from "@/lib/assessment-setup";
@@ -38,7 +39,7 @@ interface Sheet {
   subject: { id: string; name: string };
   term: { id: string; name: string };
   templates: { id: string; name: string }[];
-  template: { id: string; name: string; deadline: string | null; components: Component[]; grades: { grade: string; description: string; minScore: number; maxScore: number }[]; gradingMethod?: GradingMethod } | null;
+  template: { id: string; name: string; deadline: string | null; components: Component[]; grades: { grade: string; description: string; minScore: number; maxScore: number }[]; gradingMethod?: GradingMethod; boundaries?: { grade: string; minScore: number }[] | null } | null;
   students: SheetStudent[];
   stats: { count: number; mean: number | null; median: number | null; highest: number | null; lowest: number | null; passRate: number | null };
   canEdit: boolean;
@@ -110,6 +111,11 @@ export function AssessmentEntryWorkspace({
   const [correcting, setCorrecting] = useState(false);
   const [reason, setReason] = useState("");
   const [uploading, setUploading] = useState(false);
+  // The one app-styled confirmation this screen can show, in place of the browser's native confirm().
+  const [confirming, setConfirming] = useState<
+    { kind: "submit" } | { kind: "absent"; student: SheetStudent } | { kind: "switch"; run: () => void } | { kind: "discard" } | null
+  >(null);
+  const closeConfirm = useCallback(() => setConfirming(null), []);
 
   useEffect(() => {
     if (initial) {
@@ -229,9 +235,7 @@ export function AssessmentEntryWorkspace({
   });
 
   function clearMarksForAbsence(student: SheetStudent) {
-    if (window.confirm(`Mark ${student.name} absent / excused? This will clear all their saved marks for this assessment, including zeros, and recalculate grades and positions. Submit marks afterwards to save the absence selection.`)) {
-      clearForExcuse.mutate(student);
-    }
+    setConfirming({ kind: "absent", student });
   }
 
   const submit = useMutation({
@@ -247,31 +251,42 @@ export function AssessmentEntryWorkspace({
       setNotice("Marks submitted.");
     },
   });
+  const [applyNow, setApplyNow] = useState(false);
+  // The server enforces this; the active role only decides whether the option is offered.
+  const canApplyNow = typeof window !== "undefined" && ["owner", "admin"].includes(window.localStorage.getItem("schoolhub-active-role") ?? "");
   const requestCorrection = useMutation({
     mutationFn: () =>
-      apiFetch<{ id: string }>("/assessments/corrections", {
+      apiFetch<{ id: string; applied: boolean; publishedReports: { id: string; name: string }[] }>("/assessments/corrections", {
         method: "POST",
         body: JSON.stringify({
           classId: effectiveClassId,
           subjectId: effectiveSubjectId,
           templateId: sheet?.template?.id,
           reason: reason.trim(),
+          applyNow: canApplyNow && applyNow,
           items: changes.map(({ studentId, componentId, occurrenceIndex, marks }) => ({ studentId, componentId, occurrenceIndex, marks })),
         }),
       }),
-    onSuccess: () => {
+    onSuccess: (result) => {
       setDraft({});
       setCorrecting(false);
       setReason("");
+      setApplyNow(false);
       void sheetQuery.refetch();
       void queryClient.invalidateQueries({ queryKey: ["assessments", "corrections"] });
-      setNotice("Correction sent for approval. The marks will change once it is approved.");
+      void queryClient.invalidateQueries({ queryKey: ["mock-analytics"] });
+      if (!result.applied) setNotice("Correction sent for approval. The marks will change once it is approved.");
+      else if (result.publishedReports.length) setNotice(`Marks corrected. Published reports still show the old marks: reopen ${result.publishedReports.map((r) => `"${r.name}"`).join(", ")} under Reports, then regenerate and publish again.`);
+      else setNotice("Marks corrected and recorded in the audit trail.");
     },
   });
 
   function guard(action: () => void) {
     if (clearForExcuse.isPending || save.isPending || submit.isPending) return;
-    if ((changes.length || hasExcuseChanges) && !window.confirm("You have unsaved marks or absence selections. Switch sheets? Your draft will remain available in this tab.")) return;
+    if (changes.length || hasExcuseChanges) {
+      setConfirming({ kind: "switch", run: action });
+      return;
+    }
     setNotice(null);
     action();
   }
@@ -553,7 +568,7 @@ export function AssessmentEntryWorkspace({
                   type="button"
                   disabled={unsaved || waiting > 0 || excuseConflicts > 0 || submit.isPending || clearForExcuse.isPending}
                   title={unsaved ? "Save your marks first" : excuseConflicts > 0 ? "Clear recorded marks for the selected absent pupils, or uncheck their absence." : waiting > 0 ? `${waiting} pupil${waiting === 1 ? "" : "s"} still need marks or an excuse` : undefined}
-                  onClick={() => { if (window.confirm("Submit these marks? You will not be able to edit them directly afterwards; changes will need approval.")) submit.mutate(); }}
+                  onClick={() => setConfirming({ kind: "submit" })}
                   className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-border px-4 text-xs font-semibold hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {submit.isPending && <LoaderCircle className="size-3.5 animate-spin" />}
@@ -571,10 +586,16 @@ export function AssessmentEntryWorkspace({
                   <textarea rows={2} maxLength={2000} value={reason} onChange={(event) => setReason(event.target.value)}
                     className="rounded-lg border border-border bg-card px-3 py-2 text-xs normal-case tracking-normal text-foreground outline-none focus:border-primary/50" />
                 </label>
+                {canApplyNow && (
+                  <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <input type="checkbox" checked={applyNow} onChange={(event) => setApplyNow(event.target.checked)} />
+                    Apply now (admin): change the marks without a second approver
+                  </label>
+                )}
                 <button type="button" disabled={changes.length === 0 || invalid > 0 || reason.trim().length < 10 || requestCorrection.isPending} onClick={() => requestCorrection.mutate()}
                   className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary px-4 text-xs font-semibold text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50">
                   {requestCorrection.isPending && <LoaderCircle className="size-3.5 animate-spin" />}
-                  Send for approval{changes.length ? ` (${changes.length})` : ""}
+                  {canApplyNow && applyNow ? "Apply correction" : "Send for approval"}{changes.length ? ` (${changes.length})` : ""}
                 </button>
                 <button type="button" onClick={() => { setCorrecting(false); setDraft({}); setReason(""); }} className="h-9 rounded-lg px-3 text-xs font-semibold text-muted-foreground hover:bg-muted">Cancel</button>
               </div>
@@ -583,20 +604,79 @@ export function AssessmentEntryWorkspace({
             {(submit.error || requestCorrection.error) && <p role="alert" className="flex items-center gap-1.5 text-xs text-destructive"><CircleAlert className="size-3.5" /> {(submit.error ?? requestCorrection.error)?.message}</p>}
             {invalid > 0 && <p role="alert" className="flex items-center gap-1.5 text-xs text-destructive"><CircleAlert className="size-3.5" /> {invalid} mark{invalid === 1 ? " is" : "s are"} outside the allowed range.</p>}
             {notice && <p role="status" className="flex items-center gap-1.5 text-xs text-success"><CircleCheck className="size-3.5" /> {notice}</p>}
-            {save.error && <button type="button" className="text-xs underline" onClick={() => { if(window.confirm("Discard your local draft and reload the latest saved marks?")) {setDraft({}); void sheetQuery.refetch();} }}>Discard draft and load latest marks</button>}
+            {save.error && <button type="button" className="text-xs underline" onClick={() => setConfirming({ kind: "discard" })}>Discard draft and load latest marks</button>}
             {save.error && <p role="alert" className="flex items-center gap-1.5 text-xs text-destructive"><CircleAlert className="size-3.5" /> {save.error.message}</p>}
             <p className="ml-auto text-[11px] text-muted-foreground">
               Grades appear once every required column has a mark.
-              {sheet.template.gradingMethod === "CLASS_RANK" && " They compare each pupil with the rest of this class, so they can change as marks are entered."}
+              {sheet.template.gradingMethod === "CLASS_RANK" && (sheet.template.boundaries?.length
+                ? " Grades follow the mark boundaries set for this subject, so one pupil's marks never change another's grade."
+                : " They compare each pupil with the rest of this class, so they can change as marks are entered.")}
               {sheet.template.grades.length > 0 && (
                 sheet.template.gradingMethod === "CLASS_RANK"
-                  ? <> {sheet.template.grades.map((band, index) => `${band.grade} ${bandRangeLabel("CLASS_RANK", band, index, sheet.template!.grades.length)}`).join(" · ")}</>
+                  ? sheet.template.boundaries?.length
+                    ? <> {[
+                        ...sheet.template.boundaries.map((boundary) => `${boundary.grade} ${boundary.minScore}+`),
+                        `${sheet.template.grades[sheet.template.grades.length - 1]!.grade} below ${sheet.template.boundaries[sheet.template.boundaries.length - 1]!.minScore}`,
+                      ].join(" · ")}</>
+                    : <> {sheet.template.grades.map((band, index) => `${band.grade} ${bandRangeLabel("CLASS_RANK", band, index, sheet.template!.grades.length)}`).join(" · ")}</>
                   : <> {[...sheet.template.grades].sort((a, b) => b.minScore - a.minScore).map((band) => `${band.grade} ${band.minScore}+`).join(" · ")}</>
               )}
             </p>
           </div>
         </section>
       )}
+
+      {confirming && (() => {
+        const excusedCount = sheet ? sheet.students.filter((student) => excusedIds.has(student.studentId)).length : 0;
+        const dialog =
+          confirming.kind === "submit"
+            ? {
+                title: "Submit these marks?",
+                description: `${sheet?.subject.name ?? "This subject"} for ${sheet?.class.name ?? "this class"} will be sent for reporting${excusedCount ? `, with ${excusedCount} pupil${excusedCount === 1 ? "" : "s"} marked absent / excused` : ""}. You will not be able to edit the marks directly afterwards; changes will need approval.`,
+                confirmLabel: "Submit marks",
+                variant: "primary" as const,
+                loading: submit.isPending,
+                run: () => submit.mutate(undefined, { onSettled: closeConfirm }),
+              }
+            : confirming.kind === "absent"
+              ? {
+                  title: `Mark ${confirming.student.name} absent / excused?`,
+                  description: "This clears all their saved marks for this assessment, including zeros, and recalculates grades and positions. Submit marks afterwards to save the absence selection.",
+                  confirmLabel: "Clear marks and mark absent",
+                  variant: "danger" as const,
+                  loading: clearForExcuse.isPending,
+                  run: () => clearForExcuse.mutate(confirming.student, { onSettled: closeConfirm }),
+                }
+              : confirming.kind === "switch"
+                ? {
+                    title: "Switch sheets?",
+                    description: "You have unsaved marks or absence selections. Your draft will remain available in this tab if you come back.",
+                    confirmLabel: "Switch sheets",
+                    variant: "primary" as const,
+                    loading: false,
+                    run: () => { setNotice(null); confirming.run(); closeConfirm(); },
+                  }
+                : {
+                    title: "Discard your draft?",
+                    description: "The marks you typed on this sheet will be removed and the latest saved marks reloaded.",
+                    confirmLabel: "Discard draft",
+                    variant: "danger" as const,
+                    loading: false,
+                    run: () => { setDraft({}); void sheetQuery.refetch(); closeConfirm(); },
+                  };
+        return (
+          <ConfirmDialog
+            open
+            title={dialog.title}
+            description={dialog.description}
+            confirmLabel={dialog.confirmLabel}
+            confirmVariant={dialog.variant}
+            loading={dialog.loading}
+            onCancel={closeConfirm}
+            onConfirm={dialog.run}
+          />
+        );
+      })()}
 
       {uploading && sheet?.template && (
         <AssessmentMarksBulkImport

@@ -23,7 +23,7 @@ interface Setup {
 function build(setup: Setup = {}) {
   const calls: string[] = [];
   const log = (name: string) => vi.fn(async () => { calls.push(name); return { count: 1 }; });
-  const counts = { bills: 0, payments: 0, internalExamCandidates: 0, externalExamCandidates: 0, internalMockReports: 0, enrollments: 2, attendances: 5, guardians: 1, ...setup.counts };
+  const counts = { bills: 0, payments: 0, externalExamCandidates: 0, enrollments: 2, attendances: 5, guardians: 1, ...setup.counts };
   const request = { id: "r1", schoolId: "sch", studentId: "stu", reason: "Created by mistake", requestedByName: "Admin", status: setup.requestStatus ?? "PENDING" };
   const guardians = setup.guardians ?? [{ id: "g1", linked: 1, userId: "gu1" }];
   const tx: any = {

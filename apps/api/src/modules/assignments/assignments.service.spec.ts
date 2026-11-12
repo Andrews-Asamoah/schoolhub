@@ -101,7 +101,7 @@ function buildService(options: TestOptions = {}) {
     $transaction: vi.fn(async (callback: (value: typeof tx) => unknown) => callback(tx)),
   };
   const teacherScope = {
-    getAssignments: vi.fn(async () => ({ teacherId: "teacher-a", classTeacherClassIds: [], subjectAssignments: [] })),
+    getAssignments: vi.fn(async () => ({ teacherId: "teacher-a", classTeacherClassIds: [], subjectAssignments: [], subjectStrandAssignments: [] })),
     getTaughtClassIds: vi.fn(async () => ["class-a"]),
   };
   return {

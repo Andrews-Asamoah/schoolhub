@@ -1,6 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { PrismaService } from "../../prisma/prisma.service.js";
 import { TeacherScopeService } from "../../common/scope/teacher-scope.service.js";
+import { assignedClassIds, teachingPairs } from "../../common/scope/teacher-access.js";
 import { buildTeachingClasses } from "./teaching-classes.js";
 
 /** The signed-in teacher's own classes: where they are class teacher and what they teach. */
@@ -16,10 +17,8 @@ export class TeachingService {
     const assignments = await this.teacherScope.getAssignments(schoolId, userId);
     if (!assignments.teacherId) return { teacher: null, term: null, classes: [] };
 
-    const classIds = [
-      ...new Set([...assignments.classTeacherClassIds, ...assignments.subjectAssignments.map((row) => row.classId)]),
-    ];
-    const subjectIds = [...new Set(assignments.subjectAssignments.map((row) => row.subjectId))];
+    const classIds = assignedClassIds(assignments);
+    const subjectIds = [...new Set(teachingPairs(assignments).map((row) => row.subjectId))];
 
     const [teacher, term, classes, subjects] = await Promise.all([
       db.teacher.findFirst({

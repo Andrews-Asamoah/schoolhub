@@ -32,6 +32,7 @@ describe.skipIf(!enabled)("P2 manual journal lifecycle (PostgreSQL)", { timeout:
     schoolId = (await db.school.create({
       data: { organizationId: run + "-org", name: run, subdomain: run, code: run.toUpperCase() },
     })).id;
+    await db.financeApprovalSetting.createMany({ data: ["PAYROLL_SETTINGS","BANK_RECONCILIATION","PERIOD_CONTROL","MANUAL_JOURNAL","INVOICE_ADJUSTMENT","ACCOUNT_MAPPING"].map(control => ({ schoolId, control: control as never, required: true, approverRoles: ["owner","headteacher"] })) });
     cashId = (await db.chartAccount.create({
       data: { schoolId, code: "1000", name: "Cash", accountType: "ASSET", category: "CASH" },
     })).id;
@@ -96,7 +97,7 @@ describe.skipIf(!enabled)("P2 manual journal lifecycle (PostgreSQL)", { timeout:
   it("requires independent maker-checker approval and freezes the submitted lines", async () => {
     await service.submit(schoolId, "accountant", originalId);
     await expect(service.decide(schoolId, "accountant", originalId,
-      "accountant", false, "APPROVED", "I verified the journal")).rejects.toThrow(/owner or headteacher/i);
+      "accountant", false, "APPROVED", "I verified the journal")).rejects.toThrow(/approver chosen by the school/i);
     await expect(service.decide(schoolId, "accountant", originalId,
       "owner", false, "APPROVED", "I verified the journal")).rejects.toThrow(/preparer may never approve/i);
     const line = (await service.get(schoolId, originalId)).lines[0]!;
@@ -139,5 +140,49 @@ describe.skipIf(!enabled)("P2 manual journal lifecycle (PostgreSQL)", { timeout:
     expect((await db.chartAccount.findUniqueOrThrow({ where: { id: revenueId } })).balance.toFixed(2)).toBe("0.00");
     expect((await db.chartAccount.findUniqueOrThrow({ where: { id: payableId } })).balance.toFixed(2)).toBe("0.00");
     expect(await db.transaction.count({ where: { schoolId } })).toBe(4);
+  });
+
+  it("completes the approval step on submit when the school does not require a second approver", async () => {
+    const { POLICY_WAIVER_NOTE } = await import("./finance-approval-settings.js");
+    const where = { schoolId_control: { schoolId, control: "MANUAL_JOURNAL" as const } };
+    await db.financeApprovalSetting.update({ where, data: { required: false, approverRoles: [] } });
+    const lines = [
+      { accountId: cashId, side: "DEBIT" as const, amount: "10.00" },
+      { accountId: revenueId, side: "CREDIT" as const, amount: "10.00" },
+    ];
+    const waived = await service.create(schoolId, "accountant", {
+      postingDate: today(), description: "Journal completed without a second approver",
+      idempotencyKey: run + "-waived", lines,
+    });
+    const submitted = await service.submit(schoolId, "accountant", waived.id);
+    expect(submitted.status).toBe("APPROVED");
+    const approval = await db.financeApprovalRequest.findUniqueOrThrow({ where: { id: submitted.approvalRequestId } });
+    expect(approval).toMatchObject({
+      status: "APPROVED", waivedByPolicy: true, requestedById: "accountant", decidedById: "accountant",
+    });
+    expect(approval.decisionNote).toBe(POLICY_WAIVER_NOTE);
+    expect((await service.post(schoolId, "accountant", waived.id)).status).toBe("POSTED");
+
+    // Switching approval back on applies to the next submission.
+    await db.financeApprovalSetting.update({ where, data: { required: true, approverRoles: ["owner"] } });
+    const strict = await service.create(schoolId, "accountant", {
+      postingDate: today(), description: "Journal submitted while a second approver is required",
+      idempotencyKey: run + "-strict-again", lines,
+    });
+    expect((await service.submit(schoolId, "accountant", strict.id)).status).toBe("PENDING_APPROVAL");
+    // The headteacher is not a chosen approver now.
+    await expect(service.decide(schoolId, "head", strict.id, "headteacher", false, "APPROVED", "Trying to approve this"))
+      .rejects.toThrow(/approver chosen by the school/i);
+
+    // An item still pending when approval is later switched off is not stranded: owner or
+    // headteacher can decide it, but the preparer still cannot approve their own entry.
+    await db.financeApprovalSetting.update({ where, data: { required: false, approverRoles: [] } });
+    await expect(service.decide(schoolId, "accountant", strict.id, "accountant", false, "APPROVED", "I verified the journal"))
+      .rejects.toThrow(/approver chosen by the school/i);
+    await service.decide(schoolId, "owner", strict.id, "owner", false, "APPROVED", "Approved after the policy changed");
+
+    const { FinanceLedgerIntegrityService } = await import("./finance-ledger-integrity.service.js");
+    const report = await new FinanceLedgerIntegrityService({ client: db } as never).check(schoolId);
+    expect([report.I1.status, report.I2.status, report.I3.status]).toEqual(["PASS", "PASS", "PASS"]);
   });
 });

@@ -215,44 +215,6 @@ export function downloadGuardianReport(
   return reportPdfEndpoint({ params: { reportId }, ...options });
 }
 
-const mockSnapshotSchema = z.object({
-  name: z.string(),
-  year: z.string(),
-  term: z.string(),
-  pupil: z.object({ name: z.string(), admissionNumber: nullableText }),
-  average: z.number().nullable(),
-  position: z.number().nullable(),
-});
-const mockSchema = z.object({
-  id: z.string(),
-  sessionId: z.string(),
-  studentId: z.string(),
-  snapshot: mockSnapshotSchema,
-  publishedAt: z.string(),
-  version: z.number(),
-});
-export type GuardianMockReport = z.infer<typeof mockSchema>;
-const mocksEndpoint = defineEndpoint({
-  method: "GET",
-  path: "/internal-exams/published/guardian",
-  roles: ["guardian"],
-  response: z.array(mockSchema),
-});
-export function listGuardianMocks(options: { signal?: AbortSignal } = {}) {
-  return mocksEndpoint(options);
-}
-const mockPdfEndpoint = defineDownload({
-  method: "GET",
-  path: "/internal-exams/published/guardian/:id/pdf",
-  roles: ["guardian"],
-});
-export function downloadGuardianMock(
-  id: string,
-  options: { signal?: AbortSignal } = {},
-) {
-  return mockPdfEndpoint({ params: { id }, ...options });
-}
-
 const clubsEndpoint = defineEndpoint({
   method: "GET",
   path: "/academics/clubs",

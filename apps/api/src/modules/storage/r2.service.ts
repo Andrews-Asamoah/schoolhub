@@ -1,11 +1,13 @@
 import {
   DeleteObjectCommand,
+  GetObjectCommand,
   HeadBucketCommand,
   PutObjectCommand,
   S3Client,
 } from "@aws-sdk/client-s3";
 import { Injectable, Logger, ServiceUnavailableException } from "@nestjs/common";
 import { randomUUID } from "node:crypto";
+import { Readable } from "node:stream";
 import { env } from "../../env.js";
 
 /**
@@ -112,6 +114,36 @@ export class R2Service {
       }),
     );
     return this.publicUrl(key);
+  }
+
+  /**
+   * Reads one object from the public bucket, for the few server-side jobs that must embed an
+   * image (report PDFs). Refuses anything over `maxBytes` rather than buffering it.
+   */
+  async read(key: string, maxBytes: number): Promise<Buffer> {
+    const result = await this.getClient().send(
+      new GetObjectCommand({ Bucket: env.R2_BUCKET_NAME, Key: key }),
+      { abortSignal: AbortSignal.timeout(20_000) },
+    );
+    const stream = result.Body;
+    if (!(stream instanceof Readable)) throw new ServiceUnavailableException("The stored file cannot be read.");
+    if ((result.ContentLength ?? 0) > maxBytes) {
+      stream.destroy();
+      throw new ServiceUnavailableException("The stored file is too large to embed.");
+    }
+    const parts: Buffer[] = [];
+    let total = 0;
+    try {
+      for await (const chunk of stream) {
+        const part = Buffer.from(chunk);
+        total += part.length;
+        if (total > maxBytes) throw new ServiceUnavailableException("The stored file is too large to embed.");
+        parts.push(part);
+      }
+      return Buffer.concat(parts);
+    } finally {
+      stream.destroy();
+    }
   }
 
   /** Best-effort: a failed cleanup must never fail the user's request. */

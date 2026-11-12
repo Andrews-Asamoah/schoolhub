@@ -25,6 +25,9 @@ const AcademicYearSetup = lazy(() => import("@/components/school/academic-year-s
 const SchoolLogoUploader = lazy(() => import("@/components/school/school-logo-uploader").then((m) => ({ default: m.SchoolLogoUploader })));
 const SubjectsWorkspace = lazy(() => import("@/components/school/subjects-workspace").then((m) => ({ default: m.SubjectsWorkspace })));
 const TimetableWorkspace = lazy(() => import("@/components/school/timetable-workspace").then((m) => ({ default: m.TimetableWorkspace })));
+const ReportCardArchiveWorkspace = lazy(() => import("@/components/school/report-card-archive-workspace").then((m) => ({ default: m.ReportCardArchiveWorkspace })));
+const HeadteacherReportApprovalsWorkspace = lazy(() => import("@/components/school/headteacher-report-approvals-workspace").then((m) => ({ default: m.HeadteacherReportApprovalsWorkspace })));
+const FinanceApprovalSettingsWorkspace = lazy(() => import("@/components/school/finance-approval-settings-workspace").then((m) => ({ default: m.FinanceApprovalSettingsWorkspace })));
 const TeamRoleWorkspace = lazy(() => import("@/components/school/team-role-workspace").then((m) => ({ default: m.TeamRoleWorkspace })));
 const ClassesWorkspace = lazy(() => import("@/components/school/classes-workspace").then((m) => ({ default: m.ClassesWorkspace })));
 const AdmissionsWorkspace = lazy(() => import("@/components/school/admissions-workspace").then((m) => ({ default: m.AdmissionsWorkspace })));
@@ -69,7 +72,7 @@ const DocumentsWorkspace = lazy(() => import("@/components/portal/documents-work
 const MessagesWorkspace = lazy(() => import("@/components/portal/messages-workspace").then((m) => ({ default: m.MessagesWorkspace })));
 const NotificationsHistoryWorkspace = lazy(() => import("@/components/portal/notifications-history-workspace").then((m) => ({ default: m.NotificationsHistoryWorkspace })));
 const SchoolReportsWorkspace = lazy(() => import("@/components/school/reports-workspace").then((m) => ({ default: m.SchoolReportsWorkspace })));
-const InternalExaminationsWorkspace = lazy(() => import("@/components/school/internal-examinations-workspace").then((m) => ({ default: m.InternalExaminationsWorkspace })));
+const MockAnalysisWorkspace = lazy(() => import("@/components/school/mock-analysis-workspace").then((m) => ({ default: m.MockAnalysisWorkspace })));
 const ExternalExaminationsWorkspace = lazy(() => import("@/components/school/external-examinations-workspace").then((m) => ({ default: m.ExternalExaminationsWorkspace })));
 const TeacherReportReviewWorkspace = lazy(() => import("@/components/school/teacher-report-review-workspace").then((m) => ({ default: m.TeacherReportReviewWorkspace })));
 
@@ -305,7 +308,7 @@ function WorkspaceContent({ pageId }: { pageId: string }) {
             activeRole === "student" ? <StudentSubjectsView /> : <SubjectsWorkspace />
           )}
           {pageId === "academic-years" && <AcademicYears query={yearsQuery} />}
-          {pageId === "internal-exams" && <InternalExaminationsWorkspace />}
+          {pageId === "mock-analysis" && <MockAnalysisWorkspace />}
           {pageId === "external-exams" && <ExternalExaminationsWorkspace />}
           {pageId === "assessments" && (
             activeRole === "student" ? (
@@ -317,6 +320,8 @@ function WorkspaceContent({ pageId }: { pageId: string }) {
             )
           )}
           {pageId === "assessment-tracking" && <AssessmentTrackingWorkspace role={activeRole ?? undefined} />}
+          {pageId === "report-approvals" && <HeadteacherReportApprovalsWorkspace />}
+          {pageId === "report-cards" && <ReportCardArchiveWorkspace role={activeRole ?? undefined} />}
           {pageId === "reports" && (
             activeRole === "student" ? <StudentReportView /> : <SchoolReportsWorkspace />
           )}
@@ -340,6 +345,7 @@ function WorkspaceContent({ pageId }: { pageId: string }) {
           {pageId === "student-statements" && <StudentStatementWorkspace />}
           {pageId === "term-end-review" && <TermEndReviewWorkspace />}
           {pageId === "settings" && <SchoolSettings query={schoolQuery} />}
+          {pageId === "finance-approvals" && <FinanceApprovalSettingsWorkspace />}
           {pageId === "profile" && <ProfileWorkspace />}
           {pageId === "team" && <TeamRoleWorkspace />}
           {pageId === "support" && <TicketWorkspace mode="school" />}

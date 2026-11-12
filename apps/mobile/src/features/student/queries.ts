@@ -11,7 +11,6 @@ import {
   getSchoolClubsForStudents,
   getSchoolHousesForStudents,
   listMyAssignments,
-  listMyPublishedMocks,
   listMyPublishedReports,
 } from "@/api/student";
 import { useSession } from "@/lib/session";
@@ -50,8 +49,6 @@ export const studentKeys = {
     [...studentKeys.root(school), "assessment-report"] as const,
   publishedReports: (school: string | null) =>
     [...studentKeys.root(school), "published-reports"] as const,
-  mocks: (school: string | null) =>
-    [...studentKeys.root(school), "published-mocks"] as const,
 };
 
 function useStudentQuery<T>(
@@ -136,11 +133,5 @@ export function useMyPublishedReportsQuery() {
   const { school } = useStudentScope();
   return useStudentQuery(studentKeys.publishedReports(school), (signal) =>
     listMyPublishedReports({ signal }),
-  );
-}
-export function useMyPublishedMocksQuery() {
-  const { school } = useStudentScope();
-  return useStudentQuery(studentKeys.mocks(school), (signal) =>
-    listMyPublishedMocks({ signal }),
   );
 }

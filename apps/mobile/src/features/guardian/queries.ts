@@ -6,7 +6,6 @@ import {
   getWardTimetable,
   listGuardianClubs,
   listGuardianHouses,
-  listGuardianMocks,
   listGuardianReports,
   listMyWards,
 } from "@/api/guardian";
@@ -33,8 +32,6 @@ export const guardianKeys = {
     [...guardianKeys.root(school), "timetable", id] as const,
   reports: (school: string | null) =>
     [...guardianKeys.root(school), "reports"] as const,
-  mocks: (school: string | null) =>
-    [...guardianKeys.root(school), "mocks"] as const,
   clubs: (school: string | null) =>
     [...guardianKeys.root(school), "clubs"] as const,
   houses: (school: string | null) =>
@@ -91,15 +88,6 @@ export function useGuardianReportsQuery() {
   return useQuery({
     queryKey: guardianKeys.reports(scope.school),
     queryFn: ({ signal }) => listGuardianReports({ signal }),
-    enabled: scope.enabled,
-    meta: { persist: false },
-  });
-}
-export function useGuardianMocksQuery() {
-  const scope = useGuardianScope();
-  return useQuery({
-    queryKey: guardianKeys.mocks(scope.school),
-    queryFn: ({ signal }) => listGuardianMocks({ signal }),
     enabled: scope.enabled,
     meta: { persist: false },
   });

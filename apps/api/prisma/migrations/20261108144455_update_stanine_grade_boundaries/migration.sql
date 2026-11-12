@@ -1,0 +1,2 @@
+-- RenameIndex
+ALTER INDEX "assessment_grade_boundaries_templateId_subjectId_termId_grade_k" RENAME TO "assessment_grade_boundaries_templateId_subjectId_termId_gra_key";

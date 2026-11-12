@@ -27,7 +27,7 @@ export class AssessmentSetupService {
   /** Everything the setup screen needs in one call. */
   async getSetup(schoolId: string) {
     const db = this.prisma.client;
-    const [term, classes, subjects, pairs, templates, gradingSystems] = await Promise.all([
+    const [term, classes, subjects, pairs, templates, gradingSystems, years] = await Promise.all([
       db.term.findFirst({
         where: { isCurrent: true, academicYear: { schoolId, isCurrent: true } },
         select: { id: true, name: true, termNumber: true },
@@ -70,6 +70,11 @@ export class AssessmentSetupService {
         orderBy: [{ isSystemDefault: "asc" }, { name: "asc" }],
         include: { gradeScales: { orderBy: { displayOrder: "asc" } } },
       }),
+      db.academicYear.findMany({
+        where: { schoolId },
+        orderBy: { startDate: "desc" },
+        select: { id: true, name: true, isCurrent: true },
+      }),
     ]);
 
     const classList = [...classes].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
@@ -92,6 +97,7 @@ export class AssessmentSetupService {
 
     return {
       term,
+      years,
       classes: classList.map(({ id, name, level }) => ({ id, name, level })),
       subjects,
       templates: templates.map((row) => {
@@ -101,6 +107,9 @@ export class AssessmentSetupService {
           id: row.id,
           name: row.name,
           description: row.description,
+          category: row.category,
+          academicYearId: row.academicYearId,
+          sequence: row.sequence,
           isActive: row.isActive,
           isLocked: row.isLocked,
           deadline: row.deadline,
@@ -146,7 +155,7 @@ export class AssessmentSetupService {
             pairs,
             new Map(classList.map((klass) => [klass.id, klass])),
             new Map(subjects.map((subject) => [subject.id, subject])),
-            templates.map(scopeOf),
+            templates.filter((row) => row.category === "TERMLY").map(scopeOf),
             term.termNumber,
           ).slice(0, 200)
         : [],
@@ -164,6 +173,7 @@ export class AssessmentSetupService {
           gradingSystemId: input.gradingSystemId,
           name: input.name,
           description: input.description ?? null,
+          ...mockFields(input),
           subjectCode: input.subjectCode ?? null,
           termNumber: input.termNumber ?? null,
           deadline: deadlineFromDate(input.deadline),
@@ -172,7 +182,7 @@ export class AssessmentSetupService {
           components: {
             create: input.components.map((component, index) => ({
               name: component.name,
-              componentType: component.componentType,
+              componentType: componentTypeFor(input, component.componentType),
               maxMarks: component.maxMarks,
               weight: component.weight,
               displayOrder: index + 1,
@@ -203,6 +213,12 @@ export class AssessmentSetupService {
     });
     if (!existing) throw new NotFoundException("Assessment not found.");
     await this.checkTemplateInput(schoolId, input, id);
+    if (input.category !== existing.category) {
+      throw new ConflictException("An assessment can't change between termly and mock. Create a new one instead.");
+    }
+    if (existing.category === "MOCK" && existing._count.assessmentScores > 0 && (input.academicYearId ?? null) !== existing.academicYearId) {
+      throw new ConflictException("Marks have already been recorded, so the academic year of this mock can't change.");
+    }
 
     if (existing._count.assessmentScores > 0) {
       if (input.gradingSystemId !== existing.gradingSystemId) {
@@ -219,7 +235,7 @@ export class AssessmentSetupService {
           expectedCount: component.expectedCount,
           subjectStrandId: component.subjectStrandId,
         })),
-        input.components.map((component) => ({ ...component, expectedCount: component.isRepeatable ? component.expectedCount : 1 })),
+        input.components.map((component) => ({ ...component, componentType: componentTypeFor(input, component.componentType), expectedCount: component.isRepeatable ? component.expectedCount : 1 })),
       );
       if (problem) throw new ConflictException(problem);
 
@@ -259,6 +275,7 @@ export class AssessmentSetupService {
           gradingSystemId: input.gradingSystemId,
           name: input.name,
           description: input.description ?? null,
+          ...mockFields(input),
           subjectCode: input.subjectCode ?? null,
           termNumber: input.termNumber ?? null,
           deadline: deadlineFromDate(input.deadline),
@@ -284,7 +301,7 @@ export class AssessmentSetupService {
       for (const [index, component] of input.components.entries()) {
         const values = {
           name: component.name,
-          componentType: component.componentType,
+          componentType: componentTypeFor(input, component.componentType),
           maxMarks: component.maxMarks,
           weight: component.weight,
           displayOrder: index + 1,
@@ -307,11 +324,14 @@ export class AssessmentSetupService {
   async deleteTemplate(schoolId: string, userId: string, id: string) {
     const existing = await this.prisma.client.assessmentTemplate.findFirst({
       where: { id, schoolId },
-      select: { name: true, _count: { select: { assessmentScores: true } } },
+      select: { name: true, _count: { select: { assessmentScores: true, reportCardSets: true } } },
     });
     if (!existing) throw new NotFoundException("Assessment not found.");
     if (existing._count.assessmentScores > 0) {
       throw new ConflictException("Marks have been recorded with this assessment, so it can't be deleted. Turn it off instead.");
+    }
+    if (existing._count.reportCardSets > 0) {
+      throw new ConflictException("A report batch uses this assessment, so it can't be deleted. Turn it off instead.");
     }
     await this.prisma.client.$transaction(async (tx) => {
       await tx.assessmentExtension.deleteMany({ where: { templateId: id } });
@@ -330,7 +350,10 @@ export class AssessmentSetupService {
       include: { classes: { select: { classId: true } }, components: { orderBy: { displayOrder: "asc" } } },
     });
     if (!source) throw new NotFoundException("Assessment not found.");
-    const names = await this.prisma.client.assessmentTemplate.findMany({ where: { schoolId }, select: { name: true } });
+    const names = await this.prisma.client.assessmentTemplate.findMany({
+      where: { schoolId, category: source.category, ...(source.category === "MOCK" ? { academicYearId: source.academicYearId } : {}) },
+      select: { name: true },
+    });
     const name = nextCopyName(source.name, names.map((row) => row.name));
     const copyId = await this.prisma.client.$transaction(async (tx) => {
       const created = await tx.assessmentTemplate.create({
@@ -339,6 +362,9 @@ export class AssessmentSetupService {
           gradingSystemId: source.gradingSystemId,
           name,
           description: source.description,
+          category: source.category,
+          academicYearId: source.academicYearId,
+          sequence: source.sequence,
           termNumber: source.termNumber,
           subjectCode: source.subjectCode,
           classId: source.classId,
@@ -458,7 +484,7 @@ export class AssessmentSetupService {
 
   private async checkTemplateInput(schoolId: string, input: SaveAssessmentTemplateInput, exceptId?: string) {
     const db = this.prisma.client;
-    const [scale, classes, subject, sameName] = await Promise.all([
+    const [scale, classes, subject, sameName, year] = await Promise.all([
       db.gradingSystem.findFirst({
         where: { id: input.gradingSystemId, isActive: true, OR: [{ schoolId }, { schoolId: null, isSystemDefault: true }] },
         select: { id: true },
@@ -472,11 +498,23 @@ export class AssessmentSetupService {
             select: { id: true, strands: { where: { isActive: true }, select: { id: true } } },
           })
         : Promise.resolve(true),
+      // Termly names are unique school-wide. A mock name is unique only inside its academic
+      // year, so "Mock 1" can exist once for every year.
       db.assessmentTemplate.findFirst({
-        where: { schoolId, name: { equals: input.name, mode: "insensitive" }, ...(exceptId ? { NOT: { id: exceptId } } : {}) },
+        where: {
+          schoolId,
+          category: input.category,
+          ...(input.category === "MOCK" ? { academicYearId: input.academicYearId ?? "" } : {}),
+          name: { equals: input.name, mode: "insensitive" },
+          ...(exceptId ? { NOT: { id: exceptId } } : {}),
+        },
         select: { id: true },
       }),
+      input.category === "MOCK" && input.academicYearId
+        ? db.academicYear.findFirst({ where: { id: input.academicYearId, schoolId }, select: { id: true } })
+        : Promise.resolve(true),
     ]);
+    if (!year) throw new BadRequestException("Choose an academic year that belongs to this school.");
     if (!scale) throw new BadRequestException("Choose a grading scale that belongs to this school.");
     if (input.classIds.length && classes !== new Set(input.classIds).size) {
       throw new BadRequestException("Choose classes that belong to this school.");
@@ -496,10 +534,26 @@ export class AssessmentSetupService {
         }
       }
     }
-    if (sameName) throw new ConflictException("An assessment with this name already exists.");
+    if (sameName) {
+      throw new ConflictException(
+        input.category === "MOCK" ? "This academic year already has a mock with this name." : "An assessment with this name already exists.",
+      );
+    }
   }
 
   private async audit(tx: Db, userId: string, schoolId: string, action: "CREATE" | "UPDATE" | "DELETE", entityType: string, entityId: string, newValues: Prisma.InputJsonObject) {
     await tx.auditLog.create({ data: { userId, schoolId, action, entityType, entityId, newValues } });
   }
+}
+
+/** Fields that only mean something for a mock; a termly assessment always stores them empty. */
+export function mockFields(input: Pick<SaveAssessmentTemplateInput, "category" | "academicYearId" | "sequence">) {
+  return input.category === "MOCK"
+    ? { category: "MOCK" as const, academicYearId: input.academicYearId ?? null, sequence: input.sequence ?? null }
+    : { category: "TERMLY" as const, academicYearId: null, sequence: null };
+}
+
+/** A mock is recorded against the MOCK_EXAM component type, whatever the client sent. */
+export function componentTypeFor(input: Pick<SaveAssessmentTemplateInput, "category">, sent: SaveAssessmentTemplateInput["components"][number]["componentType"]) {
+  return input.category === "MOCK" ? ("MOCK_EXAM" as const) : sent;
 }

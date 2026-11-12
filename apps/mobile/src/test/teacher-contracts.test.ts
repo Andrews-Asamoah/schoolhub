@@ -6,7 +6,6 @@ import {
   teachingSchema,
   createAssignmentSchema,
 } from "@/api/teacher";
-import { mockMarksSchema, correctionSchema } from "@/api/teacher-mocks";
 import { calendarBlock, attendanceBatch } from "@/features/teacher/register";
 import {
   numericMark,
@@ -160,35 +159,6 @@ test("blank scores are null rather than zero; ranges and precision are enforced"
   for (const value of ["NaN", "11", "-1", "1.234", "Infinity"])
     expect(() => numericMark(value, 10)).toThrow();
   expect(() => numericMark("", 10, false)).toThrow();
-});
-test("mock writes preserve expected version and reject duplicate pupils or absent scores", () => {
-  const row = {
-    candidateId: "p",
-    expectedVersion: 3,
-    status: "MARKED",
-    marks: 0,
-  };
-  expect(
-    mockMarksSchema.parse({ paperId: "paper", entries: [row] }).entries[0]
-      ?.expectedVersion,
-  ).toBe(3);
-  expect(
-    mockMarksSchema.safeParse({ paperId: "paper", entries: [row, row] })
-      .success,
-  ).toBe(false);
-  expect(
-    mockMarksSchema.safeParse({
-      paperId: "paper",
-      entries: [{ ...row, status: "ABSENT" }],
-    }).success,
-  ).toBe(false);
-  expect(
-    correctionSchema.safeParse({
-      ...row,
-      paperId: "paper",
-      reason: "too short",
-    }).success,
-  ).toBe(false);
 });
 test("assignment forms reject empty numeric input, invalid due dates and oversized payloads", () => {
   expect(gradeFormSchema.safeParse({ score: "", feedback: "" }).success).toBe(

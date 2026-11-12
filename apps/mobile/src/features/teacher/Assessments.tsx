@@ -35,10 +35,6 @@ export function TeacherAssess() {
       }}
     >
       <LinkButton
-        label="Internal mock exams"
-        href={"/(teacher)/teacher-mocks" as Href}
-      />
-      <LinkButton
         label="Report recommendations"
         href={"/(teacher)/teacher-report-review" as Href}
       />

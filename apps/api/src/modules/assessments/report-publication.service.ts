@@ -1,11 +1,14 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
 import { PrismaService } from "../../prisma/prisma.service.js";
-import { snapshotHash } from "./report-version.js";
+import type { CreateReportSetInput } from "@schoolhub/shared";
+import { coveredClasses, REPORTABLE_SCORE_STATUSES } from "./assessment-entry.js";
+import { carriedRecommendations, snapshotHash } from "./report-version.js";
+import { ReportAssetsService } from "./report-assets.service.js";
 import { buildSubjectRow, buildSummary, overallPositions, summariseAttendance } from "./report-card-data.js";
 
-const APPROVAL_FIELDS = { teacherName: true, teacherRemark: true, teacherSignature: true, headName: true, headRemark: true, headSignature: true } as const;
-type ApprovalVersion = { setId: string; teacherName: string | null; teacherRemark: string | null; teacherSignature: string | null; headName: string | null; headRemark: string | null; headSignature: string | null };
+const APPROVAL_FIELDS = { teacherActorId: true, teacherName: true, teacherRemark: true, teacherSignature: true, headActorId: true, headName: true, headRemark: true, headSignature: true } as const;
+type ApprovalVersion = { setId: string; teacherActorId: string | null; headActorId: string | null; teacherName: string | null; teacherRemark: string | null; teacherSignature: string | null; headName: string | null; headRemark: string | null; headSignature: string | null };
 
 /** The newest published version per key; rows must already be ordered newest first. */
 function latestBySet<T extends { setId: string }>(rows: T[]): Map<string, T> {
@@ -15,26 +18,32 @@ function latestBySet<T extends { setId: string }>(rows: T[]): Map<string, T> {
 }
 
 /** The class teacher's and headteacher's remarks and signatures, as families see them. */
-function approvalOf(version: ApprovalVersion | undefined) {
+function approvalOf(version: ApprovalVersion | undefined, signatures?: { teacher: string | null; head: string | null }) {
   if (!version) return null;
   return {
-    teacher: { name: version.teacherName, remark: version.teacherRemark, signature: version.teacherSignature },
-    head: { name: version.headName, remark: version.headRemark, signature: version.headSignature },
+    teacher: { name: version.teacherName, remark: version.teacherRemark, signature: signatures ? signatures.teacher : version.teacherSignature },
+    head: { name: version.headName, remark: version.headRemark, signature: signatures ? signatures.head : version.headSignature },
   };
 }
 
 @Injectable()
 export class ReportPublicationService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService, private readonly assets: ReportAssetsService) {}
 
   async getWorkspace(schoolId: string) {
     const db = this.prisma.client;
-    const [years, templates, sets] = await Promise.all([
+    const [years, templates, sets, assessments, classes] = await Promise.all([
       db.academicYear.findMany({ where: { schoolId }, orderBy: { startDate: "desc" }, select: { id: true, name: true, isCurrent: true, terms: { orderBy: { termNumber: "asc" }, select: { id: true, name: true, termNumber: true, isCurrent: true } } } }),
       db.reportCardTemplate.findMany({ where: { schoolId }, orderBy: { name: "asc" }, select: { id: true, name: true, description: true, isActive: true, layout: true } }),
-      db.reportCardSet.findMany({ where: { schoolId }, orderBy: { updatedAt: "desc" }, take: 50, include: { template: { select: { id: true, name: true } }, academicYear: { select: { id: true, name: true } }, term: { select: { id: true, name: true, termNumber: true } }, targetClasses: { include: { class: { select: { id: true, name: true } } } }, _count: { select: { reportCards: true } } } }),
+      db.reportCardSet.findMany({ where: { schoolId }, orderBy: { updatedAt: "desc" }, take: 50, include: { assessmentTemplate: { select: { name: true } }, template: { select: { id: true, name: true } }, academicYear: { select: { id: true, name: true } }, term: { select: { id: true, name: true, termNumber: true } }, targetClasses: { include: { class: { select: { id: true, name: true } } } }, _count: { select: { reportCards: true } } } }),
+      db.assessmentTemplate.findMany({
+        where: { schoolId, isActive: true },
+        orderBy: [{ category: "asc" }, { academicYearId: "asc" }, { sequence: "asc" }, { name: "asc" }],
+        select: { id: true, name: true, category: true, academicYearId: true, sequence: true, termNumber: true, classId: true, classLevel: true, departmentId: true, classes: { select: { classId: true } } },
+      }),
+      db.class.findMany({ where: { schoolId, deletedAt: null, isActive: true }, orderBy: { name: "asc" }, select: { id: true, name: true, level: true, departmentId: true, academicYearId: true } }),
     ]);
-    return { years, templates, sets: sets.map((s) => ({ id: s.id, name: s.name, status: s.status, template: s.template, academicYear: s.academicYear, term: s.term, classes: s.targetClasses.map((r) => r.class), reportCount: s._count.reportCards, publishAt: s.publishAt, publishedAt: s.publishedAt, isReviewed: s.isReviewed, reviewedAt: s.reviewedAt, updatedAt: s.updatedAt })) };
+    return { years, templates, assessments: assessments.map(({ classes: rows, classId, classLevel, departmentId, ...assessment }) => ({ ...assessment, classes: coveredClasses({ classId, classIds: rows.map((row) => row.classId), classLevel, departmentId }, classes).map(({ id, name, academicYearId }) => ({ id, name, academicYearId })) })), sets: sets.map((s) => ({ id: s.id, name: s.name, status: s.status, assessment: s.assessmentTemplate?.name ?? null, template: s.template, academicYear: s.academicYear, term: s.term, classes: s.targetClasses.map((r) => r.class), reportCount: s._count.reportCards, publishAt: s.publishAt, publishedAt: s.publishedAt, isReviewed: s.isReviewed, reviewedAt: s.reviewedAt, updatedAt: s.updatedAt })) };
   }
 
   async getSetReports(schoolId: string, setId: string) {
@@ -62,7 +71,8 @@ export class ReportPublicationService {
       orderBy: { version: "desc" },
       select: { id: true, studentId: true, stage: true, version: true,
         teacherName: true, teacherRemark: true, teacherApprovedAt: true,
-        headName: true, headRemark: true, headApprovedAt: true, snapshotHash: true },
+        headName: true, headRemark: true, headApprovedAt: true, snapshotHash: true,
+        carriedTeacherRemark: true, carriedHeadRemark: true },
     });
     const latest = new Map<string, typeof versions[number]>();
     for (const version of versions) if (!latest.has(version.studentId)) latest.set(version.studentId, version);
@@ -75,7 +85,7 @@ export class ReportPublicationService {
     const reports = await this.prisma.client.reportCard.findMany({
       where: { studentId: student.id, publishedAt: { not: null }, set: { schoolId, status: "PUBLISHED" } },
       orderBy: { publishedAt: "desc" },
-      select: { id: true, setId: true, studentId: true, data: true, publishedAt: true, student: { select: { admissionNumber: true, profile: { select: { firstName: true, lastName: true } } } }, set: { select: { name: true, academicYear: { select: { name: true } }, term: { select: { name: true, termNumber: true } }, template: { select: { name: true, layout: true } }, school: { select: { name: true, code: true, email: true, phone: true, address: true, logo: true, motto: true, website: true, primaryColor: true, secondaryColor: true } } } } },
+      select: { id: true, setId: true, studentId: true, data: true, publishedAt: true, student: { select: { admissionNumber: true, profile: { select: { firstName: true, lastName: true, user: { select: { image: true } } } } } }, set: { select: { name: true, academicYear: { select: { name: true } }, term: { select: { name: true, termNumber: true } }, template: { select: { name: true, layout: true } }, school: { select: { name: true, code: true, email: true, phone: true, address: true, logo: true, motto: true, website: true, primaryColor: true, secondaryColor: true } } } } },
     });
     const published = await this.prisma.client.reportCardVersion.findMany({
       where: { schoolId, studentId: student.id, stage: "PUBLISHED", publishedAt: { not: null } },
@@ -83,7 +93,13 @@ export class ReportPublicationService {
       select: { setId: true, ...APPROVAL_FIELDS },
     });
     const bySet = latestBySet(published);
-    return reports.map(report => ({ ...report, pdfAvailable: bySet.has(report.setId), approval: approvalOf(bySet.get(report.setId)) }));
+    // Where a signature was not captured when the report was approved, show the approver's current one.
+    const signatureCache = new Map<string, Promise<string | null>>();
+    return Promise.all(reports.map(async report => {
+      const version = bySet.get(report.setId);
+      const signatures = version ? await this.assets.approvalSignatures(schoolId, version, signatureCache) : undefined;
+      return { ...report, pdfAvailable: !!version, approval: approvalOf(version, signatures) };
+    }));
   }
 
   async getGuardianPublishedReports(schoolId: string, userId: string) {
@@ -97,7 +113,7 @@ export class ReportPublicationService {
     const reports = await this.prisma.client.reportCard.findMany({
       where: { studentId: { in: studentIds }, publishedAt: { not: null }, set: { schoolId, status: "PUBLISHED" } },
       orderBy: { publishedAt: "desc" },
-      select: { id: true, setId: true, studentId: true, data: true, publishedAt: true, student: { select: { admissionNumber: true, profile: { select: { firstName: true, lastName: true } } } }, set: { select: { name: true, academicYear: { select: { name: true } }, term: { select: { name: true, termNumber: true } }, template: { select: { name: true, layout: true } }, school: { select: { name: true, code: true, email: true, phone: true, address: true, logo: true, motto: true, website: true, primaryColor: true, secondaryColor: true } } } } },
+      select: { id: true, setId: true, studentId: true, data: true, publishedAt: true, student: { select: { admissionNumber: true, profile: { select: { firstName: true, lastName: true, user: { select: { image: true } } } } } }, set: { select: { name: true, academicYear: { select: { name: true } }, term: { select: { name: true, termNumber: true } }, template: { select: { name: true, layout: true } }, school: { select: { name: true, code: true, email: true, phone: true, address: true, logo: true, motto: true, website: true, primaryColor: true, secondaryColor: true } } } } },
     });
     const published = await this.prisma.client.reportCardVersion.findMany({
       where: { schoolId, studentId: { in: studentIds }, stage: "PUBLISHED",
@@ -106,26 +122,47 @@ export class ReportPublicationService {
       select: { setId: true, studentId: true, ...APPROVAL_FIELDS },
     });
     const byReport = latestBySet(published.map(v => ({ ...v, setId: v.setId + ":" + v.studentId })));
-    return reports.map(report => {
+    const signatureCache = new Map<string, Promise<string | null>>();
+    return Promise.all(reports.map(async report => {
       const version = byReport.get(report.setId + ":" + report.studentId);
-      return { ...report, pdfAvailable: !!version, approval: approvalOf(version) };
-    });
+      const signatures = version ? await this.assets.approvalSignatures(schoolId, version, signatureCache) : undefined;
+      return { ...report, pdfAvailable: !!version, approval: approvalOf(version, signatures) };
+    }));
   }
 
-  async createSet(schoolId: string, actorId: string, input: { name: string; templateId: string; academicYearId: string; termId: string; classIds: string[]; publishAt: string | null }) {
-    const [template, year, term, classes] = await Promise.all([
-      this.prisma.client.reportCardTemplate.findFirst({ where: { id: input.templateId, schoolId, isActive: true }, select: { id: true } }),
-      this.prisma.client.academicYear.findFirst({ where: { id: input.academicYearId, schoolId }, select: { id: true } }),
-      this.prisma.client.term.findFirst({ where: { id: input.termId, academicYearId: input.academicYearId }, select: { id: true } }),
-      this.prisma.client.class.findMany({ where: { id: { in: input.classIds }, schoolId, deletedAt: null, isActive: true }, select: { id: true } }),
+  async createSet(schoolId: string, actorId: string, input: CreateReportSetInput) {
+    const db = this.prisma.client;
+    const [template, assessment, year, term, classes] = await Promise.all([
+      db.reportCardTemplate.findFirst({ where: { id: input.templateId, schoolId, isActive: true }, select: { id: true } }),
+      db.assessmentTemplate.findFirst({
+        where: { id: input.assessmentTemplateId, schoolId, isActive: true },
+        select: { id: true, category: true, academicYearId: true, termNumber: true, classId: true, classLevel: true, departmentId: true, classes: { select: { classId: true } } },
+      }),
+      db.academicYear.findFirst({ where: { id: input.academicYearId, schoolId }, select: { id: true } }),
+      db.term.findFirst({ where: { id: input.termId, academicYearId: input.academicYearId }, select: { id: true, termNumber: true } }),
+      db.class.findMany({ where: { schoolId, deletedAt: null, isActive: true }, select: { id: true, level: true, departmentId: true, academicYearId: true } }),
     ]);
-    if (!template || !year || !term) throw new BadRequestException("Choose a report template, academic year, and term belonging to this school.");
-    if (classes.length !== input.classIds.length) throw new BadRequestException("One or more selected classes are not available in this school.");
+    if (!template || !year || !term) throw new BadRequestException("Choose a report design, academic year, and term belonging to this school.");
+    if (!assessment) throw new BadRequestException("Choose an active assessment from this school.");
+    if (assessment.academicYearId && assessment.academicYearId !== year.id) throw new BadRequestException("This assessment belongs to a different academic year.");
+    if (assessment.termNumber && assessment.termNumber !== term.termNumber) throw new BadRequestException(`This assessment is only taken in term ${assessment.termNumber}.`);
+
+    // The assessment decides which classes are reported; a narrowing may only name some of them.
+    const covered = coveredClasses({ ...assessment, classIds: assessment.classes.map((row) => row.classId) }, classes, year.id);
+    const chosen = input.classIds?.length ? covered.filter((klass) => input.classIds!.includes(klass.id)) : covered;
+    if (!covered.length) throw new BadRequestException("This assessment doesn't cover any active class in the selected academic year.");
+    if (input.classIds?.length && chosen.length !== new Set(input.classIds).size) throw new BadRequestException("One or more selected classes are not covered by this assessment.");
+
     const publishAt = input.publishAt ? new Date(input.publishAt) : null;
     if (publishAt && Number.isNaN(publishAt.getTime())) throw new BadRequestException("The scheduled publication date is invalid.");
-    return this.prisma.client.$transaction(async (tx) => {
-      const set = await tx.reportCardSet.create({ data: { schoolId, templateId: template.id, academicYearId: year.id, termId: term.id, name: input.name, publishAt, targetClasses: { create: classes.map(({ id }) => ({ classId: id })) } }, select: { id: true, name: true, status: true, publishAt: true } });
-      await tx.auditLog.create({ data: { schoolId, userId: actorId, action: "CREATE", entityType: "REPORT_CARD_SET", entityId: set.id, newValues: { name: set.name, classIds: classes.map(({ id }) => id) } } });
+    return db.$transaction(async (tx) => {
+      const set = await tx.reportCardSet.create({
+        data: {
+          schoolId, templateId: template.id, assessmentTemplateId: assessment.id, academicYearId: year.id, termId: term.id, name: input.name, publishAt,
+          targetClasses: { create: chosen.map(({ id }) => ({ classId: id })) },
+        },
+      });
+      await tx.auditLog.create({ data: { schoolId, userId: actorId, action: "CREATE", entityType: "REPORT_CARD_SET", entityId: set.id, newValues: { name: set.name, assessmentTemplateId: assessment.id, classIds: chosen.map(({ id }) => id) } } });
       return set;
     });
   }
@@ -154,7 +191,9 @@ export class ReportPublicationService {
           id: true, admissionNumber: true,
           profile: { select: { firstName: true, lastName: true } },
           enrollments: { where: { academicYearId: set.academicYearId, termId: set.termId, status: { in: ["ACTIVE", "COMPLETED"] }, classId: { in: classIds } }, select: { class: { select: { id: true, name: true, level: true } } }, take: 1 },
-          assessmentScores: { where: { termId: set.termId, status: "FINAL" }, include: { subject: { select: { id: true, name: true, code: true } }, template: { select: { components: { select: { id: true, componentType: true, maxMarks: true, weight: true } }, gradingSystem: { select: { gradeScales: { select: { grade: true, description: true } } } } } }, componentScores: { include: { component: { select: { id: true, name: true, weight: true, maxMarks: true } } }, orderBy: { createdAt: "asc" } } } },
+          // A batch reports its one assessment. Batches made before reports were assessment-based
+          // fall back to the signed-off termly scores of the term.
+          assessmentScores: { where: { termId: set.termId, status: { in: [...REPORTABLE_SCORE_STATUSES] }, ...(set.assessmentTemplateId ? { templateId: set.assessmentTemplateId } : { template: { category: "TERMLY" } }) }, include: { subject: { select: { id: true, name: true, code: true } }, template: { select: { components: { select: { id: true, componentType: true, maxMarks: true, weight: true } }, gradingSystem: { select: { name: true, method: true, gradeScales: { orderBy: { displayOrder: "asc" }, select: { grade: true, description: true, minScore: true, maxScore: true } } } } } }, componentScores: { include: { component: { select: { id: true, name: true, weight: true, maxMarks: true } } }, orderBy: { createdAt: "asc" } } } },
           remarks: { where: { termId: set.termId }, include: { teacher: { include: { profile: true } } } },
         },
       });
@@ -189,10 +228,12 @@ export class ReportPublicationService {
         return classId ? [{ id: student.id, classId, subjectPercentages: subjectsByStudent.get(student.id)!.map((row) => row.percentage) }] : [];
       }));
       if (!reportableStudents.length) {
-        throw new BadRequestException("No finalized assessment scores were found for the selected classes and term. Finalize marks before generating reports.");
+        throw new BadRequestException("No submitted marks were found for this assessment in the selected classes and term. Teachers must submit their mark sheets before reports can be generated.");
       }
 
+      let carriedCount = 0;
       await db.$transaction(async (tx) => {
+        carriedCount = 0; // a retried transaction must not double count
         // Older snapshots survive regeneration even if the student is no longer
         // reportable: they are independent of the mutable ReportCard row.
         await tx.reportCardVersion.updateMany({
@@ -214,6 +255,11 @@ export class ReportPublicationService {
             summary: buildSummary(subjects, positions.get(student.id) ?? null, classRow ? (sizeByClass.get(classRow.id) ?? 0) : 0),
             attendance: summariseAttendance(statusesByStudent.get(student.id) ?? []),
             subjects,
+            // The scale the grades came from, kept in the sealed snapshot so the printed report can explain them.
+            gradeScale: (() => {
+              const system = student.assessmentScores[0]?.template.gradingSystem;
+              return system ? { name: system.name, method: system.method, rows: system.gradeScales.map((g) => ({ grade: g.grade, description: g.description, min: Number(g.minScore), max: Number(g.maxScore) })) } : null;
+            })(),
             remarks: student.remarks.map((r) => ({ type: r.remarkType, content: r.content, teacher: [r.teacher.profile?.firstName, r.teacher.profile?.lastName].filter(Boolean).join(" ") })),
             generatedAt: new Date().toISOString(),
           };
@@ -222,8 +268,10 @@ export class ReportPublicationService {
           if (!classId) throw new BadRequestException("Student's class enrolment is required for report approval.");
           const previous = await tx.reportCardVersion.findFirst({
             where: { setId: set.id, studentId: student.id }, orderBy: { version: "desc" },
-            select: { version: true },
+            select: { version: true, teacherRemark: true, headRemark: true, carriedTeacherRemark: true, carriedHeadRemark: true },
           });
+          const carried = carriedRecommendations(previous);
+          if (carried.carriedTeacherRemark || carried.carriedHeadRemark) carriedCount += 1;
           const snapshot = {
             schemaVersion: 1, report: data,
             school: set.school, template: set.template,
@@ -242,12 +290,13 @@ export class ReportPublicationService {
             version: (previous?.version ?? 0) + 1,
             snapshot: snapshot as Prisma.InputJsonValue,
             snapshotHash: snapshotHash(snapshot),
+            ...carried,
           } });
         }
         await tx.reportCardSet.update({ where: { id: set.id }, data: { status: "GENERATED", isReviewed: false, reviewedAt: null } });
-        await tx.auditLog.create({ data: { schoolId, userId: actorId, action: "UPDATE", entityType: "REPORT_CARD_SET", entityId: set.id, newValues: { operation: "GENERATE", reportCount: reportableStudents.length } } });
+        await tx.auditLog.create({ data: { schoolId, userId: actorId, action: "UPDATE", entityType: "REPORT_CARD_SET", entityId: set.id, newValues: { operation: "GENERATE", reportCount: reportableStudents.length, recommendationsCarriedOver: carriedCount } } });
       });
-      return { id: set.id, status: "GENERATED", reportCount: reportableStudents.length, isReviewed: false };
+      return { id: set.id, status: "GENERATED", reportCount: reportableStudents.length, skippedCount: students.length - reportableStudents.length, isReviewed: false };
     } catch (error) {
       await db.reportCardSet.update({ where: { id: set.id }, data: { status: "DRAFT" } }).catch(() => undefined);
       throw error;
@@ -293,6 +342,28 @@ export class ReportPublicationService {
         },
       });
       return updated;
+    });
+  }
+
+  /**
+   * Takes a published batch back to "generated" so corrected marks can be regenerated.
+   * Families stop seeing the old reports until the batch is approved and published again.
+   * The published snapshots are kept as history (superseded), never edited or deleted.
+   */
+  async reopen(schoolId: string, actorId: string, setId: string, reason: string) {
+    return this.prisma.client.$transaction(async (tx) => {
+      const set = await tx.reportCardSet.findFirst({ where: { id: setId, schoolId }, select: { id: true, name: true, status: true } });
+      if (!set) throw new NotFoundException("Report batch not found.");
+      if (set.status !== "PUBLISHED") throw new ConflictException("Only a published batch can be reopened.");
+      const claimed = await tx.reportCardSet.updateMany({
+        where: { id: set.id, schoolId, status: "PUBLISHED" },
+        data: { status: "GENERATED", isReviewed: false, reviewedAt: null, publishedAt: null },
+      });
+      if (claimed.count !== 1) throw new ConflictException("The report batch changed; reload and try again.");
+      const superseded = await tx.reportCardVersion.updateMany({ where: { setId: set.id, schoolId, stage: "PUBLISHED" }, data: { stage: "SUPERSEDED" } });
+      await tx.reportCard.updateMany({ where: { setId: set.id }, data: { publishedAt: null } });
+      await tx.auditLog.create({ data: { schoolId, userId: actorId, action: "UPDATE", entityType: "REPORT_CARD_SET", entityId: set.id, newValues: { operation: "REOPEN", reason, supersededVersions: superseded.count } } });
+      return { id: set.id, name: set.name, status: "GENERATED" as const };
     });
   }
 

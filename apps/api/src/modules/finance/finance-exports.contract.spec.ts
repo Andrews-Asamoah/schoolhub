@@ -49,7 +49,7 @@ describe("Phase 1 browser export contract", () => {
 
   it("declares the confidential payroll export role tier", () => {
     const policy = readWeb("lib/table-export-policy.ts");
-    expect(policy).toContain('PAYROLL_EXPORT_ROLES = ["accountant", "owner", "headteacher"]');
+    expect(policy).toContain('PAYROLL_EXPORT_ROLES = ["accountant", "owner"]');
     expect(policy).toContain("canExportPayrollTables");
   });
 });

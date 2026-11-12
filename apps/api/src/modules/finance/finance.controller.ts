@@ -22,7 +22,7 @@ import { PayrollSettingsService } from "./payroll-settings.service.js";
 import { FinanceExportsService, type FinanceExportContext, type FinanceExportFile } from "./finance-exports.service.js";
 import { SchoolTenantGuard } from "../../common/guards/school-tenant.guard.js";
 import { RolesGuard } from "../../common/guards/roles.guard.js";
-import { FINANCE_PAYROLL_EXPORT_ROLES, FINANCE_READ_ROLES, FINANCE_WRITE_ROLES, PAYROLL_SETTINGS_APPROVE_ROLES, canExportFinancePayroll } from "./finance.permissions.js";
+import { FINANCE_PAYROLL_EXPORT_ROLES, FINANCE_READ_ROLES, FINANCE_WRITE_ROLES, FINANCE_APPROVAL_ACTION_ROLES, canExportFinancePayroll } from "./finance.permissions.js";
 import { FinanceAuditInterceptor, FinanceSelfAudited } from "./finance-audit.interceptor.js";
 import { FinanceWriteRateLimitGuard, SuperAdminReasonGuard } from "./finance-safeguards.js";
 import { Roles } from "../../common/decorators/roles.decorator.js";
@@ -42,6 +42,7 @@ import {
 } from "@schoolhub/shared";
 import type { School } from "@prisma/client";
 import { z } from "zod";
+import { FinanceApprovalSettingsService } from "./finance-approval-settings.service.js";
 
 const feeStructureSchema = z.object({
   name: z.string().trim().min(2, "Enter a fee structure name").max(120),
@@ -165,6 +166,7 @@ export class FinanceController {
     private readonly financeExports: FinanceExportsService,
     private readonly ledgerIntegrity: FinanceLedgerIntegrityService,
     private readonly payrollSettings: PayrollSettingsService,
+    private readonly approvalSettings: FinanceApprovalSettingsService,
   ) {}
 
 
@@ -574,24 +576,31 @@ export class FinanceController {
   }
 
   @Post("payroll/settings/:kind/:id/activate")
-  @Roles(...PAYROLL_SETTINGS_APPROVE_ROLES)
-  activatePayrollSetting(
+  @Roles(...FINANCE_APPROVAL_ACTION_ROLES)
+  async activatePayrollSetting(
     @CurrentSchool() school: School,
     @CurrentUser() user: AuthenticatedUser,
+    @CurrentSchoolRole() schoolRole: string | undefined,
     @Param("kind", new ZodValidationPipe(settingKindSchema)) kind: z.infer<typeof settingKindSchema>,
     @Param("id") id: string,
   ) {
+    await this.approvalSettings.assertMayApprove(school.id, "PAYROLL_SETTINGS",
+      { id: user.id, role: schoolRole, isSuperAdmin: user.role === "superAdmin" }, "activate payroll settings");
     return this.payrollSettings.activate(school.id, kind, id, user.id);
   }
 
   @Patch("payroll/settings/:kind/:id/end")
-  @Roles(...PAYROLL_SETTINGS_APPROVE_ROLES)
-  endPayrollSetting(
+  @Roles(...FINANCE_APPROVAL_ACTION_ROLES)
+  async endPayrollSetting(
     @CurrentSchool() school: School,
+    @CurrentUser() user: AuthenticatedUser,
+    @CurrentSchoolRole() schoolRole: string | undefined,
     @Param("kind", new ZodValidationPipe(settingKindSchema)) kind: z.infer<typeof settingKindSchema>,
     @Param("id") id: string,
     @Body(new ZodValidationPipe(settingEndDateSchema)) body: z.infer<typeof settingEndDateSchema>,
   ) {
+    await this.approvalSettings.assertMayApprove(school.id, "PAYROLL_SETTINGS",
+      { id: user.id, role: schoolRole, isSuperAdmin: user.role === "superAdmin" }, "end payroll settings");
     return this.payrollSettings.setEndDate(school.id, kind, id, body.effectiveTo);
   }
 
@@ -756,7 +765,7 @@ export class FinanceController {
   private assertPayrollExportAllowed(user: AuthenticatedUser, schoolRole: string | undefined) {
     // RolesGuard grants platform superAdmins a global bypass. Confidential payroll exports intentionally do not.
     if (!canExportFinancePayroll(user.role, schoolRole)) {
-      throw new ForbiddenException("Payroll and salary exports are limited to the accountant, owner and headteacher roles.");
+      throw new ForbiddenException("Payroll and salary exports are limited to the accountant and owner roles.");
     }
   }
 

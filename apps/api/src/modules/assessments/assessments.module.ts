@@ -2,6 +2,7 @@ import { Module } from "@nestjs/common";
 import { AssessmentsController } from "./assessments.controller.js";
 import { AssessmentSetupController } from "./assessment-setup.controller.js";
 import { AssessmentSetupService } from "./assessment-setup.service.js";
+import { AssessmentBoundariesService } from "./assessment-boundaries.service.js";
 import { AssessmentEntryService } from "./assessment-entry.service.js";
 import { AssessmentMarksImportService } from "./assessment-marks-import.service.js";
 import { AssessmentTrackingService } from "./assessment-tracking.service.js";
@@ -11,19 +12,21 @@ import { AssessmentsService } from "./assessments.service.js";
 import { ReportPublicationController } from "./report-publication.controller.js";
 import { ReportPublicationService } from "./report-publication.service.js";
 import { ReportVersionService } from "./report-version.service.js";
-import { InternalExamsController } from "./internal-exams.controller.js";
-import { InternalExamMarksImportService } from "./internal-exam-marks-import.service.js";
-import { InternalExamsService } from "./internal-exams.service.js";
-import { MockReportService } from "./mock-report.service.js";
-import { MockCorrectionService } from "./mock-correction.service.js";
+import { ReportArchiveService } from "./report-archive.service.js";
+import { ReportRecommendationAiService } from "./report-recommendation-ai.js";
+import { ReportAssetsService } from "./report-assets.service.js";
+import { MockAnalyticsController } from "./mock-analytics.controller.js";
+import { ReportVerificationController } from "./report-verification.controller.js";
+import { ReportVerificationService } from "./report-verification.service.js";
+import { MockAnalyticsService } from "./mock-analytics.service.js";
 import { ExternalExamsController } from "./external-exams.controller.js";
 import { ExternalExamsService } from "./external-exams.service.js";
 import { ExternalBeceImportService } from "./external-bece-import.service.js";
 import { ReportTemplatePresetsService } from "./report-template-presets.service.js";
 
 @Module({
-  controllers: [AssessmentsController, AssessmentWorkflowController, AssessmentSetupController, ReportPublicationController, InternalExamsController, ExternalExamsController],
-  providers: [AssessmentsService, AssessmentEntryService, AssessmentMarksImportService, AssessmentTrackingService, AssessmentCorrectionService, AssessmentSetupService, ReportPublicationService, ReportVersionService, InternalExamsService, InternalExamMarksImportService, MockReportService, MockCorrectionService, ExternalExamsService, ExternalBeceImportService, ReportTemplatePresetsService],
+  controllers: [AssessmentsController, AssessmentWorkflowController, AssessmentSetupController, ReportPublicationController, ExternalExamsController, MockAnalyticsController, ReportVerificationController],
+  providers: [AssessmentsService, AssessmentEntryService, AssessmentMarksImportService, AssessmentTrackingService, AssessmentCorrectionService, AssessmentSetupService, AssessmentBoundariesService, ReportPublicationService, ReportVersionService, ReportArchiveService, ReportRecommendationAiService, ReportAssetsService, ExternalExamsService, ExternalBeceImportService, MockAnalyticsService, ReportVerificationService, ReportTemplatePresetsService],
   exports: [AssessmentsService],
 })
 export class AssessmentsModule {}

@@ -22,11 +22,13 @@ import { DatabaseFinanceRateLimitStore } from "./finance-rate-limit.store.js";
 import { FinanceIntegrityJob } from "./finance-integrity.job.js";
 import { PayrollSettingsService } from "./payroll-settings.service.js";
 import { FinanceLedgerIntegrityService } from "./finance-ledger-integrity.service.js";
+import { FinanceApprovalSettingsController } from "./finance-approval-settings.controller.js";
+import { FinanceApprovalSettingsService } from "./finance-approval-settings.service.js";
 
 @Module({
-  controllers: [FinanceBankReconciliationController, FinanceAccountPurposeController, FinanceController, FinanceRevenueController, FinancePeriodsController, FinanceManualJournalsController],
+  controllers: [FinanceBankReconciliationController, FinanceAccountPurposeController, FinanceController, FinanceRevenueController, FinancePeriodsController, FinanceManualJournalsController, FinanceApprovalSettingsController],
   providers: [FinanceCloseService, FinanceBankReconciliationService, FinanceReceivableAdjustmentsService, FinanceAccountPurposeService, FinanceManualJournalsService, FinancePeriodPreparationService, FinanceRevenueAdjustmentsService, FinanceService, FinanceExportsService, FinanceApprovalService, FinancePostingService, FinanceLedgerIntegrityService, FinanceAuditInterceptor,
-    PayrollSettingsService, FinanceIntegrityJob, DatabaseFinanceRateLimitStore, { provide: FINANCE_RATE_LIMIT_STORE, useExisting: DatabaseFinanceRateLimitStore }],
+    PayrollSettingsService, FinanceApprovalSettingsService, FinanceIntegrityJob, DatabaseFinanceRateLimitStore, { provide: FINANCE_RATE_LIMIT_STORE, useExisting: DatabaseFinanceRateLimitStore }],
   exports: [FinanceService, FinanceApprovalService],
 })
 export class FinanceModule {}
