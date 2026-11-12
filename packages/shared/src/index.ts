@@ -703,6 +703,11 @@ export const requestMarkCorrectionSchema = z.object({
     )
     .min(1, "Choose at least one mark to correct")
     .max(500),
+  /**
+   * Apply the correction now instead of sending it for approval. Only the owner or an administrator may;
+   * the API enforces that, so a schema that merely allows the field is not a grant of permission.
+   */
+  applyNow: z.boolean().default(false),
 });
 export type RequestMarkCorrectionInput = z.infer<typeof requestMarkCorrectionSchema>;
 
@@ -1867,6 +1872,12 @@ export const createReportSetSchema = z.object({
   publishAt: z.string().trim().nullish().transform((value) => value || null),
 });
 export type CreateReportSetInput = z.infer<typeof createReportSetSchema>;
+
+/** Reopen a published report batch so its reports can be corrected and approved again. */
+export const reopenReportSetSchema = z.object({
+  reason: z.string().trim().min(10, "Give a reason of at least 10 characters").max(500),
+});
+export type ReopenReportSetInput = z.infer<typeof reopenReportSetSchema>;
 
 /** What an assessment is for. Mirrors the AssessmentCategory enum in the API schema. */
 export const ASSESSMENT_CATEGORIES = ["TERMLY", "MOCK"] as const;

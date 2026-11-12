@@ -491,10 +491,13 @@ model ReportCardVersion {
   teacherActorId    String?
   teacherName       String?  @db.VarChar(160)
   teacherRemark     String?  @db.VarChar(2000)
+  /// Where the signed recommendation came from (see report-recommendation-source.ts). Sealed with the sign-off.
+  teacherRemarkSource String @default("MANUAL") @db.VarChar(16)
   teacherApprovedAt DateTime?
   headActorId       String?
   headName          String?  @db.VarChar(160)
   headRemark        String?  @db.VarChar(2000)
+  headRemarkSource    String @default("MANUAL") @db.VarChar(16)
   headApprovedAt    DateTime?
   /// The approver's signature image (a data URL) as it was when they approved, so the report never changes later.
   teacherSignature  String?  @db.Text

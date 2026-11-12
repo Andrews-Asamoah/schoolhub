@@ -7,6 +7,7 @@ vi.mock("../storage/private-storage.service.js", () => ({ PrivateStorageService:
 vi.mock("./report-assets.service.js", () => ({ ReportAssetsService: class {} }));
 
 import { MAX_BULK_RECOMMENDATIONS, ReportVersionService } from "./report-version.service.js";
+import { snapshotHash } from "./report-version.js";
 
 function service(overrides: { classTeacherClassIds?: string[]; version?: Record<string, unknown> | null } = {}) {
   const drafts = { upsert: vi.fn(), deleteMany: vi.fn() };
@@ -232,5 +233,57 @@ describe("headQueue carried recommendation", () => {
     } };
     const [first] = await new ReportVersionService(prisma as never, {} as never, {} as never).headQueue("school1", "head1");
     expect(first).toMatchObject({ carriedHeadRemark: "Approved with praise.", canApprove: true });
+  });
+});
+
+describe("the recommendation source is recorded when someone signs off", () => {
+  const snapshot = { report: { summary: { average: 70 }, subjects: [] } };
+
+  function signOff(version: Record<string, unknown>, role: "teacher" | "head") {
+    const updateMany = vi.fn().mockResolvedValue({ count: 1 });
+    const auditCreate = vi.fn().mockResolvedValue({});
+    const tx = {
+      $executeRaw: vi.fn().mockResolvedValue(0),
+      reportCardVersion: {
+        findFirst: vi.fn()
+          .mockResolvedValueOnce({ ...version, snapshot, snapshotHash: snapshotHash(snapshot), set: { status: "GENERATED", schoolId: "school1" } })
+          .mockResolvedValue({ id: "v1" }),
+        updateMany,
+      },
+      reportRecommendationDraft: { deleteMany: vi.fn() },
+      auditLog: { create: auditCreate },
+    };
+    const prisma = { client: { user: { findUnique: vi.fn().mockResolvedValue({ id: "u1", name: "Ms Owusu" }) },
+      $transaction: vi.fn((callback: (client: unknown) => unknown) => callback(tx)) } };
+    const scope = { getAssignments: vi.fn().mockResolvedValue({ teacherId: "t1", classTeacherClassIds: ["c1"] }) };
+    const assets = { signatureFor: vi.fn().mockResolvedValue(null) };
+    const svc = new ReportVersionService(prisma as never, scope as never, assets as never);
+    return { run: () => role === "teacher"
+      ? svc.recommend("school1", "u1", "v1", "  Works steadily.  ")
+      : svc.headteacherApprove("school1", "u1", "v1", "  Approved with praise.  "), updateMany, auditCreate };
+  }
+
+  const base = { id: "v1", setId: "set1", studentId: "s1", classId: "c1", version: 1 };
+
+  it("seals the class teacher's recommendation as MANUAL and says so in the audit trail", async () => {
+    const { run, updateMany, auditCreate } = signOff({ ...base, stage: "GENERATED" }, "teacher");
+    await run();
+    expect(updateMany).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ stage: "TEACHER_REVIEWED", teacherRemark: "Works steadily.", teacherRemarkSource: "MANUAL" }),
+    }));
+    expect(auditCreate).toHaveBeenCalledWith({ data: expect.objectContaining({
+      newValues: expect.objectContaining({ stage: "TEACHER_REVIEWED", remark: "Works steadily.", source: "MANUAL" }),
+    }) });
+  });
+
+  it("seals the headteacher's recommendation as MANUAL and says so in the audit trail", async () => {
+    const { run, updateMany, auditCreate } = signOff({ ...base, stage: "TEACHER_REVIEWED", teacherActorId: "teacher1", teacherApprovedAt: new Date() }, "head");
+    await run();
+    expect(updateMany).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ stage: "APPROVED", headRemark: "Approved with praise.", headRemarkSource: "MANUAL" }),
+    }));
+    expect(auditCreate).toHaveBeenCalledWith({ data: expect.objectContaining({
+      newValues: expect.objectContaining({ stage: "APPROVED", remark: "Approved with praise.", source: "MANUAL" }),
+    }) });
   });
 });

@@ -6,6 +6,7 @@ import { PrismaService } from "../../prisma/prisma.service.js";
 import { TeacherScopeService } from "../../common/scope/teacher-scope.service.js";
 import { ReportAssetsService } from "./report-assets.service.js";
 import { academicReportPdf, snapshotHash, type AcademicSnapshot } from "./report-version.js";
+import { MANUAL_RECOMMENDATION } from "./report-recommendation-source.js";
 
 /** Upper bound for one bulk sign-off; each row is its own transaction. */
 export const MAX_BULK_RECOMMENDATIONS = 100;
@@ -97,8 +98,8 @@ export class ReportVersionService {
     }
     await this.prisma.client.reportRecommendationDraft.upsert({
       where: { setId_studentId: { setId: v.setId, studentId: v.studentId } },
-      create: { schoolId, setId: v.setId, studentId: v.studentId, authorId: userId, remark: text, source: "MANUAL" },
-      update: { authorId: userId, remark: text, source: "MANUAL" },
+      create: { schoolId, setId: v.setId, studentId: v.studentId, authorId: userId, remark: text, source: MANUAL_RECOMMENDATION },
+      update: { authorId: userId, remark: text, source: MANUAL_RECOMMENDATION },
     });
     return { id: v.id, saved: true };
   }
@@ -217,14 +218,15 @@ export class ReportVersionService {
       const result = await tx.reportCardVersion.updateMany({
         where: { id: v.id, schoolId, stage: "GENERATED" },
         data: { stage: "TEACHER_REVIEWED", teacherActorId: actor.id,
-          teacherName: actor.name.slice(0,160), teacherRemark: remark.trim(), teacherApprovedAt: time, teacherSignature: signature },
+          teacherName: actor.name.slice(0,160), teacherRemark: remark.trim(), teacherRemarkSource: MANUAL_RECOMMENDATION,
+          teacherApprovedAt: time, teacherSignature: signature },
       });
       if (result.count !== 1) throw new ConflictException("This report changed while being reviewed.");
       await tx.reportRecommendationDraft.deleteMany({ where: { schoolId, setId: v.setId, studentId: v.studentId } });
       await tx.auditLog.create({ data: { schoolId, userId: actor.id, action: "UPDATE",
         entityType: "REPORT_CARD_VERSION", entityId: v.id,
         newValues: { stage: "TEACHER_REVIEWED", version: v.version,
-          snapshotHash: v.snapshotHash, remark: remark.trim() } } });
+          snapshotHash: v.snapshotHash, remark: remark.trim(), source: MANUAL_RECOMMENDATION } } });
       return { id: v.id, stage: "TEACHER_REVIEWED", approvedAt: time };
     });
   }
@@ -255,13 +257,14 @@ export class ReportVersionService {
       const updated = await tx.reportCardVersion.updateMany({
         where: { id: v.id, schoolId, stage: "TEACHER_REVIEWED" },
         data: { stage: "APPROVED", headActorId: actor.id, headName: actor.name.slice(0,160),
-          headRemark: remark.trim(), headApprovedAt: time, headSignature: signature },
+          headRemark: remark.trim(), headRemarkSource: MANUAL_RECOMMENDATION,
+          headApprovedAt: time, headSignature: signature },
       });
       if (updated.count !== 1) throw new ConflictException("This report changed while being approved.");
       await tx.auditLog.create({ data: { schoolId, userId, action: "UPDATE",
         entityType: "REPORT_CARD_VERSION", entityId: v.id,
         newValues: { stage: "APPROVED", version: v.version,
-          snapshotHash: v.snapshotHash, remark: remark.trim() } } });
+          snapshotHash: v.snapshotHash, remark: remark.trim(), source: MANUAL_RECOMMENDATION } } });
       return { id: v.id, stage: "APPROVED", approvedAt: time };
     });
   }
