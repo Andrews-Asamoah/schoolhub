@@ -16,6 +16,8 @@ import { ReportArchiveService } from "./report-archive.service.js";
 import { ReportRecommendationAiService } from "./report-recommendation-ai.js";
 import { ReportAssetsService } from "./report-assets.service.js";
 import { MockAnalyticsController } from "./mock-analytics.controller.js";
+import { ReportVerificationController } from "./report-verification.controller.js";
+import { ReportVerificationService } from "./report-verification.service.js";
 import { MockAnalyticsService } from "./mock-analytics.service.js";
 import { ExternalExamsController } from "./external-exams.controller.js";
 import { ExternalExamsService } from "./external-exams.service.js";
@@ -23,8 +25,8 @@ import { ExternalBeceImportService } from "./external-bece-import.service.js";
 import { ReportTemplatePresetsService } from "./report-template-presets.service.js";
 
 @Module({
-  controllers: [AssessmentsController, AssessmentWorkflowController, AssessmentSetupController, ReportPublicationController, ExternalExamsController, MockAnalyticsController],
-  providers: [AssessmentsService, AssessmentEntryService, AssessmentMarksImportService, AssessmentTrackingService, AssessmentCorrectionService, AssessmentSetupService, AssessmentBoundariesService, ReportPublicationService, ReportVersionService, ReportArchiveService, ReportRecommendationAiService, ReportAssetsService, ExternalExamsService, ExternalBeceImportService, MockAnalyticsService, ReportTemplatePresetsService],
+  controllers: [AssessmentsController, AssessmentWorkflowController, AssessmentSetupController, ReportPublicationController, ExternalExamsController, MockAnalyticsController, ReportVerificationController],
+  providers: [AssessmentsService, AssessmentEntryService, AssessmentMarksImportService, AssessmentTrackingService, AssessmentCorrectionService, AssessmentSetupService, AssessmentBoundariesService, ReportPublicationService, ReportVersionService, ReportArchiveService, ReportRecommendationAiService, ReportAssetsService, ExternalExamsService, ExternalBeceImportService, MockAnalyticsService, ReportVerificationService, ReportTemplatePresetsService],
   exports: [AssessmentsService],
 })
 export class AssessmentsModule {}

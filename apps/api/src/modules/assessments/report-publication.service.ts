@@ -193,7 +193,7 @@ export class ReportPublicationService {
           enrollments: { where: { academicYearId: set.academicYearId, termId: set.termId, status: { in: ["ACTIVE", "COMPLETED"] }, classId: { in: classIds } }, select: { class: { select: { id: true, name: true, level: true } } }, take: 1 },
           // A batch reports its one assessment. Batches made before reports were assessment-based
           // fall back to the signed-off termly scores of the term.
-          assessmentScores: { where: { termId: set.termId, status: { in: [...REPORTABLE_SCORE_STATUSES] }, ...(set.assessmentTemplateId ? { templateId: set.assessmentTemplateId } : { template: { category: "TERMLY" } }) }, include: { subject: { select: { id: true, name: true, code: true } }, template: { select: { components: { select: { id: true, componentType: true, maxMarks: true, weight: true } }, gradingSystem: { select: { gradeScales: { select: { grade: true, description: true } } } } } }, componentScores: { include: { component: { select: { id: true, name: true, weight: true, maxMarks: true } } }, orderBy: { createdAt: "asc" } } } },
+          assessmentScores: { where: { termId: set.termId, status: { in: [...REPORTABLE_SCORE_STATUSES] }, ...(set.assessmentTemplateId ? { templateId: set.assessmentTemplateId } : { template: { category: "TERMLY" } }) }, include: { subject: { select: { id: true, name: true, code: true } }, template: { select: { components: { select: { id: true, componentType: true, maxMarks: true, weight: true } }, gradingSystem: { select: { name: true, method: true, gradeScales: { orderBy: { displayOrder: "asc" }, select: { grade: true, description: true, minScore: true, maxScore: true } } } } } }, componentScores: { include: { component: { select: { id: true, name: true, weight: true, maxMarks: true } } }, orderBy: { createdAt: "asc" } } } },
           remarks: { where: { termId: set.termId }, include: { teacher: { include: { profile: true } } } },
         },
       });
@@ -255,6 +255,11 @@ export class ReportPublicationService {
             summary: buildSummary(subjects, positions.get(student.id) ?? null, classRow ? (sizeByClass.get(classRow.id) ?? 0) : 0),
             attendance: summariseAttendance(statusesByStudent.get(student.id) ?? []),
             subjects,
+            // The scale the grades came from, kept in the sealed snapshot so the printed report can explain them.
+            gradeScale: (() => {
+              const system = student.assessmentScores[0]?.template.gradingSystem;
+              return system ? { name: system.name, method: system.method, rows: system.gradeScales.map((g) => ({ grade: g.grade, description: g.description, min: Number(g.minScore), max: Number(g.maxScore) })) } : null;
+            })(),
             remarks: student.remarks.map((r) => ({ type: r.remarkType, content: r.content, teacher: [r.teacher.profile?.firstName, r.teacher.profile?.lastName].filter(Boolean).join(" ") })),
             generatedAt: new Date().toISOString(),
           };

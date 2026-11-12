@@ -251,25 +251,33 @@ export function AssessmentEntryWorkspace({
       setNotice("Marks submitted.");
     },
   });
+  const [applyNow, setApplyNow] = useState(false);
+  // The server enforces this; the active role only decides whether the option is offered.
+  const canApplyNow = typeof window !== "undefined" && ["owner", "admin"].includes(window.localStorage.getItem("schoolhub-active-role") ?? "");
   const requestCorrection = useMutation({
     mutationFn: () =>
-      apiFetch<{ id: string }>("/assessments/corrections", {
+      apiFetch<{ id: string; applied: boolean; publishedReports: { id: string; name: string }[] }>("/assessments/corrections", {
         method: "POST",
         body: JSON.stringify({
           classId: effectiveClassId,
           subjectId: effectiveSubjectId,
           templateId: sheet?.template?.id,
           reason: reason.trim(),
+          applyNow: canApplyNow && applyNow,
           items: changes.map(({ studentId, componentId, occurrenceIndex, marks }) => ({ studentId, componentId, occurrenceIndex, marks })),
         }),
       }),
-    onSuccess: () => {
+    onSuccess: (result) => {
       setDraft({});
       setCorrecting(false);
       setReason("");
+      setApplyNow(false);
       void sheetQuery.refetch();
       void queryClient.invalidateQueries({ queryKey: ["assessments", "corrections"] });
-      setNotice("Correction sent for approval. The marks will change once it is approved.");
+      void queryClient.invalidateQueries({ queryKey: ["mock-analytics"] });
+      if (!result.applied) setNotice("Correction sent for approval. The marks will change once it is approved.");
+      else if (result.publishedReports.length) setNotice(`Marks corrected. Published reports still show the old marks: reopen ${result.publishedReports.map((r) => `"${r.name}"`).join(", ")} under Reports, then regenerate and publish again.`);
+      else setNotice("Marks corrected and recorded in the audit trail.");
     },
   });
 
@@ -578,10 +586,16 @@ export function AssessmentEntryWorkspace({
                   <textarea rows={2} maxLength={2000} value={reason} onChange={(event) => setReason(event.target.value)}
                     className="rounded-lg border border-border bg-card px-3 py-2 text-xs normal-case tracking-normal text-foreground outline-none focus:border-primary/50" />
                 </label>
+                {canApplyNow && (
+                  <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <input type="checkbox" checked={applyNow} onChange={(event) => setApplyNow(event.target.checked)} />
+                    Apply now (admin): change the marks without a second approver
+                  </label>
+                )}
                 <button type="button" disabled={changes.length === 0 || invalid > 0 || reason.trim().length < 10 || requestCorrection.isPending} onClick={() => requestCorrection.mutate()}
                   className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary px-4 text-xs font-semibold text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50">
                   {requestCorrection.isPending && <LoaderCircle className="size-3.5 animate-spin" />}
-                  Send for approval{changes.length ? ` (${changes.length})` : ""}
+                  {canApplyNow && applyNow ? "Apply correction" : "Send for approval"}{changes.length ? ` (${changes.length})` : ""}
                 </button>
                 <button type="button" onClick={() => { setCorrecting(false); setDraft({}); setReason(""); }} className="h-9 rounded-lg px-3 text-xs font-semibold text-muted-foreground hover:bg-muted">Cancel</button>
               </div>

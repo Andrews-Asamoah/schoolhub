@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { jsPDF } from "jspdf";
+import QRCode from "qrcode";
 import { commonWeight as sharedWeight, ordinalParts } from "@schoolhub/shared";
 import { pdfImageFormat } from "./report-images.js";
 
@@ -14,6 +15,42 @@ export function canonicalJson(value: unknown): string {
 }
 export function snapshotHash(snapshot: unknown): string {
   return createHash("sha256").update(canonicalJson(snapshot)).digest("hex");
+}
+
+/**
+ * The short code printed on a report and carried in its verification link: the first 64 bits of the
+ * sealed snapshot's SHA-256. The verification page checks it against the stored report, so a
+ * document with a changed code, or a link made up for another report, is not recognised.
+ */
+export function reportVerificationCode(hash: string): string {
+  return (hash.slice(0, 16).toUpperCase().match(/.{4}/g) ?? []).join("-");
+}
+
+/** Public page that confirms a published report. Needs the version id and its code, so it cannot be browsed. */
+export function reportVerifyUrl(origin: string | undefined, versionId: string, hash: string): string | null {
+  if (!origin) return null;
+  try {
+    return new URL(`/verify-report/${encodeURIComponent(versionId)}/${reportVerificationCode(hash)}`, origin).toString();
+  } catch {
+    return null;
+  }
+}
+
+/** Draws a QR code as vector squares (crisp at any print size) with a white quiet zone around it. */
+function drawQr(doc: jsPDF, value: string, x: number, y: number, size: number) {
+  const { modules } = QRCode.create(value, { errorCorrectionLevel: "M" });
+  const quiet = 2;
+  const cell = size / (modules.size + quiet * 2);
+  doc.setFillColor(255, 255, 255);
+  doc.rect(x, y, size, size, "F");
+  doc.setFillColor(0, 0, 0);
+  for (let row = 0; row < modules.size; row += 1) {
+    for (let col = 0; col < modules.size; col += 1) {
+      if (modules.get(row, col)) doc.rect(x + (col + quiet) * cell, y + (row + quiet) * cell, cell + 0.2, cell + 0.2, "F");
+    }
+  }
+  doc.setDrawColor(200, 204, 210);
+  doc.rect(x, y, size, size, "S");
 }
 
 export type SnapshotSubject = {
@@ -39,6 +76,8 @@ export type AcademicSnapshot = {
     summary?: { average: number | null; subjectsGraded: number; overallPosition: number | null; classSize: number };
     attendance?: { present: number; total: number; rate: number | null } | null;
     subjects?: SnapshotSubject[];
+    /** Added with the printed grade key; older snapshots lack it and the PDF falls back to the grades used. */
+    gradeScale?: { name: string; method: string; rows: { grade: string; description: string; min: number; max: number }[] } | null;
     remarks?: { type: string; content: string; teacher: string }[];
   };
   school: { name: string; code: string; motto?: string | null };
@@ -91,6 +130,8 @@ export type ReportPdfExtras = {
   } | null;
   /** The pupil's photo as a PNG or JPEG data URL. Without one, a placeholder is drawn. */
   photo?: string | null;
+  /** Link the QR code opens to verify this report. Left out for previews, which are not issued reports. */
+  verifyUrl?: string | null;
 };
 
 type Layout = { accentColor?: string; showPosition?: boolean; showExamScore?: boolean };
@@ -251,34 +292,107 @@ export function academicReportPdf(snapshot: AcademicSnapshot, approval: ReportAp
   });
   y += 18;
 
-  // Remarks with signatures
-  const remarkBlock = (title: string, remark: string | null, name: string | null, approvedAt: Date | null, signature: string | null | undefined) => {
-    const lines = wrap(remark || "No remark recorded.", width - 16, 10);
-    const signatureHeight = 54;
-    ensure(34 + lines.length * 13 + signatureHeight + 22);
-    text(title, margin, y, { bold: true, size: 10, color: accent });
-    y += 14;
-    lines.forEach((line) => { text(line, margin + 8, y, { size: 10 }); y += 13; });
-    y += 6;
-    drawSignature(doc, signature, margin + 8, y, 130, 40);
+  // Class teacher's and headteacher's remarks side by side, each with its signature.
+  const gap = 20;
+  const colWidth = (width - gap) / 2;
+  type Remark = { title: string; remark: string | null; name: string | null; approvedAt: Date | null; signature: string | null | undefined };
+  const remarkColumns: Remark[] = [
+    { title: "CLASS TEACHER'S REMARKS", remark: approval.teacherRemark, name: approval.teacherName, approvedAt: approval.teacherApprovedAt, signature: approval.teacherSignature },
+    { title: "HEADTEACHER'S REMARKS", remark: approval.headRemark, name: approval.headName, approvedAt: approval.headApprovedAt, signature: approval.headSignature },
+  ];
+  const remarkLines = remarkColumns.map((column) => wrap(column.remark || "No remark recorded.", colWidth - 8, 10));
+  const signatureHeight = 54;
+  ensure(34 + Math.max(...remarkLines.map((lines) => lines.length)) * 13 + signatureHeight + 22);
+  const remarksTop = y;
+  let remarksBottom = y;
+  remarkColumns.forEach((column, index) => {
+    const x = margin + index * (colWidth + gap);
+    let cy = remarksTop;
+    text(column.title, x, cy, { bold: true, size: 10, color: accent });
+    cy += 14;
+    remarkLines[index]!.forEach((line) => { text(line, x + 4, cy, { size: 10 }); cy += 13; });
+    cy += 6;
+    // Both signatures sit on one line, under the longer of the two remarks.
+    remarksBottom = Math.max(remarksBottom, cy);
+  });
+  y = remarksBottom;
+  remarkColumns.forEach((column, index) => {
+    const x = margin + index * (colWidth + gap);
+    drawSignature(doc, column.signature, x + 4, y, 130, 40);
     doc.setDrawColor(150, 150, 150);
-    doc.line(margin + 8, y + 44, margin + 178, y + 44);
-    const status = approvedAt ? ` · ${approvedAt.toISOString().slice(0, 10)}` : approval.preview ? " · Awaiting approval" : "";
-    text(`${name ?? "—"}${status}`, margin + 8, y + 56, { size: 8.5, color: [90, 90, 90] });
-    y += signatureHeight + 30;
-  };
-  remarkBlock("CLASS TEACHER'S REMARKS", approval.teacherRemark, approval.teacherName, approval.teacherApprovedAt, approval.teacherSignature);
-  remarkBlock("HEADTEACHER'S REMARKS", approval.headRemark, approval.headName, approval.headApprovedAt, approval.headSignature);
+    doc.line(x + 4, y + 44, x + Math.min(colWidth - 4, 170), y + 44);
+    // A preview marks a signatory who has not approved yet instead of showing a date.
+    const status = column.approvedAt ? ` · ${column.approvedAt.toISOString().slice(0, 10)}` : approval.preview ? " · Awaiting approval" : "";
+    wrap(`${column.name ?? "—"}${status}`, colWidth - 8, 8.5).slice(0, 2)
+      .forEach((line, lineIndex) => text(line, x + 4, y + 56 + lineIndex * 10, { size: 8.5, color: [90, 90, 90] }));
+  });
+  y += signatureHeight + 30;
 
-  ensure(40);
-  text(
-    approval.preview
-      ? `Report version ${approval.version} | Preview: not yet fully approved or published`
-      : `Report version ${approval.version} | Published ${approval.publishedAt?.toISOString() ?? "—"}`,
-    margin, y, { size: 8, color: [110, 110, 110] },
-  );
-  text(`Source SHA-256: ${approval.snapshotHash}`, margin, y + 11, { size: 7, color: [110, 110, 110] });
-  text("Approval records are electronic workflow attestations; this document does not use a certificate-based digital signature.", margin, y + 22, { size: 7, color: [110, 110, 110] });
+  // Grade key at the bottom: the scale the grades came from and what each grade means.
+  const scale = snapshot.report.gradeScale ?? null;
+  const keyRows: { grade: string; description: string; range: string }[] = scale?.rows.length
+    ? scale.rows.map((row) => ({ grade: row.grade, description: row.description, range: scale.method === "SCORE_BANDS" ? `${num(row.min)}–${num(row.max)}` : "" }))
+    // Reports sealed before the scale was stored: show the grades this pupil actually earned.
+    : [...new Map(subjects.filter((row) => row.grade).map((row) => [row.grade!, row.gradeRemark ?? ""])).entries()]
+      .sort((a, b) => a[0].localeCompare(b[0], undefined, { numeric: true }))
+      .map(([grade, description]) => ({ grade, description, range: "" }));
+  if (keyRows.length) {
+    const hasRange = keyRows.some((row) => row.range);
+    const keyTitle = scale ? `GRADING SCALE: ${scale.name.toUpperCase()}` : "GRADES USED IN THIS REPORT";
+    const keyColumns = keyRows.length > 6 ? 2 : 1;
+    const perColumn = Math.ceil(keyRows.length / keyColumns);
+    const keyColWidth = (width - gap * (keyColumns - 1)) / keyColumns;
+    const keyLine = (row: { grade: string; description: string; range: string }) => `${row.grade}${hasRange && row.range ? `  (${row.range})` : ""}  -  ${row.description || "—"}`;
+    const keyLines = keyRows.map((row) => wrap(keyLine(row), keyColWidth - 4, 8.5));
+    const columnHeights = Array.from({ length: keyColumns }, (_, c) => keyLines.slice(c * perColumn, (c + 1) * perColumn).reduce((sum, lines) => sum + lines.length * 10.5 + 2, 0));
+    ensure(24 + Math.max(...columnHeights) + 8);
+    doc.setDrawColor(200, 204, 210);
+    doc.line(margin, y - 8, margin + width, y - 8);
+    text(keyTitle, margin, y + 4, { bold: true, size: 9, color: accent });
+    if (scale?.method === "CLASS_RANK") text("Grades are set by each pupil's position in the class.", margin + width, y + 4, { size: 8, color: [90, 90, 90], align: "right" });
+    const keyTop = y + 18;
+    for (let c = 0; c < keyColumns; c += 1) {
+      let ky = keyTop;
+      keyLines.slice(c * perColumn, (c + 1) * perColumn).forEach((lines) => {
+        lines.forEach((line) => { text(line, margin + c * (keyColWidth + gap) + 4, ky, { size: 8.5 }); ky += 10.5; });
+        ky += 2;
+      });
+    }
+    y = keyTop + Math.max(...columnHeights) + 10;
+  }
+
+  const grey: Rgb = [110, 110, 110];
+  const issuedLine = approval.preview
+    ? `Report version ${approval.version} | Preview: not yet fully approved or published`
+    : `Report version ${approval.version} | Published ${approval.publishedAt?.toISOString() ?? "—"}`;
+  const verifyUrl = approval.preview ? null : extras.verifyUrl ?? null;
+  if (verifyUrl) {
+    // Verification block: QR on the left, what it does and the code to quote on the right.
+    const qr = 70;
+    const textX = margin + qr + 14;
+    const textWidth = width - qr - 14;
+    const urlLines = wrap(verifyUrl, textWidth, 7.5);
+    const blockHeight = Math.max(qr, 52 + urlLines.length * 9) + 4;
+    ensure(blockHeight + 34);
+    doc.setDrawColor(200, 204, 210);
+    doc.line(margin, y - 8, margin + width, y - 8);
+    drawQr(doc, verifyUrl, margin, y, qr);
+    text("VERIFY THIS REPORT", textX, y + 10, { bold: true, size: 9, color: accent });
+    wrap("Scan the QR code, or open the link below, to confirm that this report was issued by the school and has not been altered. Compare the results shown there with this page.", textWidth, 8)
+      .slice(0, 3).forEach((line, index) => text(line, textX, y + 22 + index * 10, { size: 8, color: [60, 60, 60] }));
+    urlLines.forEach((line, index) => text(line, textX, y + 54 + index * 9, { size: 7.5, color: grey }));
+    text(`Verification code: ${reportVerificationCode(approval.snapshotHash)}`, textX, y + 54 + urlLines.length * 9 + 3, { bold: true, size: 8.5, color: [30, 30, 30] });
+    y += blockHeight + 10;
+    ensure(28);
+    text(issuedLine, margin, y, { size: 8, color: grey });
+    text("Approval records are electronic workflow attestations; this document does not use a certificate-based digital signature.", margin, y + 11, { size: 7, color: grey });
+  } else {
+    ensure(40);
+    text(issuedLine, margin, y, { size: 8, color: grey });
+    // Without a verification link (a preview, or no web address configured) the seal is all there is to quote.
+    if (!approval.preview) text(`Source SHA-256: ${approval.snapshotHash}`, margin, y + 11, { size: 7, color: grey });
+    text("Approval records are electronic workflow attestations; this document does not use a certificate-based digital signature.", margin, y + (approval.preview ? 11 : 22), { size: 7, color: grey });
+  }
   doc.setProperties({ title: "Academic report — " + snapshot.student.name, subject: "School-generated academic report" });
   return Buffer.from(doc.output("arraybuffer"));
 }

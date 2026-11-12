@@ -5,7 +5,7 @@ import {
 import { PrismaService } from "../../prisma/prisma.service.js";
 import { TeacherScopeService } from "../../common/scope/teacher-scope.service.js";
 import { ReportAssetsService } from "./report-assets.service.js";
-import { academicReportPdf, snapshotHash, type AcademicSnapshot } from "./report-version.js";
+import { academicReportPdf, reportVerifyUrl, snapshotHash, type AcademicSnapshot } from "./report-version.js";
 import { MANUAL_RECOMMENDATION } from "./report-recommendation-source.js";
 
 /** Upper bound for one bulk sign-off; each row is its own transaction. */
@@ -412,7 +412,7 @@ export class ReportVersionService {
         headName: version.headName, headRemark: version.headRemark,
         headApprovedAt: version.headApprovedAt, publishedAt: version.publishedAt,
         teacherSignature: signatures.teacher, headSignature: signatures.head,
-      }, { letterhead, photo }),
+      }, { letterhead, photo, verifyUrl: reportVerifyUrl(process.env.WEB_ORIGIN, version.id, version.snapshotHash) }),
     };
   }
 }

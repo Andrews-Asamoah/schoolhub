@@ -32,6 +32,7 @@ import { Route as AdminSchoolsSchoolIdRouteImport } from './routes/admin/schools
 import { Route as AdminSchoolsNewRouteImport } from './routes/admin/schools/new'
 import { Route as AdminSubscriptionsIndexRouteImport } from './routes/admin/subscriptions/index'
 import { Route as AdminUsersIndexRouteImport } from './routes/admin/users/index'
+import { Route as VerifyReportIdCodeRouteImport } from './routes/verify-report.$id.$code'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -148,6 +149,11 @@ const AdminUsersIndexRoute = AdminUsersIndexRouteImport.update({
   path: '/users/',
   getParentRoute: () => AdminRouteRoute,
 } as any)
+const VerifyReportIdCodeRoute = VerifyReportIdCodeRouteImport.update({
+  id: '/verify-report/$id/$code',
+  path: '/verify-report/$id/$code',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -168,6 +174,7 @@ export interface FileRoutesByFullPath {
   '/admin/': typeof AdminIndexRoute
   '/admin/schools/$schoolId': typeof AdminSchoolsSchoolIdRoute
   '/admin/schools/new': typeof AdminSchoolsNewRoute
+  '/verify-report/$id/$code': typeof VerifyReportIdCodeRoute
   '/admin/audit/': typeof AdminAuditIndexRoute
   '/admin/plans/': typeof AdminPlansIndexRoute
   '/admin/schools/': typeof AdminSchoolsIndexRoute
@@ -192,6 +199,7 @@ export interface FileRoutesByTo {
   '/admin': typeof AdminIndexRoute
   '/admin/schools/$schoolId': typeof AdminSchoolsSchoolIdRoute
   '/admin/schools/new': typeof AdminSchoolsNewRoute
+  '/verify-report/$id/$code': typeof VerifyReportIdCodeRoute
   '/admin/audit': typeof AdminAuditIndexRoute
   '/admin/plans': typeof AdminPlansIndexRoute
   '/admin/schools': typeof AdminSchoolsIndexRoute
@@ -218,6 +226,7 @@ export interface FileRoutesById {
   '/admin/': typeof AdminIndexRoute
   '/admin/schools/$schoolId': typeof AdminSchoolsSchoolIdRoute
   '/admin/schools/new': typeof AdminSchoolsNewRoute
+  '/verify-report/$id/$code': typeof VerifyReportIdCodeRoute
   '/admin/audit/': typeof AdminAuditIndexRoute
   '/admin/plans/': typeof AdminPlansIndexRoute
   '/admin/schools/': typeof AdminSchoolsIndexRoute
@@ -245,6 +254,7 @@ export interface FileRouteTypes {
     | '/admin/'
     | '/admin/schools/$schoolId'
     | '/admin/schools/new'
+    | '/verify-report/$id/$code'
     | '/admin/audit/'
     | '/admin/plans/'
     | '/admin/schools/'
@@ -269,6 +279,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/admin/schools/$schoolId'
     | '/admin/schools/new'
+    | '/verify-report/$id/$code'
     | '/admin/audit'
     | '/admin/plans'
     | '/admin/schools'
@@ -294,6 +305,7 @@ export interface FileRouteTypes {
     | '/admin/'
     | '/admin/schools/$schoolId'
     | '/admin/schools/new'
+    | '/verify-report/$id/$code'
     | '/admin/audit/'
     | '/admin/plans/'
     | '/admin/schools/'
@@ -313,6 +325,7 @@ export interface RootRouteChildren {
   ResetPasswordRoute: typeof ResetPasswordRoute
   SubscriptionInactiveRoute: typeof SubscriptionInactiveRoute
   TwoFactorSetupRoute: typeof TwoFactorSetupRoute
+  VerifyReportIdCodeRoute: typeof VerifyReportIdCodeRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -478,6 +491,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminUsersIndexRouteImport
       parentRoute: typeof AdminRouteRoute
     }
+    '/verify-report/$id/$code': {
+      id: '/verify-report/$id/$code'
+      path: '/verify-report/$id/$code'
+      fullPath: '/verify-report/$id/$code'
+      preLoaderRoute: typeof VerifyReportIdCodeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -527,6 +547,7 @@ const rootRouteChildren: RootRouteChildren = {
   ResetPasswordRoute: ResetPasswordRoute,
   SubscriptionInactiveRoute: SubscriptionInactiveRoute,
   TwoFactorSetupRoute: TwoFactorSetupRoute,
+  VerifyReportIdCodeRoute: VerifyReportIdCodeRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

@@ -6,7 +6,7 @@ import { apiFetch } from "@/lib/api";
 
 type Status = "ON_TRACK" | "WATCH" | "AT_RISK";
 type Trend = "IMPROVING" | "STEADY" | "DECLINING" | "NEW";
-interface Options { years: { id: string; name: string; isCurrent: boolean }[]; classes: { id: string; name: string; academicYearId: string | null }[] }
+interface Options { years: { id: string; name: string; isCurrent: boolean }[]; classes: { id: string; name: string; academicYearId: string | null; yearIds: string[] }[] }
 interface Mock { id: string; name: string; sequence: number | null; sat: number; classAverage: number | null; highest: number | null; lowest: number | null; atRisk: number }
 interface SubjectRow { subjectId: string; name: string; points: { mockId: string; average: number | null; sat: number; delta: number | null }[] }
 interface StudentRow {
@@ -67,7 +67,7 @@ export function MockAnalysisWorkspace() {
     if (!options.data || yearId) return;
     setYearId((options.data.years.find((y) => y.isCurrent) ?? options.data.years[0])?.id ?? "");
   }, [options.data, yearId]);
-  const classes = useMemo(() => (options.data?.classes ?? []).filter((c) => !c.academicYearId || c.academicYearId === yearId), [options.data, yearId]);
+  const classes = useMemo(() => (options.data?.classes ?? []).filter((c) => c.yearIds.includes(yearId)), [options.data, yearId]);
   useEffect(() => {
     if (classes.length && !classes.some((c) => c.id === classId)) setClassId(classes[0]!.id);
     if (!classes.length) setClassId("");
@@ -93,6 +93,16 @@ export function MockAnalysisWorkspace() {
   const selected = data?.students.find((s) => s.id === studentId) ?? null;
 
   if (options.isLoading) return <p className="text-sm text-muted-foreground">Loading mock analysis…</p>;
+  // Show a real failure instead of the "no mock exams" message, which would hide the cause.
+  if (options.isError) {
+    return (
+      <div className="rounded-2xl border border-destructive/30 bg-destructive/5 p-6 text-sm">
+        <p className="font-semibold text-destructive">Mock analysis could not be loaded.</p>
+        <p className="mt-1 text-xs text-muted-foreground">{(options.error as Error).message}</p>
+        <button type="button" onClick={() => void options.refetch()} className="mt-3 rounded-lg border border-border px-3 py-1.5 text-xs font-semibold hover:bg-muted">Try again</button>
+      </div>
+    );
+  }
   if (!options.data?.years.length) {
     return (
       <div className="rounded-2xl border border-dashed border-border p-8 text-center">
