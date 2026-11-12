@@ -197,6 +197,9 @@ impl DesktopHttp {
         {
             return Err("Unsupported desktop request.".into());
         }
+        if method == Method::POST && url.path().trim_end_matches('/') == "/api/sync/devices" {
+            return Err("Register this installation through the native device command.".into());
+        }
         // One request at a time also prevents an old response resurrecting a
         // token after sign-out. Challenge cookies never enter JS or disk.
         let mut session = self.session.lock().await;

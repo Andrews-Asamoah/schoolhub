@@ -24,7 +24,8 @@ release. The complete scope is in the
 - Registration runs after online sign-in and can be retried in the desktop
   status strip. Password changes and school/2FA access checks must finish first.
   The webview supplies a display name only; it cannot choose the storage path,
-  account, bearer or installation UUID through the registration command.
+  account, bearer or installation UUID through the registration command. Generic
+  webview transport refuses direct device-registration POSTs.
 - The API independently loads the persisted session, rejects browser and
   impersonated sessions, and prevents rebinding one session to another device.
   It enforces tenant membership, account/password/2FA policy, active subscription,
@@ -80,7 +81,7 @@ Local checks passed:
 
 - API typecheck and 757 unit tests; frontend 77 tests.
 - Normal web build and desktop web build, theme and native import/bundle guards.
-- Rust library compiled with `--locked`; 11 non-listening native tests passed,
+- Rust library compiled with `--locked`; 12 non-listening native tests passed,
   including installation persistence, scope isolation, concurrent creation,
   corrupt metadata refusal and SQLCipher storage checks.
 - Three protocol model tests passed, including 100 seeded kill/retry rounds.
@@ -92,7 +93,14 @@ require CI. The extended PostgreSQL suite covers concurrent retry, browser/body
 spoofing, school/account/role isolation, all-session revocation, preservation of
 browser sign-in, revoked re-registration and registration/revocation races.
 Windows CI additionally exercises the real Credential Manager and shell build.
-CI results for this increment must be checked before marking these gates passed.
+[Run 43312723660](https://github.com/Andrews-Asamoah/schoolhub/actions/runs/43312723660)
+passed its API job for device-lifecycle commit `ecbdd91`: migration deployment,
+API typecheck, 757 unit tests, all 9 real authentication/device tests and the
+route inventory check. The synthetic outbox/PostgreSQL cursor job also passed.
+The Windows job is still pending at this checkpoint. A subsequent native-only
+boundary check prevents generic transport from registering a caller-chosen
+installation ID and passed the 12 local non-listening tests; its Windows
+verification remains part of CI.
 
 ## Remaining Phase 2 work
 

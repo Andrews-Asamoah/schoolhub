@@ -560,3 +560,20 @@ async fn registration_uses_native_identity_and_retains_installation_across_retri
     assert_eq!(std::fs::read_dir(dir.path()).unwrap().count(), 1);
     task.await.unwrap();
 }
+
+#[tokio::test]
+async fn webview_cannot_choose_a_different_installation_through_generic_transport() {
+    let http = DesktopHttp::new("https://api.example", false).unwrap();
+    for path in [
+        "/api/sync/devices",
+        "/api/sync/devices/",
+        "/api/sync/devices?ignored=yes",
+    ] {
+        assert!(http
+            .request(request(path))
+            .await
+            .err()
+            .unwrap()
+            .contains("native device command"));
+    }
+}
