@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>SchoolHub Desktop: Phase 0 spike</title>
+  <link rel="stylesheet" href="spike.css" />
+</head>
+<body>
+  <header>
+    <h1>SchoolHub Desktop: Phase 0 spike</h1>
+    <p id="env">Loading…</p>
+  </header>
+
+  <main>
+    <section>
+      <h2>1. Credential store</h2>
+      <p>Saves a test token in the OS credential store, reads it back, then deletes it.</p>
+      <button id="cred-run">Run round trip</button>
+    </section>
+
+    <section>
+      <h2>2. Encrypted database</h2>
+      <p>Opens a per-school, per-user SQLCipher file. The key lives in the credential store.</p>
+      <label>School code <input id="school" value="demo" /></label>
+      <label>User id <input id="user" value="spike-user" /></label>
+      <div class="row">
+        <button id="db-open">Open and create tables</button>
+        <button id="db-inspect">Inspect file (must NOT be plain SQLite)</button>
+        <button id="db-wipe" class="danger">Wipe database and key</button>
+      </div>
+    </section>
+
+    <section>
+      <h2>3. Sign in over Rust HTTP (including 2FA)</h2>
+      <p>The API call is made by Rust, not the page. The token goes to the credential store.</p>
+      <label>API URL <input id="api" value="http://localhost:3001" /></label>
+      <label>Email <input id="email" type="email" /></label>
+      <label>Password <input id="password" type="password" /></label>
+      <label>2FA code (only if asked) <input id="totp" inputmode="numeric" /></label>
+      <div class="row">
+        <button id="sign-in">Sign in</button>
+        <button id="verify-totp">Submit 2FA code</button>
+        <button id="who-am-i">Who am I? (stored token)</button>
+      </div>
+    </section>
+
+    <section>
+      <h2>4. Offline attendance slice</h2>
+      <p>Records attendance into the encrypted database and the outbox in one transaction, then pushes to the mock server (<code>pnpm --filter @schoolhub/desktop mock-server</code>).</p>
+      <label>Mock server <input id="mock" value="http://127.0.0.1:4455" /></label>
+      <label>Simulate a bad connection
+        <select id="chaos">
+          <option value="">None</option>
+          <option value="drop-response">Lose the reply after the server applied it</option>
+          <option value="drop-request">Lose the request</option>
+          <option value="duplicate">Deliver twice</option>
+        </select>
+      </label>
+      <div class="row">
+        <button id="record">Record a register</button>
+        <button id="record-locked">Record for a locked register</button>
+        <button id="push">Sync now</button>
+        <button id="stats">Compare with server</button>
+        <button id="crash" class="danger">Crash the app now</button>
+      </div>
+      <p id="outbox"></p>
+    </section>
+  </main>
+
+  <section id="log-section">
+    <h2>Log</h2>
+    <button id="clear-log">Clear</button>
+    <pre id="log" aria-live="polite"></pre>
+  </section>
+
+  <script type="module" src="main.js"></script>
+</body>
+</html>

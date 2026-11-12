@@ -1,0 +1,14 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "build": {
+    "frontendDist": "../../web/dist-desktop"
+  },
+  "app": {
+    "windows": [
+      { "label": "main", "title": "SchoolHub Desktop: web bundle check", "url": "index.html?school=demo", "width": 1280, "height": 800 }
+    ],
+    "security": {
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https: http://localhost:*; font-src 'self' data:; connect-src 'self' ipc: http://ipc.localhost http://localhost:3001; object-src 'none'; base-uri 'none'; frame-ancestors 'none'"
+    }
+  }
+}

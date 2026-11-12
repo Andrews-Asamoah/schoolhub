@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-db-wipe"
+description = "Enables the db_wipe command without any pre-configured scope."
+commands.allow = ["db_wipe"]
+
+[[permission]]
+identifier = "deny-db-wipe"
+description = "Denies the db_wipe command without any pre-configured scope."
+commands.deny = ["db_wipe"]

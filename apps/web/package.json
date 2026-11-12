@@ -7,6 +7,7 @@
     "dev": "vite",
     "test": "vitest run",
     "build": "node scripts/check-theme.mjs && tsc -b && vite build",
+    "build:desktop": "vite build --mode desktop --outDir dist-desktop --emptyOutDir",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "lint:theme": "node scripts/check-theme.mjs",
