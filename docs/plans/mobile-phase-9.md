@@ -39,6 +39,8 @@ production high-severity audit can pass.
 
 - Verify school-code sign-in, authenticator codes, backup codes, role selection,
   password change, and sign-out with seeded mobile accounts.
+- Publish an announcement to a seeded class and verify it reaches that audience.
+  Open a sample staff PDF and image, then check access from a student account.
 - Verify guardian ward switching and published report PDFs. Confirm that no
   mobile role can access BECE or external exams.
 - Load a teacher register, go offline, make changes, restart the app, restore

@@ -1,6 +1,9 @@
 import { router, type Href } from "expo-router";
 import { Megaphone } from "lucide-react-native";
 import { View } from "react-native";
+import { Button } from "@/components/Button";
+import { canEnterRole } from "@/lib/permissions";
+import { useSession } from "@/lib/session";
 import { Card } from "@/components/Surface";
 import { EmptyState, ErrorState } from "@/components/States";
 import { ListRow } from "@/components/ListRow";
@@ -12,6 +15,7 @@ import { spacing, useTheme } from "@/theme/theme";
 
 export default function AnnouncementsScreen() {
   const query = useAnnouncementsQuery();
+  const session = useSession();
   const { colors } = useTheme();
   const announcements =
     query.data?.filter((item) => item.status === "PUBLISHED") ?? [];
@@ -24,6 +28,14 @@ export default function AnnouncementsScreen() {
       onRefresh={() => void query.refetch()}
     >
       <View style={{ gap: spacing.lg }}>
+        {canEnterRole(session, "teacher") ? (
+          <Button
+            label="New class announcement"
+            onPress={() =>
+              router.push("/(teacher)/teacher-announcement-new" as Href)
+            }
+          />
+        ) : null}
         {query.isPending ? (
           <Card>
             <SkeletonRow />

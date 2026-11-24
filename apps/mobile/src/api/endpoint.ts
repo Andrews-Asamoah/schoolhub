@@ -7,6 +7,7 @@ import {
   assertMobileRole,
   type MobileRole,
 } from "@/lib/permissions";
+import { SessionChangedError } from "@/lib/api-error";
 import { sessionStore } from "@/lib/session";
 
 type QueryValue = string | number | boolean | null | undefined;
@@ -232,7 +233,18 @@ export function defineUpload<TResponse>(definition: {
   };
 }
 
-/** Authenticated PDF download that shares from cache and removes the temporary file. */
+const downloadExtensions = {
+  "application/pdf": "pdf",
+  "image/png": "png",
+  "image/jpeg": "jpg",
+  "image/webp": "webp",
+} as const;
+type DownloadMimeType = keyof typeof downloadExtensions;
+export function isDownloadMimeType(value: string): value is DownloadMimeType {
+  return Object.hasOwn(downloadExtensions, value);
+}
+
+/** Shares an authenticated download from the cache and removes the temporary file. */
 export function defineDownload(definition: {
   method: "GET";
   path: string;
@@ -244,22 +256,32 @@ export function defineDownload(definition: {
     undefined,
     definition.roles,
   );
-  return async (options: BaseOptions = {}): Promise<void> => {
+  return async (
+    options: BaseOptions & { mimeType?: DownloadMimeType } = {},
+  ): Promise<void> => {
     assertScope(undefined, definition.roles);
     const path = buildPath(definition.path, options);
+    const mimeType = options.mimeType ?? "application/pdf";
+    if (!isDownloadMimeType(mimeType))
+      throw new Error("This file type is unavailable on mobile.");
+    const extension = downloadExtensions[mimeType];
+    const revision = sessionStore.getRevision();
     const bytes = await apiBytes(path, {
       method: definition.method,
       signal: options.signal,
     });
-    const filename = `schoolhub-document-${Date.now()}-${++downloadSequence}.pdf`;
+    const filename = `schoolhub-document-${Date.now()}-${++downloadSequence}.${extension}`;
     const file = new File(Paths.cache, filename);
     try {
       await file.write(bytes);
       if (!(await Sharing.isAvailableAsync()))
         throw new Error("File sharing is not available on this device.");
+      if (sessionStore.getRevision() !== revision)
+        throw new SessionChangedError();
       await Sharing.shareAsync(file.uri, {
-        dialogTitle: "Share PDF",
-        mimeType: "application/pdf",
+        dialogTitle:
+          mimeType === "application/pdf" ? "Share PDF" : "Share document",
+        mimeType,
       });
     } finally {
       if (file.exists) await file.delete();
