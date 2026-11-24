@@ -1,6 +1,7 @@
 import { ImageManipulator, SaveFormat } from "expo-image-manipulator";
 import * as ImagePicker from "expo-image-picker";
 import { File } from "expo-file-system";
+import { unregisterSchoolPush } from "@/features/shared/push";
 import { router, type Href } from "expo-router";
 import { useState } from "react";
 import { View } from "react-native";
@@ -97,6 +98,7 @@ export default function ProfileScreen() {
   async function switchRole(role: string) {
     setRoleError("");
     try {
+      void unregisterSchoolPush().catch(() => undefined);
       await setActiveRole(role);
       router.replace("/");
     } catch {

@@ -165,3 +165,27 @@ test("rotated credentials lose ready status until server membership is revalidat
     activeRole: null,
   });
 });
+
+test("only a verified restoration of the same remembered teacher preserves the attendance queue", async () => {
+  const onScopeChange = jest.fn(async () => {});
+  const store = createSessionStore(
+    {
+      readToken: async () => "teacher-token",
+      readContext: async () => ({ subdomain: "school", role: "teacher" }),
+      writeToken: async () => {},
+      writeContext: async () => {},
+    },
+    onScopeChange,
+  );
+  await store.hydrate();
+  await store.establish({
+    token: "teacher-token",
+    subdomain: "school",
+    roles: ["teacher", "guardian"],
+    activeRole: "teacher",
+    restoring: true,
+  });
+  expect(onScopeChange).toHaveBeenLastCalledWith(true);
+  await store.selectRole("guardian");
+  expect(onScopeChange).toHaveBeenLastCalledWith();
+});

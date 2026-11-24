@@ -1,6 +1,6 @@
 import { router, type Href } from "expo-router";
 import { useState } from "react";
-import { View } from "react-native";
+import { Linking, View } from "react-native";
 import { Button } from "@/components/Button";
 import { Card } from "@/components/Surface";
 import { ErrorState } from "@/components/States";
@@ -9,6 +9,7 @@ import { Screen } from "@/components/Screen";
 import { SkeletonRow } from "@/components/Skeleton";
 import { Text } from "@/components/Typography";
 import { updateNotificationPreferences } from "@/api/shared";
+import { enableSchoolPush, supportsSchoolPush } from "@/features/shared/push";
 import { useScopedMutation } from "@/features/shared/mutations";
 import { useNotificationPreferencesQuery } from "@/features/shared/queries";
 import { spacing, type, useTheme } from "@/theme/theme";
@@ -21,6 +22,26 @@ export default function NotificationSettingsScreen() {
     smsEnabled: boolean;
   } | null>(null);
   const { colors } = useTheme();
+  const [enablingPush, setEnablingPush] = useState(false);
+  const [pushMessage, setPushMessage] = useState("");
+  async function enablePush() {
+    setEnablingPush(true);
+    setPushMessage("");
+    try {
+      const enabled = await enableSchoolPush();
+      setPushMessage(
+        enabled
+          ? "Device notifications are enabled."
+          : "Allow SchoolHub notifications in your device settings.",
+      );
+    } catch {
+      setPushMessage(
+        "Could not enable device notifications. Try again shortly.",
+      );
+    } finally {
+      setEnablingPush(false);
+    }
+  }
   const emailEnabled = draft?.emailEnabled ?? query.data?.emailEnabled ?? false;
   const smsEnabled = draft?.smsEnabled ?? query.data?.smsEnabled ?? false;
 
@@ -41,6 +62,28 @@ export default function NotificationSettingsScreen() {
       refreshing={query.isRefetching}
       onRefresh={() => void query.refetch()}
     >
+      {supportsSchoolPush ? (
+        <Card>
+          <ListRow
+            title="Device notifications"
+            subtitle="Get a private alert when a school update arrives."
+          />
+          <Button
+            label="Enable on this device"
+            variant="secondary"
+            loading={enablingPush}
+            onPress={() => void enablePush()}
+          />
+          <Button
+            label="Open device settings"
+            variant="ghost"
+            onPress={() => void Linking.openSettings()}
+          />
+          {pushMessage ? (
+            <Text accessibilityRole="alert">{pushMessage}</Text>
+          ) : null}
+        </Card>
+      ) : null}
       {query.isPending ? (
         <Card>
           <SkeletonRow />

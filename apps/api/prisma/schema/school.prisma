@@ -13,6 +13,7 @@ model School {
   notificationSettings SchoolNotificationSettings?
   notificationPreferences NotificationPreference[]
   notificationDeliveries NotificationDelivery[]
+  pushDevices DeviceToken[]
   notificationDailyUsage NotificationDailyUsage[]
   id             String   @id @default(cuid())
   organizationId String   @unique

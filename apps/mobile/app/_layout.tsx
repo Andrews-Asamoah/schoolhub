@@ -7,7 +7,7 @@ import { Inter_800ExtraBold } from "@expo-google-fonts/inter/800ExtraBold";
 import { useFonts } from "expo-font";
 import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
 import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
-import { Stack } from "expo-router";
+import { router, Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
@@ -18,16 +18,22 @@ import { persistOptions, queryClient } from "@/lib/query-client";
 import { useSession, onSessionEvent } from "@/lib/session";
 import { restoreSession } from "@/lib/restore-session";
 import { canEnterRole, isAuthorizedSession } from "@/lib/permissions";
+import { useSchoolPush } from "@/features/shared/push";
 import { ThemeProvider, useTheme } from "@/theme/theme";
 
 void SplashScreen.preventAutoHideAsync();
 
 export { AppErrorBoundary as ErrorBoundary } from "@/components/AppErrorBoundary";
 
+function openPushUpdates() {
+  router.push("/(shared)/notifications");
+}
+
 function Shell() {
   const { isDark, reduceMotion } = useTheme();
   const session = useSession();
   const { show } = useToast();
+  useSchoolPush(openPushUpdates);
   useEffect(
     () =>
       onSessionEvent((event) => {

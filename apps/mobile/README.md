@@ -101,8 +101,10 @@ can be declared fully complete.
 ## Teacher workspace (Phase 7)
 
 Teacher tabs now use the school API for classes, rosters, register gaps, the
-online attendance register, score entry, internal mocks, report recommendations,
-assignments and clubs. Attendance edits stay in memory until a confirmed save;
-no offline replay is enabled. See [Phase 7](../../docs/plans/mobile-phase-7.md)
+attendance register, score entry (including mock assessments), report recommendations,
+assignments and clubs. Offline attendance batches are encrypted on the device
+and replay automatically when connectivity returns. See
+[offline attendance](../../docs/plans/mobile-phase-8-register.md) and
+[push delivery](../../docs/plans/mobile-phase-8-push.md). See [Phase 7](../../docs/plans/mobile-phase-7.md)
 for contracts, real validation transcripts and pending device acceptance.
 Teacher announcement creation and documents remain deferred pending N3.

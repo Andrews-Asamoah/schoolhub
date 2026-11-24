@@ -25,10 +25,12 @@ import {
 import { TeacherReports } from "@/features/teacher/Reports";
 import TeacherClubs from "@/features/teacher/Clubs";
 import { ApiError } from "@/lib/api-error";
-import * as registerQueue from "@/lib/register-queue";
+import * as teacherApi from "@/api/teacher";
+import * as mockRegisterQueue from "@/lib/register-queue";
 import * as session from "@/lib/session";
 const mockQuery = jest.fn();
 const mockMutate = jest.fn();
+let mockRunMutation = false;
 const mockParams = {
   classId: "c",
   subjectId: "math",
@@ -39,13 +41,35 @@ jest.mock("@/features/teacher/queries", () => ({
   useTeacherQuery: (parts: unknown[]) => mockQuery(parts),
 }));
 jest.mock("@/features/shared/mutations", () => ({
-  useScopedMutation: () => ({
-    mutateAsync: mockMutate,
+  useScopedMutation: (mutate: (payload: unknown) => unknown) => ({
+    mutateAsync: (payload: unknown) => {
+      const result = mockMutate(payload);
+      return mockRunMutation ? mutate(payload) : result;
+    },
     isPending: false,
     isError: false,
     isSuccess: false,
     reset: jest.fn(),
   }),
+}));
+jest.mock("@/features/teacher/RegisterSync", () => ({
+  useRegisterSync: () => {
+    const { useState } = jest.requireActual<typeof import("react")>("react");
+    const [pending, setPending] = useState(0);
+    return {
+      pending,
+      notice: null,
+      sync: async () =>
+        (
+          await mockRegisterQueue.flushRegisterQueue({
+            subdomain: "school",
+            send: async () => {},
+          })
+        ).remaining,
+      refreshCount: async () =>
+        setPending(await mockRegisterQueue.pendingRegisterCount("school")),
+    };
+  },
 }));
 jest.mock("expo-router", () => ({
   useLocalSearchParams: () => mockParams,
@@ -86,6 +110,10 @@ jest.mock("@shopify/flash-list", () => ({
   },
 }));
 jest.mock("@/components/Dialogs", () => ({ ConfirmDialog: () => null }));
+jest.mock("expo-crypto", () => ({
+  randomUUID:
+    jest.requireActual<typeof import("node:crypto")>("node:crypto").randomUUID,
+}));
 jest.mock("@/lib/register-queue", () => ({
   ...jest.requireActual("@/lib/register-queue"),
   enqueueRegister: jest.fn(async () => true),
@@ -525,18 +553,22 @@ test("closed school day disables marking", async () => {
 });
 describe("offline register saves", () => {
   beforeEach(() => {
+    mockRunMutation = true;
     jest.spyOn(session, "useSession").mockReturnValue({
       subdomain: "school",
       status: "ready",
       activeRole: "teacher",
     } as never);
     jest
-      .mocked(registerQueue.enqueueRegister)
+      .mocked(mockRegisterQueue.enqueueRegister)
       .mockClear()
       .mockResolvedValue(true);
-    jest.mocked(registerQueue.pendingRegisterCount).mockResolvedValue(0);
+    jest.mocked(mockRegisterQueue.pendingRegisterCount).mockResolvedValue(0);
   });
-  afterEach(() => jest.restoreAllMocks());
+  afterEach(() => {
+    mockRunMutation = false;
+    jest.restoreAllMocks();
+  });
   async function markAndSave() {
     await render(<RegisterScreen />);
     await fireEvent.press(
@@ -548,36 +580,57 @@ describe("offline register saves", () => {
     await waitFor(() => expect(mockMutate).toHaveBeenCalled());
   }
   test("an unknown-outcome failure is queued with its idempotency key", async () => {
-    mockMutate.mockRejectedValue(new TypeError("Network request failed"));
-    jest.mocked(registerQueue.pendingRegisterCount).mockResolvedValue(1);
+    jest
+      .spyOn(teacherApi, "saveRegister")
+      .mockRejectedValue(new TypeError("Network request failed"));
+    jest.mocked(mockRegisterQueue.pendingRegisterCount).mockResolvedValue(1);
     await markAndSave();
     await waitFor(() =>
-      expect(registerQueue.enqueueRegister).toHaveBeenCalledWith({
-        key: expect.stringMatching(/^reg-/),
-        subdomain: "school",
-        batch: {
-          date: expect.any(String),
-          records: [{ studentId: "p", status: "PRESENT" }],
+      expect(mockRegisterQueue.enqueueRegister).toHaveBeenCalledWith(
+        {
+          key: expect.stringMatching(/^[a-f0-9-]{36}$/),
+          subdomain: "school",
+          batch: {
+            date: expect.any(String),
+            records: [{ studentId: "p", status: "PRESENT" }],
+          },
         },
-      }),
+        expect.any(Number),
+        expect.any(Function),
+      ),
     );
     expect(await screen.findByText(/saved on this device/)).toBeVisible();
     expect(screen.queryByText(/unsaved marks/)).toBeNull();
     expect(await screen.findByText(/1 register waiting to sync/)).toBeVisible();
   });
   test("a server rejection is never queued", async () => {
-    mockMutate.mockRejectedValue(new ApiError(403, "School closed", {}));
+    jest
+      .spyOn(teacherApi, "saveRegister")
+      .mockRejectedValue(new ApiError(403, "School closed", {}));
     await markAndSave();
-    expect(registerQueue.enqueueRegister).not.toHaveBeenCalled();
+    expect(mockRegisterQueue.enqueueRegister).not.toHaveBeenCalled();
     expect(screen.getByText(/1 unsaved marks/)).toBeVisible();
   });
   test("a full queue keeps the marks on screen", async () => {
-    mockMutate.mockRejectedValue(new ApiError(503, "Unavailable", {}));
-    jest.mocked(registerQueue.enqueueRegister).mockResolvedValue(false);
+    jest
+      .spyOn(teacherApi, "saveRegister")
+      .mockRejectedValue(new ApiError(503, "Unavailable", {}));
+    jest.mocked(mockRegisterQueue.enqueueRegister).mockResolvedValue(false);
     await markAndSave();
     await waitFor(() =>
-      expect(registerQueue.enqueueRegister).toHaveBeenCalled(),
+      expect(mockRegisterQueue.enqueueRegister).toHaveBeenCalled(),
     );
     expect(screen.getByText(/1 unsaved marks/)).toBeVisible();
+  });
+  test("a later save waits behind a queued register whose outcome is still unknown", async () => {
+    const saveRegister = jest.spyOn(teacherApi, "saveRegister");
+    jest
+      .mocked(mockRegisterQueue.flushRegisterQueue)
+      .mockResolvedValueOnce({ synced: 0, rejected: [], remaining: 1 });
+    await markAndSave();
+    await waitFor(() =>
+      expect(mockRegisterQueue.enqueueRegister).toHaveBeenCalled(),
+    );
+    expect(saveRegister).not.toHaveBeenCalled();
   });
 });

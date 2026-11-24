@@ -23,6 +23,7 @@
     },
     "plugins": [
       "expo-router",
+      ["expo-notifications", { "defaultChannel": "schoolhub-updates" }],
       "expo-secure-store",
       "expo-font",
       "expo-image",

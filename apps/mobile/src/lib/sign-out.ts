@@ -1,7 +1,9 @@
+import { unregisterSchoolPush } from "@/features/shared/push";
 import { authClient } from "./auth-client";
 import { clearSession, getToken } from "./session";
 export async function signOut() {
   const token = getToken();
+  void unregisterSchoolPush().catch(() => undefined);
   let cleanupFailed = false;
   // Immediately invalidate the local generation, even if revocation is slow.
   try {

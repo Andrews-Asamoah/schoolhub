@@ -1,5 +1,8 @@
 # Mobile Phase 8: offline attendance register (part 1)
 
+Follow-up work is documented in [offline attendance acceptance](mobile-phase-8-register.md)
+and [push delivery](mobile-phase-8-push.md).
+
 Scope: teacher attendance register only. Push notifications and native two-factor
 are **not** part of this change (see "Not done").
 
