@@ -59,13 +59,14 @@ export const passwordResetFormSchema = z
   });
 
 export function useSchoolLoginForm(
-  submit: (value: z.infer<typeof loginSchema>) => Promise<void>,
+  submit: (value: z.infer<typeof loginSchema>) => Promise<void | "two-factor">,
 ) {
   return useForm({
     defaultValues: { login: "", password: "" },
     validators: { onSubmit: loginSchema },
-    onSubmit: async ({ value }) => {
-      await submit(loginSchema.parse(value));
+    onSubmit: async ({ value, formApi }) => {
+      if ((await submit(loginSchema.parse(value))) === "two-factor")
+        formApi.resetField("password");
     },
   });
 }
@@ -91,6 +92,7 @@ export function authFailureMessage(
   context:
     | "school"
     | "signIn"
+    | "twoFactor"
     | "recovery"
     | "recoveryComplete"
     | "password"
@@ -113,6 +115,19 @@ export function authFailureMessage(
     return "We couldn't find that school. Check the school code and try again.";
   if (context === "signIn" && [400, 401, 403].includes(status ?? 0))
     return "We couldn't sign you in. Check your username or email and password.";
+  if (
+    context === "twoFactor" &&
+    error &&
+    typeof error === "object" &&
+    "code" in error
+  ) {
+    if (error.code === "ACCOUNT_TEMPORARILY_LOCKED")
+      return "Too many incorrect codes. Wait 15 minutes before trying again.";
+    if (error.code === "INVALID_CODE" || error.code === "INVALID_BACKUP_CODE")
+      return "That code did not match. Check it and try again.";
+  }
+  if (context === "twoFactor" && [400, 401, 403].includes(status ?? 0))
+    return "SchoolHub could not verify that code. Try again or restart sign-in.";
   if (context === "password" && status === 400)
     return "We couldn't update your password. Check your current password and try again.";
   if (context === "recoveryComplete" && status === 400)

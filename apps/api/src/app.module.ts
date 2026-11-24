@@ -45,7 +45,13 @@ import { DashboardModule } from "./modules/dashboard/dashboard.module.js";
     JobsModule,
     StorageModule,
     // Bounded payloads for reviewed rollover batches (up to 2,000 decisions).
-    AuthModule.forRoot({ auth, bodyParser: { rawBody: true, json: { limit: "4mb" } } }),
+    AuthModule.forRoot({
+      auth,
+      // Browser CORS is enforced by originPolicy in main.ts. The Better Auth
+      // origin callback separately validates scoped native challenge requests.
+      disableTrustedOriginsCors: true,
+      bodyParser: { rawBody: true, json: { limit: "4mb" } },
+    }),
     SchoolsModule,
     StudentsModule,
     StudentDeletionModule,

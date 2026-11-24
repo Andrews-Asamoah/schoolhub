@@ -3,7 +3,12 @@ import { getSchoolRoles } from "@/api/schools";
 import { resolveLogin, changeOwnPassword } from "@/api/auth";
 import { ApiError, SessionChangedError } from "@/lib/api-error";
 import { signOut } from "@/lib/sign-out";
-import { authClient, isCurrentAuthResponse } from "@/lib/auth-client";
+import {
+  authClient,
+  clearTwoFactorChallenge,
+  hasTwoFactorChallenge,
+  isCurrentAuthResponse,
+} from "@/lib/auth-client";
 import { mobileRoles } from "@/lib/permissions";
 import { sessionStore } from "@/lib/session";
 import { changePasswordRequest } from "./forms";
@@ -22,12 +27,10 @@ export class UnsupportedMobileRoleError extends Error {
   }
 }
 
-export class UnsupportedMobileTwoFactorError extends Error {
+export class MobileTwoFactorExpiredError extends Error {
   constructor() {
-    super(
-      "This account requires two-factor verification, which isn't available in the mobile app yet. Please use your school's web portal.",
-    );
-    this.name = "UnsupportedMobileTwoFactorError";
+    super("Your verification session expired. Sign in again.");
+    this.name = "MobileTwoFactorExpiredError";
   }
 }
 
@@ -45,7 +48,7 @@ export async function signInWithSchoolCredentials(input: {
   subdomain: string;
   login: string;
   password: string;
-}): Promise<"complete"> {
+}): Promise<"complete" | "two-factor"> {
   const subdomain = input.subdomain.trim().toLowerCase();
   const revision = sessionStore.getRevision();
   assertCurrentSchool(revision, subdomain);
@@ -59,6 +62,15 @@ export async function signInWithSchoolCredentials(input: {
     password: input.password,
   });
   if (result.error) throw result.error;
+  if (
+    result.data &&
+    "twoFactorRedirect" in result.data &&
+    result.data.twoFactorRedirect
+  ) {
+    if (!isCurrentAuthResponse(result.data)) throw new SessionChangedError();
+    if (!hasTwoFactorChallenge()) throw new MobileTwoFactorExpiredError();
+    return "two-factor";
+  }
   return establishAuthenticatedResponse(result.data, subdomain);
 }
 
@@ -71,7 +83,7 @@ export async function establishAuthenticatedResponse(
   if (!parsed.success)
     throw new Error("The sign-in response could not be verified.");
   if (parsed.data.twoFactorRedirect)
-    throw new UnsupportedMobileTwoFactorError();
+    throw new Error("Verification must be completed before signing in.");
 
   const current = sessionStore.getSnapshot();
   const revision = sessionStore.getRevision();
@@ -99,6 +111,32 @@ export async function establishAuthenticatedResponse(
     mustChangePassword: parsed.data.user?.mustChangePassword,
   });
   return "complete";
+}
+
+export async function verifyMobileTwoFactor(
+  subdomain: string,
+  code: string,
+  useBackupCode: boolean,
+) {
+  assertCurrentSchool(sessionStore.getRevision(), subdomain);
+  if (!hasTwoFactorChallenge()) throw new MobileTwoFactorExpiredError();
+  const request = { code, trustDevice: false };
+  const result = useBackupCode
+    ? await authClient.twoFactor.verifyBackupCode(request)
+    : await authClient.twoFactor.verifyTotp(request);
+  if (result.error) {
+    if (
+      [
+        "INVALID_TWO_FACTOR_COOKIE",
+        "TOO_MANY_ATTEMPTS_REQUEST_NEW_CODE",
+      ].includes(result.error.code ?? "")
+    ) {
+      clearTwoFactorChallenge();
+      throw new MobileTwoFactorExpiredError();
+    }
+    throw result.error;
+  }
+  await establishAuthenticatedResponse(result.data, subdomain);
 }
 
 export async function changePasswordForCurrentSession(
