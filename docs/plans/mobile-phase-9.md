@@ -6,6 +6,10 @@ preview APK on Android first, then verify iOS before distributing an iOS build.
 
 ## Release configuration
 
+The mobile workspace uses the Expo SDK 58 versions reported by Expo Doctor.
+The workspace overrides vulnerable transitive Effect versions to 3.22.1 so the
+production high-severity audit can pass.
+
 - EAS preview and production builds require a bare HTTPS
   `EXPO_PUBLIC_API_URL` in the matching EAS environment.
 - The preview profile builds an APK for directly invited testers.
