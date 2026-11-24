@@ -145,7 +145,7 @@ describe.skipIf(!DB)("two-factor authentication (real database)", () => {
       expect(start.status).toBe(200);
       expect(start.body.twoFactorRedirect).toBe(true);
       const cookies: unknown = start.headers["set-cookie"];
-      const cookieHeader = Array.isArray(cookies) ? cookies.join(", ") : String(cookies ?? "");
+      const cookieHeader = Array.isArray(cookies) ? cookies.join(", ") : typeof cookies === "string" ? cookies : "";
       const challenge = cookieHeader.match(/(?:__Secure-)?better-auth\.two_factor=[^;,]+/)?.[0];
       expect(challenge).toBeTruthy();
       const rejectedOrigin = await nativePost(`/two-factor/${path}`, { code })
