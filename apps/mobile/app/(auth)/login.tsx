@@ -86,9 +86,10 @@ export default function SchoolLoginScreen() {
         password,
       });
       if (next === "two-factor") {
-        form.resetField("password");
         router.push("/(auth)/two-factor" as Href);
-      } else router.replace("/" as Href);
+        return next;
+      }
+      router.replace("/" as Href);
     } catch (failure) {
       setLoginError({
         subdomain,

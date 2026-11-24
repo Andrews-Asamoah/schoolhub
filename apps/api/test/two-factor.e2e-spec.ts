@@ -144,8 +144,9 @@ describe.skipIf(!DB)("two-factor authentication (real database)", () => {
       const start = await nativePost("/sign-in/email", { email, password: PASSWORD });
       expect(start.status).toBe(200);
       expect(start.body.twoFactorRedirect).toBe(true);
-      const cookies = start.headers["set-cookie"] as string[] | undefined;
-      const challenge = cookies?.find((cookie) => /better-auth\.two_factor=/.test(cookie))?.split(";")[0];
+      const cookies: unknown = start.headers["set-cookie"];
+      const cookieHeader = Array.isArray(cookies) ? cookies.join(", ") : String(cookies ?? "");
+      const challenge = cookieHeader.match(/(?:__Secure-)?better-auth\.two_factor=[^;,]+/)?.[0];
       expect(challenge).toBeTruthy();
       const rejectedOrigin = await nativePost(`/two-factor/${path}`, { code })
         .set("Origin", "https://untrusted.example.test").set("Cookie", challenge!);

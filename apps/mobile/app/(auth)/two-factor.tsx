@@ -1,6 +1,6 @@
-import { Redirect, router, useNavigation, type Href } from "expo-router";
-import { useEffect, useState } from "react";
-import { View } from "react-native";
+import { Redirect, router, type Href } from "expo-router";
+import { useEffect, useRef, useState } from "react";
+import { AppState, View } from "react-native";
 import { Button } from "@/components/Button";
 import { OtpInput } from "@/components/Fields";
 import { Screen } from "@/components/Screen";
@@ -23,11 +23,21 @@ import { spacing } from "@/theme/theme";
 export default function VerificationStep() {
   const [hadChallenge] = useState(hasTwoFactorChallenge);
   const { subdomain } = useSession();
-  const navigation = useNavigation();
-  useEffect(
-    () => navigation.addListener("beforeRemove", clearTwoFactorChallenge),
-    [navigation],
-  );
+  const mounted = useRef(false);
+  useEffect(() => {
+    mounted.current = true;
+    const foreground = AppState.addEventListener("change", (state) => {
+      if (state === "active") hasTwoFactorChallenge();
+    });
+    return () => {
+      foreground.remove();
+      mounted.current = false;
+      // React development builds may immediately remount effects.
+      queueMicrotask(() => {
+        if (!mounted.current) clearTwoFactorChallenge();
+      });
+    };
+  }, []);
   const [backup, setBackup] = useState(false);
   const [code, setCode] = useState("");
   const [error, setError] = useState("");

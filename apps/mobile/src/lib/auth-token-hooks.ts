@@ -31,11 +31,13 @@ export function createTokenHooks(store: {
     challengeGeneration++;
   }
   function currentChallenge() {
-    return challenge &&
-      challenge.revision === store.getRevision() &&
-      challenge.expiresAt > Date.now()
-      ? challenge
-      : null;
+    if (
+      challenge &&
+      (challenge.revision !== store.getRevision() ||
+        challenge.expiresAt <= Date.now())
+    )
+      clearChallenge();
+    return challenge;
   }
   const responses = new WeakMap<object, number>();
   return {

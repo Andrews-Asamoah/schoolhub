@@ -59,13 +59,14 @@ export const passwordResetFormSchema = z
   });
 
 export function useSchoolLoginForm(
-  submit: (value: z.infer<typeof loginSchema>) => Promise<void>,
+  submit: (value: z.infer<typeof loginSchema>) => Promise<void | "two-factor">,
 ) {
   return useForm({
     defaultValues: { login: "", password: "" },
     validators: { onSubmit: loginSchema },
-    onSubmit: async ({ value }) => {
-      await submit(loginSchema.parse(value));
+    onSubmit: async ({ value, formApi }) => {
+      if ((await submit(loginSchema.parse(value))) === "two-factor")
+        formApi.resetField("password");
     },
   });
 }
