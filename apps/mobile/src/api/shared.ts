@@ -71,6 +71,27 @@ export const markAllNotificationsRead = defineEndpoint({
   }),
 });
 
+const pushRegistrationId = z.string().regex(/^[a-f0-9]{64}$/);
+export const registerPushDevice = defineEndpoint({
+  method: "POST",
+  path: "/notifications/devices",
+  roles: ["teacher", "student", "guardian"],
+  request: z.object({
+    token: z
+      .string()
+      .max(200)
+      .regex(/^(?:Expo|Exponent)PushToken\[[\w-]+\]$/),
+  }),
+  response: z.object({ registrationId: pushRegistrationId }),
+});
+export const removePushDevice = defineEndpoint({
+  method: "DELETE",
+  path: "/notifications/devices",
+  roles: ["teacher", "student", "guardian"],
+  request: z.object({ registrationId: pushRegistrationId }),
+  response: actionResponseSchema,
+});
+
 const preferencesSchema = z.object({
   emailEnabled: z.boolean(),
   smsEnabled: z.boolean(),

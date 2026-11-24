@@ -10,6 +10,9 @@ export default function AuthLayout() {
         <Stack.Screen name="login" />
         <Stack.Screen name="forgot-password" />
       </Stack.Protected>
+      <Stack.Protected guard={status === "restoreUnavailable"}>
+        <Stack.Screen name="restore-unavailable" />
+      </Stack.Protected>
       <Stack.Protected guard={status === "needsRoleSelection"}>
         <Stack.Screen name="role" />
       </Stack.Protected>

@@ -561,5 +561,6 @@ model AttendanceBatchReplay {
 
   @@unique([schoolId, userId, key])
   @@index([schoolId, createdAt])
+  @@index([createdAt])
   @@map("attendance_batch_replays")
 }
