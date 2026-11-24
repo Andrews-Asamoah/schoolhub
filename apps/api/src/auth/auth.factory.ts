@@ -1,4 +1,5 @@
 import { sendAccountVerification } from "./verification-mail.js";
+import { nativeAuthOrigin, trustedAuthOrigins } from "./native-auth-origin.js";
 import { originPolicy } from "../common/origin-policy.js";
 import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
@@ -365,14 +366,17 @@ export function createAuth(prisma: PrismaLike) {
         },
       },
     },
-    trustedOrigins,
+    trustedOrigins: (request) => trustedAuthOrigins(trustedOrigins, request),
     advanced: {
+      // Exercise the same origin checks in tests and deployed environments.
+      disableOriginCheck: false,
       useSecureCookies: process.env.NODE_ENV === "production",
       ...(cookieDomain
         ? { crossSubDomainCookies: { enabled: true, domain: cookieDomain } }
         : {}),
     },
     plugins: [
+      nativeAuthOrigin,
       organization(), // each school = one organization
       bearer(), // token auth for mobile and desktop
       twoFactor({

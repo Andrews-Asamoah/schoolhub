@@ -8,6 +8,7 @@ export default function AuthLayout() {
       <Stack.Protected guard={status === "signedOut"}>
         <Stack.Screen name="school" />
         <Stack.Screen name="login" />
+        <Stack.Screen name="two-factor" />
         <Stack.Screen name="forgot-password" />
       </Stack.Protected>
       <Stack.Protected guard={status === "needsRoleSelection"}>

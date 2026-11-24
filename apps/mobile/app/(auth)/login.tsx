@@ -5,7 +5,7 @@ import { authFailureMessage, useSchoolLoginForm } from "@/features/auth/forms";
 import {
   signInWithSchoolCredentials,
   UnsupportedMobileRoleError,
-  UnsupportedMobileTwoFactorError,
+  MobileTwoFactorExpiredError,
 } from "@/features/auth/auth-actions";
 import { useSession } from "@/lib/session";
 import { getPublicSchool } from "@/api/auth";
@@ -80,18 +80,22 @@ export default function SchoolLoginScreen() {
     }
     setLoginError(null);
     try {
-      await signInWithSchoolCredentials({
+      const next = await signInWithSchoolCredentials({
         subdomain,
         login,
         password,
       });
+      if (next === "two-factor") {
+        router.push("/(auth)/two-factor" as Href);
+        return next;
+      }
       router.replace("/" as Href);
     } catch (failure) {
       setLoginError({
         subdomain,
         message:
           failure instanceof UnsupportedMobileRoleError ||
-          failure instanceof UnsupportedMobileTwoFactorError
+          failure instanceof MobileTwoFactorExpiredError
             ? failure.message
             : authFailureMessage(failure, "signIn"),
       });
