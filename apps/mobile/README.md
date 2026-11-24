@@ -2,9 +2,9 @@
 
 Only teacher, student and guardian role contexts are supported. All other
 roles, including Super Admin, are web-only. The app supports school-code lookup,
-school-account sign-in, role selection, two-factor access guidance, password
-recovery and required password changes. Accounts requiring two-factor sign-in
-must use the school's web portal until native verification is supported. The Student app includes a dashboard, timetable, assignments and text
+school-account sign-in, role selection, authenticator and backup-code sign-in,
+password recovery and required password changes. Manage two-factor enrolment in
+the web portal. The Student app includes a dashboard, timetable, assignments and text
 submissions, attendance, subjects, classmates, school community, and published
 reports. Guardian includes a family dashboard, child profiles, attendance,
 timetable, fees, published reports, announcements and school-community lists.

@@ -3,7 +3,8 @@ import {
   signInWithSchoolCredentials,
   changePasswordForAuthenticatedSession,
   UnsupportedMobileRoleError,
-  UnsupportedMobileTwoFactorError,
+  MobileTwoFactorExpiredError,
+  verifyMobileTwoFactor,
 } from "@/features/auth/auth-actions";
 
 type MockSessionState = {
@@ -39,6 +40,8 @@ const mockSession: {
 const mockGetSchoolRoles = jest.fn();
 const mockResolveLogin = jest.fn();
 const mockSignInEmail = jest.fn();
+const mockHasChallenge = jest.fn();
+const mockVerifyBackupCode = jest.fn();
 const mockIsCurrentAuthResponse = jest.fn();
 const mockSignOut = jest.fn();
 const mockChangeOwnPassword = jest.fn();
@@ -60,7 +63,12 @@ jest.mock("@/lib/session", () => ({
 jest.mock("@/lib/auth-client", () => ({
   authClient: {
     signIn: { email: (...args: unknown[]) => mockSignInEmail(...args) },
+    twoFactor: {
+      verifyBackupCode: (...args: unknown[]) => mockVerifyBackupCode(...args),
+    },
   },
+  hasTwoFactorChallenge: () => mockHasChallenge(),
+  clearTwoFactorChallenge: jest.fn(),
   isCurrentAuthResponse: (...args: unknown[]) =>
     mockIsCurrentAuthResponse(...args),
 }));
@@ -166,13 +174,48 @@ test("unsupported accounts are signed out instead of receiving a mobile role", a
   expect(mockSession.establish).not.toHaveBeenCalled();
 });
 
-test("a two-factor challenge fails closed and directs the account to web", async () => {
+test("the password step opens verification without discovering roles", async () => {
   mockIsCurrentAuthResponse.mockReturnValue(true);
+  mockHasChallenge.mockReturnValue(true);
+  mockSignInEmail.mockResolvedValue({ data: { twoFactorRedirect: true } });
   await expect(
-    establishAuthenticatedResponse({ twoFactorRedirect: true }, "school"),
-  ).rejects.toBeInstanceOf(UnsupportedMobileTwoFactorError);
+    signInWithSchoolCredentials({
+      subdomain: "school",
+      login: "student",
+      password: "fixture-password",
+    }),
+  ).resolves.toBe("two-factor");
   expect(mockGetSchoolRoles).not.toHaveBeenCalled();
   expect(mockSession.establish).not.toHaveBeenCalled();
+});
+
+test("expired verification fails closed", async () => {
+  mockHasChallenge.mockReturnValue(false);
+  await expect(
+    verifyMobileTwoFactor("school", "backup", true),
+  ).rejects.toBeInstanceOf(MobileTwoFactorExpiredError);
+  expect(mockVerifyBackupCode).not.toHaveBeenCalled();
+  expect(mockSession.establish).not.toHaveBeenCalled();
+});
+
+test("successful backup-code verification discovers mobile roles", async () => {
+  mockHasChallenge.mockReturnValue(true);
+  mockIsCurrentAuthResponse.mockReturnValue(true);
+  mockVerifyBackupCode.mockImplementation(async () => {
+    mockSession.state.token = "verified-token";
+    mockSession.state.status = "loading";
+    return { data: { user: {} } };
+  });
+  mockGetSchoolRoles.mockResolvedValue({
+    primaryRole: "teacher",
+    roles: ["teacher"],
+  });
+  await verifyMobileTwoFactor("school", "backup", true);
+  expect(mockVerifyBackupCode).toHaveBeenCalledWith({
+    code: "backup",
+    trustDevice: false,
+  });
+  expect(mockSession.establish).toHaveBeenCalledTimes(1);
 });
 
 test("authenticated users can change their password without re-establishing the session", async () => {

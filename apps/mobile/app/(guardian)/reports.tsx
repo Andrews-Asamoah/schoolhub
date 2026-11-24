@@ -10,9 +10,7 @@ import { GuardianBackButton } from "@/features/guardian/BackButton";
 import { downloadGuardianReport } from "@/api/guardian";
 import { useGuardian } from "@/features/guardian/context";
 import { WardSwitcher } from "@/features/guardian/WardSwitcher";
-import {
-  useGuardianReportsQuery,
-} from "@/features/guardian/queries";
+import { useGuardianReportsQuery } from "@/features/guardian/queries";
 import { spacing, type, useTheme } from "@/theme/theme";
 
 async function download(action: () => Promise<void>, title: string) {
