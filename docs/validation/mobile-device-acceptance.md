@@ -24,6 +24,14 @@ issues before Phase 9.
       wards, and a multi-role user. Also verify wrong password, rate limiting after
       repeated attempts, paused subscription, forced password change, and
       forgot-password flow.
+- [ ] On an associated Android/iOS build, open a real recovery email while the
+      app is closed, already open, and signed in. Verify the reset form opens
+      with no token field and asks before signing out an active session. Complete
+      a reset, verify the link cannot be reused, and test browser fallback
+      without the app installed.
+- [ ] From a guardian fee statement, open the web portal with and without an
+      active browser session. Verify sign-in continues to the correct school's
+      statement and that browser ward selection remains available.
 - [ ] Session events (`unauthorized`, `password-change-required`,
       `subscription-inactive`, and `two-factor-required`) clear the appropriate
       credentials/caches and show the expected screen.

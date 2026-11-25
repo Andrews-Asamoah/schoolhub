@@ -13,7 +13,7 @@ function inspect(map) {
     if (/(?:^|\/)app\//.test(path)) appSources++;
     const appPath = path.match(/(?:^|\/)app\/(.*)$/)?.[1];
     const allowedApp =
-      /^(?:(?:_layout|index)\.[tj]sx?$|\((?:teacher|student|guardian|auth|shared)\)\/)/;
+      /^(?:(?:_layout|index|\+native-intent|password-recovery-link)\.[tj]sx?$|\((?:teacher|student|guardian|auth|shared)\)\/)/;
     if (
       (appPath && !allowedApp.test(appPath)) ||
       /(?:^|\/)(?:app|src)\/.*(?:bece|external-exams)/i.test(path) ||

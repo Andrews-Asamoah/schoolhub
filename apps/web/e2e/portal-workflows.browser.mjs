@@ -4,6 +4,7 @@ import {pathToFileURL} from 'node:url';
 const {chromium}=await import(pathToFileURL(resolve(dirname(process.env.PLAYWRIGHT_PACKAGE_ENTRY),'index.mjs')).href);
 const browser=await chromium.launch({headless:true}),base=process.env.SCHOOLHUB_WEB_URL??'http://127.0.0.1:5173';
 try{for(const role of ['teacher','headteacher','admin','student','guardian'])for(const viewport of [{width:1440,height:1000},{width:390,height:844}]){
+ let signedIn=role!=='guardian';
  const page=await browser.newPage({viewport,locale:'en-GB'}),errors=[],calls=[];page.on('pageerror',e=>errors.push(e.message));
  const now=new Date().toISOString(),org={id:'org',name:'Test school',slug:'test-school',createdAt:now};
  const school={id:'school',organizationId:'org',name:'Test school',subdomain:'test-school',code:'TEST',academicYears:[]};
@@ -12,7 +13,8 @@ try{for(const role of ['teacher','headteacher','admin','student','guardian'])for
  const wards=['Ama','Kofi'].map((name,index)=>({id:'ward-'+index,studentId:'ward-'+index,profile:{firstName:name,lastName:'Mensah'},health:{bloodGroup:null,allergies:null,medicalConditions:null},subjects:[],guardians:[],class:{id:'class',name:'P5'},house:null}));
  await page.route('**/api/**',async route=>{
   const path=new URL(route.request().url()).pathname;calls.push(path);
-  if(path.includes('/auth/get-session'))return route.fulfill({json:session});
+  if(path.includes('/auth/get-session'))return route.fulfill({json:signedIn?session:null});
+  if(path.endsWith('/auth/sign-in/email')){signedIn=true;return route.fulfill({json:{user:session.user,token:'token'}});}
   if(path.includes('/auth/organization/list'))return route.fulfill({json:[org]});
   if(path.includes('/auth/organization/get-full-organization'))return route.fulfill({json:{...org,members:[],invitations:[]}});
   if(path.endsWith('/schools/roles'))return route.fulfill({json:{primaryRole:role,roles:[role]}});
@@ -28,7 +30,21 @@ try{for(const role of ['teacher','headteacher','admin','student','guardian'])for
   if(path.includes('/my-wards/')&&path.endsWith('/fees'))return route.fulfill({status:503,json:{message:'Try again'}});
   return route.fulfill({json:[]});
  });
- await page.goto(base+'/dashboard');
+ if(role==='guardian'){
+  const handoff=base+'/login?school=test-school&continue=guardian-fees';
+  await page.goto(handoff);
+  await page.locator('#email').fill('guardian@example.test');
+  await page.locator('#password').fill('BrowserTest123!');
+  await page.getByRole('button',{name:'Sign in',exact:true}).click();
+  await page.waitForURL(url=>url.pathname==='/guardian-fees'&&url.searchParams.get('school')==='test-school');
+  await page.getByRole('combobox').getByText('Ama Mensah',{exact:true}).waitFor();
+  await page.goto(handoff);
+  await page.waitForURL(url=>url.pathname==='/guardian-fees'&&url.searchParams.get('school')==='test-school');
+  await page.goto(base+'/login?school=test-school&continue=https%3A%2F%2Funtrusted.example');
+  await page.waitForURL(url=>url.pathname==='/dashboard');
+ }else{
+  await page.goto(base+'/dashboard');
+ }
  if(role==='guardian'){
   await page.getByText('Ama Mensah',{exact:true}).waitFor();
   await page.goto(base+'/guardian-attendance');

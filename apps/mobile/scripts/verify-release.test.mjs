@@ -26,8 +26,12 @@ function verify(sources) {
 
 test("accepts the production entry sources", () => {
   assert.equal(
-    verify(["/repo/apps/mobile/app/_layout.tsx", "../app/(auth)/login.tsx"])
-      .status,
+    verify([
+      "/repo/apps/mobile/app/_layout.tsx",
+      "../app/(auth)/login.tsx",
+      "../app/+native-intent.tsx",
+      "../app/password-recovery-link.tsx",
+    ]).status,
     0,
   );
 });

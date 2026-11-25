@@ -1,5 +1,7 @@
 import { CircleDollarSign } from "lucide-react-native";
-import { View } from "react-native";
+import { Linking, View } from "react-native";
+import { Button } from "@/components/Button";
+import { useToast } from "@/components/Toast";
 import { Card } from "@/components/Surface";
 import { EmptyState, ErrorState } from "@/components/States";
 import { ListRow } from "@/components/ListRow";
@@ -9,6 +11,8 @@ import { Text } from "@/components/Typography";
 import { useGuardian } from "@/features/guardian/context";
 import { WardSwitcher } from "@/features/guardian/WardSwitcher";
 import { useWardFeesQuery } from "@/features/guardian/queries";
+import { guardianFeesPortalUrl } from "@/lib/portal-links";
+import { useSession } from "@/lib/session";
 import { spacing, type, useTheme } from "@/theme/theme";
 
 const money = (value: string) => {
@@ -23,6 +27,9 @@ const money = (value: string) => {
 
 export default function GuardianFeesScreen() {
   const { activeWard } = useGuardian();
+  const { subdomain } = useSession();
+  const { show } = useToast();
+  const portalUrl = guardianFeesPortalUrl(subdomain);
   const query = useWardFeesQuery(activeWard?.id ?? "");
   const { colors } = useTheme();
   return (
@@ -84,6 +91,20 @@ export default function GuardianFeesScreen() {
                 reference only.
               </Text>
             </Card>
+            {portalUrl ? (
+              <Button
+                label="Open fees in web portal"
+                variant="secondary"
+                onPress={() => {
+                  void Linking.openURL(portalUrl).catch(() => {
+                    show({
+                      message: "Unable to open the web portal.",
+                      tone: "error",
+                    });
+                  });
+                }}
+              />
+            ) : null}
             <Card>
               <ListRow
                 title="Statement activity"
