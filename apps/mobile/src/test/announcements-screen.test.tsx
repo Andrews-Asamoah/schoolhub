@@ -4,6 +4,22 @@ import AnnouncementsScreen from "../../app/(shared)/announcements";
 
 const mockUseAnnouncementsQuery = jest.fn();
 const mockPush = jest.fn();
+const mockUseSession = jest.fn();
+
+jest.mock("@/lib/session", () => ({ useSession: () => mockUseSession() }));
+jest.mock("@/components/Button", () => {
+  const React = jest.requireActual<typeof import("react")>("react");
+  const { Pressable, Text } =
+    jest.requireActual<typeof import("react-native")>("react-native");
+  return {
+    Button: ({ label, onPress }: { label: string; onPress: () => void }) =>
+      React.createElement(
+        Pressable,
+        { onPress, accessibilityRole: "button" },
+        React.createElement(Text, null, label),
+      ),
+  };
+});
 
 jest.mock("@/features/announcements/queries", () => ({
   useAnnouncementsQuery: () => mockUseAnnouncementsQuery(),
@@ -104,6 +120,7 @@ const baseQuery = {
 
 beforeEach(() => {
   mockUseAnnouncementsQuery.mockReset();
+  mockUseSession.mockReturnValue({ status: "ready", activeRole: "guardian" });
   mockPush.mockReset();
   refetch.mockReset();
 });
@@ -156,4 +173,19 @@ test("announcements opens published notice details from the list", async () => {
   await render(<AnnouncementsScreen />);
   fireEvent.press(screen.getByText("Term begins Monday"));
   expect(mockPush).toHaveBeenCalledWith("/(shared)/announcements/notice-1");
+});
+
+test("only teacher sessions get the announcement publishing action", async () => {
+  mockUseAnnouncementsQuery.mockReturnValue({ ...baseQuery, data: [] });
+  const guardian = await render(<AnnouncementsScreen />);
+  expect(
+    screen.queryByRole("button", { name: "New class announcement" }),
+  ).toBeNull();
+  await guardian.unmount();
+  mockUseSession.mockReturnValue({ status: "ready", activeRole: "teacher" });
+  await render(<AnnouncementsScreen />);
+  await fireEvent.press(
+    screen.getByRole("button", { name: "New class announcement" }),
+  );
+  expect(mockPush).toHaveBeenCalledWith("/(teacher)/teacher-announcement-new");
 });

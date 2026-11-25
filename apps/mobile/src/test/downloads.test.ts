@@ -1,3 +1,5 @@
+import { File } from "expo-file-system";
+import { shareStaffDocument } from "@/api/documents";
 import { defineDownload } from "@/api/endpoint";
 import { apiBytes } from "@/lib/api";
 import { sessionStore } from "@/lib/session";
@@ -11,7 +13,7 @@ jest.mock("@/lib/api", () => ({
   publicFetch: jest.fn(),
 }));
 jest.mock("@/lib/session", () => ({
-  sessionStore: { getSnapshot: jest.fn() },
+  sessionStore: { getSnapshot: jest.fn(), getRevision: jest.fn(() => 0) },
 }));
 jest.mock("expo-file-system", () => ({
   File: jest.fn().mockImplementation(() => ({
@@ -90,4 +92,46 @@ test("denies PDF downloads outside the endpoint role", async () => {
     download({ params: { reportId: "report-1" } }),
   ).rejects.toThrow();
   expect(apiBytes).not.toHaveBeenCalled();
+});
+
+test("teachers share private PNGs with the matching file extension and media type", async () => {
+  jest.mocked(sessionStore.getSnapshot).mockReturnValue({
+    ...guardianSession,
+    activeRole: "teacher",
+    roles: ["teacher"],
+  } as never);
+  await shareStaffDocument({
+    params: { id: "staff/document" },
+    mimeType: "image/png",
+  });
+  expect(apiBytes).toHaveBeenCalledWith(
+    "/documents/staff%2Fdocument/download",
+    expect.anything(),
+  );
+  expect(File).toHaveBeenCalledWith(
+    "file://cache",
+    expect.stringMatching(/\.png$/),
+  );
+  expect(Sharing.shareAsync).toHaveBeenCalledWith(
+    expect.any(String),
+    expect.objectContaining({ mimeType: "image/png" }),
+  );
+  expect(mockDelete).toHaveBeenCalledTimes(1);
+});
+
+test("a changed session cannot open the share sheet and the cached file is deleted", async () => {
+  jest
+    .mocked(sessionStore.getRevision)
+    .mockReturnValueOnce(1)
+    .mockReturnValueOnce(2);
+  const download = defineDownload({
+    method: "GET",
+    path: "/assessments/report-cards/guardian/:reportId/pdf",
+    roles: ["guardian"],
+  });
+  await expect(download({ params: { reportId: "report-1" } })).rejects.toThrow(
+    "session has changed",
+  );
+  expect(Sharing.shareAsync).not.toHaveBeenCalled();
+  expect(mockDelete).toHaveBeenCalledTimes(1);
 });

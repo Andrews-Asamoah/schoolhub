@@ -105,6 +105,11 @@ export default function TeacherLayout() {
           <Tabs.Screen name="teacher-assignment-new" options={{ href: null }} />
           <Tabs.Screen name="teacher-assignment" options={{ href: null }} />
           <Tabs.Screen name="teacher-clubs" options={{ href: null }} />
+          <Tabs.Screen
+            name="teacher-announcement-new"
+            options={{ href: null }}
+          />
+          <Tabs.Screen name="teacher-documents" options={{ href: null }} />
         </Tabs>
       </TabBarInsetProvider>
     </RegisterSyncProvider>

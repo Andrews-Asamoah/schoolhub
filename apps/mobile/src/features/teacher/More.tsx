@@ -22,6 +22,10 @@ export default function TeacherMore() {
           href={"/(shared)/announcements" as Href}
         />
         <LinkButton
+          label="Staff documents"
+          href={"/(teacher)/teacher-documents" as Href}
+        />
+        <LinkButton
           label={`Notifications${notifications.data?.unreadCount ? ` (${notifications.data.unreadCount} unread)` : ""}`}
           href={"/(shared)/notifications" as Href}
         />

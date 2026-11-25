@@ -108,3 +108,7 @@ and replay automatically when connectivity returns. See
 [push delivery](../../docs/plans/mobile-phase-8-push.md). See [Phase 7](../../docs/plans/mobile-phase-7.md)
 for contracts, real validation transcripts and pending device acceptance.
 Teacher announcement creation and documents remain deferred pending N3.
+
+Teachers can publish class announcements to pupils or their guardians from
+Announcements. Staff documents are available in More. Open a document to
+share an authenticated PDF or image downloaded into the device's temporary cache.

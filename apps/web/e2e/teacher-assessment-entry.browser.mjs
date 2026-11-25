@@ -148,6 +148,8 @@ try {
   await esi.waitFor(); assert(await esi.isChecked(), "absence draft survives tab reload");
   await page.getByRole("combobox", { name: "Subject", exact: true }).click();
   await page.getByRole("option", { name: "Maths", exact: true }).click();
+  await modal().getByRole("heading", { name: "Switch sheets?" }).waitFor();
+  await confirmIn("Switch sheets");
   await page.getByRole("heading", { name: "Maths · JHS 1A", exact: true }).waitFor();
   assert.equal(await esi.isChecked(), false, "absence draft is scoped to the subject");
   await page.getByRole("combobox", { name: "Subject", exact: true }).click();
