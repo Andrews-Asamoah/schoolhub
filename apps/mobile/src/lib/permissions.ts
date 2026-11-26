@@ -32,17 +32,17 @@ export function roleGroup(role: unknown) {
   assertMobileRole(role);
   return `(${role})` as const;
 }
-// BECE/external exams are deferred for teachers too. No mobile v1 role gets them.
-export function canSeeBece(_role: unknown): boolean {
-  return false;
+// The API also checks the teacher’s class assignment for each register.
+export function canSeeBece(role: unknown): boolean {
+  return role === "teacher";
 }
 export function assertFeature(
   role: unknown,
   feature: "announcements" | "bece",
 ) {
   assertMobileRole(role);
-  if (feature === "bece")
-    throw new Error("External examinations are unavailable on mobile.");
+  if (feature === "bece" && !canSeeBece(role))
+    throw new Error("External examinations require the teacher portal.");
 }
 
 export function isAuthorizedSession(session: {

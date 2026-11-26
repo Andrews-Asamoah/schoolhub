@@ -20,12 +20,14 @@ export function Timetable({
   period,
   showCurrent,
   showClass,
+  showExcel,
 }: {
   entries: TimetableEntry[];
   title: string;
   period?: string;
   showCurrent?: boolean;
   showClass?: boolean;
+  showExcel?: boolean;
 }) {
   const { colors, scheme } = useTheme();
   const palette = modulePalette("violet", scheme);
@@ -96,7 +98,12 @@ export function Timetable({
         {active.entries.map((entry, index) => (
           <ListRow
             key={entry.id}
-            title={entry.subject?.name ?? entry.label ?? entry.type}
+            title={[
+              entry.subject?.name ?? entry.label ?? entry.type,
+              entry.subjectStrand?.name,
+            ]
+              .filter(Boolean)
+              .join(" · ")}
             subtitle={[
               `${entry.startTime}–${entry.endTime}`,
               showClass ? entry.class?.name : entry.teacher?.name,
@@ -117,6 +124,7 @@ export function Timetable({
         title={title}
         showCurrent={showCurrent}
         showClass={showClass}
+        showExcel={showExcel}
       />
     </View>
   );

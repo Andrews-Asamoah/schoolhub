@@ -14,9 +14,15 @@ function inspect(map) {
     const appPath = path.match(/(?:^|\/)app\/(.*)$/)?.[1];
     const allowedApp =
       /^(?:(?:_layout|index|\+native-intent|password-recovery-link)\.[tj]sx?$|\((?:teacher|student|guardian|auth|shared)\)\/)/;
+    const teacherExamSource =
+      /^(?:\(teacher\)\/teacher-external-exams\.tsx)$/.test(appPath ?? "") ||
+      /(?:^|\/)src\/(?:features\/teacher\/ExternalExams\.tsx|api\/teacher-external-exams\.ts)$/.test(
+        path,
+      );
     if (
       (appPath && !allowedApp.test(appPath)) ||
-      /(?:^|\/)(?:app|src)\/.*(?:bece|external-exams)/i.test(path) ||
+      (/(?:^|\/)(?:app|src)\/.*(?:bece|external-?exams)/i.test(path) &&
+        !teacherExamSource) ||
       forbidden.test(path)
     )
       throw new Error(`Forbidden release route: ${path}`);

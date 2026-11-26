@@ -13,6 +13,7 @@ export type Lesson = {
   startTime: string;
   endTime: string;
   subject: { name: string } | null;
+  subjectStrand?: { name: string } | null;
   class?: { name: string } | null;
   teacher?: { name: string } | null;
   classroom?: { name: string } | null;
@@ -50,11 +51,13 @@ export function TimetableActions({
   title,
   showCurrent = false,
   showClass = false,
+  showExcel = false,
 }: {
   entries: Lesson[];
   title: string;
   showCurrent?: boolean;
   showClass?: boolean;
+  showExcel?: boolean;
 }) {
   const { colors } = useTheme();
   const [now, setNow] = useState(() => new Date());
@@ -66,7 +69,7 @@ export function TimetableActions({
   }, [showCurrent]);
 
   const { current, next } = showCurrent ? lessonTiming(entries, now) : {};
-  function exportSchedule(format: "print" | "pdf") {
+  function exportSchedule(format: "print" | "pdf" | "xlsx") {
     setBusy(true);
     const ordered = [...entries].sort(
       (a, b) =>
@@ -80,7 +83,12 @@ export function TimetableActions({
       ordered.map((entry) => [
         entry.dayOfWeek,
         `${entry.startTime}–${entry.endTime}`,
-        entry.subject?.name ?? entry.label ?? entry.type,
+        [
+          entry.subject?.name ?? entry.label ?? entry.type,
+          entry.subjectStrand?.name,
+        ]
+          .filter(Boolean)
+          .join(" · "),
         (showClass ? entry.class?.name : entry.teacher?.name) ?? "",
         entry.classroom?.name ?? "",
       ]),
@@ -118,6 +126,14 @@ export function TimetableActions({
           disabled={busy}
           onPress={() => exportSchedule("pdf")}
         />
+        {showExcel ? (
+          <Button
+            label="Share timetable Excel"
+            variant="secondary"
+            disabled={busy}
+            onPress={() => exportSchedule("xlsx")}
+          />
+        ) : null}
       </View>
     </>
   );

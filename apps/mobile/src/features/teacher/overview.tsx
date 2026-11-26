@@ -13,10 +13,12 @@ import {
 import { useTeacherQuery } from "./queries";
 import { TeacherPage, QueryState, Panel, Copy, LinkButton } from "./ui";
 import { ListRow } from "@/components/ListRow";
+import { formatCalendarDate } from "@/components/CalendarDateField";
+import { Button } from "@/components/Button";
 import { SearchBar } from "@/components/Fields";
 import { StudentProfileCard } from "@/features/shared/StudentProfileCard";
 import { HeroCard } from "@/components/HeroCard";
-import { Timetable } from "@/features/shared/Timetable";
+export { default as TeacherTimetable } from "./TimetableBrowser";
 const go = (path: string, params?: Record<string, string>) =>
   router.push({ pathname: path, params } as Href);
 export function TeacherHome() {
@@ -34,7 +36,7 @@ export function TeacherHome() {
     "THURSDAY",
     "FRIDAY",
     "SATURDAY",
-  ][new Date().getDay()];
+  ][new Date().getUTCDay()];
   const lessons =
     timetable.data?.entries.filter((e) => e.dayOfWeek === today) ?? [];
   return (
@@ -133,6 +135,10 @@ export function TeacherClasses() {
     ) ?? [];
   return (
     <TeacherPage title="Classes" query={teaching}>
+      <LinkButton
+        label="Class directory"
+        href="/(teacher)/teacher-class-directory"
+      />
       <SearchBar label="Search classes" value={search} onChange={setSearch} />
       <QueryState query={teaching} empty={!classes.length}>
         {classes.map((c) => (
@@ -141,10 +147,16 @@ export function TeacherClasses() {
               {c.studentCount} pupils ·{" "}
               {c.isClassTeacher ? "Class teacher" : "Subject teacher"}
             </Copy>
-            <Copy>
-              {c.subjects.map((s) => s.name).join(", ") ||
-                "Class register and roster"}
-            </Copy>
+            {c.subjects.map((subject) => (
+              <LinkButton
+                key={subject.id}
+                label={`Enter ${subject.name} marks`}
+                href={{
+                  pathname: "/(teacher)/teacher-score-entry",
+                  params: { classId: c.id, subjectId: subject.id },
+                }}
+              />
+            ))}
             <LinkButton
               label={`View ${c.name} roster`}
               href={
@@ -205,6 +217,7 @@ export function TeacherPupil() {
     getTeaching({ signal }),
   );
   const termId = teaching.data?.term?.id;
+  const [showDetails, setShowDetails] = useState(false);
   const p = useTeacherQuery(
     ["pupil", studentId],
     (signal) => getTeacherStudent({ signal, params: { id: studentId } }),
@@ -299,19 +312,99 @@ export function TeacherPupil() {
     </TeacherPage>
   );
 }
-export function TeacherTimetable() {
-  const q = useTeacherQuery(["timetable"], (signal) =>
-    getTeacherTimetable({ signal }),
-  );
+
+function PupilRecords({
+  student,
+}: {
+  student: Awaited<ReturnType<typeof getTeacherStudent>>;
+}) {
+  const { profile, health, guardians } = student;
+  const date = (value?: string | null) =>
+    value ? formatCalendarDate(value.slice(0, 10)) : undefined;
+  const rows = [
+    ["Date of birth", date(profile.dateOfBirth)],
+    ["Gender", profile.gender],
+    ["Nationality", profile.nationality],
+    [
+      "Address",
+      [profile.residentialAddress, profile.city, profile.region]
+        .filter(Boolean)
+        .join(", "),
+    ],
+    ["Previous school", student.previousSchool],
+    ["Admitted", date(student.admissionDate)],
+    [
+      "Emergency contact",
+      [
+        profile.emergencyContactName,
+        profile.emergencyRelationship,
+        profile.emergencyContactPhone,
+      ]
+        .filter(Boolean)
+        .join(" · "),
+    ],
+  ];
   return (
-    <TeacherPage title="Weekly timetable" query={q} back>
-      <QueryState query={q} empty={!q.data?.entries.length}>
-        <Timetable
-          entries={q.data?.entries ?? []}
-          title="Teaching timetable"
-          showClass
+    <>
+      <Panel title="Personal details">
+        {rows.map(([label, value]) => (
+          <ListRow
+            key={label}
+            title={label!}
+            subtitle={value || "Not recorded"}
+          />
+        ))}
+      </Panel>
+      <Panel title="Sign-in details">
+        <ListRow
+          title="Username"
+          subtitle={
+            student.username ?? student.admissionNumber ?? "Not generated"
+          }
         />
-      </QueryState>
-    </TeacherPage>
+        <ListRow
+          title="Login email"
+          subtitle={student.loginEmail ?? profile.email ?? "Not generated"}
+        />
+      </Panel>
+      {health ? (
+        <Panel title="Health">
+          <ListRow
+            title="Blood group"
+            subtitle={health.bloodGroup ?? "Not recorded"}
+          />
+          <ListRow
+            title="Allergies"
+            subtitle={health.allergies ?? "Not recorded"}
+          />
+          <ListRow
+            title="Medical conditions"
+            subtitle={health.medicalConditions ?? "Not recorded"}
+          />
+        </Panel>
+      ) : null}
+      {guardians ? (
+        <Panel title="Parents and guardians">
+          {guardians.length ? (
+            guardians.map((guardian) => (
+              <ListRow
+                key={guardian.id}
+                title={guardian.name}
+                subtitle={[
+                  guardian.relationshipType,
+                  guardian.isPrimary ? "Primary" : "",
+                  guardian.phone,
+                  guardian.email,
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
+              />
+            ))
+          ) : (
+            <Copy>No guardian linked yet.</Copy>
+          )}
+        </Panel>
+      ) : null}
+    </>
   );
 }

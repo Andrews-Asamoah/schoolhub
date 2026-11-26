@@ -1,5 +1,8 @@
 import {
   CalendarDays,
+  BookOpen,
+  ChartNoAxesColumn,
+  GraduationCap,
   ClipboardList,
   Files,
   Megaphone,
@@ -17,6 +20,21 @@ export default function TeacherMore() {
         title="Teaching tools"
         hue="violet"
         links={[
+          {
+            label: "Students",
+            href: "/(teacher)/teacher-students",
+            icon: GraduationCap,
+          },
+          {
+            label: "Subjects",
+            href: "/(teacher)/teacher-subjects",
+            icon: BookOpen,
+          },
+          {
+            label: "School reports",
+            href: "/(teacher)/teacher-school-reports",
+            icon: ChartNoAxesColumn,
+          },
           {
             label: "Weekly timetable",
             href: "/(teacher)/teacher-timetable",

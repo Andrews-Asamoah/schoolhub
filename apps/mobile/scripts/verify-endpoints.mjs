@@ -19,6 +19,9 @@ function roleAllows(route, role) {
     route.roles.includes("...roles") ||
     route.roles.includes("...schoolRoles") ||
     (role === "teacher" &&
+      route.file.endsWith("/timetable.controller.ts") &&
+      route.roles.includes("...READ")) ||
+    (role === "teacher" &&
       route.file.endsWith("/assessment-workflow.controller.ts") &&
       route.roles.includes("...STAFF"))
   );
@@ -116,8 +119,6 @@ function walk(folder) {
           if (scopeNode && !ts.isStringLiteral(scopeNode))
             fail(file, "scope must be a string literal.");
           const scope = scopeNode?.text;
-          if (/(?:^|\/)(?:external-exams|bece)(?:\/|$)/.test(path))
-            fail(file, "External examinations are out of mobile v1 scope.");
           const rolesNode = properties.get("roles");
           if (
             !rolesNode ||
@@ -128,6 +129,23 @@ function walk(folder) {
           const roles = rolesNode.elements.map((n) => n.text);
           if (roles.some((role) => !allowed.has(role)))
             fail(file, "Unsupported mobile role.");
+          if (/(?:^|\/)(?:external-exams|bece)(?:\/|$)/.test(path)) {
+            const teacherExamEndpoints = new Set([
+              "GET /external-exams",
+              "GET /external-exams/:id/summary",
+              "GET /external-exams/papers/:id",
+              "PUT /external-exams/results",
+            ]);
+            if (
+              roles.length !== 1 ||
+              roles[0] !== "teacher" ||
+              !teacherExamEndpoints.has(`${method} ${path}`)
+            )
+              fail(
+                file,
+                "External exams require a supported teacher-only endpoint.",
+              );
+          }
           const route = inventory.find(
             (route) =>
               route.method === method &&

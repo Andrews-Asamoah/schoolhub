@@ -65,10 +65,24 @@ function assertDefinition(
 ) {
   if (!path.startsWith("/") || path.startsWith("/api/") || /[?#]/.test(path))
     throw new Error("Endpoint paths must be API-relative route templates.");
-  if (/(?:^|\/)(?:external-exams|bece)(?:\/|$)/.test(path))
-    throw new Error("External examinations are unavailable on mobile.");
-
   const key = `${method} ${path}`;
+  if (/(?:^|\/)(?:external-exams|bece)(?:\/|$)/.test(path)) {
+    const supported = [
+      "GET /external-exams",
+      "GET /external-exams/:id/summary",
+      "GET /external-exams/papers/:id",
+      "PUT /external-exams/results",
+    ];
+    if (
+      scope ||
+      roles.length !== 1 ||
+      roles[0] !== "teacher" ||
+      !supported.includes(key)
+    )
+      throw new Error(
+        "External examinations require a supported teacher-only endpoint.",
+      );
+  }
   if (scope === "public" && !publicEndpoints.has(key))
     throw new Error("Unsupported anonymous mobile endpoint.");
   if (scope === "session" && !sessionEndpoints.has(key))
