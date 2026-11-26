@@ -3456,13 +3456,15 @@ export class FinanceService {
     }
     if (query.overdue === "true") filters.push({ dueDate: { lt: asOf } });
     if (query.search?.trim()) {
-      const term = query.search.trim();
+      const term = query.search.trim().replace(/[\\%_]/g, character => "\\" + character);
+      const nameWords = term.split(/\s+/).slice(0, 12);
       filters.push({ OR: [
         { billNumber: { contains: term, mode: "insensitive" } },
         { student: { admissionNumber: { contains: term, mode: "insensitive" } } },
-        { student: { profile: { firstName: { contains: term, mode: "insensitive" } } } },
-        { student: { profile: { lastName: { contains: term, mode: "insensitive" } } } },
-        { student: { profile: { otherNames: { contains: term, mode: "insensitive" } } } },
+        { student: { profile: { AND: nameWords.map(word => {
+          const name = { contains: word, mode: "insensitive" as const };
+          return { OR: [{ firstName: name }, { otherNames: name }, { lastName: name }] };
+        }) } } },
         { class: { name: { contains: term, mode: "insensitive" } } },
       ] });
     }
