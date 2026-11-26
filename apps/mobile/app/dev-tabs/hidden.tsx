@@ -8,7 +8,7 @@ export default function HiddenTab() {
   return (
     <Screen title="Hidden tab">
       <Text style={[type.body, { color: colors.foreground }]}>
-        This screen must not appear in the floating tab bar.
+        This screen must not appear in the portal tab bar.
       </Text>
     </Screen>
   );

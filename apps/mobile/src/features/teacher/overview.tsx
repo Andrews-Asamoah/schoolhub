@@ -53,11 +53,6 @@ export function TeacherHome() {
           metric={`${teaching.data?.classes.length ?? 0} classes`}
           detail={teaching.data?.term?.name ?? "Current term"}
         />
-        {teaching.data?.classes
-          .filter((c) => c.isClassTeacher)
-          .map((c) => (
-            <ClassGaps key={c.id} id={c.id} name={c.name} />
-          ))}
       </QueryState>
       <Panel title="Today's timetable">
         <QueryState query={timetable} empty={!lessons.length}>
@@ -65,7 +60,13 @@ export function TeacherHome() {
             <ListRow
               key={e.id}
               title={e.subject?.name ?? e.label ?? e.type}
-              subtitle={`${e.startTime}–${e.endTime} · ${e.class?.name ?? ""} · ${e.classroom?.name ?? ""}`}
+              subtitle={[
+                `${e.startTime}–${e.endTime}`,
+                e.class?.name,
+                e.classroom?.name,
+              ]
+                .filter(Boolean)
+                .join(" · ")}
             />
           ))}
         </QueryState>
@@ -74,6 +75,11 @@ export function TeacherHome() {
           href={"/(teacher)/teacher-timetable" as Href}
         />
       </Panel>
+      {teaching.data?.classes
+        .filter((c) => c.isClassTeacher)
+        .map((c) => (
+          <ClassGaps key={c.id} id={c.id} name={c.name} />
+        ))}
     </TeacherPage>
   );
 }

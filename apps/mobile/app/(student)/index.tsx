@@ -109,95 +109,7 @@ export default function StudentHomeScreen() {
                   .filter(Boolean)
                   .join(" · ") || "Your student dashboard"
               }
-            >
-              <Text style={[type.body, { color: "#FFFFFF" }]}>
-                Keep up with classes, assignments and school updates.
-              </Text>
-            </HeroCard>
-
-            <Card>
-              <View
-                style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  gap: spacing.lg,
-                }}
-              >
-                {attendance.isPending ? (
-                  <View style={{ flex: 1 }}>
-                    <SkeletonRow />
-                  </View>
-                ) : attendance.isError ? (
-                  <View style={{ flex: 1 }}>
-                    <ErrorState
-                      title="Attendance unavailable"
-                      message="Your summary could not be loaded."
-                      actionLabel="Retry"
-                      onAction={() => void attendance.refetch()}
-                      hue="emerald"
-                    />
-                  </View>
-                ) : attendance.data?.attendanceRate !== null &&
-                  attendance.data ? (
-                  <ProgressRing
-                    label="Attendance"
-                    value={attendance.data.attendanceRate}
-                    hue="emerald"
-                  />
-                ) : (
-                  <Text
-                    style={[
-                      type.caption,
-                      { color: colors.mutedForeground, textAlign: "center" },
-                    ]}
-                  >
-                    Attendance rate unavailable
-                  </Text>
-                )}
-                <View style={{ flex: 1, gap: spacing.sm }}>
-                  <Text style={[type.headline, { color: colors.foreground }]}>
-                    This term
-                  </Text>
-                  {attendance.data ? (
-                    <Text
-                      style={[type.body, { color: colors.mutedForeground }]}
-                    >
-                      {attendance.data.recordedDays} days recorded
-                    </Text>
-                  ) : null}
-                  {fees.isPending ? (
-                    <SkeletonRow />
-                  ) : fees.isError ? (
-                    <ListRow
-                      title="Fee status unavailable"
-                      subtitle="Tap to retry"
-                      onPress={() => void fees.refetch()}
-                    />
-                  ) : fees.data ? (
-                    <View style={{ gap: spacing.xs }}>
-                      <Text
-                        style={[
-                          type.caption,
-                          { color: colors.mutedForeground },
-                        ]}
-                      >
-                        Fee status
-                      </Text>
-                      <StatusPill
-                        label={fees.data.label}
-                        hue={
-                          fees.data.status === "FULLY_PAID"
-                            ? "emerald"
-                            : fees.data.status === "UNKNOWN"
-                              ? "indigo"
-                              : "amber"
-                        }
-                      />
-                    </View>
-                  ) : null}
-                </View>
-              </View>
-            </Card>
+            />
 
             <Card>
               <ListRow
@@ -294,6 +206,90 @@ export default function StudentHomeScreen() {
                   No assignments need your attention.
                 </Text>
               )}
+            </Card>
+
+            <Card>
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: spacing.lg,
+                }}
+              >
+                {attendance.isPending ? (
+                  <View style={{ flex: 1 }}>
+                    <SkeletonRow />
+                  </View>
+                ) : attendance.isError ? (
+                  <View style={{ flex: 1 }}>
+                    <ErrorState
+                      title="Attendance unavailable"
+                      message="Your summary could not be loaded."
+                      actionLabel="Retry"
+                      onAction={() => void attendance.refetch()}
+                      hue="emerald"
+                    />
+                  </View>
+                ) : attendance.data?.attendanceRate !== null &&
+                  attendance.data ? (
+                  <ProgressRing
+                    label="Attendance"
+                    value={attendance.data.attendanceRate}
+                    hue="emerald"
+                  />
+                ) : (
+                  <Text
+                    style={[
+                      type.caption,
+                      { color: colors.mutedForeground, textAlign: "center" },
+                    ]}
+                  >
+                    Attendance rate unavailable
+                  </Text>
+                )}
+                <View style={{ flex: 1, gap: spacing.sm }}>
+                  <Text style={[type.headline, { color: colors.foreground }]}>
+                    This term
+                  </Text>
+                  {attendance.data ? (
+                    <Text
+                      style={[type.body, { color: colors.mutedForeground }]}
+                    >
+                      {attendance.data.recordedDays} days recorded
+                    </Text>
+                  ) : null}
+                  {fees.isPending ? (
+                    <SkeletonRow />
+                  ) : fees.isError ? (
+                    <ListRow
+                      title="Fee status unavailable"
+                      subtitle="Tap to retry"
+                      onPress={() => void fees.refetch()}
+                    />
+                  ) : fees.data ? (
+                    <View style={{ gap: spacing.xs }}>
+                      <Text
+                        style={[
+                          type.caption,
+                          { color: colors.mutedForeground },
+                        ]}
+                      >
+                        Fee status
+                      </Text>
+                      <StatusPill
+                        label={fees.data.label}
+                        hue={
+                          fees.data.status === "FULLY_PAID"
+                            ? "emerald"
+                            : fees.data.status === "UNKNOWN"
+                              ? "indigo"
+                              : "amber"
+                        }
+                      />
+                    </View>
+                  ) : null}
+                </View>
+              </View>
             </Card>
 
             <Card>
