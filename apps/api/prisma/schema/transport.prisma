@@ -1,0 +1,17 @@
+enum BusTermStatus {
+  RIDING
+  PAUSED
+  STOPPED
+}
+
+model BusTermDecision {
+  studentId String
+  termId    String
+  status    BusTermStatus
+  student   Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  term      Term    @relation(fields: [termId], references: [id], onDelete: Cascade)
+
+  @@id([studentId, termId])
+  @@index([termId])
+  @@map("bus_term_decisions")
+}

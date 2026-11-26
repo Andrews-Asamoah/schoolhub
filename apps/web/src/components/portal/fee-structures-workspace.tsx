@@ -23,6 +23,7 @@ interface FeeItem {
   name: string;
   amount: number | string;
   isOptional: boolean;
+  followsBusRoster?: boolean;
   description?: string | null;
   registryItemId?: string | null;
 }
@@ -43,6 +44,7 @@ interface FeeItemDraft {
   name: string;
   amount: string;
   isOptional: boolean;
+  followsBusRoster?: boolean;
   description: string;
 }
 interface StructureDraft {
@@ -59,7 +61,7 @@ interface FeeStructureInput {
   classLevel?: string;
   termBased: boolean;
   targetClassIds: string[];
-  items: { registryItemId?: string; name: string; amount: number; isOptional: boolean; description?: string }[];
+  items: { registryItemId?: string; name: string; amount: number; isOptional: boolean; followsBusRoster?: boolean; description?: string }[];
 }
 
 const money = (amount: number) => new Intl.NumberFormat("en-GH", {
@@ -210,6 +212,7 @@ export function FeeStructuresWorkspace() {
         name: item.name.trim(),
         amount: Number(item.amount),
         isOptional: item.isOptional,
+        followsBusRoster: item.isOptional && item.followsBusRoster,
         description: item.description.trim() || undefined,
       })),
     };
@@ -253,6 +256,7 @@ export function FeeStructuresWorkspace() {
         name: item.name,
         amount: String(item.amount),
         isOptional: item.isOptional,
+        followsBusRoster: item.isOptional && item.followsBusRoster,
         description: item.description ?? "",
       })),
     });
@@ -274,6 +278,7 @@ export function FeeStructuresWorkspace() {
         name: item.name,
         amount: String(item.amount),
         isOptional: item.isOptional,
+        followsBusRoster: item.isOptional && item.followsBusRoster,
         description: item.description ?? "",
       })),
     });
@@ -392,7 +397,7 @@ function FeeStructureCard({
       <div className="flex items-start justify-between gap-3"><div className="min-w-0"><h2 className="break-words font-semibold text-foreground">{structure.name}</h2><div className="mt-2 flex flex-wrap gap-1.5">{structure.isActive ? <Badge tone="success">Active</Badge> : <Badge>Archived</Badge>}<Badge>{structure.termBased ? "Per term" : "One-off"}</Badge>{locked && <Badge>Locked after billing</Badge>}</div></div><span className="rounded-xl bg-primary/10 p-2 text-primary"><FileText className="size-4" /></span></div>
       {structure.description && <p className="mt-3 line-clamp-2 text-sm leading-5 text-muted-foreground">{structure.description}</p>}
       <p className="mt-3 text-xs text-muted-foreground">Applies to: <span className="font-medium text-foreground">{classes.length ? classes.join(", ") : structure.classLevel || "All classes"}</span></p>
-      <div className="mt-4 space-y-2">{structure.items.map(item => <div key={item.id} className="flex items-start justify-between gap-3 text-sm"><div className="min-w-0"><p className="break-words font-medium text-foreground">{item.name}{item.isOptional && <span className="ml-2 rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">Optional</span>}</p>{item.description && <p className="text-xs text-muted-foreground">{item.description}</p>}</div><span className="shrink-0 tabular-nums text-foreground">{money(Number(item.amount))}</span></div>)}</div>
+      <div className="mt-4 space-y-2">{structure.items.map(item => <div key={item.id} className="flex items-start justify-between gap-3 text-sm"><div className="min-w-0"><p className="break-words font-medium text-foreground">{item.name}{item.isOptional && <span className="ml-2 rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">{item.followsBusRoster ? "Bus roster" : "Optional"}</span>}</p>{item.description && <p className="text-xs text-muted-foreground">{item.description}</p>}</div><span className="shrink-0 tabular-nums text-foreground">{money(Number(item.amount))}</span></div>)}</div>
       <div className="mt-4 space-y-1 border-t border-border pt-3"><div className="flex items-center justify-between gap-3"><span className="text-xs text-muted-foreground">Structure total</span><span className="font-bold tabular-nums text-foreground">{money(total)}</span></div>{optional > 0 && <p className="text-[11px] text-muted-foreground">{money(optional)} of the total is marked optional.</p>}</div>
     </div>
     <div className="space-y-3 border-t border-border bg-muted/20 px-4 py-3">

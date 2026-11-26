@@ -167,7 +167,7 @@ interface ApiFeeStructure {
   id: string;
   name: string;
   description?: string | null;
-  items: { id: string; name: string; amount: number | string; isOptional?: boolean }[];
+  items: { id: string; name: string; amount: number | string; isOptional?: boolean; followsBusRoster?: boolean }[];
   targetClasses: { class: { id: string; name: string } }[];
 }
 
@@ -503,6 +503,10 @@ export function AccountantPortalWorkspace({
     retry: false,
   });
 
+  const busRiders = billingRosterQuery.data?.filter(student => student.busStatus === "RIDING") ?? [];
+  const busPreviewUnavailable = optionalFeeItems.some(item => item.followsBusRoster)
+    && (!selectedClassId || !billingRosterQuery.isSuccess);
+
   const createInventoryItem = useMutation({
     mutationFn: (input: CreateInventoryItemInput) =>
       apiFetch<ApiInventoryItem>("/inventory/items", {
@@ -668,6 +672,7 @@ export function AccountantPortalWorkspace({
 
   function submitBill(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (busPreviewUnavailable || generateBills.isPending) return;
     const form = new FormData(event.currentTarget);
     const result = generateBillSchema.safeParse({
       academicYearId: currentYear?.id,
@@ -1170,7 +1175,18 @@ export function AccountantPortalWorkspace({
                 : billingRosterQuery.isPending ? <p role="status" className="text-sm text-muted-foreground">Loading students…</p>
                 : billingRosterQuery.error ? <div className="space-y-2"><QueryError message={billingRosterQuery.error.message} />
                   <button type="button" className={buttonSecondary} onClick={() => void billingRosterQuery.refetch()}>Retry roster</button></div>
-                : billingRosterQuery.data?.length ? optionalFeeItems.map(item => (
+                : billingRosterQuery.data?.length ? optionalFeeItems.map(item => item.followsBusRoster ? (
+                  <details key={item.id} className="rounded-lg border border-border bg-card p-3 text-sm">
+                    <summary className="cursor-pointer font-medium">
+                      {item.name} · {currency(item.amount)} · {busRiders.length} riders
+                    </summary>
+                    {busRiders.length ? (
+                      <ul className="mt-2 max-h-40 space-y-1 overflow-auto text-xs text-muted-foreground">
+                        {busRiders.map(student => <li key={student.id}>{student.name} · {student.reference}</li>)}
+                      </ul>
+                    ) : <p className="mt-2 text-xs text-muted-foreground">This class has no riders for the selected term.</p>}
+                  </details>
+                ) : (
                   <OptionalFeeRoster key={item.id} name={item.name} amount={currency(item.amount)}
                     students={billingRosterQuery.data} selected={optionalRecipients[item.id] ?? []}
                     onChange={ids => setOptionalFees({ scope: feeScope, recipients: { ...optionalRecipients, [item.id]: ids } })} />
@@ -1179,7 +1195,7 @@ export function AccountantPortalWorkspace({
             <LabeledField label="Due date (optional)"><DatePicker name="dueDate" buttonClassName={inputClass} /></LabeledField>
             <LabeledField label="Notes (optional)"><textarea name="notes" className={cn(inputClass, "h-20 py-2")} placeholder="Optional note shown on generated bills" /></LabeledField>
             <p className="text-xs leading-5 text-muted-foreground">The operation is performed by the server using the selected class roster and current term. Review the count and total in the confirmation message after generation.</p>
-            <ModalActions onCancel={() => { setShowBillForm(false); setSelectedFeeStructureId(""); setSelectedClassId(""); setOptionalFees(null); }} busy={generateBills.isPending} submitLabel="Generate bills" />
+            <ModalActions onCancel={() => { setShowBillForm(false); setSelectedFeeStructureId(""); setSelectedClassId(""); setOptionalFees(null); }} busy={generateBills.isPending} disabled={busPreviewUnavailable} submitLabel="Generate bills" />
           </form>
         </Modal>
       )}
@@ -1329,8 +1345,8 @@ function Modal({ title, description, onClose, children, footer }: { title: strin
   return <PortalModal isOpen onClose={onClose} title={title} description={description} maxWidth="2xl" footer={footer}>{children}</PortalModal>;
 }
 
-function ModalActions({ onCancel, busy, submitLabel }: { onCancel: () => void; busy: boolean; submitLabel: string }) {
-  return <div className="flex justify-end gap-2 border-t border-border pt-4"><button type="button" className={buttonSecondary} onClick={onCancel} disabled={busy}>Cancel</button><button type="submit" className={buttonPrimary} disabled={busy}>{busy && <LoaderCircle className="size-4 animate-spin" />}{submitLabel}</button></div>;
+function ModalActions({ onCancel, busy, disabled, submitLabel }: { onCancel: () => void; busy: boolean; disabled?: boolean; submitLabel: string }) {
+  return <div className="flex justify-end gap-2 border-t border-border pt-4"><button type="button" className={buttonSecondary} onClick={onCancel} disabled={busy}>Cancel</button><button type="submit" className={buttonPrimary} disabled={busy || disabled}>{busy && <LoaderCircle className="size-4 animate-spin" />}{submitLabel}</button></div>;
 }
 
 function EmptyState({ icon: Icon, title, description }: { icon: typeof Wallet; title: string; description: string }) {

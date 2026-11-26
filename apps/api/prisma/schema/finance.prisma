@@ -90,6 +90,7 @@ model FeeItem {
   category         FeeCategory?
   customCategoryId String?
   isOptional       Boolean      @default(false)
+  followsBusRoster Boolean      @default(false)
   recognitionMethod FinanceRecognitionMethod @default(AT_INVOICE)
   revenueAccountId String?
   createdAt        DateTime     @default(now())
