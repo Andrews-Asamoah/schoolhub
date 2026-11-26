@@ -3,7 +3,6 @@ import {
   ArrowRight,
   Eye,
   EyeOff,
-  GraduationCap,
   LockKeyhole,
   Mail,
   ShieldCheck,
@@ -111,7 +110,7 @@ function LoginPage() {
       if (!loginEmail.includes("@")) {
         const schoolSub = getClientSubdomain();
         if (!schoolSub) {
-          setError("Open your school’s SchoolHub address to sign in with a username, or use your email.");
+          setError("Open your school’s CampusHubGH address to sign in with a username, or use your email.");
           setLoading(false);
           return;
         }
@@ -174,12 +173,12 @@ function LoginPage() {
             {school?.logo ? (
               <img src={school.logo} alt={school.name} className="size-full object-cover" />
             ) : (
-              <GraduationCap className="size-6 text-brand-foreground/80" strokeWidth={2.2} />
+              <img src="/campushubgh.webp" alt="" className="size-full object-contain" />
             )}
           </span>
           <span>
             <span className="block text-lg font-bold tracking-tight">
-              {school?.name ?? "SchoolHub"}
+              {school?.name ?? "CampusHubGH"}
             </span>
             <span className="block text-[10px] font-semibold uppercase tracking-[0.22em] text-brand-foreground/80">
               {school?.motto ?? "School management"}
@@ -236,7 +235,7 @@ function LoginPage() {
 
         <div className="relative z-10 flex items-center justify-between text-[11px] text-brand-foreground/80">
           <span>Thoughtfully made for school communities</span>
-          <span>© {new Date().getFullYear()} SchoolHub</span>
+          <span>© {new Date().getFullYear()} CampusHubGH</span>
         </div>
         <div
           aria-hidden="true"
@@ -260,12 +259,12 @@ function LoginPage() {
               {school?.logo ? (
                 <img src={school.logo} alt={school.name} className="size-full object-cover" />
               ) : (
-                <GraduationCap className="size-5" />
+                <img src="/campushubgh.webp" alt="" className="size-full object-contain" />
               )}
             </span>
             <span>
               <span className="block text-base font-bold tracking-tight text-foreground">
-                {school?.name ?? "SchoolHub"}
+                {school?.name ?? "CampusHubGH"}
               </span>
               <span className="block text-[9px] font-semibold uppercase tracking-[0.2em] text-muted-foreground/70">
                 {school?.motto ?? "School management"}
@@ -289,7 +288,7 @@ function LoginPage() {
               Sign in to your workspace
             </h2>
             <p className="mt-2 text-sm leading-6 text-muted-foreground">
-              Enter your account details to continue to {school?.name ?? "SchoolHub"}.
+              Enter your account details to continue to {school?.name ?? "CampusHubGH"}.
             </p>
           </div>
 

@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "SchoolHub",
+    "name": "CampusHubGH",
     "slug": "schoolhub",
     "scheme": "schoolhub",
     "version": "0.1.0",
@@ -18,7 +18,7 @@
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-foreground.png",
         "backgroundImage": "./assets/adaptive-background.png",
-        "backgroundColor": "#5046E5"
+        "backgroundColor": "#FFF9ED"
       }
     },
     "plugins": [
@@ -35,10 +35,7 @@
           "image": "./assets/splash.png",
           "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#5046E5",
-          "dark": {
-            "backgroundColor": "#0B1020"
-          }
+          "backgroundColor": "#FFF9ED"
         }
       ],
       "expo-asset"

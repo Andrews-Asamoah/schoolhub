@@ -1,7 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
+import { Image } from "expo-image";
 import { router, type Href } from "expo-router";
-import { Pressable, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
 import { authFailureMessage, useSchoolLoginForm } from "@/features/auth/forms";
 import {
   signInWithSchoolCredentials,
@@ -16,10 +17,10 @@ import {
 import { Button } from "@/components/Button";
 import { Card } from "@/components/Surface";
 import { FormField } from "@/components/FormField";
-import { HeroCard } from "@/components/HeroCard";
+import { PlatformLogo } from "@/components/PlatformLogo";
 import { Screen } from "@/components/Screen";
 import { Text } from "@/components/Typography";
-import { spacing, type, useTheme } from "@/theme/theme";
+import { radius, spacing, type, useTheme } from "@/theme/theme";
 
 export default function SchoolLoginScreen() {
   const { subdomain } = useSession();
@@ -104,11 +105,19 @@ export default function SchoolLoginScreen() {
         </Pressable>
       }
     >
-      <View style={{ gap: spacing.lg }}>
-        <HeroCard
-          greeting="Welcome back"
-          detail="Sign in to continue to your school."
-        />
+      <View style={styles.signIn}>
+        <View style={styles.brand}>
+          <PlatformLogo />
+          {school.data?.logo ? (
+            <Image
+              source={{ uri: school.data.logo }}
+              accessibilityLabel={`${school.data.name} logo`}
+              accessible
+              style={[styles.schoolLogo, { backgroundColor: colors.card }]}
+              contentFit="contain"
+            />
+          ) : null}
+        </View>
         <Card padding={spacing.xl}>
           <View style={{ gap: spacing.lg }}>
             <form.Field name="login">
@@ -175,3 +184,19 @@ export default function SchoolLoginScreen() {
     </Screen>
   );
 }
+
+const styles = StyleSheet.create({
+  brand: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: spacing.md,
+  },
+  schoolLogo: { width: 52, height: 52, borderRadius: radius.md },
+  signIn: {
+    width: "100%",
+    maxWidth: 480,
+    alignSelf: "center",
+    gap: spacing.lg,
+  },
+});

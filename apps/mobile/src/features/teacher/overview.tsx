@@ -15,6 +15,7 @@ import { TeacherPage, QueryState, Panel, Copy, LinkButton } from "./ui";
 import { ListRow } from "@/components/ListRow";
 import { SearchBar } from "@/components/Fields";
 import { HeroCard } from "@/components/HeroCard";
+import { Timetable } from "@/features/shared/Timetable";
 const go = (path: string, params?: Record<string, string>) =>
   router.push({ pathname: path, params } as Href);
 export function TeacherHome() {
@@ -316,29 +317,11 @@ export function TeacherTimetable() {
   return (
     <TeacherPage title="Weekly timetable" query={q} back>
       <QueryState query={q} empty={!q.data?.entries.length}>
-        {[
-          "MONDAY",
-          "TUESDAY",
-          "WEDNESDAY",
-          "THURSDAY",
-          "FRIDAY",
-          "SATURDAY",
-          "SUNDAY",
-        ].map((day) => {
-          const entries =
-            q.data?.entries.filter((e) => e.dayOfWeek === day) ?? [];
-          return entries.length ? (
-            <Panel key={day} title={day}>
-              {entries.map((e) => (
-                <ListRow
-                  key={e.id}
-                  title={e.subject?.name ?? e.label ?? e.type}
-                  subtitle={`${e.startTime}–${e.endTime} · ${e.class?.name ?? ""}`}
-                />
-              ))}
-            </Panel>
-          ) : null;
-        })}
+        <Timetable
+          entries={q.data?.entries ?? []}
+          title="Teaching timetable"
+          showClass
+        />
       </QueryState>
     </TeacherPage>
   );

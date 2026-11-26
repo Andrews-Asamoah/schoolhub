@@ -11,6 +11,7 @@ import { Card, Surface } from "@/components/Surface";
 import { ListRow } from "@/components/ListRow";
 import { Text } from "@/components/Typography";
 import { TextField } from "@/components/TextField";
+import { PlatformLogo } from "@/components/PlatformLogo";
 import { Screen } from "@/components/Screen";
 import { API_ORIGIN } from "@/lib/config";
 import {
@@ -22,7 +23,7 @@ import {
   withSchoolLookupDeadline,
 } from "@/features/auth/school-access";
 import { setSubdomain, useSession } from "@/lib/session";
-import { radius, spacing, type, useTheme } from "@/theme/theme";
+import { spacing, type, useTheme } from "@/theme/theme";
 
 export default function SchoolAccessScreen() {
   const { subdomain } = useSession();
@@ -124,7 +125,7 @@ export default function SchoolAccessScreen() {
       });
     } catch {
       await setSubdomain(null).catch(() => undefined);
-      setError("SchoolHub couldn’t save your selection. Please try again.");
+      setError("CampusHubGH couldn’t save your selection. Please try again.");
     } finally {
       selectionPending.current = false;
       setChoosing(false);
@@ -143,26 +144,8 @@ export default function SchoolAccessScreen() {
           gap: spacing.xl,
         }}
       >
-        <View style={{ gap: spacing.md }}>
-          <View
-            style={{
-              width: 56,
-              height: 56,
-              borderRadius: radius.lg,
-              alignItems: "center",
-              justifyContent: "center",
-              backgroundColor: colors.primary,
-            }}
-          >
-            <School
-              size={28}
-              color={colors.primaryForeground}
-              accessible={false}
-            />
-          </View>
-          <Text style={[type.bodyStrong, { color: colors.primary }]}>
-            SchoolHub
-          </Text>
+        <View style={{ gap: spacing.lg }}>
+          <PlatformLogo />
           <Text
             accessibilityRole="header"
             style={[type.largeTitle, { color: colors.foreground }]}
