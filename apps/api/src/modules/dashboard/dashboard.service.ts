@@ -1,6 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { Injectable } from "@nestjs/common";
 import { PrismaService } from "../../prisma/prisma.service.js";
+import { dateString, eligibleInstructionalDates, isoDay, type AttendanceMark } from "../attendance/attendance-calendar.js";
 import { FINANCE_READ_ROLES, FINANCE_SUMMARY_ROLES, isFinancePayrollExportRole } from "../finance/finance.permissions.js";
 
 const FINANCE_SUMMARY_ROLE_SET = new Set<string>(FINANCE_SUMMARY_ROLES);
@@ -11,6 +12,68 @@ const FINANCE_DETAIL_ROLE_SET = new Set<string>(FINANCE_READ_ROLES);
 @Injectable()
 export class DashboardService {
   constructor(private readonly prisma: PrismaService) {}
+
+  async getTodayAttendance(schoolId: string) {
+    const date = dateString(new Date());
+    const day = new Date(isoDay(date));
+    const term = await this.prisma.client.term.findFirst({
+      where: { isCurrent: true, academicYear: { schoolId, isCurrent: true } },
+      select: {
+        id: true,
+        academicYearId: true,
+        startDate: true,
+        endDate: true,
+        instructionalWeekdays: true,
+        calendarDays: { where: { schoolId, date: day }, select: { isInstructional: true } },
+      },
+    });
+    if (!term || day < term.startDate || day > term.endDate) {
+      return { date, state: "outside-term" as const };
+    }
+    const instructionalDates = eligibleInstructionalDates({
+      start: date,
+      end: date,
+      asOf: date,
+      weekdays: term.instructionalWeekdays,
+      overrides: term.calendarDays.map(({ isInstructional }) => ({ date, isInstructional })),
+    });
+    if (!instructionalDates.length) {
+      return { date, state: "non-instructional" as const };
+    }
+
+    const enrollments = await this.prisma.client.enrollment.findMany({
+      where: {
+        academicYearId: term.academicYearId,
+        termId: term.id,
+        status: "ACTIVE",
+        AND: [
+          { OR: [{ effectiveFrom: null }, { effectiveFrom: { lte: day } }] },
+          { OR: [{ effectiveTo: null }, { effectiveTo: { gte: day } }] },
+        ],
+        class: { schoolId, deletedAt: null },
+        student: {
+          schoolId,
+          status: "ACTIVE",
+          deletedAt: null,
+          admissionDate: { lte: day },
+          attendanceExclusions: { none: { schoolId, termId: term.id, date: day } },
+        },
+      },
+      select: { student: { select: { attendances: { where: { date: day }, select: { status: true } } } } },
+    });
+    const counts: Record<AttendanceMark, number> = {
+      PRESENT: 0, LATE: 0, ABSENT: 0, EXCUSED: 0, SICK: 0, PERMISSION: 0,
+    };
+    let marked = 0;
+    for (const { student } of enrollments) {
+      const mark = student.attendances[0];
+      if (mark) {
+        counts[mark.status]++;
+        marked++;
+      }
+    }
+    return { date, state: "instructional" as const, counts, marked, expected: enrollments.length };
+  }
 
   async getAnalytics(schoolId: string, role: string | undefined, requestedMonths?: number) {
     const months = [3, 6, 12].includes(Number(requestedMonths)) ? Number(requestedMonths) : 6;
