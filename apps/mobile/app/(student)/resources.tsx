@@ -46,7 +46,7 @@ export default function StudentResourcesScreen() {
             },
           ]}
         />
-        <SchoolAccountMenu />
+        <SchoolAccountMenu messagesHref="/(student)/student-messages" />
       </View>
     </Screen>
   );

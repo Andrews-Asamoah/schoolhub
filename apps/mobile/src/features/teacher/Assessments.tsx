@@ -1,7 +1,7 @@
 import { MarksImport } from "./MarksImport";
 import { useState } from "react";
-import { Alert } from "react-native";
-import { useLocalSearchParams, type Href } from "expo-router";
+import { Alert, StyleSheet, View } from "react-native";
+import { router, useLocalSearchParams, type Href } from "expo-router";
 import {
   getTeaching,
   getTeacherAssessment,
@@ -13,7 +13,20 @@ import {
 } from "@/api/teacher";
 import { useScopedMutation } from "@/features/shared/mutations";
 import { useTeacherQuery } from "./queries";
-import { TeacherPage, QueryState, Panel, Copy, LinkButton } from "./ui";
+import { TeacherPage, QueryState, Panel, Copy } from "./ui";
+import {
+  BookOpen,
+  ChartNoAxesColumn,
+  ClipboardList,
+  Files,
+} from "lucide-react-native";
+import { SearchBar } from "@/components/Fields";
+import { ListRow } from "@/components/ListRow";
+import { StatusPill } from "@/components/ModulePrimitives";
+import { PortalMenu } from "@/components/PortalMenu";
+import { Surface } from "@/components/Surface";
+import { EmptyState } from "@/components/States";
+import { spacing, useTheme } from "@/theme/theme";
 import { Button } from "@/components/Button";
 import { SelectField } from "@/components/SelectField";
 import { TextField } from "@/components/TextField";
@@ -23,53 +36,90 @@ export function TeacherAssess() {
   const templates = useTeacherQuery(["templates"], (signal) =>
     getTeacherTemplates({ signal }),
   );
+  const { colors } = useTheme();
+  const [search, setSearch] = useState("");
+  const term = search.trim().toLowerCase();
+  const classes =
+    q.data?.classes
+      .map((c) => ({
+        ...c,
+        subjects: c.subjects.filter((subject) =>
+          `${c.name} ${subject.name}`.toLowerCase().includes(term),
+        ),
+      }))
+      .filter((c) => c.subjects.length) ?? [];
   return (
     <TeacherPage
-      title="Assess"
+      title="Assessments"
+      subtitle={q.data?.term?.name}
       query={{
         isRefetching: q.isRefetching || templates.isRefetching,
         refetch: () => Promise.all([q.refetch(), templates.refetch()]),
       }}
     >
-      <LinkButton
-        label="Report recommendations"
-        href={"/(teacher)/teacher-report-review" as Href}
-      />
-      <LinkButton
-        label="Published report archive"
-        href={"/(teacher)/teacher-report-archive" as Href}
-      />
-      <LinkButton
-        label="Internal mock analysis"
-        href={"/(teacher)/teacher-mock-analysis" as Href}
-      />
       <QueryState
         query={q}
         empty={!q.data?.classes.some((c) => c.subjects.length)}
       >
-        <Panel title="Score entry">
-          <Copy>
-            Choose a subject assigned to you. Scores and totals are calculated
-            by the server.
-          </Copy>
-          <QueryState query={templates} empty={!templates.data?.length}>
-            {q.data?.classes.flatMap((c) =>
-              c.subjects.map((s) => (
-                <LinkButton
-                  key={`${c.id}:${s.id}`}
-                  label={`${c.name} · ${s.name}`}
-                  href={
-                    {
-                      pathname: "/(teacher)/teacher-score-entry",
-                      params: { classId: c.id, subjectId: s.id },
-                    } as Href
-                  }
-                />
-              )),
-            )}
-          </QueryState>
-        </Panel>
+        <QueryState query={templates} empty={!templates.data?.length}>
+          <Copy heading>Score entry</Copy>
+          <SearchBar
+            label="Search classes and subjects"
+            value={search}
+            onChange={setSearch}
+          />
+          {classes.length ? (
+            classes.map((c) => (
+              <Surface key={c.id} style={styles.group}>
+                <Copy heading>{c.name}</Copy>
+                {c.subjects.map((subject, index) => (
+                  <ListRow
+                    key={subject.id}
+                    title={subject.name}
+                    leading={<BookOpen size={18} color={colors.primary} />}
+                    hue="orange"
+                    chevron
+                    divider={index < c.subjects.length - 1}
+                    onPress={() =>
+                      router.push({
+                        pathname: "/(teacher)/teacher-score-entry",
+                        params: { classId: c.id, subjectId: subject.id },
+                      } as Href)
+                    }
+                  />
+                ))}
+              </Surface>
+            ))
+          ) : (
+            <EmptyState
+              title="No matches"
+              message="Try another class or subject name."
+              hue="orange"
+            />
+          )}
+        </QueryState>
       </QueryState>
+      <PortalMenu
+        title="Reports and analysis"
+        hue="violet"
+        links={[
+          {
+            label: "Report recommendations",
+            href: "/(teacher)/teacher-report-review",
+            icon: ClipboardList,
+          },
+          {
+            label: "Published report archive",
+            href: "/(teacher)/teacher-report-archive",
+            icon: Files,
+          },
+          {
+            label: "Internal mock analysis",
+            href: "/(teacher)/teacher-mock-analysis",
+            icon: ChartNoAxesColumn,
+          },
+        ]}
+      />
     </TeacherPage>
   );
 }
@@ -113,6 +163,10 @@ function AssessmentEditor({
     Record<string, { text: string; expectedMarks: number | null }>
   >({});
   const [excused, setExcused] = useState<string[]>([]);
+  const [pupilSearch, setPupilSearch] = useState("");
+  const pupils = sheet.students.filter((pupil) =>
+    pupil.name.toLowerCase().includes(pupilSearch.trim().toLowerCase()),
+  );
   const [correcting, setCorrecting] = useState(false);
   const [importing, setImporting] = useState(false);
   const [reason, setReason] = useState("");
@@ -209,6 +263,19 @@ function AssessmentEditor({
   return (
     <>
       <Panel title={`${sheet.class.name} · ${sheet.subject.name}`}>
+        <View style={styles.badges}>
+          <StatusPill label={sheet.term.name} hue="violet" />
+          <StatusPill
+            label={
+              sheet.submission
+                ? "Submitted"
+                : sheet.canEdit
+                  ? "Open for entry"
+                  : "Read only"
+            }
+            hue={sheet.canEdit ? "emerald" : "amber"}
+          />
+        </View>
         <SelectField
           label="Assessment template"
           value={sheet.template?.id ?? ""}
@@ -313,85 +380,121 @@ function AssessmentEditor({
       {!sheet.template || !sheet.students.length ? (
         <Copy>No applicable score sheet is available.</Copy>
       ) : (
-        sheet.students.map((s) => (
-          <Panel key={s.studentId} title={s.name}>
-            <Copy>
-              {s.percentage == null
-                ? "Incomplete"
-                : `${s.percentage}% · ${s.grade ?? "No grade"}`}
+        <>
+          <SearchBar
+            label="Find a pupil"
+            value={pupilSearch}
+            onChange={setPupilSearch}
+          />
+          {!pupils.length ? (
+            <EmptyState
+              title="No pupils match"
+              message="Try another name."
+              hue="orange"
+            />
+          ) : null}
+          {pupils.map((s) => (
+            <Panel key={s.studentId} title={s.name}>
+              <View style={styles.badges}>
+                <StatusPill
+                  label={
+                    s.percentage == null ? "Incomplete" : `${s.percentage}%`
+                  }
+                  hue={s.percentage == null ? "amber" : "emerald"}
+                />
+                {s.grade ? <StatusPill label={s.grade} hue="violet" /> : null}
+              </View>
               {sheet.template?.grades?.find((band) => band.grade === s.grade)
-                ?.description
-                ? ` · ${sheet.template.grades.find((band) => band.grade === s.grade)?.description}`
-                : ""}
-            </Copy>
-            {s.excused ? <Copy>Absent / excused</Copy> : null}
-            {sheet.canSubmit && !correcting ? (
-              <Button
-                label={
-                  excused.includes(s.studentId)
-                    ? "Undo absent / excused"
-                    : "Mark absent / excused"
-                }
-                variant="ghost"
-                disabled={
-                  pending ||
-                  dirty ||
-                  (s.marks.length > 0 && !excused.includes(s.studentId))
-                }
-                onPress={() =>
-                  setExcused((ids) =>
-                    ids.includes(s.studentId)
-                      ? ids.filter((id) => id !== s.studentId)
-                      : [...ids, s.studentId],
-                  )
-                }
-              />
-            ) : null}
-            {sheet.canSubmit && s.marks.length ? (
-              <Copy>
-                Clear and save existing marks before marking this pupil absent.
-              </Copy>
-            ) : null}
-            {sheet.template!.components.flatMap((c) =>
-              Array.from({ length: c.slots }, (_, i) => {
-                const key = JSON.stringify([s.studentId, c.id, i]);
-                const saved =
-                  s.marks.find(
-                    (mark) =>
-                      mark.componentId === c.id && mark.occurrenceIndex === i,
-                  )?.marks ?? null;
-                const value = draft[key]?.text ?? String(saved ?? "");
-                return (
-                  <TextField
-                    key={key}
-                    label={`${s.name}: ${c.name}${c.slots > 1 ? ` ${i + 1}` : ""} / ${c.maxMarks}`}
-                    value={value}
-                    keyboardType="decimal-pad"
-                    editable={
-                      !pending &&
-                      !excused.includes(s.studentId) &&
-                      (correcting
-                        ? c.canCorrect === true
-                        : sheet.canEdit && c.canEdit !== false)
-                    }
-                    onChangeText={(text) =>
-                      setDraft((prev) => ({
-                        ...prev,
-                        [key]: {
-                          text,
-                          expectedMarks: prev[key]
-                            ? prev[key].expectedMarks
-                            : saved,
-                        },
-                      }))
-                    }
-                  />
-                );
-              }),
-            )}
-          </Panel>
-        ))
+                ?.description ? (
+                <Copy>
+                  {
+                    sheet.template.grades.find((band) => band.grade === s.grade)
+                      ?.description
+                  }
+                </Copy>
+              ) : null}
+              {s.excused ? <Copy>Absent / excused</Copy> : null}
+              {sheet.canSubmit && !correcting ? (
+                <Button
+                  label={
+                    excused.includes(s.studentId)
+                      ? "Undo absent / excused"
+                      : "Mark absent / excused"
+                  }
+                  variant="ghost"
+                  disabled={
+                    pending ||
+                    dirty ||
+                    (s.marks.length > 0 && !excused.includes(s.studentId))
+                  }
+                  onPress={() =>
+                    setExcused((ids) =>
+                      ids.includes(s.studentId)
+                        ? ids.filter((id) => id !== s.studentId)
+                        : [...ids, s.studentId],
+                    )
+                  }
+                />
+              ) : null}
+              {sheet.canSubmit && s.marks.length ? (
+                <Copy>
+                  Clear and save existing marks before marking this pupil
+                  absent.
+                </Copy>
+              ) : null}
+              <View style={styles.fields}>
+                {sheet.template!.components.flatMap((c) =>
+                  Array.from({ length: c.slots }, (_, i) => {
+                    const key = JSON.stringify([s.studentId, c.id, i]);
+                    const saved =
+                      s.marks.find(
+                        (mark) =>
+                          mark.componentId === c.id &&
+                          mark.occurrenceIndex === i,
+                      )?.marks ?? null;
+                    const value = draft[key]?.text ?? String(saved ?? "");
+                    return (
+                      <View key={key} style={styles.mark}>
+                        <TextField
+                          label={`${c.name}${c.slots > 1 ? ` ${i + 1}` : ""} / ${c.maxMarks}`}
+                          accessibilityLabel={`${s.name}: ${c.name}${c.slots > 1 ? ` ${i + 1}` : ""} / ${c.maxMarks}`}
+                          value={value}
+                          keyboardType="decimal-pad"
+                          editable={
+                            !pending &&
+                            !excused.includes(s.studentId) &&
+                            (correcting
+                              ? c.canCorrect === true
+                              : sheet.canEdit && c.canEdit !== false)
+                          }
+                          onChangeText={(text) =>
+                            setDraft((prev) => ({
+                              ...prev,
+                              [key]: {
+                                text,
+                                expectedMarks: prev[key]
+                                  ? prev[key].expectedMarks
+                                  : saved,
+                              },
+                            }))
+                          }
+                        />
+                      </View>
+                    );
+                  }),
+                )}
+              </View>
+            </Panel>
+          ))}
+        </>
       )}
     </>
   );
 }
+
+const styles = StyleSheet.create({
+  group: { gap: spacing.xs },
+  badges: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
+  fields: { flexDirection: "row", flexWrap: "wrap", gap: spacing.md },
+  mark: { flexGrow: 1, flexBasis: 120 },
+});

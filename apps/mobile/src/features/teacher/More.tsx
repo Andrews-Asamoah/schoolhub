@@ -50,7 +50,10 @@ export default function TeacherMore() {
           },
         ]}
       />
-      <SchoolAccountMenu unread={notifications.data?.unreadCount} />
+      <SchoolAccountMenu
+        messagesHref="/(teacher)/teacher-messages"
+        unread={notifications.data?.unreadCount}
+      />
     </TeacherPage>
   );
 }

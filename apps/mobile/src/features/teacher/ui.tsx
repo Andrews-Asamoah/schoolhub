@@ -32,12 +32,16 @@ export function Copy({
 }
 export function TeacherPage({
   title,
+  subtitle,
+  right,
   children,
   query,
   back = false,
   scroll = true,
 }: {
   title: string;
+  subtitle?: string;
+  right?: ReactNode;
   children: ReactNode;
   back?: boolean;
   scroll?: boolean;
@@ -51,6 +55,8 @@ export function TeacherPage({
       <Screen
         scroll={scroll}
         title={title}
+        subtitle={subtitle}
+        right={right}
         refreshing={query?.isRefetching}
         onRefresh={
           query

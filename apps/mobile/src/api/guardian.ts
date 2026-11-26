@@ -13,6 +13,7 @@ const wardSchema = z.object({
     firstName: z.string(),
     lastName: z.string(),
     otherNames: nullableText,
+    image: nullableText.optional(),
   }),
   class: z
     .object({ id: z.string(), name: z.string(), level: z.string().optional() })

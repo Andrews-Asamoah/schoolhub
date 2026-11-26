@@ -145,6 +145,8 @@ jest.mock("@/components/Surface", () => {
   const { View } =
     jest.requireActual<typeof import("react-native")>("react-native");
   return {
+    Surface: ({ children }: { children: ReactNode }) =>
+      React.createElement(View, null, children),
     Card: ({ children }: { children: ReactNode }) =>
       React.createElement(View, null, children),
   };
@@ -369,7 +371,12 @@ const fixture: Record<string, unknown> = {
   clubs: [{ id: "club", name: "STEM club", isActive: true, description: null }],
   pupil: {
     id: "p",
-    profile: { firstName: "Pupil", lastName: "Fixture" },
+    profile: {
+      firstName: "Pupil",
+      otherNames: "Sample",
+      lastName: "Fixture",
+      image: "https://school.example/pupil.webp",
+    },
     class: { name: "JHS 1" },
     house: null,
     status: "ACTIVE",
@@ -395,6 +402,13 @@ test("teacher classes reuse the assigned classes from the home query", async () 
   expect(mockQuery.mock.calls.every(([parts]) => parts[0] === "overview")).toBe(
     true,
   );
+});
+test("student details display the full name and school photo", async () => {
+  await render(<TeacherPupil />);
+  expect(screen.getByText("Pupil Sample Fixture")).toBeVisible();
+  expect(
+    screen.getByRole("image", { name: "Pupil Sample Fixture photo" }),
+  ).toBeVisible();
 });
 const screens = [
   TeacherHome,

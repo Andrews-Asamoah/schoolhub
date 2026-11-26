@@ -14,6 +14,7 @@ import { useTeacherQuery } from "./queries";
 import { TeacherPage, QueryState, Panel, Copy, LinkButton } from "./ui";
 import { ListRow } from "@/components/ListRow";
 import { SearchBar } from "@/components/Fields";
+import { StudentProfileCard } from "@/features/shared/StudentProfileCard";
 import { HeroCard } from "@/components/HeroCard";
 import { Timetable } from "@/features/shared/Timetable";
 const go = (path: string, params?: Record<string, string>) =>
@@ -250,19 +251,7 @@ export function TeacherPupil() {
       back
     >
       <QueryState query={p}>
-        {p.data ? (
-          <Panel
-            title={`${p.data.profile.firstName} ${p.data.profile.lastName}`}
-          >
-            <Copy>
-              {p.data.class?.name ?? "No class"} ·{" "}
-              {p.data.house?.name ?? "No house"}
-            </Copy>
-            <Copy>
-              {p.data.status} · {p.data.admissionNumber ?? ""}
-            </Copy>
-          </Panel>
-        ) : null}
+        {p.data ? <StudentProfileCard student={p.data} /> : null}
       </QueryState>
       <Panel title="Subjects">
         <QueryState query={subjects} empty={!subjects.data?.subjects.length}>

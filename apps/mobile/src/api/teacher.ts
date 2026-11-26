@@ -73,7 +73,10 @@ export const getTeacherStudent = defineEndpoint({
     id: z.string(),
     admissionNumber: z.string().nullable(),
     status: z.string(),
-    profile,
+    profile: profile.extend({
+      otherNames: z.string().nullish(),
+      image: z.string().nullish(),
+    }),
     class: named.nullable(),
     house: named.nullable(),
   }),

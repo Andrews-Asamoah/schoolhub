@@ -22,6 +22,7 @@ export default function GuardianLayout() {
               {...props}
               preloadFromHome="/(guardian)/family"
               parentTabs={{
+                "guardian-messages": "more",
                 "attendance-history": "more",
                 "absence-requests": "more",
                 timetable: "more",
@@ -126,6 +127,10 @@ export default function GuardianLayout() {
           <Tabs.Screen
             name="ward/[id]"
             options={{ tabBarButton: detailTabButton, title: "Child profile" }}
+          />
+          <Tabs.Screen
+            name="guardian-messages"
+            options={{ tabBarButton: detailTabButton }}
           />
         </Tabs>
       </TabBarInsetProvider>

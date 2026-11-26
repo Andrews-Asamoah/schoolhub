@@ -1,6 +1,8 @@
 import { useForm } from "@tanstack/react-form";
 import { useLocalSearchParams, router, type Href } from "expo-router";
 import { useState } from "react";
+import { BookOpen, ClipboardList } from "lucide-react-native";
+import { View } from "react-native";
 import {
   getManagedAssignments,
   getTeaching,
@@ -11,55 +13,108 @@ import {
 import type { z } from "zod";
 import { useScopedMutation } from "@/features/shared/mutations";
 import { useTeacherQuery } from "./queries";
-import {
-  TeacherPage,
-  QueryState,
-  Panel,
-  Copy,
-  LinkButton,
-  MutationState,
-} from "./ui";
+import { TeacherPage, QueryState, Panel, Copy, MutationState } from "./ui";
 import { assignmentFormSchema, gradeFormSchema } from "./forms";
 import { Button } from "@/components/Button";
 import { FormField } from "@/components/FormField";
-import { DatePickerField } from "@/components/Fields";
+import { SearchBar } from "@/components/Fields";
+import {
+  CalendarDateField,
+  formatCalendarDate,
+} from "@/components/CalendarDateField";
+import { StatusPill } from "@/components/ModulePrimitives";
+import { Surface } from "@/components/Surface";
+import { spacing, useTheme } from "@/theme/theme";
 import { ListRow } from "@/components/ListRow";
 import { SelectField } from "@/components/SelectField";
 export function TeacherAssignments() {
   const q = useTeacherQuery(["assignments"], (signal) =>
     getManagedAssignments({ signal }),
   );
+  const { colors } = useTheme();
+  const [search, setSearch] = useState("");
+  const term = search.trim().toLowerCase();
+  const assignments =
+    q.data?.assignments.filter((assignment) =>
+      [assignment.title, assignment.class.name, assignment.subject.name].some(
+        (text) => text.toLowerCase().includes(term),
+      ),
+    ) ?? [];
   return (
-    <TeacherPage title="Assignments" query={q}>
-      <LinkButton
-        label="New assignment"
-        href={"/(teacher)/teacher-assignment-new" as Href}
-      />
-      <QueryState query={q} empty={!q.data?.assignments.length}>
-        {q.data?.assignments.map((a) => (
-          <Panel key={a.id} title={a.title}>
-            <Copy>
-              {a.class.name} · {a.subject.name} · {a.submissions.length}{" "}
-              submitted
-            </Copy>
-            <Copy>
-              {a.dueAt ? `Due ${a.dueAt.slice(0, 10)}` : "No due date"}
-            </Copy>
-            <LinkButton
-              label={`Review ${a.title}`}
-              href={
-                {
-                  pathname: "/(teacher)/teacher-assignment",
-                  params: { id: a.id },
-                } as Href
-              }
-            />
-          </Panel>
-        ))}
+    <TeacherPage
+      title="Assignments"
+      subtitle={q.data?.term.name}
+      query={q}
+      right={
+        <Button
+          label="New assignment"
+          block={false}
+          onPress={() => router.push("/(teacher)/teacher-assignment-new")}
+        />
+      }
+    >
+      {q.data?.assignments.length ? (
+        <SearchBar
+          label="Search assignments"
+          value={search}
+          onChange={setSearch}
+        />
+      ) : null}
+      <QueryState query={q} empty={!assignments.length}>
+        {assignments.map((a) => {
+          const pending = a.submissions.filter(
+            (submission) => submission.score === null,
+          ).length;
+          const dueDate = a.dueAt && a.dueAt.slice(0, 10);
+          return (
+            <Surface key={a.id}>
+              <ListRow
+                title={a.title}
+                subtitle={`${a.class.name} · ${a.subject.name}`}
+                leading={<BookOpen size={20} color={colors.primary} />}
+                hue="emerald"
+                chevron
+                divider
+                onPress={() =>
+                  router.push({
+                    pathname: "/(teacher)/teacher-assignment",
+                    params: { id: a.id },
+                  } as Href)
+                }
+              />
+              <View
+                style={{
+                  flexDirection: "row",
+                  flexWrap: "wrap",
+                  gap: spacing.sm,
+                  paddingTop: spacing.md,
+                }}
+              >
+                <StatusPill
+                  label={
+                    dueDate
+                      ? `Due ${formatCalendarDate(dueDate)}`
+                      : "No due date"
+                  }
+                  hue="emerald"
+                />
+                <StatusPill
+                  label={
+                    pending
+                      ? `${pending} to grade`
+                      : `${a.submissions.length} submitted`
+                  }
+                  hue={pending ? "amber" : "sky"}
+                />
+              </View>
+            </Surface>
+          );
+        })}
       </QueryState>
     </TeacherPage>
   );
 }
+
 export function NewTeacherAssignment() {
   const teaching = useTeacherQuery(["overview"], (signal) =>
     getTeaching({ signal }),
@@ -111,7 +166,7 @@ export function NewTeacherAssignment() {
   return (
     <TeacherPage title="New assignment" query={teaching} back>
       <QueryState query={teaching} empty={!pairs.length}>
-        <Panel title="Publish to your class">
+        <Panel title="Audience and instructions">
           <SelectField
             label="Class and subject"
             options={pairs}
@@ -140,6 +195,8 @@ export function NewTeacherAssignment() {
               />
             )}
           </form.Field>
+        </Panel>
+        <Panel title="Grading and deadline">
           <form.Field name="maxScore">
             {(field) => (
               <FormField
@@ -152,7 +209,7 @@ export function NewTeacherAssignment() {
           </form.Field>
           <form.Field name="dueDate">
             {(field) => (
-              <DatePickerField
+              <CalendarDateField
                 label="Due date (optional)"
                 value={field.state.value}
                 onChange={field.handleChange}
@@ -160,12 +217,6 @@ export function NewTeacherAssignment() {
               />
             )}
           </form.Field>
-          <Button
-            label="Clear due date"
-            variant="ghost"
-            disabled={mutation.isPending}
-            onPress={() => form.setFieldValue("dueDate", "")}
-          />
           <Copy>
             Due dates use 23:59 UTC. Publishing immediately notifies the class.
           </Copy>
@@ -268,6 +319,7 @@ export function TeacherAssignment() {
     getManagedAssignments({ signal }),
   );
   const a = q.data?.assignments.find((a) => a.id === id);
+  const { colors } = useTheme();
   return (
     <TeacherPage title="Assignment review" query={q} back>
       <QueryState query={q} empty={!a}>
@@ -277,6 +329,27 @@ export function TeacherAssignment() {
               <Copy>
                 {a.class.name} · {a.subject.name}
               </Copy>
+              <View
+                style={{
+                  flexDirection: "row",
+                  flexWrap: "wrap",
+                  gap: spacing.sm,
+                }}
+              >
+                <StatusPill label={`${a.maxScore} points`} hue="sky" />
+                <StatusPill
+                  label={
+                    a.dueAt
+                      ? `Due ${formatCalendarDate(a.dueAt.slice(0, 10))}`
+                      : "No due date"
+                  }
+                  hue="emerald"
+                />
+                <StatusPill
+                  label={`${a.submissions.length} submitted`}
+                  hue="violet"
+                />
+              </View>
               <Copy>{a.instructions}</Copy>
             </Panel>
             {a.submissions.length ? (
@@ -292,6 +365,7 @@ export function TeacherAssignment() {
               <ListRow
                 title="No submissions yet"
                 subtitle="Pull to refresh when pupils have responded."
+                leading={<ClipboardList size={20} color={colors.primary} />}
               />
             )}
           </>

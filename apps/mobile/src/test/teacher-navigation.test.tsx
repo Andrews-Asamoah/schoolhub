@@ -6,6 +6,7 @@ import {
   screen,
   testRouter,
 } from "expo-router/testing-library";
+import type { TabBarProps } from "@/components/PortalTabBar";
 import TeacherLayout from "../../app/(teacher)/_layout";
 
 jest.mock("@/features/shared/queries", () => ({
@@ -15,7 +16,33 @@ jest.mock("@/features/teacher/RegisterSync", () => ({
   RegisterSyncProvider: ({ children }: { children: React.ReactNode }) =>
     children,
 }));
-jest.mock("@/components/PortalTabBar", () => ({ PortalTabBar: () => null }));
+jest.mock("@/components/PortalTabBar", () => ({
+  PortalTabBar: ({
+    state,
+    descriptors,
+    parentTabs,
+  }: TabBarProps & { parentTabs: Record<string, string> }) => {
+    const { Text: TabState } =
+      jest.requireActual<typeof import("react-native")>("react-native");
+    const { detailTabButton } = jest.requireActual<
+      typeof import("@/components/detailTabButton")
+    >("@/components/detailTabButton");
+    const route = state.routes[state.index];
+    if (!route) return null;
+    return (
+      <TabState testID="tab-state">
+        {[
+          parentTabs[route.name],
+          descriptors[route.key]?.options.tabBarButton === detailTabButton
+            ? "detail"
+            : "tab",
+        ]
+          .filter(Boolean)
+          .join(":")}
+      </TabState>
+    );
+  },
+}));
 
 test("the actual teacher navigator opens a detail and returns to its previous tab", async () => {
   const result = await renderRouter(
@@ -30,6 +57,7 @@ test("the actual teacher navigator opens a detail and returns to its previous ta
       "(teacher)/teacher-mock-analysis": () => <Text>Mock Analysis</Text>,
       "(teacher)/teacher-assess": () => <Text>Assess</Text>,
       "(teacher)/teacher-assignments": () => <Text>Assignments</Text>,
+      "(teacher)/teacher-messages": () => <Text>School messages</Text>,
       "(teacher)/teacher-more": () => <Text>More</Text>,
       "(teacher)/teacher-roster": () => <Text>Class Roster</Text>,
       "(teacher)/teacher-pupil": () => <Text>Pupil</Text>,
@@ -61,4 +89,11 @@ test("the actual teacher navigator opens a detail and returns to its previous ta
   expect(screen.getByText("Score Entry")).toBeVisible();
   await act(async () => router.push("/(teacher)/teacher-report-review"));
   expect(screen.getByText("Report Review")).toBeVisible();
+  await act(async () => router.navigate("/(teacher)/teacher-more"));
+  await act(async () => router.push("/(teacher)/teacher-messages"));
+  expect(screen.getByText("School messages")).toBeVisible();
+  expect(screen.getByTestId("tab-state")).toHaveTextContent(
+    "teacher-more:detail",
+  );
+  await testRouter.back("/teacher-more");
 });

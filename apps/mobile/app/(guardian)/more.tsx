@@ -62,7 +62,7 @@ export default function GuardianMoreScreen() {
             },
           ]}
         />
-        <SchoolAccountMenu />
+        <SchoolAccountMenu messagesHref="/(guardian)/guardian-messages" />
         {!activeWard ? (
           <EmptyState
             title="No child selected"
