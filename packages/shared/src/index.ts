@@ -782,8 +782,13 @@ export const generateBillSchema = z.object({
     .regex(/^\d{4}-\d{2}-\d{2}$/)
     .optional(),
   notes: z.string().optional(),
-  /** Optional fee item IDs are explicit opt-ins; all mandatory items remain billable. */
+  /** Optional items explicitly selected for the whole batch by existing callers. */
   optionalItemIds: z.array(z.string().min(1)).max(100).default([]),
+  /** Opt in only the students who use each optional service. */
+  optionalSelections: z.array(z.object({
+    feeItemId: z.string().min(1),
+    studentIds: z.array(z.string().min(1)).min(1).max(2000),
+  })).max(100).optional(),
 });
 export type GenerateBillInput = z.infer<typeof generateBillSchema>;
 

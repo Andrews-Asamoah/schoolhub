@@ -37,6 +37,7 @@ import { AccountantFinanceCharts } from "./accountant-finance-charts";
 import { AccountantFinanceReportingWorkspace } from "./accountant-finance-reporting-workspace";
 import { AccountantFinanceDetailedReportingWorkspace } from "./accountant-finance-detailed-reporting-workspace";
 import { AccountantRecordPaymentDialog } from "./accountant-record-payment-dialog";
+import { OptionalFeeRoster, type BillingStudent } from "./optional-fee-roster";
 import { apiFetch } from "@/lib/api";
 import { PortalModal } from "@/components/portal/portal-modal";
 import { cn } from "@/lib/utils";
@@ -298,7 +299,7 @@ export function AccountantPortalWorkspace({
   const [selectedInvoiceForPrint, setSelectedInvoiceForPrint] = useState<ApiBill | null>(null);
   const [selectedFeeStructureId, setSelectedFeeStructureId] = useState("");
   const [selectedClassId, setSelectedClassId] = useState("");
-  const [selectedOptionalItemIds, setSelectedOptionalItemIds] = useState<string[]>([]);
+  const [optionalFees, setOptionalFees] = useState<{ scope: string; recipients: Record<string, string[]> } | null>(null);
   const [showBillForm, setShowBillForm] = useState(false);
   const [showExpenseForm, setShowExpenseForm] = useState(false);
   const [showInventoryForm, setShowInventoryForm] = useState(false);
@@ -492,6 +493,18 @@ export function AccountantPortalWorkspace({
   const billTargetClasses = selectedFeeStructure?.targetClasses.length
     ? classes.filter((schoolClass) => selectedFeeStructure.targetClasses.some((target) => target.class.id === schoolClass.id))
     : classes;
+  const optionalFeeItems = selectedFeeStructure?.items.filter(item => item.isOptional) ?? [];
+  const feeScope = `${currentTerm?.id ?? ""}/${selectedClassId}/${selectedFeeStructureId}`;
+  const optionalRecipients = optionalFees?.scope === feeScope ? optionalFees.recipients : {};
+  const billingRosterQuery = useQuery({
+    queryKey: ["finance", "billing-roster", currentYear?.id, currentTerm?.id, selectedClassId],
+    queryFn: ({ signal }) => {
+      const params = new URLSearchParams({ academicYearId: currentYear!.id, termId: currentTerm!.id });
+      return apiFetch<BillingStudent[]>(`/finance/billing-roster/${encodeURIComponent(selectedClassId)}?${params}`, { signal });
+    },
+    enabled: showBillForm && !!selectedClassId && !!currentYear && !!currentTerm && optionalFeeItems.length > 0,
+    retry: false,
+  });
 
   const createInventoryItem = useMutation({
     mutationFn: (input: CreateInventoryItemInput) =>
@@ -536,6 +549,7 @@ export function AccountantPortalWorkspace({
         queryClient.invalidateQueries({ queryKey: ["finance", "payments"] }),
         queryClient.invalidateQueries({ queryKey: ["finance", "complete-report-dataset"] }),
         queryClient.invalidateQueries({ queryKey: ["finance", "bills"] }),
+        queryClient.invalidateQueries({ queryKey: ["finance", "students", "outstanding"] }),
         queryClient.invalidateQueries({ queryKey: ["students"] }),
       ]);
     },
@@ -565,6 +579,7 @@ export function AccountantPortalWorkspace({
         queryClient.invalidateQueries({ queryKey: ["finance", "payments"] }),
         queryClient.invalidateQueries({ queryKey: ["finance", "complete-report-dataset"] }),
         queryClient.invalidateQueries({ queryKey: ["finance", "bills"] }),
+        queryClient.invalidateQueries({ queryKey: ["finance", "students", "outstanding"] }),
         queryClient.invalidateQueries({ queryKey: ["students"] }),
       ]);
     },
@@ -573,22 +588,26 @@ export function AccountantPortalWorkspace({
 
   const generateBills = useMutation({
     mutationFn: (input: GenerateBillInput) =>
-      apiFetch<{ count: number; totalBilled: number; message?: string }>("/finance/bills/generate", {
+      apiFetch<{ count: number; totalBilled: string; skippedExisting: number; message?: string }>("/finance/bills/generate", {
         method: "POST",
         body: JSON.stringify(input),
       }),
     onSuccess: async (result) => {
       setMessage({
         kind: "success",
-        text: result.count
-          ? `Generated ${result.count} bill(s), totalling ${currency(result.totalBilled)}.`
-          : result.message ?? "No bills were generated.",
+        text: [
+          result.count ? `Generated ${result.count} bill(s), totalling ${currency(result.totalBilled)}.`
+            : result.message ?? "No bills were generated.",
+          result.skippedExisting ? `Skipped ${result.skippedExisting} student(s) with an existing invoice for this fee structure.` : "",
+        ].filter(Boolean).join(" "),
       });
       setShowBillForm(false);
+      setOptionalFees(null);
       setSelectedFeeStructureId("");
       setSelectedClassId("");
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["finance", "bills"] }),
+        queryClient.invalidateQueries({ queryKey: ["finance", "students", "outstanding"] }),
         queryClient.invalidateQueries({ queryKey: ["finance", "complete-report-dataset"] }),
         queryClient.invalidateQueries({ queryKey: ["finance", "fee-structures"] }),
       ]);
@@ -657,7 +676,9 @@ export function AccountantPortalWorkspace({
       classId: selectedClassId,
       dueDate: String(form.get("dueDate") ?? "") || undefined,
       notes: String(form.get("notes") ?? "").trim() || undefined,
-      optionalItemIds: selectedOptionalItemIds,
+      optionalSelections: Object.entries(optionalRecipients)
+        .filter(([, studentIds]) => studentIds.length > 0)
+        .map(([feeItemId, studentIds]) => ({ feeItemId, studentIds })),
     });
     if (!currentYear || !currentTerm) {
       setMessage({ kind: "error", text: "Set a current academic year and term before generating bills." });
@@ -892,7 +913,7 @@ export function AccountantPortalWorkspace({
 
       {!loading && activeTab === "invoices" && (
         <section className="rounded-2xl border border-border bg-card p-5">
-          <SectionHeader title="Invoices & bills" description="Search bills, review balances, and generate billing for an active class." action={<div className="flex flex-wrap gap-2"><TableExportMenu build={() => ({ title: "Invoice register", headers: ["Invoice","Student","Admission number","Class","Fee structure","Due date","Gross (GHS)","Discount (GHS)","Total (GHS)","Paid (GHS)","Balance (GHS)","Status"], columnTypes: ["text","text","text","text","text","date","money","money","money","money","money","text"], rows: filteredBills.map(bill => [bill.billNumber, studentName(bill.student), bill.student?.admissionNumber ?? "", bill.class?.name ?? "", bill.feeStructure?.name ?? "", dateLabel(bill.dueDate), Number(bill.grossAmount ?? bill.totalAmount), Number(bill.discountAmount ?? 0), Number(bill.totalAmount), Number(bill.paidAmount), Number(bill.balanceAmount), bill.status]), reportInfo: { school: schoolQuery.data?.name, filters: { search, status: statusFilter } } })} note="Export reflects the current invoice filters." /><ServerExportButton endpoint="/finance/exports/bills.xlsx" label="Full Excel" className={buttonSecondary} />{canWrite && <button className={buttonPrimary} onClick={() => { setMessage(null); setSelectedFeeStructureId(""); setSelectedClassId(""); setShowBillForm(true); }}><Plus className="size-4" /> Generate bills</button>}</div>} />
+          <SectionHeader title="Invoices & bills" description="Search bills, review balances, and generate billing for an active class." action={<div className="flex flex-wrap gap-2"><TableExportMenu build={() => ({ title: "Invoice register", headers: ["Invoice","Student","Admission number","Class","Fee structure","Due date","Gross (GHS)","Discount (GHS)","Total (GHS)","Paid (GHS)","Balance (GHS)","Status"], columnTypes: ["text","text","text","text","text","date","money","money","money","money","money","text"], rows: filteredBills.map(bill => [bill.billNumber, studentName(bill.student), bill.student?.admissionNumber ?? "", bill.class?.name ?? "", bill.feeStructure?.name ?? "", dateLabel(bill.dueDate), Number(bill.grossAmount ?? bill.totalAmount), Number(bill.discountAmount ?? 0), Number(bill.totalAmount), Number(bill.paidAmount), Number(bill.balanceAmount), bill.status]), reportInfo: { school: schoolQuery.data?.name, filters: { search, status: statusFilter } } })} note="Export reflects the current invoice filters." /><ServerExportButton endpoint="/finance/exports/bills.xlsx" label="Full Excel" className={buttonSecondary} />{canWrite && <button className={buttonPrimary} onClick={() => { setMessage(null); setSelectedFeeStructureId(""); setSelectedClassId(""); setOptionalFees(null); setShowBillForm(true); }}><Plus className="size-4" /> Generate bills</button>}</div>} />
           <SearchFilters search={search} setSearch={setSearch} statusFilter={statusFilter} setStatusFilter={setStatusFilter} statuses={["PENDING", "PARTIALLY_PAID", "PAID", "OVERDUE"]} />
           {billsQuery.error ? <QueryError message={billsQuery.error.message} /> : <BillsTable bills={filteredBills} onViewStudentStatement={openStudentStatement} onRecordPayment={canWrite ? (bill) => { setSelectedBillId(bill.id); setShowPaymentForm(true); } : undefined} onViewInvoice={setSelectedInvoiceForPrint} />}
           <PageControls shown={filteredBills.length} total={billsQuery.data?.total ?? 0} canPrevious={billCursorStack.length > 1} canNext={Boolean(billsQuery.data?.nextCursor)} onPrevious={() => setBillCursorStack((stack) => stack.slice(0, -1))} onNext={() => { if (billsQuery.data?.nextCursor) setBillCursorStack((stack) => [...stack, billsQuery.data!.nextCursor!]); }} />
@@ -1075,7 +1096,7 @@ export function AccountantPortalWorkspace({
         )}
 
       {showBillForm && (
-        <Modal title="Generate student bills" description="Generate bills for every active student enrolled in one class for the current academic term." onClose={() => { setShowBillForm(false); setSelectedFeeStructureId(""); setSelectedClassId(""); setSelectedOptionalItemIds([]); }}>
+        <Modal title="Generate student bills" description="Generate bills for every active student enrolled in one class for the current academic term." onClose={() => { setShowBillForm(false); setSelectedFeeStructureId(""); setSelectedClassId(""); setOptionalFees(null); }}>
           <form onSubmit={submitBill} className="space-y-4">
             {message?.kind === "error" && <QueryError message={message.text} />}
             {yearsQuery.error && <QueryError message={yearsQuery.error.message} />}
@@ -1083,22 +1104,36 @@ export function AccountantPortalWorkspace({
             {classesQuery.error && <QueryError message={classesQuery.error.message} />}
             {!currentYear || !currentTerm ? <div role="alert" className="rounded-xl border border-warning/30 bg-warning/5 p-3 text-sm text-foreground">A current academic year and term must be selected in School Settings before billing.</div> : <p className="rounded-xl bg-muted p-3 text-sm text-muted-foreground">Billing period: <span className="font-semibold text-foreground">{currentYear.name} · {currentTerm.name}</span></p>}
             <LabeledField label="Fee structure">
-              <Select name="feeStructureId" required value={selectedFeeStructureId} onValueChange={(value) => { setSelectedFeeStructureId(value); setSelectedClassId(""); setSelectedOptionalItemIds([]); }}>
+              <Select name="feeStructureId" required value={selectedFeeStructureId} onValueChange={(value) => { setSelectedFeeStructureId(value); setSelectedClassId(""); setOptionalFees(null); }}>
                 <SelectTrigger aria-label="Fee structure" className={inputClass}><SelectValue placeholder="Select a fee structure…" /></SelectTrigger>
                 <SelectContent>{feeStructures.map((fee) => <SelectItem key={fee.id} value={fee.id}>{fee.name} · {currency(fee.items.filter((item) => !item.isOptional).reduce((sum, item) => sum + Number(item.amount), 0))}{fee.items.some((item) => item.isOptional) ? " + optional items" : ""}</SelectItem>)}</SelectContent>
               </Select>
             </LabeledField>
-            {selectedFeeStructure?.items.some((item) => item.isOptional) && <fieldset className="space-y-2 rounded-xl border border-border p-3"><legend className="px-1 text-sm font-semibold text-foreground">Optional fee items</legend><p className="text-xs text-muted-foreground">Optional items are excluded unless you select them. They will be included on every bill in this batch.</p>{selectedFeeStructure.items.filter((item) => item.isOptional).map((item) => <label key={item.id} className="flex cursor-pointer items-start gap-3 rounded-lg p-2 hover:bg-muted/50"><input type="checkbox" className="mt-1 size-4 accent-primary" checked={selectedOptionalItemIds.includes(item.id)} onChange={(event) => setSelectedOptionalItemIds((current) => event.target.checked ? [...current, item.id] : current.filter((id) => id !== item.id))} /><span className="flex-1 text-sm text-foreground">{item.name}</span><span className="text-sm font-semibold tabular-nums">{currency(item.amount)}</span></label>)}</fieldset>}
             <LabeledField label="Class">
-              <Select name="classId" required value={selectedClassId} onValueChange={setSelectedClassId}>
+              <Select name="classId" required value={selectedClassId} onValueChange={value => { setSelectedClassId(value); setOptionalFees(null); }}>
                 <SelectTrigger aria-label="Class to bill" className={inputClass}><SelectValue placeholder="Select a class…" /></SelectTrigger>
                 <SelectContent>{billTargetClasses.map((schoolClass) => <SelectItem key={schoolClass.id} value={schoolClass.id}>{schoolClass.name}{typeof schoolClass._count?.students === "number" ? ` · ${schoolClass._count.students} students` : ""}</SelectItem>)}</SelectContent>
               </Select>
             </LabeledField>
+            {optionalFeeItems.length > 0 && <section aria-labelledby="optional-fees-heading" className="space-y-3 rounded-xl border border-border bg-muted/20 p-4">
+              <div>
+                <h3 id="optional-fees-heading" className="text-sm font-semibold text-foreground">Optional fee items</h3>
+                <p className="mt-1 text-xs text-muted-foreground">Choose which students use each service. Only those students will be charged for it.</p>
+              </div>
+              {!selectedClassId || !currentTerm ? <p className="text-sm text-muted-foreground">Choose a class to load its billing roster.</p>
+                : billingRosterQuery.isPending ? <p role="status" className="text-sm text-muted-foreground">Loading students…</p>
+                : billingRosterQuery.error ? <div className="space-y-2"><QueryError message={billingRosterQuery.error.message} />
+                  <button type="button" className={buttonSecondary} onClick={() => void billingRosterQuery.refetch()}>Retry roster</button></div>
+                : billingRosterQuery.data?.length ? optionalFeeItems.map(item => (
+                  <OptionalFeeRoster key={item.id} name={item.name} amount={currency(item.amount)}
+                    students={billingRosterQuery.data} selected={optionalRecipients[item.id] ?? []}
+                    onChange={ids => setOptionalFees({ scope: feeScope, recipients: { ...optionalRecipients, [item.id]: ids } })} />
+                )) : <p className="text-sm text-muted-foreground">There are no active students in this class for the current term.</p>}
+            </section>}
             <LabeledField label="Due date (optional)"><DatePicker name="dueDate" buttonClassName={inputClass} /></LabeledField>
             <LabeledField label="Notes (optional)"><textarea name="notes" className={cn(inputClass, "h-20 py-2")} placeholder="Optional note shown on generated bills" /></LabeledField>
             <p className="text-xs leading-5 text-muted-foreground">The operation is performed by the server using the selected class roster and current term. Review the count and total in the confirmation message after generation.</p>
-            <ModalActions onCancel={() => { setShowBillForm(false); setSelectedFeeStructureId(""); setSelectedClassId(""); }} busy={generateBills.isPending} submitLabel="Generate bills" />
+            <ModalActions onCancel={() => { setShowBillForm(false); setSelectedFeeStructureId(""); setSelectedClassId(""); setOptionalFees(null); }} busy={generateBills.isPending} submitLabel="Generate bills" />
           </form>
         </Modal>
       )}

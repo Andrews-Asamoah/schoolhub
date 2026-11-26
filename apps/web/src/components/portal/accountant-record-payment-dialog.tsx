@@ -1,7 +1,7 @@
 import { DatePicker } from "@/components/ui/date-picker";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useMemo, useState, type FormEvent } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api";
 import { Check, ChevronsUpDown, LoaderCircle, School, X } from "lucide-react";
 import { formatPersonName, type RecordPaymentInput } from "@schoolhub/shared";
@@ -131,9 +131,16 @@ export function AccountantRecordPaymentDialog({
     queryFn: () => apiFetch<OutstandingStudent[]>("/finance/students/outstanding"),
     retry: false,
   });
-  const studentBillsQuery = useQuery({
-    queryKey: ["finance", "bills", "student", studentId],
-    queryFn: () => apiFetch<PaymentBill[]>("/finance/bills?studentId=" + encodeURIComponent(studentId)),
+  const studentBillsQuery = useInfiniteQuery({
+    queryKey: ["finance", "bills", "student", studentId, classId],
+    initialPageParam: "",
+    queryFn: ({ pageParam, signal }) => {
+      const params = new URLSearchParams({ studentId, outstanding: "true", limit: "50" });
+      if (classId !== "ALL") params.set("classId", classId);
+      if (pageParam) params.set("cursor", pageParam);
+      return apiFetch<{ items: PaymentBill[]; nextCursor: string | null }>(`/finance/bills?${params}`, { signal });
+    },
+    getNextPageParam: page => page.nextCursor ?? undefined,
     enabled: Boolean(studentId),
     retry: false,
   });
@@ -154,9 +161,12 @@ export function AccountantRecordPaymentDialog({
   const selectedStudent =
     allStudents.find((student) => student.id === studentId) ??
     eligibleBills.find((bill) => bill.studentId === studentId)?.student;
-  const selectedStudentBills = (studentBillsQuery.data ?? eligibleBills.filter((bill) => bill.studentId === studentId))
-    .filter(outstanding)
-    .filter((bill) => classId === "ALL" || bill.class?.id === classId);
+  const selectedStudentBills = [
+    ...new Map([
+      ...eligibleBills.filter(bill => bill.studentId === studentId),
+      ...(studentBillsQuery.data?.pages.flatMap(page => page.items) ?? []),
+    ].map(bill => [bill.id, bill])).values(),
+  ].filter(bill => outstanding(bill) && (classId === "ALL" || bill.class?.id === classId));
   const selectedBill = selectedStudentBills.find((bill) => bill.id === billId);
   const allocationTotal = allocations.reduce(
     (sum, item) => sum + (item.selected ? Math.round((Number(item.amount) || 0) * 100) / 100 : 0),
@@ -407,6 +417,12 @@ export function AccountantRecordPaymentDialog({
               </SelectContent>
             </Select>
           </label>
+          {studentBillsQuery.hasNextPage && (
+            <button type="button" className={secondaryButton} disabled={studentBillsQuery.isFetching}
+              onClick={() => void studentBillsQuery.fetchNextPage()}>
+              {studentBillsQuery.isFetchingNextPage ? "Loading earlier bills…" : "Load earlier bills"}
+            </button>
+          )}
           {studentBillsQuery.error && (
             <p role="alert" className="text-sm text-destructive">
               Outstanding bills could not be refreshed: {studentBillsQuery.error.message}

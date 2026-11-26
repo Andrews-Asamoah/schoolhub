@@ -253,6 +253,45 @@ describe.skipIf(!enabled)("bill generation (database)", { timeout: 60_000 }, () 
     expect(selectedBills.every((bill) => bill.items.some((item) => item.description === "Optional trip"))).toBe(true);
   });
 
+  it("charges an optional bus fee only to eligible students selected for it", async () => {
+    const fees = await structureWithOptionalItem();
+    const bus = fees.items.find(item => item.isOptional)!;
+    const recipients = studentIds.slice(0, 2);
+    const roster = await service.getBillingRoster(schoolId, classId, yearId, termId);
+    expect(new Set(roster.map(student => student.id))).toEqual(new Set(studentIds));
+    await expect(generate(fees.id, {
+      optionalSelections: [{ feeItemId: bus.id, studentIds: [recipients[0], "outside-the-roster"] }],
+    })).rejects.toThrow(/no longer in the billing roster/);
+    expect(await billsFor(fees.id)).toHaveLength(0);
+
+    const result = await generate(fees.id, {
+      optionalSelections: [{ feeItemId: bus.id, studentIds: [...recipients, recipients[0]] }],
+    });
+    expect(result).toMatchObject({ count: STUDENTS, totalBilled: "700.00", skippedExisting: 0 });
+    const bills = await billsFor(fees.id);
+    for (const bill of bills) {
+      const optedIn = recipients.includes(bill.studentId);
+      expect(bill.totalAmount.toFixed(2)).toBe(optedIn ? "150.00" : "100.00");
+      expect(bill.items.filter(item => item.feeItemId === bus.id)).toHaveLength(optedIn ? 1 : 0);
+    }
+    await expect(generate(fees.id, {
+      optionalSelections: [{ feeItemId: bus.id, studentIds: [studentIds.at(-1)] }],
+    })).resolves.toMatchObject({ count: 0, skippedExisting: STUDENTS });
+  });
+
+  it("generates no invoices for unselected students when every item is optional", async () => {
+    const fees = await prisma.feeStructure.create({
+      data: { schoolId, name: `Bus-only ${run}`, items: { create: { name: "School bus", amount: 40, isOptional: true } } },
+      include: { items: true },
+    });
+    const result = await generate(fees.id, {
+      optionalSelections: [{ feeItemId: fees.items[0]!.id, studentIds: [studentIds[0]] }],
+    });
+    expect(result).toMatchObject({ count: 1, totalBilled: "40.00" });
+    const bills = await billsFor(fees.id);
+    expect(bills.map(bill => bill.studentId)).toEqual([studentIds[0]]);
+  });
+
   it("snapshots earlier unpaid bills without adding a duplicate charge", async () => {
     // Use a fresh student so earlier bill-generation cases cannot mark this term's
     // first bill as already snapshotted before this test creates its prior-year debt.
