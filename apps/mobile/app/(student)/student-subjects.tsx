@@ -1,3 +1,5 @@
+import { useState } from "react";
+import { TextField } from "@/components/TextField";
 import { BookOpen } from "lucide-react-native";
 import { View } from "react-native";
 import { Card } from "@/components/Surface";
@@ -13,6 +15,13 @@ import { spacing, type, useTheme } from "@/theme/theme";
 export default function StudentSubjectsScreen() {
   const query = useMySubjectsQuery();
   const { colors } = useTheme();
+  const [search, setSearch] = useState("");
+  const filtered =
+    query.data?.subjects.filter((row) =>
+      [row.name, row.code, row.teacherName].some((value) =>
+        value?.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase()),
+      ),
+    ) ?? [];
   return (
     <Screen
       title="Subjects"
@@ -22,6 +31,14 @@ export default function StudentSubjectsScreen() {
       onRefresh={() => void query.refetch()}
     >
       <View style={{ gap: spacing.lg }}>
+        {query.data?.subjects.length ? (
+          <TextField
+            label="Search subjects"
+            value={search}
+            onChangeText={setSearch}
+            returnKeyType="search"
+          />
+        ) : null}
         {query.isPending ? (
           <Card>
             <SkeletonRow />
@@ -45,7 +62,13 @@ export default function StudentSubjectsScreen() {
           />
         ) : (
           <Card>
-            {query.data.subjects.map((subject, index, entries) => (
+            {filtered.length === 0 ? (
+              <EmptyState
+                title="No matching subjects"
+                message="Try another search."
+              />
+            ) : null}
+            {filtered.map((subject, index, entries) => (
               <ListRow
                 key={subject.subjectId}
                 title={subject.name}

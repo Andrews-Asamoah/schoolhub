@@ -1,3 +1,5 @@
+import { useState } from "react";
+import { TextField } from "@/components/TextField";
 import { UsersRound } from "lucide-react-native";
 import { View } from "react-native";
 import { Card } from "@/components/Surface";
@@ -12,6 +14,13 @@ import { spacing, useTheme } from "@/theme/theme";
 export default function StudentClassmatesScreen() {
   const query = useMyClassmatesQuery();
   const { colors } = useTheme();
+  const [search, setSearch] = useState("");
+  const filtered =
+    query.data?.classmates.filter((row) =>
+      [row.name, row.house].some((value) =>
+        value?.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase()),
+      ),
+    ) ?? [];
   return (
     <Screen
       title="Classmates"
@@ -21,6 +30,14 @@ export default function StudentClassmatesScreen() {
       onRefresh={() => void query.refetch()}
     >
       <View style={{ gap: spacing.lg }}>
+        {query.data?.classmates.length ? (
+          <TextField
+            label="Search classmates"
+            value={search}
+            onChangeText={setSearch}
+            returnKeyType="search"
+          />
+        ) : null}
         {query.isPending ? (
           <Card>
             <SkeletonRow />
@@ -44,7 +61,13 @@ export default function StudentClassmatesScreen() {
           />
         ) : (
           <Card>
-            {query.data.classmates.map((classmate, index, entries) => (
+            {filtered.length === 0 ? (
+              <EmptyState
+                title="No matching classmates"
+                message="Try another search."
+              />
+            ) : null}
+            {filtered.map((classmate, index, entries) => (
               <ListRow
                 key={classmate.id}
                 title={

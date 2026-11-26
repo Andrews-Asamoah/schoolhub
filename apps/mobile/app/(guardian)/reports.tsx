@@ -1,3 +1,6 @@
+import { useState } from "react";
+import { SelectField } from "@/components/SelectField";
+import { ReportPreview } from "@/features/shared/ReportPreview";
 import { Alert, View } from "react-native";
 import { ClipboardList, Download } from "lucide-react-native";
 import { Card } from "@/components/Surface";
@@ -30,7 +33,34 @@ export default function GuardianReportsScreen() {
   const { activeWard } = useGuardian();
   const reports = useGuardianReportsQuery();
   const { colors } = useTheme();
-  const hasData = (reports.data?.length ?? 0) > 0;
+  const wardId = activeWard?.id;
+  const [selection, setSelection] = useState<{
+    wardId: string | undefined;
+    year: string;
+    term: string;
+    reportId: string;
+  }>();
+  const [previousWard, setPreviousWard] = useState(wardId);
+  if (previousWard !== wardId) {
+    setPreviousWard(wardId);
+    setSelection(undefined);
+  }
+  const active = selection?.wardId === wardId ? selection : undefined;
+  const year = active?.year ?? "";
+  const term = active?.term ?? "";
+  const wardReports =
+    reports.data?.filter((report) => report.studentId === wardId) ?? [];
+  const yearRows = wardReports.filter(
+    (report) => !year || report.set.academicYear.name === year,
+  );
+  const visible = yearRows.filter(
+    (report) => !term || report.set.term.name === term,
+  );
+  const selected = visible.find((report) => report.id === active?.reportId);
+  const options = (values: string[], label: string) => [
+    { value: "", label },
+    ...[...new Set(values)].map((value) => ({ value, label: value })),
+  ];
   const loading = reports.isPending;
   const failed = reports.isError;
   const retry = () => {
@@ -65,7 +95,7 @@ export default function GuardianReportsScreen() {
             onAction={retry}
             hue="indigo"
           />
-        ) : !hasData ? (
+        ) : !wardReports.length ? (
           <EmptyState
             title="No published reports yet"
             message="Published report cards, including mock results, will appear here."
@@ -74,6 +104,28 @@ export default function GuardianReportsScreen() {
           />
         ) : (
           <>
+            <SelectField
+              label="Academic year"
+              value={year}
+              options={options(
+                wardReports.map((report) => report.set.academicYear.name),
+                "All years",
+              )}
+              onChange={(year) =>
+                setSelection({ wardId, year, term: "", reportId: "" })
+              }
+            />
+            <SelectField
+              label="Term"
+              value={term}
+              options={options(
+                yearRows.map((report) => report.set.term.name),
+                "All terms",
+              )}
+              onChange={(term) =>
+                setSelection({ wardId, year, term, reportId: "" })
+              }
+            />
             <Card>
               <Text
                 style={[
@@ -83,41 +135,48 @@ export default function GuardianReportsScreen() {
               >
                 Academic reports
               </Text>
-              {(reports.data ?? [])
-                .filter((report) => report.studentId === activeWard.id)
-                .map((report, index, entries) => (
-                  <ListRow
-                    key={report.id}
-                    title={report.set.name}
-                    subtitle={`${report.set.academicYear.name} · ${report.set.term.name}`}
-                    leading={<ClipboardList size={20} color={colors.primary} />}
-                    trailing={
-                      report.pdfAvailable ? (
-                        <Download size={18} color={colors.primary} />
-                      ) : undefined
-                    }
-                    status={report.pdfAvailable ? "PDF" : "Published"}
-                    divider={index < entries.length - 1}
-                    onPress={
-                      report.pdfAvailable
-                        ? () =>
-                            void download(
-                              () => downloadGuardianReport(report.id),
-                              "Report",
-                            )
-                        : undefined
-                    }
-                    hue="indigo"
-                  />
-                ))}
-              {(reports.data ?? []).filter(
-                (report) => report.studentId === activeWard.id,
-              ).length === 0 ? (
+              {visible.map((report, index, entries) => (
+                <ListRow
+                  key={report.id}
+                  title={report.set.name}
+                  subtitle={`${report.set.academicYear.name} · ${report.set.term.name}`}
+                  leading={<ClipboardList size={20} color={colors.primary} />}
+                  trailing={
+                    report.pdfAvailable ? (
+                      <Download size={18} color={colors.primary} />
+                    ) : undefined
+                  }
+                  status={report.pdfAvailable ? "PDF" : "Published"}
+                  divider={index < entries.length - 1}
+                  onPress={() =>
+                    setSelection({ wardId, year, term, reportId: report.id })
+                  }
+                  hue="indigo"
+                />
+              ))}
+              {visible.length === 0 ? (
                 <Text style={[type.body, { color: colors.mutedForeground }]}>
-                  No published academic reports for this child.
+                  No reports match the selected term.
                 </Text>
               ) : null}
             </Card>
+            {selected ? (
+              <ReportPreview
+                printable={!selected.pdfAvailable}
+                title={selected.set.name}
+                data={selected.data}
+                approval={selected.approval}
+                onShare={
+                  selected.pdfAvailable
+                    ? () =>
+                        void download(
+                          () => downloadGuardianReport(selected.id),
+                          "Report",
+                        )
+                    : undefined
+                }
+              />
+            ) : null}
             <Text style={[type.caption, { color: colors.mutedForeground }]}>
               Only reports published for guardian viewing are listed. Downloads
               are shared securely from this device.

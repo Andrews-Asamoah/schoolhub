@@ -1,3 +1,5 @@
+import { reportApprovalSchema, reportDataSchema } from "./report-preview";
+import { File } from "expo-file-system";
 import { z } from "zod";
 import { defineDownload, defineEndpoint } from "./endpoint";
 
@@ -183,6 +185,8 @@ const reportSchema = z.object({
   studentId: z.string(),
   publishedAt: z.string(),
   pdfAvailable: z.boolean(),
+  data: reportDataSchema.nullish().catch(null),
+  approval: reportApprovalSchema.nullish().catch(null),
   student: z.object({
     admissionNumber: nullableText,
     profile: z.object({ firstName: z.string(), lastName: z.string() }),
@@ -248,3 +252,90 @@ const housesEndpoint = defineEndpoint({
 export function listGuardianHouses(options: { signal?: AbortSignal } = {}) {
   return housesEndpoint(options);
 }
+
+export const absenceStatuses = [
+  "ALL",
+  "PENDING",
+  "APPROVED",
+  "REJECTED",
+] as const;
+const absenceRequest = z.object({
+  id: z.string(),
+  studentId: z.string(),
+  fromDate: z.string(),
+  toDate: z.string(),
+  reason: z.string(),
+  status: z.enum(["PENDING", "APPROVED", "REJECTED"]),
+  decisionNote: z.string().nullable(),
+  attachmentMime: z.string().nullable(),
+  student: z.object({
+    profile: z.object({ firstName: z.string(), lastName: z.string() }),
+  }),
+});
+export const listAbsenceRequests = defineEndpoint({
+  method: "GET",
+  path: "/attendance/excuse-requests",
+  roles: ["guardian"],
+  response: z.object({
+    items: z.array(absenceRequest),
+    page: z.number(),
+    totalPages: z.number(),
+  }),
+});
+export const absenceFormSchema = z
+  .object({
+    studentId: z.string().min(1),
+    fromDate: z.iso.date(),
+    toDate: z.iso.date(),
+    reason: z.string().trim().min(10).max(2000),
+    file: z
+      .object({
+        uri: z.string(),
+        name: z.string(),
+        mime: z.enum([
+          "application/pdf",
+          "image/jpeg",
+          "image/png",
+          "image/webp",
+        ]),
+      })
+      .optional(),
+  })
+  .refine(
+    ({ fromDate, toDate }) => {
+      const duration = Date.parse(toDate) - Date.parse(fromDate);
+      return duration >= 0 && duration <= 30 * 86400000;
+    },
+    { message: "Choose an absence period of 1 to 31 days." },
+  );
+
+export const createAbsenceRequest = defineEndpoint({
+  method: "POST",
+  path: "/attendance/excuse-requests",
+  roles: ["guardian"],
+  request: absenceFormSchema,
+  multipart: ({ studentId, fromDate, toDate, reason, file }) => {
+    const body = new FormData();
+    body.append("studentId", studentId);
+    body.append("fromDate", fromDate);
+    body.append("toDate", toDate);
+    body.append("reason", reason);
+    if (file) {
+      const evidence = new File(file.uri);
+      if (!evidence.exists || !evidence.size || evidence.size > 5 * 1024 * 1024)
+        throw new Error("Choose a PDF or image under 5 MB.");
+      body.append(
+        "file",
+        evidence.slice(0, evidence.size, file.mime),
+        file.name,
+      );
+    }
+    return body;
+  },
+  response: absenceRequest,
+});
+export const downloadAbsenceEvidence = defineDownload({
+  method: "GET",
+  path: "/attendance/excuse-requests/:id/evidence",
+  roles: ["guardian"],
+});

@@ -170,6 +170,22 @@ export const listSentMessages = defineEndpoint({
   roles: ["teacher", "student", "guardian"],
   response: z.array(schoolMessageSchema),
 });
+const messagePageSchema = z.object({
+  items: z.array(schoolMessageSchema),
+  nextCursor: z.string().nullable(),
+});
+export const listInboxPage = defineEndpoint({
+  method: "GET",
+  path: "/messages/inbox/page",
+  roles: ["teacher", "student", "guardian"],
+  response: messagePageSchema,
+});
+export const listSentPage = defineEndpoint({
+  method: "GET",
+  path: "/messages/sent/page",
+  roles: ["teacher", "student", "guardian"],
+  response: messagePageSchema,
+});
 export const messageRecipientSchema = z.object({
   id: z.string(),
   name: z.string(),

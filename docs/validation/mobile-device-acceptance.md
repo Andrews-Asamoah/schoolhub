@@ -45,6 +45,23 @@ issues before Phase 9.
       shimmer remain smooth.
 - [ ] App icon, adaptive icon mask, and light/dark splash are correct.
 
+## Portal workflow checks
+
+- [ ] Sign in as the assigned teacher, save marks, and import a sample CSV and
+      XLSX. Verify an empty cell preserves a mark, a stale preview reports a
+      conflict, and the sheet locks after submission. Request a correction,
+      save a recommendation draft, and sign off selected reports.
+- [ ] Preview a report and open a signed archive PDF. Verify a teacher outside
+      the assigned class cannot access that pupil's report.
+- [ ] Submit a guardian absence request with a PDF or image and reopen it
+      after school leadership records a decision. Switch guardians and wards
+      to verify requests, evidence, fees and reports stay within scope.
+- [ ] Print and share a timetable, a legacy report and a fee statement. Open
+      the exported Excel statement and check that amounts are numeric.
+- [ ] Filter student assignments, search subjects and classmates, and verify
+      current and next lessons. Search message history and send a reply using
+      the guardian, teacher and student test accounts.
+
 ## Results
 
 Record each failure with reproduction steps and an issue link. Do not mark the

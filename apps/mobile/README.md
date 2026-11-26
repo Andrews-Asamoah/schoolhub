@@ -171,3 +171,22 @@ Teacher announcement creation and documents remain deferred pending N3.
 Teachers can publish class announcements to pupils or their guardians from
 Announcements. Staff documents are available in More. Open a document to
 share an authenticated PDF or image downloaded into the device's temporary cache.
+
+## Teacher, guardian and student workflows
+
+Teachers can save and submit assessment sheets, record absent or excused pupils,
+request mark corrections, and preview CSV or Excel marks before importing them.
+The report workspace supports saved recommendation drafts, bulk sign-off, and
+signed archive PDFs. Internal mock analysis uses the teacher's authorised
+subjects and classes.
+
+Guardians can submit absence requests with optional private PDF or image evidence
+and see school decisions under Attendance. Fee statements support printing and
+PDF or Excel sharing. Students can filter assignments by status, see overdue
+work, and search subjects and classmates. Both roles can preview report cards
+and print or share timetables. Message history search and replies are available
+to all three roles.
+
+Rebuild the development client or signed app when adopting these changes.
+Expo Print is a native module. Verify printing, file selection, file sharing,
+and the signed-in workflows with seeded role accounts on Android and iOS.
