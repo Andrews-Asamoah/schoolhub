@@ -72,6 +72,14 @@ Expo’s Metro tunnel connects to the development server. The API origin must
 also be reachable by the phone. Keep local HTTP testing on a private
 development network and keep credentials out of `EXPO_PUBLIC_*` variables.
 
+### Profile photos
+
+Photo uploads require the public R2 storage configured in the API's root
+`.env`. Set `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`,
+`R2_BUCKET_NAME`, and `R2_PUBLIC_URL` on the API. Restart the API after
+changing those values. A local PostgreSQL database is sufficient for sign-in
+and class records, while profile images are stored in R2.
+
 ## School access
 
 Deploy the API with `GET /api/schools/public/access/:identifier` before

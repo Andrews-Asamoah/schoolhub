@@ -1,3 +1,4 @@
+import { detailTabButton } from "@/components/detailTabButton";
 import { act, render, screen, fireEvent } from "@testing-library/react-native";
 import { Keyboard, StyleSheet } from "react-native";
 import { PortalTabBar, type TabBarProps } from "@/components/PortalTabBar";
@@ -110,7 +111,9 @@ test("a hidden detail keeps its parent selected and the parent is still reachabl
     },
     descriptors: {
       family: { options: { title: "Children" } },
-      details: { options: { hidden: true } },
+      details: {
+        options: { title: "Ward details", tabBarButton: detailTabButton },
+      },
     },
     emitter: { emit: jest.fn(() => ({ defaultPrevented: false })) },
     navigateToTab,
@@ -118,6 +121,7 @@ test("a hidden detail keeps its parent selected and the parent is still reachabl
   await render(
     <PortalTabBar {...props} parentTabs={{ "ward/[id]": "family" }} />,
   );
+  expect(screen.queryByRole("tab", { name: "Ward details" })).toBeNull();
   const tab = screen.getByRole("tab", { name: "Children" });
   expect(tab.props.accessibilityState.selected).toBe(true);
   await fireEvent.press(tab);

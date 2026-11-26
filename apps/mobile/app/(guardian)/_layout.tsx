@@ -1,3 +1,4 @@
+import { detailTabButton } from "@/components/detailTabButton";
 import { TabBarInsetProvider } from "@/components/TabBarInset";
 import { PortalTabBar } from "@/components/PortalTabBar";
 import { GuardianProvider } from "@/features/guardian/context";
@@ -15,6 +16,7 @@ export default function GuardianLayout() {
     <GuardianProvider>
       <TabBarInsetProvider>
         <Tabs
+          backBehavior="history"
           tabBar={(props) => (
             <PortalTabBar
               {...props}
@@ -103,23 +105,26 @@ export default function GuardianLayout() {
           />
           <Tabs.Screen
             name="attendance-history"
-            options={{ href: null, title: "Attendance" }}
+            options={{ tabBarButton: detailTabButton, title: "Attendance" }}
           />
           <Tabs.Screen
             name="absence-requests"
-            options={{ href: null, title: "Absence requests" }}
+            options={{
+              tabBarButton: detailTabButton,
+              title: "Absence requests",
+            }}
           />
           <Tabs.Screen
             name="timetable"
-            options={{ href: null, title: "Timetable" }}
+            options={{ tabBarButton: detailTabButton, title: "Timetable" }}
           />
           <Tabs.Screen
             name="reports"
-            options={{ href: null, title: "Reports" }}
+            options={{ tabBarButton: detailTabButton, title: "Reports" }}
           />
           <Tabs.Screen
             name="ward/[id]"
-            options={{ href: null, title: "Child profile" }}
+            options={{ tabBarButton: detailTabButton, title: "Child profile" }}
           />
         </Tabs>
       </TabBarInsetProvider>

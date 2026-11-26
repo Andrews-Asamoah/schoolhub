@@ -1,3 +1,4 @@
+import { File } from "expo-file-system";
 import { z } from "zod";
 import { defineEndpoint } from "@/api/endpoint";
 import {
@@ -395,4 +396,35 @@ test("staff document listing strips server URLs and keeps paginated metadata", a
   expect(result.meta).toEqual({ page: 2, totalPages: 3 });
   expect(result.data[0]).not.toHaveProperty("fileUrl");
   expect(result.data[0]).not.toHaveProperty("storageKey");
+});
+
+test("native avatar upload hands the Expo file directly to multipart without constructing a Blob", async () => {
+  const slice = jest.fn(() => {
+    throw new Error(
+      "React Native cannot build a Blob from an ArrayBufferView.",
+    );
+  });
+  const file = Object.create(File.prototype, {
+    size: { value: 100 },
+    name: { value: "avatar.jpg" },
+    type: { value: "image/jpeg" },
+    slice: { value: slice },
+  }) as File;
+  const append = jest.spyOn(FormData.prototype, "append");
+  try {
+    jest
+      .mocked(apiFetch)
+      .mockResolvedValueOnce({
+        image: "https://schoolhub.example.test/avatar.webp",
+      });
+    await expect(
+      uploadMyAvatar({ file, mimeType: "image/jpeg" }),
+    ).resolves.toEqual({
+      image: "https://schoolhub.example.test/avatar.webp",
+    });
+    expect(append).toHaveBeenCalledWith("avatar", file);
+    expect(slice).not.toHaveBeenCalled();
+  } finally {
+    append.mockRestore();
+  }
 });

@@ -10,7 +10,7 @@ import {
   STUDENT_IMPORT_LIMITS,
   addClubMemberSchema,
 } from "@schoolhub/shared";
-import { defineDownload, defineEndpoint } from "./endpoint";
+import { appendUploadFile, defineDownload, defineEndpoint } from "./endpoint";
 const named = z.object({ id: z.string(), name: z.string() });
 const profile = z.object({ firstName: z.string(), lastName: z.string() });
 const subject = named.extend({ code: z.string() });
@@ -559,7 +559,7 @@ export const previewTeacherMarksImport = defineEndpoint({
       ? "text/csv"
       : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
     const body = new FormData();
-    body.append("file", file.slice(0, file.size, mime), name);
+    appendUploadFile(body, "file", file, name, mime);
     return body;
   },
   response: z.object({

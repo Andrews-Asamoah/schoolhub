@@ -201,6 +201,21 @@ export function defineEndpoint<
   };
 }
 
+/** Expo Fetch can read an Expo File directly without constructing an RN Blob. */
+export function appendUploadFile(
+  body: FormData,
+  field: string,
+  file: Blob,
+  name: string,
+  mimeType: string,
+) {
+  if (file instanceof File) {
+    body.append(field, file);
+    return;
+  }
+  body.append(field, file.slice(0, file.size, mimeType), name);
+}
+
 /** Uploads a resized profile image as multipart form data. */
 export function defineUpload<TResponse>(definition: {
   method: "PUT";
@@ -227,8 +242,13 @@ export function defineUpload<TResponse>(definition: {
     if (!input.file.size || input.file.size > MAX_AVATAR_BYTES)
       throw new Error("The resized profile photo must be under 2 MB.");
     const body = new FormData();
-    const file = input.file.slice(0, input.file.size, input.mimeType);
-    body.append(definition.field, file, `profile.${input.mimeType.slice(6)}`);
+    appendUploadFile(
+      body,
+      definition.field,
+      input.file,
+      `profile.${input.mimeType.slice(6)}`,
+      input.mimeType,
+    );
     const result = await apiFetch<unknown>(definition.path, {
       method: definition.method,
       body,

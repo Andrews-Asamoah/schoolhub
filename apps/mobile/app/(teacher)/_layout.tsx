@@ -1,3 +1,4 @@
+import { detailTabButton } from "@/components/detailTabButton";
 import { Tabs } from "expo-router";
 import {
   House,
@@ -16,6 +17,7 @@ export default function TeacherLayout() {
     <RegisterSyncProvider>
       <TabBarInsetProvider>
         <Tabs
+          backBehavior="history"
           tabBar={(props) => (
             <PortalTabBar
               {...props}
@@ -111,22 +113,58 @@ export default function TeacherLayout() {
               ),
             }}
           />
-          <Tabs.Screen name="teacher-roster" options={{ href: null }} />
-          <Tabs.Screen name="teacher-pupil" options={{ href: null }} />
-          <Tabs.Screen name="teacher-timetable" options={{ href: null }} />
-          <Tabs.Screen name="teacher-register" options={{ href: null }} />
-          <Tabs.Screen name="teacher-score-entry" options={{ href: null }} />
-          <Tabs.Screen name="teacher-report-review" options={{ href: null }} />
-          <Tabs.Screen name="teacher-report-archive" options={{ href: null }} />
-          <Tabs.Screen name="teacher-mock-analysis" options={{ href: null }} />
-          <Tabs.Screen name="teacher-assignment-new" options={{ href: null }} />
-          <Tabs.Screen name="teacher-assignment" options={{ href: null }} />
-          <Tabs.Screen name="teacher-clubs" options={{ href: null }} />
+          <Tabs.Screen
+            name="teacher-roster"
+            options={{ tabBarButton: detailTabButton }}
+          />
+          <Tabs.Screen
+            name="teacher-pupil"
+            options={{ tabBarButton: detailTabButton }}
+          />
+          <Tabs.Screen
+            name="teacher-timetable"
+            options={{ tabBarButton: detailTabButton }}
+          />
+          <Tabs.Screen
+            name="teacher-register"
+            options={{ tabBarButton: detailTabButton }}
+          />
+          <Tabs.Screen
+            name="teacher-score-entry"
+            options={{ tabBarButton: detailTabButton }}
+          />
+          <Tabs.Screen
+            name="teacher-report-review"
+            options={{ tabBarButton: detailTabButton }}
+          />
+          <Tabs.Screen
+            name="teacher-report-archive"
+            options={{ tabBarButton: detailTabButton }}
+          />
+          <Tabs.Screen
+            name="teacher-mock-analysis"
+            options={{ tabBarButton: detailTabButton }}
+          />
+          <Tabs.Screen
+            name="teacher-assignment-new"
+            options={{ tabBarButton: detailTabButton }}
+          />
+          <Tabs.Screen
+            name="teacher-assignment"
+            options={{ tabBarButton: detailTabButton }}
+          />
+          <Tabs.Screen
+            name="teacher-clubs"
+            options={{ tabBarButton: detailTabButton }}
+          />
           <Tabs.Screen
             name="teacher-announcement-new"
-            options={{ href: null }}
+            options={{ tabBarButton: detailTabButton }}
           />
-          <Tabs.Screen name="teacher-documents" options={{ href: null }} />
+          <Tabs.Screen
+            name="teacher-documents"
+            options={{ tabBarButton: detailTabButton }}
+          />
         </Tabs>
       </TabBarInsetProvider>
     </RegisterSyncProvider>

@@ -1,7 +1,7 @@
 import { reportApprovalSchema, reportDataSchema } from "./report-preview";
 import { File } from "expo-file-system";
 import { z } from "zod";
-import { defineDownload, defineEndpoint } from "./endpoint";
+import { appendUploadFile, defineDownload, defineEndpoint } from "./endpoint";
 
 const nullableText = z.string().nullable();
 const wardSchema = z.object({
@@ -324,11 +324,7 @@ export const createAbsenceRequest = defineEndpoint({
       const evidence = new File(file.uri);
       if (!evidence.exists || !evidence.size || evidence.size > 5 * 1024 * 1024)
         throw new Error("Choose a PDF or image under 5 MB.");
-      body.append(
-        "file",
-        evidence.slice(0, evidence.size, file.mime),
-        file.name,
-      );
+      appendUploadFile(body, "file", evidence, file.name, file.mime);
     }
     return body;
   },

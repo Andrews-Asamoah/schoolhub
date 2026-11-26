@@ -1,3 +1,4 @@
+import { detailTabButton } from "@/components/detailTabButton";
 import { TabBarInsetProvider } from "@/components/TabBarInset";
 import { Redirect, Tabs, type Href } from "expo-router";
 import { CalendarDays, Home, MoreHorizontal } from "lucide-react-native";
@@ -48,7 +49,10 @@ export default function DevTabsLayout() {
             ),
           }}
         />
-        <Tabs.Screen name="hidden" options={{ href: null }} />
+        <Tabs.Screen
+          name="hidden"
+          options={{ tabBarButton: detailTabButton }}
+        />
       </Tabs>
     </TabBarInsetProvider>
   );

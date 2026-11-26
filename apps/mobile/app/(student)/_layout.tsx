@@ -1,3 +1,4 @@
+import { detailTabButton } from "@/components/detailTabButton";
 import { TabBarInsetProvider } from "@/components/TabBarInset";
 import { PortalTabBar } from "@/components/PortalTabBar";
 import { Tabs } from "expo-router";
@@ -13,6 +14,7 @@ export default function StudentLayout() {
   return (
     <TabBarInsetProvider>
       <Tabs
+        backBehavior="history"
         tabBar={(props) => (
           <PortalTabBar
             {...props}
@@ -101,23 +103,23 @@ export default function StudentLayout() {
         />
         <Tabs.Screen
           name="student-reports"
-          options={{ href: null, title: "Reports" }}
+          options={{ tabBarButton: detailTabButton, title: "Reports" }}
         />
         <Tabs.Screen
           name="student-subjects"
-          options={{ href: null, title: "Subjects" }}
+          options={{ tabBarButton: detailTabButton, title: "Subjects" }}
         />
         <Tabs.Screen
           name="student-classmates"
-          options={{ href: null, title: "Classmates" }}
+          options={{ tabBarButton: detailTabButton, title: "Classmates" }}
         />
         <Tabs.Screen
           name="student-community"
-          options={{ href: null, title: "Community" }}
+          options={{ tabBarButton: detailTabButton, title: "Community" }}
         />
         <Tabs.Screen
           name="assignment/[id]"
-          options={{ href: null, title: "Assignment" }}
+          options={{ tabBarButton: detailTabButton, title: "Assignment" }}
         />
       </Tabs>
     </TabBarInsetProvider>
