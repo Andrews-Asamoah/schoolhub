@@ -74,3 +74,54 @@ test("Android push config accepts an EAS file variable without replacing package
     googleServicesFile: "/tmp/google-services.json",
   });
 });
+
+test("portal configuration scopes HTTPS recovery links and preserves Expo settings", (t) => {
+  const key = "EXPO_PUBLIC_PORTAL_ORIGIN";
+  const prior = process.env[key];
+  t.after(() => {
+    if (prior === undefined) delete process.env[key];
+    else process.env[key] = prior;
+  });
+
+  for (const invalid of [
+    "http://app.schoolhub.example",
+    "https://app.schoolhub.example/login",
+    "https://app.schoolhub.example:8443",
+    "https://example.test@app.schoolhub.example",
+    "https://app.schoolhub.example?redirect=1",
+  ]) {
+    process.env[key] = invalid;
+    assert.throws(() => configure(input), /EXPO_PUBLIC_PORTAL_ORIGIN/);
+  }
+
+  process.env[key] = "https://app.schoolhub.example/";
+  const config = configure({
+    config: {
+      android: { package: "com.schoolhub.mobile" },
+      ios: { associatedDomains: ["applinks:existing.example"] },
+      extra: { eas: { projectId: "example-id" } },
+    },
+  });
+  assert.equal(config.android.package, "com.schoolhub.mobile");
+  assert.deepEqual(config.android.intentFilters, [
+    {
+      action: "VIEW",
+      autoVerify: true,
+      category: ["BROWSABLE", "DEFAULT"],
+      data: [
+        {
+          scheme: "https",
+          host: "app.schoolhub.example",
+          path: "/reset-password",
+        },
+      ],
+    },
+  ]);
+  assert.deepEqual(config.ios.associatedDomains, [
+    "applinks:existing.example",
+    "applinks:app.schoolhub.example",
+  ]);
+  assert.deepEqual(config.extra, {
+    eas: { projectId: "example-id" },
+  });
+});

@@ -51,6 +51,65 @@ development computer's reachable LAN IP (for example
 changing `.env`, restart Expo so the public variable is reloaded. Never put
 credentials in an EXPO_PUBLIC variable.
 
+## Web portal links
+
+Set `EXPO_PUBLIC_PORTAL_ORIGIN` to the bare HTTPS origin of the school web
+portal for each build environment. The guardian Fees screen opens the web
+sign-in flow, then the school’s fee statement with its print and export actions.
+The app passes the school subdomain only and uses the browser’s own session.
+
+Use the same origin as the API’s `WEB_ORIGIN` for native password recovery.
+The existing recovery email URL opens the native form on associated devices or
+the web form in a browser. The token remains in the URL fragment and is held in
+memory by the native form. School-specific web origins continue to work in the
+browser.
+
+Publish these two JSON files on the configured origin, over HTTPS, with
+`Content-Type: application/json` and a direct successful response.
+
+- `/.well-known/assetlinks.json` for Android. Include the SHA-256 fingerprints
+  for the certificates that sign the distributed builds. For Play installs, use
+  the Play App Signing certificate.
+- `/.well-known/apple-app-site-association` for iOS. Use the Apple application
+  identifier from your provisioning configuration.
+
+Android example with a placeholder fingerprint:
+
+```json
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.schoolhub.mobile",
+      "sha256_cert_fingerprints": ["REPLACE_WITH_SIGNING_CERTIFICATE_SHA256"]
+    }
+  }
+]
+```
+
+iOS example with a placeholder application identifier prefix:
+
+```json
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": ["REPLACE_WITH_APP_ID_PREFIX.com.schoolhub.mobile"],
+        "components": [{ "/": "/reset-password" }]
+      }
+    ]
+  }
+}
+```
+
+Rebuild and install the signed native app after changing its associated domain.
+Follow the reset-link and guardian handoff checks in the
+[device acceptance checklist](../../docs/validation/mobile-device-acceptance.md).
+See the Expo setup guides for
+[Android App Links](https://docs.expo.dev/linking/android-app-links/) and
+[iOS Universal Links](https://docs.expo.dev/linking/ios-universal-links/).
+
 ## Build prerequisites
 
 Run EAS commands from apps/mobile. The existing Expo owner/project identity is

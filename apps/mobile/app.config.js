@@ -23,6 +23,17 @@ function validateReleaseApi(profile, value) {
   }
 }
 
+function readPortalOrigin(value) {
+  if (!value) return undefined;
+  // Native HTTPS associations require a DNS host on the default HTTPS port.
+  if (!/^https:\/\/(?:[a-z0-9][a-z0-9-]*\.)+[a-z][a-z0-9-]*\/?$/i.test(value)) {
+    throw new Error(
+      "Set EXPO_PUBLIC_PORTAL_ORIGIN to the bare HTTPS SchoolHub web origin.",
+    );
+  }
+  return new URL(value);
+}
+
 module.exports = ({ config }) => {
   validateReleaseApi(
     process.env.EAS_BUILD_PROFILE,
@@ -30,7 +41,38 @@ module.exports = ({ config }) => {
   );
   // EAS file variables resolve to a path during the native Android build.
   const googleServicesFile = process.env.GOOGLE_SERVICES_JSON;
-  return googleServicesFile
-    ? { ...config, android: { ...config.android, googleServicesFile } }
-    : config;
+  const portal = readPortalOrigin(process.env.EXPO_PUBLIC_PORTAL_ORIGIN);
+  if (!portal && !googleServicesFile) return config;
+
+  const android = { ...config.android };
+  if (googleServicesFile) android.googleServicesFile = googleServicesFile;
+  if (!portal) return { ...config, android };
+
+  android.intentFilters = [
+    ...(android.intentFilters ?? []),
+    {
+      action: "VIEW",
+      autoVerify: true,
+      category: ["BROWSABLE", "DEFAULT"],
+      data: [
+        { scheme: "https", host: portal.hostname, path: "/reset-password" },
+      ],
+    },
+  ];
+
+  const ios = {
+    ...config.ios,
+    associatedDomains: [
+      ...new Set([
+        ...(config.ios?.associatedDomains ?? []),
+        `applinks:${portal.hostname}`,
+      ]),
+    ],
+  };
+
+  return {
+    ...config,
+    android,
+    ios,
+  };
 };

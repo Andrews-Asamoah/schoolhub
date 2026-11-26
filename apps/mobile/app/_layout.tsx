@@ -61,6 +61,7 @@ function Shell() {
         }}
       >
         <Stack.Screen name="index" />
+        <Stack.Screen name="password-recovery-link" />
         <Stack.Protected guard={!ready}>
           <Stack.Screen name="(auth)" />
         </Stack.Protected>

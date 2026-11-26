@@ -1,5 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react-native";
 import type { ReactNode } from "react";
+import { Linking } from "react-native";
 import ChildrenScreen from "../../app/(guardian)/family";
 import FeesScreen from "../../app/(guardian)/account-fees";
 
@@ -8,6 +9,26 @@ const mockUseWardFeesQuery = jest.fn();
 const mockPush = jest.fn();
 const mockSelectWard = jest.fn();
 const mockRefetch = jest.fn();
+const mockShow = jest.fn();
+jest.mock("@/lib/session", () => ({
+  useSession: () => ({ subdomain: "north-school" }),
+}));
+jest.mock("@/components/Toast", () => ({
+  useToast: () => ({ show: mockShow }),
+}));
+jest.mock("@/components/Button", () => {
+  const React = jest.requireActual<typeof import("react")>("react");
+  const { Pressable, Text } =
+    jest.requireActual<typeof import("react-native")>("react-native");
+  return {
+    Button: ({ label, onPress }: { label: string; onPress: () => void }) =>
+      React.createElement(
+        Pressable,
+        { onPress },
+        React.createElement(Text, null, label),
+      ),
+  };
+});
 
 jest.mock("@/features/guardian/context", () => ({
   useGuardian: () => mockUseGuardian(),
@@ -144,6 +165,8 @@ beforeEach(() => {
   mockPush.mockReset();
   mockSelectWard.mockReset();
   mockRefetch.mockReset();
+  mockShow.mockReset();
+  delete process.env.EXPO_PUBLIC_PORTAL_ORIGIN;
 });
 
 test("children loading and failure states offer retry", async () => {
@@ -203,4 +226,23 @@ test("fee screen renders the view-only balance for the selected child", async ()
   expect(screen.getByText("Current balance")).toBeVisible();
   expect(screen.getByText(/120/)).toBeVisible();
   expect(screen.getByText(/reference only/i)).toBeVisible();
+  expect(screen.queryByText("Open fees in web portal")).toBeNull();
+});
+
+test("guardian fees opens the configured portal without carrying child data", async () => {
+  const open = jest.spyOn(Linking, "openURL").mockResolvedValue(undefined);
+  process.env.EXPO_PUBLIC_PORTAL_ORIGIN = "https://app.schoolhub.example";
+  mockUseGuardian.mockReturnValue({ activeWard: child });
+  mockUseWardFeesQuery.mockReturnValue({
+    data: { closingBalance: "120.00", entries: [] },
+  });
+  try {
+    await render(<FeesScreen />);
+    await fireEvent.press(screen.getByText("Open fees in web portal"));
+    expect(open).toHaveBeenCalledWith(
+      "https://app.schoolhub.example/login?school=north-school&continue=guardian-fees",
+    );
+  } finally {
+    open.mockRestore();
+  }
 });

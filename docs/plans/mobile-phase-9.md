@@ -18,6 +18,10 @@ production high-severity audit can pass.
 - Configure Android FCM in EAS and supply the Firebase Android config via the
   `GOOGLE_SERVICES_JSON` EAS file variable. Configure iOS APNs in EAS before iOS push testing.
   Set `EXPO_PUSH_ACCESS_TOKEN` on the API deployment and apply the mobile push migration.
+- Set `EXPO_PUBLIC_PORTAL_ORIGIN` for the guardian fees browser handoff and native
+  password recovery. Publish the domain association files with the signed app
+  identifiers before verifying recovery on devices. See the
+  [mobile setup guide](../../apps/mobile/README.md#web-portal-links).
 - Use seeded accounts and non-production pupil data for preview testing.
 
 ## Android internal release
@@ -41,8 +45,12 @@ production high-severity audit can pass.
   password change, and sign-out with seeded mobile accounts.
 - Publish an announcement to a seeded class and verify it reaches that audience.
   Open a sample staff PDF and image, then check access from a student account.
-- Verify guardian ward switching and published report PDFs. Confirm that no
-  mobile role can access BECE or external exams.
+- Verify guardian ward switching, fee statement handoff through web login and
+  published report PDFs. Confirm that no mobile role can access BECE or external
+  exams.
+- Open an emailed password reset link with the app closed, open and signed in.
+  Complete the flow and verify the same link is single-use. Test the web fallback
+  on a device without the app installed.
 - Load a teacher register, go offline, make changes, restart the app, restore
   connectivity, and confirm the same changes arrive once. Verify a rejected
   batch is visible and a subsequent account never receives the previous queue.

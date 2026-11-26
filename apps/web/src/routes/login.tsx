@@ -9,7 +9,7 @@ import {
   ShieldCheck,
   Sparkles,
 } from "lucide-react";
-import { useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { studentLoginEmail } from "@schoolhub/shared";
 import { apiFetch, getClientSubdomain } from "@/lib/api";
@@ -36,6 +36,28 @@ function LoginPage() {
   const navigate = useNavigate();
   const { data: session, isPending: sessionPending } = useSession();
   const subdomain = getClientSubdomain();
+  // Capture the allowlisted continuation when login starts, before the router
+  // changes location and search during the sign-in transition.
+  const [feesSchool] = useState(() =>
+    new URLSearchParams(window.location.search).get("continue") === "guardian-fees"
+      ? getClientSubdomain()
+      : null,
+  );
+  const finishSignIn = useCallback((user: { role?: string | null; mustChangePassword?: boolean | null } | undefined) => {
+    if (user?.mustChangePassword) {
+      return navigate({ to: "/change-password", replace: true });
+    }
+    if (user?.role === "superAdmin") {
+      return navigate({ to: "/admin/dashboard", replace: true });
+    }
+    if (feesSchool) {
+      return navigate({
+        href: `/guardian-fees?school=${encodeURIComponent(feesSchool)}`,
+        replace: true,
+      });
+    }
+    return navigate({ to: "/dashboard", replace: true });
+  }, [feesSchool, navigate]);
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -59,14 +81,8 @@ function LoginPage() {
   useEffect(() => {
     if (sessionPending || !session?.user) return;
 
-    if (session.user.mustChangePassword) {
-      void navigate({ to: "/change-password", replace: true });
-    } else if (session.user.role === "superAdmin") {
-      void navigate({ to: "/admin/dashboard", replace: true });
-    } else {
-      void navigate({ to: "/dashboard", replace: true });
-    }
-  }, [navigate, session, sessionPending]);
+    void finishSignIn(session.user);
+  }, [finishSignIn, session, sessionPending]);
 
   useEffect(() => {
     if (sessionPending || session?.user) return;
@@ -79,20 +95,10 @@ function LoginPage() {
       <main className="flex min-h-screen items-center justify-center bg-background">
         <div role="status" className="flex items-center gap-3 text-sm text-muted-foreground">
           <span className="size-2 animate-pulse rounded-full bg-primary" />
-          {sessionPending ? "Checking your session…" : "Redirecting to your dashboard…"}
+          {sessionPending ? "Checking your session…" : "Opening your school portal…"}
         </div>
       </main>
     );
-  }
-
-  async function finishSignIn(user: { role?: string | null; mustChangePassword?: boolean | null } | undefined) {
-    if (user?.mustChangePassword) {
-      await navigate({ to: "/change-password", replace: true });
-    } else if (user?.role === "superAdmin") {
-      await navigate({ to: "/admin/dashboard", replace: true });
-    } else {
-      await navigate({ to: "/dashboard", replace: true });
-    }
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
