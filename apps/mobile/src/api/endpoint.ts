@@ -39,6 +39,7 @@ export function isValidIdempotencyKey(value: string): boolean {
 
 const publicEndpoints = new Set([
   "GET /schools/public/:subdomain",
+  "GET /schools/public/access/:identifier",
   "POST /schools/public/:subdomain/resolve-login",
   "POST /account/password-recovery/request",
   "POST /account/password-recovery/complete",

@@ -21,6 +21,18 @@ export const getPublicSchool = defineEndpoint({
   response: publicSchoolSchema,
 });
 
+export const schoolAccessMatchSchema = publicSchoolSchema.extend({
+  code: z.string(),
+});
+export type SchoolAccessMatch = z.infer<typeof schoolAccessMatchSchema>;
+export const findSchoolsForAccess = defineEndpoint({
+  method: "GET",
+  path: "/schools/public/access/:identifier",
+  roles: [],
+  scope: "public",
+  response: z.array(schoolAccessMatchSchema).max(2),
+});
+
 export const resolveLoginSchema = z.object({
   identifier: z.string().trim().min(1).max(120),
 });

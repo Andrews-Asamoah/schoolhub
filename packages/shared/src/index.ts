@@ -912,6 +912,12 @@ export const schoolHubtelConnectionSchema = z.object({
 });
 export type SchoolHubtelConnectionInput = z.infer<typeof schoolHubtelConnectionSchema>;
 
+export const schoolAccessIdentifierSchema = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .regex(/^[a-z0-9][a-z0-9-]{0,62}$/, "Enter a school code or address prefix using letters, numbers or hyphens.");
+
 export const enrollSchoolSchema = z.object({
   // School details
   schoolName: z.string().min(2),

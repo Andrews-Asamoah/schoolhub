@@ -12,12 +12,6 @@ export const loginSchema = z.object({
   password: z.string().min(1, "Enter your password."),
 });
 
-export const schoolSubdomainSchema = z
-  .string()
-  .trim()
-  .toLowerCase()
-  .regex(/^[a-z0-9][a-z0-9-]{0,62}$/, "Enter a valid school code.");
-
 export const changePasswordFormSchema = z
   .object({
     currentPassword: z
