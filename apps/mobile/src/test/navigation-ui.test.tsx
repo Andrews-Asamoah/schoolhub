@@ -6,7 +6,9 @@ import { PortalTabBar, type TabBarProps } from "@/components/PortalTabBar";
 import { TabBarInsetProvider, useTabBarInset } from "@/components/TabBarInset";
 import { FontPreviewContext, Text } from "@/components/Typography";
 jest.mock("expo-router", () => ({ router: { prefetch: jest.fn() } }));
-jest.mock("expo-haptics", () => ({ selectionAsync: jest.fn(async () => {}) }));
+jest.mock("expo-haptics", () => ({
+  selectionAsync: jest.fn().mockResolvedValue(undefined),
+}));
 jest.mock("react-native", () => {
   const native = jest.requireActual("react-native");
   return Object.create(native, {
@@ -197,9 +199,8 @@ test("the home tab preloads one destination during idle time", async () => {
   jest.useFakeTimers();
   const requestIdle = globalThis.requestIdleCallback;
   const cancelIdle = globalThis.cancelIdleCallback;
-  const idle = jest.fn<number, Parameters<typeof requestIdleCallback>>(
-    () => 1,
-  );
+  const idle = jest.fn<number, Parameters<typeof requestIdleCallback>>();
+  idle.mockReturnValue(1);
   const cancel = jest.fn<void, Parameters<typeof cancelIdleCallback>>();
   globalThis.requestIdleCallback = idle;
   globalThis.cancelIdleCallback = cancel;

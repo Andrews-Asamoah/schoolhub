@@ -232,9 +232,7 @@ export function PortalTabBar({
           style={[
             styles.label,
             {
-              color: selected
-                ? colors.foreground
-                : colors.mutedForeground,
+              color: selected ? colors.foreground : colors.mutedForeground,
               fontFamily: selected ? fonts.bold : fonts.semibold,
             },
           ]}
