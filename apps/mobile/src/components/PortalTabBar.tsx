@@ -1,6 +1,6 @@
 import { detailTabButton } from "./detailTabButton";
 import * as Haptics from "expo-haptics";
-import type { Tabs } from "expo-router";
+import { router, type Href, type Tabs } from "expo-router";
 import {
   useContext,
   useEffect,
@@ -30,6 +30,7 @@ export type TabBarProps = Parameters<
 const EDGE = 8;
 const LABEL_SIZE = 12;
 const BADGE_BORDER = 2;
+const PREFETCH_DELAY_MS = 400;
 
 export function PortalTabBar({
   state,
@@ -38,9 +39,11 @@ export function PortalTabBar({
   navigateToTab,
   hues = {},
   parentTabs = {},
+  preloadFromHome,
 }: TabBarProps & {
   hues?: Readonly<Record<string, Hue>>;
   parentTabs?: Readonly<Record<string, string>>;
+  preloadFromHome?: Href;
 }) {
   const { colors, scheme, reduceMotion } = useTheme();
   const insets = useSafeAreaInsets();
@@ -48,6 +51,7 @@ export function PortalTabBar({
   const previewScale = useContext(FontPreviewContext);
   const setInset = useSetTabBarInset();
   const scroll = useRef<ComponentRef<typeof ScrollView>>(null);
+  const preloaded = useRef(false);
   const [height, setHeight] = useState(0);
   const [keyboardVisible, setKeyboardVisible] = useState(() =>
     Keyboard.isVisible(),
@@ -71,6 +75,30 @@ export function PortalTabBar({
   useEffect(() => () => setInset(0), [setInset]);
 
   const activeRoute = state.routes[state.index];
+  const isHome = activeRoute?.name === "index";
+
+  useEffect(() => {
+    if (!preloadFromHome || !isHome || keyboardVisible || preloaded.current) {
+      return;
+    }
+
+    const preload = () => {
+      preloaded.current = true;
+      router.prefetch(preloadFromHome);
+    };
+    let idle: number | undefined;
+    const timer = setTimeout(() => {
+      if (typeof requestIdleCallback === "function") {
+        idle = requestIdleCallback(preload);
+      } else {
+        preload();
+      }
+    }, PREFETCH_DELAY_MS);
+    return () => {
+      clearTimeout(timer);
+      if (idle !== undefined) cancelIdleCallback(idle);
+    };
+  }, [isHome, keyboardVisible, preloadFromHome]);
   const tabs = state.routes
     .filter((route) => {
       const options = descriptors[route.key]?.options;
@@ -130,6 +158,93 @@ export function PortalTabBar({
 
   if (keyboardVisible) return null;
 
+  const items = tabs.map(({ route, options, label }, index) => {
+    const current = route.key === activeRoute?.key;
+    const selected = index === active;
+    const palette = modulePalette(hues[route.name] ?? "indigo", scheme);
+    const badge = options?.tabBarBadge;
+    const hasBadge =
+      badge != null && badge !== "" && badge !== 0 && badge !== "0";
+
+    return (
+      <Pressable
+        key={route.key}
+        accessibilityRole="tab"
+        accessibilityState={{ selected }}
+        accessibilityLabel={hasBadge ? `${label}, ${badge} unread` : label}
+        onLongPress={() =>
+          emitter.emit({ type: "tabLongPress", target: route.key })
+        }
+        onPress={() => {
+          const event = emitter.emit({
+            type: "tabPress",
+            target: route.key,
+            canPreventDefault: true,
+          });
+          if (!current && !event.defaultPrevented) {
+            navigateToTab(route.key);
+            void Haptics.selectionAsync().catch(() => {});
+          }
+        }}
+        android_ripple={{ color: colors.muted }}
+        style={({ pressed }) => [
+          styles.item,
+          { width: widths[index] },
+          pressed && { backgroundColor: colors.muted },
+        ]}
+      >
+        <View
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
+          style={[
+            styles.indicator,
+            selected && { backgroundColor: palette.tint },
+          ]}
+        >
+          {options?.tabBarIcon?.({
+            focused: selected,
+            color: selected ? palette.ink : colors.mutedForeground,
+            size: 22,
+          })}
+          {hasBadge ? (
+            <View
+              style={[
+                styles.badge,
+                {
+                  backgroundColor: colors.destructive,
+                  borderColor: colors.card,
+                },
+              ]}
+            >
+              <Text
+                allowFontScaling={false}
+                style={[
+                  styles.badgeText,
+                  { color: colors.destructiveForeground },
+                ]}
+              >
+                {typeof badge === "number" && badge > 99 ? "99+" : badge}
+              </Text>
+            </View>
+          ) : null}
+        </View>
+        <Text
+          style={[
+            styles.label,
+            {
+              color: selected
+                ? colors.foreground
+                : colors.mutedForeground,
+              fontFamily: selected ? fonts.bold : fonts.semibold,
+            },
+          ]}
+        >
+          {label}
+        </Text>
+      </Pressable>
+    );
+  });
+
   return (
     <View
       testID="portal-tab-bar"
@@ -147,102 +262,21 @@ export function PortalTabBar({
         },
       ]}
     >
-      <ScrollView
-        testID="portal-tab-strip"
-        ref={scroll}
-        horizontal
-        scrollEnabled={needsScroll}
-        showsHorizontalScrollIndicator={needsScroll}
-        contentContainerStyle={styles.track}
-      >
-        {tabs.map(({ route, options, label }, index) => {
-          const current = route.key === activeRoute?.key;
-          const selected = index === active;
-          const palette = modulePalette(hues[route.name] ?? "indigo", scheme);
-          const badge = options?.tabBarBadge;
-          const hasBadge =
-            badge != null && badge !== "" && badge !== 0 && badge !== "0";
-
-          return (
-            <Pressable
-              key={route.key}
-              accessibilityRole="tab"
-              accessibilityState={{ selected }}
-              accessibilityLabel={
-                hasBadge ? `${label}, ${badge} unread` : label
-              }
-              onLongPress={() =>
-                emitter.emit({ type: "tabLongPress", target: route.key })
-              }
-              onPress={() => {
-                const event = emitter.emit({
-                  type: "tabPress",
-                  target: route.key,
-                  canPreventDefault: true,
-                });
-                if (!current && !event.defaultPrevented) {
-                  void Haptics.selectionAsync();
-                  navigateToTab(route.key);
-                }
-              }}
-              style={({ pressed }) => [
-                styles.item,
-                { width: widths[index] },
-                pressed && { backgroundColor: colors.muted },
-              ]}
-            >
-              <View
-                accessibilityElementsHidden
-                importantForAccessibility="no-hide-descendants"
-                style={[
-                  styles.indicator,
-                  selected && { backgroundColor: palette.tint },
-                ]}
-              >
-                {options?.tabBarIcon?.({
-                  focused: selected,
-                  color: selected ? palette.ink : colors.mutedForeground,
-                  size: 22,
-                })}
-                {hasBadge ? (
-                  <View
-                    style={[
-                      styles.badge,
-                      {
-                        backgroundColor: colors.destructive,
-                        borderColor: colors.card,
-                      },
-                    ]}
-                  >
-                    <Text
-                      allowFontScaling={false}
-                      style={[
-                        styles.badgeText,
-                        { color: colors.destructiveForeground },
-                      ]}
-                    >
-                      {typeof badge === "number" && badge > 99 ? "99+" : badge}
-                    </Text>
-                  </View>
-                ) : null}
-              </View>
-              <Text
-                style={[
-                  styles.label,
-                  {
-                    color: selected
-                      ? colors.foreground
-                      : colors.mutedForeground,
-                    fontFamily: selected ? fonts.bold : fonts.semibold,
-                  },
-                ]}
-              >
-                {label}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </ScrollView>
+      {needsScroll ? (
+        <ScrollView
+          testID="portal-tab-strip"
+          ref={scroll}
+          horizontal
+          showsHorizontalScrollIndicator
+          contentContainerStyle={styles.track}
+        >
+          {items}
+        </ScrollView>
+      ) : (
+        <View testID="portal-tab-row" style={styles.track}>
+          {items}
+        </View>
+      )}
     </View>
   );
 }
@@ -255,7 +289,11 @@ const styles = StyleSheet.create({
     right: 0,
     borderTopWidth: StyleSheet.hairlineWidth,
   },
-  track: { paddingHorizontal: EDGE, paddingVertical: spacing.xs },
+  track: {
+    flexDirection: "row",
+    paddingHorizontal: EDGE,
+    paddingVertical: spacing.xs,
+  },
   item: {
     alignItems: "center",
     justifyContent: "flex-start",

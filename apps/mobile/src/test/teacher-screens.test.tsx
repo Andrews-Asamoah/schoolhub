@@ -282,7 +282,6 @@ const calendar = {
 };
 const fixture: Record<string, unknown> = {
   overview: teaching,
-  classes: [{ id: "c", name: "JHS 1" }],
   timetable: { entries: [] },
   roster: [
     {
@@ -388,6 +387,14 @@ beforeEach(() => {
     ...baseQuery,
     data: fixture[parts[0]!],
   }));
+});
+test("teacher classes reuse the assigned classes from the home query", async () => {
+  await render(<TeacherClasses />);
+  expect(screen.getByText("View JHS 1 roster")).toBeVisible();
+  expect(mockQuery).toHaveBeenCalledWith(["overview"]);
+  expect(mockQuery.mock.calls.every(([parts]) => parts[0] === "overview")).toBe(
+    true,
+  );
 });
 const screens = [
   TeacherHome,

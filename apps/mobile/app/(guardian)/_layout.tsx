@@ -20,6 +20,7 @@ export default function GuardianLayout() {
           tabBar={(props) => (
             <PortalTabBar
               {...props}
+              preloadFromHome="/(guardian)/family"
               parentTabs={{
                 "attendance-history": "more",
                 "absence-requests": "more",

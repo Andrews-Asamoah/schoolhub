@@ -21,6 +21,7 @@ export default function TeacherLayout() {
           tabBar={(props) => (
             <PortalTabBar
               {...props}
+              preloadFromHome="/(teacher)/teacher-classes"
               parentTabs={{
                 "teacher-roster": "teacher-classes",
                 "teacher-pupil": "teacher-classes",

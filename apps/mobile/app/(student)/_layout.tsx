@@ -18,6 +18,7 @@ export default function StudentLayout() {
         tabBar={(props) => (
           <PortalTabBar
             {...props}
+            preloadFromHome="/(student)/my-learning"
             parentTabs={{
               "student-reports": "resources",
               "student-subjects": "my-learning",
