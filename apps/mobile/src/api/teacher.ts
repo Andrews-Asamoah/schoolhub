@@ -61,11 +61,22 @@ export const getTeacherStudent = defineEndpoint({
     id: z.string(),
     admissionNumber: z.string().nullable(),
     status: z.string(),
+    profile: profile.extend({ otherNames: optionalText, image: optionalText }),
+    class: named.nullable(),
+    house: named.nullable(),
+    department: named.nullish(),
+  }),
+});
+export const getTeacherStudentRecords = defineEndpoint({
+  method: "GET",
+  path: "/students/:id/profile",
+  roles: ["teacher"],
+  response: z.object({
+    admissionNumber: z.string().nullable(),
     username: optionalText,
     loginEmail: optionalText,
     admissionDate: optionalText,
     previousSchool: optionalText,
-    department: named.nullish(),
     health: z
       .object({
         bloodGroup: optionalText,
@@ -84,8 +95,6 @@ export const getTeacherStudent = defineEndpoint({
       )
       .optional(),
     profile: profile.extend({
-      otherNames: z.string().nullish(),
-      image: optionalText,
       dateOfBirth: optionalText,
       gender: optionalText,
       nationality: optionalText,
@@ -97,8 +106,6 @@ export const getTeacherStudent = defineEndpoint({
       emergencyContactPhone: optionalText,
       emergencyRelationship: optionalText,
     }),
-    class: named.nullable(),
-    house: named.nullable(),
   }),
 });
 export const getTeacherStudentSubjects = defineEndpoint({

@@ -6,6 +6,7 @@ import {
   getRegisterGaps,
   getRoster,
   getTeacherStudent,
+  getTeacherStudentRecords,
   getTeacherStudentSubjects,
   getTeacherStudentAttendance,
   getTeacherStudentReport,
@@ -264,7 +265,19 @@ export function TeacherPupil() {
       back
     >
       <QueryState query={p}>
-        {p.data ? <StudentProfileCard student={p.data} /> : null}
+        {p.data ? (
+          <>
+            <StudentProfileCard student={p.data} />
+            <Button
+              label={showDetails ? "Hide pupil records" : "Show pupil records"}
+              variant="secondary"
+              onPress={() => setShowDetails((open) => !open)}
+            />
+            {showDetails ? (
+              <PupilRecords key={p.data.id} studentId={p.data.id} />
+            ) : null}
+          </>
+        ) : null}
       </QueryState>
       <Panel title="Subjects">
         <QueryState query={subjects} empty={!subjects.data?.subjects.length}>
@@ -313,10 +326,21 @@ export function TeacherPupil() {
   );
 }
 
-function PupilRecords({
+function PupilRecords({ studentId }: { studentId: string }) {
+  const records = useTeacherQuery(["pupil-records", studentId], (signal) =>
+    getTeacherStudentRecords({ signal, params: { id: studentId } }),
+  );
+  return (
+    <QueryState query={records}>
+      {records.data ? <PupilRecordSections student={records.data} /> : null}
+    </QueryState>
+  );
+}
+
+function PupilRecordSections({
   student,
 }: {
-  student: Awaited<ReturnType<typeof getTeacherStudent>>;
+  student: Awaited<ReturnType<typeof getTeacherStudentRecords>>;
 }) {
   const { profile, health, guardians } = student;
   const date = (value?: string | null) =>

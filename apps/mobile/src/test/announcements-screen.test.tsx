@@ -103,7 +103,7 @@ jest.mock("@/components/Skeleton", () => {
   return { SkeletonRow: () => React.createElement(Text, null, "Loading") };
 });
 jest.mock("@/theme/theme", () => ({
-  spacing: { lg: 16 },
+  ...jest.requireActual("@/theme/theme"),
   useTheme: () => ({
     colors: { mutedForeground: "#4B5675", primary: "#4338CA" },
   }),
