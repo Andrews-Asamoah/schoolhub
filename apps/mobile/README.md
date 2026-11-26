@@ -51,6 +51,14 @@ development computer's reachable LAN IP (for example
 changing `.env`, restart Expo so the public variable is reloaded. Never put
 credentials in an EXPO_PUBLIC variable.
 
+## School access
+
+Deploy the API with `GET /api/schools/public/access/:identifier` before
+distributing the matching mobile app. Users enter an exact school code or
+address prefix and select the matching school. The endpoint returns only
+matching display and branding details. The app remembers the selected school
+and reuses its branding when opening sign-in.
+
 ## Web portal links
 
 Set `EXPO_PUBLIC_PORTAL_ORIGIN` to the bare HTTPS origin of the school web
