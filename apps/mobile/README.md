@@ -43,13 +43,34 @@ cd apps/mobile
 npx expo start --clear
 ```
 
-Set EXPO_PUBLIC_API_URL to the API origin without /api; the example explains
-emulator/device addresses. In particular, `10.0.2.2` is for the Android
-emulator only. Use `http://localhost:3001` for the iOS simulator, or the
-development computer's reachable LAN IP (for example
-`http://172.26.104.18:3001`) for a physical iPhone on the same network. After
-changing `.env`, restart Expo so the public variable is reloaded. Never put
-credentials in an EXPO_PUBLIC variable.
+Set `EXPO_PUBLIC_API_URL` in `apps/mobile/.env` to the API origin without
+`/api`. Use `http://10.0.2.2:3001` for the Android emulator,
+`http://localhost:3001` for the iOS simulator, or your laptop’s Wi-Fi IPv4
+address and API port for a physical phone. On Windows, run `ipconfig` and
+read the IPv4 address under the active Wi-Fi adapter.
+
+### School lookup on a physical phone
+
+1. Start the API with `pnpm --filter @schoolhub/api dev` and check
+   `http://localhost:3001/api/health/live` on your laptop. Use the actual
+   `PORT` from the API configuration if it differs.
+2. On the phone, open `http://<laptop-Wi-Fi-IP>:3001/api/health/live` in the
+   browser. If the laptop probe works and this one fails, check whether
+   Windows Firewall allows the API on your private network and whether the
+   Wi-Fi network blocks devices from reaching one another.
+3. If liveness succeeds, open `http://<laptop-Wi-Fi-IP>:3001/api/health/ready`
+   to verify the database. Then open
+   `http://<laptop-Wi-Fi-IP>:3001/api/schools/public/access/<school-code>`.
+   A JSON array means the app’s route is reachable. An HTTP 404 means the
+   server is missing the route or the request reached the wrong server.
+4. Use the same laptop address in `apps/mobile/.env`, restart Metro with
+   `pnpm --filter @schoolhub/mobile dev --clear`, and reopen the app. An
+   installed preview or production build uses the HTTPS origin from its
+   build environment and needs a new build to change its bundled value.
+
+Expo’s Metro tunnel connects to the development server. The API origin must
+also be reachable by the phone. Keep local HTTP testing on a private
+development network and keep credentials out of `EXPO_PUBLIC_*` variables.
 
 ## School access
 
