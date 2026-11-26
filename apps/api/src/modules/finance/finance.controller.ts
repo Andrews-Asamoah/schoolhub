@@ -438,6 +438,17 @@ export class FinanceController {
     return this.financeService.setArrearsPolicy(school.id, user.id, body.arrearsPolicy);
   }
 
+  @Get("billing-roster/:classId")
+  @Roles(...FINANCE_READ_ROLES)
+  getBillingRoster(
+    @CurrentSchool() school: School,
+    @Param("classId") classId: string,
+    @Query("academicYearId") academicYearId?: string,
+    @Query("termId") termId?: string,
+  ) {
+    return this.financeService.getBillingRoster(school.id, classId, academicYearId, termId);
+  }
+
   @Get("bills")
   @Roles(...FINANCE_READ_ROLES)
   listBills(
