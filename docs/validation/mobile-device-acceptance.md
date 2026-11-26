@@ -45,6 +45,18 @@ issues before Phase 9.
       shimmer remain smooth.
 - [ ] App icon, adaptive icon mask, and light/dark splash are correct.
 
+## Navigation and appearance
+
+- [ ] Switch between all five tabs as a teacher, guardian, and student.
+      Confirm inactive labels stay visible and detail screens keep the relevant
+      section selected.
+- [ ] Test gesture navigation and three-button Android navigation. Scroll the
+      class register to its last item and verify the dock leaves it reachable.
+- [ ] Open and close the keyboard in a search field. Confirm navigation moves
+      out of the way and returns when the keyboard closes.
+- [ ] At 200% system text size, scroll the tab strip and reach the first and
+      last tabs. Check labels, unread counts, and selected states in both themes.
+
 ## Portal workflow checks
 
 - [ ] Sign in as the assigned teacher, save marks, and import a sample CSV and

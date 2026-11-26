@@ -50,7 +50,8 @@ export function Screen({
     scrollY.value = e.contentOffset.y;
   });
 
-  const top = insets.top + useHeaderBarHeight();
+  const headerHeight = useHeaderBarHeight();
+  const top = insets.top + (left || right ? headerHeight : spacing.lg);
   const heading = title ? (
     <View style={{ paddingBottom: spacing.lg }}>
       <Text
@@ -105,7 +106,12 @@ export function Screen({
       ) : (
         <View
           style={[
-            { flex: 1, paddingTop: top, paddingHorizontal: spacing.lg },
+            {
+              flex: 1,
+              paddingTop: top,
+              paddingHorizontal: spacing.lg,
+              paddingBottom: Math.max(insets.bottom, bottomInset),
+            },
             contentStyle,
           ]}
         >
@@ -114,12 +120,14 @@ export function Screen({
           {children}
         </View>
       )}
-      <GlassHeader
-        title={title ?? ""}
-        scrollY={scrollY}
-        left={left}
-        right={right}
-      />
+      {title || left || right ? (
+        <GlassHeader
+          title={title ?? ""}
+          scrollY={scrollY}
+          left={left}
+          right={right}
+        />
+      ) : null}
     </View>
   );
 }

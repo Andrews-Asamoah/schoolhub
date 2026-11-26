@@ -1,5 +1,5 @@
 import { TabBarInsetProvider } from "@/components/TabBarInset";
-import { GlassTabBar } from "@/components/GlassTabBar";
+import { PortalTabBar } from "@/components/PortalTabBar";
 import { Tabs } from "expo-router";
 import {
   BookOpen,
@@ -14,8 +14,15 @@ export default function StudentLayout() {
     <TabBarInsetProvider>
       <Tabs
         tabBar={(props) => (
-          <GlassTabBar
+          <PortalTabBar
             {...props}
+            parentTabs={{
+              "student-reports": "resources",
+              "student-subjects": "my-learning",
+              "student-classmates": "resources",
+              "student-community": "resources",
+              "assignment/[id]": "my-learning",
+            }}
             hues={{
               index: "indigo",
               "my-timetable": "violet",

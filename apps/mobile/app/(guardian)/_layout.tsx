@@ -1,5 +1,5 @@
 import { TabBarInsetProvider } from "@/components/TabBarInset";
-import { GlassTabBar } from "@/components/GlassTabBar";
+import { PortalTabBar } from "@/components/PortalTabBar";
 import { GuardianProvider } from "@/features/guardian/context";
 import { Tabs } from "expo-router";
 import {
@@ -16,8 +16,15 @@ export default function GuardianLayout() {
       <TabBarInsetProvider>
         <Tabs
           tabBar={(props) => (
-            <GlassTabBar
+            <PortalTabBar
               {...props}
+              parentTabs={{
+                "attendance-history": "more",
+                "absence-requests": "more",
+                timetable: "more",
+                reports: "more",
+                "ward/[id]": "family",
+              }}
               hues={{
                 index: "indigo",
                 family: "violet",

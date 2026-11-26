@@ -1,6 +1,6 @@
-import { router, type Href } from "expo-router";
 import {
-  BookOpen,
+  CalendarCheck,
+  ClipboardPlus,
   CalendarDays,
   ClipboardList,
   Home,
@@ -9,6 +9,7 @@ import {
 import { View } from "react-native";
 import { Card } from "@/components/Surface";
 import { EmptyState, ErrorState } from "@/components/States";
+import { PortalMenu, SchoolAccountMenu } from "@/components/PortalMenu";
 import { ListRow } from "@/components/ListRow";
 import { Screen } from "@/components/Screen";
 import { SkeletonRow } from "@/components/Skeleton";
@@ -30,36 +31,38 @@ export default function GuardianMoreScreen() {
   return (
     <Screen
       title="More"
-      subtitle="Learning and school community"
       right={<WardSwitcher />}
       refreshing={clubs.isRefetching || houses.isRefetching}
       onRefresh={retry}
     >
       <View style={{ gap: spacing.lg }}>
-        <Card>
-          <ListRow
-            title="Attendance history"
-            subtitle="Term summary and daily records"
-            leading={<CalendarDays size={20} color={colors.primary} />}
-            onPress={() =>
-              router.push("/(guardian)/attendance-history" as Href)
-            }
-            divider
-          />
-          <ListRow
-            title="Weekly timetable"
-            subtitle="Class schedule by day"
-            leading={<BookOpen size={20} color={colors.primary} />}
-            onPress={() => router.push("/(guardian)/timetable" as Href)}
-            divider
-          />
-          <ListRow
-            title="Published reports"
-            subtitle="Academic and mock report cards"
-            leading={<ClipboardList size={20} color={colors.primary} />}
-            onPress={() => router.push("/(guardian)/reports" as Href)}
-          />
-        </Card>
+        <PortalMenu
+          title="Child records"
+          hue="violet"
+          links={[
+            {
+              label: "Attendance history",
+              href: "/(guardian)/attendance-history",
+              icon: CalendarCheck,
+            },
+            {
+              label: "Absence requests",
+              href: "/(guardian)/absence-requests",
+              icon: ClipboardPlus,
+            },
+            {
+              label: "Weekly timetable",
+              href: "/(guardian)/timetable",
+              icon: CalendarDays,
+            },
+            {
+              label: "Published reports",
+              href: "/(guardian)/reports",
+              icon: ClipboardList,
+            },
+          ]}
+        />
+        <SchoolAccountMenu />
         {!activeWard ? (
           <EmptyState
             title="No child selected"

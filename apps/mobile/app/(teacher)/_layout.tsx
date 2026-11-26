@@ -6,7 +6,7 @@ import {
   BookOpen,
   LayoutGrid,
 } from "lucide-react-native";
-import { GlassTabBar } from "@/components/GlassTabBar";
+import { PortalTabBar } from "@/components/PortalTabBar";
 import { TabBarInsetProvider } from "@/components/TabBarInset";
 import { RegisterSyncProvider } from "@/features/teacher/RegisterSync";
 import { useNotificationsQuery } from "@/features/shared/queries";
@@ -17,8 +17,23 @@ export default function TeacherLayout() {
       <TabBarInsetProvider>
         <Tabs
           tabBar={(props) => (
-            <GlassTabBar
+            <PortalTabBar
               {...props}
+              parentTabs={{
+                "teacher-roster": "teacher-classes",
+                "teacher-pupil": "teacher-classes",
+                "teacher-register": "teacher-classes",
+                "teacher-score-entry": "teacher-assess",
+                "teacher-report-review": "teacher-assess",
+                "teacher-report-archive": "teacher-assess",
+                "teacher-mock-analysis": "teacher-assess",
+                "teacher-assignment-new": "teacher-assignments",
+                "teacher-assignment": "teacher-assignments",
+                "teacher-timetable": "teacher-more",
+                "teacher-clubs": "teacher-more",
+                "teacher-documents": "teacher-more",
+                "teacher-announcement-new": "teacher-more",
+              }}
               hues={{
                 index: "indigo",
                 "teacher-classes": "violet",
