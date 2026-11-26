@@ -209,6 +209,22 @@ Teachers can publish class announcements to pupils or their guardians from
 Announcements. Staff documents are available in More. Open a document to
 share an authenticated PDF or image downloaded into the device's temporary cache.
 
+## Teacher web and mobile workflows
+
+- **Classes and students** use the assigned-class scope. Mobile includes a
+  class directory, searchable student directory, pupils' profiles, attendance,
+  and shortcuts from each class to subject marks.
+- **Subjects and school reports** include the catalogue, teaching assignments
+  and non-financial analytics. Classes, students and subjects support print,
+  PDF and Excel export.
+- **Timetable** offers personal, class, teacher and room views by academic year,
+  with print, PDF and Excel export.
+- **External examinations** are visible only in the teacher portal. The API
+  limits registers to appointed class teachers. Mobile can review paper
+  summaries and transcribe results with source references. School administrators
+  and headteachers use the web workflow for their separately authorised
+  operations, including creation, index numbers, imports and attestation.
+
 ## Teacher, guardian and student workflows
 
 Teachers can save and submit assessment sheets, record absent or excused pupils,

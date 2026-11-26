@@ -1,5 +1,9 @@
 import { File } from "expo-file-system";
 import { z } from "zod";
+import {
+  listTeacherExternalExams,
+  saveTeacherExternalResults,
+} from "@/api/teacher-external-exams";
 import { defineEndpoint } from "@/api/endpoint";
 import {
   listAnnouncementClasses,
@@ -63,16 +67,67 @@ test("schemas reject malformed responses and strip unneeded personal fields", as
   jest.mocked(apiFetch).mockResolvedValue([{ id: 7 }]);
   await expect(listAnnouncements()).rejects.toThrow();
 });
-test("BECE guard applies in executable paths, even to teacher sessions", async () => {
+test("external-exam requests require the active teacher role", async () => {
+  for (const role of ["student", "guardian"]) {
+    jest.mocked(sessionStore.getSnapshot).mockReturnValue({
+      ...ready,
+      activeRole: role,
+      roles: [role, "teacher"],
+    } as never);
+    await expect(listTeacherExternalExams()).rejects.toThrow();
+  }
+  expect(apiFetch).not.toHaveBeenCalled();
+  jest.mocked(sessionStore.getSnapshot).mockReturnValue(ready as never);
+  jest.mocked(apiFetch).mockResolvedValue([]);
+  await expect(listTeacherExternalExams()).resolves.toEqual([]);
+  expect(apiFetch).toHaveBeenCalledWith("/external-exams", expect.anything());
+});
+test("BECE writes validate the grade and preserve the candidate version", async () => {
+  const request = {
+    paperId: "paper",
+    sourceReference: "School result statement",
+    entries: [
+      {
+        candidateId: "candidate",
+        status: "GRADED" as const,
+        grade: 9,
+        expectedVersion: 2,
+      },
+    ],
+  };
+  await expect(
+    saveTeacherExternalResults({
+      request: { ...request, entries: [{ ...request.entries[0]!, grade: 10 }] },
+    }),
+  ).rejects.toThrow();
+  expect(apiFetch).not.toHaveBeenCalled();
+  jest.mocked(apiFetch).mockResolvedValue({ paperId: "paper", saved: 1 });
+  await expect(saveTeacherExternalResults({ request })).resolves.toEqual({
+    paperId: "paper",
+    saved: 1,
+  });
+  expect(apiFetch).toHaveBeenCalledWith(
+    "/external-exams/results",
+    expect.objectContaining({ method: "PUT", body: JSON.stringify(request) }),
+  );
+});
+test("unsupported external-exam endpoint declarations fail closed", () => {
   expect(() =>
     defineEndpoint({
-      method: "GET",
-      path: "/external-exams/results",
+      method: "POST",
+      path: "/external-exams/bece",
       roles: ["teacher"],
       response: z.unknown(),
     }),
   ).toThrow("External examinations");
-  expect(apiFetch).not.toHaveBeenCalled();
+  expect(() =>
+    defineEndpoint({
+      method: "GET",
+      path: "/external-exams",
+      roles: ["teacher", "guardian"],
+      response: z.unknown(),
+    }),
+  ).toThrow("External examinations");
 });
 test("encodes path parameters and forwards abort signals", async () => {
   const endpoint = defineEndpoint({

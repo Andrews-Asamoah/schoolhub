@@ -285,6 +285,13 @@ const calendar = {
 const fixture: Record<string, unknown> = {
   overview: teaching,
   timetable: { entries: [] },
+  "timetable-options": {
+    academicYear: null,
+    academicYears: [],
+    classes: [],
+    teachers: [],
+    classrooms: [],
+  },
   roster: [
     {
       id: "p",
@@ -698,6 +705,59 @@ test("submits an assessment with its selected excused pupil after confirmation",
         excusedStudentIds: [assessment.students[0]?.studentId],
       },
     });
+  } finally {
+    alert.mockRestore();
+  }
+});
+
+test("marking a pupil absent clears saved marks only after confirmation", async () => {
+  const sheet = teacherApi.assessmentSheetSchema.parse(fixture.assessment);
+  const alert = jest.spyOn(Alert, "alert").mockImplementation(() => {});
+  try {
+    mockQuery.mockImplementation((parts: string[]) => ({
+      ...baseQuery,
+      data:
+        parts[0] === "assessment"
+          ? {
+              ...sheet,
+              canSubmit: true,
+              students: sheet.students.map((student) => ({
+                ...student,
+                marks: [{ componentId: "test", occurrenceIndex: 0, marks: 7 }],
+              })),
+            }
+          : fixture[parts[0]!],
+    }));
+    await render(<TeacherScoreEntry />);
+    await fireEvent.press(
+      screen.getByRole("button", { name: "Mark absent / excused" }),
+    );
+    expect(mockMutate).not.toHaveBeenCalled();
+    const confirmation = alert.mock.calls[0]?.[2]?.find(
+      (action) => action.text === "Clear marks",
+    );
+    expect(confirmation?.onPress).toBeDefined();
+    await act(async () => confirmation?.onPress?.());
+    expect(mockMutate).toHaveBeenCalledWith({
+      request: {
+        classId: "c",
+        subjectId: "math",
+        templateId: "template",
+        termId: "term",
+        entries: [
+          {
+            studentId: "p",
+            componentId: "test",
+            occurrenceIndex: 0,
+            expectedMarks: 7,
+            marks: null,
+          },
+        ],
+      },
+    });
+    expect(
+      screen.getByRole("button", { name: "Undo absent / excused" }),
+    ).toBeVisible();
   } finally {
     alert.mockRestore();
   }

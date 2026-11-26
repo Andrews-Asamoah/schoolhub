@@ -11,6 +11,7 @@ import {
   managedAssignmentsSchema,
 } from "@/api/teacher";
 import type { z } from "zod";
+import { formatDateTime } from "@/features/shared/format";
 import { useScopedMutation } from "@/features/shared/mutations";
 import { useTeacherQuery } from "./queries";
 import { TeacherPage, QueryState, Panel, Copy, MutationState } from "./ui";
@@ -43,7 +44,13 @@ export function TeacherAssignments() {
   return (
     <TeacherPage
       title="Assignments"
-      subtitle={q.data?.term.name}
+      subtitle={
+        q.data
+          ? [q.data.academicYear?.name, q.data.term.name]
+              .filter(Boolean)
+              .join(" · ")
+          : undefined
+      }
       query={q}
       right={
         <Button
@@ -59,6 +66,24 @@ export function TeacherAssignments() {
           value={search}
           onChange={setSearch}
         />
+      ) : null}
+      {q.data ? (
+        <View
+          style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing.sm }}
+        >
+          <StatusPill
+            label={`${q.data.assignments.filter((item) => item.status === "PUBLISHED").length} published`}
+            hue="emerald"
+          />
+          <StatusPill
+            label={`${q.data.assignments.reduce((count, item) => count + item.submissions.length, 0)} submissions`}
+            hue="sky"
+          />
+          <StatusPill
+            label={`${q.data.assignments.reduce((count, item) => count + item.submissions.filter((submission) => submission.status === "SUBMITTED").length, 0)} awaiting grades`}
+            hue="amber"
+          />
+        </View>
       ) : null}
       <QueryState query={q} empty={!assignments.length}>
         {assignments.map((a) => {
@@ -279,6 +304,19 @@ function GradeForm({
       <Copy>
         {submission.status} · {submission.score ?? "Not graded"} / {max}
       </Copy>
+      {submission.submittedAt ? (
+        <Copy>
+          {[
+            submission.student.admissionNumber ?? submission.student.studentId,
+            `Submitted ${formatDateTime(submission.submittedAt)}`,
+          ]
+            .filter(Boolean)
+            .join(" · ")}
+        </Copy>
+      ) : null}
+      {submission.gradedBy ? (
+        <Copy>Graded by {submission.gradedBy.name}</Copy>
+      ) : null}
       <Copy>{submission.responseText}</Copy>
       <form.Field name="score">
         {(field) => (

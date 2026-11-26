@@ -17,6 +17,7 @@ import { TeacherPage, QueryState, Panel, Copy } from "./ui";
 import {
   BookOpen,
   ChartNoAxesColumn,
+  BookOpenCheck,
   ClipboardList,
   Files,
 } from "lucide-react-native";
@@ -114,6 +115,11 @@ export function TeacherAssess() {
             icon: Files,
           },
           {
+            label: "External examinations",
+            href: "/(teacher)/teacher-external-exams",
+            icon: BookOpenCheck,
+          },
+          {
             label: "Internal mock analysis",
             href: "/(teacher)/teacher-mock-analysis",
             icon: ChartNoAxesColumn,
@@ -162,7 +168,11 @@ function AssessmentEditor({
   const [draft, setDraft] = useState<
     Record<string, { text: string; expectedMarks: number | null }>
   >({});
-  const [excused, setExcused] = useState<string[]>([]);
+  const [excused, setExcused] = useState<string[]>(() =>
+    sheet.students
+      .filter((student) => student.excused)
+      .map((student) => student.studentId),
+  );
   const [pupilSearch, setPupilSearch] = useState("");
   const pupils = sheet.students.filter((pupil) =>
     pupil.name.toLowerCase().includes(pupilSearch.trim().toLowerCase()),
@@ -180,6 +190,9 @@ function AssessmentEditor({
     submitMutation.isPending ||
     correctionMutation.isPending;
   const dirty = Object.keys(draft).length > 0;
+  const absenceChanged = sheet.students.some(
+    (student) => !!student.excused !== excused.includes(student.studentId),
+  );
   const unfinished = sheet.students.filter((student) =>
     excused.includes(student.studentId)
       ? student.marks.length > 0
@@ -240,6 +253,58 @@ function AssessmentEditor({
       );
     }
   }
+  function markExcused(student: AssessmentSheet["students"][number]) {
+    if (excused.includes(student.studentId)) {
+      setExcused((ids) => ids.filter((id) => id !== student.studentId));
+      return;
+    }
+    if (!student.marks.length) {
+      setExcused((ids) => [...ids, student.studentId]);
+      return;
+    }
+    Alert.alert(
+      "Clear recorded marks?",
+      `This clears ${student.name}’s existing marks. Submit the sheet to record the pupil as absent or excused.`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Clear marks",
+          style: "destructive",
+          onPress: () => {
+            setError("");
+            setNotice("");
+            void saveMutation
+              .mutateAsync({
+                request: {
+                  ...ref,
+                  termId: sheet.term.id,
+                  entries: student.marks.map((mark) => ({
+                    studentId: student.studentId,
+                    componentId: mark.componentId,
+                    occurrenceIndex: mark.occurrenceIndex,
+                    expectedMarks: mark.marks,
+                    marks: null,
+                  })),
+                },
+              })
+              .then(() => {
+                setExcused((ids) =>
+                  ids.includes(student.studentId)
+                    ? ids
+                    : [...ids, student.studentId],
+                );
+                setNotice(
+                  "Recorded marks cleared. Submit the sheet to save the absence.",
+                );
+              })
+              .catch(() =>
+                setError("Marks could not be cleared. Refresh and try again."),
+              );
+          },
+        },
+      ],
+    );
+  }
   async function submit() {
     setError("");
     setNotice("");
@@ -247,7 +312,6 @@ function AssessmentEditor({
       await submitMutation.mutateAsync({
         request: { ...ref, excusedStudentIds: excused },
       });
-      setExcused([]);
       setNotice("Marks submitted.");
     } catch (failure) {
       setError(
@@ -280,7 +344,7 @@ function AssessmentEditor({
           label="Assessment template"
           value={sheet.template?.id ?? ""}
           options={sheet.templates.map((t) => ({ value: t.id, label: t.name }))}
-          disabled={dirty || !!excused.length || correcting || pending}
+          disabled={dirty || absenceChanged || correcting || pending}
           onChange={onTemplate}
         />
         <Copy>
@@ -425,22 +489,18 @@ function AssessmentEditor({
                   disabled={
                     pending ||
                     dirty ||
-                    (s.marks.length > 0 && !excused.includes(s.studentId))
+                    (!excused.includes(s.studentId) &&
+                      s.marks.some(
+                        (mark) =>
+                          !sheet.template?.components.some(
+                            (component) =>
+                              component.id === mark.componentId &&
+                              component.canEdit !== false,
+                          ),
+                      ))
                   }
-                  onPress={() =>
-                    setExcused((ids) =>
-                      ids.includes(s.studentId)
-                        ? ids.filter((id) => id !== s.studentId)
-                        : [...ids, s.studentId],
-                    )
-                  }
+                  onPress={() => markExcused(s)}
                 />
-              ) : null}
-              {sheet.canSubmit && s.marks.length ? (
-                <Copy>
-                  Clear and save existing marks before marking this pupil
-                  absent.
-                </Copy>
               ) : null}
               <View style={styles.fields}>
                 {sheet.template!.components.flatMap((c) =>

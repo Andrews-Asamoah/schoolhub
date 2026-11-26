@@ -30,6 +30,9 @@ test("normalises inventory parameter names", () =>
   ));
 for (const [method, path] of [
   ["GET", "/academics/classes"],
+  ["GET", "/timetable/setup"],
+  ["GET", "/external-exams"],
+  ["PUT", "/external-exams/results"],
   ["POST", "/academics/clubs/:id/members"],
   ["PUT", "/assessments/entry"],
   ["PATCH", "/assignments/:id/submissions/:submissionId/grade"],
@@ -58,6 +61,9 @@ for (const code of [
   scopedDeclaration("GET", "/account/change-password", "session"),
   "defineEndpoint({ method:'GET', path:'/schools/public/:subdomain', roles:[], response:schema });",
   declaration("/external-exams/results"),
+  declaration("/external-exams/results", "'student'", "PUT"),
+  declaration("/external-exams/:id/summary", "'teacher','guardian'"),
+  declaration("/external-exams/bece", "'teacher'", "POST"),
   "defineEndpoint(config)",
   "apiFetch(path)",
   "fetch(path)",

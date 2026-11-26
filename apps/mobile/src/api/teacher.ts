@@ -10,9 +10,11 @@ import {
   STUDENT_IMPORT_LIMITS,
   addClubMemberSchema,
 } from "@schoolhub/shared";
+import { teacherSchedule } from "./teacher-workspace";
 import { appendUploadFile, defineDownload, defineEndpoint } from "./endpoint";
 const named = z.object({ id: z.string(), name: z.string() });
 const profile = z.object({ firstName: z.string(), lastName: z.string() });
+const optionalText = z.string().nullish();
 const subject = named.extend({ code: z.string() });
 export const teachingSchema = z.object({
   teacher: named.nullable(),
@@ -37,21 +39,7 @@ export const getTeacherTimetable = defineEndpoint({
   method: "GET",
   path: "/timetable/mine",
   roles: ["teacher"],
-  response: z.object({
-    entries: z.array(
-      z.object({
-        id: z.string(),
-        type: z.string(),
-        label: z.string().nullable(),
-        dayOfWeek: z.string(),
-        startTime: z.string(),
-        endTime: z.string(),
-        class: named.nullable(),
-        subject: named.nullable(),
-        classroom: named.nullable(),
-      }),
-    ),
-  }),
+  response: teacherSchedule,
 });
 export const getRoster = defineEndpoint({
   method: "GET",
@@ -73,12 +61,51 @@ export const getTeacherStudent = defineEndpoint({
     id: z.string(),
     admissionNumber: z.string().nullable(),
     status: z.string(),
-    profile: profile.extend({
-      otherNames: z.string().nullish(),
-      image: z.string().nullish(),
-    }),
+    profile: profile.extend({ otherNames: optionalText, image: optionalText }),
     class: named.nullable(),
     house: named.nullable(),
+    department: named.nullish(),
+  }),
+});
+export const getTeacherStudentRecords = defineEndpoint({
+  method: "GET",
+  path: "/students/:id/profile",
+  roles: ["teacher"],
+  response: z.object({
+    admissionNumber: z.string().nullable(),
+    username: optionalText,
+    loginEmail: optionalText,
+    admissionDate: optionalText,
+    previousSchool: optionalText,
+    health: z
+      .object({
+        bloodGroup: optionalText,
+        allergies: optionalText,
+        medicalConditions: optionalText,
+      })
+      .optional(),
+    guardians: z
+      .array(
+        named.extend({
+          relationshipType: z.string(),
+          isPrimary: z.boolean(),
+          phone: optionalText,
+          email: optionalText,
+        }),
+      )
+      .optional(),
+    profile: profile.extend({
+      dateOfBirth: optionalText,
+      gender: optionalText,
+      nationality: optionalText,
+      residentialAddress: optionalText,
+      city: optionalText,
+      region: optionalText,
+      email: optionalText,
+      emergencyContactName: optionalText,
+      emergencyContactPhone: optionalText,
+      emergencyRelationship: optionalText,
+    }),
   }),
 });
 export const getTeacherStudentSubjects = defineEndpoint({
@@ -342,6 +369,7 @@ export const gradeAssignmentSchema = z.object({
   feedback: z.string().trim().max(2000).nullable().optional(),
 });
 export const managedAssignmentsSchema = z.object({
+  academicYear: named.optional(),
   term: named,
   assignments: z.array(
     z.object({
@@ -360,7 +388,14 @@ export const managedAssignmentsSchema = z.object({
           status: z.string(),
           score: z.number().nullable(),
           feedback: z.string().nullable(),
-          student: z.object({ id: z.string(), profile }),
+          submittedAt: z.string().optional(),
+          gradedBy: named.nullish(),
+          student: z.object({
+            id: z.string(),
+            profile,
+            admissionNumber: z.string().nullish(),
+            studentId: z.string().optional(),
+          }),
         }),
       ),
     }),

@@ -1,6 +1,9 @@
 import { router, type Href } from "expo-router";
 import { Megaphone } from "lucide-react-native";
+import { useState } from "react";
 import { View } from "react-native";
+import { SearchBar } from "@/components/Fields";
+import { SelectField } from "@/components/SelectField";
 import { Button } from "@/components/Button";
 import { canEnterRole } from "@/lib/permissions";
 import { useSession } from "@/lib/session";
@@ -17,8 +20,19 @@ export default function AnnouncementsScreen() {
   const query = useAnnouncementsQuery();
   const session = useSession();
   const { colors } = useTheme();
+  const [search, setSearch] = useState("");
+  const [category, setCategory] = useState("");
+  const teacher = canEnterRole(session, "teacher");
   const announcements =
     query.data?.filter((item) => item.status === "PUBLISHED") ?? [];
+  const categories = [...new Set(announcements.map((item) => item.category))];
+  const matches = announcements.filter(
+    (item) =>
+      (!category || item.category === category) &&
+      `${item.title} ${item.content}`
+        .toLowerCase()
+        .includes(search.trim().toLowerCase()),
+  );
 
   return (
     <Screen
@@ -28,13 +42,36 @@ export default function AnnouncementsScreen() {
       onRefresh={() => void query.refetch()}
     >
       <View style={{ gap: spacing.lg }}>
-        {canEnterRole(session, "teacher") ? (
+        {teacher ? (
           <Button
             label="New class announcement"
             onPress={() =>
               router.push("/(teacher)/teacher-announcement-new" as Href)
             }
           />
+        ) : null}
+        {teacher && announcements.length ? (
+          <>
+            <SearchBar
+              label="Search announcements"
+              value={search}
+              onChange={setSearch}
+            />
+            <SelectField
+              label="Category"
+              value={category}
+              onChange={setCategory}
+              options={[
+                { value: "", label: "All categories" },
+                ...categories.map((item) => ({
+                  value: item,
+                  label:
+                    item.charAt(0) +
+                    item.slice(1).toLowerCase().replaceAll("_", " "),
+                })),
+              ]}
+            />
+          </>
         ) : null}
         {query.isPending ? (
           <Card>
@@ -49,16 +86,24 @@ export default function AnnouncementsScreen() {
             onAction={() => void query.refetch()}
             hue="amber"
           />
-        ) : announcements.length === 0 ? (
+        ) : matches.length === 0 ? (
           <EmptyState
-            title="No announcements yet"
-            message="Published school notices will appear here."
+            title={
+              announcements.length
+                ? "No announcements match"
+                : "No announcements yet"
+            }
+            message={
+              announcements.length
+                ? "Try another search or category."
+                : "Published school notices will appear here."
+            }
             icon={<Megaphone size={32} color={colors.mutedForeground} />}
             hue="amber"
           />
         ) : (
           <Card>
-            {announcements.map((item, index) => (
+            {matches.map((item, index) => (
               <ListRow
                 key={item.id}
                 title={item.title}
@@ -66,7 +111,7 @@ export default function AnnouncementsScreen() {
                 leading={<Megaphone size={20} color={colors.primary} />}
                 status={item.isPinned ? "Pinned" : undefined}
                 hue="amber"
-                divider={index < announcements.length - 1}
+                divider={index < matches.length - 1}
                 onPress={() =>
                   router.push(
                     `/(shared)/announcements/${encodeURIComponent(item.id)}` as Href,

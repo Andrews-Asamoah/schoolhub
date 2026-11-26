@@ -58,6 +58,11 @@ test("the actual teacher navigator opens a detail and returns to its previous ta
       "(teacher)/teacher-assess": () => <Text>Assess</Text>,
       "(teacher)/teacher-assignments": () => <Text>Assignments</Text>,
       "(teacher)/teacher-messages": () => <Text>School messages</Text>,
+      "(teacher)/teacher-class-directory": () => <Text>class-directory</Text>,
+      "(teacher)/teacher-students": () => <Text>students</Text>,
+      "(teacher)/teacher-subjects": () => <Text>subjects</Text>,
+      "(teacher)/teacher-school-reports": () => <Text>school-reports</Text>,
+      "(teacher)/teacher-external-exams": () => <Text>external-exams</Text>,
       "(teacher)/teacher-more": () => <Text>More</Text>,
       "(teacher)/teacher-roster": () => <Text>Class Roster</Text>,
       "(teacher)/teacher-pupil": () => <Text>Pupil</Text>,
@@ -96,4 +101,11 @@ test("the actual teacher navigator opens a detail and returns to its previous ta
     "teacher-more:detail",
   );
   await testRouter.back("/teacher-more");
+  await act(async () => router.navigate("/(teacher)/teacher-assess"));
+  await act(async () => router.push("/(teacher)/teacher-external-exams"));
+  expect(screen.getByText("external-exams")).toBeVisible();
+  expect(screen.getByTestId("tab-state")).toHaveTextContent(
+    "teacher-assess:detail",
+  );
+  await testRouter.back("/teacher-assess");
 });
