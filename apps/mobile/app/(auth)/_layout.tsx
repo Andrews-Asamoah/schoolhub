@@ -7,6 +7,7 @@ export default function AuthLayout() {
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Protected guard={status === "signedOut"}>
         <Stack.Screen name="school" />
+        <Stack.Screen name="welcome" />
         <Stack.Screen name="login" />
         <Stack.Screen name="two-factor" />
         <Stack.Screen name="forgot-password" />
