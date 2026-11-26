@@ -15,8 +15,8 @@ export class FinanceApprovalService {
   async request(input: {
     schoolId: string; subject: FinanceApprovalSubject; entityType: string;
     entityId: string; requestedById: string; payload: unknown; amount?: Prisma.Decimal;
-  }) {
-    return this.prisma.client.$transaction(async tx => {
+  }, db?: Prisma.TransactionClient) {
+    const create = async (tx: Prisma.TransactionClient) => {
       const pending = await tx.financeApprovalRequest.findFirst({
         where: { schoolId: input.schoolId, entityType: input.entityType, entityId: input.entityId, status: "PENDING" },
       });
@@ -41,12 +41,13 @@ export class FinanceApprovalService {
           entityId: input.entityId, requestedById: input.requestedById,
           payloadHash: approvalPayloadHash(input.payload), amount: input.amount },
       });
-    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+    };
+    return db ? create(db) : this.prisma.client.$transaction(create, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
   }
 
-  async decide(schoolId: string, requestId: string, actorId: string, status: "APPROVED" | "REJECTED", payload: unknown, note: string) {
+  async decide(schoolId: string, requestId: string, actorId: string, status: "APPROVED" | "REJECTED", payload: unknown, note: string, db?: Prisma.TransactionClient) {
     if (!note.trim()) throw new ConflictException("An approval decision requires a note.");
-    return this.prisma.client.$transaction(async tx => {
+    const decide = async (tx: Prisma.TransactionClient) => {
       const approval = await tx.financeApprovalRequest.findFirst({ where: { id: requestId, schoolId, status: "PENDING" } });
       if (!approval) throw new NotFoundException("Pending approval not found.");
       // Maker-checker is mandatory. Historical allowSelfApproval settings are ignored.
@@ -60,7 +61,8 @@ export class FinanceApprovalService {
       });
       if (updated.count !== 1) throw new ConflictException("This approval has already been decided.");
       return tx.financeApprovalRequest.findUniqueOrThrow({ where: { id: requestId } });
-    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+    };
+    return db ? decide(db) : this.prisma.client.$transaction(decide, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
   }
 
   async assertApproved(schoolId: string, entityType: string, entityId: string, payload: unknown) {

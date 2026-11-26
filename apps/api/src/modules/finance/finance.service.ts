@@ -9,6 +9,8 @@ import { PrismaService } from "../../prisma/prisma.service.js";
 import { FinancePostingService } from "./finance-posting.service.js";
 import { FinanceApprovalService } from "./finance-approval.service.js";
 import type { CreateExpenseInput, GenerateBillInput, RecordPaymentInput, StudentStatementResponse } from "@schoolhub/shared";
+import { decryptPayrollDetails, encryptPayrollDetails } from "./payroll/payroll-details-crypto.js";
+import { payrollPersonKind, type PayrollPaymentDetailsInput, type PayrollSalaryImportInput } from "./payroll/payroll-inputs.js";
 import { calculatePayslip } from "./payroll/payroll-calculator.js";
 import { resolvePayrollSettings } from "./payroll-settings.js";
 import { Prisma, type AccountCategory, type AccountType, type AuditAction, type PaymentMethod, type TransactionCategory } from "@prisma/client";
@@ -3724,8 +3726,7 @@ export class FinanceService {
     });
   }
 
-  async listPayrollSalaryRegister(schoolId: string) {
-    const db = this.prisma.client;
+  async listPayrollSalaryRegister(schoolId: string, db: Prisma.TransactionClient = this.prisma.client) {
     const [teachers, staff] = await Promise.all([
       db.teacher.findMany({
         where: { schoolId, isActive: true, deletedAt: null },
@@ -3754,6 +3755,7 @@ export class FinanceService {
       ...teachers.map((person) => ({
         id: person.id,
         type: "TEACHER" as const,
+        employeeCode: person.teacherId,
         identifier: person.staffNumber || person.teacherId,
         name: [person.profile?.firstName || person.firstName, person.profile?.lastName || person.lastName].filter(Boolean).join(" ").trim() || person.teacherId,
         monthlySalary: person.monthlySalary == null ? null : Number(person.monthlySalary),
@@ -3761,6 +3763,7 @@ export class FinanceService {
       ...staff.map((person) => ({
         id: person.id,
         type: "STAFF" as const,
+        employeeCode: person.staffId,
         identifier: person.staffNumber || person.staffId,
         name: [person.profile.firstName, person.profile.lastName].filter(Boolean).join(" ").trim() || person.staffId,
         monthlySalary: person.monthlySalary == null ? null : Number(person.monthlySalary),
@@ -3772,38 +3775,129 @@ export class FinanceService {
     if (kind !== "TEACHER" && kind !== "STAFF") {
       throw new BadRequestException("Choose a valid payroll person type.");
     }
-    const next = new Prisma.Decimal(monthlySalary);
-    await this.prisma.client.$transaction(async (tx) => {
-      // The change and its audit entry (old and new salary) commit together.
-      let previous: Prisma.Decimal | null;
-      if (kind === "TEACHER") {
-        const current = await tx.teacher.findFirst({
-          where: { id: personId, schoolId, deletedAt: null },
-          select: { monthlySalary: true },
-        });
-        if (!current) throw new NotFoundException("Teacher not found.");
-        previous = current.monthlySalary;
-        await tx.teacher.updateMany({ where: { id: personId, schoolId, deletedAt: null }, data: { monthlySalary: next } });
-      } else {
-        const current = await tx.staff.findFirst({
-          where: { id: personId, schoolId, deletedAt: null },
-          select: { monthlySalary: true },
-        });
-        if (!current) throw new NotFoundException("Staff member not found.");
-        previous = current.monthlySalary;
-        await tx.staff.updateMany({ where: { id: personId, schoolId, deletedAt: null }, data: { monthlySalary: next } });
+    const next = new Prisma.Decimal(monthlySalary).toDecimalPlaces(2);
+    await withSerializableRetry(() => this.prisma.client.$transaction(async (tx) => {
+      const where = { id: personId, schoolId, deletedAt: null };
+      const current = kind === "TEACHER"
+        ? await tx.teacher.findFirst({ where, select: { monthlySalary: true } })
+        : await tx.staff.findFirst({ where, select: { monthlySalary: true } });
+      if (!current) throw new NotFoundException("Employee not found.");
+      await this.savePayrollSalary(tx, schoolId, actorId, kind, personId, current.monthlySalary?.toFixed(2) ?? null, next);
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }));
+    return { id: personId, type: kind, monthlySalary: next.toNumber() };
+  }
+
+  private async savePayrollSalary(
+    tx: Prisma.TransactionClient, schoolId: string, actorId: string, kind: "TEACHER" | "STAFF",
+    personId: string, previous: string | null, next: Prisma.Decimal, source: "manual" | "workbook" = "manual",
+  ) {
+    if (previous === next.toFixed(2)) return;
+    const where = { id: personId, schoolId, deletedAt: null, monthlySalary: previous };
+    const data = { monthlySalary: next };
+    const update = kind === "TEACHER"
+      ? await tx.teacher.updateMany({ where, data })
+      : await tx.staff.updateMany({ where, data });
+    if (update.count !== 1) throw new ConflictException("A salary changed. Review the latest salary before saving.");
+    await this.writeAudit(tx, {
+      actorId, schoolId, action: "UPDATE", entityType: `PAYROLL_SALARY_${kind}`, entityId: personId,
+      ...(source === "workbook"
+        ? { newValues: { source } }
+        : { oldValues: { monthlySalary: previous }, newValues: { monthlySalary: next.toFixed(2) } }),
+    });
+  }
+
+  async importPayrollSalaries(schoolId: string, actorId: string, input: PayrollSalaryImportInput) {
+    const preview = async (db: Prisma.TransactionClient) => {
+      const employees = await this.listPayrollSalaryRegister(schoolId, db);
+      const byCode = new Map(employees.map(person => [`${person.type}:${person.employeeCode}`, person]));
+      const seen = new Set<string>();
+      const issues: { row: number; message: string }[] = [];
+      const rows = input.rows.flatMap(row => {
+        const key = `${row.kind}:${row.employeeCode}`;
+        const employee = byCode.get(key);
+        if (seen.has(key) || !employee) {
+          issues.push({ row: row.row, message: employee
+            ? "Employee appears more than once."
+            : "Employee ID and type do not match an active employee in this school." });
+          return [];
+        }
+        seen.add(key);
+        return [{
+          ...row,
+          employeeId: employee.id,
+          employeeName: employee.name,
+          expectedSalary: employee.monthlySalary?.toFixed(2) ?? null,
+          monthlySalary: new Prisma.Decimal(row.monthlySalary).toFixed(2),
+        }];
+      });
+      return { rows, issues };
+    };
+    if (input.mode === "preview") {
+      return preview(this.prisma.client);
+    }
+
+    return withSerializableRetry(() => this.prisma.client.$transaction(async tx => {
+      const { rows, issues } = await preview(tx);
+      if (issues.length || rows.some((row, i) => row.employeeId !== input.rows[i]?.employeeId
+        || row.expectedSalary !== input.rows[i]?.expectedSalary)) {
+        throw new ConflictException("The salary register changed. Preview the workbook again before importing.");
+      }
+      const changed = rows.filter(row => row.expectedSalary !== row.monthlySalary);
+      for (const row of changed) {
+        await this.savePayrollSalary(tx, schoolId, actorId, row.kind, row.employeeId,
+          row.expectedSalary, new Prisma.Decimal(row.monthlySalary), "workbook");
+      }
+      return { updatedCount: changed.length };
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, timeout: 20_000 }));
+  }
+
+  private async payrollEmployeeWhere(db: Prisma.TransactionClient, schoolId: string, kind: string, employeeId: string) {
+    if (!payrollPersonKind.safeParse(kind).success) throw new BadRequestException("Choose a valid payroll person type.");
+    const where = { schoolId, id: employeeId, isActive: true, deletedAt: null };
+    const employee = kind === "TEACHER"
+      ? await db.teacher.findFirst({ where, select: { id: true } })
+      : await db.staff.findFirst({ where, select: { id: true } });
+    if (!employee) throw new NotFoundException("Active payroll employee not found.");
+    return { schoolId, ...(kind === "TEACHER" ? { teacherId: employeeId } : { staffId: employeeId }) };
+  }
+
+  async getPayrollPaymentDetails(schoolId: string, kind: string, employeeId: string, actorId: string) {
+    const db = this.prisma.client;
+    const where = await this.payrollEmployeeWhere(db, schoolId, kind, employeeId);
+    const record = await db.payrollPaymentDetails.findFirst({ where });
+    if (!record) return { ssnitNumber: "", tier2MemberNumber: "", bank: null, version: null };
+    const value = decryptPayrollDetails(schoolId, kind, employeeId, record.encryptedData);
+    await this.writeAudit(db, { actorId, schoolId, action: "SCHOOL_ACCESSED",
+      entityType: `PAYROLL_PAYMENT_DETAILS_${kind}`, entityId: employeeId });
+    return { ...value, version: record.updatedAt.toISOString() };
+  }
+
+  async updatePayrollPaymentDetails(
+    schoolId: string, kind: string, employeeId: string, actorId: string,
+    { version, ...value }: PayrollPaymentDetailsInput & { version: string | null },
+  ) {
+    await withSerializableRetry(() => this.prisma.client.$transaction(async tx => {
+      const where = await this.payrollEmployeeWhere(tx, schoolId, kind, employeeId);
+      const current = await tx.payrollPaymentDetails.findFirst({ where, select: { id: true, updatedAt: true } });
+      if ((current?.updatedAt.toISOString() ?? null) !== version) {
+        throw new ConflictException("Payment details changed. Reopen the form to review the latest details.");
+      }
+      if (value.ssnitNumber || value.tier2MemberNumber || value.bank) {
+        const encryptedData = encryptPayrollDetails(schoolId, kind, employeeId, value);
+        if (current) {
+          await tx.payrollPaymentDetails.update({ where: { id: current.id }, data: { encryptedData } });
+        } else {
+          await tx.payrollPaymentDetails.create({ data: { ...where, encryptedData } });
+        }
+      } else if (current) {
+        await tx.payrollPaymentDetails.delete({ where: { id: current.id } });
       }
       await this.writeAudit(tx, {
-        actorId,
-        schoolId,
-        action: "UPDATE",
-        entityType: `PAYROLL_SALARY_${kind}`,
-        entityId: personId,
-        oldValues: { monthlySalary: previous?.toFixed(2) ?? null },
-        newValues: { monthlySalary: next.toFixed(2) },
+        actorId, schoolId, action: "UPDATE", entityType: `PAYROLL_PAYMENT_DETAILS_${kind}`, entityId: employeeId,
+        newValues: { ssnitConfigured: Boolean(value.ssnitNumber), tier2MemberConfigured: Boolean(value.tier2MemberNumber), bankConfigured: Boolean(value.bank) },
       });
-    });
-    return { id: personId, type: kind, monthlySalary };
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }));
+    return { saved: true };
   }
 
   async generatePayrollDraft(
@@ -3811,92 +3905,105 @@ export class FinanceService {
     processedById: string,
     input: { month: number; year: number; confirmResidentTaxTreatment: true },
   ) {
-    const db = this.prisma.client;
-    const periodEnd = new Date(Date.UTC(input.year, input.month, 0));
-    const [taxSchedules, contributionSchemes] = await Promise.all([
-      db.payrollTaxSchedule.findMany({ where: { OR: [{ schoolId }, { schoolId: null }], status: "ACTIVE", effectiveFrom: { lte: periodEnd } }, include: { bands: true } }),
-      db.payrollContributionScheme.findMany({ where: { OR: [{ schoolId }, { schoolId: null }], status: "ACTIVE", effectiveFrom: { lte: periodEnd } } }),
-    ]);
-    const resolved = resolvePayrollSettings(schoolId, periodEnd, taxSchedules, contributionSchemes);
-    const existing = await db.payrollRecord.findUnique({
-      where: { schoolId_month_year_runNumber: { schoolId, month: input.month, year: input.year, runNumber: 1 } },
-      select: { id: true },
-    });
-    if (existing) throw new BadRequestException("A payroll run already exists for this month and year.");
-
-    const [teachers, staff, currentYear] = await Promise.all([
-      db.teacher.findMany({
-        where: { schoolId, isActive: true, deletedAt: null },
-        select: { id: true, monthlySalary: true },
-      }),
-      db.staff.findMany({
-        where: { schoolId, isActive: true, deletedAt: null },
-        select: { id: true, monthlySalary: true },
-      }),
-      db.academicYear.findFirst({
-        where: { schoolId, isCurrent: true },
-        include: { terms: { where: { isCurrent: true }, take: 1 } },
-      }),
-    ]);
-    const eligible = [
-      ...teachers.filter((person) => Number(person.monthlySalary ?? 0) > 0).map((person) => ({
-        teacherId: person.id,
-        staffId: null as string | null,
-        basicSalary: person.monthlySalary!.toFixed(2),
-      })),
-      ...staff.filter((person) => Number(person.monthlySalary ?? 0) > 0).map((person) => ({
-        teacherId: null as string | null,
-        staffId: person.id,
-        basicSalary: person.monthlySalary!.toFixed(2),
-      })),
-    ];
-    if (!eligible.length) {
-      throw new BadRequestException("No active teachers or staff have a positive monthly salary. Add salary details before generating payroll.");
-    }
-
-    const payslips = eligible.map((person) => {
-      // SSNIT 2026 insurable earnings range: GHS 587.80–69,000.
-      const calculated = calculatePayslip(resolved.settings, {
-        residency: "RESIDENT",
-        earnings: [{ code: "BASIC", description: "Basic salary", amount: person.basicSalary, taxable: true, pensionable: true, isBasic: true }],
-        deductions: [],
-        enrolments: [{ schemeKey: "SSNIT_TIER1", employerBearsEmployeeShare: false, employerShareTaxable: false }],
+    return withSerializableRetry(() => this.prisma.client.$transaction(async db => {
+      const existing = await db.payrollRecord.findMany({
+        where: { schoolId, month: input.month, year: input.year },
+        orderBy: { runNumber: "desc" },
+        select: { runNumber: true, status: true },
       });
-      const ssnitEmployee = new Prisma.Decimal(calculated.schemes[0]!.employee);
-      const ssnitEmployer = new Prisma.Decimal(calculated.schemes[0]!.employer);
-      const grossSalary = new Prisma.Decimal(calculated.gross);
-      const incomeTax = new Prisma.Decimal(calculated.paye);
-      const netSalary = new Prisma.Decimal(calculated.net);
-      return {
-        schoolId,
-        teacherId: person.teacherId,
-        staffId: person.staffId,
-        basicSalary: new Prisma.Decimal(person.basicSalary),
-        allowances: new Prisma.Decimal(0),
-        grossSalary,
-        ssnitEmployee,
-        ssnitEmployer,
-        incomeTax,
-        otherDeductions: new Prisma.Decimal(0),
-        netSalary,
-        paymentMethod: "BANK_TRANSFER" as const,
-        paymentStatus: "PENDING" as const,
-      };
-    });
-    const sum = (key: "grossSalary" | "netSalary" | "incomeTax" | "ssnitEmployee" | "ssnitEmployer") =>
-      payslips.reduce((total, slip) => total.plus(slip[key]), new Prisma.Decimal(0));
+      if (existing.some(run => run.status !== "CANCELLED")) {
+        throw new BadRequestException("A payroll run already exists for this month and year.");
+      }
+      const periodEnd = new Date(Date.UTC(input.year, input.month, 0));
+      const [taxSchedules, contributionSchemes] = await Promise.all([
+        db.payrollTaxSchedule.findMany({ where: { OR: [{ schoolId }, { schoolId: null }], status: "ACTIVE", effectiveFrom: { lte: periodEnd } }, include: { bands: true } }),
+        db.payrollContributionScheme.findMany({ where: { OR: [{ schoolId }, { schoolId: null }], status: "ACTIVE", effectiveFrom: { lte: periodEnd } } }),
+      ]);
+      const resolved = resolvePayrollSettings(schoolId, periodEnd, taxSchedules, contributionSchemes);
+      const tier2 = resolved.settings.schemes.find(scheme => scheme.key === "SSNIT_TIER2");
+      if (tier2 && (Number(tier2.employeeRate) !== 0 || Number(tier2.employerRate) !== 0 || Number(tier2.memoRate) <= 0)) {
+        throw new BadRequestException("Configure Tier 2 as a positive memo allocation with zero employee and employer rates. It is allocated from combined SSNIT.");
+      }
 
-    const payrollRecord = await db.$transaction(async (tx) => {
-      const duplicate = await tx.payrollRecord.findUnique({
-        where: { schoolId_month_year_runNumber: { schoolId, month: input.month, year: input.year, runNumber: 1 } },
-        select: { id: true },
+      const [teachers, staff, periodYear] = await Promise.all([
+        db.teacher.findMany({
+          where: { schoolId, isActive: true, deletedAt: null },
+          select: { id: true, monthlySalary: true },
+        }),
+        db.staff.findMany({
+          where: { schoolId, isActive: true, deletedAt: null },
+          select: { id: true, monthlySalary: true },
+        }),
+        db.academicYear.findFirst({
+          where: { schoolId, startDate: { lte: periodEnd }, endDate: { gte: periodEnd } },
+          orderBy: [{ startDate: "desc" }, { id: "asc" }],
+          select: { id: true, terms: {
+            where: { startDate: { lte: periodEnd }, endDate: { gte: periodEnd } },
+            orderBy: [{ startDate: "desc" }, { id: "asc" }], take: 1, select: { id: true },
+          } },
+        }),
+      ]);
+      const eligible = [
+        ...teachers.filter((person) => Number(person.monthlySalary ?? 0) > 0).map((person) => ({
+          teacherId: person.id,
+          staffId: null as string | null,
+          basicSalary: person.monthlySalary!.toFixed(2),
+        })),
+        ...staff.filter((person) => Number(person.monthlySalary ?? 0) > 0).map((person) => ({
+          teacherId: null as string | null,
+          staffId: person.id,
+          basicSalary: person.monthlySalary!.toFixed(2),
+        })),
+      ];
+      if (!eligible.length) {
+        throw new BadRequestException("No active teachers or staff have a positive monthly salary. Add salary details before generating payroll.");
+      }
+
+      const payslips = eligible.map((person) => {
+        const calculated = calculatePayslip(resolved.settings, {
+          residency: "RESIDENT",
+          earnings: [{ code: "BASIC", description: "Basic salary", amount: person.basicSalary, taxable: true, pensionable: true, isBasic: true }],
+          deductions: [],
+          enrolments: (tier2 ? ["SSNIT_TIER1", "SSNIT_TIER2"] : ["SSNIT_TIER1"]).map(schemeKey => ({
+            schemeKey, employerBearsEmployeeShare: false, employerShareTaxable: false,
+          })),
+        });
+        const ssnitEmployee = new Prisma.Decimal(calculated.employeeContributionsDeducted);
+        const ssnitEmployer = new Prisma.Decimal(calculated.employerContributions);
+        const tier2Result = calculated.schemes.find(scheme => scheme.key === "SSNIT_TIER2");
+        const tier2Contribution = tier2Result ? new Prisma.Decimal(tier2Result.memo) : null;
+        if (tier2Contribution?.gt(ssnitEmployee.plus(ssnitEmployer))) {
+          throw new BadRequestException("The Tier 2 allocation exceeds the combined SSNIT contribution. Review the approved schemes.");
+        }
+        const grossSalary = new Prisma.Decimal(calculated.gross);
+        const incomeTax = new Prisma.Decimal(calculated.paye);
+        const netSalary = new Prisma.Decimal(calculated.net);
+        return {
+          schoolId,
+          teacherId: person.teacherId,
+          staffId: person.staffId,
+          basicSalary: new Prisma.Decimal(person.basicSalary),
+          allowances: new Prisma.Decimal(0),
+          grossSalary,
+          ssnitEmployee,
+          ssnitEmployer,
+          tier2Contribution,
+          incomeTax,
+          otherDeductions: new Prisma.Decimal(0),
+          netSalary,
+          paymentMethod: "BANK_TRANSFER" as const,
+          paymentStatus: "PENDING" as const,
+        };
       });
-      if (duplicate) throw new BadRequestException("A payroll run already exists for this month and year.");
-      return tx.payrollRecord.create({
+      const sum = (key: "grossSalary" | "netSalary" | "incomeTax" | "ssnitEmployee" | "ssnitEmployer") =>
+        payslips.reduce((total, slip) => total.plus(slip[key]), new Prisma.Decimal(0));
+
+      const payrollRecord = await db.payrollRecord.create({
         data: {
           schoolId,
           month: input.month,
           year: input.year,
+          runNumber: (existing[0]?.runNumber ?? 0) + 1,
           status: "DRAFT",
           totalGross: sum("grossSalary"),
           totalNet: sum("netSalary"),
@@ -3906,21 +4013,21 @@ export class FinanceService {
           taxScheduleId: resolved.taxScheduleId,
           settingsSnapshot: JSON.parse(JSON.stringify({ ...resolved, calculatedFor: periodEnd.toISOString().slice(0, 10) })),
           calculatedAt: new Date(),
-          academicYearId: currentYear?.id ?? null,
-          termId: currentYear?.terms[0]?.id ?? null,
+          academicYearId: periodYear?.id ?? null,
+          termId: periodYear?.terms[0]?.id ?? null,
           payslips: { create: payslips },
         },
         include: {
           _count: { select: { payslips: true } },
         },
       });
-    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 
-    return {
-      payrollRecord,
-      includedCount: eligible.length,
-      excludedCount: teachers.length + staff.length - eligible.length,
-    };
+      return {
+        payrollRecord,
+        includedCount: eligible.length,
+        excludedCount: teachers.length + staff.length - eligible.length,
+      };
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, timeout: 20_000 }));
   }
 
   async transitionPayroll(
@@ -3936,59 +4043,66 @@ export class FinanceService {
     });
     if (!payroll) throw new NotFoundException("Payroll run not found.");
     if (payroll.status === "DRAFT" && input.status === "APPROVED") {
-      if (!payroll._count.payslips) throw new BadRequestException("A payroll run without payslips cannot be approved.");
-      // Approval freezes the run. Reconcile every payslip with the run's stored totals
-      // before authorising it; a draft can become stale after salary or payslip edits.
-      const approvalSlips = await db.payslip.findMany({
-        where: { schoolId, payrollRecordId: payroll.id },
-        select: {
-          grossSalary: true, netSalary: true, incomeTax: true,
-          ssnitEmployee: true, ssnitEmployer: true, otherDeductions: true,
-        },
-      });
-      if (approvalSlips.length !== payroll._count.payslips) {
-        throw new ConflictException("Payroll payslips changed during approval. Refresh and review the run.");
-      }
-      const approvalSum = (field: "grossSalary" | "netSalary" | "incomeTax" | "ssnitEmployee" | "ssnitEmployer" | "otherDeductions") =>
-        approvalSlips.reduce((total, slip) => total.plus(slip[field]), new Prisma.Decimal(0));
-      for (const slip of approvalSlips) {
-        if (slip.netSalary.lt(0) || !slip.grossSalary.eq(
-          slip.netSalary.plus(slip.incomeTax).plus(slip.ssnitEmployee).plus(slip.otherDeductions)
-        )) {
-          throw new BadRequestException("A payslip has negative net pay or does not balance. Correct the draft before approval.");
+      return withSerializableRetry(() => db.$transaction(async tx => {
+        if (!payroll._count.payslips) throw new BadRequestException("A payroll run without payslips cannot be approved.");
+        // Approval freezes the run. Reconcile every payslip with the run's stored totals
+        // before authorising it; a draft can become stale after salary or payslip edits.
+        const approvalSlips = await tx.payslip.findMany({
+          where: { schoolId, payrollRecordId: payroll.id },
+          select: {
+            grossSalary: true, netSalary: true, incomeTax: true,
+            ssnitEmployee: true, ssnitEmployer: true, otherDeductions: true,
+          },
+        });
+        if (approvalSlips.length !== payroll._count.payslips) {
+          throw new ConflictException("Payroll payslips changed during approval. Refresh and review the run.");
         }
-      }
-      if (!payroll.totalGross.eq(approvalSum("grossSalary"))
-        || !payroll.totalNet.eq(approvalSum("netSalary"))
-        || !payroll.totalTax.eq(approvalSum("incomeTax"))
-        || !payroll.totalSSNIT.eq(approvalSum("ssnitEmployee").plus(approvalSum("ssnitEmployer")))) {
-        throw new BadRequestException("Payroll totals no longer match its payslips. Recalculate the draft before approval.");
-      }
-      // Maker-checker through the approval engine: the preparer is the requester, so the
-      // approver must be someone else unless the school's audited allowSelfApproval is set.
-      const payload = {
-        payrollRecordId: payroll.id, runNumber: payroll.runNumber,
-        totalGross: payroll.totalGross.toFixed(2), totalNet: payroll.totalNet.toFixed(2),
-        totalTax: payroll.totalTax.toFixed(2), totalSSNIT: payroll.totalSSNIT.toFixed(2),
-        payslips: payroll._count.payslips,
-      };
-      const request = await this.approvals.request({
-        schoolId, subject: "PAYROLL_RUN", entityType: "PayrollRecord", entityId: payroll.id,
-        requestedById: payroll.processedById ?? actorId, payload, amount: payroll.totalGross,
-      });
-      await this.approvals.decide(schoolId, request.id, actorId, "APPROVED", payload, "Payroll run approved.");
-      return db.payrollRecord.update({
-        where: { id: payroll.id },
-        data: { status: "APPROVED", approvedById: actorId },
-        include: {
-          payslips: { include: { staff: { select: { staffId: true, profile: { select: { firstName: true, lastName: true } } } }, teacher: { select: { teacherId: true, profile: { select: { firstName: true, lastName: true } } } } } },
-          _count: { select: { payslips: true } },
-        },
-      });
+        const approvalSum = (field: "grossSalary" | "netSalary" | "incomeTax" | "ssnitEmployee" | "ssnitEmployer" | "otherDeductions") =>
+          approvalSlips.reduce((total, slip) => total.plus(slip[field]), new Prisma.Decimal(0));
+        for (const slip of approvalSlips) {
+          if (slip.netSalary.lt(0) || !slip.grossSalary.eq(
+            slip.netSalary.plus(slip.incomeTax).plus(slip.ssnitEmployee).plus(slip.otherDeductions)
+          )) {
+            throw new BadRequestException("A payslip has negative net pay or does not balance. Correct the draft before approval.");
+          }
+        }
+        if (!payroll.totalGross.eq(approvalSum("grossSalary"))
+          || !payroll.totalNet.eq(approvalSum("netSalary"))
+          || !payroll.totalTax.eq(approvalSum("incomeTax"))
+          || !payroll.totalSSNIT.eq(approvalSum("ssnitEmployee").plus(approvalSum("ssnitEmployer")))) {
+          throw new BadRequestException("Payroll totals no longer match its payslips. Recalculate the draft before approval.");
+        }
+        // Approval history and the run status must commit together.
+        const payload = {
+          payrollRecordId: payroll.id, runNumber: payroll.runNumber,
+          totalGross: payroll.totalGross.toFixed(2), totalNet: payroll.totalNet.toFixed(2),
+          totalTax: payroll.totalTax.toFixed(2), totalSSNIT: payroll.totalSSNIT.toFixed(2),
+          payslips: payroll._count.payslips,
+        };
+        const requestedById = payroll.processedById ?? actorId;
+        const pending = await tx.financeApprovalRequest.findFirst({
+          where: { schoolId, subject: "PAYROLL_RUN", entityType: "PayrollRecord", entityId: payroll.id,
+            requestedById, status: "PENDING" },
+          select: { id: true },
+        });
+        const request = pending ?? await this.approvals.request({
+          schoolId, subject: "PAYROLL_RUN", entityType: "PayrollRecord", entityId: payroll.id,
+          requestedById, payload, amount: payroll.totalGross,
+        }, tx);
+        await this.approvals.decide(schoolId, request.id, actorId, "APPROVED", payload, "Payroll run approved.", tx);
+        return tx.payrollRecord.update({
+          where: { id: payroll.id, schoolId, status: "DRAFT" },
+          data: { status: "APPROVED", approvedById: actorId },
+          include: {
+            payslips: { include: { staff: { select: { staffId: true, profile: { select: { firstName: true, lastName: true } } } }, teacher: { select: { teacherId: true, profile: { select: { firstName: true, lastName: true } } } } } },
+            _count: { select: { payslips: true } },
+          },
+        });
+      }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }));
     }
     if (payroll.status === "DRAFT" && input.status === "CANCELLED") {
       return db.payrollRecord.update({
-        where: { id: payroll.id },
+        where: { id: payroll.id, schoolId, status: "DRAFT" },
         data: { status: "CANCELLED" },
         include: { payslips: true, _count: { select: { payslips: true } } },
       });
@@ -4011,6 +4125,7 @@ export class FinanceService {
                 incomeTax: true,
                 ssnitEmployee: true,
                 ssnitEmployer: true,
+                tier2Contribution: true,
                 otherDeductions: true,
               },
             },
@@ -4031,6 +4146,7 @@ export class FinanceService {
         const employeeSsnit = sum("ssnitEmployee");
         const employerSsnit = sum("ssnitEmployer");
         const otherDeductions = sum("otherDeductions");
+        const tier2 = current.payslips.reduce((total, slip) => total.plus(slip.tier2Contribution ?? 0), new Prisma.Decimal(0));
         if (!gross.eq(net.plus(paye).plus(employeeSsnit).plus(otherDeductions))) {
           throw new BadRequestException(
             "This payroll does not reconcile exactly: gross pay must equal net pay plus PAYE, employee SSNIT and other deductions. Review the payslips before confirming payment.",
@@ -4106,6 +4222,13 @@ export class FinanceService {
         await postLedgerEntry("PAYE withheld from payroll", paye, payrollPayable, payePayable, "TRANSFER", "PAYE liability recognised");
         await postLedgerEntry("Employee SSNIT withheld from payroll", employeeSsnit, payrollPayable, ssnitPayable, "TRANSFER", "Employee SSNIT liability recognised");
         await postLedgerEntry("Other payroll deductions withheld", otherDeductions, payrollPayable, otherDeductionPayable, "TRANSFER", "Other deductions liability recognised");
+        if (tier2.gt(0)) {
+          const tier2Payable = await this.ensureAccount(tx, schoolId, {
+            accountType: "LIABILITY", category: "ACCOUNTS_PAYABLE", name: "Tier 2 Pension Payable", code: "2211",
+          });
+          await postLedgerEntry("Allocate Tier 2 pension contributions", tier2, ssnitPayable, tier2Payable,
+            "TRANSFER", "Tier 2 portion of the combined pension liability");
+        }
 
         await tx.payslip.updateMany({
           where: { payrollRecordId: payroll.id, schoolId },
@@ -4142,7 +4265,7 @@ export class FinanceService {
   async listPayrollRecords(schoolId: string) {
     return this.prisma.client.payrollRecord.findMany({
       where: { schoolId },
-      orderBy: [{ year: "desc" }, { month: "desc" }],
+      orderBy: [{ year: "desc" }, { month: "desc" }, { runNumber: "desc" }],
       take: 100,
       include: {
         payslips: {

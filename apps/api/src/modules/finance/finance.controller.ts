@@ -9,6 +9,7 @@ import {
   Param,
   Query,
   Headers,
+  Header,
   Body,
   UseGuards,
   UseInterceptors,
@@ -18,6 +19,7 @@ import {
 import type { Request, Response } from "express";
 import { FinanceService } from "./finance.service.js";
 import { FinanceLedgerIntegrityService } from "./finance-ledger-integrity.service.js";
+import { payrollPaymentDetailsSchema, payrollSalaryImportSchema, type PayrollPaymentDetailsInput, type PayrollSalaryImportInput } from "./payroll/payroll-inputs.js";
 import { PayrollSettingsService } from "./payroll-settings.service.js";
 import { FinanceExportsService, type FinanceExportContext, type FinanceExportFile } from "./finance-exports.service.js";
 import { SchoolTenantGuard } from "../../common/guards/school-tenant.guard.js";
@@ -531,6 +533,7 @@ export class FinanceController {
 
   @Patch("payroll/salaries/:kind/:personId")
   @Roles(...FINANCE_WRITE_ROLES)
+  @FinanceSelfAudited()
   updatePayrollSalary(
     @CurrentSchool() school: School,
     @CurrentUser() user: AuthenticatedUser,
@@ -539,6 +542,51 @@ export class FinanceController {
     @Body(new ZodValidationPipe(updatePayrollSalarySchema)) body: UpdatePayrollSalaryInput,
   ) {
     return this.financeService.updatePayrollSalary(school.id, kind, personId, body.monthlySalary, user.id);
+  }
+
+  @Post("payroll/salaries/import")
+  @Roles(...FINANCE_WRITE_ROLES)
+  @FinanceSelfAudited()
+  @Header("Cache-Control", "private, no-store")
+  importPayrollSalaries(
+    @CurrentSchool() school: School,
+    @CurrentUser() user: AuthenticatedUser,
+    @CurrentSchoolRole() schoolRole: string | undefined,
+    @Body(new ZodValidationPipe(payrollSalaryImportSchema)) body: PayrollSalaryImportInput,
+  ) {
+    this.assertPayrollExportAllowed(user, schoolRole);
+    return this.financeService.importPayrollSalaries(school.id, user.id, body);
+  }
+
+  @Get("payroll/payment-details/:kind/:personId")
+  @Roles(...FINANCE_PAYROLL_EXPORT_ROLES)
+  @Header("Cache-Control", "private, no-store")
+  getPayrollPaymentDetails(
+    @CurrentSchool() school: School,
+    @CurrentUser() user: AuthenticatedUser,
+    @CurrentSchoolRole() schoolRole: string | undefined,
+    @Param("kind") kind: string,
+    @Param("personId") personId: string,
+  ) {
+    this.assertPayrollExportAllowed(user, schoolRole);
+    return this.financeService.getPayrollPaymentDetails(school.id, kind, personId, user.id);
+  }
+
+  @Put("payroll/payment-details/:kind/:personId")
+  @Roles(...FINANCE_WRITE_ROLES)
+  @FinanceSelfAudited()
+  @Header("Cache-Control", "private, no-store")
+  updatePayrollPaymentDetails(
+    @CurrentSchool() school: School,
+    @CurrentUser() user: AuthenticatedUser,
+    @CurrentSchoolRole() schoolRole: string | undefined,
+    @Param("kind") kind: string,
+    @Param("personId") personId: string,
+    @Body(new ZodValidationPipe(payrollPaymentDetailsSchema.extend({ version: z.iso.datetime().nullable() })))
+    body: PayrollPaymentDetailsInput & { version: string | null },
+  ) {
+    this.assertPayrollExportAllowed(user, schoolRole);
+    return this.financeService.updatePayrollPaymentDetails(school.id, kind, personId, user.id, body);
   }
 
   @Get("payroll/settings")
@@ -932,6 +980,21 @@ export class FinanceController {
     this.assertPayrollExportAllowed(user, schoolRole);
     const context = this.financeExportContext(school, user, request);
     return this.sendFinanceExport(response, await this.financeExports.payslipPdf(context, payslipId), "inline");
+  }
+
+  @Get("payroll/:recordId/tier-2.xlsx")
+  @Roles(...FINANCE_PAYROLL_EXPORT_ROLES)
+  async exportPayrollTier2(
+    @CurrentSchool() school: School,
+    @CurrentUser() user: AuthenticatedUser,
+    @CurrentSchoolRole() schoolRole: string | undefined,
+    @Req() request: Request,
+    @Res() response: Response,
+    @Param("recordId") recordId: string,
+  ) {
+    this.assertPayrollExportAllowed(user, schoolRole);
+    const context = this.financeExportContext(school, user, request);
+    return this.sendFinanceExport(response, await this.financeExports.payrollTier2Excel(context, recordId));
   }
 
   @Get("payroll/:recordId/payslips.pdf")

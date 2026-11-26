@@ -4,8 +4,10 @@ import { ServerExportButton } from "@/components/portal/server-export-button";
 import { useCanExportPayrollTables } from "@/lib/table-export-policy";
 import { useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertCircle, BadgeCheck, CalendarClock, CheckCircle2, FileText, LoaderCircle, PlayCircle, Printer, Wallet, X } from "lucide-react";
+import { AlertCircle, BadgeCheck, CalendarClock, CheckCircle2, FileText, LoaderCircle, PlayCircle, Printer, Upload, Wallet, X } from "lucide-react";
 import { apiFetch } from "@/lib/api";
+import { PayrollSalaryImportDialog } from "@/components/portal/payroll-salary-import-dialog";
+import { PayrollPaymentDetailsDialog } from "@/components/portal/payroll-payment-details-dialog";
 import { PortalModal } from "@/components/portal/portal-modal";
 import { cn } from "@/lib/utils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -27,6 +29,7 @@ interface Payslip {
   grossSalary: number | string;
   ssnitEmployee: number | string;
   ssnitEmployer: number | string;
+  tier2Contribution?: number | string | null;
   incomeTax: number | string;
   otherDeductions: number | string;
   netSalary: number | string;
@@ -40,6 +43,7 @@ interface PayrollRecord {
   id: string;
   month: number;
   year: number;
+  runNumber?: number;
   status: PayrollStatus;
   totalGross: number | string;
   totalNet: number | string;
@@ -53,6 +57,7 @@ interface SalaryPerson {
   id: string;
   type: "TEACHER" | "STAFF";
   identifier: string;
+  employeeCode: string;
   name: string;
   monthlySalary: number | string | null;
 }
@@ -81,7 +86,10 @@ export function PayrollManagementWorkspace() {
   const canExportPayroll = useCanExportPayrollTables();
   const queryClient = useQueryClient();
   const [showGenerate, setShowGenerate] = useState(false);
-  const [month, setMonth] = useState(String(Math.max(9, Math.min(12, new Date().getMonth() + 1))));
+  const [month, setMonth] = useState(() => String(new Date().getUTCMonth() + 1));
+  const [year, setYear] = useState(() => String(new Date().getUTCFullYear()));
+  const [showImport, setShowImport] = useState(false);
+  const [paymentDetailsPerson, setPaymentDetailsPerson] = useState<SalaryPerson | null>(null);
   const [taxConfirmed, setTaxConfirmed] = useState(false);
   const [transitionTarget, setTransitionTarget] = useState<TransitionTarget | null>(null);
   const [paidConfirmation, setPaidConfirmation] = useState(false);
@@ -111,6 +119,7 @@ export function PayrollManagementWorkspace() {
     return salaryRegister.filter(person => !term ||
       person.name.toLowerCase().includes(term) ||
       person.identifier.toLowerCase().includes(term) ||
+      person.employeeCode.toLowerCase().includes(term) ||
       person.type.toLowerCase().includes(term));
   }, [salaryRegister, salarySearch]);
   const salaryMissingCount = salaryRegister.filter(person => !(Number(person.monthlySalary) > 0)).length;
@@ -124,7 +133,7 @@ export function PayrollManagementWorkspace() {
   const paidNetTotal = payroll.filter(record => record.status === "PAID").reduce((sum, record) => sum + Number(record.totalNet), 0);
 
   const generatePayroll = useMutation({
-    mutationFn: (payload: { month: number; year: 2026; confirmResidentTaxTreatment: true }) =>
+    mutationFn: (payload: { month: number; year: number; confirmResidentTaxTreatment: true }) =>
       apiFetch<GenerateResponse>("/finance/payroll", { method: "POST", body: JSON.stringify(payload) }),
     onSuccess: async (result) => {
       setFeedback({ kind: "success", text: `Draft created for ${result.includedCount} employees. ${result.excludedCount} active employee(s) without a positive monthly salary were excluded.` });
@@ -193,7 +202,7 @@ export function PayrollManagementWorkspace() {
       setFeedback({ kind: "error", text: "Confirm the tax treatment before generating a payroll draft." });
       return;
     }
-    generatePayroll.mutate({ month: Number(month), year: 2026, confirmResidentTaxTreatment: true });
+    generatePayroll.mutate({ month: Number(month), year: Number(year), confirmResidentTaxTreatment: true });
   }
   const buildPayrollRegisterExport = (): ExportTable => ({
     title: "Payroll register",
@@ -234,7 +243,13 @@ export function PayrollManagementWorkspace() {
     <section className="rounded-2xl border border-border bg-card p-4 shadow-sm sm:p-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div><h2 className="text-lg font-semibold text-foreground">Salary register</h2><p className="mt-1 text-sm text-muted-foreground">Manage the monthly base salary used when creating new payroll drafts. Updating a salary does not alter already saved payroll runs.</p></div>
-        {canExportPayroll && <><TableExportMenu build={buildSalaryRegisterExport} note="Confidential salary data. Export access is restricted." /><ServerExportButton endpoint="/finance/exports/salaries.xlsx" label="Full salary Excel" className={secondaryButton} /></>}
+        <div className="flex flex-wrap gap-2">
+          {canWrite && canExportPayroll && <button type="button" className={primaryButton}
+            disabled={!salaryRegister.length} onClick={() => { setFeedback(null); setShowImport(true); }}>
+            <Upload className="size-4" /> Import salaries
+          </button>}
+          {canExportPayroll && <><TableExportMenu build={buildSalaryRegisterExport} note="Confidential salary data. Export access is restricted." /><ServerExportButton endpoint="/finance/exports/salaries.xlsx" label="Full salary Excel" className={secondaryButton} /></>}
+        </div>
       </div>
       <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0 flex-1"><label className="mb-1.5 block text-xs font-semibold text-muted-foreground">Search employee</label><input className={fieldClass} value={salarySearch} onChange={event => setSalarySearch(event.target.value)} placeholder="Search by name, ID, or staff type…" /></div>
@@ -245,7 +260,12 @@ export function PayrollManagementWorkspace() {
 { id: "type", header: "Type", cell: (person) => person.type === "TEACHER" ? "Teacher" : "Staff", value: (person) => person.type },
 { id: "salary", header: "Monthly salary", cell: (person) => Number(person.monthlySalary) > 0 ? money(Number(person.monthlySalary)) : "Not configured", value: (person) => Number(person.monthlySalary ?? 0), className: "text-right tabular-nums" },
 { id: "readiness", header: "Payroll readiness", cell: (person) => <span className={cn("rounded-full px-2.5 py-1 text-[10px] font-bold", Number(person.monthlySalary) > 0 ? "bg-success/10 text-success" : "bg-warning/10 text-foreground")}>{Number(person.monthlySalary) > 0 ? "READY" : "NEEDS SALARY"}</span>, value: (person) => Number(person.monthlySalary) > 0 ? "READY" : "NEEDS SALARY" },
-{ id: "actions", header: "Actions", cell: (person) => canWrite ? <button type="button" className="text-xs font-semibold text-primary hover:underline" onClick={() => { setFeedback(null); setSalaryTarget(person); setSalaryDraft(person.monthlySalary == null ? "" : String(person.monthlySalary)); }}>Edit salary</button> : null, sortable: false }
+{ id: "actions", header: "Actions", cell: (person) => (
+  <div className="flex flex-wrap gap-x-3 gap-y-2">
+    {canWrite && <button type="button" className="text-xs font-semibold text-primary hover:underline" onClick={() => { setFeedback(null); setSalaryTarget(person); setSalaryDraft(person.monthlySalary == null ? "" : String(person.monthlySalary)); }}>Edit salary</button>}
+    {canExportPayroll && <button type="button" className="text-xs font-semibold text-primary hover:underline" onClick={() => { setFeedback(null); setPaymentDetailsPerson(person); }}>Payment details</button>}
+  </div>
+), sortable: false }
 ] satisfies DataTableColumn<(typeof filteredSalaryRegister)[number]>[]} getRowId={(person) => person.type + person.id} emptyTitle="No employees" emptyDescription="No staff members match this selection." exportTitle="Salary register" searchable={false} embedded /></div> : <div className="rounded-xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">{salarySearch ? "No employees match your search." : "No active teachers or staff records are available for payroll."}</div>}
     </section>
 
@@ -255,7 +275,7 @@ export function PayrollManagementWorkspace() {
         <div className="sm:w-48"><label className="mb-1.5 block text-xs font-semibold text-muted-foreground">Status</label><Select value={statusFilter} onValueChange={setStatusFilter}><SelectTrigger className="w-full"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ALL">All statuses</SelectItem>{(["DRAFT","APPROVED","PAID","CANCELLED"] as const).map(value => <SelectItem key={value} value={value}>{value}</SelectItem>)}</SelectContent></Select></div>
       </div>
       {payrollQuery.isPending ? <LoadingState /> : payrollQuery.error ? <ErrorState message={payrollQuery.error.message} /> : visiblePayroll.length ? <div className="mt-4 overflow-x-auto"><DataTable rows={visiblePayroll} columns={[
-{ id: "period", header: "Payroll period", cell: (run) => <><p className="font-semibold text-foreground">{monthName(run.month, run.year)}</p><p className="mt-1 text-xs text-muted-foreground">SSNIT: {money(run.totalSSNIT)}</p></>, value: (run) => run.year * 100 + run.month },
+{ id: "period", header: "Payroll period", cell: (run) => <><p className="font-semibold text-foreground">{monthName(run.month, run.year)}{(run.runNumber ?? 1) > 1 ? ` · Run ${run.runNumber}` : ""}</p><p className="mt-1 text-xs text-muted-foreground">SSNIT: {money(run.totalSSNIT)}</p></>, value: (run) => run.year * 100 + run.month },
 { id: "status", header: "Status", cell: (run) => <span className={cn("inline-flex rounded-full px-2.5 py-1 text-[10px] font-bold",statusTone(run.status))}>{run.status}</span>, value: (run) => run.status },
 { id: "employees", header: "Employees", cell: (run) => run._count?.payslips ?? run.payslips.length, value: (run) => run._count?.payslips ?? run.payslips.length, className: "text-right tabular-nums" },
 { id: "gross", header: "Gross", cell: (run) => money(run.totalGross), value: (run) => Number(run.totalGross), className: "text-right tabular-nums" },
@@ -265,6 +285,24 @@ export function PayrollManagementWorkspace() {
 ] satisfies DataTableColumn<(typeof visiblePayroll)[number]>[]} getRowId={(run) => run.id} emptyTitle="No payroll runs" emptyDescription="No payroll runs match these filters." exportTitle="Payroll runs" searchable={false} embedded /></div> : <EmptyState title="No payroll runs yet" description="Generate a draft for a supported period after confirming employee salary and tax details." />}
     </section>
 
+    {showImport && canWrite && canExportPayroll && <PayrollSalaryImportDialog
+      employees={salaryRegister}
+      onClose={() => setShowImport(false)}
+      onImported={count => {
+        setShowImport(false);
+        setFeedback({ kind: "success", text: `Updated ${count} monthly salaries. New payroll drafts will use these amounts.` });
+        void queryClient.invalidateQueries({ queryKey: ["finance", "payroll-salaries"] });
+      }}
+    />}
+    {paymentDetailsPerson && canExportPayroll && <PayrollPaymentDetailsDialog
+      person={paymentDetailsPerson}
+      canEdit={canWrite}
+      onClose={() => setPaymentDetailsPerson(null)}
+      onSaved={() => {
+        setPaymentDetailsPerson(null);
+        setFeedback({ kind: "success", text: "Payroll payment details saved." });
+      }}
+    />}
     {salaryTarget && <Modal title="Update monthly salary" description={`${salaryTarget.name} · ${salaryTarget.type === "TEACHER" ? "Teacher" : "Staff"}`} onClose={() => !updateSalary.isPending && setSalaryTarget(null)}>
       <form className="space-y-4" onSubmit={submitSalary}>
         <div className="rounded-xl bg-muted/40 p-3 text-sm text-muted-foreground">This value is used for future payroll drafts only. Saved or approved payroll runs will not be recalculated.</div>
@@ -275,8 +313,11 @@ export function PayrollManagementWorkspace() {
     </Modal>}
     {showGenerate && <Modal title="Generate payroll draft" description="Build a draft payroll from the school's active staff and teacher monthly salary values." onClose={() => !generatePayroll.isPending && setShowGenerate(false)}>
       <form onSubmit={submitGenerate} className="space-y-4">
-        <div className="grid gap-4 sm:grid-cols-2"><LabeledField label="Payroll month"><Select value={month} onValueChange={setMonth}><SelectTrigger className="w-full"><SelectValue /></SelectTrigger><SelectContent>{[9,10,11,12].map(value => <SelectItem key={value} value={String(value)}>{new Date(Date.UTC(2026,value-1,1)).toLocaleDateString("en-GB",{month:"long",timeZone:"UTC"})}</SelectItem>)}</SelectContent></Select></LabeledField><LabeledField label="Year"><input disabled value="2026" className={cn(fieldClass,"opacity-70")} /></LabeledField></div>
-        <div className="rounded-xl border border-warning/30 bg-warning/5 p-4"><div className="flex gap-2"><AlertCircle className="mt-0.5 size-4 shrink-0 text-muted-foreground" /><div><p className="text-sm font-semibold text-foreground">Payroll calculation assumptions</p><p className="mt-1 text-xs leading-5 text-muted-foreground">Uses GRA resident PAYE monthly bands effective 1 September 2026. It calculates from each person's stored monthly salary only; allowances, overtime, non-resident tax treatment and other deductions are not stored in this version. Employees without a positive salary are excluded. Review each draft before approving.</p></div></div></div>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <LabeledField label="Payroll month"><Select value={month} onValueChange={value => { setMonth(value); setTaxConfirmed(false); }}><SelectTrigger className="w-full"><SelectValue /></SelectTrigger><SelectContent>{Array.from({ length: 12 }, (_, i) => <SelectItem key={i} value={String(i + 1)}>{new Date(Date.UTC(2000, i, 1)).toLocaleDateString("en-GB", { month: "long", timeZone: "UTC" })}</SelectItem>)}</SelectContent></Select></LabeledField>
+          <LabeledField label="Year"><input type="number" min="2000" max="2100" step="1" required value={year} className={fieldClass} onChange={event => { setYear(event.target.value); setTaxConfirmed(false); }} /></LabeledField>
+        </div>
+        <div className="rounded-xl border border-warning/30 bg-warning/5 p-4"><div className="flex gap-2"><AlertCircle className="mt-0.5 size-4 shrink-0 text-muted-foreground" /><div><p className="text-sm font-semibold text-foreground">Payroll calculation assumptions</p><p className="mt-1 text-xs leading-5 text-muted-foreground">Uses the approved PAYE and contribution settings effective at the end of the selected month. Drafts use each employee’s current monthly base salary. Employees without a positive salary are excluded. Verify the inputs for the selected month before generating a draft.</p></div></div></div>
         <label className="flex items-start gap-3 rounded-xl border border-border p-3 text-sm"><input type="checkbox" className="mt-1 size-4 accent-primary" checked={taxConfirmed} onChange={event => setTaxConfirmed(event.target.checked)} /><span className="leading-5 text-foreground">I have verified employee salary inputs and confirm the resident PAYE schedule is appropriate for every employee included in this draft.</span></label>
         {generatePayroll.error && <ErrorState message={generatePayroll.error.message} />}
         <div className="flex justify-end gap-2 border-t border-border pt-4"><button type="button" className={secondaryButton} onClick={() => setShowGenerate(false)} disabled={generatePayroll.isPending}>Cancel</button><button type="submit" className={primaryButton} disabled={generatePayroll.isPending || !taxConfirmed}>{generatePayroll.isPending && <LoaderCircle className="size-4 animate-spin" />} Generate draft</button></div>
@@ -298,13 +339,19 @@ export function PayrollManagementWorkspace() {
 { id: "employee", header: "Employee", cell: (slip) => <><p className="font-medium text-foreground">{personName(slip)}</p><p className="text-[10px] text-muted-foreground">{slip.staff?.staffId ?? slip.teacher?.teacherId ?? ""}</p></>, value: (slip) => personName(slip) },
 { id: "basic", header: "Basic", cell: (slip) => money(slip.basicSalary), value: (slip) => Number(slip.basicSalary), className: "text-right tabular-nums" },
 { id: "ssnit", header: "Employee SSNIT", cell: (slip) => money(slip.ssnitEmployee), value: (slip) => Number(slip.ssnitEmployee), className: "text-right tabular-nums" },
+{ id: "tier2", header: "Tier 2 allocation", cell: (slip) => slip.tier2Contribution == null ? "—" : money(slip.tier2Contribution), value: (slip) => Number(slip.tier2Contribution ?? 0), className: "text-right tabular-nums" },
 { id: "paye", header: "PAYE", cell: (slip) => money(slip.incomeTax), value: (slip) => Number(slip.incomeTax), className: "text-right tabular-nums" },
 { id: "employer", header: "Employer SSNIT", cell: (slip) => money(slip.ssnitEmployer), value: (slip) => Number(slip.ssnitEmployer), className: "text-right tabular-nums" },
 { id: "net", header: "Net", cell: (slip) => money(slip.netSalary), value: (slip) => Number(slip.netSalary), className: "text-right tabular-nums" },
 { id: "status", header: "Status", cell: (slip) => slip.paymentStatus, value: (slip) => slip.paymentStatus },
 ...(canExportPayroll ? [{ id: "pdf", header: "PDF", cell: (slip) => <ServerExportButton endpoint={"/finance/payslips/" + encodeURIComponent(slip.id) + ".pdf"} label="PDF" className="inline-flex items-center gap-1 rounded-lg border border-border px-2 py-1 text-xs font-semibold text-foreground" />, sortable: false }] satisfies DataTableColumn<(typeof selectedDetail.payslips)[number]>[] : [])
-] satisfies DataTableColumn<(typeof selectedDetail.payslips)[number]>[]} getRowId={(slip) => slip.id} emptyTitle="No payslips" emptyDescription="This run has no payslips." exportTitle="Payslips" searchable={false} embedded /><p className="mt-4 text-xs leading-5 text-muted-foreground">These are draft amounts from saved monthly salary data. Allowances, overtime and other deductions are not included in this version.</p></div>
-      <div className="payroll-slips-actions mt-4 flex justify-end gap-2">{canExportPayroll && <><ServerExportButton endpoint={`/finance/payroll/${encodeURIComponent(selectedDetail.id)}/payslips.pdf`} label="Whole-run PDF" className={secondaryButton} /><TableExportMenu build={() => ({ title: "Payslips " + monthName(selectedDetail.month, selectedDetail.year), headers: ["Employee","Employee ID","Basic (GHS)","Employee SSNIT (GHS)","PAYE (GHS)","Employer SSNIT (GHS)","Net (GHS)","Payment status"], columnTypes: ["text","text","money","money","money","money","money","text"], rows: selectedDetail.payslips.map(slip => [personName(slip),slip.staff?.staffId ?? slip.teacher?.teacherId ?? "",Number(slip.basicSalary),Number(slip.ssnitEmployee),Number(slip.incomeTax),Number(slip.ssnitEmployer),Number(slip.netSalary),slip.paymentStatus]), totals: ["Total","","",null,null,null,null,""], confidential: true, reportInfo: { period: monthName(selectedDetail.month, selectedDetail.year) } })} note="Confidential payslip data." /><button type="button" className={primaryButton} onClick={() => window.print()}><Printer className="size-4" /> Print slips</button></>}</div>
+] satisfies DataTableColumn<(typeof selectedDetail.payslips)[number]>[]} getRowId={(slip) => slip.id} emptyTitle="No payslips" emptyDescription="This run has no payslips." exportTitle="Payslips" searchable={false} embedded /><p className="mt-4 text-xs leading-5 text-muted-foreground">Amounts are saved with this payroll run. Tier 2 amounts shown are part of the combined pension contribution.</p></div>
+      <div className="payroll-slips-actions mt-4 flex flex-wrap justify-end gap-2">{canExportPayroll && <>
+        {(selectedDetail.status === "APPROVED" || selectedDetail.status === "PAID")
+          && selectedDetail.payslips.some(slip => slip.tier2Contribution != null) && (
+            <ServerExportButton endpoint={`/finance/payroll/${encodeURIComponent(selectedDetail.id)}/tier-2.xlsx`} label="Tier 2 Excel" className={secondaryButton} />
+          )}
+        <ServerExportButton endpoint={`/finance/payroll/${encodeURIComponent(selectedDetail.id)}/payslips.pdf`} label="Whole-run PDF" className={secondaryButton} /><TableExportMenu build={() => ({ title: "Payslips " + monthName(selectedDetail.month, selectedDetail.year), headers: ["Employee","Employee ID","Basic (GHS)","Employee SSNIT (GHS)","PAYE (GHS)","Employer SSNIT (GHS)","Net (GHS)","Payment status"], columnTypes: ["text","text","money","money","money","money","money","text"], rows: selectedDetail.payslips.map(slip => [personName(slip),slip.staff?.staffId ?? slip.teacher?.teacherId ?? "",Number(slip.basicSalary),Number(slip.ssnitEmployee),Number(slip.incomeTax),Number(slip.ssnitEmployer),Number(slip.netSalary),slip.paymentStatus]), totals: ["Total","","",null,null,null,null,""], confidential: true, reportInfo: { period: monthName(selectedDetail.month, selectedDetail.year) } })} note="Confidential payslip data." /><button type="button" className={primaryButton} onClick={() => window.print()}><Printer className="size-4" /> Print slips</button></>}</div>
     </Modal>}
   </div>;
 }
