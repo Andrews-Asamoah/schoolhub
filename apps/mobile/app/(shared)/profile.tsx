@@ -290,7 +290,7 @@ export default function ProfileScreen() {
           ) : null}
           <Card>
             <ListRow
-              title="About SchoolHub"
+              title="About CampusHubGH"
               subtitle="Mobile tools for teachers, students and guardians"
             />
           </Card>

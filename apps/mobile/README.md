@@ -178,10 +178,11 @@ npx eas-cli build --platform android --profile preview
 npx eas-cli build --platform android --profile production
 ```
 
-The bundled assets extend the existing Lucide GraduationCap identity used by the
-web sidebar. Source is assets/mark.svg; licensing is in assets/LICENSE-lucide.
-Regenerate with `node scripts/generate-assets.mjs` using the installed Expo image
-toolchain. Check app icons, Android masks and light/dark splash on a device.
+The CampusHubGH artwork in `assets/campushubgh-source.png` supplies the
+mobile wordmark, launcher, adaptive icon, splash and favicon, as well as the
+web sign-in mark. Regenerate those assets with
+`node scripts/generate-assets.mjs` from `apps/mobile` using the installed Expo
+image toolchain. Rebuild the native client to see the new launcher and splash.
 
 ## Validation
 
@@ -203,7 +204,6 @@ and replay automatically when connectivity returns. See
 [offline attendance](../../docs/plans/mobile-phase-8-register.md) and
 [push delivery](../../docs/plans/mobile-phase-8-push.md). See [Phase 7](../../docs/plans/mobile-phase-7.md)
 for contracts, real validation transcripts and pending device acceptance.
-Teacher announcement creation and documents remain deferred pending N3.
 
 Teachers can publish class announcements to pupils or their guardians from
 Announcements. Staff documents are available in More. Open a document to
@@ -221,7 +221,9 @@ Guardians can submit absence requests with optional private PDF or image evidenc
 and see school decisions under Attendance. Fee statements support printing and
 PDF or Excel sharing. Students can filter assignments by status, see overdue
 work, and search subjects and classmates. Both roles can preview report cards
-and print or share timetables. Message history search and replies are available
+and print or share timetables. All three roles can switch between scheduled
+days and export the full week. Teacher exports include the assigned class and
+room. Message history search and replies are available
 to all three roles.
 
 Rebuild the development client or signed app when adopting these changes.

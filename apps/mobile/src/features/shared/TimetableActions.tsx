@@ -1,29 +1,32 @@
 import { useEffect, useState } from "react";
-import { Alert } from "react-native";
+import { Alert, View } from "react-native";
 import { Button } from "@/components/Button";
 import { Card } from "@/components/Surface";
 import { Text } from "@/components/Typography";
+import { spacing, type, useTheme } from "@/theme/theme";
 import { outputTable } from "./exports";
 
-type Lesson = {
+export type Lesson = {
   type: string;
-  label: string;
+  label: string | null;
   dayOfWeek: string;
   startTime: string;
   endTime: string;
   subject: { name: string } | null;
+  class?: { name: string } | null;
   teacher?: { name: string } | null;
   classroom?: { name: string } | null;
 };
-const days = [
-  "MONDAY",
-  "TUESDAY",
-  "WEDNESDAY",
-  "THURSDAY",
-  "FRIDAY",
-  "SATURDAY",
-  "SUNDAY",
-];
+export const timetableDays = [
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+  "Sunday",
+] as const;
+const days = timetableDays.map((day) => day.toUpperCase());
 
 export function lessonTiming(entries: Lesson[], date: Date) {
   // SchoolHub's timetable uses Ghana wall time, where UTC applies year-round.
@@ -46,11 +49,14 @@ export function TimetableActions({
   entries,
   title,
   showCurrent = false,
+  showClass = false,
 }: {
   entries: Lesson[];
   title: string;
   showCurrent?: boolean;
+  showClass?: boolean;
 }) {
+  const { colors } = useTheme();
   const [now, setNow] = useState(() => new Date());
   const [busy, setBusy] = useState(false);
   useEffect(() => {
@@ -59,7 +65,7 @@ export function TimetableActions({
     return () => clearInterval(timer);
   }, [showCurrent]);
 
-  const { current, next } = lessonTiming(entries, now);
+  const { current, next } = showCurrent ? lessonTiming(entries, now) : {};
   function exportSchedule(format: "print" | "pdf") {
     setBusy(true);
     const ordered = [...entries].sort(
@@ -70,12 +76,12 @@ export function TimetableActions({
     );
     void outputTable(
       title,
-      ["Day", "Time", "Lesson", "Teacher", "Room"],
+      ["Day", "Time", "Lesson", showClass ? "Class" : "Teacher", "Room"],
       ordered.map((entry) => [
         entry.dayOfWeek,
         `${entry.startTime}–${entry.endTime}`,
-        entry.subject?.name ?? entry.label,
-        entry.teacher?.name ?? "",
+        entry.subject?.name ?? entry.label ?? entry.type,
+        (showClass ? entry.class?.name : entry.teacher?.name) ?? "",
         entry.classroom?.name ?? "",
       ]),
       format,
@@ -86,31 +92,33 @@ export function TimetableActions({
   return (
     <>
       {showCurrent ? (
-        <Card>
-          <Text>
-            Current lesson:{" "}
-            {current ? (current.subject?.name ?? current.label) : "None"}
+        <Card hue="violet" style={{ gap: spacing.xs }}>
+          <Text style={[type.bodyStrong, { color: colors.foreground }]}>
+            {current
+              ? `Now · ${current.subject?.name ?? current.label ?? "Lesson"}`
+              : "No lesson in progress"}
           </Text>
-          <Text>
-            Next today:{" "}
+          <Text style={[type.body, { color: colors.mutedForeground }]}>
             {next
-              ? `${next.subject?.name ?? next.label} at ${next.startTime}`
+              ? `Next · ${next.subject?.name ?? next.label ?? "Lesson"} at ${next.startTime}`
               : "No more lessons today"}
           </Text>
         </Card>
       ) : null}
-      <Button
-        label="Print timetable"
-        variant="secondary"
-        disabled={busy}
-        onPress={() => exportSchedule("print")}
-      />
-      <Button
-        label="Share timetable PDF"
-        variant="secondary"
-        disabled={busy}
-        onPress={() => exportSchedule("pdf")}
-      />
+      <View style={{ gap: spacing.sm }}>
+        <Button
+          label="Print timetable"
+          variant="secondary"
+          disabled={busy}
+          onPress={() => exportSchedule("print")}
+        />
+        <Button
+          label="Share timetable PDF"
+          variant="secondary"
+          disabled={busy}
+          onPress={() => exportSchedule("pdf")}
+        />
+      </View>
     </>
   );
 }

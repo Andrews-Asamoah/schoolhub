@@ -26,12 +26,12 @@ export function RolePlaceholder() {
   const notifications = useNotificationsQuery();
   return (
     <Screen
-      title={activeRole ? ROLE_LABELS[activeRole] : "SchoolHub"}
+      title={activeRole ? ROLE_LABELS[activeRole] : "CampusHubGH"}
       subtitle={tenant?.name}
     >
       <View style={{ gap: 16 }}>
         <Text style={[type.body, { color: colors.foreground }]}>
-          Your shared SchoolHub tools are ready. Role-specific learning
+          Your shared CampusHubGH tools are ready. Role-specific learning
           workspaces are being prepared.
         </Text>
         <Card>

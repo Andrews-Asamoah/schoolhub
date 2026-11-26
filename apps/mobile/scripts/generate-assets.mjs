@@ -1,49 +1,57 @@
 import { createRequire } from "node:module";
-import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 
-// Use Expo's installed image toolchain; no runtime dependency is added.
+// Use Expo's installed image toolchain without adding a runtime dependency.
 const require = createRequire(import.meta.url);
 const expoRequire = createRequire(require.resolve("expo/package.json"));
 const sharp = expoRequire("sharp");
 const folder = new URL("../assets/", import.meta.url);
-const mark = await readFile(new URL("mark.svg", folder));
-const brand = "#4338CA";
+const asset = (name) => fileURLToPath(new URL(name, folder));
+const artwork = asset("campushubgh-source.png");
+const paper = "#FFF9ED";
 const transparent = { r: 0, g: 0, b: 0, alpha: 0 };
-const foreground = await sharp(mark)
-  .resize(640, 640)
-  .extend({
-    top: 192,
-    bottom: 192,
-    left: 192,
-    right: 192,
-    background: transparent,
+
+// Bound the supplied symbol above the wordmark, excluding its outer margins.
+const symbol = await sharp(artwork)
+  .extract({ left: 462, top: 137, width: 613, height: 452 })
+  .png()
+  .toBuffer();
+
+// Add margins after resizing so the artwork stays within Android's mask area.
+async function tile(size, symbolWidth, background) {
+  const mark = await sharp(symbol)
+    .resize({ width: symbolWidth })
+    .png()
+    .toBuffer();
+  return sharp({
+    create: { width: size, height: size, channels: 4, background },
   })
-  .png()
-  .toBuffer();
-const icon = await sharp({
-  create: { width: 1024, height: 1024, channels: 3, background: brand },
-})
-  .composite([{ input: foreground }])
-  .removeAlpha()
-  .png()
-  .toBuffer();
-await sharp(icon).toFile(fileURLToPath(new URL("icon.png", folder)));
-await sharp(foreground).toFile(
-  fileURLToPath(new URL("adaptive-foreground.png", folder)),
+    .composite([{ input: mark, gravity: "centre" }])
+    .png()
+    .toBuffer();
+}
+
+const icon = await tile(1024, 632, paper);
+await sharp(icon).removeAlpha().toFile(asset("icon.png"));
+await sharp(await tile(1024, 600, transparent)).toFile(
+  asset("adaptive-foreground.png"),
 );
 await sharp({
-  create: { width: 1024, height: 1024, channels: 3, background: brand },
+  create: { width: 1024, height: 1024, channels: 3, background: paper },
 })
   .png()
-  .toFile(fileURLToPath(new URL("adaptive-background.png", folder)));
-await sharp(mark)
-  .resize(512, 512)
-  .png()
-  .toFile(fileURLToPath(new URL("splash.png", folder)));
-await sharp(icon)
+  .toFile(asset("adaptive-background.png"));
+await sharp(await tile(512, 410, paper)).toFile(asset("splash.png"));
+await sharp(await tile(128, 102, paper))
   .resize(64, 64)
-  .toFile(fileURLToPath(new URL("favicon.png", folder)));
-console.log(
-  "Generated icon (1024), adaptive layers (1024), splash (512), favicon (64).",
-);
+  .toFile(asset("favicon.png"));
+await sharp(artwork)
+  .extract({ left: 134, top: 137, width: 1268, height: 675 })
+  .resize({ width: 720 })
+  .png()
+  .toFile(asset("campushubgh-lockup.png"));
+
+const webPublic = new URL("../../web/public/", import.meta.url);
+await sharp(await tile(256, 196, paper))
+  .webp({ quality: 92 })
+  .toFile(fileURLToPath(new URL("campushubgh.webp", webPublic)));

@@ -14,7 +14,7 @@ export default function RoleSelectionScreen() {
   const [error, setError] = useState("");
 
   return (
-    <Screen title="Choose your role" subtitle="Select how you use SchoolHub">
+    <Screen title="Choose your role" subtitle="Select how you use CampusHubGH">
       <View style={{ gap: spacing.md }}>
         {session.roles.map((role) => (
           <Pressable

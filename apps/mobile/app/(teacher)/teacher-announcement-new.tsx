@@ -139,7 +139,7 @@ export default function NewClassAnnouncement() {
           />
           {publish.isError ? (
             <Copy alert>
-              SchoolHub could not confirm publication. Check Announcements
+              CampusHubGH could not confirm publication. Check Announcements
               before trying again.
             </Copy>
           ) : null}

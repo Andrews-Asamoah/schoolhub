@@ -24,12 +24,12 @@ export default function RestoreUnavailableScreen() {
   }
 
   return (
-    <Screen title="Reconnect to SchoolHub">
+    <Screen title="Reconnect to CampusHubGH">
       <Text>
-        Connect to the internet so SchoolHub can verify your saved session.
+        Connect to the internet so CampusHubGH can verify your saved session.
       </Text>
       {failed ? (
-        <Text accessibilityRole="alert">SchoolHub is still unreachable.</Text>
+        <Text accessibilityRole="alert">CampusHubGH is still unreachable.</Text>
       ) : null}
       <Button label="Try again" loading={busy} onPress={() => void retry()} />
       <Button
