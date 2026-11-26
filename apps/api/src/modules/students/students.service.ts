@@ -893,7 +893,7 @@ export class StudentsService {
     const student = await db.student.findFirst({
       where: { id: studentId, schoolId, deletedAt: null },
       include: {
-        profile: true,
+        profile: { include: { user: { select: { image: true } } } },
         house: { select: { id: true, name: true } },
         department: { select: { id: true, name: true } },
         guardians: {
@@ -940,6 +940,7 @@ export class StudentsService {
         firstName: p.firstName,
         lastName: p.lastName,
         otherNames: p.otherNames,
+        image: p.user?.image ?? null,
         gender: p.gender,
         dateOfBirth: p.dateOfBirth,
         nationality: p.nationality,

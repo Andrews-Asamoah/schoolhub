@@ -20,6 +20,7 @@ export default function StudentLayout() {
             {...props}
             preloadFromHome="/(student)/my-learning"
             parentTabs={{
+              "student-messages": "resources",
               "student-reports": "resources",
               "student-subjects": "my-learning",
               "student-classmates": "resources",
@@ -121,6 +122,10 @@ export default function StudentLayout() {
         <Tabs.Screen
           name="assignment/[id]"
           options={{ tabBarButton: detailTabButton, title: "Assignment" }}
+        />
+        <Tabs.Screen
+          name="student-messages"
+          options={{ tabBarButton: detailTabButton }}
         />
       </Tabs>
     </TabBarInsetProvider>

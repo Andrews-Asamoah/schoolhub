@@ -2,7 +2,9 @@ import { useRef, type ComponentRef, type ReactNode } from "react";
 import {
   AccessibilityInfo,
   findNodeHandle,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   ScrollView,
   View,
 } from "react-native";
@@ -15,11 +17,13 @@ export function Dialog({
   title,
   children,
   onClose,
+  closeLabel = "Cancel",
 }: {
   visible: boolean;
   title: string;
   children: ReactNode;
   onClose: () => void;
+  closeLabel?: string;
 }) {
   const { colors, reduceMotion } = useTheme();
   const insets = useSafeAreaInsets();
@@ -35,7 +39,8 @@ export function Dialog({
         if (node) AccessibilityInfo.setAccessibilityFocus(node);
       }}
     >
-      <View
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
         accessibilityViewIsModal
         style={{
           flex: 1,
@@ -68,10 +73,10 @@ export function Dialog({
               {title}
             </Text>
             {children}
-            <Button label="Cancel" variant="secondary" onPress={onClose} />
+            <Button label={closeLabel} variant="secondary" onPress={onClose} />
           </ScrollView>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }

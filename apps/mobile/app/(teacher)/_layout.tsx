@@ -23,6 +23,7 @@ export default function TeacherLayout() {
               {...props}
               preloadFromHome="/(teacher)/teacher-classes"
               parentTabs={{
+                "teacher-messages": "teacher-more",
                 "teacher-roster": "teacher-classes",
                 "teacher-pupil": "teacher-classes",
                 "teacher-register": "teacher-classes",
@@ -164,6 +165,10 @@ export default function TeacherLayout() {
           />
           <Tabs.Screen
             name="teacher-documents"
+            options={{ tabBarButton: detailTabButton }}
+          />
+          <Tabs.Screen
+            name="teacher-messages"
             options={{ tabBarButton: detailTabButton }}
           />
         </Tabs>

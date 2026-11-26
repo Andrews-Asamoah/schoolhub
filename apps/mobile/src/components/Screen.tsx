@@ -1,21 +1,18 @@
 import type { ReactNode } from "react";
 import {
   RefreshControl,
+  ScrollView,
+  StyleSheet,
   View,
   type StyleProp,
   type ViewStyle,
 } from "react-native";
-import { Text } from "@/components/Typography";
-import Animated, {
-  useAnimatedScrollHandler,
-  useSharedValue,
-} from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { spacing, type, useTheme } from "@/theme/theme";
+import { Text } from "./Typography";
 import { useTabBarInset } from "./TabBarInset";
 import { OfflineBanner } from "./OfflineBanner";
 import { Backdrop } from "./Backdrop";
-import { GlassHeader, useHeaderBarHeight } from "./GlassHeader";
 
 type Props = {
   title?: string;
@@ -30,7 +27,6 @@ type Props = {
   contentStyle?: StyleProp<ViewStyle>;
 };
 
-/** Screen scaffold: backdrop, collapsing glass header, large title, pull-to-refresh. */
 export function Screen({
   title,
   subtitle,
@@ -45,47 +41,57 @@ export function Screen({
   const { colors, accent } = useTheme();
   const bottomInset = useTabBarInset();
   const insets = useSafeAreaInsets();
-  const scrollY = useSharedValue(0);
-  const onScroll = useAnimatedScrollHandler((e) => {
-    scrollY.value = e.contentOffset.y;
-  });
-
-  const headerHeight = useHeaderBarHeight();
-  const top = insets.top + (left || right ? headerHeight : spacing.lg);
-  const heading = title ? (
-    <View style={{ paddingBottom: spacing.lg }}>
-      <Text
-        accessibilityRole="header"
-        style={[type.largeTitle, { color: colors.foreground }]}
-      >
-        {title}
-      </Text>
-      {subtitle ? (
-        <Text
-          style={[type.body, { color: colors.mutedForeground, marginTop: 2 }]}
-        >
-          {subtitle}
-        </Text>
-      ) : null}
-    </View>
-  ) : null;
+  const hasHeader = !!(title || left || right);
+  const top = spacing.lg + (hasHeader ? 0 : insets.top);
+  const bottom = Math.max(insets.bottom, bottomInset);
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.background }}>
+    <View style={[styles.fill, { backgroundColor: colors.background }]}>
       <Backdrop />
+      {hasHeader ? (
+        <View
+          style={[
+            styles.header,
+            {
+              paddingTop: insets.top + spacing.sm,
+              backgroundColor: colors.card,
+              borderBottomColor: colors.border,
+            },
+          ]}
+        >
+          {left ? <View style={styles.back}>{left}</View> : null}
+          <View style={styles.headingRow}>
+            {title ? (
+              <View style={styles.heading}>
+                <Text
+                  accessibilityRole="header"
+                  style={[
+                    right ? type.title : type.largeTitle,
+                    { color: colors.foreground },
+                  ]}
+                >
+                  {title}
+                </Text>
+                {subtitle ? (
+                  <Text
+                    style={[type.caption, { color: colors.mutedForeground }]}
+                  >
+                    {subtitle}
+                  </Text>
+                ) : null}
+              </View>
+            ) : null}
+            {right ? <View style={styles.action}>{right}</View> : null}
+          </View>
+        </View>
+      ) : null}
       {scroll ? (
-        <Animated.ScrollView
-          onScroll={onScroll}
-          scrollEventThrottle={16}
+        <ScrollView
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={[
-            {
-              paddingTop: top,
-              paddingHorizontal: spacing.lg,
-              paddingBottom:
-                Math.max(insets.bottom, bottomInset) + spacing.xxxl,
-            },
+            styles.content,
+            { paddingTop: top, paddingBottom: bottom + spacing.xxxl },
             contentStyle,
           ]}
           refreshControl={
@@ -100,34 +106,42 @@ export function Screen({
           }
         >
           <OfflineBanner />
-          {heading}
           {children}
-        </Animated.ScrollView>
+        </ScrollView>
       ) : (
         <View
           style={[
-            {
-              flex: 1,
-              paddingTop: top,
-              paddingHorizontal: spacing.lg,
-              paddingBottom: Math.max(insets.bottom, bottomInset),
-            },
+            styles.fill,
+            styles.content,
+            { paddingTop: top, paddingBottom: bottom },
             contentStyle,
           ]}
         >
           <OfflineBanner />
-          {heading}
           {children}
         </View>
       )}
-      {title || left || right ? (
-        <GlassHeader
-          title={title ?? ""}
-          scrollY={scrollY}
-          left={left}
-          right={right}
-        />
-      ) : null}
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  fill: { flex: 1 },
+  header: {
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.md,
+    gap: spacing.xs,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  back: { alignSelf: "flex-start", maxWidth: "100%" },
+  headingRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: spacing.sm,
+  },
+  heading: { flexBasis: 156, flexGrow: 1, flexShrink: 1, gap: spacing.xs },
+  action: { maxWidth: "100%", flexShrink: 1 },
+  content: { paddingHorizontal: spacing.lg },
+});

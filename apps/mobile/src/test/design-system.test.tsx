@@ -12,6 +12,7 @@ import {
   Timeline,
 } from "@/components/ModulePrimitives";
 import { OtpInput, DatePickerField, SearchBar } from "@/components/Fields";
+import { CalendarDateField } from "@/components/CalendarDateField";
 import { ConfirmDialog, ActionSheet } from "@/components/Dialogs";
 import { OfflineBanner } from "@/components/OfflineBanner";
 import { GlassSurface } from "@/components/GlassSurface";
@@ -136,6 +137,37 @@ test("date picker clamps leap day when changing calendar year", async () => {
   await fireEvent.press(screen.getByRole("button", { name: "Date: year" }));
   await fireEvent.press(screen.getByRole("radio", { name: "2025" }));
   expect(change).toHaveBeenCalledWith("2025-02-28");
+});
+test("the due-date calendar selects a leap day and can clear it", async () => {
+  const change = jest.fn();
+  function Harness() {
+    const [value, setValue] = useState("2024-01-31");
+    return (
+      <CalendarDateField
+        label="Due date"
+        value={value}
+        onChange={(date) => {
+          setValue(date);
+          change(date);
+        }}
+      />
+    );
+  }
+  const dueDate = () => screen.getByRole("button", { name: "Due date" });
+  await render(<Harness />);
+  await fireEvent.press(dueDate());
+  await fireEvent.press(screen.getByRole("button", { name: "Next month" }));
+  await fireEvent.press(
+    screen.getByRole("button", { name: /29 February 2024/ }),
+  );
+  expect(change).toHaveBeenLastCalledWith("2024-02-29");
+  await fireEvent.press(dueDate());
+  expect(
+    screen.getByRole("button", { name: /29 February 2024/, selected: true }),
+  ).toBeVisible();
+  await fireEvent.press(screen.getByText("Clear due date"));
+  expect(change).toHaveBeenLastCalledWith("");
+  expect(screen.getByText("Choose a date")).toBeVisible();
 });
 test("cancel never confirms; busy confirmation is disabled", async () => {
   const confirm = jest.fn(),

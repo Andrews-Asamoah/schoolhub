@@ -61,7 +61,13 @@ export function PortalMenu({
   );
 }
 
-export function SchoolAccountMenu({ unread }: { unread?: number }) {
+export function SchoolAccountMenu({
+  unread,
+  messagesHref,
+}: {
+  unread?: number;
+  messagesHref: Href;
+}) {
   return (
     <>
       <PortalMenu
@@ -70,7 +76,7 @@ export function SchoolAccountMenu({ unread }: { unread?: number }) {
         links={[
           {
             label: "Messages",
-            href: "/(shared)/messages",
+            href: messagesHref,
             icon: MessageCircle,
           },
           {
