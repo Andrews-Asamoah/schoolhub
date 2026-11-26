@@ -19,6 +19,7 @@ import { useScopedMutation } from "@/features/shared/mutations";
 import { useMyProfileQuery } from "@/features/shared/queries";
 import { ROLE_LABELS } from "@/lib/permissions";
 import { setActiveRole, useSession } from "@/lib/session";
+import { ApiError, SessionChangedError } from "@/lib/api-error";
 import { signOut } from "@/lib/sign-out";
 import {
   useTheme,
@@ -43,12 +44,6 @@ export default function ProfileScreen() {
     setAvatarError("");
     setBusy(true);
     try {
-      const permission =
-        await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (!permission.granted) {
-        setAvatarError("Allow photo access to choose a profile picture.");
-        return;
-      }
       const selection = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ["images"],
         allowsEditing: true,
@@ -73,12 +68,29 @@ export default function ProfileScreen() {
       try {
         await upload.mutateAsync({ file, mimeType: "image/jpeg" });
       } finally {
-        if (file.exists) await file.delete();
+        try {
+          if (file.exists) file.delete();
+        } catch {
+          // A cache cleanup failure does not change the upload result.
+        }
       }
-    } catch {
-      setAvatarError(
-        "We couldn't update your profile photo. Please try again.",
-      );
+    } catch (failure) {
+      if (failure instanceof SessionChangedError) return;
+      if (failure instanceof ApiError && failure.status === 503) {
+        setAvatarError(
+          "The school server’s photo storage is unavailable. Contact your administrator.",
+        );
+      } else if (failure instanceof ApiError && failure.status === 413) {
+        setAvatarError("That photo is too large. Choose a smaller image.");
+      } else if (failure instanceof ApiError && failure.status === 400) {
+        setAvatarError(
+          "The server could not process that photo. Try a different image.",
+        );
+      } else {
+        setAvatarError(
+          "We couldn't update your profile photo. Try another image or check your connection.",
+        );
+      }
     } finally {
       setBusy(false);
     }
@@ -183,6 +195,7 @@ export default function ProfileScreen() {
                   variant="secondary"
                   onPress={() => void changeAvatar()}
                   loading={busy || upload.isPending}
+                  disabled={remove.isPending}
                 />
                 {profile.user.image ? (
                   <Button
@@ -190,6 +203,7 @@ export default function ProfileScreen() {
                     variant="ghost"
                     onPress={() => void removeAvatar()}
                     loading={remove.isPending}
+                    disabled={busy || upload.isPending}
                   />
                 ) : null}
               </View>

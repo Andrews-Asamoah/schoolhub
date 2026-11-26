@@ -1,3 +1,4 @@
+import { detailTabButton } from "./detailTabButton";
 import * as Haptics from "expo-haptics";
 import type { Tabs } from "expo-router";
 import {
@@ -71,7 +72,10 @@ export function PortalTabBar({
 
   const activeRoute = state.routes[state.index];
   const tabs = state.routes
-    .filter((route) => !descriptors[route.key]?.options.hidden)
+    .filter((route) => {
+      const options = descriptors[route.key]?.options;
+      return !options?.hidden && options?.tabBarButton !== detailTabButton;
+    })
     .map((route) => {
       const options = descriptors[route.key]?.options;
       const label =

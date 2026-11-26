@@ -8,7 +8,7 @@ module.exports = {
   },
   setupFilesAfterEnv: ["<rootDir>/src/test/setup.ts"],
   transformIgnorePatterns: [
-    "node_modules/(?!(.pnpm|(jest-)?react-native|@react-native(-community)?|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-native-svg|test-renderer))",
+    "node_modules/(?!(.pnpm|(jest-)?react-native|@react-native(-community)?|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-native-svg|standard-navigation|test-renderer))",
   ],
   clearMocks: true,
 };
