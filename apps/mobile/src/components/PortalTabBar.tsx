@@ -70,8 +70,8 @@ export function PortalTabBar({
     };
   }, []);
   useEffect(() => {
-    setInset(keyboardVisible ? 0 : height);
-  }, [height, keyboardVisible, setInset]);
+    setInset(height);
+  }, [height, setInset]);
   useEffect(() => () => setInset(0), [setInset]);
 
   const activeRoute = state.routes[state.index];
@@ -155,8 +155,6 @@ export function PortalTabBar({
     reduceMotion,
     viewport,
   ]);
-
-  if (keyboardVisible) return null;
 
   const items = tabs.map(({ route, options, label }, index) => {
     const current = route.key === activeRoute?.key;

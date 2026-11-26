@@ -1,4 +1,4 @@
-import { router, type Href } from "expo-router";
+import { openPortalTool } from "@/lib/portal-tools";
 import { ShieldCheck } from "lucide-react-native";
 import { View } from "react-native";
 import { Button } from "@/components/Button";
@@ -28,9 +28,7 @@ export default function SecurityScreen() {
         </Card>
         <Button
           label="Change password"
-          onPress={() =>
-            router.push("/(shared)/security/change-password" as Href)
-          }
+          onPress={() => openPortalTool("/security/change-password")}
         />
       </View>
     </Screen>

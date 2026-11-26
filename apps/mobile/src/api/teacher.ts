@@ -3,6 +3,8 @@ import { reportApprovalSchema, reportDataSchema } from "./report-preview";
 import { z } from "zod";
 import {
   batchAttendanceSchema,
+  createSchoolAssignmentSchema,
+  publishAssignmentBatchSchema,
   saveAssessmentEntrySchema,
   submitAssessmentEntrySchema,
   requestMarkCorrectionSchema,
@@ -356,14 +358,7 @@ export const recommendTeacherReport = defineEndpoint({
   request: recommendationSchema,
   response: z.object({ id: z.string(), stage: z.string() }),
 });
-export const createAssignmentSchema = z.object({
-  classId: z.string().trim().min(1).max(100),
-  subjectId: z.string().trim().min(1).max(100),
-  title: z.string().trim().min(3).max(160),
-  instructions: z.string().trim().min(1).max(10000),
-  dueAt: z.string().datetime().nullable().optional(),
-  maxScore: z.number().finite().positive().max(100000),
-});
+export const createAssignmentSchema = createSchoolAssignmentSchema;
 export const gradeAssignmentSchema = z.object({
   score: z.number().finite().min(0).max(100000),
   feedback: z.string().trim().max(2000).nullable().optional(),
@@ -413,6 +408,15 @@ export const createTeacherAssignment = defineEndpoint({
   roles: ["teacher"],
   request: createAssignmentSchema,
   response: z.object({ id: z.string() }),
+});
+export const publishTeacherAssignments = defineEndpoint({
+  method: "POST",
+  path: "/assignments/batch",
+  roles: ["teacher"],
+  request: publishAssignmentBatchSchema,
+  response: z.object({
+    assignments: z.array(z.object({ id: z.string(), classId: z.string() })),
+  }),
 });
 export const gradeTeacherAssignment = defineEndpoint({
   method: "PATCH",

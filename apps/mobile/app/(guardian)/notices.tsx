@@ -1,4 +1,4 @@
-import { router, type Href } from "expo-router";
+import { openPortalTool } from "@/lib/portal-tools";
 import { Megaphone } from "lucide-react-native";
 import { View } from "react-native";
 import { Card } from "@/components/Surface";
@@ -61,11 +61,7 @@ export default function GuardianNoticesScreen() {
                 status={item.isPinned ? "Pinned" : undefined}
                 divider={index < announcements.length - 1}
                 hue="amber"
-                onPress={() =>
-                  router.push(
-                    `/(shared)/announcements/${encodeURIComponent(item.id)}` as Href,
-                  )
-                }
+                onPress={() => openPortalTool(`/announcements/${item.id}`)}
               />
             ))}
           </Card>

@@ -1,15 +1,7 @@
-import {
-  CalendarCheck,
-  ClipboardPlus,
-  CalendarDays,
-  ClipboardList,
-  Home,
-  UsersRound,
-} from "lucide-react-native";
+import { Home, UsersRound } from "lucide-react-native";
 import { View } from "react-native";
 import { Card } from "@/components/Surface";
 import { EmptyState, ErrorState } from "@/components/States";
-import { PortalMenu, SchoolAccountMenu } from "@/components/PortalMenu";
 import { ListRow } from "@/components/ListRow";
 import { Screen } from "@/components/Screen";
 import { SkeletonRow } from "@/components/Skeleton";
@@ -30,39 +22,12 @@ export default function GuardianMoreScreen() {
   const retry = () => void Promise.all([clubs.refetch(), houses.refetch()]);
   return (
     <Screen
-      title="More"
+      title="School community"
       right={<WardSwitcher />}
       refreshing={clubs.isRefetching || houses.isRefetching}
       onRefresh={retry}
     >
       <View style={{ gap: spacing.lg }}>
-        <PortalMenu
-          title="Child records"
-          hue="violet"
-          links={[
-            {
-              label: "Attendance history",
-              href: "/(guardian)/attendance-history",
-              icon: CalendarCheck,
-            },
-            {
-              label: "Absence requests",
-              href: "/(guardian)/absence-requests",
-              icon: ClipboardPlus,
-            },
-            {
-              label: "Weekly timetable",
-              href: "/(guardian)/timetable",
-              icon: CalendarDays,
-            },
-            {
-              label: "Published reports",
-              href: "/(guardian)/reports",
-              icon: ClipboardList,
-            },
-          ]}
-        />
-        <SchoolAccountMenu messagesHref="/(guardian)/guardian-messages" />
         {!activeWard ? (
           <EmptyState
             title="No child selected"

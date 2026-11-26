@@ -156,7 +156,7 @@ test("the tab strip keeps long labels available at 200 percent text size", async
   expect(screen.getByText("Attendance").props.numberOfLines).toBeUndefined();
 });
 
-test("opening the keyboard hides navigation and releases its content inset", async () => {
+test("opening the keyboard leaves navigation and its content inset visible", async () => {
   const subscribe = jest.spyOn(Keyboard, "addListener");
   const props = {
     state: { index: 0, routes: [{ name: "Home", key: "home" }] },
@@ -186,8 +186,8 @@ test("opening the keyboard hides navigation and releases its content inset", asy
     )?.[1];
     expect(show).toBeDefined();
     await act(async () => show?.({} as never));
-    expect(screen.queryByTestId("portal-tab-bar")).toBeNull();
-    expect(screen.getByTestId("clearance")).toHaveTextContent("0");
+    expect(screen.getByTestId("portal-tab-bar")).toBeVisible();
+    expect(screen.getByTestId("clearance")).toHaveTextContent("106");
     await act(async () => hide?.({} as never));
     expect(screen.getByTestId("portal-tab-bar")).toBeVisible();
   } finally {

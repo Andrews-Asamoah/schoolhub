@@ -7,12 +7,14 @@ import { Inter_800ExtraBold } from "@expo-google-fonts/inter/800ExtraBold";
 import { useFonts } from "expo-font";
 import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
 import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
-import { router, Stack } from "expo-router";
+import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+import { PortalDrawerProvider } from "@/components/PortalDrawer";
+import { openPortalTool } from "@/lib/portal-tools";
 import { ToastProvider, useToast } from "@/components/Toast";
 import { persistOptions, queryClient } from "@/lib/query-client";
 import { useSession, onSessionEvent } from "@/lib/session";
@@ -26,7 +28,7 @@ void SplashScreen.preventAutoHideAsync();
 export { AppErrorBoundary as ErrorBoundary } from "@/components/AppErrorBoundary";
 
 function openPushUpdates() {
-  router.push("/(shared)/notifications");
+  openPortalTool("/notifications");
 }
 
 function Shell() {
@@ -51,7 +53,7 @@ function Shell() {
   );
   const ready = isAuthorizedSession(session);
   return (
-    <>
+    <PortalDrawerProvider role={ready ? session.activeRole : null}>
       <StatusBar style={isDark ? "light" : "dark"} />
       <Stack
         screenOptions={{
@@ -86,7 +88,7 @@ function Shell() {
           </Stack.Protected>
         ) : null}
       </Stack>
-    </>
+    </PortalDrawerProvider>
   );
 }
 

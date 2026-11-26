@@ -184,7 +184,7 @@ test("cancel never confirms; busy confirmation is disabled", async () => {
   );
   await fireEvent.press(screen.getByRole("button", { name: "Confirm" }));
   expect(confirm).not.toHaveBeenCalled();
-  await fireEvent.press(screen.getByRole("button", { name: "Cancel" }));
+  await fireEvent.press(screen.getByTestId("modal-backdrop"));
   expect(close).toHaveBeenCalledTimes(1);
   await r.rerender(
     <ActionSheet

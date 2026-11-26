@@ -5,14 +5,11 @@ import {
   UsersRound,
   ClipboardCheck,
   BookOpen,
-  LayoutGrid,
 } from "lucide-react-native";
 import { PortalTabBar } from "@/components/PortalTabBar";
 import { TabBarInsetProvider } from "@/components/TabBarInset";
 import { RegisterSyncProvider } from "@/features/teacher/RegisterSync";
-import { useNotificationsQuery } from "@/features/shared/queries";
 export default function TeacherLayout() {
-  const q = useNotificationsQuery();
   return (
     <RegisterSyncProvider>
       <TabBarInsetProvider>
@@ -23,12 +20,14 @@ export default function TeacherLayout() {
               {...props}
               preloadFromHome="/(teacher)/teacher-classes"
               parentTabs={{
+                "teacher-tools": "index",
+                "teacher-more": "index",
                 "teacher-class-directory": "teacher-classes",
                 "teacher-external-exams": "teacher-assess",
-                "teacher-school-reports": "teacher-more",
-                "teacher-subjects": "teacher-more",
-                "teacher-students": "teacher-more",
-                "teacher-messages": "teacher-more",
+                "teacher-school-reports": "index",
+                "teacher-subjects": "index",
+                "teacher-students": "index",
+                "teacher-messages": "index",
                 "teacher-roster": "teacher-classes",
                 "teacher-pupil": "teacher-classes",
                 "teacher-register": "teacher-classes",
@@ -38,10 +37,10 @@ export default function TeacherLayout() {
                 "teacher-mock-analysis": "teacher-assess",
                 "teacher-assignment-new": "teacher-assignments",
                 "teacher-assignment": "teacher-assignments",
-                "teacher-timetable": "teacher-more",
-                "teacher-clubs": "teacher-more",
-                "teacher-documents": "teacher-more",
-                "teacher-announcement-new": "teacher-more",
+                "teacher-timetable": "index",
+                "teacher-clubs": "index",
+                "teacher-documents": "index",
+                "teacher-announcement-new": "index",
               }}
               hues={{
                 index: "indigo",
@@ -108,17 +107,7 @@ export default function TeacherLayout() {
           />
           <Tabs.Screen
             name="teacher-more"
-            options={{
-              title: "More",
-              tabBarBadge: q.data?.unreadCount || undefined,
-              tabBarIcon: ({ color, size, focused }) => (
-                <LayoutGrid
-                  color={color}
-                  size={size}
-                  strokeWidth={focused ? 2.4 : 1.9}
-                />
-              ),
-            }}
+            options={{ tabBarButton: detailTabButton }}
           />
           <Tabs.Screen
             name="teacher-roster"
@@ -194,6 +183,10 @@ export default function TeacherLayout() {
           />
           <Tabs.Screen
             name="teacher-class-directory"
+            options={{ tabBarButton: detailTabButton }}
+          />
+          <Tabs.Screen
+            name="teacher-tools"
             options={{ tabBarButton: detailTabButton }}
           />
         </Tabs>

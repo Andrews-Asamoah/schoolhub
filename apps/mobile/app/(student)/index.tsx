@@ -1,3 +1,4 @@
+import { openPortalTool } from "@/lib/portal-tools";
 import { router, type Href } from "expo-router";
 import {
   ArrowRight,
@@ -299,7 +300,7 @@ export default function StudentHomeScreen() {
                 trailing={
                   <ArrowRight size={18} color={colors.mutedForeground} />
                 }
-                onPress={() => router.push("/(shared)/announcements" as Href)}
+                onPress={() => openPortalTool("/announcements")}
                 divider
               />
               {announcements.isPending ? (
@@ -317,9 +318,7 @@ export default function StudentHomeScreen() {
                   title={latestNotice.title}
                   subtitle={`${latestNotice.category} · ${formatDateTime(latestNotice.createdAt)}`}
                   onPress={() =>
-                    router.push(
-                      `/(shared)/announcements/${encodeURIComponent(latestNotice.id)}` as Href,
-                    )
+                    openPortalTool(`/announcements/${latestNotice.id}`)
                   }
                 />
               ) : (

@@ -34,6 +34,7 @@ type GradeAssignment = {
 
 interface TestOptions {
   classSubject?: { id: string } | null;
+  permittedClassIds?: string[];
   enrollment?: CurrentEnrollment;
   gradeAssignment?: GradeAssignment;
 }
@@ -42,7 +43,8 @@ function buildService(options: TestOptions = {}) {
   const schoolAssignment = {
     findMany: vi.fn(async () => []),
     findFirst: vi.fn(async () => options.gradeAssignment ?? null),
-    create: vi.fn(async () => ({
+    create: vi.fn(async ({ data }: { data: { classId: string } }) => ({
+      classId: data.classId,
       id: "assignment-a",
       title: createInput.title,
       maxScore: 20,
@@ -75,7 +77,7 @@ function buildService(options: TestOptions = {}) {
     create: vi.fn(async () => ({ id: "notification-a" })),
     createMany: vi.fn(async () => ({ count: 1 })),
   };
-  const tx = { schoolAssignment, schoolAssignmentSubmission, enrollment, notification };
+
   const client = {
     academicYear: {
       findFirst: vi.fn(async () => ({
@@ -85,23 +87,23 @@ function buildService(options: TestOptions = {}) {
       })),
     },
     class: {
-      findFirst: vi.fn(async () => ({ id: "class-a", name: "JHS 1" })),
+      findMany: vi.fn(async ({ where }: { where: { id: { in: string[] } } }) => where.id.in.map((id) => ({ id }))),
     },
     subject: {
       findFirst: vi.fn(async () => ({ id: "subject-a", name: "Mathematics" })),
     },
     classSubject: {
-      findFirst: vi.fn(async () => options.classSubject === undefined ? { id: "class-subject-a" } : options.classSubject),
+      findMany: vi.fn(async ({ where }: { where: { classId: { in: string[] } } }) => options.classSubject === null ? [] : where.classId.in.map((classId) => ({ classId }))),
     },
     student: { findFirst: vi.fn(async () => ({ id: "student-a" })) },
     schoolAssignment,
     schoolAssignmentSubmission,
     enrollment,
     notification,
-    $transaction: vi.fn(async (callback: (value: typeof tx) => unknown) => callback(tx)),
+    $transaction: vi.fn(async (callback: (value: unknown) => unknown): Promise<unknown> => callback(client)),
   };
   const teacherScope = {
-    getAssignments: vi.fn(async () => ({ teacherId: "teacher-a", classTeacherClassIds: [], subjectAssignments: [], subjectStrandAssignments: [] })),
+    getAssignments: vi.fn(async () => ({ teacherId: "teacher-a", classTeacherClassIds: [], subjectAssignments: (options.permittedClassIds ?? []).map((classId) => ({ classId, subjectId: createInput.subjectId })), subjectStrandAssignments: [] })),
     getTaughtClassIds: vi.fn(async () => ["class-a"]),
   };
   return {
@@ -119,8 +121,8 @@ describe("AssignmentsService authorization and validation", () => {
     await expect(service.create(schoolId, "admin-user", "admin", createInput))
       .rejects.toBeInstanceOf(BadRequestException);
 
-    expect(client.class.findFirst).toHaveBeenCalledWith(expect.objectContaining({
-      where: expect.objectContaining({ id: "class-a", schoolId }),
+    expect(client.class.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ id: { in: ["class-a"] }, schoolId }),
     }));
     expect(client.subject.findFirst).toHaveBeenCalledWith(expect.objectContaining({
       where: expect.objectContaining({ id: "subject-a", schoolId }),
@@ -137,6 +139,26 @@ describe("AssignmentsService authorization and validation", () => {
     expect(teacherScope.getAssignments).toHaveBeenCalledWith(schoolId, userId);
     expect(client.schoolAssignment.create).not.toHaveBeenCalled();
     expect(client.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("publishes one assignment per selected class inside a single transaction", async () => {
+    const { classId, ...details } = createInput;
+    const classIds = [classId, "class-b"];
+    const { service, client } = buildService({ permittedClassIds: classIds });
+    const result = await service.publishBatch(schoolId, userId, "teacher", { ...details, classIds });
+    expect(result.assignments.map((item) => item.classId)).toEqual(classIds);
+    expect(client.$transaction).toHaveBeenCalledTimes(1);
+    expect(client.schoolAssignment.create).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not publish to any class if one subject assignment is outside scope", async () => {
+    const { classId, ...details } = createInput;
+    const { service, client } = buildService({ permittedClassIds: [classId] });
+    await expect(service.publishBatch(schoolId, userId, "teacher", {
+      ...details, classIds: [classId, "unassigned"],
+    })).rejects.toBeInstanceOf(ForbiddenException);
+    expect(client.schoolAssignment.create).not.toHaveBeenCalled();
+    expect(client.notification.createMany).not.toHaveBeenCalled();
   });
 
   it("does not let a student access submission endpoints without a current active enrollment", async () => {

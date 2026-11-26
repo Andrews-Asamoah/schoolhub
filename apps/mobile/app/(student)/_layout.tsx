@@ -7,7 +7,6 @@ import {
   CalendarDays,
   ClipboardCheck,
   House,
-  LayoutGrid,
 } from "lucide-react-native";
 
 export default function StudentLayout() {
@@ -20,11 +19,13 @@ export default function StudentLayout() {
             {...props}
             preloadFromHome="/(student)/my-learning"
             parentTabs={{
-              "student-messages": "resources",
-              "student-reports": "resources",
+              "student-tools": "index",
+              resources: "index",
+              "student-messages": "index",
+              "student-reports": "index",
               "student-subjects": "my-learning",
-              "student-classmates": "resources",
-              "student-community": "resources",
+              "student-classmates": "index",
+              "student-community": "index",
               "assignment/[id]": "my-learning",
             }}
             hues={{
@@ -92,16 +93,7 @@ export default function StudentLayout() {
         />
         <Tabs.Screen
           name="resources"
-          options={{
-            title: "More",
-            tabBarIcon: ({ color, size, focused }) => (
-              <LayoutGrid
-                color={color}
-                size={size}
-                strokeWidth={focused ? 2.4 : 1.9}
-              />
-            ),
-          }}
+          options={{ tabBarButton: detailTabButton }}
         />
         <Tabs.Screen
           name="student-reports"
@@ -125,6 +117,10 @@ export default function StudentLayout() {
         />
         <Tabs.Screen
           name="student-messages"
+          options={{ tabBarButton: detailTabButton }}
+        />
+        <Tabs.Screen
+          name="student-tools"
           options={{ tabBarButton: detailTabButton }}
         />
       </Tabs>

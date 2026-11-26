@@ -1,8 +1,9 @@
+import { openPortalTool } from "@/lib/portal-tools";
 import { ImageManipulator, SaveFormat } from "expo-image-manipulator";
 import * as ImagePicker from "expo-image-picker";
 import { File } from "expo-file-system";
 import { unregisterSchoolPush } from "@/features/shared/push";
-import { router, type Href } from "expo-router";
+import { router } from "expo-router";
 import { useState } from "react";
 import { View } from "react-native";
 import { removeMyAvatar, uploadMyAvatar } from "@/api/shared";
@@ -21,13 +22,7 @@ import { ROLE_LABELS } from "@/lib/permissions";
 import { setActiveRole, useSession } from "@/lib/session";
 import { ApiError, SessionChangedError } from "@/lib/api-error";
 import { signOut } from "@/lib/sign-out";
-import {
-  useTheme,
-  type BlurPreference,
-  type SchemePreference,
-  spacing,
-  type,
-} from "@/theme/theme";
+import { useTheme, type SchemePreference, spacing, type } from "@/theme/theme";
 
 export default function ProfileScreen() {
   const query = useMyProfileQuery();
@@ -214,21 +209,21 @@ export default function ProfileScreen() {
               title="Personal details"
               subtitle="Edit contact and emergency information"
               chevron
-              onPress={() => router.push("/(shared)/profile-edit" as Href)}
+              onPress={() => openPortalTool("/profile-edit")}
               divider
             />
             <ListRow
               title="Academic calendar"
               subtitle="Current school year and term"
               chevron
-              onPress={() => router.push("/(shared)/academic-context" as Href)}
+              onPress={() => openPortalTool("/academic-context")}
               divider
             />
             <ListRow
               title="Security"
               subtitle="Password and sign-in options"
               chevron
-              onPress={() => router.push("/(shared)/security" as Href)}
+              onPress={() => openPortalTool("/security")}
             />
           </Card>
           {avatarError ? (
@@ -251,16 +246,6 @@ export default function ProfileScreen() {
                 { value: "system", label: "System" },
                 { value: "light", label: "Light" },
                 { value: "dark", label: "Dark" },
-              ]}
-            />
-            <SegmentedControl<BlurPreference>
-              accessibilityLabel="Blur setting"
-              value={theme.blurPreference}
-              onChange={theme.setBlurPreference}
-              options={[
-                { value: "auto", label: "Auto" },
-                { value: "on", label: "On" },
-                { value: "off", label: "Off" },
               ]}
             />
           </Card>

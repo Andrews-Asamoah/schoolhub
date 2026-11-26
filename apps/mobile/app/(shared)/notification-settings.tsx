@@ -1,4 +1,4 @@
-import { router, type Href } from "expo-router";
+import { openPortalTool } from "@/lib/portal-tools";
 import { useState } from "react";
 import { Linking, View } from "react-native";
 import { Button } from "@/components/Button";
@@ -146,7 +146,7 @@ export default function NotificationSettingsScreen() {
           <Button
             label="Delivery history"
             variant="secondary"
-            onPress={() => router.push("/(shared)/delivery-history" as Href)}
+            onPress={() => openPortalTool("/delivery-history")}
           />
         </View>
       )}
