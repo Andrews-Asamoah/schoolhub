@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { Redirect } from "expo-router";
 import { useNetworkState } from "expo-network";
+import { isDevice } from "expo-device";
 import { School, Search, ArrowRight, CircleAlert } from "lucide-react-native";
-import { Keyboard, View } from "react-native";
+import { Keyboard, Platform, View } from "react-native";
 import { schoolAccessIdentifierSchema } from "@schoolhub/shared";
 import { findSchoolsForAccess, type SchoolAccessMatch } from "@/api/auth";
 import { Button } from "@/components/Button";
@@ -11,10 +12,13 @@ import { ListRow } from "@/components/ListRow";
 import { Text } from "@/components/Typography";
 import { TextField } from "@/components/TextField";
 import { Screen } from "@/components/Screen";
-import { authFailureMessage } from "@/features/auth/forms";
+import { API_ORIGIN } from "@/lib/config";
+import {
+  schoolConnectionProblem,
+  schoolLookupFailure,
+} from "@/features/auth/school-connection";
 import {
   cacheSchoolBranding,
-  SchoolLookupTimeout,
   withSchoolLookupDeadline,
 } from "@/features/auth/school-access";
 import { setSubdomain, useSession } from "@/lib/session";
@@ -24,8 +28,7 @@ export default function SchoolAccessScreen() {
   const { subdomain } = useSession();
   const { colors, setTenant } = useTheme();
   const network = useNetworkState();
-  const offline =
-    network.isConnected === false || network.isInternetReachable === false;
+  const offline = network.isConnected === false;
   const [code, setCode] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -69,6 +72,16 @@ export default function SchoolAccessScreen() {
       setError("You’re offline. Reconnect and try again.");
       return;
     }
+    if (__DEV__) {
+      const setupError = schoolConnectionProblem(
+        API_ORIGIN,
+        Platform.OS === "android" && isDevice,
+      );
+      if (setupError) {
+        setError(setupError);
+        return;
+      }
+    }
     Keyboard.dismiss();
     const attempt = new AbortController();
     pending.current = attempt;
@@ -86,11 +99,7 @@ export default function SchoolAccessScreen() {
         setError("No school matched. Check the school code or address prefix.");
     } catch (failure) {
       if (pending.current !== attempt) return;
-      setError(
-        failure instanceof SchoolLookupTimeout
-          ? "The school lookup timed out. Check your connection and try again."
-          : authFailureMessage(failure, "school"),
-      );
+      setError(schoolLookupFailure(failure));
     } finally {
       if (pending.current === attempt) {
         pending.current = null;

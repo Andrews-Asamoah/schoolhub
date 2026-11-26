@@ -2,6 +2,8 @@ import { act, fireEvent, render, screen } from "@testing-library/react-native";
 import SchoolAccessScreen from "../../app/(auth)/school";
 import { findSchoolsForAccess } from "@/api/auth";
 import { setSubdomain } from "@/lib/session";
+import { ApiError } from "@/lib/api-error";
+import { schoolConnectionProblem } from "@/features/auth/school-connection";
 
 const mockCache = jest.fn();
 const mockSetTenant = jest.fn();
@@ -149,7 +151,7 @@ test("shows a timeout and ignores a response arriving after the deadline", async
   await act(async () => {
     jest.advanceTimersByTime(5000);
   });
-  expect(screen.getByText(/lookup timed out/)).toBeVisible();
+  expect(screen.getByText(/health.*live/)).toBeVisible();
   expect(api.mock.calls[0]?.[0]?.signal?.aborted).toBe(true);
   await act(async () => {
     resolve([school]);
@@ -187,4 +189,35 @@ test("a completed lookup with no matches displays an actionable error", async ()
   await fireEvent.press(screen.getByText("Find school"));
   expect(await screen.findByText(/No school matched/)).toBeVisible();
   expect(screen.getByText("Find school")).toBeVisible();
+});
+
+test("a Wi-Fi network without internet can still reach a LAN-backed school lookup", async () => {
+  mockNetwork.isConnected = true;
+  mockNetwork.isInternetReachable = false;
+  api.mockResolvedValue([school]);
+  await render(<SchoolAccessScreen />);
+  await typeCode("eis-01");
+  await fireEvent.press(screen.getByText("Find school"));
+  expect(await screen.findByText(school.name)).toBeVisible();
+});
+
+test("a missing API route gets a server setup message instead of an unknown-school message", async () => {
+  api.mockRejectedValue(new ApiError(404, "Not found", {}));
+  await render(<SchoolAccessScreen />);
+  await typeCode("eis-01");
+  await fireEvent.press(screen.getByText("Find school"));
+  expect(
+    await screen.findByText(/school lookup route was not found/),
+  ).toBeVisible();
+});
+
+test("emulator-only address is rejected on physical Android", () => {
+  expect(schoolConnectionProblem("http://10.0.2.2:3001", true)).toMatch(
+    /emulator/,
+  );
+  expect(schoolConnectionProblem("http://10.0.2.2:3001", false)).toBe("");
+  expect(schoolConnectionProblem("http://192.168.1.23:3001", true)).toBe("");
+  expect(schoolConnectionProblem("http://192.168.1.23:3001/api", true)).toMatch(
+    /without/,
+  );
 });
