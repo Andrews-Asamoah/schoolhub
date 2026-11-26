@@ -412,11 +412,9 @@ test("native avatar upload hands the Expo file directly to multipart without con
   }) as File;
   const append = jest.spyOn(FormData.prototype, "append");
   try {
-    jest
-      .mocked(apiFetch)
-      .mockResolvedValueOnce({
-        image: "https://schoolhub.example.test/avatar.webp",
-      });
+    jest.mocked(apiFetch).mockResolvedValueOnce({
+      image: "https://schoolhub.example.test/avatar.webp",
+    });
     await expect(
       uploadMyAvatar({ file, mimeType: "image/jpeg" }),
     ).resolves.toEqual({
