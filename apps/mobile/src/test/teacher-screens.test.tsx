@@ -75,6 +75,7 @@ jest.mock("@/features/teacher/RegisterSync", () => ({
 }));
 jest.mock("expo-router", () => ({
   useLocalSearchParams: () => mockParams,
+  useFocusEffect: jest.fn(),
   router: { push: jest.fn(), back: jest.fn() },
 }));
 jest.mock("@/components/HeroCard", () => ({
@@ -199,6 +200,7 @@ jest.mock("@/components/Skeleton", () => {
   return { SkeletonRow: () => React.createElement(Text, null, "Loading") };
 });
 jest.mock("@/components/Charts", () => ({
+  BarChart: () => null,
   ProgressRing: ({ label }: { label: string }) => {
     const React = jest.requireActual<typeof import("react")>("react");
     const { Text } =
@@ -461,7 +463,12 @@ test("register edits are immediate but not sent until explicit save", async () =
   await fireEvent.press(
     screen.getByRole("button", { name: "Pupil Fixture: PRESENT" }),
   );
-  expect(screen.getByText("Current status: PRESENT")).toBeVisible();
+  expect(
+    screen.getByRole("button", {
+      name: "Pupil Fixture: PRESENT",
+      selected: true,
+    }),
+  ).toBeVisible();
   await fireEvent.press(screen.getByRole("button", { name: "Save register" }));
   await waitFor(() =>
     expect(mockMutate).toHaveBeenCalledWith({
@@ -497,7 +504,12 @@ test("a rejected register save keeps changes visibly unsaved", async () => {
   );
   await fireEvent.press(screen.getByRole("button", { name: "Save register" }));
   await waitFor(() => expect(mockMutate).toHaveBeenCalled());
-  expect(screen.getByText("Current status: ABSENT")).toBeVisible();
+  expect(
+    screen.getByRole("button", {
+      name: "Pupil Fixture: ABSENT",
+      selected: true,
+    }),
+  ).toBeVisible();
   expect(screen.getByText(/1 unsaved marks/)).toBeVisible();
 });
 test("score entry rejects a value above the component maximum", async () => {

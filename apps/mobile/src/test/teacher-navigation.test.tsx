@@ -1,5 +1,5 @@
 import { Text } from "react-native";
-import { router } from "expo-router";
+import { router, Stack, useLocalSearchParams } from "expo-router";
 import {
   act,
   renderRouter,
@@ -44,6 +44,10 @@ jest.mock("@/components/PortalTabBar", () => ({
   },
 }));
 
+function TestPortalTool() {
+  return <Text>{useLocalSearchParams().tool}</Text>;
+}
+
 test("the actual teacher navigator opens a detail and returns to its previous tab", async () => {
   const result = await renderRouter(
     {
@@ -63,6 +67,10 @@ test("the actual teacher navigator opens a detail and returns to its previous ta
       "(teacher)/teacher-subjects": () => <Text>subjects</Text>,
       "(teacher)/teacher-school-reports": () => <Text>school-reports</Text>,
       "(teacher)/teacher-external-exams": () => <Text>external-exams</Text>,
+      "(teacher)/teacher-tools/_layout": () => (
+        <Stack screenOptions={{ headerShown: false }} />
+      ),
+      "(teacher)/teacher-tools/[tool]": TestPortalTool,
       "(teacher)/teacher-more": () => <Text>More</Text>,
       "(teacher)/teacher-roster": () => <Text>Class Roster</Text>,
       "(teacher)/teacher-pupil": () => <Text>Pupil</Text>,
@@ -97,9 +105,16 @@ test("the actual teacher navigator opens a detail and returns to its previous ta
   await act(async () => router.navigate("/(teacher)/teacher-more"));
   await act(async () => router.push("/(teacher)/teacher-messages"));
   expect(screen.getByText("School messages")).toBeVisible();
-  expect(screen.getByTestId("tab-state")).toHaveTextContent(
-    "teacher-more:detail",
+  expect(screen.getByTestId("tab-state")).toHaveTextContent("index:detail");
+  await testRouter.back("/teacher-more");
+  await act(async () =>
+    router.push({
+      pathname: "/(teacher)/teacher-tools/[tool]",
+      params: { tool: "profile" },
+    }),
   );
+  expect(screen.getByText("profile")).toBeVisible();
+  expect(screen.getByTestId("tab-state")).toHaveTextContent("index:detail");
   await testRouter.back("/teacher-more");
   await act(async () => router.navigate("/(teacher)/teacher-assess"));
   await act(async () => router.push("/(teacher)/teacher-external-exams"));

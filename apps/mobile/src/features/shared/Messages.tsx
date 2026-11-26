@@ -1,3 +1,4 @@
+import { openPortalTool } from "@/lib/portal-tools";
 import { router } from "expo-router";
 import { Mail, Search, SquarePen } from "lucide-react-native";
 import { useDeferredValue, useState } from "react";
@@ -98,7 +99,7 @@ export default function MessagesScreen() {
           label="Compose"
           block={false}
           icon={<SquarePen size={17} color="#FFFFFF" accessible={false} />}
-          onPress={() => router.push("/(shared)/messages-new")}
+          onPress={() => openPortalTool("/messages-new")}
         />
       }
       refreshing={query.isRefetching}
@@ -199,7 +200,6 @@ export default function MessagesScreen() {
           <Dialog
             visible
             title={selected.subject}
-            closeLabel="Close message"
             onClose={() => {
               resetReply();
               setSelectedId(null);

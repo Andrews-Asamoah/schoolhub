@@ -1,3 +1,4 @@
+import { openPortalTool } from "@/lib/portal-tools";
 import { router, type Href } from "expo-router";
 import { Megaphone } from "lucide-react-native";
 import { useState } from "react";
@@ -112,11 +113,7 @@ export default function AnnouncementsScreen() {
                 status={item.isPinned ? "Pinned" : undefined}
                 hue="amber"
                 divider={index < matches.length - 1}
-                onPress={() =>
-                  router.push(
-                    `/(shared)/announcements/${encodeURIComponent(item.id)}` as Href,
-                  )
-                }
+                onPress={() => openPortalTool(`/announcements/${item.id}`)}
               />
             ))}
           </Card>

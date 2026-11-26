@@ -1,3 +1,4 @@
+import { openPortalTool } from "@/lib/portal-tools";
 import { router, type Href } from "expo-router";
 import {
   ArrowRight,
@@ -273,9 +274,7 @@ export default function GuardianHomeScreen() {
                   title={latestNotice.title}
                   subtitle={`${latestNotice.category} · ${formatDateTime(latestNotice.createdAt)}`}
                   onPress={() =>
-                    router.push(
-                      `/(shared)/announcements/${encodeURIComponent(latestNotice.id)}` as Href,
-                    )
+                    openPortalTool(`/announcements/${latestNotice.id}`)
                   }
                 />
               ) : (

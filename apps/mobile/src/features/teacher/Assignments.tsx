@@ -1,12 +1,12 @@
 import { useForm } from "@tanstack/react-form";
 import { useLocalSearchParams, router, type Href } from "expo-router";
 import { useState } from "react";
-import { BookOpen, ClipboardList } from "lucide-react-native";
-import { View } from "react-native";
+import { BookOpen, Check, ClipboardList } from "lucide-react-native";
+import { Pressable, View } from "react-native";
 import {
   getManagedAssignments,
   getTeaching,
-  createTeacherAssignment,
+  publishTeacherAssignments,
   gradeTeacherAssignment,
   managedAssignmentsSchema,
 } from "@/api/teacher";
@@ -15,8 +15,9 @@ import { formatDateTime } from "@/features/shared/format";
 import { useScopedMutation } from "@/features/shared/mutations";
 import { useTeacherQuery } from "./queries";
 import { TeacherPage, QueryState, Panel, Copy, MutationState } from "./ui";
-import { assignmentFormSchema, gradeFormSchema } from "./forms";
+import { assignmentBatchFormSchema, gradeFormSchema } from "./forms";
 import { Button } from "@/components/Button";
+import { Text } from "@/components/Typography";
 import { FormField } from "@/components/FormField";
 import { SearchBar } from "@/components/Fields";
 import {
@@ -25,7 +26,7 @@ import {
 } from "@/components/CalendarDateField";
 import { StatusPill } from "@/components/ModulePrimitives";
 import { Surface } from "@/components/Surface";
-import { spacing, useTheme } from "@/theme/theme";
+import { spacing, type, useTheme } from "@/theme/theme";
 import { ListRow } from "@/components/ListRow";
 import { SelectField } from "@/components/SelectField";
 export function TeacherAssignments() {
@@ -144,16 +145,28 @@ export function NewTeacherAssignment() {
   const teaching = useTeacherQuery(["overview"], (signal) =>
     getTeaching({ signal }),
   );
-  const [pair, setPair] = useState("");
+  const [subjectId, setSubject] = useState("");
+  const [classIds, setClasses] = useState<string[]>([]);
   const [error, setError] = useState("");
-  const mutation = useScopedMutation(createTeacherAssignment);
-  const pairs =
-    teaching.data?.classes.flatMap((c) =>
-      c.subjects.map((s) => ({
-        value: JSON.stringify([c.id, s.id]),
-        label: `${c.name} · ${s.name}`,
-      })),
-    ) ?? [];
+  const mutation = useScopedMutation(publishTeacherAssignments);
+  const { colors } = useTheme();
+  const classes = teaching.data?.classes ?? [];
+  const subjects = [
+    ...new Map(
+      classes.flatMap((item) =>
+        item.subjects.map(
+          (subject) =>
+            [subject.id, { value: subject.id, label: subject.name }] as const,
+        ),
+      ),
+    ).values(),
+  ];
+  const eligibleClasses = classes.filter((item) =>
+    item.subjects.some((subject) => subject.id === subjectId),
+  );
+  const selected = eligibleClasses
+    .filter((item) => classIds.includes(item.id))
+    .map((item) => item.id);
   const form = useForm({
     defaultValues: {
       title: "",
@@ -162,20 +175,14 @@ export function NewTeacherAssignment() {
       dueDate: "",
     },
     onSubmit: async ({ value }) => {
-      let ids: string[] = [];
-      try {
-        ids = JSON.parse(pair);
-      } catch {
-        /* Selection required. */
-      }
-      const parsed = assignmentFormSchema.safeParse({
+      const parsed = assignmentBatchFormSchema.safeParse({
         ...value,
-        classId: ids[0] ?? "",
-        subjectId: ids[1] ?? "",
+        classIds: selected,
+        subjectId,
       });
       if (!parsed.success) {
         setError(
-          "Choose a class and subject, a title (3–160 characters), instructions and a positive maximum score.",
+          "Choose a subject and at least one class. Check the title, instructions, and maximum score.",
         );
         return;
       }
@@ -190,15 +197,78 @@ export function NewTeacherAssignment() {
   });
   return (
     <TeacherPage title="New assignment" query={teaching} back>
-      <QueryState query={teaching} empty={!pairs.length}>
+      <QueryState query={teaching} empty={!subjects.length}>
         <Panel title="Audience and instructions">
           <SelectField
-            label="Class and subject"
-            options={pairs}
-            value={pair}
-            onChange={setPair}
+            label="Subject"
+            options={subjects}
+            value={subjectId}
+            onChange={(value) => {
+              setSubject(value);
+              setClasses([]);
+            }}
             disabled={mutation.isPending}
           />
+          {subjectId ? (
+            <>
+              <Copy heading>Classes · {selected.length} selected</Copy>
+              {eligibleClasses.map((item) => {
+                const checked = selected.includes(item.id);
+                return (
+                  <Pressable
+                    key={item.id}
+                    accessibilityRole="checkbox"
+                    accessibilityLabel={item.name}
+                    accessibilityState={{
+                      checked,
+                      disabled:
+                        mutation.isPending ||
+                        (!checked && selected.length >= 50),
+                    }}
+                    disabled={
+                      mutation.isPending || (!checked && selected.length >= 50)
+                    }
+                    onPress={() =>
+                      setClasses((previous) =>
+                        checked
+                          ? previous.filter((value) => value !== item.id)
+                          : [...previous, item.id],
+                      )
+                    }
+                    style={({ pressed }) => ({
+                      minHeight: 48,
+                      paddingHorizontal: spacing.md,
+                      flexDirection: "row",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      gap: spacing.sm,
+                      borderWidth: 1,
+                      borderRadius: 12,
+                      borderColor: checked ? colors.primary : colors.border,
+                      backgroundColor:
+                        pressed || checked ? colors.muted : colors.card,
+                    })}
+                  >
+                    <Text
+                      style={[
+                        type.bodyStrong,
+                        { color: colors.foreground, flexShrink: 1 },
+                      ]}
+                    >
+                      {item.name}
+                    </Text>
+                    {checked ? (
+                      <Check
+                        size={19}
+                        color={colors.primary}
+                        accessible={false}
+                      />
+                    ) : null}
+                  </Pressable>
+                );
+              })}
+            </>
+          ) : null}
           <form.Field name="title">
             {(field) => (
               <FormField
@@ -243,12 +313,17 @@ export function NewTeacherAssignment() {
             )}
           </form.Field>
           <Copy>
-            Due dates use 23:59 UTC. Publishing immediately notifies the class.
+            Due dates use 23:59 Ghana time. Publishing notifies students in the
+            selected classes.
           </Copy>
           {error ? <Copy alert>{error}</Copy> : null}
           <MutationState mutation={mutation} />
           <Button
-            label="Publish assignment"
+            label={
+              selected.length > 1
+                ? `Publish to ${selected.length} classes`
+                : "Publish assignment"
+            }
             loading={mutation.isPending}
             onPress={() => {
               void form.handleSubmit();

@@ -2269,3 +2269,19 @@ export const externalResultBatchSchema=z.object({
   if(ids.length!==new Set(ids).size)ctx.addIssue({code:"custom",path:["entries"],
     message:"Duplicate candidates in one submission are not allowed."});
 });
+
+export const createSchoolAssignmentSchema = z.object({
+  classId: z.string().trim().min(1).max(100),
+  subjectId: z.string().trim().min(1).max(100),
+  title: z.string().trim().min(3).max(160),
+  instructions: z.string().trim().min(1).max(10_000),
+  dueAt: z.iso.datetime().nullable().optional(),
+  maxScore: z.number().finite().positive().max(100_000),
+});
+export const publishAssignmentBatchSchema = createSchoolAssignmentSchema
+  .omit({ classId: true })
+  .extend({
+    classIds: z.array(createSchoolAssignmentSchema.shape.classId).min(1).max(50)
+      .refine((ids) => ids.length === new Set(ids).size, "Choose each class once."),
+  });
+export type PublishAssignmentBatchInput = z.infer<typeof publishAssignmentBatchSchema>;

@@ -592,7 +592,8 @@ test("opening an inbox message marks it read and displays its thread", async () 
 
   expect(mockMutation.mutate).toHaveBeenCalledWith("message-1");
   expect(inbox.getByRole("header", { name: "Welcome" })).toBeVisible();
-  expect(inbox.getByText("Close message")).toBeVisible();
+  await fireEvent.press(inbox.getByTestId("modal-backdrop"));
+  expect(inbox.queryByRole("header", { name: "Welcome" })).toBeNull();
 });
 
 test("notification preferences show a loading skeleton", async () => {

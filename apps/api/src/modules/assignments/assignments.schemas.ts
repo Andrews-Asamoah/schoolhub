@@ -1,13 +1,7 @@
 import { z } from "zod";
 
-export const createSchoolAssignmentSchema = z.object({
-  classId: z.string().trim().min(1).max(100),
-  subjectId: z.string().trim().min(1).max(100),
-  title: z.string().trim().min(3).max(160),
-  instructions: z.string().trim().min(1).max(10_000),
-  dueAt: z.string().datetime().nullable().optional(),
-  maxScore: z.number().finite().positive().max(100_000),
-});
+import { createSchoolAssignmentSchema } from "@schoolhub/shared";
+export { createSchoolAssignmentSchema, publishAssignmentBatchSchema } from "@schoolhub/shared";
 export type CreateSchoolAssignmentInput = z.infer<typeof createSchoolAssignmentSchema>;
 
 export const submitSchoolAssignmentSchema = z.object({

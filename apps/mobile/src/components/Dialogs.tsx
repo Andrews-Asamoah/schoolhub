@@ -2,52 +2,40 @@ import { useRef, type ComponentRef, type ReactNode } from "react";
 import {
   AccessibilityInfo,
   findNodeHandle,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
   ScrollView,
   View,
 } from "react-native";
 import { Text } from "@/components/Typography";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { type, useTheme } from "@/theme/theme";
+import { ModalOverlay } from "./ModalOverlay";
 import { Button } from "./Button";
 export function Dialog({
   visible,
   title,
   children,
   onClose,
-  closeLabel = "Cancel",
 }: {
   visible: boolean;
   title: string;
   children: ReactNode;
   onClose: () => void;
-  closeLabel?: string;
 }) {
-  const { colors, reduceMotion } = useTheme();
+  const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const heading = useRef<ComponentRef<typeof Text>>(null);
   return (
-    <Modal
+    <ModalOverlay
       visible={visible}
-      transparent
-      animationType={reduceMotion ? "none" : "fade"}
-      onRequestClose={onClose}
+      onDismiss={onClose}
       onShow={() => {
         const node = findNodeHandle(heading.current);
         if (node) AccessibilityInfo.setAccessibilityFocus(node);
       }}
     >
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-        accessibilityViewIsModal
-        style={{
-          flex: 1,
-          justifyContent: "flex-end",
-          backgroundColor: "rgba(0,0,0,0.55)",
-          paddingTop: insets.top + 24,
-        }}
+      <View
+        style={{ maxHeight: "100%", paddingTop: insets.top + 20 }}
+        pointerEvents="box-none"
       >
         <View
           style={{
@@ -73,11 +61,10 @@ export function Dialog({
               {title}
             </Text>
             {children}
-            <Button label={closeLabel} variant="secondary" onPress={onClose} />
           </ScrollView>
         </View>
-      </KeyboardAvoidingView>
-    </Modal>
+      </View>
+    </ModalOverlay>
   );
 }
 export function ConfirmDialog({

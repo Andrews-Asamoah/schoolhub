@@ -33,11 +33,13 @@ export function CalendarDateField({
   value,
   onChange,
   disabled = false,
+  allowClear = true,
 }: {
   label: string;
   value: string;
   onChange: (date: string) => void;
   disabled?: boolean;
+  allowClear?: boolean;
 }) {
   const { colors } = useTheme();
   const [open, setOpen] = useState(false);
@@ -87,7 +89,11 @@ export function CalendarDateField({
         </Text>
       </Pressable>
       {open ? (
-        <Dialog visible title="Select due date" onClose={() => setOpen(false)}>
+        <Dialog
+          visible
+          title={allowClear ? "Select due date" : label}
+          onClose={() => setOpen(false)}
+        >
           <View style={styles.month}>
             <Pressable
               accessibilityRole="button"
@@ -185,7 +191,7 @@ export function CalendarDateField({
               );
             })}
           </View>
-          {value ? (
+          {value && allowClear ? (
             <Button
               label="Clear due date"
               variant="ghost"

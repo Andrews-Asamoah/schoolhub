@@ -21,6 +21,9 @@ jest.mock("@/components/Button", () => {
   };
 });
 
+jest.mock("@/lib/portal-tools", () => ({
+  openPortalTool: (...args: unknown[]) => mockPush(...args),
+}));
 jest.mock("@/features/announcements/queries", () => ({
   useAnnouncementsQuery: () => mockUseAnnouncementsQuery(),
 }));
@@ -172,7 +175,7 @@ test("announcements opens published notice details from the list", async () => {
   });
   await render(<AnnouncementsScreen />);
   fireEvent.press(screen.getByText("Term begins Monday"));
-  expect(mockPush).toHaveBeenCalledWith("/(shared)/announcements/notice-1");
+  expect(mockPush).toHaveBeenCalledWith("/announcements/notice-1");
 });
 
 test("only teacher sessions get the announcement publishing action", async () => {

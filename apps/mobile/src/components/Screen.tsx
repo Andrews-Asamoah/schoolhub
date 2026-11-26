@@ -12,6 +12,7 @@ import { spacing, type, useTheme } from "@/theme/theme";
 import { Text } from "./Typography";
 import { useTabBarInset } from "./TabBarInset";
 import { OfflineBanner } from "./OfflineBanner";
+import { PortalDrawerButton, useOpenPortalDrawer } from "./PortalDrawer";
 import { Backdrop } from "./Backdrop";
 
 type Props = {
@@ -41,7 +42,8 @@ export function Screen({
   const { colors, accent } = useTheme();
   const bottomInset = useTabBarInset();
   const insets = useSafeAreaInsets();
-  const hasHeader = !!(title || left || right);
+  const drawer = useOpenPortalDrawer();
+  const hasHeader = !!(title || left || right || drawer);
   const top = spacing.lg + (hasHeader ? 0 : insets.top);
   const bottom = Math.max(insets.bottom, bottomInset);
 
@@ -61,12 +63,13 @@ export function Screen({
         >
           {left ? <View style={styles.back}>{left}</View> : null}
           <View style={styles.headingRow}>
+            {drawer ? <PortalDrawerButton onPress={drawer} /> : null}
             {title ? (
               <View style={styles.heading}>
                 <Text
                   accessibilityRole="header"
                   style={[
-                    right ? type.title : type.largeTitle,
+                    drawer || right ? type.title : type.largeTitle,
                     { color: colors.foreground },
                   ]}
                 >

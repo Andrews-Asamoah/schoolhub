@@ -3,13 +3,7 @@ import { TabBarInsetProvider } from "@/components/TabBarInset";
 import { PortalTabBar } from "@/components/PortalTabBar";
 import { GuardianProvider } from "@/features/guardian/context";
 import { Tabs } from "expo-router";
-import {
-  Bell,
-  CircleDollarSign,
-  House,
-  LayoutGrid,
-  UsersRound,
-} from "lucide-react-native";
+import { Bell, CircleDollarSign, House, UsersRound } from "lucide-react-native";
 
 export default function GuardianLayout() {
   return (
@@ -22,11 +16,13 @@ export default function GuardianLayout() {
               {...props}
               preloadFromHome="/(guardian)/family"
               parentTabs={{
-                "guardian-messages": "more",
-                "attendance-history": "more",
-                "absence-requests": "more",
-                timetable: "more",
-                reports: "more",
+                "guardian-tools": "index",
+                more: "index",
+                "guardian-messages": "index",
+                "attendance-history": "index",
+                "absence-requests": "index",
+                timetable: "index",
+                reports: "index",
                 "ward/[id]": "family",
               }}
               hues={{
@@ -94,16 +90,7 @@ export default function GuardianLayout() {
           />
           <Tabs.Screen
             name="more"
-            options={{
-              title: "More",
-              tabBarIcon: ({ color, size, focused }) => (
-                <LayoutGrid
-                  color={color}
-                  size={size}
-                  strokeWidth={focused ? 2.4 : 1.9}
-                />
-              ),
-            }}
+            options={{ tabBarButton: detailTabButton }}
           />
           <Tabs.Screen
             name="attendance-history"
@@ -130,6 +117,10 @@ export default function GuardianLayout() {
           />
           <Tabs.Screen
             name="guardian-messages"
+            options={{ tabBarButton: detailTabButton }}
+          />
+          <Tabs.Screen
+            name="guardian-tools"
             options={{ tabBarButton: detailTabButton }}
           />
         </Tabs>
