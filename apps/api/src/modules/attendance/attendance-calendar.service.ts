@@ -1,3 +1,4 @@
+import { formatPersonName } from "@schoolhub/shared";
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from "@nestjs/common";
 import type { AttendanceStatus } from "@prisma/client";
 import { Prisma } from "@prisma/client";
@@ -240,14 +241,14 @@ export class AttendanceCalendarService {
     const rows = await this.prisma.client.studentAttendanceExclusion.findMany({
       where: { schoolId, termId, studentId: { in: enrollments.map(row => row.studentId) } },
       include: { student: { select: { profile: {
-        select: { firstName: true, lastName: true },
+        select: { firstName: true, otherNames: true, lastName: true },
       } } } },
       orderBy: { date: "desc" },
       take: 500,
     });
     return rows.map(({ student, date, ...row }) => ({
       ...row, date: dateString(date),
-      studentName: [student.profile.firstName, student.profile.lastName].filter(Boolean).join(" "),
+      studentName: formatPersonName(student.profile),
     }));
   }
 

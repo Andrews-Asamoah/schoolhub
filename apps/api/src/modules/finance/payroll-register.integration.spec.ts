@@ -30,7 +30,7 @@ describe.skipIf(!enabled)("payroll salary register and Tier 2 on PostgreSQL", { 
     const { FinanceExportsService: Exports } = await import("./finance-exports.service.js");
     const prisma = { client: db } as never;
     service = new Finance(prisma, new FinancePostingService(prisma), new FinanceApprovalService(prisma));
-    exports = new Exports(prisma);
+    exports = new Exports(prisma, {} as never);
     await db.user.createMany({ data: [maker, checker].map(id => ({ id, name: id, email: id + "@test.invalid" })) });
     const organization = await db.organization.create({ data: { id: key, slug: key, name: key } });
     const school = await db.school.create({ data: { organizationId: organization.id, code: key, subdomain: key, name: key } });

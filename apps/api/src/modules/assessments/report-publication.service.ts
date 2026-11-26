@@ -1,7 +1,7 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
 import { PrismaService } from "../../prisma/prisma.service.js";
-import type { CreateReportSetInput } from "@schoolhub/shared";
+import { formatPersonName, type CreateReportSetInput } from "@schoolhub/shared";
 import { coveredClasses, REPORTABLE_SCORE_STATUSES } from "./assessment-entry.js";
 import { carriedRecommendations, snapshotHash } from "./report-version.js";
 import { ReportAssetsService } from "./report-assets.service.js";
@@ -61,7 +61,7 @@ export class ReportPublicationService {
         student: {
           select: {
             admissionNumber: true,
-            profile: { select: { firstName: true, lastName: true } },
+            profile: { select: { firstName: true, otherNames: true, lastName: true } },
           },
         },
       },
@@ -85,7 +85,7 @@ export class ReportPublicationService {
     const reports = await this.prisma.client.reportCard.findMany({
       where: { studentId: student.id, publishedAt: { not: null }, set: { schoolId, status: "PUBLISHED" } },
       orderBy: { publishedAt: "desc" },
-      select: { id: true, setId: true, studentId: true, data: true, publishedAt: true, student: { select: { admissionNumber: true, profile: { select: { firstName: true, lastName: true, user: { select: { image: true } } } } } }, set: { select: { name: true, academicYear: { select: { name: true } }, term: { select: { name: true, termNumber: true } }, template: { select: { name: true, layout: true } }, school: { select: { name: true, code: true, email: true, phone: true, address: true, logo: true, motto: true, website: true, primaryColor: true, secondaryColor: true } } } } },
+      select: { id: true, setId: true, studentId: true, data: true, publishedAt: true, student: { select: { admissionNumber: true, profile: { select: { firstName: true, otherNames: true, lastName: true, user: { select: { image: true } } } } } }, set: { select: { name: true, academicYear: { select: { name: true } }, term: { select: { name: true, termNumber: true } }, template: { select: { name: true, layout: true } }, school: { select: { name: true, code: true, email: true, phone: true, address: true, logo: true, motto: true, website: true, primaryColor: true, secondaryColor: true } } } } },
     });
     const published = await this.prisma.client.reportCardVersion.findMany({
       where: { schoolId, studentId: student.id, stage: "PUBLISHED", publishedAt: { not: null } },
@@ -105,7 +105,7 @@ export class ReportPublicationService {
   async getGuardianPublishedReports(schoolId: string, userId: string) {
     const guardian = await this.prisma.client.guardian.findFirst({
       where: { schoolId, deletedAt: null, isActive: true, profile: { userId } },
-      select: { students: { where: { receiveReports: true }, select: { student: { select: { id: true, admissionNumber: true, profile: { select: { firstName: true, lastName: true } } } } } } },
+      select: { students: { where: { receiveReports: true }, select: { student: { select: { id: true, admissionNumber: true, profile: { select: { firstName: true, otherNames: true, lastName: true } } } } } } },
     });
     if (!guardian) throw new NotFoundException("Guardian record not found.");
     const studentIds = guardian.students.map((row) => row.student.id);
@@ -113,7 +113,7 @@ export class ReportPublicationService {
     const reports = await this.prisma.client.reportCard.findMany({
       where: { studentId: { in: studentIds }, publishedAt: { not: null }, set: { schoolId, status: "PUBLISHED" } },
       orderBy: { publishedAt: "desc" },
-      select: { id: true, setId: true, studentId: true, data: true, publishedAt: true, student: { select: { admissionNumber: true, profile: { select: { firstName: true, lastName: true, user: { select: { image: true } } } } } }, set: { select: { name: true, academicYear: { select: { name: true } }, term: { select: { name: true, termNumber: true } }, template: { select: { name: true, layout: true } }, school: { select: { name: true, code: true, email: true, phone: true, address: true, logo: true, motto: true, website: true, primaryColor: true, secondaryColor: true } } } } },
+      select: { id: true, setId: true, studentId: true, data: true, publishedAt: true, student: { select: { admissionNumber: true, profile: { select: { firstName: true, otherNames: true, lastName: true, user: { select: { image: true } } } } } }, set: { select: { name: true, academicYear: { select: { name: true } }, term: { select: { name: true, termNumber: true } }, template: { select: { name: true, layout: true } }, school: { select: { name: true, code: true, email: true, phone: true, address: true, logo: true, motto: true, website: true, primaryColor: true, secondaryColor: true } } } } },
     });
     const published = await this.prisma.client.reportCardVersion.findMany({
       where: { schoolId, studentId: { in: studentIds }, stage: "PUBLISHED",
@@ -189,7 +189,7 @@ export class ReportPublicationService {
         where: { schoolId, deletedAt: null, enrollments: { some: { academicYearId: set.academicYearId, termId: set.termId, status: { in: ["ACTIVE", "COMPLETED"] }, classId: { in: classIds } } } },
         select: {
           id: true, admissionNumber: true,
-          profile: { select: { firstName: true, lastName: true } },
+          profile: { select: { firstName: true, otherNames: true, lastName: true } },
           enrollments: { where: { academicYearId: set.academicYearId, termId: set.termId, status: { in: ["ACTIVE", "COMPLETED"] }, classId: { in: classIds } }, select: { class: { select: { id: true, name: true, level: true } } }, take: 1 },
           // A batch reports its one assessment. Batches made before reports were assessment-based
           // fall back to the signed-off termly scores of the term.
@@ -275,7 +275,7 @@ export class ReportPublicationService {
           const snapshot = {
             schemaVersion: 1, report: data,
             school: set.school, template: set.template,
-            student: { name: [student.profile.firstName, student.profile.lastName].filter(Boolean).join(" "),
+            student: { name: formatPersonName(student.profile),
               admissionNumber: student.admissionNumber },
             year: set.academicYear.name, term: set.term.name, set: set.name,
             capturedAt: new Date().toISOString(),

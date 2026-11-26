@@ -867,7 +867,7 @@ export class AcademicsService {
                 studentId: true,
                 admissionNumber: true,
                 profile: {
-                  select: { firstName: true, lastName: true, gender: true },
+                  select: { firstName: true, otherNames: true, lastName: true, gender: true },
                 },
                 house: {
                   select: { id: true, name: true, color: true },
@@ -902,7 +902,7 @@ export class AcademicsService {
                 studentId: true,
                 admissionNumber: true,
                 profile: {
-                  select: { firstName: true, lastName: true, gender: true },
+                  select: { firstName: true, otherNames: true, lastName: true, gender: true },
                 },
                 house: {
                   select: { id: true, name: true, color: true },

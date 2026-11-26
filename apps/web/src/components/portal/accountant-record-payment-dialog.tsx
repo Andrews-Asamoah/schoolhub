@@ -4,13 +4,13 @@ import { useMemo, useState, type FormEvent } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api";
 import { Check, ChevronsUpDown, LoaderCircle, School, X } from "lucide-react";
-import type { RecordPaymentInput } from "@schoolhub/shared";
+import { formatPersonName, type RecordPaymentInput } from "@schoolhub/shared";
 import { cn } from "@/lib/utils";
 
 interface PaymentStudent {
   id: string;
   admissionNumber: string;
-  profile?: { firstName?: string | null; lastName?: string | null } | null;
+  profile?: { firstName?: string | null; otherNames?: string | null; lastName?: string | null } | null;
 }
 interface PaymentClass {
   id: string;
@@ -81,10 +81,7 @@ const money = (value: number) =>
     maximumFractionDigits: 2,
   }).format(value);
 const studentName = (student?: PaymentStudent | null) =>
-  [student?.profile?.firstName, student?.profile?.lastName]
-    .filter(Boolean)
-    .join(" ")
-    .trim() || student?.admissionNumber || "Unknown student";
+  formatPersonName(student?.profile) || student?.admissionNumber || "Unknown student";
 const outstanding = (bill: PaymentBill) =>
   amount(bill.balanceAmount) > 0 &&
   bill.status !== "CANCELLED" &&

@@ -1,3 +1,4 @@
+import { formatPersonName } from "@schoolhub/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CalendarClock, ClipboardList, LoaderCircle, Plus, Send } from "lucide-react";
 import { useMemo, useState, type FormEvent } from "react";
@@ -22,7 +23,7 @@ interface Submission {
     id: string;
     studentId: string;
     admissionNumber: string | null;
-    profile: { firstName: string; lastName: string };
+    profile: { firstName: string; otherNames?: string | null; lastName: string };
   };
   submittedBy: { id: string; name: string };
   gradedBy: { id: string; name: string } | null;
@@ -297,7 +298,7 @@ export function TeacherAssignmentsWorkspace() {
                     {assignment.submissions.length === 0 ? <p className="rounded-lg border border-dashed border-border px-4 py-5 text-center text-xs text-muted-foreground">No students have submitted a response yet.</p> : (
                       <div className="space-y-3">
                         {assignment.submissions.map((submission) => {
-                          const studentName = `${submission.student.profile.firstName} ${submission.student.profile.lastName}`.trim();
+                          const studentName = formatPersonName(submission.student.profile);
                           return (
                             <article key={submission.id} className="rounded-xl border border-border bg-background p-3 sm:p-4">
                               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -346,7 +347,7 @@ export function TeacherAssignmentsWorkspace() {
         </form>
       </PortalModal>
 
-      <PortalModal isOpen={!!gradeTarget} onClose={() => { setGradeTarget(null); setGradeError(null); }} title={gradeTarget ? `Grade: ${gradeTarget.assignment.title}` : "Grade response"} description={gradeTarget ? `${gradeTarget.submission.student.profile.firstName} ${gradeTarget.submission.student.profile.lastName} · Maximum ${gradeTarget.assignment.maxScore} marks` : undefined} maxWidth="lg" footer={<><button type="button" onClick={() => setGradeTarget(null)} disabled={gradeMutation.isPending} className="h-10 rounded-lg border border-border px-4 text-xs font-semibold text-foreground hover:bg-muted disabled:opacity-50">Cancel</button><button type="submit" form="teacher-grade-assignment" disabled={gradeMutation.isPending || !score.trim()} className="inline-flex h-10 items-center gap-2 rounded-lg bg-primary px-4 text-xs font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-50">{gradeMutation.isPending && <LoaderCircle className="size-4 animate-spin" />}Save grade</button></>}>
+      <PortalModal isOpen={!!gradeTarget} onClose={() => { setGradeTarget(null); setGradeError(null); }} title={gradeTarget ? `Grade: ${gradeTarget.assignment.title}` : "Grade response"} description={gradeTarget ? `${formatPersonName(gradeTarget.submission.student.profile)} · Maximum ${gradeTarget.assignment.maxScore} marks` : undefined} maxWidth="lg" footer={<><button type="button" onClick={() => setGradeTarget(null)} disabled={gradeMutation.isPending} className="h-10 rounded-lg border border-border px-4 text-xs font-semibold text-foreground hover:bg-muted disabled:opacity-50">Cancel</button><button type="submit" form="teacher-grade-assignment" disabled={gradeMutation.isPending || !score.trim()} className="inline-flex h-10 items-center gap-2 rounded-lg bg-primary px-4 text-xs font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-50">{gradeMutation.isPending && <LoaderCircle className="size-4 animate-spin" />}Save grade</button></>}>
         <form id="teacher-grade-assignment" onSubmit={submitGrade} className="space-y-4">
           {gradeError && <p role="alert" className="rounded-lg border border-destructive/20 bg-destructive/10 px-3 py-2 text-xs text-destructive">{gradeError}</p>}
           <div className="max-h-48 overflow-y-auto whitespace-pre-wrap break-words rounded-lg border border-border bg-muted/30 p-3 text-sm leading-6 text-foreground">{gradeTarget?.submission.responseText}</div>

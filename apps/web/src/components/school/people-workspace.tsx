@@ -24,6 +24,7 @@ import {
   type CredentialEntry,
 } from "@/components/credentials/credentials-dialog";
 import {
+  formatPersonName,
   createGuardianSchema,
   createStaffSchema,
   createTeacherSchema,
@@ -97,7 +98,7 @@ interface StudentOption {
   id: string;
   admissionNumber: string | null;
   status: string;
-  profile: { firstName: string; lastName: string };
+  profile: { firstName: string; otherNames?: string | null; lastName: string };
   class: { id: string; name: string; level: string } | null;
 }
 
@@ -168,7 +169,7 @@ interface Guardian {
     student: {
       id: string;
       admissionNumber: string | null;
-      profile: { firstName: string; lastName: string };
+      profile: { firstName: string; otherNames?: string | null; lastName: string };
     };
   }[];
 }
@@ -1315,7 +1316,7 @@ function toRow(person: Teacher | Staff | Guardian): Row {
     relatedStudents: guardian.students
       .map(
         ({ student }) =>
-          `${student.profile.firstName} ${student.profile.lastName}`,
+          formatPersonName(student.profile),
       )
       .join(", "),
     isActive: guardian.isActive,
@@ -1458,11 +1459,11 @@ function StudentSearchPicker({
               key={student.id}
               className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-2.5 py-1 text-[11px] font-medium text-primary"
             >
-              {student.profile.firstName} {student.profile.lastName}
+              {formatPersonName(student.profile)}
               <button
                 type="button"
                 onClick={() => removeStudent(student.id)}
-                aria-label={`Remove ${student.profile.firstName} ${student.profile.lastName}`}
+                aria-label={`Remove ${formatPersonName(student.profile)}`}
                 className="rounded-full p-0.5 hover:bg-primary/15"
               >
                 <X className="size-3" />
@@ -1508,7 +1509,7 @@ function StudentSearchPicker({
               >
                 <span className="min-w-0">
                   <span className="block truncate text-xs font-semibold text-foreground">
-                    {student.profile.firstName} {student.profile.lastName}
+                    {formatPersonName(student.profile)}
                   </span>
                   <span className="block truncate text-[11px] font-normal text-muted-foreground">
                     {student.class?.name ?? "Not placed this term"}
@@ -1575,7 +1576,7 @@ function GuardianDetailsDialog({
   const loginEmail = guardian.profile?.user.email;
   const students = guardian.students.map(({ student }) => ({
     id: student.id,
-    name: [student.profile.firstName, student.profile.lastName].filter(Boolean).join(" "),
+    name: formatPersonName(student.profile),
     admissionNumber: student.admissionNumber,
   }));
 

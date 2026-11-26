@@ -1,3 +1,4 @@
+import { formatPersonName } from "@schoolhub/shared";
 import { Prisma } from "@prisma/client";
 import { Injectable } from "@nestjs/common";
 import { PrismaService } from "../../prisma/prisma.service.js";
@@ -94,7 +95,7 @@ export class DashboardService {
     const [students, teachers, monthlyPayments, monthlyExpenses, recentStudents, recentPayments, recentExpenses] = await Promise.all([
       this.prisma.client.student.findMany({
         where: { schoolId, deletedAt: null, status: "ACTIVE", admissionDate: { lte: now } },
-        select: { admissionDate: true, createdAt: true, profile: { select: { firstName: true, lastName: true, gender: true } } },
+        select: { admissionDate: true, createdAt: true, profile: { select: { firstName: true, otherNames: true, lastName: true, gender: true } } },
       }),
       this.prisma.client.teacher.count({ where: { schoolId, isActive: true, deletedAt: null } }),
       canViewFinance ? this.prisma.client.payment.findMany({
@@ -108,12 +109,12 @@ export class DashboardService {
       role !== "teacher" ? this.prisma.client.student.findMany({
         where: { schoolId, deletedAt: null, createdAt: { gte: firstMonth, lte: now } },
         orderBy: { createdAt: "desc" }, take: 8,
-        select: { id: true, createdAt: true, admissionDate: true, profile: { select: { firstName: true, lastName: true } } },
+        select: { id: true, createdAt: true, admissionDate: true, profile: { select: { firstName: true, otherNames: true, lastName: true } } },
       }) : Promise.resolve([]),
       canViewFinanceDetails ? this.prisma.client.payment.findMany({
         where: { schoolId, createdAt: { gte: firstMonth, lte: now }, status: "COMPLETED" },
         orderBy: { createdAt: "desc" }, take: 8,
-        select: { id: true, amount: true, createdAt: true, paymentNumber: true, student: { select: { profile: { select: { firstName: true, lastName: true } } } } },
+        select: { id: true, amount: true, createdAt: true, paymentNumber: true, student: { select: { profile: { select: { firstName: true, otherNames: true, lastName: true } } } } },
       }) : Promise.resolve([]),
       canViewFinanceDetails ? this.prisma.client.expense.findMany({
         where: { schoolId, createdAt: { gte: firstMonth, lte: now }, ...salaryFilter },
@@ -156,12 +157,12 @@ export class DashboardService {
     const activities = [
       ...recentStudents.map((student) => ({
         id: "student-" + student.id, type: "student" as const, title: "Student record added",
-        detail: [student.profile.firstName, student.profile.lastName].filter(Boolean).join(" ") || "Student record",
+        detail: formatPersonName(student.profile) || "Student record",
         amount: null, createdAt: student.createdAt.toISOString(),
       })),
       ...(canViewFinanceDetails ? recentPayments.map((payment) => ({
         id: "payment-" + payment.id, type: "payment" as const, title: "Fee payment recorded",
-        detail: [payment.paymentNumber, [payment.student.profile.firstName, payment.student.profile.lastName].filter(Boolean).join(" ")].filter(Boolean).join(" · "),
+        detail: [payment.paymentNumber, formatPersonName(payment.student.profile)].filter(Boolean).join(" · "),
         amount: Number(payment.amount), createdAt: payment.createdAt.toISOString(),
       })) : []),
       ...(canViewFinanceDetails ? recentExpenses.map((expense) => ({

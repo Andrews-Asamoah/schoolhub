@@ -2285,3 +2285,5 @@ export const publishAssignmentBatchSchema = createSchoolAssignmentSchema
       .refine((ids) => ids.length === new Set(ids).size, "Choose each class once."),
   });
 export type PublishAssignmentBatchInput = z.infer<typeof publishAssignmentBatchSchema>;
+
+export { formatPersonName } from "./person-name.js";

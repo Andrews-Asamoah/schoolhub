@@ -1,3 +1,4 @@
+import { formatPersonName } from "@schoolhub/shared";
 import { DatePicker } from "@/components/ui/date-picker";
 import { DataTable, TableExportMenu, type DataTableColumn } from "@/components/ui/data-table";
 import { ServerExportButton } from "@/components/portal/server-export-button";
@@ -12,7 +13,7 @@ import { Search, Users, WalletCards } from "lucide-react";
 interface Student {
   id: string;
   admissionNumber: string;
-  profile?: { firstName?: string | null; lastName?: string | null } | null;
+  profile?: { firstName?: string | null; otherNames?: string | null; lastName?: string | null } | null;
 }
 
 interface FinanceBill {
@@ -173,10 +174,7 @@ const dateText = (value?: string | null) => {
 };
 
 const studentLabel = (student: Student) =>
-  [student.profile?.firstName, student.profile?.lastName]
-    .filter(Boolean)
-    .join(" ")
-    .trim() ||
+  formatPersonName(student.profile) ||
   student.admissionNumber ||
   "Unknown student";
 
