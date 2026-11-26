@@ -1,6 +1,6 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import { Prisma, type School } from "@prisma/client";
-import type { RequestMarkCorrectionInput, ReviewMarkCorrectionInput } from "@schoolhub/shared";
+import { formatPersonName, type RequestMarkCorrectionInput, type ReviewMarkCorrectionInput } from "@schoolhub/shared";
 import { PrismaService } from "../../prisma/prisma.service.js";
 import { canEnterComponentMarks, isSchoolManager } from "../../common/scope/teacher-access.js";
 import { validateMarks } from "./assessment-entry.js";
@@ -179,7 +179,7 @@ export class AssessmentCorrectionService {
     const [students, components, classes, subjects, people] = await Promise.all([
       db.student.findMany({
         where: { schoolId, id: { in: uniq(rows.flatMap((row) => row.items.map((item) => item.studentId))) } },
-        select: { id: true, admissionNumber: true, profile: { select: { firstName: true, lastName: true } } },
+        select: { id: true, admissionNumber: true, profile: { select: { firstName: true, otherNames: true, lastName: true } } },
       }),
       db.assessmentComponent.findMany({
         where: { id: { in: uniq(rows.flatMap((row) => row.items.map((item) => item.componentId))) } },
@@ -215,7 +215,7 @@ export class AssessmentCorrectionService {
         const student = studentById.get(item.studentId);
         const component = componentById.get(item.componentId);
         return {
-          studentName: student ? `${student.profile.firstName} ${student.profile.lastName}`.trim() : "Pupil",
+          studentName: student ? formatPersonName(student.profile) : "Pupil",
           admissionNumber: student?.admissionNumber ?? null,
           componentName: component?.name ?? "Component",
           occurrenceIndex: item.occurrenceIndex,

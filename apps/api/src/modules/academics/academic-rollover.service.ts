@@ -17,7 +17,7 @@ export class AcademicRolloverService{
  }
  async cohort(schoolId:string,yearId:string,termId:string){
   const term=await this.prisma.client.term.findFirst({where:{id:termId,academicYearId:yearId,academicYear:{schoolId}}});if(!term)throw new NotFoundException('Source term not found.');
-  return this.prisma.client.enrollment.findMany({where:{academicYearId:yearId,termId,status:{in:['ACTIVE','COMPLETED']},class:{schoolId},student:{schoolId,status:'ACTIVE',deletedAt:null}},select:{id:true,studentId:true,classId:true,student:{select:{admissionNumber:true,profile:{select:{firstName:true,lastName:true}}}},class:{select:{name:true,level:true,isGraduatingClass:true,nextPromotionClassId:true}}},orderBy:{studentId:'asc'},take:2001});
+  return this.prisma.client.enrollment.findMany({where:{academicYearId:yearId,termId,status:{in:['ACTIVE','COMPLETED']},class:{schoolId},student:{schoolId,status:'ACTIVE',deletedAt:null}},select:{id:true,studentId:true,classId:true,student:{select:{admissionNumber:true,profile:{select:{firstName:true,otherNames:true,lastName:true}}}},class:{select:{name:true,level:true,isGraduatingClass:true,nextPromotionClassId:true}}},orderBy:{studentId:'asc'},take:2001});
  }
  private async evidence(tx:Prisma.TransactionClient,schoolId:string,plan:RolloverPlan){
   const years=await tx.academicYear.findMany({where:{schoolId},include:{terms:{orderBy:{startDate:'asc'}}},orderBy:{id:'asc'}});

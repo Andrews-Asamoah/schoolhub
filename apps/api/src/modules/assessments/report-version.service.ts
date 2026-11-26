@@ -28,7 +28,7 @@ export class ReportVersionService {
         version: true, stage: true, teacherRemark: true, teacherActorId: true,
         carriedTeacherRemark: true, snapshot: true, createdAt: true,
         student: { select: { admissionNumber: true, profile: {
-          select: { firstName: true, lastName: true },
+          select: { firstName: true, otherNames: true, lastName: true },
         } } },
         set: { select: { name: true, term: { select: { name: true } } } } },
       orderBy: [{ setId: "asc" }, { studentId: "asc" }, { version: "desc" }],
@@ -153,7 +153,7 @@ export class ReportVersionService {
       select: { id: true, setId: true, studentId: true, classId: true, version: true, stage: true,
         teacherActorId: true, teacherName: true, teacherRemark: true, teacherApprovedAt: true,
         headName: true, headRemark: true, headApprovedAt: true, carriedHeadRemark: true, snapshot: true,
-        student: { select: { admissionNumber: true, profile: { select: { firstName: true, lastName: true } } } },
+        student: { select: { admissionNumber: true, profile: { select: { firstName: true, otherNames: true, lastName: true } } } },
         set: { select: { name: true, term: { select: { name: true } } } } },
       orderBy: [{ setId: "asc" }, { studentId: "asc" }, { version: "desc" }],
       take: 5000,

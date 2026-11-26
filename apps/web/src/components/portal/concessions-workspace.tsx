@@ -1,3 +1,4 @@
+import { formatPersonName } from "@schoolhub/shared";
 import { DatePicker } from "@/components/ui/date-picker";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useState } from "react";
@@ -48,7 +49,7 @@ const periodLabel = (award: Scholarship, years: SchoolYear[]) => {
   if (award.academicYearId) return years.find((year) => year.id === award.academicYearId)?.name ?? "Selected year";
   return "All periods";
 };
-const personName = (student: StudentOption) => [student.profile?.firstName, student.profile?.otherNames, student.profile?.lastName].filter(Boolean).join(" ").trim() || student.admissionNumber || "Student";
+const personName = (student: StudentOption) => formatPersonName(student.profile) || student.admissionNumber || "Student";
 const studentReference = (student: StudentOption) => student.admissionNumber
   ? `Admission no. ${student.admissionNumber}` : `Student ID ${student.studentId ?? "unavailable"}`;
 const termDates = new Intl.DateTimeFormat("en-GH", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });

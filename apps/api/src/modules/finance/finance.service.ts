@@ -8,7 +8,7 @@ import {
 import { PrismaService } from "../../prisma/prisma.service.js";
 import { FinancePostingService } from "./finance-posting.service.js";
 import { FinanceApprovalService } from "./finance-approval.service.js";
-import type { CreateExpenseInput, GenerateBillInput, RecordPaymentInput, StudentStatementResponse } from "@schoolhub/shared";
+import { formatPersonName, type CreateExpenseInput, type GenerateBillInput, type RecordPaymentInput, type StudentStatementResponse } from "@schoolhub/shared";
 import { decryptPayrollDetails, encryptPayrollDetails } from "./payroll/payroll-details-crypto.js";
 import { payrollPersonKind, type PayrollPaymentDetailsInput, type PayrollSalaryImportInput } from "./payroll/payroll-inputs.js";
 import { calculatePayslip } from "./payroll/payroll-calculator.js";
@@ -755,7 +755,7 @@ export class FinanceService {
             select: {
               id: true,
               admissionNumber: true,
-              profile: { select: { firstName: true, lastName: true } },
+              profile: { select: { firstName: true, otherNames: true, lastName: true } },
             },
           },
         },
@@ -910,7 +910,7 @@ export class FinanceService {
       const awards = await tx.studentScholarship.createManyAndReturn({
         data: studentIds.map(studentId => ({ ...data, studentId })),
         include: {
-          student: { select: { id: true, admissionNumber: true, profile: { select: { firstName: true, lastName: true } } } },
+          student: { select: { id: true, admissionNumber: true, profile: { select: { firstName: true, otherNames: true, lastName: true } } } },
         },
       });
       if (auditBatch) {
@@ -2156,7 +2156,7 @@ export class FinanceService {
       const existing = grouped.get(student.id) ?? {
         studentId: student.id,
         admissionNumber: student.admissionNumber,
-        name: [student.profile.firstName, student.profile.otherNames, student.profile.lastName].filter(Boolean).join(" ").trim() || student.admissionNumber || "Student",
+        name: formatPersonName(student.profile) || student.admissionNumber || "Student",
         studentStatus: student.status,
         className: student.class?.name ?? null,
         formerStudent: student.status !== "ACTIVE",
@@ -3368,7 +3368,7 @@ export class FinanceService {
       else ageing.days90Plus = ageing.days90Plus.plus(bill.balanceAmount);
     }
 
-    const studentName = [student.profile.firstName, student.profile.otherNames, student.profile.lastName].filter(Boolean).join(" ").trim();
+    const studentName = formatPersonName(student.profile);
     return {
       student: { id: student.id, admissionNumber: student.admissionNumber, name: studentName || student.admissionNumber || "Student" },
       scope,
@@ -3425,6 +3425,7 @@ export class FinanceService {
         { student: { admissionNumber: { contains: term, mode: "insensitive" } } },
         { student: { profile: { firstName: { contains: term, mode: "insensitive" } } } },
         { student: { profile: { lastName: { contains: term, mode: "insensitive" } } } },
+        { student: { profile: { otherNames: { contains: term, mode: "insensitive" } } } },
         { class: { name: { contains: term, mode: "insensitive" } } },
       ] });
     }
@@ -3448,7 +3449,7 @@ export class FinanceService {
         take: limit + 1,
         ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
         include: {
-          student: { select: { id: true, admissionNumber: true, profile: { select: { firstName: true, lastName: true } } } },
+          student: { select: { id: true, admissionNumber: true, profile: { select: { firstName: true, otherNames: true, lastName: true } } } },
           class: { select: { id: true, name: true } },
           feeStructure: { select: { name: true } },
           academicYear: { select: { id: true, name: true } },
@@ -3495,7 +3496,7 @@ export class FinanceService {
             admissionNumber: true,
             status: true,
             deletedAt: true,
-            profile: { select: { firstName: true, lastName: true } },
+            profile: { select: { firstName: true, otherNames: true, lastName: true } },
           },
         },
         class: { select: { id: true, name: true } },
@@ -3505,7 +3506,7 @@ export class FinanceService {
     const byStudent = new Map<string, {
       id: string;
       admissionNumber: string;
-      profile: { firstName: string; lastName: string } | null;
+      profile: { firstName: string; otherNames: string | null; lastName: string } | null;
       classes: Map<string, { id: string; name: string }>;
       outstandingBalance: number;
     }>();
@@ -3536,8 +3537,8 @@ export class FinanceService {
         outstandingBalance: student.outstandingBalance,
       }))
       .sort((a, b) => {
-        const aName = [a.profile?.firstName, a.profile?.lastName].filter(Boolean).join(" ") || a.admissionNumber;
-        const bName = [b.profile?.firstName, b.profile?.lastName].filter(Boolean).join(" ") || b.admissionNumber;
+        const aName = formatPersonName(a.profile) || a.admissionNumber;
+        const bName = formatPersonName(b.profile) || b.admissionNumber;
         return aName.localeCompare(bName);
       });
   }
@@ -3593,6 +3594,7 @@ export class FinanceService {
         { student: { admissionNumber: { contains: term, mode: "insensitive" } } },
         { student: { profile: { firstName: { contains: term, mode: "insensitive" } } } },
         { student: { profile: { lastName: { contains: term, mode: "insensitive" } } } },
+        { student: { profile: { otherNames: { contains: term, mode: "insensitive" } } } },
       ] });
     }
     const where: Prisma.PaymentWhereInput = {
@@ -3610,7 +3612,7 @@ export class FinanceService {
         take: limit + 1,
         ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
         include: {
-          student: { select: { id: true, admissionNumber: true, profile: { select: { firstName: true, lastName: true } } } },
+          student: { select: { id: true, admissionNumber: true, profile: { select: { firstName: true, otherNames: true, lastName: true } } } },
           bill: { select: { id: true, billNumber: true, classId: true, class: { select: { id: true, name: true } }, academicYearId: true, termId: true } },
           billAllocations: {
             include: { bill: { select: { id: true, billNumber: true, classId: true, academicYearId: true, termId: true } } },
@@ -4529,7 +4531,7 @@ export class FinanceService {
     const targets = new Map<string, StudentTarget>();
     for (const bill of bills) {
       const student = bill.student;
-      const studentName = [student.profile.firstName, student.profile.otherNames, student.profile.lastName].filter(Boolean).join(" ").trim() || "Student";
+      const studentName = formatPersonName(student.profile) || "Student";
       let target = targets.get(student.id);
       if (!target) {
         target = { studentId: student.id, name: studentName, balance: 0, earliestDueDate: bill.dueDate, guardians: new Map() };
@@ -4757,7 +4759,7 @@ export class FinanceService {
         id: true,
         admissionNumber: true,
         outstandingBalance: true,
-        profile: { select: { firstName: true, lastName: true } },
+        profile: { select: { firstName: true, otherNames: true, lastName: true } },
       },
     });
 

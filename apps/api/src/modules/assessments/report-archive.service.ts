@@ -1,3 +1,4 @@
+import { formatPersonName } from "@schoolhub/shared";
 import { Injectable, NotFoundException } from "@nestjs/common";
 import type { Prisma } from "@prisma/client";
 import { PrismaService } from "../../prisma/prisma.service.js";
@@ -40,6 +41,7 @@ export function archiveWhere(schoolId: string, query: Partial<ArchiveQuery>, sco
         { admissionNumber: contains(word) },
         { profile: { firstName: contains(word) } },
         { profile: { lastName: contains(word) } },
+        { profile: { otherNames: contains(word) } },
       ] })) } : {}),
       ...(scopeClassIds ? { enrollments: { some: { classId: { in: scopeClassIds }, status: "ACTIVE" as const } } } : {}),
     },
@@ -103,7 +105,7 @@ export class ReportArchiveService {
       db.reportCard.findMany({
         where, orderBy: [{ publishedAt: "desc" }, { id: "asc" }], skip: (page - 1) * pageSize, take: pageSize,
         select: { id: true, setId: true, studentId: true, publishedAt: true, data: true,
-          student: { select: { admissionNumber: true, profile: { select: { firstName: true, lastName: true } } } },
+          student: { select: { admissionNumber: true, profile: { select: { firstName: true, otherNames: true, lastName: true } } } },
           set: { select: { name: true, academicYear: { select: { name: true } }, term: { select: { name: true } } } } },
       }),
     ]);
@@ -125,7 +127,7 @@ export class ReportArchiveService {
         const version = versionOf.get(row.setId + ":" + row.studentId) ?? null;
         return {
           id: row.id,
-          pupilName: `${row.student.profile.firstName} ${row.student.profile.lastName}`.trim(),
+          pupilName: formatPersonName(row.student.profile),
           admissionNumber: row.student.admissionNumber,
           className: classRow?.name ?? null,
           setName: row.set.name,

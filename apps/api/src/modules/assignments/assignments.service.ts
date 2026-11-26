@@ -150,7 +150,7 @@ export class AssignmentsService {
                 id: true,
                 admissionNumber: true,
                 studentId: true,
-                profile: { select: { firstName: true, lastName: true } },
+                profile: { select: { firstName: true, otherNames: true, lastName: true } },
               },
             },
             submittedBy: { select: { id: true, name: true } },

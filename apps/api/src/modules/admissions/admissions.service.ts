@@ -8,6 +8,7 @@ import {
 } from "@nestjs/common";
 import { Prisma, type School } from "@prisma/client";
 import {
+  formatPersonName,
   createStudentSchema,
   type AdmitApplicationInput,
   type DecideApplicationInput,
@@ -262,7 +263,7 @@ export class AdmissionsService {
     const showDecision = ["ACCEPTED", "WAITLISTED", "REJECTED", "ADMITTED"].includes(app.status);
     return {
       applicationNumber: app.applicationNumber,
-      applicantName: `${app.firstName} ${app.lastName}`,
+      applicantName: formatPersonName(app),
       className: app.class.name,
       cycleName: app.cycle.name,
       status: app.status,
@@ -718,7 +719,7 @@ export class AdmissionsService {
         schoolId,
         amount: app.feeDue,
         date: paidOn,
-        description: `Admission fee - ${app.firstName} ${app.lastName} (${app.applicationNumber})`,
+        description: `Admission fee - ${formatPersonName(app)} (${app.applicationNumber})`,
         category: "ADMISSION_FEE",
         revenueAccount: { name: "Admission Fees", code: "4200" },
         referenceType: "ADMISSION_APPLICATION",

@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Pencil } from "lucide-react";
 import { useState } from "react";
 import {
+  formatPersonName,
   saveAdmissionCycleSchema,
   type ApplicationStatus,
   type IssuedCredentials,
@@ -66,6 +67,7 @@ interface Application {
   applicationNumber: string;
   status: ApplicationStatus;
   firstName: string;
+  otherNames?: string | null;
   lastName: string;
   gender: string;
   dateOfBirth: string;
@@ -458,7 +460,7 @@ function ApplicationsPanel({ cycles, canDecide }: { cycles: Cycle[]; canDecide: 
       {
         onSuccess: (result) => {
           const student = result.student;
-          const name = `${app.firstName} ${app.lastName}`;
+          const name = formatPersonName(app);
           const entries: CredentialEntry[] = [];
           if (student.credentials) entries.push({ label: `${name} (student)`, credentials: student.credentials as IssuedCredentials });
           for (const g of student.guardianCredentials ?? []) {
@@ -590,7 +592,7 @@ function ApplicationsPanel({ cycles, canDecide }: { cycles: Cycle[]; canDecide: 
                     {["SUBMITTED", "UNDER_REVIEW", "EXAM_SCHEDULED"].includes(app.status) && (
                       <input
                         type="checkbox"
-                        aria-label={`Select ${app.firstName} ${app.lastName}`}
+                        aria-label={`Select ${formatPersonName(app)}`}
                         checked={picked.has(app.id)}
                         onChange={(e) => {
                           const next = new Set(picked);
@@ -601,7 +603,7 @@ function ApplicationsPanel({ cycles, canDecide }: { cycles: Cycle[]; canDecide: 
                     )}
                   </td>
                   <td className="p-3">
-                    <p className="font-semibold text-foreground">{app.firstName} {app.lastName}</p>
+                    <p className="font-semibold text-foreground">{formatPersonName(app)}</p>
                     <p className="text-xs text-muted-foreground">{app.applicationNumber} · {app.dateOfBirth.slice(0, 10)}</p>
                   </td>
                   <td className="p-3 text-foreground">{app.class.name}</td>
@@ -642,7 +644,7 @@ function ApplicationsPanel({ cycles, canDecide }: { cycles: Cycle[]; canDecide: 
           money={money}
           onClose={() => setReceiving(null)}
           onDone={(r) => {
-            setReceipt({ ...r, name: `${receiving.firstName} ${receiving.lastName}` });
+            setReceipt({ ...r, name: formatPersonName(receiving) });
             setReceiving(null);
             void refresh();
           }}
@@ -741,7 +743,7 @@ function DecisionDialog({
     <div role="dialog" aria-modal="true" className="fixed inset-0 z-50 flex items-center justify-center bg-overlay p-4">
       <div className="w-full max-w-md rounded-2xl border border-border bg-card p-5 shadow-xl">
         <h3 className="text-sm font-bold text-foreground">
-          {label(decision)}: {app.firstName} {app.lastName}
+          {label(decision)}: {formatPersonName(app)}
         </h3>
         {belowPass && (
           <div className="mt-3 rounded-lg bg-warning/10 p-3 text-xs text-warning">
@@ -853,7 +855,7 @@ function ReceiveFeeDialog({
   return (
     <div role="dialog" aria-modal="true" className="fixed inset-0 z-50 flex items-center justify-center bg-overlay p-4">
       <div className="w-full max-w-md rounded-2xl border border-border bg-card p-5 shadow-xl">
-        <h3 className="text-sm font-bold text-foreground">Receive admission fee: {app.firstName} {app.lastName}</h3>
+        <h3 className="text-sm font-bold text-foreground">Receive admission fee: {formatPersonName(app)}</h3>
         <p className="mt-1 text-xs text-muted-foreground">{app.applicationNumber} · {app.class.name}</p>
         <p className="mt-4 rounded-lg bg-muted p-3 text-center text-2xl font-bold text-foreground">{money(app.feeDue)}</p>
         <label className="mt-3 block text-xs font-semibold">
@@ -893,7 +895,7 @@ function ExemptFeeDialog({ app, onClose, onDone }: { app: Application; onClose: 
   return (
     <div role="dialog" aria-modal="true" className="fixed inset-0 z-50 flex items-center justify-center bg-overlay p-4">
       <div className="w-full max-w-md rounded-2xl border border-border bg-card p-5 shadow-xl">
-        <h3 className="text-sm font-bold text-foreground">Exempt from admission fee: {app.firstName} {app.lastName}</h3>
+        <h3 className="text-sm font-bold text-foreground">Exempt from admission fee: {formatPersonName(app)}</h3>
         <p className="mt-1 text-xs text-muted-foreground">
           The applicant can then sit the exam without paying. The reason is kept on record and cannot be left blank.
         </p>
@@ -994,7 +996,7 @@ function ExamCell({ app, canEdit, onSaved }: { app: Application; canEdit: boolea
 
   if (editing) {
     return (
-      <form onSubmit={submit} noValidate className="space-y-2.5" aria-label={`Edit exam for ${app.firstName} ${app.lastName}`}>
+      <form onSubmit={submit} noValidate className="space-y-2.5" aria-label={`Edit exam for ${formatPersonName(app)}`}>
         <label className="block text-[11px] font-semibold text-foreground">
           Date and time
           <DateTimePicker buttonClassName={`${input} !mt-1 !h-9 text-xs`} value={date} onChange={setDate} />
@@ -1067,7 +1069,7 @@ function ExamCell({ app, canEdit, onSaved }: { app: Application; canEdit: boolea
         <button
           type="button"
           onClick={open}
-          aria-label={`Edit exam for ${app.firstName} ${app.lastName}`}
+          aria-label={`Edit exam for ${formatPersonName(app)}`}
           className="mt-0.5 inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-[11px] font-semibold text-primary hover:bg-primary/10"
         >
           <Pencil className="size-3" />

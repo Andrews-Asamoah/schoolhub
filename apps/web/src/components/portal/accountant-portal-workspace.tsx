@@ -21,6 +21,7 @@ import {
   Wallet,
 } from "lucide-react";
 import {
+  formatPersonName,
   createExpenseSchema,
   generateBillSchema,
   createInventoryItemSchema,
@@ -60,7 +61,7 @@ interface AccountantPortalWorkspaceProps {
 interface StudentSummary {
   id: string;
   admissionNumber: string;
-  profile?: { firstName?: string | null; lastName?: string | null } | null;
+  profile?: { firstName?: string | null; otherNames?: string | null; lastName?: string | null } | null;
 }
 
 interface FinanceSchool {
@@ -243,10 +244,7 @@ const dateLabel = (value?: string | null) => {
 };
 
 const studentName = (student?: StudentSummary | null) => {
-  const name = [student?.profile?.firstName, student?.profile?.lastName]
-    .filter(Boolean)
-    .join(" ")
-    .trim();
+  const name = formatPersonName(student?.profile);
   return name || student?.admissionNumber || "Unknown student";
 };
 
@@ -717,12 +715,53 @@ export function AccountantPortalWorkspace({
 
   return (
     <div className="space-y-6"><style>{`@media print {
-        body * { visibility: hidden !important; }
-        .payment-receipt-print, .payment-receipt-print *, .invoice-print-area, .invoice-print-area * { visibility: visible !important; }
-        .payment-receipt-print, .invoice-print-area { position: absolute !important; inset: 0 auto auto 0 !important; width: 100% !important; max-width: none !important; margin: 0 !important; padding: 24px !important; border: 0 !important; box-shadow: none !important; background: white !important; color: black !important; }
-        .payment-receipt-actions, .invoice-print-actions { display: none !important; }
-        .payment-receipt-print p, .payment-receipt-print span, .payment-receipt-print h2, .payment-receipt-print h3, .invoice-print-area p, .invoice-print-area span, .invoice-print-area h2, .invoice-print-area h3 { color: black !important; }
-        @page { size: A4 portrait; margin: 12mm; }
+        body:has(.finance-document-print) {
+          overflow: visible !important;
+          min-height: 0 !important;
+          background: white !important;
+        }
+        body:has(.finance-document-print) > :not(:has(.finance-document-print)),
+        [role="dialog"]:has(.finance-document-print) > :not(:has(.finance-document-print)),
+        [role="dialog"] > div:has(> .finance-document-print) > :not(.finance-document-print) {
+          display: none !important;
+        }
+        body > div:has(> [role="dialog"] .finance-document-print),
+        [role="dialog"]:has(.finance-document-print),
+        [role="dialog"] > div:has(> .finance-document-print) {
+          display: block !important;
+          position: static !important;
+          width: auto !important;
+          min-height: 0 !important;
+          max-height: none !important;
+          max-width: none !important;
+          overflow: visible !important;
+          margin: 0 !important;
+          padding: 0 !important;
+          border: 0 !important;
+          box-shadow: none !important;
+          background: transparent !important;
+          backdrop-filter: none !important;
+        }
+        .finance-document-print {
+          page: school-finance-document;
+          padding: 0 !important;
+          border: 0 !important;
+          background: white !important;
+          font-size: 10pt;
+        }
+        .finance-document-print *, .finance-document-print { visibility: visible !important; color: #161616 !important; }
+        .finance-document-print .overflow-x-auto { overflow: visible !important; }
+        .finance-document-print table { min-width: 0 !important; }
+        .finance-document-print tr { break-inside: avoid; }
+        .finance-document-print thead { display: table-header-group; }
+        .invoice-print-header { margin-bottom: 8pt !important; padding-bottom: 6pt !important; }
+        .invoice-print-header img { width: 34pt !important; height: 34pt !important; }
+        .invoice-print-summary { padding-bottom: 6pt !important; }
+        .invoice-print-meta { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5pt 13pt !important; padding-block: 8pt !important; }
+        .invoice-print-items, .invoice-print-totals { padding-block: 6pt !important; }
+        .invoice-print-items th, .invoice-print-items td, .invoice-print-totals > div { padding-block: 4pt !important; }
+        .invoice-print-totals, .invoice-print-header, .invoice-print-summary { break-inside: avoid; }
+        @page school-finance-document { size: A4 portrait; margin: 14mm; }
       }`}</style>
       {activeTab === "overview" && (
         <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-success via-success to-foreground p-6 text-background shadow-lg sm:p-8">
@@ -940,16 +979,16 @@ export function AccountantPortalWorkspace({
 
       {selectedInvoiceForPrint && (
         <Modal title="Invoice summary" description="Print-ready summary of the saved bill record." onClose={() => setSelectedInvoiceForPrint(null)}>
-          <section className="invoice-print-area rounded-xl border border-border p-5">
-            <div className="mb-5 flex items-center gap-3 border-b border-border pb-4">
+          <section className="finance-document-print rounded-xl border border-border p-5">
+            <div className="invoice-print-header mb-5 flex items-center gap-3 border-b border-border pb-4">
               {schoolQuery.data?.logo ? <img src={schoolQuery.data.logo} alt="" className="size-14 rounded-lg object-contain" /> : <div aria-hidden="true" className="flex size-14 items-center justify-center rounded-lg bg-muted text-lg font-bold text-foreground">{(schoolQuery.data?.name ?? "SH").slice(0, 2).toUpperCase()}</div>}
               <div className="min-w-0 flex-1"><p className="font-bold text-foreground">{schoolQuery.data?.name ?? "SchoolHub"}</p><p className="mt-1 text-xs text-muted-foreground">{[schoolQuery.data?.address, schoolQuery.data?.phone, schoolQuery.data?.email].filter(Boolean).join(" · ") || "School finance office"}</p></div>
             </div>
-            <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border pb-4">
+            <div className="invoice-print-summary flex flex-wrap items-start justify-between gap-3 border-b border-border pb-4">
               <div><p className="text-xs font-bold uppercase tracking-[0.15em] text-primary">SchoolHub · Student invoice</p><h2 className="mt-1 text-xl font-bold text-foreground">{selectedInvoiceForPrint.billNumber}</h2><p className="mt-1 text-sm text-muted-foreground">Issued {dateLabel(selectedInvoiceForPrint.issuedAt)}</p></div>
               <div className="text-right"><p className="text-xs text-muted-foreground">Current invoice charge</p><p className="mt-1 text-xl font-bold tabular-nums text-foreground">{currency(selectedInvoiceForPrint.totalAmount)}</p><p className="mt-1 text-xs text-muted-foreground">Total due at issue incl. previous balances</p><p className="font-bold tabular-nums text-foreground">{currency(selectedInvoiceForPrint.totalDueAtIssue ?? selectedInvoiceForPrint.totalAmount)}</p><StatusBadge value={selectedInvoiceForPrint.status} /></div>
             </div>
-            <div className="grid gap-x-6 gap-y-4 py-4 sm:grid-cols-2">
+            <div className="invoice-print-meta grid gap-x-6 gap-y-4 py-4 sm:grid-cols-2">
               <div><p className="text-xs uppercase tracking-wide text-muted-foreground">Student</p><p className="mt-1 font-semibold text-foreground">{studentName(selectedInvoiceForPrint.student)}</p><p className="mt-1 text-xs text-muted-foreground">Admission no. {selectedInvoiceForPrint.student?.admissionNumber || "—"}</p></div>
               <div><p className="text-xs uppercase tracking-wide text-muted-foreground">Class</p><p className="mt-1 font-semibold text-foreground">{selectedInvoiceForPrint.class?.name || "Class not recorded"}</p></div>
               <div><p className="text-xs uppercase tracking-wide text-muted-foreground">Fee structure</p><p className="mt-1 font-semibold text-foreground">{selectedInvoiceForPrint.feeStructure?.name || "Fee bill"}</p></div>
@@ -957,9 +996,8 @@ export function AccountantPortalWorkspace({
               <div><p className="text-xs uppercase tracking-wide text-muted-foreground">Due date</p><p className="mt-1 font-semibold text-foreground">{dateLabel(selectedInvoiceForPrint.dueDate)}</p></div>
             </div>
             {selectedInvoiceForPrint.carryForwards?.length ? <section className="rounded-xl border border-warning/30 bg-warning/5 p-4"><h3 className="text-sm font-semibold text-foreground">Previous balance brought forward</h3><p className="mt-1 text-xs leading-5 text-muted-foreground">Amounts below are snapshots from earlier invoices. Those original invoices remain open; this section does not create a second charge.</p><div className="mt-3 space-y-2">{selectedInvoiceForPrint.carryForwards.map((carry) => <div key={carry.id} className="grid grid-cols-[1fr_auto] gap-3 text-sm"><span className="text-foreground">{carry.sourceBillNumber} · {[carry.sourceAcademicYearName,carry.sourceTermName].filter(Boolean).join(" / ") || "Earlier term"}</span><span className="font-semibold tabular-nums">{currency(carry.amount)}</span></div>)}</div><div className="mt-3 flex items-center justify-between border-t border-border pt-3 text-sm font-semibold"><span>Total of prior-balance snapshots</span><span className="tabular-nums">{currency(selectedInvoiceForPrint.previousBalanceTotal ?? "0.00")}</span></div></section> : null}
-            {selectedInvoiceForPrint.items?.length ? <div className="py-4"><h3 className="mb-2 text-sm font-semibold text-foreground">Fee items</h3><div className="overflow-x-auto"><table className="w-full min-w-[520px] text-left text-sm"><thead><tr className="border-b border-border text-xs text-muted-foreground"><th className="py-2 pr-3">Description</th><th className="px-2 py-2 text-right">Qty</th><th className="px-2 py-2 text-right">Unit amount</th><th className="px-2 py-2 text-right">Total</th><th className="pl-2 py-2 text-right">Discount</th></tr></thead><tbody>{selectedInvoiceForPrint.items.map(item => <tr key={item.id} className="border-b border-border/70 last:border-0"><td className="py-2 pr-3 text-foreground">{item.description}</td><td className="px-2 py-2 text-right tabular-nums">{item.quantity}</td><td className="px-2 py-2 text-right tabular-nums">{currency(item.amount)}</td><td className="px-2 py-2 text-right font-medium tabular-nums">{currency(item.totalAmount)}</td><td className="pl-2 py-2 text-right tabular-nums text-success">{Number(item.discountAmount ?? 0) > 0 ? "−" + currency(item.discountAmount ?? 0) : "—"}</td></tr>)}</tbody></table></div></div> : null}
-            <div className="border-y border-border py-4">{Number(selectedInvoiceForPrint.discountAmount ?? 0) > 0 && <><div className="grid grid-cols-[1fr_auto] gap-3 py-2 text-sm"><span className="text-muted-foreground">Original fees</span><span className="font-medium tabular-nums text-foreground">{currency(selectedInvoiceForPrint.grossAmount ?? selectedInvoiceForPrint.totalAmount)}</span></div>{selectedInvoiceForPrint.concessions?.map((concession) => <div key={concession.id} className="grid grid-cols-[1fr_auto] gap-3 py-1 text-sm"><span className="text-success">{concession.label}</span><span className="font-medium tabular-nums text-success">−{currency(concession.amount)}</span></div>)}<div className="grid grid-cols-[1fr_auto] gap-3 border-t border-border py-2 text-sm"><span className="text-muted-foreground">Discounts & scholarships</span><span className="font-semibold tabular-nums text-success">−{currency(selectedInvoiceForPrint.discountAmount ?? 0)}</span></div></>}<div className="grid grid-cols-[1fr_auto] gap-3 py-2 text-sm"><span className="text-muted-foreground">Current-term charge</span><span className="font-semibold tabular-nums text-foreground">{currency(selectedInvoiceForPrint.totalAmount)}</span></div><div className="grid grid-cols-[1fr_auto] gap-3 py-2 text-sm"><span className="text-muted-foreground">Payments recorded</span><span className="font-semibold tabular-nums text-foreground">{currency(selectedInvoiceForPrint.paidAmount)}</span></div><div className="grid grid-cols-[1fr_auto] gap-3 border-t border-border pt-3 text-base"><span className="font-semibold text-foreground">Current-invoice balance</span><span className="font-bold tabular-nums text-foreground">{currency(selectedInvoiceForPrint.balanceAmount)}</span></div></div><p className="mt-3 text-xs leading-5 text-muted-foreground">Previous-term receivables remain open against their original invoices. The total due at issue is shown for family convenience; payment allocation clears the oldest open invoice first.</p>
-            <p className="mt-4 text-xs leading-5 text-muted-foreground">This invoice summary reflects the saved SchoolHub bill and its recorded line items.</p>
+            {selectedInvoiceForPrint.items?.length ? <div className="invoice-print-items py-4"><h3 className="mb-2 text-sm font-semibold text-foreground">Fee items</h3><div className="overflow-x-auto"><table className="w-full min-w-[520px] text-left text-sm"><thead><tr className="border-b border-border text-xs text-muted-foreground"><th className="py-2 pr-3">Description</th><th className="px-2 py-2 text-right">Qty</th><th className="px-2 py-2 text-right">Unit amount</th><th className="px-2 py-2 text-right">Total</th><th className="pl-2 py-2 text-right">Discount</th></tr></thead><tbody>{selectedInvoiceForPrint.items.map(item => <tr key={item.id} className="border-b border-border/70 last:border-0"><td className="py-2 pr-3 text-foreground">{item.description}</td><td className="px-2 py-2 text-right tabular-nums">{item.quantity}</td><td className="px-2 py-2 text-right tabular-nums">{currency(item.amount)}</td><td className="px-2 py-2 text-right font-medium tabular-nums">{currency(item.totalAmount)}</td><td className="pl-2 py-2 text-right tabular-nums text-success">{Number(item.discountAmount ?? 0) > 0 ? "−" + currency(item.discountAmount ?? 0) : "—"}</td></tr>)}</tbody></table></div></div> : null}
+            <div className="invoice-print-totals border-y border-border py-4">{Number(selectedInvoiceForPrint.discountAmount ?? 0) > 0 && <><div className="grid grid-cols-[1fr_auto] gap-3 py-2 text-sm"><span className="text-muted-foreground">Original fees</span><span className="font-medium tabular-nums text-foreground">{currency(selectedInvoiceForPrint.grossAmount ?? selectedInvoiceForPrint.totalAmount)}</span></div>{selectedInvoiceForPrint.concessions?.map((concession) => <div key={concession.id} className="grid grid-cols-[1fr_auto] gap-3 py-1 text-sm"><span className="text-success">{concession.label}</span><span className="font-medium tabular-nums text-success">−{currency(concession.amount)}</span></div>)}<div className="grid grid-cols-[1fr_auto] gap-3 border-t border-border py-2 text-sm"><span className="text-muted-foreground">Discounts & scholarships</span><span className="font-semibold tabular-nums text-success">−{currency(selectedInvoiceForPrint.discountAmount ?? 0)}</span></div></>}<div className="grid grid-cols-[1fr_auto] gap-3 py-2 text-sm"><span className="text-muted-foreground">Current-term charge</span><span className="font-semibold tabular-nums text-foreground">{currency(selectedInvoiceForPrint.totalAmount)}</span></div><div className="grid grid-cols-[1fr_auto] gap-3 py-2 text-sm"><span className="text-muted-foreground">Payments recorded</span><span className="font-semibold tabular-nums text-foreground">{currency(selectedInvoiceForPrint.paidAmount)}</span></div><div className="grid grid-cols-[1fr_auto] gap-3 border-t border-border pt-3 text-base"><span className="font-semibold text-foreground">Current-invoice balance</span><span className="font-bold tabular-nums text-foreground">{currency(selectedInvoiceForPrint.balanceAmount)}</span></div></div><p className="mt-3 text-xs leading-5 text-muted-foreground">Previous-term receivables remain open against their original invoices. The total due at issue is shown for family convenience; payment allocation clears the oldest open invoice first.</p>
           </section>
           <div className="invoice-print-actions mt-4 flex flex-wrap justify-end gap-2"><ServerExportButton endpoint={`/finance/bills/${encodeURIComponent(selectedInvoiceForPrint.id)}/invoice.pdf`} label="Official PDF" className={buttonSecondary} /><TableExportMenu build={() => ({ title: "Invoice " + selectedInvoiceForPrint.billNumber, headers: ["Field","Value"], rows: [["Invoice",selectedInvoiceForPrint.billNumber],["Student",studentName(selectedInvoiceForPrint.student)],["Admission number",selectedInvoiceForPrint.student?.admissionNumber ?? ""],["Class",selectedInvoiceForPrint.class?.name ?? ""],["Fee structure",selectedInvoiceForPrint.feeStructure?.name ?? ""],["Academic year",selectedInvoiceForPrint.academicYear?.name ?? ""],["Term",selectedInvoiceForPrint.term?.name ?? ""],["Issued",dateLabel(selectedInvoiceForPrint.issuedAt)],["Due date",dateLabel(selectedInvoiceForPrint.dueDate)],["Gross fees (GHS)",Number(selectedInvoiceForPrint.grossAmount ?? selectedInvoiceForPrint.totalAmount)],["Discounts (GHS)",Number(selectedInvoiceForPrint.discountAmount ?? 0)],["Total (GHS)",Number(selectedInvoiceForPrint.totalAmount)],["Paid (GHS)",Number(selectedInvoiceForPrint.paidAmount)],["Balance (GHS)",Number(selectedInvoiceForPrint.balanceAmount)],["Status",selectedInvoiceForPrint.status]], reportInfo: { school: schoolQuery.data?.name, period: [selectedInvoiceForPrint.academicYear?.name, selectedInvoiceForPrint.term?.name].filter(Boolean).join(" · ") } })} /><button type="button" className={buttonPrimary} onClick={() => window.print()}><Printer className="size-4" /> Print / Save PDF</button></div>
         </Modal>
@@ -967,7 +1005,7 @@ export function AccountantPortalWorkspace({
 
       {selectedReceipt && (
         <Modal title="Payment receipt" description="Saved receipt details from the school payment ledger." onClose={() => setSelectedReceipt(null)}>
-          <section className="payment-receipt-print rounded-xl border border-border p-5">
+          <section className="finance-document-print rounded-xl border border-border p-5">
             <div className="mb-5 flex items-center gap-3 border-b border-border pb-4">
               {schoolQuery.data?.logo ? <img src={schoolQuery.data.logo} alt="" className="size-14 rounded-lg object-contain" /> : <div aria-hidden="true" className="flex size-14 items-center justify-center rounded-lg bg-muted text-lg font-bold text-foreground">{(schoolQuery.data?.name ?? "SH").slice(0, 2).toUpperCase()}</div>}
               <div className="min-w-0 flex-1"><p className="font-bold text-foreground">{schoolQuery.data?.name ?? "SchoolHub"}</p><p className="mt-1 text-xs text-muted-foreground">{[schoolQuery.data?.address, schoolQuery.data?.phone, schoolQuery.data?.email].filter(Boolean).join(" · ") || "School finance office"}</p></div>

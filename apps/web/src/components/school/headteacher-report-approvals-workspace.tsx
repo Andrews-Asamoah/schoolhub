@@ -1,3 +1,4 @@
+import { formatPersonName } from "@schoolhub/shared";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ShieldCheck } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
@@ -14,7 +15,7 @@ type HeadQueueRow = {
   /** Your recommendation from the previous version of this report, kept when the batch was regenerated. */
   carriedHeadRemark: string | null;
   average: number | null; position: number | null; classSize: number | null;
-  student: { admissionNumber: string | null; profile: { firstName: string; lastName: string } };
+  student: { admissionNumber: string | null; profile: { firstName: string; otherNames?: string | null; lastName: string } };
   set: { name: string; term: { name: string } };
   subjects: { name: string; grade: string | null; percentage: number }[];
 };
@@ -87,7 +88,7 @@ export function HeadteacherReportApprovalsWorkspace() {
     if (batch && `${row.set.name} · ${row.set.term.name}` !== batch) return false;
     if (className && row.className !== className) return false;
     if (!term) return true;
-    const name = `${row.student.profile.firstName} ${row.student.profile.lastName}`.toLowerCase();
+    const name = formatPersonName(row.student.profile).toLowerCase();
     return name.includes(term) || (row.student.admissionNumber ?? "").toLowerCase().includes(term);
   }).sort((a, b) =>
     a.className.localeCompare(b.className) || (a.position ?? Infinity) - (b.position ?? Infinity)),
@@ -98,7 +99,7 @@ export function HeadteacherReportApprovalsWorkspace() {
     if (row.stage === "APPROVED") recorded.push({ label: `Headteacher${row.headName ? ` (${row.headName})` : ""}`, text: row.headRemark });
     return {
       id: row.id,
-      pupilName: `${row.student.profile.firstName} ${row.student.profile.lastName}`.trim(),
+      pupilName: formatPersonName(row.student.profile),
       admissionNumber: row.student.admissionNumber,
       context: `${row.className} · ${row.set.name} · v${row.version}`,
       average: row.average, position: row.position, classSize: row.classSize,

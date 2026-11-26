@@ -1,3 +1,4 @@
+import { formatPersonName } from "@schoolhub/shared";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ClipboardCheck } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -14,7 +15,7 @@ type QueueRow = {
   average: number | null; position: number | null; classSize: number | null; draftRemark: string | null;
   /** True when draftRemark is the recommendation carried over from a regenerated version, not text typed this time. */
   carriedOver: boolean;
-  student: { admissionNumber: string | null; profile: { firstName: string; lastName: string } };
+  student: { admissionNumber: string | null; profile: { firstName: string; otherNames?: string | null; lastName: string } };
   set: { name: string; term: { name: string } };
   subjects: { name: string; grade: string | null; percentage: number }[];
 };
@@ -95,13 +96,13 @@ export function TeacherReportReviewWorkspace() {
   const rows = useMemo(() => (reports.data ?? []).filter((row) => {
     if (onlyPending && row.stage !== "GENERATED") return false;
     if (!term) return true;
-    const name = `${row.student.profile.firstName} ${row.student.profile.lastName}`.toLowerCase();
+    const name = formatPersonName(row.student.profile).toLowerCase();
     return name.includes(term) || (row.student.admissionNumber ?? "").toLowerCase().includes(term);
   }), [reports.data, onlyPending, term]);
 
   const tableRows: RecommendationTableRow[] = rows.map((row) => ({
     id: row.id,
-    pupilName: `${row.student.profile.firstName} ${row.student.profile.lastName}`.trim(),
+    pupilName: formatPersonName(row.student.profile),
     admissionNumber: row.student.admissionNumber,
     context: `${row.set.name} · ${row.set.term.name} · v${row.version}`,
     average: row.average, position: row.position, classSize: row.classSize,

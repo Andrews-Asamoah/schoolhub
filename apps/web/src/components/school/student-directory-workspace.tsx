@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { useRef, useState } from "react";
 import {
+  formatPersonName,
   createStudentSchema,
   updateStudentRecordSchema,
   type CreateStudentInput,
@@ -236,7 +237,7 @@ export function StudentDirectoryWorkspace() {
           }}
           onClick={() => setViewingId(student.id)}
           className="rounded-md px-2 py-1.5 text-xs font-semibold text-primary hover:bg-primary/10"
-          aria-label={`View profile of ${student.profile.firstName} ${student.profile.lastName}`}
+          aria-label={`View profile of ${formatPersonName(student.profile)}`}
         >
           View
         </button>
@@ -246,20 +247,17 @@ export function StudentDirectoryWorkspace() {
       id: "name",
       header: "Student",
       value: (student) =>
-        `${student.profile.firstName} ${student.profile.lastName}${student.profile.otherNames ? ` ${student.profile.otherNames}` : ""} (${student.studentId})`,
+        `${formatPersonName(student.profile)} (${student.studentId})`,
       cell: (student) => (
         <div className="flex items-center gap-3">
           <UserAvatar
-            name={`${student.profile.firstName} ${student.profile.lastName}`}
+            name={formatPersonName(student.profile)}
             image={student.profile.user?.image}
             className="size-9 text-xs"
           />
           <span className="min-w-0">
             <span className="block font-semibold text-foreground">
-              {student.profile.firstName} {student.profile.lastName}
-              {student.profile.otherNames
-                ? ` ${student.profile.otherNames}`
-                : ""}
+              {formatPersonName(student.profile)}
             </span>
             <span className="block text-[11px] text-muted-foreground">
               {student.studentId}
@@ -307,7 +305,7 @@ export function StudentDirectoryWorkspace() {
                     type="button"
                     disabled={resetLoginMutation.isPending}
                     onClick={() => {
-                      const name = `${student.profile.firstName} ${student.profile.lastName}`;
+                      const name = formatPersonName(student.profile);
                       if (
                         window.confirm(
                           `Issue a new temporary password for ${name}? Their current password will stop working and they will be signed out.`,
@@ -325,7 +323,7 @@ export function StudentDirectoryWorkspace() {
                   type="button"
                   onClick={() => openEdit(student)}
                   className="inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-xs font-semibold text-primary hover:bg-primary/10"
-                  aria-label={`Edit ${student.profile.firstName} ${student.profile.lastName}`}
+                  aria-label={`Edit ${formatPersonName(student.profile)}`}
                 >
                   <SquarePen className="size-3.5" />
                   Edit
@@ -581,7 +579,7 @@ function StudentEditor({
         }
       }
       if (saved.credentials) {
-        const name = `${saved.profile.firstName} ${saved.profile.lastName}`;
+        const name = formatPersonName(saved.profile);
         onIssued([
           { label: `${name} (student)`, credentials: saved.credentials },
           ...(saved.guardianCredentials ?? [])

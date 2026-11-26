@@ -9,6 +9,7 @@ import {
 import { randomUUID } from 'node:crypto';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import {
+  formatPersonName,
   guardianEmailDomain,
   studentEmailDomain,
   studentUsernameBase,
@@ -1165,7 +1166,7 @@ export class StudentsService {
             id: true,
             studentId: true,
             admissionNumber: true,
-            profile: { select: { firstName: true, lastName: true, gender: true } },
+            profile: { select: { firstName: true, otherNames: true, lastName: true, gender: true } },
             house: { select: { id: true, name: true, color: true } },
           },
         },
@@ -1180,7 +1181,7 @@ export class StudentsService {
         isSelf: e.student.id === student.id,
         studentId: e.student.studentId,
         admissionNumber: e.student.admissionNumber,
-        name: `${e.student.profile.firstName} ${e.student.profile.lastName}`.trim(),
+        name: formatPersonName(e.student.profile),
         firstName: e.student.profile.firstName,
         lastName: e.student.profile.lastName,
         house: e.student.house?.name ?? 'No House',

@@ -11,7 +11,7 @@ import {StorageCleanupService} from "../storage/storage-cleanup.service.js";
 const MAX_BYTES=5*1024*1024;
 const managers=new Set<string>(SCHOOL_ADMIN_ROLES);
 const visible={id:true,studentId:true,fromDate:true,toDate:true,reason:true,status:true,version:true,decisionNote:true,reviewedAt:true,createdAt:true,
- attachmentMime:true,attachmentSize:true,student:{select:{profile:{select:{firstName:true,lastName:true}}}}} satisfies Prisma.AttendanceExcuseRequestSelect;
+ attachmentMime:true,attachmentSize:true,student:{select:{profile:{select:{firstName:true, otherNames: true,lastName:true}}}}} satisfies Prisma.AttendanceExcuseRequestSelect;
 
 @Injectable()
 export class ExcuseRequestsService {

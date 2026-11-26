@@ -1,5 +1,8 @@
-import { Injectable, NotFoundException, BadRequestException } from "@nestjs/common";
+import { Injectable, Logger, NotFoundException, BadRequestException } from "@nestjs/common";
 import { Prisma, type School } from "@prisma/client";
+import { formatPersonName } from "@schoolhub/shared";
+import { MAX_REPORT_IMAGE_INPUT_BYTES, reportImageDataUrl } from "../assessments/report-images.js";
+import { R2Service } from "../storage/r2.service.js";
 import { jsPDF } from "jspdf";
 import { autoTable } from "jspdf-autotable";
 import { decryptPayrollDetails } from "./payroll/payroll-details-crypto.js";
@@ -49,8 +52,8 @@ function dateRange(from?: string, to?: string, dateOnly = false): DateRange | un
 function asNumber(value: Prisma.Decimal | null | undefined): number | null {
   return value == null ? null : value.toNumber();
 }
-function studentName(student: { profile?: { firstName?: string | null; lastName?: string | null } | null; admissionNumber?: string | null } | null | undefined) {
-  const name = [student?.profile?.firstName, student?.profile?.lastName].filter(Boolean).join(" ").trim();
+function studentName(student: { profile?: { firstName?: string | null; otherNames?: string | null; lastName?: string | null } | null; admissionNumber?: string | null } | null | undefined) {
+  const name = formatPersonName(student?.profile);
   return name || student?.admissionNumber || "Unidentified student";
 }
 function formatMoney(value: Prisma.Decimal): string {
@@ -109,7 +112,24 @@ function primaryRgb(color: string | null | undefined): [number, number, number] 
 
 @Injectable()
 export class FinanceExportsService {
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly logger = new Logger(FinanceExportsService.name);
+
+  constructor(private readonly prisma: PrismaService, private readonly r2: R2Service) {}
+
+  private async schoolLogo(school: School): Promise<string | null> {
+    if (!school.logo) return null;
+    const key = this.r2.keyFromUrl(school.logo);
+    if (!key?.startsWith(this.r2.keys.schoolPrefix(school.id))) return null;
+    try {
+      const bytes = await this.r2.read(key, MAX_REPORT_IMAGE_INPUT_BYTES);
+      const logo = await reportImageDataUrl(bytes, { maxWidth: 54, maxHeight: 54, format: "png" });
+      if (logo) return logo;
+    } catch {
+      // A storage outage must not prevent a school from issuing its financial documents.
+    }
+    this.logger.warn(`Could not embed the logo for school ${school.id}.`);
+    return null;
+  }
 
   private async school(schoolId: string): Promise<School> {
     const school = await this.prisma.client.school.findUnique({ where: { id: schoolId } });
@@ -162,7 +182,7 @@ export class FinanceExportsService {
         where: { schoolId: context.schoolId, ...(range ? { issuedAt: range } : {}) },
         orderBy: [{ issuedAt: "asc" }, { id: "asc" }],
         include: {
-          student: { select: { admissionNumber: true, profile: { select: { firstName: true, lastName: true } } } },
+          student: { select: { admissionNumber: true, profile: { select: { firstName: true, otherNames: true, lastName: true } } } },
           class: { select: { name: true } },
           academicYear: { select: { name: true } },
           term: { select: { name: true } },
@@ -189,7 +209,7 @@ export class FinanceExportsService {
         where: { schoolId: context.schoolId, ...(range ? { paymentDate: range } : {}) },
         orderBy: [{ paymentDate: "asc" }, { id: "asc" }],
         include: {
-          student: { select: { admissionNumber: true, profile: { select: { firstName: true, lastName: true } } } },
+          student: { select: { admissionNumber: true, profile: { select: { firstName: true, otherNames: true, lastName: true } } } },
           bill: { select: { billNumber: true } },
         },
       });
@@ -335,18 +355,27 @@ export class FinanceExportsService {
   private async pdfDocument(school: School, title: string, reference: string) {
     const doc = new jsPDF({ orientation: "portrait", unit: "pt", format: "a4" });
     const pageWidth = doc.internal.pageSize.getWidth();
+    const logo = await this.schoolLogo(school);
+    const headerTextWidth = pageWidth - (logo ? 142 : 72);
     const [red, green, blue] = primaryRgb(school.primaryColor);
     doc.setFillColor(red, green, blue);
     doc.rect(0, 0, pageWidth, 78, "F");
+    if (logo) {
+      const { width, height } = doc.getImageProperties(logo);
+      const scale = Math.min(46 / width, 46 / height);
+      doc.setFillColor(255, 255, 255);
+      doc.roundedRect(pageWidth - 90, 12, 54, 54, 5, 5, "F");
+      doc.addImage(logo, "PNG", pageWidth - 63 - width * scale / 2, 39 - height * scale / 2, width * scale, height * scale);
+    }
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(16);
     doc.setFont("helvetica", "bold");
-    doc.text(school.name, 36, 30, { maxWidth: pageWidth - 72 });
+    doc.text(school.name, 36, 25, { maxWidth: headerTextWidth });
     doc.setFont("helvetica", "normal");
     doc.setFontSize(8);
     const contact = [school.code, school.address, school.phone, school.email, school.website].filter(Boolean).join(" · ");
-    doc.text(contact || "School finance office", 36, 47, { maxWidth: pageWidth - 125 });
-    if (school.motto) doc.text(school.motto, 36, 62, { maxWidth: pageWidth - 125 });
+    doc.text(contact || "School finance office", 36, 48, { maxWidth: headerTextWidth });
+    if (school.motto) doc.text(school.motto, 36, 65, { maxWidth: headerTextWidth });
     doc.setTextColor(25, 35, 50);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(14);
@@ -385,7 +414,7 @@ export class FinanceExportsService {
     const bill = await this.prisma.client.bill.findFirst({
       where: { id: billId, schoolId },
       include: {
-        student: { select: { id: true, admissionNumber: true, profile: { select: { firstName: true, lastName: true } } } },
+        student: { select: { id: true, admissionNumber: true, profile: { select: { firstName: true, otherNames: true, lastName: true } } } },
         class: { select: { name: true } },
         academicYear: { select: { name: true } },
         term: { select: { name: true } },
@@ -400,26 +429,32 @@ export class FinanceExportsService {
   async invoicePdf(context: FinanceExportContext, billId: string): Promise<FinanceExportFile> {
     const school = await this.school(context.schoolId);
     const bill = await this.findBill(context.schoolId, billId);
-    const { doc } = await this.pdfDocument(school, "Student invoice", bill.billNumber);
-    const student = studentName(bill.student);
-    doc.setFontSize(10);
-    doc.text("Student: " + student, 36, 150);
-    doc.text("Admission number: " + (bill.student.admissionNumber ?? "—"), 36, 166);
-    doc.text("Class: " + (bill.class?.name ?? "—"), 36, 182);
-    doc.text("Academic period: " + bill.academicYear.name + (bill.term?.name ? " · " + bill.term.name : ""), 36, 198);
-    doc.text("Issued: " + isoDay(bill.issuedAt) + "    Due date: " + isoDay(bill.dueDate), 36, 214);
+    const { doc, pageWidth } = await this.pdfDocument(school, "Student invoice", bill.billNumber);
+    const margin = { left: 36, right: 36, bottom: 40 };
+    const columnWidth = (pageWidth - margin.left - margin.right) / 2;
+    const tableEnd = () => (doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY ?? 136;
     autoTable(doc, {
-      startY: 230,
+      startY: 136,
+      body: [
+        ["Student: " + studentName(bill.student), "Admission number: " + (bill.student.admissionNumber ?? "—")],
+        ["Class: " + (bill.class?.name ?? "—"), "Academic period: " + bill.academicYear.name + (bill.term?.name ? " · " + bill.term.name : "")],
+        ["Issued: " + isoDay(bill.issuedAt), "Due date: " + (isoDay(bill.dueDate) || "—")],
+      ],
+      theme: "plain",
+      styles: { fontSize: 9, cellPadding: { top: 3, bottom: 3, left: 0, right: 6 } },
+      columnStyles: { 0: { cellWidth: columnWidth }, 1: { cellWidth: columnWidth } },
+      margin,
+    });
+    autoTable(doc, {
+      startY: tableEnd() + 10,
       head: [["Fee item", "Qty", "Unit amount", "Line total", "Discount"]],
       body: bill.items.map((item) => [
         item.description, String(item.quantity), formatMoney(item.amount), formatMoney(item.totalAmount), formatMoney(item.discountAmount),
       ]),
       styles: { fontSize: 8, cellPadding: 5 },
       headStyles: { fillColor: primaryRgb(school.primaryColor) },
-      margin: { left: 36, right: 36, bottom: 46 },
+      margin,
     });
-    let y = (doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY ?? 240;
-    y += 22;
     const totals = [
       ["Gross fees", formatMoney(bill.grossAmount)],
       ["Discounts and scholarships", formatMoney(bill.discountAmount)],
@@ -427,12 +462,18 @@ export class FinanceExportsService {
       ["Payments recorded", formatMoney(bill.paidAmount)],
       ["Balance due", formatMoney(bill.balanceAmount)],
     ];
-    autoTable(doc, { startY: y, body: totals, theme: "plain", styles: { fontSize: 9, cellPadding: 3 }, columnStyles: { 1: { halign: "right" } }, margin: { left: 210, right: 36, bottom: 46 } });
-    y = (doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY ?? y;
-    doc.setFontSize(8);
-    doc.text("Amount due in words: " + amountInWords(bill.balanceAmount), 36, y + 20, { maxWidth: 520 });
-    doc.text("Status: " + bill.status, 36, y + 34);
-    doc.text("Invoice reflects the saved SchoolHub billing records.", 36, y + 48, { maxWidth: 520 });
+    autoTable(doc, {
+      startY: tableEnd() + 12, body: totals, theme: "plain", pageBreak: "avoid",
+      styles: { fontSize: 9, cellPadding: 3 }, columnStyles: { 1: { halign: "right" } },
+      margin: { ...margin, left: pageWidth / 2, bottom: 70 },
+    });
+    autoTable(doc, {
+      startY: tableEnd() + 9,
+      body: [["Amount due in words: " + amountInWords(bill.balanceAmount)], ["Status: " + bill.status]],
+      theme: "plain", pageBreak: "avoid",
+      styles: { fontSize: 8, cellPadding: { top: 2, bottom: 2, left: 0, right: 0 } },
+      margin,
+    });
     this.finishPdf(doc, "Invoice", false, ["CANCELLED", "WAIVED"].includes(bill.status) ? "VOID" : undefined);
     const buffer = this.pdfBuffer(doc);
     await this.auditExport(context, "invoice.pdf", bill.items.length + 1, {});
@@ -444,7 +485,7 @@ export class FinanceExportsService {
     const payment = await this.prisma.client.payment.findFirst({
       where: { id: paymentId, schoolId: context.schoolId },
       include: {
-        student: { select: { admissionNumber: true, profile: { select: { firstName: true, lastName: true } } } },
+        student: { select: { admissionNumber: true, profile: { select: { firstName: true, otherNames: true, lastName: true } } } },
         bill: { select: { billNumber: true } },
         recordedBy: { select: { name: true, email: true } },
       },
@@ -477,7 +518,7 @@ export class FinanceExportsService {
     const school = await this.school(context.schoolId);
     const student = await this.prisma.client.student.findFirst({
       where: { id: studentId, schoolId: context.schoolId },
-      select: { id: true, admissionNumber: true, profile: { select: { firstName: true, lastName: true } } },
+      select: { id: true, admissionNumber: true, profile: { select: { firstName: true, otherNames: true, lastName: true } } },
     });
     if (!student) throw new NotFoundException("Student not found.");
     const [bills, payments] = await Promise.all([

@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import {
+  formatPersonName,
   createClubSchema,
   updateClubSchema,
   addClubMemberSchema,
@@ -37,7 +38,7 @@ interface ClubMemberRecord {
     id: string;
     studentId: string;
     admissionNumber: string;
-    profile: { firstName: string; lastName: string; gender?: string | null };
+    profile: { firstName: string; otherNames?: string | null; lastName: string; gender?: string | null };
     house: { id: string; name: string; color?: string | null } | null;
   };
 }
@@ -71,6 +72,7 @@ interface StudentOption {
   studentId: string;
   admissionNumber: string;
   firstName: string;
+  otherNames?: string | null;
   lastName: string;
   currentClass?: { name: string } | null;
 }
@@ -632,7 +634,7 @@ export function ClubsWorkspace() {
                   <SelectTrigger aria-label="Select student to enroll" className="h-9 min-w-48 flex-1"><SelectValue placeholder="Select student to enroll..." /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="__none__">Select student to enroll...</SelectItem>
-                    {(studentsQuery.data ?? []).map((student) => <SelectItem key={student.id} value={student.id}>{student.firstName} {student.lastName} ({student.admissionNumber || student.studentId})</SelectItem>)}
+                    {(studentsQuery.data ?? []).map((student) => <SelectItem key={student.id} value={student.id}>{formatPersonName(student)} ({student.admissionNumber || student.studentId})</SelectItem>)}
                   </SelectContent>
                 </Select>
 
@@ -689,7 +691,7 @@ export function ClubsWorkspace() {
                         </div>
                         <div>
                           <p className="font-bold text-foreground">
-                            {m.student.profile.firstName} {m.student.profile.lastName}
+                            {formatPersonName(m.student.profile)}
                           </p>
                           <p className="text-[10px] text-muted-foreground/70">
                             {m.student.admissionNumber || m.student.studentId} • {m.student.house?.name ?? "No House"}
