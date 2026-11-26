@@ -4,6 +4,7 @@
 
 model School {
   attendanceExcuseRequests AttendanceExcuseRequest[]
+  payrollPaymentDetails PayrollPaymentDetails[]
   studentDeletionRequests StudentDeletionRequest[]
   schoolRolloverBatches AcademicRolloverBatch[] @relation("AcademicRolloverBatch_school")
   financeBankReconciliations FinanceBankReconciliation[] @relation("FinanceBankReconciliation_school")
@@ -266,6 +267,8 @@ model Teacher {
   payslips              Payslip[]
   timetableEntries      TimetableEntry[]
 
+  payrollPaymentDetails PayrollPaymentDetails?
+
   // Scoped to Academic Year
   assignments          TeacherAssignment[]
   assessmentExtensions AssessmentExtension[]
@@ -310,6 +313,8 @@ model Staff {
   department Department? @relation("StaffDepartment", fields: [departmentId], references: [id])
   documents  Document[]
   payslips   Payslip[]
+
+  payrollPaymentDetails PayrollPaymentDetails?
 
   // Scoped to Academic Year
   assignments StaffAssignment[]

@@ -121,6 +121,8 @@ describe("finance controller routes", () => {
       r.route.includes("exports/payroll.xlsx") ||
       r.route.includes("exports/salaries.xlsx") ||
       r.route.includes("payslips.pdf") ||
+      r.route.includes("tier-2.xlsx") ||
+      r.route.includes("payroll/payment-details") ||
       r.route.includes("payslips/:payslipId.pdf") ||
       r.route === '"payroll"' ||
       r.route === '"payroll/salaries"'
@@ -134,6 +136,8 @@ describe("finance controller routes", () => {
       r.route.includes("exports/payroll.xlsx") ||
       r.route.includes("exports/salaries.xlsx") ||
       r.route.includes("payslips.pdf") ||
+      r.route.includes("tier-2.xlsx") ||
+      r.route.includes("payroll/payment-details") ||
       r.route.includes("payslips/:payslipId.pdf") ||
       r.route === '"payroll"' ||
       r.route === '"payroll/salaries"'
@@ -142,7 +146,7 @@ describe("finance controller routes", () => {
     }
   });
   it("protects the payroll and salary JSON endpoints with explicit school-role checks", () => {
-    for (const name of ["listPayrollRecords", "listPayrollSalaryRegister"]) {
+    for (const name of ["listPayrollRecords", "listPayrollSalaryRegister", "getPayrollPaymentDetails", "updatePayrollPaymentDetails", "importPayrollSalaries", "exportPayrollTier2"]) {
       const method = controllerSource.slice(controllerSource.indexOf(name + "("), controllerSource.indexOf("\n  }", controllerSource.indexOf(name + "(")) + 4);
       expect(method).toContain("this.assertPayrollExportAllowed(user, schoolRole)");
     }
