@@ -236,6 +236,20 @@ describe.skipIf(!enabled)("bill generation (database)", { timeout: 60_000 }, () 
     expect(student.outstandingBalance.toNumber()).toBe(unpaid.reduce((sum, b) => sum + Number(b.balanceAmount), 0));
   });
 
+  it("finds invoices by a student's full name across profile fields", async () => {
+    const fees = await structure([100]);
+    await generate(fees.id);
+    const target = await prisma.student.findUniqueOrThrow({ where: { id: studentIds[0] } });
+    const profile = await prisma.userProfile.update({
+      where: { id: target.profileId }, data: { otherNames: "Efua" },
+    });
+    const result = await service.listBills(schoolId, {
+      search: `${profile.firstName} Efua ${profile.lastName.toLowerCase()}`,
+    });
+    expect(result.items.length).toBeGreaterThan(0);
+    expect(new Set(result.items.map(bill => bill.studentId))).toEqual(new Set([target.id]));
+  });
+
   it("excludes optional fee items unless explicitly selected", async () => {
     const defaultFees = await structureWithOptionalItem();
     await generate(defaultFees.id);
