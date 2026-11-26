@@ -805,6 +805,48 @@ export class FinanceService {
     return this.prisma.client.siblingDiscountPolicy.update({ where: { id: policyId }, data: { isActive } });
   }
 
+  async searchScholarshipStudents(schoolId: string, search: string) {
+    if (!search) return { students: [], hasMore: false };
+
+    const students = this.prisma.client.student;
+    const where = { schoolId, status: "ACTIVE" as const, deletedAt: null };
+    const select = {
+      id: true,
+      admissionNumber: true,
+      studentId: true,
+      profile: { select: { firstName: true, otherNames: true, lastName: true } },
+    } satisfies Prisma.StudentSelect;
+    const escapeLike = (value: string) => value.replace(/[\\%_]/g, character => "\\" + character);
+    const admissionMatches = await students.findMany({
+      where: { ...where, admissionNumber: { equals: escapeLike(search), mode: "insensitive" } },
+      orderBy: { admissionNumber: "asc" },
+      take: 13,
+      select,
+    });
+    if (admissionMatches.length) {
+      return { students: admissionMatches.slice(0, 12), hasMore: admissionMatches.length > 12 };
+    }
+
+    const matches = await students.findMany({
+      where: {
+        ...where,
+        OR: [
+          { admissionNumber: { contains: escapeLike(search), mode: "insensitive" } },
+          { AND: search.split(/\s+/).map(word => {
+            const nameMatch = { contains: escapeLike(word), mode: "insensitive" as const };
+            return { profile: { OR: [
+              { firstName: nameMatch }, { otherNames: nameMatch }, { lastName: nameMatch },
+            ] } };
+          }) },
+        ],
+      },
+      orderBy: [{ profile: { firstName: "asc" } }, { profile: { lastName: "asc" } }, { id: "asc" }],
+      take: 13,
+      select,
+    });
+    return { students: matches.slice(0, 12), hasMore: matches.length > 12 };
+  }
+
   async createStudentScholarship(
     schoolId: string,
     createdById: string,
