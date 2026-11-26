@@ -1,9 +1,14 @@
 import { detailTabButton } from "@/components/detailTabButton";
 import { act, render, screen, fireEvent } from "@testing-library/react-native";
+import { router } from "expo-router";
 import { Keyboard, StyleSheet } from "react-native";
 import { PortalTabBar, type TabBarProps } from "@/components/PortalTabBar";
 import { TabBarInsetProvider, useTabBarInset } from "@/components/TabBarInset";
 import { FontPreviewContext, Text } from "@/components/Typography";
+jest.mock("expo-router", () => ({ router: { prefetch: jest.fn() } }));
+jest.mock("expo-haptics", () => ({
+  selectionAsync: jest.fn().mockResolvedValue(undefined),
+}));
 jest.mock("react-native", () => {
   const native = jest.requireActual("react-native");
   return Object.create(native, {
@@ -66,6 +71,8 @@ test("tab bar hides hidden routes, announces badges and honours prevented naviga
     </TabBarInsetProvider>,
   );
   expect(screen.queryByRole("tab", { name: "Hidden" })).toBeNull();
+  expect(screen.getByTestId("portal-tab-row")).toBeVisible();
+  expect(screen.queryByTestId("portal-tab-strip")).toBeNull();
   expect(screen.getByText("Schedule")).toBeVisible();
   expect(screen.getByText("Home")).toBeVisible();
   expect(
@@ -143,7 +150,8 @@ test("the tab strip keeps long labels available at 200 percent text size", async
       <PortalTabBar {...props} />
     </FontPreviewContext.Provider>,
   );
-  expect(screen.getByTestId("portal-tab-strip").props.scrollEnabled).toBe(true);
+  expect(screen.getByTestId("portal-tab-strip")).toBeVisible();
+  expect(screen.queryByTestId("portal-tab-row")).toBeNull();
   expect(screen.getByText("Attendance")).toBeVisible();
   expect(screen.getByText("Attendance").props.numberOfLines).toBeUndefined();
 });
@@ -184,5 +192,63 @@ test("opening the keyboard hides navigation and releases its content inset", asy
     expect(screen.getByTestId("portal-tab-bar")).toBeVisible();
   } finally {
     subscribe.mockRestore();
+  }
+});
+
+test("the home tab preloads one destination during idle time", async () => {
+  jest.useFakeTimers();
+  const requestIdle = globalThis.requestIdleCallback;
+  const cancelIdle = globalThis.cancelIdleCallback;
+  const idle = jest.fn<number, Parameters<typeof requestIdleCallback>>();
+  idle.mockReturnValue(1);
+  const cancel = jest.fn<void, Parameters<typeof cancelIdleCallback>>();
+  globalThis.requestIdleCallback = idle;
+  globalThis.cancelIdleCallback = cancel;
+  const prefetch = jest.mocked(router.prefetch);
+  const props = {
+    state: {
+      index: 0,
+      routes: [
+        { name: "index", key: "home" },
+        { name: "family", key: "family" },
+      ],
+    },
+    descriptors: {},
+    emitter: { emit: jest.fn() },
+    navigateToTab: jest.fn(),
+  } as unknown as TabBarProps;
+  const bar = (index: number) => (
+    <PortalTabBar
+      {...props}
+      state={{ ...props.state, index }}
+      preloadFromHome="/(guardian)/family"
+    />
+  );
+  try {
+    const view = await render(bar(0));
+    await act(async () => jest.advanceTimersByTime(400));
+    expect(prefetch).not.toHaveBeenCalled();
+
+    await view.rerender(bar(1));
+    expect(cancel).toHaveBeenCalledWith(1);
+    await view.rerender(bar(0));
+    await act(async () => jest.advanceTimersByTime(400));
+    const preload = idle.mock.lastCall?.[0];
+    expect(preload).toBeDefined();
+    await act(async () =>
+      preload?.({ didTimeout: false, timeRemaining: () => 16 }),
+    );
+    expect(prefetch).toHaveBeenCalledTimes(1);
+    expect(prefetch).toHaveBeenCalledWith("/(guardian)/family");
+
+    await view.rerender(bar(1));
+    await view.rerender(bar(0));
+    await act(async () => jest.advanceTimersByTime(400));
+    expect(idle).toHaveBeenCalledTimes(2);
+    await view.unmount();
+  } finally {
+    globalThis.requestIdleCallback = requestIdle;
+    globalThis.cancelIdleCallback = cancelIdle;
+    jest.useRealTimers();
   }
 });

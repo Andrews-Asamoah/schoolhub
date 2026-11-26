@@ -33,12 +33,6 @@ export const getTeaching = defineEndpoint({
   roles: ["teacher"],
   response: teachingSchema,
 });
-export const getTeacherClasses = defineEndpoint({
-  method: "GET",
-  path: "/academics/classes",
-  roles: ["teacher"],
-  response: z.array(named),
-});
 export const getTeacherTimetable = defineEndpoint({
   method: "GET",
   path: "/timetable/mine",

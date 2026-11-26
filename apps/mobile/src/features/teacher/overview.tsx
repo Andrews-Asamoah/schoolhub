@@ -2,7 +2,6 @@ import { router, type Href, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
 import {
   getTeaching,
-  getTeacherClasses,
   getTeacherTimetable,
   getRegisterGaps,
   getRoster,
@@ -124,58 +123,46 @@ export function TeacherClasses() {
   const teaching = useTeacherQuery(["overview"], (signal) =>
     getTeaching({ signal }),
   );
-  const catalogue = useTeacherQuery(["classes"], (signal) =>
-    getTeacherClasses({ signal }),
-  );
   const [search, setSearch] = useState("");
+  const normalizedSearch = search.trim().toLowerCase();
   const classes =
-    teaching.data?.classes.filter(
-      (c) =>
-        c.name.toLowerCase().includes(search.toLowerCase()) &&
-        catalogue.data?.some((row) => row.id === c.id),
+    teaching.data?.classes.filter((c) =>
+      c.name.toLowerCase().includes(normalizedSearch),
     ) ?? [];
   return (
-    <TeacherPage
-      title="Classes"
-      query={{
-        isRefetching: teaching.isRefetching || catalogue.isRefetching,
-        refetch: () => Promise.all([teaching.refetch(), catalogue.refetch()]),
-      }}
-    >
+    <TeacherPage title="Classes" query={teaching}>
       <SearchBar label="Search classes" value={search} onChange={setSearch} />
-      <QueryState query={teaching}>
-        <QueryState query={catalogue} empty={!classes.length}>
-          {classes.map((c) => (
-            <Panel key={c.id} title={c.name}>
-              <Copy>
-                {c.studentCount} pupils ·{" "}
-                {c.isClassTeacher ? "Class teacher" : "Subject teacher"}
-              </Copy>
-              <Copy>
-                {c.subjects.map((s) => s.name).join(", ") ||
-                  "Class register and roster"}
-              </Copy>
-              <LinkButton
-                label={`View ${c.name} roster`}
-                href={
-                  {
-                    pathname: "/(teacher)/teacher-roster",
-                    params: { classId: c.id },
-                  } as Href
-                }
-              />
-              <LinkButton
-                label={c.isClassTeacher ? "Mark register" : "View register"}
-                href={
-                  {
-                    pathname: "/(teacher)/teacher-register",
-                    params: { classId: c.id },
-                  } as Href
-                }
-              />
-            </Panel>
-          ))}
-        </QueryState>
+      <QueryState query={teaching} empty={!classes.length}>
+        {classes.map((c) => (
+          <Panel key={c.id} title={c.name}>
+            <Copy>
+              {c.studentCount} pupils ·{" "}
+              {c.isClassTeacher ? "Class teacher" : "Subject teacher"}
+            </Copy>
+            <Copy>
+              {c.subjects.map((s) => s.name).join(", ") ||
+                "Class register and roster"}
+            </Copy>
+            <LinkButton
+              label={`View ${c.name} roster`}
+              href={
+                {
+                  pathname: "/(teacher)/teacher-roster",
+                  params: { classId: c.id },
+                } as Href
+              }
+            />
+            <LinkButton
+              label={c.isClassTeacher ? "Mark register" : "View register"}
+              href={
+                {
+                  pathname: "/(teacher)/teacher-register",
+                  params: { classId: c.id },
+                } as Href
+              }
+            />
+          </Panel>
+        ))}
       </QueryState>
     </TeacherPage>
   );
