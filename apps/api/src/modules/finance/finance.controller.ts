@@ -204,6 +204,16 @@ export class FinanceController {
     return this.financeService.setSiblingDiscountPolicyActive(school.id, policyId, body.isActive);
   }
 
+  @Get("scholarships/students")
+  @Roles(...FINANCE_READ_ROLES)
+  @Header("Cache-Control", "private, no-store")
+  searchScholarshipStudents(
+    @CurrentSchool() school: School,
+    @Query("search", new ZodValidationPipe(z.string().trim().max(100).default(""))) search: string,
+  ) {
+    return this.financeService.searchScholarshipStudents(school.id, search);
+  }
+
   @Post("scholarships")
   @Roles(...FINANCE_WRITE_ROLES)
   createStudentScholarship(
