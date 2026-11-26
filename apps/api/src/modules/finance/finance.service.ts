@@ -47,6 +47,11 @@ type StudentStatementQuery = {
   termId?: string;
 };
 
+type ScholarshipAwardInput = {
+  name: string; valueType: "PERCENTAGE" | "FIXED"; value: number;
+  reason?: string; academicYearId?: string; termId?: string; startDate?: string; endDate?: string;
+};
+
 const BILL_STATUSES = ["PENDING", "PARTIALLY_PAID", "PAID", "OVERDUE", "CANCELLED", "WAIVED"] as const;
 const PAYMENT_METHODS = ["CASH", "BANK_TRANSFER", "CHEQUE", "MOBILE_MONEY", "CARD", "ONLINE", "OTHER"] as const;
 
@@ -847,50 +852,77 @@ export class FinanceService {
     return { students: matches.slice(0, 12), hasMore: matches.length > 12 };
   }
 
-  async createStudentScholarship(
-    schoolId: string,
-    createdById: string,
-    input: {
-      studentId: string; name: string; valueType: "PERCENTAGE" | "FIXED"; value: number;
-      reason?: string; academicYearId?: string; termId?: string; startDate?: string; endDate?: string;
-    },
-  ) {
-    const [student, academicYear, term] = await Promise.all([
-      this.prisma.client.student.findFirst({
-        where: { id: input.studentId, schoolId, deletedAt: null, status: "ACTIVE" },
-        select: { id: true },
-      }),
-      input.academicYearId
-        ? this.prisma.client.academicYear.findFirst({ where: { id: input.academicYearId, schoolId }, select: { id: true } })
-        : Promise.resolve(null),
-      input.termId
-        ? this.prisma.client.term.findFirst({ where: { id: input.termId, academicYear: { schoolId } }, select: { id: true, academicYearId: true } })
-        : Promise.resolve(null),
-    ]);
-    if (!student) throw new NotFoundException("Active student not found in this school.");
-    if (input.academicYearId && !academicYear) throw new BadRequestException("The selected academic year does not belong to this school.");
-    if (input.termId && !term) throw new BadRequestException("The selected term does not belong to this school.");
-    if (term && input.academicYearId && term.academicYearId !== input.academicYearId) {
-      throw new BadRequestException("The selected term belongs to a different academic year.");
+  async createStudentScholarship(schoolId: string, createdById: string, input: ScholarshipAwardInput & { studentId: string }) {
+    const [award] = await this.saveScholarshipAwards(schoolId, createdById, input, [input.studentId], false);
+    return award!;
+  }
+
+  async createStudentScholarships(schoolId: string, createdById: string, input: ScholarshipAwardInput & { studentIds: string[] }) {
+    const studentIds = [...new Set(input.studentIds)];
+    if (!studentIds.length || studentIds.length > 100) {
+      throw new BadRequestException("Select between 1 and 100 students.");
     }
+    const awards = await this.saveScholarshipAwards(schoolId, createdById, input, studentIds, true);
+    return { awardedCount: awards.length };
+  }
+
+  private async saveScholarshipAwards(
+    schoolId: string, createdById: string, input: ScholarshipAwardInput, studentIds: string[], auditBatch: boolean,
+  ) {
     if (input.valueType === "PERCENTAGE" && input.value > 100) throw new BadRequestException("Scholarship percentage cannot exceed 100%.");
     if (input.value <= 0) throw new BadRequestException("Scholarship value must be greater than zero.");
-    if (input.startDate && input.endDate && input.startDate > input.endDate) {
+    const startDate = parseIsoDate(input.startDate, "scholarship start date");
+    const endDate = parseIsoDate(input.endDate, "scholarship end date");
+    if (startDate && endDate && startDate > endDate) {
       throw new BadRequestException("The scholarship end date must be on or after its start date.");
     }
-    return this.prisma.client.studentScholarship.create({
-      data: {
-        schoolId, createdById, studentId: student.id, name: input.name.trim(),
-        valueType: input.valueType, value: new Prisma.Decimal(input.value),
-        reason: input.reason?.trim() || null, academicYearId: academicYear?.id ?? term?.academicYearId ?? null,
-        termId: term?.id ?? null,
-        startDate: input.startDate ? new Date(input.startDate) : null,
-        endDate: input.endDate ? new Date(input.endDate) : null,
-      },
-      include: {
-        student: { select: { id: true, admissionNumber: true, profile: { select: { firstName: true, lastName: true } } } },
-      },
-    });
+
+    return withSerializableRetry(() => this.prisma.client.$transaction(async tx => {
+      const [students, academicYear, term] = await Promise.all([
+        tx.student.findMany({
+          where: { id: { in: studentIds }, schoolId, deletedAt: null, status: "ACTIVE" },
+          select: { id: true },
+        }),
+        input.academicYearId
+          ? tx.academicYear.findFirst({ where: { id: input.academicYearId, schoolId }, select: { id: true } })
+          : Promise.resolve(null),
+        input.termId
+          ? tx.term.findFirst({ where: { id: input.termId, academicYear: { schoolId } }, select: { id: true, academicYearId: true } })
+          : Promise.resolve(null),
+      ]);
+      if (students.length !== studentIds.length) {
+        throw new NotFoundException(auditBatch
+          ? "One or more students are no longer available. Review the selection before saving."
+          : "Active student not found in this school.");
+      }
+      if (input.academicYearId && !academicYear) throw new BadRequestException("The selected academic year does not belong to this school.");
+      if (input.termId && !term) throw new BadRequestException("The selected term does not belong to this school.");
+      if (term && academicYear && term.academicYearId !== academicYear.id) {
+        throw new BadRequestException("The selected term belongs to a different academic year.");
+      }
+
+      const data = {
+        schoolId, createdById, name: input.name.trim(),
+        valueType: input.valueType, value: new Prisma.Decimal(input.value), reason: input.reason?.trim() || null,
+        academicYearId: academicYear?.id ?? term?.academicYearId ?? null, termId: term?.id ?? null,
+        startDate: startDate ?? null, endDate: endDate ?? null,
+      };
+      const awards = await tx.studentScholarship.createManyAndReturn({
+        data: studentIds.map(studentId => ({ ...data, studentId })),
+        include: {
+          student: { select: { id: true, admissionNumber: true, profile: { select: { firstName: true, lastName: true } } } },
+        },
+      });
+      if (auditBatch) {
+        await this.writeAudit(tx, {
+          actorId: createdById, schoolId, action: "CREATE", entityType: "FINANCE POST /finance/scholarships/bulk",
+          entityId: awards[0]!.id,
+          newValues: { ...data, value: data.value.toFixed(2), startDate: input.startDate ?? null, endDate: input.endDate ?? null,
+            awards: awards.map(({ id, studentId }) => ({ id, studentId })) },
+        });
+      }
+      return awards;
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }));
   }
 
   async setStudentScholarshipActive(schoolId: string, scholarshipId: string, isActive: boolean) {

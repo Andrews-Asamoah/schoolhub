@@ -136,6 +136,9 @@ const scholarshipSchema = z.object({
   startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
 });
+const bulkScholarshipSchema = scholarshipSchema.omit({ studentId: true }).extend({
+  studentIds: z.array(z.string().min(1)).min(1).max(100),
+});
 const concessionStatusSchema = z.object({ isActive: z.boolean() });
 const periodLockSchema = z.object({
   lockedThrough: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Format: YYYY-MM-DD").nullable(),
@@ -222,6 +225,17 @@ export class FinanceController {
     @Body(new ZodValidationPipe(scholarshipSchema)) body: z.infer<typeof scholarshipSchema>,
   ) {
     return this.financeService.createStudentScholarship(school.id, user.id, body);
+  }
+
+  @Post("scholarships/bulk")
+  @Roles(...FINANCE_WRITE_ROLES)
+  @FinanceSelfAudited()
+  createStudentScholarships(
+    @CurrentSchool() school: School,
+    @CurrentUser() user: AuthenticatedUser,
+    @Body(new ZodValidationPipe(bulkScholarshipSchema)) body: z.infer<typeof bulkScholarshipSchema>,
+  ) {
+    return this.financeService.createStudentScholarships(school.id, user.id, body);
   }
 
   @Patch("scholarships/:scholarshipId")

@@ -12,6 +12,7 @@ describe.skipIf(!enabled)("scholarship awards on PostgreSQL", { timeout: 60_000 
   let service: FinanceService;
   let schoolId: string;
   let studentId: string;
+  let otherSchoolStudentId: string;
   const actorId = randomUUID();
 
   beforeAll(async () => {
@@ -42,7 +43,7 @@ describe.skipIf(!enabled)("scholarship awards on PostgreSQL", { timeout: 60_000 
     studentId = (await addStudent(schoolId, "ADM_0004", "ACTIVE")).id;
     await addStudent(schoolId, "ADM-0005", "GRADUATED");
     await addStudent(schoolId, "ADM-0006", "ACTIVE", new Date());
-    await addStudent(otherSchool.id, "ADM_0004", "ACTIVE");
+    otherSchoolStudentId = (await addStudent(otherSchool.id, "ADM_0004", "ACTIVE")).id;
   });
 
   afterAll(async () => { await db?.$disconnect(); });
@@ -58,6 +59,31 @@ describe.skipIf(!enabled)("scholarship awards on PostgreSQL", { timeout: 60_000 
     for (const query of ["%", "ADM__", "ADM-0005", "ADM-0006", ""]) {
       expect(await service.searchScholarshipStudents(schoolId, query)).toEqual({ students: [], hasMore: false });
     }
+  });
+
+  it("rejects an unavailable student without awarding any and deduplicates a valid batch", async () => {
+    const id = randomUUID();
+    await db.user.create({ data: { id, name: "Kojo Owusu", email: `${id}@test.invalid` } });
+    const secondStudentId = (await db.student.create({ data: {
+      school: { connect: { id: schoolId } }, studentId: id, admissionNumber: "ADM-0007",
+      profile: { create: { userId: id, firstName: "Kojo", lastName: "Owusu" } },
+    } })).id;
+
+    const name = "Bursary award";
+    const input = { name, valueType: "FIXED" as const, value: 500 };
+    await expect(service.createStudentScholarships(schoolId, actorId, {
+      ...input, studentIds: [studentId, otherSchoolStudentId],
+    })).rejects.toThrow(/no longer available/);
+    expect(await db.studentScholarship.count({ where: { schoolId, name } })).toBe(0);
+
+    await expect(service.createStudentScholarships(schoolId, actorId, {
+      ...input, studentIds: [studentId, secondStudentId, studentId],
+    })).resolves.toEqual({ awardedCount: 2 });
+    const awards = await db.studentScholarship.findMany({ where: { schoolId, name } });
+    expect(awards.map(row => row.studentId).sort()).toEqual([studentId, secondStudentId].sort());
+    expect(awards.every(row => row.value.toFixed(2) === "500.00")).toBe(true);
+    const audit = await db.auditLog.findFirstOrThrow({ where: { schoolId, entityType: "FINANCE POST /finance/scholarships/bulk" } });
+    expect(audit.newValues).toMatchObject({ name, value: "500.00" });
   });
 
   it("saves an award scoped to the selected term with no additional issue-date window", async () => {

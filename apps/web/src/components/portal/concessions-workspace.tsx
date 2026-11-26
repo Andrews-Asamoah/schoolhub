@@ -1,12 +1,12 @@
 import { DatePicker } from "@/components/ui/date-picker";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { LabeledField } from "@/components/forms/labeled-controls";
 import { useDebouncedValue } from "@/components/superadmin/use-debounced-value";
 import { authClient } from "@/lib/auth-client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowRight, BadgeCheck, CalendarDays, CheckCircle2, GraduationCap, HeartHandshake, LoaderCircle, Plus, Search, ShieldCheck, ToggleLeft, ToggleRight } from "lucide-react";
+import { ArrowRight, BadgeCheck, CalendarDays, CheckCircle2, GraduationCap, HeartHandshake, LoaderCircle, Plus, Search, ShieldCheck, ToggleLeft, ToggleRight, X } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { FinanceReadOnlyNotice, useFinanceAccess } from "@/components/portal/finance-access";
@@ -33,6 +33,7 @@ type Scholarship = {
 type ConcessionsResponse = { siblingPolicies: SiblingPolicy[]; scholarships: Scholarship[] };
 type StudentSearchResponse = { students: StudentOption[]; hasMore: boolean };
 
+const MAX_AWARD_STUDENTS = 100;
 const field = "h-10 w-full rounded-xl border border-border bg-background px-3 text-sm text-foreground outline-none focus:ring-2 focus:ring-ring/30";
 const primary = "inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50";
 const secondary = "inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-border bg-card px-3 py-2 text-sm font-semibold text-foreground transition hover:bg-muted disabled:opacity-50";
@@ -60,8 +61,8 @@ export function ConcessionsWorkspace() {
   const [minimumWardCount, setMinimumWardCount] = useState("2");
   const [policyType, setPolicyType] = useState<ValueType>("PERCENTAGE");
   const [policyValue, setPolicyValue] = useState("5");
-  const [selectedStudent, setSelectedStudent] = useState<StudentOption | null>(null);
-  const scholarshipNameInput = useRef<HTMLInputElement>(null);
+  const [selectedStudents, setSelectedStudents] = useState<StudentOption[]>([]);
+  const [studentSearch, setStudentSearch] = useState("");
   const [scholarshipName, setScholarshipName] = useState("");
   const [scholarshipType, setScholarshipType] = useState<ValueType>("PERCENTAGE");
   const [scholarshipValue, setScholarshipValue] = useState("");
@@ -95,10 +96,10 @@ export function ConcessionsWorkspace() {
     onError: (error: Error) => setFeedback({ kind: "error", text: error.message }),
   });
   const createScholarship = useMutation({
-    mutationFn: (studentId: string) => apiFetch<Scholarship>("/finance/scholarships", {
+    mutationFn: (studentIds: string[]) => apiFetch<{ awardedCount: number }>("/finance/scholarships/bulk", {
       method: "POST",
       body: JSON.stringify({
-        studentId, name: scholarshipName, valueType: scholarshipType, value: Number(scholarshipValue),
+        studentIds, name: scholarshipName, valueType: scholarshipType, value: Number(scholarshipValue),
         ...(reason.trim() ? { reason: reason.trim() } : {}),
         ...(academicYearId ? { academicYearId } : {}),
         ...(termId ? { termId } : {}),
@@ -106,14 +107,15 @@ export function ConcessionsWorkspace() {
         ...(!termId && endDate ? { endDate } : {}),
       }),
     }),
-    onSuccess: async () => {
-      setSelectedStudent(null);
+    onSuccess: async ({ awardedCount }) => {
+      setSelectedStudents([]);
+      setStudentSearch("");
       setScholarshipName("");
       setScholarshipValue("");
       setReason("");
       setStartDate("");
       setEndDate("");
-      setFeedback({ kind: "success", text: "Scholarship saved. It will be included when new bills are generated for the student." });
+      setFeedback({ kind: "success", text: `Scholarship awarded to ${awardedCount} ${awardedCount === 1 ? "student" : "students"}. It will apply to eligible new bills.` });
       await client.invalidateQueries({ queryKey: ["finance", "concessions"] });
     },
   });
@@ -174,25 +176,30 @@ export function ConcessionsWorkspace() {
               </span>
               <div>
                 <h2 id="award-scholarship" className="font-semibold text-foreground">Award a scholarship</h2>
-                <p className="mt-1 text-sm text-muted-foreground">Apply an award to a student’s future bills.</p>
+                <p className="mt-1 text-sm text-muted-foreground">Apply the same award to one or more students.</p>
               </div>
             </div>
             <form onSubmit={event => {
               event.preventDefault();
-              if (!selectedStudent || createScholarship.isPending) return;
+              if (!selectedStudents.length || createScholarship.isPending) return;
               setFeedback(null);
-              createScholarship.mutate(selectedStudent.id);
+              createScholarship.mutate(selectedStudents.map(student => student.id));
             }}>
               <fieldset className="space-y-5 px-5 py-5 sm:px-6" disabled={createScholarship.isPending}>
-                <ScholarshipStudentSearch student={selectedStudent} onSelect={student => {
-                  setSelectedStudent(student);
-                  if (student) scholarshipNameInput.current?.focus();
-                }} />
+                <ScholarshipStudentSearch
+                  search={studentSearch}
+                  onSearchChange={setStudentSearch}
+                  selected={selectedStudents}
+                  onToggle={student => setSelectedStudents(current => {
+                    if (current.some(item => item.id === student.id)) return current.filter(item => item.id !== student.id);
+                    return current.length < MAX_AWARD_STUDENTS ? [...current, student] : current;
+                  })}
+                />
 
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div className="sm:col-span-2">
                     <LabeledField label="Scholarship name">
-                      <input ref={scholarshipNameInput} className={field} value={scholarshipName}
+                      <input className={field} value={scholarshipName}
                         onChange={event => setScholarshipName(event.target.value)} required minLength={2} maxLength={120}
                         placeholder="e.g. Academic excellence" />
                     </LabeledField>
@@ -276,8 +283,8 @@ export function ConcessionsWorkspace() {
               </fieldset>
               <div className="flex flex-wrap items-center justify-end gap-3 border-t border-border bg-muted/20 px-5 py-4 sm:px-6">
                 {createScholarship.error && <p role="alert" className="mr-auto text-sm text-destructive">{createScholarship.error.message}</p>}
-                <Button type="submit" loading={createScholarship.isPending} disabled={!selectedStudent || (!!termId && !selectedTerm)}>
-                  Save scholarship
+                <Button type="submit" loading={createScholarship.isPending} disabled={!selectedStudents.length || (!!termId && !selectedTerm)}>
+                  {selectedStudents.length > 1 ? `Award to ${selectedStudents.length} students` : "Save scholarship"}
                 </Button>
               </div>
             </form>
@@ -311,59 +318,38 @@ export function ConcessionsWorkspace() {
 }
 
 
-function ScholarshipStudentSearch({ student, onSelect }: {
-  student: StudentOption | null;
-  onSelect: (student: StudentOption | null) => void;
+function ScholarshipStudentSearch({ search, onSearchChange, selected, onToggle }: {
+  search: string;
+  onSearchChange: (value: string) => void;
+  selected: StudentOption[];
+  onToggle: (student: StudentOption) => void;
 }) {
-  const [search, setSearch] = useState("");
-  const searchInput = useRef<HTMLInputElement>(null);
   const queryText = search.trim();
   const debounced = useDebouncedValue(queryText, 220);
   const { data: organization } = authClient.useActiveOrganization();
-  const ready = !student && !!queryText && queryText === debounced;
+  const ready = !!queryText && queryText === debounced;
+  const selectedIds = new Set(selected.map(student => student.id));
+  const atLimit = selected.length >= MAX_AWARD_STUDENTS;
   const query = useQuery({
     queryKey: ["finance", "scholarship-students", organization?.id, debounced],
     queryFn: ({ signal }) => apiFetch<StudentSearchResponse>(`/finance/scholarships/students?search=${encodeURIComponent(debounced)}`, { signal }),
     enabled: ready,
     retry: false,
   });
-
-  if (student) {
-    return (
-      <div className="flex flex-wrap items-center gap-3 rounded-xl border border-primary/25 bg-primary/5 p-3">
-        <CheckCircle2 className="size-5 shrink-0 text-primary" aria-hidden="true" />
-        <div className="min-w-0 flex-1" role="status">
-          <p className="break-words text-sm font-semibold text-foreground">{personName(student)}</p>
-          <p className="break-words text-xs text-muted-foreground">{studentReference(student)}</p>
-        </div>
-        <Button type="button" variant="ghost" size="sm" onClick={() => {
-          setSearch("");
-          onSelect(null);
-          requestAnimationFrame(() => searchInput.current?.focus());
-        }}>Change student</Button>
-      </div>
-    );
-  }
-
   const matches = ready && !query.isError ? query.data?.students ?? [] : [];
-  function selectMatch(match: StudentOption) {
-    setSearch("");
-    onSelect(match);
-  }
-
   return (
     <div className="space-y-2">
-      <label htmlFor="scholarship-student-search" className="block text-sm font-medium text-foreground">Find student</label>
+      <label htmlFor="scholarship-student-search" className="block text-sm font-medium text-foreground">Find students</label>
       <div className="relative">
         <Search className="pointer-events-none absolute left-3 top-3 size-4 text-muted-foreground" aria-hidden="true" />
-        <input ref={searchInput} id="scholarship-student-search" type="search" autoComplete="off" maxLength={100}
+        <input id="scholarship-student-search" type="search" autoComplete="off" maxLength={100}
           className={cn(field, "pl-9")} placeholder="Search by name or admission number" value={search}
-          onChange={event => setSearch(event.target.value)}
+          onChange={event => onSearchChange(event.target.value)}
           onKeyDown={event => {
-            if (event.key === "Enter") {
-              event.preventDefault();
-              if (matches[0] && matches.length === 1) selectMatch(matches[0]);
-            }
+            if (event.key !== "Enter") return;
+            event.preventDefault();
+            const [match] = matches;
+            if (!atLimit && matches.length === 1 && match && !selectedIds.has(match.id)) onToggle(match);
           }} />
       </div>
       {queryText && (
@@ -379,23 +365,53 @@ function ScholarshipStudentSearch({ student, onSelect }: {
         ) : matches.length ? (
           <div>
             <p className="sr-only" role="status">{matches.length} matching students</p>
-            <ul aria-label="Matching students" className="max-h-60 divide-y divide-border overflow-auto rounded-xl border border-border">
-              {matches.map(match => (
-                <li key={match.id}>
-                  <button type="button" className="flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left transition-colors hover:bg-muted focus-visible:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
-                    onClick={() => selectMatch(match)}>
-                    <span className="min-w-0">
-                      <span className="block break-words text-sm font-medium text-foreground">{personName(match)}</span>
-                      <span className="block break-words text-xs text-muted-foreground">{studentReference(match)}</span>
-                    </span>
-                    <ArrowRight className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-                  </button>
-                </li>
-              ))}
+            <ul aria-label="Matching students" className="max-h-52 divide-y divide-border overflow-auto rounded-xl border border-border">
+              {matches.map(match => {
+                const isSelected = selectedIds.has(match.id);
+                return (
+                  <li key={match.id}>
+                    <button type="button" aria-pressed={isSelected} disabled={atLimit && !isSelected}
+                      className={cn("flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left transition-colors hover:bg-muted focus-visible:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring disabled:opacity-50", isSelected && "bg-primary/5")}
+                      onClick={() => onToggle(match)}>
+                      <span className="min-w-0">
+                        <span className="block break-words text-sm font-medium text-foreground">{personName(match)}</span>
+                        <span className="block break-words text-xs text-muted-foreground">{studentReference(match)}</span>
+                      </span>
+                      {isSelected
+                        ? <CheckCircle2 className="size-4 shrink-0 text-primary" aria-hidden="true" />
+                        : <Plus className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />}
+                    </button>
+                  </li>
+                );
+              })}
             </ul>
             {query.data?.hasMore && <p className="mt-2 text-xs text-muted-foreground">Refine your search to see more matches.</p>}
           </div>
         ) : <p role="status" className="px-1 py-1 text-sm text-muted-foreground">No active students match this search.</p>
+      )}
+
+      {selected.length > 0 && (
+        <div className="rounded-xl border border-primary/25 bg-primary/5 p-3">
+          <p role="status" className="mb-2 flex items-center gap-2 text-sm font-semibold text-foreground">
+            <CheckCircle2 className="size-4 text-primary" aria-hidden="true" />
+            {selected.length} {selected.length === 1 ? "student selected" : "students selected"}
+          </p>
+          <ul aria-label="Selected students" className="flex max-h-40 flex-wrap gap-2 overflow-auto">
+            {selected.map(student => (
+              <li key={student.id} className="flex max-w-full items-center gap-1 rounded-lg border border-border bg-card py-1 pl-2.5 pr-1">
+                <div className="min-w-0">
+                  <p className="break-words text-xs font-medium text-foreground">{personName(student)}</p>
+                  <p className="break-words text-xs text-muted-foreground">{studentReference(student)}</p>
+                </div>
+                <Button type="button" variant="ghost" size="sm" className="h-8 w-8 px-0" onClick={() => onToggle(student)}
+                  aria-label={`Remove ${personName(student)}, ${studentReference(student)}`}>
+                  <X className="size-4" aria-hidden="true" />
+                </Button>
+              </li>
+            ))}
+          </ul>
+          {atLimit && <p className="mt-2 text-xs text-muted-foreground">You can award up to {MAX_AWARD_STUDENTS} students at a time.</p>}
+        </div>
       )}
     </div>
   );
