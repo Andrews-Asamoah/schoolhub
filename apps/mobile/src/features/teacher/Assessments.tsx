@@ -1,22 +1,19 @@
+import { MarksImport } from "./MarksImport";
 import { useState } from "react";
+import { Alert } from "react-native";
 import { useLocalSearchParams, type Href } from "expo-router";
 import {
   getTeaching,
   getTeacherAssessment,
   getTeacherTemplates,
   saveTeacherAssessment,
+  submitTeacherAssessment,
+  requestTeacherMarkCorrection,
   type AssessmentSheet,
 } from "@/api/teacher";
 import { useScopedMutation } from "@/features/shared/mutations";
 import { useTeacherQuery } from "./queries";
-import {
-  TeacherPage,
-  QueryState,
-  Panel,
-  Copy,
-  LinkButton,
-  MutationState,
-} from "./ui";
+import { TeacherPage, QueryState, Panel, Copy, LinkButton } from "./ui";
 import { Button } from "@/components/Button";
 import { SelectField } from "@/components/SelectField";
 import { TextField } from "@/components/TextField";
@@ -37,6 +34,14 @@ export function TeacherAssess() {
       <LinkButton
         label="Report recommendations"
         href={"/(teacher)/teacher-report-review" as Href}
+      />
+      <LinkButton
+        label="Published report archive"
+        href={"/(teacher)/teacher-report-archive" as Href}
+      />
+      <LinkButton
+        label="Internal mock analysis"
+        href={"/(teacher)/teacher-mock-analysis" as Href}
       />
       <QueryState
         query={q}
@@ -88,7 +93,7 @@ export function TeacherScoreEntry() {
       <QueryState query={q}>
         {q.data ? (
           <AssessmentEditor
-            key={`${classId}:${subjectId}:${q.data.template?.id}`}
+            key={`${classId}:${subjectId}:${q.data.term.id}:${q.data.template?.id}`}
             sheet={q.data}
             onTemplate={setTemplate}
           />
@@ -104,45 +109,103 @@ function AssessmentEditor({
   sheet: AssessmentSheet;
   onTemplate: (id: string) => void;
 }) {
-  const [draft, setDraft] = useState<Record<string, string>>({});
+  const [draft, setDraft] = useState<
+    Record<string, { text: string; expectedMarks: number | null }>
+  >({});
+  const [excused, setExcused] = useState<string[]>([]);
+  const [correcting, setCorrecting] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [reason, setReason] = useState("");
   const [error, setError] = useState("");
-  const mutation = useScopedMutation(saveTeacherAssessment);
+  const [notice, setNotice] = useState("");
+  const saveMutation = useScopedMutation(saveTeacherAssessment);
+  const submitMutation = useScopedMutation(submitTeacherAssessment);
+  const correctionMutation = useScopedMutation(requestTeacherMarkCorrection);
+  const pending =
+    saveMutation.isPending ||
+    submitMutation.isPending ||
+    correctionMutation.isPending;
   const dirty = Object.keys(draft).length > 0;
-  const save = async () => {
-    if (!sheet.template || !sheet.canEdit) return;
+  const unfinished = sheet.students.filter((student) =>
+    excused.includes(student.studentId)
+      ? student.marks.length > 0
+      : !student.complete,
+  ).length;
+  const ref = {
+    classId: sheet.class.id,
+    subjectId: sheet.subject.id,
+    templateId: sheet.template?.id ?? "",
+  };
+  function entries() {
+    return Object.entries(draft).map(([key, { text, expectedMarks }]) => {
+      const [studentId, componentId, occurrenceIndex] = JSON.parse(key) as [
+        string,
+        string,
+        number,
+      ];
+      const component = sheet.template?.components.find(
+        (item) => item.id === componentId,
+      );
+      if (
+        !component ||
+        (correcting ? !component.canCorrect : component.canEdit === false)
+      )
+        throw new Error("You cannot edit one of the selected marks.");
+      return {
+        studentId,
+        componentId,
+        occurrenceIndex,
+        expectedMarks,
+        marks: numericMark(text, component.maxMarks),
+      };
+    });
+  }
+  async function save() {
+    setError("");
+    setNotice("");
     try {
-      const entries = Object.entries(draft).map(([key, text]) => {
-        const [studentId, componentId, index] = JSON.parse(key) as [
-          string,
-          string,
-          number,
-        ];
-        const component = sheet.template!.components.find(
-          (c) => c.id === componentId,
-        )!;
-        return {
-          studentId,
-          componentId,
-          occurrenceIndex: index,
-          marks: numericMark(text, component.maxMarks),
-        };
-      });
-      setError("");
-      await mutation.mutateAsync({
-        request: {
-          classId: sheet.class.id,
-          subjectId: sheet.subject.id,
-          templateId: sheet.template.id,
-          entries,
-        },
-      });
+      if (correcting) {
+        await correctionMutation.mutateAsync({
+          request: { ...ref, reason, items: entries(), applyNow: false },
+        });
+        setCorrecting(false);
+        setReason("");
+        setNotice("Correction sent for approval.");
+      } else {
+        await saveMutation.mutateAsync({
+          request: { ...ref, termId: sheet.term.id, entries: entries() },
+        });
+        setNotice("Marks saved.");
+      }
       setDraft({});
-    } catch {
+    } catch (failure) {
       setError(
-        "Marks were not saved. Use values within each maximum; refresh if the assessment was locked or changed.",
+        failure instanceof Error
+          ? failure.message
+          : "Marks could not be saved.",
       );
     }
-  };
+  }
+  async function submit() {
+    setError("");
+    setNotice("");
+    try {
+      await submitMutation.mutateAsync({
+        request: { ...ref, excusedStudentIds: excused },
+      });
+      setExcused([]);
+      setNotice("Marks submitted.");
+    } catch (failure) {
+      setError(
+        failure instanceof Error
+          ? failure.message
+          : "Marks could not be submitted.",
+      );
+    }
+  }
+  if (importing && sheet.template && sheet.canEdit) {
+    return <MarksImport sheet={sheet} onClose={() => setImporting(false)} />;
+  }
   return (
     <>
       <Panel title={`${sheet.class.name} · ${sheet.subject.name}`}>
@@ -150,7 +213,7 @@ function AssessmentEditor({
           label="Assessment template"
           value={sheet.template?.id ?? ""}
           options={sheet.templates.map((t) => ({ value: t.id, label: t.name }))}
-          disabled={dirty || mutation.isPending}
+          disabled={dirty || !!excused.length || correcting || pending}
           onChange={onTemplate}
         />
         <Copy>
@@ -164,24 +227,88 @@ function AssessmentEditor({
           </Copy>
         ) : null}
         {error ? <Copy alert>{error}</Copy> : null}
-        <MutationState mutation={mutation} />
+        {notice ? <Copy>{notice}</Copy> : null}
+        {sheet.submission ? (
+          <Copy>
+            Submitted on{" "}
+            {new Date(sheet.submission.submittedAt).toLocaleDateString()}
+          </Copy>
+        ) : null}
+        {sheet.pendingCorrection ? (
+          <Copy>Correction awaiting approval.</Copy>
+        ) : null}
+        {correcting ? (
+          <TextField
+            label="Reason for correction"
+            value={reason}
+            onChangeText={setReason}
+            editable={!pending}
+            multiline
+          />
+        ) : null}
         <Button
-          label="Save marks"
-          disabled={!dirty || !sheet.canEdit}
-          loading={mutation.isPending}
+          label={correcting ? "Send for approval" : "Save marks"}
+          disabled={
+            !dirty ||
+            pending ||
+            (correcting ? reason.trim().length < 10 : !sheet.canEdit)
+          }
+          loading={saveMutation.isPending || correctionMutation.isPending}
           onPress={() => {
             void save();
           }}
         />
         <Button
-          label="Discard marks"
+          label={correcting ? "Cancel correction" : "Discard marks"}
           variant="ghost"
-          disabled={!dirty || mutation.isPending}
+          disabled={(!dirty && !correcting) || pending}
           onPress={() => {
             setDraft({});
+            setCorrecting(false);
+            setReason("");
             setError("");
           }}
         />
+        {sheet.canEdit && sheet.template && !correcting ? (
+          <Button
+            label="Import marks spreadsheet"
+            variant="secondary"
+            disabled={dirty || pending}
+            onPress={() => setImporting(true)}
+          />
+        ) : null}
+        {sheet.canRequestCorrection && !correcting ? (
+          <Button
+            label="Request correction"
+            variant="secondary"
+            onPress={() => setCorrecting(true)}
+          />
+        ) : null}
+        {sheet.canSubmit && sheet.students.length && !correcting ? (
+          <>
+            {unfinished ? (
+              <Copy>
+                {unfinished} pupils still need complete marks or an absence
+                selection.
+              </Copy>
+            ) : null}
+            <Button
+              label="Submit marks"
+              disabled={dirty || unfinished > 0 || pending}
+              loading={submitMutation.isPending}
+              onPress={() =>
+                Alert.alert(
+                  "Submit marks?",
+                  "This sends the sheet for reporting and locks further mark entry.",
+                  [
+                    { text: "Cancel", style: "cancel" },
+                    { text: "Submit marks", onPress: () => void submit() },
+                  ],
+                )
+              }
+            />
+          </>
+        ) : null}
       </Panel>
       {!sheet.template || !sheet.students.length ? (
         <Copy>No applicable score sheet is available.</Copy>
@@ -192,26 +319,71 @@ function AssessmentEditor({
               {s.percentage == null
                 ? "Incomplete"
                 : `${s.percentage}% · ${s.grade ?? "No grade"}`}
+              {sheet.template?.grades?.find((band) => band.grade === s.grade)
+                ?.description
+                ? ` · ${sheet.template.grades.find((band) => band.grade === s.grade)?.description}`
+                : ""}
             </Copy>
+            {s.excused ? <Copy>Absent / excused</Copy> : null}
+            {sheet.canSubmit && !correcting ? (
+              <Button
+                label={
+                  excused.includes(s.studentId)
+                    ? "Undo absent / excused"
+                    : "Mark absent / excused"
+                }
+                variant="ghost"
+                disabled={
+                  pending ||
+                  dirty ||
+                  (s.marks.length > 0 && !excused.includes(s.studentId))
+                }
+                onPress={() =>
+                  setExcused((ids) =>
+                    ids.includes(s.studentId)
+                      ? ids.filter((id) => id !== s.studentId)
+                      : [...ids, s.studentId],
+                  )
+                }
+              />
+            ) : null}
+            {sheet.canSubmit && s.marks.length ? (
+              <Copy>
+                Clear and save existing marks before marking this pupil absent.
+              </Copy>
+            ) : null}
             {sheet.template!.components.flatMap((c) =>
               Array.from({ length: c.slots }, (_, i) => {
                 const key = JSON.stringify([s.studentId, c.id, i]);
-                const value =
-                  draft[key] ??
-                  String(
-                    s.marks.find(
-                      (m) => m.componentId === c.id && m.occurrenceIndex === i,
-                    )?.marks ?? "",
-                  );
+                const saved =
+                  s.marks.find(
+                    (mark) =>
+                      mark.componentId === c.id && mark.occurrenceIndex === i,
+                  )?.marks ?? null;
+                const value = draft[key]?.text ?? String(saved ?? "");
                 return (
                   <TextField
                     key={key}
                     label={`${s.name}: ${c.name}${c.slots > 1 ? ` ${i + 1}` : ""} / ${c.maxMarks}`}
                     value={value}
                     keyboardType="decimal-pad"
-                    editable={sheet.canEdit && !mutation.isPending}
+                    editable={
+                      !pending &&
+                      !excused.includes(s.studentId) &&
+                      (correcting
+                        ? c.canCorrect === true
+                        : sheet.canEdit && c.canEdit !== false)
+                    }
                     onChangeText={(text) =>
-                      setDraft((prev) => ({ ...prev, [key]: text }))
+                      setDraft((prev) => ({
+                        ...prev,
+                        [key]: {
+                          text,
+                          expectedMarks: prev[key]
+                            ? prev[key].expectedMarks
+                            : saved,
+                        },
+                      }))
                     }
                   />
                 );

@@ -99,6 +99,10 @@ export default function GuardianLayout() {
             options={{ href: null, title: "Attendance" }}
           />
           <Tabs.Screen
+            name="absence-requests"
+            options={{ href: null, title: "Absence requests" }}
+          />
+          <Tabs.Screen
             name="timetable"
             options={{ href: null, title: "Timetable" }}
           />

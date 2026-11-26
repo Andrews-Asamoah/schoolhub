@@ -1,3 +1,5 @@
+import { useState } from "react";
+import { ReportPreview } from "@/features/shared/ReportPreview";
 import { Alert, View } from "react-native";
 import { ClipboardList, Download } from "lucide-react-native";
 import { Card } from "@/components/Surface";
@@ -30,6 +32,8 @@ async function download(action: () => Promise<void>, title: string) {
 export default function StudentReportsScreen() {
   const assessment = useMyAssessmentReportQuery();
   const reports = useMyPublishedReportsQuery();
+  const [selectedId, setSelectedId] = useState("");
+  const selected = reports.data?.find((report) => report.id === selectedId);
   const { colors } = useTheme();
   const retry = () => {
     void Promise.all([assessment.refetch(), reports.refetch()]);
@@ -141,18 +145,7 @@ export default function StudentReportsScreen() {
                 }
                 status={report.pdfAvailable ? "PDF" : "Published"}
                 divider={index < entries.length - 1}
-                onPress={
-                  report.pdfAvailable
-                    ? () =>
-                        void download(
-                          () =>
-                            downloadMyReport({
-                              params: { reportId: report.id },
-                            }),
-                          "Report",
-                        )
-                    : undefined
-                }
+                onPress={() => setSelectedId(report.id)}
                 hue="indigo"
               />
             ))
@@ -163,6 +156,24 @@ export default function StudentReportsScreen() {
           )}
         </Card>
 
+        {selected ? (
+          <ReportPreview
+            printable={!selected.pdfAvailable}
+            title={selected.set.name}
+            data={selected.data}
+            approval={selected.approval}
+            onShare={
+              selected.pdfAvailable
+                ? () =>
+                    void download(
+                      () =>
+                        downloadMyReport({ params: { reportId: selected.id } }),
+                      "Report",
+                    )
+                : undefined
+            }
+          />
+        ) : null}
         {!hasPublishedReports && !reports.isPending ? (
           <Text style={[type.caption, { color: colors.mutedForeground }]}>
             Only results published for student viewing are listed. Downloads are

@@ -1,8 +1,8 @@
 import { router, type Href } from "expo-router";
 import { Mail, Plus, Send } from "lucide-react-native";
-import { useState } from "react";
+import { useDeferredValue, useState } from "react";
 import { View } from "react-native";
-import { markMessageRead } from "@/api/shared";
+import { markMessageRead, sendMessage } from "@/api/shared";
 import { Button } from "@/components/Button";
 import { Card } from "@/components/Surface";
 import { EmptyState, ErrorState } from "@/components/States";
@@ -11,6 +11,7 @@ import { Screen } from "@/components/Screen";
 import { SegmentedControl } from "@/components/SegmentedControl";
 import { SkeletonRow } from "@/components/Skeleton";
 import { Text } from "@/components/Typography";
+import { TextField } from "@/components/TextField";
 import { useScopedMutation } from "@/features/shared/mutations";
 import { formatDateTime } from "@/features/shared/format";
 import { useMessagesQuery } from "@/features/shared/queries";
@@ -22,14 +23,53 @@ type Folder = "inbox" | "sent";
 export default function MessagesScreen() {
   const [folder, setFolder] = useState<Folder>("inbox");
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const query = useMessagesQuery(folder);
+  const [search, setSearch] = useState("");
+  const [replyOpen, setReplyOpen] = useState(false);
+  const [reply, setReply] = useState("");
+  const [replyError, setReplyError] = useState("");
+  const query = useMessagesQuery(folder, useDeferredValue(search.trim()));
+  const send = useScopedMutation(sendMessage);
   const read = useScopedMutation((id: string) =>
     markMessageRead({ params: { id } }),
   );
   const { colors } = useTheme();
   const selected = query.data?.find((item) => item.id === selectedId);
 
+  function resetReply() {
+    setReplyOpen(false);
+    setReply("");
+    setReplyError("");
+  }
+
+  async function submitReply() {
+    if (!selected || !reply.trim()) return;
+    const to =
+      folder === "inbox"
+        ? selected.sender.id
+        : selected.recipients[0]?.recipientId;
+    if (!to) return;
+    const subject = /^re:/i.test(selected.subject)
+      ? selected.subject
+      : `Re: ${selected.subject}`;
+    setReplyError("");
+    try {
+      await send.mutateAsync({
+        request: {
+          recipientIds: [to],
+          subject: subject.slice(0, 160),
+          body: reply.trim(),
+        },
+      });
+      resetReply();
+    } catch {
+      setReplyError(
+        "Could not send the reply. Check the connection and try again.",
+      );
+    }
+  }
+
   function openMessage(message: SchoolMessage) {
+    resetReply();
     setSelectedId(message.id);
     if (
       folder === "inbox" &&
@@ -61,11 +101,22 @@ export default function MessagesScreen() {
           onChange={(value) => {
             setFolder(value);
             setSelectedId(null);
+            resetReply();
           }}
           options={[
             { value: "inbox", label: "Inbox" },
             { value: "sent", label: "Sent" },
           ]}
+        />
+        <TextField
+          label="Search message history"
+          value={search}
+          onChangeText={(value) => {
+            setSearch(value);
+            setSelectedId(null);
+            resetReply();
+          }}
+          returnKeyType="search"
         />
         {read.isError ? (
           <Text
@@ -91,7 +142,11 @@ export default function MessagesScreen() {
         ) : query.data.length === 0 ? (
           <EmptyState
             title={
-              folder === "inbox" ? "Your inbox is empty" : "No sent messages"
+              search.trim()
+                ? "No matching messages"
+                : folder === "inbox"
+                  ? "Your inbox is empty"
+                  : "No sent messages"
             }
             message="Messages stay private to your school account."
             icon={<Mail size={32} color={colors.mutedForeground} />}
@@ -129,6 +184,14 @@ export default function MessagesScreen() {
             })}
           </Card>
         )}
+        {query.hasNextPage ? (
+          <Button
+            label="Load more messages"
+            variant="secondary"
+            loading={query.isFetchingNextPage}
+            onPress={() => void query.fetchNextPage()}
+          />
+        ) : null}
         {selected ? (
           <Card padding={spacing.xl}>
             <View style={{ gap: spacing.sm }}>
@@ -152,6 +215,39 @@ export default function MessagesScreen() {
               <Text style={[type.body, { color: colors.foreground }]}>
                 {selected.body}
               </Text>
+              {replyOpen ? (
+                <>
+                  <TextField
+                    label="Reply message"
+                    value={reply}
+                    onChangeText={setReply}
+                    multiline
+                    maxLength={10000}
+                    editable={!send.isPending}
+                  />
+                  {replyError ? (
+                    <Text accessibilityRole="alert">{replyError}</Text>
+                  ) : null}
+                  <Button
+                    label="Send reply"
+                    disabled={!reply.trim()}
+                    loading={send.isPending}
+                    onPress={() => void submitReply()}
+                  />
+                  <Button
+                    label="Cancel reply"
+                    variant="ghost"
+                    disabled={send.isPending}
+                    onPress={resetReply}
+                  />
+                </>
+              ) : folder === "inbox" || selected.recipients[0]?.recipientId ? (
+                <Button
+                  label="Reply"
+                  variant="secondary"
+                  onPress={() => setReplyOpen(true)}
+                />
+              ) : null}
             </View>
           </Card>
         ) : null}

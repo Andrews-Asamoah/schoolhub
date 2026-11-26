@@ -1,4 +1,6 @@
+import { Alert } from "react-native";
 import {
+  act,
   fireEvent,
   render,
   screen,
@@ -478,7 +480,7 @@ test("score entry rejects a value above the component maximum", async () => {
   );
   await fireEvent.press(screen.getByRole("button", { name: "Save marks" }));
   await waitFor(() =>
-    expect(screen.getByText(/Marks were not saved/)).toBeVisible(),
+    expect(screen.getByText(/outside the allowed range/)).toBeVisible(),
   );
   expect(mockMutate).not.toHaveBeenCalled();
 });
@@ -633,4 +635,49 @@ describe("offline register saves", () => {
     );
     expect(saveRegister).not.toHaveBeenCalled();
   });
+});
+
+test("submits an assessment with its selected excused pupil after confirmation", async () => {
+  const assessment = teacherApi.assessmentSheetSchema.parse(fixture.assessment);
+  const alert = jest.spyOn(Alert, "alert").mockImplementation(() => {});
+  try {
+    mockQuery.mockImplementation((parts: string[]) => ({
+      ...baseQuery,
+      data:
+        parts[0] === "assessment"
+          ? {
+              ...assessment,
+              canSubmit: true,
+              students: assessment.students.map((student) => ({
+                ...student,
+                marks: [],
+                complete: false,
+              })),
+            }
+          : fixture[parts[0]!],
+    }));
+    await render(<TeacherScoreEntry />);
+    expect(screen.getByRole("button", { name: "Submit marks" })).toBeDisabled();
+    await fireEvent.press(
+      screen.getByRole("button", { name: "Mark absent / excused" }),
+    );
+    await fireEvent.press(screen.getByRole("button", { name: "Submit marks" }));
+    const confirm = alert.mock.calls[0]?.[2]?.find(
+      (button) => button.text === "Submit marks",
+    );
+    expect(confirm?.onPress).toBeDefined();
+    await act(async () => {
+      confirm?.onPress?.();
+    });
+    expect(mockMutate).toHaveBeenCalledWith({
+      request: {
+        classId: "c",
+        subjectId: "math",
+        templateId: assessment.template?.id,
+        excusedStudentIds: [assessment.students[0]?.studentId],
+      },
+    });
+  } finally {
+    alert.mockRestore();
+  }
 });

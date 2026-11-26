@@ -138,6 +138,7 @@ export function defineEndpoint<
   scope?: EndpointScope;
   request?: TRequestSchema;
   response: z.ZodType<TResponse>;
+  multipart?: (request: z.output<NonNullable<TRequestSchema>>) => FormData;
   /** Writes the server de-duplicates by `Idempotency-Key` (offline retries). */
   idempotent?: boolean;
 }) {
@@ -164,9 +165,12 @@ export function defineEndpoint<
       assertFeature(sessionStore.getSnapshot().activeRole, "bece");
 
     const path = buildPath(definition.path, options);
-    let body: string | undefined;
+    let body: string | FormData | undefined;
     if (definition.request) {
-      body = JSON.stringify(definition.request.parse(options.request));
+      const request = definition.request.parse(options.request);
+      body = definition.multipart
+        ? definition.multipart(request as z.output<NonNullable<TRequestSchema>>)
+        : JSON.stringify(request);
     } else if (options.request !== undefined) {
       throw new Error("This endpoint does not accept a request body.");
     }

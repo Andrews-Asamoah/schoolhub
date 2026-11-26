@@ -1,10 +1,16 @@
+import { File } from "expo-file-system";
+import { reportApprovalSchema, reportDataSchema } from "./report-preview";
 import { z } from "zod";
 import {
   batchAttendanceSchema,
   saveAssessmentEntrySchema,
+  submitAssessmentEntrySchema,
+  requestMarkCorrectionSchema,
+  importAssessmentMarksBatchSchema,
+  STUDENT_IMPORT_LIMITS,
   addClubMemberSchema,
 } from "@schoolhub/shared";
-import { defineEndpoint } from "./endpoint";
+import { defineDownload, defineEndpoint } from "./endpoint";
 const named = z.object({ id: z.string(), name: z.string() });
 const profile = z.object({ firstName: z.string(), lastName: z.string() });
 const subject = named.extend({ code: z.string() });
@@ -206,15 +212,28 @@ export const assessmentSheetSchema = z.object({
           name: z.string(),
           maxMarks: z.number(),
           slots: z.number().int().positive(),
+          canEdit: z.boolean().optional(),
+          canCorrect: z.boolean().optional(),
+          subjectStrandName: z.string().nullish(),
         }),
       ),
+      grades: z
+        .array(
+          z.object({ grade: z.string(), description: z.string().nullable() }),
+        )
+        .optional(),
     })
     .nullable(),
   canEdit: z.boolean(),
+  canSubmit: z.boolean().optional(),
+  canRequestCorrection: z.boolean().optional(),
+  pendingCorrection: z.object({ id: z.string() }).nullish(),
+  submission: z.object({ submittedAt: z.string() }).nullish(),
   readOnlyReason: z.string().nullable(),
   students: z.array(
     z.object({
       studentId: z.string(),
+      admissionNumber: z.string().nullish(),
       name: z.string(),
       marks: z.array(
         z.object({
@@ -223,6 +242,8 @@ export const assessmentSheetSchema = z.object({
           marks: z.number(),
         }),
       ),
+      complete: z.boolean().optional(),
+      excused: z.boolean().optional(),
       percentage: z.number().nullable(),
       grade: z.string().nullable(),
     }),
@@ -241,6 +262,20 @@ export const saveTeacherAssessment = defineEndpoint({
   roles: ["teacher"],
   request: saveAssessmentEntrySchema,
   response: assessmentSheetSchema,
+});
+export const submitTeacherAssessment = defineEndpoint({
+  method: "POST",
+  path: "/assessments/entry/submit",
+  roles: ["teacher"],
+  request: submitAssessmentEntrySchema,
+  response: assessmentSheetSchema,
+});
+export const requestTeacherMarkCorrection = defineEndpoint({
+  method: "POST",
+  path: "/assessments/corrections",
+  roles: ["teacher"],
+  request: requestMarkCorrectionSchema,
+  response: z.object({ id: z.string(), applied: z.boolean() }),
 });
 export const getTeacherTemplates = defineEndpoint({
   method: "GET",
@@ -270,6 +305,7 @@ const reviewSchema = z.object({
   id: z.string(),
   stage: z.string(),
   teacherRemark: z.string().nullable(),
+  draftRemark: z.string().nullish(),
 });
 export const getTeacherReportQueue = defineEndpoint({
   method: "GET",
@@ -387,4 +423,171 @@ export const removeTeacherClubMember = defineEndpoint({
   path: "/academics/clubs/:id/members/:studentId",
   roles: ["teacher"],
   response: z.object({ success: z.boolean() }),
+});
+
+export const saveTeacherReportDraft = defineEndpoint({
+  method: "PUT",
+  path: "/assessments/report-cards/versions/:id/draft",
+  roles: ["teacher"],
+  request: z.object({ remark: z.string().max(2000) }),
+  response: z.object({ saved: z.boolean() }),
+});
+export const bulkRecommendTeacherReports = defineEndpoint({
+  method: "POST",
+  path: "/assessments/report-cards/versions/bulk-recommend",
+  roles: ["teacher"],
+  request: z.object({
+    items: z
+      .array(recommendationSchema.extend({ id: z.string() }))
+      .min(1)
+      .max(100),
+  }),
+  response: z.object({
+    succeeded: z.number(),
+    results: z.array(
+      z.object({
+        id: z.string(),
+        ok: z.boolean(),
+        error: z.string().optional(),
+      }),
+    ),
+  }),
+});
+export const getTeacherReportPreview = defineEndpoint({
+  method: "GET",
+  path: "/assessments/report-cards/versions/:id/preview",
+  roles: ["teacher"],
+  response: z.object({
+    pupil: z.object({ name: z.string() }),
+    report: reportDataSchema,
+    approval: reportApprovalSchema,
+  }),
+});
+export const getTeacherArchiveFilters = defineEndpoint({
+  method: "GET",
+  path: "/assessments/report-cards/archive/filters",
+  roles: ["teacher"],
+  response: z.object({
+    years: z.array(named.extend({ terms: z.array(named) })),
+    classes: z.array(named),
+  }),
+});
+export const getTeacherArchive = defineEndpoint({
+  method: "GET",
+  path: "/assessments/report-cards/archive",
+  roles: ["teacher"],
+  response: z.object({
+    total: z.number(),
+    pageSize: z.number(),
+    items: z.array(
+      z.object({
+        id: z.string(),
+        pupilName: z.string(),
+        setName: z.string(),
+        academicYear: z.string(),
+        term: z.string(),
+        className: z.string().nullable(),
+        hasPdf: z.boolean(),
+      }),
+    ),
+  }),
+});
+export const downloadTeacherArchiveReport = defineDownload({
+  method: "GET",
+  path: "/assessments/report-cards/archive/:reportId/pdf",
+  roles: ["teacher"],
+});
+export const getTeacherMockOptions = defineEndpoint({
+  method: "GET",
+  path: "/mock-analytics/options",
+  roles: ["teacher"],
+  response: z.object({
+    years: z.array(named),
+    classes: z.array(named.extend({ yearIds: z.array(z.string()) })),
+  }),
+});
+export const getTeacherMockAnalysis = defineEndpoint({
+  method: "GET",
+  path: "/mock-analytics",
+  roles: ["teacher"],
+  response: z.object({
+    subjectsLimited: z.boolean(),
+    mocks: z.array(
+      named.extend({
+        classAverage: z.number().nullable(),
+        sat: z.number(),
+        atRisk: z.number(),
+      }),
+    ),
+    subjects: z.array(
+      z.object({
+        subjectId: z.string(),
+        name: z.string(),
+        points: z.array(
+          z.object({ mockId: z.string(), average: z.number().nullable() }),
+        ),
+      }),
+    ),
+    students: z.array(
+      named.extend({
+        latestAverage: z.number().nullable(),
+        status: z.string().nullable(),
+        trend: z.string(),
+        series: z.array(
+          z.object({ mockId: z.string(), average: z.number().nullable() }),
+        ),
+      }),
+    ),
+  }),
+});
+
+const importRowSchema = importAssessmentMarksBatchSchema.shape.rows.element;
+export const previewTeacherMarksImport = defineEndpoint({
+  method: "POST",
+  path: "/assessments/entry/import/preview",
+  roles: ["teacher"],
+  request: z.object({ uri: z.string(), name: z.string() }),
+  multipart: ({ uri, name }) => {
+    const file = new File(uri);
+    if (
+      !file.exists ||
+      !file.size ||
+      file.size > STUDENT_IMPORT_LIMITS.maxFileBytes
+    )
+      throw new Error("Choose a CSV or Excel file of 2 MB or smaller.");
+    const mime = name.toLowerCase().endsWith(".csv")
+      ? "text/csv"
+      : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+    const body = new FormData();
+    body.append("file", file.slice(0, file.size, mime), name);
+    return body;
+  },
+  response: z.object({
+    notices: z.array(z.string()),
+    rows: z.array(
+      z.object({
+        rowNumber: z.number(),
+        name: z.string(),
+        status: z.enum(["ready", "update", "unchanged", "duplicate", "error"]),
+        errors: z.array(z.string()),
+        detail: z.string(),
+        row: importRowSchema.shape.row.nullable(),
+      }),
+    ),
+  }),
+});
+export const applyTeacherMarksImport = defineEndpoint({
+  method: "POST",
+  path: "/assessments/entry/import",
+  roles: ["teacher"],
+  request: importAssessmentMarksBatchSchema,
+  response: z.object({
+    results: z.array(
+      z.object({
+        rowNumber: z.number(),
+        status: z.enum(["created", "updated", "failed"]),
+        message: z.string().optional(),
+      }),
+    ),
+  }),
 });

@@ -159,6 +159,19 @@ const child = {
   class: { id: "class-1", name: "Primary 4" },
 };
 
+const statement = {
+  closingBalance: "120.00",
+  entries: [],
+  ageing: {
+    notDue: "120.00",
+    days0To30: "0",
+    days31To60: "0",
+    days61To90: "0",
+    days90Plus: "0",
+  },
+  unallocatedCredit: "0",
+};
+
 beforeEach(() => {
   mockUseGuardian.mockReset();
   mockUseWardFeesQuery.mockReset();
@@ -213,10 +226,7 @@ test("selecting a child opens the child's profile", async () => {
 test("fee screen renders the view-only balance for the selected child", async () => {
   mockUseGuardian.mockReturnValue({ activeWard: child });
   mockUseWardFeesQuery.mockReturnValue({
-    data: {
-      closingBalance: "120.00",
-      entries: [],
-    },
+    data: statement,
     isPending: false,
     isError: false,
     isRefetching: false,
@@ -224,7 +234,7 @@ test("fee screen renders the view-only balance for the selected child", async ()
   });
   await render(<FeesScreen />);
   expect(screen.getByText("Current balance")).toBeVisible();
-  expect(screen.getByText(/120/)).toBeVisible();
+  expect(screen.getByRole("header", { name: /120/ })).toBeVisible();
   expect(screen.getByText(/reference only/i)).toBeVisible();
   expect(screen.queryByText("Open fees in web portal")).toBeNull();
 });
@@ -234,7 +244,7 @@ test("guardian fees opens the configured portal without carrying child data", as
   process.env.EXPO_PUBLIC_PORTAL_ORIGIN = "https://app.schoolhub.example";
   mockUseGuardian.mockReturnValue({ activeWard: child });
   mockUseWardFeesQuery.mockReturnValue({
-    data: { closingBalance: "120.00", entries: [] },
+    data: statement,
   });
   try {
     await render(<FeesScreen />);

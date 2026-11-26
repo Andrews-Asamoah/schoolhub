@@ -1,3 +1,5 @@
+import { useState } from "react";
+import { outputTable } from "@/features/shared/exports";
 import { CircleDollarSign } from "lucide-react-native";
 import { Linking, View } from "react-native";
 import { Button } from "@/components/Button";
@@ -26,12 +28,49 @@ const money = (value: string) => {
 };
 
 export default function GuardianFeesScreen() {
+  const [exporting, setExporting] = useState(false);
   const { activeWard } = useGuardian();
   const { subdomain } = useSession();
   const { show } = useToast();
   const portalUrl = guardianFeesPortalUrl(subdomain);
   const query = useWardFeesQuery(activeWard?.id ?? "");
   const { colors } = useTheme();
+  function exportFees(format: "print" | "pdf" | "xlsx") {
+    if (!query.data) return;
+    const { student, entries, openingBalance, closingBalance } = query.data;
+    setExporting(true);
+    void outputTable(
+      `Fee statement · ${student.name}`,
+      [
+        "Date",
+        "Type",
+        "Reference",
+        "Description",
+        "Amount (GHS)",
+        "Balance (GHS)",
+      ],
+      [
+        ["", "", "", "Opening balance", "", Number(openingBalance)],
+        ...entries.map((entry) => [
+          entry.date.slice(0, 10),
+          entry.type,
+          entry.reference,
+          entry.description,
+          Number(entry.amount),
+          Number(entry.runningBalance),
+        ]),
+        ["", "", "", "Closing balance", "", Number(closingBalance)],
+      ],
+      format,
+    )
+      .catch(() =>
+        show({
+          message: "Could not export this fee statement.",
+          tone: "error",
+        }),
+      )
+      .finally(() => setExporting(false));
+  }
   return (
     <Screen
       title="Fees"
@@ -91,6 +130,43 @@ export default function GuardianFeesScreen() {
                 reference only.
               </Text>
             </Card>
+            <Card>
+              <Text accessibilityRole="header" style={type.headline}>
+                Balance by due date
+              </Text>
+              {[
+                ["Not due / no due date", query.data.ageing.notDue],
+                ["0–30 days overdue", query.data.ageing.days0To30],
+                ["31–60 days overdue", query.data.ageing.days31To60],
+                ["61–90 days overdue", query.data.ageing.days61To90],
+                ["90+ days overdue", query.data.ageing.days90Plus],
+                ["Unallocated credit", query.data.unallocatedCredit],
+              ].map(([label, value]) => (
+                <ListRow
+                  key={label}
+                  title={label!}
+                  subtitle={money(value ?? "")}
+                />
+              ))}
+            </Card>
+            <Button
+              label="Print statement"
+              variant="secondary"
+              disabled={exporting}
+              onPress={() => exportFees("print")}
+            />
+            <Button
+              label="Share statement PDF"
+              variant="secondary"
+              disabled={exporting}
+              onPress={() => exportFees("pdf")}
+            />
+            <Button
+              label="Share statement Excel"
+              variant="secondary"
+              disabled={exporting}
+              onPress={() => exportFees("xlsx")}
+            />
             {portalUrl ? (
               <Button
                 label="Open fees in web portal"

@@ -1,3 +1,4 @@
+import { TimetableActions } from "@/features/shared/TimetableActions";
 import { CalendarDays } from "lucide-react-native";
 import { View } from "react-native";
 import { Card } from "@/components/Surface";
@@ -53,6 +54,11 @@ export default function StudentTimetableScreen() {
           />
         ) : (
           <>
+            <TimetableActions
+              entries={query.data.entries}
+              title={`${query.data.class?.name ?? "Class"} weekly timetable`}
+              showCurrent
+            />
             {query.data.academicYear || query.data.term ? (
               <Text style={[type.caption, { color: colors.mutedForeground }]}>
                 {[query.data.academicYear?.name, query.data.term?.name]
