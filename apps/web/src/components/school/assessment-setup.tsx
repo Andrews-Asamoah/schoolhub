@@ -17,6 +17,7 @@ import {
   bandRangeLabel,
 } from "@/lib/assessment-setup";
 import { useCanExportTables } from "@/lib/table-export-policy";
+import { confirmAction } from "@/components/ui/confirm-host";
 
 const iconButton =
   "inline-flex size-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-40";
@@ -176,7 +177,7 @@ export function AssessmentSetupWorkspace() {
             aria-label={`Delete ${template.name}`}
             title={template.marksRecorded ? "Has marks, turn it off instead" : "Delete"}
             disabled={change.isPending || template.marksRecorded > 0}
-            onClick={() => window.confirm(`Delete “${template.name}”? This cannot be undone.`) && change.mutate({ path: `templates/${template.id}`, method: "DELETE", message: `Deleted “${template.name}”.` })}
+            onClick={() => void confirmAction({ title: "Delete assessment?", description: `Delete “${template.name}”? This cannot be undone.`, confirmLabel: "Delete", danger: true }).then((ok) => { if (ok) change.mutate({ path: `templates/${template.id}`, method: "DELETE", message: `Deleted “${template.name}”.` }); })}
           ><Trash2 className="size-4" /></button>
         </div>
       ),
@@ -326,7 +327,7 @@ export function AssessmentSetupWorkspace() {
                           aria-label={`Delete ${system.name}`}
                           title={system.usedBy ? "In use" : "Delete"}
                           disabled={change.isPending || system.usedBy > 0}
-                          onClick={() => window.confirm(`Delete the “${system.name}” grading scale?`) && change.mutate({ path: `grading-systems/${system.id}`, method: "DELETE", message: `Deleted “${system.name}”.` })}
+                          onClick={() => void confirmAction({ title: "Delete grading scale?", description: `Delete the “${system.name}” grading scale?`, confirmLabel: "Delete", danger: true }).then((ok) => { if (ok) change.mutate({ path: `grading-systems/${system.id}`, method: "DELETE", message: `Deleted “${system.name}”.` }); })}
                         ><Trash2 className="size-4" /></button>
                       )}
                     </div>

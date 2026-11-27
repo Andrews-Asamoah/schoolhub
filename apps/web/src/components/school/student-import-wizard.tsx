@@ -30,6 +30,7 @@ import {
   type RowStatus,
 } from "@/lib/student-import";
 import { exportPdf, exportXlsx, printTable } from "@/lib/table-export";
+import { confirmAction } from "@/components/ui/confirm-host";
 
 type Phase = "upload" | "review" | "importing" | "done";
 type Filter = "all" | "attention" | "ready" | "duplicate";
@@ -91,8 +92,13 @@ export function StudentImportWizard({
 
   const closeRef = useRef<() => void>(() => undefined);
   closeRef.current = () => {
-    if (phase === "importing" && !window.confirm("The import is still running. Stop and close?")) return;
-    if (unsavedLogins && !window.confirm("You haven't saved the login details yet. They can't be shown again. Close anyway?")) return;
+    void (async () => {
+      if (phase === "importing" && !(await confirmAction({ title: "Stop the import?", description: "The import is still running. Stop and close?", confirmLabel: "Stop and close", danger: true }))) return;
+      if (unsavedLogins && !(await confirmAction({ title: "Login details not saved", description: "You haven't saved the login details yet. They can't be shown again. Close anyway?", confirmLabel: "Close anyway", danger: true }))) return;
+      finishClose();
+    })();
+  };
+  const finishClose = () => {
     stopRequested.current = true;
     if (results.some((result) => result.status === "created")) {
       void queryClient.invalidateQueries({ queryKey: ["students"] });

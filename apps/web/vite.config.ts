@@ -19,6 +19,21 @@ export default defineConfig({
     // Native Vite 8 tsconfig path alias support — replaces vite-tsconfig-paths plugin
     tsconfigPaths: true,
   },
+  build: {
+    // Hidden source maps are uploaded to the error tracker by CI and never referenced by the served files.
+    sourcemap: "hidden",
+    rolldownOptions: {
+      output: {
+        codeSplitting: {
+          groups: [
+            { name: "react", test: /node_modules[\\/](react|react-dom|scheduler)[\\/]/, priority: 30 },
+            { name: "tanstack", test: /node_modules[\\/]@tanstack[\\/]/, priority: 20 },
+            { name: "recharts", test: /node_modules[\\/](recharts|d3-[^\\/]+|victory-vendor)[\\/]/, priority: 10 },
+          ],
+        },
+      },
+    },
+  },
   server: {
     port: 5173,
     // Proxy API & auth calls to NestJS backend during development.

@@ -38,52 +38,80 @@ export function errorText(error: unknown, fallback = "Something went wrong.") {
 
 export { getTenantSubdomain as getClientSubdomain } from "./tenant-subdomain";
 
+const ROLE_KEY = "schoolhub-active-role";
+const ACCOUNTANT_PERIOD_KEY = "schoolhub-accountant-academic-view";
+
+/** Tenant, active-role and accountant-period headers shared by every API call. */
+function buildHeaders(path: string, initial?: HeadersInit): Headers {
+  const headers = new Headers(initial);
+  const subdomain = getClientSubdomain();
+  if (subdomain) headers.set("x-school-subdomain", subdomain);
+  if (typeof window === "undefined" || path === "/schools/roles") return headers;
+
+  const activeRole = window.localStorage.getItem(ROLE_KEY);
+  if (activeRole) headers.set("x-school-role", activeRole);
+  if (activeRole === "accountant") {
+    const period = window.sessionStorage.getItem(ACCOUNTANT_PERIOD_KEY);
+    if (period) {
+      try {
+        const parsed = JSON.parse(period) as { academicYearId?: unknown; termId?: unknown };
+        if (typeof parsed.academicYearId === "string" && typeof parsed.termId === "string") {
+          headers.set("x-academic-year-id", parsed.academicYearId);
+          headers.set("x-academic-term-id", parsed.termId);
+        }
+      } catch {
+        window.sessionStorage.removeItem(ACCOUNTANT_PERIOD_KEY);
+      }
+    }
+  }
+  return headers;
+}
+
+type UnauthorizedHandler = () => void;
+let unauthorizedHandler: UnauthorizedHandler | null = null;
+/** Registered once by the app shell so an expired session can use SPA navigation. */
+export function setUnauthorizedHandler(handler: UnauthorizedHandler | null) {
+  unauthorizedHandler = handler;
+}
+
+// Paths where a 401 is an expected answer (wrong password, no session yet), not an expiry.
+const AUTH_PAGES = ["/login", "/forgot-password", "/reset-password", "/apply", "/change-password", "/two-factor-setup", "/subscription-inactive"];
+
+/** Redirects for account gates (password change, subscription, 2FA) and session expiry. */
+function handleGate(status: number, body: unknown, path: string) {
+  if (typeof window === "undefined") return;
+  const info = body as { error?: string; reason?: string; audience?: string };
+  const here = window.location.pathname;
+
+  if (status === 401) {
+    if (path.startsWith("/auth") || AUTH_PAGES.includes(here)) return;
+    unauthorizedHandler?.();
+    return;
+  }
+  if (status !== 403) return;
+  // An administrator-issued password is still in force: every business endpoint refuses until it is replaced.
+  if (info.error === "PASSWORD_CHANGE_REQUIRED" && here !== "/change-password") {
+    window.location.assign("/change-password");
+  }
+  // The school's subscription is suspended, cancelled or expired: show one clear explanation.
+  if (info.error === "SUBSCRIPTION_INACTIVE" && here !== "/subscription-inactive") {
+    window.location.assign(`/subscription-inactive?reason=${encodeURIComponent(info.reason ?? "EXPIRED")}`);
+  }
+  // A second factor is mandatory for this account but not set up yet.
+  if (info.error === "TWO_FACTOR_REQUIRED" && here !== "/two-factor-setup") {
+    window.location.assign(`/two-factor-setup?audience=${encodeURIComponent(info.audience ?? "school-admin")}`);
+  }
+}
+
 export async function apiFetch<T>(
   path: string,
   init?: RequestInit,
 ): Promise<T> {
   const contextVersion=requestContextVersion();
-  const headers = new Headers(init?.headers);
+  const headers = buildHeaders(path, init?.headers);
   // Let the browser set the multipart boundary for file uploads.
   if (!(init?.body instanceof FormData)) {
     headers.set("Content-Type", "application/json");
-  }
-
-  const subdomain = getClientSubdomain();
-  if (subdomain) {
-    headers.set("x-school-subdomain", subdomain);
-  }
-
-  if (
-    typeof window !== "undefined" &&
-    path !== "/schools/roles"
-  ) {
-    const activeRole = window.localStorage.getItem("schoolhub-active-role");
-    if (activeRole) headers.set("x-school-role", activeRole);
-    if (activeRole === "accountant") {
-      const period = window.sessionStorage.getItem(
-        "schoolhub-accountant-academic-view",
-      );
-      if (period) {
-        try {
-          const parsed = JSON.parse(period) as {
-            academicYearId?: unknown;
-            termId?: unknown;
-          };
-          if (
-            typeof parsed.academicYearId === "string" &&
-            typeof parsed.termId === "string"
-          ) {
-            headers.set("x-academic-year-id", parsed.academicYearId);
-            headers.set("x-academic-term-id", parsed.termId);
-          }
-        } catch {
-          window.sessionStorage.removeItem(
-            "schoolhub-accountant-academic-view",
-          );
-        }
-      }
-    }
   }
 
   const res = await fetch(`${API_BASE}${path}`, {
@@ -96,38 +124,7 @@ export async function apiFetch<T>(
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
     assertRequestContext(contextVersion);
-    // An administrator-issued password is still in force: every business
-    // endpoint refuses until it is replaced, so send the user to do that.
-    if (
-      res.status === 403 &&
-      (body as { error?: string }).error === "PASSWORD_CHANGE_REQUIRED" &&
-      typeof window !== "undefined" &&
-      window.location.pathname !== "/change-password"
-    ) {
-      window.location.assign("/change-password");
-    }
-    // The school's subscription is suspended, cancelled or expired: every
-    // business endpoint refuses, so show one clear explanation instead of
-    // a page full of failed requests.
-    if (
-      res.status === 403 &&
-      (body as { error?: string }).error === "SUBSCRIPTION_INACTIVE" &&
-      typeof window !== "undefined" &&
-      window.location.pathname !== "/subscription-inactive"
-    ) {
-      const reason = (body as { reason?: string }).reason ?? "EXPIRED";
-      window.location.assign(`/subscription-inactive?reason=${encodeURIComponent(reason)}`);
-    }
-    // A second factor is mandatory for this account but not set up yet.
-    if (
-      res.status === 403 &&
-      (body as { error?: string }).error === "TWO_FACTOR_REQUIRED" &&
-      typeof window !== "undefined" &&
-      window.location.pathname !== "/two-factor-setup"
-    ) {
-      const audience = (body as { audience?: string }).audience ?? "school-admin";
-      window.location.assign(`/two-factor-setup?audience=${encodeURIComponent(audience)}`);
-    }
+    handleGate(res.status, body, path);
     throw new ApiError(
       res.status,
       (body as { message?: string }).message ?? res.statusText,
@@ -150,28 +147,7 @@ export async function apiFetch<T>(
  */
 async function apiBinary(path: string): Promise<Response> {
   const contextVersion=requestContextVersion();
-  const headers = new Headers();
-  const subdomain = getClientSubdomain();
-  if (subdomain) headers.set("x-school-subdomain", subdomain);
-
-  if (typeof window !== "undefined" && path !== "/schools/roles") {
-    const activeRole = window.localStorage.getItem("schoolhub-active-role");
-    if (activeRole) headers.set("x-school-role", activeRole);
-    if (activeRole === "accountant") {
-      const period = window.sessionStorage.getItem("schoolhub-accountant-academic-view");
-      if (period) {
-        try {
-          const parsed = JSON.parse(period) as { academicYearId?: unknown; termId?: unknown };
-          if (typeof parsed.academicYearId === "string" && typeof parsed.termId === "string") {
-            headers.set("x-academic-year-id", parsed.academicYearId);
-            headers.set("x-academic-term-id", parsed.termId);
-          }
-        } catch {
-          window.sessionStorage.removeItem("schoolhub-accountant-academic-view");
-        }
-      }
-    }
-  }
+  const headers = buildHeaders(path);
 
   const response = await fetch(`${API_BASE}${path}`, {
     method: "GET",
@@ -183,17 +159,7 @@ async function apiBinary(path: string): Promise<Response> {
   if (!response.ok) {
     const body = await response.json().catch(() => ({}));
     assertRequestContext(contextVersion);
-    if (response.status === 403 && (body as { error?: string }).error === "PASSWORD_CHANGE_REQUIRED" && typeof window !== "undefined" && window.location.pathname !== "/change-password") {
-      window.location.assign("/change-password");
-    }
-    if (response.status === 403 && (body as { error?: string }).error === "TWO_FACTOR_REQUIRED" && typeof window !== "undefined" && window.location.pathname !== "/two-factor-setup") {
-      const audience = (body as { audience?: string }).audience ?? "school-admin";
-      window.location.assign(`/two-factor-setup?audience=${encodeURIComponent(audience)}`);
-    }
-    if (response.status === 403 && (body as { error?: string }).error === "SUBSCRIPTION_INACTIVE" && typeof window !== "undefined" && window.location.pathname !== "/subscription-inactive") {
-      const reason = (body as { reason?: string }).reason ?? "EXPIRED";
-      window.location.assign(`/subscription-inactive?reason=${encodeURIComponent(reason)}`);
-    }
+    handleGate(response.status, body, path);
     throw new ApiError(response.status, (body as { message?: string }).message ?? response.statusText, body);
   }
 

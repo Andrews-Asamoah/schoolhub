@@ -39,6 +39,7 @@ import {
 } from "@/components/credentials/credentials-dialog";
 import { BulkImportButton } from "@/components/bulk-import/bulk-import-button";
 import { LabeledTextField, labeledInputClasses } from "@/components/forms/labeled-controls";
+import { confirmAction } from "@/components/ui/confirm-host";
 
 interface Student {
   id: string;
@@ -306,13 +307,12 @@ export function StudentDirectoryWorkspace() {
                     disabled={resetLoginMutation.isPending}
                     onClick={() => {
                       const name = formatPersonName(student.profile);
-                      if (
-                        window.confirm(
-                          `Issue a new temporary password for ${name}? Their current password will stop working and they will be signed out.`,
-                        )
-                      ) {
-                        resetLoginMutation.mutate({ id: student.id, name });
-                      }
+                      void confirmAction({
+                        title: "Reset login?",
+                        description: `Issue a new temporary password for ${name}? Their current password will stop working and they will be signed out.`,
+                        confirmLabel: "Issue new password",
+                        danger: true,
+                      }).then((ok) => { if (ok) resetLoginMutation.mutate({ id: student.id, name }); });
                     }}
                     className="rounded-md px-2 py-1.5 text-xs font-semibold text-primary hover:bg-primary/10 disabled:opacity-50"
                   >

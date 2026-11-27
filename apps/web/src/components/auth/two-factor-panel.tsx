@@ -128,7 +128,7 @@ export function TwoFactorPanel({ required = false, onEnabled }: TwoFactorPanelPr
     setStep("scan");
   }
 
-  async function confirm(event: FormEvent) {
+  async function confirmCode(event: FormEvent) {
     event.preventDefault();
     setBusy(true); setError(null);
     const result = await authClient.twoFactor.verifyTotp({ code: code.replace(/\s/g, "") });
@@ -194,7 +194,7 @@ export function TwoFactorPanel({ required = false, onEnabled }: TwoFactorPanelPr
           </li>
           <li className="flex gap-3">
             <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">3</span>
-            <form onSubmit={(event) => void confirm(event)} className="min-w-0 flex-1 space-y-3">
+            <form onSubmit={(event) => void confirmCode(event)} className="min-w-0 flex-1 space-y-3">
               <div>
                 <p className="text-sm font-bold text-foreground">Enter the 6-digit code to finish</p>
                 <p className="mt-0.5 text-xs text-muted-foreground">Two-factor authentication turns on only after a correct code.</p>

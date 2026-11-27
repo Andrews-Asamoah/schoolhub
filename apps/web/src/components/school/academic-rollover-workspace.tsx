@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSchoolRole } from "./school-role-switcher";
 import { apiFetch } from "@/lib/api";
+import { confirmAction } from "@/components/ui/confirm-host";
 type Decision={studentId:string;action:'PROMOTED'|'REPEATED'|'GRADUATED'|'SKIPPED';toClassId:string|null;reason:string};
 type Plan={fromYearId:string;fromTermId:string;toYearId:string;toTermId:string;policy:{name:string;version:string;basis:string;requiresPublishedReport:boolean};decisions:Decision[]};
 type Options={years:{id:string;name:string;isCurrent:boolean;terms:{id:string;name:string}[]}[];classes:{id:string;name:string;level:string;academicYearId:string|null}[]};
@@ -40,7 +41,7 @@ function RolloverManager(){
  <label className="block">Approval, cancellation or rollback reason<textarea className={input+' block w-full'} value={note} minLength={10} maxLength={1000} onChange={event=>setNote(event.target.value)}/></label>
  {reviewer&&batch.status==='PENDING'&&[true,false].map(approve=><button key={String(approve)} className={input} disabled={action.isPending||note.trim().length<10} onClick={()=>action.mutate(()=>command(batch.id,'decide',{approve,note}))}>{approve?'Approve rollover':'Reject rollover'}</button>)}
  {['PENDING','APPROVED'].includes(batch.status)&&<button className={input} disabled={action.isPending||note.trim().length<10} onClick={()=>action.mutate(()=>command(batch.id,'cancel',{reason:note}))}>Cancel unapplied batch</button>}
- {batch.status==='APPROVED'&&<button className={input} disabled={action.isPending} onClick={()=>{if(window.confirm('Apply all reviewed decisions and switch the current academic year?'))action.mutate(()=>command(batch.id,'apply'));}}>Apply approved rollover</button>}
+ {batch.status==='APPROVED'&&<button className={input} disabled={action.isPending} onClick={()=>{void confirmAction({title:'Apply rollover?',description:'Apply all reviewed decisions and switch the current academic year? This changes the current academic year for the whole school.',confirmLabel:'Apply rollover',danger:true}).then(ok=>{if(ok)action.mutate(()=>command(batch.id,'apply'));});}}>Apply approved rollover</button>}
  {batch.status==='APPLIED'&&<button className={input} disabled={action.isPending||note.trim().length<10} onClick={()=>action.mutate(()=>command(batch.id,'request-rollback',{reason:note}))}>Request guarded rollback</button>}
  {batch.status==='ROLLBACK_PENDING'&&<><p>Rollback reason: {batch.rollbackReason}</p>{reviewer&&[true,false].map(approve=><button key={String(approve)} className={input} disabled={action.isPending||note.trim().length<10} onClick={()=>action.mutate(()=>command(batch.id,'decide-rollback',{approve,note}))}>{approve?'Approve guarded rollback':'Reject rollback'}</button>)}</>}
  <p className="text-xs text-muted-foreground">Rollback requires a different reviewer and is blocked after attendance, assessments, billing, reports, submissions or placement/context changes. It preserves promotion history with reversal markers.</p>

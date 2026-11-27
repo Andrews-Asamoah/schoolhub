@@ -8,6 +8,7 @@ import {
   Logger,
 } from "@nestjs/common";
 import type { Request, Response } from "express";
+import { reportServerError } from "../error-reporting.js";
 
 interface PrismaLikeError {
   code: string;
@@ -97,6 +98,13 @@ export class GlobalExceptionFilter implements ExceptionFilter {
         `[${errorId}] ${request.method} ${request.url} -> ${detail}`,
         exception instanceof Error ? exception.stack : undefined,
       );
+      const tenant = request.headers["x-school-subdomain"];
+      reportServerError(exception, {
+        errorId,
+        tenant: typeof tenant === "string" ? tenant : undefined,
+        // Route pattern, not the URL, so ids never become part of the tag.
+        route: `${request.method} ${request.route?.path ?? "unmatched"}`,
+      });
       message = `Internal server error (ref ${errorId})`;
     }
 

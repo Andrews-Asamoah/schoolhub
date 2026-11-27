@@ -42,9 +42,17 @@ function LoginPage() {
       ? getClientSubdomain()
       : null,
   );
+  // Where an expired session came from. Only same-origin paths are accepted.
+  const [returnTo] = useState(() => {
+    const value = new URLSearchParams(window.location.search).get("redirect");
+    return value && value.startsWith("/") && !value.startsWith("//") && !value.startsWith("/login") ? value : null;
+  });
   const finishSignIn = useCallback((user: { role?: string | null; mustChangePassword?: boolean | null } | undefined) => {
     if (user?.mustChangePassword) {
       return navigate({ to: "/change-password", replace: true });
+    }
+    if (returnTo) {
+      return navigate({ href: returnTo, replace: true });
     }
     if (user?.role === "superAdmin") {
       return navigate({ to: "/admin/dashboard", replace: true });
@@ -56,7 +64,7 @@ function LoginPage() {
       });
     }
     return navigate({ to: "/dashboard", replace: true });
-  }, [feesSchool, navigate]);
+  }, [feesSchool, navigate, returnTo]);
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");

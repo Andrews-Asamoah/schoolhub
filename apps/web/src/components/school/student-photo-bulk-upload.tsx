@@ -5,6 +5,7 @@ import { BulkImportDialog } from "@/components/bulk-import/bulk-import-dialog";
 import { FileDropzone } from "@/components/bulk-import/file-dropzone";
 import { Button } from "@/components/ui/button";
 import { apiFetch } from "@/lib/api";
+import { confirmAction } from "@/components/ui/confirm-host";
 
 const MAX_IMAGE_BYTES = 2 * 1024 * 1024;
 const MAX_FILES = 250;
@@ -39,9 +40,8 @@ export function StudentPhotoBulkUpload({
   const closeRef = useRef<() => void>(() => undefined);
   closeRef.current = () => {
     if (busy) {
-      if (window.confirm("Stop after the current photo batch finishes? Already uploaded photos will be kept.")) {
-        stopRequested.current = true;
-      }
+      void confirmAction({ title: "Stop uploading?", description: "Stop after the current photo batch finishes? Already uploaded photos will be kept.", confirmLabel: "Stop after this batch" })
+        .then((ok) => { if (ok) stopRequested.current = true; });
       return;
     }
     onClose();

@@ -19,6 +19,7 @@ import type { ExportTable } from "@/lib/table-export";
 import { useSchoolRole } from "@/components/school/school-role-switcher";
 import { TimetableBulkImport } from "@/components/school/timetable-bulk-import";
 import { apiFetch } from "@/lib/api";
+import { confirmAction } from "@/components/ui/confirm-host";
 
 interface Period { id: string; name: string; startTime: string; endTime: string; sortOrder: number; departmentId: string | null }
 interface Department { id: string; name: string; code: string }
@@ -696,7 +697,7 @@ function PeriodManager({
                 className="rounded-md p-1.5 text-destructive hover:bg-destructive/10"
                 aria-label={`Delete ${period.name}`}
                 disabled={remove.isPending}
-                onClick={() => { if (window.confirm(`Delete ${period.name}?`)) remove.mutate(period.id); }}
+                onClick={() => { void confirmAction({ title: "Delete period?", description: `Delete ${period.name}?`, confirmLabel: "Delete", danger: true }).then((ok) => { if (ok) remove.mutate(period.id); }); }}
               ><Trash2 className="size-3.5" /></button>
             </span>
           </li>
@@ -831,7 +832,7 @@ function RoomManager({ rooms, onClose, onChanged }: { rooms: Room[]; onClose: ()
                 className="rounded-md p-1.5 text-destructive hover:bg-destructive/10"
                 aria-label={`Delete ${room.name}`}
                 disabled={remove.isPending}
-                onClick={() => { if (window.confirm(`Delete ${room.name}? Lessons keep running without a room.`)) remove.mutate(room.id); }}
+                onClick={() => { void confirmAction({ title: "Delete room?", description: `Delete ${room.name}? Lessons keep running without a room.`, confirmLabel: "Delete", danger: true }).then((ok) => { if (ok) remove.mutate(room.id); }); }}
               ><Trash2 className="size-3.5" /></button>
             </span>
           </li>

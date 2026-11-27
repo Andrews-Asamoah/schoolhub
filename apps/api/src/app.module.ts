@@ -1,7 +1,8 @@
 import { PasswordRecoveryModule } from "./modules/accounts/password-recovery/password-recovery.module.js";
 import { Module } from "@nestjs/common";
-import { APP_FILTER } from "@nestjs/core";
+import { APP_FILTER, APP_GUARD } from "@nestjs/core";
 import { ThrottlerModule } from "@nestjs/throttler";
+import { TenantThrottlerGuard } from "./common/guards/tenant-throttler.guard.js";
 import { AuthModule } from "@thallesp/nestjs-better-auth";
 import { auth } from "./auth/auth.js";
 import { HealthController } from "./health.controller.js";
@@ -38,8 +39,9 @@ import { DashboardModule } from "./modules/dashboard/dashboard.module.js";
 
 @Module({
   imports: [
-    // Named limit used by @UseGuards(ThrottlerGuard) on sensitive controllers.
-    // Deliberately NOT a global guard: many pupils share one school IP address.
+    // Default limit for every route (TenantThrottlerGuard, below). Buckets are per tenant and user,
+    // not per IP, because many pupils share one school IP address. Sensitive controllers keep their
+    // own stricter @Throttle rules.
     ThrottlerModule.forRoot([{ name: "default", ttl: 60_000, limit: 120 }]),
     PrismaModule,
     JobsModule,
@@ -83,6 +85,7 @@ import { DashboardModule } from "./modules/dashboard/dashboard.module.js";
       provide: APP_FILTER,
       useClass: GlobalExceptionFilter,
     },
+    { provide: APP_GUARD, useClass: TenantThrottlerGuard },
   ],
 })
 export class AppModule {}

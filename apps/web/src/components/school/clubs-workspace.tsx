@@ -27,6 +27,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { AcademicStructureBulkImport } from "@/components/school/academic-structure-bulk-import";
 import { BulkImportButton } from "@/components/bulk-import/bulk-import-button";
 import { labeledInputClasses } from "@/components/forms/labeled-controls";
+import { confirmAction } from "@/components/ui/confirm-host";
 
 interface ClubMemberRecord {
   id: string;
@@ -467,9 +468,8 @@ export function ClubsWorkspace() {
                       </button>
                       <button
                         onClick={() => {
-                          if (confirm(`Are you sure you want to delete "${club.name}"?`)) {
-                            deleteClubMutation.mutate(club.id);
-                          }
+                          void confirmAction({ title: "Delete club?", description: `Are you sure you want to delete "${club.name}"?`, confirmLabel: "Delete", danger: true })
+                            .then((ok) => { if (ok) deleteClubMutation.mutate(club.id); });
                         }}
                         aria-label="Delete club"
                         className="rounded-lg p-1.5 text-muted-foreground/70 hover:bg-destructive/10 hover:text-destructive"
@@ -706,12 +706,9 @@ export function ClubsWorkspace() {
                         {canManage && (
                           <button
                             onClick={() => {
-                              if (confirm("Remove student from this club?")) {
-                                removeMemberMutation.mutate({
-                                  clubId: selectedClubForMembers.id,
-                                  studentId: m.studentId,
-                                });
-                              }
+                              const clubId = selectedClubForMembers.id;
+                              void confirmAction({ title: "Remove student?", description: "Remove student from this club?", confirmLabel: "Remove", danger: true })
+                                .then((ok) => { if (ok) removeMemberMutation.mutate({ clubId, studentId: m.studentId }); });
                             }}
                             className="rounded-lg p-1 text-muted-foreground/70 hover:bg-destructive/10 hover:text-destructive"
                           >

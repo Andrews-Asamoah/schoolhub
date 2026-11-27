@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CheckCircle2, ImagePlus, LoaderCircle, Trash2, UploadCloud, UserRoundPen } from "lucide-react";
 import { apiBlob, apiFetch } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { confirmAction } from "@/components/ui/confirm-host";
 
 type Person = {
   id: string;
@@ -135,7 +136,7 @@ export function SignaturesWorkspace() {
           <div className="mt-4 flex flex-wrap gap-2">
             <label htmlFor={inputId} className={cn(button, "cursor-pointer")}>{isUploading ? <LoaderCircle className="size-4 animate-spin" /> : <UploadCloud className="size-4" />}{isUploading ? "Uploading…" : signatureUrl ? "Replace signature" : "Upload signature"}</label>
             <input id={inputId} type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" disabled={isUploading} onChange={(event) => { const file = event.currentTarget.files?.[0]; event.currentTarget.value = ""; chooseFile(person, file); }} />
-            {signatureUrl && <button type="button" className={button} disabled={remove.isPending} onClick={() => { if (window.confirm("Remove the stored signature for " + personName(person) + "?")) remove.mutate(person); }}><Trash2 className="size-4" /> Remove</button>}
+            {signatureUrl && <button type="button" className={button} disabled={remove.isPending} onClick={() => { void confirmAction({ title: "Remove signature?", description: "Remove the stored signature for " + personName(person) + "?", confirmLabel: "Remove", danger: true }).then((ok) => { if (ok) remove.mutate(person); }); }}><Trash2 className="size-4" /> Remove</button>}
           </div>
           <p className="mt-3 text-xs leading-5 text-muted-foreground">PNG, JPEG or WebP · maximum 2 MB · drag an image onto the box above or use the button</p>
         </article>;
