@@ -80,6 +80,7 @@ test("the actual teacher navigator opens a detail and returns to its previous ta
       "(teacher)/teacher-clubs": () => <Text>Clubs</Text>,
       "(teacher)/teacher-announcement-new": () => <Text>New Announcement</Text>,
       "(teacher)/teacher-documents": () => <Text>Documents</Text>,
+      "(teacher)/teacher-payroll": () => <Text>My payroll</Text>,
     },
     { initialUrl: "/teacher-classes" },
   );
@@ -91,6 +92,11 @@ test("the actual teacher navigator opens a detail and returns to its previous ta
   );
   expect(screen.getByText("Class Register")).toBeVisible();
   expect(result.getSearchParams()).toEqual({ classId: "class-1" });
+  await testRouter.back("/teacher-classes");
+
+  await act(async () => router.push("/(teacher)/teacher-payroll"));
+  expect(screen.getByText("My payroll")).toBeVisible();
+  expect(screen.getByTestId("tab-state")).toHaveTextContent("index:detail");
   await testRouter.back("/teacher-classes");
 
   await act(async () =>

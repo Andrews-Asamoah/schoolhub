@@ -77,3 +77,13 @@ describe("all-role portal boundaries", () => {
     expect(canRoleAccessPage("student", "external-exams")).toBe(false);
   });
 });
+
+describe("teacher payroll navigation", () => {
+  it("shows teachers their own payroll and keeps the school payroll register restricted", () => {
+    expect(canRoleAccessPage("teacher", "teacher-payroll")).toBe(true);
+    expect(canRoleAccessPage("teacher", "payroll")).toBe(false);
+    for (const role of ["guardian", "student", "staff", "accountant", "headteacher", "admin", "owner"]) {
+      expect(canRoleAccessPage(role, "teacher-payroll")).toBe(false);
+    }
+  });
+});

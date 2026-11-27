@@ -46,6 +46,7 @@ const ClubsWorkspace = lazy(() => import("@/components/school/clubs-workspace").
 const TeacherPortalWorkspace = lazy(() => import("@/components/portal/teacher-portal-workspace").then((m) => ({ default: m.TeacherPortalWorkspace })));
 const AccountantPortalWorkspace = lazy(() => import("@/components/portal/accountant-portal-workspace").then((m) => ({ default: m.AccountantPortalWorkspace })));
 const ExpenseManagementWorkspace = lazy(() => import("@/components/portal/expense-management-workspace").then((m) => ({ default: m.ExpenseManagementWorkspace })));
+const TeacherPayrollWorkspace = lazy(() => import("@/components/portal/teacher-payroll-workspace").then((m) => ({ default: m.TeacherPayrollWorkspace })));
 const PayrollManagementWorkspace = lazy(() => import("@/components/portal/payroll-management-workspace").then((m) => ({ default: m.PayrollManagementWorkspace })));
 const FeeReminderWorkspace = lazy(() => import("@/components/portal/fee-reminder-workspace").then((m) => ({ default: m.FeeReminderWorkspace })));
 const InventoryManagementWorkspace = lazy(() => import("@/components/portal/inventory-management-workspace").then((m) => ({ default: m.InventoryManagementWorkspace })));
@@ -231,7 +232,7 @@ function WorkspaceContent({ pageId }: { pageId: string }) {
   return (
     <>
       {activeRole !== "student" &&
-        !["classes", "students", "teachers", "staff", "guardians", "teacher-portal", "accountant-portal", "fees", "concessions", "bus-users", "signatures", "payments", "invoices", "expenses", "payroll", "fee-reminders", "inventory", "outstanding", "finance-reports", "student-statements", "term-end-review", "guardian-portal", "guardian-attendance", "guardian-timetable", "guardian-reports", "guardian-notices", "guardian-fees", "documents", "messages", "notifications", "student-portal", "clubs", "houses", "assignments", "classmates", "announcements"].includes(
+        !["classes", "students", "teachers", "staff", "guardians", "teacher-portal", "teacher-payroll", "accountant-portal", "fees", "concessions", "bus-users", "signatures", "payments", "invoices", "expenses", "payroll", "fee-reminders", "inventory", "outstanding", "finance-reports", "student-statements", "term-end-review", "guardian-portal", "guardian-attendance", "guardian-timetable", "guardian-reports", "guardian-notices", "guardian-fees", "documents", "messages", "notifications", "student-portal", "clubs", "houses", "assignments", "classmates", "announcements"].includes(
           pageId,
         ) && (
         <WorkspacePageHeading
@@ -263,6 +264,7 @@ function WorkspaceContent({ pageId }: { pageId: string }) {
           {pageId === "finance-reports" && <AccountantPortalWorkspace defaultTab="reports" />}
           {pageId === "expenses" && <ExpenseManagementWorkspace />}
           {pageId === "payroll" && <PayrollManagementWorkspace />}
+          {pageId === "teacher-payroll" && <TeacherPayrollWorkspace />}
           {pageId === "fee-reminders" && <FeeReminderWorkspace />}
           {pageId === "inventory" && <InventoryManagementWorkspace />}
           {pageId === "documents" && <DocumentsWorkspace />}

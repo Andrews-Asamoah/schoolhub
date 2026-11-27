@@ -6,6 +6,7 @@ import {
   ClipboardList,
   Files,
   Megaphone,
+  ReceiptText,
   UsersRound,
 } from "lucide-react-native";
 import { PortalMenu, SchoolAccountMenu } from "@/components/PortalMenu";
@@ -60,6 +61,11 @@ export default function TeacherMore() {
             label: "Announcements",
             href: "/(shared)/announcements",
             icon: Megaphone,
+          },
+          {
+            label: "My payroll",
+            href: "/(teacher)/teacher-payroll",
+            icon: ReceiptText,
           },
           {
             label: "Staff documents",

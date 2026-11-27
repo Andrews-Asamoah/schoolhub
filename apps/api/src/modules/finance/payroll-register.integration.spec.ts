@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import ExcelJS from "exceljs";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { teacherPayslipSchema } from "@schoolhub/shared";
 import type { PrismaClient } from "@prisma/client";
 import type { FinanceService } from "./finance.service.js";
 import type { FinanceExportsService } from "./finance-exports.service.js";
@@ -162,4 +163,45 @@ describe.skipIf(!enabled)("payroll salary register and Tier 2 on PostgreSQL", { 
     await expect(service.transitionPayroll(schoolId, singleAccountantRun.id, { status: "PAID", paymentMethod: "BANK_TRANSFER" }, accountant))
       .resolves.toMatchObject({ status: "PAID" });
   });
+
+  it("shows teachers only their own approved and paid payslips, including PDF access", async () => {
+    const profile = await db.userProfile.create({ data: { userId: checker, firstName: "Payroll", lastName: "Teacher" } });
+    const teacher = await db.teacher.update({ where: { id: teacherId }, data: { profileId: profile.id } });
+    const otherTeacher = await db.teacher.create({ data: {
+      school: { connect: { id: schoolId } }, department: { connect: { id: teacher.departmentId } },
+      teacherId: "0002", monthlySalary: 1400,
+      profile: { create: { firstName: "Other", lastName: "Teacher", user: { create: {
+        id: key + "-other-teacher", name: "Other Teacher", email: key + "-other-teacher@test.invalid",
+      } } } },
+    } });
+    const { payrollRecord: run } = await service.generatePayrollDraft(schoolId, maker, {
+      month: 10, year: 2026, confirmResidentTaxTreatment: true,
+    });
+    const ownSlip = await db.payslip.findFirstOrThrow({ where: { schoolId, payrollRecordId: run.id, teacherId } });
+    const cancelledSlip = await db.payslip.findFirstOrThrow({ where: { schoolId, teacherId, payrollRecord: { status: "CANCELLED" } } });
+    const context = { schoolId, actorId: checker };
+    const options = { ownTeacherPayslip: true } as const;
+    await expect(exports.payslipPdf(context, ownSlip.id, options)).rejects.toThrow(/Payslip not found/);
+    await expect(exports.payslipPdf(context, cancelledSlip.id, options)).rejects.toThrow(/Payslip not found/);
+    expect((await service.listOwnTeacherPayslips(schoolId, checker)).map(slip => slip.id)).not.toContain(ownSlip.id);
+
+    await service.transitionPayroll(schoolId, run.id, { status: "APPROVED" }, owner);
+    const rows = teacherPayslipSchema.array().parse(JSON.parse(JSON.stringify(await service.listOwnTeacherPayslips(schoolId, checker))));
+    expect(rows.map(slip => [slip.payrollRecord.month, slip.payrollRecord.status])).toEqual([
+      [10, "APPROVED"], [9, "PAID"], [8, "PAID"], [7, "PAID"],
+    ]);
+    expect(rows[0]).toMatchObject({ id: ownSlip.id, netSalary: ownSlip.netSalary.toString() });
+    expect(await service.listOwnTeacherPayslips(schoolId, maker)).toEqual([]);
+    expect(await service.listOwnTeacherPayslips("other-school", checker)).toEqual([]);
+    const pdf = await exports.payslipPdf(context, ownSlip.id, options);
+    expect(pdf.buffer.subarray(0, 5).toString()).toBe("%PDF-");
+    const otherSlip = await db.payslip.findFirstOrThrow({ where: { schoolId, payrollRecordId: run.id, teacherId: otherTeacher.id } });
+    expect((await service.listOwnTeacherPayslips(schoolId, key + "-other-teacher")).map(slip => slip.id)).toEqual([otherSlip.id]);
+    await expect(exports.payslipPdf(context, otherSlip.id, options)).rejects.toThrow(/Payslip not found/);
+    const staffSlip = await db.payslip.findFirstOrThrow({ where: { schoolId, payrollRecordId: run.id, staffId } });
+    await expect(exports.payslipPdf(context, staffSlip.id, options)).rejects.toThrow(/Payslip not found/);
+    await expect(exports.payslipPdf({ ...context, actorId: maker }, ownSlip.id, options)).rejects.toThrow(/Payslip not found/);
+    await expect(exports.payslipPdf({ ...context, schoolId: "other-school" }, ownSlip.id, options)).rejects.toThrow(/Payslip not found/);
+  });
+
 });

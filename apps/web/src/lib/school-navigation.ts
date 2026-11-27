@@ -353,6 +353,14 @@ export const schoolNavGroups: SchoolNavGroup[] = [
         apiStatus: "available",
       },
       {
+        id: "teacher-payroll",
+        label: "My payroll",
+        icon: BadgeDollarSign,
+        description: "View your approved payslips and payment status.",
+        section: "Finance",
+        apiStatus: "available",
+      },
+      {
         id: "payroll",
         label: "Payroll",
         icon: BadgeDollarSign,
@@ -575,7 +583,7 @@ const adminRestrictedFinancePages = new Set([
   "finance-reports",
 ]);
 
-const personalPages = new Set(["guardian-portal", "guardian-attendance", "guardian-timetable", "guardian-reports", "guardian-notices", "guardian-fees", "student-portal", "teacher-portal", "classmates"]);
+const personalPages = new Set(["guardian-portal", "guardian-attendance", "guardian-timetable", "guardian-reports", "guardian-notices", "guardian-fees", "student-portal", "teacher-portal", "teacher-payroll", "classmates"]);
 /**
  * The headteacher sees an explicit allowlist, so a page added later is hidden from them until it is
  * listed here. Payroll, payments, invoices, expenses, the ledger and audit trail, finance reports,
@@ -608,6 +616,7 @@ const rolePages: Record<string, string[]> = {
     .filter((item) => !adminRestrictedFinancePages.has(item.id) && !personalPages.has(item.id) && !headteacherOnlyPages.has(item.id))
     .map((item) => item.id),
   teacher: [
+    "teacher-payroll",
     "external-exams",
     "mock-analysis",
     "students",

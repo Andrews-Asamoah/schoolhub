@@ -2,6 +2,7 @@ import { FinanceCloseService } from "./finance-close.service.js";
 import { FinanceBankReconciliationController } from "./finance-bank-reconciliation.controller.js";
 import { FinanceBankReconciliationService } from "./finance-bank-reconciliation.service.js";
 import { Module } from "@nestjs/common";
+import { TeacherPayslipsController } from "./teacher-payslips.controller.js";
 import { FinanceController } from "./finance.controller.js";
 import { FinanceAccountPurposeController } from "./finance-account-purpose.controller.js";
 import { FinanceAccountPurposeService } from "./finance-account-purpose.service.js";
@@ -28,7 +29,7 @@ import { FinanceApprovalSettingsController } from "./finance-approval-settings.c
 import { FinanceApprovalSettingsService } from "./finance-approval-settings.service.js";
 
 @Module({
-  controllers: [FinanceBankReconciliationController, FinanceAccountPurposeController, FinanceController, FinanceRevenueController, FinancePeriodsController, FinanceManualJournalsController, FinanceApprovalSettingsController],
+  controllers: [FinanceBankReconciliationController, FinanceAccountPurposeController, FinanceController, FinanceRevenueController, FinancePeriodsController, FinanceManualJournalsController, FinanceApprovalSettingsController, TeacherPayslipsController],
   providers: [FinanceCloseService, FinanceBankReconciliationService, FinanceReceivableAdjustmentsService, FinanceAccountPurposeService, FinanceManualJournalsService, FinancePeriodPreparationService, FinanceRevenueAdjustmentsService, FinanceService, FinanceExportsService, FinanceApprovalService, FinancePostingService, FinanceLedgerIntegrityService, FinanceAuditInterceptor,
     PayrollSettingsService, FinanceBreakdownService, FinanceActionCentreService, FinanceApprovalSettingsService, FinanceIntegrityJob, DatabaseFinanceRateLimitStore, { provide: FINANCE_RATE_LIMIT_STORE, useExisting: DatabaseFinanceRateLimitStore }],
   exports: [FinanceService, FinanceApprovalService],

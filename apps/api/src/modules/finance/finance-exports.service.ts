@@ -5,6 +5,7 @@ import { MAX_REPORT_IMAGE_INPUT_BYTES, reportImageDataUrl } from "../assessments
 import { R2Service } from "../storage/r2.service.js";
 import { jsPDF } from "jspdf";
 import { autoTable } from "jspdf-autotable";
+import { ownTeacherPayslipScope } from "./teacher-payslips.js";
 import { decryptPayrollDetails } from "./payroll/payroll-details-crypto.js";
 import { PrismaService } from "../../prisma/prisma.service.js";
 import { buildFinanceWorkbook, type FinanceExportCell, type FinanceWorkbookInput } from "./finance-exports.helpers.js";
@@ -615,18 +616,21 @@ export class FinanceExportsService {
     return { buffer, fileName: "student-statement-" + (student.admissionNumber ?? student.id) + ".pdf", contentType: "application/pdf" };
   }
 
-  async payslipPdf(context: FinanceExportContext, payslipId: string): Promise<FinanceExportFile> {
-    const school = await this.school(context.schoolId);
+  async payslipPdf(context: FinanceExportContext, payslipId: string, options?: { ownTeacherPayslip: true }): Promise<FinanceExportFile> {
     const slip = await this.prisma.client.payslip.findFirst({
-      where: { id: payslipId, schoolId: context.schoolId },
+      where: {
+        id: payslipId, schoolId: context.schoolId,
+        ...(options?.ownTeacherPayslip ? ownTeacherPayslipScope(context.schoolId, context.actorId) : {}),
+      },
       include: {
         payrollRecord: { select: { id: true, month: true, year: true, status: true, schoolId: true } },
-        staff: { select: { staffId: true, profile: { select: { firstName: true, lastName: true } } } },
-        teacher: { select: { teacherId: true, profile: { select: { firstName: true, lastName: true } } } },
+        staff: { select: { staffId: true, profile: { select: { firstName: true, otherNames: true, lastName: true } } } },
+        teacher: { select: { teacherId: true, profile: { select: { firstName: true, otherNames: true, lastName: true } } } },
       },
     });
     if (!slip || slip.payrollRecord.schoolId !== context.schoolId) throw new NotFoundException("Payslip not found.");
 
+    const school = await this.school(context.schoolId);
     const period = String(slip.payrollRecord.year) + "-" + String(slip.payrollRecord.month).padStart(2, "0");
     const employee = studentName({
       profile: slip.staff?.profile ?? slip.teacher?.profile,

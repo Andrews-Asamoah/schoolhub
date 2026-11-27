@@ -40,6 +40,7 @@ export default function TeacherLayout() {
                 "teacher-timetable": "index",
                 "teacher-clubs": "index",
                 "teacher-documents": "index",
+                "teacher-payroll": "index",
                 "teacher-announcement-new": "index",
               }}
               hues={{
@@ -155,6 +156,10 @@ export default function TeacherLayout() {
           />
           <Tabs.Screen
             name="teacher-announcement-new"
+            options={{ tabBarButton: detailTabButton }}
+          />
+          <Tabs.Screen
+            name="teacher-payroll"
             options={{ tabBarButton: detailTabButton }}
           />
           <Tabs.Screen

@@ -13,6 +13,7 @@ import {
   Megaphone,
   Menu,
   MessageCircle,
+  ReceiptText,
   UserRound,
   UsersRound,
   type LucideIcon,
@@ -140,6 +141,15 @@ export function PortalDrawerProvider({
         {
           title: "Account",
           links: [
+            ...(role === "teacher"
+              ? [
+                  {
+                    label: "My payroll",
+                    href: "/(teacher)/teacher-payroll" as const,
+                    icon: ReceiptText,
+                  },
+                ]
+              : []),
             {
               label: "Profile and settings",
               href: portalToolHref(role, "/profile"),
