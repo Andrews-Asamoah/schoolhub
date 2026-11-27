@@ -93,9 +93,15 @@ describe("finance controller routes", () => {
   });
   it("gives every write route (POST/PATCH/PUT/DELETE) the finance write roles", () => {
     const approvals = (r: { route: string }) => /payroll\/settings\/:kind\/:id\/(activate|end)/.test(r.route);
-    for (const route of routes.filter((r) => r.verb !== "Get" && !approvals(r))) {
+    for (const route of routes.filter((r) => r.verb !== "Get" && r.route !== '"payroll/:recordId/status"' && !approvals(r))) {
       expect(route.decorators, `${route.verb} ${route.route}`).toContain("@Roles(...FINANCE_WRITE_ROLES)");
     }
+  });
+  it("admits owners and accountants to payroll transitions; the service checks the operation", () => {
+    const transition = routes.find(route => route.verb === "Patch" && route.route === '"payroll/:recordId/status"');
+    expect(transition?.decorators).toContain("@Roles(...FINANCE_PAYROLL_EXPORT_ROLES)");
+    expect(check(FINANCE_PAYROLL_EXPORT_ROLES, { role: "user" }, "owner")()).toBe(true);
+    expect(check(FINANCE_PAYROLL_EXPORT_ROLES, { role: "user" }, "headteacher")).toThrow();
   });
   it("lets owner, headteacher and accountant reach the payroll setting approval routes and leaves the decision to the school's approval setting", () => {
     expect([...FINANCE_APPROVAL_ACTION_ROLES]).toEqual(["owner", "headteacher", "accountant"]);
@@ -150,7 +156,7 @@ describe("finance controller routes", () => {
     }
   });
   it("protects the payroll and salary JSON endpoints with explicit school-role checks", () => {
-    for (const name of ["listPayrollRecords", "getPayrollRecord", "listPayrollSalaryRegister", "getPayrollPaymentDetails", "updatePayrollPaymentDetails", "importPayrollSalaries", "exportPayrollTier2", "exportPayrollStatutoryReturn"]) {
+    for (const name of ["listPayrollRecords", "getPayrollRecord", "transitionPayroll", "listPayrollSalaryRegister", "getPayrollPaymentDetails", "updatePayrollPaymentDetails", "importPayrollSalaries", "exportPayrollTier2", "exportPayrollStatutoryReturn"]) {
       const method = controllerSource.slice(controllerSource.indexOf(name + "("), controllerSource.indexOf("\n  }", controllerSource.indexOf(name + "(")) + 4);
       expect(method).toContain("this.assertPayrollExportAllowed(user, schoolRole)");
     }

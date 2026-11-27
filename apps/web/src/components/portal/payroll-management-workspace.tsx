@@ -12,7 +12,9 @@ import { PayrollSettingsPanel } from "@/components/portal/payroll-settings-panel
 import { PortalModal } from "@/components/portal/portal-modal";
 import { cn } from "@/lib/utils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { FinanceReadOnlyNotice, useFinanceAccess } from "@/components/portal/finance-access";
+import { useFinanceAccess } from "@/components/portal/finance-access";
+import { useFinanceApproval } from "@/lib/finance-approval";
+import { useSession } from "@/lib/auth-client";
 import { LabeledField } from "@/components/forms/labeled-controls";
 
 type PayrollStatus = "DRAFT" | "APPROVED" | "PAID" | "CANCELLED";
@@ -51,6 +53,7 @@ interface PayrollRecord {
   totalTax: number | string;
   totalSSNIT: number | string;
   createdAt: string;
+  processedById?: string | null;
   /** Absent in the run list (loaded per run on demand); present on a single run. */
   payslips?: Payslip[];
   _count?: { payslips: number };
@@ -86,7 +89,16 @@ function personName(payslip: Payslip) {
   return name || (payslip.teacherId ? payslip.teacher?.teacherId : payslip.staff?.staffId) || "Unlinked employee";
 }
 export function PayrollManagementWorkspace() {
-  const { canWrite } = useFinanceAccess();
+  const { activeRole, canWrite } = useFinanceAccess();
+  const { data: session } = useSession();
+  const approval = useFinanceApproval("PAYROLL_RUN");
+  const approvalSetting = approval.setting;
+  const canApproveRole = !!approvalSetting && (approvalSetting.required
+    ? !!activeRole && approvalSetting.approverRoles.includes(activeRole)
+    : activeRole === "owner" || canWrite);
+  const canApproveDraft = (run: PayrollRecord) => run.status === "DRAFT" && canApproveRole && !!session?.user.id
+    && (!approvalSetting?.required || (!!run.processedById && run.processedById !== session.user.id));
+  const approverNames = approvalSetting?.approverRoles.map(role => role === "owner" ? "the owner" : "another accountant").join(" or ");
   const canExportPayroll = useCanExportPayrollTables();
   const queryClient = useQueryClient();
   const [showGenerate, setShowGenerate] = useState(false);
@@ -201,10 +213,17 @@ export function PayrollManagementWorkspace() {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["finance", "payroll"] }),
         queryClient.invalidateQueries({ queryKey: ["finance", "payroll-run"] }),
+        queryClient.invalidateQueries({ queryKey: ["finance", "action-centre"] }),
       ]);
     },
     onError: (error: Error) => setFeedback({ kind: "error", text: error.message }),
   });
+
+  function requestApproval(run: PayrollRecord) {
+    updatePayroll.reset();
+    setSelectedRunId(null);
+    setTransitionTarget({ payroll: run, nextStatus: "APPROVED" });
+  }
 
   function submitSalary(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -262,7 +281,12 @@ export function PayrollManagementWorkspace() {
       <div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">Finance & bursary</p><h1 className="mt-1 text-2xl font-bold tracking-tight text-foreground">Payroll</h1><p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">Generate payroll drafts from employee salary records, review statutory deductions, approve runs and record confirmed disbursements.</p></div>
       <div className="flex flex-wrap gap-2">{canExportPayroll && <><TableExportMenu build={buildPayrollRegisterExport} note="Confidential payroll data. Export access is restricted." /><ServerExportButton endpoint="/finance/exports/payroll.xlsx" label="All-run Excel" className={secondaryButton} /></>}<button type="button" className={secondaryButton} onClick={() => setShowSettings(true)}><Settings2 className="size-4" /> Payroll settings</button>{canWrite && <button type="button" className={primaryButton} onClick={() => { setFeedback(null); setShowGenerate(true); }}><PlayCircle className="size-4" /> Generate payroll draft</button>}</div>
     </section>
-    {!canWrite && <FinanceReadOnlyNotice />}
+    {approval.error && <ErrorState message={`Payroll approval settings could not be loaded. ${approval.error.message}`} />}
+    {approvalSetting && <p role="note" className="rounded-xl border border-border bg-muted/40 p-3 text-sm text-muted-foreground">
+      {approvalSetting.required
+        ? `Payroll drafts need approval from ${approverNames}. The person who prepared the draft cannot approve it.`
+        : "The school allows the accountant to approve their own payroll drafts."}
+    </p>}
     {feedback && <div role={feedback.kind === "error" ? "alert" : "status"} className={cn("flex items-start gap-3 rounded-xl border p-3 text-sm", feedback.kind === "error" ? "border-destructive/30 bg-destructive/5 text-destructive" : "border-success/30 bg-success/5 text-foreground")}><span className="min-w-0 flex-1">{feedback.text}</span><button type="button" aria-label="Dismiss message" onClick={() => setFeedback(null)}><X className="size-4" /></button></div>}
     {readiness && !readiness.ready && <div role="alert" className="flex flex-col gap-3 rounded-xl border border-warning/30 bg-warning/5 p-4 text-sm sm:flex-row sm:items-center sm:justify-between">
       <div><p className="font-semibold text-foreground">Payroll can’t be calculated for {monthName(Number(month), Number(year))} yet</p><p className="mt-1 text-muted-foreground">{readiness.problems[0]}{readiness.pendingDrafts ? ` ${readiness.pendingDrafts} draft setting(s) are waiting for approval.` : ""}</p></div>
@@ -316,7 +340,7 @@ export function PayrollManagementWorkspace() {
 { id: "gross", header: "Gross", cell: (run) => money(run.totalGross), value: (run) => Number(run.totalGross), className: "text-right tabular-nums" },
 { id: "tax", header: "PAYE", cell: (run) => money(run.totalTax), value: (run) => Number(run.totalTax), className: "text-right tabular-nums" },
 { id: "net", header: "Net", cell: (run) => money(run.totalNet), value: (run) => Number(run.totalNet), className: "text-right tabular-nums" },
-{ id: "actions", header: "Actions", cell: (run) => <div className="flex flex-wrap gap-2"><button type="button" onClick={() => setSelectedRunId(run.id)} className="text-xs font-semibold text-primary hover:underline">Review slips</button>{canWrite && run.status === "DRAFT" && <button type="button" onClick={() => setTransitionTarget({ payroll: run, nextStatus: "APPROVED" })} className="text-xs font-semibold text-foreground hover:underline">Approve</button>}{canWrite && run.status === "APPROVED" && <button type="button" onClick={() => { setPaidConfirmation(false); setPaymentMethod("BANK_TRANSFER"); setTransitionTarget({ payroll: run, nextStatus: "PAID" }); }} className="text-xs font-semibold text-primary hover:underline">Confirm paid</button>}{canWrite && run.status === "DRAFT" && <button type="button" onClick={() => setTransitionTarget({ payroll: run, nextStatus: "CANCELLED" })} className="text-xs font-semibold text-destructive hover:underline">Cancel</button>}</div>, sortable: false }
+{ id: "actions", header: "Actions", cell: (run) => <div className="flex flex-wrap gap-2"><button type="button" onClick={() => setSelectedRunId(run.id)} className="text-xs font-semibold text-primary hover:underline">Review slips</button>{canApproveDraft(run) && <button type="button" onClick={() => requestApproval(run)} className="text-xs font-semibold text-foreground hover:underline">Approve</button>}{run.status === "DRAFT" && approvalSetting?.required && run.processedById && run.processedById === session?.user.id && <span className="text-xs text-muted-foreground">Awaiting independent approval</span>}{run.status === "DRAFT" && approvalSetting?.required && !run.processedById && <span className="text-xs text-muted-foreground">Missing preparer. Regenerate this draft.</span>}{canWrite && run.status === "APPROVED" && <button type="button" onClick={() => { setPaidConfirmation(false); setPaymentMethod("BANK_TRANSFER"); setTransitionTarget({ payroll: run, nextStatus: "PAID" }); }} className="text-xs font-semibold text-primary hover:underline">Confirm paid</button>}{canWrite && run.status === "DRAFT" && <button type="button" onClick={() => setTransitionTarget({ payroll: run, nextStatus: "CANCELLED" })} className="text-xs font-semibold text-destructive hover:underline">Cancel</button>}</div>, sortable: false }
 ] satisfies DataTableColumn<(typeof visiblePayroll)[number]>[]} getRowId={(run) => run.id} emptyTitle="No payroll runs" emptyDescription="No payroll runs match these filters." exportTitle="Payroll runs" searchable={false} embedded /></div> : <EmptyState title="No payroll runs yet" description="Generate a draft for a supported period after confirming employee salary and tax details." />}
     </section>
 
@@ -386,7 +410,9 @@ export function PayrollManagementWorkspace() {
 { id: "status", header: "Status", cell: (slip) => slip.paymentStatus, value: (slip) => slip.paymentStatus },
 ...(canExportPayroll ? [{ id: "pdf", header: "PDF", cell: (slip) => <ServerExportButton endpoint={"/finance/payslips/" + encodeURIComponent(slip.id) + ".pdf"} label="PDF" className="inline-flex items-center gap-1 rounded-lg border border-border px-2 py-1 text-xs font-semibold text-foreground" />, sortable: false }] satisfies DataTableColumn<(typeof selectedDetail.payslips)[number]>[] : [])
 ] satisfies DataTableColumn<(typeof selectedDetail.payslips)[number]>[]} getRowId={(slip) => slip.id} emptyTitle="No payslips" emptyDescription="This run has no payslips." exportTitle="Payslips" searchable={false} embedded /><p className="mt-4 text-xs leading-5 text-muted-foreground">Amounts are saved with this payroll run. Tier 2 amounts shown are part of the combined pension contribution.</p></div>
-      <div className="payroll-slips-actions mt-4 flex flex-wrap justify-end gap-2">{canExportPayroll && <>
+      <div className="payroll-slips-actions mt-4 flex flex-wrap justify-end gap-2">
+        {canApproveDraft(selectedDetail) && <button type="button" className={primaryButton} onClick={() => requestApproval(selectedDetail)}>Approve payroll</button>}
+        {canExportPayroll && <>
         {(selectedDetail.status === "APPROVED" || selectedDetail.status === "PAID")
           && selectedDetail.payslips.some(slip => slip.tier2Contribution != null) && (
             <ServerExportButton endpoint={`/finance/payroll/${encodeURIComponent(selectedDetail.id)}/tier-2.xlsx`} label="Tier 2 Excel" className={secondaryButton} />

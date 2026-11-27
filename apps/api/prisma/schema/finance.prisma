@@ -435,7 +435,7 @@ model PayrollRecord {
   totalTax      Decimal       @db.Decimal(15, 2)
   totalSSNIT    Decimal       @db.Decimal(15, 2)
   processedById String?
-  /// Who approved the run; must differ from processedById (separation of duties).
+  /// Who approved the run. Self-approval is recorded in the approval audit when permitted.
   approvedById  String?
   academicYearId String?
   termId        String?

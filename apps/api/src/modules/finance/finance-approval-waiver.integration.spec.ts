@@ -59,10 +59,14 @@ describe.skipIf(!enabled)("finance approvals switched off (PostgreSQL)", { timeo
     await db.$disconnect();
   });
 
-  it("defaults every control to no second approver for a school with no saved setting", async () => {
+  it("preserves independent payroll review for schools with no saved setting", async () => {
     const all = await settings.list(schoolId);
-    expect(all).toHaveLength(6);
-    for (const item of all) expect(item).toMatchObject({ required: false, approverRoles: [], configured: false });
+    expect(all).toHaveLength(7);
+    const payroll = all.find(item => item.control === "PAYROLL_RUN");
+    expect(payroll).toMatchObject({ required: true, approverRoles: ["owner", "accountant"], configured: false });
+    for (const item of all.filter(item => item !== payroll)) {
+      expect(item).toMatchObject({ required: false, approverRoles: [], configured: false });
+    }
   });
 
   it("completes a bank reconciliation on submit and records that it was waived", async () => {

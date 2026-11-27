@@ -19,6 +19,8 @@ describe.skipIf(!enabled)("payroll salary register and Tier 2 on PostgreSQL", { 
   const key = "payroll-" + randomUUID();
   const maker = key + "-maker";
   const checker = key + "-checker";
+  const accountant = { id: maker, role: "accountant" };
+  const owner = { id: checker, role: "owner" };
 
   beforeAll(async () => {
     vi.stubEnv("PAYROLL_DETAILS_ENCRYPTION_KEY", Buffer.alloc(32, 7).toString("base64"));
@@ -97,13 +99,21 @@ describe.skipIf(!enabled)("payroll salary register and Tier 2 on PostgreSQL", { 
     ] });
     const period = { month: 7, year: 2026, confirmResidentTaxTreatment: true as const };
     const first = await service.generatePayrollDraft(schoolId, maker, period);
-    await service.transitionPayroll(schoolId, first.payrollRecord.id, { status: "CANCELLED" }, maker);
+    await service.transitionPayroll(schoolId, first.payrollRecord.id, { status: "CANCELLED" }, accountant);
     const replacement = await service.generatePayrollDraft(schoolId, maker, period);
     const recordId = replacement.payrollRecord.id;
     expect(replacement.payrollRecord.runNumber).toBe(2);
-    await expect(service.transitionPayroll(schoolId, recordId, { status: "APPROVED" }, maker)).rejects.toThrow(/cannot approve/);
+    await expect(service.transitionPayroll(schoolId, recordId, { status: "APPROVED" }, accountant)).rejects.toThrow(/cannot approve/);
+    await expect(service.transitionPayroll(schoolId, recordId, { status: "APPROVED" }, { ...accountant, role: "owner" }))
+      .rejects.toThrow(/cannot approve/);
     expect(await db.financeApprovalRequest.count({ where: { schoolId, entityId: recordId } })).toBe(0);
-    await service.transitionPayroll(schoolId, recordId, { status: "APPROVED" }, checker);
+    await expect(service.transitionPayroll(schoolId, recordId, { status: "CANCELLED" }, owner)).rejects.toThrow(/Only the school accountant/);
+    await service.transitionPayroll(schoolId, recordId, { status: "APPROVED" }, owner);
+    expect(await db.financeApprovalRequest.findFirst({ where: { schoolId, entityId: recordId } })).toMatchObject({
+      status: "APPROVED", requestedById: maker, decidedById: checker, waivedByPolicy: false,
+    });
+    await expect(service.transitionPayroll(schoolId, recordId, { status: "PAID", paymentMethod: "BANK_TRANSFER" }, owner))
+      .rejects.toThrow(/Only the school accountant/);
 
     const context = { schoolId, actorId: maker };
     await expect(exports.payrollTier2Excel(context, recordId)).rejects.toThrow(/missing a number/);
@@ -120,12 +130,36 @@ describe.skipIf(!enabled)("payroll salary register and Tier 2 on PostgreSQL", { 
     expect(slip.tier2Contribution?.toFixed(2)).toBe(slip.basicSalary.mul(0.05).toFixed(2));
     expect(slip.ssnitEmployee.toFixed(2)).toBe(slip.basicSalary.mul(0.055).toFixed(2));
 
-    await service.transitionPayroll(schoolId, recordId, { status: "PAID", paymentMethod: "BANK_TRANSFER" }, maker);
+    await service.transitionPayroll(schoolId, recordId, { status: "PAID", paymentMethod: "BANK_TRANSFER" }, accountant);
     const posting = await db.transaction.findFirstOrThrow({ where: { schoolId, referenceId: recordId, description: "Allocate Tier 2 pension contributions" } });
     const savedSlips = await db.payslip.aggregate({ where: { schoolId, payrollRecordId: recordId }, _sum: { tier2Contribution: true } });
     expect(posting.amount.toFixed(2)).toBe(savedSlips._sum.tier2Contribution?.toFixed(2));
     const audits = await db.auditLog.findMany({ where: { schoolId, entityType: { startsWith: "PAYROLL_PAYMENT_DETAILS" } } });
     expect(JSON.stringify(audits)).not.toContain(bank.accountNumber);
     expect(JSON.stringify(audits)).not.toContain("00001111");
+  });
+
+  it("enforces the configured approver roles and records an explicit payroll waiver", async () => {
+    const period = { month: 8, year: 2026, confirmResidentTaxTreatment: true as const };
+    const { payrollRecord: run } = await service.generatePayrollDraft(schoolId, maker, period);
+    const policy = await db.financeApprovalSetting.create({
+      data: { schoolId, control: "PAYROLL_RUN", required: true, approverRoles: ["accountant"] },
+    });
+    await expect(service.transitionPayroll(schoolId, run.id, { status: "APPROVED" }, owner)).rejects.toThrow(/chosen by the school/);
+    const secondAccountant = { id: checker, role: "accountant" };
+    await service.transitionPayroll(schoolId, run.id, { status: "APPROVED" }, secondAccountant);
+    await expect(service.transitionPayroll(schoolId, run.id, { status: "PAID", paymentMethod: "BANK_TRANSFER" }, secondAccountant))
+      .rejects.toThrow(/did not approve/);
+    await service.transitionPayroll(schoolId, run.id, { status: "PAID", paymentMethod: "BANK_TRANSFER" }, accountant);
+
+    const { payrollRecord: singleAccountantRun } = await service.generatePayrollDraft(schoolId, maker, { ...period, month: 9 });
+    await db.financeApprovalSetting.update({ where: { id: policy.id }, data: { required: false, approverRoles: [] } });
+    await service.transitionPayroll(schoolId, singleAccountantRun.id, { status: "APPROVED" }, accountant);
+    expect(await db.financeApprovalRequest.findFirst({ where: { schoolId, entityId: singleAccountantRun.id } })).toMatchObject({
+      status: "APPROVED", requestedById: maker, decidedById: maker, waivedByPolicy: true,
+    });
+    await db.financeApprovalSetting.update({ where: { id: policy.id }, data: { required: true, approverRoles: ["owner"] } });
+    await expect(service.transitionPayroll(schoolId, singleAccountantRun.id, { status: "PAID", paymentMethod: "BANK_TRANSFER" }, accountant))
+      .resolves.toMatchObject({ status: "PAID" });
   });
 });

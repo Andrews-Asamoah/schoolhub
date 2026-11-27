@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api";
 
 export type FinanceApprovalControl =
-  | "PAYROLL_SETTINGS" | "BANK_RECONCILIATION" | "PERIOD_CONTROL"
+  | "PAYROLL_RUN" | "PAYROLL_SETTINGS" | "BANK_RECONCILIATION" | "PERIOD_CONTROL"
   | "MANUAL_JOURNAL" | "INVOICE_ADJUSTMENT" | "ACCOUNT_MAPPING";
 
 interface ApprovalSettingRow { control: string; required: boolean; approverRoles: string[] }
@@ -28,5 +28,5 @@ export function useFinanceApproval(control: FinanceApprovalControl) {
     queryFn: () => apiFetch<ApprovalSettingRow[]>("/finance/approval-settings"),
     staleTime: 60_000,
   });
-  return resolveApproval(query.data, control);
+  return { ...resolveApproval(query.data, control), setting: query.data?.find(row => row.control === control), error: query.error };
 }

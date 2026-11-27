@@ -1,6 +1,7 @@
 import { ConflictException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import { Prisma, type FinanceApprovalSubject } from "@prisma/client";
 import { createHash } from "node:crypto";
+import { loadApprovalSetting, POLICY_WAIVER_NOTE } from "./finance-approval-settings.js";
 import { PrismaService } from "../../prisma/prisma.service.js";
 
 export function approvalPayloadHash(payload: unknown): string {
@@ -25,8 +26,8 @@ export class FinanceApprovalService {
         where: { schoolId: input.schoolId, subject: input.subject, minAmount: { lte: input.amount ?? new Prisma.Decimal(0) } },
         orderBy: { minAmount: "desc" },
       });
-      // Payroll runs always have a one-approver, different-person policy; it is ordinary data
-      // the school can tighten later. Other subjects stay fail-closed until a policy exists.
+      // Payroll uses one decision record even when the school waives a second reviewer.
+      // Other subjects stay fail-closed until a policy exists.
       if (!policy && input.subject === "PAYROLL_RUN") {
         policy = await tx.financeApprovalPolicy.upsert({
           where: { schoolId_subject_minAmount: { schoolId: input.schoolId, subject: "PAYROLL_RUN", minAmount: new Prisma.Decimal(0) } },
@@ -45,19 +46,21 @@ export class FinanceApprovalService {
     return db ? create(db) : this.prisma.client.$transaction(create, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
   }
 
-  async decide(schoolId: string, requestId: string, actorId: string, status: "APPROVED" | "REJECTED", payload: unknown, note: string, db?: Prisma.TransactionClient) {
+  async decide(schoolId: string, requestId: string, actorId: string, status: "APPROVED" | "REJECTED", payload: unknown, note: string, db?: Prisma.TransactionClient, options?: { waivePayrollReview: boolean }) {
     if (!note.trim()) throw new ConflictException("An approval decision requires a note.");
     const decide = async (tx: Prisma.TransactionClient) => {
       const approval = await tx.financeApprovalRequest.findFirst({ where: { id: requestId, schoolId, status: "PENDING" } });
       if (!approval) throw new NotFoundException("Pending approval not found.");
-      // Maker-checker is mandatory. Historical allowSelfApproval settings are ignored.
-      if (actorId === approval.requestedById) {
+      const waivedByPolicy = options?.waivePayrollReview === true
+        && approval.subject === "PAYROLL_RUN" && status === "APPROVED"
+        && !(await loadApprovalSetting(tx, schoolId, "PAYROLL_RUN")).required;
+      if (actorId === approval.requestedById && !waivedByPolicy) {
         throw new ForbiddenException("The requester cannot approve their own financial change.");
       }
       if (approval.payloadHash !== approvalPayloadHash(payload)) throw new ConflictException("The financial details changed since approval was requested.");
       const updated = await tx.financeApprovalRequest.updateMany({
         where: { id: requestId, schoolId, status: "PENDING" },
-        data: { status, decidedById: actorId, decidedAt: new Date(), decisionNote: note.trim() },
+        data: { status, decidedById: actorId, decidedAt: new Date(), decisionNote: waivedByPolicy ? POLICY_WAIVER_NOTE : note.trim(), waivedByPolicy },
       });
       if (updated.count !== 1) throw new ConflictException("This approval has already been decided.");
       return tx.financeApprovalRequest.findUniqueOrThrow({ where: { id: requestId } });

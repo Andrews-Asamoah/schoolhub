@@ -7,6 +7,7 @@ import {
 } from "@nestjs/common";
 import { PrismaService } from "../../prisma/prisma.service.js";
 import { FinancePostingService } from "./finance-posting.service.js";
+import { loadApprovalSetting, mayApprovePayrollRun } from "./finance-approval-settings.js";
 import { FinanceApprovalService } from "./finance-approval.service.js";
 import { formatPersonName, type CreateExpenseInput, type GenerateBillInput, type RecordPaymentInput, type StudentStatementResponse } from "@schoolhub/shared";
 import { decryptPayrollDetails, encryptPayrollDetails } from "./payroll/payroll-details-crypto.js";
@@ -205,19 +206,6 @@ export class FinanceService {
       });
     });
     return this.getPeriodLock(schoolId);
-  }
-
-  /**
-   * Separation of duties: the person who prepared a payroll run cannot approve
-   * it, and the approver cannot be the one who confirms it paid. A different
-   * accountant or a platform administrator completes the step. Single-person schools require an independent authorised approver.
-   */
-  private assertSeparationOfDuties(actorId: string, earlierActorId: string | null | undefined, step: "approved" | "marked as paid") {
-    if (earlierActorId && earlierActorId === actorId) {
-      throw new ForbiddenException(
-        `A payroll run cannot be ${step} by the same person who ${step === "approved" ? "prepared" : "approved"} it. Ask another accountant or the platform administrator.`,
-      );
-    }
   }
 
   /** Audit entry written inside the caller's transaction so it commits (or rolls back) with the change. */
@@ -4220,16 +4208,31 @@ export class FinanceService {
     schoolId: string,
     payrollRecordId: string,
     input: { status: "APPROVED" | "PAID" | "CANCELLED"; paymentMethod?: string },
-    actorId: string,
+    actor: { id: string; role: string | undefined },
   ) {
+    const actorId = actor.id;
+    if (input.status !== "APPROVED" && actor.role !== "accountant") {
+      throw new ForbiddenException("Only the school accountant can cancel a draft or confirm disbursement.");
+    }
     const db = this.prisma.client;
-    const payroll = await db.payrollRecord.findFirst({
-      where: { id: payrollRecordId, schoolId },
-      include: { _count: { select: { payslips: true } } },
-    });
-    if (!payroll) throw new NotFoundException("Payroll run not found.");
-    if (payroll.status === "DRAFT" && input.status === "APPROVED") {
+    if (input.status === "APPROVED") {
       return withSerializableRetry(() => db.$transaction(async tx => {
+        const payroll = await tx.payrollRecord.findFirst({
+          where: { id: payrollRecordId, schoolId },
+          include: { _count: { select: { payslips: true } } },
+        });
+        if (!payroll) throw new NotFoundException("Payroll run not found.");
+        if (payroll.status !== "DRAFT") throw new BadRequestException("Only a draft payroll run can be approved.");
+        const approvalSetting = await loadApprovalSetting(tx, schoolId, "PAYROLL_RUN");
+        if (!mayApprovePayrollRun(approvalSetting, actor.role)) {
+          throw new ForbiddenException("Only a payroll approver chosen by the school can approve this run.");
+        }
+        if (approvalSetting.required && payroll.processedById === actorId) {
+          throw new ForbiddenException("You cannot approve payroll you prepared. Ask another approver configured in Finance approvals.");
+        }
+        if (approvalSetting.required && !payroll.processedById) {
+          throw new ConflictException("This draft has no recorded preparer. Ask the accountant to cancel it and generate a new draft.");
+        }
         if (!payroll._count.payslips) throw new BadRequestException("A payroll run without payslips cannot be approved.");
         // Approval freezes the run. Reconcile every payslip with the run's stored totals
         // before authorising it; a draft can become stale after salary or payslip edits.
@@ -4275,7 +4278,9 @@ export class FinanceService {
           schoolId, subject: "PAYROLL_RUN", entityType: "PayrollRecord", entityId: payroll.id,
           requestedById, payload, amount: payroll.totalGross,
         }, tx);
-        await this.approvals.decide(schoolId, request.id, actorId, "APPROVED", payload, "Payroll run approved.", tx);
+        await this.approvals.decide(schoolId, request.id, actorId, "APPROVED", payload, "Payroll run approved.", tx, {
+          waivePayrollReview: !approvalSetting.required && actor.role === "accountant",
+        });
         return tx.payrollRecord.update({
           where: { id: payroll.id, schoolId, status: "DRAFT" },
           data: { status: "APPROVED", approvedById: actorId },
@@ -4286,6 +4291,11 @@ export class FinanceService {
         });
       }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }));
     }
+    const payroll = await db.payrollRecord.findFirst({
+      where: { id: payrollRecordId, schoolId },
+      select: { id: true, status: true },
+    });
+    if (!payroll) throw new NotFoundException("Payroll run not found.");
     if (payroll.status === "DRAFT" && input.status === "CANCELLED") {
       return db.payrollRecord.update({
         where: { id: payroll.id, schoolId, status: "DRAFT" },
@@ -4294,7 +4304,6 @@ export class FinanceService {
       });
     }
     if (payroll.status === "APPROVED" && input.status === "PAID") {
-      this.assertSeparationOfDuties(actorId, payroll.approvedById, "marked as paid");
       const paymentMethod = input.paymentMethod;
       if (!paymentMethod || !["CASH", "BANK_TRANSFER", "CHEQUE", "MOBILE_MONEY", "CARD", "ONLINE", "OTHER"].includes(paymentMethod)) {
         throw new BadRequestException("Choose a valid payment method before confirming payroll disbursement.");
@@ -4320,6 +4329,16 @@ export class FinanceService {
         if (!current) throw new NotFoundException("Payroll run not found.");
         if (current.status !== "APPROVED") {
           throw new BadRequestException("Only an approved payroll run can be marked paid.");
+        }
+        if (current.approvedById === actorId) {
+          const waiver = await tx.financeApprovalRequest.findFirst({
+            where: {
+              schoolId, subject: "PAYROLL_RUN", entityType: "PayrollRecord", entityId: current.id,
+              status: "APPROVED", decidedById: actorId, waivedByPolicy: true,
+            },
+            select: { id: true },
+          });
+          if (!waiver) throw new ForbiddenException("An accountant who did not approve this payroll must confirm the disbursement.");
         }
         if (!current.payslips.length) throw new BadRequestException("A payroll run without payslips cannot be marked paid.");
 
