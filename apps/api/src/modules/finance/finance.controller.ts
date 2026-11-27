@@ -818,14 +818,16 @@ export class FinanceController {
   }
 
   @Patch("payroll/:recordId/status")
-  @Roles(...FINANCE_WRITE_ROLES)
+  @Roles(...FINANCE_PAYROLL_EXPORT_ROLES)
   transitionPayroll(
     @CurrentSchool() school: School,
     @CurrentUser() user: AuthenticatedUser,
+    @CurrentSchoolRole() schoolRole: string | undefined,
     @Param("recordId") recordId: string,
     @Body(new ZodValidationPipe(payrollTransitionSchema)) body: z.infer<typeof payrollTransitionSchema>,
   ) {
-    return this.financeService.transitionPayroll(school.id, recordId, body, user.id);
+    this.assertPayrollExportAllowed(user, schoolRole);
+    return this.financeService.transitionPayroll(school.id, recordId, body, { id: user.id, role: schoolRole });
   }
 
   @Post("bills/generate")

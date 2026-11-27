@@ -4,17 +4,16 @@ import { z } from "zod";
 /**
  * Per-school second-person approval settings for the finance controls an accountant prepares.
  *
- * A school with no stored row for a control has approval switched OFF: the accountant's own
- * submission completes the approval step and the record is marked `waivedByPolicy` so the
- * audit trail shows that no independent person decided it. Schools that existed before this
- * feature were seeded with approval ON for the owner and headteacher by the migration.
+ * Payroll runs default to independent review. Other controls default to allowing the
+ * accountant to complete the approval step. A waived decision is marked in the audit trail.
  */
 export const FINANCE_APPROVAL_CONTROLS = [
-  "PAYROLL_SETTINGS", "BANK_RECONCILIATION", "PERIOD_CONTROL",
+  "PAYROLL_RUN", "PAYROLL_SETTINGS", "BANK_RECONCILIATION", "PERIOD_CONTROL",
   "MANUAL_JOURNAL", "INVOICE_ADJUSTMENT", "ACCOUNT_MAPPING",
 ] as const satisfies readonly FinanceApprovalControl[];
 
 export const FINANCE_APPROVAL_CONTROL_LABELS: Record<FinanceApprovalControl, string> = {
+  PAYROLL_RUN: "Payroll runs",
   PAYROLL_SETTINGS: "Payroll tax and pension settings",
   BANK_RECONCILIATION: "Bank reconciliations",
   PERIOD_CONTROL: "Closing and reopening accounting periods",
@@ -25,6 +24,7 @@ export const FINANCE_APPROVAL_CONTROL_LABELS: Record<FinanceApprovalControl, str
 
 /** Roles a school may name as approvers. Both can already read the items they approve. */
 export const FINANCE_APPROVER_ROLE_OPTIONS = ["owner", "headteacher"] as const;
+const PAYROLL_RUN_APPROVER_ROLES = ["owner", "accountant"] as const;
 export type FinanceApproverRole = (typeof FINANCE_APPROVER_ROLE_OPTIONS)[number];
 
 /** Recorded as the decision note when the school policy waives the second approver. */
@@ -48,7 +48,10 @@ export function effectiveSetting(
   control: FinanceApprovalControl,
   row: { required: boolean; approverRoles: string[] } | null | undefined,
 ): EffectiveApprovalSetting {
-  if (!row) return { control, required: false, approverRoles: [], configured: false };
+  if (!row) {
+    const required = control === "PAYROLL_RUN";
+    return { control, required, approverRoles: required ? [...PAYROLL_RUN_APPROVER_ROLES] : [], configured: false };
+  }
   return { control, required: row.required, approverRoles: row.required ? [...row.approverRoles] : [], configured: true };
 }
 
@@ -73,13 +76,23 @@ export function mayApproveStep(setting: EffectiveApprovalSetting, actor: Approva
   return mayDecide(setting, actor) || (!setting.required && actor.role === "accountant");
 }
 
-export const approvalSettingInputSchema = z.object({
-  required: z.boolean(),
-  approverRoles: z.array(z.enum(FINANCE_APPROVER_ROLE_OPTIONS)).max(FINANCE_APPROVER_ROLE_OPTIONS.length).default([]),
-}).refine(v => !v.required || new Set(v.approverRoles).size >= 1, {
-  message: "Choose at least one approver role when approval is required.",
-  path: ["approverRoles"],
-});
+export function mayApprovePayrollRun(setting: EffectiveApprovalSetting, role: string | undefined) {
+  if (!setting.required) return role === "accountant" || role === "owner";
+  return (role === "accountant" || role === "owner") && setting.approverRoles.includes(role);
+}
+
+function approvalInputSchema(roles: typeof FINANCE_APPROVER_ROLE_OPTIONS | typeof PAYROLL_RUN_APPROVER_ROLES) {
+  return z.object({
+    required: z.boolean(),
+    approverRoles: z.array(z.enum(roles)).max(roles.length).default([]),
+  }).refine(v => !v.required || v.approverRoles.length > 0, {
+    message: "Choose at least one approver role when approval is required.",
+    path: ["approverRoles"],
+  });
+}
+
+export const approvalSettingInputSchema = approvalInputSchema(FINANCE_APPROVER_ROLE_OPTIONS);
+export const payrollRunApprovalSettingInputSchema = approvalInputSchema(PAYROLL_RUN_APPROVER_ROLES);
 export type ApprovalSettingInput = z.infer<typeof approvalSettingInputSchema>;
 
 type SettingReader = Pick<Prisma.TransactionClient, "financeApprovalSetting">;

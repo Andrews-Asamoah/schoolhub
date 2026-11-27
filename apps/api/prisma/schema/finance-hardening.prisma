@@ -70,8 +70,9 @@ model FinanceApprovalPolicy {
 }
 
 /// Controls whose second-person approval a school can switch on or off and assign (see
-/// finance-approval-settings.ts). A school with no row for a control has approval switched off.
+/// finance-approval-settings.ts). Payroll runs default to independent approval.
 enum FinanceApprovalControl {
+  PAYROLL_RUN
   PAYROLL_SETTINGS
   BANK_RECONCILIATION
   PERIOD_CONTROL
