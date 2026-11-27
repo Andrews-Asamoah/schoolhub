@@ -21,6 +21,7 @@ import { FinanceService } from "./finance.service.js";
 import { FinanceLedgerIntegrityService } from "./finance-ledger-integrity.service.js";
 import { payrollPaymentDetailsSchema, payrollSalaryImportSchema, type PayrollPaymentDetailsInput, type PayrollSalaryImportInput } from "./payroll/payroll-inputs.js";
 import { PayrollSettingsService } from "./payroll-settings.service.js";
+import { FinanceBreakdownService } from "./finance-breakdown.service.js";
 import { FinanceExportsService, type FinanceExportContext, type FinanceExportFile } from "./finance-exports.service.js";
 import { SchoolTenantGuard } from "../../common/guards/school-tenant.guard.js";
 import { RolesGuard } from "../../common/guards/roles.guard.js";
@@ -163,6 +164,13 @@ const markFormerStudentsSchema = z.object({
   reason: z.string().trim().min(10).max(500),
 });
 
+const breakdownQuerySchema = z.object({
+  from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  yearId: z.string().min(1).optional(),
+  termId: z.string().min(1).optional(),
+});
+
 @Controller("finance")
 @UseGuards(SchoolTenantGuard, RolesGuard, SuperAdminReasonGuard, FinanceWriteRateLimitGuard)
 @UseInterceptors(FinanceAuditInterceptor)
@@ -173,6 +181,7 @@ export class FinanceController {
     private readonly ledgerIntegrity: FinanceLedgerIntegrityService,
     private readonly payrollSettings: PayrollSettingsService,
     private readonly approvalSettings: FinanceApprovalSettingsService,
+    private readonly breakdowns: FinanceBreakdownService,
   ) {}
 
 
@@ -358,6 +367,18 @@ export class FinanceController {
     @Query("termId") termId?: string,
   ) {
     return this.financeService.getFinanceSummary(school.id, { from, to, yearId, termId });
+  }
+
+  @Get("reports/income-breakdown")
+  @Roles(...FINANCE_READ_ROLES)
+  getIncomeBreakdown(@CurrentSchool() school: School, @Query(new ZodValidationPipe(breakdownQuerySchema)) query: z.infer<typeof breakdownQuerySchema>) {
+    return this.breakdowns.income(school.id, query);
+  }
+
+  @Get("reports/expenditure-breakdown")
+  @Roles(...FINANCE_READ_ROLES)
+  getExpenditureBreakdown(@CurrentSchool() school: School, @Query(new ZodValidationPipe(breakdownQuerySchema)) query: z.infer<typeof breakdownQuerySchema>) {
+    return this.breakdowns.expenditure(school.id, query);
   }
 
   @Get("detailed-report")
@@ -580,10 +601,13 @@ export class FinanceController {
     @CurrentSchool() school: School,
     @CurrentUser() user: AuthenticatedUser,
     @CurrentSchoolRole() schoolRole: string | undefined,
+    @Query("payslips") payslips?: string,
   ) {
     this.assertPayrollExportAllowed(user, schoolRole);
-    return this.financeService.listPayrollRecords(school.id);
+    // ?payslips=false returns run summaries only (the payroll page loads one run's payslips on demand).
+    return this.financeService.listPayrollRecords(school.id, payslips !== "false");
   }
+
 
   @Get("payroll/salaries")
   @Roles(...FINANCE_PAYROLL_EXPORT_ROLES)
@@ -660,6 +684,30 @@ export class FinanceController {
     return this.payrollSettings.list(school.id);
   }
 
+  @Get("payroll/settings/templates")
+  @Roles(...FINANCE_READ_ROLES)
+  payrollSettingTemplates() {
+    return this.payrollSettings.templates();
+  }
+
+  @Post("payroll/settings/starter-drafts")
+  @Roles(...FINANCE_WRITE_ROLES)
+  createPayrollStarterDrafts(@CurrentSchool() school: School) {
+    return this.payrollSettings.createStarterDrafts(school.id);
+  }
+
+  @Get("payroll/readiness")
+  @Roles(...FINANCE_READ_ROLES)
+  payrollReadiness(
+    @CurrentSchool() school: School,
+    @Query(new ZodValidationPipe(z.object({
+      month: z.coerce.number().int().min(1).max(12),
+      year: z.coerce.number().int().min(2000).max(2100),
+    }))) query: { month: number; year: number },
+  ) {
+    return this.payrollSettings.readiness(school.id, query.month, query.year);
+  }
+
   @Post("payroll/settings/tax-schedules")
   @Roles(...FINANCE_WRITE_ROLES)
   createTaxScheduleDraft(
@@ -725,6 +773,19 @@ export class FinanceController {
     @Body(new ZodValidationPipe(payrollDraftSchema)) body: z.infer<typeof payrollDraftSchema>,
   ) {
     return this.financeService.generatePayrollDraft(school.id, user.id, body);
+  }
+
+  @Get("payroll/:recordId")
+  @Roles(...FINANCE_PAYROLL_EXPORT_ROLES)
+  @Header("Cache-Control", "private, no-store")
+  getPayrollRecord(
+    @CurrentSchool() school: School,
+    @CurrentUser() user: AuthenticatedUser,
+    @CurrentSchoolRole() schoolRole: string | undefined,
+    @Param("recordId") recordId: string,
+  ) {
+    this.assertPayrollExportAllowed(user, schoolRole);
+    return this.financeService.getPayrollRecord(school.id, recordId);
   }
 
   @Patch("payroll/:recordId/status")

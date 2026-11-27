@@ -4449,22 +4449,34 @@ export class FinanceService {
     throw new BadRequestException(`Payroll cannot move from ${payroll.status} to ${input.status}.`);
   }
 
-  async listPayrollRecords(schoolId: string) {
+  /** `withPayslips` false returns run summaries only: payslips grow with headcount and the list shows 100 runs. */
+  async listPayrollRecords(schoolId: string, withPayslips = true) {
     return this.prisma.client.payrollRecord.findMany({
       where: { schoolId },
       orderBy: [{ year: "desc" }, { month: "desc" }, { runNumber: "desc" }],
       take: 100,
       include: {
-        payslips: {
-          include: {
-            staff: { select: { staffId: true, profile: { select: { firstName: true, lastName: true } } } },
-            teacher: { select: { teacherId: true, profile: { select: { firstName: true, lastName: true } } } },
-          },
-        },
+        ...(withPayslips ? { payslips: this.payrollPayslipInclude } : {}),
         _count: { select: { payslips: true } },
       },
     });
   }
+
+  async getPayrollRecord(schoolId: string, recordId: string) {
+    const record = await this.prisma.client.payrollRecord.findFirst({
+      where: { id: recordId, schoolId },
+      include: { payslips: this.payrollPayslipInclude, _count: { select: { payslips: true } } },
+    });
+    if (!record) throw new NotFoundException("Payroll run not found.");
+    return record;
+  }
+
+  private readonly payrollPayslipInclude = {
+    include: {
+      staff: { select: { staffId: true, profile: { select: { firstName: true, lastName: true } } } },
+      teacher: { select: { teacherId: true, profile: { select: { firstName: true, lastName: true } } } },
+    },
+  };
 
   async listFeeReminderSchedules(schoolId: string) {
     return this.prisma.client.feeReminderSchedule.findMany({

@@ -37,6 +37,7 @@ import { AdminAnnouncementsWorkspace } from "./admin-announcements-workspace";
 import { AccountantFinanceCharts } from "./accountant-finance-charts";
 import { AccountantFinanceReportingWorkspace } from "./accountant-finance-reporting-workspace";
 import { AccountantFinanceDetailedReportingWorkspace } from "./accountant-finance-detailed-reporting-workspace";
+import { FinanceBreakdownReports } from "./finance-breakdown-reports";
 import { AccountantRecordPaymentDialog } from "./accountant-record-payment-dialog";
 import { OptionalFeeRoster, type BillingStudent } from "./optional-fee-roster";
 import { apiDownload, apiFetch } from "@/lib/api";
@@ -960,6 +961,7 @@ export function AccountantPortalWorkspace({
       {!loading && activeTab === "reports" && (
         <div className="space-y-6">
           <AccountantFinanceReportingWorkspace />
+          <FinanceBreakdownReports />
           <AccountantFinanceDetailedReportingWorkspace
             bills={bills}
             payments={payments}
