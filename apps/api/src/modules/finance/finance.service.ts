@@ -8,6 +8,7 @@ import {
 import { PrismaService } from "../../prisma/prisma.service.js";
 import { FinancePostingService } from "./finance-posting.service.js";
 import { loadApprovalSetting, mayApprovePayrollRun } from "./finance-approval-settings.js";
+import { ownTeacherPayslipScope } from "./teacher-payslips.js";
 import { FinanceApprovalService } from "./finance-approval.service.js";
 import { formatPersonName, type CreateExpenseInput, type GenerateBillInput, type RecordPaymentInput, type StudentStatementResponse } from "@schoolhub/shared";
 import { decryptPayrollDetails, encryptPayrollDetails } from "./payroll/payroll-details-crypto.js";
@@ -4465,6 +4466,18 @@ export class FinanceService {
       }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
     }
     throw new BadRequestException(`Payroll cannot move from ${payroll.status} to ${input.status}.`);
+  }
+
+  listOwnTeacherPayslips(schoolId: string, userId: string) {
+    return this.prisma.client.payslip.findMany({
+      where: ownTeacherPayslipScope(schoolId, userId),
+      orderBy: [{ payrollRecord: { year: "desc" } }, { payrollRecord: { month: "desc" } }, { id: "desc" }],
+      select: {
+        id: true, basicSalary: true, allowances: true, grossSalary: true,
+        incomeTax: true, ssnitEmployee: true, otherDeductions: true, netSalary: true,
+        payrollRecord: { select: { month: true, year: true, status: true } },
+      },
+    });
   }
 
   /** `withPayslips` false returns run summaries only: payslips grow with headcount and the list shows 100 runs. */

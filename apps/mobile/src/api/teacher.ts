@@ -3,6 +3,7 @@ import { reportApprovalSchema, reportDataSchema } from "./report-preview";
 import { z } from "zod";
 import {
   batchAttendanceSchema,
+  teacherPayslipSchema,
   createSchoolAssignmentSchema,
   publishAssignmentBatchSchema,
   saveAssessmentEntrySchema,
@@ -36,6 +37,17 @@ export const getTeaching = defineEndpoint({
   path: "/teaching/me",
   roles: ["teacher"],
   response: teachingSchema,
+});
+export const getTeacherPayslips = defineEndpoint({
+  method: "GET",
+  path: "/finance/me/payslips",
+  roles: ["teacher"],
+  response: z.array(teacherPayslipSchema),
+});
+export const shareTeacherPayslip = defineDownload({
+  method: "GET",
+  path: "/finance/me/payslips/:payslipId/pdf",
+  roles: ["teacher"],
 });
 export const getTeacherTimetable = defineEndpoint({
   method: "GET",

@@ -795,6 +795,23 @@ export const generateBillSchema = z.object({
   .refine(input => !input.classIds || (!input.classId && !input.studentId), { message: "Choose either multiple classes or a single class or student." });
 export type GenerateBillInput = z.infer<typeof generateBillSchema>;
 
+export const teacherPayslipSchema = z.object({
+  id: z.string(),
+  basicSalary: z.string(),
+  allowances: z.string(),
+  grossSalary: z.string(),
+  incomeTax: z.string(),
+  ssnitEmployee: z.string(),
+  otherDeductions: z.string(),
+  netSalary: z.string(),
+  payrollRecord: z.object({
+    month: z.number().int().min(1).max(12),
+    year: z.number().int(),
+    status: z.enum(["APPROVED", "PAID"]),
+  }),
+});
+export type TeacherPayslip = z.infer<typeof teacherPayslipSchema>;
+
 export type StudentStatementEntryType =
   | "INVOICE"
   | "DISCOUNT"
