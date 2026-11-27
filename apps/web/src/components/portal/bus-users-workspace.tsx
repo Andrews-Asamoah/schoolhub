@@ -96,14 +96,14 @@ export function BusUsersWorkspace() {
         </div>
         <div className="grid gap-3 sm:grid-cols-3">
           <LabeledField label="Term">
-            <select className={labeledInputClasses} value={termId} disabled={save.isPending}
+            <select aria-label="Term" className={labeledInputClasses} value={termId} disabled={save.isPending}
               onChange={event => { setSelectedTerm(event.target.value); setClassId(""); resetSelection(); }}>
               {!terms.length && <option value="">No academic terms</option>}
               {terms.map(term => <option key={term.id} value={term.id}>{term.label}</option>)}
             </select>
           </LabeledField>
           <LabeledField label="Class">
-            <select className={labeledInputClasses} value={classId} disabled={!termId || save.isPending}
+            <select aria-label="Class" className={labeledInputClasses} value={classId} disabled={!termId || save.isPending}
               onChange={event => { setClassId(event.target.value); resetSelection(); }}>
               <option value="">Choose a class</option>
               {classOptions.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
@@ -141,7 +141,7 @@ export function BusUsersWorkspace() {
               </div>
               {canWrite && <div className="flex flex-wrap items-end gap-3">
                 <LabeledField label="Update selected students">
-                  <select className={labeledInputClasses} value={action} onChange={event => setAction(event.target.value as typeof action)} disabled={save.isPending}>
+                  <select aria-label="Update selected students" className={labeledInputClasses} value={action} onChange={event => setAction(event.target.value as typeof action)} disabled={save.isPending}>
                     <option value="RIDING">Ride from this term</option>
                     <option value="PAUSED">Pause for this term</option>
                     <option value="STOPPED">Stop from this term</option>
