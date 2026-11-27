@@ -1,3 +1,5 @@
+import { toast } from "@/components/ui/toaster";
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import {useEffect,useMemo,useState} from "react";
 import {useMutation,useQuery,useQueryClient} from "@tanstack/react-query";
 import {BookOpenCheck,LockKeyhole,ShieldCheck} from "lucide-react";
@@ -51,7 +53,7 @@ export function ExternalExaminationsWorkspace(){
   const [paperId,setPaperId]=useState("");
   const [sourceReference,setSourceReference]=useState("");
   const [drafts,setDrafts]=useState<Record<string,Draft>>({});
-  const [notice,setNotice]=useState("");
+
   const sessions=useQuery({queryKey:["external-bece"],queryFn:()=>
     apiFetch<Exam[]>("/external-exams"),retry:false});
   const years=useQuery({queryKey:["external-bece","years"],queryFn:()=>
@@ -89,18 +91,18 @@ export function ExternalExaminationsWorkspace(){
   };
   const create=useMutation({mutationFn:()=>apiFetch("/external-exams/bece",{
     method:"POST",body:JSON.stringify({classId,academicYearId:yearId,examYear:Number(examYear)}),
-  }),onSuccess:async()=>{setNotice("BECE register created with frozen candidates and subjects.");await refresh();}});
+  }),onSuccess:async()=>{toast.success("BECE register created with frozen candidates and subjects.");await refresh();}});
   const open=useMutation({mutationFn:()=>apiFetch("/external-exams/"+
     encodeURIComponent(current!.id)+"/open",{method:"PATCH"}),
-    onSuccess:async()=>{setNotice("Register opened for authorised staff entry.");await refresh();}});
+    onSuccess:async()=>{toast.success("Register opened for authorised staff entry.");await refresh();}});
   const lock=useMutation({mutationFn:()=>apiFetch("/external-exams/"+
     encodeURIComponent(current!.id)+"/lock",{method:"PATCH"}),
-    onSuccess:async()=>{setNotice("Headteacher attestation recorded. Register is now locked.");await refresh();}});
+    onSuccess:async()=>{toast.success("Headteacher attestation recorded. Register is now locked.");await refresh();}});
   const save=useMutation({mutationFn:()=>apiFetch("/external-exams/results",{
     method:"PUT",body:JSON.stringify({paperId:paper!.id,sourceReference:sourceReference.trim(),
       entries:changes}),
   }),onSuccess:async()=>{
-    setNotice("BECE results recorded with source references and audit history.");
+    toast.success("BECE results recorded with source references and audit history.");
     await client.invalidateQueries({queryKey:["external-bece","sheet",paper?.id]});
     await client.invalidateQueries({queryKey:["external-bece","summary",current?.id]});
   }});
@@ -109,7 +111,7 @@ export function ExternalExaminationsWorkspace(){
       apiFetch("/external-exams/candidates/"+encodeURIComponent(id)+"/index",{
         method:"PUT",body:JSON.stringify({indexNumber,expectedVersion}),
       }),onSuccess:async()=>{
-      setNotice("Candidate index number saved and audited.");
+      toast.success("Candidate index number saved and audited.");
       await client.invalidateQueries({queryKey:["external-bece","sheet",paper?.id]});
       await client.invalidateQueries({queryKey:["external-bece","summary",current?.id]});
     }});
@@ -168,7 +170,7 @@ export function ExternalExaminationsWorkspace(){
         There are no BECE registers available for your authorised school classes.</p>}
       {current&&<>
         <div className="grid gap-3 sm:grid-cols-2">
-          <Select value={current.id} onValueChange={v=>{setSessionId(v);setPaperId("");setNotice("");}}>
+          <Select value={current.id} onValueChange={v=>{setSessionId(v);setPaperId("");}}>
             <SelectTrigger aria-label="BECE register"><SelectValue placeholder="Choose register"/></SelectTrigger>
             <SelectContent>{available.map(e=><SelectItem key={e.id} value={e.id}>
               {e.name} · {e.class.name} · {e.academicYear.name}</SelectItem>)}</SelectContent>
@@ -203,18 +205,18 @@ export function ExternalExaminationsWorkspace(){
               Unrecorded subject results</div>
           </div>
           <div className="overflow-x-auto rounded-lg border border-border">
-            <table className="w-full min-w-[650px] text-xs">
-              <thead className="bg-muted text-left"><tr><th className="p-3">Subject</th>
-                <th className="p-3">Recorded</th><th className="p-3">Pending</th>
-                <th className="p-3">Grades 1–9 (counts)</th><th className="p-3">Other statuses</th></tr></thead>
-              <tbody>{summary.data.papers.map(p=><tr key={p.id} className="border-t border-border">
-                <td className="p-3 font-semibold">{p.code} · {p.name}</td>
-                <td className="p-3">{p.recorded}/{p.expected}</td><td className="p-3">{p.pending}</td>
-                <td className="p-3">{p.grades.map(g=>g.grade+":"+g.count).join(" · ")}</td>
-                <td className="p-3">Absent {p.statuses.ABSENT} · Withheld {p.statuses.WITHHELD}
-                  {" · "}Cancelled {p.statuses.CANCELLED}</td>
-              </tr>)}</tbody>
-            </table>
+            <Table scroll={false} className="w-full min-w-[650px] text-xs">
+              <TableHeader className="bg-muted text-left"><TableRow><TableHead className="p-3">Subject</TableHead>
+                <TableHead className="p-3">Recorded</TableHead><TableHead className="p-3">Pending</TableHead>
+                <TableHead className="p-3">Grades 1–9 (counts)</TableHead><TableHead className="p-3">Other statuses</TableHead></TableRow></TableHeader>
+              <TableBody>{summary.data.papers.map(p=><TableRow key={p.id} className="border-t border-border">
+                <TableCell className="p-3 font-semibold">{p.code} · {p.name}</TableCell>
+                <TableCell className="p-3">{p.recorded}/{p.expected}</TableCell><TableCell className="p-3">{p.pending}</TableCell>
+                <TableCell className="p-3">{p.grades.map(g=>g.grade+":"+g.count).join(" · ")}</TableCell>
+                <TableCell className="p-3">Absent {p.statuses.ABSENT} · Withheld {p.statuses.WITHHELD}
+                  {" · "}Cancelled {p.statuses.CANCELLED}</TableCell>
+              </TableRow>)}</TableBody>
+            </Table>
           </div>
           <p className="text-xs text-muted-foreground">
             Counts describe school-entered grades only. No unverified BECE aggregates, pass rates or WAEC verification claims.
@@ -231,16 +233,16 @@ export function ExternalExaminationsWorkspace(){
             withheld or cancelled. Candidate index numbers require administrator access.
           </p>
           <div className="max-h-[620px] overflow-auto rounded-lg border border-border">
-            <table className="w-full min-w-[760px] text-left text-xs">
-              <thead className="sticky top-0 bg-muted"><tr><th className="p-3">Candidate</th>
-                <th className="p-3">WAEC index number</th><th className="p-3">Result status</th>
-                <th className="p-3">Grade</th><th className="p-3">Saved record</th></tr></thead>
-              <tbody>{candidates.map(c=>{
+            <Table scroll={false} className="w-full min-w-[760px] text-left text-xs">
+              <TableHeader className="sticky top-0 bg-muted"><TableRow><TableHead className="p-3">Candidate</TableHead>
+                <TableHead className="p-3">WAEC index number</TableHead><TableHead className="p-3">Result status</TableHead>
+                <TableHead className="p-3">Grade</TableHead><TableHead className="p-3">Saved record</TableHead></TableRow></TableHeader>
+              <TableBody>{candidates.map(c=>{
                 const draft=drafts[c.id]??{status:"UNRECORDED",grade:"",indexNumber:c.indexNumber??""};
-                return <tr key={c.id} className="border-t border-border align-top">
-                  <td className="p-3"><strong>{c.name}</strong>
-                    <span className="block text-muted-foreground">{c.admissionNumber??"—"}</span></td>
-                  <td className="p-3">
+                return <TableRow key={c.id} className="border-t border-border align-top">
+                  <TableCell className="p-3"><strong>{c.name}</strong>
+                    <span className="block text-muted-foreground">{c.admissionNumber??"—"}</span></TableCell>
+                  <TableCell className="p-3">
                     <div className="flex items-center gap-1">
                       <input aria-label={"Index number for "+c.name} className={field+" min-w-36"}
                         maxLength={60} value={draft.indexNumber}
@@ -252,8 +254,8 @@ export function ExternalExaminationsWorkspace(){
                           onClick={()=>index.mutate({id:c.id,indexNumber:draft.indexNumber.trim(),
                             expectedVersion:c.indexVersion})}>Save</button>}
                     </div>
-                  </td>
-                  <td className="p-3">
+                  </TableCell>
+                  <TableCell className="p-3">
                     <Select value={draft.status} disabled={!sheet.data!.canEdit}
                       onValueChange={v=>setDrafts(p=>({...p,[c.id]:{...draft,status:v as Draft["status"],grade:v==="GRADED"?draft.grade:""}}))}>
                       <SelectTrigger aria-label={"Result status for "+c.name}><SelectValue/></SelectTrigger>
@@ -263,17 +265,17 @@ export function ExternalExaminationsWorkspace(){
                         <SelectItem value="WITHHELD">Withheld</SelectItem>
                         <SelectItem value="CANCELLED">Cancelled</SelectItem></SelectContent>
                     </Select>
-                  </td>
-                  <td className="p-3">
+                  </TableCell>
+                  <TableCell className="p-3">
                     <input aria-label={"BECE grade for "+c.name} type="number" min="1" max="9" step="1"
                       className={field+" w-24"} disabled={!sheet.data!.canEdit||draft.status!=="GRADED"}
                       value={draft.grade} onChange={e=>setDrafts(p=>({...p,[c.id]:{...draft,grade:e.target.value}}))}/>
-                  </td>
-                  <td className="p-3">{c.status??"Unrecorded"}{c.grade!==null?" · "+c.grade:""}
-                    <span className="block text-muted-foreground">v{c.version}</span></td>
-                </tr>;
-              })}</tbody>
-            </table>
+                  </TableCell>
+                  <TableCell className="p-3">{c.status??"Unrecorded"}{c.grade!==null?" · "+c.grade:""}
+                    <span className="block text-muted-foreground">v{c.version}</span></TableCell>
+                </TableRow>;
+              })}</TableBody>
+            </Table>
           </div>
           {sheet.data.canEdit&&<div className="flex flex-wrap items-end gap-3">
             <div className="min-w-64 flex-1">
@@ -294,7 +296,7 @@ export function ExternalExaminationsWorkspace(){
           {index.isError&&<p role="alert" className="text-xs text-destructive">{label(index.error)}</p>}
         </div>}
       </>}
-      {notice&&<p role="status" className="rounded-lg bg-muted/40 p-3 text-xs">{notice}</p>}
+
     </section>
   </div>;
 }

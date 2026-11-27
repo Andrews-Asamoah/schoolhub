@@ -1,3 +1,4 @@
+import { toast } from "@/components/ui/toaster";
 import { formatPersonName } from "@schoolhub/shared";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ClipboardCheck } from "lucide-react";
@@ -45,7 +46,7 @@ export function TeacherReportReviewWorkspace() {
   const [search, setSearch] = useState("");
   const [onlyPending, setOnlyPending] = useState(true);
   const [bulkPending, setBulkPending] = useState(false);
-  const [bulkMessage, setBulkMessage] = useState<string | null>(null);
+
   const timers = useRef(new Map<string, number>());
   const term = useDebouncedValue(search.trim().toLowerCase(), 200);
 
@@ -127,7 +128,7 @@ export function TeacherReportReviewWorkspace() {
     const items = readyIds.map((id) => ({ id, remark: (remarks[id] ?? "").trim() }));
     if (!items.length) return;
     items.forEach((item) => cancelAutosave(item.id));
-    setBulkPending(true); setBulkMessage(null);
+    setBulkPending(true);
     items.forEach((item) => patchState(item.id, { pending: true }));
     try {
       const result = await apiFetch<BulkResult>(BASE + "bulk-recommend", { method: "POST", body: JSON.stringify({ items }) });
@@ -138,11 +139,11 @@ export function TeacherReportReviewWorkspace() {
         return next;
       });
       setSelected((prev) => new Set([...prev].filter((id) => failed.has(id))));
-      setBulkMessage(`${result.succeeded} of ${result.total} recommendations signed off.${failed.size ? " Fix the rows marked in red and try again." : ""}`);
+      toast.success(`${result.succeeded} of ${result.total} recommendations signed off.${failed.size ? " Fix the rows marked in red and try again." : ""}`);
       await queryClient.invalidateQueries({ queryKey: QUEUE_KEY });
     } catch (error) {
       items.forEach((item) => patchState(item.id, undefined));
-      setBulkMessage(errorText(error, "The recommendations could not be saved."));
+      toast.error(errorText(error, "The recommendations could not be saved."));
     } finally {
       setBulkPending(false);
     }
@@ -181,7 +182,7 @@ export function TeacherReportReviewWorkspace() {
           </button>
         </div>
       </div>
-      {bulkMessage && <p role="status" className="text-xs text-muted-foreground">{bulkMessage}</p>}
+
       {rows.length === 0
         ? <p className="text-sm text-muted-foreground">No pupils match.</p>
         : <ReportRecommendationTable

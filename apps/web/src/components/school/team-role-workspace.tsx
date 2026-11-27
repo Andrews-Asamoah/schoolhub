@@ -1,3 +1,4 @@
+import { toast } from "@/components/ui/toaster";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CircleAlert, Crown, LoaderCircle, Lock, ShieldCheck, UserRoundCog, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
@@ -42,7 +43,7 @@ export function TeamRoleWorkspace() {
   const canExport = useCanExportTables();
   const [editing, setEditing] = useState<SchoolMember | null>(null);
   const [filter, setFilter] = useState<Role | "all">("all");
-  const [notice, setNotice] = useState<string | null>(null);
+
 
   const members = useQuery({
     queryKey: ["school", "members"],
@@ -135,7 +136,7 @@ export function TeamRoleWorkspace() {
         <button
           type="button"
           onClick={() => {
-            setNotice(null);
+
             setEditing(member);
           }}
           aria-label={`Manage roles for ${member.name}`}
@@ -163,11 +164,7 @@ export function TeamRoleWorkspace() {
         </div>
       </div>
 
-      {notice && (
-        <p role="status" className="rounded-xl border border-success/20 bg-success/10 px-4 py-3 text-sm text-success">
-          {notice}
-        </p>
-      )}
+
 
       <div className="flex flex-wrap items-center gap-2">
         <label className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
@@ -207,7 +204,7 @@ export function TeamRoleWorkspace() {
           onClose={() => setEditing(null)}
           onSaved={async (updated) => {
             setEditing(null);
-            setNotice(`Roles updated for ${updated.name}.`);
+            toast.success(`Roles updated for ${updated.name}.`);
             // A new teacher role also creates a teacher record, so refresh everything
             // that lists teachers (people, class teachers, subjects, timetable).
             await Promise.all([

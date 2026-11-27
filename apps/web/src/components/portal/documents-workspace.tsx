@@ -1,3 +1,4 @@
+import { toast } from "@/components/ui/toaster";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { FileText, FileUp, FileImage, File, Download, LoaderCircle, Search, Trash2, X } from "lucide-react";
 import { useRef, useState, type FormEvent } from "react";
@@ -50,7 +51,7 @@ export function DocumentsWorkspace() {
   const [description, setDescription] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [search, setSearch] = useState("");
-  const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
+
   const [deleteTarget, setDeleteTarget] = useState<SchoolDocument | null>(null);
 
   const searchTerm = useDebouncedValue(search, 250);
@@ -64,7 +65,7 @@ export function DocumentsWorkspace() {
   const uploadMutation = useMutation({
     mutationFn: (payload: FormData) => apiFetch<SchoolDocument>("/documents", { method: "POST", body: payload }),
     onSuccess: async () => {
-      setMessage({ ok: true, text: "Document uploaded successfully." });
+      toast.success("Document uploaded successfully.");
       setTitle("");
       setDescription("");
       setFile(null);
@@ -72,7 +73,7 @@ export function DocumentsWorkspace() {
       if (inputRef.current) inputRef.current.value = "";
       await queryClient.invalidateQueries({ queryKey: ["documents"] });
     },
-    onError: (error: Error) => setMessage({ ok: false, text: error.message }),
+    onError: (error: Error) => toast.error(error.message),
   });
 
   const deleteMutation = useMutation({
@@ -80,10 +81,10 @@ export function DocumentsWorkspace() {
     onSuccess: async () => {
       setDeleteTarget(null);
       setPage(1);
-      setMessage({ ok: true, text: "Document deleted." });
+      toast.success("Document deleted.");
       await queryClient.invalidateQueries({ queryKey: ["documents"] });
     },
-    onError: (error: Error) => setMessage({ ok: false, text: error.message }),
+    onError: (error: Error) => toast.error(error.message),
   });
 
   const rows = documentsQuery.data?.data ?? [];
@@ -103,23 +104,23 @@ export function DocumentsWorkspace() {
     { id: "created", header: "Date added", value: (doc) => doc.createdAt, cell: (doc) => <span className="whitespace-nowrap text-xs text-muted-foreground">{new Intl.DateTimeFormat("en-GH", { dateStyle: "medium" }).format(new Date(doc.createdAt))}</span> },
     {
       id: "actions", header: "Actions", sortable: false, exportable: false,
-      cell: (doc) => <div className="flex items-center justify-end gap-1"><button type="button" disabled={!doc.storageReady} onClick={() => { void apiDownload(`/documents/${doc.id}/download`).catch((error: Error) => setMessage({ ok: false, text: error.message })); }} className="inline-flex size-8 items-center justify-center rounded-lg text-primary hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40" aria-label={`Download ${doc.title}`} title={doc.storageReady ? "Download document" : "Awaiting private-storage migration"}><Download className="size-4" /></button>{canManage && <button type="button" onClick={() => setDeleteTarget(doc)} className="inline-flex size-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label={`Delete ${doc.title}`}><Trash2 className="size-4" /></button>}</div>,
+      cell: (doc) => <div className="flex items-center justify-end gap-1"><button type="button" disabled={!doc.storageReady} onClick={() => { void apiDownload(`/documents/${doc.id}/download`).catch((error: Error) => toast.error(error.message)); }} className="inline-flex size-8 items-center justify-center rounded-lg text-primary hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40" aria-label={`Download ${doc.title}`} title={doc.storageReady ? "Download document" : "Awaiting private-storage migration"}><Download className="size-4" /></button>{canManage && <button type="button" onClick={() => setDeleteTarget(doc)} className="inline-flex size-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label={`Delete ${doc.title}`}><Trash2 className="size-4" /></button>}</div>,
     },
   ];
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setMessage(null);
+
     if (!file) {
-      setMessage({ ok: false, text: "Choose a PDF or image file first." });
+      toast.error("Choose a PDF or image file first.");
       return;
     }
     if (!ACCEPTED_TYPES.includes(file.type)) {
-      setMessage({ ok: false, text: "Only PDF, JPEG, PNG and WebP files are supported." });
+      toast.error("Only PDF, JPEG, PNG and WebP files are supported.");
       return;
     }
     if (file.size > MAX_BYTES) {
-      setMessage({ ok: false, text: "The file must be 10 MB or smaller." });
+      toast.error("The file must be 10 MB or smaller.");
       return;
     }
     const data = new FormData();
@@ -141,7 +142,7 @@ export function DocumentsWorkspace() {
           <label className="grid gap-1.5 text-xs font-medium">Audience<select value={audience} onChange={e => setAudience(e.target.value)} className="h-10 rounded-lg border border-input bg-background px-3 text-sm"><option value="STAFF">School staff</option><option value="LEADERSHIP">School leadership only</option></select></label>
           <button type="submit" disabled={uploadMutation.isPending} className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-xs font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-60">{uploadMutation.isPending ? <LoaderCircle className="size-4 animate-spin" /> : <FileUp className="size-4" />}{uploadMutation.isPending ? "Uploading…" : "Upload"}</button>
         </form>}
-        {message && <p role={message.ok ? "status" : "alert"} className={`mt-3 text-xs ${message.ok ? "text-success" : "text-destructive"}`}>{message.text}</p>}
+
       </section>
 
       <section className="space-y-3">

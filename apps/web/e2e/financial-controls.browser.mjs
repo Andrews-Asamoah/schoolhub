@@ -121,7 +121,7 @@ try{
    assert(await setting.getByRole('checkbox', { name: 'Another accountant' }).isChecked());
    await setting.getByRole('checkbox', { name: 'Require a second person to approve' }).uncheck();
    await setting.getByRole('button', { name: 'Save', exact: true }).click();
-   await setting.getByText('Saved.', { exact: true }).waitFor();
+   await page.getByRole('status').filter({ hasText: /^Saved\.$/ }).waitFor();
    assert.equal(payrollPolicy.required, false);
   }
   assert.deepEqual(errors,[]);await page.close();

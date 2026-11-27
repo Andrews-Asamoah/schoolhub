@@ -17,7 +17,7 @@ describe.skipIf(!enabled)("P4 as-of preview (PostgreSQL)", { timeout: 60000 }, (
     const { FinanceLedgerIntegrityService } = await import("./finance-ledger-integrity.service.js");
     const { FinancePeriodPreparationService } = await import("./finance-period-preparation.service.js");
     db = prisma;
-    const posting = new FinancePostingService({ client: db } as never);
+    const posting = new FinancePostingService();
     preview = new FinancePeriodPreparationService(
       { client: db } as never,
       new FinanceLedgerIntegrityService({ client: db } as never),

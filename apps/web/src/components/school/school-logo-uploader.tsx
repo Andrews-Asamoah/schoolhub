@@ -1,6 +1,7 @@
+import { toast } from "@/components/ui/toaster";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ImageUp, LoaderCircle, Trash2 } from "lucide-react";
-import { useRef, useState } from "react";
+import { useRef } from "react";
 import { apiFetch } from "@/lib/api";
 import { useSchoolRole } from "@/components/school/school-role-switcher";
 
@@ -11,7 +12,7 @@ export function SchoolLogoUploader({ logo }: { logo?: string | null }) {
   const { activeRole } = useSchoolRole();
   const queryClient = useQueryClient();
   const inputRef = useRef<HTMLInputElement>(null);
-  const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
+
 
   const refresh = () =>
     Promise.all([
@@ -26,32 +27,32 @@ export function SchoolLogoUploader({ logo }: { logo?: string | null }) {
       return apiFetch("/schools/current/logo", { method: "PUT", body });
     },
     onSuccess: async () => {
-      setMessage({ ok: true, text: "Logo updated." });
+      toast.success("Logo updated.");
       await refresh();
     },
-    onError: (error: Error) => setMessage({ ok: false, text: error.message }),
+    onError: (error: Error) => toast.error(error.message),
   });
 
   const remove = useMutation({
     mutationFn: () => apiFetch("/schools/current/logo", { method: "DELETE" }),
     onSuccess: async () => {
-      setMessage({ ok: true, text: "Logo removed." });
+      toast.success("Logo removed.");
       await refresh();
     },
-    onError: (error: Error) => setMessage({ ok: false, text: error.message }),
+    onError: (error: Error) => toast.error(error.message),
   });
 
   if (activeRole !== "owner" && activeRole !== "admin") return null;
 
   function onPick(file: File | undefined) {
-    setMessage(null);
+
     if (!file) return;
     if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
-      setMessage({ ok: false, text: "Choose a JPEG, PNG or WebP image." });
+      toast.error("Choose a JPEG, PNG or WebP image.");
       return;
     }
     if (file.size > MAX_BYTES) {
-      setMessage({ ok: false, text: "The image must be 2 MB or smaller." });
+      toast.error("The image must be 2 MB or smaller.");
       return;
     }
     upload.mutate(file);
@@ -102,11 +103,7 @@ export function SchoolLogoUploader({ logo }: { logo?: string | null }) {
             </button>
           )}
         </div>
-        {message && (
-          <p role={message.ok ? "status" : "alert"} className={`mt-2 text-[11px] ${message.ok ? "text-success" : "text-destructive"}`}>
-            {message.text}
-          </p>
-        )}
+
       </div>
     </div>
   );

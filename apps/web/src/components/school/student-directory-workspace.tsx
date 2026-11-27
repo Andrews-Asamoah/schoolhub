@@ -1,3 +1,4 @@
+import { toast } from "@/components/ui/toaster";
 import { PersonPhotoPicker, uploadPersonPhoto } from "./person-photo-picker";
 import { StudentProfileModal } from "@/components/school/student-profile-panel";
 import { UserAvatar } from "@/components/ui/user-avatar";
@@ -167,7 +168,7 @@ export function StudentDirectoryWorkspace() {
     requestAnimationFrame(() => { if (studentId) profileButtons.current.get(studentId)?.focus(); });
   }
   const [issued, setIssued] = useState<CredentialEntry[]>([]);
-  const [notice, setNotice] = useState<string | null>(null);
+
   const resetLoginMutation = useMutation({
     mutationFn: ({ id }: { id: string; name: string }) =>
       apiFetch<IssuedCredentials>(`/accounts/people/student/${id}/credentials`, {
@@ -433,7 +434,7 @@ export function StudentDirectoryWorkspace() {
           houses={housesQuery.data ?? []}
           canManagePhotos={canImport}
           onIssued={setIssued}
-          onNotice={setNotice}
+          onNotice={(text) => { if (text) toast.success(text); }}
           onCancel={() => {
             setShowForm(false);
             setEditing(null);
@@ -494,12 +495,7 @@ export function StudentDirectoryWorkspace() {
       </section>
 
       <CredentialsDialog entries={issued} onClose={() => setIssued([])} />
-      {notice && (
-        <p role="status" className="flex items-start justify-between gap-3 rounded-xl border border-success/20 bg-success/10 px-4 py-3 text-xs text-success">
-          <span>{notice}</span>
-          <button type="button" onClick={() => setNotice(null)} className="font-semibold underline-offset-2 hover:underline">Dismiss</button>
-        </p>
-      )}
+
       {resetLoginMutation.error && (
         <p role="alert" className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
           {resetLoginMutation.error.message}

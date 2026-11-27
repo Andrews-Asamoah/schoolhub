@@ -1,3 +1,4 @@
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -64,18 +65,18 @@ export function PayrollSalaryImportDialog({ employees, onClose, onImported }: {
             <p role="status" className="text-sm font-medium">{changes.length} salary change(s) · {preview.data.rows.length - changes.length} unchanged</p>
             {!!changes.length && (
               <div className="max-h-60 overflow-auto rounded-lg border border-border">
-                <table className="w-full text-left text-sm">
-                  <thead className="sticky top-0 bg-muted">
-                    <tr><th className="p-2">Row</th><th className="p-2">Employee</th><th className="p-2 text-right">Current</th><th className="p-2 text-right">New</th></tr>
-                  </thead>
-                  <tbody>{changes.map(row => (
-                    <tr key={row.row} className="border-t border-border">
-                      <td className="p-2">{row.row}</td><td className="p-2">{row.employeeName} <span className="text-xs text-muted-foreground">({row.employeeCode})</span></td>
-                      <td className="p-2 text-right tabular-nums">{row.expectedSalary === null ? "—" : currency.format(Number(row.expectedSalary))}</td>
-                      <td className="p-2 text-right tabular-nums">{currency.format(Number(row.monthlySalary))}</td>
-                    </tr>
-                  ))}</tbody>
-                </table>
+                <Table scroll={false} className="w-full text-left text-sm">
+                  <TableHeader className="sticky top-0 bg-muted">
+                    <TableRow><TableHead className="p-2">Row</TableHead><TableHead className="p-2">Employee</TableHead><TableHead className="p-2 text-right">Current</TableHead><TableHead className="p-2 text-right">New</TableHead></TableRow>
+                  </TableHeader>
+                  <TableBody>{changes.map(row => (
+                    <TableRow key={row.row} className="border-t border-border">
+                      <TableCell className="p-2">{row.row}</TableCell><TableCell className="p-2">{row.employeeName} <span className="text-xs text-muted-foreground">({row.employeeCode})</span></TableCell>
+                      <TableCell className="p-2 text-right tabular-nums">{row.expectedSalary === null ? "—" : currency.format(Number(row.expectedSalary))}</TableCell>
+                      <TableCell className="p-2 text-right tabular-nums">{currency.format(Number(row.monthlySalary))}</TableCell>
+                    </TableRow>
+                  ))}</TableBody>
+                </Table>
               </div>
             )}
           </div>

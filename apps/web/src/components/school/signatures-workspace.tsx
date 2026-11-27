@@ -1,3 +1,4 @@
+import { toast } from "@/components/ui/toaster";
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CheckCircle2, ImagePlus, LoaderCircle, Trash2, UploadCloud, UserRoundPen } from "lucide-react";
@@ -29,7 +30,7 @@ const personName = (person: Person) => [person.profile?.firstName ?? person.firs
 export function SignaturesWorkspace() {
   const client = useQueryClient();
   const [kind, setKind] = useState<PersonKind>("teacher");
-  const [feedback, setFeedback] = useState<{ kind: "success" | "error"; text: string } | null>(null);
+
   // The card a file is currently being dragged over, so it can light up as a drop target.
   const [dragOverKey, setDragOverKey] = useState<string | null>(null);
   const [uploadingKeys, setUploadingKeys] = useState<Set<string>>(() => new Set());
@@ -55,7 +56,7 @@ export function SignaturesWorkspace() {
       setUploadingKeys((current) => new Set(current).add(key));
     },
     onSuccess: async () => {
-      setFeedback({ kind: "success", text: "Signature uploaded to Cloudflare R2 and linked to the staff profile." });
+      toast.success("Signature uploaded to Cloudflare R2 and linked to the staff profile.");
       await Promise.all([
         client.invalidateQueries({ queryKey: ["people", "teachers"] }),
         client.invalidateQueries({ queryKey: ["people", "staff"] }),
@@ -63,7 +64,7 @@ export function SignaturesWorkspace() {
         client.invalidateQueries({ queryKey: ["people", "staff", "signatures"] }),
       ]);
     },
-    onError: (error: Error) => setFeedback({ kind: "error", text: error.message }),
+    onError: (error: Error) => toast.error(error.message),
     onSettled: (_data, _error, variables) => {
       const key = signatureKey(variables.personKind, variables.person.id);
       setUploadingKeys((current) => {
@@ -76,7 +77,7 @@ export function SignaturesWorkspace() {
   const remove = useMutation({
     mutationFn: (person: Person) => apiFetch<{ signatureUrl: null }>("/schools/current/signatures/" + kind + "/" + person.id, { method: "DELETE" }),
     onSuccess: async () => {
-      setFeedback({ kind: "success", text: "Signature removed from the staff profile." });
+      toast.success("Signature removed from the staff profile.");
       await Promise.all([
         client.invalidateQueries({ queryKey: ["people", "teachers"] }),
         client.invalidateQueries({ queryKey: ["people", "staff"] }),
@@ -84,15 +85,15 @@ export function SignaturesWorkspace() {
         client.invalidateQueries({ queryKey: ["people", "staff", "signatures"] }),
       ]);
     },
-    onError: (error: Error) => setFeedback({ kind: "error", text: error.message }),
+    onError: (error: Error) => toast.error(error.message),
   });
 
   /** Shared by the file picker and drag and drop. A dropped file skips the picker's `accept` filter, so it is checked here. */
   function chooseFile(person: Person, file: File | undefined) {
     if (!file) return;
-    if (!SIGNATURE_TYPES.includes(file.type)) { setFeedback({ kind: "error", text: "Choose a PNG, JPEG or WebP image." }); return; }
-    if (file.size > MAX_SIGNATURE_BYTES) { setFeedback({ kind: "error", text: "Choose an image no larger than 2 MB." }); return; }
-    setFeedback(null);
+    if (!SIGNATURE_TYPES.includes(file.type)) { toast.error("Choose a PNG, JPEG or WebP image."); return; }
+    if (file.size > MAX_SIGNATURE_BYTES) { toast.error("Choose an image no larger than 2 MB."); return; }
+
     upload.mutate({ person, file, personKind: kind });
   }
 
@@ -107,12 +108,12 @@ export function SignaturesWorkspace() {
         <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">Upload authorised signatures for teachers, accountants, the headteacher and other staff members. Images are validated on the server, stored in your school's Cloudflare R2 folder, and linked to each person's profile for reuse in supported forms and printouts.</p>
       </section>
 
-      {feedback && <div role={feedback.kind === "error" ? "alert" : "status"} className={cn("rounded-xl border p-3 text-sm", feedback.kind === "error" ? "border-destructive/30 bg-destructive/5 text-destructive" : "border-border bg-muted/40 text-foreground")}>{feedback.text}</div>}
+
 
       <section className="rounded-2xl border border-border bg-card p-4 shadow-sm sm:p-5">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-start gap-3"><div className="rounded-xl bg-primary/10 p-2 text-primary"><UserRoundPen className="size-5" /></div><div><h2 className="font-semibold">Choose a staff group</h2><p className="mt-1 text-sm text-muted-foreground">Only active school records are listed.</p></div></div>
-          <div className="flex gap-2"><button type="button" className={cn("rounded-xl px-4 py-2 text-sm font-semibold", kind === "teacher" ? "bg-primary text-primary-foreground" : "border border-border bg-card")} onClick={() => { setKind("teacher"); setFeedback(null); }}>Teachers</button><button type="button" className={cn("rounded-xl px-4 py-2 text-sm font-semibold", kind === "staff" ? "bg-primary text-primary-foreground" : "border border-border bg-card")} onClick={() => { setKind("staff"); setFeedback(null); }}>Staff & administration</button></div>
+          <div className="flex gap-2"><button type="button" className={cn("rounded-xl px-4 py-2 text-sm font-semibold", kind === "teacher" ? "bg-primary text-primary-foreground" : "border border-border bg-card")} onClick={() => { setKind("teacher");  }}>Teachers</button><button type="button" className={cn("rounded-xl px-4 py-2 text-sm font-semibold", kind === "staff" ? "bg-primary text-primary-foreground" : "border border-border bg-card")} onClick={() => { setKind("staff");  }}>Staff & administration</button></div>
         </div>
       </section>
 
@@ -130,7 +131,7 @@ export function SignaturesWorkspace() {
           <div
             onDragOver={(event) => { if (isUploading || !event.dataTransfer.types.includes("Files")) return; event.preventDefault(); event.dataTransfer.dropEffect = "copy"; setDragOverKey(dropKey); }}
             onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDragOverKey((current) => (current === dropKey ? null : current)); }}
-            onDrop={(event) => { event.preventDefault(); setDragOverKey(null); if (isUploading) return; const files = event.dataTransfer.files; if (files.length > 1) { setFeedback({ kind: "error", text: "Drop one image at a time." }); return; } chooseFile(person, files[0]); }}
+            onDrop={(event) => { event.preventDefault(); setDragOverKey(null); if (isUploading) return; const files = event.dataTransfer.files; if (files.length > 1) { toast.error("Drop one image at a time."); return; } chooseFile(person, files[0]); }}
             className={cn("relative mt-4 flex h-32 items-center justify-center overflow-hidden rounded-xl border border-dashed p-3 transition-colors", dragging ? "border-primary bg-primary/10" : "border-border bg-muted/30")}
           >{dragging && <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center gap-2 bg-primary/10 text-sm font-semibold text-primary"><UploadCloud className="size-5" /> Drop to {signatureUrl ? "replace" : "upload"}</div>}{signatureUrl ? <PrivateSignature key={signatureUrl + person.id} path={"/schools/current/signatures/" + kind + "/" + person.id} name={personName(person)} version={kind === "teacher" ? teachersQuery.dataUpdatedAt : staffQuery.dataUpdatedAt} /> : <div className="text-center text-muted-foreground"><ImagePlus className="mx-auto size-6" /><p className="mt-2 text-xs">No signature uploaded</p><p className="text-[11px]">Drop an image here</p></div>}</div>
           <div className="mt-4 flex flex-wrap gap-2">

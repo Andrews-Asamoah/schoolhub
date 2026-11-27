@@ -13,7 +13,7 @@ function render(layout: ReportDocLayout = {}, overrides: Partial<Parameters<type
     />,
   );
 }
-const headers = (html: string) => [...html.matchAll(/<th scope="col"[^>]*>(.*?)<\/th>/g)].map((m) => m[1]!.replace(/<[^>]+>/g, ""));
+const headers = (html: string) => [...html.matchAll(/<th\b[^>]*\bscope="col"[^>]*>(.*?)<\/th>/g)].map((m) => m[1]!.replace(/<[^>]+>/g, ""));
 
 describe("ReportCardDocument", () => {
   it("lays out Subject, Class Score, Total Score, Grade, Position, Remarks in that order", () => {

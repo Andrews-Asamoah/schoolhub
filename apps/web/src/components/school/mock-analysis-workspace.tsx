@@ -1,3 +1,4 @@
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowDownRight, ArrowRight, ArrowUpRight, BarChart3, TriangleAlert } from "lucide-react";
@@ -196,33 +197,33 @@ export function MockAnalysisWorkspace() {
 
           <Panel title="Subjects across mocks" note="Average percentage per subject. Arrows compare with the previous mock the subject was written.">
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead><tr className="border-b border-border text-left text-xs text-muted-foreground"><th className="py-2 pr-4">Subject</th>{data.mocks.map((m) => <th key={m.id} className="py-2 pr-4">{m.name}</th>)}</tr></thead>
-                <tbody>{data.subjects.map((subject) => (
-                  <tr key={subject.subjectId} className="border-b border-border/60">
-                    <td className="py-2 pr-4 font-medium">{subject.name}</td>
-                    {subject.points.map((p) => <td key={p.mockId} className="py-2 pr-4 tabular-nums">{fmt(p.average)}<Delta value={p.delta} /></td>)}
-                  </tr>
-                ))}</tbody>
-              </table>
+              <Table scroll={false} className="w-full text-sm">
+                <TableHeader><TableRow className="border-b border-border text-left text-xs text-muted-foreground"><TableHead className="py-2 pr-4">Subject</TableHead>{data.mocks.map((m) => <TableHead key={m.id} className="py-2 pr-4">{m.name}</TableHead>)}</TableRow></TableHeader>
+                <TableBody>{data.subjects.map((subject) => (
+                  <TableRow key={subject.subjectId} className="border-b border-border/60">
+                    <TableCell className="py-2 pr-4 font-medium">{subject.name}</TableCell>
+                    {subject.points.map((p) => <TableCell key={p.mockId} className="py-2 pr-4 tabular-nums">{fmt(p.average)}<Delta value={p.delta} /></TableCell>)}
+                  </TableRow>
+                ))}</TableBody>
+              </Table>
             </div>
           </Panel>
 
           <Panel title="Pupils" note={`On track: latest average ${data.thresholds.onTrack}% or more. Watch: ${data.thresholds.watch}–${data.thresholds.onTrack - 0.1}%. At risk: below ${data.thresholds.watch}%. A move of ${data.thresholds.trendDelta} points or more counts as a trend. Select a pupil for detail.`}>
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead><tr className="border-b border-border text-left text-xs text-muted-foreground">
-                  <th className="py-2 pr-4">Pupil</th>{data.mocks.map((m) => <th key={m.id} className="py-2 pr-4">{m.name}</th>)}<th className="py-2 pr-4">Trend</th><th className="py-2">Status</th>
-                </tr></thead>
-                <tbody>{students.map((student) => (
-                  <tr key={student.id} onClick={() => setStudentId(student.id === studentId ? null : student.id)} className={`cursor-pointer border-b border-border/60 hover:bg-muted/40 ${student.id === studentId ? "bg-muted/50" : ""}`}>
-                    <td className="py-2 pr-4 font-medium">{student.name}</td>
-                    {student.series.map((p) => <td key={p.mockId} className="py-2 pr-4 tabular-nums">{fmt(p.average)}{p.position != null && <span className="ml-1 text-[11px] text-muted-foreground">#{p.position}</span>}</td>)}
-                    <td className="py-2 pr-4">{student.mocksSat ? <TrendBadge trend={student.trend} change={student.change} /> : <span className="text-xs text-muted-foreground">Not sat</span>}</td>
-                    <td className="py-2">{student.status ? <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${STATUS_STYLE[student.status]}`}>{STATUS_LABEL[student.status]}</span> : <span className="text-xs text-muted-foreground">—</span>}</td>
-                  </tr>
-                ))}</tbody>
-              </table>
+              <Table scroll={false} className="w-full text-sm">
+                <TableHeader><TableRow className="border-b border-border text-left text-xs text-muted-foreground">
+                  <TableHead className="py-2 pr-4">Pupil</TableHead>{data.mocks.map((m) => <TableHead key={m.id} className="py-2 pr-4">{m.name}</TableHead>)}<TableHead className="py-2 pr-4">Trend</TableHead><TableHead className="py-2">Status</TableHead>
+                </TableRow></TableHeader>
+                <TableBody>{students.map((student) => (
+                  <TableRow key={student.id} onClick={() => setStudentId(student.id === studentId ? null : student.id)} className={`cursor-pointer border-b border-border/60 hover:bg-muted/40 ${student.id === studentId ? "bg-muted/50" : ""}`}>
+                    <TableCell className="py-2 pr-4 font-medium">{student.name}</TableCell>
+                    {student.series.map((p) => <TableCell key={p.mockId} className="py-2 pr-4 tabular-nums">{fmt(p.average)}{p.position != null && <span className="ml-1 text-[11px] text-muted-foreground">#{p.position}</span>}</TableCell>)}
+                    <TableCell className="py-2 pr-4">{student.mocksSat ? <TrendBadge trend={student.trend} change={student.change} /> : <span className="text-xs text-muted-foreground">Not sat</span>}</TableCell>
+                    <TableCell className="py-2">{student.status ? <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${STATUS_STYLE[student.status]}`}>{STATUS_LABEL[student.status]}</span> : <span className="text-xs text-muted-foreground">—</span>}</TableCell>
+                  </TableRow>
+                ))}</TableBody>
+              </Table>
             </div>
           </Panel>
 
@@ -255,20 +256,20 @@ function StudentDetail({ student, data }: { student: StudentRow; data: Analysis 
           </ResponsiveContainer>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead><tr className="border-b border-border text-left text-xs text-muted-foreground"><th className="py-2 pr-3">Subject</th>{data.mocks.map((m) => <th key={m.id} className="py-2 pr-3">{m.name}</th>)}</tr></thead>
-            <tbody>{data.subjects.map((subject) => (
-              <tr key={subject.subjectId} className="border-b border-border/60">
-                <td className="py-1.5 pr-3">{subject.name}</td>
+          <Table scroll={false} className="w-full text-sm">
+            <TableHeader><TableRow className="border-b border-border text-left text-xs text-muted-foreground"><TableHead className="py-2 pr-3">Subject</TableHead>{data.mocks.map((m) => <TableHead key={m.id} className="py-2 pr-3">{m.name}</TableHead>)}</TableRow></TableHeader>
+            <TableBody>{data.subjects.map((subject) => (
+              <TableRow key={subject.subjectId} className="border-b border-border/60">
+                <TableCell className="py-1.5 pr-3">{subject.name}</TableCell>
                 {student.series.map((p) => {
                   const row = p.subjects.find((s) => s.subjectId === subject.subjectId);
                   const avg = subject.points.find((pt) => pt.mockId === p.mockId)?.average ?? null;
                   const below = row && avg != null && row.percentage < avg;
-                  return <td key={p.mockId} className={`py-1.5 pr-3 tabular-nums ${below ? "text-destructive" : ""}`}>{row ? `${row.percentage.toFixed(1)}${row.grade ? ` (${row.grade})` : ""}` : "—"}</td>;
+                  return <TableCell key={p.mockId} className={`py-1.5 pr-3 tabular-nums ${below ? "text-destructive" : ""}`}>{row ? `${row.percentage.toFixed(1)}${row.grade ? ` (${row.grade})` : ""}` : "—"}</TableCell>;
                 })}
-              </tr>
-            ))}</tbody>
-          </table>
+              </TableRow>
+            ))}</TableBody>
+          </Table>
           <p className="mt-2 text-[11px] text-muted-foreground">Red means below the class average for that subject and mock. Grade in brackets.</p>
         </div>
       </div>

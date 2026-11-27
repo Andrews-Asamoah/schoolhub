@@ -5,7 +5,6 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   CalendarDays,
   Check,
-  CircleAlert,
   Clock3,
   Plus,
   Trash2,
@@ -72,6 +71,7 @@ export function AcademicYearSetup({ years }: AcademicYearSetupProps) {
   const queryClient = useQueryClient();
   const validationSummary = useRef<HTMLDivElement>(null);
   const mutation = useMutation({
+    meta: { success: "Academic year and terms saved. The setup checklist has been updated." },
     mutationFn: (input: CreateAcademicYearInput) =>
       apiFetch("/schools/academic-years", {
         method: "POST",
@@ -345,18 +345,6 @@ export function AcademicYearSetup({ years }: AcademicYearSetupProps) {
             }}
           </form.Subscribe>
 
-          {mutation.error && (
-            <p role="alert" className="flex items-center gap-2 rounded-lg border border-destructive/20 bg-destructive/10 px-3 py-2.5 text-xs text-destructive">
-              <CircleAlert className="size-4 shrink-0" />
-              Could not save the academic calendar: {mutation.error.message}
-            </p>
-          )}
-          {mutation.isSuccess && (
-            <p role="status" className="flex items-center gap-2 rounded-lg border border-success/20 bg-success/10 px-3 py-2.5 text-xs font-medium text-success">
-              <Check className="size-4" />
-              Academic year and terms saved. The setup checklist has been updated.
-            </p>
-          )}
           <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
               <Clock3 className="size-3.5" />

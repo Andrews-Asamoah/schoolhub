@@ -1,3 +1,4 @@
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -56,26 +57,26 @@ export function BankMatchSuggestions({ reconciliationId, busy, onApply }: {
           <span role="status" className="text-sm text-muted-foreground">{chosen.length} of {matches.length} selected</span>
         </div>
         <div className="max-h-72 overflow-auto rounded-lg border border-border bg-card">
-          <table className="w-full text-left text-sm">
-            <thead className="sticky top-0 bg-card text-muted-foreground"><tr>
-              <th scope="col" className="p-2"><span className="sr-only">Select</span></th>
-              <th scope="col" className="p-2">Statement line</th>
-              <th scope="col" className="p-2">Ledger posting</th>
-              <th scope="col" className="p-2 text-right">Amount</th>
-            </tr></thead>
-            <tbody className="divide-y divide-border">
-              {matches.map(match => <tr key={match.statementLineId}>
-                <td className="p-2">
+          <Table scroll={false} className="w-full text-left text-sm">
+            <TableHeader className="sticky top-0 bg-card text-muted-foreground"><TableRow>
+              <TableHead scope="col" className="p-2"><span className="sr-only">Select</span></TableHead>
+              <TableHead scope="col" className="p-2">Statement line</TableHead>
+              <TableHead scope="col" className="p-2">Ledger posting</TableHead>
+              <TableHead scope="col" className="p-2 text-right">Amount</TableHead>
+            </TableRow></TableHeader>
+            <TableBody className="divide-y divide-border">
+              {matches.map(match => <TableRow key={match.statementLineId}>
+                <TableCell className="p-2">
                   <input type="checkbox" className="size-4 accent-primary" checked={selection.has(match.statementLineId)}
                     aria-label={`Match ${match.reference} to ${match.transactionNumber}`} disabled={busy || query.isFetching}
                     onChange={event => setSelected(event.target.checked ? [...selected, match.statementLineId] : selected.filter(id => id !== match.statementLineId))} />
-                </td>
-                <td className="p-2"><div>{match.statementDescription}</div><div className="text-xs text-muted-foreground">{match.date.slice(0, 10)} · {match.reference}</div></td>
-                <td className="p-2"><div>{match.postingDescription}</div><div className="text-xs text-muted-foreground">{match.transactionNumber}</div></td>
-                <td className="whitespace-nowrap p-2 text-right tabular-nums">{match.amount}</td>
-              </tr>)}
-            </tbody>
-          </table>
+                </TableCell>
+                <TableCell className="p-2"><div>{match.statementDescription}</div><div className="text-xs text-muted-foreground">{match.date.slice(0, 10)} · {match.reference}</div></TableCell>
+                <TableCell className="p-2"><div>{match.postingDescription}</div><div className="text-xs text-muted-foreground">{match.transactionNumber}</div></TableCell>
+                <TableCell className="whitespace-nowrap p-2 text-right tabular-nums">{match.amount}</TableCell>
+              </TableRow>)}
+            </TableBody>
+          </Table>
         </div>
         <Button type="button" disabled={busy || query.isFetching || !query.isSuccess || !chosen.length}
           onClick={() => onApply(chosen.map(({ statementLineId, transactionId }) => ({ statementLineId, transactionId })))}>

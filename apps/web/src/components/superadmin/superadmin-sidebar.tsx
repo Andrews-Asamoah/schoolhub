@@ -46,13 +46,13 @@ export function SuperAdminSidebar({ activePage, userName, userEmail }: SuperAdmi
   return (
     <Sidebar className="superadmin-sidebar-shell border-r border-sidebar-border">
       <SidebarHeader className="superadmin-sidebar-panel">
-        <Link to="/admin/dashboard" aria-label="CampusHubGH platform dashboard"
+        <Link to="/admin/dashboard" aria-label="schoolHub platform dashboard"
           className="flex min-w-0 w-full items-center gap-2.5 rounded-lg px-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring">
           <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground shadow-sm">
-            <img src="/campushubgh.webp" alt="" className="size-full rounded-lg object-contain" />
+            <img src="/schoolhub.webp" alt="" className="size-full rounded-lg object-contain" />
           </span>
           <span className="sidebar-expanded min-w-0 flex-1">
-            <span className="superadmin-brand-title block truncate text-[14px] font-bold tracking-tight">CampusHubGH</span>
+            <span className="superadmin-brand-title block truncate text-[14px] font-bold tracking-tight">schoolHub</span>
             <span className="block text-[10px] font-bold tracking-[0.12em] text-muted-foreground">PLATFORM ADMIN</span>
           </span>
         </Link>

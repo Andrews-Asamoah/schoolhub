@@ -1,3 +1,5 @@
+import { toast } from "@/components/ui/toaster";
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import {useState} from "react";
 import {useMutation,useQuery,useQueryClient} from "@tanstack/react-query";
 import {FileSpreadsheet,ShieldCheck} from "lucide-react";
@@ -19,7 +21,7 @@ export function ExternalBeceImportWorkspace({sessionId,paperId,status}:{
   const client=useQueryClient();
   const [file,setFile]=useState<File|null>(null);
   const [preview,setPreview]=useState<Preview|null>(null);
-  const [success,setSuccess]=useState("");
+
   const [downloadError,setDownloadError]=useState("");
   const history=useQuery({queryKey:["bece-import-history",sessionId],
     queryFn:()=>apiFetch<History[]>("/external-exams/"+encodeURIComponent(sessionId)+"/import/history"),
@@ -30,7 +32,7 @@ export function ExternalBeceImportWorkspace({sessionId,paperId,status}:{
     return apiFetch<Preview>("/external-exams/"+encodeURIComponent(sessionId)+"/import/preview",{
       method:"POST",body:form,
     });
-  },onSuccess:data=>{setPreview(data);setSuccess("");}});
+  },onSuccess:data=>{setPreview(data);}});
   const apply=useMutation({mutationFn:async()=>{
     if(!file||!preview)throw new Error("Preview a workbook first.");
     const form=new FormData();form.append("file",file);form.append("sha256",preview.sha256);
@@ -39,7 +41,7 @@ export function ExternalBeceImportWorkspace({sessionId,paperId,status}:{
         method:"POST",body:form,
       });
   },onSuccess:async(result)=>{
-    setSuccess(result.committed+" BECE result entries committed with an immutable import record. Other rows were not changed.");
+    toast.success(result.committed+" BECE result entries committed with an immutable import record. Other rows were not changed.");
     setPreview(null);setFile(null);
     await Promise.all([
       client.invalidateQueries({queryKey:["external-bece"]}),
@@ -73,7 +75,7 @@ export function ExternalBeceImportWorkspace({sessionId,paperId,status}:{
           Choose completed Excel workbook (.xlsx, max 3 MB, 600 rows)
         </label>
         <input id="bece-xlsx-file" type="file" accept=".xlsx" className="block w-full text-xs"
-          onChange={e=>{setFile(e.target.files?.[0]??null);setPreview(null);setSuccess("");}}/>
+          onChange={e=>{setFile(e.target.files?.[0]??null);setPreview(null);}}/>
       </div>
       <button type="button" className={button} disabled={!file||inspect.isPending||apply.isPending}
         onClick={()=>inspect.mutate()}>
@@ -89,21 +91,21 @@ export function ExternalBeceImportWorkspace({sessionId,paperId,status}:{
           Workbook SHA-256: {preview.sha256}
         </p>
         <div className="max-h-80 overflow-auto rounded-lg border border-border">
-          <table className="w-full min-w-[630px] text-left text-xs">
-            <thead className="sticky top-0 bg-muted"><tr>
-              <th className="p-2">Excel row</th><th className="p-2">Candidate / index</th>
-              <th className="p-2">Subject</th><th className="p-2">Proposed</th>
-              <th className="p-2">Decision / issues</th>
-            </tr></thead>
-            <tbody>{preview.rows.map(row=><tr key={row.rowNumber} className="border-t border-border">
-              <td className="p-2">{row.rowNumber}</td>
-              <td className="p-2">{row.candidate||"Unknown"}<span className="block font-mono">{row.indexNumber}</span></td>
-              <td className="p-2">{row.subjectCode}</td>
-              <td className="p-2">{row.status||"Skipped"}{row.grade===null?"":": "+row.grade}</td>
-              <td className="p-2"><strong className={row.decision==="rejected"?"text-destructive":""}>{row.decision}</strong>
-                {row.errors.length>0&&<span className="block text-destructive">{row.errors.join("; ")}</span>}</td>
-            </tr>)}</tbody>
-          </table>
+          <Table scroll={false} className="w-full min-w-[630px] text-left text-xs">
+            <TableHeader className="sticky top-0 bg-muted"><TableRow>
+              <TableHead className="p-2">Excel row</TableHead><TableHead className="p-2">Candidate / index</TableHead>
+              <TableHead className="p-2">Subject</TableHead><TableHead className="p-2">Proposed</TableHead>
+              <TableHead className="p-2">Decision / issues</TableHead>
+            </TableRow></TableHeader>
+            <TableBody>{preview.rows.map(row=><TableRow key={row.rowNumber} className="border-t border-border">
+              <TableCell className="p-2">{row.rowNumber}</TableCell>
+              <TableCell className="p-2">{row.candidate||"Unknown"}<span className="block font-mono">{row.indexNumber}</span></TableCell>
+              <TableCell className="p-2">{row.subjectCode}</TableCell>
+              <TableCell className="p-2">{row.status||"Skipped"}{row.grade===null?"":": "+row.grade}</TableCell>
+              <TableCell className="p-2"><strong className={row.decision==="rejected"?"text-destructive":""}>{row.decision}</strong>
+                {row.errors.length>0&&<span className="block text-destructive">{row.errors.join("; ")}</span>}</TableCell>
+            </TableRow>)}</TableBody>
+          </Table>
         </div>
         {preview.canApply&&<button type="button" className={primary}
           disabled={apply.isPending||inspect.isPending} onClick={()=>apply.mutate()}>
@@ -119,7 +121,7 @@ export function ExternalBeceImportWorkspace({sessionId,paperId,status}:{
       This register is {status.toLowerCase()}. Excel uploads are available only while the examination is open.
     </p>}
     {downloadError&&<p role="alert" className="text-xs text-destructive">{downloadError}</p>}
-    {success&&<p role="status" className="text-xs">{success}</p>}
+
     <div className="space-y-2">
       <h5 className="text-xs font-bold">Committed import history</h5>
       {history.isPending&&<p className="text-xs text-muted-foreground">Loading import provenance…</p>}

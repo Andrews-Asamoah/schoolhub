@@ -1,3 +1,5 @@
+import { toast } from "@/components/ui/toaster";
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { formatPersonName } from "@schoolhub/shared";
 import { DatePicker } from "@/components/ui/date-picker";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -7,7 +9,7 @@ import { LabeledField } from "@/components/forms/labeled-controls";
 import { useDebouncedValue } from "@/components/superadmin/use-debounced-value";
 import { authClient } from "@/lib/auth-client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowRight, BadgeCheck, CalendarDays, CheckCircle2, GraduationCap, HeartHandshake, LoaderCircle, Plus, Search, ShieldCheck, ToggleLeft, ToggleRight, X } from "lucide-react";
+import { BadgeCheck, CalendarDays, CheckCircle2, GraduationCap, HeartHandshake, LoaderCircle, Plus, Search, ShieldCheck, ToggleLeft, ToggleRight, X } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { FinanceReadOnlyNotice, useFinanceAccess } from "@/components/portal/finance-access";
@@ -72,7 +74,7 @@ export function ConcessionsWorkspace() {
   const [termId, setTermId] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
-  const [feedback, setFeedback] = useState<{ kind: "success" | "error"; text: string } | null>(null);
+
 
   const concessionsQuery = useQuery({
     queryKey: ["finance", "concessions"],
@@ -91,10 +93,10 @@ export function ConcessionsWorkspace() {
       body: JSON.stringify({ name: policyName, minimumWardCount: Number(minimumWardCount), valueType: policyType, value: Number(policyValue) }),
     }),
     onSuccess: async () => {
-      setPolicyName(""); setPolicyValue(""); setFeedback({ kind: "success", text: "Sibling discount rule saved. It will apply to newly generated bills for eligible wards." });
+      setPolicyName(""); setPolicyValue(""); toast.success("Sibling discount rule saved. It will apply to newly generated bills for eligible wards.");
       await client.invalidateQueries({ queryKey: ["finance", "concessions"] });
     },
-    onError: (error: Error) => setFeedback({ kind: "error", text: error.message }),
+    onError: (error: Error) => toast.error(error.message),
   });
   const createScholarship = useMutation({
     mutationFn: (studentIds: string[]) => apiFetch<{ awardedCount: number }>("/finance/scholarships/bulk", {
@@ -116,19 +118,19 @@ export function ConcessionsWorkspace() {
       setReason("");
       setStartDate("");
       setEndDate("");
-      setFeedback({ kind: "success", text: `Scholarship awarded to ${awardedCount} ${awardedCount === 1 ? "student" : "students"}. It will apply to eligible new bills.` });
+      toast.success(`Scholarship awarded to ${awardedCount} ${awardedCount === 1 ? "student" : "students"}. It will apply to eligible new bills.`);
       await client.invalidateQueries({ queryKey: ["finance", "concessions"] });
     },
   });
   const togglePolicy = useMutation({
     mutationFn: ({ id, isActive }: { id: string; isActive: boolean }) => apiFetch("/finance/sibling-discount-policies/" + id, { method: "PATCH", body: JSON.stringify({ isActive }) }),
     onSuccess: () => client.invalidateQueries({ queryKey: ["finance", "concessions"] }),
-    onError: (error: Error) => setFeedback({ kind: "error", text: error.message }),
+    onError: (error: Error) => toast.error(error.message),
   });
   const toggleScholarship = useMutation({
     mutationFn: ({ id, isActive }: { id: string; isActive: boolean }) => apiFetch("/finance/scholarships/" + id, { method: "PATCH", body: JSON.stringify({ isActive }) }),
     onSuccess: () => client.invalidateQueries({ queryKey: ["finance", "concessions"] }),
-    onError: (error: Error) => setFeedback({ kind: "error", text: error.message }),
+    onError: (error: Error) => toast.error(error.message),
   });
 
   const policies = concessionsQuery.data?.siblingPolicies ?? [];
@@ -145,7 +147,7 @@ export function ConcessionsWorkspace() {
         <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">Set school-wide family discount rules and award individual scholarships. Concessions are recorded against each new bill, with a clear audit trail; existing bills are never silently rewritten.</p>
       </section>
 
-      {feedback && <div role={feedback.kind === "error" ? "alert" : "status"} className={cn("rounded-xl border p-3 text-sm", feedback.kind === "error" ? "border-destructive/30 bg-destructive/5 text-destructive" : "border-border bg-muted/40 text-foreground")}>{feedback.text}</div>}
+
 
       <div className="grid gap-3 sm:grid-cols-3">
         <div className="rounded-2xl border border-border bg-card p-4"><div className="flex items-center gap-2 text-sm text-muted-foreground"><HeartHandshake className="size-4" /> Discount rules</div><p className="mt-2 text-2xl font-bold">{policies.filter((p) => p.isActive).length}</p><p className="text-xs text-muted-foreground">Active sibling rules</p></div>
@@ -157,7 +159,7 @@ export function ConcessionsWorkspace() {
       <div className="grid items-start gap-5 xl:grid-cols-2">
         <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
           <div className="mb-4 flex items-start gap-3"><div className="rounded-xl bg-primary/10 p-2 text-primary"><HeartHandshake className="size-5" /></div><div><h2 className="font-semibold">Sibling discount rules</h2><p className="mt-1 text-sm text-muted-foreground">Based on active wards linked to the same guardian account.</p></div></div>
-          {canWrite && (<form className="grid gap-3 sm:grid-cols-2" onSubmit={(event) => { event.preventDefault(); setFeedback(null); createPolicy.mutate(); }}>
+          {canWrite && (<form className="grid gap-3 sm:grid-cols-2" onSubmit={(event) => { event.preventDefault();  createPolicy.mutate(); }}>
             <label className="text-sm font-medium sm:col-span-2">Rule name<input className={cn(field, "mt-1")} value={policyName} onChange={(e) => setPolicyName(e.target.value)} required maxLength={120} placeholder="e.g. Three-ward family discount" /></label>
             <label className="text-sm font-medium">Minimum linked wards<input className={cn(field, "mt-1")} type="number" min="2" max="30" value={minimumWardCount} onChange={(e) => setMinimumWardCount(e.target.value)} required /></label>
             <label className="text-sm font-medium">Discount type<Select value={policyType} onValueChange={(value) => setPolicyType(value as ValueType)}><SelectTrigger aria-label="Discount type" className={cn(field, "mt-1")}><SelectValue /></SelectTrigger><SelectContent><SelectItem value="PERCENTAGE">Percentage (%)</SelectItem><SelectItem value="FIXED">Fixed amount (GHS)</SelectItem></SelectContent></Select></label>
@@ -183,7 +185,7 @@ export function ConcessionsWorkspace() {
             <form onSubmit={event => {
               event.preventDefault();
               if (!selectedStudents.length || createScholarship.isPending) return;
-              setFeedback(null);
+
               createScholarship.mutate(selectedStudents.map(student => student.id));
             }}>
               <fieldset className="space-y-5 px-5 py-5 sm:px-6" disabled={createScholarship.isPending}>
@@ -283,7 +285,7 @@ export function ConcessionsWorkspace() {
                 </div>
               </fieldset>
               <div className="flex flex-wrap items-center justify-end gap-3 border-t border-border bg-muted/20 px-5 py-4 sm:px-6">
-                {createScholarship.error && <p role="alert" className="mr-auto text-sm text-destructive">{createScholarship.error.message}</p>}
+
                 <Button type="submit" loading={createScholarship.isPending} disabled={!selectedStudents.length || (!!termId && !selectedTerm)}>
                   {selectedStudents.length > 1 ? `Award to ${selectedStudents.length} students` : "Save scholarship"}
                 </Button>
@@ -301,17 +303,17 @@ export function ConcessionsWorkspace() {
         {concessionsQuery.isPending ? <p className="text-sm text-muted-foreground">Loading scholarships…</p>
           : concessionsQuery.error ? <p role="alert" className="text-sm text-destructive">{concessionsQuery.error.message}</p>
           : scholarships.length === 0 ? <p className="rounded-xl border border-dashed border-border p-4 text-sm text-muted-foreground">No student scholarships have been recorded.</p>
-          : <div className="overflow-x-auto"><table className="w-full min-w-[720px] text-left text-sm">
-            <thead><tr className="border-b border-border text-xs uppercase tracking-wide text-muted-foreground"><th className="p-3">Student</th><th className="p-3">Award</th><th className="p-3">Value</th><th className="p-3">Period</th><th className="p-3">Status</th><th className="p-3">Action</th></tr></thead>
-            <tbody>{scholarships.map((award) => <tr key={award.id} className="border-b border-border/70 last:border-0">
-              <td className="p-3"><p className="font-medium">{personName(award.student)}</p><p className="text-xs text-muted-foreground">{award.student.admissionNumber || "No admission number"}</p></td>
-              <td className="p-3"><p>{award.name}</p><p className="max-w-xs truncate text-xs text-muted-foreground">{award.reason || "No note provided"}</p></td>
-              <td className="p-3 font-medium">{award.valueType === "PERCENTAGE" ? award.value + "%" : money(award.value)}</td>
-              <td className="p-3 text-muted-foreground">{periodLabel(award, years)}</td>
-              <td className="p-3"><span className={cn("rounded-full px-2.5 py-1 text-xs font-semibold", award.isActive ? "bg-success/10 text-success" : "bg-muted text-muted-foreground")}>{award.isActive ? "Active" : "Inactive"}</span></td>
-              <td className="p-3">{canWrite && <button type="button" className={secondary} disabled={toggleScholarship.isPending} onClick={() => toggleScholarship.mutate({ id: award.id, isActive: !award.isActive })}>{award.isActive ? "Deactivate" : "Reactivate"}</button>}</td>
-            </tr>)}</tbody>
-          </table></div>}
+          : <div className="overflow-x-auto"><Table scroll={false} className="w-full min-w-[720px] text-left text-sm">
+            <TableHeader><TableRow className="border-b border-border text-xs uppercase tracking-wide text-muted-foreground"><TableHead className="p-3">Student</TableHead><TableHead className="p-3">Award</TableHead><TableHead className="p-3">Value</TableHead><TableHead className="p-3">Period</TableHead><TableHead className="p-3">Status</TableHead><TableHead className="p-3">Action</TableHead></TableRow></TableHeader>
+            <TableBody>{scholarships.map((award) => <TableRow key={award.id} className="border-b border-border/70 last:border-0">
+              <TableCell className="p-3"><p className="font-medium">{personName(award.student)}</p><p className="text-xs text-muted-foreground">{award.student.admissionNumber || "No admission number"}</p></TableCell>
+              <TableCell className="p-3"><p>{award.name}</p><p className="max-w-xs truncate text-xs text-muted-foreground">{award.reason || "No note provided"}</p></TableCell>
+              <TableCell className="p-3 font-medium">{award.valueType === "PERCENTAGE" ? award.value + "%" : money(award.value)}</TableCell>
+              <TableCell className="p-3 text-muted-foreground">{periodLabel(award, years)}</TableCell>
+              <TableCell className="p-3"><span className={cn("rounded-full px-2.5 py-1 text-xs font-semibold", award.isActive ? "bg-success/10 text-success" : "bg-muted text-muted-foreground")}>{award.isActive ? "Active" : "Inactive"}</span></TableCell>
+              <TableCell className="p-3">{canWrite && <button type="button" className={secondary} disabled={toggleScholarship.isPending} onClick={() => toggleScholarship.mutate({ id: award.id, isActive: !award.isActive })}>{award.isActive ? "Deactivate" : "Reactivate"}</button>}</TableCell>
+            </TableRow>)}</TableBody>
+          </Table></div>}
       </section>
       <p className="text-xs leading-5 text-muted-foreground">These concessions apply to newly generated bills only. Bills already issued retain their original balances and audit history. The system caps combined concessions at the bill amount and applies scholarships before the sibling discount rule.</p>
     </div>

@@ -1,3 +1,5 @@
+import { toast } from "@/components/ui/toaster";
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -23,7 +25,7 @@ export function BusUsersWorkspace() {
   const [search, setSearch] = useState("");
   const [selection, setSelection] = useState<string[]>([]);
   const [action, setAction] = useState<BusStatus | "INHERIT">("RIDING");
-  const [feedback, setFeedback] = useState("");
+
 
   const years = useQuery({ queryKey: ["schools", "academic-years"], queryFn: () => apiFetch<Year[]>("/schools/academic-years") });
   const classes = useQuery({ queryKey: ["academics", "classes"], queryFn: () => apiFetch<{ id: string; name: string; academicYearId?: string | null }[]>("/academics/classes") });
@@ -47,7 +49,7 @@ export function BusUsersWorkspace() {
     }),
     onSuccess: async ({ count }) => {
       setSelection([]);
-      setFeedback(`Updated ${count} rider record(s).`);
+      toast.success(`Updated ${count} rider record(s).`);
       await Promise.all([
         client.invalidateQueries({ queryKey: ["finance", "bus-users"] }),
         client.invalidateQueries({ queryKey: ["finance", "billing-roster"] }),
@@ -70,7 +72,7 @@ export function BusUsersWorkspace() {
 
   function resetSelection() {
     setSelection([]);
-    setFeedback("");
+
     save.reset();
   }
 
@@ -114,30 +116,30 @@ export function BusUsersWorkspace() {
           </LabeledField>
         </div>
         {(years.error || classes.error || roster.error || save.error) && <p role="alert" className="text-sm text-destructive">{(years.error ?? classes.error ?? roster.error ?? save.error)?.message}</p>}
-        {feedback && <p role="status" className="text-sm text-success">{feedback}</p>}
+
         {!classId ? <p className="text-sm text-muted-foreground">Choose a class to view its students.</p>
           : roster.isPending ? <p role="status" className="text-sm text-muted-foreground">Loading roster…</p>
           : !roster.isError && (
             <>
               <p className="text-sm font-medium text-foreground">{students.filter(student => student.busStatus === "RIDING").length} riding this term</p>
               <div className="overflow-x-auto rounded-xl border border-border">
-                <table className="w-full text-left text-sm">
-                  <thead className="bg-muted/50 text-muted-foreground"><tr>
-                    {canWrite && <th className="p-3"><span className="sr-only">Select</span></th>}
-                    <th className="p-3">Student</th><th className="p-3">Bus status</th>
-                  </tr></thead>
-                  <tbody>
-                    {!visible.length && <tr><td className="p-3 text-muted-foreground" colSpan={canWrite ? 3 : 2}>No matching students.</td></tr>}
-                    {visible.map(student => <tr key={student.id} className="border-t border-border">
-                      {canWrite && <td className="w-10 p-3"><input type="checkbox" className="size-4 accent-primary"
+                <Table scroll={false} className="w-full text-left text-sm">
+                  <TableHeader className="bg-muted/50 text-muted-foreground"><TableRow>
+                    {canWrite && <TableHead className="p-3"><span className="sr-only">Select</span></TableHead>}
+                    <TableHead className="p-3">Student</TableHead><TableHead className="p-3">Bus status</TableHead>
+                  </TableRow></TableHeader>
+                  <TableBody>
+                    {!visible.length && <TableRow><TableCell className="p-3 text-muted-foreground" colSpan={canWrite ? 3 : 2}>No matching students.</TableCell></TableRow>}
+                    {visible.map(student => <TableRow key={student.id} className="border-t border-border">
+                      {canWrite && <TableCell className="w-10 p-3"><input type="checkbox" className="size-4 accent-primary"
                         aria-label={`Select ${student.name} (${student.reference})`} checked={selection.includes(student.id)}
                         disabled={save.isPending || (selection.length === 100 && !selection.includes(student.id))}
-                        onChange={event => setSelection(current => event.target.checked ? [...current, student.id] : current.filter(id => id !== student.id))} /></td>}
-                      <td className="p-3"><p className="font-medium text-foreground">{student.name}</p><p className="text-xs text-muted-foreground">{student.reference}</p></td>
-                      <td className="p-3">{labels[student.busStatus]}</td>
-                    </tr>)}
-                  </tbody>
-                </table>
+                        onChange={event => setSelection(current => event.target.checked ? [...current, student.id] : current.filter(id => id !== student.id))} /></TableCell>}
+                      <TableCell className="p-3"><p className="font-medium text-foreground">{student.name}</p><p className="text-xs text-muted-foreground">{student.reference}</p></TableCell>
+                      <TableCell className="p-3">{labels[student.busStatus]}</TableCell>
+                    </TableRow>)}
+                  </TableBody>
+                </Table>
               </div>
               {canWrite && <div className="flex flex-wrap items-end gap-3">
                 <LabeledField label="Update selected students">

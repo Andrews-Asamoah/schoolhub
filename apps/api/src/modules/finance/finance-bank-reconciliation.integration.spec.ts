@@ -19,7 +19,7 @@ describe.skipIf(!enabled)('bank reconciliation workflow (PostgreSQL)',{timeout:6
   await db.financeApprovalSetting.createMany({ data: ["PAYROLL_SETTINGS","BANK_RECONCILIATION","PERIOD_CONTROL","MANUAL_JOURNAL","INVOICE_ADJUSTMENT","ACCOUNT_MAPPING"].map(control => ({ schoolId, control: control as never, required: true, approverRoles: ["owner","headteacher"] })) });
   bankId=(await db.chartAccount.create({data:{schoolId,code:'1000',name:'Test bank',accountType:'ASSET',category:'BANK'}})).id;
   revenueId=(await db.chartAccount.create({data:{schoolId,code:'4000',name:'Fees',accountType:'REVENUE',category:'OTHER_INCOME'}})).id;
-  const posting=new FinancePostingService({client:db} as never);
+  const posting=new FinancePostingService();
   postingId=(await db.$transaction(tx=>posting.post(tx,{schoolId,date:new Date('2026-09-02'),description:'Bank test receipt',amount:new Prisma.Decimal(10),debitAccountId:bankId,creditAccountId:revenueId,transactionType:'INCOME'}))).id;
  });
  const file=()=>({buffer:Buffer.from('Date,Description,Amount\n2026-09-02,Fees,10.00'),originalname:'bank.csv'} as Express.Multer.File);
@@ -67,7 +67,7 @@ describe.skipIf(!enabled)('bank reconciliation workflow (PostgreSQL)',{timeout:6
   const snapshot=await db.financePeriodSnapshot.findFirstOrThrow({where:{periodId:period.id}});
   await expect(db.financePeriodSnapshot.update({where:{id:snapshot.id},data:{contentHash:'changed'}})).rejects.toThrow(/immutable|append-only/);
   const {FinancePostingService}=await import('./finance-posting.service.js');
-  await expect(db.$transaction(tx=>new FinancePostingService({client:db} as never).post(tx,{schoolId,date:new Date('2026-09-03'),description:'Blocked closed-period posting',amount:new Prisma.Decimal(1),debitAccountId:bankId,creditAccountId:revenueId,transactionType:'INCOME'}))).rejects.toThrow(/closed/);
+  await expect(db.$transaction(tx=>new FinancePostingService().post(tx,{schoolId,date:new Date('2026-09-03'),description:'Blocked closed-period posting',amount:new Prisma.Decimal(1),debitAccountId:bankId,creditAccountId:revenueId,transactionType:'INCOME'}))).rejects.toThrow(/closed/);
   const reopen=await close.reopen(schoolId,maker,period.id,'Correction review requested');
   await close.decide(schoolId,reviewer,'owner',reopen.id,true,'Approved reopening for review');
   expect((await db.financeAccountingPeriod.findUniqueOrThrow({where:{id:period.id}})).reopenCount).toBe(1);
@@ -83,7 +83,7 @@ describe.skipIf(!enabled)('bank reconciliation workflow (PostgreSQL)',{timeout:6
  });
  it("suggests unique exact pairs and rejects stale selections as an atomic batch", async () => {
   const { FinancePostingService } = await import("./finance-posting.service.js");
-  const posting = new FinancePostingService({ client: db } as never);
+  const posting = new FinancePostingService();
   const post = (referenceNumber: string, credit = false, expenseId?: string) => db.$transaction(tx => posting.post(tx, {
    schoolId, date: new Date("2026-10-02"), description: referenceNumber, referenceNumber,
    amount: new Prisma.Decimal(10), debitAccountId: credit ? revenueId : bankId, creditAccountId: credit ? bankId : revenueId,

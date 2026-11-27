@@ -1,3 +1,4 @@
+import { toast } from "@/components/ui/toaster";
 import { formatPersonName } from "@schoolhub/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CalendarClock, ClipboardList, LoaderCircle, Plus, Send } from "lucide-react";
@@ -97,7 +98,7 @@ export function TeacherAssignmentsWorkspace() {
   const [dueDate, setDueDate] = useState("");
   const [maxScore, setMaxScore] = useState("100");
   const [createError, setCreateError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<{ ok: boolean; text: string } | null>(null);
+
   const [gradeTarget, setGradeTarget] = useState<{ assignment: ManagedAssignment; submission: Submission } | null>(null);
   const [score, setScore] = useState("");
   const [feedback, setFeedback] = useState("");
@@ -173,7 +174,7 @@ export function TeacherAssignmentsWorkspace() {
       setMaxScore("100");
       setSubjectId("");
       setCreateError(null);
-      setNotice({ ok: true, text: `“${created.title}” was published. ${created.notifiedStudents ?? 0} student notification(s) created.` });
+      toast.success(`“${created.title}” was published. ${created.notifiedStudents ?? 0} student notification(s) created.`);
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["assignments"] }),
         queryClient.invalidateQueries({ queryKey: ["notifications"] }),
@@ -199,7 +200,7 @@ export function TeacherAssignmentsWorkspace() {
       setScore("");
       setFeedback("");
       setGradeError(null);
-      setNotice({ ok: true, text: "Grade saved and student notified." });
+      toast.success("Grade saved and student notified.");
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["assignments"] }),
         queryClient.invalidateQueries({ queryKey: ["notifications"] }),
@@ -245,7 +246,7 @@ export function TeacherAssignmentsWorkspace() {
         actions={<button type="button" onClick={() => { setCreateError(null); setCreateOpen(true); }} disabled={!canPublish || referenceLoading || classes.length === 0} className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-xs font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-50"><Plus className="size-4" />Publish assignment</button>}
       />
 
-      {notice && <div role={notice.ok ? "status" : "alert"} className={`rounded-xl border px-4 py-3 text-sm ${notice.ok ? "border-success/20 bg-success/10 text-success" : "border-destructive/20 bg-destructive/10 text-destructive"}`}>{notice.text}</div>}
+
 
       {referenceLoading ? (
         <div role="status" className="flex min-h-40 items-center justify-center gap-2 rounded-xl border border-border bg-card text-sm text-muted-foreground"><LoaderCircle className="size-4 animate-spin" />Loading your teaching assignments…</div>

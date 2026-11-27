@@ -1,3 +1,4 @@
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { gradeBoundaryProblems, gradeFromBoundaries, suggestBoundaries } from "@schoolhub/shared";
 import { Wand2 } from "lucide-react";
@@ -157,26 +158,26 @@ export function GradeBoundariesDialog({
                 {hint && <p role="status" className="rounded-lg bg-info/10 px-3 py-2 text-xs text-info">{hint}</p>}
 
                 <div className="overflow-x-auto rounded-xl border border-border/80">
-                  <table className="w-full text-left">
-                    <thead className="bg-muted/50 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70">
-                      <tr>
-                        <th scope="col" className={cell}>Grade</th>
-                        <th scope="col" className={cell}>Share of pupils</th>
-                        <th scope="col" className={cell}>Minimum mark (%)</th>
-                        <th scope="col" className={`${cell} text-right`}>Pupils with this grade</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border/60">
+                  <Table scroll={false} className="w-full text-left">
+                    <TableHeader className="bg-muted/50 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70">
+                      <TableRow>
+                        <TableHead scope="col" className={cell}>Grade</TableHead>
+                        <TableHead scope="col" className={cell}>Share of pupils</TableHead>
+                        <TableHead scope="col" className={cell}>Minimum mark (%)</TableHead>
+                        <TableHead scope="col" className={`${cell} text-right`}>Pupils with this grade</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody className="divide-y divide-border/60">
                       {info.bands.map((band, index) => {
                         const last = index === info.bands.length - 1;
                         const count = preview?.get(band.grade);
                         return (
-                          <tr key={band.grade}>
-                            <th scope="row" className={`${cell} font-bold text-foreground`}>
+                          <TableRow key={band.grade}>
+                            <TableHead scope="row" className={`${cell} font-bold text-foreground`}>
                               {band.grade} <span className="font-normal text-muted-foreground">{band.description}</span>
-                            </th>
-                            <td className={`${cell} text-muted-foreground`}>{index === 0 ? "Top" : last ? "Bottom" : "Next"} {band.share}%</td>
-                            <td className={cell}>
+                            </TableHead>
+                            <TableCell className={`${cell} text-muted-foreground`}>{index === 0 ? "Top" : last ? "Bottom" : "Next"} {band.share}%</TableCell>
+                            <TableCell className={cell}>
                               {last ? (
                                 <span className="text-muted-foreground">Everything below grade {info.bands[index - 1]?.grade}</span>
                               ) : (
@@ -192,15 +193,15 @@ export function GradeBoundariesDialog({
                                   className="h-9 w-24 rounded-lg border border-border bg-card px-2 text-center text-xs tabular-nums text-foreground outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/20"
                                 />
                               )}
-                            </td>
-                            <td className={`${cell} text-right tabular-nums text-muted-foreground`}>
+                            </TableCell>
+                            <TableCell className={`${cell} text-right tabular-nums text-muted-foreground`}>
                               {count === undefined || total === 0 ? "—" : `${count} (${Math.round((count / total) * 1000) / 10}%)`}
-                            </td>
-                          </tr>
+                            </TableCell>
+                          </TableRow>
                         );
                       })}
-                    </tbody>
-                  </table>
+                    </TableBody>
+                  </Table>
                 </div>
                 <p className="text-[11px] text-muted-foreground">
                   Changing boundaries re-grades every finished result for this subject straight away. Marks, totals and positions do not change.

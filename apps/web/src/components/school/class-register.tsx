@@ -1,6 +1,7 @@
+import { toast } from "@/components/ui/toaster";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { batchAttendanceSchema } from "@schoolhub/shared";
-import { CircleAlert, CircleCheck, LoaderCircle } from "lucide-react";
+import { CircleAlert, LoaderCircle } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { apiFetch } from "@/lib/api";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -39,7 +40,7 @@ export function ClassRegister({ classId, className, canMark }: { classId: string
   const queryClient = useQueryClient();
   const [date, setDate] = useState(todayIso);
   const [draft, setDraft] = useState<Draft>({});
-  const [notice, setNotice] = useState<string | null>(null);
+
 
   const query = useQuery({
     queryKey: ["attendance", "class", classId, date],
@@ -57,13 +58,13 @@ export function ClassRegister({ classId, className, canMark }: { classId: string
   // Start from what is already recorded whenever the class, date or data changes.
   useEffect(() => {
     if (rows) setDraft(fromServer(rows));
-    setNotice(null);
+
   }, [rows]);
 
   const save = useMutation({
     mutationFn: (body: unknown) => apiFetch("/attendance/batch", { method: "POST", body: JSON.stringify(body) }),
     onSuccess: async () => {
-      setNotice(`Register saved for ${new Date(`${date}T00:00:00`).toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" })}.`);
+      toast.success(`Register saved for ${new Date(`${date}T00:00:00`).toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" })}.`);
       await queryClient.invalidateQueries({ queryKey: ["attendance"] });
     },
   });
@@ -89,15 +90,15 @@ export function ClassRegister({ classId, className, canMark }: { classId: string
   );
 
   function setStatus(studentId: string, status: Status | "") {
-    setNotice(null);
+
     setDraft((current) => ({ ...current, [studentId]: { status, remarks: current[studentId]?.remarks ?? "" } }));
   }
   function setRemarks(studentId: string, remarks: string) {
-    setNotice(null);
+
     setDraft((current) => ({ ...current, [studentId]: { status: current[studentId]?.status ?? "", remarks } }));
   }
   function markAllPresent() {
-    setNotice(null);
+
     setDraft((current) =>
       Object.fromEntries(
         Object.entries(current).map(([id, entry]) => [id, { ...entry, status: entry.status || "PRESENT" }]),
@@ -238,17 +239,7 @@ export function ClassRegister({ classId, className, canMark }: { classId: string
                 {save.isPending && <LoaderCircle className="size-3.5 animate-spin" />}
                 Save register
               </button>
-              {dirty && !notice && <span className="text-sm text-muted-foreground">You have unsaved changes.</span>}
-              {notice && (
-                <p role="status" className="flex items-center gap-2 text-sm text-foreground">
-                  <CircleCheck className="size-3.5" /> {notice}
-                </p>
-              )}
-              {save.error && (
-                <p role="alert" className="flex items-center gap-2 text-sm text-destructive">
-                  <CircleAlert className="size-3.5" /> {save.error.message}
-                </p>
-              )}
+              {dirty && <span className="text-sm text-muted-foreground">You have unsaved changes.</span>}
             </div>
           )}
         </>

@@ -1,3 +1,4 @@
+import { toast } from "@/components/ui/toaster";
 import { PersonPhotoPicker, uploadPersonPhoto } from "./person-photo-picker";
 import { useForm } from "@tanstack/react-form";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -258,7 +259,7 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
   const [viewing, setViewing] = useState<{ id: string; name: string } | null>(null);
   const [confirmingLogin, setConfirmingLogin] = useState<{ id: string; name: string; hasLogin: boolean } | null>(null);
   const [issued, setIssued] = useState<CredentialEntry[]>([]);
-  const [notice, setNotice] = useState<string | null>(null);
+
   const isGuardianPage = kind === "guardians";
   const canManage =
     ["owner", "admin", "headteacher"].includes(activeRole ?? "") ||
@@ -343,14 +344,12 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
       });
     },
     onSuccess: async (created, values) => {
-      setNotice(
-        !editing && created.linkedExistingAccount
-          ? `${values.firstName} ${values.lastName} already has an account at this school. It now also has this role, and they keep signing in with their own password. No new password was created.`
-          : null,
-      );
+      if (!editing && created.linkedExistingAccount) {
+        toast.success(`${values.firstName} ${values.lastName} can sign in to the new role with their existing password.`);
+      }
       if (kind === "teachers" && photo) {
         try { await uploadPersonPhoto("teacher", editing?.id ?? created.id, photo); }
-        catch { setNotice("Teacher saved, but the image upload failed. Edit the teacher to try uploading the image again."); }
+        catch { toast.error("Teacher saved, but the image upload failed. Edit the teacher to try uploading the image again."); }
       }
       setPhoto(null);
       if (!editing && created.credentials) {
@@ -1124,12 +1123,7 @@ export function PeopleWorkspace({ kind }: { kind: PeopleKind }) {
         />
       )}
       <CredentialsDialog entries={issued} onClose={() => setIssued([])} />
-      {notice && (
-        <p role="status" className="flex items-start justify-between gap-3 rounded-xl border border-success/20 bg-success/10 px-4 py-3 text-xs text-success">
-          <span>{notice}</span>
-          <button type="button" onClick={() => setNotice(null)} className="font-semibold underline-offset-2 hover:underline">Dismiss</button>
-        </p>
-      )}
+
       <WorkspaceDataTable
         rows={rows}
         columns={columns}

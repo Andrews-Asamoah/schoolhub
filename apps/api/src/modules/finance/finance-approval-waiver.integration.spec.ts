@@ -39,7 +39,7 @@ describe.skipIf(!enabled)("finance approvals switched off (PostgreSQL)", { timeo
     bankId = (await db.chartAccount.create({ data: { schoolId, code: "1000", name: "Bank", accountType: "ASSET", category: "BANK" } })).id;
     revenueId = (await db.chartAccount.create({ data: { schoolId, code: "4000", name: "Fees", accountType: "REVENUE", category: "OTHER_INCOME" } })).id;
     await db.chartAccount.create({ data: { schoolId, code: "1200", name: "Student receivables", accountType: "ASSET", category: "ACCOUNTS_RECEIVABLE" } });
-    await db.$transaction(tx => new FinancePostingService({ client: db } as never).post(tx, {
+    await db.$transaction(tx => new FinancePostingService().post(tx, {
       schoolId, date: new Date("2026-09-02"), description: "Bank receipt", amount: new Prisma.Decimal(10),
       debitAccountId: bankId, creditAccountId: revenueId, transactionType: "INCOME",
     }));

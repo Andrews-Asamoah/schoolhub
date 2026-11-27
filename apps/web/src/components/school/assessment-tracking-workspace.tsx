@@ -1,5 +1,7 @@
+import { toast } from "@/components/ui/toaster";
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { BellRing, CircleCheck, LoaderCircle, Printer, ShieldAlert, Unlock } from "lucide-react";
+import { BellRing, LoaderCircle, Printer, ShieldAlert, Unlock } from "lucide-react";
 import { useMemo, useState } from "react";
 import { FormField, FormTextarea } from "@/components/forms/form-controls";
 import { Badge } from "@/components/ui/badge";
@@ -43,7 +45,7 @@ export function AssessmentTrackingWorkspace({ role }: { role?: string }) {
   const [classId, setClassId] = useState(ALL);
   const [teacherId, setTeacherId] = useState(ALL);
   const [status, setStatus] = useState<string>(ALL);
-  const [notice, setNotice] = useState<string | null>(null);
+
   const [extending, setExtending] = useState<TrackingSheet | null>(null);
   const [reopening, setReopening] = useState<TrackingSheet | null>(null);
 
@@ -80,7 +82,7 @@ export function AssessmentTrackingWorkspace({ role }: { role?: string }) {
   const remind = useMutation({
     mutationFn: () => post<{ sent: number; skipped: number }>("/assessments/tracking/remind", { templateId: activeTemplateId }),
     onSuccess: (result) =>
-      setNotice(result.sent ? `Reminded ${result.sent} teacher${result.sent === 1 ? "" : "s"}${result.skipped ? ` (${result.skipped} reminded recently)` : ""}.` : "No reminders sent. Everyone is either up to date or was reminded in the last 12 hours."),
+      toast.success(result.sent ? `Reminded ${result.sent} teacher${result.sent === 1 ? "" : "s"}${result.skipped ? ` (${result.skipped} reminded recently)` : ""}.` : "No reminders sent. Everyone is either up to date or was reminded in the last 12 hours."),
   });
 
   const summary = data?.summary;
@@ -89,7 +91,7 @@ export function AssessmentTrackingWorkspace({ role }: { role?: string }) {
       <div className="flex flex-wrap items-end gap-3 rounded-2xl border border-border/80 bg-card p-4 print:hidden">
         <label className={label}>
           Assessment
-          <Select value={activeTemplateId || ALL} onValueChange={(value) => { setTemplateId(value === ALL ? "" : value); setClassId(ALL); setTeacherId(ALL); setStatus(ALL); setNotice(null); }}>
+          <Select value={activeTemplateId || ALL} onValueChange={(value) => { setTemplateId(value === ALL ? "" : value); setClassId(ALL); setTeacherId(ALL); setStatus(ALL);  }}>
             <SelectTrigger aria-label="Assessment" className={cn(field, "min-w-52")}><SelectValue placeholder="No assessments" /></SelectTrigger>
             <SelectContent>{(data?.templates ?? []).map((item) => <SelectItem key={item.id} value={item.id}>{item.name}</SelectItem>)}</SelectContent>
           </Select>
@@ -129,7 +131,7 @@ export function AssessmentTrackingWorkspace({ role }: { role?: string }) {
         </div>
       </div>
 
-      {notice && <p role="status" className="flex items-center gap-1.5 rounded-lg bg-success/10 px-3 py-2 text-xs text-success"><CircleCheck className="size-3.5" /> {notice}</p>}
+
       {remind.error && <p role="alert" className="text-xs text-destructive">{remind.error.message}</p>}
       {overview.error && <p role="alert" className="rounded-lg border border-destructive/20 bg-destructive/10 px-3 py-2 text-xs text-destructive">{overview.error.message}</p>}
       {overview.isPending && <p className="flex items-center gap-2 text-xs text-muted-foreground"><LoaderCircle className="size-4 animate-spin" /> Loading…</p>}
@@ -171,32 +173,32 @@ export function AssessmentTrackingWorkspace({ role }: { role?: string }) {
           {tab === "sheets" && <SheetsTable sheets={data.sheets} onExtend={setExtending} onReopen={setReopening} />}
           {tab === "teachers" && (
             <section className="overflow-x-auto rounded-2xl border border-border/80 bg-card">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-muted/50 text-[10px] uppercase tracking-wide text-muted-foreground/70">
-                  <tr><th className="px-4 py-3">Teacher</th><th className="px-3 py-3">Sheets</th><th className="px-3 py-3">Submitted</th><th className="px-3 py-3">Overdue</th><th className="min-w-48 px-3 py-3">Pupils done</th></tr>
-                </thead>
-                <tbody className="divide-y divide-border/60">
+              <Table scroll={false} className="w-full text-left text-xs">
+                <TableHeader className="bg-muted/50 text-[10px] uppercase tracking-wide text-muted-foreground/70">
+                  <TableRow><TableHead className="px-4 py-3">Teacher</TableHead><TableHead className="px-3 py-3">Sheets</TableHead><TableHead className="px-3 py-3">Submitted</TableHead><TableHead className="px-3 py-3">Overdue</TableHead><TableHead className="min-w-48 px-3 py-3">Pupils done</TableHead></TableRow>
+                </TableHeader>
+                <TableBody className="divide-y divide-border/60">
                   {data.teachers.map((row) => (
-                    <tr key={row.teacherId ?? "none"} className={cn(!row.teacherId && "bg-warning/5")}>
-                      <th scope="row" className="px-4 py-2.5 text-left font-semibold">
+                    <TableRow key={row.teacherId ?? "none"} className={cn(!row.teacherId && "bg-warning/5")}>
+                      <TableHead scope="row" className="px-4 py-2.5 text-left font-semibold">
                         {row.teacherId ? <button type="button" className="hover:underline" onClick={() => { setTeacherId(row.teacherId!); setTab("sheets"); }}>{row.name}</button> : row.name}
-                      </th>
-                      <td className="px-3 py-2.5 tabular-nums">{row.sheets}</td>
-                      <td className="px-3 py-2.5 tabular-nums">{row.submitted}</td>
-                      <td className={cn("px-3 py-2.5 tabular-nums", row.overdue > 0 && "font-semibold text-destructive")}>{row.overdue}</td>
-                      <td className="px-3 py-2.5"><Progress percent={row.percent} label={`${row.done}/${row.pupils}`} /></td>
-                    </tr>
+                      </TableHead>
+                      <TableCell className="px-3 py-2.5 tabular-nums">{row.sheets}</TableCell>
+                      <TableCell className="px-3 py-2.5 tabular-nums">{row.submitted}</TableCell>
+                      <TableCell className={cn("px-3 py-2.5 tabular-nums", row.overdue > 0 && "font-semibold text-destructive")}>{row.overdue}</TableCell>
+                      <TableCell className="px-3 py-2.5"><Progress percent={row.percent} label={`${row.done}/${row.pupils}`} /></TableCell>
+                    </TableRow>
                   ))}
-                </tbody>
-              </table>
+                </TableBody>
+              </Table>
             </section>
           )}
-          {tab === "corrections" && <Corrections canDecide={canDecide} onDecided={(text) => { setNotice(text); void refresh(); }} />}
+          {tab === "corrections" && <Corrections canDecide={canDecide} onDecided={(text) => { toast.success(text); void refresh(); }} />}
         </>
       )}
 
-      {extending && activeTemplateId && <ExtendModal sheet={extending} templateId={activeTemplateId} onClose={() => setExtending(null)} onDone={() => { setExtending(null); setNotice("Deadline extended."); void refresh(); }} />}
-      {reopening && activeTemplateId && <ReopenModal sheet={reopening} templateId={activeTemplateId} onClose={() => setReopening(null)} onDone={() => { setReopening(null); setNotice("Sheet reopened for editing."); void refresh(); }} />}
+      {extending && activeTemplateId && <ExtendModal sheet={extending} templateId={activeTemplateId} onClose={() => setExtending(null)} onDone={() => { setExtending(null); toast.success("Deadline extended."); void refresh(); }} />}
+      {reopening && activeTemplateId && <ReopenModal sheet={reopening} templateId={activeTemplateId} onClose={() => setReopening(null)} onDone={() => { setReopening(null); toast.success("Sheet reopened for editing."); void refresh(); }} />}
     </div>
   );
 }
@@ -226,25 +228,25 @@ function SheetsTable({ sheets, onExtend, onReopen }: { sheets: TrackingSheet[]; 
   if (sheets.length === 0) return <p className="rounded-2xl border border-dashed border-input p-8 text-center text-xs text-muted-foreground">No class sheets match these filters.</p>;
   return (
     <section className="overflow-x-auto rounded-2xl border border-border/80 bg-card">
-      <table className="w-full text-left text-xs">
-        <thead className="bg-muted/50 text-[10px] uppercase tracking-wide text-muted-foreground/70">
-          <tr><th className="px-4 py-3">Class</th><th className="px-3 py-3">Subject</th><th className="px-3 py-3">Teacher</th><th className="min-w-48 px-3 py-3">Progress</th><th className="px-3 py-3">Status</th><th className="px-3 py-3">Deadline</th><th className="px-3 py-3 print:hidden"><span className="sr-only">Actions</span></th></tr>
-        </thead>
-        <tbody className="divide-y divide-border/60">
+      <Table scroll={false} className="w-full text-left text-xs">
+        <TableHeader className="bg-muted/50 text-[10px] uppercase tracking-wide text-muted-foreground/70">
+          <TableRow><TableHead className="px-4 py-3">Class</TableHead><TableHead className="px-3 py-3">Subject</TableHead><TableHead className="px-3 py-3">Teacher</TableHead><TableHead className="min-w-48 px-3 py-3">Progress</TableHead><TableHead className="px-3 py-3">Status</TableHead><TableHead className="px-3 py-3">Deadline</TableHead><TableHead className="px-3 py-3 print:hidden"><span className="sr-only">Actions</span></TableHead></TableRow>
+        </TableHeader>
+        <TableBody className="divide-y divide-border/60">
           {sheets.map((sheet) => (
-            <tr key={`${sheet.classId}|${sheet.subjectId}`}>
-              <th scope="row" className="px-4 py-2.5 text-left font-semibold">{sheet.className}</th>
-              <td className="px-3 py-2.5">{sheet.subjectName}</td>
-              <td className="px-3 py-2.5">{sheet.teachers.length ? sheet.teachers.map((teacher) => teacher.name).join(", ") : <span className="text-warning">Not assigned</span>}</td>
-              <td className="px-3 py-2.5">
+            <TableRow key={`${sheet.classId}|${sheet.subjectId}`}>
+              <TableHead scope="row" className="px-4 py-2.5 text-left font-semibold">{sheet.className}</TableHead>
+              <TableCell className="px-3 py-2.5">{sheet.subjectName}</TableCell>
+              <TableCell className="px-3 py-2.5">{sheet.teachers.length ? sheet.teachers.map((teacher) => teacher.name).join(", ") : <span className="text-warning">Not assigned</span>}</TableCell>
+              <TableCell className="px-3 py-2.5">
                 {sheet.total === 0 ? <span className="text-muted-foreground">No pupils</span> : <Progress percent={sheet.percent} label={`${sheet.done}/${sheet.total}${sheet.excused ? ` · ${sheet.excused} excused` : ""}`} />}
-              </td>
-              <td className="px-3 py-2.5">
+              </TableCell>
+              <TableCell className="px-3 py-2.5">
                 <Badge variant={STATUS_VARIANT[sheet.status]}>{STATUS_LABEL[sheet.status]}</Badge>
                 {sheet.hasPendingCorrection && <Badge variant="warning" className="ml-1">Correction pending</Badge>}
-              </td>
-              <td className="px-3 py-2.5 tabular-nums text-muted-foreground">{formatDate(sheet.deadline)}</td>
-              <td className="px-3 py-2.5 print:hidden">
+              </TableCell>
+              <TableCell className="px-3 py-2.5 tabular-nums text-muted-foreground">{formatDate(sheet.deadline)}</TableCell>
+              <TableCell className="px-3 py-2.5 print:hidden">
                 <div className="flex justify-end gap-1.5">
                   {sheet.status === "SUBMITTED" ? (
                     <button type="button" onClick={() => onReopen(sheet)} className="inline-flex h-8 items-center gap-1 rounded-lg border border-border px-2.5 font-semibold hover:bg-muted"><Unlock className="size-3.5" /> Reopen</button>
@@ -252,11 +254,11 @@ function SheetsTable({ sheets, onExtend, onReopen }: { sheets: TrackingSheet[]; 
                     <button type="button" onClick={() => onExtend(sheet)} className="inline-flex h-8 items-center rounded-lg border border-border px-2.5 font-semibold hover:bg-muted">Extend</button>
                   )}
                 </div>
-              </td>
-            </tr>
+              </TableCell>
+            </TableRow>
           ))}
-        </tbody>
-      </table>
+        </TableBody>
+      </Table>
     </section>
   );
 }
@@ -351,19 +353,19 @@ function Corrections({ canDecide, onDecided }: { canDecide: boolean; onDecided: 
           </header>
           <p className="px-4 pt-3 text-xs"><span className="font-semibold">Reason: </span>{row.reason}</p>
           <div className="overflow-x-auto p-4">
-            <table className="w-full text-left text-xs">
-              <thead className="text-[10px] uppercase tracking-wide text-muted-foreground/70"><tr><th className="py-1.5 pr-3">Pupil</th><th className="px-3">Component</th><th className="px-3">Was</th><th className="px-3">Now</th></tr></thead>
-              <tbody className="divide-y divide-border/50">
+            <Table scroll={false} className="w-full text-left text-xs">
+              <TableHeader className="text-[10px] uppercase tracking-wide text-muted-foreground/70"><TableRow><TableHead className="py-1.5 pr-3">Pupil</TableHead><TableHead className="px-3">Component</TableHead><TableHead className="px-3">Was</TableHead><TableHead className="px-3">Now</TableHead></TableRow></TableHeader>
+              <TableBody className="divide-y divide-border/50">
                 {row.items.map((item, index) => (
-                  <tr key={index}>
-                    <th scope="row" className="py-1.5 pr-3 text-left font-medium">{item.studentName}</th>
-                    <td className="px-3">{item.componentName}{item.occurrenceIndex > 0 ? ` ${item.occurrenceIndex + 1}` : ""}</td>
-                    <td className="px-3 tabular-nums text-muted-foreground">{formatMark(item.previousMarks)}</td>
-                    <td className="px-3 font-semibold tabular-nums">{formatMark(item.requestedMarks)}{item.maxMarks !== null && <span className="font-normal text-muted-foreground"> / {item.maxMarks}</span>}</td>
-                  </tr>
+                  <TableRow key={index}>
+                    <TableHead scope="row" className="py-1.5 pr-3 text-left font-medium">{item.studentName}</TableHead>
+                    <TableCell className="px-3">{item.componentName}{item.occurrenceIndex > 0 ? ` ${item.occurrenceIndex + 1}` : ""}</TableCell>
+                    <TableCell className="px-3 tabular-nums text-muted-foreground">{formatMark(item.previousMarks)}</TableCell>
+                    <TableCell className="px-3 font-semibold tabular-nums">{formatMark(item.requestedMarks)}{item.maxMarks !== null && <span className="font-normal text-muted-foreground"> / {item.maxMarks}</span>}</TableCell>
+                  </TableRow>
                 ))}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
           </div>
           {row.status !== "PENDING" && row.reviewedBy && <p className="border-t border-border/60 px-4 py-2.5 text-xs text-muted-foreground">Decided by {row.reviewedBy} on {formatDate(row.reviewedAt)}{row.reviewReason ? `: ${row.reviewReason}` : ""}</p>}
           {row.status === "PENDING" && (

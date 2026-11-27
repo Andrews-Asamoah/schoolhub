@@ -1,3 +1,4 @@
+import { toast } from "@/components/ui/toaster";
 import { formatPersonName } from "@schoolhub/shared";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ShieldCheck } from "lucide-react";
@@ -60,7 +61,7 @@ export function HeadteacherReportApprovalsWorkspace() {
   const [batch, setBatch] = useState("");
   const [className, setClassName] = useState("");
   const [bulkPending, setBulkPending] = useState(false);
-  const [bulkMessage, setBulkMessage] = useState<string | null>(null);
+
   const term = useDebouncedValue(search.trim().toLowerCase(), 200);
 
   const patchState = useCallback((id: string, next: RecommendationRowState | undefined) =>
@@ -137,7 +138,7 @@ export function HeadteacherReportApprovalsWorkspace() {
   const approveBulk = async () => {
     const items = readyIds.map((id) => ({ id, remark: remarkOf(id).trim() }));
     if (!items.length) return;
-    setBulkPending(true); setBulkMessage(null);
+    setBulkPending(true);
     items.forEach((item) => patchState(item.id, { pending: true }));
     try {
       const result = await apiFetch<BulkResult>(BASE + "bulk-head-approve", { method: "POST", body: JSON.stringify({ items }) });
@@ -148,11 +149,11 @@ export function HeadteacherReportApprovalsWorkspace() {
         return next;
       });
       setSelected((prev) => new Set([...prev].filter((id) => failed.has(id))));
-      setBulkMessage(`${result.succeeded} of ${result.total} reports approved.${failed.size ? " Fix the rows marked in red and try again." : ""}`);
+      toast.success(`${result.succeeded} of ${result.total} reports approved.${failed.size ? " Fix the rows marked in red and try again." : ""}`);
       await refresh();
     } catch (error) {
       items.forEach((item) => patchState(item.id, undefined));
-      setBulkMessage(errorText(error, "The reports could not be approved."));
+      toast.error(errorText(error, "The reports could not be approved."));
     } finally {
       setBulkPending(false);
     }
@@ -207,7 +208,7 @@ export function HeadteacherReportApprovalsWorkspace() {
           </button>
         </div>
       </div>
-      {bulkMessage && <p role="status" className="text-xs text-muted-foreground">{bulkMessage}</p>}
+
       {rows.length === 0
         ? <p className="text-sm text-muted-foreground">No pupils match.</p>
         : <ReportRecommendationTable

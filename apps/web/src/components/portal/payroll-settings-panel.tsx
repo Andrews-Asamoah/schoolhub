@@ -1,3 +1,4 @@
+import { toast } from "@/components/ui/toaster";
 import { useState, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CheckCircle2, LoaderCircle, Plus, Sparkles, Trash2 } from "lucide-react";
@@ -31,7 +32,7 @@ const emptyBand = () => ({ width: "", rate: "" });
 export function PayrollSettingsPanel() {
   const { canWrite } = useFinanceAccess();
   const queryClient = useQueryClient();
-  const [message, setMessage] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
+
   const [showForm, setShowForm] = useState(false);
   const [endingId, setEndingId] = useState<string | null>(null);
   const [endDate, setEndDate] = useState("");
@@ -43,12 +44,12 @@ export function PayrollSettingsPanel() {
     queryClient.invalidateQueries({ queryKey: ["finance", "payroll-settings"] }),
     queryClient.invalidateQueries({ queryKey: ["finance", "payroll-readiness"] }),
   ]);
-  const onError = (error: Error) => setMessage({ kind: "error", text: error.message });
-  const ok = (text: string) => async () => { setMessage({ kind: "ok", text }); await refresh(); };
+  const onError = (error: Error) => toast.error(error.message);
+  const ok = (text: string) => async () => { toast.success(text); await refresh(); };
 
   const starter = useMutation({
     mutationFn: () => apiFetch<{ taxSchedules: number; schemes: number }>("/finance/payroll/settings/starter-drafts", { method: "POST" }),
-    onSuccess: async (r) => { await refresh(); setMessage({ kind: "ok", text: r.taxSchedules + r.schemes ? "Ghana starter drafts created. Review them against the source, then approve each one." : "Starter drafts already exist." }); },
+    onSuccess: async (r) => { await refresh(); toast.success(r.taxSchedules + r.schemes ? "Ghana starter drafts created. Review them against the source, then approve each one." : "Starter drafts already exist."); },
     onError,
   });
   const createTax = useMutation({
@@ -86,7 +87,7 @@ export function PayrollSettingsPanel() {
   }
   function submitTax(event: FormEvent) {
     event.preventDefault();
-    setMessage(null);
+
     createTax.mutate();
   }
   const busy = activate.isPending || discard.isPending || end.isPending;
@@ -101,8 +102,8 @@ export function PayrollSettingsPanel() {
         </div>
         {canWrite && own && <div className="flex flex-wrap gap-2">
           {status === "DRAFT" && <>
-            <button type="button" className={primaryButton} disabled={busy} onClick={() => { setMessage(null); activate.mutate({ kind, id }); }}><CheckCircle2 className="size-4" /> Approve</button>
-            <button type="button" className={secondaryButton} disabled={busy} onClick={() => { setMessage(null); discard.mutate({ kind, id }); }}><Trash2 className="size-4" /> Discard</button>
+            <button type="button" className={primaryButton} disabled={busy} onClick={() => {  activate.mutate({ kind, id }); }}><CheckCircle2 className="size-4" /> Approve</button>
+            <button type="button" className={secondaryButton} disabled={busy} onClick={() => {  discard.mutate({ kind, id }); }}><Trash2 className="size-4" /> Discard</button>
           </>}
           {status === "ACTIVE" && <button type="button" className={secondaryButton} onClick={() => { setEndingId(endingId === id ? null : id); setEndDate(""); }}>Set end date</button>}
         </div>}
@@ -120,9 +121,9 @@ export function PayrollSettingsPanel() {
     <div className="rounded-xl bg-muted/40 p-3 text-sm text-muted-foreground">
       Payroll only uses PAYE schedules and contribution schemes that are <strong className="text-foreground">approved</strong>, carry an official source and cover the pay month. Draft first, then approve (the school's approval settings decide who may approve).
     </div>
-    {message && <p role="status" className={cn("rounded-xl border p-3 text-sm", message.kind === "ok" ? "border-success/30 bg-success/5 text-foreground" : "border-destructive/30 bg-destructive/5 text-destructive")}>{message.text}</p>}
+
     {canWrite && <div className="flex flex-wrap gap-2">
-      <button type="button" className={primaryButton} disabled={starter.isPending} onClick={() => { setMessage(null); starter.mutate(); }}>
+      <button type="button" className={primaryButton} disabled={starter.isPending} onClick={() => {  starter.mutate(); }}>
         {starter.isPending ? <LoaderCircle className="size-4 animate-spin" /> : <Sparkles className="size-4" />} Create Ghana starter drafts
       </button>
       <button type="button" className={secondaryButton} onClick={() => setShowForm(v => !v)}><Plus className="size-4" /> New PAYE schedule</button>

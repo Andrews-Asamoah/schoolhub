@@ -1,3 +1,4 @@
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { useQuery } from "@tanstack/react-query";
@@ -901,35 +902,35 @@ export function StudentTimetableView() {
         {printSlots.length === 0 ? (
           <p className="student-timetable-print-empty">No valid timetable periods are available to print.</p>
         ) : (
-          <table className="student-timetable-print-table">
+          <Table scroll={false} className="student-timetable-print-table">
             <colgroup>
               <col className="student-timetable-print-time-column" />
               {DAYS.map((day) => <col key={day} />)}
             </colgroup>
-            <thead>
-              <tr>
-                <th scope="col">Time</th>
+            <TableHeader>
+              <TableRow>
+                <TableHead scope="col">Time</TableHead>
                 {DAYS.map((day) => (
-                  <th key={day} scope="col">
+                  <TableHead key={day} scope="col">
                     {formatDay(day)}
                     {isSchoolDayToday && day === todayKey && <span className="student-timetable-print-today">Today</span>}
-                  </th>
+                  </TableHead>
                 ))}
-              </tr>
-            </thead>
-            <tbody>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {printSlots.map((slot) => (
-                <tr key={slot.key}>
-                  <th scope="row">
+                <TableRow key={slot.key}>
+                  <TableHead scope="row">
                     <span>{formatTime(slot.startTime)}</span>
                     <span className="student-timetable-print-time-end">{formatTime(slot.endTime)}</span>
-                  </th>
+                  </TableHead>
                   {DAYS.map((day) => {
                     const slotEntries = entriesByDay[day].filter(
                       (entry) => parseTime(entry.startTime) === slot.startMinutes && parseTime(entry.endTime) === slot.endMinutes,
                     );
                     return (
-                      <td
+                      <TableCell
                         key={day}
                         className={cn(
                           "student-timetable-print-cell",
@@ -966,13 +967,13 @@ export function StudentTimetableView() {
                             </div>
                           );
                         })}
-                      </td>
+                      </TableCell>
                     );
                   })}
-                </tr>
+                </TableRow>
               ))}
-            </tbody>
-          </table>
+            </TableBody>
+          </Table>
         )}
 
         <footer className="student-timetable-print-footer">
