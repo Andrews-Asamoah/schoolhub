@@ -6,7 +6,7 @@ const url=process.env.TEST_DATABASE_URL??'';
 const enabled=(()=>{try{return /test/i.test(new URL(url).pathname);}catch{return false;}})();
 describe.skipIf(!enabled)('bank reconciliation workflow (PostgreSQL)',{timeout:60000},()=>{
  let db:PrismaClient,service:FinanceBankReconciliationService,schoolId='',bankId='',revenueId='',postingId='',recordId='';
- const run='bank-'+Date.now().toString(36),maker=run+'-maker',reviewer=run+'-reviewer';
+ const run='bank-'+Date.now().toString(36),maker=run+'-maker',reviewer=run+'-reviewer',studentUser=run+'-student';
  beforeAll(async()=>{
   process.env.DATABASE_URL=url;
   const {prisma}=await import('../../prisma/prisma.client.js');db=prisma;
@@ -81,6 +81,60 @@ describe.skipIf(!enabled)('bank reconciliation workflow (PostgreSQL)',{timeout:6
   await close.decide(schoolId,reviewer,'owner',again.id,true,'Approved second closing snapshot');
   expect(await db.financePeriodSnapshot.count({where:{periodId:period.id}})).toBe(2);
  });
+ it("suggests unique exact pairs and rejects stale selections as an atomic batch", async () => {
+  const { FinancePostingService } = await import("./finance-posting.service.js");
+  const posting = new FinancePostingService({ client: db } as never);
+  const post = (referenceNumber: string, credit = false, expenseId?: string) => db.$transaction(tx => posting.post(tx, {
+   schoolId, date: new Date("2026-10-02"), description: referenceNumber, referenceNumber,
+   amount: new Prisma.Decimal(10), debitAccountId: credit ? revenueId : bankId, creditAccountId: credit ? bankId : revenueId,
+   transactionType: credit ? "EXPENSE" : "INCOME",
+   referenceType: expenseId ? "EXPENSE" : undefined, referenceId: expenseId,
+  }));
+  await db.user.create({ data: { id: studentUser, name: "Student", email: studentUser + "@test.invalid" } });
+  const profile = await db.userProfile.create({ data: { userId: studentUser, firstName: "Student", lastName: "Test" } });
+  const student = await db.student.create({ data: { schoolId, profileId: profile.id, studentId: studentUser } });
+  const first = await post("RCT-2026-00001");
+  await db.payment.create({ data: {
+   schoolId, studentId: student.id, transactionId: first.id, paymentNumber: "RCT-2026-00001",
+   paymentMethod: "BANK_TRANSFER", paymentDate: new Date("2026-10-02"), amount: 10, referenceNumber: "BANK-DEP",
+  } });
+  const expense = await db.expense.create({ data: {
+   schoolId, date: new Date("2026-10-02"), amount: 10, description: "Voucher", paymentMethod: "CHEQUE",
+   voucherNumber: "VCH-2026-00001", checkNumber: "BANK-OUT",
+  } });
+  const second = await post("VCH-2026-00001", true, expense.id);
+  await post("BANK-DUP");
+  await post("BANK-DUP");
+  await post("BANK-REPEAT");
+  await post("BANK-LATER");
+  const lines = [
+   "2026-10-02,Deposit,bank-dep,10.00",
+   "2026-10-02,Withdrawal,BANK-OUT,-10.00",
+   "2026-10-02,Two postings,BANK-DUP,10.00",
+   "2026-10-02,Duplicate row A,BANK-REPEAT,10.00",
+   "2026-10-02,Duplicate row B,BANK-REPEAT,10.00",
+   "2026-10-03,Wrong date,BANK-LATER,10.00",
+   "2026-10-02,Wrong direction,BANK-OUT,10.00",
+   "2026-10-02,Missing reference,,10.00",
+  ];
+  const statement = { buffer: Buffer.from(["Date,Description,Ref,Amount", ...lines].join("\n")), originalname: "october.csv" } as Express.Multer.File;
+  const draft = await service.import(schoolId, maker, statement, {
+   accountId: bankId, startDate: "2026-10-01", endDate: "2026-10-31", openingBalance: "10", closingBalance: "70",
+   mapping: { date: "Date", description: "Description", reference: "Ref", amount: "Amount" },
+  });
+  await expect(service.suggestMatches("another-school", draft.id)).rejects.toThrow(/not found/);
+  const suggestions = await service.suggestMatches(schoolId, draft.id);
+  expect(suggestions.map(match => [match.transactionId, match.amount])).toEqual([[first.id, "10.00"], [second.id, "-10.00"]]);
+  const [one, two] = suggestions;
+  await expect(service.applySuggestedMatches(schoolId, maker, draft.id, [one!, { ...two!, transactionId: first.id }])).rejects.toThrow(/changed/);
+  expect((await service.detail(schoolId, draft.id)).statement.lines.every(line => line.matches.length === 0)).toBe(true);
+
+  const saved = await service.applySuggestedMatches(schoolId, maker, draft.id, suggestions);
+  expect(saved.count).toBe(2);
+  expect(await service.suggestMatches(schoolId, draft.id)).toEqual([]);
+  expect((await service.detail(schoolId, draft.id)).status).toBe("DRAFT");
+  await expect(service.applySuggestedMatches(schoolId, maker, draft.id, suggestions)).rejects.toThrow(/changed/);
+ });
  afterAll(async()=>{
   if(!db||!schoolId)return;
   await db.$transaction(async tx=>{
@@ -105,7 +159,7 @@ describe.skipIf(!enabled)('bank reconciliation workflow (PostgreSQL)',{timeout:6
    await tx.financeJournalLine.deleteMany({where:{entryId:{in:journals.map(x=>x.id)}}});
    await tx.financeJournalEntry.deleteMany({where:{schoolId}});
    await tx.transaction.deleteMany({where:{schoolId}});await tx.chartAccount.deleteMany({where:{schoolId}});
-   await tx.school.deleteMany({where:{id:schoolId}});await tx.organization.deleteMany({where:{id:run}});await tx.user.deleteMany({where:{id:{in:[maker,reviewer]}}});
+   await tx.school.deleteMany({where:{id:schoolId}});await tx.organization.deleteMany({where:{id:run}});await tx.user.deleteMany({where:{id:{in:[maker,reviewer,studentUser]}}});
   });await db.$disconnect();
  });
 });
