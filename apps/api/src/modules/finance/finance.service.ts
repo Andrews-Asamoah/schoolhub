@@ -589,7 +589,7 @@ export class FinanceService {
       classLevel?: string | null;
       termBased: boolean;
       targetClassIds: string[];
-      items: { registryItemId?: string | null; name: string; amount: number; isOptional: boolean; description?: string | null }[];
+      items: { registryItemId?: string | null; name: string; amount: number; isOptional: boolean; followsBusRoster?: boolean; description?: string | null }[];
     },
   ) {
     const classIds = [...new Set(input.targetClassIds)];
@@ -632,6 +632,7 @@ export class FinanceService {
               name: item.name.trim() || registryItem?.name || "Fee item",
               amount: new Prisma.Decimal(item.amount),
               isOptional: item.isOptional,
+              followsBusRoster: item.isOptional && (item.followsBusRoster ?? false),
               description: item.description?.trim() || null,
               registryItemId: item.registryItemId || null,
             };
@@ -655,7 +656,7 @@ export class FinanceService {
       classLevel?: string | null;
       termBased: boolean;
       targetClassIds: string[];
-      items: { registryItemId?: string | null; name: string; amount: number; isOptional: boolean; description?: string | null }[];
+      items: { registryItemId?: string | null; name: string; amount: number; isOptional: boolean; followsBusRoster?: boolean; description?: string | null }[];
     },
   ) {
     const classIds = [...new Set(input.targetClassIds)];
@@ -716,6 +717,7 @@ export class FinanceService {
                 name: item.name.trim() || registryItem?.name || "Fee item",
                 amount: new Prisma.Decimal(item.amount),
                 isOptional: item.isOptional,
+                followsBusRoster: item.isOptional && (item.followsBusRoster ?? false),
                 description: item.description?.trim() || null,
                 registryItemId: item.registryItemId || null,
               };
@@ -1015,13 +1017,30 @@ export class FinanceService {
     return { details, totalDiscount: round(totalDiscount) };
   }
 
-  async getBillingRoster(schoolId: string, classId: string, academicYearId?: string, termId?: string) {
+  private async busStatuses(
+    db: Prisma.TransactionClient, schoolId: string, studentIds: string[], term: { id: string; startDate: Date },
+  ) {
+    if (!studentIds.length) return new Map<string, "RIDING" | "PAUSED" | "STOPPED">();
+    const decisions = await db.busTermDecision.findMany({
+      where: {
+        studentId: { in: studentIds }, student: { schoolId },
+        term: { startDate: { lte: term.startDate }, academicYear: { schoolId } },
+        OR: [{ termId: term.id }, { status: { not: "PAUSED" }, term: { startDate: { lt: term.startDate } } }],
+      },
+      select: { studentId: true, status: true },
+      orderBy: [{ term: { startDate: "asc" } }, { termId: "asc" }],
+    });
+    return new Map(decisions.map(row => [row.studentId, row.status]));
+  }
+
+  async getBillingRoster(schoolId: string, classId: string, academicYearId?: string, termId?: string, currentOnly = true) {
     const db = this.prisma.client;
     const term = await db.term.findFirst({
-      where: { id: termId, academicYearId, isCurrent: true, academicYear: { schoolId, isCurrent: true } },
-      select: { id: true, academicYearId: true },
+      where: { id: termId, academicYearId, ...(currentOnly ? { isCurrent: true } : {}),
+        academicYear: { schoolId, ...(currentOnly ? { isCurrent: true } : {}) } },
+      select: { id: true, academicYearId: true, startDate: true },
     });
-    if (!term) throw new BadRequestException("Select the current academic year and term before billing.");
+    if (!term) throw new BadRequestException("Choose a valid billing term for this school.");
     const enrollments = await db.enrollment.findMany({
       where: { ...activeBillingEnrollment(schoolId, term.academicYearId, term.id), classId },
       select: { student: { select: {
@@ -1030,10 +1049,56 @@ export class FinanceService {
       } } },
       orderBy: [{ student: { profile: { lastName: "asc" } } }, { student: { profile: { firstName: "asc" } } }, { studentId: "asc" }],
     });
+    const statuses = await this.busStatuses(db, schoolId, enrollments.map(row => row.student.id), term);
     return enrollments.map(({ student }) => ({
       id: student.id, reference: student.admissionNumber || student.studentId,
       name: formatPersonName(student.profile) || student.admissionNumber || student.studentId,
+      busStatus: statuses.get(student.id) ?? "STOPPED",
     }));
+  }
+
+  async setBusDecisions(schoolId: string, actorId: string, input: {
+    termId: string; studentIds: string[]; status: "RIDING" | "PAUSED" | "STOPPED" | "INHERIT";
+  }) {
+    const studentIds = [...new Set(input.studentIds)].sort();
+    return withSerializableRetry(() => this.prisma.client.$transaction(async tx => {
+      const term = await tx.term.findFirst({
+        where: { id: input.termId, academicYear: { schoolId } },
+        select: { academicYearId: true },
+      });
+      if (!term) throw new NotFoundException("Term not found.");
+      const rosterCount = await tx.enrollment.count({
+        where: { ...activeBillingEnrollment(schoolId, term.academicYearId, input.termId), studentId: { in: studentIds } },
+      });
+      if (rosterCount !== studentIds.length) throw new BadRequestException("Some students are no longer enrolled for this term. Refresh the roster.");
+      if (input.status === "INHERIT") {
+        await tx.busTermDecision.deleteMany({ where: { studentId: { in: studentIds }, termId: input.termId } });
+      } else {
+        const status = input.status;
+        for (const studentId of studentIds) {
+          await tx.busTermDecision.upsert({
+            where: { studentId_termId: { studentId, termId: input.termId } },
+            create: { studentId, termId: input.termId, status }, update: { status },
+          });
+        }
+      }
+      await this.writeAudit(tx, { schoolId, actorId, action: "UPDATE", entityType: "FINANCE BUS_ROSTER",
+        entityId: input.termId, newValues: { studentIds, status: input.status } });
+      return { count: studentIds.length };
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }));
+  }
+
+  async linkBusFee(schoolId: string, actorId: string, feeItemId: string, enabled: boolean) {
+    return this.prisma.client.$transaction(async tx => {
+      const changed = await tx.feeItem.updateMany({
+        where: { id: feeItemId, isOptional: true, feeStructure: { schoolId, isActive: true } },
+        data: { followsBusRoster: enabled },
+      });
+      if (!changed.count) throw new NotFoundException("Active optional fee item not found.");
+      await this.writeAudit(tx, { schoolId, actorId, action: "UPDATE", entityType: "FINANCE BUS_FEE",
+        entityId: feeItemId, newValues: { followsBusRoster: enabled } });
+      return { enabled };
+    });
   }
 
   async generateBills(schoolId: string, input: GenerateBillInput, actorId: string) {
@@ -1104,8 +1169,13 @@ export class FinanceService {
           throw new BadRequestException("Every optional fee selection must identify an optional item in this fee structure.");
         }
       }
+      const busFees = feeStructure.items.filter(item => item.isOptional && item.followsBusRoster);
+      if (busFees.some(item => optionalIds.has(item.id) || selections.has(item.id))) {
+        throw new BadRequestException("Linked bus fees use the term bus roster. Refresh the fee structure and try again.");
+      }
+      const busRiders = busFees.length ? await this.busStatuses(tx, schoolId, studentIds, currentTerm) : new Map<string, string>();
       if (!studentIds.length) return { bills: [], emptyRoster: true, skippedExisting: 0 };
-      const batchItems = feeStructure.items.filter(item => !item.isOptional || optionalIds.has(item.id) || selections.has(item.id));
+      const batchItems = feeStructure.items.filter(item => !item.isOptional || optionalIds.has(item.id) || selections.has(item.id) || item.followsBusRoster);
       if (!batchItems.length) throw new BadRequestException("Select at least one fee item to generate this bill.");
       // P3 revenue schedules are not yet journal-backed. Refuse to issue a term-spanning
       // invoice as immediately earned revenue simply because the old bill path lacks
@@ -1195,7 +1265,8 @@ export class FinanceService {
       let skippedExisting = 0;
       for (const studentId of studentIds) {
         const billableItems = batchItems.filter(item =>
-          !item.isOptional || optionalIds.has(item.id) || selections.get(item.id)?.has(studentId),
+          !item.isOptional || optionalIds.has(item.id) || selections.get(item.id)?.has(studentId)
+            || (item.followsBusRoster && busRiders.get(studentId) === "RIDING"),
         );
         if (!billableItems.length) continue;
         const existingBill = await tx.bill.findFirst({
@@ -1364,6 +1435,7 @@ export class FinanceService {
           termId: currentTerm.id,
           optionalItemIds: [...optionalIds],
           optionalSelections: [...selections].map(([feeItemId, ids]) => ({ feeItemId, studentIds: [...ids] })),
+          busFeeItemIds: busFees.map(item => item.id),
           skippedExisting,
           lateFeesEnabled: lateFeeEnabled,
           lateFeeCount: lateFeeSourcesByStudent.size,

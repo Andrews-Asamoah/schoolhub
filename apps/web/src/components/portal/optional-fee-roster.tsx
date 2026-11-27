@@ -2,7 +2,7 @@ import { useId, useState } from "react";
 import { Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-export type BillingStudent = { id: string; name: string; reference: string };
+export type BillingStudent = { id: string; name: string; reference: string; busStatus?: "RIDING" | "PAUSED" | "STOPPED" };
 
 export function OptionalFeeRoster({ name, amount, students, selected, onChange }: {
   name: string;

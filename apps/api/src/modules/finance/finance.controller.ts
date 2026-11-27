@@ -57,6 +57,7 @@ const feeStructureSchema = z.object({
     name: z.string().trim().min(1, "Every fee item needs a name").max(120),
     amount: z.number().finite().min(0).max(100000000),
     isOptional: z.boolean().default(false),
+    followsBusRoster: z.boolean().optional(),
     description: z.string().trim().max(500).optional(),
   })).min(1, "Add at least one fee item").max(100),
 });
@@ -436,6 +437,35 @@ export class FinanceController {
     @Body(new ZodValidationPipe(arrearsPolicySchema)) body: z.infer<typeof arrearsPolicySchema>,
   ) {
     return this.financeService.setArrearsPolicy(school.id, user.id, body.arrearsPolicy);
+  }
+
+  @Get("bus-users/:classId/:termId")
+  @Roles(...FINANCE_READ_ROLES)
+  listBusUsers(@CurrentSchool() school: School, @Param("classId") classId: string, @Param("termId") termId: string) {
+    return this.financeService.getBillingRoster(school.id, classId, undefined, termId, false);
+  }
+
+  @Put("bus-users")
+  @Roles(...FINANCE_WRITE_ROLES)
+  @FinanceSelfAudited()
+  setBusUsers(
+    @CurrentSchool() school: School, @CurrentUser() user: AuthenticatedUser,
+    @Body(new ZodValidationPipe(z.object({
+      termId: z.string().min(1), studentIds: z.array(z.string().min(1)).min(1).max(100),
+      status: z.enum(["RIDING", "PAUSED", "STOPPED", "INHERIT"]),
+    }))) input: Parameters<FinanceService["setBusDecisions"]>[2],
+  ) {
+    return this.financeService.setBusDecisions(school.id, user.id, input);
+  }
+
+  @Patch("bus-fees/:feeItemId")
+  @Roles(...FINANCE_WRITE_ROLES)
+  @FinanceSelfAudited()
+  linkBusFee(
+    @CurrentSchool() school: School, @CurrentUser() user: AuthenticatedUser, @Param("feeItemId") feeItemId: string,
+    @Body(new ZodValidationPipe(z.object({ enabled: z.boolean() }))) input: { enabled: boolean },
+  ) {
+    return this.financeService.linkBusFee(school.id, user.id, feeItemId, input.enabled);
   }
 
   @Get("billing-roster/:classId")

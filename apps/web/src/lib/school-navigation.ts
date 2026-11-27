@@ -6,6 +6,7 @@ import {
   AlertCircle,
   BadgeDollarSign,
   BadgeCheck,
+  BusFront,
   Bell,
   BookOpen,
   ChartNoAxesCombined,
@@ -312,6 +313,14 @@ export const schoolNavGroups: SchoolNavGroup[] = [
         apiStatus: "available",
       },
       {
+        id: "bus-users",
+        label: "Bus Users",
+        icon: BusFront,
+        description: "Manage riders, term pauses, and automatic bus fees.",
+        section: "Finance",
+        apiStatus: "available",
+      },
+      {
         id: "concessions",
         label: "Scholarships & discounts",
         icon: BadgeCheck,
@@ -552,6 +561,7 @@ export const schoolNavItems = schoolNavGroups.flatMap((group) => group.items);
 const adminRestrictedFinancePages = new Set([
   "accountant-portal",
   "concessions",
+  "bus-users",
   "fees",
   "payments",
   "invoices",
@@ -617,6 +627,7 @@ const rolePages: Record<string, string[]> = {
   accountant: [
     "accountant-portal",
     "concessions",
+    "bus-users",
     "finance-reports",
     "student-statements",
     "term-end-review",

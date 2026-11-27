@@ -293,6 +293,38 @@ describe.skipIf(!enabled)("bill generation (database)", { timeout: 60_000 }, () 
     })).resolves.toMatchObject({ count: 0, skippedExisting: STUDENTS });
   });
 
+  it("automatically bills linked bus fees, skips a paused term and resumes the following term", async () => {
+    const fees = await structureWithOptionalItem();
+    const bus = fees.items.find(item => item.isOptional)!;
+    const rider = studentIds[0]!;
+    const paused = studentIds[1]!;
+    const prior = await prisma.term.create({ data: {
+      academicYearId: yearId, name: "Earlier term", termNumber: 2,
+      startDate: new Date("2025-09-01"), endDate: new Date("2025-12-15"),
+    } });
+    const later = await prisma.term.create({ data: {
+      academicYearId: yearId, name: "Next term", termNumber: 3,
+      startDate: new Date("2026-05-01"), endDate: new Date("2026-08-15"),
+    } });
+    await prisma.enrollment.createMany({ data: [prior.id, later.id].flatMap(id =>
+      [rider, paused].map(studentId => ({ studentId, academicYearId: yearId, classId, termId: id })),
+    ) });
+    await service.setBusDecisions(schoolId, actorId, { termId: prior.id, studentIds: [rider, paused], status: "RIDING" });
+    await service.setBusDecisions(schoolId, actorId, { termId, studentIds: [paused], status: "PAUSED" });
+    await service.linkBusFee(schoolId, actorId, bus.id, true);
+    await expect(generate(fees.id, { optionalItemIds: [bus.id] })).rejects.toThrow(/term bus roster/);
+    expect(await billsFor(fees.id)).toHaveLength(0);
+    await generate(fees.id);
+    const bills = await billsFor(fees.id);
+    expect(bills.find(row => row.studentId === rider)?.totalAmount.toFixed(2)).toBe("150.00");
+    expect(bills.find(row => row.studentId === paused)?.totalAmount.toFixed(2)).toBe("100.00");
+    expect((await service.getBillingRoster(schoolId, classId, yearId, later.id, false))
+      .find(row => row.id === paused)?.busStatus).toBe("RIDING");
+    await service.setBusDecisions(schoolId, actorId, { termId, studentIds: [rider], status: "STOPPED" });
+    expect((await service.getBillingRoster(schoolId, classId, yearId, later.id, false))
+      .find(row => row.id === rider)?.busStatus).toBe("STOPPED");
+  });
+
   it("generates no invoices for unselected students when every item is optional", async () => {
     const fees = await prisma.feeStructure.create({
       data: { schoolId, name: `Bus-only ${run}`, items: { create: { name: "School bus", amount: 40, isOptional: true } } },
