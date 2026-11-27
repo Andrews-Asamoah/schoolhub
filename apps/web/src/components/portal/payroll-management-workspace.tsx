@@ -391,6 +391,10 @@ export function PayrollManagementWorkspace() {
           && selectedDetail.payslips.some(slip => slip.tier2Contribution != null) && (
             <ServerExportButton endpoint={`/finance/payroll/${encodeURIComponent(selectedDetail.id)}/tier-2.xlsx`} label="Tier 2 Excel" className={secondaryButton} />
           )}
+        {(selectedDetail.status === "APPROVED" || selectedDetail.status === "PAID") && <>
+          <ServerExportButton endpoint={`/finance/payroll/${encodeURIComponent(selectedDetail.id)}/statutory-return.xlsx?type=paye`} label="PAYE return" className={secondaryButton} />
+          <ServerExportButton endpoint={`/finance/payroll/${encodeURIComponent(selectedDetail.id)}/statutory-return.xlsx?type=ssnit`} label="SSNIT schedule" className={secondaryButton} />
+        </>}
         <ServerExportButton endpoint={`/finance/payroll/${encodeURIComponent(selectedDetail.id)}/payslips.pdf`} label="Whole-run PDF" className={secondaryButton} /><TableExportMenu build={() => ({ title: "Payslips " + monthName(selectedDetail.month, selectedDetail.year), headers: ["Employee","Employee ID","Basic (GHS)","Employee SSNIT (GHS)","PAYE (GHS)","Employer SSNIT (GHS)","Net (GHS)","Payment status"], columnTypes: ["text","text","money","money","money","money","money","text"], rows: selectedDetail.payslips.map(slip => [personName(slip),slip.staff?.staffId ?? slip.teacher?.teacherId ?? "",Number(slip.basicSalary),Number(slip.ssnitEmployee),Number(slip.incomeTax),Number(slip.ssnitEmployer),Number(slip.netSalary),slip.paymentStatus]), totals: ["Total","","",null,null,null,null,""], confidential: true, reportInfo: { period: monthName(selectedDetail.month, selectedDetail.year) } })} note="Confidential payslip data." /><button type="button" className={primaryButton} onClick={() => window.print()}><Printer className="size-4" /> Print slips</button></>}</div>
     </Modal>}
   </div>;

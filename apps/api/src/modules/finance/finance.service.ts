@@ -4052,7 +4052,7 @@ export class FinanceService {
     const db = this.prisma.client;
     const where = await this.payrollEmployeeWhere(db, schoolId, kind, employeeId);
     const record = await db.payrollPaymentDetails.findFirst({ where });
-    if (!record) return { ssnitNumber: "", tier2MemberNumber: "", bank: null, version: null };
+    if (!record) return { ssnitNumber: "", tier2MemberNumber: "", tin: "", bank: null, version: null };
     const value = decryptPayrollDetails(schoolId, kind, employeeId, record.encryptedData);
     await this.writeAudit(db, { actorId, schoolId, action: "SCHOOL_ACCESSED",
       entityType: `PAYROLL_PAYMENT_DETAILS_${kind}`, entityId: employeeId });
@@ -4069,7 +4069,7 @@ export class FinanceService {
       if ((current?.updatedAt.toISOString() ?? null) !== version) {
         throw new ConflictException("Payment details changed. Reopen the form to review the latest details.");
       }
-      if (value.ssnitNumber || value.tier2MemberNumber || value.bank) {
+      if (value.ssnitNumber || value.tier2MemberNumber || value.tin || value.bank) {
         const encryptedData = encryptPayrollDetails(schoolId, kind, employeeId, value);
         if (current) {
           await tx.payrollPaymentDetails.update({ where: { id: current.id }, data: { encryptedData } });
@@ -4081,7 +4081,7 @@ export class FinanceService {
       }
       await this.writeAudit(tx, {
         actorId, schoolId, action: "UPDATE", entityType: `PAYROLL_PAYMENT_DETAILS_${kind}`, entityId: employeeId,
-        newValues: { ssnitConfigured: Boolean(value.ssnitNumber), tier2MemberConfigured: Boolean(value.tier2MemberNumber), bankConfigured: Boolean(value.bank) },
+        newValues: { ssnitConfigured: Boolean(value.ssnitNumber), tier2MemberConfigured: Boolean(value.tier2MemberNumber), tinConfigured: Boolean(value.tin), bankConfigured: Boolean(value.bank) },
       });
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }));
     return { saved: true };

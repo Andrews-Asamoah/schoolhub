@@ -746,6 +746,96 @@ export class FinanceExportsService {
     };
   }
 
+  /**
+   * Monthly statutory schedules built from an approved run: the GRA PAYE return (needs each employee's TIN)
+   * and the SSNIT Tier 1 contribution schedule (needs each employee's SSNIT number). Amounts are the saved
+   * run's; identifiers come from current payroll details. Missing identifiers are listed, not silently blanked.
+   */
+  async payrollStatutoryReturnExcel(context: FinanceExportContext, recordId: string, type: "paye" | "ssnit"): Promise<FinanceExportFile> {
+    const db = this.prisma.client;
+    const run = await db.payrollRecord.findFirst({
+      where: { id: recordId, schoolId: context.schoolId },
+      select: { month: true, year: true, status: true, payslips: {
+        where: { schoolId: context.schoolId },
+        select: {
+          basicSalary: true, allowances: true, grossSalary: true, ssnitEmployee: true, ssnitEmployer: true, incomeTax: true,
+          residency: true, teacherId: true, staffId: true,
+          staff: { select: { staffId: true, staffNumber: true, profile: { select: { firstName: true, lastName: true } } } },
+          teacher: { select: { teacherId: true, staffNumber: true, firstName: true, lastName: true, profile: { select: { firstName: true, lastName: true } } } },
+        },
+      } },
+    });
+    if (!run) throw new NotFoundException("Payroll run not found.");
+    if (run.status !== "APPROVED" && run.status !== "PAID") {
+      throw new BadRequestException("Approve the payroll run before downloading statutory returns.");
+    }
+    if (!run.payslips.length) throw new BadRequestException("This payroll run has no payslips.");
+    const details = await db.payrollPaymentDetails.findMany({
+      where: { schoolId: context.schoolId, OR: [
+        { teacherId: { in: run.payslips.flatMap(slip => slip.teacherId ? [slip.teacherId] : []) } },
+        { staffId: { in: run.payslips.flatMap(slip => slip.staffId ? [slip.staffId] : []) } },
+      ] },
+      select: { teacherId: true, staffId: true, encryptedData: true },
+    });
+    const sealedBy = new Map(details.map(detail => [
+      detail.teacherId ? `TEACHER:${detail.teacherId}` : `STAFF:${detail.staffId}`, detail.encryptedData,
+    ]));
+    const field = type === "paye" ? "tin" : "ssnitNumber";
+    const label = type === "paye" ? "TIN" : "SSNIT number";
+    const missing: string[] = [];
+    const seen = new Set<string>();
+    const rows = run.payslips.map((slip, index) => {
+      const kind = slip.teacherId ? "TEACHER" : "STAFF";
+      const employeeId = slip.teacherId ?? slip.staffId;
+      const sealed = sealedBy.get(`${kind}:${employeeId}`);
+      const identifier = sealed && employeeId ? decryptPayrollDetails(context.schoolId, kind, employeeId, sealed)[field] : "";
+      const profile = slip.teacher?.profile ?? slip.teacher ?? slip.staff?.profile;
+      const name = [profile?.firstName, profile?.lastName].filter(Boolean).join(" ") || "Unnamed employee";
+      const employeeNumber = slip.teacher?.staffNumber || slip.staff?.staffNumber || slip.teacher?.teacherId || slip.staff?.staffId || "";
+      if (!identifier) missing.push(name);
+      else if (seen.has(identifier)) throw new BadRequestException(`The ${label} ${identifier} appears on more than one payslip. Check the employees' payroll details before exporting.`);
+      else seen.add(identifier);
+      return type === "paye"
+        ? [index + 1, name, employeeNumber, identifier, slip.residency === "RESIDENT" ? "Resident" : "Non-resident",
+          Number(slip.basicSalary), Number(slip.allowances), Number(slip.grossSalary), Number(slip.ssnitEmployee), Number(slip.incomeTax)]
+        : [index + 1, name, employeeNumber, identifier, Number(slip.basicSalary), Number(slip.ssnitEmployee), Number(slip.ssnitEmployer),
+          Number(slip.ssnitEmployee) + Number(slip.ssnitEmployer)];
+    });
+    if (missing.length) {
+      const shown = missing.slice(0, 5).join(", ") + (missing.length > 5 ? `, and ${missing.length - 5} more` : "");
+      throw new BadRequestException(`Add a ${label} for every employee before exporting. Missing for: ${shown}.`);
+    }
+    const school = await this.school(context.schoolId);
+    const period = `${run.year}-${String(run.month).padStart(2, "0")}`;
+    const buffer = await buildFinanceWorkbook(type === "paye" ? {
+      title: "PAYE monthly return",
+      headers: ["No.", "Employee", "Staff number", "TIN", "Residency", "Basic salary (GHS)", "Allowances (GHS)", "Gross emoluments (GHS)", "Employee SSNIT (GHS)", "PAYE deducted (GHS)"],
+      columnTypes: ["number", "text", "text", "text", "text", "money", "money", "money", "money", "money"],
+      rows, totalColumns: [5, 6, 7, 8, 9],
+      reportInfo: this.statutoryInfo(school.name, period, recordId, context, "Confidential tax information. File with the Ghana Revenue Authority by the 15th of the following month."),
+    } : {
+      title: "SSNIT Tier 1 schedule",
+      headers: ["No.", "Employee", "Staff number", "SSNIT number", "Basic salary (GHS)", "Employee contribution (GHS)", "Employer contribution (GHS)", "Total contribution (GHS)"],
+      columnTypes: ["number", "text", "text", "text", "money", "money", "money", "money"],
+      rows, totalColumns: [4, 5, 6, 7],
+      reportInfo: this.statutoryInfo(school.name, period, recordId, context, "Confidential pension information. Pay and file with SSNIT by the 14th of the following month."),
+    });
+    await this.auditExport(context, `statutory-return-${type}.xlsx`, rows.length, { recordId });
+    return {
+      buffer, fileName: `schoolhub-${type === "paye" ? "paye-return" : "ssnit-tier1"}-${period}.xlsx`,
+      contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    };
+  }
+
+  private statutoryInfo(school: string, period: string, recordId: string, context: FinanceExportContext, note: string) {
+    return {
+      School: school, Period: period, Run: recordId, "Generated by": context.actorName ?? context.actorId,
+      "Generated at": new Date().toISOString(),
+      Source: "Amounts are from the saved payroll run. Identifiers are from current employee payroll details.",
+      Confidentiality: note,
+    };
+  }
+
   async payrollPdf(context: FinanceExportContext, recordId: string): Promise<FinanceExportFile> {
     const school = await this.school(context.schoolId);
     const run = await this.prisma.client.payrollRecord.findFirst({

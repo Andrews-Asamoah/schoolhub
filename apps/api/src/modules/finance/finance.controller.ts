@@ -22,6 +22,7 @@ import { FinanceLedgerIntegrityService } from "./finance-ledger-integrity.servic
 import { payrollPaymentDetailsSchema, payrollSalaryImportSchema, type PayrollPaymentDetailsInput, type PayrollSalaryImportInput } from "./payroll/payroll-inputs.js";
 import { PayrollSettingsService } from "./payroll-settings.service.js";
 import { FinanceBreakdownService } from "./finance-breakdown.service.js";
+import { FinanceActionCentreService } from "./finance-action-centre.service.js";
 import { FinanceExportsService, type FinanceExportContext, type FinanceExportFile } from "./finance-exports.service.js";
 import { SchoolTenantGuard } from "../../common/guards/school-tenant.guard.js";
 import { RolesGuard } from "../../common/guards/roles.guard.js";
@@ -182,6 +183,7 @@ export class FinanceController {
     private readonly payrollSettings: PayrollSettingsService,
     private readonly approvalSettings: FinanceApprovalSettingsService,
     private readonly breakdowns: FinanceBreakdownService,
+    private readonly actionCentre: FinanceActionCentreService,
   ) {}
 
 
@@ -367,6 +369,19 @@ export class FinanceController {
     @Query("termId") termId?: string,
   ) {
     return this.financeService.getFinanceSummary(school.id, { from, to, yearId, termId });
+  }
+
+  @Get("action-centre")
+  @Roles(...FINANCE_READ_ROLES)
+  getActionCentre(
+    @CurrentSchool() school: School,
+    @CurrentUser() user: AuthenticatedUser,
+    @CurrentSchoolRole() schoolRole: string | undefined,
+  ) {
+    // Payroll items are only shown to roles that may see payroll; everyone else gets the rest.
+    let includePayroll = true;
+    try { this.assertPayrollExportAllowed(user, schoolRole); } catch { includePayroll = false; }
+    return this.actionCentre.get(school.id, { includePayroll });
   }
 
   @Get("reports/income-breakdown")
@@ -1121,6 +1136,22 @@ export class FinanceController {
     this.assertPayrollExportAllowed(user, schoolRole);
     const context = this.financeExportContext(school, user, request);
     return this.sendFinanceExport(response, await this.financeExports.payrollTier2Excel(context, recordId));
+  }
+
+  @Get("payroll/:recordId/statutory-return.xlsx")
+  @Roles(...FINANCE_PAYROLL_EXPORT_ROLES)
+  async exportPayrollStatutoryReturn(
+    @CurrentSchool() school: School,
+    @CurrentUser() user: AuthenticatedUser,
+    @CurrentSchoolRole() schoolRole: string | undefined,
+    @Req() request: Request,
+    @Res() response: Response,
+    @Param("recordId") recordId: string,
+    @Query("type", new ZodValidationPipe(z.enum(["paye", "ssnit"]))) type: "paye" | "ssnit",
+  ) {
+    this.assertPayrollExportAllowed(user, schoolRole);
+    const context = this.financeExportContext(school, user, request);
+    return this.sendFinanceExport(response, await this.financeExports.payrollStatutoryReturnExcel(context, recordId, type));
   }
 
   @Get("payroll/:recordId/payslips.pdf")

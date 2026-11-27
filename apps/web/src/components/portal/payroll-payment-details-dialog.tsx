@@ -6,7 +6,7 @@ import { PortalModal } from "@/components/portal/portal-modal";
 import { apiFetch } from "@/lib/api";
 
 type Bank = { name: string; branch: string; accountName: string; accountNumber: string };
-type Details = { ssnitNumber: string; tier2MemberNumber: string; bank: Bank | null; version: string | null };
+type Details = { ssnitNumber: string; tier2MemberNumber: string; tin: string; bank: Bank | null; version: string | null };
 const emptyBank: Bank = { name: "", branch: "", accountName: "", accountNumber: "" };
 const bankFields: { key: keyof Bank; label: string; maxLength: number }[] = [
   { key: "name", label: "Bank name", maxLength: 100 },
@@ -59,12 +59,13 @@ function PaymentDetailsForm({ details, canEdit, busy, error, onSave, onClose }: 
 }) {
   const [ssnitNumber, setSsnitNumber] = useState(details.ssnitNumber);
   const [tier2MemberNumber, setTier2MemberNumber] = useState(details.tier2MemberNumber);
+  const [tin, setTin] = useState(details.tin ?? "");
   const [useBank, setUseBank] = useState(!!details.bank);
   const [bank, setBank] = useState(details.bank ?? emptyBank);
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (canEdit) onSave({ ssnitNumber, tier2MemberNumber, bank: useBank ? bank : null, version: details.version });
+    if (canEdit) onSave({ ssnitNumber, tier2MemberNumber, tin, bank: useBank ? bank : null, version: details.version });
   }
   return (
     <form className="space-y-4" autoComplete="off" onSubmit={submit}>
@@ -77,6 +78,10 @@ function PaymentDetailsForm({ details, canEdit, busy, error, onSave, onClose }: 
           <LabeledField label="Tier 2 member number (optional)">
             <input className={labeledInputClasses} value={tier2MemberNumber} maxLength={50}
               onChange={event => setTier2MemberNumber(event.target.value)} spellCheck={false} />
+          </LabeledField>
+          <LabeledField label="TIN (for the PAYE return)">
+            <input className={labeledInputClasses} value={tin} maxLength={20}
+              onChange={event => setTin(event.target.value)} spellCheck={false} />
           </LabeledField>
         </div>
         <label className="flex items-center gap-2 border-t border-border pt-4 text-sm font-medium">

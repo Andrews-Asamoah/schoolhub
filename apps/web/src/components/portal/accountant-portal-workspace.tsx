@@ -38,6 +38,7 @@ import { AccountantFinanceCharts } from "./accountant-finance-charts";
 import { AccountantFinanceReportingWorkspace } from "./accountant-finance-reporting-workspace";
 import { AccountantFinanceDetailedReportingWorkspace } from "./accountant-finance-detailed-reporting-workspace";
 import { FinanceBreakdownReports } from "./finance-breakdown-reports";
+import { AccountantActionCentre } from "./accountant-action-centre";
 import { AccountantRecordPaymentDialog } from "./accountant-record-payment-dialog";
 import { OptionalFeeRoster, type BillingStudent } from "./optional-fee-roster";
 import { apiDownload, apiFetch } from "@/lib/api";
@@ -790,6 +791,7 @@ export function AccountantPortalWorkspace({
         .invoice-print-totals, .invoice-print-header, .invoice-print-summary { break-inside: avoid; }
         @page school-finance-document { size: A4 portrait; margin: 14mm; }
       }`}</style>
+      {activeTab === "overview" && <AccountantActionCentre />}
       {activeTab === "overview" && (
         <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-success via-success to-foreground p-6 text-background shadow-lg sm:p-8">
           <div className="pointer-events-none absolute -right-12 -top-20 size-64 rounded-full bg-success/10 blur-3xl" />

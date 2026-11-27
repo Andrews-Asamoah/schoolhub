@@ -122,9 +122,11 @@ describe("finance controller routes", () => {
       r.route.includes("exports/salaries.xlsx") ||
       r.route.includes("payslips.pdf") ||
       r.route.includes("tier-2.xlsx") ||
+      r.route.includes("statutory-return") ||
       r.route.includes("payroll/payment-details") ||
       r.route.includes("payslips/:payslipId.pdf") ||
       r.route === '"payroll"' ||
+      r.route === '"payroll/:recordId"' ||
       r.route === '"payroll/salaries"'
     ))) {
       expect(route.decorators, `GET ${route.route}`).toContain("@Roles(...FINANCE_PAYROLL_EXPORT_ROLES)");
@@ -137,16 +139,18 @@ describe("finance controller routes", () => {
       r.route.includes("exports/salaries.xlsx") ||
       r.route.includes("payslips.pdf") ||
       r.route.includes("tier-2.xlsx") ||
+      r.route.includes("statutory-return") ||
       r.route.includes("payroll/payment-details") ||
       r.route.includes("payslips/:payslipId.pdf") ||
       r.route === '"payroll"' ||
+      r.route === '"payroll/:recordId"' ||
       r.route === '"payroll/salaries"'
     ))) {
       expect(route.decorators, `GET ${route.route}`).toContain("@Roles(...FINANCE_READ_ROLES)");
     }
   });
   it("protects the payroll and salary JSON endpoints with explicit school-role checks", () => {
-    for (const name of ["listPayrollRecords", "listPayrollSalaryRegister", "getPayrollPaymentDetails", "updatePayrollPaymentDetails", "importPayrollSalaries", "exportPayrollTier2"]) {
+    for (const name of ["listPayrollRecords", "getPayrollRecord", "listPayrollSalaryRegister", "getPayrollPaymentDetails", "updatePayrollPaymentDetails", "importPayrollSalaries", "exportPayrollTier2", "exportPayrollStatutoryReturn"]) {
       const method = controllerSource.slice(controllerSource.indexOf(name + "("), controllerSource.indexOf("\n  }", controllerSource.indexOf(name + "(")) + 4);
       expect(method).toContain("this.assertPayrollExportAllowed(user, schoolRole)");
     }

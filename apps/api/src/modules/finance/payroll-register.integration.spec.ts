@@ -78,9 +78,9 @@ describe.skipIf(!enabled)("payroll salary register and Tier 2 on PostgreSQL", { 
   it("encrypts payment details and uses saved Tier 2 values for Excel and ledger posting", async () => {
     const bank = { name: "Test bank", branch: "", accountName: "Payroll Staff", accountNumber: "000012345678" };
     await service.updatePayrollPaymentDetails(schoolId, "STAFF", staffId, maker,
-      { version: null, ssnitNumber: "00001111", tier2MemberNumber: "T2001", bank });
+      { version: null, ssnitNumber: "00001111", tier2MemberNumber: "T2001", tin: "", bank });
     const details = await service.getPayrollPaymentDetails(schoolId, "STAFF", staffId, maker);
-    expect(details).toMatchObject({ ssnitNumber: "00001111", tier2MemberNumber: "T2001", bank });
+    expect(details).toMatchObject({ ssnitNumber: "00001111", tier2MemberNumber: "T2001", tin: "", bank });
     expect((await db.payrollPaymentDetails.findUniqueOrThrow({ where: { staffId } })).encryptedData).not.toContain(bank.accountNumber);
     await expect(service.getPayrollPaymentDetails("other-school", "STAFF", staffId, maker)).rejects.toThrow(/not found/);
     await expect(service.updatePayrollPaymentDetails(schoolId, "STAFF", staffId, maker,
@@ -108,7 +108,7 @@ describe.skipIf(!enabled)("payroll salary register and Tier 2 on PostgreSQL", { 
     const context = { schoolId, actorId: maker };
     await expect(exports.payrollTier2Excel(context, recordId)).rejects.toThrow(/missing a number/);
     await service.updatePayrollPaymentDetails(schoolId, "TEACHER", teacherId, maker,
-      { version: null, ssnitNumber: "00002222", tier2MemberNumber: "", bank: null });
+      { version: null, ssnitNumber: "00002222", tier2MemberNumber: "", tin: "", bank: null });
     const file = await exports.payrollTier2Excel(context, recordId);
     const workbook = new ExcelJS.Workbook();
     await workbook.xlsx.load(file.buffer as unknown as ArrayBuffer);

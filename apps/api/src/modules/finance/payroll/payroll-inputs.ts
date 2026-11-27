@@ -23,6 +23,9 @@ export const payrollPaymentDetailsSchema = z.object({
   ssnitNumber: z.string().trim().toUpperCase().refine(value => !value || /^[A-Z0-9-]{3,32}$/.test(value),
     "Enter the SSNIT number using letters, numbers or hyphens."),
   tier2MemberNumber: z.string().trim().max(50).default(""),
+  /** Tax Identification Number (or Ghana Card PIN) used on the GRA monthly PAYE return. */
+  tin: z.string().trim().toUpperCase().refine(value => !value || /^[A-Z0-9-]{5,20}$/.test(value),
+    "Enter the TIN using letters, numbers or hyphens.").default(""),
   bank: z.object({
     name: z.string().trim().min(1).max(100),
     branch: z.string().trim().max(100),
