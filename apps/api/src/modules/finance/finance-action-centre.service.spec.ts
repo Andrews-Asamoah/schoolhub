@@ -2,12 +2,13 @@ import { describe, expect, it } from "vitest";
 import { Prisma } from "@prisma/client";
 import { daysBetween, FinanceActionCentreService, statutoryDueDate } from "./finance-action-centre.service.js";
 
-type Overrides = { ready?: boolean; drafts?: number; approved?: number; runThisMonth?: number; missing?: number; overdue?: number; latestRun?: { month: number; year: number } | null };
+type Overrides = { ready?: boolean; reminders?: number; bankDrafts?: number; drafts?: number; approved?: number; runThisMonth?: number; missing?: number; overdue?: number; latestRun?: { month: number; year: number } | null };
 function build(o: Overrides = {}) {
   const client = {
     bill: { aggregate: async () => ({ _count: { _all: o.overdue ?? 0 }, _sum: { balanceAmount: new Prisma.Decimal("1250.5") } }) },
     financeManualJournal: { count: async () => 0 },
-    financeBankReconciliation: { count: async () => 0 },
+    financeBankReconciliation: { groupBy: async () => [{ status: "DRAFT", _count: { _all: o.bankDrafts ?? 0 } }] },
+    feeReminderSchedule: { count: async () => o.reminders ?? 0 },
     payrollRecord: {
       count: async () => o.runThisMonth ?? 1,
       groupBy: async () => [{ status: "DRAFT", _count: { _all: o.drafts ?? 0 } }, { status: "APPROVED", _count: { _all: o.approved ?? 0 } }],
@@ -46,6 +47,13 @@ describe("accountant action centre", () => {
     const { items } = await build({ runThisMonth: 0, latestRun: { month: 10, year: 2026 } }).get("s1", { includePayroll: true }, NOV_27);
     expect(items.find(i => i.id === "payroll-generate")).toMatchObject({ severity: "warning" });
     expect(items.find(i => i.id === "statutory-overdue")?.title).toContain("12 days ago");
+  });
+  it("links due reminders and draft reconciliations to their workflows", async () => {
+    const { items } = await build({ reminders: 2, bankDrafts: 1 }).get("s1", { includePayroll: false }, NOV_27);
+    expect(items).toMatchObject([
+      { id: "fee-reminders-due", count: 2, page: "fee-reminders" },
+      { id: "reconciliations-draft", count: 1, page: "finance-reports" },
+    ]);
   });
   it("leaves payroll items out for roles that may not see payroll", async () => {
     const { items } = await build({ ready: false, drafts: 2, missing: 4, overdue: 1 }).get("s1", { includePayroll: false }, NOV_27);

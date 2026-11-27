@@ -7,6 +7,10 @@ import { PrismaService } from "../../prisma/prisma.service.js";
 import { decodeStatement, type StatementMapping } from "./statement-decoder.js";
 import { previewStatement } from "./statement-import.js";
 const date = (value: string) => new Date(value + "T00:00:00Z");
+type MatchChoice = { statementLineId: string; transactionId: string };
+const exactMatchKey = (reference: string, date: Date, amount: Prisma.Decimal) =>
+  JSON.stringify([reference.trim().toLowerCase(), date.toISOString().slice(0, 10), amount.toFixed(2)]);
+
 const hash = (value: unknown) => createHash("sha256").update(JSON.stringify(value)).digest("hex");
 @Injectable()
 export class FinanceBankReconciliationService {
@@ -107,6 +111,108 @@ export class FinanceBankReconciliationService {
       return { ...record, statement: evidence };
     }, { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead });
   }
+  private async exactMatches(tx: Prisma.TransactionClient, schoolId: string, id: string) {
+    const record = await this.record(tx, schoolId, id);
+    if (record.status !== "DRAFT") throw new ConflictException("Only drafts can use suggested matches.");
+    const lines = await tx.financeBankStatementLine.findMany({
+      where: { statementId: record.statementId, reference: { not: null }, matches: { none: { reconciliationId: id } } },
+      select: { id: true, date: true, reference: true, amount: true, description: true },
+      orderBy: { rowNumber: "asc" },
+    });
+    const references = [...new Set(lines.flatMap(line => line.reference ? [line.reference] : []))];
+    if (!references.length) return { record, matches: [] };
+
+    const dates = [...new Set(lines.map(line => line.date.toISOString()))].map(value => new Date(value));
+    const referenceFilter = { in: references, mode: "insensitive" as const };
+    // Receipt and voucher numbers are preserved in the ledger. Use the
+    // bank reference or cheque number stored on the originating record too.
+    const expenses = await tx.expense.findMany({
+      where: { schoolId, date: { in: dates }, OR: [{ referenceNumber: referenceFilter }, { checkNumber: referenceFilter }] },
+      select: { id: true, referenceNumber: true, checkNumber: true },
+    });
+    const expensesById = new Map(expenses.map(expense => [expense.id, expense]));
+    const paymentReference = { schoolId, referenceNumber: referenceFilter };
+    const postings = await tx.transaction.findMany({
+      where: {
+        schoolId,
+        transactionDate: { in: dates },
+        bankMatches: { none: { accountId: record.accountId, reconciliation: { supersededBy: null } } },
+        AND: [
+          { OR: [{ debitAccountId: record.accountId }, { creditAccountId: record.accountId }] },
+          { OR: [
+            { referenceNumber: referenceFilter },
+            { transactionNumber: referenceFilter },
+            { payments: { some: paymentReference } },
+            { referenceType: "EXPENSE", referenceId: { in: [...expensesById.keys()] } },
+          ] },
+        ],
+      },
+      select: {
+        id: true, referenceNumber: true, transactionNumber: true, transactionDate: true,
+        debitAccountId: true, amount: true, description: true, referenceType: true, referenceId: true,
+        payments: { where: paymentReference, select: { referenceNumber: true } },
+      },
+    });
+    const byKey = new Map<string, Array<typeof postings[number]>>();
+    for (const posting of postings) {
+      const signed = posting.debitAccountId === record.accountId ? posting.amount : posting.amount.negated();
+      const expense = posting.referenceType === "EXPENSE" && posting.referenceId ? expensesById.get(posting.referenceId) : undefined;
+      const keys = new Set([
+        posting.referenceNumber, posting.transactionNumber, expense?.referenceNumber, expense?.checkNumber,
+        ...posting.payments.map(payment => payment.referenceNumber),
+      ].filter((ref): ref is string => Boolean(ref?.trim()))
+        .map(ref => exactMatchKey(ref, posting.transactionDate, signed)));
+      for (const key of keys) {
+        const group = byKey.get(key) ?? [];
+        group.push(posting);
+        byKey.set(key, group);
+      }
+    }
+    // Count every candidate edge, including lines with multiple candidates.
+    // A suggestion must be the only option on both sides.
+    const counts = new Map<string, number>();
+    const pairs = lines.flatMap(line => {
+      if (!line.reference || line.amount.isZero()) return [];
+      const candidates = byKey.get(exactMatchKey(line.reference, line.date, line.amount)) ?? [];
+      for (const posting of candidates) counts.set(posting.id, (counts.get(posting.id) ?? 0) + 1);
+      const [posting] = candidates;
+      return candidates.length === 1 && posting ? [{ line, posting }] : [];
+    });
+    const matches = pairs.filter(({ posting }) => counts.get(posting.id) === 1).map(({ line, posting }) => ({
+      statementLineId: line.id, transactionId: posting.id, date: line.date,
+      reference: line.reference, amount: line.amount.toFixed(2), statementDescription: line.description,
+      transactionNumber: posting.transactionNumber, postingDescription: posting.description,
+    }));
+    return { record, matches };
+  }
+
+  async suggestMatches(schoolId: string, id: string) {
+    return this.transact(async tx => (await this.exactMatches(tx, schoolId, id)).matches);
+  }
+
+  async applySuggestedMatches(schoolId: string, actorId: string, id: string, choices: MatchChoice[]) {
+    return this.transact(async tx => {
+      await this.lock(tx, schoolId);
+      const { record, matches } = await this.exactMatches(tx, schoolId, id);
+      const available = new Map(matches.map(match => [match.statementLineId, match]));
+      const selected = choices.map(choice => {
+        const match = available.get(choice.statementLineId);
+        if (!match || match.transactionId !== choice.transactionId) {
+          throw new ConflictException("A suggested match changed. Refresh suggestions and review them again.");
+        }
+        available.delete(choice.statementLineId);
+        return {
+          schoolId, accountId: record.accountId, reconciliationId: id,
+          statementLineId: match.statementLineId, transactionId: match.transactionId,
+          amount: new Prisma.Decimal(match.amount).abs(), createdById: actorId,
+        };
+      });
+      const { count } = await tx.financeBankMatch.createMany({ data: selected });
+      await this.audit(tx, schoolId, actorId, id, "SUGGESTED_MATCHES_APPLIED");
+      return { count };
+    });
+  }
+
   async match(schoolId: string, actorId: string, id: string, input: { statementLineId: string; transactionId: string; amount: string }) {
     const amount = new Prisma.Decimal(input.amount);
     if (!amount.isFinite() || amount.lte(0) || amount.decimalPlaces() > 2) throw new BadRequestException("Enter a positive two-decimal match amount.");

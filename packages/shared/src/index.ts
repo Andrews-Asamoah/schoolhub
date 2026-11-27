@@ -771,15 +771,17 @@ export const recordPaymentSchema = z.object({
 });
 export type RecordPaymentInput = z.infer<typeof recordPaymentSchema>;
 
+export const billingClassIdsSchema = z.array(z.string().min(1).max(100)).min(1, "Choose at least one class.").max(100);
+
 export const generateBillSchema = z.object({
   academicYearId: z.string().min(1),
   termId: z.string().optional(),
   feeStructureId: z.string().min(1),
-  classId: z.string().optional(),
-  studentId: z.string().optional(), // if targeting single student
+  classId: z.string().min(1).optional(),
+  classIds: billingClassIdsSchema.optional(),
+  studentId: z.string().min(1).optional(), // if targeting single student
   dueDate: z
-    .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .iso.date()
     .optional(),
   notes: z.string().optional(),
   /** Optional items explicitly selected for the whole batch by existing callers. */
@@ -789,7 +791,8 @@ export const generateBillSchema = z.object({
     feeItemId: z.string().min(1),
     studentIds: z.array(z.string().min(1)).min(1).max(2000),
   })).max(100).optional(),
-});
+}).refine(input => !!(input.studentId || input.classId || input.classIds), { message: "Choose at least one class or a student." })
+  .refine(input => !input.classIds || (!input.classId && !input.studentId), { message: "Choose either multiple classes or a single class or student." });
 export type GenerateBillInput = z.infer<typeof generateBillSchema>;
 
 export type StudentStatementEntryType =

@@ -163,6 +163,55 @@ describe.skipIf(!enabled)("bill generation (database)", { timeout: 60_000 }, () 
     expect(audit).not.toBeNull();
   });
 
+  it("bills selected classes together and preserves the class of each enrolment", async () => {
+    const second = await prisma.class.create({
+      data: { schoolId, academicYearId: yearId, name: `Second class ${run}`, level: "JHS2" },
+    });
+    const studentId = studentIds[0]!;
+    await prisma.enrollment.updateMany({ where: { studentId, termId }, data: { classId: second.id } });
+    const extra = { classId: undefined, classIds: [classId, second.id] };
+    try {
+      const fees = await structureWithOptionalItem();
+      const bus = fees.items.find(item => item.isOptional)!;
+      await service.linkBusFee(schoolId, actorId, bus.id, true);
+      await service.setBusDecisions(schoolId, actorId, { termId, studentIds: [studentId], status: "RIDING" });
+      expect(await service.getBillingRoster(schoolId, extra.classIds, yearId, termId)).toHaveLength(STUDENTS);
+
+      await prisma.feeStructureClass.create({ data: { feeStructureId: fees.id, classId } });
+      await expect(generate(fees.id, extra)).rejects.toThrow(/not assigned to every selected class/);
+      await expect(generate(fees.id, { classId: undefined, studentId })).rejects.toThrow(/not assigned to the student's class/);
+      expect(await billsFor(fees.id)).toHaveLength(0);
+      await prisma.feeStructureClass.create({ data: { feeStructureId: fees.id, classId: second.id } });
+
+      await expect(generate(fees.id, extra)).resolves.toMatchObject({ count: STUDENTS, totalBilled: "650.00" });
+      const bills = await billsFor(fees.id);
+      expect(bills.find(bill => bill.studentId === studentId)).toMatchObject({ classId: second.id, totalAmount: new Prisma.Decimal(150) });
+      expect(bills.filter(bill => bill.studentId !== studentId).every(bill => bill.classId === classId && bill.totalAmount.eq(100))).toBe(true);
+      await expect(generate(fees.id, extra)).resolves.toMatchObject({ count: 0, skippedExisting: STUDENTS });
+    } finally {
+      await prisma.enrollment.updateMany({ where: { studentId, termId }, data: { classId } });
+      await service.setBusDecisions(schoolId, actorId, { termId, studentIds: [studentId], status: "INHERIT" });
+    }
+  });
+
+  it("validates real due dates and allocates rounded discounts without negative lines", async () => {
+    const studentId = studentIds[0]!;
+    const fees = await structure([0.01, 0.01, 0.01, 0.01]);
+    await expect(generate(fees.id, { dueDate: "2026-02-30" })).rejects.toThrow(/valid due date/);
+    const scholarship = await prisma.studentScholarship.create({
+      data: { schoolId, studentId, name: "Rounding regression", valueType: "FIXED", value: "0.02" },
+    });
+    try {
+      await generate(fees.id, { studentId });
+      const [bill] = await billsFor(fees.id);
+      expect(bill?.totalAmount.toFixed(2)).toBe("0.02");
+      expect(bill?.items.map(item => Number(item.discountAmount)).sort((a, b) => a - b)).toEqual([0, 0, 0.01, 0.01]);
+      expect(bill?.items.reduce((sum, item) => sum.plus(item.balanceAmount), new Prisma.Decimal(0)).eq("0.02")).toBe(true);
+    } finally {
+      await prisma.studentScholarship.update({ where: { id: scholarship.id }, data: { isActive: false } });
+    }
+  });
+
   it("does not bill the same student twice for the same fee structure", async () => {
     const fees = await structure([400]);
     await generate(fees.id);

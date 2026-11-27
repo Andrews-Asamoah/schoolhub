@@ -149,6 +149,7 @@ export function FeeReminderWorkspace() {
   const sendReminder = useMutation({
     mutationFn: (scheduleId: string) => apiFetch<ReminderResult>(`/finance/fee-reminders/${encodeURIComponent(scheduleId)}/send`, { method: "POST" }),
     onSuccess: async (result) => {
+      void queryClient.invalidateQueries({ queryKey: ["finance", "action-centre"] });
       setSendResult(result);
       setFeedback({ kind: result.failed ? "error" : "success", text: `In-app delivery finished: ${result.inAppSent} sent, ${result.skippedNoLogin} skipped without portal logins, ${result.failed} failed.` });
       await queryClient.invalidateQueries({ queryKey: ["finance", "fee-reminders"] });

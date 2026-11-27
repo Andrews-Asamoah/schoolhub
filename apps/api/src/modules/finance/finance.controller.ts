@@ -35,6 +35,7 @@ import { CurrentSchoolRole } from "../../common/decorators/current-school-role.d
 import { CurrentUser, type AuthenticatedUser } from "../../common/decorators/current-user.decorator.js";
 import { ZodValidationPipe } from "../../common/pipes/zod-validation.pipe.js";
 import {
+  billingClassIdsSchema,
   createExpenseSchema,
   generateBillSchema,
   recordPaymentSchema,
@@ -502,6 +503,19 @@ export class FinanceController {
     @Body(new ZodValidationPipe(z.object({ enabled: z.boolean() }))) input: { enabled: boolean },
   ) {
     return this.financeService.linkBusFee(school.id, user.id, feeItemId, input.enabled);
+  }
+
+  @Get("billing-roster")
+  @Roles(...FINANCE_READ_ROLES)
+  getBatchBillingRoster(
+    @CurrentSchool() school: School,
+    @Query(new ZodValidationPipe(z.object({
+      academicYearId: z.string().min(1),
+      termId: z.string().min(1),
+      classes: z.string().max(10_100).transform(value => value.split(",")).pipe(billingClassIdsSchema),
+    }))) query: { academicYearId: string; termId: string; classes: string[] },
+  ) {
+    return this.financeService.getBillingRoster(school.id, query.classes, query.academicYearId, query.termId);
   }
 
   @Get("billing-roster/:classId")

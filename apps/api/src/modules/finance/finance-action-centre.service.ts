@@ -37,13 +37,19 @@ export class FinanceActionCentreService {
     const money = (value: Prisma.Decimal | null | undefined) => (value ?? new Prisma.Decimal(0)).toFixed(2);
     const salaryGap = { schoolId, isActive: true, deletedAt: null, OR: [{ monthlySalary: null }, { monthlySalary: { lte: 0 } }] };
 
-    const [overdue, journals, reconciliations, payroll] = await Promise.all([
+    const [overdue, journals, reconciliations, reminders, payroll] = await Promise.all([
       db.bill.aggregate({
         where: { schoolId, status: { notIn: ["CANCELLED", "WAIVED"] }, balanceAmount: { gt: 0 }, dueDate: { lt: today } },
         _sum: { balanceAmount: true }, _count: { _all: true },
       }),
       db.financeManualJournal.count({ where: { schoolId, status: "PENDING_APPROVAL" } }),
-      db.financeBankReconciliation.count({ where: { schoolId, status: "PENDING" } }),
+      db.financeBankReconciliation.groupBy({
+        by: ["status"], where: { schoolId, supersededBy: null, status: { in: ["DRAFT", "PENDING"] } },
+        _count: { _all: true },
+      }),
+      db.feeReminderSchedule.count({
+        where: { schoolId, isActive: true, sendInApp: true, installments: { some: { sent: false, sendDate: { lte: today } } } },
+      }),
       options.includePayroll ? this.payrollSignals(schoolId, month, year, salaryGap) : Promise.resolve(null),
     ]);
 
@@ -94,9 +100,20 @@ export class FinanceActionCentreService {
       items.push({ id: "journals-pending", severity: "warning", page: "finance-reports", count: journals,
         title: `${journals} manual journal${journals === 1 ? "" : "s"} awaiting approval`, detail: "Another authorised user must approve them before they post." });
     }
-    if (reconciliations > 0) {
-      items.push({ id: "reconciliations-pending", severity: "warning", page: "finance-reports", count: reconciliations,
-        title: `${reconciliations} bank reconciliation${reconciliations === 1 ? "" : "s"} awaiting approval`, detail: "Review and approve so the period can close." });
+    const pendingReconciliations = reconciliations.find(row => row.status === "PENDING")?._count._all ?? 0;
+    if (pendingReconciliations > 0) {
+      items.push({ id: "reconciliations-pending", severity: "warning", page: "finance-reports", count: pendingReconciliations,
+        title: `${pendingReconciliations} bank reconciliation${pendingReconciliations === 1 ? "" : "s"} awaiting approval`, detail: "Review and approve so the period can close." });
+    }
+    const draftReconciliations = reconciliations.find(row => row.status === "DRAFT")?._count._all ?? 0;
+    if (draftReconciliations > 0) {
+      items.push({ id: "reconciliations-draft", severity: "info", page: "finance-reports", count: draftReconciliations,
+        title: `${draftReconciliations} draft bank reconciliation${draftReconciliations === 1 ? "" : "s"}`, detail: "Review suggested bank matches, reconcile remaining lines and submit." });
+    }
+    if (reminders > 0) {
+      items.push({ id: "fee-reminders-due", severity: "warning", page: "fee-reminders", count: reminders,
+        title: `${reminders} fee reminder schedule${reminders === 1 ? "" : "s"} ready to review`,
+        detail: "Preview eligible families and confirm in-app delivery." });
     }
     items.sort((a, b) => ORDER[a.severity] - ORDER[b.severity]);
     return { generatedAt: now.toISOString(), items };

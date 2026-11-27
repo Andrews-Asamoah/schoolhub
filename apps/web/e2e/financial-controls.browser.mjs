@@ -14,6 +14,17 @@ try{
   let record={id:'recon',accountId:'bank',periodEnd:'2026-09-30',version:1,supersedesId:null,status:role==='owner'?'PENDING':'DRAFT',snapshot:role==='owner'?{bookBalance:'10.00',statementBalance:'10.00',difference:'0.00',outstandingItems:[]}:null,statement:{lines:[{id:'line',date:'2026-09-02',description:'Fees',amount:'10.00',matches:[]}]}};
   await page.route('**/api/**',async route=>{
    const req=route.request(),path=new URL(req.url()).pathname;
+   if (path.endsWith('/recon/suggested-matches')) {
+    if (req.method() === 'POST') {
+     writes.push({ path, body: req.postDataJSON() });
+     record.statement.lines[0].matches = [{ id: 'saved-match', amount: '10.00' }];
+     return route.fulfill({ json: { count: 1 } });
+    }
+    return route.fulfill({ json: record.statement.lines[0].matches.length ? [] : [{
+     statementLineId: 'line', transactionId: 'posting', date: '2026-09-02', reference: 'BANK-1',
+     amount: '10.00', statementDescription: 'Fees', transactionNumber: 'TXN-1', postingDescription: 'Fees posted',
+    }] });
+   }
    if(req.method()!=='GET'){writes.push({path,body:req.postData()});if(path.endsWith('/submit'))record={...record,status:'PENDING'};if(path.endsWith('/decide'))record={...record,status:'APPROVED'};return route.fulfill({json:{id:'recon',openingBalance:'0.00',closingBalance:'10.00',movement:'10.00',duplicateRows:[],rows:[{rowNumber:1,date:'2026-09-02',description:'Fees',amount:'10.00'}]}});}
    if(path.includes('/auth/get-session'))return route.fulfill({json:session});
    if(path.includes('/auth/organization/list'))return route.fulfill({json:[org]});
@@ -46,14 +57,19 @@ try{
   await page.getByLabel('Reconciliation',{exact:true}).selectOption('recon');
   await page.getByText('Status: '+record.status+' · Version 1',{exact:true}).waitFor();
   if(role==='accountant'){
-   await page.getByLabel('Statement line',{exact:true}).selectOption('line');await page.getByLabel('Ledger posting',{exact:true}).selectOption('posting');await page.getByLabel('Match amount',{exact:true}).fill('10.00');
-   await page.getByRole('button',{name:'Save match',exact:true}).click();
+   await page.getByRole('button', { name: 'Find exact matches' }).click();
+   await page.getByRole('checkbox', { name: 'Match BANK-1 to TXN-1' }).check();
+   await page.getByRole('button', { name: 'Save 1 selected match' }).click();
+   await page.getByText('1 suggested match saved.', { exact: true }).waitFor();
+   assert.deepEqual(writes.find(write => write.path.endsWith('/suggested-matches'))?.body, [
+    { statementLineId: 'line', transactionId: 'posting' },
+   ]);
    await page.getByRole('button',{name:'Submit for independent review',exact:true}).click();
    await page.getByText('Status: PENDING · Version 1',{exact:true}).waitFor();
    await page.getByLabel('Accounting month',{exact:true}).fill('2026-09');await page.getByRole('button',{name:'Check close readiness',exact:true}).click();
    await page.getByText('Checks passed; an independent approval is still required.',{exact:true}).waitFor();
    await page.getByLabel('Request or decision reason',{exact:true}).fill('Reviewed September accounts');await Promise.all([page.waitForResponse(response=>new URL(response.url()).pathname.endsWith('/request-close')),page.getByRole('button',{name:'Request independent close approval',exact:true}).click()]);
-   assert(writes.some(write=>write.path.endsWith('/matches')));assert(writes.some(write=>write.path.endsWith('/request-close')));
+   assert(writes.some(write=>write.path.endsWith('/request-close')));
   }else{
    await page.getByLabel('Decision reason',{exact:true}).fill('Independently reviewed bank evidence');await page.getByRole('button',{name:'Approve',exact:true}).first().click();
    await page.getByText('Status: APPROVED · Version 1',{exact:true}).waitFor();
