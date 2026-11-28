@@ -5,6 +5,11 @@
 `MAJOR.MINOR.PATCH` for breaking changes, features and fixes. Expo continues
 to increment store build numbers through the production EAS profile.
 
+A change may affect a single app. Call that out in the release notes and bump
+the shared version using the usual process. The current tag workflow prepares
+builds for all three apps. Approve the web deployment, mobile store submission
+and desktop release on their respective schedules.
+
 ## Prepare a version
 
 1. Change `version` in the root `package.json`.
@@ -63,20 +68,7 @@ The first updater-enabled version needs a manual installation. Confirm
 version upgrading to the next on a Windows test account. The app checks on
 startup and periodically while open. Installation starts after user confirmation.
 
-## Build a local Windows installer
+## Build a Windows executable locally
 
-Use Node 22 or later, the repo's pnpm version, Rust, Visual Studio C++ Build
-Tools, WebView2, Perl and NASM. From the repository root in PowerShell:
-
-```powershell
-pnpm install --frozen-lockfile --filter '@schoolhub/web...'
-pnpm --filter '@schoolhub/shared' build
-$env:SCHOOLHUB_API_ORIGIN = 'https://api.your-domain.com'
-Set-Location apps/desktop
-pnpm dlx "@tauri-apps/cli@2.12.6" build --ci --features shell --target x86_64-pc-windows-msvc -- --locked
-```
-
-Find the setup executable in
-`apps/desktop/src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/`.
-This local build is for installation testing. Production builds configure the
-signed update channel through the release workflow.
+Follow the [desktop README](../../apps/desktop/README.md#build-a-windows-x64-executable)
+for the standalone executable, Windows setup installer and local API testing.
