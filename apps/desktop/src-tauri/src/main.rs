@@ -3,6 +3,8 @@
 use schoolhub_desktop_spike::http::{DesktopHttp, HttpRequest, HttpResponse};
 use tauri::Manager;
 
+mod updates;
+
 #[tauri::command]
 async fn desktop_request(
     state: tauri::State<'_, DesktopHttp>,
@@ -51,7 +53,13 @@ fn main() {
     let origin = option_env!("SCHOOLHUB_API_ORIGIN").unwrap_or("http://127.0.0.1:3001");
     let http = DesktopHttp::new(origin, cfg!(debug_assertions))
         .expect("Set SCHOOLHUB_API_ORIGIN to the production HTTPS API origin before compiling.");
-    tauri::Builder::default()
+    let context = tauri::generate_context!();
+    let mut builder = tauri::Builder::default();
+    if context.config().plugins.0.contains_key("updater") {
+        builder = builder.plugin(tauri_plugin_updater::Builder::new().build());
+    }
+    builder
+        .manage(updates::UpdateInstall::default())
         .setup(move |app| {
             let root = app.path().app_local_data_dir()?.join("installations");
             app.manage(http.with_installation_root(root));
@@ -63,8 +71,10 @@ fn main() {
             desktop_remember_session,
             desktop_resume_session,
             desktop_forget_session,
-            desktop_register_device
+            desktop_register_device,
+            updates::desktop_check_update,
+            updates::desktop_install_update
         ])
-        .run(tauri::generate_context!())
+        .run(context)
         .expect("desktop shell failed to start");
 }

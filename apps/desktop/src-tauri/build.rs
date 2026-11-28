@@ -8,6 +8,9 @@ fn main() {
             "desktop_remember_session",
             "desktop_resume_session",
             "desktop_forget_session",
+            "desktop_register_device",
+            "desktop_check_update",
+            "desktop_install_update",
         ]),
     ))
     .expect("desktop build configuration failed");

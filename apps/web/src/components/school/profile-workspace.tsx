@@ -1,8 +1,9 @@
+import { version } from "../../../package.json";
 import { SyncDevicesPanel } from "./sync-devices-panel";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { updateMyProfileSchema } from "@schoolhub/shared";
 import { LoaderCircle, Lock } from "lucide-react";
-import { useState, type FormEvent } from "react";
+import { lazy, Suspense, useState, type FormEvent } from "react";
 import { FormField, FormInput, FormTextarea } from "@/components/forms/form-controls";
 import { ProfilePhotoControls } from "@/components/school/profile-photo-controls";
 import { schoolRoleLabel, useSchoolRole } from "@/components/school/school-role-switcher";
@@ -50,6 +51,10 @@ const toValues = (profile: ProfileDetails): Record<Field, string> => ({
 });
 
 const card = "rounded-2xl border border-border/80 bg-card p-5 sm:p-6";
+
+const DesktopUpdateCheck = import.meta.env.VITE_TARGET === "desktop"
+  ? lazy(() => import("@/lib/platform/desktop/updates").then((module) => ({ default: module.DesktopUpdateCheck })))
+  : null;
 
 /** "My profile": every signed-in user's own photo and basic contact details. */
 export function ProfileWorkspace() {
@@ -199,6 +204,12 @@ function ProfileForm({ data }: { data: ProfileResponse }) {
       </form>
 
       <SyncDevicesPanel />
+
+      <section className={card} aria-labelledby="about-schoolhub-heading">
+        <h2 id="about-schoolhub-heading" className="text-sm font-semibold text-foreground">About SchoolHub</h2>
+        <p className="mb-3 mt-1 text-xs text-muted-foreground">Version {version}</p>
+        {DesktopUpdateCheck && <Suspense fallback={null}><DesktopUpdateCheck /></Suspense>}
+      </section>
 
       {/* Students and guardians sign in with simple credentials; staff accounts can add a second step. */}
       {!["student", "guardian", "parent"].includes(activeRole ?? "") && (

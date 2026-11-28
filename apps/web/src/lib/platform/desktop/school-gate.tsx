@@ -44,7 +44,7 @@ export default function DesktopSchoolGate({
           <p className="text-sm text-muted-foreground">{accessIssue.message}</p>
           <p className="text-sm text-muted-foreground">
             {accessIssue.kind === "update"
-              ? "Ask your administrator for the latest SchoolHub Desktop installer."
+              ? "Install the available update or ask your administrator for the latest SchoolHub Desktop installer."
               : "Your administrator can check the school's subscription and desktop access."}
           </p>
           <button

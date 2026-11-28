@@ -1,6 +1,6 @@
 # Verified release promotion
 
-Feature PRs target `dev`. A release is a full commit SHA plus immutable API/web image digests and a migration baseline. Branch tags are not deployment identities.
+Feature PRs can target `dev`. Promote production commits through `main` and tag them using the [production versioning runbook](./production-versioning.md). The deployment record uses a full commit SHA, immutable API/web image digests and a migration baseline.
 
 ## Gates enforced in code
 

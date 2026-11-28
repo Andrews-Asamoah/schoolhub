@@ -1,0 +1,145 @@
+name: Production release
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Verify the tagged production commit and version
+        run: |
+          git merge-base --is-ancestor "$GITHUB_SHA" origin/main
+          node scripts/release-version.mjs --check "--tag=$GITHUB_REF_NAME"
+      - name: Get the verified web and API image manifest from main
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for attempt in {1..60}; do
+            run_id=$(gh run list --workflow images.yml --commit "$GITHUB_SHA" --branch main --status success --json databaseId --jq '.[0].databaseId // empty')
+            if [ -n "$run_id" ]; then
+              gh run download "$run_id" --name "release-manifest-$GITHUB_SHA" --dir release-web
+              RELEASE_IMAGE_RUN="$run_id" node --input-type=module <<'JS'
+          import { readFileSync } from "node:fs";
+          import { expectedMigration, validateManifest } from "./scripts/release-manifest.mjs";
+          const manifest = validateManifest(JSON.parse(readFileSync("release-web/release-manifest.json", "utf8")), process.env.GITHUB_REPOSITORY, process.env.GITHUB_SHA);
+          if (manifest.sourceRunId !== process.env.RELEASE_IMAGE_RUN || manifest.expectedMigration !== expectedMigration(process.cwd())) {
+            throw new Error("Web release manifest has the wrong source run or migration.");
+          }
+          JS
+              exit 0
+            fi
+            sleep 15
+          done
+          echo "No successful image workflow from main for $GITHUB_SHA" >&2
+          exit 1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-web
+          path: release-web/release-manifest.json
+          if-no-files-found: error
+
+  desktop:
+    needs: verify
+    runs-on: windows-2022
+    timeout-minutes: 60
+    environment: production-release
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+      - uses: dtolnay/rust-toolchain@stable
+      - run: pnpm install --frozen-lockfile --filter "@schoolhub/web..."
+      - run: pnpm --filter "@schoolhub/shared" build
+      - name: Configure the GitHub update channel
+        env:
+          SCHOOLHUB_UPDATER_PUBLIC_KEY: ${{ vars.SCHOOLHUB_UPDATER_PUBLIC_KEY }}
+          SCHOOLHUB_API_ORIGIN: ${{ vars.SCHOOLHUB_API_ORIGIN }}
+        run: |
+          node -e 'const u = new URL(process.env.SCHOOLHUB_API_ORIGIN); if (u.protocol !== "https:" || u.username || u.password || u.pathname !== "/" || u.search || u.hash || /^(localhost|127\.|\[::1\])|\.(invalid|localhost)$/.test(u.hostname)) throw Error("Set a deployed HTTPS API origin");'
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node scripts/desktop-release.mjs configure
+      - name: Build the signed Windows update and NSIS installer
+        working-directory: apps/desktop
+        env:
+          SCHOOLHUB_API_ORIGIN: ${{ vars.SCHOOLHUB_API_ORIGIN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: pnpm dlx "@tauri-apps/cli@2.12.6" build --ci --features shell --target x86_64-pc-windows-msvc --config src-tauri/tauri.release.conf.json -- --locked
+      - run: node scripts/desktop-release.mjs collect
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-desktop
+          path: release-desktop/
+          if-no-files-found: error
+
+  mobile:
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    environment: production-release
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+      - run: pnpm install --frozen-lockfile --filter "@schoolhub/mobile..."
+      - name: Build both production apps in EAS
+        working-directory: apps/mobile
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          EXPO_PUBLIC_API_URL: ${{ vars.SCHOOLHUB_API_ORIGIN }}
+        run: pnpm dlx eas-cli@27.11.0 build --platform all --profile production --non-interactive
+
+  draft:
+    needs: [verify, desktop, mobile]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: release-*
+          merge-multiple: true
+          path: release-assets
+      - name: Stage the release for production approval
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh api --method POST "repos/$GH_REPO/releases/generate-notes" -f "tag_name=$GITHUB_REF_NAME" -f "target_commitish=$GITHUB_SHA" --jq .body > release-notes.md
+          node --input-type=module <<'JS'
+          import { readFileSync, writeFileSync } from "node:fs";
+          const file = "release-assets/latest.json";
+          const update = JSON.parse(readFileSync(file, "utf8"));
+          update.notes = readFileSync("release-notes.md", "utf8").trim();
+          writeFileSync(file, JSON.stringify(update, null, 2) + "\n");
+          JS
+          gh release create "$GITHUB_REF_NAME" release-assets/* --verify-tag --draft --notes-file release-notes.md --title "SchoolHub $GITHUB_REF_NAME"

@@ -10,7 +10,9 @@ import { queryClient } from "@/lib/query-client";
 import { ErrorPage, NotFoundPage } from "@/components/error-pages";
 import { setUnauthorizedHandler } from "@/lib/api";
 import { initErrorReporting } from "@/lib/error-reporting";
-import { toast } from "@/components/ui/toaster";
+import { toast, Toaster } from "@/components/ui/toaster";
+import { ConfirmHost } from "@/components/ui/confirm-host";
+import { ThemeProvider } from "@/components/theme-provider";
 import "./index.css";
 
 /**
@@ -54,23 +56,31 @@ const DesktopSchoolGate =
     ? lazy(() => import("./lib/platform/desktop/school-gate"))
     : null;
 
+const DesktopUpdateNotice =
+  import.meta.env.VITE_TARGET === "desktop"
+    ? lazy(() => import("./lib/platform/desktop/updates"))
+    : null;
+
 const rootEl = document.getElementById("root");
 if (!rootEl) throw new Error("No #root element found in index.html");
 
-const application = (
-  <QueryClientProvider client={queryClient}>
-    <RouterProvider router={router} />
-  </QueryClientProvider>
-);
+const application = <RouterProvider router={router} />;
 
 createRoot(rootEl).render(
   <StrictMode>
-    <Suspense fallback={<div role="status">Loading SchoolHub…</div>}>
-      {DesktopSchoolGate ? (
-        <DesktopSchoolGate>{application}</DesktopSchoolGate>
-      ) : (
-        application
-      )}
-    </Suspense>
+    <QueryClientProvider client={queryClient}>
+      <ThemeProvider>
+        <Suspense fallback={<div role="status">Loading SchoolHub…</div>}>
+          {DesktopSchoolGate ? (
+            <DesktopSchoolGate>{application}</DesktopSchoolGate>
+          ) : (
+            application
+          )}
+        </Suspense>
+        {DesktopUpdateNotice && <Suspense fallback={null}><DesktopUpdateNotice /></Suspense>}
+        <ConfirmHost />
+        <Toaster />
+      </ThemeProvider>
+    </QueryClientProvider>
   </StrictMode>,
 );

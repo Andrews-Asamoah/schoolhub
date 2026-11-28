@@ -1,8 +1,8 @@
 # SchoolHub desktop development
 
-All desktop work targets `desktop-version`. Phase 0 experiments and the current
-Phase 1 foundation live here. **This is not a signed R1 release or an offline
-SchoolHub product.** See `docs/plans/desktop-phase-1.md` for remaining gates.
+Production releases come from `main`. See the
+[production versioning runbook](../../docs/runbooks/production-versioning.md)
+for Windows setup builds, signed updates and release tags.
 
 ## Frontend targets
 
@@ -22,30 +22,68 @@ desktop workspace. For deployments using another web domain, set
 `VITE_SCHOOLHUB_WEB_DOMAIN` to the tenant root domain before building. Native
 imports stay inside `apps/web/src/lib/platform/desktop/`.
 
-## Native tests and Windows build
+## Build a Windows x64 executable
 
-Install stable Rust and a C compiler. Windows requires Visual Studio C++ build
-tools, Perl and NASM for vendored OpenSSL (available on the CI Windows image).
-Tests run without a graphical environment:
+Build from the production source on `main`. On Windows, install Node.js 22 or
+later, pnpm 12.4.1, stable Rust with the MSVC toolchain, Visual Studio Build
+Tools with **Desktop development with C++**, and the Microsoft Edge WebView2
+Runtime. Install Perl and NASM for the vendored OpenSSL build and make sure
+both are on your PATH. See the [Tauri Windows prerequisites][tauri-prereqs].
 
-```sh
-cd apps/desktop/src-tauri
-cargo test --locked --lib
-```
-
-To compile a release-mode development executable on Windows, build the desktop
-frontend first, then use PowerShell to pin the actual API origin:
+Open PowerShell at the repository root. Replace the sample value of
+`SCHOOLHUB_API_ORIGIN` with the deployed API's HTTPS origin without `/api`.
+Tauri compiles this value into the executable. Rebuild if it changes.
 
 ```powershell
-$env:SCHOOLHUB_API_ORIGIN = "https://your-api.example"
-cargo build --locked --release --features shell,custom-protocol
+git switch main
+git pull --ff-only origin main
+rustup target add x86_64-pc-windows-msvc
+pnpm install --frozen-lockfile --filter '@schoolhub/web...'
+pnpm --filter '@schoolhub/shared' build
+
+$env:SCHOOLHUB_API_ORIGIN = 'https://api.your-domain.com'
+Set-Location apps/desktop
+pnpm dlx '@tauri-apps/cli@2.12.6' build --ci --no-bundle --features shell --target x86_64-pc-windows-msvc -- --locked
 ```
 
-The executable is `target/release/schoolhub-desktop-spike.exe`. Its title and
-identifier still indicate the internal spike. A release build refuses to start
-without a bare HTTPS API origin. Changing the environment variable requires
-recompilation. CI uses an intentionally non-routable placeholder origin; that
-binary is a compile check, not a runnable deployment for a school.
+Run the resulting app from `apps/desktop`:
+
+```powershell
+& '.\src-tauri\target\x86_64-pc-windows-msvc\release\schoolhub-desktop-spike.exe'
+```
+
+The Cargo executable keeps its internal filename. The app window is named
+SchoolHub.
+
+### Generate the Windows setup installer
+
+Keep the same PowerShell session open in `apps/desktop` and run the build with
+NSIS bundling enabled:
+
+```powershell
+pnpm dlx '@tauri-apps/cli@2.12.6' build --ci --features shell --target x86_64-pc-windows-msvc -- --locked
+Get-ChildItem '.\src-tauri\target\x86_64-pc-windows-msvc\release\bundle\nsis\*-setup.exe'
+```
+
+Run the generated `*-setup.exe` to install SchoolHub. Local builds are for
+installation testing. Use the [production versioning runbook][release-guide]
+to build and publish the signed updater artifacts for school installations.
+
+### Test against the API on your PC
+
+With your database and API running locally, use a debug executable from
+`apps/desktop`. The API must be available at the configured port.
+
+```powershell
+$env:SCHOOLHUB_API_ORIGIN = 'http://127.0.0.1:3001'
+pnpm dlx '@tauri-apps/cli@2.12.6' build --ci --debug --no-bundle --features shell --target x86_64-pc-windows-msvc -- --locked
+& '.\src-tauri\target\x86_64-pc-windows-msvc\debug\schoolhub-desktop-spike.exe'
+```
+
+[tauri-prereqs]: https://v2.tauri.app/start/prerequisites/#windows
+[release-guide]: ../../docs/runbooks/production-versioning.md
+
+## Sign in and test
 
 At launch, select the school code and sign in online. Rust handles the HTTP
 connection, bearer token and short-lived 2FA cookie jar. Redirects and
@@ -57,11 +95,19 @@ Other operating systems have no persistence backend in this increment. Real API 
 validated. The server now enforces persisted desktop session channels, plan/school desktop entitlements and a minimum client version. Apply the session-channel migration before deploying the new API; enable desktop access in the web SuperAdmin plan or subscription editor.
 Table reports print from the active desktop window without opening a popup.
 Windows runtime acceptance still covers print preview, file downloads and uploads.
-No installer or updater is produced.
 
 For development with an installed Tauri CLI, use `cargo tauri dev --features
 shell` from this directory. Its frontend hook runs `dev:desktop`; debug builds
 use loopback HTTP unless SCHOOLHUB_API_ORIGIN is set.
+
+## Native tests
+
+From the repository root:
+
+```sh
+cd apps/desktop/src-tauri
+cargo test --locked --lib
+```
 
 ## Isolated feasibility experiments
 
