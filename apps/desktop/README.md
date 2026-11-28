@@ -80,6 +80,29 @@ pnpm dlx '@tauri-apps/cli@2.12.6' build --ci --debug --no-bundle --features shel
 & '.\src-tauri\target\x86_64-pc-windows-msvc\debug\schoolhub-desktop-spike.exe'
 ```
 
+### Build from Git Bash on Windows
+
+If Tauri reports `cargo metadata ... program not found`, Git Bash may have
+been opened before Rust was installed. Restart the app hosting the terminal
+and run `cargo --version`. If Cargo is still missing, add the Rustup bin folder
+to this shell's PATH. These commands start from `apps/desktop` with the shared
+workspace package already built and the local API listening on port 3001.
+
+```bash
+export PATH="$(cygpath -u "$USERPROFILE")/.cargo/bin:$PATH"
+hash -r
+cargo --version
+cargo metadata --manifest-path src-tauri/Cargo.toml --no-deps --format-version 1 > /dev/null
+
+export SCHOOLHUB_API_ORIGIN=http://127.0.0.1:3001
+pnpm.cmd dlx @tauri-apps/cli@2.12.6 build --ci --debug --no-bundle --features shell --target x86_64-pc-windows-msvc -- --locked
+./src-tauri/target/x86_64-pc-windows-msvc/debug/schoolhub-desktop-spike.exe
+```
+
+To enter the desktop folder from the repository root, run `cd apps/desktop`.
+From inside `apps`, run `cd desktop`. Git Bash uses forward slashes for these
+paths and `export` to pass the API origin to Tauri and Cargo.
+
 [tauri-prereqs]: https://v2.tauri.app/start/prerequisites/#windows
 [release-guide]: ../../docs/runbooks/production-versioning.md
 

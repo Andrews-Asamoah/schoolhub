@@ -180,7 +180,7 @@ npx eas-cli build --platform android --profile production
 
 The schoolHub artwork in `assets/schoolhub-mark.png` supplies the
 mobile wordmark, launcher, adaptive icon, splash and favicon, as well as the
-web sign-in mark. Regenerate those assets with
+web sign-in mark, browser favicon and Windows desktop icons. Regenerate those assets with
 `node scripts/generate-assets.mjs` from `apps/mobile` using the installed Expo
 image toolchain. Rebuild the native client to see the new launcher and splash.
 

@@ -1,3 +1,4 @@
+import { writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 
@@ -36,10 +37,34 @@ await sharp({
   .png()
   .toFile(asset("adaptive-background.png"));
 await sharp(await tile(512, 410, paper)).toFile(asset("splash.png"));
-await sharp(await tile(128, 102, paper))
-  .resize(64, 64)
-  .toFile(asset("favicon.png"));
+const favicon = await tile(64, 58, transparent);
+await writeFile(asset("favicon.png"), favicon);
+
 const webPublic = new URL("../../web/public/", import.meta.url);
-await sharp(await tile(256, 196, paper))
+await writeFile(new URL("schoolhub-favicon.png", webPublic), favicon);
+await sharp(await tile(256, 228, transparent))
   .webp({ quality: 92 })
   .toFile(fileURLToPath(new URL("schoolhub.webp", webPublic)));
+
+const desktopIcons = new URL("../../desktop/src-tauri/icons/", import.meta.url);
+const sizes = [256, 128, 64, 48, 32, 24, 16];
+const frames = await Promise.all(
+  sizes.map((size) => tile(size, Math.round(size * 0.9), transparent)),
+);
+await writeFile(new URL("icon.png", desktopIcons), frames[0]);
+
+// Windows ICO directory followed by the transparent PNG frames.
+const directory = Buffer.alloc(6 + 16 * sizes.length);
+directory.writeUInt16LE(1, 2);
+directory.writeUInt16LE(sizes.length, 4);
+let offset = directory.length;
+for (const [index, size] of sizes.entries()) {
+  const entry = 6 + index * 16;
+  directory[entry] = directory[entry + 1] = size % 256;
+  directory.writeUInt16LE(1, entry + 4);
+  directory.writeUInt16LE(32, entry + 6);
+  directory.writeUInt32LE(frames[index].length, entry + 8);
+  directory.writeUInt32LE(offset, entry + 12);
+  offset += frames[index].length;
+}
+await writeFile(new URL("icon.ico", desktopIcons), Buffer.concat([directory, ...frames]));
