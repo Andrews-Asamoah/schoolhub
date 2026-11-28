@@ -10,6 +10,9 @@ import { useSession } from "@/lib/auth-client";
 const DesktopDeviceStatus = import.meta.env.VITE_TARGET === "desktop"
   ? lazy(() => import("@/lib/platform/desktop/device-status")) : null;
 
+const DesktopUpdateNotice = import.meta.env.VITE_TARGET === "desktop"
+  ? lazy(() => import("@/lib/platform/desktop/updates")) : null;
+
 /** Root route outlet; feature routes own their page layouts. */
 export const Route = createRootRoute({
   component: RootLayout,
@@ -31,6 +34,7 @@ function RootLayout() {
         {DesktopDeviceStatus && <Suspense fallback={null}><DesktopDeviceStatus /></Suspense>}
         <Outlet />
       </PrivateContextBoundary>
+      {DesktopUpdateNotice && <Suspense fallback={null}><DesktopUpdateNotice /></Suspense>}
       <ConfirmHost />
       <Toaster />
     </ThemeProvider>

@@ -93,3 +93,7 @@ test-results/
 *.ipa
 apps/mobile/.expo/
 apps/mobile/expo-env.d.ts
+
+# Generated Windows release files
+/apps/desktop/src-tauri/tauri.release.conf.json
+/release-desktop/

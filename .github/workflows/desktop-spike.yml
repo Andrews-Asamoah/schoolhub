@@ -1,23 +1,25 @@
-name: Desktop feasibility spike
+name: Desktop validation
 
 on:
   pull_request:
-    branches: [dev, desktop-version]
+    branches: [dev, main]
     paths:
       - 'apps/desktop/**'
       - 'apps/web/**'
       - 'apps/api/**'
       - 'packages/shared/**'
       - 'pnpm-lock.yaml'
+      - 'package.json'
       - '.github/workflows/desktop-spike.yml'
   push:
-    branches: [desktop-version]
+    branches: [main]
     paths:
       - 'apps/desktop/**'
       - 'apps/web/**'
       - 'apps/api/**'
       - 'packages/shared/**'
       - 'pnpm-lock.yaml'
+      - 'package.json'
       - '.github/workflows/desktop-spike.yml'
   workflow_dispatch:
 
@@ -86,17 +88,16 @@ jobs:
       - name: Test SQLCipher, devices, sessions and Windows Credential Manager
         working-directory: apps/desktop/src-tauri
         run: cargo test --locked --lib
-      - name: Build the native shell with the actual web assets
+      - name: Build the Windows installer with the actual web assets
         env:
           SCHOOLHUB_API_ORIGIN: https://api.schoolhub.invalid
-        working-directory: apps/desktop/src-tauri
-        run: cargo build --locked --release --features shell,custom-protocol
-      - name: Report executable size (not installer size)
+        working-directory: apps/desktop
+        run: pnpm dlx "@tauri-apps/cli@2.12.6" build --ci --features shell --target x86_64-pc-windows-msvc -- --locked
+      - name: Verify the NSIS installer was produced
         shell: pwsh
         run: |
-          $binary = Get-Item apps/desktop/src-tauri/target/release/schoolhub-desktop-spike.exe
-          "Native executable bytes: $($binary.Length)" >> $env:GITHUB_STEP_SUMMARY
-          "Unsigned feasibility binary only; installer, startup, RAM and runtime validation remain pending." >> $env:GITHUB_STEP_SUMMARY
+          $installer = Get-Item apps/desktop/src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*-setup.exe -ErrorAction Stop
+          "CI installer bytes: $($installer.Length)" >> $env:GITHUB_STEP_SUMMARY
 
   server:
     name: Desktop API policy, devices and real authentication

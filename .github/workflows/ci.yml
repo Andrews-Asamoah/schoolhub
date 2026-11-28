@@ -146,7 +146,9 @@ jobs:
       - name: Check controller route inventory
         run: node apps/api/scripts/route-inventory.mjs --check
       - name: Validate release manifest contracts
-        run: node --test scripts/release-manifest.test.mjs
+        run: |
+          node scripts/release-version.mjs --check
+          node --test scripts/release-manifest.test.mjs
       - name: API lint
         run: pnpm --filter @schoolhub/api lint
       - name: Apply database migrations

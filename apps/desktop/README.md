@@ -1,8 +1,8 @@
 # SchoolHub desktop development
 
-All desktop work targets `desktop-version`. Phase 0 experiments and the current
-Phase 1 foundation live here. **This is not a signed R1 release or an offline
-SchoolHub product.** See `docs/plans/desktop-phase-1.md` for remaining gates.
+Production releases come from `main`. See the
+[production versioning runbook](../../docs/runbooks/production-versioning.md)
+for Windows setup builds, signed updates and release tags.
 
 ## Frontend targets
 
@@ -33,19 +33,8 @@ cd apps/desktop/src-tauri
 cargo test --locked --lib
 ```
 
-To compile a release-mode development executable on Windows, build the desktop
-frontend first, then use PowerShell to pin the actual API origin:
-
-```powershell
-$env:SCHOOLHUB_API_ORIGIN = "https://your-api.example"
-cargo build --locked --release --features shell,custom-protocol
-```
-
-The executable is `target/release/schoolhub-desktop-spike.exe`. Its title and
-identifier still indicate the internal spike. A release build refuses to start
-without a bare HTTPS API origin. Changing the environment variable requires
-recompilation. CI uses an intentionally non-routable placeholder origin; that
-binary is a compile check, not a runnable deployment for a school.
+For a local Windows setup executable or an updater-enabled release, follow
+the production versioning runbook linked above.
 
 At launch, select the school code and sign in online. Rust handles the HTTP
 connection, bearer token and short-lived 2FA cookie jar. Redirects and
@@ -57,7 +46,6 @@ Other operating systems have no persistence backend in this increment. Real API 
 validated. The server now enforces persisted desktop session channels, plan/school desktop entitlements and a minimum client version. Apply the session-channel migration before deploying the new API; enable desktop access in the web SuperAdmin plan or subscription editor.
 Table reports print from the active desktop window without opening a popup.
 Windows runtime acceptance still covers print preview, file downloads and uploads.
-No installer or updater is produced.
 
 For development with an installed Tauri CLI, use `cargo tauri dev --features
 shell` from this directory. Its frontend hook runs `dev:desktop`; debug builds
