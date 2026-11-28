@@ -82,7 +82,7 @@ jobs:
             const {expectedMigration} = await import(`${process.env.GITHUB_WORKSPACE}/scripts/release-manifest.mjs`);
             const component = process.env.COMPONENT;
             fs.writeFileSync(`component-${component}.json`, JSON.stringify({component, commit: context.sha, expectedMigration: expectedMigration(process.env.GITHUB_WORKSPACE), image: `ghcr.io/${context.repo.owner.toLowerCase()}/schoolhub-${component}@${process.env.DIGEST}`}));
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: release-component-${{ matrix.name }}
           path: component-${{ matrix.name }}.json
@@ -108,7 +108,7 @@ jobs:
             const manifest = assembleManifest(components, context.payload.repository.full_name, context.sha, context.runId, expectedMigration(process.env.GITHUB_WORKSPACE));
             fs.writeFileSync('release-manifest.json', JSON.stringify(manifest, null, 2));
             await core.summary.addHeading('Verified release images').addRaw(`Commit: ${context.sha}`).addTable([['Component','Digest reference'], ...Object.entries(manifest.images)]).write();
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: release-manifest-${{ github.sha }}
           path: release-manifest.json

@@ -110,7 +110,7 @@ jobs:
               expectedMigration: process.env.EXPECTED_MIGRATION_NAME ?? null, backupReference: process.env.BACKUP_REFERENCE,
               outcome: process.env.MIGRATION_OUTCOME || 'not-run', recordedAt: new Date().toISOString(), actor: context.actor};
             fs.writeFileSync('migration-record.json', JSON.stringify(record, null, 2));
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always() && steps.source.outcome == 'success'
         with:
           name: migration-record-${{ inputs.environment }}-${{ github.run_id }}
