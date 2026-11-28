@@ -10,7 +10,7 @@ shell = ["dep:tauri", "dep:tauri-build", "dep:tauri-plugin-updater"]
 custom-protocol = ["tauri/custom-protocol"]
 
 [[bin]]
-name = "schoolhub-desktop-spike"
+name = "schoolHub"
 path = "src/main.rs"
 required-features = ["shell"]
 

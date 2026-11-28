@@ -49,11 +49,8 @@ pnpm dlx '@tauri-apps/cli@2.12.6' build --ci --no-bundle --features shell --targ
 Run the resulting app from `apps/desktop`:
 
 ```powershell
-& '.\src-tauri\target\x86_64-pc-windows-msvc\release\schoolhub-desktop-spike.exe'
+& '.\src-tauri\target\x86_64-pc-windows-msvc\release\schoolHub.exe'
 ```
-
-The Cargo executable keeps its internal filename. The app window is named
-SchoolHub.
 
 ### Generate the Windows setup installer
 
@@ -77,7 +74,7 @@ With your database and API running locally, use a debug executable from
 ```powershell
 $env:SCHOOLHUB_API_ORIGIN = 'http://127.0.0.1:3001'
 pnpm dlx '@tauri-apps/cli@2.12.6' build --ci --debug --no-bundle --features shell --target x86_64-pc-windows-msvc -- --locked
-& '.\src-tauri\target\x86_64-pc-windows-msvc\debug\schoolhub-desktop-spike.exe'
+& '.\src-tauri\target\x86_64-pc-windows-msvc\debug\schoolHub.exe'
 ```
 
 ### Build from Git Bash on Windows
@@ -96,7 +93,7 @@ cargo metadata --manifest-path src-tauri/Cargo.toml --no-deps --format-version 1
 
 export SCHOOLHUB_API_ORIGIN=http://127.0.0.1:3001
 pnpm.cmd dlx @tauri-apps/cli@2.12.6 build --ci --debug --no-bundle --features shell --target x86_64-pc-windows-msvc -- --locked
-./src-tauri/target/x86_64-pc-windows-msvc/debug/schoolhub-desktop-spike.exe
+./src-tauri/target/x86_64-pc-windows-msvc/debug/schoolHub.exe
 ```
 
 To enter the desktop folder from the repository root, run `cd apps/desktop`.
