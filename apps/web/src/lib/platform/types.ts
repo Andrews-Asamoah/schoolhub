@@ -12,3 +12,11 @@ export interface Platform {
   savedSignInWarning?(): void;
   tenantSubdomain(): string | null;
 }
+
+export class DesktopConnectionError extends TypeError {}
+
+export function signInConnectionMessage(error: unknown): string {
+  return error instanceof DesktopConnectionError
+    ? error.message
+    : "We couldn’t connect. Check your internet connection and try again.";
+}

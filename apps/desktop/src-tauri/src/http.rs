@@ -42,12 +42,23 @@ pub struct DesktopHttp {
     session: Mutex<Session>,
 }
 
-fn client() -> Result<Client, String> {
-    Client::builder()
+fn is_loopback(origin: &Url) -> bool {
+    matches!(origin.host_str(), Some("localhost" | "127.0.0.1" | "[::1]"))
+}
+
+fn client(origin: &Url) -> Result<Client, String> {
+    let builder = Client::builder()
         .cookie_store(true)
         .redirect(Policy::none())
         .connect_timeout(Duration::from_secs(15))
-        .timeout(Duration::from_secs(90))
+        .timeout(Duration::from_secs(90));
+    // Local development APIs are reached directly even on networks with a proxy.
+    let builder = if is_loopback(origin) {
+        builder.no_proxy()
+    } else {
+        builder
+    };
+    builder
         .build()
         .map_err(|_| "Could not initialize the SchoolHub connection.".into())
 }
@@ -148,7 +159,6 @@ impl DesktopHttp {
         store: Arc<dyn CredentialStore>,
     ) -> Result<Self, String> {
         let origin = Url::parse(origin).map_err(|_| "Configure a valid SchoolHub API origin.")?;
-        let loopback = matches!(origin.host_str(), Some("localhost" | "127.0.0.1" | "[::1]"));
         if !origin.username().is_empty()
             || origin.password().is_some()
             || origin.query().is_some()
@@ -156,23 +166,34 @@ impl DesktopHttp {
             || origin.path() != "/"
             || origin.host_str().is_none()
             || (origin.scheme() != "https"
-                && !(allow_loopback_http && loopback && origin.scheme() == "http"))
+                && !(allow_loopback_http && is_loopback(&origin) && origin.scheme() == "http"))
         {
             return Err(
                 "The API origin must be bare HTTPS (loopback HTTP is development-only).".into(),
             );
         }
+        let client = client(&origin)?;
         Ok(Self {
             origin,
             vault: CredentialVault::new(store),
             installation_root: None,
             session: Mutex::new(Session {
-                client: client()?,
+                client,
                 bearer: None,
                 school: None,
                 saved_key: None,
             }),
         })
+    }
+
+    fn connection_error(&self) -> String {
+        let origin = self.origin.origin().ascii_serialization();
+        let hint = if is_loopback(&self.origin) {
+            "Start the SchoolHub API on this computer and try again."
+        } else {
+            "Check that this API address is reachable and try again."
+        };
+        format!("Could not reach SchoolHub at {origin}. {hint}")
     }
 
     pub fn with_installation_root(mut self, root: std::path::PathBuf) -> Self {
@@ -205,7 +226,7 @@ impl DesktopHttp {
         let mut session = self.session.lock().await;
         let pathname = url.path();
         if pathname == "/api/auth/sign-in/email" {
-            session.client = client()?;
+            session.client = client(&self.origin)?;
             session.bearer = None;
             session.saved_key = None;
         }
@@ -240,7 +261,7 @@ impl DesktopHttp {
         // A completed local logout must also let the UI discard its private
         // query/session caches when the server cannot be reached.
         if signing_out {
-            session.client = client()?;
+            session.client = client(&self.origin)?;
             session.bearer = None;
             session.saved_key = None;
             let confirmed = sent
@@ -256,8 +277,7 @@ impl DesktopHttp {
                 body: br#"{"success":true}"#.to_vec(),
             });
         }
-        let response =
-            sent.map_err(|_| "Could not reach SchoolHub. Check the connection and retry.")?;
+        let response = sent.map_err(|_| self.connection_error())?;
         let token = response
             .headers()
             .get("set-auth-token")
@@ -275,7 +295,7 @@ impl DesktopHttp {
         // A failed TOTP attempt is not a rejected authenticated session. Keep
         // its short-lived cookie so the user can retry the same challenge.
         if session.bearer.is_some() && (output.status == 401 || expired_session) {
-            session.client = client()?;
+            session.client = client(&self.origin)?;
             session.bearer = None;
             if let Some(key) = &session.saved_key {
                 self.vault.remove(key)?;
@@ -316,7 +336,7 @@ impl DesktopHttp {
                         .body("{}")
                         .send()
                         .await;
-                    session.client = client()?;
+                    session.client = client(&self.origin)?;
                     session.bearer = None;
                     let forbidden = role == Some("superAdmin");
                     let message = if forbidden {

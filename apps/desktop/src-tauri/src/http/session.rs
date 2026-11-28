@@ -49,7 +49,7 @@ impl DesktopHttp {
             ));
         }
         if identity.get("user").is_none_or(Value::is_null) {
-            session.client = client()?;
+            session.client = client(&self.origin)?;
             session.bearer = None;
             if let Some(key) = &session.saved_key {
                 self.vault.remove(key)?;
@@ -82,7 +82,7 @@ impl DesktopHttp {
             .send().await.map_err(|_| "Connect to SchoolHub to register this installation.")?;
         let output = read_limited(response).await?;
         if output.status == 401 {
-            session.client = client()?;
+            session.client = client(&self.origin)?;
             session.bearer = None;
             if let Some(key) = &session.saved_key {
                 self.vault.remove(key)?;
@@ -100,7 +100,7 @@ impl DesktopHttp {
         if session.bearer.is_some() {
             return Err("Sign out before changing schools.".into());
         }
-        session.client = client()?;
+        session.client = client(&self.origin)?;
         session.saved_key = None;
         session.school = Some(code);
         Ok(())
@@ -181,7 +181,7 @@ impl DesktopHttp {
             ));
         };
         // A fresh jar ensures an earlier account's cookies cannot influence validation.
-        let fresh = client()?;
+        let fresh = client(&self.origin)?;
         let mut checked = self
             .inspect(&fresh, &saved.bearer, &school, "/api/auth/get-session")
             .await?;
@@ -229,7 +229,7 @@ impl DesktopHttp {
         let mut session = self.session.lock().await;
         self.vault.remove(&key)?;
         if session.saved_key.as_deref() == Some(&key) {
-            session.client = client()?;
+            session.client = client(&self.origin)?;
             session.bearer = None;
             session.saved_key = None;
         }
