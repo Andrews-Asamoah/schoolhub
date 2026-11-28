@@ -24,7 +24,7 @@ const navSections: Array<{
 }> = [
   { title: "Platform management", icon: School, items: [
     { id: "schools", label: "Schools directory", icon: School, to: "/admin/schools" },
-    { id: "users", label: "System users", icon: Users, to: "/admin/users" },
+    { id: "users", label: "Platform team", icon: Users, to: "/admin/users" },
     { id: "subscriptions", label: "Subscriptions", icon: CreditCard, to: "/admin/subscriptions" },
     { id: "plans", label: "Subscription plans", icon: Layers3, to: "/admin/plans" },
     { id: "support", label: "Support desk", icon: LifeBuoy, to: "/admin/support" },

@@ -107,9 +107,13 @@ describe("platform summary counts", () => {
 
   it("excludes soft-deleted records from school-detail counts", async () => {
     const { service, client } = makeService();
-    client.school.findUnique.mockResolvedValue({ id: "sch1" });
+    client.school.findUnique.mockResolvedValue({
+      id: "sch1",
+      organization: { _count: { members: 47 }, members: [{ role: "admin", roles: ["headteacher"] }] },
+    });
 
-    await service.getSchool("sch1");
+    const detail = await service.getSchool("sch1");
+    expect(detail.userCounts).toEqual({ total: 47, headteachers: 1 });
 
     expect(client.school.findUnique).toHaveBeenCalledWith(expect.objectContaining({
       include: expect.objectContaining({
@@ -117,6 +121,8 @@ describe("platform summary counts", () => {
           select: {
             students: { where: { deletedAt: null } },
             teachers: { where: { deletedAt: null } },
+            guardians: { where: { deletedAt: null } },
+            staff: { where: { deletedAt: null } },
           },
         },
       }),

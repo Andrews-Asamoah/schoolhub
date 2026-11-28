@@ -64,6 +64,7 @@ model School {
   feeStructures               FeeStructure[]
   gradingSystems              GradingSystem[]
   guardians                   Guardian[]
+  platformSchoolGrants        PlatformSchoolGrant[]
   houses                      House[]
   payments                    Payment[]
   staff                       Staff[]

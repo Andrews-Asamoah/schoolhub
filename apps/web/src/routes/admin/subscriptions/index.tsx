@@ -157,7 +157,7 @@ function SubscriptionsPage() {
                           <button type="button" onClick={() => setManaging(school)} className="superadmin-button-secondary inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold">
                             <Settings2 className="size-3.5" /> Manage
                           </button>
-                          <Link to="/admin/schools/$schoolId" params={{ schoolId: school.id }} aria-label={`Open ${school.name}`} className="superadmin-button-secondary inline-flex items-center rounded-lg p-1.5">
+                          <Link to="/admin/schools/$schoolId" params={{ schoolId: school.subdomain }} aria-label={`Open ${school.name}`} className="superadmin-button-secondary inline-flex items-center rounded-lg p-1.5">
                             <ArrowUpRight className="size-3.5" />
                           </Link>
                         </div>

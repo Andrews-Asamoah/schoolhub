@@ -1,3 +1,4 @@
+import { PLATFORM_STAFF_ROLE } from "@schoolhub/shared";
 import { useLogout } from "@/hooks/use-logout";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { Check, Eye, EyeOff, KeyRound, ShieldCheck, X } from "lucide-react";
@@ -69,7 +70,7 @@ function ChangePasswordPage() {
       });
       // Re-read the session so the "must change" flag is gone before routing.
       await authClient.getSession({ query: { disableCookieCache: true } });
-      window.location.assign(session?.user?.role === "superAdmin" ? "/admin/dashboard" : "/dashboard");
+      window.location.assign(session?.user?.role === PLATFORM_STAFF_ROLE ? "/admin/schools" : session?.user?.role === "superAdmin" ? "/admin/dashboard" : "/dashboard");
     } catch (caught) {
       setError(
         caught instanceof ApiError

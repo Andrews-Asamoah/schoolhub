@@ -50,6 +50,7 @@ model user {
   twoFactors           twoFactor[]
   invitations          invitation[]
   members              member[]
+  platformSchoolGrants PlatformSchoolGrant[]
   attendancesMarked    Attendance[]           @relation("AttendanceMarkedBy")
   attendanceBatchReplays AttendanceBatchReplay[]
   externalExamResultsRecorded ExternalExamResult[] @relation("ExternalExamResultRecorder")
@@ -256,4 +257,22 @@ model invitation {
   @@index([organizationId])
   @@index([status])
   @@map("invitations")
+}
+
+
+enum PlatformSchoolRole {
+  SUPPORT
+  DESKTOP_ACCESS
+}
+
+model PlatformSchoolGrant {
+  userId   String
+  schoolId String
+  role     PlatformSchoolRole
+  user     user   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  school   School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@id([userId, schoolId])
+  @@index([schoolId])
+  @@map("platform_school_grants")
 }

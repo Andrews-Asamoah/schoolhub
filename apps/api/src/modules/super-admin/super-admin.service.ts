@@ -18,6 +18,7 @@ import { writeAudit, type AuditActor } from "../../common/audit/audit.js";
 import {
   evaluateSubscriptionAccess,
   SCHOOL_ADMIN_ROLES,
+  PLATFORM_STAFF_ROLE,
   hasSchoolAdministrationRole,
   SUBSCRIPTION_TRIAL_DAYS,
   type AddSchoolAdminInput,
@@ -130,28 +131,19 @@ export class SuperAdminService {
 
   async listSchoolOptions() {
     return this.prisma.client.school.findMany({
-      select: { id: true, name: true, code: true },
+      select: { id: true, name: true, code: true, subdomain: true },
       orderBy: { name: "asc" },
     });
   }
 
   async listUsers(query: SuperAdminUsersQuery) {
     const { page, limit, q, schoolId, role } = query;
-    const memberFilter: Prisma.memberWhereInput = {
-      ...(schoolId ? { organization: { school: { id: schoolId } } } : {}),
-      ...(role ? { OR: [{ role }, { roles: { has: role } }] } : {}),
-    };
     const where: Prisma.userWhereInput = {
-      role: { not: "superAdmin" },
-      members: { some: memberFilter },
-      ...(q
-        ? {
-            OR: [
-              { name: { contains: q, mode: "insensitive" } },
-              { email: { contains: q, mode: "insensitive" } },
-            ],
-          }
-        : {}),
+      role: PLATFORM_STAFF_ROLE,
+      ...(schoolId || role ? { platformSchoolGrants: { some: { schoolId, role } } } : {}),
+      ...(q ? { OR: [
+        { name: { contains: q, mode: "insensitive" } }, { email: { contains: q, mode: "insensitive" } },
+      ] } : {}),
     };
     const [users, total] = await Promise.all([
       this.prisma.client.user.findMany({
@@ -164,18 +156,9 @@ export class SuperAdminService {
           banned: true,
           twoFactorEnabled: true,
           createdAt: true,
-          members: {
-            select: {
-              role: true,
-              roles: true,
-              banned: true,
-              organization: {
-                select: {
-                  name: true,
-                  school: { select: { id: true, name: true, code: true } },
-                },
-              },
-            },
+          platformSchoolGrants: {
+            select: { role: true, school: { select: { id: true, name: true, subdomain: true } } },
+            orderBy: { school: { name: "asc" } },
           },
         },
         orderBy: { createdAt: "desc" },
@@ -332,14 +315,17 @@ export class SuperAdminService {
     };
   }
 
-  async getSchool(id: string) {
+  async getSchool(id: string, allowSlug = false) {
+    const byId = allowSlug && await this.prisma.client.school.findUnique({ where: { id }, select: { id: true } });
     const school = await this.prisma.client.school.findUnique({
-      where: { id },
+      where: !allowSlug || byId ? { id } : { subdomain: id },
       include: {
         subscription: { select: { planId: true, planName: true, amount: true, currency: true, billingCycle: true, settings: true } },
         organization: {
           include: {
+            _count: { select: { members: true } },
             members: {
+              where: { OR: [{ role: { in: [...SCHOOL_ADMIN_ROLES] } }, { roles: { hasSome: [...SCHOOL_ADMIN_ROLES] } }] },
               include: {
                 user: { select: { id: true, name: true, email: true, banned: true, twoFactorEnabled: true } },
               },
@@ -350,6 +336,8 @@ export class SuperAdminService {
             select: {
               students: { where: { deletedAt: null } },
               teachers: { where: { deletedAt: null } },
+              guardians: { where: { deletedAt: null } },
+              staff: { where: { deletedAt: null } },
             },
           },
         academicYears: {
@@ -364,7 +352,13 @@ export class SuperAdminService {
       throw new NotFoundException(`School with id "${id}" not found`);
     }
 
-    return school;
+    return {
+      ...school,
+      userCounts: {
+        total: school.organization._count.members,
+        headteachers: school.organization.members.filter((member) => member.role === "headteacher" || member.roles.includes("headteacher")).length,
+      },
+    };
   }
 
   async updateSchool(id: string, input: UpdateSchoolInput, actor: AuditActor) {
@@ -469,8 +463,8 @@ export class SuperAdminService {
     const existingUser = await this.prisma.client.user.findUnique({
       where: { email: input.email },
     });
-    if (existingUser?.role === "superAdmin") {
-      throw new ConflictException("A platform super admin cannot be added as a school admin");
+    if (existingUser?.role === "superAdmin" || existingUser?.role === PLATFORM_STAFF_ROLE) {
+      throw new ConflictException("A platform account cannot be added as a school admin");
     }
     if (existingUser?.banned) {
       throw new ConflictException("This user account is banned and cannot be added");
