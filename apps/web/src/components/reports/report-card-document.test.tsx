@@ -13,7 +13,7 @@ function render(layout: ReportDocLayout = {}, overrides: Partial<Parameters<type
     />,
   );
 }
-const headers = (html: string) => [...html.matchAll(/<th scope="col"[^>]*>(.*?)<\/th>/g)].map((m) => m[1]!.replace(/<[^>]+>/g, ""));
+const headers = (html: string) => [...html.matchAll(/<th\b[^>]*\bscope="col"[^>]*>(.*?)<\/th>/g)].map((m) => m[1]!.replace(/<[^>]+>/g, ""));
 
 describe("ReportCardDocument", () => {
   it("lays out Subject, Class Score, Total Score, Grade, Position, Remarks in that order", () => {
@@ -54,5 +54,24 @@ describe("ReportCardDocument", () => {
     const html = render({}, { approval: null, legacyRemarks: [{ type: "CLASS_TEACHER", content: "Well done", teacher: "Mrs A" }] });
     expect(html).toContain("Well done");
     expect(html).not.toContain("Class teacher’s remarks");
+  });
+  it("shows the pupil's photo when there is one", () => {
+    const sample = buildSampleReport("jhs");
+    const html = render({}, { pupil: { ...sample.pupil, photo: "https://files.example/photo.jpg" } });
+    expect(html).toContain('src="https://files.example/photo.jpg"');
+    expect(html).toContain(`alt="Photo of ${sample.pupil.name}"`);
+  });
+  it("uses a placeholder, not a broken image, when the pupil has no photo", () => {
+    const sample = buildSampleReport("jhs");
+    for (const photo of [undefined, null, ""]) {
+      const html = render({}, { pupil: { ...sample.pupil, photo } });
+      expect(html).not.toContain("Photo of ");
+      expect(html).toContain(`aria-label="No photo available for ${sample.pupil.name}"`);
+    }
+  });
+  it("shows the school's address and contact details in the header", () => {
+    const html = render({}, { school: { name: "Test School", code: "TST", logo: null, motto: null, address: "P.O. Box 12, Accra", phone: "030 000 0000", email: "info@test.edu.gh", website: null } });
+    expect(html).toContain("P.O. Box 12, Accra");
+    expect(html).toContain("030 000 0000 · info@test.edu.gh");
   });
 });

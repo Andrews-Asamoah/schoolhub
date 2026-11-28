@@ -1,3 +1,4 @@
+import { toast } from "@/components/ui/toaster";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { BookOpen, CalendarClock, CheckCircle2, ClipboardList, Clock, LoaderCircle, Send } from "lucide-react";
 import { useMemo, useState, type FormEvent } from "react";
@@ -53,7 +54,7 @@ export function StudentAssignmentsView() {
   const [filter, setFilter] = useState<Filter>("ALL");
   const [activeAssignment, setActiveAssignment] = useState<StudentAssignment | null>(null);
   const [responseText, setResponseText] = useState("");
-  const [notice, setNotice] = useState<{ ok: boolean; text: string } | null>(null);
+
 
   const query = useQuery({
     queryKey: ["assignments", "student"],
@@ -70,11 +71,11 @@ export function StudentAssignmentsView() {
     onSuccess: async () => {
       setActiveAssignment(null);
       setResponseText("");
-      setNotice({ ok: true, text: "Your response has been saved and the teacher has been notified." });
+      toast.success("Your response has been saved and the teacher has been notified.");
       await queryClient.invalidateQueries({ queryKey: ["assignments"] });
       await queryClient.invalidateQueries({ queryKey: ["notifications"] });
     },
-    onError: (error: Error) => setNotice({ ok: false, text: error.message }),
+    onError: (error: Error) => toast.error(error.message),
   });
 
   const assignments = query.data?.assignments ?? [];
@@ -93,13 +94,13 @@ export function StudentAssignmentsView() {
   function openSubmission(assignment: StudentAssignment) {
     setActiveAssignment(assignment);
     setResponseText(assignment.submission?.responseText ?? "");
-    setNotice(null);
+
   }
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!activeAssignment) return;
-    setNotice(null);
+
     submitMutation.mutate({
       assignmentId: activeAssignment.id,
       responseText: responseText.trim(),
@@ -138,7 +139,7 @@ export function StudentAssignmentsView() {
         </div>
       </section>
 
-      {notice && <p role={notice.ok ? "status" : "alert"} className={`rounded-xl border px-4 py-3 text-sm ${notice.ok ? "border-success/20 bg-success/10 text-success" : "border-destructive/20 bg-destructive/10 text-destructive"}`}>{notice.text}</p>}
+
 
       <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Filter assignments">
         {([
@@ -213,14 +214,14 @@ export function StudentAssignmentsView() {
 
       <PortalModal
         isOpen={!!activeAssignment}
-        onClose={() => { setActiveAssignment(null); setNotice(null); }}
+        onClose={() => { setActiveAssignment(null);  }}
         title={activeAssignment ? `Submit: ${activeAssignment.title}` : "Submit assignment"}
         description={activeAssignment ? `${activeAssignment.subject.name} · ${activeAssignment.maxScore} marks maximum` : undefined}
         maxWidth="2xl"
         footer={<><button type="button" onClick={() => setActiveAssignment(null)} disabled={submitMutation.isPending} className="h-10 rounded-lg border border-border px-4 text-xs font-semibold text-foreground hover:bg-muted disabled:opacity-50">Cancel</button><button type="submit" form="student-assignment-response" disabled={submitMutation.isPending || !responseText.trim()} className="inline-flex h-10 items-center gap-2 rounded-lg bg-primary px-4 text-xs font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-50">{submitMutation.isPending ? <LoaderCircle className="size-4 animate-spin" /> : <Send className="size-4" />}{submitMutation.isPending ? "Saving…" : "Save response"}</button></>}
       >
         <form id="student-assignment-response" onSubmit={submit} className="space-y-4">
-          {notice && !notice.ok && <p role="alert" className="rounded-lg border border-destructive/20 bg-destructive/10 px-3 py-2 text-xs text-destructive">{notice.text}</p>}
+
           <div className="rounded-xl border border-border bg-muted/30 p-3"><h3 className="text-xs font-semibold text-foreground">Instructions</h3><p className="mt-1 whitespace-pre-wrap text-sm leading-6 text-muted-foreground">{activeAssignment?.instructions}</p></div>
           <label className="grid gap-1.5 text-xs font-semibold text-foreground">Your response<textarea value={responseText} onChange={(event) => setResponseText(event.target.value)} required maxLength={20_000} rows={8} placeholder="Write your answer here…" className="min-h-44 resize-y rounded-lg border border-input bg-background px-3 py-2.5 text-sm font-normal leading-6 outline-none focus-visible:ring-2 focus-visible:ring-ring" /><span className="text-right text-[10px] font-normal text-muted-foreground">{responseText.length.toLocaleString()} / 20,000 characters · Text responses only</span></label>
           <p className="text-[11px] leading-5 text-muted-foreground">Your saved response is visible to your subject teacher. After it has been graded, it can no longer be edited.</p>

@@ -26,6 +26,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
+import { ghsFormat as moneyFormat } from "@/lib/format";
 const GENDER_COLORS = ["var(--chart-1)", "var(--chart-4)", "var(--chart-5)", "var(--chart-2)"];
 const chartTooltipStyle = {
   backgroundColor: "var(--popover)",
@@ -35,11 +36,6 @@ const chartTooltipStyle = {
   fontSize: 12,
 };
 const numberFormat = new Intl.NumberFormat("en-GH");
-const moneyFormat = new Intl.NumberFormat("en-GH", {
-  style: "currency",
-  currency: "GHS",
-  maximumFractionDigits: 2,
-});
 const money = (value: number) => moneyFormat.format(value);
 
 export interface InfographicCardProps {

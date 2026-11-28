@@ -312,7 +312,7 @@ export function AcademicContextSwitcher() {
           <button
             type="button"
             disabled={mutation.isPending || !academicYearId || !termId || isCurrentSelection}
-            onClick={() => { if (confirmLeavingDrafts()) mutation.mutate(); }}
+            onClick={() => { void confirmLeavingDrafts().then((ok) => { if (ok) mutation.mutate(); }); }}
             className="ml-1 rounded-lg bg-primary px-2.5 py-1 text-xs font-semibold text-primary-foreground transition-all hover:bg-primary active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {mutation.isPending ? "Switching…" : "Apply"}

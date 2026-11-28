@@ -8,6 +8,8 @@ import {
   listGuardianHouses,
   listGuardianReports,
   listMyWards,
+  listAbsenceRequests,
+  type absenceStatuses,
 } from "@/api/guardian";
 import { useSession } from "@/lib/session";
 
@@ -106,6 +108,25 @@ export function useGuardianHousesQuery() {
   return useQuery({
     queryKey: guardianKeys.houses(scope.school),
     queryFn: ({ signal }) => listGuardianHouses({ signal }),
+    enabled: scope.enabled,
+    meta: { persist: false },
+  });
+}
+
+export function useAbsenceRequestsQuery(
+  page: number,
+  status: (typeof absenceStatuses)[number],
+) {
+  const scope = useGuardianScope();
+  return useQuery({
+    queryKey: [
+      ...guardianKeys.root(scope.school),
+      "absence-requests",
+      page,
+      status,
+    ],
+    queryFn: ({ signal }) =>
+      listAbsenceRequests({ signal, query: { page, status } }),
     enabled: scope.enabled,
     meta: { persist: false },
   });

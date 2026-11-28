@@ -1,4 +1,5 @@
 import {
+  createAbsenceRequest,
   getMyWard,
   getWardAttendance,
   getWardFees,
@@ -155,5 +156,32 @@ test("guardian publishing and community adapters use only inventoried routes", a
   expect(apiFetch).toHaveBeenLastCalledWith(
     "/academics/houses",
     expect.any(Object),
+  );
+});
+
+test("absence requests use multipart school data and reject invalid ranges before sending", async () => {
+  const request = {
+    studentId: "ward-1",
+    fromDate: "2026-11-12",
+    toDate: "2026-11-13",
+    reason: "Medical appointment",
+  };
+  await expect(
+    createAbsenceRequest({ request: { ...request, toDate: "2026-11-11" } }),
+  ).rejects.toThrow();
+  expect(apiFetch).not.toHaveBeenCalled();
+  jest.mocked(apiFetch).mockResolvedValue({
+    ...request,
+    id: "absence-1",
+    status: "PENDING",
+    decisionNote: null,
+    attachmentMime: null,
+    student: { profile: { firstName: "Ama", lastName: "Mensah" } },
+  });
+  const outcome = await createAbsenceRequest({ request });
+  expect(outcome.status).toBe("PENDING");
+  expect(apiFetch).toHaveBeenCalledWith(
+    "/attendance/excuse-requests",
+    expect.objectContaining({ method: "POST", body: expect.any(FormData) }),
   );
 });

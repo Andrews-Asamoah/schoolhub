@@ -1,10 +1,12 @@
 import {
   BarChart3,
+  FolderArchive,
   ShieldCheck,
   Activity,
   AlertCircle,
   BadgeDollarSign,
   BadgeCheck,
+  BusFront,
   Bell,
   BookOpen,
   ChartNoAxesCombined,
@@ -159,6 +161,22 @@ export const schoolNavGroups: SchoolNavGroup[] = [
         apiStatus: "available",
       },
       {
+        id: "report-approvals",
+        label: "Report approvals",
+        icon: ShieldCheck,
+        description: "Review class teacher recommendations and approve pupils’ report cards for publication.",
+        section: "Academics",
+        apiStatus: "available",
+      },
+      {
+        id: "report-cards",
+        label: "Report card archive",
+        icon: FolderArchive,
+        description: "Find and open published report cards from any year or term.",
+        section: "Academics",
+        apiStatus: "available",
+      },
+      {
         id: "mock-analysis",
         label: "Mock analysis",
         icon: BarChart3,
@@ -295,6 +313,14 @@ export const schoolNavGroups: SchoolNavGroup[] = [
         apiStatus: "available",
       },
       {
+        id: "bus-users",
+        label: "Bus Users",
+        icon: BusFront,
+        description: "Manage riders, term pauses, and automatic bus fees.",
+        section: "Finance",
+        apiStatus: "available",
+      },
+      {
         id: "concessions",
         label: "Scholarships & discounts",
         icon: BadgeCheck,
@@ -323,6 +349,14 @@ export const schoolNavGroups: SchoolNavGroup[] = [
         label: "Expenses",
         icon: TrendingDown,
         description: "Track school operational expenditures and vouchers.",
+        section: "Finance",
+        apiStatus: "available",
+      },
+      {
+        id: "teacher-payroll",
+        label: "My payroll",
+        icon: BadgeDollarSign,
+        description: "View your approved payslips and payment status.",
         section: "Finance",
         apiStatus: "available",
       },
@@ -535,6 +569,7 @@ export const schoolNavItems = schoolNavGroups.flatMap((group) => group.items);
 const adminRestrictedFinancePages = new Set([
   "accountant-portal",
   "concessions",
+  "bus-users",
   "fees",
   "payments",
   "invoices",
@@ -548,19 +583,40 @@ const adminRestrictedFinancePages = new Set([
   "finance-reports",
 ]);
 
-const personalPages = new Set(["guardian-portal", "guardian-attendance", "guardian-timetable", "guardian-reports", "guardian-notices", "guardian-fees", "student-portal", "teacher-portal", "classmates"]);
-/** Pages the owner and admin use that a headteacher must not see (the API refuses them too). */
-const headteacherHiddenPages = new Set(["finance-approvals"]);
+const personalPages = new Set(["guardian-portal", "guardian-attendance", "guardian-timetable", "guardian-reports", "guardian-notices", "guardian-fees", "student-portal", "teacher-portal", "teacher-payroll", "classmates"]);
+/**
+ * The headteacher sees an explicit allowlist, so a page added later is hidden from them until it is
+ * listed here. Payroll, payments, invoices, expenses, the ledger and audit trail, finance reports,
+ * statements, term-end review, concessions, fee reminders and finance approvals are deliberately absent.
+ * "accountant-portal" stays for now because the reconciliation, journal and period-close approval
+ * screens a headteacher decides on live inside it (see finance-approval-settings).
+ */
+const headteacherPages = new Set([
+  "students", "admissions", "enrollments", "teachers", "staff", "guardians",
+  "classes", "subjects", "academic-years", "timetable",
+  "assessments", "assessment-tracking", "mock-analysis", "external-exams", "assignments", "reports", "report-cards",
+  "attendance", "houses", "clubs",
+  "fees", "outstanding", "inventory",
+  "announcements", "messages", "notifications", "documents",
+  "team", "signatures", "settings", "support", "profile",
+  "accountant-portal",
+]);
 
-const managementPages = schoolNavItems.filter((item) => !personalPages.has(item.id)).map((item) => item.id);
+/** Pages only the headteacher may use: the API refuses everyone else, so the menu does not offer them. */
+const headteacherOnlyPages = new Set(["report-approvals"]);
+
+const managementPages = schoolNavItems
+  .filter((item) => !personalPages.has(item.id) && !headteacherOnlyPages.has(item.id))
+  .map((item) => item.id);
 
 const rolePages: Record<string, string[]> = {
   owner: managementPages,
-  headteacher: managementPages.filter((id) => !headteacherHiddenPages.has(id)),
+  headteacher: [...managementPages.filter((id) => headteacherPages.has(id)), ...headteacherOnlyPages],
   admin: schoolNavItems
-    .filter((item) => !adminRestrictedFinancePages.has(item.id) && !personalPages.has(item.id))
+    .filter((item) => !adminRestrictedFinancePages.has(item.id) && !personalPages.has(item.id) && !headteacherOnlyPages.has(item.id))
     .map((item) => item.id),
   teacher: [
+    "teacher-payroll",
     "external-exams",
     "mock-analysis",
     "students",
@@ -571,6 +627,7 @@ const rolePages: Record<string, string[]> = {
     "assignments",
     "attendance",
     "reports",
+    "report-cards",
     "documents",
     "messages",
     "notifications",
@@ -579,6 +636,7 @@ const rolePages: Record<string, string[]> = {
   accountant: [
     "accountant-portal",
     "concessions",
+    "bus-users",
     "finance-reports",
     "student-statements",
     "term-end-review",

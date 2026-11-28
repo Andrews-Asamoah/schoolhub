@@ -1,3 +1,5 @@
+import { useState } from "react";
+import { SelectField } from "@/components/SelectField";
 import { router, type Href } from "expo-router";
 import { BookOpen, ClipboardList } from "lucide-react-native";
 import { View } from "react-native";
@@ -13,13 +15,17 @@ import {
 } from "@/features/student/queries";
 import { spacing, type, useTheme } from "@/theme/theme";
 
-const submissionLabel = (status: string | null | undefined) => {
+const submissionLabel = (
+  status: string | null | undefined,
+  dueAt: string | null,
+) => {
   if (status === "GRADED") return "Graded";
   if (status === "SUBMITTED") return "Submitted";
-  return "To do";
+  return dueAt && Date.parse(dueAt) < Date.now() ? "Overdue" : "To do";
 };
 
 export default function StudentLearningScreen() {
+  const [filter, setFilter] = useState("all");
   const assignments = useMyAssignmentsQuery();
   const subjects = useMySubjectsQuery();
   const { colors } = useTheme();
@@ -27,6 +33,12 @@ export default function StudentLearningScreen() {
     void Promise.all([assignments.refetch(), subjects.refetch()]);
   };
   const assignmentRows = assignments.data?.assignments ?? [];
+  const states = ["all", "todo", "submitted", "graded"];
+  const stateOf = (row: (typeof assignmentRows)[number]) =>
+    row.submission?.status?.toLowerCase() ?? "todo";
+  const filtered = assignmentRows.filter(
+    (row) => filter === "all" || stateOf(row) === filter,
+  );
   return (
     <Screen
       title="Learning"
@@ -72,28 +84,45 @@ export default function StudentLearningScreen() {
               hue="orange"
             />
           ) : assignmentRows.length ? (
-            assignmentRows.map((assignment, index) => (
-              <ListRow
-                key={assignment.id}
-                title={assignment.title}
-                subtitle={`${assignment.subject.name}${assignment.dueAt ? ` · Due ${new Date(assignment.dueAt).toLocaleDateString()}` : ""}`}
-                leading={<ClipboardList size={19} color={colors.primary} />}
-                status={submissionLabel(assignment.submission?.status)}
-                hue={
-                  assignment.submission?.status === "GRADED"
-                    ? "emerald"
-                    : assignment.submission?.status === "SUBMITTED"
-                      ? "sky"
-                      : "amber"
-                }
-                divider={index < assignmentRows.length - 1}
-                onPress={() =>
-                  router.push(
-                    `/(student)/assignment/${encodeURIComponent(assignment.id)}` as Href,
-                  )
-                }
+            <>
+              <SelectField
+                label="Assignment status"
+                value={filter}
+                options={states.map((value, index) => ({
+                  value,
+                  label: `${["All", "To do", "Submitted", "Graded"][index]} (${assignmentRows.filter((row) => value === "all" || stateOf(row) === value).length})`,
+                }))}
+                onChange={setFilter}
               />
-            ))
+              {!filtered.length ? (
+                <Text>No assignments match this status.</Text>
+              ) : null}
+              {filtered.map((assignment, index) => (
+                <ListRow
+                  key={assignment.id}
+                  title={assignment.title}
+                  subtitle={`${assignment.subject.name}${assignment.dueAt ? ` · Due ${new Date(assignment.dueAt).toLocaleDateString()}` : ""}`}
+                  leading={<ClipboardList size={19} color={colors.primary} />}
+                  status={submissionLabel(
+                    assignment.submission?.status,
+                    assignment.dueAt,
+                  )}
+                  hue={
+                    assignment.submission?.status === "GRADED"
+                      ? "emerald"
+                      : assignment.submission?.status === "SUBMITTED"
+                        ? "sky"
+                        : "amber"
+                  }
+                  divider={index < filtered.length - 1}
+                  onPress={() =>
+                    router.push(
+                      `/(student)/assignment/${encodeURIComponent(assignment.id)}` as Href,
+                    )
+                  }
+                />
+              ))}
+            </>
           ) : (
             <EmptyState
               title="No assignments yet"

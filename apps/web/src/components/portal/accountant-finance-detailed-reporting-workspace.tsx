@@ -1,3 +1,4 @@
+import { formatPersonName } from "@schoolhub/shared";
 import { DatePicker } from "@/components/ui/date-picker";
 import { DataTable, TableExportMenu, type DataTableColumn } from "@/components/ui/data-table";
 import { ServerExportButton } from "@/components/portal/server-export-button";
@@ -9,10 +10,11 @@ import { apiFetch, getClientSubdomain } from "@/lib/api";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Search, Users, WalletCards } from "lucide-react";
 
+import { formatGhs as money } from "@/lib/format";
 interface Student {
   id: string;
   admissionNumber: string;
-  profile?: { firstName?: string | null; lastName?: string | null } | null;
+  profile?: { firstName?: string | null; otherNames?: string | null; lastName?: string | null } | null;
 }
 
 interface FinanceBill {
@@ -139,12 +141,6 @@ async function fetchAllFinancePages<T extends { id: string }>(
   return records;
 }
 
-const money = (value: number) =>
-  new Intl.NumberFormat("en-GH", {
-    style: "currency",
-    currency: "GHS",
-    maximumFractionDigits: 2,
-  }).format(Number.isFinite(value) ? value : 0);
 
 function amountCents(value: number | string): bigint {
   const raw = (typeof value === "number" ? value.toFixed(2) : value).trim();
@@ -173,10 +169,7 @@ const dateText = (value?: string | null) => {
 };
 
 const studentLabel = (student: Student) =>
-  [student.profile?.firstName, student.profile?.lastName]
-    .filter(Boolean)
-    .join(" ")
-    .trim() ||
+  formatPersonName(student.profile) ||
   student.admissionNumber ||
   "Unknown student";
 

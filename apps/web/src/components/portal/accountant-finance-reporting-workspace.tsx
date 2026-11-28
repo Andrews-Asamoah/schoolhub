@@ -11,6 +11,7 @@ import { apiFetch, getClientSubdomain } from "@/lib/api";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { downloadXlsx } from "@/lib/download";
 
+import { formatGhs as money } from "@/lib/format";
 interface AcademicTerm { id: string; name: string; isCurrent: boolean; startDate?: string; endDate?: string; }
 interface AcademicYear { id: string; name: string; isCurrent: boolean; startDate?: string; endDate?: string; terms: AcademicTerm[]; }
 interface FinanceSummary {
@@ -89,7 +90,6 @@ interface TrialBalance {
     cachedBalance: string; discrepancy: string;
   }>;
 }
-const money = (value: string | number) => new Intl.NumberFormat("en-GH", { style: "currency", currency: "GHS", maximumFractionDigits: 2 }).format(Number(value) || 0);
 const inputClass = "h-10 w-full rounded-xl border border-border bg-background px-3 text-sm text-foreground outline-none focus:ring-2 focus:ring-ring/30";
 const secondaryButton = "inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-border bg-card px-4 py-2 text-sm font-semibold text-foreground transition hover:bg-muted disabled:opacity-50";
 

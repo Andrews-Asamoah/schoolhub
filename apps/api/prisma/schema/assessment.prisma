@@ -361,6 +361,7 @@ model ReportCardSet {
   assessmentTemplate AssessmentTemplate? @relation(fields: [assessmentTemplateId], references: [id], onDelete: Restrict)
   reportCards  ReportCard[]
   versions      ReportCardVersion[]
+  recommendationDrafts ReportRecommendationDraft[]
 
   @@index([assessmentTemplateId])
   @@index([schoolId])
@@ -490,14 +491,21 @@ model ReportCardVersion {
   teacherActorId    String?
   teacherName       String?  @db.VarChar(160)
   teacherRemark     String?  @db.VarChar(2000)
+  /// Where the signed recommendation came from (see report-recommendation-source.ts). Sealed with the sign-off.
+  teacherRemarkSource String @default("MANUAL") @db.VarChar(16)
   teacherApprovedAt DateTime?
   headActorId       String?
   headName          String?  @db.VarChar(160)
   headRemark        String?  @db.VarChar(2000)
+  headRemarkSource    String @default("MANUAL") @db.VarChar(16)
   headApprovedAt    DateTime?
   /// The approver's signature image (a data URL) as it was when they approved, so the report never changes later.
   teacherSignature  String?  @db.Text
   headSignature     String?  @db.Text
+  /// Recommendation text carried over from the previous version when the batch is regenerated. It is
+  /// only a prefill for the next sign-off: it is never part of the report until someone approves it.
+  carriedTeacherRemark String? @db.VarChar(2000)
+  carriedHeadRemark    String? @db.VarChar(2000)
   publishedAt       DateTime?
   createdAt         DateTime @default(now())
 
@@ -512,6 +520,29 @@ model ReportCardVersion {
   @@index([schoolId, classId, stage])
   @@index([studentId, publishedAt])
   @@map("report_card_versions")
+}
+
+/// A class teacher's unsent recommendation for one pupil in one report batch, autosaved while they work.
+/// It is not part of the report: signing off writes the recommendation onto the report version and
+/// removes the draft. `source` records where the text came from so generated drafts can be told apart later.
+model ReportRecommendationDraft {
+  id        String   @id @default(cuid())
+  schoolId  String
+  setId     String
+  studentId String
+  authorId  String
+  remark    String   @db.VarChar(2000)
+  source    String   @default("MANUAL") @db.VarChar(16)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  school  School        @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  set     ReportCardSet @relation(fields: [setId], references: [id], onDelete: Cascade)
+  student Student       @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([setId, studentId])
+  @@index([schoolId, authorId])
+  @@map("report_recommendation_drafts")
 }
 
 /// Server-side replay guard for offline attendance batch retries.
@@ -530,5 +561,6 @@ model AttendanceBatchReplay {
 
   @@unique([schoolId, userId, key])
   @@index([schoolId, createdAt])
+  @@index([createdAt])
   @@map("attendance_batch_replays")
 }

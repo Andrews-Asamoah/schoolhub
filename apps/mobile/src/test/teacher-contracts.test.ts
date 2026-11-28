@@ -10,6 +10,7 @@ import { calendarBlock, attendanceBatch } from "@/features/teacher/register";
 import {
   numericMark,
   assignmentFormSchema,
+  assignmentBatchFormSchema,
   gradeFormSchema,
 } from "@/features/teacher/forms";
 import { apiFetch } from "@/lib/api";
@@ -127,7 +128,7 @@ test("register blocks closure, weekend, future, missing calendar and outside ter
   );
   expect(calendarBlock(calendar, "2026-11-07", "2026-11-09")).toBeNull();
 });
-test("batch sends only changed roster members and preserves existing remarks", () => {
+test("batch sends changed statuses without copying existing remarks", () => {
   expect(
     attendanceBatch(
       "2026-11-02",
@@ -149,7 +150,7 @@ test("batch sends only changed roster members and preserves existing remarks", (
     ),
   ).toEqual({
     date: "2026-11-02",
-    records: [{ studentId: "s", status: "PRESENT", remarks: "Existing note" }],
+    records: [{ studentId: "s", status: "PRESENT" }],
   });
 });
 test("blank scores are null rather than zero; ranges and precision are enforced", () => {
@@ -181,6 +182,28 @@ test("assignment forms reject empty numeric input, invalid due dates and oversiz
       instructions: "x",
       maxScore: "10",
       dueDate: "invalid",
+    }).success,
+  ).toBe(false);
+});
+
+test("multi-class assignment forms produce one valid request and reject repeated classes", () => {
+  const values = {
+    subjectId: "mathematics",
+    classIds: ["jhs-1", "jhs-2"],
+    title: "Fractions practice",
+    instructions: "Answer all questions.",
+    maxScore: "20",
+    dueDate: "2026-12-01",
+  };
+  expect(assignmentBatchFormSchema.parse(values)).toMatchObject({
+    classIds: values.classIds,
+    maxScore: 20,
+    dueAt: "2026-12-01T23:59:00.000Z",
+  });
+  expect(
+    assignmentBatchFormSchema.safeParse({
+      ...values,
+      classIds: ["jhs-1", "jhs-1"],
     }).success,
   ).toBe(false);
 });

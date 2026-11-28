@@ -1,3 +1,5 @@
+import { toast } from "@/components/ui/toaster";
+import { formatPersonName } from "@schoolhub/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CalendarClock, ClipboardList, LoaderCircle, Plus, Send } from "lucide-react";
 import { useMemo, useState, type FormEvent } from "react";
@@ -22,7 +24,7 @@ interface Submission {
     id: string;
     studentId: string;
     admissionNumber: string | null;
-    profile: { firstName: string; lastName: string };
+    profile: { firstName: string; otherNames?: string | null; lastName: string };
   };
   submittedBy: { id: string; name: string };
   gradedBy: { id: string; name: string } | null;
@@ -96,7 +98,7 @@ export function TeacherAssignmentsWorkspace() {
   const [dueDate, setDueDate] = useState("");
   const [maxScore, setMaxScore] = useState("100");
   const [createError, setCreateError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<{ ok: boolean; text: string } | null>(null);
+
   const [gradeTarget, setGradeTarget] = useState<{ assignment: ManagedAssignment; submission: Submission } | null>(null);
   const [score, setScore] = useState("");
   const [feedback, setFeedback] = useState("");
@@ -172,7 +174,7 @@ export function TeacherAssignmentsWorkspace() {
       setMaxScore("100");
       setSubjectId("");
       setCreateError(null);
-      setNotice({ ok: true, text: `“${created.title}” was published. ${created.notifiedStudents ?? 0} student notification(s) created.` });
+      toast.success(`“${created.title}” was published. ${created.notifiedStudents ?? 0} student notification(s) created.`);
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["assignments"] }),
         queryClient.invalidateQueries({ queryKey: ["notifications"] }),
@@ -198,7 +200,7 @@ export function TeacherAssignmentsWorkspace() {
       setScore("");
       setFeedback("");
       setGradeError(null);
-      setNotice({ ok: true, text: "Grade saved and student notified." });
+      toast.success("Grade saved and student notified.");
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["assignments"] }),
         queryClient.invalidateQueries({ queryKey: ["notifications"] }),
@@ -244,7 +246,7 @@ export function TeacherAssignmentsWorkspace() {
         actions={<button type="button" onClick={() => { setCreateError(null); setCreateOpen(true); }} disabled={!canPublish || referenceLoading || classes.length === 0} className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-xs font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-50"><Plus className="size-4" />Publish assignment</button>}
       />
 
-      {notice && <div role={notice.ok ? "status" : "alert"} className={`rounded-xl border px-4 py-3 text-sm ${notice.ok ? "border-success/20 bg-success/10 text-success" : "border-destructive/20 bg-destructive/10 text-destructive"}`}>{notice.text}</div>}
+
 
       {referenceLoading ? (
         <div role="status" className="flex min-h-40 items-center justify-center gap-2 rounded-xl border border-border bg-card text-sm text-muted-foreground"><LoaderCircle className="size-4 animate-spin" />Loading your teaching assignments…</div>
@@ -297,7 +299,7 @@ export function TeacherAssignmentsWorkspace() {
                     {assignment.submissions.length === 0 ? <p className="rounded-lg border border-dashed border-border px-4 py-5 text-center text-xs text-muted-foreground">No students have submitted a response yet.</p> : (
                       <div className="space-y-3">
                         {assignment.submissions.map((submission) => {
-                          const studentName = `${submission.student.profile.firstName} ${submission.student.profile.lastName}`.trim();
+                          const studentName = formatPersonName(submission.student.profile);
                           return (
                             <article key={submission.id} className="rounded-xl border border-border bg-background p-3 sm:p-4">
                               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -346,7 +348,7 @@ export function TeacherAssignmentsWorkspace() {
         </form>
       </PortalModal>
 
-      <PortalModal isOpen={!!gradeTarget} onClose={() => { setGradeTarget(null); setGradeError(null); }} title={gradeTarget ? `Grade: ${gradeTarget.assignment.title}` : "Grade response"} description={gradeTarget ? `${gradeTarget.submission.student.profile.firstName} ${gradeTarget.submission.student.profile.lastName} · Maximum ${gradeTarget.assignment.maxScore} marks` : undefined} maxWidth="lg" footer={<><button type="button" onClick={() => setGradeTarget(null)} disabled={gradeMutation.isPending} className="h-10 rounded-lg border border-border px-4 text-xs font-semibold text-foreground hover:bg-muted disabled:opacity-50">Cancel</button><button type="submit" form="teacher-grade-assignment" disabled={gradeMutation.isPending || !score.trim()} className="inline-flex h-10 items-center gap-2 rounded-lg bg-primary px-4 text-xs font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-50">{gradeMutation.isPending && <LoaderCircle className="size-4 animate-spin" />}Save grade</button></>}>
+      <PortalModal isOpen={!!gradeTarget} onClose={() => { setGradeTarget(null); setGradeError(null); }} title={gradeTarget ? `Grade: ${gradeTarget.assignment.title}` : "Grade response"} description={gradeTarget ? `${formatPersonName(gradeTarget.submission.student.profile)} · Maximum ${gradeTarget.assignment.maxScore} marks` : undefined} maxWidth="lg" footer={<><button type="button" onClick={() => setGradeTarget(null)} disabled={gradeMutation.isPending} className="h-10 rounded-lg border border-border px-4 text-xs font-semibold text-foreground hover:bg-muted disabled:opacity-50">Cancel</button><button type="submit" form="teacher-grade-assignment" disabled={gradeMutation.isPending || !score.trim()} className="inline-flex h-10 items-center gap-2 rounded-lg bg-primary px-4 text-xs font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-50">{gradeMutation.isPending && <LoaderCircle className="size-4 animate-spin" />}Save grade</button></>}>
         <form id="teacher-grade-assignment" onSubmit={submitGrade} className="space-y-4">
           {gradeError && <p role="alert" className="rounded-lg border border-destructive/20 bg-destructive/10 px-3 py-2 text-xs text-destructive">{gradeError}</p>}
           <div className="max-h-48 overflow-y-auto whitespace-pre-wrap break-words rounded-lg border border-border bg-muted/30 p-3 text-sm leading-6 text-foreground">{gradeTarget?.submission.responseText}</div>

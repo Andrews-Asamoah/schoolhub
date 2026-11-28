@@ -1,3 +1,4 @@
+import { toast } from "@/components/ui/toaster";
 import { PersonPhotoPicker, uploadPersonPhoto } from "./person-photo-picker";
 import { StudentProfileModal } from "@/components/school/student-profile-panel";
 import { UserAvatar } from "@/components/ui/user-avatar";
@@ -16,6 +17,7 @@ import {
 } from "lucide-react";
 import { useRef, useState } from "react";
 import {
+  formatPersonName,
   createStudentSchema,
   updateStudentRecordSchema,
   type CreateStudentInput,
@@ -38,6 +40,7 @@ import {
 } from "@/components/credentials/credentials-dialog";
 import { BulkImportButton } from "@/components/bulk-import/bulk-import-button";
 import { LabeledTextField, labeledInputClasses } from "@/components/forms/labeled-controls";
+import { confirmAction } from "@/components/ui/confirm-host";
 
 interface Student {
   id: string;
@@ -165,7 +168,7 @@ export function StudentDirectoryWorkspace() {
     requestAnimationFrame(() => { if (studentId) profileButtons.current.get(studentId)?.focus(); });
   }
   const [issued, setIssued] = useState<CredentialEntry[]>([]);
-  const [notice, setNotice] = useState<string | null>(null);
+
   const resetLoginMutation = useMutation({
     mutationFn: ({ id }: { id: string; name: string }) =>
       apiFetch<IssuedCredentials>(`/accounts/people/student/${id}/credentials`, {
@@ -236,7 +239,7 @@ export function StudentDirectoryWorkspace() {
           }}
           onClick={() => setViewingId(student.id)}
           className="rounded-md px-2 py-1.5 text-xs font-semibold text-primary hover:bg-primary/10"
-          aria-label={`View profile of ${student.profile.firstName} ${student.profile.lastName}`}
+          aria-label={`View profile of ${formatPersonName(student.profile)}`}
         >
           View
         </button>
@@ -246,20 +249,17 @@ export function StudentDirectoryWorkspace() {
       id: "name",
       header: "Student",
       value: (student) =>
-        `${student.profile.firstName} ${student.profile.lastName}${student.profile.otherNames ? ` ${student.profile.otherNames}` : ""} (${student.studentId})`,
+        `${formatPersonName(student.profile)} (${student.studentId})`,
       cell: (student) => (
         <div className="flex items-center gap-3">
           <UserAvatar
-            name={`${student.profile.firstName} ${student.profile.lastName}`}
+            name={formatPersonName(student.profile)}
             image={student.profile.user?.image}
             className="size-9 text-xs"
           />
           <span className="min-w-0">
             <span className="block font-semibold text-foreground">
-              {student.profile.firstName} {student.profile.lastName}
-              {student.profile.otherNames
-                ? ` ${student.profile.otherNames}`
-                : ""}
+              {formatPersonName(student.profile)}
             </span>
             <span className="block text-[11px] text-muted-foreground">
               {student.studentId}
@@ -307,14 +307,13 @@ export function StudentDirectoryWorkspace() {
                     type="button"
                     disabled={resetLoginMutation.isPending}
                     onClick={() => {
-                      const name = `${student.profile.firstName} ${student.profile.lastName}`;
-                      if (
-                        window.confirm(
-                          `Issue a new temporary password for ${name}? Their current password will stop working and they will be signed out.`,
-                        )
-                      ) {
-                        resetLoginMutation.mutate({ id: student.id, name });
-                      }
+                      const name = formatPersonName(student.profile);
+                      void confirmAction({
+                        title: "Reset login?",
+                        description: `Issue a new temporary password for ${name}? Their current password will stop working and they will be signed out.`,
+                        confirmLabel: "Issue new password",
+                        danger: true,
+                      }).then((ok) => { if (ok) resetLoginMutation.mutate({ id: student.id, name }); });
                     }}
                     className="rounded-md px-2 py-1.5 text-xs font-semibold text-primary hover:bg-primary/10 disabled:opacity-50"
                   >
@@ -325,7 +324,7 @@ export function StudentDirectoryWorkspace() {
                   type="button"
                   onClick={() => openEdit(student)}
                   className="inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-xs font-semibold text-primary hover:bg-primary/10"
-                  aria-label={`Edit ${student.profile.firstName} ${student.profile.lastName}`}
+                  aria-label={`Edit ${formatPersonName(student.profile)}`}
                 >
                   <SquarePen className="size-3.5" />
                   Edit
@@ -435,7 +434,7 @@ export function StudentDirectoryWorkspace() {
           houses={housesQuery.data ?? []}
           canManagePhotos={canImport}
           onIssued={setIssued}
-          onNotice={setNotice}
+          onNotice={(text) => { if (text) toast.success(text); }}
           onCancel={() => {
             setShowForm(false);
             setEditing(null);
@@ -496,12 +495,7 @@ export function StudentDirectoryWorkspace() {
       </section>
 
       <CredentialsDialog entries={issued} onClose={() => setIssued([])} />
-      {notice && (
-        <p role="status" className="flex items-start justify-between gap-3 rounded-xl border border-success/20 bg-success/10 px-4 py-3 text-xs text-success">
-          <span>{notice}</span>
-          <button type="button" onClick={() => setNotice(null)} className="font-semibold underline-offset-2 hover:underline">Dismiss</button>
-        </p>
-      )}
+
       {resetLoginMutation.error && (
         <p role="alert" className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
           {resetLoginMutation.error.message}
@@ -581,7 +575,7 @@ function StudentEditor({
         }
       }
       if (saved.credentials) {
-        const name = `${saved.profile.firstName} ${saved.profile.lastName}`;
+        const name = formatPersonName(saved.profile);
         onIssued([
           { label: `${name} (student)`, credentials: saved.credentials },
           ...(saved.guardianCredentials ?? [])

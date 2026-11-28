@@ -1,3 +1,4 @@
+import { toast } from "@/components/ui/toaster";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CircleAlert, Copy, GraduationCap, Lock, LockOpen, LoaderCircle, Pencil, Plus, Power, Rocket, SlidersHorizontal, Trash2 } from "lucide-react";
 import { useState } from "react";
@@ -17,6 +18,7 @@ import {
   bandRangeLabel,
 } from "@/lib/assessment-setup";
 import { useCanExportTables } from "@/lib/table-export-policy";
+import { confirmAction } from "@/components/ui/confirm-host";
 
 const iconButton =
   "inline-flex size-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-40";
@@ -32,7 +34,7 @@ export function AssessmentSetupWorkspace() {
   const [editing, setEditing] = useState<SetupTemplate | "new" | "new-mock" | null>(null);
   const [scaleDialog, setScaleDialog] = useState<{ system?: SetupGradingSystem; asCopy?: boolean } | "new" | null>(null);
   const [boundariesFor, setBoundariesFor] = useState<SetupTemplate | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
+
   const [showAllUncovered, setShowAllUncovered] = useState(false);
 
   const query = useQuery({
@@ -61,7 +63,7 @@ export function AssessmentSetupWorkspace() {
     },
     onSuccess: async () => {
       await refresh();
-      setNotice("Done. Every class and subject now has a Termly assessment (class assessment 30 + exam 70). Teachers can enter marks.");
+      toast.success("Done. Every class and subject now has a Termly assessment (class assessment 30 + exam 70). Teachers can enter marks.");
     },
   });
 
@@ -69,7 +71,7 @@ export function AssessmentSetupWorkspace() {
     mutationFn: ({ path, method, body }: { path: string; method: "PUT" | "POST" | "DELETE"; body?: unknown; message: string }) =>
       apiFetch(`/assessments/setup/${path}`, { method, ...(body ? { body: JSON.stringify(body) } : {}) }),
     onSuccess: async (_result, variables) => {
-      setNotice(variables.message);
+      toast.success(variables.message);
       await refresh();
     },
   });
@@ -176,7 +178,7 @@ export function AssessmentSetupWorkspace() {
             aria-label={`Delete ${template.name}`}
             title={template.marksRecorded ? "Has marks, turn it off instead" : "Delete"}
             disabled={change.isPending || template.marksRecorded > 0}
-            onClick={() => window.confirm(`Delete “${template.name}”? This cannot be undone.`) && change.mutate({ path: `templates/${template.id}`, method: "DELETE", message: `Deleted “${template.name}”.` })}
+            onClick={() => void confirmAction({ title: "Delete assessment?", description: `Delete “${template.name}”? This cannot be undone.`, confirmLabel: "Delete", danger: true }).then((ok) => { if (ok) change.mutate({ path: `templates/${template.id}`, method: "DELETE", message: `Deleted “${template.name}”.` }); })}
           ><Trash2 className="size-4" /></button>
         </div>
       ),
@@ -194,11 +196,7 @@ export function AssessmentSetupWorkspace() {
         </ol>
       </div>
 
-      {notice && (
-        <p role="status" className="rounded-xl border border-success/20 bg-success/10 px-4 py-3 text-sm text-success">
-          {notice}
-        </p>
-      )}
+
       {(change.error || quickStart.error) && (
         <p role="alert" className="flex items-start gap-2 rounded-xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive">
           <CircleAlert className="mt-0.5 size-4 shrink-0" /> {(change.error ?? quickStart.error)?.message}
@@ -220,7 +218,7 @@ export function AssessmentSetupWorkspace() {
               <button
                 type="button"
                 disabled={quickStart.isPending}
-                onClick={() => { setNotice(null); quickStart.mutate(setup); }}
+                onClick={() => {  quickStart.mutate(setup); }}
                 className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary px-4 text-xs font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-60"
               >
                 {quickStart.isPending && <LoaderCircle className="size-3.5 animate-spin" />}
@@ -326,7 +324,7 @@ export function AssessmentSetupWorkspace() {
                           aria-label={`Delete ${system.name}`}
                           title={system.usedBy ? "In use" : "Delete"}
                           disabled={change.isPending || system.usedBy > 0}
-                          onClick={() => window.confirm(`Delete the “${system.name}” grading scale?`) && change.mutate({ path: `grading-systems/${system.id}`, method: "DELETE", message: `Deleted “${system.name}”.` })}
+                          onClick={() => void confirmAction({ title: "Delete grading scale?", description: `Delete the “${system.name}” grading scale?`, confirmLabel: "Delete", danger: true }).then((ok) => { if (ok) change.mutate({ path: `grading-systems/${system.id}`, method: "DELETE", message: `Deleted “${system.name}”.` }); })}
                         ><Trash2 className="size-4" /></button>
                       )}
                     </div>
@@ -355,7 +353,7 @@ export function AssessmentSetupWorkspace() {
           category={editing === "new-mock" ? "MOCK" : undefined}
           template={typeof editing === "string" ? undefined : editing}
           onClose={() => setEditing(null)}
-          onSaved={(message) => { setEditing(null); setNotice(message); }}
+          onSaved={(message) => { setEditing(null); toast.success(message); }}
           onCreateStandardScale={createStandardScale}
         />
       )}
@@ -365,7 +363,7 @@ export function AssessmentSetupWorkspace() {
           template={boundariesFor}
           setup={setup}
           onClose={() => setBoundariesFor(null)}
-          onSaved={(message) => { setBoundariesFor(null); setNotice(message); }}
+          onSaved={(message) => { setBoundariesFor(null); toast.success(message); }}
         />
       )}
       {scaleDialog && (
@@ -374,7 +372,7 @@ export function AssessmentSetupWorkspace() {
           system={scaleDialog === "new" ? undefined : scaleDialog.system}
           asCopy={scaleDialog === "new" ? false : scaleDialog.asCopy}
           onClose={() => setScaleDialog(null)}
-          onSaved={() => { setScaleDialog(null); setNotice("Grading scale saved."); }}
+          onSaved={() => { setScaleDialog(null); toast.success("Grading scale saved."); }}
         />
       )}
     </div>

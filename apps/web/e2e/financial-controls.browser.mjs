@@ -12,8 +12,43 @@ try{
   const session={user:{id:role,name:role,email:`${role}@example.test`,role:'user',mustChangePassword:false,twoFactorEnabled:true,createdAt:now,updatedAt:now},session:{id:'session',token:'token',userId:role,activeOrganizationId:'org',expiresAt:new Date(Date.now()+3600000).toISOString(),createdAt:now,updatedAt:now}};
   const school={id:'school',organizationId:'org',name:'Test school',code:'TEST',subdomain:'test-school',currency:'GHS'};
   let record={id:'recon',accountId:'bank',periodEnd:'2026-09-30',version:1,supersedesId:null,status:role==='owner'?'PENDING':'DRAFT',snapshot:role==='owner'?{bookBalance:'10.00',statementBalance:'10.00',difference:'0.00',outstandingItems:[]}:null,statement:{lines:[{id:'line',date:'2026-09-02',description:'Fees',amount:'10.00',matches:[]}]}};
+  let payroll = {
+   id: 'payroll-run', month: 9, year: 2026, status: 'DRAFT', processedById: 'accountant',
+   totalGross: '1000.00', totalNet: '900.00', totalTax: '50.00', totalSSNIT: '100.00',
+   createdAt: now, _count: { payslips: 1 }, payslips: [{
+    id: 'slip', basicSalary: '1000.00', allowances: '0.00', grossSalary: '1000.00',
+    ssnitEmployee: '50.00', ssnitEmployer: '50.00', incomeTax: '50.00', netSalary: '900.00',
+    otherDeductions: '0.00', paymentStatus: 'PENDING', paymentMethod: 'BANK_TRANSFER',
+   }],
+  };
+  let payrollPolicy = { control: 'PAYROLL_RUN', label: 'Payroll runs', required: true, approverRoles: ['owner', 'accountant'], configured: true };
   await page.route('**/api/**',async route=>{
    const req=route.request(),path=new URL(req.url()).pathname;
+   if (path.endsWith('/finance/approval-settings')) return route.fulfill({ json: [payrollPolicy] });
+   if (path.endsWith('/finance/approval-settings/PAYROLL_RUN') && req.method() === 'PUT') {
+    payrollPolicy = { ...payrollPolicy, ...req.postDataJSON() };
+    return route.fulfill({ json: payrollPolicy });
+   }
+   if (path.endsWith('/finance/payroll')) return route.fulfill({ json: [payroll] });
+   if (path.endsWith('/finance/payroll/readiness')) return route.fulfill({ json: { ready: true, problems: [], pendingDrafts: 0, periodEnd: '2026-11-30' } });
+   if (path.endsWith('/finance/payroll/payroll-run')) return route.fulfill({ json: payroll });
+   if (path.endsWith('/finance/payroll/payroll-run/status')) {
+    assert.equal(req.method(), 'PATCH');
+    assert.deepEqual(req.postDataJSON(), { status: 'APPROVED' });
+    payroll = { ...payroll, status: 'APPROVED' };
+    return route.fulfill({ json: payroll });
+   }
+   if (path.endsWith('/recon/suggested-matches')) {
+    if (req.method() === 'POST') {
+     writes.push({ path, body: req.postDataJSON() });
+     record.statement.lines[0].matches = [{ id: 'saved-match', amount: '10.00' }];
+     return route.fulfill({ json: { count: 1 } });
+    }
+    return route.fulfill({ json: record.statement.lines[0].matches.length ? [] : [{
+     statementLineId: 'line', transactionId: 'posting', date: '2026-09-02', reference: 'BANK-1',
+     amount: '10.00', statementDescription: 'Fees', transactionNumber: 'TXN-1', postingDescription: 'Fees posted',
+    }] });
+   }
    if(req.method()!=='GET'){writes.push({path,body:req.postData()});if(path.endsWith('/submit'))record={...record,status:'PENDING'};if(path.endsWith('/decide'))record={...record,status:'APPROVED'};return route.fulfill({json:{id:'recon',openingBalance:'0.00',closingBalance:'10.00',movement:'10.00',duplicateRows:[],rows:[{rowNumber:1,date:'2026-09-02',description:'Fees',amount:'10.00'}]}});}
    if(path.includes('/auth/get-session'))return route.fulfill({json:session});
    if(path.includes('/auth/organization/list'))return route.fulfill({json:[org]});
@@ -46,21 +81,50 @@ try{
   await page.getByLabel('Reconciliation',{exact:true}).selectOption('recon');
   await page.getByText('Status: '+record.status+' · Version 1',{exact:true}).waitFor();
   if(role==='accountant'){
-   await page.getByLabel('Statement line',{exact:true}).selectOption('line');await page.getByLabel('Ledger posting',{exact:true}).selectOption('posting');await page.getByLabel('Match amount',{exact:true}).fill('10.00');
-   await page.getByRole('button',{name:'Save match',exact:true}).click();
+   await page.getByRole('button', { name: 'Find exact matches' }).click();
+   await page.getByRole('checkbox', { name: 'Match BANK-1 to TXN-1' }).check();
+   await page.getByRole('button', { name: 'Save 1 selected match' }).click();
+   await page.getByText('1 suggested match saved.', { exact: true }).waitFor();
+   assert.deepEqual(writes.find(write => write.path.endsWith('/suggested-matches'))?.body, [
+    { statementLineId: 'line', transactionId: 'posting' },
+   ]);
    await page.getByRole('button',{name:'Submit for independent review',exact:true}).click();
    await page.getByText('Status: PENDING · Version 1',{exact:true}).waitFor();
    await page.getByLabel('Accounting month',{exact:true}).fill('2026-09');await page.getByRole('button',{name:'Check close readiness',exact:true}).click();
    await page.getByText('Checks passed; an independent approval is still required.',{exact:true}).waitFor();
    await page.getByLabel('Request or decision reason',{exact:true}).fill('Reviewed September accounts');await Promise.all([page.waitForResponse(response=>new URL(response.url()).pathname.endsWith('/request-close')),page.getByRole('button',{name:'Request independent close approval',exact:true}).click()]);
-   assert(writes.some(write=>write.path.endsWith('/matches')));assert(writes.some(write=>write.path.endsWith('/request-close')));
+   assert(writes.some(write=>write.path.endsWith('/request-close')));
   }else{
    await page.getByLabel('Decision reason',{exact:true}).fill('Independently reviewed bank evidence');await page.getByRole('button',{name:'Approve',exact:true}).first().click();
    await page.getByText('Status: APPROVED · Version 1',{exact:true}).waitFor();
    await page.getByLabel('Request or decision reason',{exact:true}).fill('Independently reviewed period evidence');await Promise.all([page.waitForResponse(response=>new URL(response.url()).pathname.endsWith('/close-request/decide')),page.getByRole('button',{name:'Approve',exact:true}).click()]);
    assert(writes.some(write=>write.path.endsWith('/close-request/decide')));
   }
+  await page.goto(base + '/payroll?school=test-school');
+  await page.getByText('September 2026', { exact: true }).waitFor();
+  if (role === 'accountant') {
+   await page.getByText('Awaiting independent approval', { exact: true }).waitFor();
+   assert.equal(await page.getByRole('button', { name: 'Approve', exact: true }).count(), 0);
+   payrollPolicy = { ...payrollPolicy, required: false, approverRoles: [] };
+   await page.reload();
+  }
+  await page.getByRole('button', { name: 'Review slips', exact: true }).click();
+  const slips = page.getByRole('dialog', { name: /Payslips · September 2026/ });
+  await slips.getByRole('button', { name: 'Approve payroll', exact: true }).click();
+  const confirm = page.getByRole('dialog', { name: 'Approve payroll', exact: true });
+  await confirm.getByRole('button', { name: 'Approve payroll', exact: true }).click();
+  await page.getByText('Payroll approved for payment.', { exact: true }).waitFor();
+  if (role === 'owner') {
+   assert.equal(await page.getByRole('button', { name: 'Confirm paid', exact: true }).count(), 0);
+   await page.goto(base + '/finance-approvals?school=test-school');
+   const setting = page.getByRole('listitem').filter({ has: page.getByRole('heading', { name: 'Payroll runs', exact: true }) });
+   assert(await setting.getByRole('checkbox', { name: 'Another accountant' }).isChecked());
+   await setting.getByRole('checkbox', { name: 'Require a second person to approve' }).uncheck();
+   await setting.getByRole('button', { name: 'Save', exact: true }).click();
+   await page.getByRole('status').filter({ hasText: /^Saved\.$/ }).waitFor();
+   assert.equal(payrollPolicy.required, false);
+  }
   assert.deepEqual(errors,[]);await page.close();
  }
- console.log('Financial controls browser checks passed for accountant/owner on desktop/mobile.');
+ console.log('Financial controls and payroll approval browser checks passed for accountant/owner on desktop/mobile.');
 }finally{await browser.close();}

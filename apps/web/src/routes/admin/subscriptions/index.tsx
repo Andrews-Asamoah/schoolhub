@@ -1,3 +1,4 @@
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useState } from "react";
@@ -12,7 +13,7 @@ import { SearchInput } from "@/components/superadmin/search-input";
 import { FilterChips } from "@/components/superadmin/filter-chips";
 import { Pagination } from "@/components/superadmin/pagination";
 import { EmptyPanel, ErrorPanel, LoadingPanel } from "@/components/superadmin/state-panels";
-import { useDebouncedValue } from "@/components/superadmin/use-debounced-value";
+import { useDebouncedValue } from "@/lib/use-debounced-value";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/admin/subscriptions/")({
@@ -121,37 +122,37 @@ function SubscriptionsPage() {
         ) : (
           <>
             <div className={cn("overflow-x-auto transition-opacity", schools.isPlaceholderData && "opacity-60")}>
-              <table className="w-full min-w-[860px] text-left text-sm">
-                <thead>
-                  <tr className="border-b border-border bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground">
-                    <th scope="col" className="px-5 py-3 font-semibold">School</th>
-                    <th scope="col" className="px-5 py-3 font-semibold">Plan</th>
-                    <th scope="col" className="px-5 py-3 font-semibold">Status</th>
-                    <th scope="col" className="px-5 py-3 font-semibold">Expires</th>
-                    <th scope="col" className="hidden px-5 py-3 font-semibold md:table-cell">Students</th>
-                    <th scope="col" className="px-5 py-3"><span className="sr-only">Actions</span></th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
+              <Table scroll={false} className="w-full min-w-[860px] text-left text-sm">
+                <TableHeader>
+                  <TableRow className="border-b border-border bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground">
+                    <TableHead scope="col">School</TableHead>
+                    <TableHead scope="col">Plan</TableHead>
+                    <TableHead scope="col">Status</TableHead>
+                    <TableHead scope="col">Expires</TableHead>
+                    <TableHead scope="col" className="hidden md:table-cell">Students</TableHead>
+                    <TableHead scope="col"><span className="sr-only">Actions</span></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody className="divide-y divide-border">
                   {schools.data.data.map((school) => (
-                    <tr key={school.id} className="transition hover:bg-muted/40">
-                      <td className="px-5 py-3.5">
+                    <TableRow key={school.id} className="transition hover:bg-muted/40">
+                      <TableCell>
                         <p className="font-semibold text-foreground">{school.name}</p>
                         <p className="mt-0.5 text-xs text-muted-foreground">{school.code} · {school.subdomain}</p>
-                      </td>
-                      <td className="px-5 py-3.5">
+                      </TableCell>
+                      <TableCell>
                         <p className="font-semibold text-foreground">{school.subscription?.planName ?? "Unassigned"}</p>
                         <p className="mt-0.5 text-xs text-muted-foreground">{school.subscription?.amount !== null && school.subscription?.amount !== undefined ? `${school.subscription.currency} ${Number(school.subscription.amount).toFixed(2)} / ${school.subscription.billingCycle?.toLowerCase() ?? "cycle"}` : "No price configured"}</p>
-                      </td>
-                      <td className="px-5 py-3.5">
+                      </TableCell>
+                      <TableCell>
                         <SubscriptionBadge status={school.organization.subscriptionStatus} expiresAt={school.organization.expiresAt} />
-                      </td>
-                      <td className="px-5 py-3.5">
+                      </TableCell>
+                      <TableCell>
                         <p className="text-foreground">{formatDate(school.organization.expiresAt)}</p>
                         <p className="mt-0.5 text-xs text-muted-foreground">{school.organization.expiresAt ? describeExpiry(school.organization.expiresAt) : "Never expires"}</p>
-                      </td>
-                      <td className="hidden px-5 py-3.5 tabular-nums text-foreground md:table-cell">{school._count.students.toLocaleString()}</td>
-                      <td className="px-5 py-3.5">
+                      </TableCell>
+                      <TableCell className="hidden tabular-nums text-foreground md:table-cell">{school._count.students.toLocaleString()}</TableCell>
+                      <TableCell>
                         <div className="flex justify-end gap-2">
                           <button type="button" onClick={() => setManaging(school)} className="superadmin-button-secondary inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold">
                             <Settings2 className="size-3.5" /> Manage
@@ -160,11 +161,11 @@ function SubscriptionsPage() {
                             <ArrowUpRight className="size-3.5" />
                           </Link>
                         </div>
-                      </td>
-                    </tr>
+                      </TableCell>
+                    </TableRow>
                   ))}
-                </tbody>
-              </table>
+                </TableBody>
+              </Table>
             </div>
             <Pagination page={schools.data.meta.page} totalPages={schools.data.meta.totalPages} total={schools.data.meta.total} limit={LIMIT} onChange={setPage} />
           </>

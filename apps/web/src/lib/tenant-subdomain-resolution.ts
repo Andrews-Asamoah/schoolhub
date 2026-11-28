@@ -20,4 +20,3 @@ export function resolveTenantSubdomain(hostname: string, search = ""): string | 
   }
   return null;
 }
-

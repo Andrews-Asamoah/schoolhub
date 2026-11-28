@@ -16,7 +16,7 @@ const source = new Pool({ connectionString: sourceUrl, max: 1, connectionTimeout
 const restored = new Pool({ connectionString: restoredUrl, max: 1, connectionTimeoutMillis: 10_000 });
 const targetPrisma = new PrismaClient({ adapter: new PrismaPg({ connectionString: restoredUrl }) });
 // Identifiers are constant, never interpolated from user input.
-const schoolTables = ["students", "payments", "bills", "transactions", "chart_accounts", "finance_journal_entries", "report_card_versions", "internal_mock_reports", "documents"];
+const schoolTables = ["students", "payments", "bills", "transactions", "chart_accounts", "finance_journal_entries", "report_card_sets", "report_card_versions", "documents"];
 const globalTables = ["schools", "users", "user_profiles", "finance_journal_lines", "bill_items", "payment_items"];
 const mismatches: Array<{ table: string; reason: string }> = [];
 const started = Date.now();

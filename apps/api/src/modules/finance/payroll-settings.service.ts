@@ -1,7 +1,8 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
 import { PrismaService } from "../../prisma/prisma.service.js";
-import { assertValidTaxBands } from "./payroll-settings.js";
+import { assertValidTaxBands, resolvePayrollSettings } from "./payroll-settings.js";
+import { GHANA_PAYE_2026, ghanaSchemeTemplates } from "./payroll-settings.templates.js";
 
 export type TaxScheduleDraftInput = {
   name: string; effectiveFrom: string; effectiveTo?: string | null; nonResidentRate: string; sourceNote: string;
@@ -35,6 +36,65 @@ export class PayrollSettingsService {
       db.payrollContributionScheme.findMany({ where: { OR: [{ schoolId }, { schoolId: null }] }, orderBy: [{ key: "asc" }, { effectiveFrom: "desc" }], take: 500 }),
     ]);
     return { taxSchedules, schemes };
+  }
+
+
+  /** Starter values an accountant can load into a draft. Nothing here is saved or approved. */
+  templates() {
+    return { taxSchedule: GHANA_PAYE_2026, schemes: ghanaSchemeTemplates(GHANA_PAYE_2026.effectiveFrom) };
+  }
+
+  /**
+   * One-click setup: creates DRAFT rows from the Ghana templates for whatever the school is still missing.
+   * Rows already present (any status) for the same key/start date are skipped, so it is safe to click twice.
+   */
+  async createStarterDrafts(schoolId: string) {
+    const { taxSchedules, schemes } = await this.list(schoolId);
+    const created = { taxSchedules: 0, schemes: 0 };
+    const taxFrom = GHANA_PAYE_2026.effectiveFrom;
+    if (!taxSchedules.some(row => row.schoolId === schoolId && row.effectiveFrom.toISOString().slice(0, 10) === taxFrom)) {
+      await this.createTaxScheduleDraft(schoolId, GHANA_PAYE_2026);
+      created.taxSchedules += 1;
+    }
+    for (const template of ghanaSchemeTemplates("2026-01-01")) {
+      const exists = schemes.some(row => row.schoolId === schoolId && row.key === template.key);
+      if (exists) continue;
+      await this.createSchemeDraft(schoolId, template);
+      created.schemes += 1;
+    }
+    return created;
+  }
+
+  /**
+   * Tells the payroll page, before anyone clicks Generate, whether a draft can be calculated for the month
+   * and, if not, exactly what is missing. Uses the same resolver as the generator, so the two never disagree.
+   */
+  async readiness(schoolId: string, month: number, year: number) {
+    const periodEnd = new Date(Date.UTC(year, month, 0));
+    const db = this.prisma.client;
+    const scope = { OR: [{ schoolId }, { schoolId: null }] };
+    const [taxRows, schemeRows, draftTax, draftSchemes] = await Promise.all([
+      db.payrollTaxSchedule.findMany({ where: { ...scope, status: "ACTIVE", effectiveFrom: { lte: periodEnd } }, include: { bands: true } }),
+      db.payrollContributionScheme.findMany({ where: { ...scope, status: "ACTIVE", effectiveFrom: { lte: periodEnd } } }),
+      db.payrollTaxSchedule.count({ where: { schoolId, status: "DRAFT" } }),
+      db.payrollContributionScheme.count({ where: { schoolId, status: "DRAFT" } }),
+    ]);
+    const problems: string[] = [];
+    let resolved: ReturnType<typeof resolvePayrollSettings> | null = null;
+    try {
+      resolved = resolvePayrollSettings(schoolId, periodEnd, taxRows, schemeRows);
+    } catch (error) {
+      problems.push(error instanceof Error ? error.message : "Payroll settings could not be resolved.");
+    }
+    const pendingDrafts = draftTax + draftSchemes;
+    if (problems.length && pendingDrafts) {
+      problems.push(`${pendingDrafts} draft setting(s) are waiting for approval. Activate them from Payroll settings.`);
+    }
+    return {
+      month, year, periodEnd: periodEnd.toISOString().slice(0, 10), ready: !!resolved, problems, pendingDrafts,
+      taxScheduleId: resolved?.taxScheduleId ?? null,
+      schemeKeys: resolved?.settings.schemes.map(s => s.key) ?? [],
+    };
   }
 
   async createTaxScheduleDraft(schoolId: string, input: TaxScheduleDraftInput) {

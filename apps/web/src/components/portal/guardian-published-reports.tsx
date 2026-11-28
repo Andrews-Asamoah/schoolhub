@@ -1,3 +1,4 @@
+import { formatPersonName } from "@schoolhub/shared";
 import {useGuardianWard} from "@/hooks/use-guardian-ward";
 import { useQuery } from "@tanstack/react-query";
 import { FileText, LoaderCircle, Printer } from "lucide-react";
@@ -14,11 +15,11 @@ type Report = {
   data: { student?: { class?: { name?: string } | null }; subjects?: ReportDocSubject[]; remarks?: { type: string; content: string; teacher: string }[]; summary?: ReportDocumentProps["summary"]; attendance?: ReportDocumentProps["attendance"] };
   approval?: ReportDocApproval | null;
   publishedAt: string | null;
-  student: { admissionNumber: string | null; profile: { firstName: string; lastName: string } };
+  student: { admissionNumber: string | null; profile: { firstName: string; otherNames?: string | null; lastName: string; user?: { image: string | null } | null } };
   set: { name: string; academicYear: { name: string }; term: { name: string }; template: { name: string; layout: ReportDocLayout | null }; school: { name: string; code: string; email: string | null; phone: string | null; address: string | null; logo: string | null; motto: string | null; website: string | null; primaryColor: string; secondaryColor: string } };
 };
 
-export function GuardianPublishedReports({wards=[]}:{wards?:{id:string;profile:{firstName:string;lastName:string}}[]}) {
+export function GuardianPublishedReports({wards=[]}:{wards?:{id:string;profile:{firstName:string;otherNames?:string|null;lastName:string}}[]}) {
   const [selectedId, setSelectedId] = useState("");
   const [downloadError,setDownloadError]=useState<string | null>(null);
   const reports = useQuery({ queryKey: ["assessments", "report-cards", "guardian"], queryFn: () => apiFetch<Report[]>("/assessments/report-cards/guardian"), retry: false });
@@ -39,11 +40,11 @@ export function GuardianPublishedReports({wards=[]}:{wards?:{id:string;profile:{
   if (reports.isError) return <div role="alert" className="rounded-xl border border-destructive/20 bg-destructive/10 p-4 text-sm text-destructive">Unable to load published reports: {reports.error.message}</div>;
   return <section className="space-y-4 rounded-2xl border border-border bg-card p-5">
     <div className="grid gap-3 sm:grid-cols-3 print:hidden">
-      {wards.length>0&&<label className="text-xs font-semibold">Child<select aria-label="Report child" value={wardId} onChange={event=>{selectWard(event.target.value);setSelectedId("");}} className="mt-1 block w-full rounded-lg border border-input bg-background p-2">{wards.map(ward=><option key={ward.id} value={ward.id}>{ward.profile.firstName} {ward.profile.lastName}</option>)}</select></label>}
+      {wards.length>0&&<label className="text-xs font-semibold">Child<select aria-label="Report child" value={wardId} onChange={event=>{selectWard(event.target.value);setSelectedId("");}} className="mt-1 block w-full rounded-lg border border-input bg-background p-2">{wards.map(ward=><option key={ward.id} value={ward.id}>{formatPersonName(ward.profile)}</option>)}</select></label>}
       <label className="text-xs font-semibold">Academic year<select aria-label="Report academic year" value={year} onChange={event=>{setYear(event.target.value);setTerm("");setSelectedId("");}} className="mt-1 block w-full rounded-lg border border-input bg-background p-2"><option value="">All published years</option>{years.map(name=><option key={name}>{name}</option>)}</select></label>
       <label className="text-xs font-semibold">Term<select aria-label="Report term" value={term} onChange={event=>{setTerm(event.target.value);setSelectedId("");}} className="mt-1 block w-full rounded-lg border border-input bg-background p-2"><option value="">All published terms</option>{terms.map(name=><option key={name}>{name}</option>)}</select></label>
     </div>
-    <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between print:hidden"><div><div className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.16em] text-primary"><FileText className="size-4" />Family portal</div><h2 className="flex items-center gap-2 text-xl font-black tracking-tight">Published report cards</h2><p className="mt-1 text-sm text-muted-foreground">Reports released by your school for linked wards.</p></div>{rows.length > 0 && <div className="flex flex-col gap-2 sm:flex-row"><Select value={selected?.id ?? rows[0]?.id ?? "__none__"} onValueChange={setSelectedId}><SelectTrigger aria-label="Select ward report" className="h-10 min-w-0 sm:max-w-72"><SelectValue placeholder="Choose a report" /></SelectTrigger><SelectContent>{rows.map((row) => <SelectItem key={row.id} value={row.id}>{row.student.profile.firstName} {row.student.profile.lastName} · {row.set.term.name}</SelectItem>)}</SelectContent></Select><button type="button" onClick={() => {
+    <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between print:hidden"><div><div className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.16em] text-primary"><FileText className="size-4" />Family portal</div><h2 className="flex items-center gap-2 text-xl font-black tracking-tight">Published report cards</h2><p className="mt-1 text-sm text-muted-foreground">Reports released by your school for linked wards.</p></div>{rows.length > 0 && <div className="flex flex-col gap-2 sm:flex-row"><Select value={selected?.id ?? rows[0]?.id ?? "__none__"} onValueChange={setSelectedId}><SelectTrigger aria-label="Select ward report" className="h-10 min-w-0 sm:max-w-72"><SelectValue placeholder="Choose a report" /></SelectTrigger><SelectContent>{rows.map((row) => <SelectItem key={row.id} value={row.id}>{formatPersonName(row.student.profile)} · {row.set.term.name}</SelectItem>)}</SelectContent></Select><button type="button" onClick={() => {
   if (!selected) return;
   if (selected.pdfAvailable) void downloadAcademicReport(
     `/assessments/report-cards/guardian/${encodeURIComponent(selected.id)}/pdf`,
@@ -56,7 +57,7 @@ export function GuardianPublishedReports({wards=[]}:{wards?:{id:string;profile:{
         printClass="guardian-report-print-area"
         school={selected.set.school}
         layout={layout}
-        pupil={{ name: `${selected.student.profile.firstName} ${selected.student.profile.lastName}`, admissionNumber: selected.student.admissionNumber, className: selected.data.student?.class?.name ?? null }}
+        pupil={{ name: formatPersonName(selected.student.profile), admissionNumber: selected.student.admissionNumber, className: selected.data.student?.class?.name ?? null, photo: selected.student.profile.user?.image ?? null }}
         setName={selected.set.name}
         academicYear={selected.set.academicYear.name}
         term={selected.set.term.name}

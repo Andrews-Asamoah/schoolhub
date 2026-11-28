@@ -1,5 +1,5 @@
 import { AlertTriangle } from "lucide-react";
-import { useEffect, useId, useRef } from "react";
+import { useEffect, useId, useRef, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/button";
 
@@ -13,6 +13,9 @@ interface ConfirmDialogProps {
   cancelLabel?: string;
   confirmVariant?: ConfirmVariant;
   loading?: boolean;
+  /** Extra content under the description, e.g. a reason field. */
+  children?: ReactNode;
+  confirmDisabled?: boolean;
   onConfirm: () => void;
   onCancel: () => void;
 }
@@ -29,6 +32,8 @@ export function ConfirmDialog({
   cancelLabel = "Cancel",
   confirmVariant = "primary",
   loading = false,
+  children,
+  confirmDisabled = false,
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
@@ -94,6 +99,7 @@ export function ConfirmDialog({
           <div className="min-w-0 pt-0.5">
             <h2 id={titleId} className="text-base font-bold text-foreground">{title}</h2>
             <p id={descriptionId} className="mt-2 text-sm leading-6 text-muted-foreground">{description}</p>
+            {children}
           </div>
         </div>
         <div className="flex flex-col-reverse gap-2 border-t border-border bg-muted/30 px-5 py-4 sm:flex-row sm:justify-end sm:px-6">
@@ -105,7 +111,7 @@ export function ConfirmDialog({
             onClick={onCancel}
           >{cancelLabel}</Button>
           <Button type="button" variant={confirmVariant === "danger" ? "destructive" : "default"}
-            loading={loading} disabled={loading} onClick={onConfirm}>
+            loading={loading} disabled={loading || confirmDisabled} onClick={onConfirm}>
             {loading ? "Please wait…" : confirmLabel}
           </Button>
         </div>

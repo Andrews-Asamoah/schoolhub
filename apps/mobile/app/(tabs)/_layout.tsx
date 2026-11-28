@@ -1,7 +1,7 @@
 import { TabBarInsetProvider } from "@/components/TabBarInset";
 import { Redirect, Tabs, type Href } from "expo-router";
 import { CalendarDays, House } from "lucide-react-native";
-import { GlassTabBar } from "@/components/GlassTabBar";
+import { PortalTabBar } from "@/components/PortalTabBar";
 
 export default function AppTabsLayout() {
   if (!__DEV__) return <Redirect href={"/(auth)/school" as Href} />;
@@ -9,7 +9,7 @@ export default function AppTabsLayout() {
     <TabBarInsetProvider>
       <Tabs
         tabBar={(props) => (
-          <GlassTabBar
+          <PortalTabBar
             {...props}
             hues={{
               index: "indigo",

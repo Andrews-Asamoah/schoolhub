@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  FINANCE_APPROVAL_CONTROLS, approvalSettingInputSchema, effectiveSetting, loadApprovalSetting, mayApproveStep, mayDecide,
+  FINANCE_APPROVAL_CONTROLS, approvalSettingInputSchema, payrollRunApprovalSettingInputSchema, effectiveSetting, loadApprovalSetting, mayApproveStep, mayDecide,
 } from "./finance-approval-settings.js";
 
 const actor = (role: string | undefined, isSuperAdmin = false) => ({ id: "u1", role, isSuperAdmin });
@@ -53,9 +53,18 @@ describe("finance approval settings", () => {
     expect(approvalSettingInputSchema.safeParse({ required: false }).success).toBe(true);
   });
 
-  it("covers all six controls", async () => {
+  it("uses independent review for payroll until a school saves its setting", () => {
+    expect(effectiveSetting("PAYROLL_RUN", null)).toMatchObject({
+      required: true, approverRoles: ["owner", "accountant"], configured: false,
+    });
+    expect(effectiveSetting("PAYROLL_RUN", { required: false, approverRoles: [] }).required).toBe(false);
+    expect(payrollRunApprovalSettingInputSchema.safeParse({ required: true, approverRoles: ["accountant"] }).success).toBe(true);
+    expect(payrollRunApprovalSettingInputSchema.safeParse({ required: true, approverRoles: ["headteacher"] }).success).toBe(false);
+  });
+
+  it("covers all seven controls", async () => {
     expect([...FINANCE_APPROVAL_CONTROLS].sort()).toEqual([
-      "ACCOUNT_MAPPING", "BANK_RECONCILIATION", "INVOICE_ADJUSTMENT", "MANUAL_JOURNAL", "PAYROLL_SETTINGS", "PERIOD_CONTROL",
+      "ACCOUNT_MAPPING", "BANK_RECONCILIATION", "INVOICE_ADJUSTMENT", "MANUAL_JOURNAL", "PAYROLL_RUN", "PAYROLL_SETTINGS", "PERIOD_CONTROL",
     ]);
     const db = { financeApprovalSetting: { findUnique: async () => null } };
     expect((await loadApprovalSetting(db as never, "s1", "MANUAL_JOURNAL")).required).toBe(false);

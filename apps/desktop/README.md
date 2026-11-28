@@ -14,10 +14,13 @@ pnpm --filter @schoolhub/web test
 pnpm --filter @schoolhub/web build:desktop
 ```
 
-The web and desktop outputs are separate (`dist` / `dist-desktop`). Desktop
-routing omits the SuperAdmin portal and school application route. Native
-imports stay inside `apps/web/src/lib/platform/desktop/`, and both bundles have
-build checks to enforce the separation.
+The web and desktop outputs are separate (`dist` / `dist-desktop`). The desktop
+build checks that it includes every shared route. All school portals are served
+from the same workspace components. Platform SuperAdmin and the public application
+form run in the browser. Admissions staff can copy the application link from the
+desktop workspace. For deployments using another web domain, set
+`VITE_SCHOOLHUB_WEB_DOMAIN` to the tenant root domain before building. Native
+imports stay inside `apps/web/src/lib/platform/desktop/`.
 
 ## Native tests and Windows build
 
@@ -52,8 +55,9 @@ saved sign-in to validate it online. Forget saved sign-in removes only that
 account's saved credential. Passwords and challenge cookies are never saved.
 Other operating systems have no persistence backend in this increment. Real API and Windows runtime sign-in remain to be
 validated. The server now enforces persisted desktop session channels, plan/school desktop entitlements and a minimum client version. Apply the session-channel migration before deploying the new API; enable desktop access in the web SuperAdmin plan or subscription editor.
-Downloads/printing still use browser helpers and are not accepted native
-features yet. No installer or updater is produced.
+Table reports print from the active desktop window without opening a popup.
+Windows runtime acceptance still covers print preview, file downloads and uploads.
+No installer or updater is produced.
 
 For development with an installed Tauri CLI, use `cargo tauri dev --features
 shell` from this directory. Its frontend hook runs `dev:desktop`; debug builds

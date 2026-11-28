@@ -48,10 +48,10 @@ export function SchoolSidebar({
   return (
     <Sidebar className="school-sidebar-shell">
       <SidebarHeader>
-        <Link to="/dashboard" aria-label="SchoolHub overview"
+        <Link to="/dashboard" aria-label="schoolHub overview"
           className="flex min-w-0 w-full items-center gap-2.5 rounded-lg px-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring">
           <span className="flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-sidebar-primary text-sidebar-primary-foreground shadow-sm">
-            {schoolLogo ? <img src={schoolLogo} alt="" className="size-full object-cover" /> : <GraduationCap className="size-5" />}
+            {schoolLogo ? <img src={schoolLogo} alt="" className="size-full object-cover" /> : <img src="/schoolhub.webp" alt="" className="size-full object-contain" />}
           </span>
           <span className="sidebar-expanded min-w-0 flex-1">
             <span className="school-brand-title block truncate text-[14px] font-bold tracking-tight text-sidebar-foreground">{schoolName ?? "School Workspace"}</span>

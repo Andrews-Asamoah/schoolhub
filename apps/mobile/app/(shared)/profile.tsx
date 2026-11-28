@@ -1,7 +1,10 @@
+import { useToast } from "@/components/Toast";
+import { openPortalTool } from "@/lib/portal-tools";
 import { ImageManipulator, SaveFormat } from "expo-image-manipulator";
 import * as ImagePicker from "expo-image-picker";
 import { File } from "expo-file-system";
-import { router, type Href } from "expo-router";
+import { unregisterSchoolPush } from "@/features/shared/push";
+import { router } from "expo-router";
 import { useState } from "react";
 import { View } from "react-native";
 import { removeMyAvatar, uploadMyAvatar } from "@/api/shared";
@@ -18,36 +21,23 @@ import { useScopedMutation } from "@/features/shared/mutations";
 import { useMyProfileQuery } from "@/features/shared/queries";
 import { ROLE_LABELS } from "@/lib/permissions";
 import { setActiveRole, useSession } from "@/lib/session";
+import { ApiError, SessionChangedError } from "@/lib/api-error";
 import { signOut } from "@/lib/sign-out";
-import {
-  useTheme,
-  type BlurPreference,
-  type SchemePreference,
-  spacing,
-  type,
-} from "@/theme/theme";
+import { useTheme, type SchemePreference, spacing, type } from "@/theme/theme";
 
 export default function ProfileScreen() {
   const query = useMyProfileQuery();
   const session = useSession();
   const theme = useTheme();
+  const { show } = useToast();
   const upload = useScopedMutation(uploadMyAvatar);
   const remove = useScopedMutation(removeMyAvatar);
-  const [avatarError, setAvatarError] = useState("");
-  const [roleError, setRoleError] = useState("");
-  const [signOutError, setSignOutError] = useState("");
+
   const [busy, setBusy] = useState(false);
 
   async function changeAvatar() {
-    setAvatarError("");
     setBusy(true);
     try {
-      const permission =
-        await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (!permission.granted) {
-        setAvatarError("Allow photo access to choose a profile picture.");
-        return;
-      }
       const selection = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ["images"],
         allowsEditing: true,
@@ -71,48 +61,80 @@ export default function ProfileScreen() {
       const file = new File(resized.uri);
       try {
         await upload.mutateAsync({ file, mimeType: "image/jpeg" });
+        show({ message: "Profile photo updated.", tone: "success" });
       } finally {
-        if (file.exists) await file.delete();
+        try {
+          if (file.exists) file.delete();
+        } catch {
+          // A cache cleanup failure does not change the upload result.
+        }
       }
-    } catch {
-      setAvatarError(
-        "We couldn't update your profile photo. Please try again.",
-      );
+    } catch (failure) {
+      if (failure instanceof SessionChangedError) return;
+      if (failure instanceof ApiError && failure.status === 503) {
+        show({
+          message:
+            "The school server’s photo storage is unavailable. Contact your administrator.",
+          tone: "error",
+        });
+      } else if (failure instanceof ApiError && failure.status === 413) {
+        show({
+          message: "That photo is too large. Choose a smaller image.",
+          tone: "error",
+        });
+      } else if (failure instanceof ApiError && failure.status === 400) {
+        show({
+          message:
+            "The server could not process that photo. Try a different image.",
+          tone: "error",
+        });
+      } else {
+        show({
+          message:
+            "We couldn't update your profile photo. Try another image or check your connection.",
+          tone: "error",
+        });
+      }
     } finally {
       setBusy(false);
     }
   }
 
   async function removeAvatar() {
-    setAvatarError("");
     try {
       await remove.mutateAsync(undefined);
+      show({ message: "Profile photo removed.", tone: "success" });
     } catch {
-      setAvatarError(
-        "We couldn't remove your profile photo. Please try again.",
-      );
+      show({
+        message: "We couldn't remove your profile photo. Please try again.",
+        tone: "error",
+      });
     }
   }
 
   async function switchRole(role: string) {
-    setRoleError("");
     try {
+      void unregisterSchoolPush().catch(() => undefined);
       await setActiveRole(role);
       router.replace("/");
     } catch {
-      setRoleError("We couldn't switch roles. Please try again.");
+      show({
+        message: "We couldn't switch roles. Please try again.",
+        tone: "error",
+      });
     }
   }
 
   async function signOutAccount() {
-    setSignOutError("");
     try {
       await signOut();
       router.replace("/");
     } catch {
-      setSignOutError(
-        "Your local session was cleared, but server sign-out could not be confirmed.",
-      );
+      show({
+        message:
+          "Your local session was cleared, but server sign-out could not be confirmed.",
+        tone: "error",
+      });
     }
   }
 
@@ -181,6 +203,7 @@ export default function ProfileScreen() {
                   variant="secondary"
                   onPress={() => void changeAvatar()}
                   loading={busy || upload.isPending}
+                  disabled={remove.isPending}
                 />
                 {profile.user.image ? (
                   <Button
@@ -188,6 +211,7 @@ export default function ProfileScreen() {
                     variant="ghost"
                     onPress={() => void removeAvatar()}
                     loading={remove.isPending}
+                    disabled={busy || upload.isPending}
                   />
                 ) : null}
               </View>
@@ -198,31 +222,24 @@ export default function ProfileScreen() {
               title="Personal details"
               subtitle="Edit contact and emergency information"
               chevron
-              onPress={() => router.push("/(shared)/profile-edit" as Href)}
+              onPress={() => openPortalTool("/profile-edit")}
               divider
             />
             <ListRow
               title="Academic calendar"
               subtitle="Current school year and term"
               chevron
-              onPress={() => router.push("/(shared)/academic-context" as Href)}
+              onPress={() => openPortalTool("/academic-context")}
               divider
             />
             <ListRow
               title="Security"
               subtitle="Password and sign-in options"
               chevron
-              onPress={() => router.push("/(shared)/security" as Href)}
+              onPress={() => openPortalTool("/security")}
             />
           </Card>
-          {avatarError ? (
-            <Text
-              accessibilityRole="alert"
-              style={[type.caption, { color: theme.colors.destructive }]}
-            >
-              {avatarError}
-            </Text>
-          ) : null}
+
           <Text style={[type.headline, { color: theme.colors.foreground }]}>
             Appearance
           </Text>
@@ -235,16 +252,6 @@ export default function ProfileScreen() {
                 { value: "system", label: "System" },
                 { value: "light", label: "Light" },
                 { value: "dark", label: "Dark" },
-              ]}
-            />
-            <SegmentedControl<BlurPreference>
-              accessibilityLabel="Blur setting"
-              value={theme.blurPreference}
-              onChange={theme.setBlurPreference}
-              options={[
-                { value: "auto", label: "Auto" },
-                { value: "on", label: "On" },
-                { value: "off", label: "Off" },
               ]}
             />
           </Card>
@@ -262,30 +269,15 @@ export default function ProfileScreen() {
                   label: ROLE_LABELS[role],
                 }))}
               />
-              {roleError ? (
-                <Text
-                  accessibilityRole="alert"
-                  style={[type.caption, { color: theme.colors.destructive }]}
-                >
-                  {roleError}
-                </Text>
-              ) : null}
             </>
           ) : null}
           <Card>
             <ListRow
-              title="About SchoolHub"
+              title="About schoolHub"
               subtitle="Mobile tools for teachers, students and guardians"
             />
           </Card>
-          {signOutError ? (
-            <Text
-              accessibilityRole="alert"
-              style={[type.caption, { color: theme.colors.destructive }]}
-            >
-              {signOutError}
-            </Text>
-          ) : null}
+
           <Button
             label="Sign out"
             variant="secondary"

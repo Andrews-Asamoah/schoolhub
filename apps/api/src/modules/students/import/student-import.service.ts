@@ -1,6 +1,7 @@
 import { BadRequestException, HttpException, Injectable, Logger } from "@nestjs/common";
 import { Prisma, type School } from "@prisma/client";
 import {
+  formatPersonName,
   type CreateStudentInput,
   type ImportStudentBatchInput,
   type NormalizedStudentRow,
@@ -86,7 +87,7 @@ export class StudentImportService {
         return index === undefined ? "" : (record.cells[index] ?? "");
       };
       const outcome = normalizeRecord(get, record.rowNumber);
-      const rawName = `${get("firstName")} ${get("lastName")}`.replace(/\s+/g, " ").trim() || "(no name)";
+      const rawName = formatPersonName({ firstName: get("firstName"), otherNames: get("otherNames"), lastName: get("lastName") }) || "(no name)";
       if (!outcome.row) {
         classIds.push(null);
         return { rowNumber: record.rowNumber, status: "error", errors: outcome.errors, warnings: outcome.warnings, row: null, name: rawName, className: get("className").trim() || null };
@@ -99,7 +100,7 @@ export class StudentImportService {
         errors: verdict.errors,
         warnings: verdict.warnings,
         row: outcome.row,
-        name: `${outcome.row.firstName} ${outcome.row.lastName}`,
+        name: formatPersonName(outcome.row),
         className: outcome.row.className ?? null,
       };
     });
@@ -146,7 +147,7 @@ export class StudentImportService {
     const results: ImportRowResult[] = [];
 
     for (const row of input.rows) {
-      const name = `${row.firstName} ${row.lastName}`;
+      const name = formatPersonName(row);
       const base = { rowNumber: row.rowNumber, name };
       const verdict = evaluateRow(row, ctx);
       if (verdict.status === "duplicate") {

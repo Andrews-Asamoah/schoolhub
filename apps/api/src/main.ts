@@ -6,8 +6,10 @@ import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 import { AppModule } from "./app.module.js";
 import { originPolicy } from "./common/origin-policy.js";
 import { env } from "./env.js";
+import { initErrorReporting } from "./common/error-reporting.js";
 
 async function bootstrap() {
+  initErrorReporting();
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     bodyParser: false,
   });

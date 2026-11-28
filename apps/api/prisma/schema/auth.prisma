@@ -18,6 +18,7 @@ model user {
   passwordRecoveryRequests PasswordRecoveryRequest[]
   notificationPreferences NotificationPreference[]
   notificationDeliveries NotificationDelivery[]
+  pushDevices DeviceToken[]
   id            String    @id
   name          String
   email         String    @unique
@@ -127,6 +128,7 @@ model session {
   desktopDevice        SyncDevice? @relation(fields: [desktopDeviceId], references: [id], onDelete: Cascade)
 
   user user @relation(fields: [userId], references: [id], onDelete: Cascade)
+  pushDevices DeviceToken[]
 
   @@index([token])
   @@index([userId])

@@ -4,13 +4,12 @@ import {
   ArrowRight,
   Eye,
   EyeOff,
-  GraduationCap,
   LockKeyhole,
   Mail,
   ShieldCheck,
   Sparkles,
 } from "lucide-react";
-import { lazy, Suspense, useEffect, useState, type FormEvent } from "react";
+import { lazy, Suspense, useCallback, useEffect, useState, type FormEvent } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { studentLoginEmail } from "@schoolhub/shared";
 import { apiFetch, getClientSubdomain } from "@/lib/api";
@@ -39,6 +38,36 @@ function LoginPage() {
   const navigate = useNavigate();
   const { data: session, isPending: sessionPending } = useSession();
   const subdomain = getClientSubdomain();
+  // Capture the allowlisted continuation when login starts, before the router
+  // changes location and search during the sign-in transition.
+  const [feesSchool] = useState(() =>
+    new URLSearchParams(window.location.search).get("continue") === "guardian-fees"
+      ? getClientSubdomain()
+      : null,
+  );
+  // Where an expired session came from. Only same-origin paths are accepted.
+  const [returnTo] = useState(() => {
+    const value = new URLSearchParams(window.location.search).get("redirect");
+    return value && value.startsWith("/") && !value.startsWith("//") && !value.startsWith("/login") ? value : null;
+  });
+  const finishSignIn = useCallback((user: { role?: string | null; mustChangePassword?: boolean | null } | undefined) => {
+    if (user?.mustChangePassword) {
+      return navigate({ to: "/change-password", replace: true });
+    }
+    if (returnTo) {
+      return navigate({ href: returnTo, replace: true });
+    }
+    if (user?.role === "superAdmin") {
+      return navigate({ to: "/admin/dashboard", replace: true });
+    }
+    if (feesSchool) {
+      return navigate({
+        href: `/guardian-fees?school=${encodeURIComponent(feesSchool)}`,
+        replace: true,
+      });
+    }
+    return navigate({ to: "/dashboard", replace: true });
+  }, [feesSchool, navigate, returnTo]);
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -61,16 +90,10 @@ function LoginPage() {
   const school = tenantData?.school;
 
   useEffect(() => {
-    if (sessionPending || !session?.user) return;
+    if (sessionPending || loading || needsTwoFactor || !session?.user) return;
 
-    if (session.user.mustChangePassword) {
-      void navigate({ to: "/change-password", replace: true });
-    } else if (session.user.role === "superAdmin") {
-      void navigate({ to: "/admin/dashboard", replace: true });
-    } else {
-      void navigate({ to: "/dashboard", replace: true });
-    }
-  }, [navigate, session, sessionPending]);
+    void finishSignIn(session.user);
+  }, [finishSignIn, session, sessionPending, loading, needsTwoFactor]);
 
   useEffect(() => {
     if (sessionPending || session?.user) return;
@@ -83,24 +106,18 @@ function LoginPage() {
       <main className="flex min-h-screen items-center justify-center bg-background">
         <div role="status" className="flex items-center gap-3 text-sm text-muted-foreground">
           <span className="size-2 animate-pulse rounded-full bg-primary" />
-          {sessionPending ? "Checking your session…" : "Redirecting to your dashboard…"}
+          {sessionPending ? "Checking your session…" : "Opening your school portal…"}
         </div>
       </main>
     );
   }
 
-  async function finishSignIn(user: { role?: string | null; mustChangePassword?: boolean | null } | undefined) {
+  async function finishInteractiveSignIn(user: Parameters<typeof finishSignIn>[0]) {
     if (rememberDevice && platform.rememberSession) {
       try { await platform.rememberSession(); }
       catch { platform.savedSignInWarning?.(); }
     }
-    if (user?.mustChangePassword) {
-      await navigate({ to: "/change-password", replace: true });
-    } else if (user?.role === "superAdmin") {
-      await navigate({ to: "/admin/dashboard", replace: true });
-    } else {
-      await navigate({ to: "/dashboard", replace: true });
-    }
+    await finishSignIn(user);
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -113,7 +130,7 @@ function LoginPage() {
       if (!loginEmail.includes("@")) {
         const schoolSub = getClientSubdomain();
         if (!schoolSub) {
-          setError("Open your school’s SchoolHub address to sign in with a username, or use your email.");
+          setError("Open your school’s schoolHub address to sign in with a username, or use your email.");
           setLoading(false);
           return;
         }
@@ -139,7 +156,7 @@ function LoginPage() {
         return;
       }
 
-      await finishSignIn(result.data?.user);
+      await finishInteractiveSignIn(result.data?.user);
     } catch {
       setError("We couldn’t connect. Check your internet connection and try again.");
     } finally {
@@ -177,12 +194,12 @@ function LoginPage() {
             {school?.logo ? (
               <img src={school.logo} alt={school.name} className="size-full object-cover" />
             ) : (
-              <GraduationCap className="size-6 text-brand-foreground/80" strokeWidth={2.2} />
+              <img src="/schoolhub.webp" alt="" className="size-full object-contain" />
             )}
           </span>
           <span>
             <span className="block text-lg font-bold tracking-tight">
-              {school?.name ?? "SchoolHub"}
+              {school?.name ?? "schoolHub"}
             </span>
             <span className="block text-[10px] font-semibold uppercase tracking-[0.22em] text-brand-foreground/80">
               {school?.motto ?? "School management"}
@@ -239,7 +256,7 @@ function LoginPage() {
 
         <div className="relative z-10 flex items-center justify-between text-[11px] text-brand-foreground/80">
           <span>Thoughtfully made for school communities</span>
-          <span>© {new Date().getFullYear()} SchoolHub</span>
+          <span>© {new Date().getFullYear()} schoolHub</span>
         </div>
         <div
           aria-hidden="true"
@@ -263,12 +280,12 @@ function LoginPage() {
               {school?.logo ? (
                 <img src={school.logo} alt={school.name} className="size-full object-cover" />
               ) : (
-                <GraduationCap className="size-5" />
+                <img src="/schoolhub.webp" alt="" className="size-full object-contain" />
               )}
             </span>
             <span>
               <span className="block text-base font-bold tracking-tight text-foreground">
-                {school?.name ?? "SchoolHub"}
+                {school?.name ?? "schoolHub"}
               </span>
               <span className="block text-[9px] font-semibold uppercase tracking-[0.2em] text-muted-foreground/70">
                 {school?.motto ?? "School management"}
@@ -278,7 +295,7 @@ function LoginPage() {
 
           {needsTwoFactor ? (
             <TwoFactorChallenge
-              onVerified={finishSignIn}
+              onVerified={finishInteractiveSignIn}
               allowTrustDevice={!subdomain}
               onCancel={() => { setNeedsTwoFactor(false); setError(null); }}
             />
@@ -292,7 +309,7 @@ function LoginPage() {
               Sign in to your workspace
             </h2>
             <p className="mt-2 text-sm leading-6 text-muted-foreground">
-              Enter your account details to continue to {school?.name ?? "SchoolHub"}.
+              Enter your account details to continue to {school?.name ?? "schoolHub"}.
             </p>
           </div>
 

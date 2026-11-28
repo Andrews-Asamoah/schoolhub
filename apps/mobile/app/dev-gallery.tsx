@@ -150,7 +150,7 @@ export default function DevGallery() {
                 key={name}
                 style={[type[name], { color: t.colors.foreground }]}
               >
-                {name} · SchoolHub
+                {name} · schoolHub
               </Text>
             ))}
           </Card>

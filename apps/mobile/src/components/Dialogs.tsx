@@ -2,13 +2,13 @@ import { useRef, type ComponentRef, type ReactNode } from "react";
 import {
   AccessibilityInfo,
   findNodeHandle,
-  Modal,
   ScrollView,
   View,
 } from "react-native";
 import { Text } from "@/components/Typography";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { type, useTheme } from "@/theme/theme";
+import { ModalOverlay } from "./ModalOverlay";
 import { Button } from "./Button";
 export function Dialog({
   visible,
@@ -21,28 +21,21 @@ export function Dialog({
   children: ReactNode;
   onClose: () => void;
 }) {
-  const { colors, reduceMotion } = useTheme();
+  const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const heading = useRef<ComponentRef<typeof Text>>(null);
   return (
-    <Modal
+    <ModalOverlay
       visible={visible}
-      transparent
-      animationType={reduceMotion ? "none" : "fade"}
-      onRequestClose={onClose}
+      onDismiss={onClose}
       onShow={() => {
         const node = findNodeHandle(heading.current);
         if (node) AccessibilityInfo.setAccessibilityFocus(node);
       }}
     >
       <View
-        accessibilityViewIsModal
-        style={{
-          flex: 1,
-          justifyContent: "flex-end",
-          backgroundColor: "rgba(0,0,0,0.55)",
-          paddingTop: insets.top + 24,
-        }}
+        style={{ maxHeight: "100%", paddingTop: insets.top + 20 }}
+        pointerEvents="box-none"
       >
         <View
           style={{
@@ -68,11 +61,10 @@ export function Dialog({
               {title}
             </Text>
             {children}
-            <Button label="Cancel" variant="secondary" onPress={onClose} />
           </ScrollView>
         </View>
       </View>
-    </Modal>
+    </ModalOverlay>
   );
 }
 export function ConfirmDialog({

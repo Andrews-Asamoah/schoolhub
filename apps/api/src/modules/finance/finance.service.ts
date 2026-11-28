@@ -7,8 +7,12 @@ import {
 } from "@nestjs/common";
 import { PrismaService } from "../../prisma/prisma.service.js";
 import { FinancePostingService } from "./finance-posting.service.js";
+import { loadApprovalSetting, mayApprovePayrollRun } from "./finance-approval-settings.js";
+import { ownTeacherPayslipScope } from "./teacher-payslips.js";
 import { FinanceApprovalService } from "./finance-approval.service.js";
-import type { CreateExpenseInput, GenerateBillInput, RecordPaymentInput, StudentStatementResponse } from "@schoolhub/shared";
+import { formatPersonName, type CreateExpenseInput, type GenerateBillInput, type RecordPaymentInput, type StudentStatementResponse } from "@schoolhub/shared";
+import { decryptPayrollDetails, encryptPayrollDetails } from "./payroll/payroll-details-crypto.js";
+import { payrollPersonKind, type PayrollPaymentDetailsInput, type PayrollSalaryImportInput } from "./payroll/payroll-inputs.js";
 import { calculatePayslip } from "./payroll/payroll-calculator.js";
 import { resolvePayrollSettings } from "./payroll-settings.js";
 import { Prisma, type AccountCategory, type AccountType, type AuditAction, type PaymentMethod, type TransactionCategory } from "@prisma/client";
@@ -45,6 +49,11 @@ type StudentStatementQuery = {
   termId?: string;
 };
 
+type ScholarshipAwardInput = {
+  name: string; valueType: "PERCENTAGE" | "FIXED"; value: number;
+  reason?: string; academicYearId?: string; termId?: string; startDate?: string; endDate?: string;
+};
+
 const BILL_STATUSES = ["PENDING", "PARTIALLY_PAID", "PAID", "OVERDUE", "CANCELLED", "WAIVED"] as const;
 const PAYMENT_METHODS = ["CASH", "BANK_TRANSFER", "CHEQUE", "MOBILE_MONEY", "CARD", "ONLINE", "OTHER"] as const;
 
@@ -58,6 +67,14 @@ function parseIsoDate(value: string | undefined, label: string, endOfDay = false
     throw new BadRequestException(`Enter a valid ${label} date.`);
   }
   return date;
+}
+
+function activeBillingEnrollment(schoolId: string, academicYearId: string, termId: string): Prisma.EnrollmentWhereInput {
+  return {
+    academicYearId, termId, status: "ACTIVE",
+    student: { schoolId, deletedAt: null, status: "ACTIVE" },
+    class: { schoolId, deletedAt: null },
+  };
 }
 
 function addUtcDays(date: Date, days: number): Date {
@@ -190,19 +207,6 @@ export class FinanceService {
       });
     });
     return this.getPeriodLock(schoolId);
-  }
-
-  /**
-   * Separation of duties: the person who prepared a payroll run cannot approve
-   * it, and the approver cannot be the one who confirms it paid. A different
-   * accountant or a platform administrator completes the step. Single-person schools require an independent authorised approver.
-   */
-  private assertSeparationOfDuties(actorId: string, earlierActorId: string | null | undefined, step: "approved" | "marked as paid") {
-    if (earlierActorId && earlierActorId === actorId) {
-      throw new ForbiddenException(
-        `A payroll run cannot be ${step} by the same person who ${step === "approved" ? "prepared" : "approved"} it. Ask another accountant or the platform administrator.`,
-      );
-    }
   }
 
   /** Audit entry written inside the caller's transaction so it commits (or rolls back) with the change. */
@@ -574,7 +578,7 @@ export class FinanceService {
       classLevel?: string | null;
       termBased: boolean;
       targetClassIds: string[];
-      items: { registryItemId?: string | null; name: string; amount: number; isOptional: boolean; description?: string | null }[];
+      items: { registryItemId?: string | null; name: string; amount: number; isOptional: boolean; followsBusRoster?: boolean; description?: string | null }[];
     },
   ) {
     const classIds = [...new Set(input.targetClassIds)];
@@ -617,6 +621,7 @@ export class FinanceService {
               name: item.name.trim() || registryItem?.name || "Fee item",
               amount: new Prisma.Decimal(item.amount),
               isOptional: item.isOptional,
+              followsBusRoster: item.isOptional && (item.followsBusRoster ?? false),
               description: item.description?.trim() || null,
               registryItemId: item.registryItemId || null,
             };
@@ -640,7 +645,7 @@ export class FinanceService {
       classLevel?: string | null;
       termBased: boolean;
       targetClassIds: string[];
-      items: { registryItemId?: string | null; name: string; amount: number; isOptional: boolean; description?: string | null }[];
+      items: { registryItemId?: string | null; name: string; amount: number; isOptional: boolean; followsBusRoster?: boolean; description?: string | null }[];
     },
   ) {
     const classIds = [...new Set(input.targetClassIds)];
@@ -701,6 +706,7 @@ export class FinanceService {
                 name: item.name.trim() || registryItem?.name || "Fee item",
                 amount: new Prisma.Decimal(item.amount),
                 isOptional: item.isOptional,
+                followsBusRoster: item.isOptional && (item.followsBusRoster ?? false),
                 description: item.description?.trim() || null,
                 registryItemId: item.registryItemId || null,
               };
@@ -748,7 +754,7 @@ export class FinanceService {
             select: {
               id: true,
               admissionNumber: true,
-              profile: { select: { firstName: true, lastName: true } },
+              profile: { select: { firstName: true, otherNames: true, lastName: true } },
             },
           },
         },
@@ -803,50 +809,119 @@ export class FinanceService {
     return this.prisma.client.siblingDiscountPolicy.update({ where: { id: policyId }, data: { isActive } });
   }
 
-  async createStudentScholarship(
-    schoolId: string,
-    createdById: string,
-    input: {
-      studentId: string; name: string; valueType: "PERCENTAGE" | "FIXED"; value: number;
-      reason?: string; academicYearId?: string; termId?: string; startDate?: string; endDate?: string;
-    },
-  ) {
-    const [student, academicYear, term] = await Promise.all([
-      this.prisma.client.student.findFirst({
-        where: { id: input.studentId, schoolId, deletedAt: null, status: "ACTIVE" },
-        select: { id: true },
-      }),
-      input.academicYearId
-        ? this.prisma.client.academicYear.findFirst({ where: { id: input.academicYearId, schoolId }, select: { id: true } })
-        : Promise.resolve(null),
-      input.termId
-        ? this.prisma.client.term.findFirst({ where: { id: input.termId, academicYear: { schoolId } }, select: { id: true, academicYearId: true } })
-        : Promise.resolve(null),
-    ]);
-    if (!student) throw new NotFoundException("Active student not found in this school.");
-    if (input.academicYearId && !academicYear) throw new BadRequestException("The selected academic year does not belong to this school.");
-    if (input.termId && !term) throw new BadRequestException("The selected term does not belong to this school.");
-    if (term && input.academicYearId && term.academicYearId !== input.academicYearId) {
-      throw new BadRequestException("The selected term belongs to a different academic year.");
+  async searchScholarshipStudents(schoolId: string, search: string) {
+    if (!search) return { students: [], hasMore: false };
+
+    const students = this.prisma.client.student;
+    const where = { schoolId, status: "ACTIVE" as const, deletedAt: null };
+    const select = {
+      id: true,
+      admissionNumber: true,
+      studentId: true,
+      profile: { select: { firstName: true, otherNames: true, lastName: true } },
+    } satisfies Prisma.StudentSelect;
+    const escapeLike = (value: string) => value.replace(/[\\%_]/g, character => "\\" + character);
+    const admissionMatches = await students.findMany({
+      where: { ...where, admissionNumber: { equals: escapeLike(search), mode: "insensitive" } },
+      orderBy: { admissionNumber: "asc" },
+      take: 13,
+      select,
+    });
+    if (admissionMatches.length) {
+      return { students: admissionMatches.slice(0, 12), hasMore: admissionMatches.length > 12 };
     }
+
+    const matches = await students.findMany({
+      where: {
+        ...where,
+        OR: [
+          { admissionNumber: { contains: escapeLike(search), mode: "insensitive" } },
+          { AND: search.split(/\s+/).map(word => {
+            const nameMatch = { contains: escapeLike(word), mode: "insensitive" as const };
+            return { profile: { OR: [
+              { firstName: nameMatch }, { otherNames: nameMatch }, { lastName: nameMatch },
+            ] } };
+          }) },
+        ],
+      },
+      orderBy: [{ profile: { firstName: "asc" } }, { profile: { lastName: "asc" } }, { id: "asc" }],
+      take: 13,
+      select,
+    });
+    return { students: matches.slice(0, 12), hasMore: matches.length > 12 };
+  }
+
+  async createStudentScholarship(schoolId: string, createdById: string, input: ScholarshipAwardInput & { studentId: string }) {
+    const [award] = await this.saveScholarshipAwards(schoolId, createdById, input, [input.studentId], false);
+    return award!;
+  }
+
+  async createStudentScholarships(schoolId: string, createdById: string, input: ScholarshipAwardInput & { studentIds: string[] }) {
+    const studentIds = [...new Set(input.studentIds)];
+    if (!studentIds.length || studentIds.length > 100) {
+      throw new BadRequestException("Select between 1 and 100 students.");
+    }
+    const awards = await this.saveScholarshipAwards(schoolId, createdById, input, studentIds, true);
+    return { awardedCount: awards.length };
+  }
+
+  private async saveScholarshipAwards(
+    schoolId: string, createdById: string, input: ScholarshipAwardInput, studentIds: string[], auditBatch: boolean,
+  ) {
     if (input.valueType === "PERCENTAGE" && input.value > 100) throw new BadRequestException("Scholarship percentage cannot exceed 100%.");
     if (input.value <= 0) throw new BadRequestException("Scholarship value must be greater than zero.");
-    if (input.startDate && input.endDate && input.startDate > input.endDate) {
+    const startDate = parseIsoDate(input.startDate, "scholarship start date");
+    const endDate = parseIsoDate(input.endDate, "scholarship end date");
+    if (startDate && endDate && startDate > endDate) {
       throw new BadRequestException("The scholarship end date must be on or after its start date.");
     }
-    return this.prisma.client.studentScholarship.create({
-      data: {
-        schoolId, createdById, studentId: student.id, name: input.name.trim(),
-        valueType: input.valueType, value: new Prisma.Decimal(input.value),
-        reason: input.reason?.trim() || null, academicYearId: academicYear?.id ?? term?.academicYearId ?? null,
-        termId: term?.id ?? null,
-        startDate: input.startDate ? new Date(input.startDate) : null,
-        endDate: input.endDate ? new Date(input.endDate) : null,
-      },
-      include: {
-        student: { select: { id: true, admissionNumber: true, profile: { select: { firstName: true, lastName: true } } } },
-      },
-    });
+
+    return withSerializableRetry(() => this.prisma.client.$transaction(async tx => {
+      const [students, academicYear, term] = await Promise.all([
+        tx.student.findMany({
+          where: { id: { in: studentIds }, schoolId, deletedAt: null, status: "ACTIVE" },
+          select: { id: true },
+        }),
+        input.academicYearId
+          ? tx.academicYear.findFirst({ where: { id: input.academicYearId, schoolId }, select: { id: true } })
+          : Promise.resolve(null),
+        input.termId
+          ? tx.term.findFirst({ where: { id: input.termId, academicYear: { schoolId } }, select: { id: true, academicYearId: true } })
+          : Promise.resolve(null),
+      ]);
+      if (students.length !== studentIds.length) {
+        throw new NotFoundException(auditBatch
+          ? "One or more students are no longer available. Review the selection before saving."
+          : "Active student not found in this school.");
+      }
+      if (input.academicYearId && !academicYear) throw new BadRequestException("The selected academic year does not belong to this school.");
+      if (input.termId && !term) throw new BadRequestException("The selected term does not belong to this school.");
+      if (term && academicYear && term.academicYearId !== academicYear.id) {
+        throw new BadRequestException("The selected term belongs to a different academic year.");
+      }
+
+      const data = {
+        schoolId, createdById, name: input.name.trim(),
+        valueType: input.valueType, value: new Prisma.Decimal(input.value), reason: input.reason?.trim() || null,
+        academicYearId: academicYear?.id ?? term?.academicYearId ?? null, termId: term?.id ?? null,
+        startDate: startDate ?? null, endDate: endDate ?? null,
+      };
+      const awards = await tx.studentScholarship.createManyAndReturn({
+        data: studentIds.map(studentId => ({ ...data, studentId })),
+        include: {
+          student: { select: { id: true, admissionNumber: true, profile: { select: { firstName: true, otherNames: true, lastName: true } } } },
+        },
+      });
+      if (auditBatch) {
+        await this.writeAudit(tx, {
+          actorId: createdById, schoolId, action: "CREATE", entityType: "FINANCE POST /finance/scholarships/bulk",
+          entityId: awards[0]!.id,
+          newValues: { ...data, value: data.value.toFixed(2), startDate: input.startDate ?? null, endDate: input.endDate ?? null,
+            awards: awards.map(({ id, studentId }) => ({ id, studentId })) },
+        });
+      }
+      return awards;
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }));
   }
 
   async setStudentScholarshipActive(schoolId: string, scholarshipId: string, isActive: boolean) {
@@ -931,63 +1006,120 @@ export class FinanceService {
     return { details, totalDiscount: round(totalDiscount) };
   }
 
-  async generateBills(schoolId: string, input: GenerateBillInput, actorId: string) {
-    const currentYear = await this.prisma.client.academicYear.findFirst({
-      where: { schoolId, isCurrent: true },
-      include: { terms: { where: { isCurrent: true }, take: 1 } },
+  private async busStatuses(
+    db: Prisma.TransactionClient, schoolId: string, studentIds: string[], term: { id: string; startDate: Date },
+  ) {
+    if (!studentIds.length) return new Map<string, "RIDING" | "PAUSED" | "STOPPED">();
+    const decisions = await db.busTermDecision.findMany({
+      where: {
+        studentId: { in: studentIds }, student: { schoolId },
+        term: { startDate: { lte: term.startDate }, academicYear: { schoolId } },
+        OR: [{ termId: term.id }, { status: { not: "PAUSED" }, term: { startDate: { lt: term.startDate } } }],
+      },
+      select: { studentId: true, status: true },
+      orderBy: [{ term: { startDate: "asc" } }, { termId: "asc" }],
     });
-    const currentTerm = currentYear?.terms[0];
-    if (!currentYear || !currentTerm) {
-      throw new BadRequestException("This school has not selected a current academic year and term.");
-    }
-    if (input.academicYearId !== currentYear.id || (input.termId && input.termId !== currentTerm.id)) {
-      throw new BadRequestException("Bills can only be generated for the currently selected academic year and term.");
-    }
-    if (input.classId) {
-      const schoolClass = await this.prisma.client.class.findFirst({
-        where: { id: input.classId, schoolId, deletedAt: null },
-        select: { id: true },
-      });
-      if (!schoolClass) throw new NotFoundException("Class not found in this school.");
-    }
+    return new Map(decisions.map(row => [row.studentId, row.status]));
+  }
 
-    let studentIds: string[] = [];
-    if (input.studentId) {
-      const enrollment = await this.prisma.client.enrollment.findFirst({
-        where: {
-          studentId: input.studentId,
-          academicYearId: currentYear.id,
-          termId: currentTerm.id,
-          status: "ACTIVE",
-          student: { schoolId, deletedAt: null, status: "ACTIVE" },
-        },
-        select: { studentId: true },
-      });
-      if (!enrollment) throw new BadRequestException("The selected student is not enrolled in the current term.");
-      studentIds = [enrollment.studentId];
-    } else if (input.classId) {
-      const students = await this.prisma.client.enrollment.findMany({
-        where: {
-          classId: input.classId,
-          academicYearId: currentYear.id,
-          termId: currentTerm.id,
-          status: "ACTIVE",
-          student: { schoolId, deletedAt: null, status: "ACTIVE" },
-        },
-        select: { studentId: true },
-      });
-      studentIds = students.map((enrollment) => enrollment.studentId);
-    } else {
-      throw new BadRequestException("Either classId or studentId must be provided");
-    }
-    if (studentIds.length === 0) return { success: true, count: 0, totalBilled: "0.00", message: "No active students to bill" };
-    studentIds.sort();
+  async getBillingRoster(schoolId: string, classes: string | string[], academicYearId?: string, termId?: string, currentOnly = true) {
+    const db = this.prisma.client;
+    const term = await db.term.findFirst({
+      where: { id: termId, academicYearId, ...(currentOnly ? { isCurrent: true } : {}),
+        academicYear: { schoolId, ...(currentOnly ? { isCurrent: true } : {}) } },
+      select: { id: true, academicYearId: true, startDate: true },
+    });
+    if (!term) throw new BadRequestException("Choose a valid billing term for this school.");
+    const enrollments = await db.enrollment.findMany({
+      where: { ...activeBillingEnrollment(schoolId, term.academicYearId, term.id), classId: typeof classes === "string" ? classes : { in: classes },
+        ...(currentOnly ? { class: { schoolId, deletedAt: null, isActive: true } } : {}),
+      },
+      select: { student: { select: {
+        id: true, admissionNumber: true, studentId: true,
+        profile: { select: { firstName: true, otherNames: true, lastName: true } },
+      } } },
+      orderBy: [{ student: { profile: { lastName: "asc" } } }, { student: { profile: { firstName: "asc" } } }, { studentId: "asc" }],
+    });
+    const statuses = await this.busStatuses(db, schoolId, enrollments.map(row => row.student.id), term);
+    return enrollments.map(({ student }) => ({
+      id: student.id, reference: student.admissionNumber || student.studentId,
+      name: formatPersonName(student.profile) || student.admissionNumber || student.studentId,
+      busStatus: statuses.get(student.id) ?? "STOPPED",
+    }));
+  }
 
-    const year = new Date().getUTCFullYear();
+  async setBusDecisions(schoolId: string, actorId: string, input: {
+    termId: string; studentIds: string[]; status: "RIDING" | "PAUSED" | "STOPPED" | "INHERIT";
+  }) {
+    const studentIds = [...new Set(input.studentIds)].sort();
+    return withSerializableRetry(() => this.prisma.client.$transaction(async tx => {
+      const term = await tx.term.findFirst({
+        where: { id: input.termId, academicYear: { schoolId } },
+        select: { academicYearId: true },
+      });
+      if (!term) throw new NotFoundException("Term not found.");
+      const rosterCount = await tx.enrollment.count({
+        where: { ...activeBillingEnrollment(schoolId, term.academicYearId, input.termId), studentId: { in: studentIds } },
+      });
+      if (rosterCount !== studentIds.length) throw new BadRequestException("Some students are no longer enrolled for this term. Refresh the roster.");
+      if (input.status === "INHERIT") {
+        await tx.busTermDecision.deleteMany({ where: { studentId: { in: studentIds }, termId: input.termId } });
+      } else {
+        const status = input.status;
+        for (const studentId of studentIds) {
+          await tx.busTermDecision.upsert({
+            where: { studentId_termId: { studentId, termId: input.termId } },
+            create: { studentId, termId: input.termId, status }, update: { status },
+          });
+        }
+      }
+      await this.writeAudit(tx, { schoolId, actorId, action: "UPDATE", entityType: "FINANCE BUS_ROSTER",
+        entityId: input.termId, newValues: { studentIds, status: input.status } });
+      return { count: studentIds.length };
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }));
+  }
+
+  async linkBusFee(schoolId: string, actorId: string, feeItemId: string, enabled: boolean) {
+    return this.prisma.client.$transaction(async tx => {
+      const changed = await tx.feeItem.updateMany({
+        where: { id: feeItemId, isOptional: true, feeStructure: { schoolId, isActive: true } },
+        data: { followsBusRoster: enabled },
+      });
+      if (!changed.count) throw new NotFoundException("Active optional fee item not found.");
+      await this.writeAudit(tx, { schoolId, actorId, action: "UPDATE", entityType: "FINANCE BUS_FEE",
+        entityId: feeItemId, newValues: { followsBusRoster: enabled } });
+      return { enabled };
+    });
+  }
+
+  async generateBills(schoolId: string, input: GenerateBillInput, actorId: string) {
+    const classIds = [...new Set(input.classIds ?? (input.classId ? [input.classId] : []))];
+    if (!input.studentId && !classIds.length) {
+      throw new BadRequestException("Choose at least one class or a student.");
+    }
+    const issuedAt = new Date();
+    const dueDate = parseIsoDate(input.dueDate, "due");
+    const year = issuedAt.getUTCFullYear();
     const billingResult = await withSerializableRetry(() => this.prisma.client.$transaction(async (tx) => {
       const accrual = await this.lockAccrualTransition(tx, schoolId);
-      if (accrual) await this.assertPostingDate(tx, schoolId, new Date());
+      if (accrual) await this.assertPostingDate(tx, schoolId, issuedAt);
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${schoolId}), hashtext(${input.feeStructureId}))`;
+      const currentYear = await tx.academicYear.findFirst({
+        where: { schoolId, isCurrent: true },
+        include: { terms: { where: { isCurrent: true }, take: 1 } },
+      });
+      const currentTerm = currentYear?.terms[0];
+      if (!currentYear || !currentTerm) {
+        throw new BadRequestException("This school has not selected a current academic year and term.");
+      }
+      if (input.academicYearId !== currentYear.id || (input.termId && input.termId !== currentTerm.id)) {
+        throw new BadRequestException("Bills can only be generated for the currently selected academic year and term.");
+      }
+      if (classIds.length) {
+        const validClassCount = await tx.class.count({ where: { id: { in: classIds }, schoolId, isActive: true, deletedAt: null } });
+        if (validClassCount !== classIds.length) throw new NotFoundException("One or more billing classes are inactive or unavailable.");
+      }
+
       const feeStructure = await tx.feeStructure.findFirst({
         where: { id: input.feeStructureId, schoolId, isActive: true },
         include: { items: true, targetClasses: { select: { classId: true } } },
@@ -995,32 +1127,69 @@ export class FinanceService {
       if (!feeStructure) throw new NotFoundException("Fee structure not found.");
       if (!feeStructure.items.length) throw new BadRequestException("Fee structure contains no billable items.");
 
+      const targets = new Set(feeStructure.targetClasses.map(target => target.classId));
+      if (targets.size && classIds.some(classId => !targets.has(classId))) {
+        throw new BadRequestException("The fee structure is not assigned to every selected class.");
+      }
+      const enrollments = await tx.enrollment.findMany({
+        where: {
+          ...activeBillingEnrollment(schoolId, currentYear.id, currentTerm.id),
+          class: { schoolId, deletedAt: null, isActive: true },
+          ...(classIds.length ? { classId: { in: classIds } } : {}),
+          ...(input.studentId ? { studentId: input.studentId } : {}),
+        },
+        select: { studentId: true, classId: true },
+        orderBy: { studentId: "asc" },
+      });
+      if (targets.size && enrollments.some(row => !targets.has(row.classId))) {
+        throw new BadRequestException("The fee structure is not assigned to the student's class.");
+      }
+      const studentIds = enrollments.map(row => row.studentId);
+      if (input.studentId && !studentIds.length) {
+        throw new BadRequestException("The selected student is not enrolled in the billing class and term.");
+      }
+      const eligibleStudents = new Set(studentIds);
       const optionalIds = new Set(input.optionalItemIds ?? []);
-      const optionalItems = feeStructure.items.filter((item) => item.isOptional);
-      const optionalItemsById = new Map(optionalItems.map((item) => [item.id, item]));
-      for (const optionalId of optionalIds) {
-        if (!optionalItemsById.has(optionalId)) {
-          throw new BadRequestException("Every optionalItemId must identify an optional item in this fee structure.");
+      const optionalItems = new Map(feeStructure.items.filter(item => item.isOptional).map(item => [item.id, item]));
+      const selections = new Map<string, Set<string>>();
+      for (const entry of input.optionalSelections ?? []) {
+        if (optionalIds.has(entry.feeItemId) || selections.has(entry.feeItemId)) {
+          throw new BadRequestException("Choose one student selection per optional fee item.");
+        }
+        const selectedStudents = new Set(entry.studentIds);
+        if ([...selectedStudents].some(id => !eligibleStudents.has(id))) {
+          throw new BadRequestException("One or more students selected for an optional fee are no longer in the billing roster. Refresh the roster before trying again.");
+        }
+        selections.set(entry.feeItemId, selectedStudents);
+      }
+      for (const optionalId of [...optionalIds, ...selections.keys()]) {
+        if (!optionalItems.has(optionalId)) {
+          throw new BadRequestException("Every optional fee selection must identify an optional item in this fee structure.");
         }
       }
-      const billableItems = feeStructure.items.filter((item) => !item.isOptional || optionalIds.has(item.id));
-      if (billableItems.length === 0) throw new BadRequestException("Select at least one fee item to generate this bill.");
+      const busFees = feeStructure.items.filter(item => item.isOptional && item.followsBusRoster);
+      if (busFees.some(item => optionalIds.has(item.id) || selections.has(item.id))) {
+        throw new BadRequestException("Linked bus fees use the term bus roster. Refresh the fee structure and try again.");
+      }
+      const busRiders = busFees.length ? await this.busStatuses(tx, schoolId, studentIds, currentTerm) : new Map<string, string>();
+      if (!studentIds.length) return { bills: [], emptyRoster: true, skippedExisting: 0 };
+      const batchItems = feeStructure.items.filter(item => !item.isOptional || optionalIds.has(item.id) || selections.has(item.id) || item.followsBusRoster);
+      if (!batchItems.length) throw new BadRequestException("Select at least one fee item to generate this bill.");
       // P3 revenue schedules are not yet journal-backed. Refuse to issue a term-spanning
       // invoice as immediately earned revenue simply because the old bill path lacks
       // deferral handling. Existing AT_INVOICE billing remains unchanged.
-      if (billableItems.some(item => item.recognitionMethod !== "AT_INVOICE")) {
+      if (batchItems.some(item => item.recognitionMethod !== "AT_INVOICE")) {
         throw new ConflictException("Deferred-revenue fee items are not ready for billing until P3 recognition posting is activated and reconciled.");
       }
-      if (
-        input.classId &&
-        feeStructure.targetClasses.length > 0 &&
-        !feeStructure.targetClasses.some((target) => target.classId === input.classId)
-      ) {
-        throw new BadRequestException("This fee structure is not assigned to the selected class.");
-      }
-
+      const currentTermBills = await tx.bill.findMany({
+        where: { schoolId, academicYearId: currentYear.id, termId: currentTerm.id, studentId: { in: studentIds } },
+        select: { studentId: true, feeStructureId: true, status: true, carryForwardSnapshotCreated: true },
+      });
+      const existingInvoices = new Set(currentTermBills
+        .filter(bill => bill.feeStructureId === feeStructure.id && bill.status !== "CANCELLED" && bill.status !== "WAIVED")
+        .map(bill => bill.studentId));
+      const snapshotted = new Set(currentTermBills.filter(bill => bill.carryForwardSnapshotCreated).map(bill => bill.studentId));
       const billNumbers = await this.createNumberSequence(tx, schoolId, "bill", `INV-${year}-`);
-      const totalAmount = billableItems.reduce((sum, item) => sum.plus(item.amount), new Prisma.Decimal(0));
       const previousBills = await tx.bill.findMany({
         where: {
           schoolId,
@@ -1091,16 +1260,18 @@ export class FinanceService {
       }
 
       const results: Array<{ id: string; billNumber: string; totalAmount: Prisma.Decimal }> = [];
-      for (const studentId of studentIds) {
-        const existingBill = await tx.bill.findFirst({
-          where: {
-            schoolId, studentId, academicYearId: currentYear.id, termId: currentTerm.id,
-            feeStructureId: input.feeStructureId, status: { notIn: ["CANCELLED", "WAIVED"] },
-          },
-          select: { id: true },
-        });
-        if (existingBill) continue;
-
+      let skippedExisting = 0;
+      for (const { studentId, classId } of enrollments) {
+        const billableItems = batchItems.filter(item =>
+          !item.isOptional || optionalIds.has(item.id) || selections.get(item.id)?.has(studentId)
+            || (item.followsBusRoster && busRiders.get(studentId) === "RIDING"),
+        );
+        if (!billableItems.length) continue;
+        if (existingInvoices.has(studentId)) {
+          skippedExisting++;
+          continue;
+        }
+        const totalAmount = billableItems.reduce((sum, item) => sum.plus(item.amount), new Prisma.Decimal(0));
         const concessions = await this.calculateStudentConcessions(
           tx, schoolId, studentId, currentYear.id, currentTerm.id, totalAmount,
         );
@@ -1109,6 +1280,7 @@ export class FinanceService {
         const lateFeeSources = lateFeeSourcesByStudent.get(studentId) ?? [];
         const lateFeeTotal = lateFeeSources.reduce((sum, source) => sum.plus(source.amount), new Prisma.Decimal(0));
         const billTotal = netTotal.plus(lateFeeTotal);
+        let cumulativeGross = new Prisma.Decimal(0);
         let allocatedDiscount = new Prisma.Decimal(0);
         const billItems: Array<{
           feeItemId: string | null;
@@ -1119,12 +1291,16 @@ export class FinanceService {
           discountAmount: Prisma.Decimal;
           balanceAmount: Prisma.Decimal;
           status: "FULLY_PAID" | "UNPAID";
-        }> = billableItems.map((item, index) => {
+        }> = billableItems.map((item) => {
           const grossLine = item.amount;
-          const lineDiscount = index === billableItems.length - 1
-            ? round(concessions.totalDiscount.minus(allocatedDiscount))
-            : round(concessions.totalDiscount.mul(grossLine).div(totalAmount.eq(0) ? 1 : totalAmount));
-          allocatedDiscount = allocatedDiscount.plus(lineDiscount);
+          cumulativeGross = cumulativeGross.plus(grossLine);
+          // Cumulative rounding keeps each discount between zero and its line amount,
+          // while reconciling all line discounts to the invoice discount.
+          const cumulativeDiscount = totalAmount.eq(0)
+            ? new Prisma.Decimal(0)
+            : round(concessions.totalDiscount.mul(cumulativeGross).div(totalAmount));
+          const lineDiscount = cumulativeDiscount.minus(allocatedDiscount);
+          allocatedDiscount = cumulativeDiscount;
           const netLine = Prisma.Decimal.max(0, round(grossLine.minus(lineDiscount)));
           return {
             feeItemId: item.id,
@@ -1148,17 +1324,7 @@ export class FinanceService {
           status: "UNPAID" as const,
         })));
 
-        const alreadySnapshotted = await tx.bill.findFirst({
-          where: {
-            schoolId,
-            studentId,
-            academicYearId: currentYear.id,
-            termId: currentTerm.id,
-            carryForwardSnapshotCreated: true,
-          },
-          select: { id: true },
-        });
-        const carryForwardRows = alreadySnapshotted ? [] : (carryForwardsByStudent.get(studentId) ?? []);
+        const carryForwardRows = snapshotted.has(studentId) ? [] : (carryForwardsByStudent.get(studentId) ?? []);
         const billNumber = billNumbers.next();
         const bill = await tx.bill.create({
           data: {
@@ -1167,7 +1333,7 @@ export class FinanceService {
             academicYearId: currentYear.id,
             termId: currentTerm.id,
             feeStructureId: input.feeStructureId,
-            classId: input.classId,
+            classId,
             carryForwardSnapshotCreated: true,
             billNumber,
             grossAmount: totalAmount.plus(lateFeeTotal),
@@ -1176,7 +1342,8 @@ export class FinanceService {
             paidAmount: new Prisma.Decimal(0),
             balanceAmount: billTotal,
             status: billTotal.eq(0) ? "PAID" : "PENDING",
-            dueDate: input.dueDate ? new Date(input.dueDate) : undefined,
+            issuedAt,
+            dueDate,
             notes: input.notes,
             items: { create: billItems },
             concessions: {
@@ -1230,7 +1397,7 @@ export class FinanceService {
             name: "School Fees Income", code: "4000",
           });
           await this.postAccrualEntry(tx, {
-            schoolId, amount: billTotal, date: new Date(),
+            schoolId, amount: billTotal, date: issuedAt,
             description: `Fees invoiced ${bill.billNumber}`,
             debit: receivables, credit: income,
             referenceType: "BILL", referenceId: bill.id, referenceNumber: bill.billNumber,
@@ -1251,22 +1418,28 @@ export class FinanceService {
           firstBillNumber: results[0]?.billNumber ?? null,
           lastBillNumber: results[results.length - 1]?.billNumber ?? null,
           classId: input.classId ?? null,
+          classIds,
           studentId: input.studentId ?? null,
           termId: currentTerm.id,
           optionalItemIds: [...optionalIds],
+          optionalSelections: [...selections].map(([feeItemId, ids]) => ({ feeItemId, studentIds: [...ids] })),
+          busFeeItemIds: busFees.map(item => item.id),
+          skippedExisting,
           lateFeesEnabled: lateFeeEnabled,
           lateFeeCount: lateFeeSourcesByStudent.size,
           totalBilled: results.reduce((sum, bill) => sum.plus(bill.totalAmount), new Prisma.Decimal(0)).toFixed(2),
         },
       });
-      return { bills: results };
-    }, { isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted }), {
+      return { bills: results, emptyRoster: false, skippedExisting };
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted, timeout: 60_000 }), {
       onExhausted: () => new ConflictException("The system is busy generating other bills. Please try again in a moment."),
     });
 
     return {
       success: true,
       count: billingResult.bills.length,
+      skippedExisting: billingResult.skippedExisting,
+      ...(billingResult.emptyRoster ? { message: "No active students to bill." } : {}),
       totalBilled: billingResult.bills.reduce((sum, bill) => sum.plus(bill.totalAmount), new Prisma.Decimal(0)).toFixed(2),
     };
   }
@@ -2080,7 +2253,7 @@ export class FinanceService {
       const existing = grouped.get(student.id) ?? {
         studentId: student.id,
         admissionNumber: student.admissionNumber,
-        name: [student.profile.firstName, student.profile.otherNames, student.profile.lastName].filter(Boolean).join(" ").trim() || student.admissionNumber || "Student",
+        name: formatPersonName(student.profile) || student.admissionNumber || "Student",
         studentStatus: student.status,
         className: student.class?.name ?? null,
         formerStudent: student.status !== "ACTIVE",
@@ -3292,7 +3465,7 @@ export class FinanceService {
       else ageing.days90Plus = ageing.days90Plus.plus(bill.balanceAmount);
     }
 
-    const studentName = [student.profile.firstName, student.profile.otherNames, student.profile.lastName].filter(Boolean).join(" ").trim();
+    const studentName = formatPersonName(student.profile);
     return {
       student: { id: student.id, admissionNumber: student.admissionNumber, name: studentName || student.admissionNumber || "Student" },
       scope,
@@ -3343,12 +3516,15 @@ export class FinanceService {
     }
     if (query.overdue === "true") filters.push({ dueDate: { lt: asOf } });
     if (query.search?.trim()) {
-      const term = query.search.trim();
+      const term = query.search.trim().replace(/[\\%_]/g, character => "\\" + character);
+      const nameWords = term.split(/\s+/).slice(0, 12);
       filters.push({ OR: [
         { billNumber: { contains: term, mode: "insensitive" } },
         { student: { admissionNumber: { contains: term, mode: "insensitive" } } },
-        { student: { profile: { firstName: { contains: term, mode: "insensitive" } } } },
-        { student: { profile: { lastName: { contains: term, mode: "insensitive" } } } },
+        { student: { profile: { AND: nameWords.map(word => {
+          const name = { contains: word, mode: "insensitive" as const };
+          return { OR: [{ firstName: name }, { otherNames: name }, { lastName: name }] };
+        }) } } },
         { class: { name: { contains: term, mode: "insensitive" } } },
       ] });
     }
@@ -3372,7 +3548,7 @@ export class FinanceService {
         take: limit + 1,
         ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
         include: {
-          student: { select: { id: true, admissionNumber: true, profile: { select: { firstName: true, lastName: true } } } },
+          student: { select: { id: true, admissionNumber: true, profile: { select: { firstName: true, otherNames: true, lastName: true } } } },
           class: { select: { id: true, name: true } },
           feeStructure: { select: { name: true } },
           academicYear: { select: { id: true, name: true } },
@@ -3419,7 +3595,7 @@ export class FinanceService {
             admissionNumber: true,
             status: true,
             deletedAt: true,
-            profile: { select: { firstName: true, lastName: true } },
+            profile: { select: { firstName: true, otherNames: true, lastName: true } },
           },
         },
         class: { select: { id: true, name: true } },
@@ -3429,7 +3605,7 @@ export class FinanceService {
     const byStudent = new Map<string, {
       id: string;
       admissionNumber: string;
-      profile: { firstName: string; lastName: string } | null;
+      profile: { firstName: string; otherNames: string | null; lastName: string } | null;
       classes: Map<string, { id: string; name: string }>;
       outstandingBalance: number;
     }>();
@@ -3460,8 +3636,8 @@ export class FinanceService {
         outstandingBalance: student.outstandingBalance,
       }))
       .sort((a, b) => {
-        const aName = [a.profile?.firstName, a.profile?.lastName].filter(Boolean).join(" ") || a.admissionNumber;
-        const bName = [b.profile?.firstName, b.profile?.lastName].filter(Boolean).join(" ") || b.admissionNumber;
+        const aName = formatPersonName(a.profile) || a.admissionNumber;
+        const bName = formatPersonName(b.profile) || b.admissionNumber;
         return aName.localeCompare(bName);
       });
   }
@@ -3517,6 +3693,7 @@ export class FinanceService {
         { student: { admissionNumber: { contains: term, mode: "insensitive" } } },
         { student: { profile: { firstName: { contains: term, mode: "insensitive" } } } },
         { student: { profile: { lastName: { contains: term, mode: "insensitive" } } } },
+        { student: { profile: { otherNames: { contains: term, mode: "insensitive" } } } },
       ] });
     }
     const where: Prisma.PaymentWhereInput = {
@@ -3534,7 +3711,7 @@ export class FinanceService {
         take: limit + 1,
         ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
         include: {
-          student: { select: { id: true, admissionNumber: true, profile: { select: { firstName: true, lastName: true } } } },
+          student: { select: { id: true, admissionNumber: true, profile: { select: { firstName: true, otherNames: true, lastName: true } } } },
           bill: { select: { id: true, billNumber: true, classId: true, class: { select: { id: true, name: true } }, academicYearId: true, termId: true } },
           billAllocations: {
             include: { bill: { select: { id: true, billNumber: true, classId: true, academicYearId: true, termId: true } } },
@@ -3724,8 +3901,7 @@ export class FinanceService {
     });
   }
 
-  async listPayrollSalaryRegister(schoolId: string) {
-    const db = this.prisma.client;
+  async listPayrollSalaryRegister(schoolId: string, db: Prisma.TransactionClient = this.prisma.client) {
     const [teachers, staff] = await Promise.all([
       db.teacher.findMany({
         where: { schoolId, isActive: true, deletedAt: null },
@@ -3754,6 +3930,7 @@ export class FinanceService {
       ...teachers.map((person) => ({
         id: person.id,
         type: "TEACHER" as const,
+        employeeCode: person.teacherId,
         identifier: person.staffNumber || person.teacherId,
         name: [person.profile?.firstName || person.firstName, person.profile?.lastName || person.lastName].filter(Boolean).join(" ").trim() || person.teacherId,
         monthlySalary: person.monthlySalary == null ? null : Number(person.monthlySalary),
@@ -3761,6 +3938,7 @@ export class FinanceService {
       ...staff.map((person) => ({
         id: person.id,
         type: "STAFF" as const,
+        employeeCode: person.staffId,
         identifier: person.staffNumber || person.staffId,
         name: [person.profile.firstName, person.profile.lastName].filter(Boolean).join(" ").trim() || person.staffId,
         monthlySalary: person.monthlySalary == null ? null : Number(person.monthlySalary),
@@ -3772,38 +3950,129 @@ export class FinanceService {
     if (kind !== "TEACHER" && kind !== "STAFF") {
       throw new BadRequestException("Choose a valid payroll person type.");
     }
-    const next = new Prisma.Decimal(monthlySalary);
-    await this.prisma.client.$transaction(async (tx) => {
-      // The change and its audit entry (old and new salary) commit together.
-      let previous: Prisma.Decimal | null;
-      if (kind === "TEACHER") {
-        const current = await tx.teacher.findFirst({
-          where: { id: personId, schoolId, deletedAt: null },
-          select: { monthlySalary: true },
-        });
-        if (!current) throw new NotFoundException("Teacher not found.");
-        previous = current.monthlySalary;
-        await tx.teacher.updateMany({ where: { id: personId, schoolId, deletedAt: null }, data: { monthlySalary: next } });
-      } else {
-        const current = await tx.staff.findFirst({
-          where: { id: personId, schoolId, deletedAt: null },
-          select: { monthlySalary: true },
-        });
-        if (!current) throw new NotFoundException("Staff member not found.");
-        previous = current.monthlySalary;
-        await tx.staff.updateMany({ where: { id: personId, schoolId, deletedAt: null }, data: { monthlySalary: next } });
+    const next = new Prisma.Decimal(monthlySalary).toDecimalPlaces(2);
+    await withSerializableRetry(() => this.prisma.client.$transaction(async (tx) => {
+      const where = { id: personId, schoolId, deletedAt: null };
+      const current = kind === "TEACHER"
+        ? await tx.teacher.findFirst({ where, select: { monthlySalary: true } })
+        : await tx.staff.findFirst({ where, select: { monthlySalary: true } });
+      if (!current) throw new NotFoundException("Employee not found.");
+      await this.savePayrollSalary(tx, schoolId, actorId, kind, personId, current.monthlySalary?.toFixed(2) ?? null, next);
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }));
+    return { id: personId, type: kind, monthlySalary: next.toNumber() };
+  }
+
+  private async savePayrollSalary(
+    tx: Prisma.TransactionClient, schoolId: string, actorId: string, kind: "TEACHER" | "STAFF",
+    personId: string, previous: string | null, next: Prisma.Decimal, source: "manual" | "workbook" = "manual",
+  ) {
+    if (previous === next.toFixed(2)) return;
+    const where = { id: personId, schoolId, deletedAt: null, monthlySalary: previous };
+    const data = { monthlySalary: next };
+    const update = kind === "TEACHER"
+      ? await tx.teacher.updateMany({ where, data })
+      : await tx.staff.updateMany({ where, data });
+    if (update.count !== 1) throw new ConflictException("A salary changed. Review the latest salary before saving.");
+    await this.writeAudit(tx, {
+      actorId, schoolId, action: "UPDATE", entityType: `PAYROLL_SALARY_${kind}`, entityId: personId,
+      ...(source === "workbook"
+        ? { newValues: { source } }
+        : { oldValues: { monthlySalary: previous }, newValues: { monthlySalary: next.toFixed(2) } }),
+    });
+  }
+
+  async importPayrollSalaries(schoolId: string, actorId: string, input: PayrollSalaryImportInput) {
+    const preview = async (db: Prisma.TransactionClient) => {
+      const employees = await this.listPayrollSalaryRegister(schoolId, db);
+      const byCode = new Map(employees.map(person => [`${person.type}:${person.employeeCode}`, person]));
+      const seen = new Set<string>();
+      const issues: { row: number; message: string }[] = [];
+      const rows = input.rows.flatMap(row => {
+        const key = `${row.kind}:${row.employeeCode}`;
+        const employee = byCode.get(key);
+        if (seen.has(key) || !employee) {
+          issues.push({ row: row.row, message: employee
+            ? "Employee appears more than once."
+            : "Employee ID and type do not match an active employee in this school." });
+          return [];
+        }
+        seen.add(key);
+        return [{
+          ...row,
+          employeeId: employee.id,
+          employeeName: employee.name,
+          expectedSalary: employee.monthlySalary?.toFixed(2) ?? null,
+          monthlySalary: new Prisma.Decimal(row.monthlySalary).toFixed(2),
+        }];
+      });
+      return { rows, issues };
+    };
+    if (input.mode === "preview") {
+      return preview(this.prisma.client);
+    }
+
+    return withSerializableRetry(() => this.prisma.client.$transaction(async tx => {
+      const { rows, issues } = await preview(tx);
+      if (issues.length || rows.some((row, i) => row.employeeId !== input.rows[i]?.employeeId
+        || row.expectedSalary !== input.rows[i]?.expectedSalary)) {
+        throw new ConflictException("The salary register changed. Preview the workbook again before importing.");
+      }
+      const changed = rows.filter(row => row.expectedSalary !== row.monthlySalary);
+      for (const row of changed) {
+        await this.savePayrollSalary(tx, schoolId, actorId, row.kind, row.employeeId,
+          row.expectedSalary, new Prisma.Decimal(row.monthlySalary), "workbook");
+      }
+      return { updatedCount: changed.length };
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, timeout: 20_000 }));
+  }
+
+  private async payrollEmployeeWhere(db: Prisma.TransactionClient, schoolId: string, kind: string, employeeId: string) {
+    if (!payrollPersonKind.safeParse(kind).success) throw new BadRequestException("Choose a valid payroll person type.");
+    const where = { schoolId, id: employeeId, isActive: true, deletedAt: null };
+    const employee = kind === "TEACHER"
+      ? await db.teacher.findFirst({ where, select: { id: true } })
+      : await db.staff.findFirst({ where, select: { id: true } });
+    if (!employee) throw new NotFoundException("Active payroll employee not found.");
+    return { schoolId, ...(kind === "TEACHER" ? { teacherId: employeeId } : { staffId: employeeId }) };
+  }
+
+  async getPayrollPaymentDetails(schoolId: string, kind: string, employeeId: string, actorId: string) {
+    const db = this.prisma.client;
+    const where = await this.payrollEmployeeWhere(db, schoolId, kind, employeeId);
+    const record = await db.payrollPaymentDetails.findFirst({ where });
+    if (!record) return { ssnitNumber: "", tier2MemberNumber: "", tin: "", bank: null, version: null };
+    const value = decryptPayrollDetails(schoolId, kind, employeeId, record.encryptedData);
+    await this.writeAudit(db, { actorId, schoolId, action: "SCHOOL_ACCESSED",
+      entityType: `PAYROLL_PAYMENT_DETAILS_${kind}`, entityId: employeeId });
+    return { ...value, version: record.updatedAt.toISOString() };
+  }
+
+  async updatePayrollPaymentDetails(
+    schoolId: string, kind: string, employeeId: string, actorId: string,
+    { version, ...value }: PayrollPaymentDetailsInput & { version: string | null },
+  ) {
+    await withSerializableRetry(() => this.prisma.client.$transaction(async tx => {
+      const where = await this.payrollEmployeeWhere(tx, schoolId, kind, employeeId);
+      const current = await tx.payrollPaymentDetails.findFirst({ where, select: { id: true, updatedAt: true } });
+      if ((current?.updatedAt.toISOString() ?? null) !== version) {
+        throw new ConflictException("Payment details changed. Reopen the form to review the latest details.");
+      }
+      if (value.ssnitNumber || value.tier2MemberNumber || value.tin || value.bank) {
+        const encryptedData = encryptPayrollDetails(schoolId, kind, employeeId, value);
+        if (current) {
+          await tx.payrollPaymentDetails.update({ where: { id: current.id }, data: { encryptedData } });
+        } else {
+          await tx.payrollPaymentDetails.create({ data: { ...where, encryptedData } });
+        }
+      } else if (current) {
+        await tx.payrollPaymentDetails.delete({ where: { id: current.id } });
       }
       await this.writeAudit(tx, {
-        actorId,
-        schoolId,
-        action: "UPDATE",
-        entityType: `PAYROLL_SALARY_${kind}`,
-        entityId: personId,
-        oldValues: { monthlySalary: previous?.toFixed(2) ?? null },
-        newValues: { monthlySalary: next.toFixed(2) },
+        actorId, schoolId, action: "UPDATE", entityType: `PAYROLL_PAYMENT_DETAILS_${kind}`, entityId: employeeId,
+        newValues: { ssnitConfigured: Boolean(value.ssnitNumber), tier2MemberConfigured: Boolean(value.tier2MemberNumber), tinConfigured: Boolean(value.tin), bankConfigured: Boolean(value.bank) },
       });
-    });
-    return { id: personId, type: kind, monthlySalary };
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }));
+    return { saved: true };
   }
 
   async generatePayrollDraft(
@@ -3811,92 +4080,105 @@ export class FinanceService {
     processedById: string,
     input: { month: number; year: number; confirmResidentTaxTreatment: true },
   ) {
-    const db = this.prisma.client;
-    const periodEnd = new Date(Date.UTC(input.year, input.month, 0));
-    const [taxSchedules, contributionSchemes] = await Promise.all([
-      db.payrollTaxSchedule.findMany({ where: { OR: [{ schoolId }, { schoolId: null }], status: "ACTIVE", effectiveFrom: { lte: periodEnd } }, include: { bands: true } }),
-      db.payrollContributionScheme.findMany({ where: { OR: [{ schoolId }, { schoolId: null }], status: "ACTIVE", effectiveFrom: { lte: periodEnd } } }),
-    ]);
-    const resolved = resolvePayrollSettings(schoolId, periodEnd, taxSchedules, contributionSchemes);
-    const existing = await db.payrollRecord.findUnique({
-      where: { schoolId_month_year_runNumber: { schoolId, month: input.month, year: input.year, runNumber: 1 } },
-      select: { id: true },
-    });
-    if (existing) throw new BadRequestException("A payroll run already exists for this month and year.");
-
-    const [teachers, staff, currentYear] = await Promise.all([
-      db.teacher.findMany({
-        where: { schoolId, isActive: true, deletedAt: null },
-        select: { id: true, monthlySalary: true },
-      }),
-      db.staff.findMany({
-        where: { schoolId, isActive: true, deletedAt: null },
-        select: { id: true, monthlySalary: true },
-      }),
-      db.academicYear.findFirst({
-        where: { schoolId, isCurrent: true },
-        include: { terms: { where: { isCurrent: true }, take: 1 } },
-      }),
-    ]);
-    const eligible = [
-      ...teachers.filter((person) => Number(person.monthlySalary ?? 0) > 0).map((person) => ({
-        teacherId: person.id,
-        staffId: null as string | null,
-        basicSalary: person.monthlySalary!.toFixed(2),
-      })),
-      ...staff.filter((person) => Number(person.monthlySalary ?? 0) > 0).map((person) => ({
-        teacherId: null as string | null,
-        staffId: person.id,
-        basicSalary: person.monthlySalary!.toFixed(2),
-      })),
-    ];
-    if (!eligible.length) {
-      throw new BadRequestException("No active teachers or staff have a positive monthly salary. Add salary details before generating payroll.");
-    }
-
-    const payslips = eligible.map((person) => {
-      // SSNIT 2026 insurable earnings range: GHS 587.80–69,000.
-      const calculated = calculatePayslip(resolved.settings, {
-        residency: "RESIDENT",
-        earnings: [{ code: "BASIC", description: "Basic salary", amount: person.basicSalary, taxable: true, pensionable: true, isBasic: true }],
-        deductions: [],
-        enrolments: [{ schemeKey: "SSNIT_TIER1", employerBearsEmployeeShare: false, employerShareTaxable: false }],
+    return withSerializableRetry(() => this.prisma.client.$transaction(async db => {
+      const existing = await db.payrollRecord.findMany({
+        where: { schoolId, month: input.month, year: input.year },
+        orderBy: { runNumber: "desc" },
+        select: { runNumber: true, status: true },
       });
-      const ssnitEmployee = new Prisma.Decimal(calculated.schemes[0]!.employee);
-      const ssnitEmployer = new Prisma.Decimal(calculated.schemes[0]!.employer);
-      const grossSalary = new Prisma.Decimal(calculated.gross);
-      const incomeTax = new Prisma.Decimal(calculated.paye);
-      const netSalary = new Prisma.Decimal(calculated.net);
-      return {
-        schoolId,
-        teacherId: person.teacherId,
-        staffId: person.staffId,
-        basicSalary: new Prisma.Decimal(person.basicSalary),
-        allowances: new Prisma.Decimal(0),
-        grossSalary,
-        ssnitEmployee,
-        ssnitEmployer,
-        incomeTax,
-        otherDeductions: new Prisma.Decimal(0),
-        netSalary,
-        paymentMethod: "BANK_TRANSFER" as const,
-        paymentStatus: "PENDING" as const,
-      };
-    });
-    const sum = (key: "grossSalary" | "netSalary" | "incomeTax" | "ssnitEmployee" | "ssnitEmployer") =>
-      payslips.reduce((total, slip) => total.plus(slip[key]), new Prisma.Decimal(0));
+      if (existing.some(run => run.status !== "CANCELLED")) {
+        throw new BadRequestException("A payroll run already exists for this month and year.");
+      }
+      const periodEnd = new Date(Date.UTC(input.year, input.month, 0));
+      const [taxSchedules, contributionSchemes] = await Promise.all([
+        db.payrollTaxSchedule.findMany({ where: { OR: [{ schoolId }, { schoolId: null }], status: "ACTIVE", effectiveFrom: { lte: periodEnd } }, include: { bands: true } }),
+        db.payrollContributionScheme.findMany({ where: { OR: [{ schoolId }, { schoolId: null }], status: "ACTIVE", effectiveFrom: { lte: periodEnd } } }),
+      ]);
+      const resolved = resolvePayrollSettings(schoolId, periodEnd, taxSchedules, contributionSchemes);
+      const tier2 = resolved.settings.schemes.find(scheme => scheme.key === "SSNIT_TIER2");
+      if (tier2 && (Number(tier2.employeeRate) !== 0 || Number(tier2.employerRate) !== 0 || Number(tier2.memoRate) <= 0)) {
+        throw new BadRequestException("Configure Tier 2 as a positive memo allocation with zero employee and employer rates. It is allocated from combined SSNIT.");
+      }
 
-    const payrollRecord = await db.$transaction(async (tx) => {
-      const duplicate = await tx.payrollRecord.findUnique({
-        where: { schoolId_month_year_runNumber: { schoolId, month: input.month, year: input.year, runNumber: 1 } },
-        select: { id: true },
+      const [teachers, staff, periodYear] = await Promise.all([
+        db.teacher.findMany({
+          where: { schoolId, isActive: true, deletedAt: null },
+          select: { id: true, monthlySalary: true },
+        }),
+        db.staff.findMany({
+          where: { schoolId, isActive: true, deletedAt: null },
+          select: { id: true, monthlySalary: true },
+        }),
+        db.academicYear.findFirst({
+          where: { schoolId, startDate: { lte: periodEnd }, endDate: { gte: periodEnd } },
+          orderBy: [{ startDate: "desc" }, { id: "asc" }],
+          select: { id: true, terms: {
+            where: { startDate: { lte: periodEnd }, endDate: { gte: periodEnd } },
+            orderBy: [{ startDate: "desc" }, { id: "asc" }], take: 1, select: { id: true },
+          } },
+        }),
+      ]);
+      const eligible = [
+        ...teachers.filter((person) => Number(person.monthlySalary ?? 0) > 0).map((person) => ({
+          teacherId: person.id,
+          staffId: null as string | null,
+          basicSalary: person.monthlySalary!.toFixed(2),
+        })),
+        ...staff.filter((person) => Number(person.monthlySalary ?? 0) > 0).map((person) => ({
+          teacherId: null as string | null,
+          staffId: person.id,
+          basicSalary: person.monthlySalary!.toFixed(2),
+        })),
+      ];
+      if (!eligible.length) {
+        throw new BadRequestException("No active teachers or staff have a positive monthly salary. Add salary details before generating payroll.");
+      }
+
+      const payslips = eligible.map((person) => {
+        const calculated = calculatePayslip(resolved.settings, {
+          residency: "RESIDENT",
+          earnings: [{ code: "BASIC", description: "Basic salary", amount: person.basicSalary, taxable: true, pensionable: true, isBasic: true }],
+          deductions: [],
+          enrolments: (tier2 ? ["SSNIT_TIER1", "SSNIT_TIER2"] : ["SSNIT_TIER1"]).map(schemeKey => ({
+            schemeKey, employerBearsEmployeeShare: false, employerShareTaxable: false,
+          })),
+        });
+        const ssnitEmployee = new Prisma.Decimal(calculated.employeeContributionsDeducted);
+        const ssnitEmployer = new Prisma.Decimal(calculated.employerContributions);
+        const tier2Result = calculated.schemes.find(scheme => scheme.key === "SSNIT_TIER2");
+        const tier2Contribution = tier2Result ? new Prisma.Decimal(tier2Result.memo) : null;
+        if (tier2Contribution?.gt(ssnitEmployee.plus(ssnitEmployer))) {
+          throw new BadRequestException("The Tier 2 allocation exceeds the combined SSNIT contribution. Review the approved schemes.");
+        }
+        const grossSalary = new Prisma.Decimal(calculated.gross);
+        const incomeTax = new Prisma.Decimal(calculated.paye);
+        const netSalary = new Prisma.Decimal(calculated.net);
+        return {
+          schoolId,
+          teacherId: person.teacherId,
+          staffId: person.staffId,
+          basicSalary: new Prisma.Decimal(person.basicSalary),
+          allowances: new Prisma.Decimal(0),
+          grossSalary,
+          ssnitEmployee,
+          ssnitEmployer,
+          tier2Contribution,
+          incomeTax,
+          otherDeductions: new Prisma.Decimal(0),
+          netSalary,
+          paymentMethod: "BANK_TRANSFER" as const,
+          paymentStatus: "PENDING" as const,
+        };
       });
-      if (duplicate) throw new BadRequestException("A payroll run already exists for this month and year.");
-      return tx.payrollRecord.create({
+      const sum = (key: "grossSalary" | "netSalary" | "incomeTax" | "ssnitEmployee" | "ssnitEmployer") =>
+        payslips.reduce((total, slip) => total.plus(slip[key]), new Prisma.Decimal(0));
+
+      const payrollRecord = await db.payrollRecord.create({
         data: {
           schoolId,
           month: input.month,
           year: input.year,
+          runNumber: (existing[0]?.runNumber ?? 0) + 1,
           status: "DRAFT",
           totalGross: sum("grossSalary"),
           totalNet: sum("netSalary"),
@@ -3906,95 +4188,123 @@ export class FinanceService {
           taxScheduleId: resolved.taxScheduleId,
           settingsSnapshot: JSON.parse(JSON.stringify({ ...resolved, calculatedFor: periodEnd.toISOString().slice(0, 10) })),
           calculatedAt: new Date(),
-          academicYearId: currentYear?.id ?? null,
-          termId: currentYear?.terms[0]?.id ?? null,
+          academicYearId: periodYear?.id ?? null,
+          termId: periodYear?.terms[0]?.id ?? null,
           payslips: { create: payslips },
         },
         include: {
           _count: { select: { payslips: true } },
         },
       });
-    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 
-    return {
-      payrollRecord,
-      includedCount: eligible.length,
-      excludedCount: teachers.length + staff.length - eligible.length,
-    };
+      return {
+        payrollRecord,
+        includedCount: eligible.length,
+        excludedCount: teachers.length + staff.length - eligible.length,
+      };
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, timeout: 20_000 }));
   }
 
   async transitionPayroll(
     schoolId: string,
     payrollRecordId: string,
     input: { status: "APPROVED" | "PAID" | "CANCELLED"; paymentMethod?: string },
-    actorId: string,
+    actor: { id: string; role: string | undefined },
   ) {
+    const actorId = actor.id;
+    if (input.status !== "APPROVED" && actor.role !== "accountant") {
+      throw new ForbiddenException("Only the school accountant can cancel a draft or confirm disbursement.");
+    }
     const db = this.prisma.client;
+    if (input.status === "APPROVED") {
+      return withSerializableRetry(() => db.$transaction(async tx => {
+        const payroll = await tx.payrollRecord.findFirst({
+          where: { id: payrollRecordId, schoolId },
+          include: { _count: { select: { payslips: true } } },
+        });
+        if (!payroll) throw new NotFoundException("Payroll run not found.");
+        if (payroll.status !== "DRAFT") throw new BadRequestException("Only a draft payroll run can be approved.");
+        const approvalSetting = await loadApprovalSetting(tx, schoolId, "PAYROLL_RUN");
+        if (!mayApprovePayrollRun(approvalSetting, actor.role)) {
+          throw new ForbiddenException("Only a payroll approver chosen by the school can approve this run.");
+        }
+        if (approvalSetting.required && payroll.processedById === actorId) {
+          throw new ForbiddenException("You cannot approve payroll you prepared. Ask another approver configured in Finance approvals.");
+        }
+        if (approvalSetting.required && !payroll.processedById) {
+          throw new ConflictException("This draft has no recorded preparer. Ask the accountant to cancel it and generate a new draft.");
+        }
+        if (!payroll._count.payslips) throw new BadRequestException("A payroll run without payslips cannot be approved.");
+        // Approval freezes the run. Reconcile every payslip with the run's stored totals
+        // before authorising it; a draft can become stale after salary or payslip edits.
+        const approvalSlips = await tx.payslip.findMany({
+          where: { schoolId, payrollRecordId: payroll.id },
+          select: {
+            grossSalary: true, netSalary: true, incomeTax: true,
+            ssnitEmployee: true, ssnitEmployer: true, otherDeductions: true,
+          },
+        });
+        if (approvalSlips.length !== payroll._count.payslips) {
+          throw new ConflictException("Payroll payslips changed during approval. Refresh and review the run.");
+        }
+        const approvalSum = (field: "grossSalary" | "netSalary" | "incomeTax" | "ssnitEmployee" | "ssnitEmployer" | "otherDeductions") =>
+          approvalSlips.reduce((total, slip) => total.plus(slip[field]), new Prisma.Decimal(0));
+        for (const slip of approvalSlips) {
+          if (slip.netSalary.lt(0) || !slip.grossSalary.eq(
+            slip.netSalary.plus(slip.incomeTax).plus(slip.ssnitEmployee).plus(slip.otherDeductions)
+          )) {
+            throw new BadRequestException("A payslip has negative net pay or does not balance. Correct the draft before approval.");
+          }
+        }
+        if (!payroll.totalGross.eq(approvalSum("grossSalary"))
+          || !payroll.totalNet.eq(approvalSum("netSalary"))
+          || !payroll.totalTax.eq(approvalSum("incomeTax"))
+          || !payroll.totalSSNIT.eq(approvalSum("ssnitEmployee").plus(approvalSum("ssnitEmployer")))) {
+          throw new BadRequestException("Payroll totals no longer match its payslips. Recalculate the draft before approval.");
+        }
+        // Approval history and the run status must commit together.
+        const payload = {
+          payrollRecordId: payroll.id, runNumber: payroll.runNumber,
+          totalGross: payroll.totalGross.toFixed(2), totalNet: payroll.totalNet.toFixed(2),
+          totalTax: payroll.totalTax.toFixed(2), totalSSNIT: payroll.totalSSNIT.toFixed(2),
+          payslips: payroll._count.payslips,
+        };
+        const requestedById = payroll.processedById ?? actorId;
+        const pending = await tx.financeApprovalRequest.findFirst({
+          where: { schoolId, subject: "PAYROLL_RUN", entityType: "PayrollRecord", entityId: payroll.id,
+            requestedById, status: "PENDING" },
+          select: { id: true },
+        });
+        const request = pending ?? await this.approvals.request({
+          schoolId, subject: "PAYROLL_RUN", entityType: "PayrollRecord", entityId: payroll.id,
+          requestedById, payload, amount: payroll.totalGross,
+        }, tx);
+        await this.approvals.decide(schoolId, request.id, actorId, "APPROVED", payload, "Payroll run approved.", tx, {
+          waivePayrollReview: !approvalSetting.required && actor.role === "accountant",
+        });
+        return tx.payrollRecord.update({
+          where: { id: payroll.id, schoolId, status: "DRAFT" },
+          data: { status: "APPROVED", approvedById: actorId },
+          include: {
+            payslips: { include: { staff: { select: { staffId: true, profile: { select: { firstName: true, lastName: true } } } }, teacher: { select: { teacherId: true, profile: { select: { firstName: true, lastName: true } } } } } },
+            _count: { select: { payslips: true } },
+          },
+        });
+      }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }));
+    }
     const payroll = await db.payrollRecord.findFirst({
       where: { id: payrollRecordId, schoolId },
-      include: { _count: { select: { payslips: true } } },
+      select: { id: true, status: true },
     });
     if (!payroll) throw new NotFoundException("Payroll run not found.");
-    if (payroll.status === "DRAFT" && input.status === "APPROVED") {
-      if (!payroll._count.payslips) throw new BadRequestException("A payroll run without payslips cannot be approved.");
-      // Approval freezes the run. Reconcile every payslip with the run's stored totals
-      // before authorising it; a draft can become stale after salary or payslip edits.
-      const approvalSlips = await db.payslip.findMany({
-        where: { schoolId, payrollRecordId: payroll.id },
-        select: {
-          grossSalary: true, netSalary: true, incomeTax: true,
-          ssnitEmployee: true, ssnitEmployer: true, otherDeductions: true,
-        },
-      });
-      if (approvalSlips.length !== payroll._count.payslips) {
-        throw new ConflictException("Payroll payslips changed during approval. Refresh and review the run.");
-      }
-      const approvalSum = (field: "grossSalary" | "netSalary" | "incomeTax" | "ssnitEmployee" | "ssnitEmployer" | "otherDeductions") =>
-        approvalSlips.reduce((total, slip) => total.plus(slip[field]), new Prisma.Decimal(0));
-      for (const slip of approvalSlips) {
-        if (slip.netSalary.lt(0) || !slip.grossSalary.eq(
-          slip.netSalary.plus(slip.incomeTax).plus(slip.ssnitEmployee).plus(slip.otherDeductions)
-        )) {
-          throw new BadRequestException("A payslip has negative net pay or does not balance. Correct the draft before approval.");
-        }
-      }
-      if (!payroll.totalGross.eq(approvalSum("grossSalary"))
-        || !payroll.totalNet.eq(approvalSum("netSalary"))
-        || !payroll.totalTax.eq(approvalSum("incomeTax"))
-        || !payroll.totalSSNIT.eq(approvalSum("ssnitEmployee").plus(approvalSum("ssnitEmployer")))) {
-        throw new BadRequestException("Payroll totals no longer match its payslips. Recalculate the draft before approval.");
-      }
-      // Maker-checker through the approval engine: the preparer is the requester, so the
-      // approver must be someone else unless the school's audited allowSelfApproval is set.
-      const payload = {
-        payrollRecordId: payroll.id, runNumber: payroll.runNumber,
-        totalGross: payroll.totalGross.toFixed(2), totalNet: payroll.totalNet.toFixed(2),
-        totalTax: payroll.totalTax.toFixed(2), totalSSNIT: payroll.totalSSNIT.toFixed(2),
-        payslips: payroll._count.payslips,
-      };
-      const request = await this.approvals.request({
-        schoolId, subject: "PAYROLL_RUN", entityType: "PayrollRecord", entityId: payroll.id,
-        requestedById: payroll.processedById ?? actorId, payload, amount: payroll.totalGross,
-      });
-      await this.approvals.decide(schoolId, request.id, actorId, "APPROVED", payload, "Payroll run approved.");
-      return db.payrollRecord.update({
-        where: { id: payroll.id },
-        data: { status: "APPROVED", approvedById: actorId },
-        include: {
-          payslips: { include: { staff: { select: { staffId: true, profile: { select: { firstName: true, lastName: true } } } }, teacher: { select: { teacherId: true, profile: { select: { firstName: true, lastName: true } } } } } },
-          _count: { select: { payslips: true } },
-        },
-      });
-    }
     if (payroll.status === "DRAFT" && input.status === "CANCELLED") {
       return db.payrollRecord.update({
-        where: { id: payroll.id },
+        where: { id: payroll.id, schoolId, status: "DRAFT" },
         data: { status: "CANCELLED" },
         include: { payslips: true, _count: { select: { payslips: true } } },
       });
     }
     if (payroll.status === "APPROVED" && input.status === "PAID") {
-      this.assertSeparationOfDuties(actorId, payroll.approvedById, "marked as paid");
       const paymentMethod = input.paymentMethod;
       if (!paymentMethod || !["CASH", "BANK_TRANSFER", "CHEQUE", "MOBILE_MONEY", "CARD", "ONLINE", "OTHER"].includes(paymentMethod)) {
         throw new BadRequestException("Choose a valid payment method before confirming payroll disbursement.");
@@ -4011,6 +4321,7 @@ export class FinanceService {
                 incomeTax: true,
                 ssnitEmployee: true,
                 ssnitEmployer: true,
+                tier2Contribution: true,
                 otherDeductions: true,
               },
             },
@@ -4019,6 +4330,16 @@ export class FinanceService {
         if (!current) throw new NotFoundException("Payroll run not found.");
         if (current.status !== "APPROVED") {
           throw new BadRequestException("Only an approved payroll run can be marked paid.");
+        }
+        if (current.approvedById === actorId) {
+          const waiver = await tx.financeApprovalRequest.findFirst({
+            where: {
+              schoolId, subject: "PAYROLL_RUN", entityType: "PayrollRecord", entityId: current.id,
+              status: "APPROVED", decidedById: actorId, waivedByPolicy: true,
+            },
+            select: { id: true },
+          });
+          if (!waiver) throw new ForbiddenException("An accountant who did not approve this payroll must confirm the disbursement.");
         }
         if (!current.payslips.length) throw new BadRequestException("A payroll run without payslips cannot be marked paid.");
 
@@ -4031,6 +4352,7 @@ export class FinanceService {
         const employeeSsnit = sum("ssnitEmployee");
         const employerSsnit = sum("ssnitEmployer");
         const otherDeductions = sum("otherDeductions");
+        const tier2 = current.payslips.reduce((total, slip) => total.plus(slip.tier2Contribution ?? 0), new Prisma.Decimal(0));
         if (!gross.eq(net.plus(paye).plus(employeeSsnit).plus(otherDeductions))) {
           throw new BadRequestException(
             "This payroll does not reconcile exactly: gross pay must equal net pay plus PAYE, employee SSNIT and other deductions. Review the payslips before confirming payment.",
@@ -4106,6 +4428,13 @@ export class FinanceService {
         await postLedgerEntry("PAYE withheld from payroll", paye, payrollPayable, payePayable, "TRANSFER", "PAYE liability recognised");
         await postLedgerEntry("Employee SSNIT withheld from payroll", employeeSsnit, payrollPayable, ssnitPayable, "TRANSFER", "Employee SSNIT liability recognised");
         await postLedgerEntry("Other payroll deductions withheld", otherDeductions, payrollPayable, otherDeductionPayable, "TRANSFER", "Other deductions liability recognised");
+        if (tier2.gt(0)) {
+          const tier2Payable = await this.ensureAccount(tx, schoolId, {
+            accountType: "LIABILITY", category: "ACCOUNTS_PAYABLE", name: "Tier 2 Pension Payable", code: "2211",
+          });
+          await postLedgerEntry("Allocate Tier 2 pension contributions", tier2, ssnitPayable, tier2Payable,
+            "TRANSFER", "Tier 2 portion of the combined pension liability");
+        }
 
         await tx.payslip.updateMany({
           where: { payrollRecordId: payroll.id, schoolId },
@@ -4139,22 +4468,46 @@ export class FinanceService {
     throw new BadRequestException(`Payroll cannot move from ${payroll.status} to ${input.status}.`);
   }
 
-  async listPayrollRecords(schoolId: string) {
+  listOwnTeacherPayslips(schoolId: string, userId: string) {
+    return this.prisma.client.payslip.findMany({
+      where: ownTeacherPayslipScope(schoolId, userId),
+      orderBy: [{ payrollRecord: { year: "desc" } }, { payrollRecord: { month: "desc" } }, { id: "desc" }],
+      select: {
+        id: true, basicSalary: true, allowances: true, grossSalary: true,
+        incomeTax: true, ssnitEmployee: true, otherDeductions: true, netSalary: true,
+        payrollRecord: { select: { month: true, year: true, status: true } },
+      },
+    });
+  }
+
+  /** `withPayslips` false returns run summaries only: payslips grow with headcount and the list shows 100 runs. */
+  async listPayrollRecords(schoolId: string, withPayslips = true) {
     return this.prisma.client.payrollRecord.findMany({
       where: { schoolId },
-      orderBy: [{ year: "desc" }, { month: "desc" }],
+      orderBy: [{ year: "desc" }, { month: "desc" }, { runNumber: "desc" }],
       take: 100,
       include: {
-        payslips: {
-          include: {
-            staff: { select: { staffId: true, profile: { select: { firstName: true, lastName: true } } } },
-            teacher: { select: { teacherId: true, profile: { select: { firstName: true, lastName: true } } } },
-          },
-        },
+        ...(withPayslips ? { payslips: this.payrollPayslipInclude } : {}),
         _count: { select: { payslips: true } },
       },
     });
   }
+
+  async getPayrollRecord(schoolId: string, recordId: string) {
+    const record = await this.prisma.client.payrollRecord.findFirst({
+      where: { id: recordId, schoolId },
+      include: { payslips: this.payrollPayslipInclude, _count: { select: { payslips: true } } },
+    });
+    if (!record) throw new NotFoundException("Payroll run not found.");
+    return record;
+  }
+
+  private readonly payrollPayslipInclude = {
+    include: {
+      staff: { select: { staffId: true, profile: { select: { firstName: true, lastName: true } } } },
+      teacher: { select: { teacherId: true, profile: { select: { firstName: true, lastName: true } } } },
+    },
+  };
 
   async listFeeReminderSchedules(schoolId: string) {
     return this.prisma.client.feeReminderSchedule.findMany({
@@ -4332,7 +4685,7 @@ export class FinanceService {
     const targets = new Map<string, StudentTarget>();
     for (const bill of bills) {
       const student = bill.student;
-      const studentName = [student.profile.firstName, student.profile.otherNames, student.profile.lastName].filter(Boolean).join(" ").trim() || "Student";
+      const studentName = formatPersonName(student.profile) || "Student";
       let target = targets.get(student.id);
       if (!target) {
         target = { studentId: student.id, name: studentName, balance: 0, earliestDueDate: bill.dueDate, guardians: new Map() };
@@ -4560,7 +4913,7 @@ export class FinanceService {
         id: true,
         admissionNumber: true,
         outstandingBalance: true,
-        profile: { select: { firstName: true, lastName: true } },
+        profile: { select: { firstName: true, otherNames: true, lastName: true } },
       },
     });
 

@@ -1,6 +1,16 @@
+import { File } from "expo-file-system";
 import { z } from "zod";
+import {
+  listTeacherExternalExams,
+  saveTeacherExternalResults,
+} from "@/api/teacher-external-exams";
 import { defineEndpoint } from "@/api/endpoint";
-import { listAnnouncements } from "@/api/announcements";
+import {
+  listAnnouncementClasses,
+  listAnnouncements,
+  publishClassAnnouncement,
+} from "@/api/announcements";
+import { listStaffDocuments, shareStaffDocument } from "@/api/documents";
 import {
   getCurrentAcademicContext,
   getMyProfile,
@@ -57,16 +67,67 @@ test("schemas reject malformed responses and strip unneeded personal fields", as
   jest.mocked(apiFetch).mockResolvedValue([{ id: 7 }]);
   await expect(listAnnouncements()).rejects.toThrow();
 });
-test("BECE guard applies in executable paths, even to teacher sessions", async () => {
+test("external-exam requests require the active teacher role", async () => {
+  for (const role of ["student", "guardian"]) {
+    jest.mocked(sessionStore.getSnapshot).mockReturnValue({
+      ...ready,
+      activeRole: role,
+      roles: [role, "teacher"],
+    } as never);
+    await expect(listTeacherExternalExams()).rejects.toThrow();
+  }
+  expect(apiFetch).not.toHaveBeenCalled();
+  jest.mocked(sessionStore.getSnapshot).mockReturnValue(ready as never);
+  jest.mocked(apiFetch).mockResolvedValue([]);
+  await expect(listTeacherExternalExams()).resolves.toEqual([]);
+  expect(apiFetch).toHaveBeenCalledWith("/external-exams", expect.anything());
+});
+test("BECE writes validate the grade and preserve the candidate version", async () => {
+  const request = {
+    paperId: "paper",
+    sourceReference: "School result statement",
+    entries: [
+      {
+        candidateId: "candidate",
+        status: "GRADED" as const,
+        grade: 9,
+        expectedVersion: 2,
+      },
+    ],
+  };
+  await expect(
+    saveTeacherExternalResults({
+      request: { ...request, entries: [{ ...request.entries[0]!, grade: 10 }] },
+    }),
+  ).rejects.toThrow();
+  expect(apiFetch).not.toHaveBeenCalled();
+  jest.mocked(apiFetch).mockResolvedValue({ paperId: "paper", saved: 1 });
+  await expect(saveTeacherExternalResults({ request })).resolves.toEqual({
+    paperId: "paper",
+    saved: 1,
+  });
+  expect(apiFetch).toHaveBeenCalledWith(
+    "/external-exams/results",
+    expect.objectContaining({ method: "PUT", body: JSON.stringify(request) }),
+  );
+});
+test("unsupported external-exam endpoint declarations fail closed", () => {
   expect(() =>
     defineEndpoint({
-      method: "GET",
-      path: "/external-exams/results",
+      method: "POST",
+      path: "/external-exams/bece",
       roles: ["teacher"],
       response: z.unknown(),
     }),
   ).toThrow("External examinations");
-  expect(apiFetch).not.toHaveBeenCalled();
+  expect(() =>
+    defineEndpoint({
+      method: "GET",
+      path: "/external-exams",
+      roles: ["teacher", "guardian"],
+      response: z.unknown(),
+    }),
+  ).toThrow("External examinations");
 });
 test("encodes path parameters and forwards abort signals", async () => {
   const endpoint = defineEndpoint({
@@ -305,4 +366,118 @@ test("idempotency keys are only accepted by endpoints that declare them, and are
       response: z.unknown(),
     }),
   ).toThrow("Only write endpoints");
+});
+
+test("teacher announcement publishing limits writes to selected classes and their guardians", async () => {
+  const notice = {
+    title: "Class trip",
+    content: "Meet on Friday.",
+    category: "GENERAL" as const,
+  };
+  await expect(
+    publishClassAnnouncement({
+      request: { ...notice, target: "SELECTED_CLASSES", classIds: [] },
+    }),
+  ).rejects.toThrow();
+  await expect(
+    publishClassAnnouncement({
+      request: {
+        ...notice,
+        target: "SCHOOL_COMMUNITY" as never,
+        classIds: ["class-a"],
+      },
+    }),
+  ).rejects.toThrow();
+  expect(apiFetch).not.toHaveBeenCalled();
+
+  jest.mocked(apiFetch).mockResolvedValue({
+    ...notice,
+    id: "notice-a",
+    target: "SELECTED_CLASS_GUARDIANS",
+    isPinned: false,
+    status: "PUBLISHED",
+    createdAt: "2026-11-02T00:00:00.000Z",
+  });
+  await publishClassAnnouncement({
+    request: {
+      ...notice,
+      target: "SELECTED_CLASS_GUARDIANS",
+      classIds: ["class-a"],
+    },
+  });
+  expect(apiFetch).toHaveBeenCalledWith(
+    "/announcements",
+    expect.objectContaining({
+      method: "POST",
+      body: expect.stringContaining('"classIds":["class-a"]'),
+    }),
+  );
+});
+
+test("guardian sessions cannot open teacher announcement or document APIs", async () => {
+  jest.mocked(sessionStore.getSnapshot).mockReturnValue({
+    ...ready,
+    activeRole: "guardian",
+    roles: ["guardian"],
+  } as never);
+  await expect(listAnnouncementClasses()).rejects.toThrow();
+  await expect(listStaffDocuments()).rejects.toThrow();
+  await expect(shareStaffDocument({ params: { id: "doc" } })).rejects.toThrow();
+  expect(apiFetch).not.toHaveBeenCalled();
+});
+
+test("staff document listing strips server URLs and keeps paginated metadata", async () => {
+  jest.mocked(apiFetch).mockResolvedValue({
+    data: [
+      {
+        id: "doc",
+        title: "Staff handbook",
+        description: null,
+        fileType: "application/pdf",
+        storageReady: true,
+        fileUrl: "https://storage.example.test/doc",
+        storageKey: "private-key",
+      },
+    ],
+    meta: { page: 2, totalPages: 3 },
+  });
+  const result = await listStaffDocuments({
+    query: { search: "handbook", page: 2 },
+  });
+  expect(apiFetch).toHaveBeenCalledWith(
+    "/documents?search=handbook&page=2",
+    expect.anything(),
+  );
+  expect(result.meta).toEqual({ page: 2, totalPages: 3 });
+  expect(result.data[0]).not.toHaveProperty("fileUrl");
+  expect(result.data[0]).not.toHaveProperty("storageKey");
+});
+
+test("native avatar upload hands the Expo file directly to multipart without constructing a Blob", async () => {
+  const slice = jest.fn(() => {
+    throw new Error(
+      "React Native cannot build a Blob from an ArrayBufferView.",
+    );
+  });
+  const file = Object.create(File.prototype, {
+    size: { value: 100 },
+    name: { value: "avatar.jpg" },
+    type: { value: "image/jpeg" },
+    slice: { value: slice },
+  }) as File;
+  const append = jest.spyOn(FormData.prototype, "append");
+  try {
+    jest.mocked(apiFetch).mockResolvedValueOnce({
+      image: "https://schoolhub.example.test/avatar.webp",
+    });
+    await expect(
+      uploadMyAvatar({ file, mimeType: "image/jpeg" }),
+    ).resolves.toEqual({
+      image: "https://schoolhub.example.test/avatar.webp",
+    });
+    expect(append).toHaveBeenCalledWith("avatar", file);
+    expect(slice).not.toHaveBeenCalled();
+  } finally {
+    append.mockRestore();
+  }
 });

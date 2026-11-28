@@ -1,21 +1,33 @@
+import { detailTabButton } from "@/components/detailTabButton";
 import { TabBarInsetProvider } from "@/components/TabBarInset";
-import { GlassTabBar } from "@/components/GlassTabBar";
+import { PortalTabBar } from "@/components/PortalTabBar";
 import { Tabs } from "expo-router";
 import {
   BookOpen,
   CalendarDays,
   ClipboardCheck,
   House,
-  LayoutGrid,
 } from "lucide-react-native";
 
 export default function StudentLayout() {
   return (
     <TabBarInsetProvider>
       <Tabs
+        backBehavior="history"
         tabBar={(props) => (
-          <GlassTabBar
+          <PortalTabBar
             {...props}
+            preloadFromHome="/(student)/my-learning"
+            parentTabs={{
+              "student-tools": "index",
+              resources: "index",
+              "student-messages": "index",
+              "student-reports": "index",
+              "student-subjects": "my-learning",
+              "student-classmates": "index",
+              "student-community": "index",
+              "assignment/[id]": "my-learning",
+            }}
             hues={{
               index: "indigo",
               "my-timetable": "violet",
@@ -81,36 +93,35 @@ export default function StudentLayout() {
         />
         <Tabs.Screen
           name="resources"
-          options={{
-            title: "More",
-            tabBarIcon: ({ color, size, focused }) => (
-              <LayoutGrid
-                color={color}
-                size={size}
-                strokeWidth={focused ? 2.4 : 1.9}
-              />
-            ),
-          }}
+          options={{ tabBarButton: detailTabButton }}
         />
         <Tabs.Screen
           name="student-reports"
-          options={{ href: null, title: "Reports" }}
+          options={{ tabBarButton: detailTabButton, title: "Reports" }}
         />
         <Tabs.Screen
           name="student-subjects"
-          options={{ href: null, title: "Subjects" }}
+          options={{ tabBarButton: detailTabButton, title: "Subjects" }}
         />
         <Tabs.Screen
           name="student-classmates"
-          options={{ href: null, title: "Classmates" }}
+          options={{ tabBarButton: detailTabButton, title: "Classmates" }}
         />
         <Tabs.Screen
           name="student-community"
-          options={{ href: null, title: "Community" }}
+          options={{ tabBarButton: detailTabButton, title: "Community" }}
         />
         <Tabs.Screen
           name="assignment/[id]"
-          options={{ href: null, title: "Assignment" }}
+          options={{ tabBarButton: detailTabButton, title: "Assignment" }}
+        />
+        <Tabs.Screen
+          name="student-messages"
+          options={{ tabBarButton: detailTabButton }}
+        />
+        <Tabs.Screen
+          name="student-tools"
+          options={{ tabBarButton: detailTabButton }}
         />
       </Tabs>
     </TabBarInsetProvider>

@@ -1,79 +1,172 @@
 import { useForm } from "@tanstack/react-form";
 import { useLocalSearchParams, router, type Href } from "expo-router";
 import { useState } from "react";
+import { BookOpen, Check, ClipboardList } from "lucide-react-native";
+import { Pressable, View } from "react-native";
 import {
   getManagedAssignments,
   getTeaching,
-  createTeacherAssignment,
+  publishTeacherAssignments,
   gradeTeacherAssignment,
   managedAssignmentsSchema,
 } from "@/api/teacher";
 import type { z } from "zod";
+import { formatDateTime } from "@/features/shared/format";
 import { useScopedMutation } from "@/features/shared/mutations";
 import { useTeacherQuery } from "./queries";
-import {
-  TeacherPage,
-  QueryState,
-  Panel,
-  Copy,
-  LinkButton,
-  MutationState,
-} from "./ui";
-import { assignmentFormSchema, gradeFormSchema } from "./forms";
+import { TeacherPage, QueryState, Panel, Copy, MutationState } from "./ui";
+import { assignmentBatchFormSchema, gradeFormSchema } from "./forms";
 import { Button } from "@/components/Button";
+import { Text } from "@/components/Typography";
 import { FormField } from "@/components/FormField";
-import { DatePickerField } from "@/components/Fields";
+import { SearchBar } from "@/components/Fields";
+import {
+  CalendarDateField,
+  formatCalendarDate,
+} from "@/components/CalendarDateField";
+import { StatusPill } from "@/components/ModulePrimitives";
+import { Surface } from "@/components/Surface";
+import { spacing, type, useTheme } from "@/theme/theme";
 import { ListRow } from "@/components/ListRow";
 import { SelectField } from "@/components/SelectField";
 export function TeacherAssignments() {
   const q = useTeacherQuery(["assignments"], (signal) =>
     getManagedAssignments({ signal }),
   );
+  const { colors } = useTheme();
+  const [search, setSearch] = useState("");
+  const term = search.trim().toLowerCase();
+  const assignments =
+    q.data?.assignments.filter((assignment) =>
+      [assignment.title, assignment.class.name, assignment.subject.name].some(
+        (text) => text.toLowerCase().includes(term),
+      ),
+    ) ?? [];
   return (
-    <TeacherPage title="Assignments" query={q}>
-      <LinkButton
-        label="New assignment"
-        href={"/(teacher)/teacher-assignment-new" as Href}
-      />
-      <QueryState query={q} empty={!q.data?.assignments.length}>
-        {q.data?.assignments.map((a) => (
-          <Panel key={a.id} title={a.title}>
-            <Copy>
-              {a.class.name} · {a.subject.name} · {a.submissions.length}{" "}
-              submitted
-            </Copy>
-            <Copy>
-              {a.dueAt ? `Due ${a.dueAt.slice(0, 10)}` : "No due date"}
-            </Copy>
-            <LinkButton
-              label={`Review ${a.title}`}
-              href={
-                {
-                  pathname: "/(teacher)/teacher-assignment",
-                  params: { id: a.id },
-                } as Href
-              }
-            />
-          </Panel>
-        ))}
+    <TeacherPage
+      title="Assignments"
+      subtitle={
+        q.data
+          ? [q.data.academicYear?.name, q.data.term.name]
+              .filter(Boolean)
+              .join(" · ")
+          : undefined
+      }
+      query={q}
+      right={
+        <Button
+          label="New assignment"
+          block={false}
+          onPress={() => router.push("/(teacher)/teacher-assignment-new")}
+        />
+      }
+    >
+      {q.data?.assignments.length ? (
+        <SearchBar
+          label="Search assignments"
+          value={search}
+          onChange={setSearch}
+        />
+      ) : null}
+      {q.data ? (
+        <View
+          style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing.sm }}
+        >
+          <StatusPill
+            label={`${q.data.assignments.filter((item) => item.status === "PUBLISHED").length} published`}
+            hue="emerald"
+          />
+          <StatusPill
+            label={`${q.data.assignments.reduce((count, item) => count + item.submissions.length, 0)} submissions`}
+            hue="sky"
+          />
+          <StatusPill
+            label={`${q.data.assignments.reduce((count, item) => count + item.submissions.filter((submission) => submission.status === "SUBMITTED").length, 0)} awaiting grades`}
+            hue="amber"
+          />
+        </View>
+      ) : null}
+      <QueryState query={q} empty={!assignments.length}>
+        {assignments.map((a) => {
+          const pending = a.submissions.filter(
+            (submission) => submission.score === null,
+          ).length;
+          const dueDate = a.dueAt && a.dueAt.slice(0, 10);
+          return (
+            <Surface key={a.id}>
+              <ListRow
+                title={a.title}
+                subtitle={`${a.class.name} · ${a.subject.name}`}
+                leading={<BookOpen size={20} color={colors.primary} />}
+                hue="emerald"
+                chevron
+                divider
+                onPress={() =>
+                  router.push({
+                    pathname: "/(teacher)/teacher-assignment",
+                    params: { id: a.id },
+                  } as Href)
+                }
+              />
+              <View
+                style={{
+                  flexDirection: "row",
+                  flexWrap: "wrap",
+                  gap: spacing.sm,
+                  paddingTop: spacing.md,
+                }}
+              >
+                <StatusPill
+                  label={
+                    dueDate
+                      ? `Due ${formatCalendarDate(dueDate)}`
+                      : "No due date"
+                  }
+                  hue="emerald"
+                />
+                <StatusPill
+                  label={
+                    pending
+                      ? `${pending} to grade`
+                      : `${a.submissions.length} submitted`
+                  }
+                  hue={pending ? "amber" : "sky"}
+                />
+              </View>
+            </Surface>
+          );
+        })}
       </QueryState>
     </TeacherPage>
   );
 }
+
 export function NewTeacherAssignment() {
   const teaching = useTeacherQuery(["overview"], (signal) =>
     getTeaching({ signal }),
   );
-  const [pair, setPair] = useState("");
+  const [subjectId, setSubject] = useState("");
+  const [classIds, setClasses] = useState<string[]>([]);
   const [error, setError] = useState("");
-  const mutation = useScopedMutation(createTeacherAssignment);
-  const pairs =
-    teaching.data?.classes.flatMap((c) =>
-      c.subjects.map((s) => ({
-        value: JSON.stringify([c.id, s.id]),
-        label: `${c.name} · ${s.name}`,
-      })),
-    ) ?? [];
+  const mutation = useScopedMutation(publishTeacherAssignments);
+  const { colors } = useTheme();
+  const classes = teaching.data?.classes ?? [];
+  const subjects = [
+    ...new Map(
+      classes.flatMap((item) =>
+        item.subjects.map(
+          (subject) =>
+            [subject.id, { value: subject.id, label: subject.name }] as const,
+        ),
+      ),
+    ).values(),
+  ];
+  const eligibleClasses = classes.filter((item) =>
+    item.subjects.some((subject) => subject.id === subjectId),
+  );
+  const selected = eligibleClasses
+    .filter((item) => classIds.includes(item.id))
+    .map((item) => item.id);
   const form = useForm({
     defaultValues: {
       title: "",
@@ -82,20 +175,14 @@ export function NewTeacherAssignment() {
       dueDate: "",
     },
     onSubmit: async ({ value }) => {
-      let ids: string[] = [];
-      try {
-        ids = JSON.parse(pair);
-      } catch {
-        /* Selection required. */
-      }
-      const parsed = assignmentFormSchema.safeParse({
+      const parsed = assignmentBatchFormSchema.safeParse({
         ...value,
-        classId: ids[0] ?? "",
-        subjectId: ids[1] ?? "",
+        classIds: selected,
+        subjectId,
       });
       if (!parsed.success) {
         setError(
-          "Choose a class and subject, a title (3–160 characters), instructions and a positive maximum score.",
+          "Choose a subject and at least one class. Check the title, instructions, and maximum score.",
         );
         return;
       }
@@ -110,15 +197,78 @@ export function NewTeacherAssignment() {
   });
   return (
     <TeacherPage title="New assignment" query={teaching} back>
-      <QueryState query={teaching} empty={!pairs.length}>
-        <Panel title="Publish to your class">
+      <QueryState query={teaching} empty={!subjects.length}>
+        <Panel title="Audience and instructions">
           <SelectField
-            label="Class and subject"
-            options={pairs}
-            value={pair}
-            onChange={setPair}
+            label="Subject"
+            options={subjects}
+            value={subjectId}
+            onChange={(value) => {
+              setSubject(value);
+              setClasses([]);
+            }}
             disabled={mutation.isPending}
           />
+          {subjectId ? (
+            <>
+              <Copy heading>Classes · {selected.length} selected</Copy>
+              {eligibleClasses.map((item) => {
+                const checked = selected.includes(item.id);
+                return (
+                  <Pressable
+                    key={item.id}
+                    accessibilityRole="checkbox"
+                    accessibilityLabel={item.name}
+                    accessibilityState={{
+                      checked,
+                      disabled:
+                        mutation.isPending ||
+                        (!checked && selected.length >= 50),
+                    }}
+                    disabled={
+                      mutation.isPending || (!checked && selected.length >= 50)
+                    }
+                    onPress={() =>
+                      setClasses((previous) =>
+                        checked
+                          ? previous.filter((value) => value !== item.id)
+                          : [...previous, item.id],
+                      )
+                    }
+                    style={({ pressed }) => ({
+                      minHeight: 48,
+                      paddingHorizontal: spacing.md,
+                      flexDirection: "row",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      gap: spacing.sm,
+                      borderWidth: 1,
+                      borderRadius: 12,
+                      borderColor: checked ? colors.primary : colors.border,
+                      backgroundColor:
+                        pressed || checked ? colors.muted : colors.card,
+                    })}
+                  >
+                    <Text
+                      style={[
+                        type.bodyStrong,
+                        { color: colors.foreground, flexShrink: 1 },
+                      ]}
+                    >
+                      {item.name}
+                    </Text>
+                    {checked ? (
+                      <Check
+                        size={19}
+                        color={colors.primary}
+                        accessible={false}
+                      />
+                    ) : null}
+                  </Pressable>
+                );
+              })}
+            </>
+          ) : null}
           <form.Field name="title">
             {(field) => (
               <FormField
@@ -140,6 +290,8 @@ export function NewTeacherAssignment() {
               />
             )}
           </form.Field>
+        </Panel>
+        <Panel title="Grading and deadline">
           <form.Field name="maxScore">
             {(field) => (
               <FormField
@@ -152,7 +304,7 @@ export function NewTeacherAssignment() {
           </form.Field>
           <form.Field name="dueDate">
             {(field) => (
-              <DatePickerField
+              <CalendarDateField
                 label="Due date (optional)"
                 value={field.state.value}
                 onChange={field.handleChange}
@@ -160,19 +312,18 @@ export function NewTeacherAssignment() {
               />
             )}
           </form.Field>
-          <Button
-            label="Clear due date"
-            variant="ghost"
-            disabled={mutation.isPending}
-            onPress={() => form.setFieldValue("dueDate", "")}
-          />
           <Copy>
-            Due dates use 23:59 UTC. Publishing immediately notifies the class.
+            Due dates use 23:59 Ghana time. Publishing notifies students in the
+            selected classes.
           </Copy>
           {error ? <Copy alert>{error}</Copy> : null}
           <MutationState mutation={mutation} />
           <Button
-            label="Publish assignment"
+            label={
+              selected.length > 1
+                ? `Publish to ${selected.length} classes`
+                : "Publish assignment"
+            }
             loading={mutation.isPending}
             onPress={() => {
               void form.handleSubmit();
@@ -228,6 +379,19 @@ function GradeForm({
       <Copy>
         {submission.status} · {submission.score ?? "Not graded"} / {max}
       </Copy>
+      {submission.submittedAt ? (
+        <Copy>
+          {[
+            submission.student.admissionNumber ?? submission.student.studentId,
+            `Submitted ${formatDateTime(submission.submittedAt)}`,
+          ]
+            .filter(Boolean)
+            .join(" · ")}
+        </Copy>
+      ) : null}
+      {submission.gradedBy ? (
+        <Copy>Graded by {submission.gradedBy.name}</Copy>
+      ) : null}
       <Copy>{submission.responseText}</Copy>
       <form.Field name="score">
         {(field) => (
@@ -268,6 +432,7 @@ export function TeacherAssignment() {
     getManagedAssignments({ signal }),
   );
   const a = q.data?.assignments.find((a) => a.id === id);
+  const { colors } = useTheme();
   return (
     <TeacherPage title="Assignment review" query={q} back>
       <QueryState query={q} empty={!a}>
@@ -277,6 +442,27 @@ export function TeacherAssignment() {
               <Copy>
                 {a.class.name} · {a.subject.name}
               </Copy>
+              <View
+                style={{
+                  flexDirection: "row",
+                  flexWrap: "wrap",
+                  gap: spacing.sm,
+                }}
+              >
+                <StatusPill label={`${a.maxScore} points`} hue="sky" />
+                <StatusPill
+                  label={
+                    a.dueAt
+                      ? `Due ${formatCalendarDate(a.dueAt.slice(0, 10))}`
+                      : "No due date"
+                  }
+                  hue="emerald"
+                />
+                <StatusPill
+                  label={`${a.submissions.length} submitted`}
+                  hue="violet"
+                />
+              </View>
               <Copy>{a.instructions}</Copy>
             </Panel>
             {a.submissions.length ? (
@@ -292,6 +478,7 @@ export function TeacherAssignment() {
               <ListRow
                 title="No submissions yet"
                 subtitle="Pull to refresh when pupils have responded."
+                leading={<ClipboardList size={20} color={colors.primary} />}
               />
             )}
           </>

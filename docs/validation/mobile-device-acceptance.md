@@ -24,6 +24,14 @@ issues before Phase 9.
       wards, and a multi-role user. Also verify wrong password, rate limiting after
       repeated attempts, paused subscription, forced password change, and
       forgot-password flow.
+- [ ] On an associated Android/iOS build, open a real recovery email while the
+      app is closed, already open, and signed in. Verify the reset form opens
+      with no token field and asks before signing out an active session. Complete
+      a reset, verify the link cannot be reused, and test browser fallback
+      without the app installed.
+- [ ] From a guardian fee statement, open the web portal with and without an
+      active browser session. Verify sign-in continues to the correct school's
+      statement and that browser ward selection remains available.
 - [ ] Session events (`unauthorized`, `password-change-required`,
       `subscription-inactive`, and `two-factor-required`) clear the appropriate
       credentials/caches and show the expected screen.
@@ -36,6 +44,35 @@ issues before Phase 9.
 - [ ] Low-end Android: 500-row FlashList scrolling, sheets, counters, and
       shimmer remain smooth.
 - [ ] App icon, adaptive icon mask, and light/dark splash are correct.
+
+## Navigation and appearance
+
+- [ ] Switch between all five tabs as a teacher, guardian, and student.
+      Confirm inactive labels stay visible and detail screens keep the relevant
+      section selected.
+- [ ] Test gesture navigation and three-button Android navigation. Scroll the
+      class register to its last item and verify the dock leaves it reachable.
+- [ ] Open and close the keyboard in a search field. Confirm navigation moves
+      out of the way and returns when the keyboard closes.
+- [ ] At 200% system text size, scroll the tab strip and reach the first and
+      last tabs. Check labels, unread counts, and selected states in both themes.
+
+## Portal workflow checks
+
+- [ ] Sign in as the assigned teacher, save marks, and import a sample CSV and
+      XLSX. Verify an empty cell preserves a mark, a stale preview reports a
+      conflict, and the sheet locks after submission. Request a correction,
+      save a recommendation draft, and sign off selected reports.
+- [ ] Preview a report and open a signed archive PDF. Verify a teacher outside
+      the assigned class cannot access that pupil's report.
+- [ ] Submit a guardian absence request with a PDF or image and reopen it
+      after school leadership records a decision. Switch guardians and wards
+      to verify requests, evidence, fees and reports stay within scope.
+- [ ] Print and share a timetable, a legacy report and a fee statement. Open
+      the exported Excel statement and check that amounts are numeric.
+- [ ] Filter student assignments, search subjects and classmates, and verify
+      current and next lessons. Search message history and send a reply using
+      the guardian, teacher and student test accounts.
 
 ## Results
 

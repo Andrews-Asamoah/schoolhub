@@ -7,6 +7,10 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { routeTree } from "./routeTree.gen";
 
 import { queryClient } from "@/lib/query-client";
+import { ErrorPage, NotFoundPage } from "@/components/error-pages";
+import { setUnauthorizedHandler } from "@/lib/api";
+import { initErrorReporting } from "@/lib/error-reporting";
+import { toast } from "@/components/ui/toaster";
 import "./index.css";
 
 /**
@@ -18,6 +22,24 @@ const router = createRouter({
   context: { queryClient },
   // Scroll to top on navigation
   scrollRestoration: true,
+  // Any render error or unknown URL shows a recoverable page instead of a blank screen.
+  defaultErrorComponent: ErrorPage,
+  defaultNotFoundComponent: NotFoundPage,
+});
+
+initErrorReporting();
+
+// An expired session returns 401: tell the user, then go to /login and come back afterwards.
+let redirectingToLogin = false;
+setUnauthorizedHandler(() => {
+  if (redirectingToLogin) return;
+  redirectingToLogin = true;
+  const { pathname, search } = window.location;
+  toast.error("Your session has expired. Please sign in again.");
+  void queryClient.cancelQueries();
+  void router
+    .navigate({ to: "/login", search: { redirect: `${pathname}${search}` } as never, replace: true })
+    .finally(() => { redirectingToLogin = false; });
 });
 
 // TypeScript — register the router for full type inference

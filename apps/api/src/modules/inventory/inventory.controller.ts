@@ -57,7 +57,7 @@ export class InventoryController {
   }
 
   @Post("items")
-  @Roles("owner", "admin", "headteacher", "accountant")
+  @Roles("owner", "admin", "accountant")
   createItem(
     @CurrentSchool() school: School,
     @CurrentUser() user: AuthenticatedUser,
@@ -67,7 +67,7 @@ export class InventoryController {
   }
 
   @Patch("items/:id")
-  @Roles("owner", "admin", "headteacher", "accountant")
+  @Roles("owner", "admin", "accountant")
   updateItem(
     @CurrentSchool() school: School,
     @Param("id") id: string,
@@ -77,7 +77,7 @@ export class InventoryController {
   }
 
   @Post("items/:id/movements")
-  @Roles("owner", "admin", "headteacher", "accountant")
+  @Roles("owner", "admin", "accountant")
   recordMovement(
     @CurrentSchool() school: School,
     @CurrentUser() user: AuthenticatedUser,

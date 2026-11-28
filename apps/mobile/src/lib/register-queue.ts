@@ -1,3 +1,12 @@
+import {
+  AESEncryptionKey,
+  AESKeySize,
+  AESSealedData,
+  aesDecryptAsync,
+  aesEncryptAsync,
+  randomUUID,
+} from "expo-crypto";
+import * as SecureStore from "expo-secure-store";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   batchAttendanceSchema,
@@ -19,6 +28,8 @@ import { ApiError, SessionChangedError } from "./api-error";
  *   (`wipeQueryCache`), expires after 14 days and holds at most 20 registers.
  */
 export const REGISTER_QUEUE_KEY = "schoolhub:register-queue";
+const REGISTER_KEY = "schoolhub.register-queue-key";
+const SEALED_PREFIX = "aes-gcm-v1:";
 export const MAX_QUEUED_REGISTERS = 20;
 export const QUEUE_MAX_AGE_MS = 14 * 24 * 60 * 60 * 1000;
 
@@ -43,20 +54,7 @@ export type FlushResult = {
 
 /** A unique, format-valid idempotency key (uniqueness, not secrecy, is required). */
 export function newIdempotencyKey(): string {
-  const bytes = new Uint8Array(12);
-  const cryptoObject = (
-    globalThis as {
-      crypto?: { getRandomValues?: (a: Uint8Array) => Uint8Array };
-    }
-  ).crypto;
-  if (cryptoObject?.getRandomValues) cryptoObject.getRandomValues(bytes);
-  else
-    for (let i = 0; i < bytes.length; i++)
-      bytes[i] = Math.floor(Math.random() * 256);
-  const random = Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join(
-    "",
-  );
-  return `reg-${Date.now().toString(36)}-${random}`;
+  return randomUUID();
 }
 
 /** Outcome unknown or server temporarily unavailable: safe to retry with the same key. */
@@ -80,8 +78,23 @@ async function load(now = Date.now()): Promise<QueuedRegister[]> {
   if (!raw) return [];
   let parsed: unknown;
   try {
-    parsed = JSON.parse(raw);
-  } catch {
+    if (raw.startsWith(SEALED_PREFIX)) {
+      const secret = await SecureStore.getItemAsync(REGISTER_KEY);
+      if (!secret) {
+        await AsyncStorage.removeItem(REGISTER_QUEUE_KEY);
+        return [];
+      }
+      const key = await AESEncryptionKey.import(secret, "base64");
+      const sealed = AESSealedData.fromCombined(
+        raw.slice(SEALED_PREFIX.length),
+      );
+      const bytes = await aesDecryptAsync(sealed, key);
+      parsed = JSON.parse(new TextDecoder().decode(bytes));
+    } else {
+      parsed = JSON.parse(raw);
+    }
+  } catch (error) {
+    if (raw.startsWith(SEALED_PREFIX)) throw error;
     return [];
   }
   if (!Array.isArray(parsed)) return [];
@@ -91,21 +104,45 @@ async function load(now = Date.now()): Promise<QueuedRegister[]> {
     if (result.success && now - result.data.createdAt <= QUEUE_MAX_AGE_MS)
       entries.push(result.data);
   }
+  if (!raw.startsWith(SEALED_PREFIX) || entries.length !== parsed.length)
+    await save(entries);
   return entries;
 }
 
 async function save(entries: QueuedRegister[]) {
-  if (!entries.length) await AsyncStorage.removeItem(REGISTER_QUEUE_KEY);
-  else await AsyncStorage.setItem(REGISTER_QUEUE_KEY, JSON.stringify(entries));
+  if (!entries.length) {
+    await AsyncStorage.removeItem(REGISTER_QUEUE_KEY);
+    return;
+  }
+  const secret = await SecureStore.getItemAsync(REGISTER_KEY);
+  const key = secret
+    ? await AESEncryptionKey.import(secret, "base64")
+    : await AESEncryptionKey.generate(AESKeySize.AES256);
+  if (!secret)
+    await SecureStore.setItemAsync(REGISTER_KEY, await key.encoded("base64"));
+  const plaintext = new TextEncoder().encode(JSON.stringify(entries));
+  const sealed = await aesEncryptAsync(plaintext, key);
+  await AsyncStorage.setItem(
+    REGISTER_QUEUE_KEY,
+    SEALED_PREFIX + (await sealed.combined("base64")),
+  );
 }
 
 /** Returns false when the queue is full (the caller must keep the marks on screen). */
 export function enqueueRegister(
   entry: Omit<QueuedRegister, "createdAt">,
   now = Date.now(),
+  isCurrent = () => true,
 ) {
   return locked(async () => {
-    const entries = (await load(now)).filter((e) => e.key !== entry.key);
+    const entries = await load(now);
+    if (!isCurrent()) return false;
+    const existing = entries.find((candidate) => candidate.key === entry.key);
+    if (existing)
+      return (
+        existing.subdomain === entry.subdomain &&
+        JSON.stringify(existing.batch) === JSON.stringify(entry.batch)
+      );
     if (entries.length >= MAX_QUEUED_REGISTERS) return false;
     entries.push({
       ...entry,
@@ -125,7 +162,12 @@ export function pendingRegisterCount(subdomain: string): Promise<number> {
 
 export function clearRegisterQueue(): Promise<void> {
   return locked(async () => {
-    await AsyncStorage.removeItem(REGISTER_QUEUE_KEY);
+    const operations = await Promise.allSettled([
+      AsyncStorage.removeItem(REGISTER_QUEUE_KEY),
+      SecureStore.deleteItemAsync(REGISTER_KEY),
+    ]);
+    if (operations[0]?.status === "rejected")
+      throw new Error("Unable to clear stored offline registers.");
   });
 }
 
@@ -142,6 +184,7 @@ export function flushRegisterQueue(input: {
   return locked(async () => {
     const all = await load(input.now);
     const own = all.filter((e) => e.subdomain === input.subdomain);
+    if (!all.length) return { synced: 0, rejected: [], remaining: 0 };
     const result: FlushResult = { synced: 0, rejected: [], remaining: 0 };
     const kept: QueuedRegister[] = [];
     let stopped = false;

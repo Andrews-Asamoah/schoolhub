@@ -103,8 +103,9 @@ font scaling, light/dark screenshots and native builds remain manual acceptance
 gates. Automated schema/component tests and Metro exports do not replace them.
 Keep the PR draft until that evidence and CI are reviewed.
 
-N3 is still open in v3: teacher announcement creation and document access are
-therefore deferred. Teachers can read shared announcements. N2/N5 (push/offline)
+Follow-up: teachers can publish announcements to their assigned classes or
+their guardians and open private staff documents. The mobile client uses the
+existing teacher-scoped API contracts for both tools. N2/N5 (push/offline)
 remain Phase 8 work and require owner approval before any backend change.
 Native MFA remains deferred under Phase 4A; this phase does not change auth or
 claim enrolled accounts work on hardware. Existing password-recovery email

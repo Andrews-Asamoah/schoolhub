@@ -1,14 +1,21 @@
 import { hueForName, modulePalette } from "@/theme/palette";
-import { Image } from "expo-image";
+import { Image, type ImageProps } from "expo-image";
+import { useState } from "react";
 import { LinearGradient } from "expo-linear-gradient";
 import { View } from "react-native";
 import { Text } from "@/components/Typography";
 import { fonts, useTheme } from "@/theme/theme";
 
-type Props = { name: string; uri?: string | null; size?: number };
+type Props = {
+  name: string;
+  uri?: string | null;
+  size?: number;
+  cachePolicy?: ImageProps["cachePolicy"];
+};
 
 /** Photo, or initials on a gradient that stays the same for a given name. */
-export function Avatar({ name, uri, size = 44 }: Props) {
+export function Avatar({ name, uri, size = 44, cachePolicy }: Props) {
+  const [failedUri, setFailedUri] = useState<string | null>(null);
   const { scheme } = useTheme();
   const p = modulePalette(hueForName(name), scheme);
   const initials = name
@@ -30,11 +37,16 @@ export function Avatar({ name, uri, size = 44 }: Props) {
         backgroundColor: p.solid,
       }}
     >
-      {uri ? (
+      {uri && uri !== failedUri ? (
         <Image
           source={{ uri }}
+          accessible
+          accessibilityRole="image"
+          accessibilityLabel={`${name} photo`}
           style={{ width: size, height: size }}
           contentFit="cover"
+          cachePolicy={cachePolicy}
+          onError={() => setFailedUri(uri)}
         />
       ) : (
         <>

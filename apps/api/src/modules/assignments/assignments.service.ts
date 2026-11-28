@@ -1,3 +1,4 @@
+import type { PublishAssignmentBatchInput } from "@schoolhub/shared";
 import {
   BadRequestException,
   ConflictException,
@@ -149,7 +150,7 @@ export class AssignmentsService {
                 id: true,
                 admissionNumber: true,
                 studentId: true,
-                profile: { select: { firstName: true, lastName: true } },
+                profile: { select: { firstName: true, otherNames: true, lastName: true } },
               },
             },
             submittedBy: { select: { id: true, name: true } },
@@ -174,95 +175,95 @@ export class AssignmentsService {
   }
 
   async create(schoolId: string, userId: string, role: string | undefined, input: CreateSchoolAssignmentInput) {
+    const { classId, ...assignment } = input;
+    const [created] = await this.publish(schoolId, userId, role, { ...assignment, classIds: [classId] });
+    return created!;
+  }
+
+  async publishBatch(schoolId: string, userId: string, role: string | undefined, input: PublishAssignmentBatchInput) {
+    if (role !== "teacher") throw new ForbiddenException("Only teachers can use batch publishing.");
+    return { assignments: await this.publish(schoolId, userId, role, input) };
+  }
+
+  private async publish(schoolId: string, userId: string, role: string | undefined, input: PublishAssignmentBatchInput) {
     if (!["owner", "admin", "headteacher", "teacher"].includes(role ?? "")) {
       throw new ForbiddenException("Your role cannot publish assignments.");
     }
     const current = await this.currentTerm(schoolId);
-    const [schoolClass, subject] = await Promise.all([
-      this.prisma.client.class.findFirst({
-        where: {
-          id: input.classId,
-          schoolId,
-          isActive: true,
-          deletedAt: null,
-          OR: [{ academicYearId: current.academicYear.id }, { academicYearId: null }],
-        },
-        select: { id: true, name: true },
-      }),
-      this.prisma.client.subject.findFirst({
-        where: { id: input.subjectId, schoolId, isActive: true, deletedAt: null },
-        select: { id: true, name: true },
-      }),
-    ]);
-    if (!schoolClass) throw new NotFoundException("Active class not found in this school.");
-    if (!subject) throw new NotFoundException("Active subject not found in this school.");
-
-    const classSubject = await this.prisma.client.classSubject.findFirst({
-      where: { classId: schoolClass.id, subjectId: subject.id },
-      select: { id: true },
-    });
-    if (!classSubject) {
-      throw new BadRequestException("The selected subject is not assigned to this class.");
-    }
-
-    if (role === "teacher") {
-      const scope = await this.teacherScope.getAssignments(schoolId, userId);
-      if (!canEnterMarks(role, scope, schoolClass.id, subject.id)) {
-        throw new ForbiddenException("Teachers can only publish assignments for subjects assigned to them.");
-      }
-    }
-
+    const { classIds, subjectId } = input;
     const dueAt = input.dueAt ? new Date(input.dueAt) : null;
     if (dueAt && Number.isNaN(dueAt.getTime())) {
       throw new BadRequestException("Enter a valid due date.");
     }
 
-    return this.prisma.client.$transaction(async (tx) => {
-      const assignment = await tx.schoolAssignment.create({
-        data: {
-          schoolId,
-          classId: schoolClass.id,
-          subjectId: subject.id,
-          academicYearId: current.academicYear.id,
-          termId: current.term.id,
-          createdById: userId,
-          title: input.title.trim(),
-          instructions: input.instructions.trim(),
-          dueAt,
-          maxScore: new Prisma.Decimal(input.maxScore),
-          status: "PUBLISHED",
-        },
-        include: {
-          class: { select: { id: true, name: true, level: true } },
-          subject: { select: { id: true, name: true, code: true } },
-          createdBy: { select: { id: true, name: true } },
-        },
-      });
+    const scope = role === "teacher" ? await this.teacherScope.getAssignments(schoolId, userId) : null;
+    if (scope && classIds.some((classId) => !canEnterMarks(role, scope, classId, subjectId))) {
+      throw new ForbiddenException("Teachers can only publish assignments for subjects assigned to them.");
+    }
 
-      const enrollments = await tx.enrollment.findMany({
-        where: {
-          classId: schoolClass.id,
-          academicYearId: current.academicYear.id,
-          termId: current.term.id,
-          status: "ACTIVE",
-          student: { schoolId, deletedAt: null },
-        },
-        select: { student: { select: { profile: { select: { userId: true } } } } },
-      });
-      const recipientIds = [...new Set(enrollments.map((row) => row.student.profile.userId))];
-      if (recipientIds.length) {
-        await tx.notification.createMany({
-          data: recipientIds.map((recipientId) => ({
-            schoolId,
-            userId: recipientId,
-            type: "GENERAL" as const,
-            title: `New assignment: ${assignment.title}`,
-            message: `${assignment.subject.name} · ${assignment.class.name}`,
-            link: "/assignments",
-          })),
-        });
+    return this.prisma.client.$transaction(async (tx) => {
+      const [classes, subject, classSubjects, enrollments] = await Promise.all([
+        tx.class.findMany({
+          where: {
+            id: { in: classIds }, schoolId, isActive: true, deletedAt: null,
+            OR: [{ academicYearId: current.academicYear.id }, { academicYearId: null }],
+          },
+          select: { id: true },
+        }),
+        tx.subject.findFirst({
+          where: { id: subjectId, schoolId, isActive: true, deletedAt: null },
+          select: { id: true },
+        }),
+        tx.classSubject.findMany({
+          where: { classId: { in: classIds }, subjectId },
+          select: { classId: true },
+        }),
+        tx.enrollment.findMany({
+          where: {
+            classId: { in: classIds }, academicYearId: current.academicYear.id,
+            termId: current.term.id, status: "ACTIVE", student: { schoolId, deletedAt: null },
+          },
+          select: { classId: true, student: { select: { profile: { select: { userId: true } } } } },
+        }),
+      ]);
+      if (classes.length !== classIds.length) throw new NotFoundException("An active class was not found in this school.");
+      if (!subject) throw new NotFoundException("Active subject not found in this school.");
+      if (classSubjects.length !== classIds.length) throw new BadRequestException("The selected subject must be assigned to every chosen class.");
+
+      const recipientsByClass = new Map<string, Set<string>>();
+      for (const enrollment of enrollments) {
+        const recipients = recipientsByClass.get(enrollment.classId) ?? new Set<string>();
+        recipients.add(enrollment.student.profile.userId);
+        recipientsByClass.set(enrollment.classId, recipients);
       }
-      return { ...assignment, maxScore: Number(assignment.maxScore), notifiedStudents: recipientIds.length };
+
+      const assignments = [];
+      for (const classId of classIds) {
+        const assignment = await tx.schoolAssignment.create({
+          data: {
+            schoolId, classId, subjectId, academicYearId: current.academicYear.id,
+            termId: current.term.id, createdById: userId, title: input.title.trim(),
+            instructions: input.instructions.trim(), dueAt,
+            maxScore: new Prisma.Decimal(input.maxScore), status: "PUBLISHED",
+          },
+          include: {
+            class: { select: { id: true, name: true, level: true } },
+            subject: { select: { id: true, name: true, code: true } },
+            createdBy: { select: { id: true, name: true } },
+          },
+        });
+        const recipientIds = [...(recipientsByClass.get(classId) ?? [])];
+        if (recipientIds.length) {
+          await tx.notification.createMany({
+            data: recipientIds.map((userId) => ({
+              schoolId, userId, type: "GENERAL" as const, title: `New assignment: ${assignment.title}`,
+              message: `${assignment.subject.name} · ${assignment.class.name}`, link: "/assignments",
+            })),
+          });
+        }
+        assignments.push({ ...assignment, maxScore: Number(assignment.maxScore), notifiedStudents: recipientIds.length });
+      }
+      return assignments;
     });
   }
 

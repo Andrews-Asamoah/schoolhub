@@ -27,6 +27,36 @@ describe("all-role portal boundaries", () => {
       expect(canRoleAccessPage(role, page)).toBe(false);
     }
   });
+  it("shows the headteacher only the allowlisted pages, with no payroll or ledger pages", () => {
+    const pages = getSchoolNavGroupsForRole("headteacher").flatMap((group) => group.items.map((item) => item.id));
+    for (const id of ["payroll", "payments", "invoices", "expenses", "finance-audit", "finance-reports", "student-statements", "term-end-review", "concessions", "fee-reminders", "finance-approvals"]) {
+      expect(pages).not.toContain(id);
+      expect(canRoleAccessPage("headteacher", id)).toBe(false);
+    }
+    for (const id of ["assessments", "students", "attendance", "fees", "outstanding", "inventory", "announcements"]) {
+      expect(pages).toContain(id);
+    }
+  });
+  it("offers Report approvals to the headteacher only", () => {
+    expect(canRoleAccessPage("headteacher", "report-approvals")).toBe(true);
+    for (const role of ["owner", "admin", "teacher", "accountant", "student", "guardian", "staff"]) {
+      expect(canRoleAccessPage(role, "report-approvals")).toBe(false);
+    }
+    const pages = getSchoolNavGroupsForRole("headteacher").flatMap((group) => group.items.map((item) => item.id));
+    expect(pages).toContain("report-approvals");
+  });
+
+  it("offers the report card archive to owner, admin, headteacher and teachers only", () => {
+    for (const role of ["owner", "admin", "headteacher", "teacher"]) {
+      expect(canRoleAccessPage(role, "report-cards")).toBe(true);
+      const pages = getSchoolNavGroupsForRole(role).flatMap((group) => group.items.map((item) => item.id));
+      expect(pages).toContain("report-cards");
+    }
+    for (const role of ["accountant", "student", "guardian"]) {
+      expect(canRoleAccessPage(role, "report-cards")).toBe(false);
+    }
+  });
+
   it("denies unknown and unresolved roles", () => {
     expect(getSchoolNavGroupsForRole("unexpected")).toEqual([]);
     expect(canRoleAccessPage(null, "students")).toBe(false);
@@ -45,5 +75,15 @@ describe("all-role portal boundaries", () => {
     expect(canRoleAccessPage("student", "classmates")).toBe(true);
     expect(canRoleAccessPage("guardian", "external-exams")).toBe(false);
     expect(canRoleAccessPage("student", "external-exams")).toBe(false);
+  });
+});
+
+describe("teacher payroll navigation", () => {
+  it("shows teachers their own payroll and keeps the school payroll register restricted", () => {
+    expect(canRoleAccessPage("teacher", "teacher-payroll")).toBe(true);
+    expect(canRoleAccessPage("teacher", "payroll")).toBe(false);
+    for (const role of ["guardian", "student", "staff", "accountant", "headteacher", "admin", "owner"]) {
+      expect(canRoleAccessPage(role, "teacher-payroll")).toBe(false);
+    }
   });
 });

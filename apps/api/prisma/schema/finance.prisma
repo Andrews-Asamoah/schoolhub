@@ -90,6 +90,7 @@ model FeeItem {
   category         FeeCategory?
   customCategoryId String?
   isOptional       Boolean      @default(false)
+  followsBusRoster Boolean      @default(false)
   recognitionMethod FinanceRecognitionMethod @default(AT_INVOICE)
   revenueAccountId String?
   createdAt        DateTime     @default(now())
@@ -400,6 +401,23 @@ model ExpenditureCategoryRegistry {
   @@map("expenditure_category_registry")
 }
 
+/// Payroll-only data. Personal identifiers and bank details are stored as authenticated ciphertext.
+model PayrollPaymentDetails {
+  id            String  @id @default(cuid())
+  schoolId      String
+  teacherId     String? @unique
+  staffId       String? @unique
+  encryptedData String
+  updatedAt     DateTime @updatedAt
+
+  school  School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  teacher Teacher? @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  staff   Staff?   @relation(fields: [staffId], references: [id], onDelete: Cascade)
+
+  @@index([schoolId])
+  @@map("payroll_payment_details")
+}
+
 model PayrollRecord {
   /// 1 for the original run; supplementary or correction runs use 2, 3...
   runNumber Int @default(1)
@@ -417,7 +435,7 @@ model PayrollRecord {
   totalTax      Decimal       @db.Decimal(15, 2)
   totalSSNIT    Decimal       @db.Decimal(15, 2)
   processedById String?
-  /// Who approved the run; must differ from processedById (separation of duties).
+  /// Who approved the run. Self-approval is recorded in the approval audit when permitted.
   approvedById  String?
   academicYearId String?
   termId        String?
@@ -447,6 +465,8 @@ model Payslip {
   grossSalary     Decimal       @db.Decimal(15, 2)
   ssnitEmployee   Decimal       @db.Decimal(15, 2)
   ssnitEmployer   Decimal       @db.Decimal(15, 2)
+  /// Tier 2 allocation of the combined employee and employer SSNIT contribution.
+  tier2Contribution Decimal?     @db.Decimal(15, 2)
   incomeTax       Decimal       @db.Decimal(15, 2)
   otherDeductions Decimal       @default(0) @db.Decimal(15, 2)
   netSalary       Decimal       @db.Decimal(15, 2)

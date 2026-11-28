@@ -1,6 +1,74 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { PrismaService } from "../../prisma/prisma.service.js";
 import { DashboardService } from "./dashboard.service.js";
+
+describe("DashboardService today’s attendance", () => {
+  const day = new Date("2026-11-26");
+  const currentTerm = {
+    id: "term-1",
+    academicYearId: "year-1",
+    startDate: new Date("2026-09-01"),
+    endDate: new Date("2026-12-18"),
+    instructionalWeekdays: [1, 2, 3, 4, 5],
+    calendarDays: [] as { isInstructional: boolean }[],
+  };
+  const findTerm = vi.fn();
+  const findEnrollments = vi.fn();
+  const service = new DashboardService({ client: {
+    term: { findFirst: findTerm },
+    enrollment: { findMany: findEnrollments },
+  } } as unknown as PrismaService);
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-11-26T14:20:00Z"));
+    findTerm.mockReset().mockResolvedValue(currentTerm);
+    findEnrollments.mockReset().mockResolvedValue([]);
+  });
+
+  afterEach(() => vi.useRealTimers());
+
+  it("counts school-scoped marks and leaves eligible students without marks unmarked", async () => {
+    const statuses = ["PRESENT", "PRESENT", "LATE", "ABSENT", "EXCUSED", "SICK", "PERMISSION", null];
+    findEnrollments.mockResolvedValue(statuses.map(status => ({
+      student: { attendances: status === null ? [] : [{ status }] },
+    })));
+
+    expect(await service.getTodayAttendance("school-1")).toEqual({
+      date: "2026-11-26", state: "instructional", expected: 8, marked: 7,
+      counts: { PRESENT: 2, LATE: 1, ABSENT: 1, EXCUSED: 1, SICK: 1, PERMISSION: 1 },
+    });
+    expect(findTerm).toHaveBeenCalledWith(expect.objectContaining({
+      where: { isCurrent: true, academicYear: { schoolId: "school-1", isCurrent: true } },
+    }));
+    expect(findEnrollments).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        termId: "term-1", academicYearId: "year-1", status: "ACTIVE",
+        student: expect.objectContaining({
+          schoolId: "school-1",
+          attendanceExclusions: { none: { schoolId: "school-1", termId: "term-1", date: day } },
+        }),
+      }),
+      select: { student: { select: { attendances: { where: { date: day }, select: { status: true } } } } },
+    }));
+  });
+
+  it("honors a school closure and a make-up instructional day", async () => {
+    findTerm.mockResolvedValueOnce({ ...currentTerm, calendarDays: [{ isInstructional: false }] });
+    expect(await service.getTodayAttendance("school-1")).toMatchObject({ state: "non-instructional" });
+    expect(findEnrollments).not.toHaveBeenCalled();
+
+    vi.setSystemTime(new Date("2026-11-28T14:20:00Z"));
+    findTerm.mockResolvedValueOnce({ ...currentTerm, calendarDays: [{ isInstructional: true }] });
+    expect(await service.getTodayAttendance("school-1")).toMatchObject({ state: "instructional", expected: 0, marked: 0 });
+  });
+
+  it("does not report attendance outside the current term", async () => {
+    vi.setSystemTime(new Date("2026-12-19T14:20:00Z"));
+    expect(await service.getTodayAttendance("school-1")).toEqual({ date: "2026-12-19", state: "outside-term" });
+    expect(findEnrollments).not.toHaveBeenCalled();
+  });
+});
 
 describe("DashboardService finance visibility", () => {
   it("returns administrators aggregate finance data without fetching or exposing transaction details", async () => {

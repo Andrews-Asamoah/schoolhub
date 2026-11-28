@@ -36,7 +36,7 @@ After every task: run pnpm typecheck (and the mobile app's lint and tests once t
 If anything in this brief conflicts with the actual repo, trust the repo, tell me exactly what differs, and wait for my decision.
 5. Decisions (edit these if you disagree)
 Guardian fees are view-only in v1. No in-app payment.
-Teacher BECE/external-exam entry is deferred (not in v1). Mock exams are entered through the normal assessment entry screens (a mock is an assessment category); the standalone internal mock screens were removed.
+The teacher portal supports external-exam transcription for the appointed class teacher. Candidate administration, imports and attestation remain with the web roles authorised by the API. Mock exams are entered through the normal assessment entry screens (a mock is an assessment category); the standalone internal mock screens were removed.
 Glass with a fallback: frosted glass on capable devices; on low-end Android, GlassSurface falls back to a translucent solid colour (no blur).
 Offline: only the teacher attendance register queues offline in v1. Everything else is online with cached reads.
 Platforms: Android first (Play Store), then iOS.

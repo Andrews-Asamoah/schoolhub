@@ -1,9 +1,12 @@
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { DatePicker, DateTimePicker } from "@/components/ui/date-picker";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Pencil } from "lucide-react";
+import { Copy, Pencil } from "lucide-react";
 import { useState } from "react";
+import { toast } from "@/components/ui/toaster";
 import {
+  formatPersonName,
   saveAdmissionCycleSchema,
   type ApplicationStatus,
   type IssuedCredentials,
@@ -13,6 +16,7 @@ import { useSchoolRole } from "@/components/school/school-role-switcher";
 import { WorkspaceEmptyState } from "@/components/school/workspace-ui";
 import { apiFetch, errorText } from "@/lib/api";
 import { getTenantSubdomain, useTenantSchool } from "@/lib/tenant";
+import { platform } from "@schoolhub/platform";
 
 interface ClassOption {
   id: string;
@@ -66,6 +70,7 @@ interface Application {
   applicationNumber: string;
   status: ApplicationStatus;
   firstName: string;
+  otherNames?: string | null;
   lastName: string;
   gender: string;
   dateOfBirth: string;
@@ -131,6 +136,9 @@ export function AdmissionsWorkspace() {
   const { activeRole } = useSchoolRole();
   const canDecide = ["owner", "admin", "headteacher"].includes(activeRole ?? "");
   const subdomain = getTenantSubdomain();
+  const publicFormUrl = subdomain ? (platform.target === "desktop"
+    ? `https://${subdomain}.${import.meta.env.VITE_SCHOOLHUB_WEB_DOMAIN || "schoolhub.gh"}/apply`
+    : new URL(`/apply${window.location.search}`, window.location.origin).href) : null;
   const cyclesQuery = useQuery({
     queryKey: ["admissions", "cycles"],
     queryFn: () => apiFetch<Cycle[]>("/admissions/cycles"),
@@ -152,14 +160,30 @@ export function AdmissionsWorkspace() {
             </button>
           ))}
         </div>
-        {subdomain && (
-          <p className="text-xs text-muted-foreground">
-            Public enrollment form:{" "}
-            <a className="font-semibold text-primary underline" href={`/apply${window.location.search}`} target="_blank" rel="noreferrer">
-              {window.location.origin}/apply
-            </a>
-          </p>
-        )}
+        {publicFormUrl && (platform.target === "desktop" ? (
+          <div className="flex flex-wrap items-end gap-2">
+            <label className="grid gap-1 text-xs text-muted-foreground">
+              Public enrollment form
+              <input readOnly value={publicFormUrl} onFocus={(event) => event.target.select()}
+                className="w-64 max-w-full rounded-md border border-input bg-background px-2 py-1.5 text-foreground" />
+            </label>
+            <button type="button" className="inline-flex items-center gap-1.5 rounded-md border border-input px-2 py-1.5 text-xs font-semibold"
+              onClick={async () => {
+                try {
+                  await navigator.clipboard.writeText(publicFormUrl);
+                  toast.success("Application link copied.");
+                } catch {
+                  toast.error("Could not copy automatically. Select the link to copy it manually.");
+                }
+              }}>
+              <Copy className="size-3.5" /> Copy link
+            </button>
+          </div>
+        ) : (
+          <a className="text-xs font-semibold text-primary underline" href={publicFormUrl} target="_blank" rel="noreferrer">
+            Open public enrollment form
+          </a>
+        ))}
       </div>
       {cyclesQuery.error ? (
         <WorkspaceEmptyState title="Could not load admissions" description={errorText(cyclesQuery.error)} />
@@ -458,7 +482,7 @@ function ApplicationsPanel({ cycles, canDecide }: { cycles: Cycle[]; canDecide: 
       {
         onSuccess: (result) => {
           const student = result.student;
-          const name = `${app.firstName} ${app.lastName}`;
+          const name = formatPersonName(app);
           const entries: CredentialEntry[] = [];
           if (student.credentials) entries.push({ label: `${name} (student)`, credentials: student.credentials as IssuedCredentials });
           for (const g of student.guardianCredentials ?? []) {
@@ -563,34 +587,34 @@ function ApplicationsPanel({ cycles, canDecide }: { cycles: Cycle[]; canDecide: 
         <WorkspaceEmptyState title="No applications" description="Applications appear here as parents submit the public enrollment form." />
       ) : (
         <div className="overflow-x-auto rounded-2xl border border-border bg-card">
-          <table className="w-full min-w-[860px] text-left text-sm">
-            <thead className="border-b border-border text-xs text-muted-foreground">
-              <tr>
-                <th className="p-3">
+          <Table scroll={false} className="w-full min-w-[860px] text-left text-sm">
+            <TableHeader className="border-b border-border text-xs text-muted-foreground">
+              <TableRow>
+                <TableHead>
                   <input
                     type="checkbox"
                     aria-label="Select all awaiting exam"
                     checked={schedulable.length > 0 && schedulable.every((r) => picked.has(r.id))}
                     onChange={(e) => setPicked(e.target.checked ? new Set(schedulable.map((r) => r.id)) : new Set())}
                   />
-                </th>
-                <th className="p-3">Applicant</th>
-                <th className="p-3">Class</th>
-                <th className="p-3">Guardian</th>
-                <th className="p-3">Status</th>
-                <th className="p-3">Admission fee</th>
-                <th className="p-3">Exam</th>
-                <th className="p-3">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
+                </TableHead>
+                <TableHead>Applicant</TableHead>
+                <TableHead>Class</TableHead>
+                <TableHead>Guardian</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Admission fee</TableHead>
+                <TableHead>Exam</TableHead>
+                <TableHead>Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {rows.map((app) => (
-                <tr key={app.id} className="border-b border-border/60 align-top last:border-0">
-                  <td className="p-3">
+                <TableRow key={app.id} className="border-b border-border/60 align-top last:border-0">
+                  <TableCell>
                     {["SUBMITTED", "UNDER_REVIEW", "EXAM_SCHEDULED"].includes(app.status) && (
                       <input
                         type="checkbox"
-                        aria-label={`Select ${app.firstName} ${app.lastName}`}
+                        aria-label={`Select ${formatPersonName(app)}`}
                         checked={picked.has(app.id)}
                         onChange={(e) => {
                           const next = new Set(picked);
@@ -599,18 +623,18 @@ function ApplicationsPanel({ cycles, canDecide }: { cycles: Cycle[]; canDecide: 
                         }}
                       />
                     )}
-                  </td>
-                  <td className="p-3">
-                    <p className="font-semibold text-foreground">{app.firstName} {app.lastName}</p>
+                  </TableCell>
+                  <TableCell>
+                    <p className="font-semibold text-foreground">{formatPersonName(app)}</p>
                     <p className="text-xs text-muted-foreground">{app.applicationNumber} · {app.dateOfBirth.slice(0, 10)}</p>
-                  </td>
-                  <td className="p-3 text-foreground">{app.class.name}</td>
-                  <td className="p-3 text-xs text-muted-foreground">
+                  </TableCell>
+                  <TableCell className="text-foreground">{app.class.name}</TableCell>
+                  <TableCell className="text-xs text-muted-foreground">
                     {app.guardianFirstName} {app.guardianLastName} ({label(app.guardianRelationship)})
                     <br />{app.guardianPhone}{app.guardianEmail ? ` · ${app.guardianEmail}` : ""}
-                  </td>
-                  <td className="p-3"><Badge value={app.status} /></td>
-                  <td className="p-3">
+                  </TableCell>
+                  <TableCell><Badge value={app.status} /></TableCell>
+                  <TableCell>
                     <FeeCell
                       app={app}
                       money={money}
@@ -621,17 +645,17 @@ function ApplicationsPanel({ cycles, canDecide }: { cycles: Cycle[]; canDecide: 
                       onExempt={() => setExempting(app)}
                       onWithdraw={() => withdraw.mutate(app.id)}
                     />
-                  </td>
-                  <td className="min-w-[250px] p-3 align-top text-xs">
+                  </TableCell>
+                  <TableCell className="min-w-[250px] align-top text-xs">
                     <ExamCell app={app} canEdit={canEditExam} onSaved={() => void refresh()} />
-                  </td>
-                  <td className="p-3">
+                  </TableCell>
+                  <TableCell>
                     <RowActions app={app} canDecide={canDecide} busy={act.isPending} onAct={act.mutate} onDecide={(decision) => setDeciding({ app, decision })} onAdmit={() => admit(app)} />
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               ))}
-            </tbody>
-          </table>
+            </TableBody>
+          </Table>
         </div>
       )}
 
@@ -642,7 +666,7 @@ function ApplicationsPanel({ cycles, canDecide }: { cycles: Cycle[]; canDecide: 
           money={money}
           onClose={() => setReceiving(null)}
           onDone={(r) => {
-            setReceipt({ ...r, name: `${receiving.firstName} ${receiving.lastName}` });
+            setReceipt({ ...r, name: formatPersonName(receiving) });
             setReceiving(null);
             void refresh();
           }}
@@ -741,7 +765,7 @@ function DecisionDialog({
     <div role="dialog" aria-modal="true" className="fixed inset-0 z-50 flex items-center justify-center bg-overlay p-4">
       <div className="w-full max-w-md rounded-2xl border border-border bg-card p-5 shadow-xl">
         <h3 className="text-sm font-bold text-foreground">
-          {label(decision)}: {app.firstName} {app.lastName}
+          {label(decision)}: {formatPersonName(app)}
         </h3>
         {belowPass && (
           <div className="mt-3 rounded-lg bg-warning/10 p-3 text-xs text-warning">
@@ -853,7 +877,7 @@ function ReceiveFeeDialog({
   return (
     <div role="dialog" aria-modal="true" className="fixed inset-0 z-50 flex items-center justify-center bg-overlay p-4">
       <div className="w-full max-w-md rounded-2xl border border-border bg-card p-5 shadow-xl">
-        <h3 className="text-sm font-bold text-foreground">Receive admission fee: {app.firstName} {app.lastName}</h3>
+        <h3 className="text-sm font-bold text-foreground">Receive admission fee: {formatPersonName(app)}</h3>
         <p className="mt-1 text-xs text-muted-foreground">{app.applicationNumber} · {app.class.name}</p>
         <p className="mt-4 rounded-lg bg-muted p-3 text-center text-2xl font-bold text-foreground">{money(app.feeDue)}</p>
         <label className="mt-3 block text-xs font-semibold">
@@ -893,7 +917,7 @@ function ExemptFeeDialog({ app, onClose, onDone }: { app: Application; onClose: 
   return (
     <div role="dialog" aria-modal="true" className="fixed inset-0 z-50 flex items-center justify-center bg-overlay p-4">
       <div className="w-full max-w-md rounded-2xl border border-border bg-card p-5 shadow-xl">
-        <h3 className="text-sm font-bold text-foreground">Exempt from admission fee: {app.firstName} {app.lastName}</h3>
+        <h3 className="text-sm font-bold text-foreground">Exempt from admission fee: {formatPersonName(app)}</h3>
         <p className="mt-1 text-xs text-muted-foreground">
           The applicant can then sit the exam without paying. The reason is kept on record and cannot be left blank.
         </p>
@@ -994,7 +1018,7 @@ function ExamCell({ app, canEdit, onSaved }: { app: Application; canEdit: boolea
 
   if (editing) {
     return (
-      <form onSubmit={submit} noValidate className="space-y-2.5" aria-label={`Edit exam for ${app.firstName} ${app.lastName}`}>
+      <form onSubmit={submit} noValidate className="space-y-2.5" aria-label={`Edit exam for ${formatPersonName(app)}`}>
         <label className="block text-[11px] font-semibold text-foreground">
           Date and time
           <DateTimePicker buttonClassName={`${input} !mt-1 !h-9 text-xs`} value={date} onChange={setDate} />
@@ -1067,7 +1091,7 @@ function ExamCell({ app, canEdit, onSaved }: { app: Application; canEdit: boolea
         <button
           type="button"
           onClick={open}
-          aria-label={`Edit exam for ${app.firstName} ${app.lastName}`}
+          aria-label={`Edit exam for ${formatPersonName(app)}`}
           className="mt-0.5 inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-[11px] font-semibold text-primary hover:bg-primary/10"
         >
           <Pencil className="size-3" />

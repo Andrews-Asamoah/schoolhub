@@ -29,6 +29,7 @@ describe.skipIf(!enabled)("versioned academic reports (PostgreSQL)",{timeout:90_
     process.env.WEB_ORIGIN??="http://localhost:5173";
     const {ReportVersionService}=await import("./report-version.service.js");
     const {ReportPublicationService}=await import("./report-publication.service.js");
+    const {ReportAssetsService}=await import("./report-assets.service.js");
     await db.organization.create({data:{id:orgA,name:"Synthetic A",slug:orgA}});
     await db.organization.create({data:{id:orgB,name:"Synthetic B",slug:orgB}});
     schoolId=(await db.school.create({data:{
@@ -57,13 +58,15 @@ describe.skipIf(!enabled)("versioned academic reports (PostgreSQL)",{timeout:90_
     versionId=(await db.reportCardVersion.create({data:{
       schoolId,setId,studentId,classId,version:1,snapshot:snap,snapshotHash:snapshotHash(snap),
     }})).id;
+    // No object storage in this test: pictures simply come back empty, as when nothing is uploaded.
+    const assets=new ReportAssetsService({client:db} as never,{read:async()=>{throw new Error("no storage in this test");}} as never,{keyFromUrl:()=>null,keys:{schoolPrefix:()=>"x"}} as never);
     versions=new ReportVersionService({client:db} as never,{
       getAssignments:async (_school:string,actor:string)=>({
         teacherId:actor===teacher?actor:null,
         classTeacherClassIds:actor===teacher?[classId]:[],subjectAssignments:[],
       }),
-    } as never,{read:async()=>{throw new Error("no storage in this test");}} as never);
-    publisher=new ReportPublicationService({client:db} as never);
+    } as never,assets);
+    publisher=new ReportPublicationService({client:db} as never,assets);
   });
   afterAll(async()=>{
     if(!db)return;

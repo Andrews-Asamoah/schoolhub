@@ -1,3 +1,4 @@
+import { openPortalTool } from "@/lib/portal-tools";
 import { router, type Href } from "expo-router";
 import {
   ArrowRight,
@@ -116,14 +117,55 @@ export default function GuardianHomeScreen() {
         ) : (
           <>
             <HeroCard
-              greeting={`Hello, ${childName(activeWard).split(" ")[0]}`}
+              greeting={childName(activeWard)}
               detail={activeWard.class?.name ?? "Class not assigned"}
-            >
-              <Text style={[type.body, { color: "#FFFFFF" }]}>
-                {activeWard.profile.firstName}&apos;s school updates and
-                progress
-              </Text>
-            </HeroCard>
+            />
+
+            <Card>
+              <ListRow
+                title="Today's timetable"
+                subtitle={timetable.data?.class?.name ?? "Class schedule"}
+                leading={<CalendarDays size={20} color={colors.primary} />}
+                trailing={
+                  <ArrowRight size={18} color={colors.mutedForeground} />
+                }
+                onPress={() => router.push("/(guardian)/timetable" as Href)}
+                divider
+              />
+              {timetable.isPending ? (
+                <SkeletonRow />
+              ) : timetable.isError ? (
+                <ErrorState
+                  title="Timetable unavailable"
+                  message="The timetable could not be loaded."
+                  actionLabel="Retry"
+                  onAction={() => void timetable.refetch()}
+                  hue="violet"
+                />
+              ) : todayEntries.length ? (
+                todayEntries
+                  .slice(0, 3)
+                  .map((entry) => (
+                    <ListRow
+                      key={entry.id}
+                      title={entry.subject?.name ?? entry.label}
+                      subtitle={`${entry.startTime}–${entry.endTime}${entry.classroom?.name ? ` · ${entry.classroom.name}` : ""}`}
+                    />
+                  ))
+              ) : (
+                <Text
+                  style={[
+                    type.body,
+                    {
+                      color: colors.mutedForeground,
+                      paddingVertical: spacing.md,
+                    },
+                  ]}
+                >
+                  No classes are scheduled for today.
+                </Text>
+              )}
+            </Card>
 
             {attendance.isPending ? (
               <Card>
@@ -209,52 +251,6 @@ export default function GuardianHomeScreen() {
 
             <Card>
               <ListRow
-                title="Today's timetable"
-                subtitle={timetable.data?.class?.name ?? "Class schedule"}
-                leading={<CalendarDays size={20} color={colors.primary} />}
-                trailing={
-                  <ArrowRight size={18} color={colors.mutedForeground} />
-                }
-                onPress={() => router.push("/(guardian)/timetable" as Href)}
-                divider
-              />
-              {timetable.isPending ? (
-                <SkeletonRow />
-              ) : timetable.isError ? (
-                <ErrorState
-                  title="Timetable unavailable"
-                  message="The timetable could not be loaded."
-                  actionLabel="Retry"
-                  onAction={() => void timetable.refetch()}
-                  hue="violet"
-                />
-              ) : todayEntries.length ? (
-                todayEntries
-                  .slice(0, 3)
-                  .map((entry) => (
-                    <ListRow
-                      key={entry.id}
-                      title={entry.subject?.name ?? entry.label}
-                      subtitle={`${entry.startTime}–${entry.endTime}${entry.classroom?.name ? ` · ${entry.classroom.name}` : ""}`}
-                    />
-                  ))
-              ) : (
-                <Text
-                  style={[
-                    type.body,
-                    {
-                      color: colors.mutedForeground,
-                      paddingVertical: spacing.md,
-                    },
-                  ]}
-                >
-                  No classes are scheduled for today.
-                </Text>
-              )}
-            </Card>
-
-            <Card>
-              <ListRow
                 title="Latest notice"
                 leading={<Megaphone size={20} color={colors.primary} />}
                 trailing={
@@ -278,9 +274,7 @@ export default function GuardianHomeScreen() {
                   title={latestNotice.title}
                   subtitle={`${latestNotice.category} · ${formatDateTime(latestNotice.createdAt)}`}
                   onPress={() =>
-                    router.push(
-                      `/(shared)/announcements/${encodeURIComponent(latestNotice.id)}` as Href,
-                    )
+                    openPortalTool(`/announcements/${latestNotice.id}`)
                   }
                 />
               ) : (

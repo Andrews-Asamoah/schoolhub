@@ -12,6 +12,7 @@ import { ListRow } from "@/components/ListRow";
 import { Screen } from "@/components/Screen";
 import { SkeletonHero, SkeletonRow } from "@/components/Skeleton";
 import { Text } from "@/components/Typography";
+import { StudentProfileCard } from "@/features/shared/StudentProfileCard";
 import { GuardianBackButton } from "@/features/guardian/BackButton";
 import { useMyWardQuery } from "@/features/guardian/queries";
 import { useGuardian } from "@/features/guardian/context";
@@ -27,16 +28,10 @@ export default function WardProfileScreen() {
     if (id) selectWard(id);
   }, [id, selectWard]);
   const ward = query.data;
-  const name = ward
-    ? [ward.profile.firstName, ward.profile.otherNames, ward.profile.lastName]
-        .filter(Boolean)
-        .join(" ")
-    : "Child profile";
 
   return (
     <Screen
-      title={name}
-      subtitle={ward?.class?.name ?? "Student profile"}
+      title="Child profile"
       left={<GuardianBackButton />}
       refreshing={query.isRefetching}
       onRefresh={() => void query.refetch()}
@@ -65,35 +60,7 @@ export default function WardProfileScreen() {
           />
         ) : (
           <>
-            <Card>
-              <Text
-                style={[
-                  type.headline,
-                  { color: colors.foreground, marginBottom: spacing.md },
-                ]}
-              >
-                School details
-              </Text>
-              <ListRow
-                title="Admission number"
-                subtitle={ward.admissionNumber ?? "Not recorded"}
-                divider
-              />
-              <ListRow
-                title="Class"
-                subtitle={ward.class?.name ?? "Not assigned"}
-                divider
-              />
-              <ListRow
-                title="Department"
-                subtitle={ward.department?.name ?? "Not assigned"}
-                divider
-              />
-              <ListRow
-                title="House"
-                subtitle={ward.house?.name ?? "Not assigned"}
-              />
-            </Card>
+            <StudentProfileCard student={ward} />
             <Card>
               <ListRow
                 title="Attendance"

@@ -7,6 +7,7 @@ import {
   assertMobileRole,
   type MobileRole,
 } from "@/lib/permissions";
+import { SessionChangedError } from "@/lib/api-error";
 import { sessionStore } from "@/lib/session";
 
 type QueryValue = string | number | boolean | null | undefined;
@@ -38,6 +39,7 @@ export function isValidIdempotencyKey(value: string): boolean {
 
 const publicEndpoints = new Set([
   "GET /schools/public/:subdomain",
+  "GET /schools/public/access/:identifier",
   "POST /schools/public/:subdomain/resolve-login",
   "POST /account/password-recovery/request",
   "POST /account/password-recovery/complete",
@@ -63,10 +65,24 @@ function assertDefinition(
 ) {
   if (!path.startsWith("/") || path.startsWith("/api/") || /[?#]/.test(path))
     throw new Error("Endpoint paths must be API-relative route templates.");
-  if (/(?:^|\/)(?:external-exams|bece)(?:\/|$)/.test(path))
-    throw new Error("External examinations are unavailable on mobile.");
-
   const key = `${method} ${path}`;
+  if (/(?:^|\/)(?:external-exams|bece)(?:\/|$)/.test(path)) {
+    const supported = [
+      "GET /external-exams",
+      "GET /external-exams/:id/summary",
+      "GET /external-exams/papers/:id",
+      "PUT /external-exams/results",
+    ];
+    if (
+      scope ||
+      roles.length !== 1 ||
+      roles[0] !== "teacher" ||
+      !supported.includes(key)
+    )
+      throw new Error(
+        "External examinations require a supported teacher-only endpoint.",
+      );
+  }
   if (scope === "public" && !publicEndpoints.has(key))
     throw new Error("Unsupported anonymous mobile endpoint.");
   if (scope === "session" && !sessionEndpoints.has(key))
@@ -137,6 +153,7 @@ export function defineEndpoint<
   scope?: EndpointScope;
   request?: TRequestSchema;
   response: z.ZodType<TResponse>;
+  multipart?: (request: z.output<NonNullable<TRequestSchema>>) => FormData;
   /** Writes the server de-duplicates by `Idempotency-Key` (offline retries). */
   idempotent?: boolean;
 }) {
@@ -163,9 +180,12 @@ export function defineEndpoint<
       assertFeature(sessionStore.getSnapshot().activeRole, "bece");
 
     const path = buildPath(definition.path, options);
-    let body: string | undefined;
+    let body: string | FormData | undefined;
     if (definition.request) {
-      body = JSON.stringify(definition.request.parse(options.request));
+      const request = definition.request.parse(options.request);
+      body = definition.multipart
+        ? definition.multipart(request as z.output<NonNullable<TRequestSchema>>)
+        : JSON.stringify(request);
     } else if (options.request !== undefined) {
       throw new Error("This endpoint does not accept a request body.");
     }
@@ -195,6 +215,21 @@ export function defineEndpoint<
   };
 }
 
+/** Expo Fetch can read an Expo File directly without constructing an RN Blob. */
+export function appendUploadFile(
+  body: FormData,
+  field: string,
+  file: Blob,
+  name: string,
+  mimeType: string,
+) {
+  if (file instanceof File) {
+    body.append(field, file);
+    return;
+  }
+  body.append(field, file.slice(0, file.size, mimeType), name);
+}
+
 /** Uploads a resized profile image as multipart form data. */
 export function defineUpload<TResponse>(definition: {
   method: "PUT";
@@ -221,8 +256,13 @@ export function defineUpload<TResponse>(definition: {
     if (!input.file.size || input.file.size > MAX_AVATAR_BYTES)
       throw new Error("The resized profile photo must be under 2 MB.");
     const body = new FormData();
-    const file = input.file.slice(0, input.file.size, input.mimeType);
-    body.append(definition.field, file, `profile.${input.mimeType.slice(6)}`);
+    appendUploadFile(
+      body,
+      definition.field,
+      input.file,
+      `profile.${input.mimeType.slice(6)}`,
+      input.mimeType,
+    );
     const result = await apiFetch<unknown>(definition.path, {
       method: definition.method,
       body,
@@ -232,7 +272,18 @@ export function defineUpload<TResponse>(definition: {
   };
 }
 
-/** Authenticated PDF download that shares from cache and removes the temporary file. */
+const downloadExtensions = {
+  "application/pdf": "pdf",
+  "image/png": "png",
+  "image/jpeg": "jpg",
+  "image/webp": "webp",
+} as const;
+type DownloadMimeType = keyof typeof downloadExtensions;
+export function isDownloadMimeType(value: string): value is DownloadMimeType {
+  return Object.hasOwn(downloadExtensions, value);
+}
+
+/** Shares an authenticated download from the cache and removes the temporary file. */
 export function defineDownload(definition: {
   method: "GET";
   path: string;
@@ -244,22 +295,32 @@ export function defineDownload(definition: {
     undefined,
     definition.roles,
   );
-  return async (options: BaseOptions = {}): Promise<void> => {
+  return async (
+    options: BaseOptions & { mimeType?: DownloadMimeType } = {},
+  ): Promise<void> => {
     assertScope(undefined, definition.roles);
     const path = buildPath(definition.path, options);
+    const mimeType = options.mimeType ?? "application/pdf";
+    if (!isDownloadMimeType(mimeType))
+      throw new Error("This file type is unavailable on mobile.");
+    const extension = downloadExtensions[mimeType];
+    const revision = sessionStore.getRevision();
     const bytes = await apiBytes(path, {
       method: definition.method,
       signal: options.signal,
     });
-    const filename = `schoolhub-document-${Date.now()}-${++downloadSequence}.pdf`;
+    const filename = `schoolhub-document-${Date.now()}-${++downloadSequence}.${extension}`;
     const file = new File(Paths.cache, filename);
     try {
       await file.write(bytes);
       if (!(await Sharing.isAvailableAsync()))
         throw new Error("File sharing is not available on this device.");
+      if (sessionStore.getRevision() !== revision)
+        throw new SessionChangedError();
       await Sharing.shareAsync(file.uri, {
-        dialogTitle: "Share PDF",
-        mimeType: "application/pdf",
+        dialogTitle:
+          mimeType === "application/pdf" ? "Share PDF" : "Share document",
+        mimeType,
       });
     } finally {
       if (file.exists) await file.delete();

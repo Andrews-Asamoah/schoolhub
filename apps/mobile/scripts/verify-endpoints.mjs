@@ -13,6 +13,19 @@ const inventory = JSON.parse(
   ),
 ).routes;
 const allowed = new Set(["teacher", "student", "guardian"]);
+function roleAllows(route, role) {
+  return (
+    route.roles.includes(role) ||
+    route.roles.includes("...roles") ||
+    route.roles.includes("...schoolRoles") ||
+    (role === "teacher" &&
+      route.file.endsWith("/timetable.controller.ts") &&
+      route.roles.includes("...READ")) ||
+    (role === "teacher" &&
+      route.file.endsWith("/assessment-workflow.controller.ts") &&
+      route.roles.includes("...STAFF"))
+  );
+}
 const normalise = (path) =>
   path.replace(/:[^/]+/g, ":param").replace(/\/+$/, "");
 let count = 0;
@@ -106,8 +119,6 @@ function walk(folder) {
           if (scopeNode && !ts.isStringLiteral(scopeNode))
             fail(file, "scope must be a string literal.");
           const scope = scopeNode?.text;
-          if (/(?:^|\/)(?:external-exams|bece)(?:\/|$)/.test(path))
-            fail(file, "External examinations are out of mobile v1 scope.");
           const rolesNode = properties.get("roles");
           if (
             !rolesNode ||
@@ -118,6 +129,23 @@ function walk(folder) {
           const roles = rolesNode.elements.map((n) => n.text);
           if (roles.some((role) => !allowed.has(role)))
             fail(file, "Unsupported mobile role.");
+          if (/(?:^|\/)(?:external-exams|bece)(?:\/|$)/.test(path)) {
+            const teacherExamEndpoints = new Set([
+              "GET /external-exams",
+              "GET /external-exams/:id/summary",
+              "GET /external-exams/papers/:id",
+              "PUT /external-exams/results",
+            ]);
+            if (
+              roles.length !== 1 ||
+              roles[0] !== "teacher" ||
+              !teacherExamEndpoints.has(`${method} ${path}`)
+            )
+              fail(
+                file,
+                "External exams require a supported teacher-only endpoint.",
+              );
+          }
           const route = inventory.find(
             (route) =>
               route.method === method &&
@@ -131,31 +159,16 @@ function walk(folder) {
                 file,
                 "Tenant-scoped endpoints require a tenant guard and mobile roles.",
               );
-            const routeRoles = route.roles.flatMap((role) =>
-              role === "...roles" || role === "...schoolRoles"
-                ? [...allowed]
-                : [role],
-            );
             if (
-              routeRoles.length &&
-              roles.some((role) => !routeRoles.includes(role))
+              route.roles.length &&
+              roles.some((role) => !roleAllows(route, role))
             )
               fail(
                 file,
                 "Declared role is not allowed by the route inventory.",
               );
           } else if (route.roles.length) {
-            if (
-              !roles.length ||
-              roles.some((role) => {
-                const routeRoles =
-                  route.roles.includes("...roles") ||
-                  route.roles.includes("...schoolRoles")
-                    ? [...allowed]
-                    : route.roles;
-                return !routeRoles.includes(role);
-              })
-            )
+            if (!roles.length || roles.some((role) => !roleAllows(route, role)))
               fail(
                 file,
                 "Declared role is not allowed by the route inventory.",
@@ -166,6 +179,7 @@ function walk(folder) {
             const key = `${method} ${path}`;
             const allowedPublic = new Set([
               "GET /schools/public/:subdomain",
+              "GET /schools/public/access/:identifier",
               "POST /schools/public/:subdomain/resolve-login",
               "POST /account/password-recovery/request",
               "POST /account/password-recovery/complete",

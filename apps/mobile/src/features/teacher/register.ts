@@ -35,7 +35,7 @@ export function attendanceBatch(
     .map((r) => ({
       studentId: r.studentId,
       status: draft[r.studentId],
-      ...(r.attendance?.remarks ? { remarks: r.attendance.remarks } : {}),
+      // Omit existing remarks so a retry cannot copy stale notes back to the server.
     }));
   return batchAttendanceSchema.parse({ date, records });
 }
