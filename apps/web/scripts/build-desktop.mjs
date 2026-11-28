@@ -2,17 +2,20 @@ import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 
 const dev = process.argv.includes("--dev");
-const result = spawnSync(
-  process.platform === "win32" ? "pnpm.cmd" : "pnpm",
-  dev ? ["exec", "vite"] : ["build"],
-  {
+const windows = process.platform === "win32";
+function runPnpm(args) {
+  const result = spawnSync(windows ? "pnpm.cmd" : "pnpm", args, {
     stdio: "inherit",
     env: { ...process.env, VITE_TARGET: "desktop" },
-    shell: process.platform === "win32",
-  },
-);
-if (result.error) throw result.error;
-if (result.status !== 0) process.exit(result.status ?? 1);
+    shell: windows,
+  });
+  if (result.error) throw result.error;
+  if (result.status !== 0) process.exit(result.status ?? 1);
+}
+
+// The web app imports the compiled shared package, which may be stale after a pull.
+runPnpm(["--filter", "@schoolhub/shared", "build"]);
+runPnpm(dev ? ["exec", "vite"] : ["build"]);
 
 function fullPaths(file) {
   const source = readFileSync(new URL(file, import.meta.url), "utf8");

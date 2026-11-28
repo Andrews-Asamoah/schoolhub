@@ -32,14 +32,14 @@ both are on your PATH. See the [Tauri Windows prerequisites][tauri-prereqs].
 
 Open PowerShell at the repository root. Replace the sample value of
 `SCHOOLHUB_API_ORIGIN` with the deployed API's HTTPS origin without `/api`.
-Tauri compiles this value into the executable. Rebuild if it changes.
+Tauri compiles this value into the executable. Rebuild if it changes. The
+desktop build automatically rebuilds the shared workspace package.
 
 ```powershell
 git switch main
 git pull --ff-only origin main
 rustup target add x86_64-pc-windows-msvc
 pnpm install --frozen-lockfile --filter '@schoolhub/web...'
-pnpm --filter '@schoolhub/shared' build
 
 $env:SCHOOLHUB_API_ORIGIN = 'https://api.your-domain.com'
 Set-Location apps/desktop
@@ -83,8 +83,8 @@ pnpm run build:windows --debug
 If Tauri reports `cargo metadata ... program not found`, Git Bash may have
 been opened before Rust was installed. Restart the app hosting the terminal
 and run `cargo --version`. If Cargo is still missing, add the Rustup bin folder
-to this shell's PATH. These commands start from `apps/desktop` with the shared
-workspace package already built and the local API listening on port 3001.
+to this shell's PATH. These commands start from `apps/desktop` with the local API
+listening on port 3001.
 
 ```bash
 export PATH="$(cygpath -u "$USERPROFILE")/.cargo/bin:$PATH"
