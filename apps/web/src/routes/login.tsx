@@ -18,6 +18,8 @@ import { ThemeToggle } from "@/components/school/theme-toggle";
 import { consumeLogoutNotice } from "@/hooks/use-logout";
 import { signIn, useSession } from "@/lib/auth-client";
 import { TwoFactorChallenge } from "@/components/auth/two-factor-challenge";
+import { SchoolEntryLoading, useVerifiedSchool } from "@/components/auth/school-entry";
+import type { SchoolPublicInfo } from "@/lib/tenant";
 
 export const Route = createFileRoute("/login")({
   component: LoginPage,
@@ -27,12 +29,43 @@ const DesktopSessionControls = import.meta.env.VITE_TARGET === "desktop" ? lazy(
 
 const chartBars = [42, 58, 49, 75, 63, 88, 70, 96, 77, 100, 84, 91];
 
-interface PublicSchoolBranding {
-  school: {
-    name: string;
-    logo: string | null;
-    motto: string | null;
-  };
+function useSignInLogo(subdomain: string | null, logo?: string | null) {
+  const [localLogo, setLocalLogo] = useState<{ source: string; url: string }>();
+  useEffect(() => {
+    if (platform.target !== "desktop" || !subdomain || !logo) return;
+    const controller = new AbortController();
+    let localUrl: string | undefined;
+    void platform.fetch(`${platform.apiBase}/schools/public/${subdomain}/logo`, { signal: controller.signal })
+      .then(async (response) => {
+        if (!response.ok || !/^image\/(webp|png|jpeg)$/.test(response.headers.get("content-type") ?? "")) return;
+        const image = await response.blob();
+        if (controller.signal.aborted) return;
+        localUrl = URL.createObjectURL(image);
+        setLocalLogo({ source: logo, url: localUrl });
+      })
+      .catch(() => undefined);
+    return () => {
+      controller.abort();
+      if (localUrl) URL.revokeObjectURL(localUrl);
+    };
+  }, [subdomain, logo]);
+
+  return platform.target === "desktop" ? (localLogo?.source === logo ? localLogo?.url : undefined) : logo;
+}
+
+function SignInLogo({ source, name }: { source?: string | null; name?: string }) {
+  return (
+    <img
+      src={source || "/schoolhub.webp"}
+      alt={source ? name ?? "" : ""}
+      className="size-full object-contain"
+      onError={(event) => {
+        if (!event.currentTarget.src.endsWith("/schoolhub.webp")) {
+          event.currentTarget.src = "/schoolhub.webp";
+        }
+      }}
+    />
+  );
 }
 
 function LoginPage() {
@@ -81,14 +114,18 @@ function LoginPage() {
   const [needsTwoFactor, setNeedsTwoFactor] = useState(false);
 
   // Fetch school branding dynamically if a tenant subdomain is active
-  const { data: tenantData } = useQuery({
+  const verifiedSchool = useVerifiedSchool();
+  const { data: schoolDetails } = useQuery({
     queryKey: ["login-branding", subdomain],
-    queryFn: () => apiFetch<PublicSchoolBranding>(`/admissions/public/${subdomain}`),
+    queryFn: () => apiFetch<SchoolPublicInfo>(`/schools/public/${subdomain}`),
+    staleTime: 15 * 60_000,
     enabled: Boolean(subdomain),
     retry: false,
   });
 
-  const school = tenantData?.school;
+  const school = schoolDetails ?? (verifiedSchool?.subdomain === subdomain ? verifiedSchool : null);
+  const motto = schoolDetails?.motto;
+  const schoolLogo = useSignInLogo(subdomain, school?.logo);
 
   useEffect(() => {
     if (sessionPending || loading || needsTwoFactor || !session?.user) return;
@@ -103,6 +140,14 @@ function LoginPage() {
   }, [session, sessionPending]);
 
   if (sessionPending || session?.user) {
+    if (platform.target === "desktop") {
+      return (
+        <SchoolEntryLoading
+          title={school?.name ?? "Opening your school"}
+          detail={sessionPending ? "Checking your session." : "Getting your school portal ready."}
+        />
+      );
+    }
     return (
       <main className="flex min-h-screen items-center justify-center bg-background">
         <div role="status" className="flex items-center gap-3 text-sm text-muted-foreground">
@@ -144,7 +189,9 @@ function LoginPage() {
       if (subdomain) await platform.prepareSignIn?.(subdomain);
       const result = await signIn.email({ email: loginEmail, password });
       if (result.error) {
-        setError(result.error.message ?? "Sign-in failed. Check your details and try again.");
+        setError(result.error.status >= 500
+          ? "The school server couldn’t complete sign-in. Try again or contact your administrator."
+          : result.error.message ?? "Sign-in failed. Check your details and try again.");
         setLoading(false);
         return;
       }
@@ -192,18 +239,14 @@ function LoginPage() {
         {/* Dynamic Header Brand (Subdomain logo + name) */}
         <div className="relative z-10 flex items-center gap-3">
           <span className="flex size-12 items-center justify-center overflow-hidden rounded-2xl bg-brand-foreground/10 ring-1 ring-brand-foreground/20 backdrop-blur">
-            {school?.logo ? (
-              <img src={school.logo} alt={school.name} className="size-full object-cover" />
-            ) : (
-              <img src="/schoolhub.webp" alt="" className="size-full object-contain" />
-            )}
+            <SignInLogo key={schoolLogo} source={schoolLogo} name={school?.name} />
           </span>
           <span>
             <span className="block text-lg font-bold tracking-tight">
               {school?.name ?? "schoolHub"}
             </span>
             <span className="block text-[10px] font-semibold uppercase tracking-[0.22em] text-brand-foreground/80">
-              {school?.motto ?? "School management"}
+              {motto ?? "School management"}
             </span>
           </span>
         </div>
@@ -220,8 +263,8 @@ function LoginPage() {
             </span>
           </h1>
           <p className="mt-5 max-w-md text-[15px] leading-7 text-brand-foreground/80">
-            {school?.motto 
-              ? `"${school.motto}" — Bringing your people, learning, and operations together in one clear workspace.` 
+            {motto
+              ? `"${motto}" — Bringing your people, learning, and operations together in one clear workspace.`
               : "Bring your people, learning, and day-to-day operations together in one calm, clear workspace."}
           </p>
 
@@ -278,18 +321,14 @@ function LoginPage() {
         <div className="w-full max-w-105">
           <div className="mb-9 flex items-center gap-3 lg:hidden">
             <span className="flex size-11 items-center justify-center overflow-hidden rounded-xl bg-primary text-primary-foreground shadow-lg shadow-primary/20">
-              {school?.logo ? (
-                <img src={school.logo} alt={school.name} className="size-full object-cover" />
-              ) : (
-                <img src="/schoolhub.webp" alt="" className="size-full object-contain" />
-              )}
+              <SignInLogo key={schoolLogo} source={schoolLogo} name={school?.name} />
             </span>
             <span>
               <span className="block text-base font-bold tracking-tight text-foreground">
                 {school?.name ?? "schoolHub"}
               </span>
               <span className="block text-[9px] font-semibold uppercase tracking-[0.2em] text-muted-foreground/70">
-                {school?.motto ?? "School management"}
+                {motto ?? "School management"}
               </span>
             </span>
           </div>

@@ -943,6 +943,14 @@ export const schoolAccessIdentifierSchema = z
   .toLowerCase()
   .regex(/^[a-z0-9][a-z0-9-]{0,62}$/, "Enter a school code or address prefix using letters, numbers or hyphens.");
 
+export const schoolAccessMatchesSchema = z.array(z.object({
+  name: z.string(),
+  subdomain: schoolAccessIdentifierSchema,
+  code: z.string(),
+  logo: z.string().nullish(),
+})).max(2);
+export type SchoolAccessMatch = z.infer<typeof schoolAccessMatchesSchema>[number];
+
 export const enrollSchoolSchema = z.object({
   // School details
   schoolName: z.string().min(2),

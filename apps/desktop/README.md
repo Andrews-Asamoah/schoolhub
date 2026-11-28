@@ -159,6 +159,21 @@ HTTP 503 means the API is running but its database check failed. Check the API
 terminal for the startup or database error. If the port differs from the build's
 `SCHOOLHUB_API_ORIGIN`, rebuild with the API's actual origin.
 
+### Apply the local database migrations before signing in
+
+If the API log reports Prisma `P2022` for `sessions.clientPlatform`, the API
+can reach PostgreSQL but its schema is behind. Stop the local API, leave
+PostgreSQL running, and apply the checked-in migrations from the repository
+root using the same local `.env` as the API.
+
+```sh
+pnpm db:deploy
+pnpm --filter @schoolhub/api dev
+```
+
+This applies pending migrations without resetting the database. Restart the
+desktop sign-in after the API finishes starting.
+
 ## Native tests
 
 From the repository root:

@@ -254,7 +254,7 @@ impl DesktopHttp {
         if let Some(token) = &session.bearer {
             request = request.bearer_auth(token);
         }
-        if signing_out {
+        if signing_out || pathname.starts_with("/api/schools/public/") {
             request = request.timeout(Duration::from_secs(10));
         }
         let sent = request.body(input.body).send().await;
