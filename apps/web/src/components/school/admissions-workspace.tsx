@@ -1,3 +1,4 @@
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { DatePicker, DateTimePicker } from "@/components/ui/date-picker";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -565,30 +566,30 @@ function ApplicationsPanel({ cycles, canDecide }: { cycles: Cycle[]; canDecide: 
         <WorkspaceEmptyState title="No applications" description="Applications appear here as parents submit the public enrollment form." />
       ) : (
         <div className="overflow-x-auto rounded-2xl border border-border bg-card">
-          <table className="w-full min-w-[860px] text-left text-sm">
-            <thead className="border-b border-border text-xs text-muted-foreground">
-              <tr>
-                <th className="p-3">
+          <Table scroll={false} className="w-full min-w-[860px] text-left text-sm">
+            <TableHeader className="border-b border-border text-xs text-muted-foreground">
+              <TableRow>
+                <TableHead className="p-3">
                   <input
                     type="checkbox"
                     aria-label="Select all awaiting exam"
                     checked={schedulable.length > 0 && schedulable.every((r) => picked.has(r.id))}
                     onChange={(e) => setPicked(e.target.checked ? new Set(schedulable.map((r) => r.id)) : new Set())}
                   />
-                </th>
-                <th className="p-3">Applicant</th>
-                <th className="p-3">Class</th>
-                <th className="p-3">Guardian</th>
-                <th className="p-3">Status</th>
-                <th className="p-3">Admission fee</th>
-                <th className="p-3">Exam</th>
-                <th className="p-3">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
+                </TableHead>
+                <TableHead className="p-3">Applicant</TableHead>
+                <TableHead className="p-3">Class</TableHead>
+                <TableHead className="p-3">Guardian</TableHead>
+                <TableHead className="p-3">Status</TableHead>
+                <TableHead className="p-3">Admission fee</TableHead>
+                <TableHead className="p-3">Exam</TableHead>
+                <TableHead className="p-3">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {rows.map((app) => (
-                <tr key={app.id} className="border-b border-border/60 align-top last:border-0">
-                  <td className="p-3">
+                <TableRow key={app.id} className="border-b border-border/60 align-top last:border-0">
+                  <TableCell className="p-3">
                     {["SUBMITTED", "UNDER_REVIEW", "EXAM_SCHEDULED"].includes(app.status) && (
                       <input
                         type="checkbox"
@@ -601,18 +602,18 @@ function ApplicationsPanel({ cycles, canDecide }: { cycles: Cycle[]; canDecide: 
                         }}
                       />
                     )}
-                  </td>
-                  <td className="p-3">
+                  </TableCell>
+                  <TableCell className="p-3">
                     <p className="font-semibold text-foreground">{formatPersonName(app)}</p>
                     <p className="text-xs text-muted-foreground">{app.applicationNumber} · {app.dateOfBirth.slice(0, 10)}</p>
-                  </td>
-                  <td className="p-3 text-foreground">{app.class.name}</td>
-                  <td className="p-3 text-xs text-muted-foreground">
+                  </TableCell>
+                  <TableCell className="p-3 text-foreground">{app.class.name}</TableCell>
+                  <TableCell className="p-3 text-xs text-muted-foreground">
                     {app.guardianFirstName} {app.guardianLastName} ({label(app.guardianRelationship)})
                     <br />{app.guardianPhone}{app.guardianEmail ? ` · ${app.guardianEmail}` : ""}
-                  </td>
-                  <td className="p-3"><Badge value={app.status} /></td>
-                  <td className="p-3">
+                  </TableCell>
+                  <TableCell className="p-3"><Badge value={app.status} /></TableCell>
+                  <TableCell className="p-3">
                     <FeeCell
                       app={app}
                       money={money}
@@ -623,17 +624,17 @@ function ApplicationsPanel({ cycles, canDecide }: { cycles: Cycle[]; canDecide: 
                       onExempt={() => setExempting(app)}
                       onWithdraw={() => withdraw.mutate(app.id)}
                     />
-                  </td>
-                  <td className="min-w-[250px] p-3 align-top text-xs">
+                  </TableCell>
+                  <TableCell className="min-w-[250px] p-3 align-top text-xs">
                     <ExamCell app={app} canEdit={canEditExam} onSaved={() => void refresh()} />
-                  </td>
-                  <td className="p-3">
+                  </TableCell>
+                  <TableCell className="p-3">
                     <RowActions app={app} canDecide={canDecide} busy={act.isPending} onAct={act.mutate} onDecide={(decision) => setDeciding({ app, decision })} onAdmit={() => admit(app)} />
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               ))}
-            </tbody>
-          </table>
+            </TableBody>
+          </Table>
         </div>
       )}
 

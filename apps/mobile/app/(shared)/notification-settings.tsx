@@ -32,7 +32,7 @@ export default function NotificationSettingsScreen() {
       setPushMessage(
         enabled
           ? "Device notifications are enabled."
-          : "Allow CampusHubGH notifications in your device settings.",
+          : "Allow schoolHub notifications in your device settings.",
       );
     } catch {
       setPushMessage(

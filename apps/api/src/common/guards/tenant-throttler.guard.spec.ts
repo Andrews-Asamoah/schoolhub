@@ -4,11 +4,6 @@ import { ThrottlerGuard } from "@nestjs/throttler";
 import { describe, expect, it } from "vitest";
 import { TenantThrottlerGuard } from "./tenant-throttler.guard.js";
 
-@Controller("plain")
-class PlainController {
-  @Get() ok() { return "ok"; }
-}
-
 @Controller("own")
 @UseGuards(ThrottlerGuard)
 class OwnGuardController {

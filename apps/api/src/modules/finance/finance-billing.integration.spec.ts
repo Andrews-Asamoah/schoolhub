@@ -74,7 +74,7 @@ describe.skipIf(!enabled)("bill generation (database)", { timeout: 60_000 }, () 
     const { FinancePostingService } = await import("./finance-posting.service.js");
     const { FinanceApprovalService } = await import("./finance-approval.service.js");
     prisma = client;
-    service = new FinanceService({ client } as never, new FinancePostingService({ client } as never), new FinanceApprovalService({ client } as never));
+    service = new FinanceService({ client } as never, new FinancePostingService(), new FinanceApprovalService({ client } as never));
 
     const org = await prisma.organization.create({ data: { id: `${run}-org`, name: `Test ${run}`, slug: `${run}-org` } });
     const school = await prisma.school.create({ data: { organizationId: org.id, name: `Test School ${run}`, code: run.toUpperCase(), subdomain: run } });

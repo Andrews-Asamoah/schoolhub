@@ -1,3 +1,4 @@
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CalendarClock, CircleAlert, Copy, LoaderCircle, Pencil, Plus, Trash2, X } from "lucide-react";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
@@ -285,26 +286,26 @@ export function TimetableWorkspace() {
               Periods for <span className="font-semibold text-foreground/80">{classDeptId ? departmentName : "classes without a department"}</span>
             </p>
           )}
-          <table className="w-full min-w-[720px] border-collapse text-left">
-            <thead>
-              <tr className="border-b border-border/60 bg-muted/70">
-                <th className="w-32 px-3 py-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70">Period</th>
+          <Table scroll={false} className="w-full min-w-[720px] border-collapse text-left">
+            <TableHeader>
+              <TableRow className="border-b border-border/60 bg-muted/70">
+                <TableHead className="w-32 px-3 py-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70">Period</TableHead>
                 {days.map((day) => (
-                  <th key={day} className="px-3 py-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70">{DAY_LABEL[day]}</th>
+                  <TableHead key={day} className="px-3 py-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70">{DAY_LABEL[day]}</TableHead>
                 ))}
-              </tr>
-            </thead>
-            <tbody>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {visiblePeriods.map((period) => (
-                <tr key={period.id} className="border-b border-border/60 last:border-0">
-                  <th scope="row" className="px-3 py-2 align-top text-left">
+                <TableRow key={period.id} className="border-b border-border/60 last:border-0">
+                  <TableHead scope="row" className="px-3 py-2 align-top text-left">
                     <span className="block text-xs font-semibold text-foreground">{period.name}</span>
                     <span className="text-[10px] text-muted-foreground">{period.startTime}–{period.endTime}</span>
-                  </th>
+                  </TableHead>
                   {days.map((day) => {
                     const cell = cellMap.get(`${day}|${period.startTime}|${period.endTime}`) ?? [];
                     return (
-                      <td key={day} className="h-[74px] min-w-[120px] px-1.5 py-1.5 align-top">
+                      <TableCell key={day} className="h-[74px] min-w-[120px] px-1.5 py-1.5 align-top">
                         {cell.map((entry) => (
                           <EntryCard
                             key={entry.id}
@@ -323,13 +324,13 @@ export function TimetableWorkspace() {
                             <Plus className="size-4" />
                           </button>
                         )}
-                      </td>
+                      </TableCell>
                     );
                   })}
-                </tr>
+                </TableRow>
               ))}
-            </tbody>
-          </table>
+            </TableBody>
+          </Table>
           {entriesQuery.isFetching && (
             <p className="px-4 py-2 text-[11px] text-muted-foreground/70" role="status">Updating…</p>
           )}

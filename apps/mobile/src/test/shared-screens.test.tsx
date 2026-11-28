@@ -55,6 +55,9 @@ jest.mock("@/features/announcements/queries", () => ({
   useAnnouncementsQuery: (...args: unknown[]) =>
     mockHooks.announcements(...args),
 }));
+jest.mock("@/components/Toast", () => ({
+  useToast: () => ({ show: jest.fn() }),
+}));
 jest.mock("@/features/shared/mutations", () => ({
   useScopedMutation: () => mockMutation,
 }));

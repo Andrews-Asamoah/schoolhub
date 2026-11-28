@@ -1,7 +1,8 @@
+import { toast } from "@/components/ui/toaster";
 import { DatePicker } from "@/components/ui/date-picker";
 import { useState, type FormEvent, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Bell, CalendarClock, CircleAlert, ClipboardList, LoaderCircle, Pause, Play, Plus, Send, ShieldCheck, Users, WalletCards, X } from "lucide-react";
+import { Bell, CalendarClock, CircleAlert, ClipboardList, LoaderCircle, Pause, Play, Plus, Send, ShieldCheck, Users, WalletCards } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { PortalModal } from "@/components/portal/portal-modal";
 import { cn } from "@/lib/utils";
@@ -92,7 +93,7 @@ export function FeeReminderWorkspace() {
   const [previewTarget, setPreviewTarget] = useState<ReminderSchedule | null>(null);
   const [preview, setPreview] = useState<ReminderPreview | null>(null);
   const [sendResult, setSendResult] = useState<ReminderResult | null>(null);
-  const [feedback, setFeedback] = useState<{ kind: "success" | "error"; text: string } | null>(null);
+
 
   const schedulesQuery = useQuery({
     queryKey: ["finance", "fee-reminders"],
@@ -110,12 +111,12 @@ export function FeeReminderWorkspace() {
       installment?: { label: string; dueDate: string; sendDate: string };
     }) => apiFetch<ReminderSchedule>("/finance/fee-reminders", { method: "POST", body: JSON.stringify(payload) }),
     onSuccess: async (schedule) => {
-      setFeedback({ kind: "success", text: `Reminder schedule “${schedule.name}” created. It is configured for in-app notices only.` });
+      toast.success(`Reminder schedule “${schedule.name}” created. It is configured for in-app notices only.`);
       setCreateOpen(false);
       setDraft(initialDraft());
       await queryClient.invalidateQueries({ queryKey: ["finance", "fee-reminders"] });
     },
-    onError: (error: Error) => setFeedback({ kind: "error", text: error.message }),
+    onError: (error: Error) => toast.error(error.message),
   });
   const addInstallment = useMutation({
     mutationFn: ({ scheduleId, input }: { scheduleId: string; input: { label: string; dueDate: string; sendDate: string } }) =>
@@ -124,11 +125,11 @@ export function FeeReminderWorkspace() {
         body: JSON.stringify(input),
       }),
     onSuccess: async (installment) => {
-      setFeedback({ kind: "success", text: `Reminder date “${installment.label}” added to the schedule.` });
+      toast.success(`Reminder date “${installment.label}” added to the schedule.`);
       setInstallmentTarget(null);
       await queryClient.invalidateQueries({ queryKey: ["finance", "fee-reminders"] });
     },
-    onError: (error: Error) => setFeedback({ kind: "error", text: error.message }),
+    onError: (error: Error) => toast.error(error.message),
   });
   const changeActive = useMutation({
     mutationFn: ({ id, isActive }: { id: string; isActive: boolean }) => apiFetch<ReminderSchedule>(`/finance/fee-reminders/${encodeURIComponent(id)}`, {
@@ -136,25 +137,25 @@ export function FeeReminderWorkspace() {
       body: JSON.stringify({ isActive }),
     }),
     onSuccess: async (schedule) => {
-      setFeedback({ kind: "success", text: schedule.isActive ? "Reminder schedule activated." : "Reminder schedule paused." });
+      toast.success(schedule.isActive ? "Reminder schedule activated." : "Reminder schedule paused.");
       await queryClient.invalidateQueries({ queryKey: ["finance", "fee-reminders"] });
     },
-    onError: (error: Error) => setFeedback({ kind: "error", text: error.message }),
+    onError: (error: Error) => toast.error(error.message),
   });
   const previewQuery = useMutation({
     mutationFn: (scheduleId: string) => apiFetch<ReminderPreview>(`/finance/fee-reminders/${encodeURIComponent(scheduleId)}/preview`),
     onSuccess: (data) => setPreview(data),
-    onError: (error: Error) => setFeedback({ kind: "error", text: error.message }),
+    onError: (error: Error) => toast.error(error.message),
   });
   const sendReminder = useMutation({
     mutationFn: (scheduleId: string) => apiFetch<ReminderResult>(`/finance/fee-reminders/${encodeURIComponent(scheduleId)}/send`, { method: "POST" }),
     onSuccess: async (result) => {
       void queryClient.invalidateQueries({ queryKey: ["finance", "action-centre"] });
       setSendResult(result);
-      setFeedback({ kind: result.failed ? "error" : "success", text: `In-app delivery finished: ${result.inAppSent} sent, ${result.skippedNoLogin} skipped without portal logins, ${result.failed} failed.` });
+      toast[result.failed ? "error" : "success"](`In-app delivery finished: ${result.inAppSent} sent, ${result.skippedNoLogin} skipped without portal logins, ${result.failed} failed.`);
       await queryClient.invalidateQueries({ queryKey: ["finance", "fee-reminders"] });
     },
-    onError: (error: Error) => setFeedback({ kind: "error", text: error.message }),
+    onError: (error: Error) => toast.error(error.message),
   });
 
   function updateDraft<K extends keyof ScheduleDraft>(key: K, value: ScheduleDraft[K]) {
@@ -162,13 +163,13 @@ export function FeeReminderWorkspace() {
   }
   function submitCreate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setFeedback(null);
+
     if (!Number.isFinite(Number(draft.minimumOutstanding)) || Number(draft.minimumOutstanding) < 0) {
-      setFeedback({ kind: "error", text: "Enter a valid non-negative minimum balance." });
+      toast.error("Enter a valid non-negative minimum balance.");
       return;
     }
     if (draft.addInstallment && draft.sendDate > draft.dueDate) {
-      setFeedback({ kind: "error", text: "The reminder send date must be on or before the due date." });
+      toast.error("The reminder send date must be on or before the due date.");
       return;
     }
     createSchedule.mutate({
@@ -181,7 +182,7 @@ export function FeeReminderWorkspace() {
   }
 
   async function openPreview(schedule: ReminderSchedule) {
-    setFeedback(null);
+
     setPreview(null);
     setSendResult(null);
     setPreviewTarget(schedule);
@@ -191,10 +192,10 @@ export function FeeReminderWorkspace() {
   return <div className="mx-auto w-full min-w-0 max-w-screen-2xl space-y-6">
     <section className="flex flex-col gap-4 rounded-2xl border border-border bg-card p-5 shadow-sm sm:flex-row sm:items-end sm:justify-between sm:p-6">
       <div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">Finance & bursary</p><h1 className="mt-1 text-2xl font-bold tracking-tight text-foreground">Fee reminders</h1><p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">Prepare targeted fee reminders, preview eligible families and send controlled in-app notices from verified outstanding balances.</p></div>
-      {canWrite && <button type="button" className={primaryButton} onClick={() => { setFeedback(null); setDraft(initialDraft()); setCreateOpen(true); }}><Plus className="size-4" /> New schedule</button>}
+      {canWrite && <button type="button" className={primaryButton} onClick={() => {  setDraft(initialDraft()); setCreateOpen(true); }}><Plus className="size-4" /> New schedule</button>}
     </section>
     {!canWrite && <FinanceReadOnlyNotice />}
-    {feedback && <div role={feedback.kind === "error" ? "alert" : "status"} className={cn("flex items-start gap-3 rounded-xl border p-3 text-sm", feedback.kind === "error" ? "border-destructive/30 bg-destructive/5 text-destructive" : "border-success/30 bg-success/5 text-foreground")}><span className="min-w-0 flex-1">{feedback.text}</span><button type="button" aria-label="Dismiss" onClick={() => setFeedback(null)}><X className="size-4" /></button></div>}
+
     <div className="rounded-2xl border border-primary/20 bg-primary/5 p-4"><div className="flex items-start gap-3"><ShieldCheck className="mt-0.5 size-5 shrink-0 text-primary" /><div><p className="text-sm font-semibold text-foreground">Delivery is in-app only</p><p className="mt-1 text-sm leading-5 text-muted-foreground">SMS and email reminders are not connected in this SchoolHub implementation. Preview and confirm before sending; reminders are sent only to linked guardian portal accounts, and recipients without a login are reported as skipped.</p></div></div></div>
     <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3"><Metric label="Schedules" value={schedulesQuery.isPending ? "—" : String(schedules.length)} detail="Saved reminder plans" icon={ClipboardList} /><Metric label="Active schedules" value={schedulesQuery.isPending ? "—" : String(schedules.filter(item => item.isActive).length)} detail="Available for manual preview and send" icon={Bell} /><Metric label="Delivery attempts" value={schedulesQuery.isPending ? "—" : String(schedules.reduce((sum, item) => sum + (item._count?.logs ?? 0), 0))} detail="Sent, skipped and failed log entries" icon={Send} /></div>
     {schedulesQuery.isPending ? <LoadingState /> : schedulesQuery.error ? <ErrorState message={schedulesQuery.error.message} /> : schedules.length ? <div className="grid min-w-0 gap-4 xl:grid-cols-2">{schedules.map(schedule => <article key={schedule.id} className="min-w-0 overflow-hidden rounded-2xl border border-border bg-card shadow-sm"><div className={cn("h-1", schedule.isActive ? "bg-primary" : "bg-muted-foreground/30")} /><div className="p-4 sm:p-5"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><h2 className="break-words font-semibold text-foreground">{schedule.name}</h2><p className="mt-1 text-xs text-muted-foreground">{[schedule.academicYear?.name, schedule.term?.name].filter(Boolean).join(" · ") || "No current academic period assigned"}</p></div><span className={cn("rounded-full px-2.5 py-1 text-[10px] font-bold uppercase", schedule.isActive ? "bg-success/10 text-success" : "bg-muted text-muted-foreground")}>{schedule.isActive ? "Active" : "Paused"}</span></div>
@@ -213,7 +214,7 @@ export function FeeReminderWorkspace() {
         <div className="rounded-xl border border-border bg-muted/30 p-3"><p className="text-xs font-semibold text-foreground">Available message variables</p><p className="mt-1 text-xs leading-5 text-muted-foreground">Use {"{{studentName}}"}, {"{{guardianName}}"}, {"{{outstandingBalance}}"}, {"{{dueDate}}"} and {"{{installmentLabel}}"} in your message.</p></div>
         <label className="flex items-start gap-3 rounded-xl border border-border p-3 text-sm"><input type="checkbox" className="mt-1 size-4 accent-primary" checked={draft.addInstallment} onChange={event => updateDraft("addInstallment", event.target.checked)} /><span><span className="font-semibold text-foreground">Add a reminder date</span><span className="mt-1 block text-xs leading-5 text-muted-foreground">Records a due date and send date for reporting. The schedule is not sent automatically in the background.</span></span></label>
         {draft.addInstallment && <div className="grid gap-3 sm:grid-cols-3"><LabeledField label="Installment label"><input className={fieldClass} required minLength={1} maxLength={100} value={draft.installmentLabel} onChange={event => updateDraft("installmentLabel", event.target.value)} /></LabeledField><LabeledField label="Send date"><DatePicker buttonClassName={fieldClass} required value={draft.sendDate} max={draft.dueDate} onChange={(value) => updateDraft("sendDate", value)} /></LabeledField><LabeledField label="Due date"><DatePicker buttonClassName={fieldClass} required value={draft.dueDate} min={draft.sendDate} onChange={(value) => updateDraft("dueDate", value)} /></LabeledField></div>}
-        {createSchedule.error && <ErrorState message={createSchedule.error.message} />}
+
         <div className="flex justify-end gap-2 border-t border-border pt-4"><button type="button" className={secondaryButton} onClick={() => setCreateOpen(false)} disabled={createSchedule.isPending}>Cancel</button><button type="submit" className={primaryButton} disabled={createSchedule.isPending}>{createSchedule.isPending && <LoaderCircle className="size-4 animate-spin" />} Save schedule</button></div>
       </form>
     </Modal>}
@@ -222,14 +223,14 @@ export function FeeReminderWorkspace() {
       <form className="space-y-4" onSubmit={(event) => {
         event.preventDefault();
         if (installmentDraft.sendDate > installmentDraft.dueDate) {
-          setFeedback({ kind: "error", text: "The send date must be on or before the due date." });
+          toast.error("The send date must be on or before the due date.");
           return;
         }
         addInstallment.mutate({ scheduleId: installmentTarget.id, input: installmentDraft });
       }}>
         <LabeledField label="Installment label"><input className={fieldClass} required minLength={1} maxLength={100} value={installmentDraft.label} onChange={event => setInstallmentDraft(current => ({ ...current, label: event.target.value }))} /></LabeledField>
         <div className="grid gap-3 sm:grid-cols-2"><LabeledField label="Send date"><DatePicker buttonClassName={fieldClass} required max={installmentDraft.dueDate} value={installmentDraft.sendDate} onChange={(value) => setInstallmentDraft(current => ({ ...current, sendDate: value }))} /></LabeledField><LabeledField label="Due date"><DatePicker buttonClassName={fieldClass} required min={installmentDraft.sendDate} value={installmentDraft.dueDate} onChange={(value) => setInstallmentDraft(current => ({ ...current, dueDate: value }))} /></LabeledField></div>
-        {addInstallment.error && <ErrorState message={addInstallment.error.message} />}
+
         <p className="rounded-xl bg-muted/40 p-3 text-xs leading-5 text-muted-foreground">Adding a date does not send a message automatically. The new date becomes the next reminder available for preview and manual in-app delivery.</p>
         <div className="flex justify-end gap-2 border-t border-border pt-4"><button type="button" className={secondaryButton} onClick={() => setInstallmentTarget(null)} disabled={addInstallment.isPending}>Cancel</button><button type="submit" className={primaryButton} disabled={addInstallment.isPending}>{addInstallment.isPending && <LoaderCircle className="size-4 animate-spin" />} Add date</button></div>
       </form>
@@ -241,7 +242,7 @@ export function FeeReminderWorkspace() {
         <div className="grid gap-3 sm:grid-cols-2"><Summary label="Students with outstanding fees" value={String(preview.studentCount)} /><Summary label="Guardian portal recipients" value={String(preview.guardianCount)} /><Summary label="Guardians without a login" value={String(preview.guardiansWithoutPortal)} /><Summary label="Outstanding in this preview" value={money(preview.totalOutstanding)} /></div>
         {preview.sampleStudents.length > 0 && <div className="rounded-xl border border-border p-3"><h3 className="text-sm font-semibold text-foreground">Sample of eligible students</h3><div className="mt-2 divide-y divide-border">{preview.sampleStudents.map((student,index) => <div key={student.name+index} className="flex items-center justify-between gap-3 py-2 text-sm"><span className="text-foreground">{student.name}</span><span className="font-semibold tabular-nums text-foreground">{money(student.balance)}</span></div>)}</div></div>}
         {sendResult && <div className="rounded-xl border border-success/30 bg-success/5 p-3 text-sm text-foreground">Last run: {sendResult.inAppSent} sent, {sendResult.skippedNoLogin} skipped, {sendResult.failed} failed, {sendResult.alreadySent} already sent.</div>}
-        {sendReminder.error && <ErrorState message={sendReminder.error.message} />}
+
         <div className="flex flex-wrap justify-end gap-2 border-t border-border pt-4"><button type="button" className={secondaryButton} onClick={() => setPreviewTarget(null)} disabled={sendReminder.isPending}>Close</button><button type="button" className={primaryButton} disabled={sendReminder.isPending || !preview.guardianCount || !previewTarget.isActive} onClick={() => sendReminder.mutate(previewTarget.id)}>{sendReminder.isPending && <LoaderCircle className="size-4 animate-spin" />}<Send className="size-4" /> Send in-app reminders</button></div>
       </div> : <p className="text-sm text-muted-foreground">Preview is not available yet.</p>}
     </Modal>}

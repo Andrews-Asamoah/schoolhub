@@ -70,8 +70,8 @@ export default function PasswordRecoveryLinkScreen() {
             <>
               {status === "signedOut" ? null : (
                 <Text>
-                  Sign out of your current CampusHubGH session to use the
-                  password reset link.
+                  Sign out of your current schoolHub session to use the password
+                  reset link.
                 </Text>
               )}
               <Button
@@ -100,7 +100,7 @@ export default function PasswordRecoveryLinkScreen() {
           )}
           <Button
             label={
-              status === "signedOut" ? "Back to sign in" : "Back to CampusHubGH"
+              status === "signedOut" ? "Back to sign in" : "Back to schoolHub"
             }
             variant="secondary"
             onPress={exit}

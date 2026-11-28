@@ -7,19 +7,13 @@ const expoRequire = createRequire(require.resolve("expo/package.json"));
 const sharp = expoRequire("sharp");
 const folder = new URL("../assets/", import.meta.url);
 const asset = (name) => fileURLToPath(new URL(name, folder));
-const artwork = asset("campushubgh-source.png");
+const artwork = asset("schoolhub-mark.png");
 const paper = "#FFF9ED";
 const transparent = { r: 0, g: 0, b: 0, alpha: 0 };
 
-// Bound the supplied symbol above the wordmark, excluding its outer margins.
-const symbol = await sharp(artwork)
-  .extract({ left: 462, top: 137, width: 613, height: 452 })
-  .png()
-  .toBuffer();
-
 // Add margins after resizing so the artwork stays within Android's mask area.
 async function tile(size, symbolWidth, background) {
-  const mark = await sharp(symbol)
+  const mark = await sharp(artwork)
     .resize({ width: symbolWidth })
     .png()
     .toBuffer();
@@ -45,13 +39,7 @@ await sharp(await tile(512, 410, paper)).toFile(asset("splash.png"));
 await sharp(await tile(128, 102, paper))
   .resize(64, 64)
   .toFile(asset("favicon.png"));
-await sharp(artwork)
-  .extract({ left: 134, top: 137, width: 1268, height: 675 })
-  .resize({ width: 720 })
-  .png()
-  .toFile(asset("campushubgh-lockup.png"));
-
 const webPublic = new URL("../../web/public/", import.meta.url);
 await sharp(await tile(256, 196, paper))
   .webp({ quality: 92 })
-  .toFile(fileURLToPath(new URL("campushubgh.webp", webPublic)));
+  .toFile(fileURLToPath(new URL("schoolhub.webp", webPublic)));

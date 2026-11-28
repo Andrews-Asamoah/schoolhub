@@ -1,3 +1,4 @@
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { useQueryClient } from "@tanstack/react-query";
 import { Check, LoaderCircle } from "lucide-react";
 import { useRef, useState } from "react";
@@ -162,10 +163,10 @@ export function StudentPhotoBulkUpload({
           <div className="space-y-2">
             <p className="text-sm font-semibold text-foreground">{uploaded} uploaded · {failed} failed</p>
             <div className="max-h-60 overflow-auto rounded-xl border border-border">
-              <table className="w-full text-left text-xs">
-                <thead className="sticky top-0 bg-muted text-muted-foreground"><tr><th className="p-2">File</th><th className="p-2">Student ID</th><th className="p-2">Result</th><th className="p-2">Details</th></tr></thead>
-                <tbody>{results.map((result, index) => <tr key={`${result.fileName}:${index}`} className="border-t border-border"><td className="max-w-40 truncate p-2">{result.fileName}</td><td className="p-2">{result.studentId ?? result.identifier}</td><td className="p-2">{result.status === "uploaded" ? <span className="inline-flex items-center gap-1 text-success"><Check className="size-3" />Uploaded</span> : <span className="text-destructive">Failed</span>}</td><td className="p-2 text-muted-foreground">{result.message ?? ""}</td></tr>)}</tbody>
-              </table>
+              <Table scroll={false} className="w-full text-left text-xs">
+                <TableHeader className="sticky top-0 bg-muted text-muted-foreground"><TableRow><TableHead className="p-2">File</TableHead><TableHead className="p-2">Student ID</TableHead><TableHead className="p-2">Result</TableHead><TableHead className="p-2">Details</TableHead></TableRow></TableHeader>
+                <TableBody>{results.map((result, index) => <TableRow key={`${result.fileName}:${index}`} className="border-t border-border"><TableCell className="max-w-40 truncate p-2">{result.fileName}</TableCell><TableCell className="p-2">{result.studentId ?? result.identifier}</TableCell><TableCell className="p-2">{result.status === "uploaded" ? <span className="inline-flex items-center gap-1 text-success"><Check className="size-3" />Uploaded</span> : <span className="text-destructive">Failed</span>}</TableCell><TableCell className="p-2 text-muted-foreground">{result.message ?? ""}</TableCell></TableRow>)}</TableBody>
+              </Table>
             </div>
           </div>
         )}

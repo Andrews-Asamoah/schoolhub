@@ -47,11 +47,11 @@ beforeEach(() => {
   mockSession = { status: "signedOut", subdomain: null, activeRole: null };
 });
 
-test("first launch introduces CampusHubGH and opens school lookup in one tap", async () => {
+test("first launch introduces schoolHub and opens school lookup in one tap", async () => {
   const result = await renderRouter(routes, { initialUrl: "/" });
 
   expect(
-    await screen.findByRole("header", { name: "Welcome to CampusHubGH" }),
+    await screen.findByRole("header", { name: "Welcome to schoolHub" }),
   ).toBeVisible();
   expect(screen.getByText(/school office can give you a code/)).toBeVisible();
   expect(result.getPathname()).toBe("/welcome");
@@ -69,7 +69,7 @@ test.each(["/", "/welcome"])(
 
     await waitFor(() => expect(result.getPathname()).toBe("/login"));
     expect(screen.getByText("School sign-in")).toBeVisible();
-    expect(screen.queryByText("Welcome to CampusHubGH")).toBeNull();
+    expect(screen.queryByText("Welcome to schoolHub")).toBeNull();
   },
 );
 
@@ -82,5 +82,5 @@ test("an authenticated guardian goes directly to the portal", async () => {
   await renderRouter(routes, { initialUrl: "/" });
 
   expect(await screen.findByText("Guardian home")).toBeVisible();
-  expect(screen.queryByText("Welcome to CampusHubGH")).toBeNull();
+  expect(screen.queryByText("Welcome to schoolHub")).toBeNull();
 });

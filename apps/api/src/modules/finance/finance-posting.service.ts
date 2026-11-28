@@ -1,6 +1,5 @@
 import { BadRequestException, Injectable } from "@nestjs/common";
 import { Prisma, type TransactionCategory } from "@prisma/client";
-import { PrismaService } from "../../prisma/prisma.service.js";
 
 export type PostingInput = {
   schoolId: string; date: Date; description: string; amount: Prisma.Decimal;
@@ -18,8 +17,6 @@ export type PostingInput = {
  */
 @Injectable()
 export class FinancePostingService {
-  constructor(private readonly prisma: PrismaService) {}
-
   async post(tx: Prisma.TransactionClient, input: PostingInput) {
     if (!input.amount.isFinite() || input.amount.lte(0) || input.amount.decimalPlaces() > 2) {
       throw new BadRequestException("Posting amount must be a positive two-decimal amount.");

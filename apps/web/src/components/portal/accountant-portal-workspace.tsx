@@ -1,3 +1,5 @@
+import { toast } from "@/components/ui/toaster";
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { useDebouncedValue } from "@/components/superadmin/use-debounced-value";
 import { DatePicker } from "@/components/ui/date-picker";
 import { DataTable, TableExportMenu, type DataTableColumn } from "@/components/ui/data-table";
@@ -313,7 +315,7 @@ export function AccountantPortalWorkspace({
   const [showInventoryForm, setShowInventoryForm] = useState(false);
   const [stockItemId, setStockItemId] = useState("");
   const [selectedPayrollId, setSelectedPayrollId] = useState("");
-  const [message, setMessage] = useState<{ kind: "success" | "error"; text: string } | null>(null);
+
 
   const schoolQuery = useQuery({
     queryKey: ["school", "current"],
@@ -517,11 +519,11 @@ export function AccountantPortalWorkspace({
         body: JSON.stringify(input),
       }),
     onSuccess: async () => {
-      setMessage({ kind: "success", text: "Inventory item created and opening stock recorded." });
+      toast.success("Inventory item created and opening stock recorded.");
       setShowInventoryForm(false);
       await queryClient.invalidateQueries({ queryKey: ["inventory", "items"] });
     },
-    onError: (error: Error) => setMessage({ kind: "error", text: error.message }),
+    onError: (error: Error) => toast.error(error.message),
   });
 
   const recordStockMovement = useMutation({
@@ -531,11 +533,11 @@ export function AccountantPortalWorkspace({
         body: JSON.stringify(input),
       }),
     onSuccess: async () => {
-      setMessage({ kind: "success", text: "Stock movement recorded and inventory quantity updated." });
+      toast.success("Stock movement recorded and inventory quantity updated.");
       setStockItemId("");
       await queryClient.invalidateQueries({ queryKey: ["inventory", "items"] });
     },
-    onError: (error: Error) => setMessage({ kind: "error", text: error.message }),
+    onError: (error: Error) => toast.error(error.message),
   });
 
   const recordPayment = useMutation({
@@ -546,7 +548,7 @@ export function AccountantPortalWorkspace({
       }),
     onSuccess: async (payment) => {
       paymentKeyRef.current = null;
-      setMessage({ kind: "success", text: `Payment recorded. Receipt ${payment.paymentNumber} is ready.` });
+      toast.success(`Payment recorded. Receipt ${payment.paymentNumber} is ready.`);
       setShowPaymentForm(false);
       setSelectedBillId("");
       await Promise.all([
@@ -558,7 +560,7 @@ export function AccountantPortalWorkspace({
         queryClient.invalidateQueries({ queryKey: ["students"] }),
       ]);
     },
-    onError: (error: Error) => setMessage({ kind: "error", text: error.message }),
+    onError: (error: Error) => toast.error(error.message),
   });
 
   useEffect(() => {
@@ -580,7 +582,7 @@ export function AccountantPortalWorkspace({
         body: JSON.stringify({ kind: input.kind, reason: input.reason }),
       }),
     onSuccess: async (payment) => {
-      setMessage({ kind: "success", text: `Receipt ${payment.paymentNumber} was reversed and the bill balance restored.` });
+      toast.success(`Receipt ${payment.paymentNumber} was reversed and the bill balance restored.`);
       setReverseTarget(null);
       setReverseReason("");
       await Promise.all([
@@ -592,7 +594,7 @@ export function AccountantPortalWorkspace({
         queryClient.invalidateQueries({ queryKey: ["students"] }),
       ]);
     },
-    onError: (error: Error) => setMessage({ kind: "error", text: error.message }),
+    onError: (error: Error) => toast.error(error.message),
   });
 
   const generateBills = useMutation({
@@ -602,14 +604,11 @@ export function AccountantPortalWorkspace({
         body: JSON.stringify(input),
       }),
     onSuccess: async (result) => {
-      setMessage({
-        kind: "success",
-        text: [
+      toast.success([
           result.count ? `Generated ${result.count} bill(s), totalling ${currency(result.totalBilled)}.`
             : result.message ?? "No bills were generated.",
           result.skippedExisting ? `Skipped ${result.skippedExisting} student(s) with an existing invoice for this fee structure.` : "",
-        ].filter(Boolean).join(" "),
-      });
+        ].filter(Boolean).join(" "));
       setShowBillForm(false);
       setOptionalFees(null);
       setSelectedFeeStructureId("");
@@ -621,7 +620,7 @@ export function AccountantPortalWorkspace({
         queryClient.invalidateQueries({ queryKey: ["finance", "fee-structures"] }),
       ]);
     },
-    onError: (error: Error) => setMessage({ kind: "error", text: error.message }),
+    onError: (error: Error) => toast.error(error.message),
   });
 
   const createExpense = useMutation({
@@ -631,11 +630,11 @@ export function AccountantPortalWorkspace({
         body: JSON.stringify(input),
       }),
     onSuccess: async () => {
-      setMessage({ kind: "success", text: "Expense saved to the school finance records." });
+      toast.success("Expense saved to the school finance records.");
       setShowExpenseForm(false);
       await queryClient.invalidateQueries({ queryKey: ["finance", "expenses"] });
     },
-    onError: (error: Error) => setMessage({ kind: "error", text: error.message }),
+    onError: (error: Error) => toast.error(error.message),
   });
 
   function submitInventoryItem(event: FormEvent<HTMLFormElement>) {
@@ -650,10 +649,10 @@ export function AccountantPortalWorkspace({
       initialQuantity: Number(form.get("initialQuantity")),
     });
     if (!result.success) {
-      setMessage({ kind: "error", text: result.error.issues[0]?.message ?? "Check the inventory details." });
+      toast.error(result.error.issues[0]?.message ?? "Check the inventory details.");
       return;
     }
-    setMessage(null);
+
     createInventoryItem.mutate(result.data);
   }
 
@@ -668,10 +667,10 @@ export function AccountantPortalWorkspace({
       recipientName: String(form.get("recipientName") ?? "").trim() || undefined,
     });
     if (!result.success) {
-      setMessage({ kind: "error", text: result.error.issues[0]?.message ?? "Check the stock movement details." });
+      toast.error(result.error.issues[0]?.message ?? "Check the stock movement details.");
       return;
     }
-    setMessage(null);
+
     recordStockMovement.mutate({ itemId: stockItemId, input: result.data });
   }
 
@@ -691,14 +690,14 @@ export function AccountantPortalWorkspace({
         .map(([feeItemId, studentIds]) => ({ feeItemId, studentIds })),
     });
     if (!currentYear || !currentTerm) {
-      setMessage({ kind: "error", text: "Set a current academic year and term before generating bills." });
+      toast.error("Set a current academic year and term before generating bills.");
       return;
     }
     if (!result.success) {
-      setMessage({ kind: "error", text: result.error.issues[0]?.message ?? "Check the billing details." });
+      toast.error(result.error.issues[0]?.message ?? "Check the billing details.");
       return;
     }
-    setMessage(null);
+
     generateBills.mutate(result.data);
   }
 
@@ -715,10 +714,10 @@ export function AccountantPortalWorkspace({
       referenceNumber: String(form.get("referenceNumber") ?? "").trim() || undefined,
     });
     if (!result.success) {
-      setMessage({ kind: "error", text: result.error.issues[0]?.message ?? "Check the expense details." });
+      toast.error(result.error.issues[0]?.message ?? "Check the expense details.");
       return;
     }
-    setMessage(null);
+
     createExpense.mutate(result.data);
   }
 
@@ -811,13 +810,13 @@ export function AccountantPortalWorkspace({
               </p>
             </div>
             {canWrite ? (<div className="flex flex-wrap gap-2">
-              <button className={buttonPrimary} onClick={() => { setMessage(null); setSelectedBillId(""); setShowPaymentForm(true); }}>
+              <button className={buttonPrimary} onClick={() => {  setSelectedBillId(""); setShowPaymentForm(true); }}>
                 <Plus className="size-4" /> Record payment
               </button>
-              <button className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-background/30 bg-background/10 px-4 py-2 text-sm font-semibold text-background transition hover:bg-background/20" onClick={() => { setMessage(null); setSelectedFeeStructureId(""); setSelectedClassIds([]); setShowBillForm(true); }}>
+              <button className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-background/30 bg-background/10 px-4 py-2 text-sm font-semibold text-background transition hover:bg-background/20" onClick={() => {  setSelectedFeeStructureId(""); setSelectedClassIds([]); setShowBillForm(true); }}>
                 <Receipt className="size-4" /> Generate bills
               </button>
-              <button className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-background/30 bg-background/10 px-4 py-2 text-sm font-semibold text-background transition hover:bg-background/20" onClick={() => { setMessage(null); setShowExpenseForm(true); }}>
+              <button className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-background/30 bg-background/10 px-4 py-2 text-sm font-semibold text-background transition hover:bg-background/20" onClick={() => {  setShowExpenseForm(true); }}>
                 <Plus className="size-4" /> Add expense
               </button>
             </div>) : <p className="max-w-xs text-sm text-background/80">View only. Only the school accountant can record or change financial data.</p>}
@@ -825,16 +824,7 @@ export function AccountantPortalWorkspace({
         </section>
       )}
 
-      {message && !showPaymentForm && !showBillForm && !showExpenseForm && !showInventoryForm && !stockItemId && (
-        <div role={message.kind === "error" ? "alert" : "status"} className={cn(
-          "flex items-start gap-3 rounded-2xl border p-4 text-sm",
-          message.kind === "error" ? "border-destructive/30 bg-destructive/5 text-destructive" : "border-success/30 bg-success/5 text-foreground",
-        )}>
-          {message.kind === "error" ? <AlertCircle className="mt-0.5 size-4 shrink-0" /> : <CheckCircle2 className="mt-0.5 size-4 shrink-0" />}
-          <p className="min-w-0 flex-1">{message.text}</p>
-          <button className="text-xs font-semibold underline" onClick={() => setMessage(null)}>Dismiss</button>
-        </div>
-      )}
+
 
       {activeTab === "overview" && (
         <section aria-label="Financial performance indicators" className="space-y-3">
@@ -924,7 +914,7 @@ export function AccountantPortalWorkspace({
 
       {!loading && activeTab === "invoices" && (
         <section className="rounded-2xl border border-border bg-card p-5">
-          <SectionHeader title="Invoices & bills" description="Search bills, review balances, and generate billing for one or more classes." action={<div className="flex flex-wrap gap-2"><TableExportMenu build={() => ({ title: "Invoice register", headers: ["Invoice","Student","Admission number","Class","Fee structure","Due date","Gross (GHS)","Discount (GHS)","Total (GHS)","Paid (GHS)","Balance (GHS)","Status"], columnTypes: ["text","text","text","text","text","date","money","money","money","money","money","text"], rows: bills.map(bill => [bill.billNumber, studentName(bill.student), bill.student?.admissionNumber ?? "", bill.class?.name ?? "", bill.feeStructure?.name ?? "", dateLabel(bill.dueDate), Number(bill.grossAmount ?? bill.totalAmount), Number(bill.discountAmount ?? 0), Number(bill.totalAmount), Number(bill.paidAmount), Number(bill.balanceAmount), bill.status]), reportInfo: { school: schoolQuery.data?.name, filters: { search: invoiceSearch, status: statusFilter } } })} note="Export reflects the current invoice filters." /><ServerExportButton endpoint="/finance/exports/bills.xlsx" label="Full Excel" className={buttonSecondary} />{canWrite && <button className={buttonPrimary} onClick={() => { setMessage(null); setSelectedFeeStructureId(""); setSelectedClassIds([]); setOptionalFees(null); setShowBillForm(true); }}><Plus className="size-4" /> Generate bills</button>}</div>} />
+          <SectionHeader title="Invoices & bills" description="Search bills, review balances, and generate billing for one or more classes." action={<div className="flex flex-wrap gap-2"><TableExportMenu build={() => ({ title: "Invoice register", headers: ["Invoice","Student","Admission number","Class","Fee structure","Due date","Gross (GHS)","Discount (GHS)","Total (GHS)","Paid (GHS)","Balance (GHS)","Status"], columnTypes: ["text","text","text","text","text","date","money","money","money","money","money","text"], rows: bills.map(bill => [bill.billNumber, studentName(bill.student), bill.student?.admissionNumber ?? "", bill.class?.name ?? "", bill.feeStructure?.name ?? "", dateLabel(bill.dueDate), Number(bill.grossAmount ?? bill.totalAmount), Number(bill.discountAmount ?? 0), Number(bill.totalAmount), Number(bill.paidAmount), Number(bill.balanceAmount), bill.status]), reportInfo: { school: schoolQuery.data?.name, filters: { search: invoiceSearch, status: statusFilter } } })} note="Export reflects the current invoice filters." /><ServerExportButton endpoint="/finance/exports/bills.xlsx" label="Full Excel" className={buttonSecondary} />{canWrite && <button className={buttonPrimary} onClick={() => {  setSelectedFeeStructureId(""); setSelectedClassIds([]); setOptionalFees(null); setShowBillForm(true); }}><Plus className="size-4" /> Generate bills</button>}</div>} />
           <SearchFilters search={search}
             setSearch={setSearch}
             statusFilter={statusFilter} setStatusFilter={value => { setStatusFilter(value); setBillCursorStack([null]); }} statuses={["PENDING", "PARTIALLY_PAID", "PAID", "OVERDUE"]} />
@@ -945,7 +935,7 @@ export function AccountantPortalWorkspace({
 
       {!loading && activeTab === "payments" && (
         <section className="rounded-2xl border border-border bg-card p-5">
-          <SectionHeader title="Payments & receipts" description="Saved payment transactions from the school finance ledger." action={<div className="flex flex-wrap gap-2"><TableExportMenu build={() => ({ title: "Payment register", headers: ["Receipt","Student","Admission number","Bill","Date","Method","Reference","Amount (GHS)","Status"], columnTypes: ["text","text","text","text","date","text","text","money","text"], rows: filteredPayments.map(payment => [payment.paymentNumber, studentName(payment.student), payment.student?.admissionNumber ?? "", payment.bill?.billNumber ?? "", dateLabel(payment.paymentDate), payment.paymentMethod, payment.referenceNumber ?? "", Number(payment.amount), payment.status]), reportInfo: { school: schoolQuery.data?.name, filters: { search } } })} note="Export reflects the current payment filters." /><ServerExportButton endpoint="/finance/exports/payments.xlsx" label="Full Excel" className={buttonSecondary} />{canWrite && <button className={buttonPrimary} onClick={() => { setMessage(null); setSelectedBillId(""); setShowPaymentForm(true); }}><Plus className="size-4" /> Record payment</button>}</div>} />
+          <SectionHeader title="Payments & receipts" description="Saved payment transactions from the school finance ledger." action={<div className="flex flex-wrap gap-2"><TableExportMenu build={() => ({ title: "Payment register", headers: ["Receipt","Student","Admission number","Bill","Date","Method","Reference","Amount (GHS)","Status"], columnTypes: ["text","text","text","text","date","text","text","money","text"], rows: filteredPayments.map(payment => [payment.paymentNumber, studentName(payment.student), payment.student?.admissionNumber ?? "", payment.bill?.billNumber ?? "", dateLabel(payment.paymentDate), payment.paymentMethod, payment.referenceNumber ?? "", Number(payment.amount), payment.status]), reportInfo: { school: schoolQuery.data?.name, filters: { search } } })} note="Export reflects the current payment filters." /><ServerExportButton endpoint="/finance/exports/payments.xlsx" label="Full Excel" className={buttonSecondary} />{canWrite && <button className={buttonPrimary} onClick={() => {  setSelectedBillId(""); setShowPaymentForm(true); }}><Plus className="size-4" /> Record payment</button>}</div>} />
           <div className="relative my-4 max-w-md"><Search className="absolute left-3 top-3 size-4 text-muted-foreground" /><input className={cn(inputClass, "pl-9")} value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search receipt, student, or reference" /></div>
           {paymentsQuery.error ? <QueryError message={paymentsQuery.error.message} /> : <PaymentsTable payments={filteredPayments} onViewStudentStatement={openStudentStatement} onViewReceipt={setSelectedReceipt} onReverse={canWrite ? (payment) => { setReverseKind("VOID"); setReverseReason(""); setReverseTarget(payment); } : undefined} />}
           <PageControls shown={filteredPayments.length} total={paymentsQuery.data?.total ?? 0} canPrevious={paymentCursorStack.length > 1} canNext={Boolean(paymentsQuery.data?.nextCursor)} onPrevious={() => setPaymentCursorStack((stack) => stack.slice(0, -1))} onNext={() => { if (paymentsQuery.data?.nextCursor) setPaymentCursorStack((stack) => [...stack, paymentsQuery.data!.nextCursor!]); }} />
@@ -977,7 +967,7 @@ export function AccountantPortalWorkspace({
 
       {!loading && activeTab === "expenses" && (
         <section className="rounded-2xl border border-border bg-card p-5">
-          <SectionHeader title="Operating expenses" description="Expense entries saved to the school database." action={canWrite ? <button className={buttonPrimary} onClick={() => { setMessage(null); setShowExpenseForm(true); }}><Plus className="size-4" /> Add expense</button> : undefined} />
+          <SectionHeader title="Operating expenses" description="Expense entries saved to the school database." action={canWrite ? <button className={buttonPrimary} onClick={() => {  setShowExpenseForm(true); }}><Plus className="size-4" /> Add expense</button> : undefined} />
           {expensesQuery.error ? <QueryError message={expensesQuery.error.message} /> : <ExpensesTable expenses={expenses} />}
         </section>
       )}
@@ -1004,7 +994,7 @@ export function AccountantPortalWorkspace({
           <SectionHeader
             title="Supplies & inventory"
             description="Track stock quantities, minimum levels, and auditable stock-in / stock-out movements."
-            action={<button className={buttonPrimary} onClick={() => { setMessage(null); setShowInventoryForm(true); }}><Plus className="size-4" /> Add item</button>}
+            action={<button className={buttonPrimary} onClick={() => {  setShowInventoryForm(true); }}><Plus className="size-4" /> Add item</button>}
           />
           {inventoryQuery.error ? <QueryError message={inventoryQuery.error.message} /> : inventoryItems.length ? (
             <div className="mt-4 overflow-x-auto">
@@ -1014,7 +1004,7 @@ export function AccountantPortalWorkspace({
 { id: "minimum", header: "Minimum", cell: (item) => item.minQuantity, value: (item) => item.minQuantity },
 { id: "status", header: "Stock status", cell: (item) => <StatusBadge value={item.quantity <= item.minQuantity ? "LOW STOCK" : "IN STOCK"} />, value: (item) => item.quantity <= item.minQuantity ? "LOW STOCK" : "IN STOCK" },
 { id: "updated", header: "Updated", cell: (item) => dateLabel(item.updatedAt), value: (item) => item.updatedAt },
-{ id: "actions", header: "Actions", cell: (item) => <button className="text-xs font-semibold text-primary hover:underline" onClick={() => { setMessage(null); setStockItemId(item.id); }}>Record movement</button>, sortable: false } ] satisfies DataTableColumn<(typeof inventoryItems)[number]>[]} getRowId={(item) => item.id} emptyTitle="No records" emptyDescription="No records match the current selection." exportTitle="Inventory items" searchable={false} embedded />
+{ id: "actions", header: "Actions", cell: (item) => <button className="text-xs font-semibold text-primary hover:underline" onClick={() => {  setStockItemId(item.id); }}>Record movement</button>, sortable: false } ] satisfies DataTableColumn<(typeof inventoryItems)[number]>[]} getRowId={(item) => item.id} emptyTitle="No records" emptyDescription="No records match the current selection." exportTitle="Inventory items" searchable={false} embedded />
             </div>
           ) : <EmptyState icon={Package} title="No inventory items yet" description="Create an item and record its opening quantity. Every subsequent stock-in or stock-out is stored as a dated movement." />}
         </section>
@@ -1076,7 +1066,7 @@ export function AccountantPortalWorkspace({
               <div><p className="text-xs uppercase tracking-wide text-muted-foreground">Due date</p><p className="mt-1 font-semibold text-foreground">{dateLabel(selectedInvoiceForPrint.dueDate)}</p></div>
             </div>
             {selectedInvoiceForPrint.carryForwards?.length ? <section className="rounded-xl border border-warning/30 bg-warning/5 p-4"><h3 className="text-sm font-semibold text-foreground">Previous balance brought forward</h3><p className="mt-1 text-xs leading-5 text-muted-foreground">Amounts below are snapshots from earlier invoices. Those original invoices remain open; this section does not create a second charge.</p><div className="mt-3 space-y-2">{selectedInvoiceForPrint.carryForwards.map((carry) => <div key={carry.id} className="grid grid-cols-[1fr_auto] gap-3 text-sm"><span className="text-foreground">{carry.sourceBillNumber} · {[carry.sourceAcademicYearName,carry.sourceTermName].filter(Boolean).join(" / ") || "Earlier term"}</span><span className="font-semibold tabular-nums">{currency(carry.amount)}</span></div>)}</div><div className="mt-3 flex items-center justify-between border-t border-border pt-3 text-sm font-semibold"><span>Total of prior-balance snapshots</span><span className="tabular-nums">{currency(selectedInvoiceForPrint.previousBalanceTotal ?? "0.00")}</span></div></section> : null}
-            {selectedInvoiceForPrint.items?.length ? <div className="invoice-print-items py-4"><h3 className="mb-2 text-sm font-semibold text-foreground">Fee items</h3><div className="overflow-x-auto"><table className="w-full min-w-[520px] text-left text-sm"><thead><tr className="border-b border-border text-xs text-muted-foreground"><th className="py-2 pr-3">Description</th><th className="px-2 py-2 text-right">Qty</th><th className="px-2 py-2 text-right">Unit amount</th><th className="px-2 py-2 text-right">Total</th><th className="pl-2 py-2 text-right">Discount</th></tr></thead><tbody>{selectedInvoiceForPrint.items.map(item => <tr key={item.id} className="border-b border-border/70 last:border-0"><td className="py-2 pr-3 text-foreground">{item.description}</td><td className="px-2 py-2 text-right tabular-nums">{item.quantity}</td><td className="px-2 py-2 text-right tabular-nums">{currency(item.amount)}</td><td className="px-2 py-2 text-right font-medium tabular-nums">{currency(item.totalAmount)}</td><td className="pl-2 py-2 text-right tabular-nums text-success">{Number(item.discountAmount ?? 0) > 0 ? "−" + currency(item.discountAmount ?? 0) : "—"}</td></tr>)}</tbody></table></div></div> : null}
+            {selectedInvoiceForPrint.items?.length ? <div className="invoice-print-items py-4"><h3 className="mb-2 text-sm font-semibold text-foreground">Fee items</h3><div className="overflow-x-auto"><Table scroll={false} className="w-full min-w-[520px] text-left text-sm"><TableHeader><TableRow className="border-b border-border text-xs text-muted-foreground"><TableHead className="py-2 pr-3">Description</TableHead><TableHead className="px-2 py-2 text-right">Qty</TableHead><TableHead className="px-2 py-2 text-right">Unit amount</TableHead><TableHead className="px-2 py-2 text-right">Total</TableHead><TableHead className="pl-2 py-2 text-right">Discount</TableHead></TableRow></TableHeader><TableBody>{selectedInvoiceForPrint.items.map(item => <TableRow key={item.id} className="border-b border-border/70 last:border-0"><TableCell className="py-2 pr-3 text-foreground">{item.description}</TableCell><TableCell className="px-2 py-2 text-right tabular-nums">{item.quantity}</TableCell><TableCell className="px-2 py-2 text-right tabular-nums">{currency(item.amount)}</TableCell><TableCell className="px-2 py-2 text-right font-medium tabular-nums">{currency(item.totalAmount)}</TableCell><TableCell className="pl-2 py-2 text-right tabular-nums text-success">{Number(item.discountAmount ?? 0) > 0 ? "−" + currency(item.discountAmount ?? 0) : "—"}</TableCell></TableRow>)}</TableBody></Table></div></div> : null}
             <div className="invoice-print-totals border-y border-border py-4">{Number(selectedInvoiceForPrint.discountAmount ?? 0) > 0 && <><div className="grid grid-cols-[1fr_auto] gap-3 py-2 text-sm"><span className="text-muted-foreground">Original fees</span><span className="font-medium tabular-nums text-foreground">{currency(selectedInvoiceForPrint.grossAmount ?? selectedInvoiceForPrint.totalAmount)}</span></div>{selectedInvoiceForPrint.concessions?.map((concession) => <div key={concession.id} className="grid grid-cols-[1fr_auto] gap-3 py-1 text-sm"><span className="text-success">{concession.label}</span><span className="font-medium tabular-nums text-success">−{currency(concession.amount)}</span></div>)}<div className="grid grid-cols-[1fr_auto] gap-3 border-t border-border py-2 text-sm"><span className="text-muted-foreground">Discounts & scholarships</span><span className="font-semibold tabular-nums text-success">−{currency(selectedInvoiceForPrint.discountAmount ?? 0)}</span></div></>}<div className="grid grid-cols-[1fr_auto] gap-3 py-2 text-sm"><span className="text-muted-foreground">Current-term charge</span><span className="font-semibold tabular-nums text-foreground">{currency(selectedInvoiceForPrint.totalAmount)}</span></div><div className="grid grid-cols-[1fr_auto] gap-3 py-2 text-sm"><span className="text-muted-foreground">Payments recorded</span><span className="font-semibold tabular-nums text-foreground">{currency(selectedInvoiceForPrint.paidAmount)}</span></div><div className="grid grid-cols-[1fr_auto] gap-3 border-t border-border pt-3 text-base"><span className="font-semibold text-foreground">Current-invoice balance</span><span className="font-bold tabular-nums text-foreground">{currency(selectedInvoiceForPrint.balanceAmount)}</span></div></div><p className="mt-3 text-xs leading-5 text-muted-foreground">Previous-term receivables remain open against their original invoices. The total due at issue is shown for family convenience; payment allocation clears the oldest open invoice first.</p>
           </section>
         </Modal>
@@ -1117,13 +1107,13 @@ export function AccountantPortalWorkspace({
           classes={classes}
           initialBillId={selectedBillId}
           isSubmitting={recordPayment.isPending}
-          errorMessage={message?.kind === "error" ? message.text : undefined}
+
           onClose={() => {
             setShowPaymentForm(false);
             setSelectedBillId("");
           }}
           onSubmit={(input) => {
-            setMessage(null);
+
             recordPayment.mutate(input);
           }}
         />
@@ -1156,7 +1146,7 @@ export function AccountantPortalWorkspace({
       {showBillForm && (
         <Modal title="Generate student bills" description="Bill multiple classes on the same fee structure in one run." onClose={() => { if (generateBills.isPending) return; setShowBillForm(false); setSelectedFeeStructureId(""); setSelectedClassIds([]); setOptionalFees(null); }}>
           <form onSubmit={submitBill} className="space-y-4">
-            {message?.kind === "error" && <QueryError message={message.text} />}
+
             {yearsQuery.error && <QueryError message={yearsQuery.error.message} />}
             {feeStructuresQuery.error && <QueryError message={feeStructuresQuery.error.message} />}
             {classesQuery.error && <QueryError message={classesQuery.error.message} />}
@@ -1258,7 +1248,7 @@ export function AccountantPortalWorkspace({
       {showInventoryForm && (
         <Modal title="Add inventory item" description="Create a stock item with a minimum quantity threshold and optional opening stock." onClose={() => setShowInventoryForm(false)}>
           <form onSubmit={submitInventoryItem} className="space-y-4">
-            {message?.kind === "error" && <QueryError message={message.text} />}
+
             <LabeledField label="Item name"><input name="name" required minLength={2} maxLength={150} className={inputClass} placeholder="e.g. Exercise books, lab glassware" /></LabeledField>
             <div className="grid gap-4 sm:grid-cols-2">
               <LabeledField label="Category"><input name="category" className={inputClass} placeholder="Books, stationery, equipment…" /></LabeledField>
@@ -1275,7 +1265,7 @@ export function AccountantPortalWorkspace({
       {stockItemId && (
         <Modal title="Record stock movement" description={`Update quantities for ${inventoryItems.find((item) => item.id === stockItemId)?.name ?? "this item"}. Stock cannot go below zero.`} onClose={() => setStockItemId("")}>
           <form onSubmit={submitStockMovement} className="space-y-4">
-            {message?.kind === "error" && <QueryError message={message.text} />}
+
             <div className="grid gap-4 sm:grid-cols-2">
               <LabeledField label="Movement type"><Select name="type" required defaultValue="IN"><SelectTrigger aria-label="Movement type" className={inputClass}><SelectValue /></SelectTrigger><SelectContent><SelectItem value="IN">Stock in — received</SelectItem><SelectItem value="OUT">Stock out — issued</SelectItem></SelectContent></Select></LabeledField>
               <LabeledField label="Quantity"><input name="quantity" type="number" required min="1" step="1" className={inputClass} /></LabeledField>
@@ -1291,7 +1281,7 @@ export function AccountantPortalWorkspace({
       {showExpenseForm && (
         <Modal title="Record an expense" description="Save a school expense to the database. Enter the actual payment and reference details." onClose={() => setShowExpenseForm(false)}>
           <form onSubmit={submitExpense} className="space-y-4">
-            {message?.kind === "error" && <QueryError message={message.text} />}
+
             <div className="grid gap-4 sm:grid-cols-2">
               <LabeledField label="Date"><DatePicker name="date" required defaultValue={new Date().toISOString().slice(0, 10)} buttonClassName={inputClass} /></LabeledField>
               <LabeledField label="Amount (GHS)"><input name="amount" type="number" required min="0.01" step="0.01" className={inputClass} placeholder="0.00" /></LabeledField>

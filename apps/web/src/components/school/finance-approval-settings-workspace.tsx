@@ -1,3 +1,4 @@
+import { toast } from "@/components/ui/toaster";
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { LoaderCircle } from "lucide-react";
@@ -37,7 +38,7 @@ function SettingCard({ setting }: { setting: ApprovalSetting }) {
   ] : APPROVER_ROLES;
   const [required, setRequired] = useState(setting.required);
   const [roles, setRoles] = useState<string[]>(setting.approverRoles);
-  const [message, setMessage] = useState("");
+
 
   useEffect(() => {
     setRequired(setting.required);
@@ -49,10 +50,10 @@ function SettingCard({ setting }: { setting: ApprovalSetting }) {
       method: "PUT", body: JSON.stringify({ required, approverRoles: required ? roles : [] }),
     }),
     onSuccess: async () => {
-      setMessage("Saved.");
+      toast.success("Saved.");
       await client.invalidateQueries({ queryKey: ["finance-approval-settings"] });
     },
-    onError: (error: Error) => setMessage(error.message),
+    onError: (error: Error) => toast.error(error.message),
   });
 
   const unchanged = required === setting.required
@@ -67,7 +68,7 @@ function SettingCard({ setting }: { setting: ApprovalSetting }) {
       </div>
       <label className="flex items-center gap-2 text-sm">
         <input type="checkbox" checked={required}
-          onChange={(event) => { setRequired(event.target.checked); setMessage(""); }} />
+          onChange={(event) => { setRequired(event.target.checked);  }} />
         Require a second person to approve
       </label>
       {required ? (
@@ -79,7 +80,7 @@ function SettingCard({ setting }: { setting: ApprovalSetting }) {
                 onChange={(event) => {
                   setRoles((current) => event.target.checked
                     ? [...current, role.value] : current.filter((item) => item !== role.value));
-                  setMessage("");
+
                 }} />
               {role.label}
             </label>
@@ -99,7 +100,7 @@ function SettingCard({ setting }: { setting: ApprovalSetting }) {
           className="inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground disabled:opacity-50">
           {save.isPending && <LoaderCircle className="size-4 animate-spin" />}Save
         </button>
-        {message && <p role="status" className="text-sm">{message}</p>}
+
       </div>
     </li>
   );

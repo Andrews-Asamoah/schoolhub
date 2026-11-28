@@ -21,7 +21,7 @@ describe.skipIf(!enabled)("P2 immutable paired journals (PostgreSQL)", { timeout
     const { prisma } = await import("../../prisma/prisma.client.js");
     const { FinancePostingService } = await import("./finance-posting.service.js");
     db = prisma;
-    posting = new FinancePostingService({ client: db } as never);
+    posting = new FinancePostingService();
     await db.organization.create({ data: { id: run + "-org", name: run, slug: run } });
     schoolId = (await db.school.create({
       data: { organizationId: run + "-org", code: run.toUpperCase(), subdomain: run, name: run },

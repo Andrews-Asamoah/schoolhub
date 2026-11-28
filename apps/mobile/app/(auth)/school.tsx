@@ -125,7 +125,7 @@ export default function SchoolAccessScreen() {
       });
     } catch {
       await setSubdomain(null).catch(() => undefined);
-      setError("CampusHubGH couldn’t save your selection. Please try again.");
+      setError("schoolHub couldn’t save your selection. Please try again.");
     } finally {
       selectionPending.current = false;
       setChoosing(false);

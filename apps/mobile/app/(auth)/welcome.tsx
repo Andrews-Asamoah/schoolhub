@@ -39,7 +39,7 @@ export default function WelcomeScreen() {
             accessibilityRole="header"
             style={[type.display, { color: colors.foreground }]}
           >
-            Welcome to CampusHubGH
+            Welcome to schoolHub
           </Text>
           <Text style={[type.body, { color: colors.mutedForeground }]}>
             Find your school, then sign in with the account your school gave

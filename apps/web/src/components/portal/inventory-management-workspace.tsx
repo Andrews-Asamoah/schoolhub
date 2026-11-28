@@ -1,8 +1,9 @@
+import { toast } from "@/components/ui/toaster";
 import { DatePicker } from "@/components/ui/date-picker";
 import { DataTable, TableExportMenu, type DataTableColumn } from "@/components/ui/data-table";
 import { useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, History, LoaderCircle, Package, Pencil, Plus, Search, Warehouse, X } from "lucide-react";
+import { AlertTriangle, History, LoaderCircle, Package, Pencil, Plus, Search, Warehouse } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { PortalModal } from "@/components/portal/portal-modal";
 import { cn } from "@/lib/utils";
@@ -97,7 +98,7 @@ export function InventoryManagementWorkspace() {
   const [movementOpen, setMovementOpen] = useState(false);
   const [itemDraft, setItemDraft] = useState<ItemDraft>(itemFresh);
   const [movementDraft, setMovementDraft] = useState<MovementDraft>(movementFresh);
-  const [feedback, setFeedback] = useState<{kind:"success"|"error";text:string}|null>(null);
+
   const rangeInvalid = Boolean(fromDate && toDate && fromDate > toDate);
 
   const itemsQuery = useQuery({
@@ -144,11 +145,11 @@ export function InventoryManagementWorkspace() {
       name:input.name.trim(),description:input.description.trim()||undefined,category:input.category.trim()||undefined,unit:input.unit.trim()||"pcs",initialQuantity:Number(input.initialQuantity),minQuantity:Number(input.minQuantity)
     })}),
     onSuccess:async(item)=>{
-      setFeedback({kind:"success",text:"Inventory item “"+item.name+"” was created."});
+      toast.success("Inventory item “"+item.name+"” was created.");
       setCreateOpen(false);setItemDraft(itemFresh());
       await Promise.all([queryClient.invalidateQueries({queryKey:["inventory","items"]}),queryClient.invalidateQueries({queryKey:["inventory","transactions"]})]);
     },
-    onError:(error:Error)=>setFeedback({kind:"error",text:error.message}),
+    onError:(error:Error)=>toast.error(error.message),
   });
   const createCategory = useMutation({
     mutationFn: (name: string) => apiFetch<InventoryCategory>("/inventory/categories", {
@@ -156,11 +157,11 @@ export function InventoryManagementWorkspace() {
       body: JSON.stringify({ name: name.trim() }),
     }),
     onSuccess: async (category) => {
-      setFeedback({ kind: "success", text: `Inventory category “${category.name}” added.` });
+      toast.success(`Inventory category “${category.name}” added.`);
       setCategoryDraft("");
       await queryClient.invalidateQueries({ queryKey: ["inventory", "categories"] });
     },
-    onError: (error: Error) => setFeedback({ kind: "error", text: error.message }),
+    onError: (error: Error) => toast.error(error.message),
   });
   const updateItem = useMutation({
     mutationFn: ({ id, input }: { id: string; input: EditItemDraft }) =>
@@ -175,29 +176,29 @@ export function InventoryManagementWorkspace() {
         }),
       }),
     onSuccess: async (item) => {
-      setFeedback({ kind: "success", text: "Inventory item “" + item.name + "” updated. On-hand quantity is unchanged." });
+      toast.success("Inventory item “" + item.name + "” updated. On-hand quantity is unchanged.");
       setEditTarget(null);
       setEditDraft(null);
       await queryClient.invalidateQueries({ queryKey: ["inventory", "items"] });
     },
-    onError: (error: Error) => setFeedback({ kind: "error", text: error.message }),
+    onError: (error: Error) => toast.error(error.message),
   });
   const recordMovement = useMutation({
     mutationFn:(input:MovementDraft)=>apiFetch<InventoryMovement>("/inventory/items/"+encodeURIComponent(input.itemId)+"/movements",{method:"POST",body:JSON.stringify({
       type:input.type,quantity:Number(input.quantity),date:input.date,description:input.description.trim()||undefined,recipientName:input.recipientName.trim()||undefined
     })}),
     onSuccess:async()=>{
-      setFeedback({kind:"success",text:"Stock movement saved and the on-hand quantity updated."});
+      toast.success("Stock movement saved and the on-hand quantity updated.");
       setMovementOpen(false);setMovementDraft(movementFresh());
       await Promise.all([queryClient.invalidateQueries({queryKey:["inventory","items"]}),queryClient.invalidateQueries({queryKey:["inventory","transactions"]})]);
     },
-    onError:(error:Error)=>setFeedback({kind:"error",text:error.message}),
+    onError:(error:Error)=>toast.error(error.message),
   });
 
   function submitItem(event:FormEvent<HTMLFormElement>){
     event.preventDefault();
     if(!Number.isInteger(Number(itemDraft.initialQuantity))||Number(itemDraft.initialQuantity)<0||!Number.isInteger(Number(itemDraft.minQuantity))||Number(itemDraft.minQuantity)<0){
-      setFeedback({kind:"error",text:"Opening and minimum stock quantities must be non-negative whole numbers."});return;
+      toast.error("Opening and minimum stock quantities must be non-negative whole numbers.");return;
     }
     createItem.mutate(itemDraft);
   }
@@ -205,7 +206,7 @@ export function InventoryManagementWorkspace() {
     event.preventDefault();
     const name = categoryDraft.trim();
     if (name.length < 2 || name.length > 100) {
-      setFeedback({ kind: "error", text: "Category names must contain 2–100 characters." });
+      toast.error("Category names must contain 2–100 characters.");
       return;
     }
     createCategory.mutate(name);
@@ -214,7 +215,7 @@ export function InventoryManagementWorkspace() {
     event.preventDefault();
     if (!editTarget || !editDraft) return;
     if (!editDraft.name.trim() || !editDraft.unit.trim() || !Number.isInteger(Number(editDraft.minQuantity)) || Number(editDraft.minQuantity) < 0) {
-      setFeedback({ kind: "error", text: "Enter a valid item name, unit and non-negative whole-number minimum stock level." });
+      toast.error("Enter a valid item name, unit and non-negative whole-number minimum stock level.");
       return;
     }
     updateItem.mutate({ id: editTarget.id, input: editDraft });
@@ -222,18 +223,18 @@ export function InventoryManagementWorkspace() {
   function submitMovement(event:FormEvent<HTMLFormElement>){
     event.preventDefault();
     const item=itemList.find(candidate=>candidate.id===movementDraft.itemId);
-    if(!item){setFeedback({kind:"error",text:"Choose an inventory item."});return;}
-    if(!Number.isInteger(Number(movementDraft.quantity))||Number(movementDraft.quantity)<=0){setFeedback({kind:"error",text:"Movement quantity must be a positive whole number."});return;}
-    if(movementDraft.type==="OUT"&&Number(movementDraft.quantity)>item.quantity){setFeedback({kind:"error",text:"This movement is larger than the current stock. Available: "+item.quantity+" "+(item.unit||"pcs")+"."});return;}
+    if(!item){toast.error("Choose an inventory item.");return;}
+    if(!Number.isInteger(Number(movementDraft.quantity))||Number(movementDraft.quantity)<=0){toast.error("Movement quantity must be a positive whole number.");return;}
+    if(movementDraft.type==="OUT"&&Number(movementDraft.quantity)>item.quantity){toast.error("This movement is larger than the current stock. Available: "+item.quantity+" "+(item.unit||"pcs")+".");return;}
     recordMovement.mutate(movementDraft);
   }
 
   return <div className="mx-auto w-full min-w-0 max-w-screen-2xl space-y-6">
     <section className="flex flex-col gap-4 rounded-2xl border border-border bg-card p-5 shadow-sm sm:flex-row sm:items-end sm:justify-between sm:p-6">
       <div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">Finance & bursary</p><h1 className="mt-1 text-2xl font-bold tracking-tight text-foreground">Inventory & supplies</h1><p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">Track quantities, flag low stock, and review an auditable history of stock received and issued.</p></div>
-      <div className="flex flex-wrap gap-2"><TableExportMenu build={() => ({ title: "Inventory register", headers: ["Item","Category","Description","Quantity on hand","Unit","Minimum quantity","Stock status","Last updated"], columnTypes: ["text","text","text","number","text","number","text","date"], rows: visibleItems.map(item => [item.name,item.category ?? "",item.description ?? "",item.quantity,item.unit ?? "pcs",item.minQuantity,item.quantity <= item.minQuantity ? "LOW STOCK" : "IN STOCK",dateLabel(item.updatedAt)]), reportInfo: { filters: { search, category: categoryFilter, lowStockOnly } } })} note="Exports reflect the visible stock register." />{canManageCategories&&<button type="button" className={secondaryButton} onClick={()=>{setFeedback(null);setCategoriesOpen(true);}}>Manage categories</button>}<button type="button" className={primaryButton} onClick={()=>{setFeedback(null);setItemDraft(itemFresh());setCreateOpen(true);}}><Plus className="size-4"/>Add item</button></div>
+      <div className="flex flex-wrap gap-2"><TableExportMenu build={() => ({ title: "Inventory register", headers: ["Item","Category","Description","Quantity on hand","Unit","Minimum quantity","Stock status","Last updated"], columnTypes: ["text","text","text","number","text","number","text","date"], rows: visibleItems.map(item => [item.name,item.category ?? "",item.description ?? "",item.quantity,item.unit ?? "pcs",item.minQuantity,item.quantity <= item.minQuantity ? "LOW STOCK" : "IN STOCK",dateLabel(item.updatedAt)]), reportInfo: { filters: { search, category: categoryFilter, lowStockOnly } } })} note="Exports reflect the visible stock register." />{canManageCategories&&<button type="button" className={secondaryButton} onClick={()=>{setCategoriesOpen(true);}}>Manage categories</button>}<button type="button" className={primaryButton} onClick={()=>{setItemDraft(itemFresh());setCreateOpen(true);}}><Plus className="size-4"/>Add item</button></div>
     </section>
-    {feedback&&<div role={feedback.kind==="error"?"alert":"status"} className={cn("flex items-start gap-3 rounded-xl border p-3 text-sm",feedback.kind==="error"?"border-destructive/30 bg-destructive/5 text-destructive":"border-success/30 bg-success/5 text-foreground")}><span className="min-w-0 flex-1">{feedback.text}</span><button type="button" aria-label="Dismiss" onClick={()=>setFeedback(null)}><X className="size-4"/></button></div>}
+
     {categoriesQuery.isError&&<ErrorState message={"Inventory categories could not be loaded: "+categoriesQuery.error.message}/>}
     <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"><Metric label="Stocked items" value={itemsQuery.isPending?"—":String(itemList.length)} detail="Items in the register" icon={Package}/><Metric label="Low stock alerts" value={itemsQuery.isPending?"—":String(lowCount)} detail="At or below minimum quantity" icon={AlertTriangle}/><Metric label="Total quantity recorded" value={itemsQuery.isPending?"—":String(totalUnits)} detail="Quantities across mixed units" icon={Warehouse}/><Metric label="Movements in period" value={transactionQuery.isPending?"—":String(transactions.length)} detail="History is filtered by dates below" icon={History}/></div>
 
@@ -268,16 +269,16 @@ export function InventoryManagementWorkspace() {
         <LabeledField label="New category"><input autoFocus required minLength={2} maxLength={100} className={fieldClass} value={categoryDraft} onChange={event=>setCategoryDraft(event.target.value)} placeholder="e.g. Learning materials"/></LabeledField>
         <button type="submit" className={primaryButton} disabled={createCategory.isPending}>{createCategory.isPending?<LoaderCircle className="size-4 animate-spin"/>:<Plus className="size-4"/>}Add category</button>
       </form>
-      {createCategory.error&&<div className="mt-3"><ErrorState message={createCategory.error.message}/></div>}
+
       <div className="mt-5 space-y-2">
         <h3 className="text-sm font-semibold text-foreground">Available categories</h3>
         {categoriesQuery.isPending?<LoadingState/>:categoriesQuery.isError?<ErrorState message={categoriesQuery.error.message}/>:inventoryCategories.length===0?<p className="rounded-xl border border-dashed border-border p-4 text-sm text-muted-foreground">No categories yet. Add one above to make it available in the inventory forms.</p>:<ul className="divide-y divide-border rounded-xl border border-border">{inventoryCategories.map(category=><li key={category.id} className="px-4 py-3"><p className="text-sm font-medium text-foreground">{category.name}</p>{category.description&&<p className="mt-1 text-xs text-muted-foreground">{category.description}</p>}</li>)}</ul>}
       </div>
     </Modal>}
-    {createOpen&&<Modal title="Add inventory item" description="Create a stock record and optionally record opening stock." onClose={()=>!createItem.isPending&&setCreateOpen(false)}><form className="space-y-4" onSubmit={submitItem}><div className="grid gap-4 sm:grid-cols-2"><LabeledField label="Item name"><input required minLength={2} maxLength={150} className={fieldClass} value={itemDraft.name} onChange={event=>setItemDraft(current=>({...current,name:event.target.value}))} placeholder="e.g. Exercise books"/></LabeledField><CategoryField categories={categoryNames} value={itemDraft.category} onChange={category=>setItemDraft(current=>({...current,category}))}/></div><LabeledField label="Description (optional)"><textarea maxLength={500} className={cn(fieldClass,"h-20 py-2")} value={itemDraft.description} onChange={event=>setItemDraft(current=>({...current,description:event.target.value}))}/></LabeledField><div className="grid gap-4 sm:grid-cols-3"><LabeledField label="Unit"><input required maxLength={20} className={fieldClass} value={itemDraft.unit} onChange={event=>setItemDraft(current=>({...current,unit:event.target.value}))}/></LabeledField><LabeledField label="Opening quantity"><input type="number" required min="0" step="1" className={fieldClass} value={itemDraft.initialQuantity} onChange={event=>setItemDraft(current=>({...current,initialQuantity:event.target.value}))}/></LabeledField><LabeledField label="Minimum stock"><input type="number" required min="0" step="1" className={fieldClass} value={itemDraft.minQuantity} onChange={event=>setItemDraft(current=>({...current,minQuantity:event.target.value}))}/></LabeledField></div>{categoryNames.length===0&&<p className="text-xs text-muted-foreground">Ask the accountant to add inventory categories before classifying items.</p>}{createItem.error&&<ErrorState message={createItem.error.message}/>}<div className="flex justify-end gap-2 border-t border-border pt-4"><button type="button" className={secondaryButton} onClick={()=>setCreateOpen(false)} disabled={createItem.isPending}>Cancel</button><button type="submit" className={primaryButton} disabled={createItem.isPending}>{createItem.isPending&&<LoaderCircle className="size-4 animate-spin"/>}Save item</button></div></form></Modal>}
+    {createOpen&&<Modal title="Add inventory item" description="Create a stock record and optionally record opening stock." onClose={()=>!createItem.isPending&&setCreateOpen(false)}><form className="space-y-4" onSubmit={submitItem}><div className="grid gap-4 sm:grid-cols-2"><LabeledField label="Item name"><input required minLength={2} maxLength={150} className={fieldClass} value={itemDraft.name} onChange={event=>setItemDraft(current=>({...current,name:event.target.value}))} placeholder="e.g. Exercise books"/></LabeledField><CategoryField categories={categoryNames} value={itemDraft.category} onChange={category=>setItemDraft(current=>({...current,category}))}/></div><LabeledField label="Description (optional)"><textarea maxLength={500} className={cn(fieldClass,"h-20 py-2")} value={itemDraft.description} onChange={event=>setItemDraft(current=>({...current,description:event.target.value}))}/></LabeledField><div className="grid gap-4 sm:grid-cols-3"><LabeledField label="Unit"><input required maxLength={20} className={fieldClass} value={itemDraft.unit} onChange={event=>setItemDraft(current=>({...current,unit:event.target.value}))}/></LabeledField><LabeledField label="Opening quantity"><input type="number" required min="0" step="1" className={fieldClass} value={itemDraft.initialQuantity} onChange={event=>setItemDraft(current=>({...current,initialQuantity:event.target.value}))}/></LabeledField><LabeledField label="Minimum stock"><input type="number" required min="0" step="1" className={fieldClass} value={itemDraft.minQuantity} onChange={event=>setItemDraft(current=>({...current,minQuantity:event.target.value}))}/></LabeledField></div>{categoryNames.length===0&&<p className="text-xs text-muted-foreground">Ask the accountant to add inventory categories before classifying items.</p>}<div className="flex justify-end gap-2 border-t border-border pt-4"><button type="button" className={secondaryButton} onClick={()=>setCreateOpen(false)} disabled={createItem.isPending}>Cancel</button><button type="submit" className={primaryButton} disabled={createItem.isPending}>{createItem.isPending&&<LoaderCircle className="size-4 animate-spin"/>}Save item</button></div></form></Modal>}
 
-    {editTarget&&editDraft&&<Modal title="Edit inventory item" description="Update item details and the low-stock threshold. On-hand quantity is maintained by stock movements and will not be changed here." onClose={()=>!updateItem.isPending&&(setEditTarget(null),setEditDraft(null))}><form className="space-y-4" onSubmit={submitEditItem}><div className="grid gap-4 sm:grid-cols-2"><LabeledField label="Item name"><input required minLength={2} maxLength={150} className={fieldClass} value={editDraft.name} onChange={event=>setEditDraft(current=>current?({...current,name:event.target.value}):current)} /></LabeledField><CategoryField categories={categoryNames} value={editDraft.category} onChange={category=>setEditDraft(current=>current?({...current,category}):current)}/></div><LabeledField label="Description (optional)"><textarea maxLength={500} className={cn(fieldClass,"h-20 py-2")} value={editDraft.description} onChange={event=>setEditDraft(current=>current?({...current,description:event.target.value}):current)} /></LabeledField><div className="grid gap-4 sm:grid-cols-2"><LabeledField label="Unit"><input required maxLength={20} className={fieldClass} value={editDraft.unit} onChange={event=>setEditDraft(current=>current?({...current,unit:event.target.value}):current)} /></LabeledField><LabeledField label="Minimum stock"><input type="number" required min="0" step="1" className={fieldClass} value={editDraft.minQuantity} onChange={event=>setEditDraft(current=>current?({...current,minQuantity:event.target.value}):current)} /></LabeledField></div><div className="rounded-xl bg-muted/40 p-3 text-xs leading-5 text-muted-foreground">Current on-hand quantity: <strong className="text-foreground">{editTarget.quantity} {editTarget.unit||"pcs"}</strong>. Use Record movement to change stock quantities so the inventory history remains auditable.</div>{updateItem.error&&<ErrorState message={updateItem.error.message}/>}<div className="flex justify-end gap-2 border-t border-border pt-4"><button type="button" className={secondaryButton} onClick={()=>{setEditTarget(null);setEditDraft(null);}} disabled={updateItem.isPending}>Cancel</button><button type="submit" className={primaryButton} disabled={updateItem.isPending}>{updateItem.isPending&&<LoaderCircle className="size-4 animate-spin"/>}Save changes</button></div></form></Modal>}
-    {movementOpen&&<Modal title="Record stock movement" description={itemList.find(item=>item.id===movementDraft.itemId)?.name??"Update stock"} onClose={()=>!recordMovement.isPending&&setMovementOpen(false)}><form className="space-y-4" onSubmit={submitMovement}><LabeledField label="Inventory item"><Select value={movementDraft.itemId} onValueChange={value=>setMovementDraft(current=>({...current,itemId:value}))}><SelectTrigger className="w-full"><SelectValue placeholder="Choose an item"/></SelectTrigger><SelectContent>{itemList.map(item=><SelectItem key={item.id} value={item.id}>{item.name} — {item.quantity} {item.unit||"pcs"} on hand</SelectItem>)}</SelectContent></Select></LabeledField><div className="grid gap-4 sm:grid-cols-2"><LabeledField label="Movement type"><Select value={movementDraft.type} onValueChange={value=>setMovementDraft(current=>({...current,type:value as "IN"|"OUT"}))}><SelectTrigger className="w-full"><SelectValue/></SelectTrigger><SelectContent><SelectItem value="IN">Stock in — received</SelectItem><SelectItem value="OUT">Stock out — issued</SelectItem></SelectContent></Select></LabeledField><LabeledField label="Quantity"><input type="number" min="1" step="1" required className={fieldClass} value={movementDraft.quantity} onChange={event=>setMovementDraft(current=>({...current,quantity:event.target.value}))}/></LabeledField></div><div className="grid gap-4 sm:grid-cols-2"><LabeledField label="Date"><DatePicker required buttonClassName={fieldClass} value={movementDraft.date} onChange={(value) =>setMovementDraft(current=>({...current,date:value}))}/></LabeledField><LabeledField label="Recipient (optional)"><input maxLength={150} className={fieldClass} value={movementDraft.recipientName} onChange={event=>setMovementDraft(current=>({...current,recipientName:event.target.value}))} placeholder="Department or staff member"/></LabeledField></div><LabeledField label="Description / reason"><textarea maxLength={500} className={cn(fieldClass,"h-20 py-2")} value={movementDraft.description} onChange={event=>setMovementDraft(current=>({...current,description:event.target.value}))} placeholder="Delivery note, issue reason, invoice reference…"/></LabeledField>{recordMovement.error&&<ErrorState message={recordMovement.error.message}/>}<div className="flex justify-end gap-2 border-t border-border pt-4"><button type="button" className={secondaryButton} onClick={()=>setMovementOpen(false)} disabled={recordMovement.isPending}>Cancel</button><button type="submit" className={primaryButton} disabled={recordMovement.isPending}>{recordMovement.isPending&&<LoaderCircle className="size-4 animate-spin"/>}Save movement</button></div></form></Modal>}
+    {editTarget&&editDraft&&<Modal title="Edit inventory item" description="Update item details and the low-stock threshold. On-hand quantity is maintained by stock movements and will not be changed here." onClose={()=>!updateItem.isPending&&(setEditTarget(null),setEditDraft(null))}><form className="space-y-4" onSubmit={submitEditItem}><div className="grid gap-4 sm:grid-cols-2"><LabeledField label="Item name"><input required minLength={2} maxLength={150} className={fieldClass} value={editDraft.name} onChange={event=>setEditDraft(current=>current?({...current,name:event.target.value}):current)} /></LabeledField><CategoryField categories={categoryNames} value={editDraft.category} onChange={category=>setEditDraft(current=>current?({...current,category}):current)}/></div><LabeledField label="Description (optional)"><textarea maxLength={500} className={cn(fieldClass,"h-20 py-2")} value={editDraft.description} onChange={event=>setEditDraft(current=>current?({...current,description:event.target.value}):current)} /></LabeledField><div className="grid gap-4 sm:grid-cols-2"><LabeledField label="Unit"><input required maxLength={20} className={fieldClass} value={editDraft.unit} onChange={event=>setEditDraft(current=>current?({...current,unit:event.target.value}):current)} /></LabeledField><LabeledField label="Minimum stock"><input type="number" required min="0" step="1" className={fieldClass} value={editDraft.minQuantity} onChange={event=>setEditDraft(current=>current?({...current,minQuantity:event.target.value}):current)} /></LabeledField></div><div className="rounded-xl bg-muted/40 p-3 text-xs leading-5 text-muted-foreground">Current on-hand quantity: <strong className="text-foreground">{editTarget.quantity} {editTarget.unit||"pcs"}</strong>. Use Record movement to change stock quantities so the inventory history remains auditable.</div><div className="flex justify-end gap-2 border-t border-border pt-4"><button type="button" className={secondaryButton} onClick={()=>{setEditTarget(null);setEditDraft(null);}} disabled={updateItem.isPending}>Cancel</button><button type="submit" className={primaryButton} disabled={updateItem.isPending}>{updateItem.isPending&&<LoaderCircle className="size-4 animate-spin"/>}Save changes</button></div></form></Modal>}
+    {movementOpen&&<Modal title="Record stock movement" description={itemList.find(item=>item.id===movementDraft.itemId)?.name??"Update stock"} onClose={()=>!recordMovement.isPending&&setMovementOpen(false)}><form className="space-y-4" onSubmit={submitMovement}><LabeledField label="Inventory item"><Select value={movementDraft.itemId} onValueChange={value=>setMovementDraft(current=>({...current,itemId:value}))}><SelectTrigger className="w-full"><SelectValue placeholder="Choose an item"/></SelectTrigger><SelectContent>{itemList.map(item=><SelectItem key={item.id} value={item.id}>{item.name} — {item.quantity} {item.unit||"pcs"} on hand</SelectItem>)}</SelectContent></Select></LabeledField><div className="grid gap-4 sm:grid-cols-2"><LabeledField label="Movement type"><Select value={movementDraft.type} onValueChange={value=>setMovementDraft(current=>({...current,type:value as "IN"|"OUT"}))}><SelectTrigger className="w-full"><SelectValue/></SelectTrigger><SelectContent><SelectItem value="IN">Stock in — received</SelectItem><SelectItem value="OUT">Stock out — issued</SelectItem></SelectContent></Select></LabeledField><LabeledField label="Quantity"><input type="number" min="1" step="1" required className={fieldClass} value={movementDraft.quantity} onChange={event=>setMovementDraft(current=>({...current,quantity:event.target.value}))}/></LabeledField></div><div className="grid gap-4 sm:grid-cols-2"><LabeledField label="Date"><DatePicker required buttonClassName={fieldClass} value={movementDraft.date} onChange={(value) =>setMovementDraft(current=>({...current,date:value}))}/></LabeledField><LabeledField label="Recipient (optional)"><input maxLength={150} className={fieldClass} value={movementDraft.recipientName} onChange={event=>setMovementDraft(current=>({...current,recipientName:event.target.value}))} placeholder="Department or staff member"/></LabeledField></div><LabeledField label="Description / reason"><textarea maxLength={500} className={cn(fieldClass,"h-20 py-2")} value={movementDraft.description} onChange={event=>setMovementDraft(current=>({...current,description:event.target.value}))} placeholder="Delivery note, issue reason, invoice reference…"/></LabeledField><div className="flex justify-end gap-2 border-t border-border pt-4"><button type="button" className={secondaryButton} onClick={()=>setMovementOpen(false)} disabled={recordMovement.isPending}>Cancel</button><button type="submit" className={primaryButton} disabled={recordMovement.isPending}>{recordMovement.isPending&&<LoaderCircle className="size-4 animate-spin"/>}Save movement</button></div></form></Modal>}
   </div>;
 }
 

@@ -178,7 +178,7 @@ npx eas-cli build --platform android --profile preview
 npx eas-cli build --platform android --profile production
 ```
 
-The CampusHubGH artwork in `assets/campushubgh-source.png` supplies the
+The schoolHub artwork in `assets/schoolhub-mark.png` supplies the
 mobile wordmark, launcher, adaptive icon, splash and favicon, as well as the
 web sign-in mark. Regenerate those assets with
 `node scripts/generate-assets.mjs` from `apps/mobile` using the installed Expo
