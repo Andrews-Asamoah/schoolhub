@@ -2,7 +2,7 @@ import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { Download, FolderArchive } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { useDebouncedValue } from "@/components/superadmin/use-debounced-value";
+import { useDebouncedValue } from "@/lib/use-debounced-value";
 import { apiFetch, downloadAcademicReport, errorText } from "@/lib/api";
 
 type ArchiveItem = {

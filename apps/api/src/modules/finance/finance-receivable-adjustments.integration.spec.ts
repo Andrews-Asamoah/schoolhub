@@ -24,7 +24,7 @@ describe.skipIf(!enabled)("P3 approved receivable adjustments (PostgreSQL)", { t
     const { FinanceRevenueAdjustmentsService } = await import("./finance-revenue-adjustments.service.js");
     const { FinanceReceivableAdjustmentsService } = await import("./finance-receivable-adjustments.service.js");
     db = prisma;
-    const posting = new FinancePostingService({ client: db } as never);
+    const posting = new FinancePostingService();
     const accounts = new FinanceAccountPurposeService({ client: db } as never);
     draft = new FinanceRevenueAdjustmentsService({ client: db } as never);
     approved = new FinanceReceivableAdjustmentsService({ client: db } as never, posting, accounts);

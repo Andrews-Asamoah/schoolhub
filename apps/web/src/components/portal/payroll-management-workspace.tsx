@@ -1,17 +1,24 @@
+import { toast } from "@/components/ui/toaster";
 import { DataTable, TableExportMenu, type DataTableColumn } from "@/components/ui/data-table";
 import type { ExportTable } from "@/lib/table-export";
 import { ServerExportButton } from "@/components/portal/server-export-button";
 import { useCanExportPayrollTables } from "@/lib/table-export-policy";
 import { useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertCircle, BadgeCheck, CalendarClock, CheckCircle2, FileText, LoaderCircle, PlayCircle, Printer, Wallet, X } from "lucide-react";
+import { AlertCircle, BadgeCheck, CalendarClock, CheckCircle2, FileText, LoaderCircle, PlayCircle, Printer, Settings2, Upload, Wallet } from "lucide-react";
 import { apiFetch } from "@/lib/api";
+import { PayrollSalaryImportDialog } from "@/components/portal/payroll-salary-import-dialog";
+import { PayrollPaymentDetailsDialog } from "@/components/portal/payroll-payment-details-dialog";
+import { PayrollSettingsPanel } from "@/components/portal/payroll-settings-panel";
 import { PortalModal } from "@/components/portal/portal-modal";
 import { cn } from "@/lib/utils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { FinanceReadOnlyNotice, useFinanceAccess } from "@/components/portal/finance-access";
+import { useFinanceAccess } from "@/components/portal/finance-access";
+import { useFinanceApproval } from "@/lib/finance-approval";
+import { useSession } from "@/lib/auth-client";
 import { LabeledField } from "@/components/forms/labeled-controls";
 
+import { formatGhs as money } from "@/lib/format";
 type PayrollStatus = "DRAFT" | "APPROVED" | "PAID" | "CANCELLED";
 type PaymentMethod = "CASH" | "BANK_TRANSFER" | "CHEQUE" | "MOBILE_MONEY" | "CARD" | "ONLINE" | "OTHER";
 interface PersonName {
@@ -27,6 +34,7 @@ interface Payslip {
   grossSalary: number | string;
   ssnitEmployee: number | string;
   ssnitEmployer: number | string;
+  tier2Contribution?: number | string | null;
   incomeTax: number | string;
   otherDeductions: number | string;
   netSalary: number | string;
@@ -40,19 +48,25 @@ interface PayrollRecord {
   id: string;
   month: number;
   year: number;
+  runNumber?: number;
   status: PayrollStatus;
   totalGross: number | string;
   totalNet: number | string;
   totalTax: number | string;
   totalSSNIT: number | string;
   createdAt: string;
-  payslips: Payslip[];
+  processedById?: string | null;
+  /** Absent in the run list (loaded per run on demand); present on a single run. */
+  payslips?: Payslip[];
   _count?: { payslips: number };
 }
+type PayrollRun = PayrollRecord & { payslips: Payslip[] };
+interface PayrollReadiness { ready: boolean; problems: string[]; pendingDrafts: number; periodEnd: string }
 interface SalaryPerson {
   id: string;
   type: "TEACHER" | "STAFF";
   identifier: string;
+  employeeCode: string;
   name: string;
   monthlySalary: number | string | null;
 }
@@ -65,7 +79,6 @@ interface TransitionTarget {
   payroll: PayrollRecord;
   nextStatus: "APPROVED" | "PAID" | "CANCELLED";
 }
-const money = (value: number | string) => new Intl.NumberFormat("en-GH", { style: "currency", currency: "GHS", minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(value) || 0);
 const monthName = (month: number, year: number) => new Intl.DateTimeFormat("en-GB", { month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(Date.UTC(year, month - 1, 1)));
 const statusTone = (status: string) => status === "PAID" ? "bg-success/10 text-success" : status === "APPROVED" ? "bg-primary/10 text-primary" : status === "CANCELLED" ? "bg-destructive/10 text-destructive" : "bg-warning/10 text-foreground";
 const fieldClass = "h-10 w-full rounded-xl border border-input bg-background px-3 text-sm text-foreground outline-none placeholder:text-muted-foreground focus:ring-2 focus:ring-ring/30";
@@ -77,22 +90,35 @@ function personName(payslip: Payslip) {
   return name || (payslip.teacherId ? payslip.teacher?.teacherId : payslip.staff?.staffId) || "Unlinked employee";
 }
 export function PayrollManagementWorkspace() {
-  const { canWrite } = useFinanceAccess();
+  const { activeRole, canWrite } = useFinanceAccess();
+  const { data: session } = useSession();
+  const approval = useFinanceApproval("PAYROLL_RUN");
+  const approvalSetting = approval.setting;
+  const canApproveRole = !!approvalSetting && (approvalSetting.required
+    ? !!activeRole && approvalSetting.approverRoles.includes(activeRole)
+    : activeRole === "owner" || canWrite);
+  const canApproveDraft = (run: PayrollRecord) => run.status === "DRAFT" && canApproveRole && !!session?.user.id
+    && (!approvalSetting?.required || (!!run.processedById && run.processedById !== session.user.id));
+  const approverNames = approvalSetting?.approverRoles.map(role => role === "owner" ? "the owner" : "another accountant").join(" or ");
   const canExportPayroll = useCanExportPayrollTables();
   const queryClient = useQueryClient();
   const [showGenerate, setShowGenerate] = useState(false);
-  const [month, setMonth] = useState(String(Math.max(9, Math.min(12, new Date().getMonth() + 1))));
+  const [month, setMonth] = useState(() => String(new Date().getUTCMonth() + 1));
+  const [year, setYear] = useState(() => String(new Date().getUTCFullYear()));
+  const [showImport, setShowImport] = useState(false);
+  const [paymentDetailsPerson, setPaymentDetailsPerson] = useState<SalaryPerson | null>(null);
   const [taxConfirmed, setTaxConfirmed] = useState(false);
   const [transitionTarget, setTransitionTarget] = useState<TransitionTarget | null>(null);
   const [paidConfirmation, setPaidConfirmation] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("BANK_TRANSFER");
-  const [selectedDetail, setSelectedDetail] = useState<PayrollRecord | null>(null);
+  const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
+  const [showSettings, setShowSettings] = useState(false);
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [search, setSearch] = useState("");
   const [salarySearch, setSalarySearch] = useState("");
   const [salaryTarget, setSalaryTarget] = useState<SalaryPerson | null>(null);
   const [salaryDraft, setSalaryDraft] = useState("");
-  const [feedback, setFeedback] = useState<{ kind: "success" | "error"; text: string } | null>(null);
+
 
   const salaryRegisterQuery = useQuery({
     queryKey: ["finance", "payroll-salaries"],
@@ -101,16 +127,33 @@ export function PayrollManagementWorkspace() {
   });
   const payrollQuery = useQuery({
     queryKey: ["finance", "payroll"],
-    queryFn: () => apiFetch<PayrollRecord[]>("/finance/payroll"),
+    queryFn: () => apiFetch<PayrollRecord[]>("/finance/payroll?payslips=false"),
     retry: false,
   });
   const payroll = payrollQuery.data ?? [];
+  const detailQuery = useQuery({
+    queryKey: ["finance", "payroll-run", selectedRunId],
+    queryFn: () => apiFetch<PayrollRun>(`/finance/payroll/${encodeURIComponent(selectedRunId!)}`),
+    enabled: !!selectedRunId,
+    retry: false,
+  });
+  const selectedDetail = detailQuery.data ?? null;
+  // Tells the accountant up front whether the selected month can be calculated, instead of failing on Generate.
+  const readinessQuery = useQuery({
+    queryKey: ["finance", "payroll-readiness", month, year],
+    queryFn: () => apiFetch<PayrollReadiness>(`/finance/payroll/readiness?month=${month}&year=${year}`),
+    enabled: /^\d{4}$/.test(year) && Number(month) >= 1 && Number(month) <= 12,
+    retry: false,
+    staleTime: 30_000,
+  });
+  const readiness = readinessQuery.data;
   const salaryRegister = salaryRegisterQuery.data ?? [];
   const filteredSalaryRegister = useMemo(() => {
     const term = salarySearch.trim().toLowerCase();
     return salaryRegister.filter(person => !term ||
       person.name.toLowerCase().includes(term) ||
       person.identifier.toLowerCase().includes(term) ||
+      person.employeeCode.toLowerCase().includes(term) ||
       person.type.toLowerCase().includes(term));
   }, [salaryRegister, salarySearch]);
   const salaryMissingCount = salaryRegister.filter(person => !(Number(person.monthlySalary) > 0)).length;
@@ -119,20 +162,26 @@ export function PayrollManagementWorkspace() {
     const textMatch = !term || monthName(record.month, record.year).toLowerCase().includes(term) || String(record.year).includes(term);
     return textMatch && (statusFilter === "ALL" || record.status === statusFilter);
   }), [payroll, search, statusFilter]);
-  const draftCount = payroll.filter(record => record.status === "DRAFT").length;
-  const approvedCount = payroll.filter(record => record.status === "APPROVED").length;
-  const paidNetTotal = payroll.filter(record => record.status === "PAID").reduce((sum, record) => sum + Number(record.totalNet), 0);
+  const { draftCount, approvedCount, paidCount, paidNetTotal } = useMemo(() => {
+    const totals = { draftCount: 0, approvedCount: 0, paidCount: 0, paidNetTotal: 0 };
+    for (const record of payrollQuery.data ?? []) {
+      if (record.status === "DRAFT") totals.draftCount += 1;
+      else if (record.status === "APPROVED") totals.approvedCount += 1;
+      else if (record.status === "PAID") { totals.paidCount += 1; totals.paidNetTotal += Number(record.totalNet); }
+    }
+    return totals;
+  }, [payrollQuery.data]);
 
   const generatePayroll = useMutation({
-    mutationFn: (payload: { month: number; year: 2026; confirmResidentTaxTreatment: true }) =>
+    mutationFn: (payload: { month: number; year: number; confirmResidentTaxTreatment: true }) =>
       apiFetch<GenerateResponse>("/finance/payroll", { method: "POST", body: JSON.stringify(payload) }),
     onSuccess: async (result) => {
-      setFeedback({ kind: "success", text: `Draft created for ${result.includedCount} employees. ${result.excludedCount} active employee(s) without a positive monthly salary were excluded.` });
+      toast.success(`Draft created for ${result.includedCount} employees. ${result.excludedCount} active employee(s) without a positive monthly salary were excluded.`);
       setShowGenerate(false);
       setTaxConfirmed(false);
       await queryClient.invalidateQueries({ queryKey: ["finance", "payroll"] });
     },
-    onError: (error: Error) => setFeedback({ kind: "error", text: error.message }),
+    onError: (error: Error) => toast.error(error.message),
   });
   const updateSalary = useMutation({
     mutationFn: ({ person, monthlySalary }: { person: SalaryPerson; monthlySalary: number }) =>
@@ -141,7 +190,7 @@ export function PayrollManagementWorkspace() {
         { method: "PATCH", body: JSON.stringify({ monthlySalary }) },
       ),
     onSuccess: async (_result, variables) => {
-      setFeedback({ kind: "success", text: `Monthly salary updated for ${variables.person.name}. New payroll drafts will use this value.` });
+      toast.success(`Monthly salary updated for ${variables.person.name}. New payroll drafts will use this value.`);
       setSalaryTarget(null);
       setSalaryDraft("");
       await Promise.all([
@@ -149,7 +198,7 @@ export function PayrollManagementWorkspace() {
         queryClient.invalidateQueries({ queryKey: ["finance", "payroll"] }),
       ]);
     },
-    onError: (error: Error) => setFeedback({ kind: "error", text: error.message }),
+    onError: (error: Error) => toast.error(error.message),
   });
   const updatePayroll = useMutation({
     mutationFn: (input: TransitionTarget & { paymentMethod?: PaymentMethod }) =>
@@ -159,20 +208,30 @@ export function PayrollManagementWorkspace() {
       }),
     onSuccess: async (_record, variables) => {
       const actionText = variables.nextStatus === "APPROVED" ? "Payroll approved for payment." : variables.nextStatus === "PAID" ? "Payroll marked paid and payslips marked completed." : "Draft payroll cancelled.";
-      setFeedback({ kind: "success", text: actionText });
+      toast.success(actionText);
       setTransitionTarget(null);
       setPaidConfirmation(false);
-      await queryClient.invalidateQueries({ queryKey: ["finance", "payroll"] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["finance", "payroll"] }),
+        queryClient.invalidateQueries({ queryKey: ["finance", "payroll-run"] }),
+        queryClient.invalidateQueries({ queryKey: ["finance", "action-centre"] }),
+      ]);
     },
-    onError: (error: Error) => setFeedback({ kind: "error", text: error.message }),
+    onError: (error: Error) => toast.error(error.message),
   });
+
+  function requestApproval(run: PayrollRecord) {
+    updatePayroll.reset();
+    setSelectedRunId(null);
+    setTransitionTarget({ payroll: run, nextStatus: "APPROVED" });
+  }
 
   function submitSalary(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!salaryTarget) return;
     const amount = Number(salaryDraft);
     if (salaryDraft.trim() === "" || !Number.isFinite(amount) || amount < 0 || amount > 10000000) {
-      setFeedback({ kind: "error", text: "Enter a valid non-negative monthly salary in GHS." });
+      toast.error("Enter a valid non-negative monthly salary in GHS.");
       return;
     }
     updateSalary.mutate({ person: salaryTarget, monthlySalary: Math.round((amount + Number.EPSILON) * 100) / 100 });
@@ -190,20 +249,21 @@ export function PayrollManagementWorkspace() {
   function submitGenerate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!taxConfirmed) {
-      setFeedback({ kind: "error", text: "Confirm the tax treatment before generating a payroll draft." });
+      toast.error("Confirm the tax treatment before generating a payroll draft.");
       return;
     }
-    generatePayroll.mutate({ month: Number(month), year: 2026, confirmResidentTaxTreatment: true });
+    generatePayroll.mutate({ month: Number(month), year: Number(year), confirmResidentTaxTreatment: true });
   }
+  // Run-level register built from the slim list. Per-employee lines are in the "All-run Excel" server export.
   const buildPayrollRegisterExport = (): ExportTable => ({
-    title: "Payroll register",
-    headers: ["Period", "Run status", "Employee", "Employee ID", "Basic (GHS)", "Employee SSNIT (GHS)", "PAYE (GHS)", "Employer SSNIT (GHS)", "Net (GHS)", "Payment status"],
-    columnTypes: ["text", "text", "text", "text", "money", "money", "money", "money", "money", "text"],
-    rows: visiblePayroll.flatMap(run => run.payslips.map(slip => [
-      monthName(run.month, run.year), run.status, personName(slip), slip.staff?.staffId ?? slip.teacher?.teacherId ?? "",
-      Number(slip.basicSalary), Number(slip.ssnitEmployee), Number(slip.incomeTax), Number(slip.ssnitEmployer), Number(slip.netSalary), slip.paymentStatus,
-    ])),
-    totals: ["Total", "", "", "", null, null, null, null, null, ""],
+    title: "Payroll runs",
+    headers: ["Period", "Run", "Status", "Employees", "Gross (GHS)", "PAYE (GHS)", "SSNIT (GHS)", "Net (GHS)"],
+    columnTypes: ["text", "text", "text", "number", "money", "money", "money", "money"],
+    rows: visiblePayroll.map(run => [
+      monthName(run.month, run.year), `#${run.runNumber ?? 1}`, run.status, run._count?.payslips ?? 0,
+      Number(run.totalGross), Number(run.totalTax), Number(run.totalSSNIT), Number(run.totalNet),
+    ]),
+    totals: ["Total", "", "", null, null, null, null, null],
     confidential: true,
     reportInfo: { period: "Selected payroll runs" },
   });
@@ -220,21 +280,36 @@ export function PayrollManagementWorkspace() {
     }`}</style>
     <section className="flex flex-col gap-4 rounded-2xl border border-border bg-card p-5 shadow-sm sm:flex-row sm:items-end sm:justify-between sm:p-6">
       <div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">Finance & bursary</p><h1 className="mt-1 text-2xl font-bold tracking-tight text-foreground">Payroll</h1><p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">Generate payroll drafts from employee salary records, review statutory deductions, approve runs and record confirmed disbursements.</p></div>
-      <div className="flex flex-wrap gap-2">{canExportPayroll && <><TableExportMenu build={buildPayrollRegisterExport} note="Confidential payroll data. Export access is restricted." /><ServerExportButton endpoint="/finance/exports/payroll.xlsx" label="All-run Excel" className={secondaryButton} /></>}{canWrite && <button type="button" className={primaryButton} onClick={() => { setFeedback(null); setShowGenerate(true); }}><PlayCircle className="size-4" /> Generate payroll draft</button>}</div>
+      <div className="flex flex-wrap gap-2">{canExportPayroll && <><TableExportMenu build={buildPayrollRegisterExport} note="Confidential payroll data. Export access is restricted." /><ServerExportButton endpoint="/finance/exports/payroll.xlsx" label="All-run Excel" className={secondaryButton} /></>}<button type="button" className={secondaryButton} onClick={() => setShowSettings(true)}><Settings2 className="size-4" /> Payroll settings</button>{canWrite && <button type="button" className={primaryButton} onClick={() => {  setShowGenerate(true); }}><PlayCircle className="size-4" /> Generate payroll draft</button>}</div>
     </section>
-    {!canWrite && <FinanceReadOnlyNotice />}
-    {feedback && <div role={feedback.kind === "error" ? "alert" : "status"} className={cn("flex items-start gap-3 rounded-xl border p-3 text-sm", feedback.kind === "error" ? "border-destructive/30 bg-destructive/5 text-destructive" : "border-success/30 bg-success/5 text-foreground")}><span className="min-w-0 flex-1">{feedback.text}</span><button type="button" aria-label="Dismiss message" onClick={() => setFeedback(null)}><X className="size-4" /></button></div>}
+    {approval.error && <ErrorState message={`Payroll approval settings could not be loaded. ${approval.error.message}`} />}
+    {approvalSetting && <p role="note" className="rounded-xl border border-border bg-muted/40 p-3 text-sm text-muted-foreground">
+      {approvalSetting.required
+        ? `Payroll drafts need approval from ${approverNames}. The person who prepared the draft cannot approve it.`
+        : "The school allows the accountant to approve their own payroll drafts."}
+    </p>}
+
+    {readiness && !readiness.ready && <div role="alert" className="flex flex-col gap-3 rounded-xl border border-warning/30 bg-warning/5 p-4 text-sm sm:flex-row sm:items-center sm:justify-between">
+      <div><p className="font-semibold text-foreground">Payroll can’t be calculated for {monthName(Number(month), Number(year))} yet</p><p className="mt-1 text-muted-foreground">{readiness.problems[0]}{readiness.pendingDrafts ? ` ${readiness.pendingDrafts} draft setting(s) are waiting for approval.` : ""}</p></div>
+      <button type="button" className={secondaryButton} onClick={() => setShowSettings(true)}><Settings2 className="size-4" /> Set up PAYE &amp; SSNIT</button>
+    </div>}
     <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
       <Metric label="Drafts to review" value={payrollQuery.isPending ? "—" : String(draftCount)} detail="Awaiting accountant approval" icon={FileText} />
       <Metric label="Approved runs" value={payrollQuery.isPending ? "—" : String(approvedCount)} detail="Ready for disbursement" icon={BadgeCheck} />
-      <Metric label="Paid runs" value={payrollQuery.isPending ? "—" : String(payroll.filter(record => record.status === "PAID").length)} detail="Recorded as disbursed" icon={CheckCircle2} />
+      <Metric label="Paid runs" value={payrollQuery.isPending ? "—" : String(paidCount)} detail="Recorded as disbursed" icon={CheckCircle2} />
       <Metric label="Net paid total" value={payrollQuery.isPending ? "—" : money(paidNetTotal)} detail="Across the listed payroll runs" icon={Wallet} />
     </div>
 
     <section className="rounded-2xl border border-border bg-card p-4 shadow-sm sm:p-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div><h2 className="text-lg font-semibold text-foreground">Salary register</h2><p className="mt-1 text-sm text-muted-foreground">Manage the monthly base salary used when creating new payroll drafts. Updating a salary does not alter already saved payroll runs.</p></div>
-        {canExportPayroll && <><TableExportMenu build={buildSalaryRegisterExport} note="Confidential salary data. Export access is restricted." /><ServerExportButton endpoint="/finance/exports/salaries.xlsx" label="Full salary Excel" className={secondaryButton} /></>}
+        <div className="flex flex-wrap gap-2">
+          {canWrite && canExportPayroll && <button type="button" className={primaryButton}
+            disabled={!salaryRegister.length} onClick={() => {  setShowImport(true); }}>
+            <Upload className="size-4" /> Import salaries
+          </button>}
+          {canExportPayroll && <><TableExportMenu build={buildSalaryRegisterExport} note="Confidential salary data. Export access is restricted." /><ServerExportButton endpoint="/finance/exports/salaries.xlsx" label="Full salary Excel" className={secondaryButton} /></>}
+        </div>
       </div>
       <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0 flex-1"><label className="mb-1.5 block text-xs font-semibold text-muted-foreground">Search employee</label><input className={fieldClass} value={salarySearch} onChange={event => setSalarySearch(event.target.value)} placeholder="Search by name, ID, or staff type…" /></div>
@@ -245,7 +320,12 @@ export function PayrollManagementWorkspace() {
 { id: "type", header: "Type", cell: (person) => person.type === "TEACHER" ? "Teacher" : "Staff", value: (person) => person.type },
 { id: "salary", header: "Monthly salary", cell: (person) => Number(person.monthlySalary) > 0 ? money(Number(person.monthlySalary)) : "Not configured", value: (person) => Number(person.monthlySalary ?? 0), className: "text-right tabular-nums" },
 { id: "readiness", header: "Payroll readiness", cell: (person) => <span className={cn("rounded-full px-2.5 py-1 text-[10px] font-bold", Number(person.monthlySalary) > 0 ? "bg-success/10 text-success" : "bg-warning/10 text-foreground")}>{Number(person.monthlySalary) > 0 ? "READY" : "NEEDS SALARY"}</span>, value: (person) => Number(person.monthlySalary) > 0 ? "READY" : "NEEDS SALARY" },
-{ id: "actions", header: "Actions", cell: (person) => canWrite ? <button type="button" className="text-xs font-semibold text-primary hover:underline" onClick={() => { setFeedback(null); setSalaryTarget(person); setSalaryDraft(person.monthlySalary == null ? "" : String(person.monthlySalary)); }}>Edit salary</button> : null, sortable: false }
+{ id: "actions", header: "Actions", cell: (person) => (
+  <div className="flex flex-wrap gap-x-3 gap-y-2">
+    {canWrite && <button type="button" className="text-xs font-semibold text-primary hover:underline" onClick={() => {  setSalaryTarget(person); setSalaryDraft(person.monthlySalary == null ? "" : String(person.monthlySalary)); }}>Edit salary</button>}
+    {canExportPayroll && <button type="button" className="text-xs font-semibold text-primary hover:underline" onClick={() => {  setPaymentDetailsPerson(person); }}>Payment details</button>}
+  </div>
+), sortable: false }
 ] satisfies DataTableColumn<(typeof filteredSalaryRegister)[number]>[]} getRowId={(person) => person.type + person.id} emptyTitle="No employees" emptyDescription="No staff members match this selection." exportTitle="Salary register" searchable={false} embedded /></div> : <div className="rounded-xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">{salarySearch ? "No employees match your search." : "No active teachers or staff records are available for payroll."}</div>}
     </section>
 
@@ -255,31 +335,55 @@ export function PayrollManagementWorkspace() {
         <div className="sm:w-48"><label className="mb-1.5 block text-xs font-semibold text-muted-foreground">Status</label><Select value={statusFilter} onValueChange={setStatusFilter}><SelectTrigger className="w-full"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ALL">All statuses</SelectItem>{(["DRAFT","APPROVED","PAID","CANCELLED"] as const).map(value => <SelectItem key={value} value={value}>{value}</SelectItem>)}</SelectContent></Select></div>
       </div>
       {payrollQuery.isPending ? <LoadingState /> : payrollQuery.error ? <ErrorState message={payrollQuery.error.message} /> : visiblePayroll.length ? <div className="mt-4 overflow-x-auto"><DataTable rows={visiblePayroll} columns={[
-{ id: "period", header: "Payroll period", cell: (run) => <><p className="font-semibold text-foreground">{monthName(run.month, run.year)}</p><p className="mt-1 text-xs text-muted-foreground">SSNIT: {money(run.totalSSNIT)}</p></>, value: (run) => run.year * 100 + run.month },
+{ id: "period", header: "Payroll period", cell: (run) => <><p className="font-semibold text-foreground">{monthName(run.month, run.year)}{(run.runNumber ?? 1) > 1 ? ` · Run ${run.runNumber}` : ""}</p><p className="mt-1 text-xs text-muted-foreground">SSNIT: {money(run.totalSSNIT)}</p></>, value: (run) => run.year * 100 + run.month },
 { id: "status", header: "Status", cell: (run) => <span className={cn("inline-flex rounded-full px-2.5 py-1 text-[10px] font-bold",statusTone(run.status))}>{run.status}</span>, value: (run) => run.status },
-{ id: "employees", header: "Employees", cell: (run) => run._count?.payslips ?? run.payslips.length, value: (run) => run._count?.payslips ?? run.payslips.length, className: "text-right tabular-nums" },
+{ id: "employees", header: "Employees", cell: (run) => run._count?.payslips ?? run.payslips?.length ?? 0, value: (run) => run._count?.payslips ?? run.payslips?.length ?? 0, className: "text-right tabular-nums" },
 { id: "gross", header: "Gross", cell: (run) => money(run.totalGross), value: (run) => Number(run.totalGross), className: "text-right tabular-nums" },
 { id: "tax", header: "PAYE", cell: (run) => money(run.totalTax), value: (run) => Number(run.totalTax), className: "text-right tabular-nums" },
 { id: "net", header: "Net", cell: (run) => money(run.totalNet), value: (run) => Number(run.totalNet), className: "text-right tabular-nums" },
-{ id: "actions", header: "Actions", cell: (run) => <div className="flex flex-wrap gap-2"><button type="button" onClick={() => setSelectedDetail(run)} className="text-xs font-semibold text-primary hover:underline">Review slips</button>{canWrite && run.status === "DRAFT" && <button type="button" onClick={() => setTransitionTarget({ payroll: run, nextStatus: "APPROVED" })} className="text-xs font-semibold text-foreground hover:underline">Approve</button>}{canWrite && run.status === "APPROVED" && <button type="button" onClick={() => { setPaidConfirmation(false); setPaymentMethod("BANK_TRANSFER"); setTransitionTarget({ payroll: run, nextStatus: "PAID" }); }} className="text-xs font-semibold text-primary hover:underline">Confirm paid</button>}{canWrite && run.status === "DRAFT" && <button type="button" onClick={() => setTransitionTarget({ payroll: run, nextStatus: "CANCELLED" })} className="text-xs font-semibold text-destructive hover:underline">Cancel</button>}</div>, sortable: false }
+{ id: "actions", header: "Actions", cell: (run) => <div className="flex flex-wrap gap-2"><button type="button" onClick={() => setSelectedRunId(run.id)} className="text-xs font-semibold text-primary hover:underline">Review slips</button>{canApproveDraft(run) && <button type="button" onClick={() => requestApproval(run)} className="text-xs font-semibold text-foreground hover:underline">Approve</button>}{run.status === "DRAFT" && approvalSetting?.required && run.processedById && run.processedById === session?.user.id && <span className="text-xs text-muted-foreground">Awaiting independent approval</span>}{run.status === "DRAFT" && approvalSetting?.required && !run.processedById && <span className="text-xs text-muted-foreground">Missing preparer. Regenerate this draft.</span>}{canWrite && run.status === "APPROVED" && <button type="button" onClick={() => { setPaidConfirmation(false); setPaymentMethod("BANK_TRANSFER"); setTransitionTarget({ payroll: run, nextStatus: "PAID" }); }} className="text-xs font-semibold text-primary hover:underline">Confirm paid</button>}{canWrite && run.status === "DRAFT" && <button type="button" onClick={() => setTransitionTarget({ payroll: run, nextStatus: "CANCELLED" })} className="text-xs font-semibold text-destructive hover:underline">Cancel</button>}</div>, sortable: false }
 ] satisfies DataTableColumn<(typeof visiblePayroll)[number]>[]} getRowId={(run) => run.id} emptyTitle="No payroll runs" emptyDescription="No payroll runs match these filters." exportTitle="Payroll runs" searchable={false} embedded /></div> : <EmptyState title="No payroll runs yet" description="Generate a draft for a supported period after confirming employee salary and tax details." />}
     </section>
 
+    {showImport && canWrite && canExportPayroll && <PayrollSalaryImportDialog
+      employees={salaryRegister}
+      onClose={() => setShowImport(false)}
+      onImported={count => {
+        setShowImport(false);
+        toast.success(`Updated ${count} monthly salaries. New payroll drafts will use these amounts.`);
+        void queryClient.invalidateQueries({ queryKey: ["finance", "payroll-salaries"] });
+      }}
+    />}
+    {paymentDetailsPerson && canExportPayroll && <PayrollPaymentDetailsDialog
+      person={paymentDetailsPerson}
+      canEdit={canWrite}
+      onClose={() => setPaymentDetailsPerson(null)}
+      onSaved={() => {
+        setPaymentDetailsPerson(null);
+        toast.success("Payroll payment details saved.");
+      }}
+    />}
     {salaryTarget && <Modal title="Update monthly salary" description={`${salaryTarget.name} · ${salaryTarget.type === "TEACHER" ? "Teacher" : "Staff"}`} onClose={() => !updateSalary.isPending && setSalaryTarget(null)}>
       <form className="space-y-4" onSubmit={submitSalary}>
         <div className="rounded-xl bg-muted/40 p-3 text-sm text-muted-foreground">This value is used for future payroll drafts only. Saved or approved payroll runs will not be recalculated.</div>
         <LabeledField label="Monthly base salary (GHS)"><input type="number" min="0" max="10000000" step="0.01" required className={fieldClass} value={salaryDraft} onChange={event => setSalaryDraft(event.target.value)} placeholder="0.00" /></LabeledField>
-        {updateSalary.error && <ErrorState message={updateSalary.error.message} />}
+
         <div className="flex justify-end gap-2 border-t border-border pt-4"><button type="button" className={secondaryButton} onClick={() => setSalaryTarget(null)} disabled={updateSalary.isPending}>Cancel</button><button type="submit" className={primaryButton} disabled={updateSalary.isPending}>{updateSalary.isPending && <LoaderCircle className="size-4 animate-spin" />}Save salary</button></div>
       </form>
     </Modal>}
     {showGenerate && <Modal title="Generate payroll draft" description="Build a draft payroll from the school's active staff and teacher monthly salary values." onClose={() => !generatePayroll.isPending && setShowGenerate(false)}>
       <form onSubmit={submitGenerate} className="space-y-4">
-        <div className="grid gap-4 sm:grid-cols-2"><LabeledField label="Payroll month"><Select value={month} onValueChange={setMonth}><SelectTrigger className="w-full"><SelectValue /></SelectTrigger><SelectContent>{[9,10,11,12].map(value => <SelectItem key={value} value={String(value)}>{new Date(Date.UTC(2026,value-1,1)).toLocaleDateString("en-GB",{month:"long",timeZone:"UTC"})}</SelectItem>)}</SelectContent></Select></LabeledField><LabeledField label="Year"><input disabled value="2026" className={cn(fieldClass,"opacity-70")} /></LabeledField></div>
-        <div className="rounded-xl border border-warning/30 bg-warning/5 p-4"><div className="flex gap-2"><AlertCircle className="mt-0.5 size-4 shrink-0 text-muted-foreground" /><div><p className="text-sm font-semibold text-foreground">Payroll calculation assumptions</p><p className="mt-1 text-xs leading-5 text-muted-foreground">Uses GRA resident PAYE monthly bands effective 1 September 2026. It calculates from each person's stored monthly salary only; allowances, overtime, non-resident tax treatment and other deductions are not stored in this version. Employees without a positive salary are excluded. Review each draft before approving.</p></div></div></div>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <LabeledField label="Payroll month"><Select value={month} onValueChange={value => { setMonth(value); setTaxConfirmed(false); }}><SelectTrigger className="w-full"><SelectValue /></SelectTrigger><SelectContent>{Array.from({ length: 12 }, (_, i) => <SelectItem key={i} value={String(i + 1)}>{new Date(Date.UTC(2000, i, 1)).toLocaleDateString("en-GB", { month: "long", timeZone: "UTC" })}</SelectItem>)}</SelectContent></Select></LabeledField>
+          <LabeledField label="Year"><input type="number" min="2000" max="2100" step="1" required value={year} className={fieldClass} onChange={event => { setYear(event.target.value); setTaxConfirmed(false); }} /></LabeledField>
+        </div>
+        {readiness && (readiness.ready
+          ? <p className="flex items-center gap-2 rounded-xl border border-success/30 bg-success/5 p-3 text-xs text-foreground"><CheckCircle2 className="size-4 text-success" /> Approved PAYE and SSNIT settings cover {monthName(Number(month), Number(year))}.</p>
+          : <div role="alert" className="rounded-xl border border-destructive/30 bg-destructive/5 p-3 text-xs text-destructive"><p>{readiness.problems[0]}</p><button type="button" className="mt-2 font-semibold underline" onClick={() => { setShowGenerate(false); setShowSettings(true); }}>Open payroll settings</button></div>)}
+        <div className="rounded-xl border border-warning/30 bg-warning/5 p-4"><div className="flex gap-2"><AlertCircle className="mt-0.5 size-4 shrink-0 text-muted-foreground" /><div><p className="text-sm font-semibold text-foreground">Payroll calculation assumptions</p><p className="mt-1 text-xs leading-5 text-muted-foreground">Uses the approved PAYE and contribution settings effective at the end of the selected month. Drafts use each employee’s current monthly base salary. Employees without a positive salary are excluded. Verify the inputs for the selected month before generating a draft.</p></div></div></div>
         <label className="flex items-start gap-3 rounded-xl border border-border p-3 text-sm"><input type="checkbox" className="mt-1 size-4 accent-primary" checked={taxConfirmed} onChange={event => setTaxConfirmed(event.target.checked)} /><span className="leading-5 text-foreground">I have verified employee salary inputs and confirm the resident PAYE schedule is appropriate for every employee included in this draft.</span></label>
-        {generatePayroll.error && <ErrorState message={generatePayroll.error.message} />}
-        <div className="flex justify-end gap-2 border-t border-border pt-4"><button type="button" className={secondaryButton} onClick={() => setShowGenerate(false)} disabled={generatePayroll.isPending}>Cancel</button><button type="submit" className={primaryButton} disabled={generatePayroll.isPending || !taxConfirmed}>{generatePayroll.isPending && <LoaderCircle className="size-4 animate-spin" />} Generate draft</button></div>
+
+        <div className="flex justify-end gap-2 border-t border-border pt-4"><button type="button" className={secondaryButton} onClick={() => setShowGenerate(false)} disabled={generatePayroll.isPending}>Cancel</button><button type="submit" className={primaryButton} disabled={generatePayroll.isPending || !taxConfirmed || readiness?.ready === false}>{generatePayroll.isPending && <LoaderCircle className="size-4 animate-spin" />} Generate draft</button></div>
       </form>
     </Modal>}
 
@@ -288,23 +392,37 @@ export function PayrollManagementWorkspace() {
         {transitionTarget.nextStatus === "APPROVED" && <p className="text-sm leading-6 text-muted-foreground">Review the employee payslips before approval. This records the payroll as approved; it does not issue a payment.</p>}
         {transitionTarget.nextStatus === "CANCELLED" && <p className="text-sm leading-6 text-muted-foreground">Only draft runs can be cancelled. The saved payslip data will remain attached to the cancelled record for traceability.</p>}
         {transitionTarget.nextStatus === "PAID" && <><LabeledField label="Disbursement method"><Select value={paymentMethod} onValueChange={value => setPaymentMethod(value as PaymentMethod)}><SelectTrigger className="w-full"><SelectValue /></SelectTrigger><SelectContent>{(["BANK_TRANSFER","CHEQUE","MOBILE_MONEY","CASH","CARD","ONLINE","OTHER"] as const).map(method => <SelectItem key={method} value={method}>{method.replaceAll("_"," ")}</SelectItem>)}</SelectContent></Select></LabeledField><label className="flex items-start gap-3 rounded-xl border border-warning/30 bg-warning/5 p-3 text-sm"><input type="checkbox" className="mt-1 size-4 accent-primary" checked={paidConfirmation} onChange={event => setPaidConfirmation(event.target.checked)} /><span className="leading-5">I confirm the salaries have actually been disbursed or paid outside SchoolHub. This only records the status; it does not transfer funds.</span></label></>}
-        {updatePayroll.error && <ErrorState message={updatePayroll.error.message} />}
+
         <div className="flex justify-end gap-2 border-t border-border pt-4"><button type="button" className={secondaryButton} onClick={() => setTransitionTarget(null)} disabled={updatePayroll.isPending}>Back</button><button type="button" className={primaryButton} disabled={updatePayroll.isPending || (transitionTarget.nextStatus === "PAID" && !paidConfirmation)} onClick={() => updatePayroll.mutate({ ...transitionTarget, ...(transitionTarget.nextStatus === "PAID" ? { paymentMethod } : {}) })}>{updatePayroll.isPending && <LoaderCircle className="size-4 animate-spin" />}{transitionTarget.nextStatus === "APPROVED" ? "Approve payroll" : transitionTarget.nextStatus === "PAID" ? "Confirm paid" : "Cancel draft"}</button></div>
       </div>
     </Modal>}
 
-    {selectedDetail && <Modal title={`Payslips · ${monthName(selectedDetail.month, selectedDetail.year)}`} description="Review salary values and recorded deductions before approving payroll." onClose={() => setSelectedDetail(null)}>
+    {showSettings && <Modal title="Payroll settings" description="PAYE tax schedules and pension contribution schemes used to calculate payroll." onClose={() => setShowSettings(false)}><PayrollSettingsPanel /></Modal>}
+    {selectedRunId && !selectedDetail && <Modal title="Payslips" description="Loading this payroll run…" onClose={() => setSelectedRunId(null)}>{detailQuery.error ? <ErrorState message={detailQuery.error.message} /> : <LoadingState />}</Modal>}
+    {selectedDetail && <Modal title={`Payslips · ${monthName(selectedDetail.month, selectedDetail.year)}`} description="Review salary values and recorded deductions before approving payroll." onClose={() => setSelectedRunId(null)}>
       <div className="payroll-slips-print overflow-x-auto"><div className="mb-3 grid gap-2 sm:grid-cols-3"><Summary label="Employees" value={String(selectedDetail.payslips.length)} /><Summary label="Gross" value={money(selectedDetail.totalGross)} /><Summary label="Net" value={money(selectedDetail.totalNet)} /></div><DataTable rows={selectedDetail.payslips} columns={[
 { id: "employee", header: "Employee", cell: (slip) => <><p className="font-medium text-foreground">{personName(slip)}</p><p className="text-[10px] text-muted-foreground">{slip.staff?.staffId ?? slip.teacher?.teacherId ?? ""}</p></>, value: (slip) => personName(slip) },
 { id: "basic", header: "Basic", cell: (slip) => money(slip.basicSalary), value: (slip) => Number(slip.basicSalary), className: "text-right tabular-nums" },
 { id: "ssnit", header: "Employee SSNIT", cell: (slip) => money(slip.ssnitEmployee), value: (slip) => Number(slip.ssnitEmployee), className: "text-right tabular-nums" },
+{ id: "tier2", header: "Tier 2 allocation", cell: (slip) => slip.tier2Contribution == null ? "—" : money(slip.tier2Contribution), value: (slip) => Number(slip.tier2Contribution ?? 0), className: "text-right tabular-nums" },
 { id: "paye", header: "PAYE", cell: (slip) => money(slip.incomeTax), value: (slip) => Number(slip.incomeTax), className: "text-right tabular-nums" },
 { id: "employer", header: "Employer SSNIT", cell: (slip) => money(slip.ssnitEmployer), value: (slip) => Number(slip.ssnitEmployer), className: "text-right tabular-nums" },
 { id: "net", header: "Net", cell: (slip) => money(slip.netSalary), value: (slip) => Number(slip.netSalary), className: "text-right tabular-nums" },
 { id: "status", header: "Status", cell: (slip) => slip.paymentStatus, value: (slip) => slip.paymentStatus },
 ...(canExportPayroll ? [{ id: "pdf", header: "PDF", cell: (slip) => <ServerExportButton endpoint={"/finance/payslips/" + encodeURIComponent(slip.id) + ".pdf"} label="PDF" className="inline-flex items-center gap-1 rounded-lg border border-border px-2 py-1 text-xs font-semibold text-foreground" />, sortable: false }] satisfies DataTableColumn<(typeof selectedDetail.payslips)[number]>[] : [])
-] satisfies DataTableColumn<(typeof selectedDetail.payslips)[number]>[]} getRowId={(slip) => slip.id} emptyTitle="No payslips" emptyDescription="This run has no payslips." exportTitle="Payslips" searchable={false} embedded /><p className="mt-4 text-xs leading-5 text-muted-foreground">These are draft amounts from saved monthly salary data. Allowances, overtime and other deductions are not included in this version.</p></div>
-      <div className="payroll-slips-actions mt-4 flex justify-end gap-2">{canExportPayroll && <><ServerExportButton endpoint={`/finance/payroll/${encodeURIComponent(selectedDetail.id)}/payslips.pdf`} label="Whole-run PDF" className={secondaryButton} /><TableExportMenu build={() => ({ title: "Payslips " + monthName(selectedDetail.month, selectedDetail.year), headers: ["Employee","Employee ID","Basic (GHS)","Employee SSNIT (GHS)","PAYE (GHS)","Employer SSNIT (GHS)","Net (GHS)","Payment status"], columnTypes: ["text","text","money","money","money","money","money","text"], rows: selectedDetail.payslips.map(slip => [personName(slip),slip.staff?.staffId ?? slip.teacher?.teacherId ?? "",Number(slip.basicSalary),Number(slip.ssnitEmployee),Number(slip.incomeTax),Number(slip.ssnitEmployer),Number(slip.netSalary),slip.paymentStatus]), totals: ["Total","","",null,null,null,null,""], confidential: true, reportInfo: { period: monthName(selectedDetail.month, selectedDetail.year) } })} note="Confidential payslip data." /><button type="button" className={primaryButton} onClick={() => window.print()}><Printer className="size-4" /> Print slips</button></>}</div>
+] satisfies DataTableColumn<(typeof selectedDetail.payslips)[number]>[]} getRowId={(slip) => slip.id} emptyTitle="No payslips" emptyDescription="This run has no payslips." exportTitle="Payslips" searchable={false} embedded /><p className="mt-4 text-xs leading-5 text-muted-foreground">Amounts are saved with this payroll run. Tier 2 amounts shown are part of the combined pension contribution.</p></div>
+      <div className="payroll-slips-actions mt-4 flex flex-wrap justify-end gap-2">
+        {canApproveDraft(selectedDetail) && <button type="button" className={primaryButton} onClick={() => requestApproval(selectedDetail)}>Approve payroll</button>}
+        {canExportPayroll && <>
+        {(selectedDetail.status === "APPROVED" || selectedDetail.status === "PAID")
+          && selectedDetail.payslips.some(slip => slip.tier2Contribution != null) && (
+            <ServerExportButton endpoint={`/finance/payroll/${encodeURIComponent(selectedDetail.id)}/tier-2.xlsx`} label="Tier 2 Excel" className={secondaryButton} />
+          )}
+        {(selectedDetail.status === "APPROVED" || selectedDetail.status === "PAID") && <>
+          <ServerExportButton endpoint={`/finance/payroll/${encodeURIComponent(selectedDetail.id)}/statutory-return.xlsx?type=paye`} label="PAYE return" className={secondaryButton} />
+          <ServerExportButton endpoint={`/finance/payroll/${encodeURIComponent(selectedDetail.id)}/statutory-return.xlsx?type=ssnit`} label="SSNIT schedule" className={secondaryButton} />
+        </>}
+        <ServerExportButton endpoint={`/finance/payroll/${encodeURIComponent(selectedDetail.id)}/payslips.pdf`} label="Whole-run PDF" className={secondaryButton} /><TableExportMenu build={() => ({ title: "Payslips " + monthName(selectedDetail.month, selectedDetail.year), headers: ["Employee","Employee ID","Basic (GHS)","Employee SSNIT (GHS)","PAYE (GHS)","Employer SSNIT (GHS)","Net (GHS)","Payment status"], columnTypes: ["text","text","money","money","money","money","money","text"], rows: selectedDetail.payslips.map(slip => [personName(slip),slip.staff?.staffId ?? slip.teacher?.teacherId ?? "",Number(slip.basicSalary),Number(slip.ssnitEmployee),Number(slip.incomeTax),Number(slip.ssnitEmployer),Number(slip.netSalary),slip.paymentStatus]), totals: ["Total","","",null,null,null,null,""], confidential: true, reportInfo: { period: monthName(selectedDetail.month, selectedDetail.year) } })} note="Confidential payslip data." /><button type="button" className={primaryButton} onClick={() => window.print()}><Printer className="size-4" /> Print slips</button></>}</div>
     </Modal>}
   </div>;
 }

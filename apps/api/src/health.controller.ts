@@ -1,3 +1,4 @@
+import { SkipThrottle } from "@nestjs/throttler";
 import { Controller, Get, Logger, ServiceUnavailableException } from "@nestjs/common";
 import { AllowAnonymous, Session, type UserSession } from "@thallesp/nestjs-better-auth";
 import { PrismaService } from "./prisma/prisma.service.js";
@@ -30,6 +31,8 @@ export async function databaseIsReachable(
   }
 }
 
+// Probes and uptime monitors poll constantly and must never be rate limited.
+@SkipThrottle()
 @Controller()
 export class HealthController {
   private readonly logger = new Logger(HealthController.name);

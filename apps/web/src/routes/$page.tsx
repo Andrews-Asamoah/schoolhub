@@ -39,6 +39,7 @@ const AssessmentTrackingWorkspace = lazy(() => import("@/components/school/asses
 const AssessmentsAdmin = lazy(() => import("@/components/school/assessments-admin").then((m) => ({ default: m.AssessmentsAdmin })));
 const ClassRegister = lazy(() => import("@/components/school/class-register").then((m) => ({ default: m.ClassRegister })));
 const AttendanceReviewWorkspace = lazy(() => import("@/components/school/attendance-review-workspace").then((m) => ({ default: m.AttendanceReviewWorkspace })));
+const SyncDevicesPanel = lazy(() => import("@/components/school/sync-devices-panel").then((m) => ({ default: m.SyncDevicesPanel })));
 const SchoolSettingsForm = lazy(() => import("@/components/school/school-settings-form").then((m) => ({ default: m.SchoolSettingsForm })));
 const ProfileWorkspace = lazy(() => import("@/components/school/profile-workspace").then((m) => ({ default: m.ProfileWorkspace })));
 const HousesWorkspace = lazy(() => import("@/components/school/houses-workspace").then((m) => ({ default: m.HousesWorkspace })));
@@ -46,10 +47,12 @@ const ClubsWorkspace = lazy(() => import("@/components/school/clubs-workspace").
 const TeacherPortalWorkspace = lazy(() => import("@/components/portal/teacher-portal-workspace").then((m) => ({ default: m.TeacherPortalWorkspace })));
 const AccountantPortalWorkspace = lazy(() => import("@/components/portal/accountant-portal-workspace").then((m) => ({ default: m.AccountantPortalWorkspace })));
 const ExpenseManagementWorkspace = lazy(() => import("@/components/portal/expense-management-workspace").then((m) => ({ default: m.ExpenseManagementWorkspace })));
+const TeacherPayrollWorkspace = lazy(() => import("@/components/portal/teacher-payroll-workspace").then((m) => ({ default: m.TeacherPayrollWorkspace })));
 const PayrollManagementWorkspace = lazy(() => import("@/components/portal/payroll-management-workspace").then((m) => ({ default: m.PayrollManagementWorkspace })));
 const FeeReminderWorkspace = lazy(() => import("@/components/portal/fee-reminder-workspace").then((m) => ({ default: m.FeeReminderWorkspace })));
 const InventoryManagementWorkspace = lazy(() => import("@/components/portal/inventory-management-workspace").then((m) => ({ default: m.InventoryManagementWorkspace })));
 const FeeStructuresWorkspace = lazy(() => import("@/components/portal/fee-structures-workspace").then((m) => ({ default: m.FeeStructuresWorkspace })));
+const BusUsersWorkspace = lazy(() => import("@/components/portal/bus-users-workspace").then(m => ({ default: m.BusUsersWorkspace })));
 const ConcessionsWorkspace = lazy(() => import("@/components/portal/concessions-workspace").then((m) => ({ default: m.ConcessionsWorkspace })));
 const FinanceAuditWorkspace = lazy(() => import("@/components/portal/finance-audit-workspace").then((m) => ({ default: m.FinanceAuditWorkspace })));
 const StudentStatementWorkspace = lazy(() => import("@/components/portal/student-statement-workspace").then((m) => ({ default: m.StudentStatementWorkspace })));
@@ -230,7 +233,7 @@ function WorkspaceContent({ pageId }: { pageId: string }) {
   return (
     <>
       {activeRole !== "student" &&
-        !["classes", "students", "teachers", "staff", "guardians", "teacher-portal", "accountant-portal", "fees", "concessions", "signatures", "payments", "invoices", "expenses", "payroll", "fee-reminders", "inventory", "outstanding", "finance-reports", "student-statements", "term-end-review", "guardian-portal", "guardian-attendance", "guardian-timetable", "guardian-reports", "guardian-notices", "guardian-fees", "documents", "messages", "notifications", "student-portal", "clubs", "houses", "assignments", "classmates", "announcements"].includes(
+        !["classes", "students", "teachers", "staff", "guardians", "teacher-portal", "teacher-payroll", "accountant-portal", "fees", "concessions", "bus-users", "signatures", "payments", "invoices", "expenses", "payroll", "fee-reminders", "inventory", "outstanding", "finance-reports", "student-statements", "term-end-review", "guardian-portal", "guardian-attendance", "guardian-timetable", "guardian-reports", "guardian-notices", "guardian-fees", "documents", "messages", "notifications", "student-portal", "clubs", "houses", "assignments", "classmates", "announcements"].includes(
           pageId,
         ) && (
         <WorkspacePageHeading
@@ -262,6 +265,7 @@ function WorkspaceContent({ pageId }: { pageId: string }) {
           {pageId === "finance-reports" && <AccountantPortalWorkspace defaultTab="reports" />}
           {pageId === "expenses" && <ExpenseManagementWorkspace />}
           {pageId === "payroll" && <PayrollManagementWorkspace />}
+          {pageId === "teacher-payroll" && <TeacherPayrollWorkspace />}
           {pageId === "fee-reminders" && <FeeReminderWorkspace />}
           {pageId === "inventory" && <InventoryManagementWorkspace />}
           {pageId === "documents" && <DocumentsWorkspace />}
@@ -329,6 +333,7 @@ function WorkspaceContent({ pageId }: { pageId: string }) {
             activeRole === "student" ? <StudentAttendanceView /> : <><AttendanceWorkspace query={classesQuery} /><AbsenceRequestsWorkspace /></>
           )}
           {pageId === "concessions" && <ConcessionsWorkspace />}
+          {pageId === "bus-users" && <BusUsersWorkspace />}
           {pageId === "signatures" && <SignaturesWorkspace />}
           {pageId === "fees" && (
             activeRole === "student" ? (
@@ -468,6 +473,7 @@ function SchoolSettings({ query }: { query: UseQueryResult<School, Error> }) {
     <div className="rounded-2xl border border-border/80 bg-card p-5 sm:p-6">
       <SchoolLogoUploader logo={school.logo} />
       <SchoolSettingsForm school={school} />
+      <SyncDevicesPanel scope="school" />
     </div>
   );
 }

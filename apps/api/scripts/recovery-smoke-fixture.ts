@@ -11,7 +11,7 @@ try {
     const school = await prisma.school.create({ data: { organizationId, code: "RECOVERY-SMOKE", name: "Synthetic recovery fixture", subdomain: organizationId } });
     const cash = await prisma.chartAccount.create({ data: { schoolId: school.id, name: "Fixture cash", code: "1000", accountType: "ASSET", category: "CASH" } });
     const income = await prisma.chartAccount.create({ data: { schoolId: school.id, name: "Fixture income", code: "4000", accountType: "REVENUE", category: "OTHER_INCOME" } });
-    const posting = new FinancePostingService({ client: prisma } as never);
+    const posting = new FinancePostingService();
     await prisma.$transaction(tx => posting.post(tx, { schoolId: school.id, date: new Date(), description: "Synthetic recovery control",
       amount: new Prisma.Decimal("125.25"), debitAccountId: cash.id, creditAccountId: income.id, transactionType: "INCOME", referenceType: "RECOVERY_TEST", referenceId: organizationId }));
   } else if (process.argv.includes("--cleanup")) {

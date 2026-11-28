@@ -1,6 +1,8 @@
+import { toast } from "@/components/ui/toaster";
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { useMarkDraft } from "@/hooks/use-mark-draft";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CircleAlert, CircleCheck, Lock, LoaderCircle } from "lucide-react";
+import { CircleAlert, Lock, LoaderCircle } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { apiFetch } from "@/lib/api";
 import { BulkImportButton } from "@/components/bulk-import/bulk-import-button";
@@ -107,7 +109,7 @@ export function AssessmentEntryWorkspace({
   const [classId, setClassId] = useState(initial?.classId ?? "");
   const [subjectId, setSubjectId] = useState(initial?.subjectId ?? "");
   const [templateId, setTemplateId] = useState("");
-  const [notice, setNotice] = useState<string | null>(null);
+
   const [correcting, setCorrecting] = useState(false);
   const [reason, setReason] = useState("");
   const [uploading, setUploading] = useState(false);
@@ -205,11 +207,12 @@ export function AssessmentEntryWorkspace({
     onSuccess: (result) => {
       setDraft({});
       queryClient.setQueryData(sheetKey, result);
-      setNotice("Marks saved.");
+      toast.success("Marks saved.");
     },
   });
 
   const clearForExcuse = useMutation({
+    onError: (error) => toast.error(`Could not mark the pupil absent or excused. ${error.message} Reload the latest marks before retrying.`),
     mutationFn: (student: SheetStudent) => apiFetch<Sheet>("/assessments/entry", {
       method: "PUT",
       body: JSON.stringify({
@@ -230,7 +233,7 @@ export function AssessmentEntryWorkspace({
       queryClient.setQueryData(sheetKey, result);
       setExcuseDraft((current) => ({ ...current, [student.studentId]: true }));
       void queryClient.invalidateQueries({ queryKey: ["assessments", "tracking"] });
-      setNotice(`Recorded marks cleared for ${student.name}. Submit marks to save the absent / excused selection.`);
+      toast.success(`Recorded marks cleared for ${student.name}. Submit marks to save the absent / excused selection.`);
     },
   });
 
@@ -248,7 +251,7 @@ export function AssessmentEntryWorkspace({
       setExcuseDraft({});
       queryClient.setQueryData(sheetKey, result);
       void queryClient.invalidateQueries({ queryKey: ["assessments", "tracking"] });
-      setNotice("Marks submitted.");
+      toast.success("Marks submitted.");
     },
   });
   const [applyNow, setApplyNow] = useState(false);
@@ -275,9 +278,9 @@ export function AssessmentEntryWorkspace({
       void sheetQuery.refetch();
       void queryClient.invalidateQueries({ queryKey: ["assessments", "corrections"] });
       void queryClient.invalidateQueries({ queryKey: ["mock-analytics"] });
-      if (!result.applied) setNotice("Correction sent for approval. The marks will change once it is approved.");
-      else if (result.publishedReports.length) setNotice(`Marks corrected. Published reports still show the old marks: reopen ${result.publishedReports.map((r) => `"${r.name}"`).join(", ")} under Reports, then regenerate and publish again.`);
-      else setNotice("Marks corrected and recorded in the audit trail.");
+      if (!result.applied) toast.success("Correction sent for approval. The marks will change once it is approved.");
+      else if (result.publishedReports.length) toast.success(`Marks corrected. Published reports still show the old marks: reopen ${result.publishedReports.map((r) => `"${r.name}"`).join(", ")} under Reports, then regenerate and publish again.`);
+      else toast.success("Marks corrected and recorded in the audit trail.");
     },
   });
 
@@ -287,7 +290,7 @@ export function AssessmentEntryWorkspace({
       setConfirming({ kind: "switch", run: action });
       return;
     }
-    setNotice(null);
+
     action();
   }
 
@@ -393,34 +396,34 @@ export function AssessmentEntryWorkspace({
             <p className="p-5 text-xs text-muted-foreground">No pupils are enrolled in this class this term.</p>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-muted/50">
-                  <tr>
-                    <th scope="col" className="px-4 py-3 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70">Pupil</th>
+              <Table scroll={false} className="w-full text-left text-xs">
+                <TableHeader className="bg-muted/50">
+                  <TableRow>
+                    <TableHead scope="col">Pupil</TableHead>
                     {components.map((component) => (
-                      <th key={component.id} scope="col" colSpan={component.slots} className="px-2 py-3 text-center text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70">
+                      <TableHead key={component.id} scope="col" colSpan={component.slots} className="text-center">
                         {component.name}
                         {component.subjectStrandName && <span className="block font-semibold normal-case tracking-normal">{component.subjectStrandName}</span>}
                         <span className="block font-normal normal-case tracking-normal">out of {component.maxMarks} · {component.weight}%</span>
                         {!component.canEdit && mode === "teacher" && <span className="block font-normal normal-case tracking-normal">Read only</span>}
-                      </th>
+                      </TableHead>
                     ))}
-                    <th scope="col" className="px-3 py-3 text-center text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70">Total (%)</th>
-                    <th scope="col" className="px-3 py-3 text-center text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70">Grade</th>
-                    <th scope="col" className="px-3 py-3 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70">Description</th>
-                    <th scope="col" className="px-3 py-3 text-center text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70">Pos.</th>
-                    <th scope="col" className="px-3 py-3 text-center text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70">Absent / excused</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border/60">
+                    <TableHead scope="col" className="text-center">Total (%)</TableHead>
+                    <TableHead scope="col" className="text-center">Grade</TableHead>
+                    <TableHead scope="col">Description</TableHead>
+                    <TableHead scope="col" className="text-center">Pos.</TableHead>
+                    <TableHead scope="col" className="text-center">Absent / excused</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody className="divide-y divide-border/60">
                   {sheet.students.map((student, rowIndex) => {
                     const hasRestrictedMarks = student.marks.some((mark) => !editableComponentIds.has(mark.componentId));
                     return (
-                    <tr key={student.studentId}>
-                      <th scope="row" className="px-4 py-2 text-left font-semibold text-foreground">
+                    <TableRow key={student.studentId}>
+                      <TableHead scope="row" className="text-left text-foreground">
                         {student.name}
                         <span className="block text-[10px] font-normal text-muted-foreground/70">{student.admissionNumber ?? ""}</span>
-                      </th>
+                      </TableHead>
                       {components.flatMap((component) =>
                         Array.from({ length: component.slots }, (_, slot) => {
                           const key = cellKey(student.studentId, component.id, slot);
@@ -428,7 +431,7 @@ export function AssessmentEntryWorkspace({
                           const number = value.trim() === "" ? null : Number(value);
                           const bad = number !== null && (!Number.isFinite(number) || number < 0 || number > component.maxMarks);
                           return (
-                            <td key={key} className="px-1.5 py-1.5 text-center">
+                            <TableCell key={key} className="text-center">
                               <input
                                 type="number"
                                 inputMode="decimal"
@@ -449,30 +452,30 @@ export function AssessmentEntryWorkspace({
                                 }}
                                 aria-invalid={bad || undefined}
                                 aria-label={`${student.name}, ${component.name}${component.slots > 1 ? ` ${slot + 1}` : ""}, out of ${component.maxMarks}`}
-                                onChange={(event) => { setNotice(null); setDraft((current) => ({ ...current, [key]: {value:event.target.value, expectedMarks:current[key]?.expectedMarks !== undefined ? current[key]!.expectedMarks : saved.has(key) ? Number(saved.get(key)) : null} })); }}
+                                onChange={(event) => {  setDraft((current) => ({ ...current, [key]: {value:event.target.value, expectedMarks:current[key]?.expectedMarks !== undefined ? current[key]!.expectedMarks : saved.has(key) ? Number(saved.get(key)) : null} })); }}
                                 className={`h-9 w-16 rounded-lg border px-2 text-center text-xs tabular-nums outline-none focus:ring-2 disabled:bg-muted/50 disabled:text-muted-foreground ${
                                   bad
                                     ? "border-destructive/50 bg-destructive/10 text-destructive focus:ring-destructive/20"
                                     : "border-border bg-card text-foreground focus:border-primary/50 focus:ring-primary/20"
                                 }`}
                               />
-                            </td>
+                            </TableCell>
                           );
                         }),
                       )}
-                      <td className="px-3 py-2 text-center font-semibold tabular-nums text-foreground">{student.marks.length ? `${student.percentage}%` : "—"}</td>
-                      <td className="px-3 py-2 text-center">
+                      <TableCell className="text-center font-semibold tabular-nums text-foreground">{student.marks.length ? `${student.percentage}%` : "—"}</TableCell>
+                      <TableCell className="text-center">
                         {student.grade ? (
                           <span className="rounded-md bg-primary/10 px-2 py-0.5 font-bold text-primary">{student.grade}</span>
                         ) : (
                           <span className="text-muted-foreground/70" title={student.marks.length ? "Waiting for the remaining marks" : undefined}>{student.marks.length ? "Incomplete" : "—"}</span>
                         )}
-                      </td>
-                      <td className="px-3 py-2 text-muted-foreground">
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
                         {student.grade ? sheet.template?.grades.find((band) => band.grade === student.grade)?.description || "—" : "—"}
-                      </td>
-                      <td className="px-3 py-2 text-center tabular-nums text-muted-foreground">{student.position ?? "—"}</td>
-                      <td className="px-3 py-2 text-center">
+                      </TableCell>
+                      <TableCell className="text-center tabular-nums text-muted-foreground">{student.position ?? "—"}</TableCell>
+                      <TableCell className="text-center">
                         <input
                           type="checkbox"
                           aria-label={`${student.name} is absent or excused`}
@@ -504,12 +507,12 @@ export function AssessmentEntryWorkspace({
                             Clear recorded marks
                           </button>
                         )}
-                      </td>
-                    </tr>
+                      </TableCell>
+                    </TableRow>
                     );
                   })}
-                </tbody>
-              </table>
+                </TableBody>
+              </Table>
             </div>
           )}
 
@@ -558,7 +561,7 @@ export function AssessmentEntryWorkspace({
                 className="h-9 text-xs"
                 disabled={unsaved || clearForExcuse.isPending}
                 title={unsaved ? "Save or discard the marks you have typed first" : undefined}
-                onClick={() => { setNotice(null); setUploading(true); }}
+                onClick={() => {  setUploading(true); }}
               />
             )}
             {sheet.canSubmit && !correcting && (() => {
@@ -600,12 +603,12 @@ export function AssessmentEntryWorkspace({
                 <button type="button" onClick={() => { setCorrecting(false); setDraft({}); setReason(""); }} className="h-9 rounded-lg px-3 text-xs font-semibold text-muted-foreground hover:bg-muted">Cancel</button>
               </div>
             )}
-            {clearForExcuse.error && <p role="alert" className="text-xs text-destructive">Could not mark the pupil absent / excused: {clearForExcuse.error.message} No absence selection was applied. Reload the latest marks before retrying.</p>}
-            {(submit.error || requestCorrection.error) && <p role="alert" className="flex items-center gap-1.5 text-xs text-destructive"><CircleAlert className="size-3.5" /> {(submit.error ?? requestCorrection.error)?.message}</p>}
+
+
             {invalid > 0 && <p role="alert" className="flex items-center gap-1.5 text-xs text-destructive"><CircleAlert className="size-3.5" /> {invalid} mark{invalid === 1 ? " is" : "s are"} outside the allowed range.</p>}
-            {notice && <p role="status" className="flex items-center gap-1.5 text-xs text-success"><CircleCheck className="size-3.5" /> {notice}</p>}
+
             {save.error && <button type="button" className="text-xs underline" onClick={() => setConfirming({ kind: "discard" })}>Discard draft and load latest marks</button>}
-            {save.error && <p role="alert" className="flex items-center gap-1.5 text-xs text-destructive"><CircleAlert className="size-3.5" /> {save.error.message}</p>}
+
             <p className="ml-auto text-[11px] text-muted-foreground">
               Grades appear once every required column has a mark.
               {sheet.template.gradingMethod === "CLASS_RANK" && (sheet.template.boundaries?.length
@@ -654,7 +657,7 @@ export function AssessmentEntryWorkspace({
                     confirmLabel: "Switch sheets",
                     variant: "primary" as const,
                     loading: false,
-                    run: () => { setNotice(null); confirming.run(); closeConfirm(); },
+                    run: () => {  confirming.run(); closeConfirm(); },
                   }
                 : {
                     title: "Discard your draft?",
@@ -702,7 +705,7 @@ export function AssessmentEntryWorkspace({
           }}
           onClose={() => setUploading(false)}
           onComplete={() => {
-            setNotice("Marks uploaded. The table now shows the saved marks.");
+            toast.success("Marks uploaded. The table now shows the saved marks.");
             void sheetQuery.refetch();
             void queryClient.invalidateQueries({ queryKey: ["assessments", "tracking"] });
           }}

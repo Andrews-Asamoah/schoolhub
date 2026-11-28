@@ -40,3 +40,10 @@ describe("SuperAdminGuard", () => {
     expect(() => guard.canActivate(ctx({ id: "1", role: "superAdmin", mustChangePassword: true, twoFactorEnabled: true }))).toThrow(ForbiddenException);
   });
 });
+
+it("refuses a persisted desktop session even when no desktop header is supplied", () => {
+  const context = { switchToHttp: () => ({ getRequest: () => ({ headers: {}, session: {
+    user: { id: "sa", role: "superAdmin", twoFactorEnabled: true }, session: { clientPlatform: "desktop" },
+  } }) }) } as unknown as ExecutionContext;
+  expect(() => new SuperAdminGuard().canActivate(context)).toThrow(/web portal/);
+});

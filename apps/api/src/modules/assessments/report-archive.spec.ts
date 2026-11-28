@@ -22,11 +22,11 @@ describe("archiveWhere", () => {
     expect(where.data).toEqual({ path: ["student", "class", "id"], equals: "c1" });
   });
 
-  it("requires every word of a search to match a first name, last name or admission number", () => {
+  it("requires every word of a search to match a recorded name or admission number", () => {
     const where = archiveWhere("school1", { q: "  ama   ADM-7 " }, null);
     const and = (where.student as { AND: { OR: unknown[] }[] }).AND;
     expect(and).toHaveLength(2);
-    expect(and[0]!.OR).toHaveLength(3);
+    expect(and[0]!.OR).toContainEqual({ profile: { otherNames: { contains: "ama", mode: "insensitive" } } });
     expect(JSON.stringify(and[1])).toContain("ADM-7");
   });
 

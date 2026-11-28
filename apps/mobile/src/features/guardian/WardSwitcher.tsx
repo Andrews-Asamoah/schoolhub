@@ -36,7 +36,13 @@ export function WardSwitcher() {
         }}
       >
         <UsersRound size={18} color={colors.primary} />
-        <Text style={[type.caption, { color: colors.foreground }]}>
+        <Text
+          numberOfLines={1}
+          style={[
+            type.caption,
+            { color: colors.foreground, flexShrink: 1, maxWidth: 128 },
+          ]}
+        >
           {title}
         </Text>
       </Pressable>

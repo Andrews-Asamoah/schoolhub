@@ -1,6 +1,7 @@
+import { toast } from "@/components/ui/toaster";
 import { useMutation } from "@tanstack/react-query";
 import { Camera, LoaderCircle, Trash2 } from "lucide-react";
-import { useRef, useState } from "react";
+import { useRef } from "react";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import { apiFetch } from "@/lib/api";
 import { useSession } from "@/lib/auth-client";
@@ -17,7 +18,7 @@ export function ProfilePhotoControls({ avatarClassName = "size-16 text-xl" }: { 
   const user = session?.user;
   const image = user?.image ?? null;
   const inputRef = useRef<HTMLInputElement>(null);
-  const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
+
 
   const upload = useMutation({
     mutationFn: (file: File) => {
@@ -26,30 +27,30 @@ export function ProfilePhotoControls({ avatarClassName = "size-16 text-xl" }: { 
       return apiFetch("/schools/current/me/avatar", { method: "PUT", body });
     },
     onSuccess: async () => {
-      setMessage({ ok: true, text: "Photo updated." });
+      toast.success("Photo updated.");
       await refetch();
     },
-    onError: (error: Error) => setMessage({ ok: false, text: error.message }),
+    onError: (error: Error) => toast.error(error.message),
   });
 
   const remove = useMutation({
     mutationFn: () => apiFetch("/schools/current/me/avatar", { method: "DELETE" }),
     onSuccess: async () => {
-      setMessage({ ok: true, text: "Photo removed." });
+      toast.success("Photo removed.");
       await refetch();
     },
-    onError: (error: Error) => setMessage({ ok: false, text: error.message }),
+    onError: (error: Error) => toast.error(error.message),
   });
 
   function onPick(file: File | undefined) {
-    setMessage(null);
+
     if (!file) return;
     if (!ACCEPTED.includes(file.type)) {
-      setMessage({ ok: false, text: "Choose a JPEG, PNG or WebP image." });
+      toast.error("Choose a JPEG, PNG or WebP image.");
       return;
     }
     if (file.size > MAX_BYTES) {
-      setMessage({ ok: false, text: "The image must be 2 MB or smaller." });
+      toast.error("The image must be 2 MB or smaller.");
       return;
     }
     upload.mutate(file);
@@ -95,11 +96,7 @@ export function ProfilePhotoControls({ avatarClassName = "size-16 text-xl" }: { 
             </button>
           )}
         </div>
-        {message && (
-          <p role={message.ok ? "status" : "alert"} className={`mt-2 text-[11px] ${message.ok ? "text-success" : "text-destructive"}`}>
-            {message.text}
-          </p>
-        )}
+
       </div>
     </div>
   );

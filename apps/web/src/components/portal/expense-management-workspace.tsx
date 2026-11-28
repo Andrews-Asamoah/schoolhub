@@ -1,10 +1,11 @@
+import { toast } from "@/components/ui/toaster";
 import { DatePicker } from "@/components/ui/date-picker";
 import { DataTable, TableExportMenu, type DataTableColumn } from "@/components/ui/data-table";
 import type { ExportTable } from "@/lib/table-export";
 import { ServerExportButton } from "@/components/portal/server-export-button";
 import { useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowDownRight, CalendarDays, FileText, LoaderCircle, Plus, Printer, Search, Tags, Wallet, X } from "lucide-react";
+import { ArrowDownRight, CalendarDays, FileText, LoaderCircle, Plus, Printer, Search, Tags, Wallet } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { PortalModal } from "@/components/portal/portal-modal";
 import { cn } from "@/lib/utils";
@@ -12,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { FinanceReadOnlyNotice, useFinanceAccess } from "@/components/portal/finance-access";
 import { LabeledField } from "@/components/forms/labeled-controls";
 
+import { formatGhs as currency } from "@/lib/format";
 interface ExpenseCategory {
   id: string;
   name: string;
@@ -47,7 +49,6 @@ interface ExpenseDraft {
 }
 const accountingGroups = ["SALARY", "UTILITIES", "SUPPLIES", "MAINTENANCE", "TRANSPORT", "RENT", "INSURANCE", "TAXES", "OTHER"];
 const paymentMethods = ["CASH", "BANK_TRANSFER", "CHEQUE", "MOBILE_MONEY", "CARD", "ONLINE", "OTHER"];
-const currency = (value: number) => new Intl.NumberFormat("en-GH", { style: "currency", currency: "GHS", minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
 const dateValue = (date: Date) => {
   const shifted = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
   return shifted.toISOString().slice(0, 10);
@@ -96,7 +97,7 @@ export function ExpenseManagementWorkspace() {
   const [editingCategory, setEditingCategory] = useState<ExpenseCategory | null>(null);
   const [editingName, setEditingName] = useState("");
   const [editingDescription, setEditingDescription] = useState("");
-  const [feedback, setFeedback] = useState<{ kind: "success" | "error"; text: string } | null>(null);
+
   const rangeInvalid = Boolean(fromDate && toDate && fromDate > toDate);
 
   const expensesQuery = useQuery({
@@ -161,12 +162,12 @@ export function ExpenseManagementWorkspace() {
       }),
     }),
     onSuccess: async (created) => {
-      setFeedback({ kind: "success", text: `Expense recorded: ${created.voucherNumber || created.id.slice(-8)}.` });
+      toast.success(`Expense recorded: ${created.voucherNumber || created.id.slice(-8)}.`);
       setShowExpenseForm(false);
       setDraft(freshDraft());
       await queryClient.invalidateQueries({ queryKey: ["finance", "expenses"] });
     },
-    onError: (error: Error) => setFeedback({ kind: "error", text: error.message }),
+    onError: (error: Error) => toast.error(error.message),
   });
 
   const createCategory = useMutation({
@@ -175,12 +176,12 @@ export function ExpenseManagementWorkspace() {
       body: JSON.stringify(input),
     }),
     onSuccess: async (created) => {
-      setFeedback({ kind: "success", text: `Category “${created.name}” added.` });
+      toast.success(`Category “${created.name}” added.`);
       setCategoryName("");
       setCategoryDescription("");
       await queryClient.invalidateQueries({ queryKey: ["finance", "expenditure-categories"] });
     },
-    onError: (error: Error) => setFeedback({ kind: "error", text: error.message }),
+    onError: (error: Error) => toast.error(error.message),
   });
   const updateCategory = useMutation({
     mutationFn: ({ id, name, description }: { id: string; name: string; description?: string }) =>
@@ -189,11 +190,11 @@ export function ExpenseManagementWorkspace() {
         body: JSON.stringify({ name, description }),
       }),
     onSuccess: async (updated) => {
-      setFeedback({ kind: "success", text: `Category “${updated.name}” updated.` });
+      toast.success(`Category “${updated.name}” updated.`);
       setEditingCategory(null);
       await queryClient.invalidateQueries({ queryKey: ["finance", "expenditure-categories"] });
     },
-    onError: (error: Error) => setFeedback({ kind: "error", text: error.message }),
+    onError: (error: Error) => toast.error(error.message),
   });
 
   function updateDraft<K extends keyof ExpenseDraft>(key: K, value: ExpenseDraft[K]) {
@@ -201,9 +202,9 @@ export function ExpenseManagementWorkspace() {
   }
   function submitExpense(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setFeedback(null);
+
     if (Number(draft.amount) <= 0 || !Number.isFinite(Number(draft.amount))) {
-      setFeedback({ kind: "error", text: "Enter an amount greater than zero." });
+      toast.error("Enter an amount greater than zero.");
       return;
     }
     createExpense.mutate(draft);
@@ -233,11 +234,11 @@ export function ExpenseManagementWorkspace() {
       }`}</style>
       <section className="flex flex-col gap-4 rounded-2xl border border-border bg-card p-5 shadow-sm sm:flex-row sm:items-end sm:justify-between sm:p-6">
         <div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">Finance & bursary</p><h1 className="mt-1 text-2xl font-bold tracking-tight text-foreground">Expenses</h1><p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">Record school expenditure, keep voucher references together, and analyse spend by date, category and payment method.</p></div>
-        <div className="flex flex-wrap gap-2">{canWrite && <button type="button" className={secondaryButton} onClick={() => setShowCategoryManager(true)}><Tags className="size-4" /> Manage categories</button>}<TableExportMenu build={buildExpenseExportTable} note="Exports reflect the selected date range." /><ServerExportButton endpoint={"/finance/exports/expenses.xlsx?from=" + encodeURIComponent(fromDate) + "&to=" + encodeURIComponent(toDate)} label="Full Excel" className={secondaryButton} />{canWrite && <button type="button" className={primaryButton} onClick={() => { setFeedback(null); setDraft(freshDraft()); setShowExpenseForm(true); }}><Plus className="size-4" /> Record expense</button>}</div>
+        <div className="flex flex-wrap gap-2">{canWrite && <button type="button" className={secondaryButton} onClick={() => setShowCategoryManager(true)}><Tags className="size-4" /> Manage categories</button>}<TableExportMenu build={buildExpenseExportTable} note="Exports reflect the selected date range." /><ServerExportButton endpoint={"/finance/exports/expenses.xlsx?from=" + encodeURIComponent(fromDate) + "&to=" + encodeURIComponent(toDate)} label="Full Excel" className={secondaryButton} />{canWrite && <button type="button" className={primaryButton} onClick={() => {  setDraft(freshDraft()); setShowExpenseForm(true); }}><Plus className="size-4" /> Record expense</button>}</div>
       </section>
 
       {!canWrite && <FinanceReadOnlyNotice />}
-      {feedback && <div role={feedback.kind === "error" ? "alert" : "status"} className={cn("flex items-start gap-3 rounded-xl border p-3 text-sm", feedback.kind === "error" ? "border-destructive/30 bg-destructive/5 text-destructive" : "border-success/30 bg-success/5 text-foreground")}><span className="min-w-0 flex-1">{feedback.text}</span><button type="button" onClick={() => setFeedback(null)} aria-label="Dismiss message"><X className="size-4" /></button></div>}
+
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <Metric label="Total in selected period" value={expensesQuery.isPending || rangeInvalid ? "—" : currency(periodTotal)} detail={`${expenses.length} saved expense record(s)`} icon={ArrowDownRight} />
@@ -273,7 +274,7 @@ export function ExpenseManagementWorkspace() {
           <div className="grid gap-4 sm:grid-cols-2"><LabeledField label="Accounting group"><Select value={draft.category} onValueChange={(value) => updateDraft("category", value)}><SelectTrigger className="w-full"><SelectValue /></SelectTrigger><SelectContent>{accountingGroups.map((group) => <SelectItem key={group} value={group}>{label(group)}</SelectItem>)}</SelectContent></Select></LabeledField><LabeledField label="Payment method"><Select value={draft.paymentMethod} onValueChange={(value) => updateDraft("paymentMethod", value)}><SelectTrigger className="w-full"><SelectValue /></SelectTrigger><SelectContent>{paymentMethods.map((method) => <SelectItem key={method} value={method}>{label(method)}</SelectItem>)}</SelectContent></Select></LabeledField></div>
           <div className="grid gap-4 sm:grid-cols-3"><LabeledField label="Voucher number"><input maxLength={120} className={fieldClass} value={draft.voucherNumber} onChange={(event) => updateDraft("voucherNumber", event.target.value)} placeholder="e.g. PV-2026-001" /></LabeledField><LabeledField label="Cheque number"><input maxLength={120} className={fieldClass} value={draft.checkNumber} onChange={(event) => updateDraft("checkNumber", event.target.value)} placeholder="Optional" /></LabeledField><LabeledField label="Reference / transaction ID"><input maxLength={120} className={fieldClass} value={draft.referenceNumber} onChange={(event) => updateDraft("referenceNumber", event.target.value)} placeholder="Optional" /></LabeledField></div>
           <div className="rounded-xl bg-muted/40 p-3 text-xs leading-5 text-muted-foreground">The saved record will include the creator and current academic period where configured. Financial entries cannot be edited or deleted from this screen, preserving the transaction trail.</div>
-          {createExpense.error && <ErrorState message={createExpense.error.message} />}
+
           <div className="flex flex-wrap justify-end gap-2 border-t border-border pt-4"><button type="button" className={secondaryButton} onClick={() => setShowExpenseForm(false)} disabled={createExpense.isPending}>Cancel</button><button type="submit" className={primaryButton} disabled={createExpense.isPending}>{createExpense.isPending && <LoaderCircle className="size-4 animate-spin" />} Save expense</button></div>
         </form>
       </Modal>}
@@ -281,10 +282,10 @@ export function ExpenseManagementWorkspace() {
       {showCategoryManager && <Modal title="Expenditure categories" description="Create and maintain categories reused by the expense register." onClose={() => setShowCategoryManager(false)}>
         <form className="space-y-4" onSubmit={(event) => { event.preventDefault(); createCategory.mutate({ name: categoryName.trim(), description: categoryDescription.trim() || undefined }); }}>
           <div className="grid gap-3 sm:grid-cols-2"><LabeledField label="Category name"><input required minLength={2} maxLength={120} className={fieldClass} value={categoryName} onChange={(event) => setCategoryName(event.target.value)} placeholder="e.g. School repairs" /></LabeledField><LabeledField label="Description (optional)"><input maxLength={500} className={fieldClass} value={categoryDescription} onChange={(event) => setCategoryDescription(event.target.value)} placeholder="Short description" /></LabeledField></div>
-          {createCategory.error && <ErrorState message={createCategory.error.message} />}
+
           <div className="flex justify-end"><button type="submit" className={primaryButton} disabled={createCategory.isPending || categoryName.trim().length < 2}>{createCategory.isPending && <LoaderCircle className="size-4 animate-spin" />} Add category</button></div>
         </form>
-        <div className="mt-5 border-t border-border pt-4"><h3 className="text-sm font-semibold text-foreground">Saved categories ({categories.length})</h3>{categoriesQuery.isPending ? <LoadingState /> : categoriesQuery.error ? <ErrorState message={categoriesQuery.error.message} /> : categories.length ? <div className="mt-3 divide-y divide-border">{categories.map((category) => editingCategory?.id === category.id ? <form key={category.id} className="grid gap-2 py-3" onSubmit={(event) => { event.preventDefault(); updateCategory.mutate({ id: category.id, name: editingName.trim(), description: editingDescription.trim() || undefined }); }}><LabeledField label="Name"><input className={fieldClass} required minLength={2} value={editingName} onChange={(event) => setEditingName(event.target.value)} /></LabeledField><LabeledField label="Description"><input className={fieldClass} value={editingDescription} onChange={(event) => setEditingDescription(event.target.value)} /></LabeledField><div className="flex justify-end gap-2"><button type="button" className={secondaryButton} onClick={() => setEditingCategory(null)}>Cancel</button><button type="submit" className={primaryButton} disabled={updateCategory.isPending}>Save changes</button></div>{updateCategory.error && <ErrorState message={updateCategory.error.message} />}</form> : <div key={category.id} className="flex items-start justify-between gap-3 py-3"><div className="min-w-0"><p className="text-sm font-medium text-foreground">{category.name}</p>{category.description && <p className="mt-1 text-xs text-muted-foreground">{category.description}</p>}</div><button type="button" className="text-xs font-semibold text-primary hover:underline" onClick={() => { setEditingCategory(category); setEditingName(category.name); setEditingDescription(category.description ?? ""); }}>Edit</button></div>)}</div> : <p className="mt-3 text-sm text-muted-foreground">No categories saved yet.</p>}</div>
+        <div className="mt-5 border-t border-border pt-4"><h3 className="text-sm font-semibold text-foreground">Saved categories ({categories.length})</h3>{categoriesQuery.isPending ? <LoadingState /> : categoriesQuery.error ? <ErrorState message={categoriesQuery.error.message} /> : categories.length ? <div className="mt-3 divide-y divide-border">{categories.map((category) => editingCategory?.id === category.id ? <form key={category.id} className="grid gap-2 py-3" onSubmit={(event) => { event.preventDefault(); updateCategory.mutate({ id: category.id, name: editingName.trim(), description: editingDescription.trim() || undefined }); }}><LabeledField label="Name"><input className={fieldClass} required minLength={2} value={editingName} onChange={(event) => setEditingName(event.target.value)} /></LabeledField><LabeledField label="Description"><input className={fieldClass} value={editingDescription} onChange={(event) => setEditingDescription(event.target.value)} /></LabeledField><div className="flex justify-end gap-2"><button type="button" className={secondaryButton} onClick={() => setEditingCategory(null)}>Cancel</button><button type="submit" className={primaryButton} disabled={updateCategory.isPending}>Save changes</button></div></form> : <div key={category.id} className="flex items-start justify-between gap-3 py-3"><div className="min-w-0"><p className="text-sm font-medium text-foreground">{category.name}</p>{category.description && <p className="mt-1 text-xs text-muted-foreground">{category.description}</p>}</div><button type="button" className="text-xs font-semibold text-primary hover:underline" onClick={() => { setEditingCategory(category); setEditingName(category.name); setEditingDescription(category.description ?? ""); }}>Edit</button></div>)}</div> : <p className="mt-3 text-sm text-muted-foreground">No categories saved yet.</p>}</div>
       </Modal>}
 
       {selectedExpense && <Modal title="Expense voucher" description="Saved expense details and accounting references." onClose={() => setSelectedExpense(null)}>

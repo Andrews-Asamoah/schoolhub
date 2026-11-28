@@ -10,7 +10,7 @@ import { PrismaService } from "../../prisma/prisma.service.js";
 import { R2Service } from "../storage/r2.service.js";
 import { StorageCleanupService } from "../storage/storage-cleanup.service.js";
 import { writeAudit, type AuditActor } from "../../common/audit/audit.js";
-import type { StudentDeletionQuery } from "@schoolhub/shared";
+import { formatPersonName, type StudentDeletionQuery } from "@schoolhub/shared";
 import {
   buildImpact,
   describeBlockers,
@@ -66,6 +66,7 @@ export class StudentDeletionService {
         profile: {
           select: {
             firstName: true,
+            otherNames: true,
             lastName: true,
             userId: true,
             user: { select: { image: true, role: true } },
@@ -161,7 +162,7 @@ export class StudentDeletionService {
     const guardians = planGuardians(candidates);
 
     return {
-      studentName: `${student.profile.firstName} ${student.profile.lastName}`.trim(),
+      studentName: formatPersonName(student.profile),
       admissionNumber: student.admissionNumber,
       className: student.class?.name ?? null,
       status: student.status,

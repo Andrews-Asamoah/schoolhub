@@ -11,7 +11,7 @@ function makeService(overrides: Record<string, any> = {}) {
   const client: Record<string, any> = {
     school: { findUnique: vi.fn(), findFirst: vi.fn(async () => null), findMany: vi.fn(async () => []), update: vi.fn(), create: vi.fn(async (a: any) => ({ id: "sch1", ...a.data })), count: vi.fn(async () => 0) },
     organization: { update: vi.fn(), create: vi.fn(), groupBy: vi.fn(async () => []), count: vi.fn(async () => 0) },
-    subscription: { upsert: vi.fn(), create: vi.fn() },
+    subscription: { upsert: vi.fn(async () => ({ settings: {} })), create: vi.fn(), update: vi.fn() },
     user: { findUnique: vi.fn(async () => null), create: vi.fn(async (a: any) => ({ ...a.data })) },
     account: { create: vi.fn() },
     student: { count: vi.fn(async () => 0) },
@@ -263,6 +263,19 @@ describe("updateSubscription", () => {
     expect(audit).toMatchObject({ action: "SUBSCRIPTION_CHANGED", schoolId: "sch1", userId: "sa1" });
     expect(audit.oldValues.status).toBe("TRIALING");
     expect(audit.newValues).toMatchObject({ status: "ACTIVE", note: "Paid term 1" });
+  });
+
+  it("saves and audits an explicit desktop override without removing other settings", async () => {
+    const { service, client } = makeService();
+    client.school.findUnique.mockResolvedValue(school());
+    client.subscription.upsert.mockResolvedValue({ settings: { existing: 42, desktopEnabled: false } });
+    vi.spyOn(service, "getSchool").mockResolvedValue({} as never);
+    await service.updateSubscription("sch1", { status: "ACTIVE", desktopEnabled: true }, actor);
+    expect(client.subscription.update.mock.calls[0][0].data.settings).toEqual({ existing: 42, desktopEnabled: true });
+    expect(client.auditLog.create.mock.calls[0][0].data).toMatchObject({ oldValues: { desktopEnabled: false }, newValues: { desktopEnabled: true } });
+    client.subscription.update.mockClear();
+    await service.updateSubscription("sch1", { status: "ACTIVE", desktopEnabled: null }, actor);
+    expect(client.subscription.update.mock.calls[0][0].data.settings).toEqual({ existing: 42 });
   });
 
   it("maps CANCELLED to the billing enum's CANCELED spelling", async () => {

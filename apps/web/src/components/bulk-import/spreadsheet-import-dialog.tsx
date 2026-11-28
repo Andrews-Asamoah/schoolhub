@@ -1,3 +1,4 @@
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { STUDENT_IMPORT_LIMITS } from "@schoolhub/shared";
 import { CircleAlert, LoaderCircle } from "lucide-react";
 import { useRef, useState, type ReactNode } from "react";
@@ -253,23 +254,23 @@ export function SpreadsheetImportDialog<Row extends ImportPreviewRow, Result ext
             </div>
             {reviewExtras?.(preview)}
             <div className="max-h-64 overflow-auto rounded-lg border border-border">
-              <table className="w-full text-left text-xs">
-                <thead className="sticky top-0 bg-muted">
-                  <tr><th className={cell}>Row</th><th className={cell}>Name</th><th className={cell}>Status</th><th className={cell}>Details</th></tr>
-                </thead>
-                <tbody>
+              <Table scroll={false} className="w-full text-left text-xs">
+                <TableHeader className="sticky top-0 bg-muted">
+                  <TableRow><TableHead className={cell}>Row</TableHead><TableHead className={cell}>Name</TableHead><TableHead className={cell}>Status</TableHead><TableHead className={cell}>Details</TableHead></TableRow>
+                </TableHeader>
+                <TableBody>
                   {preview.rows.map((row) => (
-                    <tr key={row.rowNumber} className="border-t border-border">
-                      <td className={cell}>{row.rowNumber}</td>
-                      <td className={cell}>{row.name}</td>
-                      <td className={cell}>
+                    <TableRow key={row.rowNumber} className="border-t border-border">
+                      <TableCell className={cell}>{row.rowNumber}</TableCell>
+                      <TableCell className={cell}>{row.name}</TableCell>
+                      <TableCell className={cell}>
                         <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-semibold capitalize", BADGE[row.status] ?? BADGE.duplicate)}>{row.status}</span>
-                      </td>
-                      <td className={cell}>{row.errors.join(" ") || readyDetail(row as Row)}</td>
-                    </tr>
+                      </TableCell>
+                      <TableCell className={cell}>{row.errors.join(" ") || readyDetail(row as Row)}</TableCell>
+                    </TableRow>
                   ))}
-                </tbody>
-              </table>
+                </TableBody>
+              </Table>
             </div>
           </div>
         )}
@@ -282,25 +283,25 @@ export function SpreadsheetImportDialog<Row extends ImportPreviewRow, Result ext
             </p>
             {resultNotice && <p className="rounded-lg bg-warning/10 p-2 text-xs text-warning">{resultNotice}</p>}
             <div className="max-h-72 overflow-auto rounded-lg border border-border">
-              <table className="w-full text-left text-xs">
-                <thead className="sticky top-0 bg-muted">
-                  <tr>
-                    <th className={cell}>Name</th><th className={cell}>Status</th>
-                    {resultColumns.map((column) => <th key={column.header} className={cell}>{column.header}</th>)}
-                    <th className={cell}>Details</th>
-                  </tr>
-                </thead>
-                <tbody>
+              <Table scroll={false} className="w-full text-left text-xs">
+                <TableHeader className="sticky top-0 bg-muted">
+                  <TableRow>
+                    <TableHead className={cell}>Name</TableHead><TableHead className={cell}>Status</TableHead>
+                    {resultColumns.map((column) => <TableHead key={column.header} className={cell}>{column.header}</TableHead>)}
+                    <TableHead className={cell}>Details</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
                   {results.map((result) => (
-                    <tr key={result.rowNumber} className="border-t border-border">
-                      <td className={cell}>{result.name}</td>
-                      <td className={cell}>{result.status}</td>
-                      {resultColumns.map((column) => <td key={column.header} className={cell}>{column.cell(result)}</td>)}
-                      <td className={cell}>{result.message ?? ""}</td>
-                    </tr>
+                    <TableRow key={result.rowNumber} className="border-t border-border">
+                      <TableCell className={cell}>{result.name}</TableCell>
+                      <TableCell className={cell}>{result.status}</TableCell>
+                      {resultColumns.map((column) => <TableCell key={column.header} className={cell}>{column.cell(result)}</TableCell>)}
+                      <TableCell className={cell}>{result.message ?? ""}</TableCell>
+                    </TableRow>
                   ))}
-                </tbody>
-              </table>
+                </TableBody>
+              </Table>
             </div>
           </div>
         )}

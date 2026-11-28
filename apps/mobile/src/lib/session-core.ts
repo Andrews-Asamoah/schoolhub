@@ -3,6 +3,7 @@ import { assertMobileRole, mobileRoles, type MobileRole } from "./permissions";
 export type SessionStatus =
   | "loading"
   | "signedOut"
+  | "restoreUnavailable"
   | "needsRoleSelection"
   | "needsPasswordChange"
   | "needsTwoFactorSetup"
@@ -37,7 +38,7 @@ const initial = (): SessionState => ({
 });
 export function createSessionStore(
   storage: SessionStorage,
-  onScopeChange: () => Promise<void> = async () => {},
+  onScopeChange: (preserveRegister?: boolean) => Promise<void> = async () => {},
 ) {
   let state: SessionState = Object.freeze({
     ...initial(),
@@ -127,12 +128,17 @@ export function createSessionStore(
       const role = state.activeRole;
       await persist(() => storage.writeContext(next, role));
     },
+    markRestoreUnavailable(revision: number) {
+      if (revision === epoch && state.status === "loading" && state.token)
+        publish({ status: "restoreUnavailable" });
+    },
     async establish(input: {
       token: string;
       subdomain: string;
       roles: readonly string[];
       activeRole?: string | null;
       mustChangePassword?: boolean;
+      restoring?: boolean;
     }) {
       const supported = mobileRoles(input.roles);
       if (!supported.length) {
@@ -148,10 +154,17 @@ export function createSessionStore(
         if (!supported.includes(requested))
           throw new Error("Role is not assigned to this account.");
       }
+      const preserveRegister =
+        input.restoring === true &&
+        requested === "teacher" &&
+        state.rememberedRole === "teacher" &&
+        state.token === input.token &&
+        state.subdomain === input.subdomain &&
+        !input.mustChangePassword;
       const version = ++epoch;
       publish({ status: "loading", activeRole: null });
       try {
-        await onScopeChange();
+        await onScopeChange(preserveRegister);
         if (version !== epoch) return;
         await persist(async () => {
           await storage.writeToken(input.token);

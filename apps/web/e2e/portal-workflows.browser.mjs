@@ -4,6 +4,7 @@ import {pathToFileURL} from 'node:url';
 const {chromium}=await import(pathToFileURL(resolve(dirname(process.env.PLAYWRIGHT_PACKAGE_ENTRY),'index.mjs')).href);
 const browser=await chromium.launch({headless:true}),base=process.env.SCHOOLHUB_WEB_URL??'http://127.0.0.1:5173';
 try{for(const role of ['teacher','headteacher','admin','student','guardian'])for(const viewport of [{width:1440,height:1000},{width:390,height:844}]){
+ let signedIn=role!=='guardian';
  const page=await browser.newPage({viewport,locale:'en-GB'}),errors=[],calls=[];page.on('pageerror',e=>errors.push(e.message));
  const now=new Date().toISOString(),org={id:'org',name:'Test school',slug:'test-school',createdAt:now};
  const school={id:'school',organizationId:'org',name:'Test school',subdomain:'test-school',code:'TEST',academicYears:[]};
@@ -12,9 +13,18 @@ try{for(const role of ['teacher','headteacher','admin','student','guardian'])for
  const wards=['Ama','Kofi'].map((name,index)=>({id:'ward-'+index,studentId:'ward-'+index,profile:{firstName:name,lastName:'Mensah'},health:{bloodGroup:null,allergies:null,medicalConditions:null},subjects:[],guardians:[],class:{id:'class',name:'P5'},house:null}));
  await page.route('**/api/**',async route=>{
   const path=new URL(route.request().url()).pathname;calls.push(path);
-  if(path.includes('/auth/get-session'))return route.fulfill({json:session});
+  if(path.includes('/auth/get-session'))return route.fulfill({json:signedIn?session:null});
+  if(path.endsWith('/auth/sign-in/email')){signedIn=true;return route.fulfill({json:{user:session.user,token:'token'}});}
   if(path.includes('/auth/organization/list'))return route.fulfill({json:[org]});
   if(path.includes('/auth/organization/get-full-organization'))return route.fulfill({json:{...org,members:[],invitations:[]}});
+  if (path === '/api/finance/me/payslips' && role === 'teacher') return route.fulfill({ json: [{
+   id: 'my-slip', basicSalary: '1000.00', allowances: '0.00', grossSalary: '1000.00', incomeTax: '50.00',
+   ssnitEmployee: '55.00', otherDeductions: '0.00', netSalary: '895.00',
+   payrollRecord: { month: 10, year: 2026, status: 'PAID' },
+  }] });
+  if (path === '/api/finance/me/payslips/my-slip/pdf' && role === 'teacher') return route.fulfill({
+   contentType: 'application/pdf', headers: { 'content-disposition': 'attachment; filename="my-payslip.pdf"' }, body: '%PDF-1.7',
+  });
   if(path.endsWith('/schools/roles'))return route.fulfill({json:{primaryRole:role,roles:[role]}});
   if(path.endsWith('/schools/academic-context'))return route.fulfill({json:null});
   if(path.includes('/schools/public/')||path.endsWith('/schools/current'))return route.fulfill({json:school});
@@ -22,13 +32,28 @@ try{for(const role of ['teacher','headteacher','admin','student','guardian'])for
   if(path.endsWith('/students/my-wards'))return route.fulfill({json:wards});
   if(path.endsWith('/students/me'))return route.fulfill({json:wards[0]});
   if(path.endsWith('/dashboard/work-queue'))return route.fulfill({json:{role,generatedAt:now,term:{id:'term',name:'Term 1'},items:[{id:'work',title:role==='headteacher'?'Awaiting headteacher review':role==='admin'?'Missing active guardian links':'Your pending tasks',detail:'Scoped live work',page:role==='student'?'assignments':'assessments',count:3}],lessons:role==='teacher'?[{id:'lesson',day:'MONDAY',start:'08:00',end:'09:00',className:'P5',subject:'Science'}]:[],upcoming:role==='student'?[{id:'task',title:'Science homework',dueAt:now,status:'TO_DO'}]:[]}});
+  if(path.endsWith('/dashboard/attendance/today'))return route.fulfill({json:{date:now.slice(0,10),state:'outside-term'}});
   if(path.endsWith('/dashboard/analytics'))return route.fulfill({json:{generatedAt:now,periodMonths:6,canViewFinance:false,metrics:{activeStudents:30,activeTeachers:5,newAdmissionsThisMonth:1,revenueThisMonth:null,expendituresThisMonth:null},genderDistribution:[],enrollmentGrowth:[],financialStatus:[],hasFinancialRecords:false,recentActivities:[]}});
   if(path.includes('/attendance/guardian/'))return route.fulfill({status:503,json:{message:'Try again'}});
   if(path.includes('/timetable/'))return route.fulfill({status:503,json:{message:'Try again'}});
   if(path.includes('/my-wards/')&&path.endsWith('/fees'))return route.fulfill({status:503,json:{message:'Try again'}});
   return route.fulfill({json:[]});
  });
- await page.goto(base+'/dashboard');
+ if(role==='guardian'){
+  const handoff=base+'/login?school=test-school&continue=guardian-fees';
+  await page.goto(handoff);
+  await page.locator('#email').fill('guardian@example.test');
+  await page.locator('#password').fill('BrowserTest123!');
+  await page.getByRole('button',{name:'Sign in',exact:true}).click();
+  await page.waitForURL(url=>url.pathname==='/guardian-fees'&&url.searchParams.get('school')==='test-school');
+  await page.getByRole('combobox').getByText('Ama Mensah',{exact:true}).waitFor();
+  await page.goto(handoff);
+  await page.waitForURL(url=>url.pathname==='/guardian-fees'&&url.searchParams.get('school')==='test-school');
+  await page.goto(base+'/login?school=test-school&continue=https%3A%2F%2Funtrusted.example');
+  await page.waitForURL(url=>url.pathname==='/dashboard');
+ }else{
+  await page.goto(base+'/dashboard');
+ }
  if(role==='guardian'){
   await page.getByText('Ama Mensah',{exact:true}).waitFor();
   await page.goto(base+'/guardian-attendance');
@@ -42,7 +67,19 @@ try{for(const role of ['teacher','headteacher','admin','student','guardian'])for
   await page.getByRole('heading',{name:title,exact:true}).waitFor();
   if(role==='teacher')await page.getByText('Science',{exact:true}).waitFor();
   if(role==='student')await page.getByText('Science homework',{exact:true}).waitFor();
-  if(role==='teacher')assert.equal(calls.includes('/api/dashboard/analytics'),false);
+  if (role === 'teacher') {
+   assert.equal(calls.includes('/api/dashboard/analytics'), false);
+   if (viewport.width > 1000) {
+    await page.getByRole('button', { name: 'Finance', exact: true }).click();
+    await page.getByRole('link', { name: 'My payroll', exact: true }).click();
+   } else await page.goto(base + '/teacher-payroll?school=test-school');
+   await page.getByRole('heading', { name: 'My payroll', exact: true }).waitFor();
+   await page.getByText('October 2026', { exact: true }).click();
+   await page.getByText('Employee SSNIT', { exact: true }).waitFor();
+   const download = page.waitForEvent('download');
+   await page.getByRole('button', { name: 'Download PDF', exact: true }).click();
+   assert.equal((await download).suggestedFilename(), 'my-payslip.pdf');
+  }
  }
  assert.deepEqual(errors,[]);assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await page.close();
 }console.log('Portal workflow checks passed for teacher/headteacher/admin/student work queues and guardian ward continuity on desktop/mobile.');}finally{await browser.close();}

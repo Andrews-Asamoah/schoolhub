@@ -1,7 +1,7 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import { createHash } from "node:crypto";
 import { PrismaService } from "../../prisma/prisma.service.js";
-import type { BatchAttendanceInput } from "@schoolhub/shared";
+import { formatPersonName, type BatchAttendanceInput } from "@schoolhub/shared";
 import { canManageAcademicContext } from "../../common/academic-context.js";
 import { canMarkRegister } from "../../common/scope/teacher-access.js";
 import { TeacherScopeService } from "../../common/scope/teacher-scope.service.js";
@@ -218,7 +218,7 @@ export class AttendanceService {
     return students.map((s) => ({
       studentId: s.id,
       admissionNumber: s.admissionNumber,
-      name: `${s.profile.firstName} ${s.profile.lastName}`,
+      name: formatPersonName(s.profile),
       attendance: s.attendances[0] ?? null,
     }));
   }

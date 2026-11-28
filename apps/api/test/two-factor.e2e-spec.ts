@@ -126,6 +126,42 @@ describe.skipIf(!DB)("two-factor authentication (real database)", () => {
     return { agent: a, secret, backupCodes: enable.body.backupCodes as string[], totpURI: enable.body.totpURI as string };
   }
 
+  it("verifies a native teacher sign-in using either an authenticator code or a backup code", async () => {
+    const { hashPassword } = await import("better-auth/crypto");
+    const { generateId } = await import("better-auth");
+    const email = `native-teacher-${RUN}@e2e.test`;
+    const userId = generateId();
+    await prisma.user.create({ data: { id: userId, name: "Mobile teacher", email, emailVerified: true } });
+    await prisma.account.create({ data: {
+      id: generateId(), accountId: userId, providerId: "credential", userId, password: await hashPassword(PASSWORD),
+    } });
+    await prisma.member.create({ data: { id: generateId(), organizationId: ids.org, userId, role: "teacher" } });
+    const { secret, backupCodes } = await enrol(email);
+    const nativePost = (path: string, body: object) => request(app.getHttpServer())
+      .post(`/api/auth${path}`).set("Expo-Origin", "schoolhub://").set("X-Forwarded-For", nextIp()).send(body);
+
+    for (const [path, code] of [["verify-totp", totp(secret)], ["verify-backup-code", backupCodes[0]!]]) {
+      const start = await nativePost("/sign-in/email", { email, password: PASSWORD });
+      expect(start.status).toBe(200);
+      expect(start.body.twoFactorRedirect).toBe(true);
+      const cookies: unknown = start.headers["set-cookie"];
+      const cookieHeader = Array.isArray(cookies) ? cookies.join(", ") : typeof cookies === "string" ? cookies : "";
+      const challenge = cookieHeader.match(/(?:__Secure-)?better-auth\.two_factor=[^;,]+/)?.[0];
+      expect(challenge).toBeTruthy();
+      const rejectedOrigin = await nativePost(`/two-factor/${path}`, { code })
+        .set("Origin", "https://untrusted.example.test").set("Cookie", challenge!);
+      expect(rejectedOrigin.status).toBe(403);
+      const verified = await nativePost(`/two-factor/${path}`, { code }).set("Cookie", challenge!);
+      expect(verified.status).toBe(200);
+      const bearer = verified.headers["set-auth-token"];
+      expect(bearer).toBeTruthy();
+      const roles = await request(app.getHttpServer()).get("/api/schools/roles")
+        .set("Authorization", `Bearer ${bearer}`).set("X-School-Subdomain", `e2e-${RUN}`);
+      expect(roles.status).toBe(200);
+      expect(roles.body.roles).toContain("teacher");
+    }
+  });
+
   // ======================================================================
   describe("enforcement for platform super-admins", () => {
     let secret = "";

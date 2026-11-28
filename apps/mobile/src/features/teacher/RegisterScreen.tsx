@@ -1,6 +1,6 @@
-import { memo, useCallback, useEffect, useRef, useState } from "react";
+import { memo, useRef, useState } from "react";
 import { useLocalSearchParams } from "expo-router";
-import { AppState, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
 import { FlashList } from "@shopify/flash-list";
 import type { AttendanceStatus, Register } from "@/api/teacher";
 import {
@@ -12,14 +12,14 @@ import {
   saveRegister,
 } from "@/api/teacher";
 import { useScopedMutation } from "@/features/shared/mutations";
-import { useSession } from "@/lib/session";
+import { sessionStore, useSession } from "@/lib/session";
+import { SessionChangedError } from "@/lib/api-error";
 import {
   enqueueRegister,
-  flushRegisterQueue,
   isRetryableRegisterError,
   newIdempotencyKey,
-  pendingRegisterCount,
 } from "@/lib/register-queue";
+import { useRegisterSync } from "./RegisterSync";
 import { useTeacherQuery } from "./queries";
 import {
   calendarBlock,
@@ -29,10 +29,12 @@ import {
 } from "./register";
 import { TeacherPage, QueryState, Panel, Copy } from "./ui";
 import { Button } from "@/components/Button";
-import { SelectField } from "@/components/SelectField";
-import { DatePickerField, SearchBar } from "@/components/Fields";
-import { ConfirmDialog } from "@/components/Dialogs";
-import { spacing } from "@/theme/theme";
+import { SearchBar } from "@/components/Fields";
+import { CalendarDateField } from "@/components/CalendarDateField";
+import { Text } from "@/components/Typography";
+import { modulePalette } from "@/theme/palette";
+import { ActionSheet, ConfirmDialog } from "@/components/Dialogs";
+import { spacing, type, useTheme } from "@/theme/theme";
 export default function TeacherRegister() {
   const params = useLocalSearchParams<{ classId: string }>();
   return <RegisterBody key={params.classId} />;
@@ -81,73 +83,63 @@ function RegisterBody() {
     !!klass,
   );
   const subdomain = useSession().subdomain;
-  // One key per save intent: a retry after an unknown outcome reuses it, so the
-  // server applies the batch at most once.
-  const keyRef = useRef<string | undefined>(undefined);
-  const mutation = useScopedMutation(
-    (input: Parameters<typeof saveRegister>[0]["request"]) =>
-      saveRegister({ request: input, idempotencyKey: keyRef.current }),
-  );
-  const [pending, setPending] = useState(0);
-  const [syncNote, setSyncNote] = useState<string | null>(null);
+  const revision = sessionStore.getRevision();
+  const attempt = useRef<{ body: string; key: string } | null>(null);
+  const isCurrent = () => sessionStore.getRevision() === revision;
+  const { pending, notice, sync, refreshCount } = useRegisterSync();
   const [queuedNote, setQueuedNote] = useState(false);
-  const refetchRegister = query.refetch;
-  /** Sends queued registers; resolves with what to show (never sets state itself). */
-  const runSync = useCallback(async () => {
-    if (!subdomain) return null;
-    const result = await flushRegisterQueue({
-      subdomain,
-      send: (entry) =>
-        saveRegister({ request: entry.batch, idempotencyKey: entry.key }),
-    }).catch(() => null);
-    const remaining = await pendingRegisterCount(subdomain).catch(() => 0);
-    return { result, remaining };
-  }, [subdomain]);
-  const applySync = useCallback(
-    (outcome: Awaited<ReturnType<typeof runSync>>) => {
-      if (!outcome) return;
-      setPending(outcome.remaining);
-      const { result } = outcome;
-      if (!result) return;
-      if (result.rejected.length)
-        setSyncNote(
-          `${result.rejected.length} saved register${result.rejected.length === 1 ? " was" : "s were"} rejected by the server (for example a closed day or changed assignment) and removed: ${result.rejected.map((r) => r.date).join(", ")}. Review those dates.`,
-        );
-      else if (result.synced) setSyncNote(null);
-      if (result.synced) void refetchRegister();
+  const mutation = useScopedMutation(
+    async (batch: Parameters<typeof saveRegister>[0]["request"]) => {
+      if (!subdomain) throw new SessionChangedError();
+      const body = JSON.stringify(batch);
+      const key =
+        attempt.current?.body === body
+          ? attempt.current.key
+          : newIdempotencyKey();
+      attempt.current = { body, key };
+
+      const remaining = await sync();
+      if (!isCurrent()) throw new SessionChangedError();
+      if (remaining === null)
+        throw new Error("Offline register storage is unavailable.");
+      if (!remaining) {
+        try {
+          await saveRegister({ request: batch, idempotencyKey: key });
+          return "saved";
+        } catch (error) {
+          if (!isRetryableRegisterError(error)) throw error;
+        }
+      }
+      if (
+        !(await enqueueRegister(
+          { key, subdomain, batch },
+          Date.now(),
+          isCurrent,
+        ))
+      )
+        throw new Error("Could not keep this register on the device.");
+      return "queued";
     },
-    [refetchRegister],
   );
-  const syncPending = useCallback(
-    () => runSync().then(applySync),
-    [runSync, applySync],
-  );
-  useEffect(() => {
-    let active = true;
-    const sync = () =>
-      void runSync().then((outcome) => {
-        if (active) applySync(outcome);
-      });
-    sync();
-    const subscription = AppState.addEventListener("change", (state) => {
-      if (state === "active") sync();
-    });
-    return () => {
-      active = false;
-      subscription.remove();
-    };
-  }, [runSync, applySync]);
   const rows = query.data ?? [];
+  const { colors, scheme } = useTheme();
+  const totals = { PRESENT: 0, ABSENT: 0, LATE: 0, unmarked: 0 };
+  for (const row of rows) {
+    const status = registerStatus(row, draft);
+    if (status === "PRESENT" || status === "ABSENT" || status === "LATE")
+      totals[status]++;
+    if (!status) totals.unmarked++;
+  }
   const dirty = Object.keys(draft).length > 0;
   const block = calendarBlock(
-    calendar.isError ? undefined : calendar.data,
+    calendar.data,
     date,
     new Date().toISOString().slice(0, 10),
   );
   const editable =
     !!klass?.isClassTeacher &&
     !block &&
-    !query.isError &&
+    !!query.data &&
     !query.isPending &&
     !mutation.isPending &&
     !calendar.isRefetching;
@@ -174,204 +166,259 @@ function RegisterBody() {
   async function save() {
     if (!editable || !dirty) return;
     const batch = attendanceBatch(date, rows, draft);
-    const key = newIdempotencyKey();
-    keyRef.current = key;
     setQueuedNote(false);
     try {
-      await mutation.mutateAsync(batch);
+      const outcome = await mutation.mutateAsync(batch);
+      attempt.current = null;
       setDraft({});
-      void syncPending();
-    } catch (error) {
-      /* A server rejection is never queued or retried: unsaved marks stay visible.
-         Only an unknown outcome (offline, timeout, 5xx) is kept for a safe retry. */
-      if (subdomain && isRetryableRegisterError(error)) {
-        const queued = await enqueueRegister({ key, subdomain, batch }).catch(
-          () => false,
-        );
-        if (queued) {
-          mutation.reset();
-          setDraft({});
-          setQueuedNote(true);
-          setPending(await pendingRegisterCount(subdomain).catch(() => 0));
-        }
+      if (outcome === "queued" && subdomain) {
+        mutation.reset();
+        setQueuedNote(true);
+        await refreshCount();
       }
+    } catch {
+      // Leave the draft and its idempotency key available for retry.
     }
   }
   return (
     <TeacherPage title="Class register" back scroll={false}>
-      <QueryState query={teaching} empty={!klass}>
-        <QueryState query={query} empty={!rows.length}>
-          <FlashList
-            data={visible}
-            keyExtractor={(r) => r.studentId}
-            extraData={{ draft, editable }}
-            refreshing={query.isRefetching}
-            onRefresh={refresh}
-            ListHeaderComponent={
-              <View style={{ gap: spacing.md }}>
-                <Panel title={klass?.name ?? "Register"}>
-                  <DatePickerField
-                    label="Register date"
-                    value={date}
-                    onChange={changeDate}
-                    disabled={mutation.isPending}
-                  />
-                  {dirty ? (
-                    <Copy alert>
-                      {Object.keys(draft).length} unsaved marks. Stay online and
-                      save before changing dates.
-                    </Copy>
-                  ) : null}
-                  {!klass?.isClassTeacher ? (
-                    <Copy alert>
-                      View only: the assigned class teacher marks this register.
-                    </Copy>
-                  ) : null}
-                  <QueryState query={calendar}>
-                    {block ? <Copy alert>{block}</Copy> : null}
-                  </QueryState>
-                  {mutation.isError ? (
-                    <Copy alert>
-                      Register not saved. The server may have rejected a
-                      closure, approved exclusion or changed assignment. Unsaved
-                      marks remain here; review or discard them and refresh
-                      before retrying.
-                    </Copy>
-                  ) : null}
-                  {mutation.isSuccess ? (
-                    <Copy alert>
-                      Register saved and confirmed by the server.
-                    </Copy>
-                  ) : null}
-                  {queuedNote ? (
-                    <Copy alert>
-                      You appear to be offline. The register is saved on this
-                      device and will sync automatically when you reopen the app
-                      with a connection.
-                    </Copy>
-                  ) : null}
-                  {pending > 0 ? (
-                    <>
-                      <Copy alert>
-                        {pending} register{pending === 1 ? "" : "s"} waiting to
-                        sync. Server-confirmed marks may be out of date until it
-                        finishes.
-                      </Copy>
-                      <Button
-                        label="Sync now"
-                        variant="secondary"
-                        disabled={mutation.isPending}
-                        onPress={() => {
-                          void syncPending();
-                        }}
-                      />
-                    </>
-                  ) : null}
-                  {syncNote ? <Copy alert>{syncNote}</Copy> : null}
-                  <Copy>
-                    {
-                      rows.filter((r) => registerStatus(r, draft) === "PRESENT")
-                        .length
-                    }{" "}
-                    present ·{" "}
-                    {
-                      rows.filter((r) => registerStatus(r, draft) === "ABSENT")
-                        .length
-                    }{" "}
-                    absent ·{" "}
-                    {
-                      rows.filter((r) => registerStatus(r, draft) === "LATE")
-                        .length
-                    }{" "}
-                    late ·{" "}
-                    {rows.filter((r) => !registerStatus(r, draft)).length}{" "}
-                    unmarked
-                  </Copy>
-                  <Button
-                    label="Mark all present"
-                    disabled={!editable}
-                    onPress={() => {
-                      mutation.reset();
-                      setDraft(
-                        Object.fromEntries(
-                          rows.map((r) => [r.studentId, "PRESENT"]),
-                        ),
-                      );
-                    }}
-                  />
-                  <Button
-                    label="Save register"
-                    disabled={!editable || !dirty}
-                    loading={mutation.isPending}
-                    onPress={() => {
-                      void save();
-                    }}
-                  />
-                  {dirty ? (
-                    <Button
-                      label="Discard unsaved marks"
-                      variant="ghost"
+      <QueryState
+        query={{ ...teaching, isError: teaching.isError && !teaching.data }}
+        empty={!klass}
+      >
+        <QueryState
+          query={{ ...query, isError: query.isError && !query.data }}
+          empty={!rows.length}
+        >
+          <View style={styles.list}>
+            <FlashList
+              data={visible}
+              keyExtractor={(r) => r.studentId}
+              extraData={{ draft, editable }}
+              refreshing={query.isRefetching}
+              onRefresh={refresh}
+              ListHeaderComponent={
+                <View style={{ gap: spacing.md }}>
+                  <Panel title={klass?.name ?? "Register"}>
+                    <CalendarDateField
+                      label="Register date"
+                      allowClear={false}
+                      value={date}
+                      onChange={changeDate}
                       disabled={mutation.isPending}
-                      onPress={() => setDiscard(date)}
                     />
-                  ) : null}
-                </Panel>
-                <SearchBar
-                  label="Search register"
-                  value={search}
-                  onChange={setSearch}
+                    {dirty ? (
+                      <Copy alert>
+                        {Object.keys(draft).length} unsaved marks. Save before
+                        changing dates.
+                      </Copy>
+                    ) : null}
+                    {!klass?.isClassTeacher ? (
+                      <Copy alert>
+                        View only: the assigned class teacher marks this
+                        register.
+                      </Copy>
+                    ) : null}
+                    <QueryState
+                      query={{
+                        ...calendar,
+                        isError: calendar.isError && !calendar.data,
+                      }}
+                    >
+                      {block ? <Copy alert>{block}</Copy> : null}
+                    </QueryState>
+                    {mutation.isError ? (
+                      <Copy alert>
+                        Register not saved. The server may have rejected a
+                        closure, approved exclusion or changed assignment.
+                        Unsaved marks remain here; review or discard them and
+                        refresh before retrying.
+                      </Copy>
+                    ) : null}
+                    {mutation.isSuccess ? (
+                      <Copy alert>
+                        Register saved and confirmed by the server.
+                      </Copy>
+                    ) : null}
+                    {queuedNote && pending > 0 ? (
+                      <Copy alert>
+                        The register is saved on this device. It will sync when
+                        your connection returns.
+                      </Copy>
+                    ) : null}
+                    {pending > 0 ? (
+                      <>
+                        <Copy alert>
+                          {pending} register{pending === 1 ? "" : "s"} waiting
+                          to sync. Server-confirmed marks may be out of date
+                          until it finishes.
+                        </Copy>
+                        <Button
+                          label="Sync now"
+                          variant="secondary"
+                          disabled={mutation.isPending}
+                          onPress={() => {
+                            void sync();
+                          }}
+                        />
+                      </>
+                    ) : null}
+                    {notice ? <Copy alert>{notice}</Copy> : null}
+                    <View style={styles.summary}>
+                      {[
+                        {
+                          label: "Present",
+                          value: totals.PRESENT,
+                          hue: "emerald",
+                        },
+                        { label: "Absent", value: totals.ABSENT, hue: "rose" },
+                        { label: "Late", value: totals.LATE, hue: "amber" },
+                        {
+                          label: "Unmarked",
+                          value: totals.unmarked,
+                          hue: "indigo",
+                        },
+                      ].map(({ label, value, hue }) => {
+                        const palette = modulePalette(
+                          hue as "emerald" | "rose" | "amber" | "indigo",
+                          scheme,
+                        );
+                        return (
+                          <View
+                            key={label}
+                            style={[
+                              styles.summaryCell,
+                              { backgroundColor: palette.tint },
+                            ]}
+                          >
+                            <Text
+                              style={[type.headline, { color: palette.ink }]}
+                            >
+                              {value}
+                            </Text>
+                            <Text
+                              style={[type.caption, { color: palette.ink }]}
+                            >
+                              {label}
+                            </Text>
+                          </View>
+                        );
+                      })}
+                    </View>
+                    <Button
+                      label="Mark all present"
+                      disabled={!editable}
+                      onPress={() => {
+                        mutation.reset();
+                        setDraft(
+                          Object.fromEntries(
+                            rows.map((r) => [r.studentId, "PRESENT"]),
+                          ),
+                        );
+                      }}
+                    />
+                    {dirty ? (
+                      <Button
+                        label="Discard unsaved marks"
+                        variant="ghost"
+                        disabled={mutation.isPending}
+                        onPress={() => setDiscard(date)}
+                      />
+                    ) : null}
+                  </Panel>
+                  <SearchBar
+                    label="Search register"
+                    value={search}
+                    onChange={setSearch}
+                  />
+                  <View
+                    style={[
+                      styles.tableRow,
+                      {
+                        backgroundColor: colors.muted,
+                        borderColor: colors.border,
+                      },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        type.bodyStrong,
+                        styles.name,
+                        { color: colors.foreground },
+                      ]}
+                    >
+                      Pupil
+                    </Text>
+                    <Text
+                      style={[
+                        type.bodyStrong,
+                        styles.attendance,
+                        { color: colors.foreground },
+                      ]}
+                    >
+                      Attendance
+                    </Text>
+                  </View>
+                </View>
+              }
+              renderItem={({ item }) => (
+                <RegisterRow
+                  row={item}
+                  status={registerStatus(item, draft)}
+                  disabled={!editable}
+                  onMark={(status) => {
+                    mutation.reset();
+                    setDraft((prev) => ({ ...prev, [item.studentId]: status }));
+                  }}
                 />
-              </View>
-            }
-            renderItem={({ item }) => (
-              <RegisterRow
-                row={item}
-                status={registerStatus(item, draft)}
-                disabled={!editable}
-                onMark={(status) => {
-                  mutation.reset();
-                  setDraft((prev) => ({ ...prev, [item.studentId]: status }));
-                }}
+              )}
+              ListEmptyComponent={<Copy>No pupils match this search.</Copy>}
+              ListFooterComponent={
+                <View style={{ gap: spacing.md, paddingVertical: spacing.lg }}>
+                  <Panel title="Register gaps">
+                    <QueryState query={gaps} empty={!gaps.data?.days.length}>
+                      {gaps.data?.days
+                        .slice(-15)
+                        .reverse()
+                        .map((d) => (
+                          <Button
+                            key={d.date}
+                            label={`${d.date}: ${d.missing} unmarked${d.historical ? " (historical)" : ""}`}
+                            variant="ghost"
+                            disabled={mutation.isPending}
+                            onPress={() => changeDate(d.date)}
+                          />
+                        ))}
+                    </QueryState>
+                  </Panel>
+                  <Panel title="Recorded dates">
+                    <QueryState query={dates} empty={!dates.data?.length}>
+                      {dates.data
+                        ?.slice(-15)
+                        .reverse()
+                        .map((d) => (
+                          <Button
+                            key={d}
+                            label={d}
+                            variant="ghost"
+                            disabled={mutation.isPending}
+                            onPress={() => changeDate(d)}
+                          />
+                        ))}
+                    </QueryState>
+                  </Panel>
+                </View>
+              }
+            />
+            <View style={[styles.save, { backgroundColor: colors.background }]}>
+              <Button
+                label="Save register"
+                disabled={!editable || !dirty}
+                loading={mutation.isPending}
+                onPress={() => void save()}
               />
-            )}
-            ListEmptyComponent={<Copy>No pupils match this search.</Copy>}
-            ListFooterComponent={
-              <View style={{ gap: spacing.md, paddingVertical: spacing.lg }}>
-                <Panel title="Register gaps">
-                  <QueryState query={gaps} empty={!gaps.data?.days.length}>
-                    {gaps.data?.days
-                      .slice(-15)
-                      .reverse()
-                      .map((d) => (
-                        <Button
-                          key={d.date}
-                          label={`${d.date}: ${d.missing} unmarked${d.historical ? " (historical)" : ""}`}
-                          variant="ghost"
-                          disabled={mutation.isPending}
-                          onPress={() => changeDate(d.date)}
-                        />
-                      ))}
-                  </QueryState>
-                </Panel>
-                <Panel title="Recorded dates">
-                  <QueryState query={dates} empty={!dates.data?.length}>
-                    {dates.data
-                      ?.slice(-15)
-                      .reverse()
-                      .map((d) => (
-                        <Button
-                          key={d}
-                          label={d}
-                          variant="ghost"
-                          disabled={mutation.isPending}
-                          onPress={() => changeDate(d)}
-                        />
-                      ))}
-                  </QueryState>
-                </Panel>
-              </View>
-            }
-          />
+            </View>
+          </View>
         </QueryState>
       </QueryState>
       <ConfirmDialog
@@ -403,35 +450,133 @@ const RegisterRow = memo(function RegisterRow({
   disabled: boolean;
   onMark: (status: AttendanceStatus) => void;
 }) {
+  const { colors, scheme } = useTheme();
+  const [showStatuses, setShowStatuses] = useState(false);
+  const standard = [
+    { value: "PRESENT", label: "P", hue: "emerald" },
+    { value: "ABSENT", label: "A", hue: "rose" },
+    { value: "LATE", label: "L", hue: "amber" },
+  ] as const;
+  const other = status && !standard.some((option) => option.value === status);
   return (
-    <View style={{ paddingVertical: spacing.md }}>
-      <Panel title={row.name}>
-        <Copy>Current status: {status ?? "UNMARKED"}</Copy>
-        <View
-          style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing.sm }}
-        >
-          {(["PRESENT", "ABSENT", "LATE"] as const).map((s) => (
-            <Button
-              key={s}
-              label={`${row.name}: ${s}`}
-              block={false}
-              variant={status === s ? "primary" : "secondary"}
+    <View
+      style={[
+        styles.tableRow,
+        { backgroundColor: colors.card, borderColor: colors.border },
+      ]}
+    >
+      <View style={styles.name}>
+        <Text style={[type.bodyStrong, { color: colors.foreground }]}>
+          {row.name}
+        </Text>
+        {row.admissionNumber ? (
+          <Text style={[type.caption, { color: colors.mutedForeground }]}>
+            {row.admissionNumber}
+          </Text>
+        ) : null}
+        {other || !status ? (
+          <Text style={[type.caption, { color: colors.mutedForeground }]}>
+            {status
+              ? status.charAt(0) + status.slice(1).toLowerCase()
+              : "Unmarked"}
+          </Text>
+        ) : null}
+      </View>
+      <View style={styles.attendance}>
+        {standard.map(({ value, label, hue }) => {
+          const palette = modulePalette(hue, scheme);
+          const selected = status === value;
+          return (
+            <Pressable
+              key={value}
+              accessibilityRole="button"
+              accessibilityLabel={`${row.name}: ${value}`}
+              accessibilityState={{ selected, disabled }}
               disabled={disabled}
-              onPress={() => onMark(s)}
-            />
-          ))}
-        </View>
-        <SelectField
-          label={`Other status for ${row.name}`}
-          value={status ?? ""}
-          options={["EXCUSED", "SICK", "PERMISSION"].map((s) => ({
-            value: s,
-            label: s,
-          }))}
+              onPress={() => onMark(value)}
+              style={[
+                styles.mark,
+                {
+                  backgroundColor: selected ? palette.tint : colors.card,
+                  borderColor: selected ? palette.ink : colors.border,
+                },
+              ]}
+            >
+              <Text
+                style={[
+                  type.bodyStrong,
+                  { color: selected ? palette.ink : colors.mutedForeground },
+                ]}
+              >
+                {label}
+              </Text>
+            </Pressable>
+          );
+        })}
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`Other status for ${row.name}`}
+          accessibilityState={{ selected: !!other, disabled }}
           disabled={disabled}
-          onChange={(value) => onMark(value as AttendanceStatus)}
+          onPress={() => setShowStatuses(true)}
+          style={[
+            styles.mark,
+            {
+              backgroundColor: other ? colors.muted : colors.card,
+              borderColor: colors.border,
+            },
+          ]}
+        >
+          <Text style={[type.bodyStrong, { color: colors.foreground }]}>⋯</Text>
+        </Pressable>
+      </View>
+      {showStatuses ? (
+        <ActionSheet
+          visible
+          title={`Attendance for ${row.name}`}
+          onClose={() => setShowStatuses(false)}
+          actions={[
+            { label: "Excused", onPress: () => onMark("EXCUSED") },
+            { label: "Sick", onPress: () => onMark("SICK") },
+            { label: "Permission", onPress: () => onMark("PERMISSION") },
+          ]}
         />
-      </Panel>
+      ) : null}
     </View>
   );
+});
+
+const styles = StyleSheet.create({
+  list: { flex: 1 },
+  summary: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
+  summaryCell: {
+    flexBasis: 68,
+    flexGrow: 1,
+    padding: spacing.sm,
+    borderRadius: 10,
+    gap: spacing.xs,
+  },
+  tableRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.sm,
+    gap: spacing.sm,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  name: { flex: 1, minWidth: 0 },
+  attendance: {
+    width: 176,
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  mark: {
+    width: 44,
+    minHeight: 44,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 9,
+    borderWidth: 1,
+  },
+  save: { paddingTop: spacing.sm },
 });

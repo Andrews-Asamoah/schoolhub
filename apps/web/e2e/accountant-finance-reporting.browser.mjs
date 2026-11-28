@@ -224,11 +224,55 @@ async function runMissingAcademicPeriod() {
   await page.close();
 }
 
+async function runBatchBilling() {
+  const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  await installMocks(page);
+  await page.route("**/api/academics/classes", route => route.fulfill({ json: [
+    { id: "class-1", name: "Primary 1", isActive: true },
+    { id: "class-2", name: "Primary 2", isActive: true },
+  ] }));
+  await page.route("**/api/finance/fee-structures", route => route.fulfill({ json: [{
+    id: "fees", name: "Term fees", targetClasses: [], items: [
+      { id: "tuition", name: "Tuition", amount: "100.00", isOptional: false },
+      { id: "bus", name: "School bus", amount: "50.00", isOptional: true, followsBusRoster: true },
+    ],
+  }] }));
+  await page.route("**/api/finance/bills?*", route => route.fulfill({ json: { items: [], nextCursor: null } }));
+  await page.route("**/api/finance/billing-roster?*", route => {
+    const params = new URL(route.request().url()).searchParams;
+    assert.equal(params.get("classes"), "class-1,class-2");
+    return route.fulfill({ json: [
+      { id: "student-1", name: "Ama Test", reference: "ADM1", busStatus: "RIDING" },
+      { id: "student-2", name: "Kojo Test", reference: "ADM2", busStatus: "STOPPED" },
+    ] });
+  });
+  await page.route("**/api/finance/bills/generate", route => {
+    const input = route.request().postDataJSON();
+    assert.deepEqual(input.classIds, ["class-1", "class-2"]);
+    assert.equal(input.feeStructureId, "fees");
+    assert.equal(input.termId, "term-1");
+    return route.fulfill({ json: { count: 2, totalBilled: "250.00", skippedExisting: 0 } });
+  });
+
+  await page.goto(`${base}/invoices?school=test-school`);
+  await page.getByRole("button", { name: "Generate bills", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Generate student bills" });
+  await dialog.getByRole("combobox", { name: "Fee structure" }).click();
+  await page.getByRole("option", { name: /Term fees/ }).click();
+  await dialog.getByRole("button", { name: "Select all", exact: true }).click();
+  await dialog.getByText("2 active students across the selected classes.", { exact: false }).waitFor();
+  await dialog.getByText("1 rider", { exact: false }).waitFor();
+  await dialog.getByRole("button", { name: "Generate bills", exact: true }).click();
+  await page.getByText(/Generated 2 bill/).waitFor();
+  await page.close();
+}
+
 try {
   await runPeriodScopes({ width: 1440, height: 1000 });
   await runPeriodScopes({ width: 390, height: 844 });
   await runMissingAcademicPeriod();
-  console.log("Accountant finance reporting browser checks passed: retry, academic scopes, missing period guard, and desktop/mobile layout.");
+  await runBatchBilling();
+  console.log("Accountant finance reporting browser checks passed: retry, academic scopes, missing period guard, batch billing, and desktop/mobile layout.");
 } finally {
   await browser.close();
 }

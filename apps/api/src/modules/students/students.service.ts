@@ -9,6 +9,7 @@ import {
 import { randomUUID } from 'node:crypto';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import {
+  formatPersonName,
   guardianEmailDomain,
   studentEmailDomain,
   studentUsernameBase,
@@ -893,7 +894,7 @@ export class StudentsService {
     const student = await db.student.findFirst({
       where: { id: studentId, schoolId, deletedAt: null },
       include: {
-        profile: true,
+        profile: { include: { user: { select: { image: true } } } },
         house: { select: { id: true, name: true } },
         department: { select: { id: true, name: true } },
         guardians: {
@@ -940,6 +941,7 @@ export class StudentsService {
         firstName: p.firstName,
         lastName: p.lastName,
         otherNames: p.otherNames,
+        image: p.user?.image ?? null,
         gender: p.gender,
         dateOfBirth: p.dateOfBirth,
         nationality: p.nationality,
@@ -1164,7 +1166,7 @@ export class StudentsService {
             id: true,
             studentId: true,
             admissionNumber: true,
-            profile: { select: { firstName: true, lastName: true, gender: true } },
+            profile: { select: { firstName: true, otherNames: true, lastName: true, gender: true } },
             house: { select: { id: true, name: true, color: true } },
           },
         },
@@ -1179,7 +1181,7 @@ export class StudentsService {
         isSelf: e.student.id === student.id,
         studentId: e.student.studentId,
         admissionNumber: e.student.admissionNumber,
-        name: `${e.student.profile.firstName} ${e.student.profile.lastName}`.trim(),
+        name: formatPersonName(e.student.profile),
         firstName: e.student.profile.firstName,
         lastName: e.student.profile.lastName,
         house: e.student.house?.name ?? 'No House',

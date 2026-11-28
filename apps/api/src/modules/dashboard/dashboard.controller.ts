@@ -30,4 +30,10 @@ export class DashboardController {
   ) {
     return this.dashboardService.getAnalytics(school.id, role, Number(months) || 6);
   }
+
+  @Get("attendance/today")
+  @Roles("owner", "admin", "headteacher")
+  getTodayAttendance(@CurrentSchool() school: School) {
+    return this.dashboardService.getTodayAttendance(school.id);
+  }
 }

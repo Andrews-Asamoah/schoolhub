@@ -23,3 +23,25 @@ export const listAnnouncements = defineEndpoint({
   roles: ["teacher", "student", "guardian"],
   response: z.array(announcementSchema),
 });
+
+const teacherAnnouncementRequest = createAnnouncementSchema
+  .pick({ title: true, content: true, category: true })
+  .extend({
+    target: z.enum(["SELECTED_CLASSES", "SELECTED_CLASS_GUARDIANS"]),
+    classIds: z.array(z.string().trim().min(1)).min(1).max(100),
+  });
+
+export const listAnnouncementClasses = defineEndpoint({
+  method: "GET",
+  path: "/announcements/classes",
+  roles: ["teacher"],
+  response: z.array(z.object({ id: z.string().min(1), name: z.string() })),
+});
+
+export const publishClassAnnouncement = defineEndpoint({
+  method: "POST",
+  path: "/announcements",
+  roles: ["teacher"],
+  request: teacherAnnouncementRequest,
+  response: announcementSchema,
+});

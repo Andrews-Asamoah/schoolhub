@@ -14,6 +14,8 @@ import { ReportVersionService } from "./report-version.service.js";
 import { ARCHIVE_DEFAULT_PAGE_SIZE, ARCHIVE_MAX_PAGE_SIZE, ReportArchiveService } from "./report-archive.service.js";
 import type { Response } from "express";
 import { ReportTemplatePresetsService } from "./report-template-presets.service.js";
+import { Throttle } from "@nestjs/throttler";
+import { BULK_THROTTLE } from "../../common/bulk-throttle.js";
 
 const archiveQuerySchema = z.object({
   page: z.coerce.number().int().min(1).max(10_000).default(1),
@@ -58,6 +60,7 @@ export class ReportPublicationController {
   }
 
   @Post("versions/bulk-recommend")
+  @Throttle(BULK_THROTTLE)
   @Roles("teacher")
   bulkRecommend(@CurrentSchool() school: School, @CurrentUser() user: AuthenticatedUser, @Body() body: unknown) {
     const raw = body && typeof body === "object" && "items" in body ? (body as { items: unknown }).items : undefined;
@@ -86,6 +89,7 @@ export class ReportPublicationController {
   }
 
   @Post("versions/bulk-head-approve")
+  @Throttle(BULK_THROTTLE)
   @Roles("headteacher")
   bulkHeadteacherApprove(@CurrentSchool() school: School, @CurrentUser() user: AuthenticatedUser, @Body() body: unknown) {
     const raw = body && typeof body === "object" && "items" in body ? (body as { items: unknown }).items : undefined;

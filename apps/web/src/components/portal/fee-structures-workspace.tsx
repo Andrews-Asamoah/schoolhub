@@ -1,3 +1,4 @@
+import { toast } from "@/components/ui/toaster";
 import { useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Archive, CheckCircle2, CircleAlert, Copy, FileText, LoaderCircle, Pencil, Plus, RefreshCw, Search, Tags, X } from "lucide-react";
@@ -7,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { FinanceReadOnlyNotice, useFinanceAccess } from "@/components/portal/finance-access";
 import { LabeledField } from "@/components/forms/labeled-controls";
 
+import { formatGhs as money } from "@/lib/format";
 interface FeeRegistryItem {
   id: string;
   name: string;
@@ -23,6 +25,7 @@ interface FeeItem {
   name: string;
   amount: number | string;
   isOptional: boolean;
+  followsBusRoster?: boolean;
   description?: string | null;
   registryItemId?: string | null;
 }
@@ -43,6 +46,7 @@ interface FeeItemDraft {
   name: string;
   amount: string;
   isOptional: boolean;
+  followsBusRoster?: boolean;
   description: string;
 }
 interface StructureDraft {
@@ -59,15 +63,9 @@ interface FeeStructureInput {
   classLevel?: string;
   termBased: boolean;
   targetClassIds: string[];
-  items: { registryItemId?: string; name: string; amount: number; isOptional: boolean; description?: string }[];
+  items: { registryItemId?: string; name: string; amount: number; isOptional: boolean; followsBusRoster?: boolean; description?: string }[];
 }
 
-const money = (amount: number) => new Intl.NumberFormat("en-GH", {
-  style: "currency",
-  currency: "GHS",
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2,
-}).format(amount);
 const blankItem = (): FeeItemDraft => ({
   rowId: `item-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
   registryItemId: "",
@@ -100,7 +98,7 @@ export function FeeStructuresWorkspace() {
   const [draft, setDraft] = useState<StructureDraft>(freshDraft);
   const [registryName, setRegistryName] = useState("");
   const [registryDescription, setRegistryDescription] = useState("");
-  const [feedback, setFeedback] = useState<{ kind: "success" | "error"; text: string } | null>(null);
+
 
   const structuresQuery = useQuery({
     queryKey: ["finance", "fee-structures", "all"],
@@ -141,14 +139,14 @@ export function FeeStructuresWorkspace() {
       body: JSON.stringify(input),
     }),
     onSuccess: async (created) => {
-      setFeedback({ kind: "success", text: `“${created.name}” was created successfully.` });
+      toast.success(`“${created.name}” was created successfully.`);
       setCreateOpen(false);
       setEditingStructure(null);
       setDraftMode("create");
       setDraft(freshDraft());
       await queryClient.invalidateQueries({ queryKey: ["finance", "fee-structures"] });
     },
-    onError: (error: Error) => setFeedback({ kind: "error", text: error.message }),
+    onError: (error: Error) => toast.error(error.message),
   });
   const updateStructure = useMutation({
     mutationFn: ({ id, input }: { id: string; input: FeeStructureInput }) =>
@@ -157,14 +155,14 @@ export function FeeStructuresWorkspace() {
         body: JSON.stringify(input),
       }),
     onSuccess: async (updated) => {
-      setFeedback({ kind: "success", text: `“${updated.name}” was updated successfully.` });
+      toast.success(`“${updated.name}” was updated successfully.`);
       setCreateOpen(false);
       setEditingStructure(null);
       setDraftMode("create");
       setDraft(freshDraft());
       await queryClient.invalidateQueries({ queryKey: ["finance", "fee-structures"] });
     },
-    onError: (error: Error) => setFeedback({ kind: "error", text: error.message }),
+    onError: (error: Error) => toast.error(error.message),
   });
   const setActive = useMutation({
     mutationFn: ({ id, isActive }: { id: string; isActive: boolean }) =>
@@ -173,10 +171,10 @@ export function FeeStructuresWorkspace() {
         body: JSON.stringify({ isActive }),
       }),
     onSuccess: async (_value, variables) => {
-      setFeedback({ kind: "success", text: variables.isActive ? "Fee structure reactivated." : "Fee structure archived. Existing bills are retained." });
+      toast.success(variables.isActive ? "Fee structure reactivated." : "Fee structure archived. Existing bills are retained.");
       await queryClient.invalidateQueries({ queryKey: ["finance", "fee-structures"] });
     },
-    onError: (error: Error) => setFeedback({ kind: "error", text: error.message }),
+    onError: (error: Error) => toast.error(error.message),
   });
   const createRegistryItem = useMutation({
     mutationFn: (input: { name: string; description?: string }) => apiFetch<FeeRegistryItem>("/finance/fee-item-registry", {
@@ -184,19 +182,19 @@ export function FeeStructuresWorkspace() {
       body: JSON.stringify(input),
     }),
     onSuccess: async (item) => {
-      setFeedback({ kind: "success", text: `Fee item category “${item.name}” was added.` });
+      toast.success(`Fee item category “${item.name}” was added.`);
       setRegistryName("");
       setRegistryDescription("");
       await queryClient.invalidateQueries({ queryKey: ["finance", "fee-item-registry"] });
     },
-    onError: (error: Error) => setFeedback({ kind: "error", text: error.message }),
+    onError: (error: Error) => toast.error(error.message),
   });
 
   function submitStructure(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setFeedback(null);
+
     if (draft.items.some((item) => !item.name.trim() || item.amount.trim() === "" || !Number.isFinite(Number(item.amount)) || Number(item.amount) < 0)) {
-      setFeedback({ kind: "error", text: "Give every fee item a name and a valid non-negative amount." });
+      toast.error("Give every fee item a name and a valid non-negative amount.");
       return;
     }
     const input: FeeStructureInput = {
@@ -210,6 +208,7 @@ export function FeeStructuresWorkspace() {
         name: item.name.trim(),
         amount: Number(item.amount),
         isOptional: item.isOptional,
+        followsBusRoster: item.isOptional && item.followsBusRoster,
         description: item.description.trim() || undefined,
       })),
     };
@@ -227,7 +226,7 @@ export function FeeStructuresWorkspace() {
     setDraft((current) => ({ ...current, items: current.items.map((item) => item.rowId === rowId ? { ...item, ...patch } : item) }));
   }
   function beginCreate() {
-    setFeedback(null);
+
     setEditingStructure(null);
     setDraftMode("create");
     setDraft(freshDraft());
@@ -235,10 +234,10 @@ export function FeeStructuresWorkspace() {
   }
   function beginEdit(structure: FeeStructure) {
     if ((structure._count?.bills ?? 0) > 0) {
-      setFeedback({ kind: "error", text: "This fee structure has already been used to generate student bills. Duplicate it to edit the figures in a new structure." });
+      toast.error("This fee structure has already been used to generate student bills. Duplicate it to edit the figures in a new structure.");
       return;
     }
-    setFeedback(null);
+
     setEditingStructure(structure);
     setDraftMode("edit");
     setDraft({
@@ -253,13 +252,14 @@ export function FeeStructuresWorkspace() {
         name: item.name,
         amount: String(item.amount),
         isOptional: item.isOptional,
+        followsBusRoster: item.isOptional && item.followsBusRoster,
         description: item.description ?? "",
       })),
     });
     setCreateOpen(true);
   }
   function beginDuplicate(structure: FeeStructure) {
-    setFeedback(null);
+
     setEditingStructure(null);
     setDraftMode("duplicate");
     setDraft({
@@ -274,6 +274,7 @@ export function FeeStructuresWorkspace() {
         name: item.name,
         amount: String(item.amount),
         isOptional: item.isOptional,
+        followsBusRoster: item.isOptional && item.followsBusRoster,
         description: item.description ?? "",
       })),
     });
@@ -297,13 +298,13 @@ export function FeeStructuresWorkspace() {
           <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">Build reusable fee templates from standard fee items and assign them to classes. Once a structure has generated student bills, it becomes read-only; duplicate it to reuse the details with different amounts.</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          {canWrite && <button type="button" className={secondaryButton} onClick={() => { setFeedback(null); setRegistryOpen(true); }}><Tags className="size-4" /> Fee item categories</button>}
+          {canWrite && <button type="button" className={secondaryButton} onClick={() => {  setRegistryOpen(true); }}><Tags className="size-4" /> Fee item categories</button>}
           {canWrite && <button type="button" className={primaryButton} onClick={beginCreate}><Plus className="size-4" /> Create structure</button>}
         </div>
       </section>
 
       {!canWrite && <FinanceReadOnlyNotice />}
-      {feedback && <div role={feedback.kind === "error" ? "alert" : "status"} className={cn("flex items-start gap-3 rounded-xl border p-3 text-sm", feedback.kind === "error" ? "border-destructive/30 bg-destructive/5 text-destructive" : "border-success/30 bg-success/5 text-foreground")}><span className="min-w-0 flex-1">{feedback.text}</span><button type="button" onClick={() => setFeedback(null)} aria-label="Dismiss message"><X className="size-4" /></button></div>}
+
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         <Metric label="Active structures" value={structuresQuery.isPending ? "—" : String(activeCount)} detail="Available for future billing" icon={CheckCircle2} />
@@ -392,7 +393,7 @@ function FeeStructureCard({
       <div className="flex items-start justify-between gap-3"><div className="min-w-0"><h2 className="break-words font-semibold text-foreground">{structure.name}</h2><div className="mt-2 flex flex-wrap gap-1.5">{structure.isActive ? <Badge tone="success">Active</Badge> : <Badge>Archived</Badge>}<Badge>{structure.termBased ? "Per term" : "One-off"}</Badge>{locked && <Badge>Locked after billing</Badge>}</div></div><span className="rounded-xl bg-primary/10 p-2 text-primary"><FileText className="size-4" /></span></div>
       {structure.description && <p className="mt-3 line-clamp-2 text-sm leading-5 text-muted-foreground">{structure.description}</p>}
       <p className="mt-3 text-xs text-muted-foreground">Applies to: <span className="font-medium text-foreground">{classes.length ? classes.join(", ") : structure.classLevel || "All classes"}</span></p>
-      <div className="mt-4 space-y-2">{structure.items.map(item => <div key={item.id} className="flex items-start justify-between gap-3 text-sm"><div className="min-w-0"><p className="break-words font-medium text-foreground">{item.name}{item.isOptional && <span className="ml-2 rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">Optional</span>}</p>{item.description && <p className="text-xs text-muted-foreground">{item.description}</p>}</div><span className="shrink-0 tabular-nums text-foreground">{money(Number(item.amount))}</span></div>)}</div>
+      <div className="mt-4 space-y-2">{structure.items.map(item => <div key={item.id} className="flex items-start justify-between gap-3 text-sm"><div className="min-w-0"><p className="break-words font-medium text-foreground">{item.name}{item.isOptional && <span className="ml-2 rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">{item.followsBusRoster ? "Bus roster" : "Optional"}</span>}</p>{item.description && <p className="text-xs text-muted-foreground">{item.description}</p>}</div><span className="shrink-0 tabular-nums text-foreground">{money(Number(item.amount))}</span></div>)}</div>
       <div className="mt-4 space-y-1 border-t border-border pt-3"><div className="flex items-center justify-between gap-3"><span className="text-xs text-muted-foreground">Structure total</span><span className="font-bold tabular-nums text-foreground">{money(total)}</span></div>{optional > 0 && <p className="text-[11px] text-muted-foreground">{money(optional)} of the total is marked optional.</p>}</div>
     </div>
     <div className="space-y-3 border-t border-border bg-muted/20 px-4 py-3">

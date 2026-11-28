@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
+import { lazy, Suspense } from "react";
 import {
   Building2,
   Users,
@@ -19,7 +20,8 @@ import { OperationsHealthPanel } from "@/components/superadmin/operations-health
 import { SubscriptionBadge } from "@/components/superadmin/subscription-badge";
 import { DataTable, type DataTableColumn } from "@/components/ui/data-table";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
+// recharts is large: load it only when the subscription chart is shown.
+const StatusPie = lazy(() => import("@/components/superadmin/status-pie").then((m) => ({ default: m.StatusPie })));
 
 export const Route = createFileRoute("/admin/dashboard")({
   component: AdminDashboard,
@@ -287,14 +289,7 @@ function AdminDashboard() {
             return (
               <div className="grid min-w-0 items-center gap-4 sm:grid-cols-[minmax(180px,0.8fr)_minmax(0,1fr)]">
                 <div role="img" aria-label={data.map((item) => `${item.label}: ${item.value} schools`).join(", ")} className="h-56 min-w-0">
-                  <ResponsiveContainer width="100%" height="100%" minWidth={0}>
-                    <PieChart>
-                      <Pie data={data} dataKey="value" nameKey="label" cx="50%" cy="50%" innerRadius="57%" outerRadius="82%" paddingAngle={2} stroke="none">
-                        {data.map((item) => <Cell key={item.status} fill={item.fill} />)}
-                      </Pie>
-                      <Tooltip contentStyle={{ borderRadius: 12, border: "1px solid var(--border)", backgroundColor: "var(--popover)", color: "var(--popover-foreground)", fontSize: 12 }} formatter={(value) => [`${Number(value ?? 0).toLocaleString("en-GH")} schools`, "Schools"]} />
-                    </PieChart>
-                  </ResponsiveContainer>
+                  <Suspense fallback={null}><StatusPie data={data} /></Suspense>
                 </div>
                 <ul className="min-w-0 space-y-2">
                   {data.map((item) => <li key={item.status} className="flex items-center justify-between gap-3 text-xs"><span className="flex min-w-0 items-center gap-2 text-muted-foreground"><span className="size-2.5 shrink-0 rounded-sm" style={{ backgroundColor: item.fill }} /><span className="truncate">{item.label}</span></span><span className="font-semibold tabular-nums text-foreground">{item.value.toLocaleString("en-GH")}</span></li>)}

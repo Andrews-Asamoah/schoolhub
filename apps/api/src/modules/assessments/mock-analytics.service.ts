@@ -1,3 +1,4 @@
+import { formatPersonName } from "@schoolhub/shared";
 import { BadRequestException, ForbiddenException, Injectable } from "@nestjs/common";
 import { PrismaService } from "../../prisma/prisma.service.js";
 import { TeacherScopeService } from "../../common/scope/teacher-scope.service.js";
@@ -75,12 +76,12 @@ export class MockAnalyticsService {
     });
     const enrolments = await db.enrollment.findMany({
       where: { classId: klass.id, academicYearId: year.id, status: { in: ["ACTIVE", "COMPLETED"] }, student: { schoolId, deletedAt: null } },
-      select: { student: { select: { id: true, admissionNumber: true, profile: { select: { firstName: true, lastName: true } } } } },
+      select: { student: { select: { id: true, admissionNumber: true, profile: { select: { firstName: true, otherNames: true, lastName: true } } } } },
     });
     const students = [...new Map(enrolments.map((e) => [e.student.id, {
       id: e.student.id,
       admissionNumber: e.student.admissionNumber ?? "",
-      name: `${e.student.profile.firstName} ${e.student.profile.lastName}`.trim(),
+      name: formatPersonName(e.student.profile),
     }])).values()].sort((a, b) => a.name.localeCompare(b.name));
 
     const rows = templates.length && students.length

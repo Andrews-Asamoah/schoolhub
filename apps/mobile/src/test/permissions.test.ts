@@ -28,8 +28,10 @@ test("allows only the three mobile roles", () => {
     expect(() => roleGroup(role)).toThrow();
   }
 });
-test("BECE and external examinations are unavailable to every mobile v1 role", () => {
-  for (const role of MOBILE_ROLES) {
+test("external examinations are available to teachers only", () => {
+  expect(canSeeBece("teacher")).toBe(true);
+  expect(() => assertFeature("teacher", "bece")).not.toThrow();
+  for (const role of ["student", "guardian", "admin", null]) {
     expect(canSeeBece(role)).toBe(false);
     expect(() => assertFeature(role, "bece")).toThrow();
   }

@@ -84,3 +84,48 @@ describe("SchoolTenantGuard subscription enforcement", () => {
     expect(prisma.client.school.findUnique).not.toHaveBeenCalled();
   });
 });
+
+describe("SchoolTenantGuard desktop enforcement", () => {
+  function desktop(features: unknown, settings: unknown = {}) {
+    const fixture = setup({ subscriptionStatus: "ACTIVE", expiresAt: null });
+    fixture.request.session.session = { clientPlatform: "desktop" };
+    fixture.request.headers["x-schoolhub-client-version"] = "0.1.0";
+    const billing = { findUnique: vi.fn(async () => ({ plan: { features }, settings })) };
+    Object.assign(fixture.prisma.client, { subscription: billing });
+    return { ...fixture, billing };
+  }
+  it("allows a licensed desktop session even without a channel header", async () => {
+    const { guard, context, billing } = desktop(["desktop"]);
+    await expect(guard.canActivate(context)).resolves.toBe(true);
+    expect(billing.findUnique).toHaveBeenCalledWith(expect.objectContaining({ where: { schoolId: "sch1" } }));
+  });
+  it("denies desktop access without changing browser access", async () => {
+    const { guard, context, request } = desktop([]);
+    await expect(guard.canActivate(context)).rejects.toMatchObject({ response: { error: "DESKTOP_ACCESS_DISABLED" } });
+    request.session.session = { clientPlatform: "web" };
+    await expect(guard.canActivate(context)).resolves.toBe(true);
+  });
+  it("applies both enabling and disabling per-school overrides", async () => {
+    const enabled = desktop([], { desktopEnabled: true });
+    await expect(enabled.guard.canActivate(enabled.context)).resolves.toBe(true);
+    const disabled = desktop(["desktop"], { desktopEnabled: false });
+    await expect(disabled.guard.canActivate(disabled.context)).rejects.toThrow(/not enabled/);
+  });
+  it("rejects missing versions and cannot be bypassed with a web header", async () => {
+    const { guard, context, request, prisma } = desktop(["desktop"]);
+    delete request.headers["x-schoolhub-client-version"];
+    request.headers["x-schoolhub-client"] = "web";
+    await expect(guard.canActivate(context)).rejects.toMatchObject({ status: 426 });
+    expect(prisma.client.school.findUnique).not.toHaveBeenCalled();
+  });
+  it("rejects a platform admin's desktop session before the tenant bypass", async () => {
+    const { guard, context, request } = desktop(["desktop"]);
+    request.session.user = { id: "sa", role: "superAdmin", twoFactorEnabled: true };
+    await expect(guard.canActivate(context)).rejects.toThrow(/web portal/);
+  });
+  it("does not let a desktop license override an inactive subscription", async () => {
+    const { guard, context, prisma } = desktop(["desktop"]);
+    prisma.client.school.findUnique.mockImplementation(async () => ({ id: "sch1", organizationId: "org1", subdomain: "achimota", name: "Achimota", organization: { subscriptionStatus: "SUSPENDED", expiresAt: null } }));
+    await expect(guard.canActivate(context)).rejects.toMatchObject({ response: { error: "SUBSCRIPTION_INACTIVE" } });
+  });
+});

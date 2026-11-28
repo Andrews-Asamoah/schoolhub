@@ -2,6 +2,7 @@ import { FinanceCloseService } from "./finance-close.service.js";
 import { FinanceBankReconciliationController } from "./finance-bank-reconciliation.controller.js";
 import { FinanceBankReconciliationService } from "./finance-bank-reconciliation.service.js";
 import { Module } from "@nestjs/common";
+import { TeacherPayslipsController } from "./teacher-payslips.controller.js";
 import { FinanceController } from "./finance.controller.js";
 import { FinanceAccountPurposeController } from "./finance-account-purpose.controller.js";
 import { FinanceAccountPurposeService } from "./finance-account-purpose.service.js";
@@ -21,14 +22,16 @@ import { FINANCE_RATE_LIMIT_STORE } from "./finance-safeguards.js";
 import { DatabaseFinanceRateLimitStore } from "./finance-rate-limit.store.js";
 import { FinanceIntegrityJob } from "./finance-integrity.job.js";
 import { PayrollSettingsService } from "./payroll-settings.service.js";
+import { FinanceBreakdownService } from "./finance-breakdown.service.js";
+import { FinanceActionCentreService } from "./finance-action-centre.service.js";
 import { FinanceLedgerIntegrityService } from "./finance-ledger-integrity.service.js";
 import { FinanceApprovalSettingsController } from "./finance-approval-settings.controller.js";
 import { FinanceApprovalSettingsService } from "./finance-approval-settings.service.js";
 
 @Module({
-  controllers: [FinanceBankReconciliationController, FinanceAccountPurposeController, FinanceController, FinanceRevenueController, FinancePeriodsController, FinanceManualJournalsController, FinanceApprovalSettingsController],
+  controllers: [FinanceBankReconciliationController, FinanceAccountPurposeController, FinanceController, FinanceRevenueController, FinancePeriodsController, FinanceManualJournalsController, FinanceApprovalSettingsController, TeacherPayslipsController],
   providers: [FinanceCloseService, FinanceBankReconciliationService, FinanceReceivableAdjustmentsService, FinanceAccountPurposeService, FinanceManualJournalsService, FinancePeriodPreparationService, FinanceRevenueAdjustmentsService, FinanceService, FinanceExportsService, FinanceApprovalService, FinancePostingService, FinanceLedgerIntegrityService, FinanceAuditInterceptor,
-    PayrollSettingsService, FinanceApprovalSettingsService, FinanceIntegrityJob, DatabaseFinanceRateLimitStore, { provide: FINANCE_RATE_LIMIT_STORE, useExisting: DatabaseFinanceRateLimitStore }],
+    PayrollSettingsService, FinanceBreakdownService, FinanceActionCentreService, FinanceApprovalSettingsService, FinanceIntegrityJob, DatabaseFinanceRateLimitStore, { provide: FINANCE_RATE_LIMIT_STORE, useExisting: DatabaseFinanceRateLimitStore }],
   exports: [FinanceService, FinanceApprovalService],
 })
 export class FinanceModule {}

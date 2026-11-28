@@ -18,6 +18,7 @@ import {
 } from "@/components/school/workspace-ui";
 import { apiFetch } from "@/lib/api";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { confirmAction } from "@/components/ui/confirm-host";
 
 interface SubjectRow {
   id: string;
@@ -247,9 +248,8 @@ export function SubjectsWorkspace() {
                   className="rounded-md px-2 py-1.5 text-xs font-semibold text-destructive hover:bg-destructive/10 disabled:opacity-50"
                   disabled={deleteMutation.isPending}
                   onClick={() => {
-                    if (window.confirm(`Delete ${subject.name}? This cannot be undone.`)) {
-                      deleteMutation.mutate(subject);
-                    }
+                    void confirmAction({ title: "Delete subject?", description: `Delete ${subject.name}? This cannot be undone.`, confirmLabel: "Delete", danger: true })
+                      .then((ok) => { if (ok) deleteMutation.mutate(subject); });
                   }}
                 >
                   Delete

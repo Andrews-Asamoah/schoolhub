@@ -6,6 +6,9 @@ import { ListRow } from "@/components/ListRow";
 import { EmptyState, ErrorState } from "@/components/States";
 import { FormField } from "@/components/FormField";
 import { useSchoolLoginForm } from "@/features/auth/forms";
+jest.mock("react-native-safe-area-context", () => ({
+  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
+}));
 jest.mock("@/theme/theme", () => {
   const actual = jest.requireActual("@/theme/theme");
   const { lightTokens } = jest.requireActual("@/theme/tokens.generated");

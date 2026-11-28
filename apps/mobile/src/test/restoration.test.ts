@@ -107,3 +107,17 @@ test("an old auth response cannot apply its user flags to a new login", async ()
     activeRole: null,
   });
 });
+
+test("a transient connection failure preserves the saved session for a guarded retry", async () => {
+  jest.mocked(AsyncStorage.removeItem).mockClear();
+  jest
+    .mocked(authClient.getSession)
+    .mockRejectedValueOnce(new TypeError("Network request failed"));
+  await restoreSession();
+  expect(sessionStore.getSnapshot()).toMatchObject({
+    status: "restoreUnavailable",
+    token: "fixture-session",
+    activeRole: null,
+  });
+  expect(AsyncStorage.removeItem).not.toHaveBeenCalled();
+});

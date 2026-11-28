@@ -1,18 +1,20 @@
+import { publishAssignmentBatchSchema } from "@schoolhub/shared";
 import { z } from "zod";
 import {
   createAssignmentSchema,
   gradeAssignmentSchema,
   recommendationSchema,
 } from "@/api/teacher";
-export const assignmentFormSchema = z
-  .object({
-    classId: z.string().min(1),
-    subjectId: z.string().min(1),
-    title: z.string(),
-    instructions: z.string(),
-    maxScore: z.string().trim().min(1),
-    dueDate: z.string(),
-  })
+const assignmentFields = z.object({
+  classId: z.string().min(1),
+  subjectId: z.string().min(1),
+  title: z.string(),
+  instructions: z.string(),
+  maxScore: z.string().trim().min(1),
+  dueDate: z.string(),
+});
+
+export const assignmentFormSchema = assignmentFields
   .transform((v): z.input<typeof createAssignmentSchema> => ({
     classId: v.classId,
     subjectId: v.subjectId,
@@ -22,6 +24,22 @@ export const assignmentFormSchema = z
     dueAt: v.dueDate ? v.dueDate + "T23:59:00.000Z" : null,
   }))
   .pipe(createAssignmentSchema);
+export const assignmentBatchFormSchema = assignmentFields
+  .omit({ classId: true })
+  .extend({ classIds: z.array(z.string()) })
+  .transform(
+    ({
+      dueDate,
+      maxScore,
+      ...details
+    }): z.input<typeof publishAssignmentBatchSchema> => ({
+      ...details,
+      maxScore: Number(maxScore),
+      dueAt: dueDate ? `${dueDate}T23:59:00.000Z` : null,
+    }),
+  )
+  .pipe(publishAssignmentBatchSchema);
+
 export const gradeFormSchema = z
   .object({ score: z.string().trim().min(1), feedback: z.string() })
   .transform((v): z.input<typeof gradeAssignmentSchema> => ({

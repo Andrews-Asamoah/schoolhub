@@ -54,7 +54,14 @@ export default function ComposeMessageScreen() {
   return (
     <Screen
       title="New message"
-      subtitle="Send a private school message"
+      left={
+        <Button
+          label="Back"
+          variant="ghost"
+          block={false}
+          onPress={() => router.back()}
+        />
+      }
       refreshing={recipients.isRefetching}
       onRefresh={() => void recipients.refetch()}
     >

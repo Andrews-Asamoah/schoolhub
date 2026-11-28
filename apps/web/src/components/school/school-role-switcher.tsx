@@ -76,7 +76,7 @@ export function useSchoolRole() {
       : query.data?.primaryRole ?? null;
 
   async function selectRole(role: string) {
-    if (!query.data?.roles.includes(role) || !confirmLeavingDrafts()) return;
+    if (!query.data?.roles.includes(role) || !(await confirmLeavingDrafts())) return;
     await queryClient.cancelQueries();
     window.localStorage.setItem(ACTIVE_ROLE_STORAGE_KEY, role);
     setStoredRole(role);

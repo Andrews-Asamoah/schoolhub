@@ -56,3 +56,11 @@ describe("attendance batch idempotency", () => {
     await expect(service.batchRecordAttendance("school-A", "user-1", other, "teacher", "reg-abcdefgh")).rejects.toBeInstanceOf(ConflictException);
   });
 });
+
+it("retains replay keys past the mobile queue's 14-day lifetime", async () => {
+  const { AttendanceReplayRetention } = await import("./attendance-replay-retention.js");
+  const deleteMany = vi.fn().mockResolvedValue({ count: 1 });
+  const retention = new AttendanceReplayRetention({ client: { attendanceBatchReplay: { deleteMany } } } as never);
+  await expect(retention.purge(new Date("2026-11-24T00:00:00Z"))).resolves.toEqual({ count: 1 });
+  expect(deleteMany).toHaveBeenCalledWith({ where: { createdAt: { lt: new Date("2026-10-25T00:00:00Z") } } });
+});

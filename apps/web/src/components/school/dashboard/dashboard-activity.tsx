@@ -9,12 +9,8 @@ import {
 import { cn } from "@/lib/utils";
 import type { DashboardActivity } from "@/components/school/dashboard/dashboard-data";
 
-const money = new Intl.NumberFormat("en-GH", {
-  style: "currency",
-  currency: "GHS",
-  maximumFractionDigits: 2,
-});
 
+import { ghsFormat as money } from "@/lib/format";
 const timestamp = (value: string) =>
   new Intl.DateTimeFormat("en-GH", {
     dateStyle: "medium",

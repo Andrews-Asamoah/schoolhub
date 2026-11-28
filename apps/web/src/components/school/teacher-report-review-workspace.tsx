@@ -1,3 +1,5 @@
+import { toast } from "@/components/ui/toaster";
+import { formatPersonName } from "@schoolhub/shared";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ClipboardCheck } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -5,7 +7,7 @@ import {
   MIN_RECOMMENDATION_LENGTH, ReportRecommendationTable,
   type RecommendationRowState, type RecommendationTableRow,
 } from "@/components/reports/report-recommendation-table";
-import { useDebouncedValue } from "@/components/superadmin/use-debounced-value";
+import { useDebouncedValue } from "@/lib/use-debounced-value";
 import { ReportVersionViewer } from "@/components/school/report-version-viewer";
 import { apiFetch, errorText } from "@/lib/api";
 
@@ -14,7 +16,7 @@ type QueueRow = {
   average: number | null; position: number | null; classSize: number | null; draftRemark: string | null;
   /** True when draftRemark is the recommendation carried over from a regenerated version, not text typed this time. */
   carriedOver: boolean;
-  student: { admissionNumber: string | null; profile: { firstName: string; lastName: string } };
+  student: { admissionNumber: string | null; profile: { firstName: string; otherNames?: string | null; lastName: string } };
   set: { name: string; term: { name: string } };
   subjects: { name: string; grade: string | null; percentage: number }[];
 };
@@ -44,7 +46,7 @@ export function TeacherReportReviewWorkspace() {
   const [search, setSearch] = useState("");
   const [onlyPending, setOnlyPending] = useState(true);
   const [bulkPending, setBulkPending] = useState(false);
-  const [bulkMessage, setBulkMessage] = useState<string | null>(null);
+
   const timers = useRef(new Map<string, number>());
   const term = useDebouncedValue(search.trim().toLowerCase(), 200);
 
@@ -95,13 +97,13 @@ export function TeacherReportReviewWorkspace() {
   const rows = useMemo(() => (reports.data ?? []).filter((row) => {
     if (onlyPending && row.stage !== "GENERATED") return false;
     if (!term) return true;
-    const name = `${row.student.profile.firstName} ${row.student.profile.lastName}`.toLowerCase();
+    const name = formatPersonName(row.student.profile).toLowerCase();
     return name.includes(term) || (row.student.admissionNumber ?? "").toLowerCase().includes(term);
   }), [reports.data, onlyPending, term]);
 
   const tableRows: RecommendationTableRow[] = rows.map((row) => ({
     id: row.id,
-    pupilName: `${row.student.profile.firstName} ${row.student.profile.lastName}`.trim(),
+    pupilName: formatPersonName(row.student.profile),
     admissionNumber: row.student.admissionNumber,
     context: `${row.set.name} · ${row.set.term.name} · v${row.version}`,
     average: row.average, position: row.position, classSize: row.classSize,
@@ -126,7 +128,7 @@ export function TeacherReportReviewWorkspace() {
     const items = readyIds.map((id) => ({ id, remark: (remarks[id] ?? "").trim() }));
     if (!items.length) return;
     items.forEach((item) => cancelAutosave(item.id));
-    setBulkPending(true); setBulkMessage(null);
+    setBulkPending(true);
     items.forEach((item) => patchState(item.id, { pending: true }));
     try {
       const result = await apiFetch<BulkResult>(BASE + "bulk-recommend", { method: "POST", body: JSON.stringify({ items }) });
@@ -137,11 +139,11 @@ export function TeacherReportReviewWorkspace() {
         return next;
       });
       setSelected((prev) => new Set([...prev].filter((id) => failed.has(id))));
-      setBulkMessage(`${result.succeeded} of ${result.total} recommendations signed off.${failed.size ? " Fix the rows marked in red and try again." : ""}`);
+      toast.success(`${result.succeeded} of ${result.total} recommendations signed off.${failed.size ? " Fix the rows marked in red and try again." : ""}`);
       await queryClient.invalidateQueries({ queryKey: QUEUE_KEY });
     } catch (error) {
       items.forEach((item) => patchState(item.id, undefined));
-      setBulkMessage(errorText(error, "The recommendations could not be saved."));
+      toast.error(errorText(error, "The recommendations could not be saved."));
     } finally {
       setBulkPending(false);
     }
@@ -180,7 +182,7 @@ export function TeacherReportReviewWorkspace() {
           </button>
         </div>
       </div>
-      {bulkMessage && <p role="status" className="text-xs text-muted-foreground">{bulkMessage}</p>}
+
       {rows.length === 0
         ? <p className="text-sm text-muted-foreground">No pupils match.</p>
         : <ReportRecommendationTable

@@ -3,7 +3,9 @@
 // ============================================================================
 
 model School {
+  syncDevices SyncDevice[]
   attendanceExcuseRequests AttendanceExcuseRequest[]
+  payrollPaymentDetails PayrollPaymentDetails[]
   studentDeletionRequests StudentDeletionRequest[]
   schoolRolloverBatches AcademicRolloverBatch[] @relation("AcademicRolloverBatch_school")
   financeBankReconciliations FinanceBankReconciliation[] @relation("FinanceBankReconciliation_school")
@@ -13,6 +15,7 @@ model School {
   notificationSettings SchoolNotificationSettings?
   notificationPreferences NotificationPreference[]
   notificationDeliveries NotificationDelivery[]
+  pushDevices DeviceToken[]
   notificationDailyUsage NotificationDailyUsage[]
   id             String   @id @default(cuid())
   organizationId String   @unique
@@ -165,6 +168,7 @@ model UserProfile {
 }
 
 model Student {
+  busDecisions BusTermDecision[]
   attendanceExcuseRequests AttendanceExcuseRequest[]
   id                 String        @id @default(cuid())
   profileId          String        @unique
@@ -265,6 +269,8 @@ model Teacher {
   payslips              Payslip[]
   timetableEntries      TimetableEntry[]
 
+  payrollPaymentDetails PayrollPaymentDetails?
+
   // Scoped to Academic Year
   assignments          TeacherAssignment[]
   assessmentExtensions AssessmentExtension[]
@@ -309,6 +315,8 @@ model Staff {
   department Department? @relation("StaffDepartment", fields: [departmentId], references: [id])
   documents  Document[]
   payslips   Payslip[]
+
+  payrollPaymentDetails PayrollPaymentDetails?
 
   // Scoped to Academic Year
   assignments StaffAssignment[]

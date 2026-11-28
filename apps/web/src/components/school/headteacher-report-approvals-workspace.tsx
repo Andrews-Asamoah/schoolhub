@@ -1,3 +1,5 @@
+import { toast } from "@/components/ui/toaster";
+import { formatPersonName } from "@schoolhub/shared";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ShieldCheck } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
@@ -5,7 +7,7 @@ import {
   MIN_RECOMMENDATION_LENGTH, ReportRecommendationTable,
   type RecommendationRowState, type RecommendationTableRow, type RecordedRemark,
 } from "@/components/reports/report-recommendation-table";
-import { useDebouncedValue } from "@/components/superadmin/use-debounced-value";
+import { useDebouncedValue } from "@/lib/use-debounced-value";
 import { apiFetch, errorText } from "@/lib/api";
 
 type HeadQueueRow = {
@@ -14,7 +16,7 @@ type HeadQueueRow = {
   /** Your recommendation from the previous version of this report, kept when the batch was regenerated. */
   carriedHeadRemark: string | null;
   average: number | null; position: number | null; classSize: number | null;
-  student: { admissionNumber: string | null; profile: { firstName: string; lastName: string } };
+  student: { admissionNumber: string | null; profile: { firstName: string; otherNames?: string | null; lastName: string } };
   set: { name: string; term: { name: string } };
   subjects: { name: string; grade: string | null; percentage: number }[];
 };
@@ -59,7 +61,7 @@ export function HeadteacherReportApprovalsWorkspace() {
   const [batch, setBatch] = useState("");
   const [className, setClassName] = useState("");
   const [bulkPending, setBulkPending] = useState(false);
-  const [bulkMessage, setBulkMessage] = useState<string | null>(null);
+
   const term = useDebouncedValue(search.trim().toLowerCase(), 200);
 
   const patchState = useCallback((id: string, next: RecommendationRowState | undefined) =>
@@ -87,7 +89,7 @@ export function HeadteacherReportApprovalsWorkspace() {
     if (batch && `${row.set.name} · ${row.set.term.name}` !== batch) return false;
     if (className && row.className !== className) return false;
     if (!term) return true;
-    const name = `${row.student.profile.firstName} ${row.student.profile.lastName}`.toLowerCase();
+    const name = formatPersonName(row.student.profile).toLowerCase();
     return name.includes(term) || (row.student.admissionNumber ?? "").toLowerCase().includes(term);
   }).sort((a, b) =>
     a.className.localeCompare(b.className) || (a.position ?? Infinity) - (b.position ?? Infinity)),
@@ -98,7 +100,7 @@ export function HeadteacherReportApprovalsWorkspace() {
     if (row.stage === "APPROVED") recorded.push({ label: `Headteacher${row.headName ? ` (${row.headName})` : ""}`, text: row.headRemark });
     return {
       id: row.id,
-      pupilName: `${row.student.profile.firstName} ${row.student.profile.lastName}`.trim(),
+      pupilName: formatPersonName(row.student.profile),
       admissionNumber: row.student.admissionNumber,
       context: `${row.className} · ${row.set.name} · v${row.version}`,
       average: row.average, position: row.position, classSize: row.classSize,
@@ -136,7 +138,7 @@ export function HeadteacherReportApprovalsWorkspace() {
   const approveBulk = async () => {
     const items = readyIds.map((id) => ({ id, remark: remarkOf(id).trim() }));
     if (!items.length) return;
-    setBulkPending(true); setBulkMessage(null);
+    setBulkPending(true);
     items.forEach((item) => patchState(item.id, { pending: true }));
     try {
       const result = await apiFetch<BulkResult>(BASE + "bulk-head-approve", { method: "POST", body: JSON.stringify({ items }) });
@@ -147,11 +149,11 @@ export function HeadteacherReportApprovalsWorkspace() {
         return next;
       });
       setSelected((prev) => new Set([...prev].filter((id) => failed.has(id))));
-      setBulkMessage(`${result.succeeded} of ${result.total} reports approved.${failed.size ? " Fix the rows marked in red and try again." : ""}`);
+      toast.success(`${result.succeeded} of ${result.total} reports approved.${failed.size ? " Fix the rows marked in red and try again." : ""}`);
       await refresh();
     } catch (error) {
       items.forEach((item) => patchState(item.id, undefined));
-      setBulkMessage(errorText(error, "The reports could not be approved."));
+      toast.error(errorText(error, "The reports could not be approved."));
     } finally {
       setBulkPending(false);
     }
@@ -206,7 +208,7 @@ export function HeadteacherReportApprovalsWorkspace() {
           </button>
         </div>
       </div>
-      {bulkMessage && <p role="status" className="text-xs text-muted-foreground">{bulkMessage}</p>}
+
       {rows.length === 0
         ? <p className="text-sm text-muted-foreground">No pupils match.</p>
         : <ReportRecommendationTable

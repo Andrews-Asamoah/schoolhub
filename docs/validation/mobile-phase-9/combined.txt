@@ -1,0 +1,46 @@
+SchoolHub mobile combined validation. Excerpts from local command output.
+
+Frozen install, API/mobile typecheck, mobile lint, formatting and mobile tests
+Done in 536ms using pnpm v11.25.0
+Done in 1.6s using pnpm v11.25.0
+$ tsc --noEmit
+Done in 1.8s using pnpm v11.25.0
+$ expo lint --max-warnings 0
+All matched files use Prettier code style!
+Test Suites: 28 passed, 28 total
+Tests:       240 passed, 240 total
+PASS: 1582 text, icon, gradient and composited chrome contrast pairs across light/dark themes.
+PASS: 75 endpoint declarations match inventory methods, paths and mobile roles.
+ℹ tests 45
+ℹ pass 45
+ℹ fail 0
+
+Expo Doctor
+Running 20 checks on your project...
+20/20 checks passed. No issues detected!
+
+Android and iOS release exports
+Android Bundled 49500ms node_modules/.pnpm/expo-router@58.0.32_efadef6d722a54fbc8fe825ffa1bb22c/node_modules/expo-router/entry.js (4508 modules)
+Exported: dist/android
+entry-e185284d14d73cc14db377b199ef061b.hbc: 6860776 bytes (Hermes)
+PASS: 1 source map(s), 62 app sources; no development, mock or Super Admin routes.
+iOS Bundled 57325ms node_modules/.pnpm/expo-router@58.0.32_efadef6d722a54fbc8fe825ffa1bb22c/node_modules/expo-router/entry.js (4507 modules)
+Exported: dist/ios
+entry-29061fc9830cf750501ac916828a78c3.hbc: 6860496 bytes (Hermes)
+PASS: 1 source map(s), 62 app sources; no development, mock or Super Admin routes.
+
+PostgreSQL migration and regression checks
+74 migrations found in prisma/migrations
+No pending migrations to apply.
+No difference detected.
+Test Files  3 passed (3)
+Tests  9 passed (9)
+$ vitest run --config vitest.config.e2e.ts test/two-factor.e2e-spec.ts
+Test Files  1 passed (1)
+Tests  20 passed (20)
+
+Production audit (high-severity gate)
+6 vulnerabilities found
+Severity: 1 low | 5 moderate
+
+The Expo exports are JavaScript bundles. Signed builds and physical-device checks still require release acceptance.

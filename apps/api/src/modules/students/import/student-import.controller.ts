@@ -1,7 +1,9 @@
 import { BadRequestException, Body, Controller, Header, Post, UploadedFile, UseGuards, UseInterceptors } from "@nestjs/common";
 import { FileInterceptor } from "@nestjs/platform-express";
+import { Throttle } from "@nestjs/throttler";
 import type { School } from "@prisma/client";
 import { STUDENT_IMPORT_LIMITS, importStudentBatchSchema, type ImportStudentBatchInput } from "@schoolhub/shared";
+import { BULK_THROTTLE } from "../../../common/bulk-throttle.js";
 import { CurrentSchool } from "../../../common/decorators/current-school.decorator.js";
 import { CurrentSchoolRole } from "../../../common/decorators/current-school-role.decorator.js";
 import { CurrentUser, type AuthenticatedUser } from "../../../common/decorators/current-user.decorator.js";
@@ -17,6 +19,7 @@ import { StudentImportService } from "./student-import.service.js";
  * so they are never cached.
  */
 @Controller("students/import")
+@Throttle(BULK_THROTTLE)
 @UseGuards(SchoolTenantGuard, RolesGuard)
 @Roles("owner", "admin", "headteacher")
 export class StudentImportController {

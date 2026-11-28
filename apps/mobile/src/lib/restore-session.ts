@@ -2,6 +2,7 @@ import { getSchoolRoles } from "@/api/schools";
 import { authClient, isCurrentAuthResponse } from "./auth-client";
 import { hydrateSession, sessionStore } from "./session";
 import { isMobileRole } from "./permissions";
+import { ApiError } from "./api-error";
 import { log } from "./log";
 
 export async function restoreSession() {
@@ -26,6 +27,18 @@ async function restoreSavedSession(retry: boolean) {
     )
       return;
     ownerRevision = sessionStore.getRevision();
+    if (
+      result.error &&
+      (result.error.status === 0 ||
+        result.error.status === 408 ||
+        result.error.status === 429 ||
+        result.error.status >= 500)
+    )
+      throw new ApiError(
+        result.error.status,
+        "Unable to verify the saved session.",
+        null,
+      );
     const user = result.data?.user as
       { role?: string; mustChangePassword?: boolean } | undefined;
     if (
@@ -42,7 +55,10 @@ async function restoreSavedSession(retry: boolean) {
       !sessionStore.getSnapshot().token ||
       (sessionStore.getSnapshot().status !== "loading" &&
         !(
-          retry && sessionStore.getSnapshot().status === "subscriptionInactive"
+          retry &&
+          ["subscriptionInactive", "restoreUnavailable"].includes(
+            sessionStore.getSnapshot().status,
+          )
         ))
     )
       return;
@@ -60,9 +76,25 @@ async function restoreSavedSession(retry: boolean) {
       roles: membership.roles,
       activeRole: preferred,
       mustChangePassword: user.mustChangePassword,
+      restoring: true,
     });
-  } catch {
+  } catch (error) {
     if (sessionStore.getRevision() !== ownerRevision) return;
+    if (
+      error instanceof TypeError ||
+      (error instanceof ApiError &&
+        (error.status === 0 ||
+          error.status === 408 ||
+          error.status === 429 ||
+          error.status >= 500))
+    ) {
+      sessionStore.markRestoreUnavailable(ownerRevision);
+      if (retry)
+        throw new Error(
+          "Unable to verify your session. Check your connection and try again.",
+        );
+      return;
+    }
     if (retry)
       throw new Error(
         "Unable to refresh your school session. Try again shortly.",

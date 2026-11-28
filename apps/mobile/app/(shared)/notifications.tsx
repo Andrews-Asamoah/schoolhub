@@ -1,4 +1,4 @@
-import { router, type Href } from "expo-router";
+import { openPortalTool } from "@/lib/portal-tools";
 import { Bell, Settings2 } from "lucide-react-native";
 import { View } from "react-native";
 import { Button } from "@/components/Button";
@@ -41,18 +41,14 @@ export default function NotificationsScreen() {
             label="History"
             variant="secondary"
             block={false}
-            onPress={() =>
-              router.push("/(shared)/notification-history" as Href)
-            }
+            onPress={() => openPortalTool("/notification-history")}
           />
           <Button
             label="Settings"
             variant="secondary"
             block={false}
             icon={<Settings2 size={18} color={colors.foreground} />}
-            onPress={() =>
-              router.push("/(shared)/notification-settings" as Href)
-            }
+            onPress={() => openPortalTool("/notification-settings")}
           />
         </View>
         {query.data?.unreadCount ? (

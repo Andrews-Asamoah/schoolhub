@@ -1,10 +1,17 @@
 import { useEffect, useRef, useState, type SetStateAction } from "react";
 import { useBlocker } from "@tanstack/react-router";
 import { useSession } from "@/lib/auth-client";
+import { confirmAction } from "@/components/ui/confirm-host";
 
 const dirtyEditors = new Set<symbol>();
-export function confirmLeavingDrafts() {
-  return dirtyEditors.size === 0 || window.confirm("You have unsaved marks. Continue? Your draft will remain available in this tab for 24 hours.");
+export function hasUnsavedMarks() { return dirtyEditors.size > 0; }
+export async function confirmLeavingDrafts(): Promise<boolean> {
+  if (dirtyEditors.size === 0) return true;
+  return confirmAction({
+    title: "Leave with unsaved marks?",
+    description: "You have unsaved marks. Your draft will remain available in this tab for 24 hours.",
+    confirmLabel: "Leave",
+  });
 }
 
 /** Tab-local recovery, scoped to principal, school, role, term and sheet. */
@@ -42,6 +49,6 @@ export function useMarkDraft<T>(sheetKey: string, valid: (value: unknown) => val
     if (dirty) dirtyEditors.add(id); else dirtyEditors.delete(id);
     return () => { dirtyEditors.delete(id); };
   }, [dirty]);
-  useBlocker({ disabled: !dirty, enableBeforeUnload: dirty, shouldBlockFn: () => !confirmLeavingDrafts() });
+  useBlocker({ disabled: !dirty, enableBeforeUnload: dirty, shouldBlockFn: async () => !(await confirmLeavingDrafts()) });
   return [value, setValue] as const;
 }

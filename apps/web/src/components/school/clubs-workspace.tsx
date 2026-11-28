@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import {
+  formatPersonName,
   createClubSchema,
   updateClubSchema,
   addClubMemberSchema,
@@ -26,6 +27,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { AcademicStructureBulkImport } from "@/components/school/academic-structure-bulk-import";
 import { BulkImportButton } from "@/components/bulk-import/bulk-import-button";
 import { labeledInputClasses } from "@/components/forms/labeled-controls";
+import { confirmAction } from "@/components/ui/confirm-host";
 
 interface ClubMemberRecord {
   id: string;
@@ -37,7 +39,7 @@ interface ClubMemberRecord {
     id: string;
     studentId: string;
     admissionNumber: string;
-    profile: { firstName: string; lastName: string; gender?: string | null };
+    profile: { firstName: string; otherNames?: string | null; lastName: string; gender?: string | null };
     house: { id: string; name: string; color?: string | null } | null;
   };
 }
@@ -71,6 +73,7 @@ interface StudentOption {
   studentId: string;
   admissionNumber: string;
   firstName: string;
+  otherNames?: string | null;
   lastName: string;
   currentClass?: { name: string } | null;
 }
@@ -465,9 +468,8 @@ export function ClubsWorkspace() {
                       </button>
                       <button
                         onClick={() => {
-                          if (confirm(`Are you sure you want to delete "${club.name}"?`)) {
-                            deleteClubMutation.mutate(club.id);
-                          }
+                          void confirmAction({ title: "Delete club?", description: `Are you sure you want to delete "${club.name}"?`, confirmLabel: "Delete", danger: true })
+                            .then((ok) => { if (ok) deleteClubMutation.mutate(club.id); });
                         }}
                         aria-label="Delete club"
                         className="rounded-lg p-1.5 text-muted-foreground/70 hover:bg-destructive/10 hover:text-destructive"
@@ -632,7 +634,7 @@ export function ClubsWorkspace() {
                   <SelectTrigger aria-label="Select student to enroll" className="h-9 min-w-48 flex-1"><SelectValue placeholder="Select student to enroll..." /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="__none__">Select student to enroll...</SelectItem>
-                    {(studentsQuery.data ?? []).map((student) => <SelectItem key={student.id} value={student.id}>{student.firstName} {student.lastName} ({student.admissionNumber || student.studentId})</SelectItem>)}
+                    {(studentsQuery.data ?? []).map((student) => <SelectItem key={student.id} value={student.id}>{formatPersonName(student)} ({student.admissionNumber || student.studentId})</SelectItem>)}
                   </SelectContent>
                 </Select>
 
@@ -689,7 +691,7 @@ export function ClubsWorkspace() {
                         </div>
                         <div>
                           <p className="font-bold text-foreground">
-                            {m.student.profile.firstName} {m.student.profile.lastName}
+                            {formatPersonName(m.student.profile)}
                           </p>
                           <p className="text-[10px] text-muted-foreground/70">
                             {m.student.admissionNumber || m.student.studentId} • {m.student.house?.name ?? "No House"}
@@ -704,12 +706,9 @@ export function ClubsWorkspace() {
                         {canManage && (
                           <button
                             onClick={() => {
-                              if (confirm("Remove student from this club?")) {
-                                removeMemberMutation.mutate({
-                                  clubId: selectedClubForMembers.id,
-                                  studentId: m.studentId,
-                                });
-                              }
+                              const clubId = selectedClubForMembers.id;
+                              void confirmAction({ title: "Remove student?", description: "Remove student from this club?", confirmLabel: "Remove", danger: true })
+                                .then((ok) => { if (ok) removeMemberMutation.mutate({ clubId, studentId: m.studentId }); });
                             }}
                             className="rounded-lg p-1 text-muted-foreground/70 hover:bg-destructive/10 hover:text-destructive"
                           >

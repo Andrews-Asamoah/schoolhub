@@ -1,5 +1,6 @@
 import type { ComponentProps, ReactNode } from "react";
 import { PortalModal } from "@/components/portal/portal-modal";
+import { confirmAction } from "@/components/ui/confirm-host";
 
 interface BulkImportDialogProps {
   title: string;
@@ -30,8 +31,10 @@ export function BulkImportDialog({
   maxWidth = "4xl",
 }: BulkImportDialogProps) {
   const dismiss = () => {
-    if (busy && !window.confirm(busyMessage)) return;
-    onClose();
+    if (!busy) return onClose();
+    void confirmAction({ title: "Close while uploading?", description: busyMessage, confirmLabel: "Close window" }).then((ok) => {
+      if (ok) onClose();
+    });
   };
   return (
     <PortalModal isOpen onClose={dismiss} title={title} description={description} footer={footer} maxWidth={maxWidth}>

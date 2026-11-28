@@ -32,6 +32,7 @@ import {
   FileSpreadsheet,
   FileText,
   Inbox,
+  LoaderCircle,
   Printer,
   Search,
   SlidersHorizontal,
@@ -41,10 +42,14 @@ import {
   Table,
   TableBody,
   TableCell,
+  TableFooter,
   TableHead,
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { ErrorState } from "@/components/ui/empty-state";
+import { Skeleton } from "@/components/ui/skeleton";
+import { errorText } from "@/lib/api";
 import {
   exportPdf,
   exportXlsx,
@@ -80,7 +85,11 @@ export interface DataTableColumn<T> {
   exportable?: boolean;
   /** Allow sorting by this column. Defaults to true except for action columns. */
   sortable?: boolean;
+  /** Cell alignment. Right-aligned columns also use tabular figures so money and marks line up. */
+  align?: "left" | "center" | "right";
 }
+
+const ALIGN_CLASS = { left: "", center: "text-center", right: "text-right tabular-nums" } as const;
 
 const isActionColumn = (column: { header: string }) => !column.header.trim() || /^actions?$/i.test(column.header.trim());
 
@@ -112,6 +121,13 @@ export interface DataTableProps<T extends RowData> {
   embedded?: boolean;
   /** Client-side paging. Turn off when the page already pages on the server. */
   paginate?: boolean;
+  /** Placeholder rows while the first load is in flight. */
+  isLoading?: boolean;
+  /** A failed load: shows a retry banner instead of an empty table. */
+  error?: unknown;
+  onRetry?: () => void;
+  /** Totals or summary rows (<TableRow> elements) shown in the table footer. */
+  footer?: ReactNode;
 }
 
 export function DataTable<T extends RowData>({
@@ -128,6 +144,10 @@ export function DataTable<T extends RowData>({
   searchable = true,
   embedded = false,
   paginate = true,
+  isLoading = false,
+  error,
+  onRetry,
+  footer,
 }: DataTableProps<T>) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [globalFilter, setGlobalFilter] = useState("");
@@ -148,7 +168,7 @@ export function DataTable<T extends RowData>({
       enableSorting: column.sortable ?? !isActionColumn(column),
       enableGlobalFilter: !isActionColumn(column) || column.value !== undefined,
       sortFn: (a, b, id) => compareValues(a.getValue(id), b.getValue(id)),
-      meta: { className: column.className, exportable: column.exportable ?? !isActionColumn(column) },
+      meta: { className: cn(ALIGN_CLASS[column.align ?? "left"], column.className), exportable: column.exportable ?? !isActionColumn(column) },
     }));
     if (!canExport) return data;
     return [
@@ -211,6 +231,8 @@ export function DataTable<T extends RowData>({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rows]);
 
+  if (error) return <ErrorState message={errorText(error)} onRetry={onRetry} />;
+  if (isLoading) return <DataTableSkeleton columns={columns.length} />;
   if (rows.length === 0) return <DataTableEmpty title={emptyTitle} description={emptyDescription} />;
 
   const filteredCount = table.getPrePaginatedRowModel().rows.length;
@@ -301,7 +323,7 @@ export function DataTable<T extends RowData>({
                     key={header.id}
                     scope="col"
                     aria-sort={sorted === "asc" ? "ascending" : sorted === "desc" ? "descending" : undefined}
-                    className={cn("px-5", meta?.className)}
+                    className={meta?.className}
                   >
                     {header.isPlaceholder ? null : header.column.getCanSort() ? (
                       <button
@@ -328,7 +350,7 @@ export function DataTable<T extends RowData>({
                 {row.getVisibleCells().map((cell) => {
                   const meta = cell.column.columnDef.meta as { className?: string } | undefined;
                   return (
-                    <TableCell key={cell.id} className={cn("px-5 py-3.5", meta?.className)}>
+                    <TableCell key={cell.id} className={meta?.className}>
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </TableCell>
                   );
@@ -343,6 +365,7 @@ export function DataTable<T extends RowData>({
             </TableRow>
           )}
         </TableBody>
+        {footer && <TableFooter>{footer}</TableFooter>}
       </Table>
 
       {!compact && paginate && (
@@ -378,14 +401,58 @@ export function DataTable<T extends RowData>({
 }
 
 /** Print / PDF / Excel menu for any table-shaped data (also used by the timetable grid). */
-export function TableExportMenu({ build, note }: { build: () => ExportTable; note?: string }) {
+export function TableExportMenu({ build, note, officialPdf, onPrint, triggerClassName, openUp = false }: {
+  build: () => ExportTable;
+  note?: string;
+  officialPdf?: () => Promise<void>;
+  onPrint?: () => void;
+  triggerClassName?: string;
+  openUp?: boolean;
+}) {
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string>();
+
+  async function download(action: () => Promise<void>) {
+    setPending(true);
+    setError(undefined);
+    try {
+      await action();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Export failed. Please try again.");
+    } finally {
+      setPending(false);
+    }
+  }
+
   return (
-    <Menu label="Export" icon={<Download className="size-3.5" />}>
-      <MenuButton icon={<Printer className="size-3.5" />} onClick={() => printTable(build())}>Print</MenuButton>
-      <MenuButton icon={<FileSpreadsheet className="size-3.5" />} onClick={() => void exportXlsx(build())}>Export Excel</MenuButton>
-      <MenuButton icon={<FileText className="size-3.5" />} onClick={() => void exportPdf(build())}>Export PDF</MenuButton>
-      {note && <p className="border-t border-border px-2 pb-1 pt-2 text-[10px] text-muted-foreground">{note}</p>}
-    </Menu>
+    <div className="flex flex-col items-end gap-1">
+      <Menu label={pending ? "Preparing…" : "Export"}
+        icon={pending ? <LoaderCircle className="size-4 animate-spin" /> : <Download className="size-4" />}
+        triggerClassName={triggerClassName} openUp={openUp} busy={pending}>
+        <MenuButton icon={<FileText className="size-3.5" />} onClick={() => void download(officialPdf ?? (() => exportPdf(build())))}>
+          {officialPdf ? "Download official PDF" : "Export PDF"}
+        </MenuButton>
+        <MenuButton icon={<Printer className="size-3.5" />} onClick={onPrint ?? (() => printTable(build()))}>
+          {onPrint ? "Print / Save PDF" : "Print"}
+        </MenuButton>
+        <MenuButton icon={<FileSpreadsheet className="size-3.5" />} onClick={() => void download(() => exportXlsx(build()))}>Export Excel</MenuButton>
+        {note && <p className="border-t border-border px-2 pb-1 pt-2 text-[10px] text-muted-foreground">{note}</p>}
+      </Menu>
+      {error && <p role="alert" className="text-xs text-destructive">{error}</p>}
+    </div>
+  );
+}
+
+export function DataTableSkeleton({ columns, rows = 5 }: { columns: number; rows?: number }) {
+  const cols = Math.max(1, columns);
+  return (
+    <div role="status" aria-label="Loading table" className="space-y-3 rounded-2xl border border-border bg-card p-4">
+      {Array.from({ length: rows }, (_, row) => (
+        <div key={row} className="grid gap-3" style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}>
+          {Array.from({ length: cols }, (_, col) => <Skeleton key={col} className="h-5" />)}
+        </div>
+      ))}
+    </div>
   );
 }
 
@@ -415,38 +482,49 @@ function PagerButton({ label, disabled, onClick, children }: { label: string; di
   );
 }
 
-function Menu({ label, icon, children }: { label: string; icon: ReactNode; children: ReactNode }) {
+function Menu({ label, icon, children, triggerClassName, openUp = false, busy = false }: {
+  label: string; icon: ReactNode; children: ReactNode; triggerClassName?: string; openUp?: boolean; busy?: boolean;
+}) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     if (!open) return;
     const close = (event: MouseEvent | KeyboardEvent) => {
       if (event instanceof KeyboardEvent) {
-        if (event.key === "Escape") setOpen(false);
+        if (event.key !== "Escape") return;
+        if (ref.current?.contains(document.activeElement)) {
+          event.stopPropagation();
+          triggerRef.current?.focus();
+        }
+        setOpen(false);
       } else if (ref.current && !ref.current.contains(event.target as Node)) {
         setOpen(false);
       }
     };
     document.addEventListener("mousedown", close);
-    document.addEventListener("keydown", close);
+    document.addEventListener("keydown", close, true);
     return () => {
       document.removeEventListener("mousedown", close);
-      document.removeEventListener("keydown", close);
+      document.removeEventListener("keydown", close, true);
     };
   }, [open]);
   return (
     <div ref={ref} className="relative">
       <button
         type="button"
+        ref={triggerRef}
+        disabled={busy}
+        aria-busy={busy || undefined}
         aria-haspopup="menu"
         aria-expanded={open}
         onClick={() => setOpen((value) => !value)}
-        className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-border bg-background px-3 text-xs font-semibold text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+        className={triggerClassName ?? "inline-flex h-9 items-center gap-1.5 rounded-lg border border-border bg-background px-3 text-xs font-semibold text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50"}
       >
         {icon} {label}
       </button>
       {open && (
-        <div role="menu" className="absolute right-0 z-20 mt-1 min-w-48 rounded-xl border border-border bg-popover p-1 text-popover-foreground shadow-lg" onClick={(event) => {
+        <div role="menu" className={cn("absolute right-0 z-20 min-w-48 rounded-xl border border-border bg-popover p-1 text-popover-foreground shadow-lg", openUp ? "bottom-full mb-1" : "mt-1")} onClick={(event) => {
           if ((event.target as HTMLElement).closest("[data-menu-close]")) setOpen(false);
         }}>
           {children}

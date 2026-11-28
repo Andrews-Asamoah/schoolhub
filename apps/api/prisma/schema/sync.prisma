@@ -1,0 +1,27 @@
+// Logical installation identifiers are metadata, never authentication secrets.
+model SyncDevice {
+  id               String   @id @default(uuid())
+  schoolId         String
+  userId           String
+  installationId   String   @db.Uuid
+  name             String   @db.VarChar(80)
+  platform         String   @db.VarChar(10)
+  clientVersion    String   @db.VarChar(32)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  lastSeenAt       DateTime @default(now())
+  revokedAt        DateTime?
+  revokedById      String?
+  revocationReason String?  @db.VarChar(500)
+
+  school   School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  owner    user   @relation("SyncDeviceOwner", fields: [userId], references: [id], onDelete: Cascade)
+  revoker  user?  @relation("SyncDeviceRevoker", fields: [revokedById], references: [id], onDelete: SetNull)
+  sessions session[]
+
+  @@unique([schoolId, userId, installationId])
+  @@index([schoolId, createdAt, id])
+  @@index([userId])
+  @@index([revokedById])
+  @@map("sync_devices")
+}

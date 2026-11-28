@@ -1,3 +1,4 @@
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { commonWeight, ordinalParts } from "@schoolhub/shared";
 import { CheckCircle2, GraduationCap, UserRound } from "lucide-react";
 import { useState, type ReactNode } from "react";
@@ -187,32 +188,32 @@ export function ReportCardDocument(props: ReportDocumentProps) {
           </div>
           {subjects.length ? (
             <div className="overflow-x-auto rounded-xl border border-border">
-              <table className="w-full min-w-[640px] border-collapse text-left text-sm">
-                <thead>
-                  <tr style={{ backgroundColor: accent, color: onAccent }}>
-                    <th scope="col" className={heading}>Subject</th>
-                    <th scope="col" className={`${heading} text-center`}>Class Score{classWeight ? ` (${fixed(classWeight, 0)}%)` : ""}</th>
-                    {showExam && <th scope="col" className={`${heading} text-center`}>Exam Score{examWeight ? ` (${fixed(examWeight, 0)}%)` : ""}</th>}
-                    <th scope="col" className={`${heading} text-center`}>Total Score ({fixed(totalWeight, 0)}%)</th>
-                    <th scope="col" className={`${heading} text-center`}>Grade</th>
-                    {showPosition && <th scope="col" className={`${heading} text-center`}>Position</th>}
-                    <th scope="col" className={heading}>Remarks</th>
-                  </tr>
-                </thead>
-                <tbody>
+              <Table scroll={false} className="w-full min-w-[640px] border-collapse text-left text-sm">
+                <TableHeader>
+                  <TableRow style={{ backgroundColor: accent, color: onAccent }}>
+                    <TableHead scope="col" className={heading}>Subject</TableHead>
+                    <TableHead scope="col" className={`${heading} text-center`}>Class Score{classWeight ? ` (${fixed(classWeight, 0)}%)` : ""}</TableHead>
+                    {showExam && <TableHead scope="col" className={`${heading} text-center`}>Exam Score{examWeight ? ` (${fixed(examWeight, 0)}%)` : ""}</TableHead>}
+                    <TableHead scope="col" className={`${heading} text-center`}>Total Score ({fixed(totalWeight, 0)}%)</TableHead>
+                    <TableHead scope="col" className={`${heading} text-center`}>Grade</TableHead>
+                    {showPosition && <TableHead scope="col" className={`${heading} text-center`}>Position</TableHead>}
+                    <TableHead scope="col" className={heading}>Remarks</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
                   {subjects.map((row, index) => (
-                    <tr key={row.subject.id} className={index % 2 ? "border-t border-border bg-muted/20" : "border-t border-border"}>
-                      <th scope="row" className="p-3 text-left font-semibold">{row.subject.name}</th>
-                      <td className="p-3 text-center tabular-nums">{scoreCell(row.classScore, row.classWeight, classWeight)}</td>
-                      {showExam && <td className="p-3 text-center tabular-nums">{scoreCell(row.examScore, row.examWeight, examWeight)}</td>}
-                      <td className="p-3 text-center font-semibold tabular-nums">{fixed(row.totalScore)}</td>
-                      <td className="p-3 text-center"><span className="inline-flex min-w-9 justify-center rounded-lg px-2 py-1 text-xs font-black" style={{ color: accent, backgroundColor: `${accent}14` }}>{row.grade ?? "—"}</span></td>
-                      {showPosition && <td className="p-3 text-center tabular-nums">{row.position == null ? "—" : <Ordinal value={row.position} />}</td>}
-                      <td className="p-3 text-muted-foreground">{row.gradeRemark ?? row.remarks ?? "—"}</td>
-                    </tr>
+                    <TableRow key={row.subject.id} className={index % 2 ? "border-t border-border bg-muted/20" : "border-t border-border"}>
+                      <TableHead scope="row" className="p-3 text-left font-semibold">{row.subject.name}</TableHead>
+                      <TableCell className="p-3 text-center tabular-nums">{scoreCell(row.classScore, row.classWeight, classWeight)}</TableCell>
+                      {showExam && <TableCell className="p-3 text-center tabular-nums">{scoreCell(row.examScore, row.examWeight, examWeight)}</TableCell>}
+                      <TableCell className="p-3 text-center font-semibold tabular-nums">{fixed(row.totalScore)}</TableCell>
+                      <TableCell className="p-3 text-center"><span className="inline-flex min-w-9 justify-center rounded-lg px-2 py-1 text-xs font-black" style={{ color: accent, backgroundColor: `${accent}14` }}>{row.grade ?? "—"}</span></TableCell>
+                      {showPosition && <TableCell className="p-3 text-center tabular-nums">{row.position == null ? "—" : <Ordinal value={row.position} />}</TableCell>}
+                      <TableCell className="p-3 text-muted-foreground">{row.gradeRemark ?? row.remarks ?? "—"}</TableCell>
+                    </TableRow>
                   ))}
-                </tbody>
-              </table>
+                </TableBody>
+              </Table>
             </div>
           ) : (
             <div className="rounded-xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">No finalized subject results were included in this report.</div>

@@ -13,7 +13,7 @@ export interface SubscriptionTarget {
   id: string;
   name: string;
   organization: { subscriptionStatus: string; expiresAt: string | null };
-  subscription?: { planId: string | null; planName: string; amount: string | number | null; currency: string; billingCycle: "MONTHLY" | "YEARLY" | null } | null;
+  subscription?: { planId: string | null; planName: string; amount: string | number | null; currency: string; billingCycle: "MONTHLY" | "YEARLY" | null; settings?: { desktopEnabled?: boolean } | null } | null;
 }
 
 const STATUS_OPTIONS: { value: SubscriptionStatusValue; label: string; hint: string }[] = [
@@ -40,6 +40,8 @@ export function SubscriptionDialog({ school, onClose }: { school: SubscriptionTa
   const [status, setStatus] = useState<string>(school.organization.subscriptionStatus);
   const [expiry, setExpiry] = useState(initialDate);
   const [note, setNote] = useState("");
+  const initialDesktop = typeof school.subscription?.settings?.desktopEnabled === "boolean" ? String(school.subscription.settings.desktopEnabled) : "plan";
+  const [desktopAccess, setDesktopAccess] = useState(initialDesktop);
   const [planId, setPlanId] = useState(school.subscription?.planId ?? "");
   const [billingCycle, setBillingCycle] = useState<"MONTHLY" | "YEARLY">(school.subscription?.billingCycle ?? "MONTHLY");
   const plans = useQuery({ queryKey: ["superadmin", "subscription-plans"], queryFn: () => apiFetch<Array<{ id: string; name: string; code: string; monthlyPrice: string | number; yearlyPrice: string | number; currency: string; isActive: boolean }>>("/super-admin/subscription-plans") });
@@ -48,7 +50,8 @@ export function SubscriptionDialog({ school, onClose }: { school: SubscriptionTa
 
   const mutation = useMutation({
     mutationFn: () => {
-      const body: { status: string; expiresAt?: string | null; note?: string } = { status };
+      const body: { status: string; expiresAt?: string | null; note?: string; desktopEnabled?: boolean | null } = { status };
+      if (desktopAccess !== initialDesktop) body.desktopEnabled = desktopAccess === "plan" ? null : desktopAccess === "true";
       if (expiry !== initialDate) body.expiresAt = expiry || null;
       if (note.trim()) body.note = note.trim();
       return apiFetch(`/super-admin/schools/${school.id}/subscription`, { method: "PATCH", body: JSON.stringify(body) });
@@ -75,7 +78,7 @@ export function SubscriptionDialog({ school, onClose }: { school: SubscriptionTa
 
   const effectiveExpiry = expiry ? `${expiry}T23:59:59.999Z` : null;
   const outcome = evaluateSubscriptionAccess(status, effectiveExpiry);
-  const unchanged = status === school.organization.subscriptionStatus && expiry === initialDate && !note.trim();
+  const unchanged = status === school.organization.subscriptionStatus && expiry === initialDate && desktopAccess === initialDesktop && !note.trim();
 
   return createPortal(
     <div className="superadmin-dialog-backdrop fixed inset-0 z-50 flex items-end justify-center bg-overlay p-0 sm:items-center sm:p-4" role="presentation"
@@ -121,6 +124,13 @@ export function SubscriptionDialog({ school, onClose }: { school: SubscriptionTa
           {planMutation.isSuccess && <p role="status" className="mt-2 text-xs text-success">Plan assignment saved.</p>}
           {plans.error && <p role="alert" className="mt-2 text-xs text-destructive">Plans could not be loaded: {plans.error.message}</p>}
         </section>
+        <div className="mt-5">
+          <label htmlFor="sub-desktop-access" className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Desktop app access</label>
+          <select id="sub-desktop-access" value={desktopAccess} onChange={event => setDesktopAccess(event.target.value)} className="mt-2 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground">
+            <option value="plan">Use assigned plan</option><option value="true">Enable for this school</option><option value="false">Disable for this school</option>
+          </select>
+          <p className="mt-1 text-xs text-muted-foreground">An override takes precedence over the plan. An inactive subscription still blocks desktop access.</p>
+        </div>
         <fieldset className="mt-5">
           <legend className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Status</legend>
           <div className="mt-2 grid gap-2 sm:grid-cols-2">

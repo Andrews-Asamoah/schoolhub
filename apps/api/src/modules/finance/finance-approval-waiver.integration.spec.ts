@@ -39,7 +39,7 @@ describe.skipIf(!enabled)("finance approvals switched off (PostgreSQL)", { timeo
     bankId = (await db.chartAccount.create({ data: { schoolId, code: "1000", name: "Bank", accountType: "ASSET", category: "BANK" } })).id;
     revenueId = (await db.chartAccount.create({ data: { schoolId, code: "4000", name: "Fees", accountType: "REVENUE", category: "OTHER_INCOME" } })).id;
     await db.chartAccount.create({ data: { schoolId, code: "1200", name: "Student receivables", accountType: "ASSET", category: "ACCOUNTS_RECEIVABLE" } });
-    await db.$transaction(tx => new FinancePostingService({ client: db } as never).post(tx, {
+    await db.$transaction(tx => new FinancePostingService().post(tx, {
       schoolId, date: new Date("2026-09-02"), description: "Bank receipt", amount: new Prisma.Decimal(10),
       debitAccountId: bankId, creditAccountId: revenueId, transactionType: "INCOME",
     }));
@@ -59,10 +59,14 @@ describe.skipIf(!enabled)("finance approvals switched off (PostgreSQL)", { timeo
     await db.$disconnect();
   });
 
-  it("defaults every control to no second approver for a school with no saved setting", async () => {
+  it("preserves independent payroll review for schools with no saved setting", async () => {
     const all = await settings.list(schoolId);
-    expect(all).toHaveLength(6);
-    for (const item of all) expect(item).toMatchObject({ required: false, approverRoles: [], configured: false });
+    expect(all).toHaveLength(7);
+    const payroll = all.find(item => item.control === "PAYROLL_RUN");
+    expect(payroll).toMatchObject({ required: true, approverRoles: ["owner", "accountant"], configured: false });
+    for (const item of all.filter(item => item !== payroll)) {
+      expect(item).toMatchObject({ required: false, approverRoles: [], configured: false });
+    }
   });
 
   it("completes a bank reconciliation on submit and records that it was waived", async () => {

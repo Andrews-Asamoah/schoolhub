@@ -1,3 +1,4 @@
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { CircleAlert, GraduationCap, ShieldAlert, ShieldCheck, ShieldX } from "lucide-react";
@@ -89,12 +90,12 @@ function VerifyReportPage() {
                 <h2 className="text-sm font-bold">Results on record</h2>
                 <p className="mb-3 mt-1 text-xs text-muted-foreground">These must match the marks and grades on the printed report.</p>
                 <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead><tr className="border-b border-border text-left text-xs text-muted-foreground"><th className="py-2 pr-4">Subject</th><th className="py-2 pr-4">Total score</th><th className="py-2">Grade</th></tr></thead>
-                    <tbody>{data.results.subjects.map((row) => (
-                      <tr key={row.name} className="border-b border-border/60"><td className="py-2 pr-4 font-medium">{row.name}</td><td className="py-2 pr-4 tabular-nums">{num(row.total)}</td><td className="py-2">{row.grade ?? "—"}</td></tr>
-                    ))}</tbody>
-                  </table>
+                  <Table scroll={false} className="w-full text-sm">
+                    <TableHeader><TableRow className="border-b border-border text-left text-xs text-muted-foreground"><TableHead className="py-2 pr-4">Subject</TableHead><TableHead className="py-2 pr-4">Total score</TableHead><TableHead className="py-2">Grade</TableHead></TableRow></TableHeader>
+                    <TableBody>{data.results.subjects.map((row) => (
+                      <TableRow key={row.name} className="border-b border-border/60"><TableCell className="py-2 pr-4 font-medium">{row.name}</TableCell><TableCell className="py-2 pr-4 tabular-nums">{num(row.total)}</TableCell><TableCell className="py-2">{row.grade ?? "—"}</TableCell></TableRow>
+                    ))}</TableBody>
+                  </Table>
                 </div>
                 <p className="mt-3 text-sm">
                   Average <strong className="tabular-nums">{num(data.results.average)}%</strong>

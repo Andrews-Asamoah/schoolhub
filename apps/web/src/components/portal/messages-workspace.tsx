@@ -1,3 +1,4 @@
+import { toast } from "@/components/ui/toaster";
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Inbox, LoaderCircle, Mail, MailOpen, MessageSquare, Plus, Reply, Search, Send, UserRound } from "lucide-react";
 import { useState, type FormEvent } from "react";
@@ -42,8 +43,7 @@ export function MessagesWorkspace() {
   const [selectedRecipients, setSelectedRecipients] = useState<string[]>([]);
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
-  const [messageNotice, setMessageNotice] = useState<{ ok: boolean; text: string } | null>(null);
-  const [sendError, setSendError] = useState<string | null>(null);
+
 
   const [historySearch, setHistorySearch] = useState("");
   const pageOptions = (mailbox: Folder) => ({
@@ -74,8 +74,8 @@ export function MessagesWorkspace() {
       setBody("");
       setSelectedRecipients([]);
       setRecipientSearch("");
-      setSendError(null);
-      setMessageNotice({ ok: true, text: "Message sent." });
+
+      toast.success("Message sent.");
       setFolder("sent");
       setSelectedId(message.id);
       await Promise.all([
@@ -83,7 +83,7 @@ export function MessagesWorkspace() {
         queryClient.invalidateQueries({ queryKey: ["notifications"] }),
       ]);
     },
-    onError: (error: Error) => setSendError(error.message),
+    onError: (error: Error) => toast.error(error.message),
   });
 
   const readMutation = useMutation({
@@ -100,7 +100,7 @@ export function MessagesWorkspace() {
   function changeFolder(next: Folder) {
     setFolder(next);
     setSelectedId(null);
-    setMessageNotice(null);
+
   }
 
   function openMessage(message: SchoolMessage) {
@@ -115,15 +115,15 @@ export function MessagesWorkspace() {
     setSelectedRecipients(replyId ? [replyId] : []);
     setSubject(message.subject.startsWith("Re: ") ? message.subject : `Re: ${message.subject}`);
     setBody("");
-    setSendError(null);
+
     setComposeOpen(true);
   }
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setSendError(null);
+
     if (selectedRecipients.length === 0) {
-      setSendError("Choose at least one recipient.");
+      toast.error("Choose at least one recipient.");
       return;
     }
     sendMutation.mutate({ recipientIds: selectedRecipients, subject: subject.trim(), body: body.trim() });
@@ -133,10 +133,10 @@ export function MessagesWorkspace() {
     <div className="space-y-4">
       <section className="flex flex-col gap-4 rounded-2xl border border-border bg-card p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between sm:p-5">
         <div className="flex items-start gap-3"><span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary"><MessageSquare className="size-5" /></span><div><h2 className="text-sm font-semibold text-foreground">School messages</h2><p className="mt-1 max-w-2xl text-xs leading-5 text-muted-foreground">Send private messages to permitted members of your school. Recipient access is restricted to your active school and role.</p></div></div>
-        <button type="button" onClick={() => { setSendError(null); setComposeOpen(true); }} className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-xs font-semibold text-primary-foreground hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><Plus className="size-4" />New message</button>
+        <button type="button" onClick={() => {  setComposeOpen(true); }} className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-xs font-semibold text-primary-foreground hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><Plus className="size-4" />New message</button>
       </section>
 
-      {messageNotice && <p role="status" className="rounded-lg border border-success/20 bg-success/10 px-3 py-2 text-xs text-success">{messageNotice.text}</p>}
+
       {query.isError && <ErrorState message={query.error.message} onRetry={() => void query.refetch()} />}
 
       <section className="grid min-h-[460px] overflow-hidden rounded-2xl border border-border bg-card shadow-sm lg:grid-cols-[minmax(260px,0.85fr)_minmax(0,1.5fr)]">
@@ -164,7 +164,7 @@ export function MessagesWorkspace() {
 
       <PortalModal isOpen={composeOpen} onClose={() => setComposeOpen(false)} title="New message" description="Messages are private to the sender and selected recipients within this school." maxWidth="2xl" footer={<><button type="button" onClick={() => setComposeOpen(false)} className="h-10 rounded-lg border border-border px-4 text-xs font-semibold text-foreground hover:bg-muted">Cancel</button><button type="submit" form="school-message-compose" disabled={sendMutation.isPending} className="inline-flex h-10 items-center gap-2 rounded-lg bg-primary px-4 text-xs font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-60">{sendMutation.isPending ? <LoaderCircle className="size-4 animate-spin" /> : <Send className="size-4" />}{sendMutation.isPending ? "Sending…" : "Send message"}</button></>} >
         <form id="school-message-compose" onSubmit={submit} className="space-y-4">
-          {sendError && <p role="alert" className="rounded-lg border border-destructive/20 bg-destructive/10 px-3 py-2 text-xs text-destructive">{sendError}</p>}
+
           <div className="space-y-2"><div className="flex items-center justify-between gap-3"><label htmlFor="message-recipient-search" className="text-xs font-semibold text-foreground">Recipients <span className="font-normal text-muted-foreground">({selectedRecipients.length}/25)</span></label><span className="text-[10px] text-muted-foreground">Role-limited list</span></div><div className="relative"><Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" /><input id="message-recipient-search" value={recipientSearch} onChange={(event) => setRecipientSearch(event.target.value)} placeholder="Search school members…" className="h-10 w-full rounded-lg border border-input bg-background pl-9 pr-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring" /></div><div className="max-h-48 overflow-y-auto rounded-lg border border-border">
           {contactsQuery.isPending ? <div className="p-4 text-xs text-muted-foreground">Loading school members…</div>
           : contactsQuery.isError ? <div role="alert" className="p-4 text-xs text-destructive">{contactsQuery.error.message}</div>

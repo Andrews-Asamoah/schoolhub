@@ -1,0 +1,1 @@
+ALTER TYPE "FinanceApprovalControl" ADD VALUE IF NOT EXISTS 'PAYROLL_RUN';

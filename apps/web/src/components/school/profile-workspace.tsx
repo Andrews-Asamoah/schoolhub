@@ -1,3 +1,4 @@
+import { SyncDevicesPanel } from "./sync-devices-panel";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { updateMyProfileSchema } from "@schoolhub/shared";
 import { LoaderCircle, Lock } from "lucide-react";
@@ -69,21 +70,21 @@ function ProfileForm({ data }: { data: ProfileResponse }) {
   const queryClient = useQueryClient();
   const [values, setValues] = useState(() => toValues(data.profile));
   const [errors, setErrors] = useState<Partial<Record<Field, string>>>({});
-  const [saved, setSaved] = useState(false);
 
   const save = useMutation({
+    meta: { success: "Profile saved." },
     mutationFn: (body: unknown) =>
       apiFetch<ProfileResponse>("/schools/current/me/profile", { method: "PATCH", body: JSON.stringify(body) }),
     onSuccess: async (result) => {
       queryClient.setQueryData(PROFILE_KEY, result);
       setValues(toValues(result.profile));
-      setSaved(true);
+
       await refetchSession(); // the header shows the name
     },
   });
 
   const set = (field: Field) => (event: { target: { value: string } }) => {
-    setSaved(false);
+
     setValues((current) => ({ ...current, [field]: event.target.value }));
   };
 
@@ -192,10 +193,12 @@ function ProfileForm({ data }: { data: ProfileResponse }) {
             {save.isPending && <LoaderCircle className="size-3.5 animate-spin" />}
             Save changes
           </button>
-          {saved && <p role="status" className="text-xs text-success">Profile saved.</p>}
-          {save.error && <p role="alert" className="text-xs text-destructive">{save.error.message}</p>}
+
+
         </div>
       </form>
+
+      <SyncDevicesPanel />
 
       {/* Students and guardians sign in with simple credentials; staff accounts can add a second step. */}
       {!["student", "guardian", "parent"].includes(activeRole ?? "") && (

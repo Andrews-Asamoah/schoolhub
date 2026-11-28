@@ -1,11 +1,4 @@
-import { router, type Href } from "expo-router";
-import {
-  BookOpen,
-  CalendarDays,
-  ClipboardList,
-  Home,
-  UsersRound,
-} from "lucide-react-native";
+import { Home, UsersRound } from "lucide-react-native";
 import { View } from "react-native";
 import { Card } from "@/components/Surface";
 import { EmptyState, ErrorState } from "@/components/States";
@@ -29,37 +22,12 @@ export default function GuardianMoreScreen() {
   const retry = () => void Promise.all([clubs.refetch(), houses.refetch()]);
   return (
     <Screen
-      title="More"
-      subtitle="Learning and school community"
+      title="School community"
       right={<WardSwitcher />}
       refreshing={clubs.isRefetching || houses.isRefetching}
       onRefresh={retry}
     >
       <View style={{ gap: spacing.lg }}>
-        <Card>
-          <ListRow
-            title="Attendance history"
-            subtitle="Term summary and daily records"
-            leading={<CalendarDays size={20} color={colors.primary} />}
-            onPress={() =>
-              router.push("/(guardian)/attendance-history" as Href)
-            }
-            divider
-          />
-          <ListRow
-            title="Weekly timetable"
-            subtitle="Class schedule by day"
-            leading={<BookOpen size={20} color={colors.primary} />}
-            onPress={() => router.push("/(guardian)/timetable" as Href)}
-            divider
-          />
-          <ListRow
-            title="Published reports"
-            subtitle="Academic and mock report cards"
-            leading={<ClipboardList size={20} color={colors.primary} />}
-            onPress={() => router.push("/(guardian)/reports" as Href)}
-          />
-        </Card>
         {!activeWard ? (
           <EmptyState
             title="No child selected"

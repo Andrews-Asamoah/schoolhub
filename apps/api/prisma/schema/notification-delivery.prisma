@@ -105,3 +105,24 @@ model SchoolSmsConnection {
  @@index([retiredAt],map:"school_sms_connection_retention")
  @@map("school_sms_connections")
 }
+
+/// An Expo installation is bound to one signed-in school session at a time.
+model DeviceToken {
+  registrationId String   @id
+  token          String   @unique
+  schoolId       String
+  userId         String
+  sessionId      String
+  role           String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  school  School  @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  user    user    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  session session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([schoolId, userId])
+  @@index([sessionId])
+  @@index([userId])
+  @@map("device_tokens")
+}
